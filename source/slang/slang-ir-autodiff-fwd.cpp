@@ -62,64 +62,54 @@ void ForwardDiffTranscriber::generateTrivialFwdDiffFunc(IRFunc* primalFunc, IRFu
     {
         diffParams.add(param);
     }
-    auto emitDiffPairVal = [&](IRDifferentialPairTypeBase* pairType, IRInst* primalVal)
+    auto emitDiffPairVal = [&](IRDifferentialPairTypeBase* pairType)
     {
-        auto diffVal = getDifferentialZeroOfType(&builder, pairType->getValueType());
-        //_markInstAsDifferential(&builder, diffVal, primalVal);
+        auto primal = builder.emitDefaultConstruct(pairType->getValueType());
+        builder.markInstAsPrimal(primal);
+        auto diff = getDifferentialZeroOfType(&builder, pairType->getValueType());
+        builder.markInstAsDifferential(diff, primal->getDataType());
 
-        auto pairVal = builder.emitMakeDifferentialPair(pairType, primalVal, diffVal);
-        builder.markInstAsMixedDifferential(pairVal);
+        auto val = builder.emitMakeDifferentialPair(pairType, primal, diff);
+        builder.markInstAsMixedDifferential(val);
 
-        return pairVal;  
+        return val;
+        
     };
-
-    List<IRInst*> primalArgs;
     for (auto param : diffParams)
     {
         if (auto outType = as<IROutTypeBase>(param->getFullType()))
         {
             if (isRelevantDifferentialPair(outType))
             {
-                IRInst* primalVar = builder.emitVar(
-                    as<IRDifferentialPairType>(outType->getValueType())->getValueType());
-
-                builder.markInstAsPrimal(primalVar);
-                primalArgs.add(primalVar);
-
-                if (as<IRInOutType>(param->getFullType()))
-                {
-                    // Load primal value and store it in the var
-                    auto load = builder.emitDifferentialPairGetPrimal(param);
-                    builder.markInstAsPrimal(load);
-                    auto store = builder.emitStore(primalVar, load);
-                    builder.markInstAsPrimal(store);
-                }
+                auto pairType = as<IRDifferentialPairTypeBase>(outType->getValueType());
+                auto val = emitDiffPairVal(pairType);
+                auto store = builder.emitStore(param, val);
+                builder.markInstAsMixedDifferential(store);
             }
             else
             {
-                IRInst* primalVar = builder.emitVar(outType->getValueType());
-                builder.markInstAsPrimal(primalVar);
-                primalArgs.add(primalVar);
+                auto val = builder.emitDefaultConstruct(outType->getValueType());
+                builder.markInstAsPrimal(val);
+
+                auto store = builder.emitStore(param, val);
+                builder.markInstAsPrimal(store);
+
             }
         }
     }
-
-    // Emit a call to the primal function
-    auto primalCall = builder.emitCallInst(
-        primalFunc->getDataType(), primalFunc, primalArgs.getCount(), primalArgs.getBuffer());
-    builder.markInstAsPrimal(primalCall);
-
     if (isRelevantDifferentialPair(diffFunc->getResultType()))
     {
         auto pairType = as<IRDifferentialPairTypeBase>(diffFunc->getResultType());
-        auto val = emitDiffPairVal(pairType, primalCall);
+        auto val = emitDiffPairVal(pairType);
         auto returnInst = builder.emitReturn(val);
         builder.markInstAsMixedDifferential(val);
         builder.markInstAsMixedDifferential(returnInst);
     }
     else
     {
-        auto returnInst = builder.emitReturn(primalCall);
+        auto retVal = builder.emitDefaultConstruct(diffFunc->getResultType());
+        auto returnInst = builder.emitReturn(retVal);
+        builder.markInstAsPrimal(retVal);
         builder.markInstAsPrimal(returnInst);
     }
 }
