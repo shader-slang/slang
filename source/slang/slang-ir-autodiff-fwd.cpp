@@ -1617,16 +1617,12 @@ void insertTempVarForMutableParams(IRModule* module, IRFunc* func)
     }
 }
 
-bool isResourcePointer(IRInst* ptrInst)
+bool isLocalPointer(IRInst* ptrInst)
 {
-    if (auto getElementPtr = as<IRGetElementPtr>(ptrInst))
-        return isResourcePointer(getElementPtr->getBase());
-    else if (auto fieldAddr = as<IRFieldAddress>(ptrInst))
-        return isResourcePointer(fieldAddr->getBase());
-    else if (as<IRVar>(ptrInst))
-        return false;
-    else
-        return true;
+    // If it's not a local var or a function parameter, then it's probably 
+    // referencing something outside the function scope.
+    // 
+    return as<IRVar>(getRootAddr(ptrInst)) || as<IRParam>(getRootAddr(ptrInst));
 }
 
 void lowerSwizzledStores(IRModule* module, IRFunc* func)
@@ -1640,7 +1636,7 @@ void lowerSwizzledStores(IRModule* module, IRFunc* func)
         {
             if (auto swizzledStore = as<IRSwizzledStore>(inst))
             {
-                if (isResourcePointer(swizzledStore->getDest()))
+                if (!isLocalPointer(swizzledStore->getDest()))
                     continue;
 
                 builder.setInsertBefore(inst);
