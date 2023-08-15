@@ -74,6 +74,8 @@ struct ByteAddressBufferLegalizationContext
 
     void processGetEquivalentStructuredBuffer(IRInst* inst)
     {
+        m_builder.setInsertBefore(inst);
+
         // We need to see what type it is to be interpreted as.
         auto type = inst->getDataType();
 
@@ -83,7 +85,6 @@ struct ByteAddressBufferLegalizationContext
 
         // The buffer is operand 0
         auto buffer = inst->getOperand(0);
-
         // Get the equivalent structured buffer for the buffer.
         if( auto structuredBuffer = getEquivalentStructuredBuffer(elementType, buffer) )
         {
