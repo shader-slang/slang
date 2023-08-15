@@ -894,8 +894,11 @@ struct vector
     __init(vector<T,N> value);
 }
 
+const int kRowMajorMatrixLayout = $(SLANG_MATRIX_LAYOUT_ROW_MAJOR);
+const int kColumnMajorMatrixLayout = $(SLANG_MATRIX_LAYOUT_COLUMN_MAJOR);
+
     /// A matrix with `R` rows and `C` columns, with elements of type `T`.
-__generic<T = float, let R : int = 4, let C : int = 4>
+__generic<T = float, let R : int = 4, let C : int = 4, let L : int = $(SLANG_MATRIX_LAYOUT_MODE_UNKNOWN)>
 __magic_type(MatrixExpressionType)
 struct matrix
 {
@@ -1111,7 +1114,7 @@ for (int tt = 0; tt < kBaseTypeCount; ++tt)
 for( int R = 2; R <= 4; ++R )
 for( int C = 2; C <= 4; ++C )
 {
-    sb << "__generic<T> __extension matrix<T, " << R << "," << C << ">\n{\n";
+    sb << "__generic<T, let L:int> __extension matrix<T, " << R << "," << C << ", L>\n{\n";
 
     // initialize from R*C scalars
     sb << "__intrinsic_op(" << int(kIROp_MakeMatrix) << ") __init(";
@@ -1137,7 +1140,7 @@ for( int C = 2; C <= 4; ++C )
     for( int cc = C; cc <= 4; ++cc )
     {
         if(rr == R && cc == C) continue;
-        sb << "__intrinsic_op(" << int(kIROp_MatrixReshape) << ") __init(matrix<T," << rr << "," << cc << "> value);\n";
+        sb << "__intrinsic_op(" << int(kIROp_MatrixReshape) << ") __init(matrix<T," << rr << "," << cc << ", L> value);\n";
     }
     sb << "}\n";
 }
@@ -1207,16 +1210,16 @@ extension vector<T, N> : IDifferentiable
     }
 }
 
-__generic<T:__BuiltinFloatingPointType, let R: int, let C: int>
-extension matrix<T, R, C> : IDifferentiable
+__generic<T:__BuiltinFloatingPointType, let R: int, let C: int, let L : int>
+extension matrix<T, R, C, L> : IDifferentiable
 {
-    typedef matrix<T, R, C> Differential;
+    typedef matrix<T, R, C, L> Differential;
 
     [__unsafeForceInlineEarly]
     [BackwardDifferentiable]
     static Differential dzero()
     {
-        return matrix<T, R, C>(__slang_noop_cast<T>(T.dzero()));
+        return matrix<T, R, C, L>(__slang_noop_cast<T>(T.dzero()));
     }
 
     [__unsafeForceInlineEarly]
@@ -2425,9 +2428,9 @@ vector<T,N> operator$(op.name)(in out vector<T,N> value)
 {$(fixity.bodyPrefix) value = value $(op.binOp) T(1); return $(fixity.returnVal); }
 
 $(fixity.qual)
-__generic<T : __BuiltinArithmeticType, let R : int, let C : int>
+__generic<T : __BuiltinArithmeticType, let R : int, let C : int, let L : int>
 [__unsafeForceInlineEarly]
-matrix<T,R,C> operator$(op.name)(in out matrix<T,R,C> value)
+matrix<T,R,C> operator$(op.name)(in out matrix<T,R,C,L> value)
 {$(fixity.bodyPrefix) value = value $(op.binOp) T(1); return $(fixity.returnVal); }
 
 $(fixity.qual)
@@ -2609,9 +2612,9 @@ __generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType, let N : int, let M :
 __intrinsic_op($(info.op))
 matrix<L,N,M> operator$(info.name)(matrix<L,N,M> left, matrix<R,N,M> right);
 
-__generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType, let N : int, let M : int>
+__generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType, let N : int, let M : int, let Layout : int>
 [__unsafeForceInlineEarly]
-matrix<L, N, M> operator$(info.name)=(in out matrix<L, N, M> left, matrix<R, N, M> right)
+matrix<L, N, M> operator$(info.name)=(in out matrix<L, N, M, Layout> left, matrix<R, N, M> right)
 {
     left = left $(info.name) right;
     return left;
@@ -2641,9 +2644,9 @@ __generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType, let N : int, let M :
 __intrinsic_op($(info.op))
 matrix<L,N,M> operator$(info.name)(matrix<L,N,M> left, R right);
 
-__generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType, let N : int, let M : int>
+__generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType, let N : int, let M : int, let Layout : int>
 [__unsafeForceInlineEarly]
-matrix<L,N,M> operator$(info.name)=(in out matrix<L,N,M> left, R right)
+matrix<L,N,M> operator$(info.name)=(in out matrix<L,N,M, Layout> left, R right)
 {
     left = left $(info.name) right;
     return left;
@@ -2696,17 +2699,17 @@ ${{{{
         return left;
     }
 
-    __generic<T : $(op.interface), let R : int, let C : int>
+    __generic<T : $(op.interface), let R : int, let C : int, let Layout : int>
     [__unsafeForceInlineEarly]
-    matrix<T,R,C> operator$(op.name)=(in out matrix<T,R,C> left, matrix<T,R,C> right)
+    matrix<T,R,C> operator$(op.name)=(in out matrix<T,R,C,Layout> left, matrix<T,R,C> right)
     {
         left = left $(op.name) right;
         return left;
     }
 
-    __generic<T : $(op.interface), let R : int, let C : int>
+    __generic<T : $(op.interface), let R : int, let C : int, let Layout : int>
     [__unsafeForceInlineEarly]
-    matrix<T,R,C> operator$(op.name)=(in out matrix<T,R,C> left, T right)
+    matrix<T,R,C> operator$(op.name)=(in out matrix<T,R,C, Layout> left, T right)
     {
         left = left $(op.name) right;
         return left;

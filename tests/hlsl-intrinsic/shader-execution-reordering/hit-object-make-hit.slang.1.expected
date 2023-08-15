@@ -104,8 +104,7 @@ void main()
     hitObjectNV hitObj_1;
     hitObjectRecordHitNV(hitObj_1, scene_0, _S14, _S16, _S15, 0U, 0U, 4U, _S17.Origin_0, _S17.TMin_0, _S17.Direction_0, _S17.TMax_0, (0));
     uint _S18 = calcValue_0(hitObj_1);
-    uint r_4 = r_3 + _S18;
-    ((outputBuffer_0)._data[(_S10)]) = r_4;
+    outputBuffer_0._data[_S10] = r_3 + _S18;
     return;
 }
 

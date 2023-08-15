@@ -2866,23 +2866,6 @@ static TypeLayoutResult _createTypeLayout(
 
     if (declForModifiers)
     {
-        // TODO: The approach implemented here has a row/column-major
-        // layout model recursively affect any sub-fields (so that
-        // the layout of a nested struct depends on the context where
-        // it is nested). This is consistent with the GLSL behavior
-        // for these modifiers, but it is *not* how HLSL is supposed
-        // to work.
-        //
-        // In the trivial case where `row_major` and `column_major`
-        // are only applied to leaf fields/variables of matrix type
-        // the difference should be immaterial.
-
-        if (declForModifiers->hasModifier<RowMajorLayoutModifier>())
-            subContext.matrixLayoutMode = kMatrixLayoutMode_RowMajor;
-
-        if (declForModifiers->hasModifier<ColumnMajorLayoutModifier>())
-            subContext.matrixLayoutMode = kMatrixLayoutMode_ColumnMajor;
-
         // TODO: really need to look for other modifiers that affect
         // layout, such as GLSL `std140`.
     }
@@ -3866,7 +3849,12 @@ static TypeLayoutResult _createTypeLayout(
         //
         size_t layoutMajorCount = rowCount;
         size_t layoutMinorCount = colCount;
-        if (context.matrixLayoutMode == kMatrixLayoutMode_ColumnMajor)
+        auto matrixLayout = getIntVal(matType->getLayout());
+        if (matrixLayout == SLANG_MATRIX_LAYOUT_MODE_UNKNOWN)
+        {
+            matrixLayout = context.matrixLayoutMode;
+        }
+        if (matrixLayout == SLANG_MATRIX_LAYOUT_COLUMN_MAJOR)
         {
             size_t tmp = layoutMajorCount;
             layoutMajorCount = layoutMinorCount;
@@ -3891,7 +3879,7 @@ static TypeLayoutResult _createTypeLayout(
 
         size_t rowStride = 0;
         size_t colStride = 0;
-        if(context.matrixLayoutMode == kMatrixLayoutMode_ColumnMajor)
+        if (matrixLayout == SLANG_MATRIX_LAYOUT_COLUMN_MAJOR)
         {
             colStride = majorStride;
             rowStride = minorStride;
@@ -3918,7 +3906,7 @@ static TypeLayoutResult _createTypeLayout(
 
         typeLayout->elementTypeLayout = rowTypeLayout;
         typeLayout->uniformStride = rowStride;
-        typeLayout->mode = context.matrixLayoutMode;
+        typeLayout->mode = (MatrixLayoutMode)matrixLayout;
 
         typeLayout->addResourceUsage(info.kind, info.size);
 

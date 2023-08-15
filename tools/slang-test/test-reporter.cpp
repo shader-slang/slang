@@ -221,13 +221,6 @@ void TestReporter::dumpOutputDifference(const String& expectedOutput, const Stri
         expectedOutput.getBuffer(),
         actualOutput.getBuffer());
 
-
-    if (m_dumpOutputOnFailure && canWriteStdError())
-    {
-        fprintf(stderr, "%s", builder.getBuffer());
-        fflush(stderr);
-    }
-
     // Add to the m_currentInfo
     message(TestMessageType::TestFailure, builder);
 }

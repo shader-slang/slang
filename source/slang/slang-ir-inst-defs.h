@@ -52,7 +52,7 @@ INST(Nop, nop, 0, 0)
     INST(BasicBlockType, BasicBlock, 0, HOISTABLE)
 
     INST(VectorType, Vec, 2, HOISTABLE)
-    INST(MatrixType, Mat, 3, HOISTABLE)
+    INST(MatrixType, Mat, 4, HOISTABLE)
 
     INST(ConjunctionType, Conjunction, 0, HOISTABLE)
     INST(AttributedType, Attributed, 0, HOISTABLE)
@@ -427,6 +427,9 @@ INST(ByteAddressBufferStore, byteAddressBufferStore, 3, 0)
 // - `dst` is a value of type T
 //
 INST(StructuredBufferLoad, structuredBufferLoad, 2, 0)
+INST(StructuredBufferLoadStatus, structuredBufferLoadStatus, 3, 0)
+INST(RWStructuredBufferLoad, rwstructuredBufferLoad, 2, 0)
+INST(RWStructuredBufferLoadStatus, rwstructuredBufferLoadStatus, 3, 0)
 
 // Store data to a structured buffer
 //
@@ -437,7 +440,9 @@ INST(StructuredBufferLoad, structuredBufferLoad, 2, 0)
 // - `offset` is an `int`
 // - `src` is a value of type T
 //
-INST(StructuredBufferStore, structuredBufferStore, 3, 0)
+INST(RWStructuredBufferStore, rwstructuredBufferStore, 3, 0)
+
+INST(RWStructuredBufferGetElementPtr, rwstructuredBufferGetElementPtr, 2, 0)
 
 INST(MeshOutputRef, meshOutputRef, 2, 0)
 

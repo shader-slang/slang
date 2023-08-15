@@ -894,6 +894,28 @@ namespace Slang
             }
             return true;
         }
+        // matrix type with different layouts are convertible
+        if (auto fromMatrixType = as<MatrixExpressionType>(fromType))
+        {
+            if (auto toMatrixType = as<MatrixExpressionType>(toType))
+            {
+                if (fromMatrixType->getElementType()->equals(toMatrixType->getElementType()) &&
+                    fromMatrixType->getRowCount()->equals(toMatrixType->getRowCount()) &&
+                    fromMatrixType->getColumnCount()->equals(toMatrixType->getColumnCount()))
+                {
+                    if (outCost)
+                    {
+                        *outCost = kConversionCost_MatrixLayout;
+                    }
+                    if (outToExpr)
+                    {
+                        *outToExpr = fromExpr;
+                    }
+                    return true;
+                }
+            }
+
+        }
 
         // A type is always convertible to any of its supertypes.
         //

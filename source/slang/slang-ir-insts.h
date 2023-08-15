@@ -1979,6 +1979,14 @@ struct IRStore : IRInst
     IRInst* getVal() { return val.get(); }
 };
 
+struct IRRWStructuredBufferStore : IRInst
+{
+    IR_LEAF_ISA(RWStructuredBufferStore)
+    IRInst* getStructuredBuffer() { return getOperand(0); }
+    IRInst* getIndex() { return getOperand(1); }
+    IRInst* getVal() { return getOperand(2); }
+};
+
 struct IRFieldExtract : IRInst
 {
     IRUse   base;
@@ -2011,6 +2019,13 @@ struct IRGetElement : IRInst
 struct IRGetElementPtr : IRInst
 {
     IR_LEAF_ISA(GetElementPtr);
+    IRInst* getBase() { return getOperand(0); }
+    IRInst* getIndex() { return getOperand(1); }
+};
+
+struct IRRWStructuredBufferGetElementPtr : IRInst
+{
+    IR_LEAF_ISA(RWStructuredBufferGetElementPtr);
     IRInst* getBase() { return getOperand(0); }
     IRInst* getIndex() { return getOperand(1); }
 };
@@ -2957,7 +2972,8 @@ public:
     IRMatrixType* getMatrixType(
         IRType* elementType,
         IRInst* rowCount,
-        IRInst* columnCount);
+        IRInst* columnCount,
+        IRInst* layout);
 
     IRArrayListType* getArrayListType(IRType* elementType);
     IRTensorViewType* getTensorViewType(IRType* elementType);

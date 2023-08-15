@@ -223,6 +223,7 @@ bool isOne(IRInst* inst);
 
 void initializeScratchData(IRInst* inst);
 void resetScratchDataBit(IRInst* inst, int bitIndex);
+
 }
 
 #endif

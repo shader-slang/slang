@@ -1919,7 +1919,10 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_ByteAddressBufferLoad:
     case kIROp_ByteAddressBufferStore:
     case kIROp_StructuredBufferLoad:
-    case kIROp_StructuredBufferStore:
+    case kIROp_RWStructuredBufferLoad:
+    case kIROp_RWStructuredBufferLoadStatus:
+    case kIROp_RWStructuredBufferStore:
+    case kIROp_RWStructuredBufferGetElementPtr:
     case kIROp_Reinterpret:
     case kIROp_IsType:
     case kIROp_ImageSubscript:

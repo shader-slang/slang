@@ -40,5 +40,5 @@ jobs:
       run: |
         $slangTestBinDir = ".\bin\windows-${{matrix.testPlatform}}\${{matrix.configuration}}\";
         $env:Path += ";$slangTestBinDir";
-        & "$slangTestBinDir\slang-test.exe" -appveyor -bindir "$slangTestBinDir\" -platform ${{matrix.testPlatform}} -configuration ${{matrix.configuration}} -category ${{matrix.testCategory}} 2>&1;
+        & "$slangTestBinDir\slang-test.exe" -appveyor -bindir "$slangTestBinDir\" -platform ${{matrix.testPlatform}} -configuration ${{matrix.configuration}} -category ${{matrix.testCategory}} -api all-cpu 2>&1;
     

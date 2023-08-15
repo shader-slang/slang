@@ -1403,11 +1403,11 @@ void __sincos_impl(vector<T, N> x, out vector<T, N> s, out vector<T, N> c)
     c = cos(x);
 }
 
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L1 : int, let L2 : int>
 [BackwardDifferentiable]
 [PrimalSubstituteOf(sincos)]
 [PreferRecompute]
-void __sincos_impl(matrix<T, N, M> x, out matrix<T, N, M> s, out matrix<T, N, M> c)
+void __sincos_impl(matrix<T, N, M> x, out matrix<T, N, M, L1> s, out matrix<T, N, M, L2> c)
 {
     s = sin(x);
     c = cos(x);
