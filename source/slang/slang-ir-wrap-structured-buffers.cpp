@@ -161,50 +161,21 @@ struct WrapStructuredBuffersContext
                 // are calls that could potentially be intrinsic
                 // operations on `*StructuredBuffer`.
                 //
-                auto call = as<IRCall>(valueUse->getUser());
-                if(!call)
+                auto user = valueUse->getUser();
+                switch (user->getOp())
+                {
+                case kIROp_StructuredBufferLoad:
+                case kIROp_StructuredBufferLoadStatus:
+                case kIROp_RWStructuredBufferStore:
+                case kIROp_RWStructuredBufferLoadStatus:
+                case kIROp_RWStructuredBufferGetElementPtr:
+                    break;
+                default:
                     return;
-                if(call->getArgCount() == 0)
-                    return;
-                if(call->getArg(0) != valueOfStructuredBufferType)
-                    return;
+                }
 
-                // At this point we have a candidate `call` instruction,
-                // but we need to determine whether it is a call to
-                // one of the `*StructuredBuffer` intrinsics that we want
-                // to rewrite, or if it is another user-defined function
-                // that we should leave along (even if that user-defined
-                // function happens to return a matrix).
-                //
-                // For now we will do this in a somewhat ad-hoc fashion.
-                // We know that the `Load` and `operator[]` operations
-                // on `*StructuredBuffer` are generic, and unlike user-defined
-                // generic functions they will not have been specialized
-                // before we get here.
-                //
-                // We will thus use the fact that the callee of the call
-                // is a `specialize` instruction to let us know that it
-                // is an intrinsic, and thus should be one of the functions
-                // we care about.
-                //
-                // TODO: Figure out if there is a more robust way to make
-                // this check. It is possible that structured buffer
-                // access should be modeled with explicit IR opcodes
-                // rather than just as builtin functions.
-                //
-                auto callee = call->getCallee();
-                if(!as<IRSpecialize>(callee))
-                    return;
-
-                // At this point it seems likely we have one of the calls
-                // we want to rewrite, but there are still intrinsics
-                // like `GetDimensions` that we want to leave alone.
-                //
-                // For now we will look at the return type of the call,
-                // where we care about two cases.
-                //
-                builder->setInsertBefore(call->getNextInst());
-                auto oldResultType = call->getDataType();
+                builder->setInsertAfter(user);
+                auto oldResultType = user->getDataType();
 
                 // First we care about the case for `Load`, which
                 // will return the element type, which would be
@@ -217,7 +188,7 @@ struct WrapStructuredBuffersContext
                     // go ahead and modify its type to be correct.
                     //
                     auto newResultType = wrapperStruct;
-                    builder->setDataType(call, newResultType);
+                    builder->setDataType(user, newResultType);
 
                     // Next, we need to make sure to extract the
                     // field from the wrapper struct, so that
@@ -232,12 +203,12 @@ struct WrapStructuredBuffersContext
                     //
                     //      float4x4 newVal = call.wrapped;
                     //
-                    auto newVal = builder->emitFieldExtract(oldResultType, call, wrappedFieldKey);
+                    auto newVal = builder->emitFieldExtract(oldResultType, user, wrappedFieldKey);
 
                     // Any code that used the value of `call` should
                     // now use `newVal` instead...
                     //
-                    call->replaceUsesWith(newVal);
+                    user->replaceUsesWith(newVal);
                     //
                     // ... except for one important gotcha, which is
                     // that `newVal` itself used `call`, and replacing
@@ -251,7 +222,7 @@ struct WrapStructuredBuffersContext
                     // of `replaceUsesWith` that can handle cases like
                     // this.
                     //
-                    newVal->setOperand(0, call);
+                    newVal->setOperand(0, user);
                 }
                 //
                 // The second interesting case is the `ref` accessor
@@ -276,11 +247,11 @@ struct WrapStructuredBuffersContext
                         // there if you want the comments.
 
                         auto newResultType = builder->getPtrType(oldPtrType->getOp(), wrapperStruct);
-                        builder->setDataType(call, newResultType);
+                        builder->setDataType(user, newResultType);
 
-                        auto newVal = builder->emitFieldAddress(oldResultType, call, wrappedFieldKey);
-                        call->replaceUsesWith(newVal);
-                        newVal->setOperand(0, call);
+                        auto newVal = builder->emitFieldAddress(oldResultType, user, wrappedFieldKey);
+                        user->replaceUsesWith(newVal);
+                        newVal->setOperand(0, user);
                     }
                 }
             });

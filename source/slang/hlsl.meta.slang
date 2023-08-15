@@ -235,19 +235,20 @@ struct StructuredBuffer
         out uint numStructs,
         out uint stride);
 
-    __target_intrinsic(glsl, "$0._data[$1]")
-    __target_intrinsic(spirv_direct, "%addr = OpAccessChain resultType*StorageBuffer resultId _0 const(int, 0) _1; OpLoad resultType resultId %addr;")
-    [__readNone]
+    //__target_intrinsic(glsl, "$0._data[$1]")
+    //__target_intrinsic(spirv_direct, "%addr = OpAccessChain resultType*StorageBuffer resultId _0 const(int, 0) _1; OpLoad resultType resultId %addr;")
+    __intrinsic_op($(kIROp_StructuredBufferLoad))
     T Load(int location);
 
-    [__readNone]
+    __intrinsic_op($(kIROp_StructuredBufferLoadStatus))
     T Load(int location, out uint status);
 
     __subscript(uint index) -> T
     {
-        __target_intrinsic(glsl, "$0._data[$1]")
-        __target_intrinsic(spirv_direct, "%addr = OpAccessChain resultType*StorageBuffer resultId _0 const(int, 0) _1; OpLoad resultType resultId %addr;")
+        //__target_intrinsic(glsl, "$0._data[$1]")
+        //__target_intrinsic(spirv_direct, "%addr = OpAccessChain resultType*StorageBuffer resultId _0 const(int, 0) _1; OpLoad resultType resultId %addr;")
         [__readNone]
+        __intrinsic_op($(kIROp_StructuredBufferLoad))
         get;
     };
 };
@@ -709,7 +710,6 @@ static const struct {
 for(auto item : kMutableStructuredBufferCases) {
 }}}}
 
-
 __generic<T>
 __magic_type(HLSL$(item.name)Type)
 __intrinsic_type($(item.op))
@@ -724,18 +724,22 @@ struct $(item.name)
 
     uint IncrementCounter();
 
-    __target_intrinsic(glsl, "$0._data[$1]")
-    __target_intrinsic(spirv_direct, "%addr = OpAccessChain resultType*StorageBuffer resultId _0 const(int, 0) _1; OpLoad resultType resultId %addr;")
+    //__target_intrinsic(glsl, "$0._data[$1]")
+    //__target_intrinsic(spirv_direct, "%addr = OpAccessChain resultType*StorageBuffer resultId _0 const(int, 0) _1; OpLoad resultType resultId %addr;")
     [__NoSideEffect]
+    __intrinsic_op($(kIROp_RWStructuredBufferLoad))
     T Load(int location);
+
     [__NoSideEffect]
+    __intrinsic_op($(kIROp_RWStructuredBufferLoadStatus))
     T Load(int location, out uint status);
 
     __subscript(uint index) -> T
     {
-        __target_intrinsic(glsl, "$0._data[$1]")
-        __target_intrinsic(spirv_direct, "*StorageBuffer OpAccessChain resultType resultId _0 const(int, 0) _1")
+        //__target_intrinsic(glsl, "$0._data[$1]")
+        //__target_intrinsic(spirv_direct, "*StorageBuffer OpAccessChain resultType resultId _0 const(int, 0) _1")
         [__NoSideEffect]
+        __intrinsic_op($(kIROp_RWStructuredBufferGetElementPtr))
         ref;
     }
 };
@@ -2248,10 +2252,10 @@ vector<T, N> frexp(vector<T, N> x, out vector<T, N> exp)
     VECTOR_MAP_BINARY(T, N, frexp, x, exp);
 }
 
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L : int>
 __target_intrinsic(hlsl)
 [__readNone]
-matrix<T, N, M> frexp(matrix<T, N, M> x, out matrix<T, N, M> exp)
+matrix<T, N, M> frexp(matrix<T, N, M> x, out matrix<T, N, M, L> exp)
 {
     MATRIX_MAP_BINARY(T, N, M, frexp, x, exp);
 }
@@ -2924,10 +2928,10 @@ vector<T,N> modf(vector<T,N> x, out vector<T,N> ip)
     VECTOR_MAP_BINARY(T, N, modf, x, ip);
 }
 
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L : int>
 __target_intrinsic(hlsl)
 [__readNone]
-matrix<T,N,M> modf(matrix<T,N,M> x, out matrix<T,N,M> ip)
+matrix<T,N,M> modf(matrix<T,N,M> x, out matrix<T,N,M,L> ip)
 {
     MATRIX_MAP_BINARY(T, N, M, modf, x, ip);
 }
@@ -3664,10 +3668,10 @@ void sincos(vector<T,N> x, out vector<T,N> s, out vector<T,N> c)
     c = cos(x);
 }
 
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L1: int, let L2 : int>
 __target_intrinsic(hlsl)
 [__readNone]
-void sincos(matrix<T,N,M> x, out matrix<T,N,M> s, out matrix<T,N,M> c)
+void sincos(matrix<T,N,M> x, out matrix<T,N,M,L1> s, out matrix<T,N,M,L2> c)
 {
     s = sin(x);
     c = cos(x);
