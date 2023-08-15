@@ -62,8 +62,9 @@ static IRInst* _getDiffTypeFromPairType(AutoDiffSharedContext*sharedContext, IRB
     // Special case when the primal tpe is an InterfaceType.
     if (auto primalInterfaceType = as<IRInterfaceType>(type->getValueType()))
     {
-        // The witness should just be a struct key.
-        SLANG_ASSERT(as<IRStructKey>(type->getWitness()));
+        // The witness should just be a struct key or requirement entry.
+        SLANG_ASSERT(as<IRStructKey>(type->getWitness()) || 
+            as<IRInterfaceRequirementEntry>(type->getWitness()));
 
         // The differential type is the IDifferentiable interface type.
         return sharedContext->differentiableInterfaceType;

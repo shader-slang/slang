@@ -99,6 +99,17 @@ namespace Slang
         // for interface types that are used as a witness table type.
         //
 
+        HashSet<IRInst*> implementedInterfaces;
+        // Add all interface type that are implemented by at least one type to a set.
+        for (auto inst : module->getGlobalInsts())
+        {
+            if (inst->getOp() == kIROp_WitnessTable)
+            {
+                auto interfaceType = cast<IRWitnessTableType>(inst->getDataType())->getConformanceType();
+                implementedInterfaces.add(interfaceType);
+            }
+        }
+
         // Collect all interface types that require inference.
         HashSet<IRInterfaceType*> interfaceTypes;
         for (auto inst : module->getGlobalInsts())
@@ -117,6 +128,10 @@ namespace Slang
                 
                 // If the interface already has an explicit any-value-size, don't infer anything.
                 if (interfaceType->findDecoration<IRAnyValueSizeDecoration>())
+                    continue;
+
+                // Skip interfaces that are not implemented by any type.
+                if (!implementedInterfaces.contains(interfaceType))
                     continue;
                 
                 interfaceTypes.add(interfaceType);
