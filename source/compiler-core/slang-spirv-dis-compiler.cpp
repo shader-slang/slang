@@ -1,8 +1,12 @@
 #include "slang-spirv-dis-compiler.h"
 
 #include "../core/slang-common.h"
+#include "../core/slang-string-util.h"
+#include "../core/slang-string.h"
+#include "slang-artifact-desc-util.h"
 #include "slang-artifact-representation.h"
 #include "slang-artifact-util.h"
+#include "slang-artifact-representation-impl.h"
 
 namespace Slang
 {
@@ -39,18 +43,22 @@ SlangResult SLANG_MCALL SPIRVDisDownstreamCompiler::convert(
     ISlangBlob* fromBlob;
     SLANG_RETURN_ON_FAIL(from->loadBlob(ArtifactKeep::No, &fromBlob));
 
+    ComPtr<IOSFileArtifactRepresentation> fromFile;
+    SLANG_RETURN_ON_FAIL(from->requireFile(ArtifactKeep::No, fromFile.writeRef()));
+
+    String toFile;
+    File::generateTemporary(UnownedStringSlice("spv-asm"), toFile);
+
     // Set up our process
     CommandLine commandLine;
     commandLine.m_executableLocation.setName("spirv-dis");
+    commandLine.addArg("--comment");
+    commandLine.addArg(fromFile->getPath());
+    commandLine.addArg("-o");
+    commandLine.addArg(toFile);
     RefPtr<Process> p;
     SLANG_RETURN_ON_FAIL(Process::create(commandLine, 0, p));
-    const auto in = p->getStream(StdStreamType::In);
-    const auto out = p->getStream(StdStreamType::Out);
     const auto err = p->getStream(StdStreamType::ErrorOut);
-
-    // Write the assembly
-    SLANG_RETURN_ON_FAIL(in->write(fromBlob->getBufferPointer(), fromBlob->getBufferSize()));
-    in->close();
 
     // Wait for it to finish
     if(!p->waitForTermination(1000))
@@ -61,18 +69,26 @@ SlangResult SLANG_MCALL SPIRVDisDownstreamCompiler::convert(
     SLANG_RETURN_ON_FAIL(StreamUtil::readAll(err, 0, errData));
     fwrite(errData.getBuffer(), errData.getCount(), 1, stderr);
 
+    // If spirv-dis failed, we fail
     const auto ret = p->getReturnValue();
     if(ret != 0)
         return SLANG_FAIL;
 
-    // Read the disassembly
-    List<Byte> outData;
-    SLANG_RETURN_ON_FAIL(StreamUtil::readAll(out, 0, outData));
+    // Normalize line endings
+    String outContents;
+    SLANG_RETURN_ON_FAIL(File::readAllText(toFile, outContents));
+    StringBuilder outBuilder;
+    StringUtil::appendStandardLines(outContents.getUnownedSlice(), outBuilder);
+    SLANG_RETURN_ON_FAIL(File::writeAllBytes(toFile, outBuilder.getBuffer(), outBuilder.getLength()));
 
-    // Wobble it into an artifact
-    ComPtr<ISlangBlob> outBlob = RawBlob::create(outData.getBuffer(), outData.getCount());
+    // Return as a file artifact
+    auto fileRep = OSFileArtifactRepresentation::create(
+        IOSFileArtifactRepresentation::Kind::Owned,
+        toFile.getUnownedSlice(),
+        nullptr
+    );
     auto artifact = ArtifactUtil::createArtifact(to);
-    artifact->addRepresentationUnknown(outBlob.detach());
+    artifact->addRepresentation(fileRep.detach());
     *outArtifact = artifact.detach();
 
     return SLANG_OK;

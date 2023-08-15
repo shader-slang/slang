@@ -427,7 +427,7 @@ static DocMarkdownWriter::Requirement _getRequirementFromTargetToken(const Token
     }
 
     auto targetName = tok.getContent();
-    if (targetName == "spirv_direct")
+    if (targetName == "spirv")
     {
         return Requirement{CodeGenTarget::SPIRV, UnownedStringSlice("")};
     }

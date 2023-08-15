@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -profile glsl_450 -stage compute -entry MainCs -line-directive-mode none
-//CHECK: {{.*}} AtomicIAdd
+//CHECK: {{.*}} OpAtomicIAdd
 RWBuffer<uint> g_InterlockTest;
 
 [numthreads(1,1,1)]

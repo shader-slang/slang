@@ -1597,7 +1597,7 @@ namespace Slang
 
         bool shouldEmitSPIRVDirectly()
         {
-            return (targetFlags & SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY) != 0;
+            return targetFlags & SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY;
         }
 
         bool isWholeProgramRequest()
@@ -1636,7 +1636,7 @@ namespace Slang
     private:
         Linkage*                linkage = nullptr;
         CodeGenTarget           format = CodeGenTarget::Unknown;
-        SlangTargetFlags        targetFlags = 0;
+        SlangTargetFlags        targetFlags = kDefaultTargetFlags;
         Slang::Profile          targetProfile = Slang::Profile();
         FloatingPointMode       floatingPointMode = FloatingPointMode::Default;
         List<CapabilityAtom>    rawCapabilities;

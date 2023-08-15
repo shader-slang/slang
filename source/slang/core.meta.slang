@@ -2078,6 +2078,16 @@ struct TextureTypeInfo
 
             sb << "__target_intrinsic(glsl, \"$ctextureLod($p, $2, $3)$z\")\n";
 
+            // SPIR-V
+            {
+                // TODO:
+                // Need to:
+                // - Construct sampled image type OpTypeSampledImage of image type
+                // - Construct OpSampledImage from image and sampler
+                // - Call OpImageSampleExplicitLod
+                // test ./tests/compute/texture-simpler.slang
+            }
+
             // CUDA
             {
                 const int coordCount = base.coordCount;

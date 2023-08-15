@@ -32,6 +32,8 @@ SpvSnippet::ASMType parseASMType(Slang::Misc::TokenReader& tokenReader)
         return SpvSnippet::ASMType::Float2;
     else if (word == "int")
         return SpvSnippet::ASMType::Int;
+    else if (word == "uint")
+        return SpvSnippet::ASMType::UInt;
     else if (word == "_p")
         return SpvSnippet::ASMType::FloatOrDouble;
     return SpvSnippet::ASMType::None;
@@ -190,12 +192,13 @@ RefPtr<SpvSnippet> SpvSnippet::parse(UnownedStringSlice definition)
                             operand.content = (SpvWord)0xFFFFFFFF;
                             if (tokenReader.AdvanceIf("*"))
                             {
-                                // A "*" at operand qualifies the use of `resultType` with
-                                // a storage class, but does not modify `resultType` itself.
+                                // A "*" at operand qualifies the use of `resultType` as
+                                // `ptr(resultType, storage class), but does
+                                // not modify `resultType` itself.
                                 auto storageClass = tokenReader.ReadWord();
                                 auto spvStorageClass = translateStorageClass(storageClass);
                                 operand.content = spvStorageClass;
-                                snippet->usedResultTypeStorageClasses.add(spvStorageClass);
+                                snippet->usedPtrResultTypeStorageClasses.add(spvStorageClass);
                             }
                             inst.operands.add(operand);
                         }

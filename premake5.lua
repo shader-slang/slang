@@ -228,6 +228,14 @@ newoption {
     allowed     = { { "true", "True"}, { "false", "False" } }
 }
 
+newoption {
+    trigger     = "default-spirv-direct",
+    description = "(Optional) Development flag to make the default SPIR-V path generate directly rather than via GLSL",
+    value       = "bool",
+    default     = "false",
+    allowed     = { { "true", "True"}, { "false", "False" } }
+}
+
 buildLocation = _OPTIONS["build-location"]
 executeBinary = (_OPTIONS["execute-binary"] == "true")
 buildGlslang = (_OPTIONS["build-glslang"] == "true")
@@ -245,6 +253,7 @@ fullDebugValidation = (_OPTIONS["full-debug-validation"] == "true")
 enableAsan = (_OPTIONS["enable-asan"] == "true")
 dxOnVk = (_OPTIONS["dx-on-vk"] == "true")
 enableAftermath = (_OPTIONS["enable-aftermath"] == "true")
+defaultSPIRVDirect = (_OPTIONS["default-spirv-direct"] == "true")
 
 -- If stdlib embedding is enabled, disable stdlib source embedding by default
 disableStdlibSource = enableEmbedStdLib
@@ -433,6 +442,10 @@ workspace "slang"
 
         if dxOnVk then
             defines { "SLANG_CONFIG_DX_ON_VK" }
+        end
+
+        if defaultSPIRVDirect then
+            defines { "SLANG_CONFIG_DEFAULT_SPIRV_DIRECT" }
         end
 
 function dump(o)

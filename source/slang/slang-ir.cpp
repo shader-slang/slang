@@ -959,10 +959,32 @@ namespace Slang
     }
 
     //
+    // IRTupleTypeLayout
+    //
+
+    void IRTupleTypeLayout::Builder::addAttrsImpl(List<IRInst*>& ioOperands)
+    {
+        auto irBuilder = getIRBuilder();
+        for(auto field : m_fields)
+        {
+            ioOperands.add(irBuilder->getTupleFieldLayoutAttr(field.layout));
+        }
+    }
+
+    //
     // IRArrayTypeLayout
     //
 
     void IRArrayTypeLayout::Builder::addOperandsImpl(List<IRInst*>& ioOperands)
+    {
+        ioOperands.add(m_elementTypeLayout);
+    }
+
+    //
+    // IRStructuredBufferTypeLayout
+    //
+
+    void IRStructuredBufferTypeLayout::Builder::addOperandsImpl(List<IRInst*>& ioOperands)
     {
         ioOperands.add(m_elementTypeLayout);
     }
@@ -4414,6 +4436,19 @@ namespace Slang
         return inst;
     }
 
+    IRVar* IRBuilder::emitVar(
+        IRType*         type,
+        IRIntegerValue  addressSpace)
+    {
+        auto allocatedType = getPtrType(kIROp_PtrType, type, addressSpace);
+        auto inst = createInst<IRVar>(
+            this,
+            kIROp_Var,
+            allocatedType);
+        addInst(inst);
+        return inst;
+    }
+
     IRInst* IRBuilder::emitLoadReverseGradient(IRType* type, IRInst* diffValue)
     {
         auto inst = createInst<IRLoadReverseGradient>(
@@ -5665,6 +5700,18 @@ namespace Slang
         return cast<IRStructFieldLayoutAttr>(createIntrinsicInst(
             getVoidType(),
             kIROp_StructFieldLayoutAttr,
+            SLANG_COUNT_OF(operands),
+            operands));
+    }
+
+    IRTupleFieldLayoutAttr* IRBuilder::getTupleFieldLayoutAttr(
+        IRTypeLayout*    layout)
+    {
+        IRInst* operands[] = { layout };
+
+        return cast<IRTupleFieldLayoutAttr>(createIntrinsicInst(
+            getVoidType(),
+            kIROp_TupleFieldLayoutAttr,
             SLANG_COUNT_OF(operands),
             operands));
     }
@@ -7456,6 +7503,21 @@ namespace Slang
             auto decorationCaps = decoration->getTargetCaps();
             if (decorationCaps.isIncompatibleWith(targetCaps))
                 continue;
+
+            if(decoration->hasPredicate())
+            {
+                const auto scrutinee = decoration->getTypeScrutinee();
+                const auto predicate = decoration->getTypePredicate();
+                const auto predicateFun =
+                      predicate == "boolean"  ? [](auto t){ return t->getOp() == kIROp_BoolType; }
+                    : predicate == "integral" ? isIntegralType
+                    : predicate == "floating" ? isFloatingType
+                    : nullptr;
+
+                SLANG_ASSERT(predicateFun);
+                if(!predicateFun(scrutinee))
+                    continue;
+            }
 
             if(!bestDecoration || decorationCaps.isBetterForTarget(bestCaps, targetCaps))
             {

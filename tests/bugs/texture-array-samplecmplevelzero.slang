@@ -1,5 +1,5 @@
 //TEST_DISABLED:SIMPLE(filecheck=CHECK): -entry MainPs -stage fragment -profile glsl_450 -target spirv
-//CHECK: EntryPoint
+//CHECK: OpEntryPoint
 
 SamplerComparisonState g_tSFMShadowDepthTexture_sampler; 
 Texture2DArray g_tSFMShadowDepthTexture; 

@@ -79,8 +79,16 @@ class TargetIntrinsicModifier : public Modifier
     // is an intrisic for.
     Token targetToken;
 
-    // A custom definition for the operation
-    Token definitionToken;
+    // A custom definition for the operation, one of either an ident or a
+    // string (the concatenation of several string literals)
+    Token definitionIdent;
+    String definitionString;
+    bool isString;
+
+    // A predicate to be used on an identifier to guard this intrinsic
+    Token predicateToken;
+    NameLoc scrutinee;
+    DeclRef<Decl> scrutineeDeclRef;
 };
 
 // A modifier that marks a declaration as representing a

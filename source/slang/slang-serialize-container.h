@@ -36,7 +36,7 @@ struct SerialContainerData
     struct Target
     {
         CodeGenTarget       codeGenTarget = CodeGenTarget::Unknown;
-        SlangTargetFlags    flags = 0;
+        SlangTargetFlags    flags = kDefaultTargetFlags;
         Profile             profile;
         FloatingPointMode   floatingPointMode = FloatingPointMode::Default;
     };

@@ -456,6 +456,10 @@ namespace Slang
             {
                 return SourceLanguage::CUDA;
             }
+            case PassThroughMode::SpirvDis:
+            {
+                return SourceLanguage::SPIRV;
+            }
             
             default: break;
         }
@@ -485,7 +489,7 @@ namespace Slang
             case CodeGenTarget::SPIRVAssembly:
             case CodeGenTarget::SPIRV:
             {
-                return PassThroughMode::Glslang;
+                return PassThroughMode::SpirvDis;
             }
             case CodeGenTarget::DXBytecode:
             case CodeGenTarget::DXBytecodeAssembly:
