@@ -1622,7 +1622,8 @@ bool isLocalPointer(IRInst* ptrInst)
     // If it's not a local var or a function parameter, then it's probably 
     // referencing something outside the function scope.
     // 
-    return as<IRVar>(getRootAddr(ptrInst)) || as<IRParam>(getRootAddr(ptrInst));
+    auto addr = getRootAddr(ptrInst);
+    return as<IRVar>(addr) || as<IRParam>(addr);
 }
 
 void lowerSwizzledStores(IRModule* module, IRFunc* func)
