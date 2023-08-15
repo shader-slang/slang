@@ -31,8 +31,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 	Foo<float> obj;
 
 	float outVal = obj.test(tid, 0.f);
-	outputBuffer[tid] = outVal; // Expect: 1
+	outputBuffer[0] = outVal; // Expect: 1
 
 	float outVal2 = obj.test(uint2(tid, tid), 0.f);
-	outputBuffer[tid + 1] = outVal2; // Expect: 2
+	outputBuffer[1] = outVal2; // Expect: 2
 }
