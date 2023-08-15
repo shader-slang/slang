@@ -219,12 +219,9 @@ InstPair ForwardDiffTranscriber::transcribeBinaryArith(IRBuilder* builder, IRIns
                 auto diffRightTimesLeft = builder->emitMul(diffType, diffRight, primalLeft);
                 builder->markInstAsDifferential(diffLeftTimesRight, resultType);
                 builder->markInstAsDifferential(diffRightTimesLeft, resultType);
-                //_markInstAsDifferential(builder, diffLeftTimesRight, primalArith);
-                //_markInstAsDifferential(builder, diffRightTimesLeft, primalArith);
 
                 auto diffAdd = builder->emitAdd(diffType, diffLeftTimesRight, diffRightTimesLeft);
                 builder->markInstAsDifferential(diffAdd, resultType);
-                //_markInstAsDifferential(builder, diffAdd, primalArith);
 
                 return InstPair(primalArith, diffAdd);
             }
@@ -233,7 +230,6 @@ InstPair ForwardDiffTranscriber::transcribeBinaryArith(IRBuilder* builder, IRIns
             {
                 auto diffSub = builder->emitSub(diffType, diffLeft, diffRight);
                 builder->markInstAsDifferential(diffSub, resultType);
-                //_markInstAsDifferential(builder, diffSub, primalArith);
 
                 return InstPair(primalArith, diffSub);
             }
@@ -252,13 +248,11 @@ InstPair ForwardDiffTranscriber::transcribeBinaryArith(IRBuilder* builder, IRIns
                             builder->getFloatValue(
                                 constant->getDataType(), 1.0 / constant->getValue()));
                         builder->markInstAsDifferential(diff, resultType);
-                        //_markInstAsDifferential(builder, diff, primalArith);
                     }
                     else
                     {
                         diff = builder->emitDiv(diffType, diffLeft, primalRight);
                         builder->markInstAsDifferential(diff, resultType);
-                        //_markInstAsDifferential(builder, diff, primalArith);
                     }
                     return InstPair(primalArith, diff);
                 }
@@ -266,22 +260,18 @@ InstPair ForwardDiffTranscriber::transcribeBinaryArith(IRBuilder* builder, IRIns
                 {
                     auto diffLeftTimesRight = builder->emitMul(diffType, diffLeft, primalRight);
                     builder->markInstAsDifferential(diffLeftTimesRight, resultType);
-                    //_markInstAsDifferential(builder, diffLeftTimesRight, primalArith);
 
                     auto diffRightTimesLeft = builder->emitMul(diffType, primalLeft, diffRight);
                     builder->markInstAsDifferential(diffRightTimesLeft, resultType);
-                    //_markInstAsDifferential(builder, diffRightTimesLeft, primalArith);
                 
                     auto diffSub = builder->emitSub(diffType, diffLeftTimesRight, diffRightTimesLeft);
                     builder->markInstAsDifferential(diffSub, resultType);
-                    //_markInstAsDifferential(builder, diffSub, primalArith);
 
                     auto diffMul = builder->emitMul(primalRight->getFullType(), primalRight, primalRight);
                     builder->markInstAsPrimal(diffMul);
 
                     auto diffDiv = builder->emitDiv(diffType, diffSub, diffMul);
                     builder->markInstAsDifferential(diffDiv, resultType);
-                    //_markInstAsDifferential(builder, diffDiv, primalArith);
 
                     return InstPair(primalArith, diffDiv);
                 }
@@ -710,7 +700,6 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
                         {
                             diffArgVal = argBuilder.emitLoad(diffArg);
                             argBuilder.markInstAsDifferential(diffArgVal, pairValType->getValueType());
-                            //_markInstAsDifferential(&argBuilder, diffArgVal, primalArg);
                         }
                         auto initVal = argBuilder.emitMakeDifferentialPair(pairValType, primalVal, diffArgVal);
                         argBuilder.markInstAsMixedDifferential(initVal, primalType);
@@ -729,11 +718,9 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
                         {
                             auto newDiffVal = afterBuilder.emitDifferentialPairGetDifferential((IRType*)diffType, newVal);
                             afterBuilder.markInstAsDifferential(newDiffVal, pairValType->getValueType());
-                            //_markInstAsDifferential(&afterBuilder, newDiffVal, primalArg);
 
                             auto storeInst = afterBuilder.emitStore(diffArg, newDiffVal);
                             afterBuilder.markInstAsDifferential(storeInst, pairValType->getValueType());
-                            //_markInstAsDifferential(&afterBuilder, newDiffVal, primalArg);
                         }
                     }
                     args.add(srcVar);
@@ -1774,7 +1761,6 @@ InstPair ForwardDiffTranscriber::transcribeFunc(IRBuilder* inBuilder, IRFunc* pr
                     {
                         auto diffVal = builder.emitLoad(writeBack.value.differential);
                         builder.markInstAsDifferential(diffVal, primalVal->getFullType());
-                        //_markInstAsDifferential(&builder, diffVal, primalVal);
 
                         valToStore = builder.emitMakeDifferentialPair(cast<IRPtrTypeBase>(param->getFullType())->getValueType(),
                             primalVal, diffVal);
@@ -2052,7 +2038,6 @@ InstPair ForwardDiffTranscriber::transcribeFuncParam(IRBuilder* builder, IRParam
             auto diff = builder->emitVar(diffType);
             builder->markInstAsDifferential(
                 diff, builder->getPtrType(ptrInnerPairType->getValueType()));
-            //_markInstAsDifferential(builder, diff, primal);
 
             IRInst* primalInitVal = nullptr;
             IRInst* diffInitVal = nullptr;
@@ -2070,7 +2055,6 @@ InstPair ForwardDiffTranscriber::transcribeFuncParam(IRBuilder* builder, IRParam
                 diffInitVal = builder->emitDifferentialPairGetDifferential(diffType, initVal);
             }
             builder->markInstAsDifferential(diffInitVal, ptrInnerPairType->getValueType());
-            //_markInstAsDifferential(builder, diffInitVal, primalInitVal);
             
             builder->emitStore(primal, primalInitVal);
 

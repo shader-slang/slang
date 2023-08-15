@@ -1656,8 +1656,7 @@ namespace Slang
             RequirementWitness witnessValue;
             auto requirementDecl = m_astBuilder->getSharedASTBuilder()->findBuiltinRequirementDecl(BuiltinRequirementKind::DifferentialType);
             if (!inheritanceDecl->witnessTable->getRequirementDictionary().tryGetValue(requirementDecl, witnessValue))
-                return;
-            
+                return;            
             // A type used as differential type must have itself as its own differential type.
             if (witnessValue.getFlavor() != RequirementWitness::Flavor::val)
                 return;
