@@ -3625,24 +3625,6 @@ static void _addLayout(TypeLayoutContext& context,
 
 static TypeLayoutResult _updateLayout(TypeLayoutContext& context,
     Type* type,
-    TypeLayout* layout,
-    const SimpleLayoutInfo& info)
-{
-    auto layoutResultPtr = context.layoutMap.tryGetValue(type);
-    SLANG_ASSERT(layoutResultPtr);
-    if (layoutResultPtr)
-    {
-        // Check the layout is the same!
-        SLANG_ASSERT(layoutResultPtr->layout.get() == layout);
-        // Update the info
-        layoutResultPtr->info = info;
-    }
-
-    return TypeLayoutResult(layout, info);
-}
-
-static TypeLayoutResult _updateLayout(TypeLayoutContext& context,
-    Type* type,
     const TypeLayoutResult& result)
 {
     auto layoutResultPtr = context.layoutMap.tryGetValue(type);
