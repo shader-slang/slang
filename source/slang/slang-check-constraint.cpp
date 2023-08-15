@@ -705,14 +705,16 @@ namespace Slang
             auto fstDeclRef = fstDeclRefType->getDeclRef();
 
             if (auto typeParamDecl = as<GenericTypeParamDecl>(fstDeclRef.getDecl()))
-                return TryUnifyTypeParam(constraints, typeParamDecl, snd);
+                if (typeParamDecl->parentDecl == constraints.genericDecl)
+                    return TryUnifyTypeParam(constraints, typeParamDecl, snd);
 
             if (auto sndDeclRefType = as<DeclRefType>(snd))
             {
                 auto sndDeclRef = sndDeclRefType->getDeclRef();
 
                 if (auto typeParamDecl = as<GenericTypeParamDecl>(sndDeclRef.getDecl()))
-                    return TryUnifyTypeParam(constraints, typeParamDecl, fst);
+                    if (typeParamDecl->parentDecl == constraints.genericDecl)
+                        return TryUnifyTypeParam(constraints, typeParamDecl, fst);
 
                 // can't be unified if they refer to different declarations.
                 if (fstDeclRef.getDecl() != sndDeclRef.getDecl()) return false;
@@ -816,7 +818,7 @@ namespace Slang
 
             if (auto typeParamDecl = as<GenericTypeParamDecl>(fstDeclRef.getDecl()))
             {
-                if(typeParamDecl->parentDecl == constraints.genericDecl )
+                if(typeParamDecl->parentDecl == constraints.genericDecl)
                     return TryUnifyTypeParam(constraints, typeParamDecl, snd);
             }
         }
@@ -827,7 +829,7 @@ namespace Slang
 
             if (auto typeParamDecl = as<GenericTypeParamDecl>(sndDeclRef.getDecl()))
             {
-                if(typeParamDecl->parentDecl == constraints.genericDecl )
+                if(typeParamDecl->parentDecl == constraints.genericDecl)
                     return TryUnifyTypeParam(constraints, typeParamDecl, fst);
             }
         }
