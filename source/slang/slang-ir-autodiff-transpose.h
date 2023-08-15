@@ -2819,9 +2819,6 @@ struct DiffTransposePass
             return existentialZero;
         }
 
-        // Should not see this in this method.
-        // SLANG_RELEASE_ASSERT(!as<IRInterfaceType>(primalType));
-
         auto zeroMethod = diffTypeContext.getZeroMethodForType(builder, primalType);
 
         // Should exist.
