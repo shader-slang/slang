@@ -1360,7 +1360,7 @@ struct DiffTransposePass
                 SLANG_ASSERT(!(afterBlockMap.containsKey(afterBlock) && \
                     afterBlockMap[afterBlock] != block->getTerminator()));
 
-                afterBlockMap[afterBlock] = block->getTerminator();
+                afterBlockMap.set(afterBlock, block->getTerminator());
             }
         }
     }

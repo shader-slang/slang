@@ -3613,7 +3613,7 @@ static void _addLayout(TypeLayoutContext& context,
 {
     // Add it *without info*.
     // The info can be added with _updateLayout
-    context.layoutMap[type] = TypeLayoutResult(layout, SimpleLayoutInfo());
+    context.layoutMap.set(type, TypeLayoutResult(layout, SimpleLayoutInfo()));
 }
 
 static void _addLayout(TypeLayoutContext& context,

@@ -168,7 +168,7 @@ struct DiffUnzipPass
                     indexRegionMap->map[as<IRBlock>(primalMap[block])] = (IndexedRegion*)indexRegionMap->map[block];
                 
                 if (diffMap.containsKey(block))
-                    indexRegionMap->map[as<IRBlock>(diffMap[block])] = (IndexedRegion*)indexRegionMap->map[block];
+                    indexRegionMap->map.set(as<IRBlock>(diffMap[block]), (IndexedRegion*)indexRegionMap->map[block]);
             }
         }
         
