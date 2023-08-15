@@ -76,14 +76,15 @@ namespace Slang
 
     const float kMaxLoadFactor = 0.7f;
 
-    template<typename TKey, typename TValue>
+    template<typename TKey, typename TValue, typename Hash = Slang::Hash<TKey>, typename KeyEqual = std::equal_to<TKey>>
     class Dictionary
     {
         using InnerMap = ankerl::unordered_dense::map<
             TKey,
             TValue,
-            Hash<TKey>>;
-        using ThisType = Dictionary<TKey, TValue>;
+            Hash,
+            KeyEqual>;
+        using ThisType = Dictionary<TKey, TValue, Hash, KeyEqual>;
         InnerMap map;
     public:
         //
