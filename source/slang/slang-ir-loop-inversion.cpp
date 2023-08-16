@@ -12,22 +12,71 @@
 namespace Slang
 {
 
+static bool isSameBlockOrTrivialBranch(IRBlock* target, IRBlock* scrutinee)
+{
+    if(target == scrutinee)
+        return true;
+    const auto br = as<IRUnconditionalBranch>(scrutinee->getFirstOrdinaryInst());
+    return br && br->getTargetBlock() == target && br->getArgCount() == 0 && !scrutinee->hasMoreThanOneUse();
+};
+
+static bool isSmallBlock(IRBlock* c)
+{
+    return true;
+}
+
 // Loops are suitable for inversion if:
-// - The loop jumps to a breaking condition first
+// - The loop jumps to a conditional branch which has the break block as one of
+//   its successors (or a trivial break block which we erase) and the other
+//   successor is empty
+// - The conditional block is "small", because we will be duplicating it
 static bool isSuitableForInversion(IRLoop* loop)
 {
     const auto nextBlock = loop->getTargetBlock();
     const auto breakBlock = loop->getBreakBlock();
 
     // The first thing a loop does must be a conditional
-    const auto branch = as<IRConditionalBranch>(nextBlock->getTerminator());
+    const auto branch = as<IRIfElse>(nextBlock->getTerminator());
     if(!branch)
         return false;
 
-    // The loop starts with a condition which breaks from the loop
+    if(!isSmallBlock(nextBlock))
+        return false;
+
     const auto t = branch->getTrueBlock();
     const auto f = branch->getFalseBlock();
-    return t == breakBlock || f == breakBlock;
+    const auto a = branch->getAfterBlock();
+
+    //
+    // In principle we could perform this simplification in the cfg simplifier,
+    // however it relies on slightly more context than is simple to insert
+    // there, namely that the removed trivial branching block is branching to a
+    // loop break block.
+    //
+
+    // Do we break on the 'true' side?
+    if(isSameBlockOrTrivialBranch(breakBlock, t) && f == a)
+    {
+        if(t != breakBlock)
+        {
+            branch->trueBlock.set(breakBlock);
+            t->removeAndDeallocate();
+        }
+        return true;
+    }
+
+    // ... or the false side
+    if(isSameBlockOrTrivialBranch(breakBlock, f) && t == a)
+    {
+        if(f != breakBlock)
+        {
+            branch->falseBlock.set(breakBlock);
+            f->removeAndDeallocate();
+        }
+        return true;
+    }
+
+    return false;
 }
 
 static IRParam* duplicateToParamWithDecorations(IRBuilder& builder, IRCloneEnv& cloneEnv, IRInst* i)
@@ -106,6 +155,13 @@ static void invertLoop(IRBuilder& builder, IRLoop* loop)
     e1->insertAfter(c1);
     builder.emitBranch(b, c1Params.getCount(), c1Params.getBuffer());
     c1bUse.set(e1);
+    // Similarly, we have to replace any existing 'break's to break via e1
+    traverseUses(b, [&](IRUse* u){
+        auto userBlock = u->getUser()->getParent();
+        // Restrict this to just those blocks within this loop
+        if(userBlock != e1 && domTree->dominates(s, userBlock) && !domTree->dominates(b, userBlock))
+            u->set(e1);
+    });
     // We now have
     // s: ...1 loop break=b next=c1
     // c1: if x then goto e1 else goto d
