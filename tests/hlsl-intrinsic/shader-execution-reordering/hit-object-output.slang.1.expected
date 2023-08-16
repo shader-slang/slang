@@ -64,9 +64,6 @@ void accumulate_0(inout uint value_2, hitObjectNV hit_0)
         MyAttributes_0 _S3 = HitObject_GetAttributes_0(hit_0);
         value_2 = value_2 + (16U + _S3.value_0);
     }
-    else
-    {
-    }
     return;
 }
 
