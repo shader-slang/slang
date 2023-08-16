@@ -4279,10 +4279,6 @@ static SlangResult runUnitTestModule(TestContext* context, TestOptions& testOpti
 
 SlangResult innerMain(int argc, char** argv)
 {
-    // Disable buffering for out and std out
-    StreamUtil::setStreamBufferStyle(StdStreamType::Out, StreamBufferStyle::None);
-    StreamUtil::setStreamBufferStyle(StdStreamType::ErrorOut, StreamBufferStyle::None);
-
     auto stdWriters = StdWriters::initDefaultSingleton();
 
     // The context holds useful things used during testing
