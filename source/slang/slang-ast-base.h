@@ -397,7 +397,7 @@ class Val : public NodeBase
 
     bool equals(Val* val) const
     {
-        return this == val || const_cast<Val*>(this)->resolve() == val->resolve();
+        return this == val || (val && const_cast<Val*>(this)->resolve() == val->resolve());
     }
 
     // Appends as text to the end of the builder
