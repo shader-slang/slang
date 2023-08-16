@@ -76,7 +76,7 @@ TestReporter::TestReporter() :
     m_passedTestCount = 0;
     m_failedTestCount = 0;
     m_ignoredTestCount = 0;
-
+    m_expectedFailedTestCount = 0;
     m_maxFailTestResults = 10;
 
     m_inTest = false;
@@ -574,7 +574,7 @@ void TestReporter::message(TestMessageType type, const char* messageContent)
 
 bool TestReporter::didAllSucceed() const
 {
-    return m_passedTestCount + m_expectedFailedTestCount == (m_totalTestCount - m_ignoredTestCount);
+    return m_failedTestCount == 0;
 }
 
 void TestReporter::outputSummary()
