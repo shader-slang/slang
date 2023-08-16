@@ -2067,8 +2067,6 @@ void releaseNullDifferentialType(AutoDiffSharedContext* context)
     {
         if (auto publicDecoration = nullStruct->findDecoration<IRPublicDecoration>())
             publicDecoration->removeAndDeallocate();
-        if (auto exportDecoration = nullStruct->findDecoration<IRExportDecoration>())
-            exportDecoration->removeAndDeallocate();
         if (auto keepAliveDecoration = nullStruct->findDecoration<IRKeepAliveDecoration>())
             keepAliveDecoration->removeAndDeallocate();
     }
@@ -2077,8 +2075,6 @@ void releaseNullDifferentialType(AutoDiffSharedContext* context)
     {
         if (auto publicDecoration = nullWitness->findDecoration<IRPublicDecoration>())
             publicDecoration->removeAndDeallocate();
-        if (auto exportDecoration = nullWitness->findDecoration<IRExportDecoration>())
-            exportDecoration->removeAndDeallocate();
         if (auto keepAliveDecoration = nullWitness->findDecoration<IRKeepAliveDecoration>())
             keepAliveDecoration->removeAndDeallocate();
     }
