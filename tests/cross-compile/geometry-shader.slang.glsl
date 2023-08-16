@@ -68,13 +68,6 @@ void main()
 
     for(;;)
     {
-        if(ii_0 < 3)
-        {}
-        else
-        {
-            break;
-        }
-
         RasterVertex_0 rasterVertex_0;
         rasterVertex_0.position_0 = _S10[ii_0].position_1;
         rasterVertex_0.color_0 = _S10[ii_0].color_1;
@@ -82,13 +75,17 @@ void main()
         RasterVertex_0 _S11 = rasterVertex_0;
         _S4 = rasterVertex_0.position_0;
         _S5 = _S11.color_0;
-
         gl_Layer = int(_S11.id_0);
-
         EmitVertex();
-
-        ii_0 = ii_0 + 1;
+        int ii_1 = ii_0 + 1;
+        if(ii_1 < 3)
+        {
+            ii_0 = ii_1;
+        }
+        else
+        {
+            break;
+        }
     }
-
     return;
 }
