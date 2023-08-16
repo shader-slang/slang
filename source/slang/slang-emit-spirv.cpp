@@ -2715,11 +2715,7 @@ struct SPIRVEmitContext
         SpvWord baseId = 0;
         // Only used in debug build, but we don't want a warning/error for an unused initialized variable
 
-        if (auto ptrLikeType = as<IRPointerLikeType>(base->getDataType()))
-        {
-            baseId = getID(ensureInst(base));
-        }
-        else if (auto ptrType = as<IRPtrTypeBase>(base->getDataType()))
+        if (as<IRPointerLikeType>(base->getDataType()) || as<IRPtrTypeBase>(base->getDataType()))
         {
             baseId = getID(ensureInst(base));
         }
