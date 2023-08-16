@@ -1,15 +1,13 @@
 // Test that storage type lowering correctly handles matrix layout modifiers.
 
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type -xslang -use-glsl-matrix-layout-modifier -xslang -fvk-use-gl-layout
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type -xslang -fvk-use-gl-layout
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 ], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 struct MyStruct
 {
-    // row_major here is flipped by the `-use-glsl-matrix-layout-modifier` compiler option so
-    // it actually means column_major here.
-    row_major float3x2 mat;
+    column_major float3x2 mat;
     int otherVal[4];
 
 }
