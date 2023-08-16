@@ -39,7 +39,7 @@ SlangResult JSONRPCConnection::init(HTTPPacketConnection* connection, CallStyle 
 
 SlangResult JSONRPCConnection::initWithStdStreams(CallStyle defaultCallStyle, Process* process)
 {
-    RefPtr<Stream> stdinStream, stdoutStream, stderrStream;
+    RefPtr<Stream> stdinStream, stdoutStream;
 
     Process::getStdStream(StdStreamType::In, stdinStream);
     Process::getStdStream(StdStreamType::Out, stdoutStream);
