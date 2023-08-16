@@ -407,11 +407,8 @@ SlangResult Session::saveStdLib(SlangArchiveType archiveType, ISlangBlob** outBl
 
     SLANG_AST_BUILDER_RAII(m_builtinLinkage->getASTBuilder());
 
-    for (auto& pair : m_builtinLinkage->mapNameToLoadedModules)
+    for (const auto& [moduleName, module] : m_builtinLinkage->mapNameToLoadedModules)
     {
-        const Name* moduleName = pair.key;
-        Module* module = pair.value;
-
         // Set up options
         SerialContainerUtil::WriteOptions options;
 
@@ -943,10 +940,8 @@ Linkage::Linkage(Session* session, ASTBuilder* astBuilder, Linkage* builtinLinka
     // Copy of the built in linkages modules
     if (builtinLinkage)
     {
-        for (const auto& pair : builtinLinkage->mapNameToLoadedModules)
-        {
-            mapNameToLoadedModules.add(pair.key, pair.value);
-        }
+        for (const auto& nameToMod : builtinLinkage->mapNameToLoadedModules)
+            mapNameToLoadedModules.add(nameToMod);
     }
 
     {
@@ -1387,10 +1382,10 @@ void Linkage::buildHash(DigestBuilder<SHA1>& builder, SlangInt targetIndex)
     }
 
     // Add the preprocessor definitions to the hash
-    for (auto& key : preprocessorDefinitions)
+    for (const auto& [defName, defVal] : preprocessorDefinitions)
     {
-        builder.append(key.key);
-        builder.append(key.value);
+        builder.append(defName);
+        builder.append(defVal);
     }
 
     // Add the target specified by targetIndex
@@ -2074,9 +2069,9 @@ static void _calcViewInitiatingHierarchy(SourceManager* sourceManager, ViewIniti
     // Order all the children, by their raw SourceLocs. This is desirable, so that a trivial traversal
     // will traverse children in the order they are initiated in the parent source.
     // This assumes they increase in SourceLoc implies an later within a source file - this is true currently.
-    for (auto& pair : outHierarchy)
+    for (auto& [_, value] : outHierarchy)
     {
-        pair.value.sort([](SourceView* a, SourceView* b) -> bool { return a->getInitiatingSourceLoc().getRaw() < b->getInitiatingSourceLoc().getRaw(); });
+        value.sort([](SourceView* a, SourceView* b) -> bool { return a->getInitiatingSourceLoc().getRaw() < b->getInitiatingSourceLoc().getRaw(); });
     }
 }
 
@@ -2233,12 +2228,12 @@ void FrontEndCompileRequest::parseTranslationUnit(
     // Note! that a adding a define twice will cause an exception in debug builds
     // that may be desirable or not...
     Dictionary<String, String> combinedPreprocessorDefinitions;
-    for(auto& def : getLinkage()->preprocessorDefinitions)
-        combinedPreprocessorDefinitions.add(def.key, def.value);
-    for(auto& def : preprocessorDefinitions)
-        combinedPreprocessorDefinitions.add(def.key, def.value);
-    for(auto& def : translationUnit->preprocessorDefinitions)
-        combinedPreprocessorDefinitions.add(def.key, def.value);
+    for(const auto& def : getLinkage()->preprocessorDefinitions)
+        combinedPreprocessorDefinitions.add(def);
+    for(const auto& def : preprocessorDefinitions)
+        combinedPreprocessorDefinitions.add(def);
+    for(const auto& def : translationUnit->preprocessorDefinitions)
+        combinedPreprocessorDefinitions.add(def);
 
     // Define standard macros, if not already defined. This style assumes using `#if __SOME_VAR` style, as in
     //

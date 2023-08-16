@@ -1063,14 +1063,10 @@ namespace Slang
             sourceTarget = CodeGenTarget(TypeConvertUtil::getCompileTargetFromSourceLanguage((SlangSourceLanguage)sourceLanguage));
 
             // If it's pass through we accumulate the preprocessor definitions. 
-            for (auto& define : translationUnit->compileRequest->preprocessorDefinitions)
-            {
-                preprocessorDefinitions.add(define.key, define.value);
-            }
-            for (auto& define : translationUnit->preprocessorDefinitions)
-            {
-                preprocessorDefinitions.add(define.key, define.value);
-            }
+            for (const auto& define : translationUnit->compileRequest->preprocessorDefinitions)
+                preprocessorDefinitions.add(define);
+            for (const auto& define : translationUnit->preprocessorDefinitions)
+                preprocessorDefinitions.add(define);
             
             {
                 /* TODO(JS): Not totally clear what options should be set here. If we are using the pass through - then using say the defines/includes
@@ -1148,10 +1144,8 @@ namespace Slang
             // of downstream compilation. 
             
             auto linkage = getLinkage();
-            for (auto& define : linkage->preprocessorDefinitions)
-            {
-                preprocessorDefinitions.add(define.key, define.value);
-            }
+            for (const auto& define : linkage->preprocessorDefinitions)
+                preprocessorDefinitions.add(define);
         }
 
         
@@ -1398,12 +1392,12 @@ namespace Slang
 
                 Index i = 0;
 
-                for(auto& def : preprocessorDefinitions)
+                for(const auto& [defKey, defValue] : preprocessorDefinitions)
                 {
                     auto& define = dst[i];
                     
-                    define.nameWithSig = allocator.allocate(def.key);
-                    define.value = allocator.allocate(def.value);
+                    define.nameWithSig = allocator.allocate(defKey);
+                    define.value = allocator.allocate(defValue);
 
                     ++i;
                 }

@@ -1782,7 +1782,7 @@ bool finalizeAutoDiffPass(IRModule* module)
     // Remove auto-diff related decorations.
     stripAutoDiffDecorations(module);
 
-    return false;
+    return modified;
 }
 
 IRBlock* getBlock(IRInst* inst)

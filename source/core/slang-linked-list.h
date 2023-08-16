@@ -4,6 +4,7 @@
 #include "../../slang.h"
 
 #include "slang-allocator.h"
+#include <type_traits>
 
 namespace Slang
 {
@@ -28,6 +29,7 @@ public:
     };
     LinkedNode<T>* getPrevious() { return prev; };
     LinkedNode<T>* getNext() { return next; };
+    const LinkedNode<T>* getNext() const { return next; };
     LinkedNode<T>* insertAfter(const T& nData)
     {
         LinkedNode<T>* n = new LinkedNode<T>(list);
@@ -88,37 +90,46 @@ private:
     int count;
 
 public:
-    class Iterator
+    template<bool Const>
+    class GenIterator
     {
     public:
-        LinkedNode<T>* current, *next;
-        void setCurrent(LinkedNode<T>* cur)
+        using Node = std::conditional_t<Const, const LinkedNode<T>, LinkedNode<T>>;
+        Node* current, *next;
+        void setCurrent(Node* cur)
         {
             current = cur;
             if (current)
                 next = current->getNext();
             else
-                next = 0;
+                next = nullptr;
         }
-        Iterator() { current = next = nullptr; }
-        Iterator(LinkedNode<T>* cur) { setCurrent(cur); }
-        T& operator*() const { return current->value; }
-        Iterator& operator++()
+        GenIterator() { current = next = nullptr; }
+        GenIterator(Node* cur) { setCurrent(cur); }
+        std::conditional_t<Const, const T&, T&>
+            operator*() const { return current->value; }
+        GenIterator& operator++()
         {
             setCurrent(next);
             return *this;
         }
-        Iterator operator++(int)
+        GenIterator operator++(int)
         {
-            Iterator rs = *this;
+            GenIterator rs = *this;
             setCurrent(next);
             return rs;
         }
-        bool operator!=(const Iterator& iter) const { return current != iter.current; }
-        bool operator==(const Iterator& iter) const { return current == iter.current; }
+        bool operator!=(const GenIterator& iter) const { return current != iter.current; }
+        bool operator==(const GenIterator& iter) const { return current == iter.current; }
     };
-    Iterator begin() const { return Iterator(head); }
-    Iterator end() const { return Iterator(0); }
+
+    using Iterator = GenIterator<false>;
+    Iterator begin() { return Iterator(head); }
+    Iterator end() { return Iterator(0); }
+
+    using ConstIterator = GenIterator<true>;
+    ConstIterator begin() const { return ConstIterator(head); }
+    ConstIterator end() const { return ConstIterator(0); }
 
 public:
     LinkedList()

@@ -338,10 +338,8 @@ struct EliminateMultiLevelBreakContext
         // Once we have rewritten regions' break blocks with additional targetLevel parameter, all
         // original branches into that block without a parameter will now need to provide a default
         // value equal to the level of its corresponding region.
-        for (auto breakBlockKV : mapNewBreakBlockToRegionLevel)
+        for (auto [breakBlock, level] : mapNewBreakBlockToRegionLevel)
         {
-            auto breakBlock = breakBlockKV.key;
-            auto level = breakBlockKV.value;
             IRInst* levelInst = nullptr;
             List<IRUse*> uses;
             for (auto use = breakBlock->firstUse; use; use = use->nextUse)

@@ -26,7 +26,7 @@ struct IRSerialWriter
     static Result writeContainer(const IRSerialData& data, SerialCompressionType compressionType, RiffContainer* container);
     
     /// Get an instruction index from an instruction
-    Ser::InstIndex getInstIndex(IRInst* inst) const { return inst ? Ser::InstIndex(m_instMap[inst]) : Ser::InstIndex(0); }
+    Ser::InstIndex getInstIndex(IRInst* inst) const { return inst ? Ser::InstIndex(m_instMap.getValue(inst)) : Ser::InstIndex(0); }
 
         /// Get a slice from an index
     UnownedStringSlice getStringSlice(Ser::StringIndex index) const { return m_stringSlicePool.getSlice(StringSlicePool::Handle(index)); }
