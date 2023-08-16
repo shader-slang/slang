@@ -1206,7 +1206,6 @@ namespace Slang
                 auto specializationArg = args[ii];
                 genericArgs.add(specializationArg.val);
             }
-            auto genericInnerDeclRef = getLinkage()->getASTBuilder()->getGenericAppDeclRef(genericDeclRef, genericArgs.getArrayView());
             ASTBuilder* astBuilder = getLinkage()->getASTBuilder();
 
             for (auto constraintDecl : getMembersOfType<GenericTypeConstraintDecl>(

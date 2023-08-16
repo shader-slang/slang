@@ -56,6 +56,7 @@ namespace Slang
                 buffer[i++] = (char)(digit - 10 + 'A');
         } while ((val /= radix) > 0);
 
+        SLANG_ASSERT(i >= 0);
         while(i < padTo)
             buffer[i++] = '0';
 

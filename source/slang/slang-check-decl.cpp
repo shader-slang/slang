@@ -1335,7 +1335,7 @@ namespace Slang
                 auto newDeclRef = createDefaultSubstitutionsIfNeeded(m_astBuilder, this, declRefType->getDeclRef());
                 auto newType = DeclRefType::create(m_astBuilder, newDeclRef);
                 sharedTypeExpr->base.type = newType;
-                if (auto typetype = as<TypeType>(typeExp.exp->type))
+                if (as<TypeType>(typeExp.exp->type))
                     typeExp.exp->type = m_astBuilder->getTypeType(newType);
             }
         }
