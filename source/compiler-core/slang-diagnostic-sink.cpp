@@ -550,7 +550,7 @@ SlangResult DiagnosticSink::getBlobIfNeeded(ISlangBlob** outBlob)
     return SLANG_OK;
 }
 
-void DiagnosticSink::diagnoseImpl(DiagnosticInfo const& info, const UnownedStringSlice& formattedMessage)
+bool DiagnosticSink::diagnoseImpl(DiagnosticInfo const& info, const UnownedStringSlice& formattedMessage)
 {
     if (info.severity >= Severity::Error)
     {
@@ -576,6 +576,7 @@ void DiagnosticSink::diagnoseImpl(DiagnosticInfo const& info, const UnownedStrin
         // TODO: figure out a better policy for aborting compilation
         SLANG_ABORT_COMPILATION("");
     }
+    return true;
 }
 
 Severity DiagnosticSink::getEffectiveMessageSeverity(DiagnosticInfo const& info)
@@ -598,13 +599,13 @@ Severity DiagnosticSink::getEffectiveMessageSeverity(DiagnosticInfo const& info)
     return effectiveSeverity;
 }
 
-void DiagnosticSink::diagnoseImpl(SourceLoc const& pos, DiagnosticInfo info, int argCount, DiagnosticArg const* args)
+bool DiagnosticSink::diagnoseImpl(SourceLoc const& pos, DiagnosticInfo info, int argCount, DiagnosticArg const* args)
 {
     // Override the severity in the 'info' structure to pass it further into formatDiagnostics
     info.severity = getEffectiveMessageSeverity(info);
 
     if (info.severity == Severity::Disable)
-        return;
+        return false;
 
     StringBuilder messageBuilder;
     {
@@ -621,7 +622,7 @@ void DiagnosticSink::diagnoseImpl(SourceLoc const& pos, DiagnosticInfo info, int
         formatDiagnostic(this, diagnostic, messageBuilder);
     }
 
-    diagnoseImpl(info, messageBuilder.getUnownedSlice());
+    return diagnoseImpl(info, messageBuilder.getUnownedSlice());
 }
 
 void DiagnosticSink::diagnoseRaw(
