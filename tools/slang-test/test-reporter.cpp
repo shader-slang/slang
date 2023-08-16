@@ -84,10 +84,11 @@ TestReporter::TestReporter() :
     m_isVerbose = false;
 }
 
-Result TestReporter::init(TestOutputMode outputMode, bool isSubReporter)
+Result TestReporter::init(TestOutputMode outputMode, const HashSet<String>& expectedFailureList, bool isSubReporter)
 {
     m_outputMode = outputMode;
     m_isSubReporter = isSubReporter;
+    m_expectedFailureList = expectedFailureList;
     return SLANG_OK;
 }
 
@@ -141,7 +142,8 @@ void TestReporter::addResult(TestResult result)
     assert(m_inTest);
 
     std::lock_guard<std::recursive_mutex> lock(m_mutex);
-
+    if (result == TestResult::Fail && m_expectedFailureList.contains(m_currentInfo.name))
+        result = TestResult::ExpectedFail;
     m_currentInfo.testResult = combine(m_currentInfo.testResult, result);
     m_numCurrentResults++;
 }
@@ -158,6 +160,7 @@ void TestReporter::addResultWithLocation(TestResult result, const char* testText
     assert(m_inTest);
 
     std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    result = adjustResult(m_currentInfo.name.getUnownedSlice(), result);
 
     m_numCurrentResults++;
 
@@ -295,12 +298,13 @@ static void _appendTime(double timeInSec, StringBuilder& out)
     out << timeInSec << "ns";
 }
 
-void TestReporter::_addResult(const TestInfo& info)
+void TestReporter::_addResult(TestInfo info)
 {
     if (info.testResult == TestResult::Ignored && m_hideIgnored)
     {
         return;
     }
+    info.testResult = adjustResult(info.name.getUnownedSlice(), info.testResult);
 
     m_totalTestCount++;
 
@@ -311,6 +315,7 @@ void TestReporter::_addResult(const TestInfo& info)
             break;
 
         case TestResult::Pass:
+        case TestResult::ExpectedFail:
             m_passedTestCount++;
             break;
 
@@ -332,6 +337,9 @@ void TestReporter::_addResult(const TestInfo& info)
         {
         case TestResult::Fail:
             resultString = "FAILED";
+            break;
+        case TestResult::ExpectedFail:
+            resultString = "failed(expected)";
             break;
         case TestResult::Pass:
             resultString = "passed";
@@ -383,7 +391,8 @@ void TestReporter::_addResult(const TestInfo& info)
                     }
                     break;
                 }
-                case TestResult::Pass:     
+                case TestResult::Pass:
+                case TestResult::ExpectedFail:
                 {
                     StringBuilder message;
                     message << info.message;
@@ -443,6 +452,8 @@ void TestReporter::_addResult(const TestInfo& info)
                 case TestResult::Fail:      resultString = "Failed";  break;
                 case TestResult::Pass:      resultString = "Passed";  break;
                 case TestResult::Ignored:   resultString = "Ignored"; break;
+                case TestResult::ExpectedFail:   resultString = "ExpectedFail"; break;
+
                 default:
                     assert(!"unexpected");
                     break;
@@ -713,4 +724,11 @@ void TestReporter::endSuite()
     }
     
     m_suiteStack.removeLast();
+}
+
+TestResult TestReporter::adjustResult(UnownedStringSlice testName, TestResult result)
+{
+    if (result == TestResult::Fail && m_expectedFailureList.contains(testName))
+        result = TestResult::ExpectedFail;
+    return result;
 }

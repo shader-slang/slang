@@ -70,6 +70,8 @@ class TestReporter : public ITestReporter
     void startSuite(const Slang::String& name);
     void endSuite();
 
+    TestResult adjustResult(Slang::UnownedStringSlice testName, TestResult result);
+
     virtual SLANG_NO_THROW void SLANG_MCALL startTest(const char* testName) override;
     virtual SLANG_NO_THROW void SLANG_MCALL addResult(TestResult result) override;
     virtual SLANG_NO_THROW void SLANG_MCALL addResultWithLocation(TestResult result, const char* testText, const char* file, int line) override;
@@ -101,7 +103,7 @@ class TestReporter : public ITestReporter
 
     void outputSummary();
 
-    SlangResult init(TestOutputMode outputMode, bool isSubReporter = false);
+    SlangResult init(TestOutputMode outputMode, const Slang::HashSet<Slang::String>& expectedFailureList, bool isSubReporter = false);
 
         /// Ctor
     TestReporter();
@@ -129,10 +131,10 @@ class TestReporter : public ITestReporter
     bool m_isVerbose = false;
     bool m_hideIgnored = false;
     bool m_isSubReporter = false;
-
+    Slang::HashSet<Slang::String> m_expectedFailureList;
 protected:
     
-    void _addResult(const TestInfo& info);
+    void _addResult(TestInfo info);
     
     Slang::StringBuilder m_currentMessage;
     TestInfo m_currentInfo;
