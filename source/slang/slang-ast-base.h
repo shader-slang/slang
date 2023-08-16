@@ -350,34 +350,34 @@ class Val : public NodeBase
         {
             return as<T>(val->getOperand(index + offset));
         }
-        struct Iterator
+        struct ConstIterator
         {
             const Val* val;
             Index i;
-            bool operator==(Iterator other) const
+            bool operator==(ConstIterator other) const
             {
                 return val == other.val && i == other.i;
             }
-            bool operator!=(Iterator other) const
+            bool operator!=(ConstIterator other) const
             {
                 return val != other.val || i != other.i;
             }
-            T*& operator*() const
+            T *const & operator*() const
             {
-                return *(T**)&val->m_operands[i].values.nodeOperand;
+                return *(this->operator->());
             }
-            T** operator->() const
+            T *const * operator->() const
             {
-                return (T**)&val->m_operands[i].values.nodeOperand;
+                return reinterpret_cast<T *const *>(&val->m_operands[i].values.nodeOperand);
             }
-            Iterator& operator++()
+            ConstIterator& operator++()
             {
                 i++;
                 return *this;
             }
         };
-        Iterator begin() const { return Iterator { val, offset }; }
-        Iterator end() const { return Iterator{ val, offset + count }; }
+        ConstIterator begin() const { return ConstIterator { val, offset }; }
+        ConstIterator end() const { return ConstIterator{ val, offset + count }; }
     };
 
     typedef IValVisitor Visitor;
