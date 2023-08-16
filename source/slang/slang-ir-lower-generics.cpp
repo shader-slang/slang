@@ -176,6 +176,30 @@ namespace Slang
             });
     }
 
+    void stripWrapExistential(IRModule* module)
+    {
+        auto& workList = *module->getContainerPool().getList<IRInst>();
+        workList.add(module->getModuleInst());
+        for (Index i = 0; i < workList.getCount(); i++)
+        {
+            auto inst = workList[i];
+            switch (inst->getOp())
+            {
+            case kIROp_WrapExistential:
+                {
+                    auto operand = inst->getOperand(0);
+                    inst->replaceUsesWith(operand);
+                    inst->removeAndDeallocate();
+                }
+                break;
+            default:
+                for (auto child : inst->getChildren())
+                    workList.add(child);
+                break;
+            }
+        }
+    }
+
     void lowerGenerics(
         TargetRequest*          targetReq,
         IRModule*               module,
@@ -234,5 +258,11 @@ namespace Slang
         generateAnyValueMarshallingFunctions(&sharedContext);
         if (sink->getErrorCount() != 0)
             return;
+
+        // At this point, we should no longer need to care any `WrapExistential` insts,
+        // although they could still exist in the IR in order to call generic stdlib functions,
+        // e.g. RWStucturedBuffer.Load(WrapExistential(sbuffer, type), index).
+        // We should remove them now.
+        stripWrapExistential(module);
     }
 } // namespace Slang

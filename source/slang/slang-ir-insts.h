@@ -606,6 +606,28 @@ struct IRNaturalSizeAndAlignmentDecoration : IRDecoration
     IRIntegerValue getAlignment() { return getAlignmentOperand()->getValue(); }
 };
 
+struct IRSizeAndAlignmentDecoration : IRDecoration
+{
+    IR_LEAF_ISA(SizeAndAlignmentDecoration)
+
+    IRTypeLayoutRuleName getLayoutName() { return IRTypeLayoutRuleName(cast<IRIntLit>(getOperand(0))->getValue()); }
+    
+    IRIntLit* getSizeOperand() { return cast<IRIntLit>(getOperand(1)); }
+    IRIntLit* getAlignmentOperand() { return cast<IRIntLit>(getOperand(2)); }
+    IRIntegerValue getSize() { return getSizeOperand()->getValue(); }
+    IRIntegerValue getAlignment() { return getAlignmentOperand()->getValue(); }
+};
+
+struct IROffsetDecoration : IRDecoration
+{
+    IR_LEAF_ISA(OffsetDecoration)
+
+    IRTypeLayoutRuleName getLayoutName() { return IRTypeLayoutRuleName(cast<IRIntLit>(getOperand(0))->getValue()); }
+
+    IRIntLit* getOffsetOperand() { return cast<IRIntLit>(getOperand(1)); }
+    IRIntegerValue getOffset() { return getOffsetOperand()->getValue(); }
+};
+
 struct IRNaturalOffsetDecoration : IRDecoration
 {
     enum { kOp = kIROp_NaturalOffsetDecoration };
@@ -3103,6 +3125,15 @@ public:
 
     IRUnsizedArrayType* getUnsizedArrayType(
         IRType* elementType);
+
+    IRArrayType* getArrayType(
+        IRType* elementType,
+        IRInst* elementCount,
+        IRInst* stride);
+
+    IRUnsizedArrayType* getUnsizedArrayType(
+        IRType* elementType,
+        IRInst* stride);
 
     IRVectorType* getVectorType(
         IRType* elementType,

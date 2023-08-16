@@ -1217,7 +1217,6 @@ struct SPIRVEmitContext
         case kIROp_StructType:
             {
                 List<IRType*> types;
-                // TODO: decorate offset
                 for (auto field : static_cast<IRStructType*>(inst)->getFields())
                     types.add(field->getFieldType());
                 auto spvStructType = emitOpTypeStruct(
@@ -1225,6 +1224,7 @@ struct SPIRVEmitContext
                     types
                 );
                 emitDecorations(inst, getID(spvStructType));
+                emitLayoutDecorations(as<IRStructType>(inst), getID(spvStructType));
                 return spvStructType;
             }
         case kIROp_VectorType:
@@ -1248,35 +1248,6 @@ struct SPIRVEmitContext
                     vectorSpvType,
                     SpvLiteralInteger::from32(int32_t(columnCount))
                 );
-                // TODO: properly compute matrix stride.
-                uint32_t stride = 0;
-                switch (columnCount)
-                {
-                case 1:
-                    stride = 4;
-                    break;
-                case 2:
-                    stride = 8;
-                    break;
-                case 3:
-                case 4:
-                    stride = 16;
-                    break;
-                default:
-                    break;
-                }
-                // TODO: This decoration is not legal here. It must be placed
-                // on a struct member (which may entail wrapping matrices)
-                emitOpDecorate(
-                    getSection(SpvLogicalSectionID::Annotations),
-                    nullptr,
-                    matrixSPVType,
-                    SpvDecorationRowMajor);
-                emitOpDecorateMatrixStride(
-                    getSection(SpvLogicalSectionID::Annotations),
-                    nullptr,
-                    matrixSPVType,
-                    SpvLiteralInteger::from32(stride));
                 return matrixSPVType;
             }
         case kIROp_ArrayType:
@@ -1286,15 +1257,23 @@ struct SPIRVEmitContext
                 const auto arrayType = inst->getOp() == kIROp_ArrayType
                     ? emitOpTypeArray(inst, elementType, static_cast<IRArrayTypeBase*>(inst)->getElementCount())
                     : emitOpTypeRuntimeArray(inst, elementType);
-                // TODO: properly decorate stride.
-                // TODO: don't do this more than once
-                IRSizeAndAlignment sizeAndAlignment;
-                getNaturalSizeAndAlignment(this->m_targetRequest, elementType, &sizeAndAlignment);
+                auto strideInst = as<IRArrayTypeBase>(inst)->getArrayStride();
+                int stride = 0;
+                if (strideInst)
+                {
+                    stride = (int)getIntVal(strideInst);
+                }
+                else
+                {
+                    IRSizeAndAlignment sizeAndAlignment;
+                    getNaturalSizeAndAlignment(this->m_targetRequest, elementType, &sizeAndAlignment);
+                    stride = (int)sizeAndAlignment.getStride();
+                }
                 emitOpDecorateArrayStride(
                     getSection(SpvLogicalSectionID::Annotations),
                     nullptr,
                     arrayType,
-                    SpvLiteralInteger::from32(int32_t(sizeAndAlignment.getStride())));
+                    SpvLiteralInteger::from32(stride));
                 return arrayType;
             }
 
@@ -1841,13 +1820,6 @@ struct SPIRVEmitContext
             return emitLoad(parent, as<IRLoad>(inst));
         case kIROp_Store:
             return emitStore(parent, as<IRStore>(inst));
-        case kIROp_StructuredBufferLoad:
-        case kIROp_StructuredBufferLoadStatus:
-        case kIROp_RWStructuredBufferLoad:
-        case kIROp_RWStructuredBufferLoadStatus:
-            return emitStructuredBufferLoad(parent, inst);
-        case kIROp_RWStructuredBufferStore:
-            return emitStructuredBufferStore(parent, inst);
         case kIROp_RWStructuredBufferGetElementPtr:
             return emitStructuredBufferGetElementPtr(parent, inst);
         case kIROp_swizzle:
@@ -2072,39 +2044,6 @@ struct SPIRVEmitContext
         default:
             break;
 
-        case kIROp_LayoutDecoration:
-            {
-                // Basic offsets for structs used in buffers
-                if(const auto typeLayout = as<IRTypeLayout>(as<IRLayoutDecoration>(decoration)->getLayout()))
-                {
-                    if(const auto structTypeLayout = as<IRStructTypeLayout>(typeLayout))
-                    {
-                        auto section = getSection(SpvLogicalSectionID::Annotations);
-                        SpvWord i = 0;
-                        for(const auto fieldLayoutAttr : structTypeLayout->getFieldLayoutAttrs())
-                        {
-                            if(const auto structFieldLayoutAttr = as<IRStructFieldLayoutAttr>(fieldLayoutAttr))
-                            {
-                                const auto varLayout = structFieldLayoutAttr->getLayout();
-                                if(const auto varOffsetAttr = varLayout->findOffsetAttr(LayoutResourceKind::Uniform))
-                                {
-                                    const auto offset = static_cast<SpvWord>(varOffsetAttr->getOffset());
-                                    emitOpMemberDecorateOffset(
-                                        section,
-                                        fieldLayoutAttr,
-                                        dstID,
-                                        SpvLiteralInteger::from32(i),
-                                        SpvLiteralInteger::from32(offset)
-                                    );
-                                }
-                            }
-                            ++i;
-                        }
-                    }
-                }
-            }
-            break;
-
         // [3.32.2. Debug Instructions]
         //
         // > OpName
@@ -2218,6 +2157,76 @@ struct SPIRVEmitContext
             }
             break;
         // ...
+        }
+    }
+
+    void emitLayoutDecorations(IRStructType* structType, SpvWord spvStructID)
+    {
+        /*****
+        * SPIRV Spec:
+        * Each structure-type member must have an Offset decoration.
+        * 
+        * Each array type must have an ArrayStride decoration, unless it is an
+        * array that contains a structure decorated with Block or BufferBlock, in
+        * which case it must not have an ArrayStride decoration.
+        * 
+        * Each structure-type member that is a matrix or array-of-matrices must be
+        * decorated with a MatrixStride Decoration, and one of the RowMajor or
+        * ColMajor decorations.
+        * 
+        * The ArrayStride, MatrixStride, and Offset decorations must be large
+        * enough to hold the size of the objects they affect (that is, specifying
+        * overlap is invalid). Each ArrayStride and MatrixStride must be greater
+        * than zero, and it is invalid for two members of a given structure to be
+        * assigned the same Offset.
+        * 
+        *****/
+        auto layout = structType->findDecoration<IRSizeAndAlignmentDecoration>();
+        IRTypeLayoutRuleName layoutRuleName = IRTypeLayoutRuleName::Natural;
+        if (layout)
+        {
+            layoutRuleName = layout->getLayoutName();
+        }
+        int32_t id = 0;
+        for (auto field : structType->getFields())
+        {
+            IRIntegerValue offset = 0;
+            getOffset(IRTypeLayoutRules::get(layoutRuleName), field, &offset);
+            emitOpMemberDecorateOffset(
+                getSection(SpvLogicalSectionID::Annotations),
+                nullptr,
+                spvStructID,
+                SpvLiteralInteger::from32(id),
+                SpvLiteralInteger::from32(int32_t(offset)));
+            auto matrixType = as<IRMatrixType>(field->getFieldType());
+            auto arrayType = as<IRArrayTypeBase>(field->getFieldType());
+            if (!matrixType && arrayType)
+            {
+                matrixType = as<IRMatrixType>(arrayType->getElementType());
+            }
+            if (matrixType)
+            {
+                IRSizeAndAlignment matrixSize;
+                getSizeAndAlignment(IRTypeLayoutRules::get(layoutRuleName), matrixType, &matrixSize);
+                // Reminder: the meaning of row/column major layout
+                // in our semantics is the *opposite* of what GLSL/SPIRV
+                // calls them, because what they call "columns"
+                // are what we call "rows."
+                //
+                emitOpMemberDecorate(
+                    getSection(SpvLogicalSectionID::Annotations),
+                    nullptr,
+                    spvStructID,
+                    SpvLiteralInteger::from32(id),
+                    getIntVal(matrixType->getLayout()) == SLANG_MATRIX_LAYOUT_COLUMN_MAJOR? SpvDecorationRowMajor : SpvDecorationColMajor);
+                emitOpMemberDecorateMatrixStride(
+                    getSection(SpvLogicalSectionID::Annotations),
+                    nullptr,
+                    spvStructID,
+                    SpvLiteralInteger::from32(id),
+                    SpvLiteralInteger::from32((int32_t)matrixSize.getStride()));
+            }
+            id++;
         }
     }
 
@@ -2860,22 +2869,6 @@ struct SPIRVEmitContext
     SpvInst* emitStore(SpvInstParent* parent, IRStore* inst)
     {
         return emitOpStore(parent, inst, inst->getPtr(), inst->getVal());
-    }
-
-    SpvInst* emitStructuredBufferLoad(SpvInstParent* parent, IRInst* inst)
-    {
-        //"%addr = OpAccessChain resultType*StorageBuffer resultId _0 const(int, 0) _1; OpLoad resultType resultId %addr;"
-        IRBuilder builder(inst);
-        auto addr = emitInst(parent, inst, SpvOpAccessChain, inst->getOperand(0)->getDataType(), kResultID, inst->getOperand(0), emitIntConstant(0, builder.getIntType()), inst->getOperand(1));
-        return emitInst(parent, inst, SpvOpLoad, inst->getFullType(), kResultID, addr);
-    }
-    
-    SpvInst* emitStructuredBufferStore(SpvInstParent* parent, IRInst* inst)
-    {
-        //"%addr = OpAccessChain resultType*StorageBuffer resultId _0 const(int, 0) _1; OpStore %addr _2;"
-        IRBuilder builder(inst);
-        auto addr = emitInst(parent, inst, SpvOpAccessChain, inst->getOperand(0)->getDataType(), kResultID, inst->getOperand(0), emitIntConstant(0, builder.getIntType()), inst->getOperand(1));
-        return emitInst(parent, inst, SpvOpStore, addr, inst->getOperand(2));
     }
 
     SpvInst* emitStructuredBufferGetElementPtr(SpvInstParent* parent, IRInst* inst)

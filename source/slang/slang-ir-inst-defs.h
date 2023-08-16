@@ -731,6 +731,12 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// A `[ForceUnroll]` decoration indicates the loop should be unrolled by the Slang compiler.
     INST(ForceUnrollDecoration, ForceUnroll, 0, 0)
 
+        /// A `[SizeAndAlignment(l,s,a)]` decoration is attached to a type to indicate that is has size `s` and alignment `a` under layout rules `l`.
+    INST(SizeAndAlignmentDecoration, SizeAndAlignment, 3, 0)
+
+        /// A `[Offset(l, o)]` decoration is attached to a field to indicate that it has offset `o` in the parent type under layout rules `l`.
+    INST(OffsetDecoration, Offset, 2, 0)
+
         /// A `[naturalSizeAndAlignment(s,a)]` decoration is attached to a type to indicate that is has natural size `s` and alignment `a`
     INST(NaturalSizeAndAlignmentDecoration, naturalSizeAndAlignment, 2, 0)
 

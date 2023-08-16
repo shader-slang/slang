@@ -2809,6 +2809,29 @@ namespace Slang
             operands);
     }
 
+    IRArrayType* IRBuilder::getArrayType(
+        IRType* elementType,
+        IRInst* elementCount,
+        IRInst* stride)
+    {
+        IRInst* operands[] = { elementType, elementCount, stride };
+        return (IRArrayType*)getType(
+            kIROp_ArrayType,
+            sizeof(operands) / sizeof(operands[0]),
+            operands);
+    }
+
+    IRUnsizedArrayType* IRBuilder::getUnsizedArrayType(
+        IRType* elementType,
+        IRInst* stride)
+    {
+        IRInst* operands[] = { elementType, stride };
+        return (IRUnsizedArrayType*)getType(
+            kIROp_UnsizedArrayType,
+            sizeof(operands) / sizeof(operands[0]),
+            operands);
+    }
+
     IRVectorType* IRBuilder::getVectorType(
         IRType* elementType,
         IRInst* elementCount)

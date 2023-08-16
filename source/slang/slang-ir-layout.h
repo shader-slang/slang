@@ -18,7 +18,6 @@
 
 #include "slang-ir.h"
 
-
 namespace Slang
 {
 class TargetRequest;
@@ -50,6 +49,23 @@ struct IRSizeAndAlignment
         return align(size, alignment);
     }
 };
+
+struct IRTypeLayoutRules
+{
+public:
+    IRTypeLayoutRuleName ruleName;
+    virtual IRSizeAndAlignment alignCompositeElement(IRSizeAndAlignment elementSize) = 0;
+    virtual IRSizeAndAlignment getVectorSizeAndAlignment(IRSizeAndAlignment element, IRIntegerValue count) = 0;
+    static IRTypeLayoutRules* getStd430();
+    static IRTypeLayoutRules* getStd140();
+    static IRTypeLayoutRules* getNatural();
+    static IRTypeLayoutRules* get(IRTypeLayoutRuleName name);
+};
+
+Result getOffset(IRTypeLayoutRules* rules, IRStructField* field, IRIntegerValue* outOffset);
+
+Result getSizeAndAlignment(IRTypeLayoutRules* rules, IRType* type, IRSizeAndAlignment* outSizeAndAlignment);
+
 
     /// Compute (if necessary) and return the natural size and alignment of `type`.
     ///
