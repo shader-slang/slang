@@ -2113,7 +2113,7 @@ bool finalizeAutoDiffPass(IRModule* module)
     // 
     releaseNullDifferentialType(&autodiffContext);
 
-    return false;
+    return modified;
 }
 
 IRBlock* getBlock(IRInst* inst)

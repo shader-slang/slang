@@ -270,10 +270,8 @@ namespace Slang
             }
 
             // Replace all optional types with lowered struct types.
-            for (auto kv : loweredOptionalTypes)
-            {
-                kv.key->replaceUsesWith(kv.value->loweredType);
-            }
+            for (const auto& [key, value] : loweredOptionalTypes)
+                key->replaceUsesWith(value->loweredType);
         }
     };
     

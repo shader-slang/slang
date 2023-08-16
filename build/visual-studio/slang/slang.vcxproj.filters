@@ -120,6 +120,9 @@
     <ClInclude Include="..\..\..\source\slang\slang-emit-source-writer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-emit-spirv-ops-debug-info-ext.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-emit-spirv-ops.h">
       <Filter>Header Files</Filter>
     </ClInclude>

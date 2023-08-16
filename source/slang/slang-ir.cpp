@@ -3123,6 +3123,23 @@ namespace Slang
     {
         return emitIntrinsicInst((IRType*)type, kIROp_OutImplicitCast, 1, &value);
     }
+    IRInst* IRBuilder::emitDebugSource(UnownedStringSlice fileName, UnownedStringSlice source)
+    {
+        IRInst* args[] = { getStringValue(fileName), getStringValue(source) };
+        return emitIntrinsicInst(getVoidType(), kIROp_DebugSource, 2, args);
+    }
+    IRInst* IRBuilder::emitDebugLine(IRInst* source, IRIntegerValue lineStart, IRIntegerValue lineEnd, IRIntegerValue colStart, IRIntegerValue colEnd)
+    {
+        IRInst* args[] = 
+        {
+            source,
+            getIntValue(getIntType(), lineStart),
+            getIntValue(getIntType(), lineEnd),
+            getIntValue(getIntType(), colStart),
+            getIntValue(getIntType(), colEnd)
+        };
+        return emitIntrinsicInst(getVoidType(), kIROp_DebugLine, 5, args);
+    }
     IRLiveRangeStart* IRBuilder::emitLiveRangeStart(IRInst* referenced)
     {
         // This instruction doesn't produce any result, 

@@ -612,6 +612,24 @@ namespace Slang
         m_buffer->length += strnlen_s(data, kCount);
     }
 
+    void String::append(StableHashCode32 value)
+    {
+        const Index digits = 8;
+        // + null terminator
+        char* data = prepareForAppend(digits + 1);
+        auto count = intToAscii(data, value.hash, 16, digits);
+        m_buffer->length += count;
+    }
+
+    void String::append(StableHashCode64 value)
+    {
+        const Index digits = 16;
+        // + null terminator
+        char* data = prepareForAppend(digits + 1);
+        auto count = intToAscii(data, value.hash, 16, digits);
+        m_buffer->length += count;
+    }
+
     // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! UnownedStringSlice !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     Index UnownedStringSlice::indexOf(char c) const

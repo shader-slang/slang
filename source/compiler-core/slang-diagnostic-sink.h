@@ -163,30 +163,31 @@ public:
     SLANG_FORCE_INLINE int getErrorCount() { return m_errorCount; }
 
     template<typename P, typename... Args>
-    void diagnose(P const& pos, DiagnosticInfo const& info, Args const&... args )
+    bool diagnose(P const& pos, DiagnosticInfo const& info, Args const&... args )
     {
         DiagnosticArg as[] = { DiagnosticArg(args)... };
-        diagnoseImpl(getDiagnosticPos(pos), info, sizeof...(args), as);
+        return diagnoseImpl(getDiagnosticPos(pos), info, sizeof...(args), as);
     }
 
     template<typename P>
-    void diagnose(P const& pos, DiagnosticInfo const& info)
+    bool diagnose(P const& pos, DiagnosticInfo const& info)
     {
         // MSVC gets upset with the zero sized array above, so overload that case here
-        diagnoseImpl(getDiagnosticPos(pos), info, 0, nullptr);
+        return diagnoseImpl(getDiagnosticPos(pos), info, 0, nullptr);
     }
 
     // Useful for notes on existing diagnostics, where it would be redundant to display the same line again.
     // (Ideally we would print the error/warning and notes in one call...)
     template<typename P, typename... Args>
-    void diagnoseWithoutSourceView(P const& pos, DiagnosticInfo const& info, Args const&... args )
+    bool diagnoseWithoutSourceView(P const& pos, DiagnosticInfo const& info, Args const&... args )
     {
         const auto fs = this->getFlags();
         this->resetFlag(Flag::SourceLocationLine);
 
-        diagnose(pos, info, args...);
+        auto result = diagnose(pos, info, args...);
 
         this->setFlags(fs);
+        return result;
     }
 
         // Add a diagnostic with raw text
@@ -259,8 +260,9 @@ public:
     ISlangWriter* writer = nullptr;
 
 protected:
-    void diagnoseImpl(SourceLoc const& pos, DiagnosticInfo info, int argCount, DiagnosticArg const* args);
-    void diagnoseImpl(DiagnosticInfo const& info, const UnownedStringSlice& formattedMessage);
+    // Returns true if a diagnostic is actually written.
+    bool diagnoseImpl(SourceLoc const& pos, DiagnosticInfo info, int argCount, DiagnosticArg const* args);
+    bool diagnoseImpl(DiagnosticInfo const& info, const UnownedStringSlice& formattedMessage);
 
     Severity getEffectiveMessageSeverity(DiagnosticInfo const& info);
 

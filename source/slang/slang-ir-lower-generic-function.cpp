@@ -370,10 +370,8 @@ namespace Slang
 
         void replaceLoweredInterfaceTypes()
         {
-            for (auto lowered : sharedContext->loweredInterfaceTypes)
-            {
-                 lowered.key->replaceUsesWith(lowered.value);
-            }
+            for (const auto& [loweredKey, loweredValue] : sharedContext->loweredInterfaceTypes)
+                 loweredKey->replaceUsesWith(loweredValue);
             sharedContext->mapInterfaceRequirementKeyValue.clear();
         }
 

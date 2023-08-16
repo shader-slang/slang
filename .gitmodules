@@ -25,3 +25,6 @@
 [submodule "external/lz4"]
 	path = external/lz4
 	url = https://github.com/lz4/lz4
+[submodule "external/unordered_dense"]
+	path = external/unordered_dense
+	url = https://github.com/martinus/unordered_dense.git

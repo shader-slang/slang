@@ -2744,10 +2744,8 @@ void legalizeEntryPointForGLSL(
 
     // Let's fix the size array type globals now that we know the maximum index
     {
-        for (const auto& a : context.systemNameToGlobalMap)
+        for (const auto& [_, value] : context.systemNameToGlobalMap)
         {
-            const auto& value = a.value;
-
             auto type = value.globalParam->getDataType();
 
             // Strip out if there is one

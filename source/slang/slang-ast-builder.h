@@ -57,7 +57,7 @@ public:
 
     Decl* findBuiltinRequirementDecl(BuiltinRequirementKind kind)
     {
-        return m_builtinRequirementDecls[kind].getValue();
+        return m_builtinRequirementDecls.getValue(kind);
     }
 
         /// A name pool that can be used for lookup for findClassInfo etc. It is the same pool as the Session.
@@ -154,6 +154,35 @@ struct ValKey
     HashCode getHashCode() const { return hashCode; }
 };
 
+// Add a specialization which can hash both ValKey and ValNodeDesc
+template<>
+struct Hash<ValKey>
+{
+    using is_transparent = void;
+    auto operator()(const ValKey& k) const
+    {
+        return k.getHashCode();
+    }
+    auto operator()(const ValNodeDesc& k) const
+    {
+        return Hash<ValNodeDesc>{}(k);
+    }
+};
+
+// A functor which can compare ValKey for equality with ValNodeDesc
+struct ValKeyEqual
+{
+    using is_transparent = void;
+    bool operator()(const Slang::ValKey& a, const Slang::ValKey& b) const
+    {
+        return a == b;
+    }
+    bool operator()(const Slang::ValNodeDesc& a, const Slang::ValKey& b) const
+    {
+        return b == a;
+    }
+};
+
 class ASTBuilder : public RefObject
 {
     friend class SharedASTBuilder;
@@ -176,7 +205,7 @@ public:
 
     /// A cache for AST nodes that are entirely defined by their node type, with
     /// no need for additional state.
-    Dictionary<ValKey, Val*> m_cachedNodes;
+    Dictionary<ValKey, Val*, Hash<ValKey>, ValKeyEqual> m_cachedNodes;
 
     Dictionary<GenericDecl*, List<Val*>> m_cachedGenericDefaultArgs;
 

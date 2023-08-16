@@ -571,7 +571,7 @@ struct DiffTransposePass
         // Keep track of first diff block, since this is where 
         // we'll emit temporary vars to hold per-block derivatives.
         // 
-        auto firstRevDiffBlock = revBlockMap[terminalDiffBlocks[0]].getValue();
+        auto firstRevDiffBlock = revBlockMap.getValue(terminalDiffBlocks[0]);
         firstRevDiffBlockMap[revDiffFunc] = firstRevDiffBlock;
 
         // Move all diff vars to first block, and initialize them with zero.
@@ -861,11 +861,14 @@ struct DiffTransposePass
         // function scope variable, since control flow can affect what blocks contribute to
         // for a specific inst.
         // 
-        for (auto pair : gradientsMap)
+        List<IRLoad*> loads;
+        for (const auto& [key, _] : gradientsMap)
         {
-            if (auto loadInst = as<IRLoad>(pair.key))
-                accumulateGradientsForLoad(&builder, loadInst);
+            if (auto load = as<IRLoad>(key))
+                loads.add(load);
         }
+        for(const auto& load : loads)
+                accumulateGradientsForLoad(&builder, load);
 
         // Do the same thing with the phi parameters if the block.
         List<IRInst*> phiParamRevGradInsts;
@@ -909,16 +912,16 @@ struct DiffTransposePass
         // Also handle any remaining gradients for insts that appear in prior blocks.
         List<IRInst*> externInsts; // Holds insts in a different block, same function.
         List<IRInst*> globalInsts; // Holds insts in the global scope.
-        for (auto pair : gradientsMap)
+        for (const auto& [inst, _] : gradientsMap)
         {
-            auto instParent = pair.key->getParent();
+            auto instParent = inst->getParent();
             if (instParent != fwdBlock)
             {
                 if (instParent->getParent() == fwdBlock->getParent())
-                    externInsts.add(pair.key);
+                    externInsts.add(inst);
                 
                 if (as<IRModuleInst>(instParent))
-                    globalInsts.add(pair.key);
+                    globalInsts.add(inst);
             }
         }
 
@@ -1357,7 +1360,7 @@ struct DiffTransposePass
                 SLANG_ASSERT(!(afterBlockMap.containsKey(afterBlock) && \
                     afterBlockMap[afterBlock] != block->getTerminator()));
 
-                afterBlockMap[afterBlock] = block->getTerminator();
+                afterBlockMap.set(afterBlock, block->getTerminator());
             }
         }
     }
@@ -2911,7 +2914,7 @@ struct DiffTransposePass
         {
             gradientsMap[fwdInst] = List<RevGradient>();
         }
-        gradientsMap[fwdInst].getValue().add(assignment);
+        gradientsMap.getValue(fwdInst).add(assignment);
     }
 
     List<RevGradient> getRevGradients(IRInst* fwdInst)
@@ -2921,7 +2924,7 @@ struct DiffTransposePass
 
     List<RevGradient> popRevGradients(IRInst* fwdInst)
     {
-        List<RevGradient> val = gradientsMap[fwdInst].getValue();
+        List<RevGradient> val = gradientsMap.getValue(fwdInst);
         gradientsMap.remove(fwdInst);
         return val;
     }

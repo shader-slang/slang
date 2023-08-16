@@ -109,7 +109,7 @@ static Dictionary<IRBlock*, IRBlock*> createPrimalRecomputeBlocks(
         recomputeBlock->insertAtEnd(func);
         builder.addDecoration(recomputeBlock, kIROp_RecomputeBlockDecoration);
         recomputeBlockMap.add(primalBlock, recomputeBlock);
-        indexedBlockInfo[recomputeBlock] = indexedBlockInfo[primalBlock].getValue();
+        indexedBlockInfo.set(recomputeBlock, indexedBlockInfo.getValue(primalBlock));
         return recomputeBlock;
     };
     
@@ -189,7 +189,7 @@ static Dictionary<IRBlock*, IRBlock*> createPrimalRecomputeBlocks(
             // Queue work for the subregion.
             auto loop = as<IRLoop>(primalBlock->getTerminator());
             auto bodyBlock = getLoopRegionBodyBlock(loop);
-            auto diffLoop = mapPrimalLoopToDiffLoop[loop].getValue();
+            auto diffLoop = mapPrimalLoopToDiffLoop.getValue(loop);
             auto diffBodyBlock = getLoopRegionBodyBlock(diffLoop);
             auto bodyRecomputeBlock = createRecomputeBlock(bodyBlock);
             bodyRecomputeBlock->insertBefore(diffBodyBlock);
@@ -500,11 +500,10 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
 struct ImplicationParams
 {
     IRInst *condition, *induction, *block;
-    HashCode getHashCode() const { return getHashCodeBytewise(*this); }
-    // C++20: friend auto operator<=>(const ImplicationParams&, const ImplicationParams&) = default;
-    friend bool operator==(const ImplicationParams& x, const ImplicationParams& y)
+    SLANG_BYTEWISE_HASHABLE;
+    bool operator==(const ImplicationParams& other) const
     {
-        return x.condition == y.condition && x.induction == y.induction && x.block == y.block;
+        return condition == other.condition && induction == other.induction && block == other.block;
     }
 };
 
@@ -994,7 +993,7 @@ void applyCheckpointSet(
                 predecessorSet.add(predecessor);
                 
                 auto primalPhiArg = as<IRUnconditionalBranch>(predecessor->getTerminator())->getArg(ii);
-                auto recomputePredecessor = mapPrimalBlockToRecomputeBlock[predecessor].getValue();
+                auto recomputePredecessor = mapPrimalBlockToRecomputeBlock.getValue(predecessor);
 
                 // For now, find the primal phi argument in this predecessor,
                 // and stick it into the recompute predecessor's branch inst. We
@@ -1241,7 +1240,7 @@ static int getInstRegionNestLevel(
     IRBlock* defBlock,
     IRInst* inst)
 {
-    auto result = indexedBlockInfo[defBlock].getValue().getCount();
+    auto result = indexedBlockInfo.getValue(defBlock).getCount();
     // Loop counters are considered to not belong to the region started by the its loop.
     if (result > 0 && inst->findDecoration<IRLoopCounterDecoration>())
         result--;
@@ -1355,7 +1354,7 @@ static List<IndexTrackingInfo> maybeTrimIndices(
         {
             auto useInst = use.getUser();
             auto useBlock = useInst->getParent();
-            auto useBlockIndices = indexedBlockInfo[as<IRBlock>(useBlock)].getValue();
+            auto useBlockIndices = indexedBlockInfo.getValue(as<IRBlock>(useBlock));
             if (useBlockIndices.contains(index))
             {
                 found = true;
@@ -1543,7 +1542,7 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
                 continue;
             }
 
-            auto defBlockIndices = indexedBlockInfo[defBlock].getValue();
+            auto defBlockIndices = indexedBlockInfo.getValue(defBlock);
             IRBlock* varBlock = defaultVarBlock;
             if (isRecomputeInst)
             {

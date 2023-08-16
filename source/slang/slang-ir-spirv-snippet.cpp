@@ -102,7 +102,7 @@ RefPtr<SpvSnippet> SpvSnippet::parse(UnownedStringSlice definition)
             if (tokenReader.AdvanceIf("%"))
             {
                 String instName = tokenReader.ReadToken().Content;
-                mapInstNameToIndex[instName] = (int)snippet->instructions.getCount();
+                mapInstNameToIndex.set(instName, (int)snippet->instructions.getCount());
                 tokenReader.Read(Slang::Misc::TokenType::OpAssign);
             }
             SpvOp opCode;

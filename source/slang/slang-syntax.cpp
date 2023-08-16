@@ -411,7 +411,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         ASTBuilder*     astBuilder,
         DeclRef<Decl>   declRef)
     {
-        if (auto builtinMod = declRef.getDecl()->findModifier<BuiltinTypeModifier>())
+        if (declRef.getDecl()->findModifier<BuiltinTypeModifier>())
         {
             // Always create builtin types in global AST builder.
             if (astBuilder->getSharedASTBuilder()->getInnerASTBuilder() != astBuilder)
