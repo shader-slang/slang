@@ -170,6 +170,7 @@ void Session::init()
 
     // Built in linkage uses the built in builder
     m_builtinLinkage = new Linkage(this, builtinAstBuilder, nullptr);
+    m_builtinLinkage->debugInfoLevel = DebugInfoLevel::None;
 
     // Because the `Session` retains the builtin `Linkage`,
     // we need to make sure that the parent pointer inside
@@ -2425,8 +2426,6 @@ void FrontEndCompileRequest::generateIR()
         // * it can generate diagnostics
 
         /// Generate IR for translation unit.
-        /// TODO(JS): Use the linkage ASTBuilder, because it seems possible that cross module constructs are possible in
-        /// ir lowering.
         RefPtr<IRModule> irModule(generateIRForTranslationUnit(getLinkage()->getASTBuilder(), translationUnit));
 
         if (verifyDebugSerialization)

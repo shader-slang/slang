@@ -946,11 +946,11 @@ static void addExplicitParameterBinding(
             }
             else
             {
-                getSink(context)->diagnose(paramA, diagnosticInfo,
+                bool written = getSink(context)->diagnose(paramA, diagnosticInfo,
                     getReflectionName(paramA),
                     getReflectionName(paramB));
-
-                getSink(context)->diagnose(paramB, Diagnostics::seeDeclarationOf, getReflectionName(paramB));
+                if (written)
+                    getSink(context)->diagnose(paramB, Diagnostics::seeDeclarationOf, getReflectionName(paramB));
             }
         }
     }
