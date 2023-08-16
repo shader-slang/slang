@@ -658,8 +658,8 @@ namespace Slang
     // Remove [KeepAlive] decorations for primal param replacement insts.
     static void _unlockPrimalParamReplacementInsts(ParameterBlockTransposeInfo& paramInfo)
     {
-        for (auto& kv : paramInfo.mapPrimalSpecificParamToReplacementInPropFunc)
-            kv.value->findDecoration<IRKeepAliveDecoration>()->removeAndDeallocate();
+        for (const auto& [_, value] : paramInfo.mapPrimalSpecificParamToReplacementInPropFunc)
+            value->findDecoration<IRKeepAliveDecoration>()->removeAndDeallocate();
     }
 
     // Transcribe a function definition.

@@ -83,14 +83,17 @@ static void _addFile(const String& path, const ArtifactDesc& desc, IOSFileArtifa
     // Display full path of source files in diagnostics
     cmdLine.addArg("/FC");
 
-    if (options.flags & CompileOptions::Flag::EnableExceptionHandling)
+    if (options.sourceLanguage == SLANG_SOURCE_LANGUAGE_CPP)
     {
-        if (options.sourceLanguage == SLANG_SOURCE_LANGUAGE_CPP)
+        if (options.flags & CompileOptions::Flag::EnableExceptionHandling)
         {
             // https://docs.microsoft.com/en-us/cpp/build/reference/eh-exception-handling-model?view=vs-2019
             // Assumes c functions cannot throw
             cmdLine.addArg("/EHsc");
         }
+
+        // To maintain parity with the slang compiler headers which are shared
+        cmdLine.addArg("/std:c++17");
     }
 
     if (options.flags & CompileOptions::Flag::Verbose)

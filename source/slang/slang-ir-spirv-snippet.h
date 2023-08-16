@@ -76,7 +76,7 @@ struct SpvSnippet : public RefObject
         ASMType type;
         SpvWord intValues[4];
         float floatValues[4];
-        HashCode getHashCode()
+        HashCode getHashCode() const
         {
             HashCode result = (HashCode)type;
             for (int i = 0; i < 4; i++)
@@ -96,7 +96,7 @@ struct SpvSnippet : public RefObject
             }
             return result;
         }
-        bool operator==(const ASMConstant& other)
+        bool operator==(const ASMConstant& other) const
         {
             if (type != other.type)
                 return false;

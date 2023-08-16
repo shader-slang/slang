@@ -159,11 +159,8 @@ struct DiffUnzipPass
         //
         {
             List<IRBlock*> workList;
-            for (auto blockRegionPair : indexRegionMap->map)
-            {
-                IRBlock* block = blockRegionPair.key;
+            for (auto [block, _] : indexRegionMap->map)
                 workList.add(block);
-            }
 
             for (auto block : workList)
             {
@@ -171,7 +168,7 @@ struct DiffUnzipPass
                     indexRegionMap->map[as<IRBlock>(primalMap[block])] = (IndexedRegion*)indexRegionMap->map[block];
                 
                 if (diffMap.containsKey(block))
-                    indexRegionMap->map[as<IRBlock>(diffMap[block])] = (IndexedRegion*)indexRegionMap->map[block];
+                    indexRegionMap->map.set(as<IRBlock>(diffMap[block]), (IndexedRegion*)indexRegionMap->map[block]);
             }
         }
         

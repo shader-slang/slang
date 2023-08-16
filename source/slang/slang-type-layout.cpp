@@ -1986,12 +1986,12 @@ RefPtr<TypeLayout> applyOffsetToTypeLayout(
             mapOldFieldToNew.add(oldField.Ptr(), newField.Ptr());
         }
 
-        for (auto entry : oldStructTypeLayout->mapVarToLayout)
+        for (const auto& [entryKey, entryValue] : oldStructTypeLayout->mapVarToLayout)
         {
             VarLayout* newFieldLayout = nullptr;
-            if (mapOldFieldToNew.tryGetValue(entry.value.Ptr(), newFieldLayout))
+            if (mapOldFieldToNew.tryGetValue(entryValue.Ptr(), newFieldLayout))
             {
-                newStructTypeLayout->mapVarToLayout.add(entry.key, newFieldLayout);
+                newStructTypeLayout->mapVarToLayout.add(entryKey, newFieldLayout);
             }
         }
 
@@ -2705,8 +2705,9 @@ static RefPtr<TypeLayout> _createParameterGroupTypeLayout(
     // We will first compute a layout for the element type of
     // the parameter group.
     //
-    auto elementTypeLayout = createTypeLayout(
-        context.with(elementTypeRules),
+    auto elementTypeLayout = createTypeLayoutWith(
+        context,
+        elementTypeRules,
         elementType);
 
     // Now we delegate to a routine that does the meat of
@@ -2830,8 +2831,9 @@ createStructuredBufferTypeLayout(
     auto structuredBufferLayoutRules = context.getRulesFamily()->getStructuredBufferRules(context.targetReq);
 
     // Create and save type layout for the buffer contents.
-    auto elementTypeLayout = createTypeLayout(
-        context.with(structuredBufferLayoutRules),
+    auto elementTypeLayout = createTypeLayoutWith(
+        context,
+        structuredBufferLayoutRules,
         elementType);
 
     return createStructuredBufferTypeLayout(
@@ -2849,7 +2851,7 @@ createStructuredBufferTypeLayout(
     /// together as a `TypeLayoutResult`.
     ///
 static TypeLayoutResult _createTypeLayout(
-    TypeLayoutContext const&    context,
+    TypeLayoutContext&          context,
     Type*                       type);
 
     /// Create layout information for the given `type`, obeying any layout modifiers on the given declaration.
@@ -3131,10 +3133,8 @@ static RefPtr<TypeLayout> maybeAdjustLayoutForArrayElementType(
             mapOriginalFieldToAdjusted.add(originalField, adjustedField);
         }
 
-        for( auto p : originalStructTypeLayout->mapVarToLayout )
+        for( auto [key, originalVal] : originalStructTypeLayout->mapVarToLayout )
         {
-            VarDeclBase* key = p.key;
-            RefPtr<VarLayout> originalVal = p.value;
             RefPtr<VarLayout> adjustedVal;
             if( mapOriginalFieldToAdjusted.tryGetValue(originalVal, adjustedVal) )
             {
@@ -3436,7 +3436,7 @@ static bool _isDescriptorSlotLike(
 }
 
 static TypeLayoutResult createArrayLikeTypeLayout(
-    TypeLayoutContext const&    context,
+    TypeLayoutContext& context,
     Type* type,
     Type* baseType,
     IntVal* arrayLength
@@ -3607,23 +3607,23 @@ static TypeLayoutResult createArrayLikeTypeLayout(
     return TypeLayoutResult(typeLayout, arrayUniformInfo);
 }
 
-static void _addLayout(TypeLayoutContext const& context,
+static void _addLayout(TypeLayoutContext& context,
     Type* type,
     TypeLayout* layout)
 {
     // Add it *without info*.
     // The info can be added with _updateLayout
-    context.layoutMap[type] = TypeLayoutResult(layout, SimpleLayoutInfo());
+    context.layoutMap.set(type, TypeLayoutResult(layout, SimpleLayoutInfo()));
 }
 
-static void _addLayout(TypeLayoutContext const& context,
+static void _addLayout(TypeLayoutContext& context,
     Type* type,
     const TypeLayoutResult& result)
 {
     context.layoutMap[type] = result;
 }
 
-static TypeLayoutResult _updateLayout(TypeLayoutContext const& context,
+static TypeLayoutResult _updateLayout(TypeLayoutContext& context,
     Type* type,
     const TypeLayoutResult& result)
 {
@@ -3641,7 +3641,7 @@ static TypeLayoutResult _updateLayout(TypeLayoutContext const& context,
 }
 
 static TypeLayoutResult _createTypeLayout(
-    TypeLayoutContext const&    context,
+    TypeLayoutContext&          context,
     Type*                       type)
 {
     if (auto layoutResultPtr = context.layoutMap.tryGetValue(type))
@@ -4226,7 +4226,7 @@ static TypeLayoutResult _createTypeLayout(
                 //
                 auto anyValueRules = context.getRulesFamily()->getAnyValueRules();
                 RefPtr<TypeLayout> concreteTypeAnyValueLayout =
-                    createTypeLayout(context.with(anyValueRules), concreteType);
+                    createTypeLayoutWith(context, anyValueRules, concreteType);
 
                 // We will look at the resource usage of the concrete type
                 // to determine if it "fits" in the reserved space.
@@ -4547,11 +4547,21 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
 }
 
 RefPtr<TypeLayout> createTypeLayout(
-    TypeLayoutContext const&    context,
+    TypeLayoutContext&          context,
     Type*                       type)
 {
     return _createTypeLayout(context, type).layout;
 }
+
+RefPtr<TypeLayout> createTypeLayoutWith(
+    const TypeLayoutContext&    context,
+    LayoutRulesImpl*            rules,
+    Type*                       type)
+{
+    auto c = context.with(rules);
+    return createTypeLayout(c, type);
+}
+
 
 void TypeLayout::removeResourceUsage(LayoutResourceKind kind)
 {

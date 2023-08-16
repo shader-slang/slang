@@ -1043,7 +1043,7 @@ struct ComponentKey
     Slang::UnownedStringSlice typeName;
     Slang::ShortList<ShaderComponentID> specializationArgs;
     Slang::HashCode hash;
-    Slang::HashCode getHashCode()
+    Slang::HashCode getHashCode() const
     {
         return hash;
     }
@@ -1060,7 +1060,7 @@ struct PipelineKey
     PipelineStateBase* pipeline;
     Slang::ShortList<ShaderComponentID> specializationArgs;
     Slang::HashCode hash;
-    Slang::HashCode getHashCode()
+    Slang::HashCode getHashCode() const
     {
         return hash;
     }
@@ -1070,7 +1070,7 @@ struct PipelineKey
         for (auto& arg : specializationArgs)
             hash = Slang::combineHash(hash, arg);
     }
-    bool operator==(const PipelineKey& other)
+    bool operator==(const PipelineKey& other) const
     {
         if (pipeline != other.pipeline)
             return false;
@@ -1090,12 +1090,12 @@ struct OwningComponentKey
     Slang::String typeName;
     Slang::ShortList<ShaderComponentID> specializationArgs;
     Slang::HashCode hash;
-    Slang::HashCode getHashCode()
+    Slang::HashCode getHashCode() const
     {
         return hash;
     }
     template<typename KeyType>
-    bool operator==(const KeyType& other)
+    bool operator==(const KeyType& other) const
     {
         if (typeName != other.typeName)
             return false;

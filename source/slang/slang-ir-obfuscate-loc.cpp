@@ -4,7 +4,7 @@
 #include "../../slang.h"
 
 #include "../core/slang-random-generator.h"
-#include "../core/slang-hash.h"
+#include "../core/slang-stable-hash.h"
 #include "../core/slang-char-util.h"
 
 #include "../core/slang-castable.h"
@@ -81,7 +81,7 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
     // Doing so would mean that we could use the obfuscated location ouput to output 
     // the origin.
 
-    HashCode hash = 0;
+    StableHashCode32 hash{0};
 
     List<LocPair> locPairs;
 
@@ -124,10 +124,10 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
 
                     const auto pathInfo = sourceView->getViewPathInfo();
                     const auto name = pathInfo.getName();
-                    const auto nameHash = getHashCode(pathInfo.getName().getUnownedSlice());
+                    const auto nameHash = getStableHashCode32(name.getBuffer(), name.getLength());
                     
                     // Combine the name
-                    hash = combineHash(hash, nameHash);
+                    hash = combineStableHash(hash, nameHash);
                 }
 
                 // We *can't* just use the offset to produce the hash, because the source might have
@@ -140,8 +140,7 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
                 const auto lineIndex = sourceFile->calcLineIndexFromOffset(offset);
                 const auto lineOffset = sourceFile->calcColumnOffset(lineIndex, offset);
 
-                hash = combineHash(hash, getHashCode(lineIndex));
-                hash = combineHash(hash, getHashCode(lineOffset));
+                hash = combineStableHash(hash, getStableHashCode32(lineIndex), getStableHashCode32(lineOffset));
             }    
         }
     }

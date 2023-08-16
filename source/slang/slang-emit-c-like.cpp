@@ -3,6 +3,7 @@
 
 #include "../core/slang-writer.h"
 #include "../compiler-core/slang-name.h"
+#include "../core/slang-stable-hash.h"
 
 #include "slang-ir-bind-existentials.h"
 #include "slang-ir-dce.h"
@@ -833,7 +834,7 @@ void CLikeSourceEmitter::appendScrubbedName(const UnownedStringSlice& name, Stri
         if (length > maxTokenLength)
         {
             // We are going to output with a prefix and a hash of the full name
-            const HashCode64 hash = getStableHashCode64(out.getBuffer(), length);
+            const auto hash = getStableHashCode64(out.getBuffer(), length);
             // Two hex chars per byte
             const Index hashSize = sizeof(hash) * 2; 
 
@@ -848,7 +849,7 @@ void CLikeSourceEmitter::appendScrubbedName(const UnownedStringSlice& name, Stri
             // Let's add a _ to separate from the rest of the name
             out.appendChar('_');
             // Append the hash in hex
-            out.append(uint64_t(hash), 16);
+            out.append(hash);
 
             SLANG_ASSERT(out.getLength() <= maxTokenLength);
         }
@@ -2497,7 +2498,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         if (stringLit)
         {
             auto slice = stringLit->getStringSlice();
-            m_writer->emit(static_cast<int32_t>(getStableHashCode32(slice.begin(), slice.getLength())));
+            m_writer->emit(getStableHashCode32(slice.begin(), slice.getLength()).hash);
         }
         else
         {

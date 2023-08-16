@@ -484,11 +484,11 @@ struct ValSet
         ValItem() = default;
         ValItem(Val* v) : val(v) {}
 
-        HashCode getHashCode()
+        HashCode getHashCode() const
         {
             return val ? val->getHashCode() : 0;
         }
-        bool operator==(ValItem other)
+        bool operator==(const ValItem other) const
         {
             if (val == other.val)
                 return true;

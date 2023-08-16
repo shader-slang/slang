@@ -2962,9 +2962,9 @@ SLANG_API const char* spReflection_getHashedString(
     return slice.begin();
 }
 
-SLANG_API int spComputeStringHash(const char* chars, size_t count)
+SLANG_API SlangUInt32 spComputeStringHash(const char* chars, size_t count)
 {
-    return (int)getStableHashCode32(chars, count);
+    return SlangUInt32(getStableHashCode32(chars, count));
 }
 
 SLANG_API SlangReflectionTypeLayout* spReflection_getGlobalParamsTypeLayout(

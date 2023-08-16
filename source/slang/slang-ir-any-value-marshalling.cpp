@@ -27,7 +27,7 @@ namespace Slang
         {
             IRType* originalType;
             IRIntegerValue anyValueSize;
-            bool operator ==(MarshallingFunctionKey other)
+            bool operator ==(MarshallingFunctionKey other) const
             {
                 return originalType == other.originalType && anyValueSize == other.anyValueSize;
             }
