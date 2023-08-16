@@ -959,10 +959,32 @@ namespace Slang
     }
 
     //
+    // IRTupleTypeLayout
+    //
+
+    void IRTupleTypeLayout::Builder::addAttrsImpl(List<IRInst*>& ioOperands)
+    {
+        auto irBuilder = getIRBuilder();
+        for(auto field : m_fields)
+        {
+            ioOperands.add(irBuilder->getTupleFieldLayoutAttr(field.layout));
+        }
+    }
+
+    //
     // IRArrayTypeLayout
     //
 
     void IRArrayTypeLayout::Builder::addOperandsImpl(List<IRInst*>& ioOperands)
+    {
+        ioOperands.add(m_elementTypeLayout);
+    }
+
+    //
+    // IRStructuredBufferTypeLayout
+    //
+
+    void IRStructuredBufferTypeLayout::Builder::addOperandsImpl(List<IRInst*>& ioOperands)
     {
         ioOperands.add(m_elementTypeLayout);
     }
@@ -1001,32 +1023,6 @@ namespace Slang
     void IRMatrixTypeLayout::Builder::addOperandsImpl(List<IRInst*>& ioOperands)
     {
         ioOperands.add(m_modeInst);
-    }
-
-    //
-    // IRTaggedUnionTypeLayout
-    //
-
-    IRTaggedUnionTypeLayout::Builder::Builder(IRBuilder* irBuilder, LayoutSize tagOffset)
-        : Super::Builder(irBuilder)
-    {
-        m_tagOffset = irBuilder->getIntValue(irBuilder->getIntType(), tagOffset.raw);
-    }
-
-    void IRTaggedUnionTypeLayout::Builder::addCaseTypeLayout(IRTypeLayout* typeLayout)
-    {
-        m_caseTypeLayoutAttrs.add(getIRBuilder()->getCaseTypeLayoutAttr(typeLayout));
-    }
-
-    void IRTaggedUnionTypeLayout::Builder::addOperandsImpl(List<IRInst*>& ioOperands)
-    {
-        ioOperands.add(m_tagOffset);
-    }
-
-    void IRTaggedUnionTypeLayout::Builder::addAttrsImpl(List<IRInst*>& ioOperands)
-    {
-        for(auto attr : m_caseTypeLayoutAttrs)
-            ioOperands.add(attr);
     }
 
     //
@@ -2834,9 +2830,10 @@ namespace Slang
     IRMatrixType* IRBuilder::getMatrixType(
         IRType* elementType,
         IRInst* rowCount,
-        IRInst* columnCount)
+        IRInst* columnCount,
+        IRInst* layout)
     {
-        IRInst* operands[] = { elementType, rowCount, columnCount };
+        IRInst* operands[] = { elementType, rowCount, columnCount, layout };
         return (IRMatrixType*)getType(
             kIROp_MatrixType,
             sizeof(operands) / sizeof(operands[0]),
@@ -2979,17 +2976,6 @@ namespace Slang
             kIROp_RateQualifiedType,
             sizeof(operands) / sizeof(operands[0]),
             operands);
-    }
-
-    IRType* IRBuilder::getTaggedUnionType(
-        UInt            caseCount,
-        IRType* const*  caseTypes)
-    {
-        return (IRType*)createIntrinsicInst(
-            getTypeKind(),
-            kIROp_TaggedUnionType,
-            caseCount,
-            (IRInst* const*) caseTypes);
     }
 
     IRType* IRBuilder::getBindExistentialsType(
@@ -3335,7 +3321,6 @@ namespace Slang
         IRInst* const*  args)
     {
         auto innerReturnVal = findInnerMostGenericReturnVal(as<IRGeneric>(genericVal));
-
         if (as<IRWitnessTable>(innerReturnVal))
         {
             return createIntrinsicInst(
@@ -3371,7 +3356,7 @@ namespace Slang
         // the emit logic, but this is a reasonably early place
         // to catch it.
         //
-        SLANG_ASSERT(witnessTableVal->getOp() != kIROp_StructKey);
+        SLANG_ASSERT(witnessTableVal && witnessTableVal->getOp() != kIROp_StructKey);
 
         IRInst* args[] = {witnessTableVal, interfaceMethodVal};
 
@@ -4443,6 +4428,19 @@ namespace Slang
         IRType*         type)
     {
         auto allocatedType = getPtrType(type);
+        auto inst = createInst<IRVar>(
+            this,
+            kIROp_Var,
+            allocatedType);
+        addInst(inst);
+        return inst;
+    }
+
+    IRVar* IRBuilder::emitVar(
+        IRType*         type,
+        IRIntegerValue  addressSpace)
+    {
+        auto allocatedType = getPtrType(kIROp_PtrType, type, addressSpace);
         auto inst = createInst<IRVar>(
             this,
             kIROp_Var,
@@ -5536,6 +5534,8 @@ namespace Slang
             return emitIntrinsicInst(
                 getNativePtrType((IRType*)valueType->getOperand(0)), kIROp_GetNativePtr, 1, &value);
             break;
+        case kIROp_ExtractExistentialType:
+            return emitGetNativePtr(value->getOperand(0));
         default:
             SLANG_UNEXPECTED("invalid operand type for `getNativePtr`.");
             UNREACHABLE_RETURN(nullptr);
@@ -5700,6 +5700,18 @@ namespace Slang
         return cast<IRStructFieldLayoutAttr>(createIntrinsicInst(
             getVoidType(),
             kIROp_StructFieldLayoutAttr,
+            SLANG_COUNT_OF(operands),
+            operands));
+    }
+
+    IRTupleFieldLayoutAttr* IRBuilder::getTupleFieldLayoutAttr(
+        IRTypeLayout*    layout)
+    {
+        IRInst* operands[] = { layout };
+
+        return cast<IRTupleFieldLayoutAttr>(createIntrinsicInst(
+            getVoidType(),
+            kIROp_TupleFieldLayoutAttr,
             SLANG_COUNT_OF(operands),
             operands));
     }
@@ -6726,6 +6738,55 @@ namespace Slang
         return false;
     }
 
+    bool isFloatingType(IRType *t)
+    {
+        if(auto basic = as<IRBasicType>(t))
+        {
+            switch(basic->getBaseType())
+            {
+            case BaseType::Float:
+            case BaseType::Half:
+            case BaseType::Double:
+                return true;
+            default:
+                return false;
+            }
+        }
+        return false;
+    }
+
+    IntInfo getIntTypeInfo(const IRType* intType)
+    {
+        switch(intType->getOp())
+        {
+            case kIROp_UInt8Type: return {8, false};
+            case kIROp_UInt16Type: return {16, false};
+            case kIROp_UIntType: return {32, false};
+            case kIROp_UInt64Type: return {64, false};
+            case kIROp_Int8Type: return {8, true};
+            case kIROp_Int16Type: return {16, true};
+            case kIROp_IntType: return {32, true};
+            case kIROp_Int64Type: return {64, true};
+
+            case kIROp_IntPtrType: // target platform dependent
+            case kIROp_UIntPtrType: // target platform dependent
+            default:
+                SLANG_UNEXPECTED("Unhandled type passed to getIntTypeInfo");
+        }
+    }
+
+    FloatInfo getFloatingTypeInfo(const IRType* floatType)
+    {
+        switch(floatType->getOp())
+        {
+            case kIROp_HalfType: return {16};
+            case kIROp_FloatType: return {32};
+            case kIROp_DoubleType: return {64};
+            default:
+                SLANG_UNEXPECTED("Unhandled type passed to getFloatTypeInfo");
+        }
+    }
+
     bool isIntegralScalarOrCompositeType(IRType* t)
     {
         if (!t)
@@ -7291,6 +7352,9 @@ namespace Slang
         case kIROp_MakeDifferentialPair:
         case kIROp_MakeTuple:
         case kIROp_GetTupleElement:
+        case kIROp_StructuredBufferLoad:
+        case kIROp_RWStructuredBufferLoad:
+        case kIROp_RWStructuredBufferGetElementPtr:
         case kIROp_Load:    // We are ignoring the possibility of loads from bad addresses, or `volatile` loads
         case kIROp_LoadReverseGradient:
         case kIROp_ReverseGradientDiffPairRef:
@@ -7439,6 +7503,21 @@ namespace Slang
             auto decorationCaps = decoration->getTargetCaps();
             if (decorationCaps.isIncompatibleWith(targetCaps))
                 continue;
+
+            if(decoration->hasPredicate())
+            {
+                const auto scrutinee = decoration->getTypeScrutinee();
+                const auto predicate = decoration->getTypePredicate();
+                const auto predicateFun =
+                      predicate == "boolean"  ? [](auto t){ return t->getOp() == kIROp_BoolType; }
+                    : predicate == "integral" ? isIntegralType
+                    : predicate == "floating" ? isFloatingType
+                    : nullptr;
+
+                SLANG_ASSERT(predicateFun);
+                if(!predicateFun(scrutinee))
+                    continue;
+            }
 
             if(!bestDecoration || decorationCaps.isBetterForTarget(bestCaps, targetCaps))
             {

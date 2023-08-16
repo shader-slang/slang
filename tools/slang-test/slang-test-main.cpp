@@ -3661,9 +3661,9 @@ bool testCategoryMatches(
     TestCategory*                           categoryToMatch,
     const Dictionary<TestCategory*, TestCategory*>& categorySet)
 {
-    for( auto item : categorySet )
+    for( const auto& [_, category] : categorySet )
     {
-        if(testCategoryMatches(categoryToMatch, item.value))
+        if(testCategoryMatches(categoryToMatch, category))
             return true;
     }
     return false;

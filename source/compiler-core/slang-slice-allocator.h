@@ -97,7 +97,7 @@ struct SliceAllocator
     void deallocateAll() { m_arena.deallocateAll(); }
 
     SliceAllocator():
-        m_arena(1024)
+        m_arena(2097152)
     {
     }
 protected:

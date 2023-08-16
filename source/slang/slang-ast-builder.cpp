@@ -29,12 +29,6 @@ void SharedASTBuilder::init(Session* session)
     // Clear the built in types
     memset(m_builtinTypes, 0, sizeof(m_builtinTypes));
 
-    // Create common shared types
-    m_errorType = m_astBuilder->create<ErrorType>();
-    m_bottomType = m_astBuilder->create<BottomType>();
-    m_initializerListType = m_astBuilder->create<InitializerListType>();
-    m_overloadedType = m_astBuilder->create<OverloadGroupType>();
-
     // We can just iterate over the class pointers.
     // NOTE! That this adds the names of the abstract classes too(!)
     for (Index i = 0; i < Index(ASTNodeType::CountOf); ++i)
@@ -151,6 +145,31 @@ Type* SharedASTBuilder::getDiffInterfaceType()
     return m_diffInterfaceType;
 }
 
+Type* SharedASTBuilder::getErrorType()
+{
+    if (!m_errorType)
+        m_errorType = m_astBuilder->getOrCreate<ErrorType>();
+    return m_errorType;
+}
+Type* SharedASTBuilder::getBottomType()
+{
+    if (!m_bottomType)
+        m_bottomType = m_astBuilder->getOrCreate<BottomType>();
+    return m_bottomType;
+}
+Type* SharedASTBuilder::getInitializerListType()
+{
+    if (!m_initializerListType)
+        m_initializerListType = m_astBuilder->getOrCreate<InitializerListType>();
+    return m_initializerListType;
+}
+Type* SharedASTBuilder::getOverloadedType()
+{
+    if (!m_overloadedType)
+        m_overloadedType = m_astBuilder->getOrCreate<OverloadGroupType>();
+    return m_overloadedType;
+}
+
 SharedASTBuilder::~SharedASTBuilder()
 {
     // Release built in types..
@@ -191,36 +210,39 @@ void SharedASTBuilder::registerMagicDecl(Decl* decl, MagicTypeModifier* modifier
 
 Decl* SharedASTBuilder::findMagicDecl(const String& name)
 {
-    return m_magicDecls[name].getValue();
+    return m_magicDecls.getValue(name);
 }
 
 Decl* SharedASTBuilder::tryFindMagicDecl(const String& name)
 {
-    if (m_magicDecls.containsKey(name))
-    {
-        return m_magicDecls[name].getValue();
-    }
-    else
-    {
-        return nullptr;
-    }
+    auto d = m_magicDecls.tryGetValue(name);
+    return d ? *d : nullptr;
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ASTBuilder !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+Index& _getGlobalASTEpochId()
+{
+    static thread_local Index epochId = 1;
+    return epochId;
+}
 
 ASTBuilder::ASTBuilder(SharedASTBuilder* sharedASTBuilder, const String& name):
     m_sharedASTBuilder(sharedASTBuilder),
     m_name(name),
     m_id(sharedASTBuilder->m_id++),
-    m_arena(2048)
+    m_arena(2097152)
 {
     SLANG_ASSERT(sharedASTBuilder);
+    // Copy Val deduplication map over so we don't create duplicate Vals that are already
+    // existent in the stdlib.
+    m_cachedNodes = sharedASTBuilder->getInnerASTBuilder()->m_cachedNodes;
 }
 
 ASTBuilder::ASTBuilder():
     m_sharedASTBuilder(nullptr),
     m_id(-1),
-    m_arena(2048)
+    m_arena(2097152)
 {
     m_name = "SharedASTBuilder::m_astBuilder";
 }
@@ -233,6 +255,17 @@ ASTBuilder::~ASTBuilder()
         SLANG_ASSERT(info->m_destructorFunc);
         info->m_destructorFunc(node);
     }
+    incrementEpoch();
+}
+
+Index ASTBuilder::getEpoch()
+{
+    return _getGlobalASTEpochId();
+}
+
+void ASTBuilder::incrementEpoch()
+{
+    _getGlobalASTEpochId()++;
 }
 
 NodeBase* ASTBuilder::createByNodeType(ASTNodeType nodeType)
@@ -252,6 +285,13 @@ NodeBase* ASTBuilder::createByNodeType(ASTNodeType nodeType)
 Type* ASTBuilder::getSpecializedBuiltinType(Type* typeParam, char const* magicTypeName)
 {
     auto declRef = getBuiltinDeclRef(magicTypeName, typeParam);
+    auto rsType = DeclRefType::create(this, declRef);
+    return rsType;
+}
+
+Type* ASTBuilder::getSpecializedBuiltinType(ArrayView<Val*> genericArgs, const char* magicTypeName)
+{
+    auto declRef = getBuiltinDeclRef(magicTypeName, genericArgs);
     auto rsType = DeclRefType::create(this, declRef);
     return rsType;
 }
@@ -292,51 +332,72 @@ ArrayExpressionType* ASTBuilder::getArrayType(Type* elementType, IntVal* element
 {
     if (!elementCount)
         elementCount = getIntVal(getIntType(), kUnsizedArrayMagicLength);
-
-    auto result = getOrCreate<ArrayExpressionType>(elementType, elementCount);
-    if (!result->declRef.getDecl())
+    if (elementCount->getType() != getIntType())
     {
-        auto arrayGenericDecl = as<GenericDecl>(m_sharedASTBuilder->findMagicDecl("ArrayType"));
-        auto arrayTypeDecl = arrayGenericDecl->inner;
-        auto substitutions = getOrCreateGenericSubstitution(nullptr, arrayGenericDecl, elementType, elementCount);
-        result->declRef = getSpecializedDeclRef<Decl>(arrayTypeDecl, substitutions);
+        // Canonicalize constant elementCount to int.
+        if (auto elementCountConstantInt = as<ConstantIntVal>(elementCount))
+        {
+            elementCount = getIntVal(getIntType(), elementCountConstantInt->getValue());
+        }
     }
-    return result;
+    Val* args[] = {elementType, elementCount};
+    return as<ArrayExpressionType>(getSpecializedBuiltinType(makeArrayView(args), "ArrayExpressionType"));
+}
+
+ConstantBufferType* ASTBuilder::getConstantBufferType(Type* elementType)
+{
+    return as<ConstantBufferType>(getSpecializedBuiltinType(elementType, "ConstantBufferType"));
+}
+
+ParameterBlockType* ASTBuilder::getParameterBlockType(Type* elementType)
+{
+    return as<ParameterBlockType>(getSpecializedBuiltinType(elementType, "ParameterBlockType"));
+}
+
+HLSLStructuredBufferType* ASTBuilder::getStructuredBufferType(Type* elementType)
+{
+    return as<HLSLStructuredBufferType>(getSpecializedBuiltinType(elementType, "HLSLStructuredBufferType"));
+}
+
+SamplerStateType* ASTBuilder::getSamplerStateType()
+{
+    return as<SamplerStateType>(getSpecializedBuiltinType(nullptr, "HLSLStructuredBufferType"));
 }
 
 VectorExpressionType* ASTBuilder::getVectorType(
     Type*    elementType,
     IntVal*  elementCount)
 {
-    auto result = getOrCreate<VectorExpressionType>(elementType, elementCount);
-    if (!result->declRef.getDecl())
+    // Canonicalize constant elementCount to int.
+    if (auto elementCountConstantInt = as<ConstantIntVal>(elementCount))
     {
-        auto vectorGenericDecl = as<GenericDecl>(m_sharedASTBuilder->findMagicDecl("Vector"));
-        auto vectorTypeDecl = vectorGenericDecl->inner;
-        auto substitutions = getOrCreateGenericSubstitution(nullptr, vectorGenericDecl, elementType, elementCount);
-        result->declRef = getSpecializedDeclRef<Decl>(vectorTypeDecl, substitutions);
+        elementCount = getIntVal(getIntType(), elementCountConstantInt->getValue());
     }
-    return result;
+    Val* args[] = { elementType, elementCount };
+    return as<VectorExpressionType>(getSpecializedBuiltinType(makeArrayView(args), "VectorExpressionType"));
+}
+
+MatrixExpressionType* ASTBuilder::getMatrixType(Type* elementType, IntVal* rowCount, IntVal* colCount, IntVal* layout)
+{
+    // Canonicalize constant size arguments to int.
+    if (auto rowCountConstantInt = as<ConstantIntVal>(rowCount))
+    {
+        rowCount = getIntVal(getIntType(), rowCountConstantInt->getValue());
+    }
+    if (auto colCountConstantInt = as<ConstantIntVal>(colCount))
+    {
+        colCount = getIntVal(getIntType(), colCountConstantInt->getValue());
+    }
+    Val* args[] = { elementType, rowCount, colCount, layout };
+    return as<MatrixExpressionType>(getSpecializedBuiltinType(makeArrayView(args), "MatrixExpressionType"));
 }
 
 DifferentialPairType* ASTBuilder::getDifferentialPairType(
     Type* valueType,
     Witness* primalIsDifferentialWitness)
 {
-    auto genericDecl = dynamicCast<GenericDecl>(m_sharedASTBuilder->findMagicDecl("DifferentialPairType"));
-
-    auto typeDecl = genericDecl->inner;
-
-    auto substitutions = getOrCreateGenericSubstitution(
-        nullptr,
-        genericDecl,
-        valueType,
-        primalIsDifferentialWitness);
-
-    auto declRef = getSpecializedDeclRef<Decl>(typeDecl, substitutions);
-    auto rsType = DeclRefType::create(this, declRef);
-
-    return as<DifferentialPairType>(rsType);
+    Val* args[] = { valueType, primalIsDifferentialWitness };
+    return as<DifferentialPairType>(getSpecializedBuiltinType(makeArrayView(args), "DifferentialPairType"));
 }
 
 DeclRef<InterfaceDecl> ASTBuilder::getDifferentiableInterfaceDecl()
@@ -364,20 +425,9 @@ MeshOutputType* ASTBuilder::getMeshOutputTypeFromModifier(
         : as<HLSLIndicesModifier>(modifier) ? "IndicesType"
         : as<HLSLPrimitivesModifier>(modifier) ? "PrimitivesType"
         : (SLANG_UNEXPECTED("Unhandled mesh output modifier"), nullptr);
-    auto genericDecl = dynamicCast<GenericDecl>(m_sharedASTBuilder->findMagicDecl(declName));
 
-    auto typeDecl = genericDecl->inner;
-
-    auto substitutions = getOrCreateGenericSubstitution(
-        nullptr,
-        genericDecl,
-        elementType,
-        maxElementCount);
-
-    auto declRef = getSpecializedDeclRef<Decl>(typeDecl, substitutions);
-    auto rsType = DeclRefType::create(this, declRef);
-
-    return as<MeshOutputType>(rsType);
+    Val* args[] = { elementType, maxElementCount };
+    return as<MeshOutputType>(getSpecializedBuiltinType(makeArrayView(args), declName));
 }
 
 Type* ASTBuilder::getDifferentiableInterfaceType()
@@ -390,17 +440,27 @@ DeclRef<Decl> ASTBuilder::getBuiltinDeclRef(const char* builtinMagicTypeName, Va
     auto decl = m_sharedASTBuilder->findMagicDecl(builtinMagicTypeName);
     if (auto genericDecl = as<GenericDecl>(decl))
     {
-        decl = genericDecl->inner;
-        Substitutions* subst = nullptr;
-        if (genericArg)
-        {
-            subst = getOrCreateGenericSubstitution(nullptr, genericDecl, genericArg);
-        }
-        return getSpecializedDeclRef(decl, subst);
+        auto declRef = getGenericAppDeclRef(makeDeclRef(genericDecl), makeConstArrayViewSingle(genericArg));
+        return declRef;
     }
     else
     {
         SLANG_ASSERT(!genericArg);
+    }
+    return makeDeclRef(decl);
+}
+
+DeclRef<Decl> ASTBuilder::getBuiltinDeclRef(const char* builtinMagicTypeName, ArrayView<Val*> genericArgs)
+{
+    auto decl = m_sharedASTBuilder->findMagicDecl(builtinMagicTypeName);
+    if (auto genericDecl = as<GenericDecl>(decl))
+    {
+        auto declRef = getGenericAppDeclRef(makeDeclRef(genericDecl), genericArgs);
+        return declRef;
+    }
+    else
+    {
+        SLANG_ASSERT(!decl && !genericArgs.getCount());
     }
     return makeDeclRef(decl);
 }
@@ -413,9 +473,7 @@ Type* ASTBuilder::getAndType(Type* left, Type* right)
 
 Type* ASTBuilder::getModifiedType(Type* base, Count modifierCount, Val* const* modifiers)
 {
-    auto type = create<ModifiedType>();
-    type->base = base;
-    type->modifiers.addRange(modifiers, modifierCount);
+    auto type = getOrCreate<ModifiedType>(base, makeArrayView((Val**)modifiers, modifierCount));
     return type;
 }
 
@@ -434,15 +492,16 @@ Val* ASTBuilder::getNoDiffModifierVal()
     return getOrCreate<NoDiffModifierVal>();
 }
 
-Type* ASTBuilder::getFuncType(List<Type*> parameters, Type* result)
+FuncType* ASTBuilder::getFuncType(ArrayView<Type*> parameters, Type* result, Type* errorType)
 {
-    auto errorType = getOrCreate<BottomType>();
+    if (!errorType)
+        errorType = getOrCreate<BottomType>();
     return getOrCreate<FuncType>(parameters, result, errorType);
 }
 
-Type* ASTBuilder::getTupleType(List<Type*>& types)
+TupleType* ASTBuilder::getTupleType(List<Type*>& types)
 {
-    return getOrCreate<TupleType>(types);
+    return getOrCreate<TupleType>(types.getArrayView());
 }
 
 TypeType* ASTBuilder::getTypeType(Type* type)
@@ -453,11 +512,11 @@ TypeType* ASTBuilder::getTypeType(Type* type)
 TypeEqualityWitness* ASTBuilder::getTypeEqualityWitness(
     Type* type)
 {
-    return getOrCreate<TypeEqualityWitness>(type);
+    return getOrCreate<TypeEqualityWitness>(type, type);
 }
 
 
-SubtypeWitness* ASTBuilder::getDeclaredSubtypeWitness(
+DeclaredSubtypeWitness* ASTBuilder::getDeclaredSubtypeWitness(
     Type*                   subType,
     Type*                   superType,
     DeclRef<Decl> const&    declRef)
@@ -504,8 +563,8 @@ top:
         // Let's call the intermediate type here `x`, we know that the `b <: c`
         // witness is based on witnesses that `b <: x` and `x <: c`:
         //
-        auto bIsSubtypeOfXWitness = bIsTransitiveSubtypeOfCWitness->subToMid;
-        auto xIsSubtypeOfCWitness = bIsTransitiveSubtypeOfCWitness->midToSup;
+        auto bIsSubtypeOfXWitness = bIsTransitiveSubtypeOfCWitness->getSubToMid();
+        auto xIsSubtypeOfCWitness = bIsTransitiveSubtypeOfCWitness->getMidToSup();
 
         // We can recursively call this operation to produce a witness that
         // `a <: x`, based on the witnesses we already have for `a <: b` and `b <: x`:
@@ -522,8 +581,8 @@ top:
         goto top;
     }
 
-    auto aType = aIsSubtypeOfBWitness->sub;
-    auto cType = bIsSubtypeOfCWitness->sup;
+    auto aType = aIsSubtypeOfBWitness->getSub();
+    auto cType = bIsSubtypeOfCWitness->getSup();
 
     // If the right-hand side is a conjunction witness for `B <: C`
     // of the form `(B <: X)&(B <: Y)`, then we have it that `C = X&Y`
@@ -552,8 +611,8 @@ top:
         // the witness `W` that `B <: X&Y&...` as well as the index
         // `i` of `C` within the conjunction.
         //
-        auto bIsSubtypeOfConjunction = bIsSubtypeViaExtraction->conjunctionWitness;
-        auto indexOfCInConjunction = bIsSubtypeViaExtraction->indexInConjunction;
+        auto bIsSubtypeOfConjunction = bIsSubtypeViaExtraction->getConjunctionWitness();
+        auto indexOfCInConjunction = bIsSubtypeViaExtraction->getIndexInConjunction();
 
         // We lift the extraction to the outside of the composition, by
         // forming a witness for `A <: C` that is of the form
@@ -578,22 +637,12 @@ top:
     // formal set of rules for the allowed structure of our witnesses to
     // guarantee that our simplifications are sufficient.
 
-    TransitiveSubtypeWitness* transitiveWitness = getOrCreateWithDefaultCtor<TransitiveSubtypeWitness>(
+    TransitiveSubtypeWitness* transitiveWitness = getOrCreate<TransitiveSubtypeWitness>(
         aType,
         cType,
         aIsSubtypeOfBWitness,
         bIsSubtypeOfCWitness);
-    transitiveWitness->sub = aType;
-    transitiveWitness->sup = cType;
-    transitiveWitness->subToMid = aIsSubtypeOfBWitness;
-    transitiveWitness->midToSup = bIsSubtypeOfCWitness;
-
     return transitiveWitness;
-}
-
-ThisTypeSubtypeWitness* ASTBuilder::getThisTypeSubtypeWitness(Type* subType, Type* superType)
-{
-    return getOrCreate<ThisTypeSubtypeWitness>(subType, superType);
 }
 
 SubtypeWitness* ASTBuilder::getExtractFromConjunctionSubtypeWitness(
@@ -620,16 +669,11 @@ SubtypeWitness* ASTBuilder::getExtractFromConjunctionSubtypeWitness(
     //
     // * What if the original witness is transitive?
 
-    auto witness = getOrCreateWithDefaultCtor<ExtractFromConjunctionSubtypeWitness>(
+    auto witness = getOrCreate<ExtractFromConjunctionSubtypeWitness>(
         subType,
         superType,
         conjunctionWitness,
         indexOfSuperTypeInConjunction);
-
-    witness->sub = subType;
-    witness->sup = superType;
-    witness->conjunctionWitness = conjunctionWitness;
-    witness->indexInConjunction = indexOfSuperTypeInConjunction;
     return witness;
 }
 
@@ -649,11 +693,11 @@ SubtypeWitness* ASTBuilder::getConjunctionSubtypeWitness(
     auto rExtract = as<ExtractFromConjunctionSubtypeWitness>(subIsRWitness);
     if(lExtract && rExtract)
     {
-        if (lExtract->indexInConjunction == 0
-            && rExtract->indexInConjunction == 1)
+        if (lExtract->getIndexInConjunction() == 0
+            && rExtract->getIndexInConjunction() == 1)
         {
-            auto lInner = lExtract->conjunctionWitness;
-            auto rInner = rExtract->conjunctionWitness;
+            auto lInner = lExtract->getConjunctionWitness();
+            auto rInner = rExtract->getConjunctionWitness();
             if (lInner == rInner)
             {
                 return lInner;
@@ -672,57 +716,30 @@ SubtypeWitness* ASTBuilder::getConjunctionSubtypeWitness(
     // witness) deeper, so that we have more chances to expose a
     // conjunction witness at higher levels.
 
-    auto witness = getOrCreateWithDefaultCtor<ConjunctionSubtypeWitness>(
+    auto witness = getOrCreate<ConjunctionSubtypeWitness>(
         sub,
         lAndR,
         subIsLWitness,
         subIsRWitness);
-    witness->componentWitnesses[0] = subIsLWitness;
-    witness->componentWitnesses[1] = subIsRWitness;
-    witness->sub = sub;
-    witness->sup = lAndR;
     return witness;
 }
 
-bool ASTBuilder::NodeDesc::operator==(NodeDesc const& that) const
+DeclRef<Decl> _getMemberDeclRef(ASTBuilder* builder, DeclRef<Decl> parent, Decl* decl)
 {
-    if (hashCode != that.hashCode) return false;
-    if(type != that.type) return false;
-    if(operands.getCount() != that.operands.getCount()) return false;
-    for(Index i = 0; i < operands.getCount(); ++i)
-    {
-        // Note: we are comparing the operands directly for identity
-        // (pointer equality) rather than doing the `Val`-level
-        // equality check.
-        //
-        // The rationale here is that nodes that will be created
-        // via a `NodeDesc` *should* all be going through the
-        // deduplication path anyway, as should their operands.
-        // 
-        if (operands[i].values.nodeOperand != that.operands[i].values.nodeOperand) return false;
-    }
-    return true;
+    return builder->getMemberDeclRef(parent, decl);
 }
 
-void ASTBuilder::NodeDesc::init()
+
+thread_local ASTBuilder* gCurrentASTBuilder = nullptr;
+
+ASTBuilder* getCurrentASTBuilder()
 {
-    Hasher hasher;
-    hasher.hashValue(Int(type));
-    for(Index i = 0; i < operands.getCount(); ++i)
-    {
-        // Note: we are hashing the raw pointer value rather
-        // than the content of the value node. This is done
-        // to match the semantics implemented for `==` on
-        // `NodeDesc`.
-        //
-        hasher.hashValue(operands[i].values.nodeOperand);
-    }
-    hashCode = hasher.getResult();
+    return gCurrentASTBuilder;
 }
 
-DeclRef<Decl> _getSpecializedDeclRef(ASTBuilder* builder, Decl* decl, Substitutions* subst)
+void setCurrentASTBuilder(ASTBuilder* astBuilder)
 {
-    return builder->getSpecializedDeclRef(decl, subst);
+    gCurrentASTBuilder = astBuilder;
 }
 
 } // namespace Slang

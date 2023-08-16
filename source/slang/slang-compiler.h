@@ -650,9 +650,6 @@ namespace Slang
         List<Module*> const& getModuleDependencies() SLANG_OVERRIDE { return m_moduleDependencies; }
         List<SourceFile*> const& getFileDependencies() SLANG_OVERRIDE { return m_fileDependencies; }
 
-                    /// Get a list of tagged-union types referenced by the specialization parameters.
-        List<TaggedUnionType*> const& getTaggedUnionTypes() { return m_taggedUnionTypes; }
-
         RefPtr<IRModule> getIRModule() { return m_irModule; }
 
         void acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo) SLANG_OVERRIDE;
@@ -678,9 +675,6 @@ namespace Slang
 
         List<String> m_entryPointMangledNames;
         List<String> m_entryPointNameOverrides;
-
-        // Any tagged union types that were referenced by the specialization arguments.
-        List<TaggedUnionType*> m_taggedUnionTypes;
 
         List<Module*> m_moduleDependencies;
         List<SourceFile*> m_fileDependencies;
@@ -1188,10 +1182,11 @@ namespace Slang
 
     enum class PassThroughMode : SlangPassThroughIntegral
     {
-        None = SLANG_PASS_THROUGH_NONE,	                    ///< don't pass through: use Slang compiler
-        Fxc = SLANG_PASS_THROUGH_FXC,	                    ///< pass through HLSL to `D3DCompile` API
-        Dxc = SLANG_PASS_THROUGH_DXC,	                    ///< pass through HLSL to `IDxcCompiler` API
-        Glslang = SLANG_PASS_THROUGH_GLSLANG,	            ///< pass through GLSL to `glslang` library
+        None = SLANG_PASS_THROUGH_NONE,                     ///< don't pass through: use Slang compiler
+        Fxc = SLANG_PASS_THROUGH_FXC,                       ///< pass through HLSL to `D3DCompile` API
+        Dxc = SLANG_PASS_THROUGH_DXC,                       ///< pass through HLSL to `IDxcCompiler` API
+        Glslang = SLANG_PASS_THROUGH_GLSLANG,               ///< pass through GLSL to `glslang` library
+        SpirvDis = SLANG_PASS_THROUGH_SPIRV_DIS,            ///< pass through spirv-dis
         Clang = SLANG_PASS_THROUGH_CLANG,                   ///< Pass through clang compiler
         VisualStudio = SLANG_PASS_THROUGH_VISUAL_STUDIO,    ///< Visual studio compiler
         Gcc = SLANG_PASS_THROUGH_GCC,                       ///< Gcc compiler
@@ -1602,7 +1597,7 @@ namespace Slang
 
         bool shouldEmitSPIRVDirectly()
         {
-            return (targetFlags & SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY) != 0;
+            return targetFlags & SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY;
         }
 
         bool isWholeProgramRequest()
@@ -1641,7 +1636,7 @@ namespace Slang
     private:
         Linkage*                linkage = nullptr;
         CodeGenTarget           format = CodeGenTarget::Unknown;
-        SlangTargetFlags        targetFlags = 0;
+        SlangTargetFlags        targetFlags = kDefaultTargetFlags;
         Slang::Profile          targetProfile = Slang::Profile();
         FloatingPointMode       floatingPointMode = FloatingPointMode::Default;
         List<CapabilityAtom>    rawCapabilities;
@@ -1702,11 +1697,11 @@ namespace Slang
     {
         slang::TypeReflection* elementType;
         slang::ContainerType containerType;
-        bool operator==(ContainerTypeKey other)
+        bool operator==(ContainerTypeKey other) const
         {
             return elementType == other.elementType && containerType == other.containerType;
         }
-        Slang::HashCode getHashCode()
+        Slang::HashCode getHashCode() const
         {
             return Slang::combineHash(
                 Slang::getHashCode(elementType), Slang::getHashCode(containerType));
@@ -1788,7 +1783,6 @@ namespace Slang
             char const* value);
         SlangResult setMatrixLayoutMode(
             SlangMatrixLayoutMode mode);
-
             /// Create an initially-empty linkage
         Linkage(Session* session, ASTBuilder* astBuilder, Linkage* builtinLinkage);
 
@@ -2677,6 +2671,7 @@ namespace Slang
         virtual SLANG_NO_THROW void SLANG_MCALL setDebugInfoFormat(SlangDebugInfoFormat format) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setReportDownstreamTime(bool value) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setReportPerfBenchmark(bool value) SLANG_OVERRIDE;
+
         void setHLSLToVulkanLayoutOptions(int targetIndex, HLSLToVulkanLayoutOptions* vulkanLayoutOptions);
 
         EndToEndCompileRequest(
@@ -3031,6 +3026,7 @@ namespace Slang
             /// This AST Builder should only be used for creating AST nodes that are global across requests
             /// not doing so could lead to memory being consumed but not used.
         ASTBuilder* getGlobalASTBuilder() { return globalAstBuilder; }
+        void finalizeSharedASTBuilder();
 
         RefPtr<ASTBuilder> globalAstBuilder;
 

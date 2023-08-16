@@ -74,6 +74,8 @@ struct ByteAddressBufferLegalizationContext
 
     void processGetEquivalentStructuredBuffer(IRInst* inst)
     {
+        m_builder.setInsertBefore(inst);
+
         // We need to see what type it is to be interpreted as.
         auto type = inst->getDataType();
 
@@ -83,7 +85,6 @@ struct ByteAddressBufferLegalizationContext
 
         // The buffer is operand 0
         auto buffer = inst->getOperand(0);
-
         // Get the equivalent structured buffer for the buffer.
         if( auto structuredBuffer = getEquivalentStructuredBuffer(elementType, buffer) )
         {
@@ -203,6 +204,24 @@ struct ByteAddressBufferLegalizationContext
         return false;
     }
 
+    SlangResult getOffset(TargetRequest* target, IRStructField* field, IRIntegerValue* outOffset)
+    {
+        if (target->getHLSLToVulkanLayoutOptions() && target->getHLSLToVulkanLayoutOptions()->shouldUseGLLayout())
+        {
+            return getStd430Offset(target, field, outOffset);
+        }
+        return getNaturalOffset(target, field, outOffset);
+    }
+
+    SlangResult getSizeAndAlignment(TargetRequest* target, IRType* type, IRSizeAndAlignment* outSizeAlignment)
+    {
+        if (target->getHLSLToVulkanLayoutOptions() && target->getHLSLToVulkanLayoutOptions()->shouldUseGLLayout())
+        {
+            return getStd430SizeAndAlignment(target, type, outSizeAlignment);
+        }
+        return getNaturalSizeAndAlignment(target, type, outSizeAlignment);
+    }
+
     // The core workhorse routine for the load case is `emitLegalLoad`,
     // which tries to emit load operations that read a value of the
     // given `type` from the given `buffer` at the required `baseOffset`
@@ -256,7 +275,7 @@ struct ByteAddressBufferLegalizationContext
                 // then we fail to legalize this load.
                 //
                 IRIntegerValue fieldOffset = 0;
-                SLANG_RETURN_NULL_ON_FAIL(getNaturalOffset(m_target, field, &fieldOffset));
+                SLANG_RETURN_NULL_ON_FAIL(getOffset(m_target, field, &fieldOffset));
 
                 // Otherwise, we load the field by recursively calling this function
                 // on the field type, with an adjusted immediate offset.
@@ -303,23 +322,42 @@ struct ByteAddressBufferLegalizationContext
             // small detail that we need to construct the row type
             // that we expect to load for each "element."
             //
-            // TODO: The logic here assumes row-major layout, because
-            // the row-vs-column-major information has been dropped
-            // by this point in the IR.
-            //
-            // In order to allow both row- and column-major matrices
-            // to be loaded from byte-address buffers, we would need
-            // to make row-vs-column-major-ness be part of the IR
-            // type system so that IR layout can take it into account.
-            //
-            // For now we have to live with the "natural" layout of
-            // matrices always being row-major.
-            //
-            auto rowCountInst = as<IRIntLit>(matType->getRowCount());
-            if( rowCountInst )
+            if (getIntVal(matType->getLayout()) != SLANG_MATRIX_LAYOUT_COLUMN_MAJOR)
             {
-                auto rowType = m_builder.getVectorType(matType->getElementType(), matType->getColumnCount());
-                return emitLegalSequenceLoad(type, buffer, baseOffset, immediateOffset, kIROp_MakeMatrix, rowType, rowCountInst->getValue());
+                auto rowCountInst = as<IRIntLit>(matType->getRowCount());
+                if( rowCountInst )
+                {
+                    auto rowType = m_builder.getVectorType(matType->getElementType(), matType->getColumnCount());
+                    return emitLegalSequenceLoad(type, buffer, baseOffset, immediateOffset, kIROp_MakeMatrix, rowType, rowCountInst->getValue());
+                }
+            }
+            else
+            {
+                List<IRInst*> elements;
+                auto colCount = (Index)getIntVal(matType->getColumnCount());
+                auto rowCount = (Index)getIntVal(matType->getRowCount());
+                auto colVectorType = m_builder.getVectorType(matType->getElementType(), rowCount);
+                IRSizeAndAlignment colVectorSizeAlignment;
+                getSizeAndAlignment(m_target, colVectorType, &colVectorSizeAlignment);
+                for (Index c = 0; c < colCount; c++)
+                {
+                    auto colVector = emitLegalLoad(colVectorType, buffer, baseOffset, immediateOffset);
+                    for (Index r = 0; r < rowCount; r++)
+                    {
+                        elements.add(m_builder.emitElementExtract(colVector, (IRIntegerValue)r));
+                    }
+                    immediateOffset += colVectorSizeAlignment.getStride();
+                }
+                List<IRInst*> args;
+                for (Index r = 0; r < rowCount; r++)
+                {
+                    for (Index c = 0; c < colCount; c++)
+                    {
+                        auto index = c * rowCount + r;
+                        args.add(elements[index]);
+                    }
+                }
+                return m_builder.emitMakeMatrix(matType, (UInt)args.getCount(), args.getBuffer());
             }
         }
         else if( auto vecType = as<IRVectorType>(type) )
@@ -803,7 +841,7 @@ struct ByteAddressBufferLegalizationContext
                 auto fieldType = field->getFieldType();
 
                 IRIntegerValue fieldOffset;
-                SLANG_RETURN_ON_FAIL(getNaturalOffset(m_target, field, &fieldOffset));
+                SLANG_RETURN_ON_FAIL(getOffset(m_target, field, &fieldOffset));
 
                 auto fieldVal = m_builder.emitFieldExtract(fieldType, value, field->getKey());
                 SLANG_RETURN_ON_FAIL(emitLegalStore(fieldType, buffer, baseOffset, immediateOffset + fieldOffset, fieldVal));
@@ -823,14 +861,40 @@ struct ByteAddressBufferLegalizationContext
         }
         else if( auto matType = as<IRMatrixType>(type) )
         {
-            // Matrix storesget the same caveat as the load case:
-            // we are only supporting row-major layout for now.
-            //
-            auto rowCountInst = as<IRIntLit>(matType->getRowCount());
-            if( rowCountInst )
+            auto layout = getIntVal(matType->getLayout());
+            if (layout != SLANG_MATRIX_LAYOUT_COLUMN_MAJOR)
             {
-                auto rowType = m_builder.getVectorType(matType->getElementType(), matType->getColumnCount());
-                return emitLegalSequenceStore(buffer, baseOffset, immediateOffset, value, rowType, rowCountInst->getValue());
+                auto rowCountInst = as<IRIntLit>(matType->getRowCount());
+                if( rowCountInst )
+                {
+                    auto rowType = m_builder.getVectorType(matType->getElementType(), matType->getColumnCount());
+                    return emitLegalSequenceStore(buffer, baseOffset, immediateOffset, value, rowType, rowCountInst->getValue());
+                }
+            }
+            else
+            {
+                auto colCount = (Index)getIntVal(matType->getColumnCount());
+                auto rowCount = (Index)getIntVal(matType->getRowCount());
+                List<IRInst*> srcRows;
+                for (Index r = 0; r < rowCount; r++)
+                    srcRows.add(m_builder.emitElementExtract(value, (IRIntegerValue)r));
+                for (Index c = 0; c < colCount; c++)
+                {
+                    List<IRInst*> colVectorArgs;
+                    for (Index r = 0; r < rowCount; r++)
+                    {
+                        auto rowVector = srcRows[r];
+                        auto element = m_builder.emitElementExtract(rowVector, (IRIntegerValue)c);
+                        colVectorArgs.add(element);
+                    }
+                    auto colVectorType = m_builder.getVectorType(matType->getElementType(), rowCount);
+                    auto colVector = m_builder.emitMakeVector(colVectorType, colVectorArgs);
+                    IRSizeAndAlignment colVectorSizeAlignment;
+                    getSizeAndAlignment(m_target, colVectorType, &colVectorSizeAlignment);
+                    emitLegalStore(colVectorType, buffer, baseOffset, immediateOffset, colVector);
+                    immediateOffset += colVectorSizeAlignment.getStride();
+                }
+                return SLANG_OK;
             }
         }
         else if( auto vecType = as<IRVectorType>(type) )
@@ -874,7 +938,6 @@ struct ByteAddressBufferLegalizationContext
     Result emitSimpleStore(IRType* type, IRInst* buffer, IRInst* baseOffset, IRIntegerValue immediateOfset, IRInst* value)
     {
         IRInst* offset = emitOffsetAddIfNeeded(baseOffset, immediateOfset);
-
         if( m_options.translateToStructuredBufferOps )
         {
             if( auto structuredBuffer = getEquivalentStructuredBuffer(type, buffer) )
@@ -895,7 +958,7 @@ struct ByteAddressBufferLegalizationContext
                 auto index = m_builder.emitIntrinsicInst(indexType, kIROp_Div, 2, divArgs);
 
                 IRInst* args[] = { structuredBuffer, index, value };
-                m_builder.emitIntrinsicInst(type, kIROp_StructuredBufferStore, 3, args);
+                m_builder.emitIntrinsicInst(type, kIROp_RWStructuredBufferStore, 3, args);
                 return SLANG_OK;
             }
 

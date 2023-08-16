@@ -65,14 +65,14 @@ namespace Slang
         // That is, the join of a vector and a scalar type is
         // a vector type with a joined element type.
         auto joinElementType = TryJoinTypes(
-            vectorType->elementType,
+            vectorType->getElementType(),
             scalarType);
         if(!joinElementType)
             return nullptr;
 
         return createVectorType(
             joinElementType,
-            vectorType->elementCount);
+            vectorType->getElementCount());
     }
 
     Type* SemanticsVisitor::_tryJoinTypeWithInterface(
@@ -110,11 +110,11 @@ namespace Slang
             for(Int baseTypeFlavorIndex = 0; baseTypeFlavorIndex < Int(BaseType::CountOf); baseTypeFlavorIndex++)
             {
                 // Don't consider `type`, since we already know it doesn't work.
-                if(baseTypeFlavorIndex == Int(basicType->baseType))
+                if(baseTypeFlavorIndex == Int(basicType->getBaseType()))
                     continue;
 
                 // Look up the type in our session.
-                auto candidateType = type->getASTBuilder()->getBuiltinType(BaseType(baseTypeFlavorIndex));
+                auto candidateType = getCurrentASTBuilder()->getBuiltinType(BaseType(baseTypeFlavorIndex));
                 if(!candidateType)
                     continue;
 
@@ -186,20 +186,15 @@ namespace Slang
         {
             if (auto rightBasic = as<BasicExpressionType>(right))
             {
-                auto leftFlavor = leftBasic->baseType;
-                auto rightFlavor = rightBasic->baseType;
+                auto costConvertRightToLeft = getConversionCost(leftBasic, rightBasic);
+                auto costConvertLeftToRight = getConversionCost(rightBasic, leftBasic);
 
-                // TODO(tfoley): Need a special-case rule here that if
-                // either operand is of type `half`, then we promote
-                // to at least `float`
-
-                // Return the one that had higher rank...
-                if (leftFlavor > rightFlavor)
-                    return left;
+                // Return the one that had lower conversion cost.
+                if (costConvertRightToLeft > costConvertLeftToRight)
+                    return right;
                 else
                 {
-                    SLANG_ASSERT(rightFlavor > leftFlavor); // equality was handles at the top of this function
-                    return right;
+                    return left;
                 }
             }
 
@@ -217,19 +212,19 @@ namespace Slang
             if(auto rightVector = as<VectorExpressionType>(right))
             {
                 // Check if the vector sizes match
-                if(!leftVector->elementCount->equalsVal(rightVector->elementCount))
+                if(!leftVector->getElementCount()->equals(rightVector->getElementCount()))
                     return nullptr;
 
                 // Try to join the element types
                 auto joinElementType = TryJoinTypes(
-                    leftVector->elementType,
-                    rightVector->elementType);
+                    leftVector->getElementType(),
+                    rightVector->getElementType());
                 if(!joinElementType)
                     return nullptr;
 
                 return createVectorType(
                     joinElementType,
-                    leftVector->elementCount);
+                    leftVector->getElementCount());
             }
 
             // We can also join a vector and a scalar
@@ -242,7 +237,7 @@ namespace Slang
         // HACK: trying to work trait types in here...
         if(auto leftDeclRefType = as<DeclRefType>(left))
         {
-            if( auto leftInterfaceRef = leftDeclRefType->declRef.as<InterfaceDecl>() )
+            if( auto leftInterfaceRef = leftDeclRefType->getDeclRef().as<InterfaceDecl>() )
             {
                 //
                 return _tryJoinTypeWithInterface(right, left);
@@ -250,7 +245,7 @@ namespace Slang
         }
         if(auto rightDeclRefType = as<DeclRefType>(right))
         {
-            if( auto rightInterfaceRef = rightDeclRefType->declRef.as<InterfaceDecl>() )
+            if( auto rightInterfaceRef = rightDeclRefType->getDeclRef().as<InterfaceDecl>() )
             {
                 //
                 return _tryJoinTypeWithInterface(left, right);
@@ -263,10 +258,10 @@ namespace Slang
         return nullptr;
     }
 
-    SubstitutionSet SemanticsVisitor::trySolveConstraintSystem(
+    DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
         ConstraintSystem*       system,
         DeclRef<GenericDecl>    genericDeclRef,
-        GenericSubstitution*    substWithKnownGenericArgs)
+        ArrayView<Val*>         knownGenericArgs)
     {
         // For now the "solver" is going to be ridiculously simplistic.
 
@@ -288,9 +283,8 @@ namespace Slang
         for( auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(m_astBuilder, genericDeclRef) )
         {
             if(!TryUnifyTypes(*system, getSub(m_astBuilder, constraintDeclRef), getSup(m_astBuilder, constraintDeclRef)))
-                return SubstitutionSet();
+                return DeclRef<Decl>();
         }
-        SubstitutionSet resultSubst = genericDeclRef.getSubst();
 
         // Once have built up the full list of constraints we are trying to satisfy,
         // we will attempt to solve for each parameter in a way that satisfies all
@@ -310,10 +304,10 @@ namespace Slang
         // or not they are compatible with the constraints).
         //
         Count knownGenericArgCount = 0;
-        if (substWithKnownGenericArgs)
+        if (knownGenericArgs.getCount())
         {
-            knownGenericArgCount = substWithKnownGenericArgs->getArgs().getCount();
-            for (auto arg : substWithKnownGenericArgs->getArgs())
+            knownGenericArgCount = knownGenericArgs.getCount();
+            for (auto arg : knownGenericArgs)
             {
                 args.add(arg);
             }
@@ -364,7 +358,7 @@ namespace Slang
                         if (!joinType)
                         {
                             // failure!
-                            return SubstitutionSet();
+                            return DeclRef<Decl>();
                         }
                         type = joinType;
                     }
@@ -375,7 +369,7 @@ namespace Slang
                 if (!type)
                 {
                     // failure!
-                    return SubstitutionSet();
+                    return DeclRef<Decl>();
                 }
                 args.add(type);
             }
@@ -417,10 +411,10 @@ namespace Slang
                     }
                     else
                     {
-                        if(!val->equalsVal(cVal))
+                        if(!val->equals(cVal))
                         {
                             // failure!
-                            return SubstitutionSet();
+                            return DeclRef<Decl>();
                         }
                     }
 
@@ -430,7 +424,7 @@ namespace Slang
                 if (!val)
                 {
                     // failure!
-                    return SubstitutionSet();
+                    return DeclRef<Decl>();
                 }
                 args.add(val);
             }
@@ -456,14 +450,10 @@ namespace Slang
         // search for a conformance `Robin : ISidekick`, which involved
         // apply the substitutions we already know...
 
-        GenericSubstitution* solvedSubst = m_astBuilder->getOrCreateGenericSubstitution(
-            genericDeclRef.getSubst(), genericDeclRef.getDecl(), args.getArrayView());
-
         for( auto constraintDecl : genericDeclRef.getDecl()->getMembersOfType<GenericTypeConstraintDecl>() )
         {
-            DeclRef<GenericTypeConstraintDecl> constraintDeclRef = m_astBuilder->getSpecializedDeclRef(
-                constraintDecl,
-                solvedSubst);
+            DeclRef<GenericTypeConstraintDecl> constraintDeclRef = m_astBuilder->getGenericAppDeclRef(
+                genericDeclRef, args.getArrayView(), constraintDecl).as<GenericTypeConstraintDecl>();
 
             // Extract the (substituted) sub- and super-type from the constraint.
             auto sub = getSub(m_astBuilder, constraintDeclRef);
@@ -476,7 +466,7 @@ namespace Slang
                 // not provide an explicit type parameter to specialize a generic
                 // and the type parameter cannot be inferred from any arguments.
                 // In this case, we should fail the constraint check.
-                return SubstitutionSet();
+                return DeclRef<Decl>();
             }
 
             // Search for a witness that shows the constraint is satisfied.
@@ -492,7 +482,7 @@ namespace Slang
                 //
                 // TODO: Ideally we should print an error message in
                 // this case, to let the user know why things failed.
-                return SubstitutionSet();
+                return DeclRef<Decl>();
             }
 
             // TODO: We may need to mark some constrains in our constraint
@@ -505,13 +495,11 @@ namespace Slang
         {
             if (!c.satisfied)
             {
-                return SubstitutionSet();
+                return DeclRef<Decl>();
             }
         }
 
-        resultSubst = m_astBuilder->getOrCreateGenericSubstitution(
-            genericDeclRef.getSubst(), genericDeclRef.getDecl(), args);
-        return resultSubst;
+        return m_astBuilder->getGenericAppDeclRef(genericDeclRef, args.getArrayView());
     }
 
     bool SemanticsVisitor::TryUnifyVals(
@@ -533,7 +521,7 @@ namespace Slang
         {
             if (auto sndIntVal = as<ConstantIntVal>(snd))
             {
-                return fstIntVal->value == sndIntVal->value;
+                return fstIntVal->getValue() == sndIntVal->getValue();
             }
         }
 
@@ -541,23 +529,23 @@ namespace Slang
         if (auto fstInt = as<IntVal>(fst))
         {
             if (auto tc = as<TypeCastIntVal>(fstInt))
-                fstInt = as<IntVal>(tc->base);
+                fstInt = as<IntVal>(tc->getBase());
             if (auto sndInt = as<IntVal>(snd))
             {
                 if (auto tc = as<TypeCastIntVal>(sndInt))
-                    sndInt = as<IntVal>(tc->base);
+                    sndInt = as<IntVal>(tc->getBase());
                 auto fstParam = as<GenericParamIntVal>(fstInt);
                 auto sndParam = as<GenericParamIntVal>(sndInt);
 
                 bool okay = false;
                 if (fstParam)
                 {
-                    if(TryUnifyIntParam(constraints, fstParam->declRef, sndInt))
+                    if(TryUnifyIntParam(constraints, fstParam->getDeclRef(), sndInt))
                         okay = true;
                 }
                 if (sndParam)
                 {
-                    if(TryUnifyIntParam(constraints, sndParam->declRef, fstInt))
+                    if(TryUnifyIntParam(constraints, sndParam->getDeclRef(), fstInt))
                         okay = true;
                 }
                 return okay;
@@ -568,8 +556,8 @@ namespace Slang
         {
             if (auto sndWit = as<DeclaredSubtypeWitness>(snd))
             {
-                auto constraintDecl1 = fstWit->declRef.as<TypeConstraintDecl>();
-                auto constraintDecl2 = sndWit->declRef.as<TypeConstraintDecl>();
+                auto constraintDecl1 = fstWit->getDeclRef().as<TypeConstraintDecl>();
+                auto constraintDecl2 = sndWit->getDeclRef().as<TypeConstraintDecl>();
                 SLANG_ASSERT(constraintDecl1);
                 SLANG_ASSERT(constraintDecl2);
                 return TryUnifyTypes(constraints,
@@ -586,8 +574,8 @@ namespace Slang
             if (auto sndWit = as<SubtypeWitness>(snd))
             {
                 return TryUnifyTypes(constraints,
-                    fstWit->sup,
-                    sndWit->sup);
+                    fstWit->getSup(),
+                    sndWit->getSup());
             }
         }
 
@@ -597,35 +585,28 @@ namespace Slang
         //return false;
     }
 
-    bool SemanticsVisitor::tryUnifySubstitutions(
-        ConstraintSystem&       constraints,
-        Substitutions*   fst,
-        Substitutions*   snd)
+    bool SemanticsVisitor::tryUnifyDeclRef(
+        ConstraintSystem& constraints,
+        DeclRefBase* fst,
+        DeclRefBase* snd)
     {
-        // They must both be NULL or non-NULL
-        if (!fst || !snd)
-            return !fst && !snd;
-
-        if(auto fstGeneric = as<GenericSubstitution>(fst))
-        {
-            if(auto sndGeneric = as<GenericSubstitution>(snd))
-            {
-                return tryUnifyGenericSubstitutions(
-                    constraints,
-                    fstGeneric,
-                    sndGeneric);
-            }
-        }
-
-        // TODO: need to handle other cases here
-
-        return false;
+        if (fst == snd)
+            return true;
+        if (fst == nullptr || snd == nullptr)
+            return false;
+        auto fstGen = SubstitutionSet(fst).findGenericAppDeclRef();
+        auto sndGen = SubstitutionSet(snd).findGenericAppDeclRef();
+        if (fstGen == sndGen)
+            return true;
+        if (fstGen == nullptr || sndGen == nullptr)
+            return false;
+        return tryUnifyGenericAppDeclRef(constraints, fstGen, sndGen);
     }
 
-    bool SemanticsVisitor::tryUnifyGenericSubstitutions(
+    bool SemanticsVisitor::tryUnifyGenericAppDeclRef(
         ConstraintSystem&           constraints,
-        GenericSubstitution* fst,
-        GenericSubstitution* snd)
+        GenericAppDeclRef* fst,
+        GenericAppDeclRef* snd)
     {
         SLANG_ASSERT(fst);
         SLANG_ASSERT(snd);
@@ -649,7 +630,10 @@ namespace Slang
         }
 
         // Their "base" specializations must unify
-        if (!tryUnifySubstitutions(constraints, fstGen->getOuter(), sndGen->getOuter()))
+        auto fstBase = fst->getBase();
+        auto sndBase = snd->getBase();
+
+        if (!tryUnifyDeclRef(constraints, fstBase, sndBase))
         {
             okay = false;
         }
@@ -718,27 +702,29 @@ namespace Slang
     {
         if (auto fstDeclRefType = as<DeclRefType>(fst))
         {
-            auto fstDeclRef = fstDeclRefType->declRef;
+            auto fstDeclRef = fstDeclRefType->getDeclRef();
 
             if (auto typeParamDecl = as<GenericTypeParamDecl>(fstDeclRef.getDecl()))
-                return TryUnifyTypeParam(constraints, typeParamDecl, snd);
+                if (typeParamDecl->parentDecl == constraints.genericDecl)
+                    return TryUnifyTypeParam(constraints, typeParamDecl, snd);
 
             if (auto sndDeclRefType = as<DeclRefType>(snd))
             {
-                auto sndDeclRef = sndDeclRefType->declRef;
+                auto sndDeclRef = sndDeclRefType->getDeclRef();
 
                 if (auto typeParamDecl = as<GenericTypeParamDecl>(sndDeclRef.getDecl()))
-                    return TryUnifyTypeParam(constraints, typeParamDecl, fst);
+                    if (typeParamDecl->parentDecl == constraints.genericDecl)
+                        return TryUnifyTypeParam(constraints, typeParamDecl, fst);
 
                 // can't be unified if they refer to different declarations.
                 if (fstDeclRef.getDecl() != sndDeclRef.getDecl()) return false;
 
                 // next we need to unify the substitutions applied
                 // to each declaration reference.
-                if (!tryUnifySubstitutions(
+                if (!tryUnifyDeclRef(
                     constraints,
-                    fstDeclRef.getSubst(),
-                    sndDeclRef.getSubst()))
+                    fstDeclRef,
+                    sndDeclRef))
                 {
                     return false;
                 }
@@ -749,15 +735,15 @@ namespace Slang
         {
             if (auto sndFunType = as<FuncType>(snd))
             {
-                const Index numParams = fstFunType->paramTypes.getCount();
-                if(numParams != sndFunType->paramTypes.getCount())
+                const Index numParams = fstFunType->getParamCount();
+                if(numParams != sndFunType->getParamCount())
                     return false;
                 for(Index i = 0; i < numParams; ++i)
                 {
-                    if(!TryUnifyTypes(constraints, fstFunType->paramTypes[i], sndFunType->paramTypes[i]))
+                    if(!TryUnifyTypes(constraints, fstFunType->getParamType(i), sndFunType->getParamType(i)))
                         return false;
                 }
-                return TryUnifyTypes(constraints, fstFunType->resultType, sndFunType->resultType);
+                return TryUnifyTypes(constraints, fstFunType->getResultType(), sndFunType->getResultType());
             }
         }
 
@@ -779,13 +765,13 @@ namespace Slang
         //
         if (auto fstAndType = as<AndType>(fst))
         {
-            return TryUnifyTypes(constraints, fstAndType->left, snd)
-                && TryUnifyTypes(constraints, fstAndType->right, snd);
+            return TryUnifyTypes(constraints, fstAndType->getLeft(), snd)
+                && TryUnifyTypes(constraints, fstAndType->getRight(), snd);
         }
         else if (auto sndAndType = as<AndType>(snd))
         {
-            return TryUnifyTypes(constraints, fst, sndAndType->left)
-                || TryUnifyTypes(constraints, fst, sndAndType->right);
+            return TryUnifyTypes(constraints, fst, sndAndType->getLeft())
+                || TryUnifyTypes(constraints, fst, sndAndType->getRight());
         }
         else
             return false;
@@ -828,22 +814,22 @@ namespace Slang
 
         if (auto fstDeclRefType = as<DeclRefType>(fst))
         {
-            auto fstDeclRef = fstDeclRefType->declRef;
+            auto fstDeclRef = fstDeclRefType->getDeclRef();
 
             if (auto typeParamDecl = as<GenericTypeParamDecl>(fstDeclRef.getDecl()))
             {
-                if(typeParamDecl->parentDecl == constraints.genericDecl )
+                if(typeParamDecl->parentDecl == constraints.genericDecl)
                     return TryUnifyTypeParam(constraints, typeParamDecl, snd);
             }
         }
 
         if (auto sndDeclRefType = as<DeclRefType>(snd))
         {
-            auto sndDeclRef = sndDeclRefType->declRef;
+            auto sndDeclRef = sndDeclRefType->getDeclRef();
 
             if (auto typeParamDecl = as<GenericTypeParamDecl>(sndDeclRef.getDecl()))
             {
-                if(typeParamDecl->parentDecl == constraints.genericDecl )
+                if(typeParamDecl->parentDecl == constraints.genericDecl)
                     return TryUnifyTypeParam(constraints, typeParamDecl, fst);
             }
         }
@@ -863,7 +849,7 @@ namespace Slang
             {
                 return TryUnifyTypes(
                     constraints,
-                    fstVectorType->elementType,
+                    fstVectorType->getElementType(),
                     sndScalarType);
             }
         }
@@ -875,7 +861,7 @@ namespace Slang
                 return TryUnifyTypes(
                     constraints,
                     fstScalarType,
-                    sndVectorType->elementType);
+                    sndVectorType->getElementType());
             }
         }
 

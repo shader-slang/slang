@@ -63,6 +63,7 @@ struct SpvSnippet : public RefObject
     {
         None,
         Int,
+        UInt,
         Float,
         Double,
         FloatOrDouble, // Float or double type, depending on the result type of the intrinsic.
@@ -75,7 +76,7 @@ struct SpvSnippet : public RefObject
         ASMType type;
         SpvWord intValues[4];
         float floatValues[4];
-        HashCode getHashCode()
+        HashCode getHashCode() const
         {
             HashCode result = (HashCode)type;
             for (int i = 0; i < 4; i++)
@@ -95,7 +96,7 @@ struct SpvSnippet : public RefObject
             }
             return result;
         }
-        bool operator==(const ASMConstant& other)
+        bool operator==(const ASMConstant& other) const
         {
             if (type != other.type)
                 return false;
@@ -109,6 +110,8 @@ struct SpvSnippet : public RefObject
                 return floatValues[0] == other.floatValues[0] &&
                        floatValues[1] == other.floatValues[1];
             case ASMType::Int:
+                return intValues[0] == other.intValues[0];
+            case ASMType::UInt:
                 return intValues[0] == other.intValues[0];
             case ASMType::UInt2:
                 return intValues[0] == other.intValues[0] && intValues[1] == other.intValues[1];
@@ -125,7 +128,7 @@ struct SpvSnippet : public RefObject
     };
 
     List<ASMInst> instructions;
-    List<SpvStorageClass> usedResultTypeStorageClasses;
+    HashSet<SpvStorageClass> usedPtrResultTypeStorageClasses;
     List<ASMConstant> constants;
     SpvStorageClass resultStorageClass = SpvStorageClassMax;
 

@@ -287,8 +287,7 @@ convention for interface methods.
 #endif
 
 #ifndef SLANG_COMPILE_TIME_ASSERT
-//  TODO(C++17), can use terse static_assert
-#   define SLANG_COMPILE_TIME_ASSERT(x) static_assert(x, #x)
+#   define SLANG_COMPILE_TIME_ASSERT(x) static_assert(x)
 #endif
 
 #ifndef SLANG_OFFSET_OF
@@ -634,6 +633,7 @@ extern "C"
         SLANG_PASS_THROUGH_FXC,
         SLANG_PASS_THROUGH_DXC,
         SLANG_PASS_THROUGH_GLSLANG,
+        SLANG_PASS_THROUGH_SPIRV_DIS,
         SLANG_PASS_THROUGH_CLANG,                   ///< Clang C/C++ compiler 
         SLANG_PASS_THROUGH_VISUAL_STUDIO,           ///< Visual studio C/C++ compiler
         SLANG_PASS_THROUGH_GCC,                     ///< GCC C/C++ compiler
@@ -698,9 +698,14 @@ extern "C"
         /* When set, will dump out the IR between intermediate compilation steps.*/
         SLANG_TARGET_FLAG_DUMP_IR = 1 << 9,
 
-        /* When set, will generate SPIRV directly instead of going through glslang. */
+        /* When set, will generate SPIRV directly rather than via glslang. */
         SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY = 1 << 10,
     };
+#if defined(SLANG_CONFIG_DEFAULT_SPIRV_DIRECT)
+    constexpr static SlangTargetFlags kDefaultTargetFlags = SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY;
+#else
+    constexpr static SlangTargetFlags kDefaultTargetFlags = 0;
+#endif
 
     /*!
     @brief Options to control floating-point precision guarantees for a target.
@@ -736,6 +741,7 @@ extern "C"
         SLANG_SOURCE_LANGUAGE_C,
         SLANG_SOURCE_LANGUAGE_CPP,
         SLANG_SOURCE_LANGUAGE_CUDA,
+        SLANG_SOURCE_LANGUAGE_SPIRV,
         SLANG_SOURCE_LANGUAGE_COUNT_OF,
     };
 
@@ -2406,7 +2412,7 @@ extern "C"
 
         /// Compute a string hash.
         /// Count should *NOT* include terminating zero.
-    SLANG_API int spComputeStringHash(const char* chars, size_t count);
+    SLANG_API SlangUInt32 spComputeStringHash(const char* chars, size_t count);
 
         /// Get a type layout representing reflection information for the global-scope prameters.
     SLANG_API SlangReflectionTypeLayout* spReflection_getGlobalParamsTypeLayout(
@@ -4130,7 +4136,6 @@ namespace slang
 
         virtual SLANG_NO_THROW void SLANG_MCALL setReportPerfBenchmark(bool value) = 0;
 
-
     };
 
     #define SLANG_UUID_ICompileRequest ICompileRequest::getTypeGuid()
@@ -4152,7 +4157,7 @@ namespace slang
         SlangProfileID          profile = SLANG_PROFILE_UNKNOWN;
 
             /** Flags for the code generation target. Currently unused. */
-        SlangTargetFlags        flags = 0;
+        SlangTargetFlags        flags = kDefaultTargetFlags;
 
             /** Default mode to use for floating-point operations on the target.
             */

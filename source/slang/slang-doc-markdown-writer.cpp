@@ -427,7 +427,7 @@ static DocMarkdownWriter::Requirement _getRequirementFromTargetToken(const Token
     }
 
     auto targetName = tok.getContent();
-    if (targetName == "spirv_direct")
+    if (targetName == "spirv")
     {
         return Requirement{CodeGenTarget::SPIRV, UnownedStringSlice("")};
     }
@@ -1064,9 +1064,9 @@ void DocMarkdownWriter::writeAggType(const ASTMarkup::Entry& entry, AggTypeDeclB
         auto& memberDict = aggTypeDecl->getMemberDictionary();
 
         List<Decl*> uniqueMethods;
-        for (const auto& pair : memberDict)
+        for (const auto& [_, decl] : memberDict)
         {
-            CallableDecl* callableDecl = as<CallableDecl>(pair.value);
+            CallableDecl* callableDecl = as<CallableDecl>(decl);
             if (callableDecl && isVisible(callableDecl))
             {
                 uniqueMethods.add(callableDecl);
@@ -1119,7 +1119,7 @@ void DocMarkdownWriter::writeDescription(const ASTMarkup::Entry& entry)
 void DocMarkdownWriter::writeDecl(const ASTMarkup::Entry& entry, Decl* decl)
 {
     // Skip these they will be output as part of their respective 'containers'
-    if (as<ParamDecl>(decl) || as<EnumCaseDecl>(decl) || as<AssocTypeDecl>(decl) || as<InheritanceDecl>(decl))
+    if (as<ParamDecl>(decl) || as<EnumCaseDecl>(decl) || as<AssocTypeDecl>(decl) || as<InheritanceDecl>(decl) || as<ThisTypeDecl>(decl))
     {
         return; 
     }

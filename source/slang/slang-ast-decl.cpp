@@ -4,6 +4,7 @@
 #include <assert.h>
 
 #include "slang-generated-ast-macro.h"
+#include "slang-ast-decl.h"
 
 namespace Slang {
 
@@ -116,6 +117,23 @@ bool isLocalVar(const Decl* decl)
         return true;
 
     return false;
+}
+
+ThisTypeDecl* InterfaceDecl::getThisTypeDecl()
+{
+    for (auto member : members)
+    {
+        if (auto thisTypeDeclCandidate = as<ThisTypeDecl>(member))
+        {
+            return thisTypeDeclCandidate;
+        }
+    }
+    SLANG_UNREACHABLE("InterfaceDecl does not have a ThisType decl.");
+}
+
+InterfaceDecl* ThisTypeConstraintDecl::getInterfaceDecl()
+{
+    return as<InterfaceDecl>(parentDecl->parentDecl);
 }
 
 } // namespace Slang

@@ -186,38 +186,41 @@ void SourceWriter::emitName(Name* name)
     emitName(name, SourceLoc());
 }
 
-void SourceWriter::emit(IntegerLiteralValue value)
-{
-    char buffer[32];
-    sprintf(buffer, "%lld", (long long int)value);
-    emit(buffer);
-}
-
-void SourceWriter::emit(UInt value)
-{
-    char buffer[32];
-    sprintf(buffer, "%llu", (unsigned long long)(value));
-    emit(buffer);
-}
-
 void SourceWriter::emitUInt64(uint64_t value)
 {
-    char buffer[32];
-    sprintf(buffer, "%llu", (unsigned long long)(value));
-    emit(buffer);
+    emit(value);
 }
 
 void SourceWriter::emitInt64(int64_t value)
 {
-    char buffer[32];
-    sprintf(buffer, "%lld", (long long int)value);
+    emit(value);
+}
+
+void SourceWriter::emit(Int32 value)
+{
+    char buffer[16];
+    sprintf(buffer, "%" PRId32, value);
     emit(buffer);
 }
 
-void SourceWriter::emit(int value)
+void SourceWriter::emit(Int64 value)
 {
-    char buffer[16];
-    sprintf(buffer, "%d", value);
+    char buffer[32];
+    sprintf(buffer, "%" PRId64, value);
+    emit(buffer);
+}
+
+void SourceWriter::emit(UInt32 value)
+{
+    char buffer[32];
+    sprintf(buffer, "%" PRIu32, value);
+    emit(buffer);
+}
+
+void SourceWriter::emit(UInt64 value)
+{
+    char buffer[32];
+    sprintf(buffer, "%" PRIu64, value);
     emit(buffer);
 }
 

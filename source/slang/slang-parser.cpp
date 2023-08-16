@@ -1323,10 +1323,9 @@ namespace Slang
     // parent link is set up correctly.
     static void AddMember(ContainerDecl* container, Decl* member)
     {
-        if (container && member)
+        if (container)
         {
-            member->parentDecl = container;
-            container->members.add(member);
+            container->addMember(member);
         }
     }
 
@@ -1334,7 +1333,7 @@ namespace Slang
     {
         if (scope)
         {
-            AddMember(scope->containerDecl, member);
+            scope->containerDecl->addMember(member);
         }
     }
 
@@ -2149,30 +2148,6 @@ namespace Slang
         }
         return typeExpr;
     }
-
-    static Expr* parseTaggedUnionType(Parser* parser)
-    {
-        TaggedUnionTypeExpr* taggedUnionType = parser->astBuilder->create<TaggedUnionTypeExpr>();
-
-        parser->ReadToken(TokenType::LParent);
-        while(!AdvanceIfMatch(parser, MatchedTokenType::Parentheses))
-        {
-            auto caseType = parser->ParseTypeExp();
-            taggedUnionType->caseTypes.add(caseType);
-
-            if(AdvanceIf(parser, TokenType::RParent))
-                break;
-
-            parser->ReadToken(TokenType::Comma);
-        }
-
-        return taggedUnionType;
-    }
-
-    static NodeBase* parseTaggedUnionType(Parser* parser, void* /*unused*/)
-    {
-        return parseTaggedUnionType(parser);
-    }
         /// Parse an expression of the form __fwd_diff(fn) where fn is an 
         /// identifier pointing to a function.
     static Expr* parseForwardDifferentiate(Parser* parser)
@@ -2232,19 +2207,6 @@ namespace Slang
     static NodeBase* parseDispatchKernel(Parser* parser, void* /* unused */)
     {
         return parseDispatchKernel(parser);
-    }
-
-        /// Parse a `This` type expression
-    static Expr* parseThisTypeExpr(Parser* parser)
-    {
-        ThisTypeExpr* expr = parser->astBuilder->create<ThisTypeExpr>();
-        expr->scope = parser->currentScope;
-        return expr;
-    }
-
-    static NodeBase* parseThisTypeExpr(Parser* parser, void* /*userData*/)
-    {
-        return parseThisTypeExpr(parser);
     }
 
     // (a,b,c) style tuples, curently unused
@@ -2457,22 +2419,6 @@ namespace Slang
             auto decl = parseEnumDecl(parser);
             typeSpec.decl = decl;
             typeSpec.expr = createDeclRefType(parser, decl);
-            return typeSpec;
-        }
-        // TODO: This case would not be needed if we had the
-        // code below dispatch into `parseAtomicExpr`, which
-        // already includes logic for keyword lookup.
-        //
-        // Leaving this case here for now to avoid breaking anything.
-        //
-        else if(AdvanceIf(parser, "__TaggedUnion"))
-        {
-            typeSpec.expr = parseTaggedUnionType(parser);
-            return typeSpec;
-        }
-        else if(AdvanceIf(parser, "This"))
-        {
-            typeSpec.expr = parseThisTypeExpr(parser);
             return typeSpec;
         }
         // Uncomment should we decide to enable (a,b,c) tuple types
@@ -3170,7 +3116,7 @@ namespace Slang
 
     static NodeBase* parseInterfaceDecl(Parser* parser, void* /*userData*/)
     {
-        InterfaceDecl* decl = parser->astBuilder->create<InterfaceDecl>();
+        InterfaceDecl* decl = parser->astBuilder->createInterfaceDecl(parser->tokenReader.peekLoc());
         parser->FillPosition(decl);
 
         AdvanceIf(parser, TokenType::CompletionRequest);
@@ -4082,6 +4028,8 @@ namespace Slang
 
     void Parser::parseSourceFile(ModuleDecl* program)
     {
+        SLANG_AST_BUILDER_RAII(astBuilder);
+
         if (outerScope)
         {
             currentScope = outerScope;
@@ -4328,6 +4276,7 @@ namespace Slang
                     parser->astBuilder,
                     nullptr, // no semantics visitor available yet
                     staticMemberExpr->name,
+                    aggTypeDecl,
                     declRef);
 
                 if (!lookupResult.isValid() || lookupResult.isOverloaded())
@@ -4632,6 +4581,25 @@ namespace Slang
         Token closingBraceToken;
         while (!AdvanceIfMatch(this, MatchedTokenType::CurlyBraces, &closingBraceToken))
         {
+            if (LookAheadToken("struct"))
+            {
+                auto structDecl = ParseStruct();
+                AddMember(scopeDecl, structDecl);
+                continue;
+            }
+            else if (AdvanceIf(this, "typedef"))
+            {
+                auto typeDefDecl = parseTypeDef(this, nullptr);
+                AddMember(scopeDecl, (Decl*)typeDefDecl);
+                continue;
+            }
+            else if (AdvanceIf(this, "typealias"))
+            {
+                auto typeDefDecl = parseTypeAliasDecl(this, nullptr);
+                AddMember(scopeDecl, (Decl*)typeDefDecl);
+                continue;
+            }
+
             auto stmt = ParseStatement();
             if(stmt)
             {
@@ -6252,7 +6220,7 @@ namespace Slang
                     // Need to get the basic type, so we can fit to underlying type
                     if (auto basicExprType = as<BasicExpressionType>(intLit->type.type))
                     {
-                        value = _fixIntegerLiteral(basicExprType->baseType, value, nullptr, nullptr);
+                        value = _fixIntegerLiteral(basicExprType->getBaseType(), value, nullptr, nullptr);
                     }
 
                     newLiteral->value = value;
@@ -6444,6 +6412,7 @@ namespace Slang
     static NodeBase* parseTargetIntrinsicModifier(Parser* parser, void* /*userData*/)
     {
         auto modifier = parser->astBuilder->create<TargetIntrinsicModifier>();
+        modifier->isString = false;
 
         if (AdvanceIf(parser, TokenType::LParent))
         {
@@ -6451,13 +6420,31 @@ namespace Slang
 
             if( AdvanceIf(parser, TokenType::Comma) )
             {
+                if(parser->LookAheadToken(TokenType::LParent, 1))
+                {
+                    modifier->predicateToken = parser->ReadToken(TokenType::Identifier);
+                    parser->ReadToken();
+                    modifier->scrutinee = NameLoc(parser->ReadToken(TokenType::Identifier));
+                    parser->ReadToken(TokenType::RParent);
+                    parser->ReadToken(TokenType::Comma);
+                }
                 if( parser->LookAheadToken(TokenType::StringLiteral) )
                 {
-                    modifier->definitionToken = parser->ReadToken();
+                    bool first = true;
+                    do
+                    {
+                        const auto t = parser->ReadToken();
+                        first
+                            ? void(first = false)
+                            : modifier->definitionString.append(" ");
+                        modifier->definitionString.append(getStringLiteralTokenValue(t));
+                        modifier->isString = true;
+                    }
+                    while(parser->LookAheadToken(TokenType::StringLiteral));
                 }
                 else
                 {
-                    modifier->definitionToken = parser->ReadToken(TokenType::Identifier);
+                    modifier->definitionIdent = parser->ReadToken(TokenType::Identifier);
                 }
             }
 
@@ -6710,6 +6697,12 @@ namespace Slang
         {
             modifier->tag = uint32_t(stringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
         }
+		auto classInfo = parser->astBuilder->findClassInfo(getName(parser, modifier->magicName));
+		if (classInfo)
+		{
+			modifier->magicNodeType = ASTNodeType(classInfo->m_classId);
+		}
+		// TODO: print diagnostic if the magic type name doesn't correspond to an actual ASTNodeType.
         parser->ReadToken(TokenType::RParent);
 
         return modifier;
@@ -6910,14 +6903,12 @@ namespace Slang
         // !!!!!!!!!!!!!!!!!!!!!!! Expr !!!!!!!!!!!!!!!!!!!!!!!!!!!
 
         _makeParseExpr("this",  parseThisExpr),
-        _makeParseExpr("This",  parseThisTypeExpr),
         _makeParseExpr("true",  parseTrueExpr),
         _makeParseExpr("false", parseFalseExpr),
         _makeParseExpr("nullptr", parseNullPtrExpr),
         _makeParseExpr("none", parseNoneExpr),
         _makeParseExpr("try",     parseTryExpr),
         _makeParseExpr("no_diff", parseTreatAsDifferentiableExpr),
-        _makeParseExpr("__TaggedUnion", parseTaggedUnionType),
         _makeParseExpr("__fwd_diff", parseForwardDifferentiate),
         _makeParseExpr("__bwd_diff", parseBackwardDifferentiate),
         _makeParseExpr("fwd_diff", parseForwardDifferentiate),

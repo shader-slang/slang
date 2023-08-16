@@ -86,7 +86,7 @@ struct Conditional
             /// The preprocessor should not skip tokens, and should not bother evaluating subsequent branch conditions.
         During,
 
-            /// Indicates that this conditional has laready seen the branch with a `true` condition
+            /// Indicates that this conditional has already seen the branch with a `true` condition
             ///
             /// The preprocessor should skip tokens, and should not bother evaluating subsequent branch conditions.
         After,
@@ -963,7 +963,7 @@ private:
     InputFile* m_parent = nullptr;
 
         /// The inner-most preprocessor conditional active for this file.
-    Conditional*        m_conditional = nullptr;
+    Conditional* m_conditional = nullptr;
 
         /// The lexer input stream that unexpanded tokens will be read from
     LexerInputStream* m_lexerStream;
@@ -2860,7 +2860,6 @@ static void HandleElifDirective(PreprocessorDirectiveContext* context)
     //
     // This is the behavior expected by at least one input program.
     // We will eventually want to be pedantic about this.
-    // even if t
     switch(PeekRawTokenType(context))
     {
     case TokenType::EndOfFile:
@@ -2869,8 +2868,6 @@ static void HandleElifDirective(PreprocessorDirectiveContext* context)
         HandleElseDirective(context);
         return;
     }
-
-    PreprocessorExpressionValue value = _parseAndEvaluateExpression(context);
 
     // if we aren't inside a conditional, then error
     Conditional* conditional = inputFile->getInnerMostConditional();
@@ -2890,17 +2887,29 @@ static void HandleElifDirective(PreprocessorDirectiveContext* context)
 
     switch (conditional->state)
     {
-    case Conditional::State::Before:
-        if(value)
-            conditional->state = Conditional::State::During;
-        break;
-
-    case Conditional::State::During:
-        conditional->state = Conditional::State::After;
-        break;
-
-    default:
-        break;
+        case Conditional::State::Before:
+        {
+            // Only evaluate the expression if we are in the before state.
+            const PreprocessorExpressionValue value = _parseAndEvaluateExpression(context);
+            if (value)
+            {
+                conditional->state = Conditional::State::During;
+            }
+            break;    
+        }
+        case Conditional::State::During:
+        {
+            // Consume to end of line, ignoring expression 
+            SkipToEndOfLine(context);
+            conditional->state = Conditional::State::After;
+            break;
+        }
+        default:
+        {
+            // Consume to end of line, ignoring expression
+            SkipToEndOfLine(context);
+            break;
+        }
     }
 
     updateLexerFlagsForConditionals(inputFile);
@@ -3855,11 +3864,8 @@ static Token ReadToken(Preprocessor* preprocessor)
 // clean up after an environment
 Environment::~Environment()
 {
-    for (auto pair : this->macros)
-    {
-        auto macro = pair.value;
+    for (const auto& [_, macro] : this->macros)
         delete macro;
-    }
 }
 
 // Add a simple macro definition from a string (e.g., for a
@@ -4057,10 +4063,8 @@ TokenList preprocessSource(
 
     if(desc.defines)
     {
-        for (auto p : *desc.defines)
-        {
-            DefineMacro(&preprocessor, p.key, p.value);
-        }
+        for (const auto& [key, value] : *desc.defines)
+            DefineMacro(&preprocessor, key, value);
     }
 
     {

@@ -103,12 +103,11 @@ static HashFindResult minimalPerfectHash(const List<String>& ss, HashParams& has
     const auto hash = [&](const String& s, const HashCode64 salt = 0) -> UInt32
     {
         //
-        // The current getStableHashCode32 is susceptible to patterns of
-        // collisions causing the search to fail for the SPIR-V opnames
-        //
-        // getStableHashCode64 is better, although it still performs poorly on
-        // short strings, taking over 300000 iterations to diverge on "Ceil"
-        // and "FMix" (and place them in already unoccupied slots)!
+        // The current getStableHashCode is susceptible to patterns of
+        // collisions causing the search to fail for the SPIR-V opnames; it
+        // performs poorly on short strings, taking over 300000 iterations to
+        // diverge on "Ceil" and "FMix" (and place them in already unoccupied
+        // slots)!
         //
         // Use FNV Hash here which seem perform much better on these short inputs
         // https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function

@@ -318,7 +318,6 @@ SlangResult SourceView::_findSourceMapLoc(SourceLoc loc, SourceLocType type, Han
     // view, which may be a parent to the current one. 
     auto lookupSourceManager = m_sourceFile->getSourceManager();
 
-    HandleSourceLoc handleLoc;
     SLANG_RETURN_ON_FAIL(_findLocWithSourceMap(lookupSourceManager, this, loc, type, outLoc));
 
     return SLANG_OK;

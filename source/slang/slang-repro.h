@@ -4,6 +4,7 @@
 
 #include "../core/slang-riff.h"
 #include "../core/slang-string.h"
+#include "../core/slang-stable-hash.h"
 
 // For TranslationUnitRequest
 #include "slang-compiler.h"
@@ -35,7 +36,7 @@ struct ReproUtil
     {
         RiffHeader m_chunk;                              ///< The chunk 
         RiffSemanticVersion m_semanticVersion;          ///< The semantic version
-        uint32_t m_typeHash;                            ///< A hash based on the binary representation. If doesn't match then not binary compatible (extra check over semantic versioning)
+        StableHashCode32 m_typeHash;                   ///< A hash based on the binary representation. If doesn't match then not binary compatible (extra check over semantic versioning)
     };
 
     struct FileState

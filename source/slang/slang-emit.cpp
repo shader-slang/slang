@@ -49,17 +49,18 @@
 #include "slang-ir-specialize-arrays.h"
 #include "slang-ir-specialize-buffer-load-arg.h"
 #include "slang-ir-specialize-resources.h"
+#include "slang-ir-specialize-matrix-layout.h"
 #include "slang-ir-ssa.h"
 #include "slang-ir-ssa-simplification.h"
 #include "slang-ir-strip-cached-dict.h"
 #include "slang-ir-strip-witness-tables.h"
 #include "slang-ir-synthesize-active-mask.h"
-#include "slang-ir-union.h"
 #include "slang-ir-validate.h"
 #include "slang-ir-wrap-structured-buffers.h"
 #include "slang-ir-liveness.h"
 #include "slang-ir-glsl-liveness.h"
 #include "slang-ir-legalize-uniform-buffer-load.h"
+#include "slang-ir-lower-buffer-element-type.h"
 #include "slang-ir-string-hash.h"
 #include "slang-ir-simplify-for-emit.h"
 #include "slang-ir-pytorch-cpp-binding.h"
@@ -347,16 +348,15 @@ Result linkAndOptimizeIR(
     // Lower `Result<T,E>` types into ordinary struct types.
     lowerResultType(irModule, sink);
 
-    // Desguar any union types, since these will be illegal on
-    // various targets.
-    //
-    desugarUnionTypes(irModule);
 #if 0
     dumpIRIfEnabled(codeGenContext, irModule, "UNIONS DESUGARED");
 #endif
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
     simplifyIR(irModule, sink);
+
+    // Fill in default matrix layout into matrix types that left layout unspecified.
+    specializeMatrixLayout(codeGenContext->getTargetReq(), irModule);
 
     // It's important that this takes place before defunctionalization as we
     // want to be able to easily discover the cooperate and fallback funcitons
@@ -592,10 +592,6 @@ Result linkAndOptimizeIR(
         specializeArrayParameters(codeGenContext, irModule);
     }
     eliminateDeadCode(irModule);
-
-    // Rewrite functions that return arrays to return them via `out` parameter,
-    // since our target languages doesn't allow returning arrays.
-    legalizeArrayReturnType(irModule);
 
 #if 0
     dumpIRIfEnabled(codeGenContext, irModule, "AFTER RESOURCE SPECIALIZATION");
@@ -861,6 +857,14 @@ Result linkAndOptimizeIR(
     // If any have survived this far, change them back to regular (decorated)
     // arrays that the emitters can deal with.
     legalizeMeshOutputTypes(irModule);
+
+    // We need to lower any types used in a buffer resource (e.g. ContantBuffer or StructuredBuffer) into
+    // a simple storage type that has target independent layout.
+    lowerBufferElementTypeToStorageType(targetRequest, irModule);
+
+    // Rewrite functions that return arrays to return them via `out` parameter,
+    // since our target languages doesn't allow returning arrays.
+    legalizeArrayReturnType(irModule);
 
     if (isKhronosTarget(targetRequest) || target == CodeGenTarget::HLSL)
     {

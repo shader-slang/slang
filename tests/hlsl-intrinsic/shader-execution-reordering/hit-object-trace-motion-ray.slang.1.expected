@@ -45,7 +45,7 @@ uint calcValue_0(hitObjectNV hit_0)
         uint geometryIndex_0 = (hitObjectGetGeometryIndexNV((hit_0)));
         uint primitiveIndex_0 = (hitObjectGetPrimitiveIndexNV((hit_0)));
         SomeValues_0 objSomeValues_0 = HitObject_GetAttributes_0(hit_0);
-        r_0 = instanceIndex_0 + instanceID_0 + geometryIndex_0 + primitiveIndex_0 + uint(objSomeValues_0.a_0);
+        r_0 = uint(int(instanceIndex_0 + instanceID_0 + geometryIndex_0 + primitiveIndex_0) + objSomeValues_0.a_0);
     }
     else
     {
@@ -83,7 +83,7 @@ void main()
     hitObjectTraceRayMotionNV(hitObj_0, scene_0, 20U, 255U, 0U, 4U, 0U, _S7.Origin_0, _S7.TMin_0, _S7.Direction_0, _S7.TMax_0, currentTime_0, (0));
     uint _S8 = uint(idx_0);
     uint _S9 = calcValue_0(hitObj_0);
-    ((outputBuffer_0)._data[(_S8)]) = _S9;
+    outputBuffer_0._data[_S8] = _S9;
     return;
 }
 

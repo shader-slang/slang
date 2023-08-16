@@ -32,13 +32,15 @@ public:
     void emit(Name* name);
     void emit(const NameLoc& nameAndLoc);
     void emit(const StringSliceLoc& nameAndLoc);
-    void emit(IntegerLiteralValue value);
 
     void emitUInt64(uint64_t value);
     void emitInt64(int64_t value);
 
-    void emit(UInt value);
-    void emit(int value);
+    void emit(Int32 value);
+    void emit(UInt32 value);
+    void emit(Int64 value);
+    void emit(UInt64 value);
+
     void emit(double value);
 
     void emitChar(char c);

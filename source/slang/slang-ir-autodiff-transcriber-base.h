@@ -114,7 +114,7 @@ struct AutoDiffTranscriberBase
 
     IRInst* getDifferentialZeroOfType(IRBuilder* builder, IRType* primalType);
 
-    InstPair trascribeNonDiffInst(IRBuilder* builder, IRInst* origInst);
+    InstPair transcribeNonDiffInst(IRBuilder* builder, IRInst* origInst);
 
     InstPair transcribeReturn(IRBuilder* builder, IRReturn* origReturn);
 

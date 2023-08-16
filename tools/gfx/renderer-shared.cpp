@@ -3,6 +3,7 @@
 #include "core/slang-io.h"
 #include "core/slang-token-reader.h"
 
+#include "../../source/core/slang-stable-hash.h"
 #include "../../source/core/slang-file-system.h"
 
 #include "../../slang.h"

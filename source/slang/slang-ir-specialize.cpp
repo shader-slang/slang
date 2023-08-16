@@ -288,17 +288,10 @@ struct SpecializationContext
         IRGeneric* g = generic;
         for (;;)
         {
-            // We can't specialize a generic if it is marked as
-            // being imported from an external module (in which
-            // case its definition is not available to us).
-            //
-            if (!isDefinition(g))
-                return false;
-
             // Given the generic `g`, we will find the value
             // it appears to return in its body.
             //
-            auto val = findGenericReturnVal(g);
+            const auto val = findGenericReturnVal(g);
             if (!val)
                 return false;
 
@@ -310,6 +303,29 @@ struct SpecializationContext
                 g = nestedGeneric;
                 continue;
             }
+
+            // HACK: there are conflicting features in our target intrinsic decorations
+            // Some reference generic parameter with the `$G0` syntax (the
+            // first generic parameter) while other have a predicate
+            // `boolean(T)` where the T is resolved properly in IR lowering. We
+            // need to specialize the latter and not the former.
+            //
+            // The solution is to remove the `$G` syntax and replace that with
+            // resolved types too.
+            bool intrinsicNeedsSpecialization = false;
+            for(const auto dec : val->getDecorations())
+            {
+                // TODO: We should probably take into account our target to see if the intrinsic applies
+                if(const auto intrinsicDec = as<IRTargetIntrinsicDecoration>(dec))
+                    intrinsicNeedsSpecialization = intrinsicNeedsSpecialization || intrinsicDec->hasPredicate();
+            }
+
+            // We can't specialize a generic if it is marked as
+            // being imported from an external module (in which
+            // case its definition is not available to us).
+            //
+            if (!isDefinition(g) && !intrinsicNeedsSpecialization)
+                return false;
 
             // We should never specialize intrinsic types.
             //
@@ -616,7 +632,7 @@ struct SpecializationContext
         int childrenCount = 0;
         for (auto child = dictInst->getFirstChild(); child; child = child->next)
             childrenCount++;
-        dict.reserve(1 << Math::Log2Ceil(childrenCount * 2));
+        dict.reserve(Index{1} << Math::Log2Ceil(childrenCount * 2));
         for (auto child : dictInst->getChildren())
         {
             auto item = as<IRSpecializationDictionaryItem>(child);
@@ -682,18 +698,18 @@ struct SpecializationContext
         builder.setInsertInto(moduleInst);
         auto dictInst = builder.emitIntrinsicInst(nullptr, dictOp, 0, nullptr);
         builder.setInsertInto(dictInst);
-        for (auto kv : dict)
+        for (const auto& [key, value] : dict)
         {
-            if (!kv.value->parent)
+            if (!value->parent)
                 continue;
-            for (auto keyVal : kv.key.vals)
+            for (auto keyVal : key.vals)
             {
                 if (!keyVal->parent) goto next;
             }
             {
                 List<IRInst*> args;
-                args.add(kv.value);
-                args.addRange(kv.key.vals);
+                args.add(value);
+                args.addRange(key.vals);
                 builder.emitIntrinsicInst(nullptr, kIROp_SpecializationDictionaryItem, args.getCount(), args.getBuffer());
             }
         next:;

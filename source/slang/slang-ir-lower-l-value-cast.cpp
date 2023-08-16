@@ -166,15 +166,10 @@ struct LValueCastLoweringContext
         // convert in.
         
         // Okay we are going to replace the implicit casts with temporaries around call sites/uses.
-        List<IRInst*> useSites;
+        List<IRUse*> useSites;
         for (auto use = castInst->firstUse; use; use = use->nextUse)
         {
-            auto useSite = use->getUser();
-
-            if (useSites.indexOf(useSite) < 0)
-            {
-                useSites.add(useSite);
-            }
+            useSites.add(use);
         }
 
         // If there is a name hint on the source, we'll copy it over to the temporaries
@@ -187,7 +182,8 @@ struct LValueCastLoweringContext
 
         for (auto useSite : useSites)
         {
-            builder.setInsertBefore(useSite);
+            auto user = useSite->getUser();
+            builder.setInsertBefore(user);
             auto tmpVar = builder.emitVar(toValueType);
 
             if (nameHintDecoration)
@@ -196,27 +192,17 @@ struct LValueCastLoweringContext
             }
 
             // If it's inout we convert via cast whats in the castOperand
-            if (castInst->getOp() == kIROp_InOutImplicitCast)
+            if (castInst->getOp() == kIROp_InOutImplicitCast && user->getOp() != kIROp_Store)
             {
                 builder.emitStore(tmpVar, builder.emitCast(toValueType, builder.emitLoad(castOperand)));
             }
 
             // Convert the temporary back to the original location
-            builder.setInsertAfter(useSite);
+            builder.setInsertAfter(user);
             builder.emitStore(castOperand, builder.emitCast(fromValueType, builder.emitLoad(tmpVar)));
 
             // Go through all of the operands of the use inst relacing, with the temporary
-            const auto operandCount = Count(useSite->getOperandCount());
-            auto operands = useSite->getOperands();
-
-            for (Index i = 0; i < operandCount; ++i)
-            {
-                auto& callSiteOperand = operands[i];
-                if(callSiteOperand.get() == castInst)
-                {
-                    callSiteOperand.set(tmpVar);
-                }
-            }
+            builder.replaceOperand(useSite, tmpVar);
         }
 
         // When we are done we can destroy the inst

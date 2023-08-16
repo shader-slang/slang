@@ -676,8 +676,9 @@ RefPtr<TypeLayout> getTypeLayoutForGlobalShaderParameter(
 
     if(varDecl->hasModifier<ShaderRecordAttribute>() && as<ConstantBufferType>(type))
     {
-        return createTypeLayout(
-            layoutContext.with(rules->getShaderRecordConstantBufferRules()),
+        return createTypeLayoutWith(
+            layoutContext,
+            rules->getShaderRecordConstantBufferRules(),
             type);
     }
 
@@ -686,8 +687,9 @@ RefPtr<TypeLayout> getTypeLayoutForGlobalShaderParameter(
     // qualifier before we move on to anything else.
     if( varDecl->hasModifier<PushConstantAttribute>() && as<ConstantBufferType>(type) )
     {
-        return createTypeLayout(
-            layoutContext.with(rules->getPushConstantBufferRules()),
+        return createTypeLayoutWith(
+            layoutContext,
+            rules->getPushConstantBufferRules(),
             type);
     }
 
@@ -710,8 +712,9 @@ RefPtr<TypeLayout> getTypeLayoutForGlobalShaderParameter(
 
     // An "ordinary" global variable is implicitly a uniform
     // shader parameter.
-    return createTypeLayout(
-        layoutContext.with(rules->getConstantBufferRules(context->getTargetRequest())),
+    return createTypeLayoutWith(
+        layoutContext,
+        rules->getConstantBufferRules(context->getTargetRequest()),
         type);
 }
 
@@ -1910,15 +1913,19 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         case Stage::ClosestHit:
         case Stage::Miss:
             // `in out` or `out` parameter is payload
-            return createTypeLayout(context->layoutContext.with(
-                context->getRulesFamily()->getRayPayloadParameterRules()),
-                type);
+            return createTypeLayoutWith(
+                context->layoutContext,
+                context->getRulesFamily()->getRayPayloadParameterRules(),
+                type
+            );
 
         case Stage::Callable:
             // `in out` or `out` parameter is payload
-            return createTypeLayout(context->layoutContext.with(
-                context->getRulesFamily()->getCallablePayloadParameterRules()),
-                type);
+            return createTypeLayoutWith(
+                context->layoutContext,
+                context->getRulesFamily()->getCallablePayloadParameterRules(),
+                type
+            );
 
         }
     }
@@ -1946,9 +1953,11 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         case Stage::AnyHit:
         case Stage::ClosestHit:
             // `in` parameter is hit attributes
-            return createTypeLayout(context->layoutContext.with(
-                context->getRulesFamily()->getHitAttributesParameterRules()),
-                type);
+            return createTypeLayoutWith(
+                context->layoutContext,
+                context->getRulesFamily()->getHitAttributesParameterRules(),
+                type
+            );
         }
     }
 
@@ -2064,7 +2073,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
     // otherwise they will include all of the above cases...
     else if( auto declRefType = as<DeclRefType>(type) )
     {
-        auto declRef = declRefType->declRef;
+        auto declRef = declRefType->getDeclRef();
 
         if (auto structDeclRef = declRef.as<StructDecl>())
         {
@@ -2226,9 +2235,9 @@ static RefPtr<TypeLayout> computeEntryPointParameterTypeLayout(
         // a uniform shader parameter passed via the implicitly-defined
         // constant buffer (e.g., the `$Params` constant buffer seen in fxc/dxc output).
         //
-        return createTypeLayout(
-            context->layoutContext.with(
-                context->getRulesFamily()->getConstantBufferRules(context->getTargetRequest())),
+        return createTypeLayoutWith(
+            context->layoutContext,
+            context->getRulesFamily()->getConstantBufferRules(context->getTargetRequest()),
             paramType);
     }
     else
@@ -2777,7 +2786,7 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
 
         // Any generic specialization applied to the entry-point function
         // must also be applied to its parameters.
-        paramDeclRef = context->getASTBuilder()->getSpecializedDeclRef(paramDeclRef.getDecl(), entryPointFuncDeclRef.getSubst());
+        paramDeclRef = context->getASTBuilder()->getMemberDeclRef(entryPointFuncDeclRef, paramDeclRef.getDecl());
 
         // When computing layout for an entry-point parameter,
         // we want to make sure that the layout context has access
@@ -3033,24 +3042,6 @@ struct CollectParametersVisitor : ComponentTypeVisitor
         // along.
         //
         visitChildren(specialized);
-
-        // While we are at it, we will also make note of any
-        // tagged-union types that were used as part of the
-        // specialization arguments, since we need to make
-        // sure that their layout information is computed
-        // and made available for IR code generation.
-        //
-        // Note: this isn't really the best place for this logic to sit,
-        // but it is the simplest place where we can collect all the tagged
-        // union types that get referenced by a program.
-        //
-        for( auto taggedUnionType : specialized->getTaggedUnionTypes() )
-        {
-            SLANG_ASSERT(taggedUnionType);
-            auto substType = taggedUnionType;
-            auto typeLayout = createTypeLayout(m_context->layoutContext, substType);
-            m_context->shared->programLayout->taggedUnionTypeLayouts.add(typeLayout);
-        }
     }
 
 
@@ -3189,9 +3180,8 @@ void diagnoseGlobalUniform(
 static int _calcTotalNumUsedRegistersForLayoutResourceKind(ParameterBindingContext* bindingContext, LayoutResourceKind kind)
 {
     int numUsed = 0;
-    for (auto& pair : bindingContext->shared->globalSpaceUsedRangeSets)
+    for (auto& [_, rangeSet] : bindingContext->shared->globalSpaceUsedRangeSets)
     {
-        UsedRangeSet* rangeSet = pair.value;
         const auto& usedRanges = rangeSet->usedResourceRanges[kind];
         for (const auto& usedRange : usedRanges.ranges)
         {
@@ -3634,7 +3624,8 @@ static void _appendRange(Index start, LayoutSize size, StringBuilder& ioBuf)
 }
 
 static void _maybeApplyHLSLToVulkanShifts(
-    ParameterBindingContext* paramContext, 
+    ParameterBindingContext* paramContext,
+    ParameterBindingAndKindInfo& globalConstantBinding,
     TargetRequest* targetReq,
     DiagnosticSink* sink)
 {
@@ -3653,6 +3644,17 @@ static void _maybeApplyHLSLToVulkanShifts(
     if (!vulkanOptions->canInferBindings())
     {
         return;
+    }
+
+    // If the user specified -fvk-b-shift for the default space but not -fvk-bind-global, we want to apply the shift
+    // to the global constant buffer.
+    if (!vulkanOptions->hasGlobalsBinding())
+    {
+        auto globalCBufferShift = vulkanOptions->getShift(HLSLToVulkanLayoutOptions::Kind::ConstantBuffer, globalConstantBinding.space);
+        if (globalCBufferShift != HLSLToVulkanLayoutOptions::kInvalidShift)
+        {
+            globalConstantBinding.index += globalCBufferShift;
+        }
     }
 
     for (ParameterInfo* parameterInfo : sharedContext.parameters)
@@ -3743,6 +3745,8 @@ RefPtr<ProgramLayout> generateParameterBindings(
     TargetProgram*  targetProgram,
     DiagnosticSink* sink)
 {
+    SLANG_AST_BUILDER_RAII(targetProgram->getProgram()->getLinkage()->getASTBuilder());
+
     auto program = targetProgram->getProgram();
     auto targetReq = targetProgram->getTargetReq();
 
@@ -4035,7 +4039,7 @@ RefPtr<ProgramLayout> generateParameterBindings(
     _completeBindings(&context, program);
 
     // We may need to finally do any shifting if we have HLSLToVulkanLayoutOptions
-    _maybeApplyHLSLToVulkanShifts(&context, targetReq, sink);
+    _maybeApplyHLSLToVulkanShifts(&context, globalConstantBufferBinding, targetReq, sink);
 
     // Next we need to create a type layout to reflect the information
     // we have collected, and we will use the `ScopeLayoutBuilder`

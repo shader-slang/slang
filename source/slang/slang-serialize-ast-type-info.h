@@ -39,19 +39,90 @@ struct SerialTypeInfo<SyntaxClass<T>>
     }
 };
 
+// MatrixCoord can just go as is
+template <>
+struct SerialTypeInfo<MatrixCoord> : SerialIdentityTypeInfo<MatrixCoord> {};
+
+inline void serializeValPointerValue(SerialWriter* writer, Val* ptrValue, SerialIndex* outSerial)
+{
+    if (ptrValue)
+        ptrValue = ptrValue->resolve();
+    *(SerialIndex*)outSerial = writer->addPointer(ptrValue);
+}
+
+inline void deserializeValPointerValue(SerialReader* reader, const SerialIndex* inSerial, void* outPtr)
+{
+    auto val = reader->getPointer(*(const SerialIndex*)inSerial).dynamicCast<Val>();
+    *(Val**)outPtr = val;
+}
+
+template<typename T>
+struct PtrSerialTypeInfo<T, std::enable_if_t<std::is_base_of_v<Val, T>>>
+{
+    typedef T* NativeType;
+    typedef SerialIndex SerialType;
+    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
+
+    static void toSerial(SerialWriter* writer, const void* inNative, void* outSerial)
+    {
+        auto ptrValue = *(T**)inNative;
+        serializeValPointerValue(writer, ptrValue, (SerialIndex*)outSerial);
+    }
+
+    static void toNative(SerialReader* reader, const void* inSerial, void* outNative)
+    {
+        deserializeValPointerValue(reader, (SerialIndex*)inSerial, outNative);
+    }
+};
 
 template <typename T>
 struct SerialTypeInfo<DeclRef<T>> : public SerialTypeInfo<DeclRefBase*> {};
 
-// MatrixCoord can just go as is
+// ValNodeOperand
 template <>
-struct SerialTypeInfo<MatrixCoord> : SerialIdentityTypeInfo<MatrixCoord> {};
+struct SerialTypeInfo<ValNodeOperand>
+{
+    typedef ValNodeOperand NativeType;
+    struct SerialType
+    {
+        int8_t kind;
+        int64_t val;
+    };
+    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
+
+    static void toSerial(SerialWriter* writer, const void* native, void* serial)
+    {
+        auto& src = *(const NativeType*)native;
+        auto& dst = *(SerialType*)serial;
+        dst.kind = int8_t(src.kind);
+        if (src.kind == ValNodeOperandKind::ConstantValue)
+            dst.val = src.values.intOperand;
+        else if (src.kind == ValNodeOperandKind::ValNode)
+            serializeValPointerValue(writer, (Val*)src.values.nodeOperand, (SerialIndex*)&dst.val);
+        else
+            SerialTypeInfo<NodeBase*>::toSerial(writer, &src.values.nodeOperand, (SerialIndex*)&dst.val);
+    }
+    static void toNative(SerialReader* reader, const void* serial, void* native)
+    {
+        auto& dst = *(NativeType*)native;
+        auto& src = *(const SerialType*)serial;
+
+        // Initialize
+        dst = NativeType();
+        dst.kind = ValNodeOperandKind(src.kind);
+        if (dst.kind == ValNodeOperandKind::ConstantValue)
+            dst.values.intOperand = int64_t(src.val);
+        else if (dst.kind == ValNodeOperandKind::ValNode)
+            deserializeValPointerValue(reader, (SerialIndex*)&src.val, (Val**)&dst.values.nodeOperand);
+        else
+            SerialTypeInfo<NodeBase*>::toNative(reader, (SerialIndex*)&src.val, (NodeBase**)&dst.values.nodeOperand);
+    }
+};
 
 // LookupResultItem
 SLANG_VALUE_TYPE_INFO(LookupResultItem)
 // QualType
 SLANG_VALUE_TYPE_INFO(QualType)
-
 
 // LookupResult
 template <>
@@ -151,10 +222,6 @@ struct SerialTypeInfo<Modifiers>
     }
 };
 
-// ASTNodeType
-template <>
-struct SerialTypeInfo<ASTNodeType> : public SerialConvertTypeInfo<ASTNodeType, uint16_t> {};
-
 // LookupResultItem_Breadcrumb::ThisParameterMode
 template <>
 struct SerialTypeInfo<LookupResultItem_Breadcrumb::ThisParameterMode> : public SerialConvertTypeInfo<LookupResultItem_Breadcrumb::ThisParameterMode, uint8_t> {};
@@ -169,6 +236,7 @@ struct SerialTypeInfo<RequirementWitness::Flavor> : public SerialConvertTypeInfo
 
 // RequirementWitness
 SLANG_VALUE_TYPE_INFO(RequirementWitness)
+
 
 } // namespace Slang
 

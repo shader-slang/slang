@@ -550,9 +550,9 @@ Verify IR in the front-end.
 
 Experimental options (use at your own risk) 
 
-<a id="emit-spirv-directly"></a>
-## -emit-spirv-directly
-Generate SPIR-V output directly (otherwise through GLSL and using the glslang compiler) 
+<a id="emit-spirv-via-glsl"></a>
+## -emit-spirv-via-glsl
+Generate SPIR-V output by generating and compiling GLSL using glslang
 
 
 <a id="file-system"></a>
@@ -852,7 +852,7 @@ A capability describes an optional feature that a target may or may not support.
 * `c` 
 * `cpp` 
 * `cuda` 
-* `spirv_direct` 
+* `spirv`
 * `GL_NV_ray_tracing` : enables the GL_NV_ray_tracing extension 
 * `GL_EXT_ray_tracing` : enables the GL_EXT_ray_tracing extension 
 * `GL_NV_fragment_shader_barycentric` : enables the GL_NV_fragment_shader_barycentric extension 

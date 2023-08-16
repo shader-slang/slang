@@ -79,8 +79,16 @@ class TargetIntrinsicModifier : public Modifier
     // is an intrisic for.
     Token targetToken;
 
-    // A custom definition for the operation
-    Token definitionToken;
+    // A custom definition for the operation, one of either an ident or a
+    // string (the concatenation of several string literals)
+    Token definitionIdent;
+    String definitionString;
+    bool isString;
+
+    // A predicate to be used on an identifier to guard this intrinsic
+    Token predicateToken;
+    NameLoc scrutinee;
+    DeclRef<Decl> scrutineeDeclRef;
 };
 
 // A modifier that marks a declaration as representing a
@@ -392,6 +400,8 @@ class MagicTypeModifier : public Modifier
 {
     SLANG_AST_CLASS(MagicTypeModifier)
 
+    ASTNodeType magicNodeType = ASTNodeType(-1);
+
         /// Modifier has a name so call this magicModifier to disambiguate
     String magicName;
     uint32_t tag = uint32_t(0);
@@ -600,7 +610,7 @@ class Attribute : public AttributeBase
 {
     SLANG_AST_CLASS(Attribute)
  
-    AttributeArgumentValueDict intArgVals;
+    List<Val*> intArgVals;
 };
 
 class UserDefinedAttribute : public Attribute 
@@ -1054,10 +1064,23 @@ class DifferentiableAttribute : public Attribute
 {
     SLANG_AST_CLASS(DifferentiableAttribute)
 
+    List<KeyValuePair<DeclRefBase*, SubtypeWitness*>> m_typeToIDifferentiableWitnessMappings;
+
+    void addType(DeclRefBase* declRef, SubtypeWitness* witness)
+    {
+        getMapTypeToIDifferentiableWitness();
+        if (m_mapToIDifferentiableWitness.addIfNotExists(declRef, witness))
+        {
+            m_typeToIDifferentiableWitnessMappings.add(KeyValuePair<DeclRefBase*, SubtypeWitness*>(declRef, witness));
+        }
+    }
+
     /// Mapping from types to subtype witnesses for conformance to IDifferentiable.
-    OrderedDictionary<DeclRefBase*, SubtypeWitness*>   m_mapTypeToIDifferentiableWitness;
+    const OrderedDictionary<DeclRefBase*, SubtypeWitness*>& getMapTypeToIDifferentiableWitness();
 
     SLANG_UNREFLECTED ValSet m_typeRegistrationWorkingSet;
+private:
+    OrderedDictionary<DeclRefBase*, SubtypeWitness*> m_mapToIDifferentiableWitness;
 };
 
 class DllImportAttribute : public Attribute

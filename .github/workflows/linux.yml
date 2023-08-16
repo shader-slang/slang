@@ -69,4 +69,5 @@ jobs:
         CONFIGURATION=${{matrix.configuration}}
         CC=${{matrix.compiler}}
         ARCH=${{matrix.platform}}
+        PATH="${PATH:+${PATH}:}$(pwd)/external/slang-binaries/spirv-tools/$(uname -m)-linux/bin"
         source ./github_test.sh

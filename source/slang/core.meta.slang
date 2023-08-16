@@ -316,7 +316,7 @@ interface __FlagsEnumType : __EnumType
 };
 
 __generic<T, let N:int>
-__magic_type(ArrayType)
+__magic_type(ArrayExpressionType)
 struct Array
 {
 }
@@ -876,7 +876,7 @@ extension int16_t
 
     /// An `N` component vector with elements of type `T`.
 __generic<T = float, let N : int = 4>
-__magic_type(Vector)
+__magic_type(VectorExpressionType)
 struct vector
 {
         /// The element type of the vector
@@ -894,9 +894,12 @@ struct vector
     __init(vector<T,N> value);
 }
 
+const int kRowMajorMatrixLayout = $(SLANG_MATRIX_LAYOUT_ROW_MAJOR);
+const int kColumnMajorMatrixLayout = $(SLANG_MATRIX_LAYOUT_COLUMN_MAJOR);
+
     /// A matrix with `R` rows and `C` columns, with elements of type `T`.
-__generic<T = float, let R : int = 4, let C : int = 4>
-__magic_type(Matrix)
+__generic<T = float, let R : int = 4, let C : int = 4, let L : int = $(SLANG_MATRIX_LAYOUT_MODE_UNKNOWN)>
+__magic_type(MatrixExpressionType)
 struct matrix
 {
     __intrinsic_op($(kIROp_MakeMatrixFromScalar))
@@ -957,12 +960,12 @@ for (int tt = 0; tt < kTypeCount; ++tt)
 
 __generic<T>
 __intrinsic_type($(kIROp_ConstantBufferType))
-__magic_type(ConstantBuffer)
+__magic_type(ConstantBufferType)
 struct ConstantBuffer {}
 
 __generic<T>
 __intrinsic_type($(kIROp_TextureBufferType))
-__magic_type(TextureBuffer)
+__magic_type(TextureBufferType)
 struct TextureBuffer {}
 
 __generic<T>
@@ -1111,7 +1114,7 @@ for (int tt = 0; tt < kBaseTypeCount; ++tt)
 for( int R = 2; R <= 4; ++R )
 for( int C = 2; C <= 4; ++C )
 {
-    sb << "__generic<T> __extension matrix<T, " << R << "," << C << ">\n{\n";
+    sb << "__generic<T, let L:int> __extension matrix<T, " << R << "," << C << ", L>\n{\n";
 
     // initialize from R*C scalars
     sb << "__intrinsic_op(" << int(kIROp_MakeMatrix) << ") __init(";
@@ -1137,7 +1140,7 @@ for( int C = 2; C <= 4; ++C )
     for( int cc = C; cc <= 4; ++cc )
     {
         if(rr == R && cc == C) continue;
-        sb << "__intrinsic_op(" << int(kIROp_MatrixReshape) << ") __init(matrix<T," << rr << "," << cc << "> value);\n";
+        sb << "__intrinsic_op(" << int(kIROp_MatrixReshape) << ") __init(matrix<T," << rr << "," << cc << ", L> value);\n";
     }
     sb << "}\n";
 }
@@ -1207,16 +1210,16 @@ extension vector<T, N> : IDifferentiable
     }
 }
 
-__generic<T:__BuiltinFloatingPointType, let R: int, let C: int>
-extension matrix<T, R, C> : IDifferentiable
+__generic<T:__BuiltinFloatingPointType, let R: int, let C: int, let L : int>
+extension matrix<T, R, C, L> : IDifferentiable
 {
-    typedef matrix<T, R, C> Differential;
+    typedef matrix<T, R, C, L> Differential;
 
     [__unsafeForceInlineEarly]
     [BackwardDifferentiable]
     static Differential dzero()
     {
-        return matrix<T, R, C>(__slang_noop_cast<T>(T.dzero()));
+        return matrix<T, R, C, L>(__slang_noop_cast<T>(T.dzero()));
     }
 
     [__unsafeForceInlineEarly]
@@ -1238,14 +1241,14 @@ extension matrix<T, R, C> : IDifferentiable
 //@ public:
 
     /// Sampling state for filtered texture fetches.
-__magic_type(SamplerState, $(int(SamplerStateFlavor::SamplerState)))
+__magic_type(SamplerStateType, $(int(SamplerStateFlavor::SamplerState)))
 __intrinsic_type($(kIROp_SamplerStateType))
 struct SamplerState
 {
 }
 
     /// Sampling state for filtered texture fetches that include a comparison operation before filtering.
-__magic_type(SamplerState, $(int(SamplerStateFlavor::SamplerComparisonState)))
+__magic_type(SamplerStateType, $(int(SamplerStateFlavor::SamplerComparisonState)))
 __intrinsic_type($(kIROp_SamplerComparisonStateType))
 struct SamplerComparisonState
 {
@@ -1347,12 +1350,12 @@ struct TextureTypeInfo
             
         if(prefixInfo.combined)
         {
-            sb << "__magic_type(TextureSampler," << int(flavor) << ")\n";
+            sb << "__magic_type(TextureSamplerType," << int(flavor) << ")\n";
             sb << "__intrinsic_type(" << (kIROp_TextureSamplerType + (int(flavor) << kIROpMeta_OtherShift)) << ")\n";
         }
         else
         {
-            sb << "__magic_type(Texture," << int(flavor) << ")\n";
+            sb << "__magic_type(TextureType," << int(flavor) << ")\n";
             sb << "__intrinsic_type(" << (kIROp_TextureType + (int(flavor) << kIROpMeta_OtherShift)) << ")\n";
         }
         sb << "struct ";
@@ -1641,7 +1644,9 @@ struct TextureTypeInfo
             }
             sb << ");\n";
 
+
             // GLSL
+            glslFuncName = (access == SLANG_RESOURCE_ACCESS_READ) ? "texelFetchOffset" : "imageLoad";
             if (isMultisample)
             {
                 sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
@@ -1654,12 +1659,12 @@ struct TextureTypeInfo
                 if( needsMipLevel )
                 {
                     sb << "($1)." << kGLSLLoadCoordsSwizzle[loadCoordCount] << ", ($1)." << kGLSLLoadLODSwizzle[loadCoordCount];
+                    sb << ", $2)$z\")\n";
                 }
                 else
                 {
-                    sb << "$1, 0";
+                    sb << "$1, 0, $2)$z\")\n";
                 }
-                sb << ", $2)$z\")\n";
             }
 
             if (isReadOnly)
@@ -2073,6 +2078,16 @@ struct TextureTypeInfo
 
             sb << "__target_intrinsic(glsl, \"$ctextureLod($p, $2, $3)$z\")\n";
 
+            // SPIR-V
+            {
+                // TODO:
+                // Need to:
+                // - Construct sampled image type OpTypeSampledImage of image type
+                // - Construct OpSampledImage from image and sampler
+                // - Call OpImageSampleExplicitLod
+                // test ./tests/compute/texture-simpler.slang
+            }
+
             // CUDA
             {
                 const int coordCount = base.coordCount;
@@ -2423,9 +2438,9 @@ vector<T,N> operator$(op.name)(in out vector<T,N> value)
 {$(fixity.bodyPrefix) value = value $(op.binOp) T(1); return $(fixity.returnVal); }
 
 $(fixity.qual)
-__generic<T : __BuiltinArithmeticType, let R : int, let C : int>
+__generic<T : __BuiltinArithmeticType, let R : int, let C : int, let L : int>
 [__unsafeForceInlineEarly]
-matrix<T,R,C> operator$(op.name)(in out matrix<T,R,C> value)
+matrix<T,R,C> operator$(op.name)(in out matrix<T,R,C,L> value)
 {$(fixity.bodyPrefix) value = value $(op.binOp) T(1); return $(fixity.returnVal); }
 
 $(fixity.qual)
@@ -2607,9 +2622,9 @@ __generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType, let N : int, let M :
 __intrinsic_op($(info.op))
 matrix<L,N,M> operator$(info.name)(matrix<L,N,M> left, matrix<R,N,M> right);
 
-__generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType, let N : int, let M : int>
+__generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType, let N : int, let M : int, let Layout : int>
 [__unsafeForceInlineEarly]
-matrix<L, N, M> operator$(info.name)=(in out matrix<L, N, M> left, matrix<R, N, M> right)
+matrix<L, N, M> operator$(info.name)=(in out matrix<L, N, M, Layout> left, matrix<R, N, M> right)
 {
     left = left $(info.name) right;
     return left;
@@ -2639,9 +2654,9 @@ __generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType, let N : int, let M :
 __intrinsic_op($(info.op))
 matrix<L,N,M> operator$(info.name)(matrix<L,N,M> left, R right);
 
-__generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType, let N : int, let M : int>
+__generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType, let N : int, let M : int, let Layout : int>
 [__unsafeForceInlineEarly]
-matrix<L,N,M> operator$(info.name)=(in out matrix<L,N,M> left, R right)
+matrix<L,N,M> operator$(info.name)=(in out matrix<L,N,M, Layout> left, R right)
 {
     left = left $(info.name) right;
     return left;
@@ -2694,17 +2709,17 @@ ${{{{
         return left;
     }
 
-    __generic<T : $(op.interface), let R : int, let C : int>
+    __generic<T : $(op.interface), let R : int, let C : int, let Layout : int>
     [__unsafeForceInlineEarly]
-    matrix<T,R,C> operator$(op.name)=(in out matrix<T,R,C> left, matrix<T,R,C> right)
+    matrix<T,R,C> operator$(op.name)=(in out matrix<T,R,C,Layout> left, matrix<T,R,C> right)
     {
         left = left $(op.name) right;
         return left;
     }
 
-    __generic<T : $(op.interface), let R : int, let C : int>
+    __generic<T : $(op.interface), let R : int, let C : int, let Layout : int>
     [__unsafeForceInlineEarly]
-    matrix<T,R,C> operator$(op.name)=(in out matrix<T,R,C> left, T right)
+    matrix<T,R,C> operator$(op.name)=(in out matrix<T,R,C, Layout> left, T right)
     {
         left = left $(op.name) right;
         return left;

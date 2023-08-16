@@ -197,6 +197,8 @@ namespace Slang
             return ThisType(m_buffer + index, m_count - index);
         }
 
+        T& getLast() { return m_buffer[m_count - 1]; }
+
         ArrayView() : Super() {}
         ArrayView(T* buffer, Index size) :Super(buffer, size) {}
     };

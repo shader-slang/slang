@@ -170,10 +170,8 @@ namespace Slang
             }
 
             // Replace all tuple types with lowered struct types.
-            for (auto kv : loweredTuples)
-            {
-                kv.key->replaceUsesWith(kv.value->structType);
-            }
+            for (const auto& [key, value] : loweredTuples)
+                key->replaceUsesWith(value->structType);
         }
     };
     

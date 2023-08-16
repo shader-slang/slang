@@ -35,7 +35,8 @@ LookupResult lookUpDirectAndTransparentMembers(
     ASTBuilder*             astBuilder,
     SemanticsVisitor*       semantics,
     Name*                   name,
-    DeclRef<ContainerDecl>  containerDeclRef,
+    ContainerDecl*          containerDecl,
+    DeclRef<Decl>           parentDeclRef,       // The parent of the resulting declref.
     LookupMask              mask = LookupMask::Default);
 
 // TODO: this belongs somewhere else

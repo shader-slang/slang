@@ -13,6 +13,8 @@
 #include "slang-lookup.h"
 #include "slang-syntax.h"
 #include "slang-ast-synthesis.h"
+#include "slang-ast-reflect.h"
+
 #include <limits>
 
 namespace Slang
@@ -200,12 +202,6 @@ namespace Slang
 
         void visitDecl(Decl*) {}
         void visitDeclGroup(DeclGroup*) {}
-
-        Val* resolveVal(Val* val);
-        Type* resolveType(Type* type)
-        {
-            return (Type*)resolveVal(type);
-        }
 
         void visitTypeExp(TypeExp& exp)
         {
@@ -581,7 +577,7 @@ namespace Slang
         return getTypeForDeclRef(astBuilder, nullptr, nullptr, declRef, &typeResult, loc);
     }
 
-    DeclRef<ExtensionDecl> ApplyExtensionToType(
+    DeclRef<ExtensionDecl> applyExtensionToType(
         SemanticsVisitor*       semantics,
         ExtensionDecl*          extDecl,
         Type*  type)
@@ -589,118 +585,7 @@ namespace Slang
         if(!semantics)
             return DeclRef<ExtensionDecl>();
 
-        return semantics->ApplyExtensionToType(extDecl, type);
-    }
-
-    GenericSubstitution* createDefaultSubstitutionsForGeneric(
-        ASTBuilder*             astBuilder,
-        SemanticsVisitor* semantics,
-        GenericDecl*            genericDecl,
-        Substitutions*   outerSubst)
-    {
-        GenericSubstitution* cachedResult = nullptr;
-        if (astBuilder->m_genericDefaultSubst.tryGetValue(genericDecl, cachedResult))
-        {
-            if (cachedResult->getOuter() == outerSubst)
-                return cachedResult;
-        }
-
-        List<Val*> args;
-
-        for( auto mm : genericDecl->members )
-        {
-            if( auto genericTypeParamDecl = as<GenericTypeParamDecl>(mm) )
-            {
-                args.add(DeclRefType::create(astBuilder, astBuilder->getSpecializedDeclRef<Decl>(genericTypeParamDecl, outerSubst)));
-            }
-            else if( auto genericValueParamDecl = as<GenericValueParamDecl>(mm) )
-            {
-                if (semantics)
-                    ensureDecl(semantics, genericValueParamDecl, DeclCheckState::ReadyForLookup);
-
-                args.add(astBuilder->getOrCreate<GenericParamIntVal>(
-                    genericValueParamDecl->getType(),
-                    astBuilder->getSpecializedDeclRef(genericValueParamDecl, outerSubst)));
-            }
-        }
-
-        bool shouldCache = true;
-
-        // create default substitution arguments for constraints
-        for (auto mm : genericDecl->members)
-        {
-            if (auto genericTypeConstraintDecl = as<GenericTypeConstraintDecl>(mm))
-            {
-                if (semantics)
-                {
-                    ensureDecl(semantics, genericTypeConstraintDecl, DeclCheckState::ReadyForReference);
-                }
-                auto constraintDeclRef = astBuilder->getSpecializedDeclRef<GenericTypeConstraintDecl>(genericTypeConstraintDecl, outerSubst);
-                auto witness =
-                    astBuilder->getDeclaredSubtypeWitness(
-                        getSub(astBuilder, constraintDeclRef),
-                        getSup(astBuilder, constraintDeclRef),
-                        astBuilder->getSpecializedDeclRef(genericTypeConstraintDecl, outerSubst));
-                // TODO: this is an ugly hack to prevent crashing.
-                // In early stages of compilation witness->sub and witness->sup may not be checked yet.
-                // When semanticVisitor is present we have used that to ensure the type is checked.
-                // However due to how the code is written we cannot guarantee semanticVisitor is always available
-                // here, and if we can't get the checked sup/sub type this subst is incomplete and should not be
-                // cached.
-                if (!witness->sub)
-                    shouldCache = false;
-                args.add(witness);
-            }
-        }
-
-        GenericSubstitution* genericSubst = astBuilder->getOrCreateGenericSubstitution(outerSubst, genericDecl, args);
-        if (shouldCache)
-            astBuilder->m_genericDefaultSubst[genericDecl] = genericSubst;
-        return genericSubst;
-    }
-
-    // Sometimes we need to refer to a declaration the way that it would be specialized
-    // inside the context where it is declared (e.g., with generic parameters filled in
-    // using their archetypes).
-    //
-    SubstitutionSet createDefaultSubstitutions(
-        ASTBuilder*     astBuilder,
-        SemanticsVisitor* semantics,
-        Decl*           decl,
-        SubstitutionSet outerSubstSet)
-    {
-        auto dd = decl->parentDecl;
-        if( auto genericDecl = as<GenericDecl>(dd) )
-        {
-            // We don't want to specialize references to anything
-            // other than the "inner" declaration itself.
-            if(decl != genericDecl->inner)
-                return outerSubstSet;
-
-            GenericSubstitution* genericSubst = createDefaultSubstitutionsForGeneric(
-                astBuilder,
-                semantics,
-                genericDecl,
-                outerSubstSet.substitutions);
-
-            return SubstitutionSet(genericSubst);
-        }
-
-        return outerSubstSet;
-    }
-
-    SubstitutionSet createDefaultSubstitutions(
-        ASTBuilder* astBuilder,
-        SemanticsVisitor* semantics,
-        Decl*   decl)
-    {
-        SubstitutionSet subst;
-        if( auto parentDecl = decl->parentDecl )
-        {
-            subst = createDefaultSubstitutions(astBuilder, semantics, parentDecl);
-        }
-        subst = createDefaultSubstitutions(astBuilder, semantics, decl, subst);
-        return subst;
+        return semantics->applyExtensionToType(extDecl, type);
     }
 
     bool SemanticsVisitor::isDeclUsableAsStaticMember(
@@ -1066,7 +951,7 @@ namespace Slang
                 auto baseExprType = memberExpr->baseExpression->type.type;
                 if (auto typeType = as<TypeType>(baseExprType))
                 {
-                    if (diffThisType->equals(typeType->type))
+                    if (diffThisType->equals(typeType->getType()))
                     {
                         return;
                     }
@@ -1149,7 +1034,6 @@ namespace Slang
         {
             // A variable with an explicit type is simpler, for the
             // most part.
-
             TypeExp typeExp = CheckUsableType(varDecl->type);
             varDecl->type = typeExp;
             if (varDecl->type.equals(m_astBuilder->getVoidType()))
@@ -1183,6 +1067,23 @@ namespace Slang
             // arrays in specific cases)
             //
             validateArraySizeForVariable(varDecl);
+        }
+
+        // If there is a matrix layout modifier, we will modify the matrix type now.
+        if (auto matrixType = as<MatrixExpressionType>(varDecl->type.type))
+        {
+            if (auto matrixLayoutModifier = varDecl->findModifier<MatrixLayoutModifier>())
+            {
+                auto matrixLayout = as<ColumnMajorLayoutModifier>(matrixLayoutModifier) ? SLANG_MATRIX_LAYOUT_COLUMN_MAJOR : SLANG_MATRIX_LAYOUT_ROW_MAJOR;
+                auto newMatrixType = getASTBuilder()->getMatrixType(
+                    matrixType->getElementType(),
+                    matrixType->getRowCount(),
+                    matrixType->getColumnCount(),
+                    getASTBuilder()->getIntVal(getASTBuilder()->getIntType(), matrixLayout));
+                varDecl->type.type = newMatrixType;
+                if (varDecl->initExpr)
+                    varDecl->initExpr = coerce(CoercionSite::Initializer, varDecl->type, varDecl->initExpr);
+            }
         }
 
         checkMeshOutputDecl(varDecl);
@@ -1256,7 +1157,7 @@ namespace Slang
         {
             if (auto basicType = as<BasicExpressionType>(varDecl->getType()))
             {
-                switch (basicType->baseType)
+                switch (basicType->getBaseType())
                 {
                 case BaseType::Bool:
                 case BaseType::Int8:
@@ -1297,7 +1198,24 @@ namespace Slang
             if (auto nodiffModifier = modifiedType->findModifier<NoDiffModifierVal>())
             {
                 varDecl->type.type = getRemovedModifierType(modifiedType, nodiffModifier);
-                addModifier(varDecl, m_astBuilder->getOrCreate<NoDiffModifier>());
+                auto noDiffModifier = m_astBuilder->create<NoDiffModifier>();
+                noDiffModifier->loc = varDecl->loc;
+                addModifier(varDecl, noDiffModifier);
+            }
+        }
+
+
+        if (as<NamespaceDeclBase>(varDecl->parentDecl))
+        {
+            // If this is a global variable with [vk::push_constant] attribute,
+            // we need to make sure to wrap it in a `ConstantBuffer`.
+            
+            if (!as<ConstantBufferType>(varDecl->type))
+            {
+                if (varDecl->findModifier<PushConstantAttribute>())
+                {
+                    varDecl->type.type = m_astBuilder->getConstantBufferType(varDecl->type);
+                }
             }
         }
     }
@@ -1414,11 +1332,11 @@ namespace Slang
         {
             if (auto declRefType = as<DeclRefType>(sharedTypeExpr->base))
             {
-                auto subst = createDefaultSubstitutions(m_astBuilder, this, declRefType->declRef.getDecl());
-                auto newType = DeclRefType::create(m_astBuilder, m_astBuilder->getSpecializedDeclRef(declRefType->declRef.getDecl(), subst));
+                auto newDeclRef = createDefaultSubstitutionsIfNeeded(m_astBuilder, this, declRefType->getDeclRef());
+                auto newType = DeclRefType::create(m_astBuilder, newDeclRef);
                 sharedTypeExpr->base.type = newType;
                 if (auto typetype = as<TypeType>(typeExp.exp->type))
-                    typetype->type = newType;
+                    typeExp.exp->type = m_astBuilder->getTypeType(newType);
             }
         }
     }
@@ -1462,20 +1380,20 @@ namespace Slang
         }
 
         // If `This` is nested inside a generic, we need to form a complete declref type to the
-        // newly synthesized aggTypeDecl here. This can be done by obtaining ThisTypeSubstitution
-        // from requirementDeclRef to get the generic substitution for outer generic parameters, and
+        // newly synthesized aggTypeDecl here. This can be done by obtaining the this type witness
+        // from requirementDeclRef to get the generic arguments for the outer generic, and
         // apply it to the newly synthesized decl.
         SubstitutionSet substSet;
-        if (auto thisTypeSusbt = findThisTypeSubstitution(
-            requirementDeclRef.getSubst(),
-            as<InterfaceDecl>(requirementDeclRef.getParent(m_astBuilder)).getDecl()))
+        if (auto thisWitness = findThisTypeWitness(
+            SubstitutionSet(requirementDeclRef),
+            as<InterfaceDecl>(requirementDeclRef.getParent()).getDecl()))
         {
-            if (auto declRefType = as<DeclRefType>(thisTypeSusbt->witness->sub))
+            if (auto declRefType = as<DeclRefType>(thisWitness->getSub()))
             {
-                substSet = declRefType->declRef.getSubst();
+                substSet = SubstitutionSet(declRefType->getDeclRef());
             }
         }
-        auto satisfyingType = DeclRefType::create(m_astBuilder, m_astBuilder->getSpecializedDeclRef(aggTypeDecl, substSet));
+        auto satisfyingType = DeclRefType::create(m_astBuilder, m_astBuilder->getMemberDeclRef(substSet.declRef, aggTypeDecl));
 
         // Helper function to add a `diffType` field into the synthesized type for the original
         // `member`.
@@ -1498,8 +1416,7 @@ namespace Slang
                 fieldLookupExpr->type.type = diffMemberType;
                 auto baseTypeExpr = m_astBuilder->create<SharedTypeExpr>();
                 baseTypeExpr->base.type = differentialType;
-                auto baseTypeType = m_astBuilder->create<TypeType>();
-                baseTypeType->type = differentialType;
+                auto baseTypeType = m_astBuilder->getOrCreate<TypeType>(differentialType);
                 baseTypeExpr->type.type = baseTypeType;
                 fieldLookupExpr->baseExpression = baseTypeExpr;
                 fieldLookupExpr->declRef = makeDeclRef(diffField);
@@ -1514,8 +1431,7 @@ namespace Slang
                 fieldLookupExpr->type.type = diffMemberType;
                 auto baseTypeExpr = m_astBuilder->create<SharedTypeExpr>();
                 baseTypeExpr->base.type = differentialType;
-                auto baseTypeType = m_astBuilder->create<TypeType>();
-                baseTypeType->type = differentialType;
+                auto baseTypeType = m_astBuilder->getOrCreate<TypeType>(differentialType);
                 baseTypeExpr->type.type = baseTypeType;
                 fieldLookupExpr->baseExpression = baseTypeExpr;
                 fieldLookupExpr->declRef = makeDeclRef(diffField);
@@ -1530,7 +1446,7 @@ namespace Slang
         {
             if (auto declRefType = as<DeclRefType>(inheritanceDecl->base.type))
             {
-                if (declRefType->declRef == m_astBuilder->getDifferentiableInterfaceDecl())
+                if (declRefType->getDeclRef() == m_astBuilder->getDifferentiableInterfaceDecl())
                 {
                     hasDifferentialConformance = true;
                     break;
@@ -1575,7 +1491,7 @@ namespace Slang
             if (auto baseDeclRefType = as<DeclRefType>(inheritance->base.type))
             {
                 // Skip interface super types.
-                if (baseDeclRefType->declRef.as<InterfaceDecl>())
+                if (baseDeclRefType->getDeclRef().as<InterfaceDecl>())
                     continue;
                 if (auto superDiffType = tryGetDifferentialType(m_astBuilder, baseDeclRefType))
                 {
@@ -1603,6 +1519,9 @@ namespace Slang
         if (doesTypeSatisfyAssociatedTypeConstraintRequirement(satisfyingType, requirementDeclRef, witnessTable))
         {
             witnessTable->add(requirementDeclRef.getDecl(), RequirementWitness(satisfyingType));
+
+            // Incrase the epoch so that future calls to Type::getCanonicalType will return the up-to-date folded types.
+            m_astBuilder->incrementEpoch();
             return true;
         }
 
@@ -1732,11 +1651,11 @@ namespace Slang
             auto baseType = as<DeclRefType>(inheritanceDecl->witnessTable->baseType);
             if (!baseType)
                 return;
-            if (baseType->declRef.getDecl() != m_astBuilder->getDifferentiableInterfaceDecl().getDecl())
+            if (baseType->getDeclRef().getDecl() != m_astBuilder->getDifferentiableInterfaceDecl().getDecl())
                 return;
             RequirementWitness witnessValue;
             auto requirementDecl = m_astBuilder->getSharedASTBuilder()->findBuiltinRequirementDecl(BuiltinRequirementKind::DifferentialType);
-            if (!inheritanceDecl->witnessTable->requirementDictionary.tryGetValue(requirementDecl, witnessValue))
+            if (!inheritanceDecl->witnessTable->getRequirementDictionary().tryGetValue(requirementDecl, witnessValue))
                 return;
 
             // A type used as differential type must have itself as its own differential type.
@@ -1748,7 +1667,7 @@ namespace Slang
             auto diffDiffType = tryGetDifferentialType(m_astBuilder, differentialType);
             if (!differentialType->equals(diffDiffType))
             {
-                SourceLoc sourceLoc = differentialType->declRef.getDecl()->loc;
+                SourceLoc sourceLoc = differentialType->getDeclRef().getDecl()->loc;
                 getSink()->diagnose(sourceLoc, Diagnostics::differentialTypeShouldServeAsItsOwnDifferentialType, differentialType);
                 getSink()->diagnose(inheritanceDecl, Diagnostics::noteSeeUseOfDifferentialType, differentialType, inheritanceDecl->getSup());
             }
@@ -2087,11 +2006,11 @@ namespace Slang
         // Once things are done, we will install the satisfying values
         // into the witness table for the requirements.
         //
-        for( auto p : mapRequiredToSatisfyingAccessorDeclRef )
+        for( const auto& [key, value] : mapRequiredToSatisfyingAccessorDeclRef )
         {
             witnessTable->add(
-                p.key.getDecl(),
-                RequirementWitness(p.value));
+                key.getDecl(),
+                RequirementWitness(value));
         }
         //
         // Note: the property declaration itself isn't something that
@@ -2272,7 +2191,7 @@ namespace Slang
                 auto satisfyingVal = m_astBuilder->getOrCreate<GenericParamIntVal>(
                     requiredValueParamDeclRef.getDecl()->getType(),
                     satisfyingValueParamDeclRef);
-                satisfyingVal->declRef = satisfyingValueParamDeclRef;
+                satisfyingVal->getDeclRef() = satisfyingValueParamDeclRef;
 
                 requiredSubstArgs.add(satisfyingVal);
             }
@@ -2296,21 +2215,16 @@ namespace Slang
             }
         }
 
-        GenericSubstitution* requiredSubst = m_astBuilder->getOrCreateGenericSubstitution(
-            requiredGenericDeclRef.getSubst(),
-            requiredGenericDeclRef.getDecl(),
-            requiredSubstArgs);
-
         // Now that we have computed a set of specialization arguments that will
         // specialize the generic requirement at the type parameters of the satisfying
         // generic, we can construct a reference to that declaration and re-run some
         // of the earlier checking logic with more type information usable.
         //
-        auto specializedRequiredGenericDeclRef = m_astBuilder->getSpecializedDeclRef<GenericDecl>(requiredGenericDeclRef.getDecl(), requiredSubst);
-        auto specializedRequiredMemberDeclRefs = getMembers(m_astBuilder, specializedRequiredGenericDeclRef);
+        auto specializedRequiredGenericInnerDeclRef = m_astBuilder->getGenericAppDeclRef(
+            requiredGenericDeclRef, requiredSubstArgs.getArrayView());
         for (Index i = 0; i < memberCount; i++)
         {
-            auto requiredMemberDeclRef = specializedRequiredMemberDeclRefs[i];
+            auto requiredMemberDeclRef = requiredMemberDeclRefs[i];
             auto satisfyingMemberDeclRef = satisfyingMemberDeclRefs[i];
 
             if(auto requiredTypeParamDeclRef = requiredMemberDeclRef.as<GenericTypeParamDecl>())
@@ -2350,13 +2264,16 @@ namespace Slang
                 // In current code the sub type will always be one of the generic type parameters,
                 // and the super-type will always be an interface, but there should be no
                 // need to make use of those additional details here.
-
-                auto requiredSubType = getSub(m_astBuilder, requiredConstraintDeclRef);
+                auto specializedRequiredConstraintDeclRef = m_astBuilder->getGenericAppDeclRef(
+                    requiredGenericDeclRef,
+                    requiredSubstArgs.getArrayView(),
+                    requiredConstraintDeclRef.getDecl()).as<GenericTypeConstraintDecl>();
+                auto requiredSubType = getSub(m_astBuilder, specializedRequiredConstraintDeclRef);
                 auto satisfyingSubType = getSub(m_astBuilder, satisfyingConstraintDeclRef);
                 if (!satisfyingSubType->equals(requiredSubType))
                     return false;
 
-                auto requiredSuperType = getSup(m_astBuilder, requiredConstraintDeclRef);
+                auto requiredSuperType = getSup(m_astBuilder, specializedRequiredConstraintDeclRef);
                 auto satisfyingSuperType = getSup(m_astBuilder, satisfyingConstraintDeclRef);
                 if (!satisfyingSuperType->equals(requiredSuperType))
                     return false;
@@ -2385,8 +2302,8 @@ namespace Slang
         // declaration (whatever it is) for an exact match.
         //
         return doesMemberSatisfyRequirement(
-            m_astBuilder->getSpecializedDeclRef<Decl>(satisfyingGenericDeclRef.getDecl()->inner, satisfyingGenericDeclRef.getSubst()),
-            m_astBuilder->getSpecializedDeclRef<Decl>(requiredGenericDeclRef.getDecl()->inner, requiredSubst),
+            m_astBuilder->getMemberDeclRef(satisfyingGenericDeclRef, getInner(satisfyingGenericDeclRef)),
+            specializedRequiredGenericInnerDeclRef,
             witnessTable);
     }
 
@@ -2429,7 +2346,7 @@ namespace Slang
         {
             // If we are seeing a placeholder that awaits synthesis, return false now to trigger
             // auto synthesis.
-            if (declRefType->declRef.getDecl()->hasModifier<ToBeSynthesizedModifier>())
+            if (declRefType->getDeclRef().getDecl()->hasModifier<ToBeSynthesizedModifier>())
                 return false;
         }
         // We need to confirm that the chosen type `satisfyingType`,
@@ -2451,7 +2368,7 @@ namespace Slang
             // type can indeed satisfy the interface requirement.
             witnessTable->add(
                 requiredAssociatedTypeDeclRef.getDecl(),
-                RequirementWitness(satisfyingType));
+                RequirementWitness(satisfyingType->getCanonicalType()));
         }
 
         return conformance;
@@ -2548,7 +2465,7 @@ namespace Slang
             // check if the specified type satisfies the constraints defined by the associated type
             if (auto requiredTypeDeclRef = requiredMemberDeclRef.as<AssocTypeDecl>())
             {
-                ensureDecl(typedefDeclRef, DeclCheckState::CanUseAsType);
+                ensureDecl(typedefDeclRef, DeclCheckState::ReadyForLookup);
 
                 auto satisfyingType = getNamedType(m_astBuilder, typedefDeclRef);
                 return doesTypeSatisfyAssociatedTypeRequirement(satisfyingType, requiredTypeDeclRef, witnessTable);
@@ -2633,9 +2550,6 @@ namespace Slang
         {
             if (auto constraintDecl = as<GenericTypeConstraintDecl>(member))
             {
-                getASTBuilder()->getSpecializedDeclRef(
-                    constraintDecl, requiredMemberDeclRef.getSubst());
-
                 auto synConstraintDecl = m_astBuilder->create<GenericTypeConstraintDecl>();
                 synConstraintDecl->nameAndLoc = constraintDecl->getNameAndLoc();
                 synConstraintDecl->parentDecl = synGenericDecl;
@@ -2643,12 +2557,12 @@ namespace Slang
                 // For constraints of type T : Interface, where T is a simple type parameter, 
                 // find the declaration of T
                 // 
-                if (auto typeParamDecl = as<DeclRefType>(constraintDecl->sub.type)->declRef.as<GenericTypeParamDecl>().getDecl())
+                if (auto typeParamDecl = as<DeclRefType>(constraintDecl->sub.type)->getDeclRef().as<GenericTypeParamDecl>().getDecl())
                 {  
-                    auto synTypeParamDecl = mapOrigToSynTypeParams[typeParamDecl];
+                    auto synTypeParamDecl = mapOrigToSynTypeParams.getValue(typeParamDecl);
 
                     // Construct a DeclRefExpr from the type parameter.
-                    auto synTypeParamDeclRef = makeDeclRef(synTypeParamDecl.getValue());
+                    auto synTypeParamDeclRef = makeDeclRef(synTypeParamDecl);
 
                     auto synTypeParamDeclRefExpr = m_astBuilder->create<VarExpr>();
                     synTypeParamDeclRefExpr->declRef = synTypeParamDeclRef;
@@ -2665,37 +2579,19 @@ namespace Slang
             }
         }
 
-        // Get outer substitutions. (This inner-most substition 
-        // must be a ThisTypeSubstition)
-        // 
-        Substitutions* outer = nullptr;
-        if (auto thisTypeSubst = findThisTypeSubstitution(
-            requiredMemberDeclRef.getSubst(),
-            as<InterfaceDecl>(requiredMemberDeclRef.getParent(m_astBuilder)).getDecl()))
-        {
-            outer = thisTypeSubst;
-        }
-
         // Override generic pointer to point to the original generic container.
         // This will create a substitution of the synthesized parameters for the
         // original parameters.
-        // 
-        GenericSubstitution* requiredFuncSubsts = createDefaultSubstitutionsForGeneric(m_astBuilder, this, requiredMemberDeclRef.getDecl(), outer);
-        DeclRef<Decl> requiredFuncDeclRef = m_astBuilder->getSpecializedDeclRef(requiredMemberDeclRef.getDecl()->inner, requiredFuncSubsts);
+        //
+        auto defaultArgs = getDefaultSubstitutionArgs(m_astBuilder, this, synGenericDecl);
+        DeclRef<FuncDecl> requiredFuncDeclRef = m_astBuilder->getGenericAppDeclRef(
+                requiredMemberDeclRef, defaultArgs.getArrayView()).as<FuncDecl>();
 
-        GenericSubstitution* substSynParamsForOrigGeneric = m_astBuilder->getOrCreateGenericSubstitution(
-            outer,
-            requiredMemberDeclRef.getDecl(),
-            createDefaultSubstitutionsForGeneric(m_astBuilder, this, synGenericDecl, nullptr)->getArgs());
-
-        // Substitute parameters of the synthesized generic for the parameters of the original generic.
-        requiredFuncDeclRef = substituteDeclRef(substSynParamsForOrigGeneric, m_astBuilder, requiredFuncDeclRef);
-
-        SLANG_ASSERT(requiredFuncDeclRef.as<FuncDecl>());
+        SLANG_ASSERT(requiredFuncDeclRef);
 
         synGenericDecl->inner = synthesizeMethodSignatureForRequirementWitness(
             context,
-            requiredFuncDeclRef.as<FuncDecl>(),
+            requiredFuncDeclRef,
             synArgs,
             synThis);
         synGenericDecl->inner->parentDecl = synGenericDecl;
@@ -2845,14 +2741,12 @@ namespace Slang
         {
             if (auto fwdReq = as<ForwardDerivativeRequirementDecl>(reqRefDecl->referencedDecl))
             {
-                ForwardDifferentiateVal* val = m_astBuilder->create<ForwardDifferentiateVal>();
-                val->func = satisfyingMemberDeclRef;
+                ForwardDifferentiateVal* val = m_astBuilder->getOrCreate<ForwardDifferentiateVal>(satisfyingMemberDeclRef);
                 witnessTable->add(fwdReq, RequirementWitness(val));
             }
             else if (auto bwdReq = as<BackwardDerivativeRequirementDecl>(reqRefDecl->referencedDecl))
             {
-                DifferentiateVal* val = m_astBuilder->create<BackwardDifferentiateVal>();
-                val->func = satisfyingMemberDeclRef;
+                DifferentiateVal* val = m_astBuilder->getOrCreate<BackwardDifferentiateVal>(satisfyingMemberDeclRef);
                 witnessTable->add(bwdReq, RequirementWitness(val));
             }
         }
@@ -3112,7 +3006,7 @@ namespace Slang
         // or uses, an associated type or `This`.
         //
         // Ideally we should be looking up the type using a `DeclRef` that
-        // refers to the interface requirement using a `ThisTypeSubstitution`
+        // refers to the interface requirement using a `LookupDeclRef`
         // that refers to the satisfying type declaration, and requirement
         // checking for non-associated-type requirements should be done *after*
         // requirement checking for associated-type requirements.
@@ -3368,9 +3262,9 @@ namespace Slang
         // difference between our synthetic property and a hand-written
         // one with the same behavior.
         //
-        for(auto p : mapRequiredAccessorToSynAccessor)
+        for(auto& [key, value] : mapRequiredAccessorToSynAccessor)
         {
-            witnessTable->add(p.key.getDecl(), RequirementWitness(makeDeclRef(p.value)));
+            witnessTable->add(key.getDecl(), RequirementWitness(makeDeclRef(value)));
         }
         witnessTable->add(requiredMemberDeclRef.getDecl(),
             RequirementWitness(makeDeclRef(synPropertyDecl)));
@@ -3562,7 +3456,7 @@ namespace Slang
 
         // First we need to make sure the associated `Differential` type requirement is satisfied.
         bool hasDifferentialAssocType = false;
-        for (auto existingEntry : witnessTable->requirementDictionary)
+        for (auto& existingEntry : witnessTable->getRequirementDictionary())
         {
             if (auto builtinReqAttr = existingEntry.key->findModifier<BuiltinRequirementModifier>())
             {
@@ -3637,7 +3531,6 @@ namespace Slang
             {
                 case SynthesisPattern::AllInductive:
                 {
-                    int paramIndex = 0;
                     for (auto arg : synArgs)
                     {
                         auto memberExpr = m_astBuilder->create<MemberExpr>();
@@ -3647,8 +3540,6 @@ namespace Slang
                         memberExpr->name = varMember->getName();
                         paramFields.add(memberExpr);
                         inductiveArgMask.add(true);
-
-                        paramIndex++;
                     }
                     break;
                 }
@@ -3711,20 +3602,33 @@ namespace Slang
 
         // If `This` is nested inside a generic, we need to form a complete declref type to the
         // newly synthesized method here in order to fill into the witness table.
-        // This can be done by obtaining ThisTypeSubstitution from requirementDeclRef to get the
+        // This can be done by obtaining the ThisType witness from requirementDeclRef to get the
         // generic substitution for outer generic parameters, and apply it here.
         SubstitutionSet substSet;
-        if (auto thisTypeSubst = findThisTypeSubstitution(
-            requirementDeclRef.getSubst(),
+        if (auto thisTypeWitness = findThisTypeWitness(
+            SubstitutionSet(requirementDeclRef),
             as<InterfaceDecl>(requirementDeclRef.getDecl()->parentDecl)))
         {
-            if (auto declRefType = as<DeclRefType>(thisTypeSubst->witness->sub))
+            if (auto declRefType = as<DeclRefType>(thisTypeWitness->getSub()))
             {
-                substSet = declRefType->declRef.getSubst();
+                substSet = SubstitutionSet(declRefType->getDeclRef());
             }
         }
+        if (auto outerGeneric = GetOuterGeneric(context->parentDecl))
+        {
+            // If the context->parentDecl is not the same as ThisType represented by genApp, then it must be an extension
+            // to ThisType. In this case, we need to form a new GenericAppDeclRef to specailizethe outer parent extension
+            // decl. Note that the extension might be a partial extension with some generic arguments missing, and
+            // we can't support that case right now. For now we can just assume the extension will have the same set
+            // of generic parameters as the target type.
+            auto defaultArgs = getDefaultSubstitutionArgs(m_astBuilder, this, outerGeneric);
+            auto specializedParent = m_astBuilder->getGenericAppDeclRef(makeDeclRef(outerGeneric), defaultArgs.getArrayView());
+            auto specializedFunc = m_astBuilder->getMemberDeclRef(specializedParent, synFunc);
+            witnessTable->add(requirementDeclRef.getDecl(), RequirementWitness(specializedFunc));
+            return true;
+        }
 
-        witnessTable->add(requirementDeclRef.getDecl(), RequirementWitness(m_astBuilder->getSpecializedDeclRef<Decl>(synFunc, substSet)));
+        witnessTable->add(requirementDeclRef.getDecl(), RequirementWitness(m_astBuilder->getDirectDeclRef(synFunc)));
         return true;
     }
 
@@ -3752,11 +3656,16 @@ namespace Slang
         // witness in the table for the requirement, so
         // that we can bail out early.
         //
-        if(witnessTable->requirementDictionary.containsKey(requiredMemberDeclRef.getDecl()))
+        if(witnessTable->getRequirementDictionary().containsKey(requiredMemberDeclRef.getDecl()))
         {
             return true;
         }
 
+        // The ThisType requirement is always satisfied.
+        if (as<ThisTypeDecl>(requiredMemberDeclRef.getDecl()))
+        {
+            return true;
+        }
 
         // An important exception to the above is that an
         // inheritance declaration in the interface is not going
@@ -3972,17 +3881,13 @@ namespace Slang
         ensureDecl(superInterfaceDeclRef, DeclCheckState::CanReadInterfaceRequirements);
 
         // When comparing things like signatures, we need to do so in the context
-        // of a this-type substitution that aligns the signatures in the interface
+        // of a LookupDeclRef that aligns the signatures in the interface
         // with those in the concrete type. For example, we need to treat any uses
         // of `This` in the interface as equivalent to the concrete type for the
         // purpose of signature matching (and similarly for associated types).
         //
-        ThisTypeSubstitution* thisTypeSubst = m_astBuilder->getOrCreateThisTypeSubstitution(
-            superInterfaceDeclRef.getDecl(),
-            subTypeConformsToSuperInterfaceWitness,
-            superInterfaceDeclRef.getSubst());
-
-        auto specializedSuperInterfaceDeclRef = m_astBuilder->getSpecializedDeclRef<InterfaceDecl>(superInterfaceDeclRef.getDecl(), thisTypeSubst);
+        auto thisTypeDeclRef = m_astBuilder->getLookupDeclRef(
+            subTypeConformsToSuperInterfaceWitness, superInterfaceDeclRef.getDecl()->getThisTypeDecl());
 
         bool result = true;
 
@@ -4014,35 +3919,36 @@ namespace Slang
         // constraints and solve for those type variables as part of the
         // conformance-checking process.
         //
-        for(auto requiredMemberDeclRef : getMembers(m_astBuilder, specializedSuperInterfaceDeclRef))
+        for(auto requiredMemberDecl : getMembers(m_astBuilder, superInterfaceDeclRef))
         {
-            if(!isAssociatedTypeDecl(requiredMemberDeclRef.getDecl()))
+            if(!isAssociatedTypeDecl(requiredMemberDecl.getDecl()))
                 continue;
-
+            auto requiredMemberDeclRef = m_astBuilder->getLookupDeclRef(subTypeConformsToSuperInterfaceWitness, requiredMemberDecl.getDecl());
             auto requirementSatisfied = findWitnessForInterfaceRequirement(
                 context,
                 subType,
                 superInterfaceType,
                 inheritanceDecl,
-                specializedSuperInterfaceDeclRef,
+                thisTypeDeclRef,
                 requiredMemberDeclRef,
                 witnessTable,
                 subTypeConformsToSuperInterfaceWitness);
 
             result = result && requirementSatisfied;
         }
-        for(auto requiredMemberDeclRef : getMembers(m_astBuilder, specializedSuperInterfaceDeclRef))
+        for(auto requiredMemberDecl : getMembers(m_astBuilder, superInterfaceDeclRef))
         {
-            if(isAssociatedTypeDecl(requiredMemberDeclRef.getDecl()))
+            if(isAssociatedTypeDecl(requiredMemberDecl.getDecl()))
                 continue;
-            if (requiredMemberDeclRef.as<DerivativeRequirementDecl>())
+            if (requiredMemberDecl.as<DerivativeRequirementDecl>())
                 continue;
+            auto requiredMemberDeclRef = m_astBuilder->getLookupDeclRef(subTypeConformsToSuperInterfaceWitness, requiredMemberDecl.getDecl());
             auto requirementSatisfied = findWitnessForInterfaceRequirement(
                 context,
                 subType,
                 superInterfaceType,
                 inheritanceDecl,
-                specializedSuperInterfaceDeclRef,
+                thisTypeDeclRef,
                 requiredMemberDeclRef,
                 witnessTable,
                 subTypeConformsToSuperInterfaceWitness);
@@ -4074,25 +3980,27 @@ namespace Slang
         // the time we are compiling and handle those, and punt on the larger issue
         // for a bit longer.
         //
-        for(auto candidateExt : getCandidateExtensions(specializedSuperInterfaceDeclRef, this))
+        for(auto candidateExt : getCandidateExtensions(superInterfaceDeclRef, this))
         {
             // We need to apply the extension to the interface type that our
             // concrete type is inheriting from.
             //
-            Type* targetType = DeclRefType::create(m_astBuilder, specializedSuperInterfaceDeclRef);
-            auto extDeclRef = ApplyExtensionToType(candidateExt, targetType);
-            if(!extDeclRef)
+            Type* targetType = DeclRefType::create(m_astBuilder, thisTypeDeclRef);
+            auto parentDeclRef = applyExtensionToType(candidateExt, targetType);
+            if(!parentDeclRef)
                 continue;
 
             // Only inheritance clauses from the extension matter right now.
-            for(auto requiredInheritanceDeclRef : getMembersOfType<InheritanceDecl>(m_astBuilder, extDeclRef))
+            for(auto requiredInheritanceDecl : getMembersOfType<InheritanceDecl>(m_astBuilder, candidateExt))
             {
+                auto requiredInheritanceDeclRef = m_astBuilder->getLookupDeclRef(
+                    subTypeConformsToSuperInterfaceWitness, requiredInheritanceDecl.getDecl());
                 auto requirementSatisfied = findWitnessForInterfaceRequirement(
                     context,
                     subType,
                     superInterfaceType,
                     inheritanceDecl,
-                    specializedSuperInterfaceDeclRef,
+                    thisTypeDeclRef,
                     requiredInheritanceDeclRef,
                     witnessTable,
                     subTypeConformsToSuperInterfaceWitness);
@@ -4116,7 +4024,7 @@ namespace Slang
     {
         if (auto supereclRefType = as<DeclRefType>(superType))
         {
-            auto superTypeDeclRef = supereclRefType->declRef;
+            auto superTypeDeclRef = supereclRefType->getDeclRef();
             if (auto superInterfaceDeclRef = superTypeDeclRef.as<InterfaceDecl>())
             {
                 // The type is stating that it conforms to an interface.
@@ -4157,11 +4065,11 @@ namespace Slang
 
         if( auto declRefType = as<DeclRefType>(subType) )
         {
-            auto declRef = declRefType->declRef;
+            auto declRef = declRefType->getDeclRef();
 
             if (auto superDeclRefType = as<DeclRefType>(superType))
             {
-                auto superTypeDecl = superDeclRefType->declRef.getDecl();
+                auto superTypeDecl = superDeclRefType->getDeclRef().getDecl();
                 if (superTypeDecl->findModifier<ComInterfaceAttribute>())
                 {
                     // A struct cannot implement a COM Interface.
@@ -4213,10 +4121,7 @@ namespace Slang
         // Look at the type being inherited from, and validate
         // appropriately.
 
-        DeclaredSubtypeWitness* subIsSuperWitness = m_astBuilder->create<DeclaredSubtypeWitness>();
-        subIsSuperWitness->declRef = makeDeclRef(inheritanceDecl);
-        subIsSuperWitness->sub = subType;
-        subIsSuperWitness->sup = superType;
+        DeclaredSubtypeWitness* subIsSuperWitness = m_astBuilder->getDeclaredSubtypeWitness(subType, superType, makeDeclRef(inheritanceDecl));
 
         ConformanceCheckingContext context;
         context.conformingType = subType;
@@ -4318,7 +4223,7 @@ namespace Slang
         {
             return;
         }
-        auto baseDecl = baseDeclRefType->declRef.getDecl();
+        auto baseDecl = baseDeclRefType->getDeclRef().getDecl();
 
         // Using the parent/child hierarchy baked into `Decl`s we
         // can find the modules that contain both the `decl` doing
@@ -4400,7 +4305,7 @@ namespace Slang
                 continue;
             }
 
-            auto baseDeclRef = baseDeclRefType->declRef;
+            auto baseDeclRef = baseDeclRefType->getDeclRef();
             auto baseInterfaceDeclRef = baseDeclRef.as<InterfaceDecl>();
             if( !baseInterfaceDeclRef )
             {
@@ -4461,7 +4366,7 @@ namespace Slang
                 continue;
             }
 
-            auto baseDeclRef = baseDeclRefType->declRef;
+            auto baseDeclRef = baseDeclRefType->getDeclRef();
             if( auto baseInterfaceDeclRef = baseDeclRef.as<InterfaceDecl>() )
             {
             }
@@ -4530,7 +4435,7 @@ namespace Slang
                 continue;
             }
 
-            auto baseDeclRef = baseDeclRefType->declRef;
+            auto baseDeclRef = baseDeclRefType->getDeclRef();
             if (auto baseInterfaceDeclRef = baseDeclRef.as<InterfaceDecl>())
             {
             }
@@ -4579,8 +4484,8 @@ namespace Slang
         auto basicType = as<BasicExpressionType>(type);
         if(!basicType)
             return false;
-
-        return isIntegerBaseType(basicType->baseType) || basicType->baseType == BaseType::Bool;
+        auto baseType = basicType->getBaseType();
+        return isIntegerBaseType(baseType) || baseType == BaseType::Bool;
     }
 
     bool SemanticsVisitor::isIntValueInRangeOfType(IntegerLiteralValue value, Type* type)
@@ -4589,7 +4494,7 @@ namespace Slang
         if (!basicType)
             return false;
 
-        switch (basicType->baseType)
+        switch (basicType->getBaseType())
         {
         case BaseType::UInt8:
             return (value >= 0 && value <= std::numeric_limits<uint8_t>::max()) || (value == -1);
@@ -4671,7 +4576,7 @@ namespace Slang
                 continue;
             }
 
-            auto baseDeclRef = baseDeclRefType->declRef;
+            auto baseDeclRef = baseDeclRefType->getDeclRef();
             if( auto baseInterfaceDeclRef = baseDeclRef.as<InterfaceDecl>() )
             {
                 _validateCrossModuleInheritance(decl, inheritanceDecl);
@@ -4775,7 +4680,7 @@ namespace Slang
             Decl* tagAssociatedTypeDecl = nullptr;
             if(auto enumTypeTypeDeclRefType = dynamicCast<DeclRefType>(enumTypeType))
             {
-                if(auto enumTypeTypeInterfaceDecl = as<InterfaceDecl>(enumTypeTypeDeclRefType->declRef.getDecl()))
+                if(auto enumTypeTypeInterfaceDecl = as<InterfaceDecl>(enumTypeTypeDeclRefType->getDeclRef().getDecl()))
                 {
                     for(auto memberDecl : enumTypeTypeInterfaceDecl->members)
                     {
@@ -4846,7 +4751,7 @@ namespace Slang
                 {
                     if(auto constIntVal = as<ConstantIntVal>(explicitTagVal))
                     {
-                        defaultTag = constIntVal->value;
+                        defaultTag = constIntVal->getValue();
                     }
                     else
                     {
@@ -5000,7 +4905,7 @@ namespace Slang
     bool SemanticsVisitor::doGenericSignaturesMatch(
         GenericDecl*                    left,
         GenericDecl*                    right,
-        GenericSubstitution**    outSubstRightToLeft)
+        DeclRef<Decl>*                  outSpecializedRightInner)
     {
         // Our first goal here is to determine if `left` and
         // `right` have equivalent lists of explicit
@@ -5118,9 +5023,9 @@ namespace Slang
         // `foo2<T>` so that its constraint, after specialization,
         // looks like `T : IFoo`.
         //
-        auto& substRightToLeft = *outSubstRightToLeft;
-        List<Val*> leftArgs = getDefaultSubstitutionArgs(left);
-        substRightToLeft = getASTBuilder()->getOrCreateGenericSubstitution(nullptr, right, leftArgs);
+        auto& substInnerRightToLeft = *outSpecializedRightInner;
+        List<Val*> leftArgs = getDefaultSubstitutionArgs(m_astBuilder, this, left);
+        substInnerRightToLeft = m_astBuilder->getGenericAppDeclRef(makeDeclRef(right), leftArgs.getArrayView());
 
         // We should now be able to enumerate the constraints
         // on `right` in a way that uses the same type parameters
@@ -5192,7 +5097,9 @@ namespace Slang
             // arguments into account.
             //
             GenericTypeConstraintDecl* leftConstraint = leftConstraints[cc];
-            DeclRef<GenericTypeConstraintDecl> rightConstraint = m_astBuilder->getSpecializedDeclRef(rightConstraints[cc], substRightToLeft);
+            auto unspecializedRightConstarintDeclRef = createDefaultSubstitutionsIfNeeded(m_astBuilder, this, makeDeclRef(rightConstraints[cc]));
+            DeclRef<GenericTypeConstraintDecl> rightConstraint = substInnerRightToLeft.substitute(
+                m_astBuilder, unspecializedRightConstarintDeclRef).as<GenericTypeConstraintDecl>();
 
             // For now, every constraint has the form `sub : sup`
             // to indicate that `sub` must be a subtype of `sup`.
@@ -5262,44 +5169,59 @@ namespace Slang
         return true;
     }
 
-    List<Val*> SemanticsVisitor::getDefaultSubstitutionArgs(GenericDecl* genericDecl)
+    List<Val*> getDefaultSubstitutionArgs(ASTBuilder* astBuilder, SemanticsVisitor* semantics, GenericDecl* genericDecl)
     {
         List<Val*> args;
-        for (auto dd : genericDecl->members)
-        {
-            if (dd == genericDecl->inner)
-                continue;
+        if (astBuilder->m_cachedGenericDefaultArgs.tryGetValue(genericDecl, args))
+            return args;
 
-            if (auto typeParam = as<GenericTypeParamDecl>(dd))
+        for (auto mm : genericDecl->members)
+        {
+            if (auto genericTypeParamDecl = as<GenericTypeParamDecl>(mm))
             {
-                auto type = DeclRefType::create(m_astBuilder, makeDeclRef(typeParam));
-                args.add(type);
+                args.add(DeclRefType::create(astBuilder, astBuilder->getDirectDeclRef(genericTypeParamDecl)));
             }
-            else if (auto valueParam = as<GenericValueParamDecl>(dd))
+            else if (auto genericValueParamDecl = as<GenericValueParamDecl>(mm))
             {
-                auto val = m_astBuilder->getOrCreate<GenericParamIntVal>(
-                    valueParam->getType(),
-                    DeclRef<VarDeclBase>(valueParam));
-                args.add(val);
+                if (semantics)
+                    semantics->ensureDecl(genericValueParamDecl, DeclCheckState::ReadyForLookup);
+
+                args.add(astBuilder->getOrCreate<GenericParamIntVal>(
+                    genericValueParamDecl->getType(),
+                    astBuilder->getDirectDeclRef(genericValueParamDecl)));
             }
         }
 
-        // Add defaults for constraint parameters.
-        for (auto dd : genericDecl->members)
+        bool shouldCache = true;
+
+        // create default substitution arguments for constraints
+        for (auto mm : genericDecl->members)
         {
-            if (auto constraintDecl = as<GenericTypeConstraintDecl>(dd))
+            if (auto genericTypeConstraintDecl = as<GenericTypeConstraintDecl>(mm))
             {
-                // Convert the constraint to an appropriate witness.
-                auto witness = tryGetSubtypeWitness(constraintDecl->sub, constraintDecl->sup);
-
-                // Must be non-null since we know there's a constraint. If null, something is 
-                // very wrong.
-                //
-                SLANG_ASSERT(witness);
-
+                if (semantics)
+                    semantics->ensureDecl(genericTypeConstraintDecl, DeclCheckState::ReadyForReference);
+                auto constraintDeclRef = astBuilder->getDirectDeclRef<GenericTypeConstraintDecl>(genericTypeConstraintDecl);
+                auto witness =
+                    astBuilder->getDeclaredSubtypeWitness(
+                        getSub(astBuilder, constraintDeclRef),
+                        getSup(astBuilder, constraintDeclRef),
+                        constraintDeclRef);
+                // TODO: this is an ugly hack to prevent crashing.
+                // In early stages of compilation witness->sub and witness->sup may not be checked yet.
+                // When semanticVisitor is present we have used that to ensure the type is checked.
+                // However due to how the code is written we cannot guarantee semanticVisitor is always available
+                // here, and if we can't get the checked sup/sub type this subst is incomplete and should not be
+                // cached.
+                if (!witness->getSub())
+                    shouldCache = false;
                 args.add(witness);
             }
         }
+
+        if (shouldCache)
+            astBuilder->m_cachedGenericDefaultArgs[genericDecl] = args;
+
         return args;
     }
 
@@ -5427,11 +5349,11 @@ namespace Slang
             // Then we will compare the parameter types of `foo2`
             // against the specialization `foo1<U>`.
             //
-            GenericSubstitution* subst = nullptr;
-            if(!doGenericSignaturesMatch(newGenericDecl, oldGenericDecl, &subst))
+            DeclRef<Decl> specializedOldDeclInner;
+            if(!doGenericSignaturesMatch(newGenericDecl, oldGenericDecl, &specializedOldDeclInner))
                 return SLANG_OK;
 
-            oldDeclRef = getASTBuilder()->getSpecializedDeclRef(oldDecl, subst);
+            oldDeclRef = specializedOldDeclInner.as<FuncDecl>();
         }
 
         // If the parameter signatures don't match, then don't worry
@@ -5535,9 +5457,8 @@ namespace Slang
             _addTargetModifiers(newDecl, newTargets);
 
             bool hasConflict = false;
-            for (auto& pair : newTargets)
+            for (auto& [target, value] : newTargets)
             {
-                Name* target = pair.key;
                 auto found = currentTargets.tryGetValue(target);
                 if (found)
                 {
@@ -5854,7 +5775,7 @@ namespace Slang
                 auto reqDecl = m_astBuilder->create<ForwardDerivativeRequirementDecl>();
                 reqDecl->originalRequirementDecl = decl;
                 cloneModifiers(reqDecl, decl);
-                auto declRef = m_astBuilder->getSpecializedDeclRef<CallableDecl>(decl, createDefaultSubstitutions(m_astBuilder, this, decl));
+                auto declRef = createDefaultSubstitutionsIfNeeded(m_astBuilder, this, makeDeclRef(decl)).as<CallableDecl>();
                 auto diffFuncType = getForwardDiffFuncType(getFuncType(m_astBuilder, declRef));
                 setFuncTypeIntoRequirementDecl(reqDecl, as<FuncType>(diffFuncType));
                 interfaceDecl->members.add(reqDecl);
@@ -5869,7 +5790,7 @@ namespace Slang
             if (decl->hasModifier<BackwardDifferentiableAttribute>())
             {
                 // Requirement for backward derivative.
-                auto declRef = m_astBuilder->getSpecializedDeclRef<CallableDecl>(decl, createDefaultSubstitutions(m_astBuilder, this, decl));
+                auto declRef = createDefaultSubstitutionsIfNeeded(m_astBuilder, this, makeDeclRef(decl)).as<CallableDecl>();
                 auto originalFuncType = getFuncType(m_astBuilder, declRef);
                 auto diffFuncType = as<FuncType>(getBackwardDiffFuncType(originalFuncType));
                 {
@@ -5938,7 +5859,7 @@ namespace Slang
     IntegerLiteralValue SemanticsVisitor::GetMinBound(IntVal* val)
     {
         if (auto constantVal = as<ConstantIntVal>(val))
-            return constantVal->value;
+            return constantVal->getValue();
 
         // TODO(tfoley): Need to track intervals so that this isn't just a lie...
         return 1;
@@ -6009,7 +5930,7 @@ namespace Slang
         if (auto targetDeclRefType = as<DeclRefType>(decl->targetType))
         {
             // Attach our extension to that type as a candidate...
-            if (auto aggTypeDeclRef = targetDeclRefType->declRef.as<AggTypeDecl>())
+            if (auto aggTypeDeclRef = targetDeclRefType->getDeclRef().as<AggTypeDecl>())
             {
                 auto aggTypeDecl = aggTypeDeclRef.getDecl();
 
@@ -6060,7 +5981,7 @@ namespace Slang
                 continue;
             }
 
-            auto baseDeclRef = baseDeclRefType->declRef;
+            auto baseDeclRef = baseDeclRefType->getDeclRef();
             auto baseInterfaceDeclRef = baseDeclRef.as<InterfaceDecl>();
             if( !baseInterfaceDeclRef )
             {
@@ -6091,9 +6012,9 @@ namespace Slang
             // conform to the interface and fill in its
             // requirements.
             //
-            ThisType* thisType = m_astBuilder->create<ThisType>();
-            thisType->interfaceDeclRef = interfaceDeclRef;
-            return thisType;
+            return DeclRefType::create(
+                m_astBuilder,
+                m_astBuilder->getDirectDeclRef(interfaceDeclRef.getDecl()->getThisTypeDecl()));
         }
         else if (auto aggTypeDeclRef = declRef.as<AggTypeDecl>())
         {
@@ -6144,7 +6065,7 @@ namespace Slang
     {
         if( auto declRefType = as<DeclRefType>(type) )
         {
-            return calcThisType(declRefType->declRef);
+            return calcThisType(declRefType->getDeclRef());
         }
         else
         {
@@ -6389,7 +6310,7 @@ namespace Slang
         return parentGeneric;
     }
 
-    DeclRef<ExtensionDecl> SemanticsVisitor::ApplyExtensionToType(
+    DeclRef<ExtensionDecl> SemanticsVisitor::applyExtensionToType(
         ExtensionDecl*  extDecl,
         Type*    type)
     {
@@ -6423,15 +6344,15 @@ namespace Slang
 
             if (!TryUnifyTypes(constraints, extDecl->targetType.Ptr(), type))
                 return DeclRef<ExtensionDecl>();
-            auto constraintSubst = trySolveConstraintSystem(&constraints, makeDeclRef(extGenericDecl));
-            if (!constraintSubst)
+            auto solvedDeclRef = trySolveConstraintSystem(&constraints, makeDeclRef(extGenericDecl), ArrayView<Val*>());
+            if (!solvedDeclRef)
             {
                 return DeclRef<ExtensionDecl>();
             }
 
             // Construct a reference to the extension with our constraint variables
             // set as they were found by solving the constraint system.
-            extDeclRef = m_astBuilder->getSpecializedDeclRef<Decl>(extDecl, constraintSubst).as<ExtensionDecl>();
+            extDeclRef = solvedDeclRef.as<ExtensionDecl>();
         }
 
         // Now extract the target type from our (possibly specialized) extension decl-ref.
@@ -6443,67 +6364,21 @@ namespace Slang
         // substitution to the extension decl-ref.
         if(auto targetDeclRefType = as<DeclRefType>(targetType))
         {
-            if(auto targetInterfaceDeclRef = targetDeclRefType->declRef.as<InterfaceDecl>())
+            if(auto targetInterfaceDeclRef = targetDeclRefType->getDeclRef().as<InterfaceDecl>())
             {
                 // Okay, the target type is an interface.
                 //
-                // Is the type we want to apply to also an interface?
-                if(auto appDeclRefType = as<DeclRefType>(type))
+                // Is the type we want to apply to a ThisType?
+                if(auto appDeclRefType = as<ThisType>(type))
                 {
-                    if(auto appInterfaceDeclRef = appDeclRefType->declRef.as<InterfaceDecl>())
+                    if(auto thisTypeLookupDeclRef = SubstitutionSet(appDeclRefType->getDeclRef()).findLookupDeclRef())
                     {
-                        if(appInterfaceDeclRef.getDecl() == targetInterfaceDeclRef.getDecl())
+                        if(thisTypeLookupDeclRef->getDecl() == targetInterfaceDeclRef.getDecl())
                         {
                             // Looks like we have a match in the types,
-                            // now let's see if we have a this-type substitution.
-                            if(auto appThisTypeSubst = as<ThisTypeSubstitution>(appInterfaceDeclRef.getSubst()))
-                            {
-                                if(appThisTypeSubst->interfaceDecl == appInterfaceDeclRef.getDecl())
-                                {
-                                    // The type we want to apply to has a this-type substitution,
-                                    // and (by construction) the target type currently does not.
-                                    //
-                                    SLANG_ASSERT(!as<ThisTypeSubstitution>(targetInterfaceDeclRef.getSubst()));
-
-                                    // We will create a new substitution to apply to the target type.
-                                    ThisTypeSubstitution* newTargetSubst = m_astBuilder->getOrCreateThisTypeSubstitution(
-                                        appThisTypeSubst->interfaceDecl,
-                                        appThisTypeSubst->witness,
-                                        targetInterfaceDeclRef.getSubst());
-
-                                    targetType = DeclRefType::create(m_astBuilder,
-                                        m_astBuilder->getSpecializedDeclRef<InterfaceDecl>(targetInterfaceDeclRef.getDecl(), newTargetSubst));
-
-                                    // Note: we are constructing a this-type substitution that
-                                    // we will apply to the extension declaration as well.
-                                    // This is not strictly allowed by our current representation
-                                    // choices, but we need it in order to make sure that
-                                    // references to the target type of the extension
-                                    // declaration have a chance to resolve the way we want them to.
-
-                                    ThisTypeSubstitution* newExtSubst = m_astBuilder->getOrCreateThisTypeSubstitution(
-                                        appThisTypeSubst->interfaceDecl,
-                                        appThisTypeSubst->witness,
-                                        extDeclRef.getSubst());
-
-                                    extDeclRef = m_astBuilder->getSpecializedDeclRef<ExtensionDecl>(
-                                        extDeclRef.getDecl(),
-                                        newExtSubst);
-
-                                    // TODO: Ideally we should also apply the chosen specialization to
-                                    // the decl-ref for the extension, so that subsequent lookup through
-                                    // the members of this extension will retain that substitution and
-                                    // be able to apply it.
-                                    //
-                                    // E.g., if an extension method returns a value of an associated
-                                    // type, then we'd want that to become specialized to a concrete
-                                    // type when using the extension method on a value of concrete type.
-                                    //
-                                    // The challenge here that makes me reluctant to just staple on
-                                    // such a substitution is that it wouldn't follow our implicit
-                                    // rules about where `ThisTypeSubstitution`s can appear.
-                                }
-                            }
+                            // now let's see if `type`'s declref starts with a Lookup.
+                            targetType = type;
+                            extDeclRef = m_astBuilder->getLookupDeclRef(thisTypeLookupDeclRef->getWitness(), extDeclRef.getDecl());
                         }
                     }
                 }
@@ -6626,7 +6501,6 @@ namespace Slang
         {
             if( auto namespaceDeclRef = declRefExpr->declRef.as<NamespaceDeclBase>() )
             {
-                SLANG_ASSERT(!namespaceDeclRef.getSubst());
                 namespaceDecl = namespaceDeclRef.getDecl();
             }
         }
@@ -6788,10 +6662,10 @@ namespace Slang
     
     void SharedSemanticsContext::_addCandidateExtensionsFromModule(ModuleDecl* moduleDecl)
     {
-        for( auto& entry : moduleDecl->mapTypeToCandidateExtensions )
+        for( auto& [entryKey, entryValue] : moduleDecl->mapTypeToCandidateExtensions )
         {
-            auto& list = _getCandidateExtensionList(entry.key, m_mapTypeDeclToCandidateExtensions);
-            list.addRange(entry.value->candidateExtensions);
+            auto& list = _getCandidateExtensionList(entryKey, m_mapTypeDeclToCandidateExtensions);
+            list.addRange(entryValue->candidateExtensions);
         }
     }
 
@@ -6992,7 +6866,7 @@ namespace Slang
                 // the extension to the type and see if we succeed in
                 // making a match.
                 //
-                auto extDeclRef = ApplyExtensionToType(semantics, extDecl, aggType);
+                auto extDeclRef = applyExtensionToType(semantics, extDecl, aggType);
                 if(!extDeclRef)
                     continue;
 
@@ -7050,8 +6924,8 @@ namespace Slang
     {
         if (auto andType = as<AndType>(type))
         {
-            _getCanonicalConstraintTypes(outTypeList, andType->left);
-            _getCanonicalConstraintTypes(outTypeList, andType->right);
+            _getCanonicalConstraintTypes(outTypeList, andType->getLeft());
+            _getCanonicalConstraintTypes(outTypeList, andType->getRight());
         }
         else
         {
@@ -7072,7 +6946,7 @@ namespace Slang
             assert(
                 genericTypeConstraintDecl.getDecl()->sub.type->astNodeType ==
                 ASTNodeType::DeclRefType);
-            auto typeParamDecl = as<DeclRefType>(genericTypeConstraintDecl.getDecl()->sub.type)->declRef.getDecl();
+            auto typeParamDecl = as<DeclRefType>(genericTypeConstraintDecl.getDecl()->sub.type)->getDeclRef().getDecl();
             List<Type*>* constraintTypes = genericConstraints.tryGetValue(typeParamDecl);
             assert(constraintTypes);
             constraintTypes->add(genericTypeConstraintDecl.getDecl()->getSup().type);
@@ -7090,42 +6964,6 @@ namespace Slang
             result[constraints.key] = typeList;
         }
         return result;
-    }
-
-    Val* SemanticsDeclTypeResolutionVisitor::resolveVal(Val* val)
-    {
-        if (auto declRefType = as<DeclRefType>(val))
-        {
-            if (auto concreteType = _tryLookupConcreteAssociatedTypeFromThisTypeSubst(m_astBuilder, declRefType->declRef))
-                return as<Type>(concreteType);
-            for (auto subst = declRefType->declRef.getSubst(); subst; subst=subst->getOuter())
-            {
-                if (auto genericSubst = as<GenericSubstitution>(subst))
-                {
-                    ShortList<Val*> newArgs;
-                    for (auto& arg : genericSubst->getArgs())
-                    {
-                        arg = resolveVal(arg);
-                        SLANG_RELEASE_ASSERT(arg);
-                    }
-                }
-            }
-        }
-        else if (auto subtypeWitness = as<SubtypeWitness>(val))
-        {
-            auto sub = as<Type>(resolveVal(subtypeWitness->sub));
-            auto sup = as<Type>(resolveVal(subtypeWitness->sup));
-            if (sub && sup)
-            {
-                if (sub != subtypeWitness->sub || sup != subtypeWitness->sup)
-                {
-                    auto newVal = tryGetSubtypeWitness(as<Type>(sub), as<Type>(sup));
-                    if (newVal)
-                        val = newVal;
-                }
-            }
-        }
-        return val;
     }
 
     struct ArgsWithDirectionInfo

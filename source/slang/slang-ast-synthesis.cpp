@@ -134,8 +134,7 @@ Expr* ASTSynthesizer::emitMemberExpr(Type* type, Name* name)
 {
     auto rs = m_builder->create<StaticMemberExpr>();
     auto typeExpr = m_builder->create<SharedTypeExpr>();
-    auto typetype = m_builder->create<TypeType>();
-    typetype->type = type;
+    auto typetype = m_builder->getOrCreate<TypeType>(type);
     typeExpr->type = typetype;
     rs->baseExpression = typeExpr;
     rs->name = name;

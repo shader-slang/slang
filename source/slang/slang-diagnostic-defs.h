@@ -238,6 +238,10 @@ DIAGNOSTIC(20014, Error, classIsReservedKeyword, "'class' is a reserved keyword 
 
 DIAGNOSTIC(20101, Warning, unintendedEmptyStatement, "potentially unintended empty statement at this location; use {} instead.")
 
+// 29xxx - Snippet parsing
+DIAGNOSTIC(29000, Error, snippetParsingFailed, "unable to parse target intrinsic snippet: $0")
+
+
 //
 // 3xxxx - Semantic analysis
 //
@@ -296,6 +300,8 @@ DIAGNOSTIC(30064, Note,  implicitCastUsedAsLValue, "argument was implicitly cast
 
 DIAGNOSTIC(30065, Error, newCanOnlyBeUsedToInitializeAClass, "`new` can only be used to initialize a class")
 DIAGNOSTIC(30066, Error, classCanOnlyBeInitializedWithNew, "a class can only be initialized by a `new` clause")
+
+DIAGNOSTIC(30067, Error, mutatingMethodOnFunctionInputParameter, "mutating method '$0' called on `in` parameter '$1'; changes will not be visible to caller. copy the parameter into a local variable if this behavior is intended")
 
 DIAGNOSTIC(30100, Error, staticRefToNonStaticMember, "type '$0' cannot be used to refer to non-static member '$1'")
 
@@ -722,5 +728,8 @@ DIAGNOSTIC(99999, Internal, internalCompilerError, "Slang internal compiler erro
 DIAGNOSTIC(99999, Error, compilationAborted, "Slang compilation aborted due to internal error")
 DIAGNOSTIC(99999, Error, compilationAbortedDueToException, "Slang compilation aborted due to an exception of $0: $1")
 DIAGNOSTIC(99999, Internal, serialDebugVerificationFailed, "Verification of serial debug information failed.")
+DIAGNOSTIC(99999, Internal, spirvValidationFailed, "Validation of generated SPIR-V failed.")
+
+DIAGNOSTIC(99999, Internal, noBlocksOrIntrinsic, "no blocks found for function definition, is there a '$0' intrinsic missing?")
 
 #undef DIAGNOSTIC

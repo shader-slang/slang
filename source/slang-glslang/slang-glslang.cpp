@@ -97,7 +97,7 @@ static void dump(
 }
 
 static void dumpDiagnostics(
-    const glslang_CompileRequest_1_1& request,
+    const glslang_CompileRequest_1_2& request,
     std::string const&      log)
 {
     dump(log.c_str(), log.length(), request.diagnosticFunc, request.diagnosticUserData, stderr);
@@ -147,7 +147,7 @@ struct SPIRVOptimizationDiagnostic
 
 // Apply the SPIRV-Tools optimizer to generated SPIR-V based on the desired optimization level
 // TODO: add flag for optimizing SPIR-V size as well
-static void glslang_optimizeSPIRV(spv_target_env targetEnv, const glslang_CompileRequest_1_1& request, std::vector<SPIRVOptimizationDiagnostic>& outDiags, std::vector<unsigned int>& ioSpirv)
+static void glslang_optimizeSPIRV(spv_target_env targetEnv, const glslang_CompileRequest_1_2& request, std::vector<SPIRVOptimizationDiagnostic>& outDiags, std::vector<unsigned int>& ioSpirv)
 {
     const auto optimizationLevel = request.optimizationLevel;
 
@@ -509,7 +509,7 @@ static spv_target_env _getUniversalTargetEnv(glslang::EShTargetLanguageVersion i
     return SPV_ENV_UNIVERSAL_1_2;
 }
 
-static int glslang_compileGLSLToSPIRV(const glslang_CompileRequest_1_1& request)
+static int glslang_compileGLSLToSPIRV(glslang_CompileRequest_1_2 request)
 {
     // Check that the encoding matches
     assert(glslang::EShTargetSpv_1_4 == _makeTargetLanguageVersion(1, 4));
@@ -591,13 +591,35 @@ static int glslang_compileGLSLToSPIRV(const glslang_CompileRequest_1_1& request)
     int sourceTextLength = (int)(sourceTextEnd - sourceText);
 
     shader->setPreamble("#extension GL_GOOGLE_cpp_style_line_directive : require\n");
-
     shader->setStringsWithLengthsAndNames(
         &sourceText,
         &sourceTextLength,
         &request.sourcePath,
         1);
 
+    // Options for compilation of glsl to Spv
+
+    // spvOptions ctors with default options (this it the same as passing nullptr to GlslangToSpv)
+    glslang::SpvOptions spvOptions;
+
+    const SlangDebugInfoLevel debugLevel = (SlangDebugInfoLevel)request.debugInfoType;
+
+    // Enable generation of debug info, if any debug level other than none is requested
+    if (debugLevel != SLANG_DEBUG_INFO_LEVEL_NONE)
+    {
+        spvOptions.generateDebugInfo = true;
+        spvOptions.emitNonSemanticShaderDebugInfo = true;
+        shader->setDebugInfo(true);
+    }
+
+    if (debugLevel == SLANG_DEBUG_INFO_LEVEL_MAXIMAL)
+    {
+        spvOptions.emitNonSemanticShaderDebugSource = true;
+        spvOptions.disableOptimizer = true;
+        request.optimizationLevel = SLANG_OPTIMIZATION_LEVEL_NONE;
+    }
+
+    // Link program
     {
         const EShMessages messages = EShMessages(EShMsgSpvRules | EShMsgVulkanRules);
 
@@ -606,6 +628,9 @@ static int glslang_compileGLSLToSPIRV(const glslang_CompileRequest_1_1& request)
             dumpDiagnostics(request, shader->getInfoLog());
             return 1;
         }
+
+        if (request.entryPointName && strlen(request.entryPointName))
+            shader->setEntryPoint(request.entryPointName);
 
         program->addShader(shader);
 
@@ -622,24 +647,15 @@ static int glslang_compileGLSLToSPIRV(const glslang_CompileRequest_1_1& request)
         }
     }
 
-    // Options for compilation of glsl to Spv
-
-    // spvOptions ctors with default options (this it the same as passing nullptr to GlslangToSpv)
-    glslang::SpvOptions spvOptions;
-
-    const SlangDebugInfoLevel debugLevel = (SlangDebugInfoLevel)request.debugInfoType;
-
-    // Enable generation of debug info, if any debug level other than none is requested
-    if (debugLevel != SLANG_DEBUG_INFO_LEVEL_NONE)
-    {
-        spvOptions.generateDebugInfo = true;
-    }
-
     for(int stage = 0; stage < EShLangCount; ++stage)
     {
         auto stageIntermediate = program->getIntermediate((EShLanguage)stage);
         if(!stageIntermediate)
             continue;
+        if (debugLevel == SLANG_DEBUG_INFO_LEVEL_MAXIMAL)
+        {
+            stageIntermediate->addSourceText(sourceText, sourceTextLength);
+        }
 
         std::vector<unsigned int> spirv;
         spv::SpvBuildLogger logger;
@@ -685,7 +701,7 @@ static int glslang_compileGLSLToSPIRV(const glslang_CompileRequest_1_1& request)
     return 0;
 }
 
-static int glslang_dissassembleSPIRV(const glslang_CompileRequest_1_1& request)
+static int glslang_dissassembleSPIRV(const glslang_CompileRequest_1_2& request)
 {
     typedef unsigned int SPIRVWord;
 
@@ -738,7 +754,7 @@ public:
     bool m_isInitialized = false;
 };
 
-static int _compile(const glslang_CompileRequest_1_1& request)
+static int _compile(const glslang_CompileRequest_1_2& request)
 {
     int result = 0;
     switch (request.action)
@@ -765,7 +781,7 @@ _declspec(dllexport)
 #else
 __attribute__((__visibility__("default")))
 #endif
-int glslang_compile_1_1(glslang_CompileRequest_1_1* inRequest)
+int glslang_compile_1_2(glslang_CompileRequest_1_2 * inRequest)
 {
     static ProcessInitializer g_processInitializer;
     if (!g_processInitializer.init())
@@ -780,7 +796,7 @@ int glslang_compile_1_1(glslang_CompileRequest_1_1* inRequest)
     }
 
     // If it's the right size just use it
-    if (inRequest->sizeInBytes == sizeof(glslang_CompileRequest_1_1))
+    if (inRequest->sizeInBytes == sizeof(glslang_CompileRequest_1_2))
     {
         return _compile(*inRequest);
     }
@@ -790,8 +806,8 @@ int glslang_compile_1_1(glslang_CompileRequest_1_1* inRequest)
 
         // Try to ensure some binary compatibility, by using sizeInBytes member, and copying
 
-        glslang_CompileRequest_1_1 request;
-        
+        glslang_CompileRequest_1_2 request;
+
         // Copy into request
         const size_t copySize = (inRequest->sizeInBytes > sizeof(request)) ? sizeof(request) : inRequest->sizeInBytes;
         ::memcpy(&request, inRequest, copySize);
@@ -800,6 +816,21 @@ int glslang_compile_1_1(glslang_CompileRequest_1_1* inRequest)
 
         return _compile(request);
     }
+}
+
+extern "C"
+#ifdef _MSC_VER
+_declspec(dllexport)
+#else
+__attribute__((__visibility__("default")))
+#endif
+int glslang_compile_1_1(glslang_CompileRequest_1_1* inRequest)
+{
+    glslang_CompileRequest_1_2 request;
+    memset(&request, 0, sizeof(request));
+    request.sizeInBytes = sizeof(request);
+    request.set(*inRequest);
+    return glslang_compile_1_2(&request);
 }
 
 extern "C"

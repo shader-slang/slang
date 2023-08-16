@@ -171,10 +171,9 @@ SlangResult MemoryFileSystem::enumeratePathContents(const char* path, FileSystem
     ImplicitDirectoryCollector collector(canonicalPath, true);
 
     // If it is a directory, we need to see if there is anything in it
-    for (const auto& pair : m_entries)
+    for (const auto& [_, childEntry] : m_entries)
     {
-        const Entry* childEntry = &pair.value;
-        collector.addPath(childEntry->m_type, childEntry->m_canonicalPath.getUnownedSlice());
+        collector.addPath(childEntry.m_type, childEntry.m_canonicalPath.getUnownedSlice());
     }
 
     return collector.enumerate(callback, userData);
@@ -275,10 +274,9 @@ SlangResult MemoryFileSystem::remove(const char* path)
             ImplicitDirectoryCollector collector(canonicalPath);
 
             // If it is a directory, we need to see if there is anything in it
-            for (const auto& pair : m_entries)
+            for (const auto& [_, childEntry] : m_entries)
             {
-                const Entry* childEntry = &pair.value;
-                collector.addPath(childEntry->m_type, childEntry->m_canonicalPath.getUnownedSlice());
+                collector.addPath(childEntry.m_type, childEntry.m_canonicalPath.getUnownedSlice());
                 if (collector.hasContent())
                 {
                     // Directory is not empty

@@ -141,7 +141,7 @@ namespace Slang
     {
         if( auto constVal = as<ConstantIntVal>(val) )
         {
-            auto cVal = constVal->value;
+            auto cVal = constVal->getValue();
             if(cVal >= 0 && cVal <= 9 )
             {
                 emit(context, (UInt)cVal);
@@ -190,13 +190,13 @@ namespace Slang
 
         if( auto basicType = dynamicCast<BasicExpressionType>(type) )
         {
-            emitBaseType(context, basicType->baseType);
+            emitBaseType(context, basicType->getBaseType());
         }
         else if( auto vecType = dynamicCast<VectorExpressionType>(type) )
         {
             emitRaw(context, "v");
-            emitSimpleIntVal(context, vecType->elementCount);
-            emitType(context, vecType->elementType);
+            emitSimpleIntVal(context, vecType->getElementCount());
+            emitType(context, vecType->getElementType());
         }
         else if( auto matType = dynamicCast<MatrixExpressionType>(type) )
         {
@@ -208,11 +208,11 @@ namespace Slang
         }
         else if( auto namedType = dynamicCast<NamedExpressionType>(type) )
         {
-            emitType(context, getType(context->astBuilder, namedType->declRef));
+            emitType(context, getType(context->astBuilder, namedType->getDeclRef()));
         }
         else if( auto declRefType = dynamicCast<DeclRefType>(type) )
         {
-            emitQualifiedName(context, declRefType->declRef);
+            emitQualifiedName(context, declRefType->getDeclRef());
         }
         else if (auto arrType = dynamicCast<ArrayExpressionType>(type))
         {
@@ -220,19 +220,10 @@ namespace Slang
             emitSimpleIntVal(context, arrType->getElementCount());
             emitType(context, arrType->getElementType());
         }
-        else if( auto taggedUnionType = dynamicCast<TaggedUnionType>(type) )
-        {
-            emitRaw(context, "u");
-            for( auto caseType : taggedUnionType->caseTypes )
-            {
-                emitType(context, caseType);
-            }
-            emitRaw(context, "U");
-        }
         else if( auto thisType = dynamicCast<ThisType>(type) )
         {
             emitRaw(context, "t");
-            emitQualifiedName(context, thisType->interfaceDeclRef);
+            emitQualifiedName(context, thisType->getInterfaceDecl());
         }
         else if (const auto errorType = dynamicCast<ErrorType>(type))
         {
@@ -259,6 +250,15 @@ namespace Slang
             emit(context, n);
             for(Index i = 0; i < n; ++i)
                 emitType(context, tupleType->getMember(i));
+        }
+        else if (auto modifiedType = dynamicCast<ModifiedType>(type))
+        {
+            emitRaw(context, "Tm");
+            emitType(context, modifiedType->getBase());
+            auto n = modifiedType->getModifierCount();
+            emit(context, n);
+            for (Index i = 0; i < n; ++i)
+                emitVal(context, modifiedType->getModifier(i));
         }
         else
         {
@@ -300,50 +300,54 @@ namespace Slang
             // "depth" (how many outer generics) and "index" (which
             // parameter are they at the specified depth).
             emitRaw(context, "K");
-            emitName(context, genericParamIntVal->declRef.getName());
+            emitName(context, genericParamIntVal->getDeclRef().getName());
         }
         else if( auto constantIntVal = dynamicCast<ConstantIntVal>(val) )
         {
             // TODO: need to figure out what prefix/suffix is needed
             // to allow demangling later.
             emitRaw(context, "k");
-            emit(context, (UInt) constantIntVal->value);
+            emit(context, (UInt) constantIntVal->getValue());
         }
         else if (auto funcCallIntVal = dynamicCast<FuncCallIntVal>(val))
         {
             emitRaw(context, "KC");
-            emit(context, funcCallIntVal->args.getCount());
-            emitName(context, funcCallIntVal->funcDeclRef.getName());
-            for (Index i = 0; i < funcCallIntVal->args.getCount(); i++)
-                emitVal(context, funcCallIntVal->args[i]);
+            emit(context, funcCallIntVal->getArgs().getCount());
+            emitName(context, funcCallIntVal->getFuncDeclRef().getName());
+            for (Index i = 0; i < funcCallIntVal->getArgs().getCount(); i++)
+                emitVal(context, funcCallIntVal->getArgs()[i]);
         }
         else if (auto lookupIntVal = dynamicCast<WitnessLookupIntVal>(val))
         {
             emitRaw(context, "KL");
-            emitVal(context, lookupIntVal->witness);
-            emitName(context, lookupIntVal->key->getName());
+            emitVal(context, lookupIntVal->getWitness());
+            emitName(context, lookupIntVal->getKey()->getName());
         }
         else if (const auto polynomialIntVal = dynamicCast<PolynomialIntVal>(val))
         {
             emitRaw(context, "KX");
-            emit(context, (UInt)polynomialIntVal->constantTerm);
-            emit(context, (UInt)polynomialIntVal->terms.getCount());
-            for (auto term : polynomialIntVal->terms)
+            emit(context, (UInt)polynomialIntVal->getConstantTerm());
+            emit(context, (UInt)polynomialIntVal->getTerms().getCount());
+            for (auto term : polynomialIntVal->getTerms())
             {
-                emit(context, (UInt)term->constFactor);
-                emit(context, (UInt)term->paramFactors.getCount());
-                for (auto factor : term->paramFactors)
+                emit(context, (UInt)term->getConstFactor());
+                emit(context, (UInt)term->getParamFactors().getCount());
+                for (auto factor : term->getParamFactors())
                 {
-                    emitVal(context, factor->param);
-                    emit(context, (UInt)factor->power);
+                    emitVal(context, factor->getParam());
+                    emit(context, (UInt)factor->getPower());
                 }
             }
         }
         else if (const auto typecastIntVal = dynamicCast<TypeCastIntVal>(val))
         {
             emitRaw(context, "KK");
-            emitVal(context, typecastIntVal->type);
-            emitVal(context, typecastIntVal->base);
+            emitVal(context, typecastIntVal->getType());
+            emitVal(context, typecastIntVal->getBase());
+        }
+        else if (auto modifier = as<ModifierVal>(val))
+        {
+            emitNameImpl(context, UnownedStringSlice(modifier->getClassInfo().m_name));
         }
         else
         {
@@ -355,7 +359,7 @@ namespace Slang
         ManglingContext*    context,
         DeclRef<Decl>       declRef)
     {
-        auto parentDeclRef = declRef.getParent(context->astBuilder);
+        auto parentDeclRef = declRef.getParent();
         auto parentGenericDeclRef = parentDeclRef.as<GenericDecl>();
         if( parentDeclRef )
         {
@@ -423,14 +427,14 @@ namespace Slang
             // There are two cases here: either we have specializations
             // in place for the parent generic declaration, or we don't.
 
-            auto subst = findInnerMostGenericSubstitution(declRef.getSubst());
-            if( subst && subst->getGenericDecl() == parentGenericDeclRef.getDecl())
+            auto substArgs = tryGetGenericArguments(SubstitutionSet(declRef), parentGenericDeclRef.getDecl());
+            if (substArgs.getCount())
             {
                 // This is the case where we *do* have substitutions.
                 emitRaw(context, "G");
-                UInt genericArgCount = subst->getArgs().getCount();
+                UInt genericArgCount = substArgs.getCount();
                 emit(context, genericArgCount);
-                for (auto aa : subst->getArgs())
+                for (auto aa : substArgs)
                 {
                     emitVal(context, aa);
                 }
@@ -441,7 +445,7 @@ namespace Slang
                 // information about the parameters of the generic here.
                 emitRaw(context, "g");
                 UInt genericParameterCount = 0;
-                for( auto mm : getMembers(context->astBuilder, parentGenericDeclRef) )
+                for( auto mm : getMembers(context->astBuilder, parentGenericDeclRef.as<ContainerDecl>()) )
                 {
                     if(mm.is<GenericTypeParamDecl>())
                     {
@@ -569,7 +573,7 @@ namespace Slang
             // mangling the generic and the inner entity
             emitRaw(context, "G");
 
-            SLANG_ASSERT(genericDecl.getSubst() == nullptr);
+            SLANG_ASSERT(SubstitutionSet(genericDecl).findGenericAppDeclRef() == nullptr);
 
             auto innerDecl = getInner(genericDecl);
 
@@ -591,6 +595,7 @@ namespace Slang
 
     static String getMangledName(ASTBuilder* astBuilder, DeclRef<Decl> const& declRef)
     {
+        SLANG_AST_BUILDER_RAII(astBuilder);
         ManglingContext context(astBuilder);
         mangleName(&context, declRef);
         return context.sb.produceString();
@@ -598,11 +603,15 @@ namespace Slang
 
     String getMangledName(ASTBuilder* astBuilder, DeclRefBase* declRef)
     {
+        SLANG_AST_BUILDER_RAII(astBuilder);
+
         return getMangledName(astBuilder, DeclRef<Decl>(declRef));
     }
 
     String getMangledName(ASTBuilder* astBuilder, Decl* decl)
     {
+        SLANG_AST_BUILDER_RAII(astBuilder);
+
         return getMangledName(astBuilder, makeDeclRef(decl));
     }
     
@@ -611,6 +620,7 @@ namespace Slang
         DeclRef<Decl> sub,
         DeclRef<Decl> sup)
     {
+        SLANG_AST_BUILDER_RAII(astBuilder);
         ManglingContext context(astBuilder);
         emitRaw(&context, "_SW");
         emitQualifiedName(&context, sub);
@@ -623,6 +633,7 @@ namespace Slang
         DeclRef<Decl> sub,
         Type* sup)
     {
+        SLANG_AST_BUILDER_RAII(astBuilder);
         // The mangled form for a witness that `sub`
         // conforms to `sup` will be named:
         //
@@ -640,6 +651,7 @@ namespace Slang
         Type* sub,
         Type* sup)
     {
+        SLANG_AST_BUILDER_RAII(astBuilder);
         // The mangled form for a witness that `sub`
         // conforms to `sup` will be named:
         //
@@ -654,6 +666,7 @@ namespace Slang
 
     String getMangledTypeName(ASTBuilder* astBuilder, Type* type)
     {
+        SLANG_AST_BUILDER_RAII(astBuilder);
         ManglingContext context(astBuilder);
         emitType(&context, type);
         return context.sb.produceString();
@@ -668,7 +681,7 @@ namespace Slang
 
     String getHashedName(const UnownedStringSlice& mangledName)
     {
-        HashCode64 hash = getStableHashCode64(mangledName.begin(), mangledName.getLength());
+        StableHashCode64 hash = getStableHashCode64(mangledName.begin(), mangledName.getLength());
 
         StringBuilder builder;
         builder << "_Sh";

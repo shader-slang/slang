@@ -2,6 +2,10 @@
 
 typedef uint UINT;
 
+// Access float2/float3 as a float3
+[ForceInline] float3 __asFloat3(float2 v) { return float3(v, 0); }
+[ForceInline] float3 __asFloat3(float3 v) { return v; }
+
 __generic<T>
 __magic_type(HLSLAppendStructuredBufferType)
 __intrinsic_type($(kIROp_HLSLAppendStructuredBufferType))
@@ -231,19 +235,19 @@ struct StructuredBuffer
         out uint numStructs,
         out uint stride);
 
+    __intrinsic_op($(kIROp_StructuredBufferLoad))
     __target_intrinsic(glsl, "$0._data[$1]")
-    __target_intrinsic(spirv_direct, "%addr = OpAccessChain resultType*StorageBuffer resultId _0 const(int, 0) _1; OpLoad resultType resultId %addr;")
+    __target_intrinsic(spirv, "%addr = OpAccessChain resultType*StorageBuffer resultId _0 const(int, 0) _1; OpLoad resultType resultId %addr;")
     [__readNone]
     T Load(int location);
 
-    [__readNone]
+    __intrinsic_op($(kIROp_StructuredBufferLoadStatus))
     T Load(int location, out uint status);
 
     __subscript(uint index) -> T
     {
-        __target_intrinsic(glsl, "$0._data[$1]")
-        __target_intrinsic(spirv_direct, "%addr = OpAccessChain resultType*StorageBuffer resultId _0 const(int, 0) _1; OpLoad resultType resultId %addr;")
         [__readNone]
+        __intrinsic_op($(kIROp_StructuredBufferLoad))
         get;
     };
 };
@@ -705,7 +709,6 @@ static const struct {
 for(auto item : kMutableStructuredBufferCases) {
 }}}}
 
-
 __generic<T>
 __magic_type(HLSL$(item.name)Type)
 __intrinsic_type($(item.op))
@@ -720,18 +723,18 @@ struct $(item.name)
 
     uint IncrementCounter();
 
-    __target_intrinsic(glsl, "$0._data[$1]")
-    __target_intrinsic(spirv_direct, "%addr = OpAccessChain resultType*StorageBuffer resultId _0 const(int, 0) _1; OpLoad resultType resultId %addr;")
     [__NoSideEffect]
+    __intrinsic_op($(kIROp_RWStructuredBufferLoad))
     T Load(int location);
+
     [__NoSideEffect]
+    __intrinsic_op($(kIROp_RWStructuredBufferLoadStatus))
     T Load(int location, out uint status);
 
     __subscript(uint index) -> T
     {
-        __target_intrinsic(glsl, "$0._data[$1]")
-        __target_intrinsic(spirv_direct, "*StorageBuffer OpAccessChain resultType resultId _0 const(int, 0) _1")
         [__NoSideEffect]
+        __intrinsic_op($(kIROp_RWStructuredBufferGetElementPtr))
         ref;
     }
 };
@@ -804,7 +807,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_abs($0)")
 __target_intrinsic(cpp, "$P_abs($0)")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 fi(FAbs, SAbs) _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fi(FAbs, SAbs) _0")
 [__readNone]
 T abs(T x);
 /*{
@@ -815,7 +818,7 @@ T abs(T x);
 __generic<T : __BuiltinIntegerType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 fi(FAbs, SAbs) _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fi(FAbs, SAbs) _0")
 [__readNone]
 vector<T, N> abs(vector<T, N> x)
 {
@@ -835,14 +838,14 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_abs($0)")
 __target_intrinsic(cpp, "$P_abs($0)")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 fi(FAbs, SAbs) _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fi(FAbs, SAbs) _0")
 [__readNone]
 T abs(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 fi(FAbs, SAbs) _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fi(FAbs, SAbs) _0")
 [__readNone]
 vector<T, N> abs(vector<T, N> x)
 {
@@ -864,14 +867,14 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_acos($0)")
 __target_intrinsic(cpp, "$P_acos($0)")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Acos _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Acos _0")
 [__readNone]
 T acos(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Acos _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Acos _0")
 [__readNone]
 vector<T, N> acos(vector<T, N> x)
 {
@@ -891,12 +894,18 @@ __generic<T : __BuiltinType>
 __target_intrinsic(cpp, "bool($0)")
 __target_intrinsic(cuda, "bool($0)")
 __target_intrinsic(glsl, "bool($0)")
+__target_intrinsic(spirv, boolean(T), "OpCopyObject resultType resultId _0")
+__target_intrinsic(spirv, integral(T), "OpINotEqual resultType resultId _0 const(,0)")
+__target_intrinsic(spirv, floating(T), "OpFUnordNotEqual resultType resultId _0 const(,0)")
 [__readNone]
 bool all(T x);
 
 __generic<T : __BuiltinType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "all(bvec$N0($0))")
+__target_intrinsic(spirv, boolean(T), "OpAll resultType resultId _0")
+__target_intrinsic(spirv, integral(T), "%c = OpINotEqual resultType resultId _0 const(,0); OpAll resultType resultId %c")
+__target_intrinsic(spirv, floating(T), "%c = OpFUnordNotEqual resultType resultId _0 const(,0); OpAll resultType resultId %c")
 [__readNone]
 bool all(vector<T,N> x)
 {
@@ -966,7 +975,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "packDouble2x32(uvec2($0, $1))")
 __target_intrinsic(cpp, "$P_asdouble($0, $1)")
 __target_intrinsic(cuda, "$P_asdouble($0, $1)")
-__target_intrinsic(spirv_direct, "%v = OpCompositeConstruct _type(uint2) resultId _0 _1; OpExtInst resultType resultId glsl450 59 %v")
+__target_intrinsic(spirv, "%v = OpCompositeConstruct _type(uint2) resultId _0 _1; OpExtInst resultType resultId glsl450 59 %v")
 __glsl_extension(GL_ARB_gpu_shader5)
 [__readNone]
 double asdouble(uint lowbits, uint highbits);
@@ -977,7 +986,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "intBitsToFloat")
 __target_intrinsic(cpp, "$P_asfloat($0)")
 __target_intrinsic(cuda, "$P_asfloat($0)")
-__target_intrinsic(spirv_direct, "OpBitcast resultType resultId _0")
+__target_intrinsic(spirv, "OpBitcast resultType resultId _0")
 [__readNone]
 float asfloat(int x);
 
@@ -985,14 +994,14 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "uintBitsToFloat")
 __target_intrinsic(cpp, "$P_asfloat($0)")
 __target_intrinsic(cuda, "$P_asfloat($0)")
-__target_intrinsic(spirv_direct, "OpBitcast resultType resultId _0")
+__target_intrinsic(spirv, "OpBitcast resultType resultId _0")
 [__readNone]
 float asfloat(uint x);
 
 __generic<let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "intBitsToFloat")
-__target_intrinsic(spirv_direct, "OpBitcast resultType resultId _0")
+__target_intrinsic(spirv, "OpBitcast resultType resultId _0")
 [__readNone]
 vector<float, N> asfloat(vector< int, N> x)
 {
@@ -1002,7 +1011,7 @@ vector<float, N> asfloat(vector< int, N> x)
 __generic<let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "uintBitsToFloat")
-__target_intrinsic(spirv_direct, "OpBitcast resultType resultId _0")
+__target_intrinsic(spirv, "OpBitcast resultType resultId _0")
 [__readNone]
 vector<float,N> asfloat(vector<uint,N> x)
 {
@@ -1049,14 +1058,14 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_asin($0)")
 __target_intrinsic(cpp, "$P_asin($0)")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Asin _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Asin _0")
 [__readNone]
 T asin(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Asin _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Asin _0")
 [__readNone]
 vector<T, N> asin(vector<T, N> x)
 {
@@ -1077,7 +1086,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "floatBitsToInt")
 __target_intrinsic(cpp, "$P_asint($0)")
 __target_intrinsic(cuda, "$P_asint($0)")
-__target_intrinsic(spirv_direct, "OpBitcast resultType resultId _0")
+__target_intrinsic(spirv, "OpBitcast resultType resultId _0")
 [__readNone]
 int asint(float x);
 
@@ -1085,14 +1094,14 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "int($0)")
 __target_intrinsic(cpp, "$P_asint($0)")
 __target_intrinsic(cuda, "$P_asint($0)")
-__target_intrinsic(spirv_direct, "OpBitcast resultType resultId _0")
+__target_intrinsic(spirv, "OpBitcast resultType resultId _0")
 [__readNone]
 int asint(uint x);
 
 __generic<let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "floatBitsToInt")
-__target_intrinsic(spirv_direct, "OpBitcast resultType resultId _0")
+__target_intrinsic(spirv, "OpBitcast resultType resultId _0")
 [__readNone]
 vector<int, N> asint(vector<float, N> x)
 {
@@ -1102,7 +1111,7 @@ vector<int, N> asint(vector<float, N> x)
 __generic<let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "ivec$N0($0)")
-__target_intrinsic(spirv_direct, "OpBitcast resultType resultId _0")
+__target_intrinsic(spirv, "OpBitcast resultType resultId _0")
 [__readNone]
 vector<int, N> asint(vector<uint, N> x)
 {
@@ -1157,7 +1166,7 @@ void asuint(double value, out uint lowbits, out uint highbits);
 
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "floatBitsToUint")
-__target_intrinsic(spirv_direct, "OpBitcast resultType resultId _0")
+__target_intrinsic(spirv, "OpBitcast resultType resultId _0")
 __target_intrinsic(cpp, "$P_asuint($0)")
 __target_intrinsic(cuda, "$P_asuint($0)")
 [__readNone]
@@ -1165,7 +1174,7 @@ uint asuint(float x);
 
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "uint($0)")
-__target_intrinsic(spirv_direct, "OpBitcast resultType resultId _0")
+__target_intrinsic(spirv, "OpBitcast resultType resultId _0")
 __target_intrinsic(cpp, "$P_asuint($0)")
 __target_intrinsic(cuda, "$P_asuint($0)")
 [__readNone]
@@ -1174,7 +1183,7 @@ uint asuint(int x);
 __generic<let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "floatBitsToUint")
-__target_intrinsic(spirv_direct, "OpBitcast resultType resultId _0")
+__target_intrinsic(spirv, "OpBitcast resultType resultId _0")
 [__readNone]
 vector<uint,N> asuint(vector<float,N> x)
 {
@@ -1184,7 +1193,7 @@ vector<uint,N> asuint(vector<float,N> x)
 __generic<let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "uvec$N0($0)")
-__target_intrinsic(spirv_direct, "OpBitcast resultType resultId _0")
+__target_intrinsic(spirv, "OpBitcast resultType resultId _0")
 [__readNone]
 vector<uint, N> asuint(vector<int, N> x)
 {
@@ -1309,14 +1318,14 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_atan($0)")
 __target_intrinsic(cpp, "$P_atan($0)")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Atan _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Atan _0")
 [__readNone]
 T atan(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Atan _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Atan _0")
 [__readNone]
 vector<T, N> atan(vector<T, N> x)
 {
@@ -1336,14 +1345,14 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl,"atan($0,$1)")
 __target_intrinsic(cuda, "$P_atan2($0, $1)")
 __target_intrinsic(cpp, "$P_atan2($0, $1)")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Atan2 _0 _1")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Atan2 _0 _1")
 [__readNone]
 T atan2(T y, T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl,"atan($0,$1)")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Atan2 _0 _1")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Atan2 _0 _1")
 [__readNone]
 vector<T, N> atan2(vector<T, N> y, vector<T, N> x)
 {
@@ -1364,14 +1373,14 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_ceil($0)")
 __target_intrinsic(cpp, "$P_ceil($0)")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Ceil _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Ceil _0")
 [__readNone]
 T ceil(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Ceil _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Ceil _0")
 [__readNone]
 vector<T, N> ceil(vector<T, N> x)
 {
@@ -1394,7 +1403,7 @@ bool CheckAccessFullyMapped(uint status);
 __generic<T : __BuiltinIntegerType>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 fus(FClamp, UClamp, SClamp) _0 _1 _2")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FClamp, UClamp, SClamp) _0 _1 _2")
 [__readNone]
 T clamp(T x, T minBound, T maxBound)
 {
@@ -1404,7 +1413,7 @@ T clamp(T x, T minBound, T maxBound)
 __generic<T : __BuiltinIntegerType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 fus(FClamp, UClamp, SClamp) _0 _1 _2")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FClamp, UClamp, SClamp) _0 _1 _2")
 [__readNone]
 vector<T, N> clamp(vector<T, N> x, vector<T, N> minBound, vector<T, N> maxBound)
 {
@@ -1422,7 +1431,7 @@ matrix<T,N,M> clamp(matrix<T,N,M> x, matrix<T,N,M> minBound, matrix<T,N,M> maxBo
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 fus(FClamp, UClamp, SClamp) _0 _1 _2")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FClamp, UClamp, SClamp) _0 _1 _2")
 [__readNone]
 T clamp(T x, T minBound, T maxBound)
 {
@@ -1432,7 +1441,7 @@ T clamp(T x, T minBound, T maxBound)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 fus(FClamp, UClamp, SClamp) _0 _1 _2")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FClamp, UClamp, SClamp) _0 _1 _2")
 [__readNone]
 vector<T, N> clamp(vector<T, N> x, vector<T, N> minBound, vector<T, N> maxBound)
 {
@@ -1475,14 +1484,14 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_cos($0)")
 __target_intrinsic(cpp, "$P_cos($0)")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Cos _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Cos _0")
 [__readNone]
 T cos(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Cos _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Cos _0")
 [__readNone]
 vector<T, N> cos(vector<T, N> x)
 {
@@ -1503,14 +1512,14 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_cosh($0)")
 __target_intrinsic(cpp, "$P_cosh($0)")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Cosh _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Cosh _0")
 [__readNone]
 T cosh(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Cosh _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Cosh _0")
 [__readNone]
 vector<T,N> cosh(vector<T,N> x)
 {
@@ -1538,7 +1547,7 @@ uint countbits(uint value);
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Cross _0 _1")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Cross _0 _1")
 [__readNone]
 vector<T,3> cross(vector<T,3> left, vector<T,3> right)
 {
@@ -1551,7 +1560,7 @@ vector<T,3> cross(vector<T,3> left, vector<T,3> right)
 __generic<T : __BuiltinIntegerType>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Cross _0 _1")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Cross _0 _1")
 [__readNone]
 vector<T, 3> cross(vector<T, 3> left, vector<T, 3> right)
 {
@@ -1721,7 +1730,7 @@ matrix<T, N, M> ddy_fine(matrix<T, N, M> x)
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Degrees _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Degrees _0")
 [__readNone]
 T degrees(T x)
 {
@@ -1731,7 +1740,7 @@ T degrees(T x)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Degrees _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Degrees _0")
 [__readNone]
 vector<T, N> degrees(vector<T, N> x)
 {
@@ -1751,7 +1760,7 @@ matrix<T, N, M> degrees(matrix<T, N, M> x)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Determinant _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Determinant _0")
 [__readNone]
 [PreferCheckpoint]
 T determinant(matrix<T,N,N> m);
@@ -1770,9 +1779,16 @@ void DeviceMemoryBarrierWithGroupSync();
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Distance _0 _1")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Distance _0 _1")
 [__readNone]
 T distance(vector<T, N> x, vector<T, N> y)
+{
+    return length(x - y);
+}
+
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+T distance(T x, T y)
 {
     return length(x - y);
 }
@@ -1825,13 +1841,13 @@ RWStructuredBuffer<T> __getEquivalentStructuredBuffer<T>(RWByteAddressBuffer b);
 
 __generic<T : __BuiltinArithmeticType>
 __target_intrinsic(glsl, interpolateAtCentroid)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 InterpolateAtCentroid _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 InterpolateAtCentroid _0")
 [__readNone]
 T EvaluateAttributeAtCentroid(T x);
 
 __generic<T : __BuiltinArithmeticType, let N : int>
 __target_intrinsic(glsl, interpolateAtCentroid)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 InterpolateAtCentroid _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 InterpolateAtCentroid _0")
 [__readNone]
 vector<T,N> EvaluateAttributeAtCentroid(vector<T,N> x);
 
@@ -1845,13 +1861,13 @@ matrix<T,N,M> EvaluateAttributeAtCentroid(matrix<T,N,M> x)
 
 __generic<T : __BuiltinArithmeticType>
 __target_intrinsic(glsl, "interpolateAtSample($0, int($1))")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 InterpolateAtSample _0 _1")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 InterpolateAtSample _0 _1")
 [__readNone]
 T EvaluateAttributeAtSample(T x, uint sampleindex);
 
 __generic<T : __BuiltinArithmeticType, let N : int>
 __target_intrinsic(glsl, "interpolateAtSample($0, int($1))")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 InterpolateAtSample _0 _1")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 InterpolateAtSample _0 _1")
 [__readNone]
 vector<T,N> EvaluateAttributeAtSample(vector<T,N> x, uint sampleindex);
 
@@ -1870,13 +1886,13 @@ matrix<T,N,M> EvaluateAttributeAtSample(matrix<T,N,M> x, uint sampleindex)
 
 __generic<T : __BuiltinArithmeticType>
 __target_intrinsic(glsl, "interpolateAtOffset($0, vec2($1) / 16.0f)")
-__target_intrinsic(spirv_direct, "%foffset = OpConvertSToF _type(float2) resultId _1; %offsetdiv16 = 136 _type(float2) resultId %foffset const(float2, 16.0, 16.0); OpExtInst resultType resultId glsl450 78 _0 %offsetdiv16")
+__target_intrinsic(spirv, "%foffset = OpConvertSToF _type(float2) resultId _1; %offsetdiv16 = 136 _type(float2) resultId %foffset const(float2, 16.0, 16.0); OpExtInst resultType resultId glsl450 78 _0 %offsetdiv16")
 [__readNone]
 T EvaluateAttributeSnapped(T x, int2 offset);
 
 __generic<T : __BuiltinArithmeticType, let N : int>
 __target_intrinsic(glsl, "interpolateAtOffset($0, vec2($1) / 16.0f)")
-__target_intrinsic(spirv_direct, "%foffset = OpConvertSToF _type(float2) resultId _1; %offsetdiv16 = 136 _type(float2) resultId %foffset const(float2, 16.0, 16.0); OpExtInst resultType resultId glsl450 78 _0 %offsetdiv16")
+__target_intrinsic(spirv, "%foffset = OpConvertSToF _type(float2) resultId _1; %offsetdiv16 = 136 _type(float2) resultId %foffset const(float2, 16.0, 16.0); OpExtInst resultType resultId glsl450 78 _0 %offsetdiv16")
 [__readNone]
 vector<T,N> EvaluateAttributeSnapped(vector<T,N> x, int2 offset);
 
@@ -1900,14 +1916,14 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_exp($0)")
 __target_intrinsic(cpp, "$P_exp($0)")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Exp _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Exp _0")
 [__readNone]
 T exp(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Exp _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Exp _0")
 [__readNone]
 vector<T, N> exp(vector<T, N> x)
 {
@@ -1929,14 +1945,14 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_exp2($0)")
 __target_intrinsic(cpp, "$P_exp2($0)")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Exp2 _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Exp2 _0")
 [__readNone]
 T exp2(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Exp2 _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Exp2 _0")
 [__readNone]
 vector<T,N> exp2(vector<T,N> x)
 {
@@ -2040,13 +2056,13 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl,"findMSB")
 __target_intrinsic(cuda, "$P_firstbithigh($0)")
 __target_intrinsic(cpp, "$P_firstbithigh($0)")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 FindSMsb _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 FindSMsb _0")
 [__readNone]
 int firstbithigh(int value);
 
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl,"findMSB")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 FindSMsb _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 FindSMsb _0")
 __generic<let N : int>
 [__readNone]
 vector<int, N> firstbithigh(vector<int, N> value)
@@ -2058,13 +2074,13 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl,"findMSB")
 __target_intrinsic(cuda, "$P_firstbithigh($0)")
 __target_intrinsic(cpp, "$P_firstbithigh($0)")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 FindUMsb _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 FindUMsb _0")
 [__readNone]
 uint firstbithigh(uint value);
 
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl,"findMSB")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 FindUMsb _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 FindUMsb _0")
 __generic<let N : int>
 [__readNone]
 vector<uint,N> firstbithigh(vector<uint,N> value)
@@ -2077,13 +2093,13 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl,"findLSB")
 __target_intrinsic(cuda, "$P_firstbitlow($0)")
 __target_intrinsic(cpp, "$P_firstbitlow($0)")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 FindILsb _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 FindILsb _0")
 [__readNone]
 int firstbitlow(int value);
 
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl,"findLSB")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 FindILsb _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 FindILsb _0")
 __generic<let N : int>
 [__readNone]
 vector<int,N> firstbitlow(vector<int,N> value)
@@ -2095,14 +2111,14 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl,"findLSB")
 __target_intrinsic(cuda, "$P_firstbitlow($0)")
 __target_intrinsic(cpp, "$P_firstbitlow($0)")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 FindILsb _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 FindILsb _0")
 [__readNone]
 uint firstbitlow(uint value);
 
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl,"findLSB")
 __generic<let N : int>
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 FindILsb _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 FindILsb _0")
 [__readNone]
 vector<uint,N> firstbitlow(vector<uint,N> value)
 {
@@ -2116,14 +2132,14 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_floor($0)")
 __target_intrinsic(cpp, "$P_floor($0)")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Floor _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Floor _0")
 [__readNone]
 T floor(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Floor _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Floor _0")
 [__readNone]
 vector<T, N> floor(vector<T, N> x)
 {
@@ -2143,14 +2159,14 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_fma($0, $1, $2)")
 __target_intrinsic(cpp, "$P_fma($0, $1, $2)")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Fma _0 _1 _2")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Fma _0 _1 _2")
 [__readNone]
 double fma(double a, double b, double c);
 
 __generic<let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Fma _0 _1 _2")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Fma _0 _1 _2")
 [__readNone]
 vector<double, N> fma(vector<double, N> a, vector<double, N> b, vector<double, N> c)
 {
@@ -2198,14 +2214,14 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl, fract)
 __target_intrinsic(cuda, "$P_frac($0)")
 __target_intrinsic(cpp, "$P_frac($0)")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Fract _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Fract _0")
 [__readNone]
 T frac(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, fract)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Fract _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Fract _0")
 [__readNone]
 vector<T, N> frac(vector<T, N> x)
 {
@@ -2223,24 +2239,24 @@ matrix<T, N, M> frac(matrix<T, N, M> x)
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Frexp _0 _1")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Frexp _0 _1")
 [__readNone]
 T frexp(T x, out T exp);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Frexp _0 _1")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Frexp _0 _1")
 [__readNone]
 vector<T, N> frexp(vector<T, N> x, out vector<T, N> exp)
 {
     VECTOR_MAP_BINARY(T, N, frexp, x, exp);
 }
 
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L : int>
 __target_intrinsic(hlsl)
 [__readNone]
-matrix<T, N, M> frexp(matrix<T, N, M> x, out matrix<T, N, M> exp)
+matrix<T, N, M> frexp(matrix<T, N, M> x, out matrix<T, N, M, L> exp)
 {
     MATRIX_MAP_BINARY(T, N, M, frexp, x, exp);
 }
@@ -2345,11 +2361,23 @@ float2 GetRenderTargetSamplePosition(int Index);
 // Group memory barrier
 __target_intrinsic(glsl, "groupMemoryBarrier")
 __target_intrinsic(cuda, "__threadfence_block")
+__target_intrinsic(spirv, "OpMemoryBarrier const(int,ScopeWorkgroup)"
+                            "const(int, MemorySemanticsAcquireReleaseMask"
+                                     "| MemorySemanticsUniformMemoryMask"
+                                     "| MemorySemanticsImageMemoryMask"
+                                     "| MemorySemanticsAtomicCounterMemoryMask"
+                                     "| MemorySemanticsWorkgroupMemoryMask)")
 void GroupMemoryBarrier();
 
 
 __target_intrinsic(glsl, "groupMemoryBarrier(), barrier()")
 __target_intrinsic(cuda, "__syncthreads()")
+__target_intrinsic(spirv, "OpControlBarrier const(int,ScopeWorkgroup) const(int, ScopeWorkgroup)"
+                            "const(int, MemorySemanticsAcquireReleaseMask"
+                                     "| MemorySemanticsUniformMemoryMask"
+                                     "| MemorySemanticsImageMemoryMask"
+                                     "| MemorySemanticsAtomicCounterMemoryMask"
+                                     "| MemorySemanticsWorkgroupMemoryMask)")
 void GroupMemoryBarrierWithGroupSync();
 
 // Atomics
@@ -2362,12 +2390,19 @@ __target_intrinsic(glsl, "$atomicAdd($A, $1)")
 __target_intrinsic(cuda, "atomicAdd((uint*)$0, $1)")
 void InterlockedAdd(__ref uint dest, uint value);
 
+__target_intrinsic(glsl, "$atomicAdd($A, $1)")
+__target_intrinsic(cuda, "atomicAdd((uint*)$0, $1)")
+void InterlockedAdd(__ref uint dest, int value);
+
 __target_intrinsic(glsl, "($2 = $atomicAdd($A, $1))")
 __target_intrinsic(cuda, "(*$2 = atomicAdd($0, $1))")
 void InterlockedAdd(__ref  int dest,  int value, out  int original_value);
 
 __target_intrinsic(glsl, "($2 = $atomicAdd($A, $1))")
 __target_intrinsic(cuda, "(*$2 = (uint)atomicAdd((uint*)$0, $1))")
+__target_intrinsic(spirv, "%old = OpAtomicIAdd _type(uint) resultId _0"
+                                "const(int, ScopeDevice) const(int, MemorySemanticsMaskNone) _1;"
+                          "OpStore _2 %old;")
 void InterlockedAdd(__ref uint dest, uint value, out uint original_value);
 
 __target_intrinsic(glsl, "$atomicAnd($A, $1)")
@@ -2558,7 +2593,7 @@ matrix<bool, N, M> isnan(matrix<T, N, M> x)
 
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Ldexp _0 _1")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Ldexp _0 _1")
 [__readNone]
 T ldexp(T x, T exp)
 {
@@ -2567,7 +2602,7 @@ T ldexp(T x, T exp)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Ldexp _0 _1")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Ldexp _0 _1")
 [__readNone]
 vector<T, N> ldexp(vector<T, N> x, vector<T, N> exp)
 {
@@ -2586,7 +2621,7 @@ matrix<T, N, M> ldexp(matrix<T, N, M> x, matrix<T, N, M> exp)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Length _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Length _0")
 [__readNone]
 T length(vector<T, N> x)
 {
@@ -2595,16 +2630,16 @@ T length(vector<T, N> x)
 
 // Scalar float length
 __generic<T : __BuiltinFloatingPointType>
-T length(T x) 
-{ 
-    return abs(x); 
+T length(T x)
+{
+    return abs(x);
 }
 
 // Linear interpolation
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, mix)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 FMix _0 _1 _2")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 FMix _0 _1 _2")
 [__readNone]
 T lerp(T x, T y, T s)
 {
@@ -2614,7 +2649,7 @@ T lerp(T x, T y, T s)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, mix)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 FMix _0 _1 _2")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 FMix _0 _1 _2")
 [__readNone]
 vector<T, N> lerp(vector<T, N> x, vector<T, N> y, vector<T, N> s)
 {
@@ -2646,14 +2681,14 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_log($0)")
 __target_intrinsic(cpp, "$P_log($0)")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Log _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Log _0")
 [__readNone]
 T log(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Log _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Log _0")
 [__readNone]
 vector<T, N> log(vector<T, N> x)
 {
@@ -2674,14 +2709,14 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "(log( $0 ) * $S0( 0.43429448190325182765112891891661) )" )
 __target_intrinsic(cuda, "$P_log10($0)")
 __target_intrinsic(cpp, "$P_log10($0)")
-__target_intrinsic(spirv_direct, "%baseElog = OpExtInst resultType resultId glsl450 Log _0; OpFMul resultType resultId _0 %baseElog const(_p,0.43429448190325182765112891891661)")
+__target_intrinsic(spirv, "%baseElog = OpExtInst resultType resultId glsl450 Log _0; OpFMul resultType resultId _0 %baseElog const(_p,0.43429448190325182765112891891661)")
 [__readNone]
 T log10(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "(log( $0 ) * $S0(0.43429448190325182765112891891661) )" )
-__target_intrinsic(spirv_direct, "%baseElog = OpExtInst resultType resultId glsl450 Log _0; OpVectorTimesScalar resultType resultId _0 %baseElog const(_p,0.43429448190325182765112891891661)")
+__target_intrinsic(spirv, "%baseElog = OpExtInst resultType resultId glsl450 Log _0; OpVectorTimesScalar resultType resultId _0 %baseElog const(_p,0.43429448190325182765112891891661)")
 [__readNone]
 vector<T,N> log10(vector<T,N> x)
 {
@@ -2702,14 +2737,14 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_log2($0)")
 __target_intrinsic(cpp, "$P_log2($0)")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Log2 _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Log2 _0")
 [__readNone]
 T log2(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Log2 _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Log2 _0")
 [__readNone]
 vector<T,N> log2(vector<T,N> x)
 {
@@ -2731,14 +2766,14 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl, fma)
 __target_intrinsic(cuda, "$P_fma($0, $1, $2)")
 __target_intrinsic(cpp, "$P_fma($0, $1, $2)")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Fma _0 _1 _2")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Fma _0 _1 _2")
 [__readNone]
 T mad(T mvalue, T avalue, T bvalue);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, fma)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Fma _0 _1 _2")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Fma _0 _1 _2")
 [__readNone]
 vector<T, N> mad(vector<T, N> mvalue, vector<T, N> avalue, vector<T, N> bvalue)
 {
@@ -2758,14 +2793,14 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl, fma)
 __target_intrinsic(cuda, "$P_fma($0, $1, $2)")
 __target_intrinsic(cpp, "$P_fma($0, $1, $2)")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Fma _0 _1 _2")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Fma _0 _1 _2")
 [__readNone]
 T mad(T mvalue, T avalue, T bvalue);
 
 __generic<T : __BuiltinIntegerType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, fma)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Fma _0 _1 _2")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Fma _0 _1 _2")
 [__readNone]
 vector<T, N> mad(vector<T, N> mvalue, vector<T, N> avalue, vector<T, N> bvalue)
 {
@@ -2787,7 +2822,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_max($0, $1)")
 __target_intrinsic(cpp, "$P_max($0, $1)")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 fus(FMax, UMax, SMax) _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMax, UMax, SMax) _0")
 [__readNone]
 T max(T x, T y);
 // Note: a stdlib implementation of `max` (or `min`) will require splitting
@@ -2798,7 +2833,7 @@ T max(T x, T y);
 __generic<T : __BuiltinIntegerType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 fus(FMax, UMax, SMax) _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMax, UMax, SMax) _0")
 [__readNone]
 vector<T, N> max(vector<T, N> x, vector<T, N> y)
 {
@@ -2818,14 +2853,14 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_max($0, $1)")
 __target_intrinsic(cpp, "$P_max($0, $1)")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 fus(FMax, UMax, SMax) _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMax, UMax, SMax) _0")
 [__readNone]
 T max(T x, T y);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 fus(FMax, UMax, SMax) _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMax, UMax, SMax) _0")
 [__readNone]
 vector<T, N> max(vector<T, N> x, vector<T, N> y)
 {
@@ -2846,14 +2881,14 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_min($0, $1)")
 __target_intrinsic(cpp, "$P_min($0, $1)")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 fus(FMin, UMin, SMin) _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMin, UMin, SMin) _0")
 [__readNone]
 T min(T x, T y);
 
 __generic<T : __BuiltinIntegerType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 fus(FMin, UMin, SMin) _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMin, UMin, SMin) _0")
 [__readNone]
 vector<T,N> min(vector<T,N> x, vector<T,N> y)
 {
@@ -2873,14 +2908,14 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_min($0, $1)")
 __target_intrinsic(cpp, "$P_min($0, $1)")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 fus(FMin, UMin, SMin) _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMin, UMin, SMin) _0")
 [__readNone]
 T min(T x, T y);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 fus(FMin, UMin, SMin) _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMin, UMin, SMin) _0")
 [__readNone]
 vector<T,N> min(vector<T,N> x, vector<T,N> y)
 {
@@ -2909,10 +2944,10 @@ vector<T,N> modf(vector<T,N> x, out vector<T,N> ip)
     VECTOR_MAP_BINARY(T, N, modf, x, ip);
 }
 
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L : int>
 __target_intrinsic(hlsl)
 [__readNone]
-matrix<T,N,M> modf(matrix<T,N,M> x, out matrix<T,N,M> ip)
+matrix<T,N,M> modf(matrix<T,N,M> x, out matrix<T,N,M,L> ip)
 {
     MATRIX_MAP_BINARY(T, N, M, modf, x, ip);
 }
@@ -3206,10 +3241,10 @@ int NonUniformResourceIndex(int index)
     return index;
 }
 
-/// HLSL allows NonUniformResourceIndex around non int/uint types. 
+/// HLSL allows NonUniformResourceIndex around non int/uint types.
 /// It's effect is presumably to ignore it, which the following implementation does.
 /// We should also look to add a warning for this scenario.
-[__unsafeForceInlineEarly] 
+[__unsafeForceInlineEarly]
 [deprecated("NonUniformResourceIndex on a type other than uint/int is depreciated and has no effect")]
 T NonUniformResourceIndex<T>(T value) { return value; }
 
@@ -3217,7 +3252,7 @@ T NonUniformResourceIndex<T>(T value) { return value; }
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Normalize _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Normalize _0")
 [__readNone]
 vector<T,N> normalize(vector<T,N> x)
 {
@@ -3230,14 +3265,14 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_pow($0, $1)")
 __target_intrinsic(cpp, "$P_pow($0, $1)")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Pow _0 _1")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Pow _0 _1")
 [__readNone]
 T pow(T x, T y);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Pow _0 _1")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Pow _0 _1")
 [__readNone]
 vector<T, N> pow(vector<T, N> x, vector<T, N> y)
 {
@@ -3393,7 +3428,7 @@ void ProcessTriTessFactorsMin(
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Radians _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Radians _0")
 [__readNone]
 T radians(T x)
 {
@@ -3403,7 +3438,7 @@ T radians(T x)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Radians _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Radians _0")
 [__readNone]
 vector<T, N> radians(vector<T, N> x)
 {
@@ -3447,7 +3482,7 @@ matrix<T, N, M> rcp(matrix<T, N, M> x)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Reflect _0 _1")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Reflect _0 _1")
 [__readNone]
 vector<T,N> reflect(vector<T,N> i, vector<T,N> n)
 {
@@ -3458,7 +3493,7 @@ vector<T,N> reflect(vector<T,N> i, vector<T,N> n)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Refract _0 _1 _2")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Refract _0 _1 _2")
 [__readNone]
 vector<T,N> refract(vector<T,N> i, vector<T,N> n, T eta)
 {
@@ -3490,14 +3525,14 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_round($0)")
 __target_intrinsic(cpp, "$P_round($0)")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Round _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Round _0")
 [__readNone]
 T round(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Round _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Round _0")
 [__readNone]
 vector<T, N> round(vector<T, N> x)
 {
@@ -3518,7 +3553,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "inversesqrt($0)")
 __target_intrinsic(cuda, "$P_rsqrt($0)")
 __target_intrinsic(cpp, "$P_rsqrt($0)")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 InverseSqrt _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 InverseSqrt _0")
 [__readNone]
 T rsqrt(T x)
 {
@@ -3528,7 +3563,7 @@ T rsqrt(T x)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "inversesqrt($0)")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 InverseSqrt _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 InverseSqrt _0")
 [__readNone]
 vector<T, N> rsqrt(vector<T, N> x)
 {
@@ -3577,14 +3612,14 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "int(sign($0))")
 __target_intrinsic(cuda, "$P_sign($0)")
 __target_intrinsic(cpp, "$P_sign($0)")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 fi(FSign, SSign) _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fi(FSign, SSign) _0")
 [__readNone]
 int sign(T x);
 
 __generic<T : __BuiltinSignedArithmeticType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "ivec$N0(sign($0))")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 fi(FSign, SSign) _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fi(FSign, SSign) _0")
 [__readNone]
 vector<int, N> sign(vector<T, N> x)
 {
@@ -3607,14 +3642,14 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_sin($0)")
 __target_intrinsic(cpp, "$P_sin($0)")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Sin _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Sin _0")
 [__readNone]
 T sin(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Sin _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Sin _0")
 [__readNone]
 vector<T, N> sin(vector<T, N> x)
 {
@@ -3649,10 +3684,10 @@ void sincos(vector<T,N> x, out vector<T,N> s, out vector<T,N> c)
     c = cos(x);
 }
 
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L1: int, let L2 : int>
 __target_intrinsic(hlsl)
 [__readNone]
-void sincos(matrix<T,N,M> x, out matrix<T,N,M> s, out matrix<T,N,M> c)
+void sincos(matrix<T,N,M> x, out matrix<T,N,M,L1> s, out matrix<T,N,M,L2> c)
 {
     s = sin(x);
     c = cos(x);
@@ -3664,14 +3699,14 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_sinh($0)")
 __target_intrinsic(cpp, "$P_sinh($0)")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Sinh _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Sinh _0")
 [__readNone]
 T sinh(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Sinh _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Sinh _0")
 [__readNone]
 vector<T, N> sinh(vector<T, N> x)
 {
@@ -3690,7 +3725,7 @@ matrix<T, N, M> sinh(matrix<T, N, M> x)
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 SmoothStep _0 _1 _2")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 SmoothStep _0 _1 _2")
 [__readNone]
 T smoothstep(T min, T max, T x)
 {
@@ -3701,7 +3736,7 @@ T smoothstep(T min, T max, T x)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 SmoothStep _0 _1 _2")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 SmoothStep _0 _1 _2")
 [__readNone]
 vector<T, N> smoothstep(vector<T, N> min, vector<T, N> max, vector<T, N> x)
 {
@@ -3722,14 +3757,14 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_sqrt($0)")
 __target_intrinsic(cpp, "$P_sqrt($0)")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Sqrt _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Sqrt _0")
 [__readNone]
 T sqrt(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Sqrt _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Sqrt _0")
 [__readNone]
 vector<T, N> sqrt(vector<T, N> x)
 {
@@ -3748,7 +3783,7 @@ matrix<T, N, M> sqrt(matrix<T, N, M> x)
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Step _0 _1")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Step _0 _1")
 [__readNone]
 T step(T y, T x)
 {
@@ -3758,7 +3793,7 @@ T step(T y, T x)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Step _0 _1")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Step _0 _1")
 [__readNone]
 vector<T,N> step(vector<T,N> y, vector<T,N> x)
 {
@@ -3779,14 +3814,14 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_tan($0)")
 __target_intrinsic(cpp, "$P_tan($0)")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Tan _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Tan _0")
 [__readNone]
 T tan(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Tan _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Tan _0")
 [__readNone]
 vector<T, N> tan(vector<T, N> x)
 {
@@ -3807,14 +3842,14 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_tanh($0)")
 __target_intrinsic(cpp, "$P_tanh($0)")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Tanh _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Tanh _0")
 [__readNone]
 T tanh(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Tanh _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Tanh _0")
 [__readNone]
 vector<T,N> tanh(vector<T,N> x)
 {
@@ -3876,14 +3911,14 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_trunc($0)")
 __target_intrinsic(cpp, "$P_trunc($0)")
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Trunc _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Trunc _0")
 [__readNone]
 T trunc(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv_direct, "OpExtInst resultType resultId glsl450 Trunc _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Trunc _0")
 [__readNone]
 vector<T, N> trunc(vector<T, N> x)
 {
@@ -5044,7 +5079,7 @@ for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
     bool isReadOnly = (access == SLANG_RESOURCE_ACCESS_READ);
     auto flavor = TextureFlavor::create(TextureFlavor::Shape::ShapeBuffer, access).flavor;
     sb << "__generic<T>\n";
-    sb << "__magic_type(Texture," << int(flavor) << ")\n";
+    sb << "__magic_type(TextureType," << int(flavor) << ")\n";
     sb << "__intrinsic_type(" << (kIROp_TextureType + (int(flavor) << kIROpMeta_OtherShift)) << ")\n";
     sb << "struct ";
     sb << kBaseBufferAccessLevels[aa].name;
@@ -5562,7 +5597,7 @@ static const int feedbackTexture2DFlavor = int(TextureFlavor::create(TextureFlav
 static const int feedbackTexture2DArrayFlavor = int(TextureFlavor::create(TextureFlavor::Shape::Shape2D, SLANG_RESOURCE_ACCESS_WRITE, SLANG_TEXTURE_FEEDBACK_FLAG | SLANG_TEXTURE_ARRAY_FLAG).flavor);
 }}}}
 
-__magic_type(Texture, $(feedbackTexture2DFlavor))
+__magic_type(TextureType, $(feedbackTexture2DFlavor))
 __intrinsic_type($(kIROp_TextureType + (feedbackTexture2DFlavor << kIROpMeta_OtherShift)))
 struct FeedbackTexture2D<T : __BuiltinSamplerFeedbackType>
 {
@@ -5615,7 +5650,7 @@ struct FeedbackTexture2D<T : __BuiltinSamplerFeedbackType>
 
 
 
-__magic_type(Texture, $(feedbackTexture2DArrayFlavor))
+__magic_type(TextureType, $(feedbackTexture2DArrayFlavor))
 __intrinsic_type($(kIROp_TextureType + (feedbackTexture2DArrayFlavor << kIROpMeta_OtherShift)))
 struct FeedbackTexture2DArray<T : __BuiltinSamplerFeedbackType>
 {
@@ -7103,6 +7138,7 @@ func saturated_cooperation_using<A, B, C>(
     }
 }
 
+
 ${{{{
 //
 // Texture Footprint Queries
@@ -7299,7 +7335,7 @@ ${
             Coords          coords,
             int             granularity,
             bool            useCoarseLevel,
-        out __FootprintData footprint);
+            out __FootprintData footprint);
 
     [__NoSideEffect]
     __glsl_version(450)
@@ -7311,7 +7347,7 @@ ${
             Coords          coords,
             int             granularity,
             bool            useCoarseLevel,
-        out __FootprintData footprint,
+            out __FootprintData footprint,
             float           bias);
 
     [__NoSideEffect]
@@ -7326,7 +7362,7 @@ ${
             float           lodClamp,
             int             granularity,
             bool            useCoarseLevel,
-        out __FootprintData footprint);
+            out __FootprintData footprint);
 
     [__NoSideEffect]
     __glsl_version(450)
@@ -7340,7 +7376,7 @@ ${
             float           lodClamp,
             int             granularity,
             bool            useCoarseLevel,
-        out __FootprintData footprint,
+            out __FootprintData footprint,
             float           bias);
 
     [__NoSideEffect]
@@ -7355,7 +7391,7 @@ ${
             float                   lod,
             int                     granularity,
             bool                    useCoarseLevel,
-        out __FootprintData         footprint);
+            out __FootprintData         footprint);
 
 
 ${{{
@@ -7375,7 +7411,7 @@ ${{{
             Coords          dy,
             int             granularity,
             bool            useCoarseLevel,
-        out __FootprintData footprint);
+            out __FootprintData footprint);
 
     [__NoSideEffect]
     __glsl_version(450)
@@ -7391,7 +7427,7 @@ ${{{
             float           lodClamp,
             int             granularity,
             bool            useCoarseLevel,
-        out __FootprintData footprint);
+            out __FootprintData footprint);
 ${{{
     }
 }}}
@@ -7440,8 +7476,9 @@ for(auto levelChoice : kLevelChoices)
         uint                    textureIndex,
         uint                    samplerSpace,
         uint                    samplerIndex,
-        Coords                  coords,
-        FootprintGranularity    granularity);
+        float3                  coords,
+        FootprintGranularity    granularity, 
+        out uint                isSingleLod);
 
     [__NoSideEffect]
     [__requiresNVAPI]
@@ -7452,9 +7489,10 @@ for(auto levelChoice : kLevelChoices)
         uint                    textureIndex,
         uint                    samplerSpace,
         uint                    samplerIndex,
-        Coords                  coords,
+        float3                  coords,
         FootprintGranularity    granularity,
-        float                   lodBias);
+        float                   lodBias, 
+        out uint                isSingleLod);
 
     [__NoSideEffect]
     [__requiresNVAPI]
@@ -7465,9 +7503,10 @@ for(auto levelChoice : kLevelChoices)
         uint                    textureIndex,
         uint                    samplerSpace,
         uint                    samplerIndex,
-        Coords                  coords,
+        float3                  coords,
         FootprintGranularity    granularity,
-        float                   lod);
+        float                   lod, 
+        out uint                isSingleLod);
 
 ${{{
     // Texture sampling with gradient is only available for 2D textures.
@@ -7482,10 +7521,11 @@ ${{{
         uint                    textureIndex,
         uint                    samplerSpace,
         uint                    samplerIndex,
-        Coords                  coords,
+        float3                  coords,
         FootprintGranularity    granularity,
-        Coords                  dx,
-        Coords                  dy);
+        float3                  dx,
+        float3                  dy, 
+        out uint                isSingleLod);
 ${{{
     }
 }}}
@@ -7534,10 +7574,13 @@ ${
             SamplerState            sampler,
             Coords                  coords)
     {
-        return { __queryFootprint$(CoarseOrFine)NVAPI(
+        uint isSingleLod = 0;
+        Footprint footprint =  {__queryFootprint$(CoarseOrFine)NVAPI(
             __getRegisterSpace(this), __getRegisterIndex(this),
             __getRegisterSpace(sampler), __getRegisterIndex(sampler),
-            coords, granularity), false };
+            __asFloat3(coords), granularity, /* out */isSingleLod), false};
+        footprint._isSingleLevel = (isSingleLod != 0);
+        return footprint;
     }
 
     /// Query the footprint that would be accessed by a texture sampling operation.
@@ -7575,10 +7618,14 @@ ${
             Coords                  coords,
             float                   lodBias)
     {
-        return { __queryFootprint$(CoarseOrFine)BiasNVAPI(
+        uint isSingleLod = 0;
+        Footprint footprint = {__queryFootprint$(CoarseOrFine)BiasNVAPI(
             __getRegisterSpace(this), __getRegisterIndex(this),
             __getRegisterSpace(sampler), __getRegisterIndex(sampler),
-            coords, granularity, lodBias), false };
+            __asFloat3(coords), granularity, lodBias, /* out */isSingleLod), false}; 
+            
+        footprint._isSingleLevel = (isSingleLod != 0);
+        return footprint;
     }
 
     /// Query the footprint that would be accessed by a texture sampling operation.
@@ -7657,10 +7704,14 @@ ${
             Coords                  coords,
             float                   lod)
     {
-        return { __queryFootprint$(CoarseOrFine)LevelNVAPI(
+        uint isSingleLod = 0;
+        Footprint footprint = {__queryFootprint$(CoarseOrFine)LevelNVAPI(
             __getRegisterSpace(this), __getRegisterIndex(this),
             __getRegisterSpace(sampler), __getRegisterIndex(sampler),
-            coords, granularity, lod), false };
+            __asFloat3(coords), granularity, lod, /* out */isSingleLod), false};
+            
+        footprint._isSingleLevel = (isSingleLod != 0);
+        return footprint;
     }
 
 
@@ -7706,10 +7757,14 @@ ${{{
             Coords                  dx,
             Coords                  dy)
     {
-        return { __queryFootprint$(CoarseOrFine)GradNVAPI(
+        uint isSingleLod = 0;
+        Footprint footprint = {__queryFootprint$(CoarseOrFine)GradNVAPI(
             __getRegisterSpace(this), __getRegisterIndex(this),
             __getRegisterSpace(sampler), __getRegisterIndex(sampler),
-            coords, granularity, dx, dy), false };
+            __asFloat3(coords), granularity, __asFloat3(dx), __asFloat3(dy), /* out */isSingleLod), false};
+
+        footprint._isSingleLevel = (isSingleLod != 0);
+        return footprint;
     }
 
     /// Query the footprint that would be accessed by a texture sampling operation.
@@ -7747,3 +7802,18 @@ ${{{{
 ${{{{
 }
 }}}}
+
+// Buffer Pointer
+
+__generic<T, let Alignment : int = 16>
+__intrinsic_type($(kIROp_HLSLConstBufferPointerType))
+__glsl_extension(GL_EXT_buffer_reference)
+__magic_type(ConstBufferPointerType)
+struct ConstBufferPointer
+{
+    __glsl_version(450)
+    __glsl_extension(GL_EXT_buffer_reference)
+    __target_intrinsic(glsl, "$0._data")
+    [__NoSideEffect]
+    T get();
+}

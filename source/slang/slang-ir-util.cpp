@@ -258,14 +258,10 @@ void moveInstChildren(IRInst* dest, IRInst* src)
     }
 }
 
-String dumpIRToString(IRInst* root)
+String dumpIRToString(IRInst* root, IRDumpOptions options)
 {
     StringBuilder sb;
     StringWriter writer(&sb, Slang::WriterFlag::AutoFlush);
-    IRDumpOptions options = {};
-#if 1
-    options.flags = IRDumpOptions::Flag::DumpDebugIds;
-#endif
     dumpIR(root, options, nullptr, &writer);
     return sb.toString();
 }
@@ -410,6 +406,8 @@ bool isPtrLikeOrHandleType(IRInst* type)
     if (as<IRPointerLikeType>(type))
         return true;
     if (as<IRPseudoPtrType>(type))
+        return true;
+    if (as<IRHLSLStructuredBufferTypeBase>(type))
         return true;
     switch (type->getOp())
     {
@@ -875,7 +873,12 @@ bool isGlobalOrUnknownMutableAddress(IRGlobalValueWithCode* parentFunc, IRInst* 
 
     if (root)
     {
+        // If this is a global readonly resource, it is not a mutable address.
         if (as<IRParameterGroupType>(root->getDataType()))
+        {
+            return false;
+        }
+        if (as<IRHLSLStructuredBufferType>(root->getDataType()))
         {
             return false;
         }
@@ -992,6 +995,47 @@ void resetScratchDataBit(IRInst* inst, int bitIndex)
         item->scratchData &= ~(1ULL << bitIndex);
         for (auto child = item->getLastDecorationOrChild(); child; child = child->getPrevInst())
             workList.add(child);
+    }
+}
+
+UnownedStringSlice getBasicTypeNameHint(IRType* basicType)
+{
+    switch (basicType->getOp())
+    {
+        case kIROp_IntType:
+            return UnownedStringSlice::fromLiteral("int");
+        case kIROp_Int8Type:
+            return UnownedStringSlice::fromLiteral("int8");
+        case kIROp_Int16Type:
+            return UnownedStringSlice::fromLiteral("int16");
+        case kIROp_Int64Type:
+            return UnownedStringSlice::fromLiteral("int64");
+        case kIROp_IntPtrType:
+            return UnownedStringSlice::fromLiteral("intptr");
+        case kIROp_UIntType:
+            return UnownedStringSlice::fromLiteral("uint");
+        case kIROp_UInt8Type:
+            return UnownedStringSlice::fromLiteral("uint8");
+        case kIROp_UInt16Type:
+            return UnownedStringSlice::fromLiteral("uint16");
+        case kIROp_UInt64Type:
+            return UnownedStringSlice::fromLiteral("uint64");
+        case kIROp_UIntPtrType:
+            return UnownedStringSlice::fromLiteral("uintptr");
+        case kIROp_FloatType:
+            return UnownedStringSlice::fromLiteral("float");
+        case kIROp_HalfType:
+            return UnownedStringSlice::fromLiteral("half");
+        case kIROp_DoubleType:
+            return UnownedStringSlice::fromLiteral("double");
+        case kIROp_BoolType:
+            return UnownedStringSlice::fromLiteral("bool");
+        case kIROp_VoidType:
+            return UnownedStringSlice::fromLiteral("void");
+        case kIROp_CharType:
+            return UnownedStringSlice::fromLiteral("char");
+        default:
+            return UnownedStringSlice();
     }
 }
 

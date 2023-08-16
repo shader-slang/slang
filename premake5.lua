@@ -228,6 +228,14 @@ newoption {
     allowed     = { { "true", "True"}, { "false", "False" } }
 }
 
+newoption {
+    trigger     = "default-spirv-direct",
+    description = "(Optional) Development flag to make the default SPIR-V path generate directly rather than via GLSL",
+    value       = "bool",
+    default     = "false",
+    allowed     = { { "true", "True"}, { "false", "False" } }
+}
+
 buildLocation = _OPTIONS["build-location"]
 executeBinary = (_OPTIONS["execute-binary"] == "true")
 buildGlslang = (_OPTIONS["build-glslang"] == "true")
@@ -245,6 +253,7 @@ fullDebugValidation = (_OPTIONS["full-debug-validation"] == "true")
 enableAsan = (_OPTIONS["enable-asan"] == "true")
 dxOnVk = (_OPTIONS["dx-on-vk"] == "true")
 enableAftermath = (_OPTIONS["enable-aftermath"] == "true")
+defaultSPIRVDirect = (_OPTIONS["default-spirv-direct"] == "true")
 
 -- If stdlib embedding is enabled, disable stdlib source embedding by default
 disableStdlibSource = enableEmbedStdLib
@@ -399,6 +408,10 @@ workspace "slang"
     filter { "toolset:clang or gcc*", "language:C++" }
         buildoptions { "-Wno-reorder", "-Wno-invalid-offsetof" }
 
+    -- Enable some warnings on clang/gcc which are on by default in MSVC
+    filter { "toolset:clang or gcc*", "language:C++" }
+        buildoptions { "-Wnarrowing" }
+
     -- When compiling the debug configuration, we want to turn
     -- optimization off, make sure debug symbols are output,
     -- and add the same preprocessor definition that VS
@@ -433,6 +446,10 @@ workspace "slang"
 
         if dxOnVk then
             defines { "SLANG_CONFIG_DX_ON_VK" }
+        end
+
+        if defaultSPIRVDirect then
+            defines { "SLANG_CONFIG_DEFAULT_SPIRV_DIRECT" }
         end
 
 function dump(o)

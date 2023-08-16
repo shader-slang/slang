@@ -265,7 +265,7 @@ namespace Slang
     {
         if (auto declaredWitness = as<DeclaredSubtypeWitness>(witness))
         {
-            auto declModule = getModule(declaredWitness->declRef.getDecl());
+            auto declModule = getModule(declaredWitness->getDeclRef().getDecl());
             m_moduleDependencyList.addDependency(declModule);
             m_fileDependencyList.addDependency(declModule);
             if (m_requirementSet.add(declModule))
@@ -276,8 +276,8 @@ namespace Slang
         }
         else if (auto transitiveWitness = as<TransitiveSubtypeWitness>(witness))
         {
-            addDepedencyFromWitness(transitiveWitness->midToSup);
-            addDepedencyFromWitness(transitiveWitness->subToMid);
+            addDepedencyFromWitness(transitiveWitness->getMidToSup());
+            addDepedencyFromWitness(transitiveWitness->getSubToMid());
         }
         else if (auto conjunctionWitness = as<ConjunctionSubtypeWitness>(witness))
         {
@@ -456,6 +456,10 @@ namespace Slang
             {
                 return SourceLanguage::CUDA;
             }
+            case PassThroughMode::SpirvDis:
+            {
+                return SourceLanguage::SPIRV;
+            }
             
             default: break;
         }
@@ -485,7 +489,7 @@ namespace Slang
             case CodeGenTarget::SPIRVAssembly:
             case CodeGenTarget::SPIRV:
             {
-                return PassThroughMode::Glslang;
+                return PassThroughMode::SpirvDis;
             }
             case CodeGenTarget::DXBytecode:
             case CodeGenTarget::DXBytecodeAssembly:
@@ -938,6 +942,17 @@ namespace Slang
         return desc.style == ArtifactStyle::Host;
     }
 
+    static bool _shouldSetEntryPointName(TargetRequest* targetReq)
+    {
+        if (!isKhronosTarget(targetReq))
+            return true;
+        if (!targetReq->getHLSLToVulkanLayoutOptions())
+            return false;
+        if (targetReq->getHLSLToVulkanLayoutOptions()->getUseOriginalEntryPointName())
+            return true;
+        return false;
+    }
+
     SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& outArtifact)
     {
         outArtifact.setNull();
@@ -1048,14 +1063,10 @@ namespace Slang
             sourceTarget = CodeGenTarget(TypeConvertUtil::getCompileTargetFromSourceLanguage((SlangSourceLanguage)sourceLanguage));
 
             // If it's pass through we accumulate the preprocessor definitions. 
-            for (auto& define : translationUnit->compileRequest->preprocessorDefinitions)
-            {
-                preprocessorDefinitions.add(define.key, define.value);
-            }
-            for (auto& define : translationUnit->preprocessorDefinitions)
-            {
-                preprocessorDefinitions.add(define.key, define.value);
-            }
+            for (const auto& define : translationUnit->compileRequest->preprocessorDefinitions)
+                preprocessorDefinitions.add(define);
+            for (const auto& define : translationUnit->preprocessorDefinitions)
+                preprocessorDefinitions.add(define);
             
             {
                 /* TODO(JS): Not totally clear what options should be set here. If we are using the pass through - then using say the defines/includes
@@ -1133,10 +1144,8 @@ namespace Slang
             // of downstream compilation. 
             
             auto linkage = getLinkage();
-            for (auto& define : linkage->preprocessorDefinitions)
-            {
-                preprocessorDefinitions.add(define.key, define.value);
-            }
+            for (const auto& define : linkage->preprocessorDefinitions)
+                preprocessorDefinitions.add(define);
         }
 
         
@@ -1222,11 +1231,14 @@ namespace Slang
                 auto entryPoint = getEntryPoint(entryPointIndex);
                 profile = getEffectiveProfile(entryPoint, targetReq);
 
-                options.entryPointName = allocator.allocate(getText(entryPoint->getName()));
-                auto entryPointNameOverride = getProgram()->getEntryPointNameOverride(entryPointIndex);
-                if (entryPointNameOverride.getLength() != 0)
+                if (_shouldSetEntryPointName(getTargetReq()))
                 {
-                    options.entryPointName = allocator.allocate(entryPointNameOverride);
+                    options.entryPointName = allocator.allocate(getText(entryPoint->getName()));
+                    auto entryPointNameOverride = getProgram()->getEntryPointNameOverride(entryPointIndex);
+                    if (entryPointNameOverride.getLength() != 0)
+                    {
+                        options.entryPointName = allocator.allocate(entryPointNameOverride);
+                    }
                 }
             }
             else 
@@ -1380,12 +1392,12 @@ namespace Slang
 
                 Index i = 0;
 
-                for(auto& def : preprocessorDefinitions)
+                for(const auto& [defKey, defValue] : preprocessorDefinitions)
                 {
                     auto& define = dst[i];
                     
-                    define.nameWithSig = allocator.allocate(def.key);
-                    define.value = allocator.allocate(def.value);
+                    define.nameWithSig = allocator.allocate(defKey);
+                    define.value = allocator.allocate(defValue);
 
                     ++i;
                 }

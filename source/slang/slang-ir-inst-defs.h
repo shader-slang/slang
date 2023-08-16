@@ -52,9 +52,7 @@ INST(Nop, nop, 0, 0)
     INST(BasicBlockType, BasicBlock, 0, HOISTABLE)
 
     INST(VectorType, Vec, 2, HOISTABLE)
-    INST(MatrixType, Mat, 3, HOISTABLE)
-
-    INST(TaggedUnionType, TaggedUnion, 0, HOISTABLE)
+    INST(MatrixType, Mat, 4, HOISTABLE)
 
     INST(ConjunctionType, Conjunction, 0, HOISTABLE)
     INST(AttributedType, Attributed, 0, HOISTABLE)
@@ -121,6 +119,7 @@ INST(Nop, nop, 0, 0)
             INST(OutType, Out, 1, HOISTABLE)
             INST(InOutType, InOut, 1, HOISTABLE)
         INST_RANGE(OutTypeBase, OutType, InOutType)
+        INST(HLSLConstBufferPointerType, ConstBufferPointerType, 2, HOISTABLE)
     INST_RANGE(PtrTypeBase, PtrType, InOutType)
 
     // A ComPtr<T> type is treated as a opaque type that represents a reference-counted handle to a COM object.
@@ -428,6 +427,9 @@ INST(ByteAddressBufferStore, byteAddressBufferStore, 3, 0)
 // - `dst` is a value of type T
 //
 INST(StructuredBufferLoad, structuredBufferLoad, 2, 0)
+INST(StructuredBufferLoadStatus, structuredBufferLoadStatus, 3, 0)
+INST(RWStructuredBufferLoad, rwstructuredBufferLoad, 2, 0)
+INST(RWStructuredBufferLoadStatus, rwstructuredBufferLoadStatus, 3, 0)
 
 // Store data to a structured buffer
 //
@@ -438,7 +440,9 @@ INST(StructuredBufferLoad, structuredBufferLoad, 2, 0)
 // - `offset` is an `int`
 // - `src` is a value of type T
 //
-INST(StructuredBufferStore, structuredBufferStore, 3, 0)
+INST(RWStructuredBufferStore, rwstructuredBufferStore, 3, 0)
+
+INST(RWStructuredBufferGetElementPtr, rwstructuredBufferGetElementPtr, 2, 0)
 
 INST(MeshOutputRef, meshOutputRef, 2, 0)
 
@@ -733,6 +737,12 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// A `[naturalOffset(o)]` decoration is attached to a field to indicate that it has natural offset `o` in the parent type
     INST(NaturalOffsetDecoration, naturalOffset, 1, 0)
 
+        /// A `[std430SizeAndAlignment(s,a)]` decoration is attached to a type to indicate that is has std430 size `s` and alignment `a`
+    INST(Std430SizeAndAlignmentDecoration, naturalSizeAndAlignment, 2, 0)
+
+        /// A `[std430Offset(o)]` decoration is attached to a field to indicate that it has std430 offset `o` in the parent type
+    INST(Std430OffsetDecoration, naturalOffset, 1, 0)
+
     /* LinkageDecoration */
         INST(ImportDecoration, import, 1, 0)
         INST(ExportDecoration, export, 1, 0)
@@ -985,9 +995,10 @@ INST(GetEquivalentStructuredBuffer,     getEquivalentStructuredBuffer, 1, 0)
         INST(ArrayTypeLayout, arrayTypeLayout, 1, HOISTABLE)
         INST(StreamOutputTypeLayout, streamOutputTypeLayout, 1, HOISTABLE)
         INST(MatrixTypeLayout, matrixTypeLayout, 1, HOISTABLE)
-        INST(TaggedUnionTypeLayout, taggedUnionTypeLayout, 0, HOISTABLE)
         INST(ExistentialTypeLayout, existentialTypeLayout, 0, HOISTABLE)
         INST(StructTypeLayout, structTypeLayout, 0, HOISTABLE)
+        INST(TupleTypeLayout, tupleTypeLayout, 0, HOISTABLE)
+        INST(StructuredBufferTypeLayout, structuredBufferTypeLayout, 1, HOISTABLE)
         // TODO(JS): Ideally we'd have the layout to the pointed to value type (ie 1 instead of 0 here). But to avoid infinite recursion we don't.
         INST(PointerTypeLayout, ptrTypeLayout, 0, HOISTABLE)
     INST_RANGE(TypeLayout, TypeLayoutBase, PointerTypeLayout)
@@ -999,6 +1010,7 @@ INST_RANGE(Layout, VarLayout, EntryPointLayout)
     INST(PendingLayoutAttr, pendingLayout, 1, HOISTABLE)
     INST(StageAttr, stage, 1, HOISTABLE)
     INST(StructFieldLayoutAttr, fieldLayout, 2, HOISTABLE)
+    INST(TupleFieldLayoutAttr, fieldLayout, 1, HOISTABLE)
     INST(CaseTypeLayoutAttr, caseLayout, 1, HOISTABLE)
     INST(UNormAttr, unorm, 0, HOISTABLE)
     INST(SNormAttr, snorm, 0, HOISTABLE)

@@ -93,9 +93,15 @@ enum class OptionKind
     VulkanBindShift,
     VulkanBindGlobals,
     VulkanInvertY,
+    VulkanUseEntryPointName,
+    VulkanUseGLLayout,
+
 
     GLSLForceScalarLayout,
     EnableEffectAnnotations,
+
+    EmitSpirvViaGLSL,
+    EmitSpirvDirectly,
     
     // Downstream
 
@@ -128,7 +134,6 @@ enum class OptionKind
 
     // Experimental
 
-    EmitSpirvDirectly,
     FileSystem,
     Heterogeneous,
     NoMangle,
@@ -369,11 +374,11 @@ void initCommandOptions(CommandOptions& options)
 
     const Option generalOpts[] = 
     {
-        { OptionKind::MacroDefine,  "-D?...",   "-D<name>[=<value>], -D <name>[=<value>]", 
-        "Insert a preprocessor macro.\n" 
+        { OptionKind::MacroDefine,  "-D?...",   "-D<name>[=<value>], -D <name>[=<value>]",
+        "Insert a preprocessor macro.\n"
         "The space between - D and <name> is optional. If no <value> is specified, Slang will define the macro with an empty value." },
         { OptionKind::DepFile,      "-depfile", "-depfile <path>", "Save the source file dependency list in a file." },
-        { OptionKind::EntryPointName, "-entry", "-entry <name>", 
+        { OptionKind::EntryPointName, "-entry", "-entry <name>",
         "Specify the name of an entry-point function.\n"
         "When compiling from a single file, this defaults to main if you specify a stage using -stage.\n"
         "Multiple -entry options may be used in a single invocation. "
@@ -383,7 +388,7 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::EmitIr,       "-emit-ir", nullptr, "Emit IR typically as a '.slang-module' when outputting to a container." },
         { OptionKind::Help,         "-h,-help,--help", "-h or -h <help-category>", "Print this message, or help in specified category." },
         { OptionKind::HelpStyle,    "-help-style", "-help-style <help-style>", "Help formatting style" },
-        { OptionKind::Include,      "-I?...", "-I<path>, -I <path>", 
+        { OptionKind::Include,      "-I?...", "-I<path>, -I <path>",
         "Add a path to be used in resolving '#include' "
         "and 'import' operations."},
         { OptionKind::Language,     "-lang", "-lang <language>", "Set the language for the following input files."},
@@ -498,9 +503,22 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::VulkanBindGlobals, "-fvk-bind-globals", "-fvk-bind-globals <N> <descriptor-set>",
         "Places the $Globals cbuffer at descriptor set <descriptor-set> and binding <N>."},
         { OptionKind::VulkanInvertY, "-fvk-invert-y", nullptr, "Negates (additively inverts) SV_Position.y before writing to stage output."},
+        { OptionKind::VulkanUseEntryPointName, "-fvk-use-entrypoint-name", nullptr, "Uses the entrypoint name from the source instead of 'main' in the spirv output."},
+        { OptionKind::VulkanUseGLLayout, "-fvk-use-gl-layout", nullptr, "Use std430 layout instead of D3D buffer layout for raw buffer load/stores."},
         { OptionKind::EnableEffectAnnotations,
          "-enable-effect-annotations", nullptr, 
          "Enables support for legacy effect annotation syntax."},
+#if defined(SLANG_CONFIG_DEFAULT_SPIRV_DIRECT)
+        { OptionKind::EmitSpirvViaGLSL, "-emit-spirv-via-glsl", nullptr,
+        "Generate SPIR-V output by compiling generated GLSL with glslang" },
+        { OptionKind::EmitSpirvDirectly, "-emit-spirv-directly", nullptr,
+        "Generate SPIR-V output direclty (default)" },
+#else
+        { OptionKind::EmitSpirvViaGLSL, "-emit-spirv-via-glsl", nullptr,
+        "Generate SPIR-V output by compiling generated GLSL with glslang (default)" },
+        { OptionKind::EmitSpirvDirectly, "-emit-spirv-directly", nullptr,
+        "Generate SPIR-V output direclty rather than by compiling generated GLSL with glslang" },
+#endif
     };
 
     _addOptions(makeConstArrayView(targetOpts), options);
@@ -578,9 +596,6 @@ void initCommandOptions(CommandOptions& options)
 
     const Option experimentalOpts[] = 
     {
-        { OptionKind::EmitSpirvDirectly, "-emit-spirv-directly", nullptr, 
-        "Generate SPIR-V output directly (otherwise through "
-        "GLSL and using the glslang compiler)"},
         { OptionKind::FileSystem, "-file-system", "-file-system <file-system-type>", 
         "Set the filesystem hook to use for a compile request."},
         { OptionKind::Heterogeneous, "-heterogeneous", nullptr, "Output heterogeneity-related code." },
@@ -721,7 +736,7 @@ struct OptionsParser
     {
         CodeGenTarget       format = CodeGenTarget::Unknown;
         ProfileVersion      profileVersion = ProfileVersion::Unknown;
-        SlangTargetFlags    targetFlags = 0;
+        SlangTargetFlags    targetFlags = kDefaultTargetFlags;
         int                 targetID = -1;
         FloatingPointMode   floatingPointMode = FloatingPointMode::Default;
         bool                forceGLSLScalarLayout = false;
@@ -2016,6 +2031,18 @@ SlangResult OptionsParser::_parse(
                 m_hlslToVulkanLayoutOptions->setInvertY(true);
                 break;
             }
+            case OptionKind::VulkanUseEntryPointName:
+            {
+                // -fvk-use-entrypoint-name
+                m_hlslToVulkanLayoutOptions->setUseOriginalEntryPointName(true);
+                break;
+            }
+            case OptionKind::VulkanUseGLLayout:
+            {
+                // -fvk-use-gl-layout
+                m_hlslToVulkanLayoutOptions->setUseGLLayout(true);
+                break;
+            }
             case OptionKind::Profile: SLANG_RETURN_ON_FAIL(_parseProfile(arg)); break;
             case OptionKind::Capability:
             {
@@ -2263,7 +2290,16 @@ SlangResult OptionsParser::_parse(
                 // We retun an error so after this has successfully passed, we quit
                 return SLANG_FAIL;
             }
-            case OptionKind::EmitSpirvDirectly: getCurrentTarget()->targetFlags |= SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY; break;
+            case OptionKind::EmitSpirvViaGLSL:
+            {
+                getCurrentTarget()->targetFlags &= ~SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY;
+            }
+            break;
+            case OptionKind::EmitSpirvDirectly:
+            {
+                getCurrentTarget()->targetFlags |= SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY;
+            }
+            break;
 
             case OptionKind::DefaultDownstreamCompiler:
             {

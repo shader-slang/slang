@@ -82,6 +82,27 @@ struct IRTargetSpecificDecoration : IRDecoration
     IRCapabilitySet* getTargetCapsOperand() { return cast<IRCapabilitySet>(getOperand(0)); }
 
     CapabilitySet getTargetCaps() { return getTargetCapsOperand()->getCaps(); }
+
+    bool hasPredicate()
+    {
+        return getOperandCount() >= 4;
+    }
+
+    UnownedStringSlice getTypePredicate()
+    {
+        SLANG_ASSERT(getOperandCount() == 4);
+        const auto lit = as<IRStringLit>(getOperand(2));
+        SLANG_ASSERT(lit);
+        return lit->getStringSlice();
+    }
+
+    IRType* getTypeScrutinee()
+    {
+        SLANG_ASSERT(getOperandCount() == 4);
+        const auto t = as<IRType>(getOperand(3));
+        SLANG_ASSERT(t);
+        return t;
+    }
 };
 
 struct IRTargetDecoration : IRTargetSpecificDecoration
@@ -589,6 +610,28 @@ struct IRNaturalOffsetDecoration : IRDecoration
 {
     enum { kOp = kIROp_NaturalOffsetDecoration };
     IR_LEAF_ISA(NaturalOffsetDecoration)
+
+    IRIntLit* getOffsetOperand() { return cast<IRIntLit>(getOperand(0)); }
+
+    IRIntegerValue getOffset() { return getOffsetOperand()->getValue(); }
+};
+
+struct IRStd430SizeAndAlignmentDecoration : IRDecoration
+{
+    enum { kOp = kIROp_Std430SizeAndAlignmentDecoration };
+    IR_LEAF_ISA(Std430SizeAndAlignmentDecoration)
+
+    IRIntLit* getSizeOperand() { return cast<IRIntLit>(getOperand(0)); }
+    IRIntLit* getAlignmentOperand() { return cast<IRIntLit>(getOperand(1)); }
+
+    IRIntegerValue getSize() { return getSizeOperand()->getValue(); }
+    IRIntegerValue getAlignment() { return getAlignmentOperand()->getValue(); }
+};
+
+struct IRStd430OffsetDecoration : IRDecoration
+{
+    enum { kOp = kIROp_Std430OffsetDecoration };
+    IR_LEAF_ISA(Std430OffsetDecoration)
 
     IRIntLit* getOffsetOperand() { return cast<IRIntLit>(getOperand(0)); }
 
@@ -1524,6 +1567,38 @@ struct IRArrayTypeLayout : IRTypeLayout
     };
 };
 
+    /// Specialized layout information for structured buffer types
+struct IRStructuredBufferTypeLayout : IRTypeLayout
+{
+    typedef IRTypeLayout Super;
+
+    IR_LEAF_ISA(StructuredBufferTypeLayout)
+
+    IRTypeLayout* getElementTypeLayout()
+    {
+        return cast<IRTypeLayout>(getOperand(0));
+    }
+
+    struct Builder : Super::Builder
+    {
+        Builder(IRBuilder* irBuilder, IRTypeLayout* elementTypeLayout)
+            : Super::Builder(irBuilder)
+            , m_elementTypeLayout(elementTypeLayout)
+        {}
+
+        IRStructuredBufferTypeLayout* build()
+        {
+            return cast<IRStructuredBufferTypeLayout>(Super::Builder::build());
+        }
+
+    protected:
+        IROp getOp() SLANG_OVERRIDE { return kIROp_StructuredBufferTypeLayout; }
+        void addOperandsImpl(List<IRInst*>& ioOperands) override;
+
+        IRTypeLayout* m_elementTypeLayout;
+    };
+};
+
 /* TODO(JS): 
 
 It would arguably be "more correct" if the IRPointerTypeLayout, contained a refence to the value/target
@@ -1706,6 +1781,74 @@ struct IRStructTypeLayout : IRTypeLayout
     };
 };
 
+    /// Attribute that specifies the layout for one field of a structure type.
+struct IRTupleFieldLayoutAttr : IRAttr
+{
+    IR_LEAF_ISA(TupleFieldLayoutAttr)
+
+    IRTypeLayout* getLayout()
+    {
+        return cast<IRTypeLayout>(getOperand(1));
+    }
+};
+
+    /// Specialized layout information for tuple types.
+struct IRTupleTypeLayout : IRTypeLayout
+{
+    IR_LEAF_ISA(TupleTypeLayout)
+
+    typedef IRTypeLayout Super;
+
+        /// Get all of the attributes that represent field layouts.
+    IROperandList<IRTupleFieldLayoutAttr> getFieldLayoutAttrs()
+    {
+        return findAttrs<IRTupleFieldLayoutAttr>();
+    }
+
+        /// Get the number of fields for which layout information is stored.
+    UInt getFieldCount()
+    {
+        return getFieldLayoutAttrs().getCount();
+    }
+
+        /// Get the layout information for a field by `index`
+    IRTypeLayout* getFieldLayout(UInt index)
+    {
+        return getFieldLayoutAttrs()[index]->getLayout();
+    }
+
+        /// Specialized builder for tuple type layouts.
+    struct Builder : Super::Builder
+    {
+        Builder(IRBuilder* irBuilder)
+            : Super::Builder(irBuilder)
+        {}
+
+        void addField(IRTypeLayout* layout)
+        {
+            FieldInfo info;
+            info.layout = layout;
+            m_fields.add(info);
+        }
+
+        IRTupleTypeLayout* build()
+        {
+            return cast<IRTupleTypeLayout>(Super::Builder::build());
+        }
+
+    protected:
+        IROp getOp() SLANG_OVERRIDE { return kIROp_TupleTypeLayout; }
+        void addAttrsImpl(List<IRInst*>& ioOperands) override;
+
+        struct FieldInfo
+        {
+            IRTypeLayout* layout;
+        };
+
+        List<FieldInfo> m_fields;
+    };
+};
+
     /// Attribute that represents the layout for one case of a union type
 struct IRCaseTypeLayoutAttr : IRAttr
 {
@@ -1715,59 +1858,6 @@ struct IRCaseTypeLayoutAttr : IRAttr
     {
         return cast<IRTypeLayout>(getOperand(0));
     }
-};
-
-    /// Specialized layout information for tagged union types
-struct IRTaggedUnionTypeLayout : IRTypeLayout
-{
-    typedef IRTypeLayout Super;
-
-    IR_LEAF_ISA(TaggedUnionTypeLayout)
-
-        /// Get the (byte) offset of the tagged union's tag (aka "discriminator") field
-    LayoutSize getTagOffset()
-    {
-        return LayoutSize::fromRaw(LayoutSize::RawValue(getIntVal(cast<IRIntLit>(getOperand(0)))));
-    }
-
-        /// Get all the attributes representing layouts for the difference cases
-    IROperandList<IRCaseTypeLayoutAttr> getCaseTypeLayoutAttrs()
-    {
-        return findAttrs<IRCaseTypeLayoutAttr>();
-    }
-
-        /// Get the number of cases for which layout information is stored
-    UInt getCaseCount()
-    {
-        return getCaseTypeLayoutAttrs().getCount();
-    }
-
-        /// Get the layout information for the case at the given `index`
-    IRTypeLayout* getCaseTypeLayout(UInt index)
-    {
-        return getCaseTypeLayoutAttrs()[index]->getTypeLayout();
-    }
-
-        /// Specialized builder for tagged union type layouts
-    struct Builder : Super::Builder
-    {
-        Builder(IRBuilder* irBuilder, LayoutSize tagOffset);
-
-        void addCaseTypeLayout(IRTypeLayout* typeLayout);
-
-        IRTaggedUnionTypeLayout* build()
-        {
-            return cast<IRTaggedUnionTypeLayout>(Super::Builder::build());
-        }
-
-    protected:
-        IROp getOp() SLANG_OVERRIDE { return kIROp_TaggedUnionTypeLayout; }
-        void addOperandsImpl(List<IRInst*>& ioOperands) SLANG_OVERRIDE;
-        void addAttrsImpl(List<IRInst*>& ioOperands) SLANG_OVERRIDE;
-
-        IRInst* m_tagOffset = nullptr;
-        List<IRAttr*> m_caseTypeLayoutAttrs;
-    };
 };
 
     /// Type layout for an existential/interface type.
@@ -1989,6 +2079,10 @@ struct IRCall : IRInst
 
     UInt getArgCount() { return getOperandCount() - 1; }
     IRUse* getArgs() { return getOperands() + 1; }
+    IROperandList<IRInst> getArgsList()
+    {
+        return IROperandList<IRInst>(getOperands() + 1, getOperands() + getOperandCount());
+    }
     IRInst* getArg(UInt index) { return getOperand(index + 1); }
 };
 
@@ -2008,6 +2102,14 @@ struct IRStore : IRInst
 
     IRInst* getPtr() { return ptr.get(); }
     IRInst* getVal() { return val.get(); }
+};
+
+struct IRRWStructuredBufferStore : IRInst
+{
+    IR_LEAF_ISA(RWStructuredBufferStore)
+    IRInst* getStructuredBuffer() { return getOperand(0); }
+    IRInst* getIndex() { return getOperand(1); }
+    IRInst* getVal() { return getOperand(2); }
 };
 
 struct IRFieldExtract : IRInst
@@ -2042,6 +2144,13 @@ struct IRGetElement : IRInst
 struct IRGetElementPtr : IRInst
 {
     IR_LEAF_ISA(GetElementPtr);
+    IRInst* getBase() { return getOperand(0); }
+    IRInst* getIndex() { return getOperand(1); }
+};
+
+struct IRRWStructuredBufferGetElementPtr : IRInst
+{
+    IR_LEAF_ISA(RWStructuredBufferGetElementPtr);
     IRInst* getBase() { return getOperand(0); }
     IRInst* getIndex() { return getOperand(1); }
 };
@@ -2726,6 +2835,25 @@ struct IRGetRegisterSpace : IRBindingQuery
     IR_LEAF_ISA(GetRegisterSpace);
 };
 
+struct IRIntCast : IRInst
+{
+    IR_LEAF_ISA(IntCast)
+};
+
+struct IRFloatCast : IRInst
+{
+    IR_LEAF_ISA(FloatCast)
+};
+
+struct IRCastIntToFloat : IRInst
+{
+    IR_LEAF_ISA(CastIntToFloat)
+};
+
+struct IRCastFloatToInt : IRInst
+{
+    IR_LEAF_ISA(CastFloatToInt)
+};
 
 struct IRBuilderSourceLocRAII;
 
@@ -2969,7 +3097,8 @@ public:
     IRMatrixType* getMatrixType(
         IRType* elementType,
         IRInst* rowCount,
-        IRInst* columnCount);
+        IRInst* columnCount,
+        IRInst* layout);
 
     IRArrayListType* getArrayListType(IRType* elementType);
     IRTensorViewType* getTensorViewType(IRType* elementType);
@@ -3012,16 +3141,6 @@ public:
     IRRateQualifiedType* getRateQualifiedType(
         IRRate* rate,
         IRType* dataType);
-
-    IRType* getTaggedUnionType(
-        UInt            caseCount,
-        IRType* const*  caseTypes);
-
-    IRType* getTaggedUnionType(
-        List<IRType*> const& caseTypes)
-    {
-        return getTaggedUnionType(caseTypes.getCount(), caseTypes.getBuffer());
-    }
 
     IRType* getBindExistentialsType(
         IRInst*         baseType,
@@ -3441,6 +3560,9 @@ public:
 
     IRVar* emitVar(
         IRType* type);
+    IRVar* emitVar(
+        IRType* type,
+        IRIntegerValue addressSpace);
 
     IRInst* emitLoad(
         IRType* type,
@@ -3728,6 +3850,18 @@ public:
         return addDecoration(value, op, operands, SLANG_COUNT_OF(operands));
     }
 
+    IRDecoration* addDecoration(IRInst* value, IROp op, IRInst* operand0, IRInst* operand1, IRInst* operand2)
+    {
+        IRInst* operands[] = { operand0, operand1, operand2 };
+        return addDecoration(value, op, operands, SLANG_COUNT_OF(operands));
+    }
+
+    IRDecoration* addDecoration(IRInst* value, IROp op, IRInst* operand0, IRInst* operand1, IRInst* operand2, IRInst* operand3)
+    {
+        IRInst* operands[] = { operand0, operand1, operand2, operand3 };
+        return addDecoration(value, op, operands, SLANG_COUNT_OF(operands));
+    }
+
     template<typename T>
     void addSimpleDecoration(IRInst* value)
     {
@@ -3753,6 +3887,8 @@ public:
     IRStructFieldLayoutAttr* getFieldLayoutAttr(
         IRInst*         key,
         IRVarLayout*    layout);
+    IRTupleFieldLayoutAttr* getTupleFieldLayoutAttr(
+        IRTypeLayout*    layout);
     IRCaseTypeLayoutAttr* getCaseTypeLayoutAttr(
         IRTypeLayout*   layout);
 
@@ -3850,14 +3986,26 @@ public:
         addDecoration(value, kIROp_SemanticDecoration, getStringValue(text), getIntValue(getIntType(), index));
     }
 
-    void addTargetIntrinsicDecoration(IRInst* value, IRInst* caps, UnownedStringSlice const& definition)
+    void addTargetIntrinsicDecoration(IRInst* value, IRInst* caps, UnownedStringSlice const& definition, UnownedStringSlice const& predicate, IRInst* typeScrutinee)
     {
-        addDecoration(value, kIROp_TargetIntrinsicDecoration, caps, getStringValue(definition));
+        typeScrutinee
+            ? addDecoration(
+                value,
+                kIROp_TargetIntrinsicDecoration,
+                caps,
+                getStringValue(definition),
+                getStringValue(predicate),
+                typeScrutinee)
+            : addDecoration(
+                value,
+                kIROp_TargetIntrinsicDecoration,
+                caps,
+                getStringValue(definition));
     }
 
-    void addTargetIntrinsicDecoration(IRInst* value, CapabilitySet const& caps, UnownedStringSlice const& definition)
+    void addTargetIntrinsicDecoration(IRInst* value, CapabilitySet const& caps, UnownedStringSlice const& definition, UnownedStringSlice const& predicate = UnownedStringSlice{}, IRInst* typeScrutinee = nullptr)
     {
-        addTargetIntrinsicDecoration(value, getCapabilityValue(caps), definition);
+        addTargetIntrinsicDecoration(value, getCapabilityValue(caps), definition, predicate, typeScrutinee);
     }
 
     void addTargetDecoration(IRInst* value, IRInst* caps)

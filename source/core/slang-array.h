@@ -101,6 +101,50 @@ namespace Slang
         Index m_count = 0;
 	};
 
+    template<typename T>
+    class Array<T, 0>
+    {
+    public:
+        T* begin() { return nullptr; }
+        const T* begin() const { return nullptr; }
+
+        const T* end() const { return nullptr; }
+        T* end() { return nullptr; }
+
+        inline Index getCapacity() const { return 0; }
+        inline Index getCount() const { return 0; }
+        inline void setCount(Index newCount)
+        {
+            SLANG_ASSERT(newCount == 0);
+        }
+        inline const T* getBuffer() const { return nullptr; }
+        inline T* getBuffer() { return nullptr; }
+        inline void clear() {}
+
+        template<typename T2>
+        Index indexOf(const T2& val) const { return getView().indexOf(val);    }
+        template<typename T2>
+        Index lastIndexOf(const T2& val) const { return getView().lastIndexOf(val); }
+        template<typename Func>
+        Index findFirstIndex(const Func& predicate) const { return getView().findFirstIndex(predicate); }
+        template<typename Func>
+        Index findLastIndex(const Func& predicate) const { return getView().findLastIndex(predicate); }
+
+        inline ConstArrayView<T> getView() const { return ConstArrayView<T>(nullptr, 0); }
+        inline ConstArrayView<T> getView(Index start, Index count) const
+        {
+            SLANG_ASSERT(start == 0 && count == 0);
+            return ConstArrayView<T>(nullptr, 0);
+        }
+
+        inline ArrayView<T> getView() { return ArrayView<T>(nullptr, 0); }
+        inline ArrayView<T> getView(Index start, Index count)
+        {
+            SLANG_ASSERT(start == 0 && count == 0);
+            return ArrayView<T>(nullptr, 0);
+        }
+    };
+
 	template<typename T, typename ...TArgs>
 	struct FirstType
 	{
@@ -125,6 +169,12 @@ namespace Slang
 		insertArray(rs, args...);
 		return rs;
 	}
+
+    template<typename T>
+	auto makeArray() -> Array<T, 0>
+    {
+        return Array<T, 0>();
+    }
 
 
     template<typename TList>

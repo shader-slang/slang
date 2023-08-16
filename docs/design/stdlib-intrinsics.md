@@ -77,7 +77,7 @@ This is a widely used and somewhat complicated intrinsic. Placed on a declaratio
 * cuda - CUDA
 * cpp - C++ output (used for exe, shared-library or host-callable)
 
-* spirv_direct - Used for slangs SPIR-V direct mechanism
+* spirv - Used for slangs SPIR-V direct mechanism
 
 A function definition can have a `target_intrinsic` *and* a body. In that case, the body will be used for targets where the `target_intrinsic` isn't defined. 
 

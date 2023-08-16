@@ -3,6 +3,7 @@
 
 #include "../core/slang-writer.h"
 #include "../compiler-core/slang-name.h"
+#include "../core/slang-stable-hash.h"
 
 #include "slang-ir-bind-existentials.h"
 #include "slang-ir-dce.h"
@@ -14,7 +15,6 @@
 #include "slang-ir-specialize.h"
 #include "slang-ir-specialize-resources.h"
 #include "slang-ir-ssa.h"
-#include "slang-ir-union.h"
 #include "slang-ir-util.h"
 #include "slang-ir-validate.h"
 #include "slang-legalize-types.h"
@@ -834,7 +834,7 @@ void CLikeSourceEmitter::appendScrubbedName(const UnownedStringSlice& name, Stri
         if (length > maxTokenLength)
         {
             // We are going to output with a prefix and a hash of the full name
-            const HashCode64 hash = getStableHashCode64(out.getBuffer(), length);
+            const auto hash = getStableHashCode64(out.getBuffer(), length);
             // Two hex chars per byte
             const Index hashSize = sizeof(hash) * 2; 
 
@@ -849,7 +849,7 @@ void CLikeSourceEmitter::appendScrubbedName(const UnownedStringSlice& name, Stri
             // Let's add a _ to separate from the rest of the name
             out.appendChar('_');
             // Append the hash in hex
-            out.append(uint64_t(hash), 16);
+            out.append(hash);
 
             SLANG_ASSERT(out.getLength() <= maxTokenLength);
         }
@@ -952,7 +952,7 @@ String CLikeSourceEmitter::generateName(IRInst* inst)
         // Just use the linkages mangled name directly.
         return externCppDecoration->getName();
     }
-
+    
     // If we have a name hint on the instruction, then we will try to use that
     // to provide the basis for the actual name in the output code.
     if(auto nameHintDecoration = inst->findDecoration<IRNameHintDecoration>())
@@ -967,6 +967,19 @@ String CLikeSourceEmitter::generateName(IRInst* inst)
         return linkageDecoration->getMangledName();
     }
 
+    switch (inst->getOp())
+    {
+    case kIROp_HLSLConstBufferPointerType:
+        {
+            StringBuilder sb;
+            sb << "BufferPointer_";
+            sb << getName(inst->getOperand(0));
+            sb << "_" << Int32(getID(inst));
+            return sb.produceString();
+        }
+    default:
+        break;
+    }
     // Otherwise fall back to a construct temporary name
     // for the instruction.
     StringBuilder sb;
@@ -1009,19 +1022,20 @@ void CLikeSourceEmitter::emitSimpleValueImpl(IRInst* inst)
             {
                 default:
                 
-                case BaseType::Int:
-                {
-                    m_writer->emit("int(");
-                    m_writer->emit(int32_t(litInst->value.intVal));
-                    m_writer->emit(")");
-                    return;
-                }
                 case BaseType::Int8:
                 {
                     m_writer->emit("int8_t(");
                     m_writer->emit(int8_t(litInst->value.intVal));
                     m_writer->emit(")");
                     return;
+                }
+                case BaseType::UInt8:
+                {
+                    m_writer->emit("uint8_t(");
+                    m_writer->emit(UInt(uint8_t(litInst->value.intVal)));
+                    m_writer->emit("U");
+                    m_writer->emit(")");
+                    break;
                 }
                 case BaseType::Int16:
                 {
@@ -1030,17 +1044,20 @@ void CLikeSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                     m_writer->emit(")");
                     return;
                 }
-                case BaseType::UInt8:
-                {
-                    m_writer->emit(UInt(uint8_t(litInst->value.intVal)));
-                    m_writer->emit("U");
-                    break;
-                }
                 case BaseType::UInt16:
                 {
+                    m_writer->emit("uint16_t(");
                     m_writer->emit(UInt(uint16_t(litInst->value.intVal)));
                     m_writer->emit("U");
+                    m_writer->emit(")");
                     break;
+                }
+                case BaseType::Int:
+                {
+                    m_writer->emit("int(");
+                    m_writer->emit(int32_t(litInst->value.intVal));
+                    m_writer->emit(")");
+                    return;
                 }
                 case BaseType::UInt:
                 {
@@ -2130,6 +2147,52 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         }
         break;
 
+    case kIROp_StructuredBufferLoad:
+    case kIROp_RWStructuredBufferLoad:
+        {
+            auto base = inst->getOperand(0);
+            emitOperand(base, outerPrec);
+            m_writer->emit(".Load(");
+            emitOperand(inst->getOperand(1), EmitOpInfo());
+            m_writer->emit(")");
+        }
+        break;
+
+    case kIROp_StructuredBufferLoadStatus:
+    case kIROp_RWStructuredBufferLoadStatus:
+        {
+            auto base = inst->getOperand(0);
+            emitOperand(base, outerPrec);
+            m_writer->emit(".Load(");
+            emitOperand(inst->getOperand(1), EmitOpInfo());
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(2), EmitOpInfo());
+            m_writer->emit(")");
+        }
+        break;
+
+    case kIROp_RWStructuredBufferGetElementPtr:
+        {
+            auto base = inst->getOperand(0);
+            emitOperand(base, outerPrec);
+            m_writer->emit("[");
+            emitOperand(inst->getOperand(1), EmitOpInfo());
+            m_writer->emit("]");
+        }
+        break;
+
+    case kIROp_RWStructuredBufferStore:
+        {
+            auto base = inst->getOperand(0);
+            emitOperand(base, EmitOpInfo());
+            m_writer->emit(".Store(");
+            emitOperand(inst->getOperand(1), EmitOpInfo());
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(2), EmitOpInfo());
+            m_writer->emit(")");
+        }
+        break;
+
     case kIROp_Call:
         {
             emitCallExpr((IRCall*)inst, outerPrec);
@@ -2435,7 +2498,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         if (stringLit)
         {
             auto slice = stringLit->getStringSlice();
-            m_writer->emit(static_cast<int32_t>(getStableHashCode32(slice.begin(), slice.getLength())));
+            m_writer->emit(getStableHashCode32(slice.begin(), slice.getLength()).hash);
         }
         else
         {
@@ -3740,7 +3803,6 @@ void CLikeSourceEmitter::emitGlobalInstImpl(IRInst* inst)
     case kIROp_InterfaceType:
         emitInterface(cast<IRInterfaceType>(inst));
         break;
-
     case kIROp_WitnessTable:
         emitWitnessTable(cast<IRWitnessTable>(inst));
         break;

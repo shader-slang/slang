@@ -54,7 +54,7 @@ namespace Slang
         Type* superType)
     {
         SubtypeWitness* result = nullptr;
-        if (getShared()->tryGetSubtypeWitness(subType, superType, result))
+        if (getShared()->tryGetSubtypeWitnessFromCache(subType, superType, result))
             return result;
         result = checkAndConstructSubtypeWitness(subType, superType);
         getShared()->cacheSubtypeWitness(subType, superType, result);
@@ -107,11 +107,11 @@ namespace Slang
         // First, make sure both sub type and super type decl are ready for lookup.
         if (auto subDeclRefType = as<DeclRefType>(subType))
         {
-            ensureDecl(subDeclRefType->declRef.getDecl(), DeclCheckState::ReadyForLookup);
+            ensureDecl(subDeclRefType->getDeclRef().getDecl(), DeclCheckState::ReadyForLookup);
         }
         if (auto superDeclRefType = as<DeclRefType>(subType))
         {
-            ensureDecl(superDeclRefType->declRef.getDecl(), DeclCheckState::ReadyForLookup);
+            ensureDecl(superDeclRefType->getDeclRef().getDecl(), DeclCheckState::ReadyForLookup);
         }
 
         // In the common case, we can use the pre-computed inheritance information for `subType`
@@ -173,13 +173,13 @@ namespace Slang
         DeclRef<Decl> superTypeDeclRef;
         if (auto superDeclRefType = as<DeclRefType>(superType))
         {
-            superTypeDeclRef = superDeclRefType->declRef;
+            superTypeDeclRef = superDeclRefType->getDeclRef();
         }
 
-        if (auto dynamicType = as<DynamicType>(subType))
+        if (as<DynamicType>(subType))
         {
             // A __Dynamic type always conforms to the interface via its witness table.
-            auto witness = m_astBuilder->create<DynamicSubtypeWitness>();
+            auto witness = m_astBuilder->getOrCreate<DynamicSubtypeWitness>(subType, superType);
             return witness;
         }
         else if (auto conjunctionSuperType = as<AndType>(superType))
@@ -189,10 +189,10 @@ namespace Slang
             // We therefore simply recursively test both `T <: L`
             // and `T <: R`.
             //
-            auto leftWitness = isSubtype(subType, conjunctionSuperType->left);
+            auto leftWitness = isSubtype(subType, conjunctionSuperType->getLeft());
             if (!leftWitness) return nullptr;
             //
-            auto rightWitness = isSubtype(subType, conjunctionSuperType->right);
+            auto rightWitness = isSubtype(subType, conjunctionSuperType->getRight());
             if (!rightWitness) return nullptr;
 
             // If both of the sub-relationships hold, we can construct
@@ -214,69 +214,13 @@ namespace Slang
             // TODO(tfoley): We could add support for `ExtractExistentialType` to
             // the inheritance linearization logic, and eliminate this case.
             //
-            auto interfaceDeclRef = extractExistentialType->originalInterfaceDeclRef;
+            auto interfaceDeclRef = extractExistentialType->getOriginalInterfaceDeclRef();
             if (interfaceDeclRef.equals(superTypeDeclRef))
             {
                 auto witness = extractExistentialType->getSubtypeWitness();
                 return witness;
             }
             return nullptr;
-        }
-        //
-        // TODO(tfoley): We should probably just remove `TaggedUnionType`,
-        // since there is no useful code that relies on it any more.
-        //
-        else if(auto taggedUnionType = as<TaggedUnionType>(subType))
-        {
-            // A tagged union type conforms to an interface if all of
-            // the constituent types in the tagged union conform.
-            //
-            // We will iterate over the "case" types in the tagged
-            // union, and check if they conform to the interface.
-            // Along the way we will collect the conformance witness
-            // values for the case types.
-            //
-            List<SubtypeWitness*> caseWitnesses;
-            for(auto caseType : taggedUnionType->caseTypes)
-            {
-                auto caseWitness = isSubtype(caseType, superType);
-
-                if(!caseWitness)
-                {
-                    return nullptr;
-                }
-
-                caseWitnesses.add(caseWitness);
-            }
-
-            // We also need to validate the requirements on
-            // the interface to make sure that they are suitable for
-            // use with a tagged-union type.
-            //
-            // For example, if the interface includes a `static` method
-            // (which can therefore be called without a particular instance),
-            // then we wouldn't know what implementation of that method
-            // to use because there is no tag value to dispatch on.
-            //
-            // We will start out being conservative about what we accept
-            // here, just to keep things simple.
-            //
-            if( auto superInterfaceDeclRef = superTypeDeclRef.as<InterfaceDecl>() )
-            {
-                if(!isInterfaceSafeForTaggedUnion(superInterfaceDeclRef))
-                    return nullptr;
-            }
-
-            // If we reach this point then we have a concrete
-            // witness for each of the case types, and that is
-            // enough to build a witness for the tagged union.
-            //
-            TaggedUnionSubtypeWitness* taggedUnionWitness = m_astBuilder->create<TaggedUnionSubtypeWitness>();
-            taggedUnionWitness->sub = taggedUnionType;
-            taggedUnionWitness->sup = superType;
-            taggedUnionWitness->caseWitnesses.swapWith(caseWitnesses);
-
-            return taggedUnionWitness;
         }
 
         // default is failure
@@ -287,7 +231,7 @@ namespace Slang
     {
         if (auto declRefType = as<DeclRefType>(type))
         {
-            if (auto interfaceDeclRef = declRefType->declRef.as<InterfaceDecl>())
+            if (auto interfaceDeclRef = declRefType->getDeclRef().as<InterfaceDecl>())
                 return true;
         }
         return false;

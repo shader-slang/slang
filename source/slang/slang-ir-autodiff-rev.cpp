@@ -218,7 +218,7 @@ namespace Slang
         case kIROp_WrapExistential:
         case kIROp_MakeExistential:
         case kIROp_MakeExistentialWithRTTI:
-            return trascribeNonDiffInst(builder, origInst);
+            return transcribeNonDiffInst(builder, origInst);
 
         case kIROp_StructKey:
             return InstPair(origInst, nullptr);
@@ -658,8 +658,8 @@ namespace Slang
     // Remove [KeepAlive] decorations for primal param replacement insts.
     static void _unlockPrimalParamReplacementInsts(ParameterBlockTransposeInfo& paramInfo)
     {
-        for (auto& kv : paramInfo.mapPrimalSpecificParamToReplacementInPropFunc)
-            kv.value->findDecoration<IRKeepAliveDecoration>()->removeAndDeallocate();
+        for (const auto& [_, value] : paramInfo.mapPrimalSpecificParamToReplacementInPropFunc)
+            value->findDecoration<IRKeepAliveDecoration>()->removeAndDeallocate();
     }
 
     // Transcribe a function definition.

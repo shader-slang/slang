@@ -1608,12 +1608,55 @@ void insertTempVarForMutableParams(IRModule* module, IRFunc* func)
             if (inst->getOp() == kIROp_Return)
             {
                 builder.setInsertBefore(inst);
-                for (auto& kv : mapParamToTempVar)
-                {
-                    builder.emitStore(kv.key, builder.emitLoad(kv.value));
-                }
+                for (const auto& [param, var] : mapParamToTempVar)
+                    builder.emitStore(param, builder.emitLoad(var));
             }
         }
+    }
+}
+
+bool isLocalPointer(IRInst* ptrInst)
+{
+    // If it's not a local var or a function parameter, then it's probably 
+    // referencing something outside the function scope.
+    // 
+    auto addr = getRootAddr(ptrInst);
+    return as<IRVar>(addr) || as<IRParam>(addr);
+}
+
+void lowerSwizzledStores(IRModule* module, IRFunc* func)
+{
+    List<IRInst*> instsToRemove;
+
+    IRBuilder builder(module);
+    for (auto block : func->getBlocks())
+    {
+        for (auto inst : block->getChildren())
+        {
+            if (auto swizzledStore = as<IRSwizzledStore>(inst))
+            {
+                if (!isLocalPointer(swizzledStore->getDest()))
+                    continue;
+
+                builder.setInsertBefore(inst);
+                for (UIndex ii = 0; ii < swizzledStore->getElementCount(); ii++)
+                {
+                    auto indexVal = swizzledStore->getElementIndex(ii);
+                    auto indexedPtr = builder.emitElementAddress(swizzledStore->getDest(), indexVal);
+                    builder.emitStore(
+                        indexedPtr, 
+                        builder.emitElementExtract(
+                            swizzledStore->getSource(), 
+                            builder.getIntValue(builder.getIntType(), ii)));
+                }
+                instsToRemove.add(inst);
+            }
+        }
+    }
+
+    for (auto inst : instsToRemove)
+    {
+        inst->removeAndDeallocate();
     }
 }
 
@@ -1625,6 +1668,8 @@ SlangResult ForwardDiffTranscriber::prepareFuncForForwardDiff(IRFunc* func)
     performForceInlining(func);
     
     initializeLocalVariables(autoDiffSharedContext->moduleInst->getModule(), func);
+
+    lowerSwizzledStores(autoDiffSharedContext->moduleInst->getModule(), func);
 
     auto result = eliminateAddressInsts(func, sink);
 
@@ -1846,6 +1891,17 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_undefined:
         return transcribeUndefined(builder, origInst);
 
+        // Differentiable insts that should have been lowered in a previous pass.
+    case kIROp_SwizzledStore: 
+    {
+        // If we have a non-null dest ptr, then we error out because something went wrong
+        // when lowering swizzle-stores to regular stores
+        //
+        auto swizzledStore = as<IRSwizzledStore>(origInst);
+        SLANG_RELEASE_ASSERT(lookupDiffInst(swizzledStore->getDest(), nullptr) == nullptr);
+        return transcribeNonDiffInst(builder, swizzledStore);
+    }
+
         // Known non-differentiable insts.
     case kIROp_Not:
     case kIROp_BitAnd:
@@ -1858,7 +1914,10 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_ByteAddressBufferLoad:
     case kIROp_ByteAddressBufferStore:
     case kIROp_StructuredBufferLoad:
-    case kIROp_StructuredBufferStore:
+    case kIROp_RWStructuredBufferLoad:
+    case kIROp_RWStructuredBufferLoadStatus:
+    case kIROp_RWStructuredBufferStore:
+    case kIROp_RWStructuredBufferGetElementPtr:
     case kIROp_Reinterpret:
     case kIROp_IsType:
     case kIROp_ImageSubscript:
@@ -1872,13 +1931,13 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_DetachDerivative:
     case kIROp_GetSequentialID:
     case kIROp_GetStringHash:
-        return trascribeNonDiffInst(builder, origInst);
+        return transcribeNonDiffInst(builder, origInst);
 
         // A call to createDynamicObject<T>(arbitraryData) cannot provide a diff value,
         // so we treat this inst as non differentiable.
         // We can extend the frontend and IR with a separate op-code that can provide an explicit diff value.
     case kIROp_CreateExistentialObject:
-        return trascribeNonDiffInst(builder, origInst);
+        return transcribeNonDiffInst(builder, origInst);
 
     case kIROp_StructKey:
         return InstPair(origInst, nullptr);

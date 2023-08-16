@@ -8,17 +8,139 @@ namespace Slang {
 
 // Syntax class definitions for compile-time values.
 
+class DirectDeclRef : public DeclRefBase
+{
+public:
+    SLANG_AST_CLASS(DirectDeclRef)
+
+    DirectDeclRef(Decl* decl)
+    {
+        setOperands(decl);
+    }
+
+    DeclRefBase* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride();
+    DeclRefBase* _getBaseOverride();
+};
+
+// Represent an static member of a base decl.
+// Note that we automatically fold the DeclRef if the path is known to be static.
+// For example, MemberDeclRef(DirectDeclRef(A), B) ==> DirectDeclRef(B),
+// and MemberDeclRef(MemberDeclRef(A, B), C) ==> MemberDeclRef(A, C).
+//
+class MemberDeclRef : public DeclRefBase
+{
+public:
+    SLANG_AST_CLASS(MemberDeclRef);
+
+    DeclRefBase* getParentOperand() { return as<DeclRefBase>(getOperand(1)); }
+
+    MemberDeclRef(Decl* decl, DeclRefBase* parent)
+    {
+        setOperands(decl, parent);
+    }
+
+    DeclRefBase* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+
+    void _toTextOverride(StringBuilder& out);
+
+    Val* _resolveImplOverride();
+
+    DeclRefBase* _getBaseOverride();
+};
+
+
+// Represent a lookup of SuperType::`m_decl` from `lookupSourceType` type that we know conforms to SuperType.
+class LookupDeclRef : public DeclRefBase
+{
+public:
+    SLANG_AST_CLASS(LookupDeclRef);
+
+    // m_decl represents the decl in SuperType that we want to lookup.
+
+    // The source type that we are looking up from.
+    Type* getLookupSource()
+    {
+        return as<Type>(getOperand(1));
+    }
+
+    // Witness that `lookupSourceType`:SuperType.
+    SubtypeWitness* getWitness()
+    {
+        return as<SubtypeWitness>(getOperand(2));
+    }
+
+    LookupDeclRef(Decl* declToLookup, Type* lookupSource, SubtypeWitness* witness)
+    {
+        setOperands(declToLookup, lookupSource, witness);
+    }
+
+    Decl* getSupDecl();
+
+    DeclRefBase* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+
+    void _toTextOverride(StringBuilder& out);
+
+    Val* _resolveImplOverride();
+
+    DeclRefBase* _getBaseOverride();
+
+private:
+    Val* tryResolve(SubtypeWitness* newWitness, Type* newLookupSource);
+};
+
+// Represents a specialization of a generic decl.
+class GenericAppDeclRef : public DeclRefBase
+{
+public:
+    SLANG_AST_CLASS(GenericAppDeclRef);
+
+    DeclRefBase* getGenericDeclRef() { return as<DeclRefBase>(getOperand(1)); }
+    Index getArgCount() { return getOperandCount() - 2; }
+    Val* getArg(Index index) { return getOperand(index + 2); }
+
+    GenericAppDeclRef(Decl* innerDecl, DeclRefBase* genericDeclRef, OperandView<Val> args)
+    {
+        m_operands.add(ValNodeOperand(innerDecl));
+        m_operands.add(ValNodeOperand(genericDeclRef));
+        for (auto arg : args)
+        {
+            m_operands.add(ValNodeOperand(arg));
+        }
+    }
+
+    GenericAppDeclRef(Decl* innerDecl, DeclRefBase* genericDeclRef, ConstArrayView<Val*> args)
+    {
+        m_operands.add(ValNodeOperand(innerDecl));
+        m_operands.add(ValNodeOperand(genericDeclRef));
+        for (auto arg : args)
+        {
+            m_operands.add(ValNodeOperand(arg));
+        }
+    }
+
+    GenericDecl* getGenericDecl();
+
+    OperandView<Val> getArgs() { return OperandView<Val>(this, 2, getArgCount()); }
+
+    DeclRefBase* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+
+    void _toTextOverride(StringBuilder& out);
+
+    Val* _resolveImplOverride();
+
+    DeclRefBase* _getBaseOverride();
+};
+
 // A compile-time integer (may not have a specific concrete value)
 class IntVal : public Val 
 {
     SLANG_ABSTRACT_AST_CLASS(IntVal)
 
-    Type* type;
+    Type* getType() { return as<Type>(getOperand(0)); }
 
-    IntVal(Type* inType)
-        : type(inType)
-    {}
-
+    Val* _resolveImplOverride() { return this; }
 };
 
 // Trivial case of a value that is just a constant integer
@@ -26,18 +148,15 @@ class ConstantIntVal : public IntVal
 {
     SLANG_AST_CLASS(ConstantIntVal)
 
-    IntegerLiteralValue value;
+    IntegerLiteralValue getValue() { return getIntConstOperand(1); }
 
     // Overrides should be public so base classes can access
-    bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
-    HashCode _getHashCodeOverride();
 
-protected:
     ConstantIntVal(Type* inType, IntegerLiteralValue inValue)
-        : IntVal(inType), value(inValue)
-    {}
-
+    {
+        setOperands(inType, inValue);
+    }
 };
 
 // The logical "value" of a reference to a generic value parameter
@@ -45,30 +164,31 @@ class GenericParamIntVal : public IntVal
 {
     SLANG_AST_CLASS(GenericParamIntVal)
 
-    DeclRef<VarDeclBase> declRef;
+    DeclRef<VarDeclBase> getDeclRef() { return as<DeclRefBase>(getOperand(1)); }
 
     // Overrides should be public so base classes can access
-    bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
-    HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 
     GenericParamIntVal(Type* inType, DeclRef<VarDeclBase> inDeclRef)
-        : IntVal(inType), declRef(inDeclRef)
-    {}
+    {
+        setOperands(inType, inDeclRef);
+    }
 };
 
 class TypeCastIntVal : public IntVal
 {
     SLANG_AST_CLASS(TypeCastIntVal)
 
-    bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
-    HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
 
-    Val* base;
-    TypeCastIntVal(Type* inType, Val* inBase) : IntVal(inType), base(inBase) {}
+    Val* getBase() { return getOperand(1); }
+    TypeCastIntVal(Type* inType, Val* inBase)
+    {
+        setOperands(inType, inBase);
+    }
 
     static Val* tryFoldImpl(ASTBuilder* astBuilder, Type* resultType, Val* base, DiagnosticSink* sink);
 };
@@ -78,16 +198,21 @@ class FuncCallIntVal : public IntVal
 {
     SLANG_AST_CLASS(FuncCallIntVal)
 
-    bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
-    HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
 
-    DeclRef<Decl> funcDeclRef;
-    Type* funcType;
-    List<IntVal*> args;
+    DeclRef<Decl> getFuncDeclRef() { return as<DeclRefBase>(getOperand(1)); }
+    Type* getFuncType() { return as<Type>(getOperand(2)); }
+    OperandView<IntVal> getArgs() { return OperandView<IntVal>(this, 3, getOperandCount() - 3); }
+    Index getArgCount() { return getOperandCount() - 3; }
 
-    FuncCallIntVal(Type* inType) : IntVal(inType) {}
+    FuncCallIntVal(Type* inType, DeclRef<Decl> inFuncDeclRef, Type* inFuncType, ArrayView<IntVal*> inArgs)
+    {
+        setOperands(inType, inFuncDeclRef, inFuncType);
+        for (auto arg : inArgs)
+            m_operands.add(ValNodeOperand(arg));
+    }
 
     static Val* tryFoldImpl(ASTBuilder* astBuilder, Type* resultType, DeclRef<Decl> newFuncDecl, List<IntVal*>& newArgs, DiagnosticSink* sink);
 };
@@ -96,15 +221,17 @@ class WitnessLookupIntVal : public IntVal
 {
     SLANG_AST_CLASS(WitnessLookupIntVal)
 
-    bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
-    HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
 
-    SubtypeWitness* witness;
-    Decl* key;
+    SubtypeWitness* getWitness() { return as<SubtypeWitness>(getOperand(1)); }
+    Decl* getKey() { return as<Decl>(getDeclOperand(2)); }
 
-    WitnessLookupIntVal(Type* inType) : IntVal(inType) {}
+    WitnessLookupIntVal(Type* inType, SubtypeWitness* witness, Decl* key)
+    {
+        setOperands(inType, witness, key);
+    }
 
     static Val* tryFoldOrNull(ASTBuilder* astBuilder, SubtypeWitness* witness, Decl* key);
 
@@ -113,23 +240,31 @@ class WitnessLookupIntVal : public IntVal
 
 // polynomial expression "2*a*b^3 + 1" will be represented as:
 // { constantTerm:1, terms: [ { constFactor:2, paramFactors:[{"a", 1}, {"b", 3}] } ] }
-class PolynomialIntValFactor : public NodeBase
+class PolynomialIntValFactor : public Val
 {
     SLANG_AST_CLASS(PolynomialIntValFactor)
 public:
-    IntVal* param;
-    IntegerLiteralValue power;
+    IntVal* getParam() const { return as<IntVal>(getOperand(0)); }
+    IntegerLiteralValue getPower() const { return getIntConstOperand(1); }
+
+    PolynomialIntValFactor(IntVal* inParam, IntegerLiteralValue inPower)
+    {
+        setOperands(inParam, inPower);
+    }
+
+    Val* _resolveImplOverride();
+
     // for sorting only.
     bool operator<(const PolynomialIntValFactor& other) const
     {
-        if (auto thisGenParam = as<GenericParamIntVal>(param))
+        if (auto thisGenParam = as<GenericParamIntVal>(getParam()))
         {
-            if (auto thatGenParam = as<GenericParamIntVal>(other.param))
+            if (auto thatGenParam = as<GenericParamIntVal>(other.getParam()))
             {
-                if (thisGenParam->equalsVal(thatGenParam))
-                    return power < other.power;
+                if (thisGenParam->equals(thatGenParam))
+                    return getPower() < other.getPower();
                 else
-                    return thisGenParam->declRef.getDecl() < thatGenParam->declRef.getDecl();
+                    return thisGenParam->getDeclRef().getDecl() < thatGenParam->getDeclRef().getDecl();
             }
             else
             {
@@ -138,64 +273,84 @@ public:
         }
         else
         {
-            if (const auto thatGenParam = as<GenericParamIntVal>(other.param))
+            if (const auto thatGenParam = as<GenericParamIntVal>(other.getParam()))
             {
                 return false;
             }
-            return param == other.param ? power < other.power : param < other.param;
+            return getParam() == other.getParam() ? getPower() < other.getPower() : getParam() < other.getParam();
         }
         
     }
     // for sorting only.
     bool operator==(const PolynomialIntValFactor& other) const
     {
-        if (auto thisGenParam = as<GenericParamIntVal>(param))
+        if (auto thisGenParam = as<GenericParamIntVal>(getParam()))
         {
-            if (auto thatGenParam = as<GenericParamIntVal>(other.param))
+            if (auto thatGenParam = as<GenericParamIntVal>(other.getParam()))
             {
-                if (thisGenParam->equalsVal(thatGenParam) && power == other.power)
+                if (thisGenParam->equals(thatGenParam) && getPower() == other.getPower())
                     return true;
             }
             return false;
         }
-        return power == other.power && param == other.param;
+        return getPower() == other.getPower() && getParam() == other.getParam();
     }
     bool equals(const PolynomialIntValFactor& other) const
     {
-        return power == other.power && param->equalsVal(other.param);
+        return getPower() == other.getPower() && getParam()->equals(other.getParam());
     }
 
 };
-class PolynomialIntValTerm : public NodeBase
+class PolynomialIntValTerm : public Val
 {
     SLANG_AST_CLASS(PolynomialIntValTerm)
 public:
-    IntegerLiteralValue constFactor;
-    List<PolynomialIntValFactor*> paramFactors;
+    IntegerLiteralValue getConstFactor() const { return getIntConstOperand(0); }
+    OperandView<PolynomialIntValFactor> getParamFactors() const { return OperandView<PolynomialIntValFactor>(this, 1, getOperandCount() - 1); }
+
+    Val* _resolveImplOverride();
+
+    PolynomialIntValTerm(IntegerLiteralValue inConstFactor, ArrayView<PolynomialIntValFactor*> inParamFactors)
+    {
+        setOperands(inConstFactor);
+        addOperands(inParamFactors);
+    }
+
+    PolynomialIntValTerm(IntegerLiteralValue inConstFactor, OperandView<PolynomialIntValFactor> inParamFactors)
+    {
+        setOperands(inConstFactor);
+        addOperands(inParamFactors);
+    }
+
     bool canCombineWith(const PolynomialIntValTerm& other) const
     {
-        if (paramFactors.getCount() != other.paramFactors.getCount())
+        auto paramFactors = getParamFactors();
+        if (paramFactors.getCount() != other.getParamFactors().getCount())
             return false;
-        for (Index i = 0; i < paramFactors.getCount(); i++)
+        for (Index i = 0; i < getParamFactors().getCount(); i++)
         {
-            if (!paramFactors[i]->equals(*other.paramFactors[i]))
+            if (!paramFactors[i]->equals(*other.getParamFactors()[i]))
                 return false;
         }
         return true;
     }
     bool operator<(const PolynomialIntValTerm& other) const
     {
-        if (constFactor < other.constFactor)
+        auto constFactor = getConstFactor();
+        auto paramFactors = getParamFactors();
+
+        if (constFactor < other.getConstFactor())
             return true;
-        else if (constFactor == other.constFactor)
+        else if (constFactor == other.getConstFactor())
         {
+            auto otherParamFactors = other.getParamFactors();
             for (Index i = 0; i < paramFactors.getCount(); i++)
             {
-                if (i >= other.paramFactors.getCount())
+                if (i >= otherParamFactors.getCount())
                     return false;
-                if (*(paramFactors[i]) < *(other.paramFactors[i]))
+                if (*(paramFactors[i]) < *(otherParamFactors[i]))
                     return true;
-                if (*(paramFactors[i]) == *(other.paramFactors[i]))
+                if (*(paramFactors[i]) == *(otherParamFactors[i]))
                 {
                 }
                 else
@@ -213,27 +368,25 @@ class PolynomialIntVal : public IntVal
     SLANG_AST_CLASS(PolynomialIntVal)
 public:
     
-    List<PolynomialIntValTerm*> terms;
-    IntegerLiteralValue constantTerm = 0;
+    IntegerLiteralValue getConstantTerm() { return getIntConstOperand(1); };
+    OperandView<PolynomialIntValTerm> getTerms() { return OperandView<PolynomialIntValTerm>(this, 2, getOperandCount() - 2); };
 
-    bool isConstant() { return terms.getCount() == 0; }
-    // Canonicalize the polynomial. If the polynomial can be simplified to a constant or a genericparam,
-    // the method returns the value simplified to.
-    // Otherwise, in-place modifications are performed and returns this.
-    IntVal* canonicalize(ASTBuilder* builder);
+    bool isConstant() { return getOperandCount() == 1; }
 
     // Overrides should be public so base classes can access
-    bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
-    HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
 
-    static PolynomialIntVal* neg(ASTBuilder* astBuilder, IntVal* base);
-    static PolynomialIntVal* add(ASTBuilder* astBuilder, IntVal* op0, IntVal* op1);
-    static PolynomialIntVal* sub(ASTBuilder* astBuilder, IntVal* op0, IntVal* op1);
-    static PolynomialIntVal* mul(ASTBuilder* astBuilder, IntVal* op0, IntVal* op1);
-    PolynomialIntVal(Type* inType) : IntVal(inType) {}
-
+    static IntVal* neg(ASTBuilder* astBuilder, IntVal* base);
+    static IntVal* add(ASTBuilder* astBuilder, IntVal* op0, IntVal* op1);
+    static IntVal* sub(ASTBuilder* astBuilder, IntVal* op0, IntVal* op1);
+    static IntVal* mul(ASTBuilder* astBuilder, IntVal* op0, IntVal* op1);
+    PolynomialIntVal(Type* inType, IntegerLiteralValue inConstantTerm, ArrayView<PolynomialIntValTerm*> inTerms)
+    {
+        setOperands(inType, inConstantTerm);
+        addOperands(inTerms);
+    }
 };
 
     /// An unknown integer value indicating an erroneous sub-expression
@@ -241,17 +394,16 @@ class ErrorIntVal : public IntVal
 {
     SLANG_AST_CLASS(ErrorIntVal)
 
-    ErrorIntVal(Type* inType) : IntVal(inType) {}
+    ErrorIntVal(Type* inType) { setOperands(inType); }
 
     // TODO: We should probably eventually just have an `ErrorVal` here
     // and have all `Val`s that represent ordinary values hold their
     // `Type` so that we can have an `ErrorVal` of any type.
 
     // Overrides should be public so base classes can access
-    bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
-    HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride() { return this;  }
 };
 
 // A witness to the fact that some proposition is true, encoded
@@ -301,25 +453,23 @@ class SubtypeWitness : public Witness
 {
     SLANG_ABSTRACT_AST_CLASS(SubtypeWitness)
 
-    Type* sub = nullptr;
-    Type* sup = nullptr;
+    Val* _resolveImplOverride();
+
+    Type* getSub() { return as<Type>(getOperand(0)); }
+    Type* getSup() { return as<Type>(getOperand(1)); }
 };
 
 class TypeEqualityWitness : public SubtypeWitness 
 {
     SLANG_AST_CLASS(TypeEqualityWitness)
 
-    TypeEqualityWitness(
-        Type* type)
+    TypeEqualityWitness(Type* subType, Type* supType)
     {
-        this->sub = type;
-        this->sup = type;
+        setOperands(subType, supType);
     }
 
     // Overrides should be public so base classes can access
-    bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
-    HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
@@ -329,19 +479,19 @@ class DeclaredSubtypeWitness : public SubtypeWitness
 {
     SLANG_AST_CLASS(DeclaredSubtypeWitness)
 
-    DeclRef<Decl> declRef;
+    DeclRef<Decl> getDeclRef()
+    {
+        return as<DeclRefBase>(getOperand(2));
+    }
 
     // Overrides should be public so base classes can access
-    bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
-    HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
 
     DeclaredSubtypeWitness(Type* inSub, Type* inSup, DeclRef<Decl> inDeclRef)
-        : declRef(inDeclRef)
     {
-        sub = inSub;
-        sup = inSup;
+        setOperands(inSub, inSup, inDeclRef);
     }
 };
 
@@ -351,20 +501,25 @@ class TransitiveSubtypeWitness : public SubtypeWitness
     SLANG_AST_CLASS(TransitiveSubtypeWitness)
 
     // Witness that `sub : mid`
-    SubtypeWitness* subToMid = nullptr;
+    SubtypeWitness* getSubToMid()
+    {
+        return as<SubtypeWitness>(getOperand(2));
+    }
 
     // Witness that `mid : sup`
-    SubtypeWitness* midToSup = nullptr;
+    SubtypeWitness* getMidToSup()
+    {
+        return as<SubtypeWitness>(getOperand(3));
+    }
 
     // Overrides should be public so base classes can access
-    bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
-    HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 
-    TransitiveSubtypeWitness(SubtypeWitness* inSubToMid, SubtypeWitness* inMidToSup)
-        : subToMid(inSubToMid), midToSup(inMidToSup)
-    {}
+    TransitiveSubtypeWitness(Type* subType, Type* supType, SubtypeWitness* inSubToMid, SubtypeWitness* inMidToSup)
+    {
+        setOperands(subType, supType, inSubToMid, inMidToSup);
+    }
 };
 
 // A witness that `sub : sup` because `sub` was wrapped into
@@ -374,45 +529,16 @@ class ExtractExistentialSubtypeWitness : public SubtypeWitness
     SLANG_AST_CLASS(ExtractExistentialSubtypeWitness)
 
     // The declaration of the existential value that has been opened
-    DeclRef<VarDeclBase> declRef;
+    DeclRef<VarDeclBase> getDeclRef() { return as<DeclRefBase>(getOperand(2)); }
 
-    // Overrides should be public so base classes can access
-    bool _equalsValOverride(Val* val);
-    void _toTextOverride(StringBuilder& out);
-    HashCode _getHashCodeOverride();
-    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
-};
-
-// A witness that `sub : sup`, because `sub` is a tagged union
-// of the form `A | B | C | ...` and each of `A : sup`,
-// `B : sup`, `C : sup`, etc.
-//
-class TaggedUnionSubtypeWitness : public SubtypeWitness 
-{
-    SLANG_AST_CLASS(TaggedUnionSubtypeWitness)
-
-    // Witnesses that each of the "case" types in the union
-    // is a subtype of `sup`.
-    //
-    List<SubtypeWitness*> caseWitnesses;
-
-    // Overrides should be public so base classes can access
-    bool _equalsValOverride(Val* val);
-    void _toTextOverride(StringBuilder& out);
-    HashCode _getHashCodeOverride();
-    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
-};
-
-    /// A witness of the fact that `ThisType(someInterface) : someInterface`
-class ThisTypeSubtypeWitness : public SubtypeWitness
-{
-    SLANG_AST_CLASS(ThisTypeSubtypeWitness)
-
-    ThisTypeSubtypeWitness(Type* subType, Type* supType)
+    ExtractExistentialSubtypeWitness(Type* inSub, Type* inSup, DeclRef<Decl> inDeclRef)
     {
-        sub = subType;
-        sup = supType;
+        setOperands(inSub, inSup, inDeclRef);
     }
+
+    // Overrides should be public so base classes can access
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
     /// A witness of the fact that a user provided "__Dynamic" type argument is a
@@ -420,6 +546,10 @@ class ThisTypeSubtypeWitness : public SubtypeWitness
 class DynamicSubtypeWitness : public SubtypeWitness
 {
     SLANG_AST_CLASS(DynamicSubtypeWitness)
+    DynamicSubtypeWitness(Type* inSub, Type* inSup)
+    {
+        setOperands(inSub, inSup);
+    }
 };
 
     /// A witness that `T : L & R` because `T : L` and `T : R`
@@ -431,23 +561,24 @@ class ConjunctionSubtypeWitness : public SubtypeWitness
     // an operation that takes two witness tables `leftWitness`
     // and `rightWitness`, and forms a pair/tuple of
     // `(leftWitness, rightWitness)`.
+    static const int kComponentCount = 2;
 
-    static const Count kComponentCount = 2;
-    SubtypeWitness* componentWitnesses[kComponentCount];
+    ConjunctionSubtypeWitness(Type* inSub, Type* inSup, SubtypeWitness* left, SubtypeWitness* right)
+    {
+        setOperands(inSub, inSup, left, right);
+    }
 
-    SubtypeWitness* getLeftWitness() const { return componentWitnesses[0]; }
-    SubtypeWitness* getRightWitness() const { return componentWitnesses[1]; }
+    SubtypeWitness* getLeftWitness() const { return as<SubtypeWitness>(getOperand(2)); }
+    SubtypeWitness* getRightWitness() const { return as<SubtypeWitness>(getOperand(3)); }
 
-    Count getComponentCount() const { return kComponentCount; }
+    Count getComponentCount() const { return 2; }
     SubtypeWitness* getComponentWitness(Index index) const
     {
         SLANG_ASSERT(index >= 0 && index < kComponentCount);
-        return componentWitnesses[index];
+        return as<SubtypeWitness>(getOperand(2 + index));
     }
 
-    bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
-    HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
@@ -461,19 +592,22 @@ class ExtractFromConjunctionSubtypeWitness : public SubtypeWitness
     // `(leftWtiness, rightWitness)` and extracts one of the
     // elements of it.
 
-        /// Witness that `T < L & R`
-    SubtypeWitness* conjunctionWitness;
+    /// Witness that `T < L & R`
+    SubtypeWitness* getConjunctionWitness() { return as<SubtypeWitness>(getOperand(2)); };
+
+    ExtractFromConjunctionSubtypeWitness(Type* inSub, Type* inSup, SubtypeWitness* witness, int index)
+    {
+        setOperands(inSub, inSup, witness, index);
+    }
 
         /// The zero-based index of the super-type we care about in the conjunction
         ///
         /// If `conjunctionWitness` is `T < L & R` then this index should be zero if
         /// we want to represent `T < L` and one if we want `T < R`.
         ///
-    int indexInConjunction;
+    int getIndexInConjunction() { return (int)getIntConstOperand(3); };
 
-    bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
-    HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
@@ -482,8 +616,7 @@ class ModifierVal : public Val
 {
     SLANG_AST_CLASS(ModifierVal)
 
-    bool _equalsValOverride(Val* val);
-    HashCode _getHashCodeOverride();
+    Val* _resolveImplOverride() { return this; }
 };
 
 class TypeModifierVal : public ModifierVal
@@ -525,37 +658,91 @@ class DifferentiateVal : public Val
 {
     SLANG_AST_CLASS(DifferentiateVal)
 
-    DeclRef<Decl> func;
+    DifferentiateVal(DeclRef<Decl> inFunc)
+    {
+        setOperands(inFunc);
+    }
 
-    bool _equalsValOverride(Val* val);
+    DeclRef<Decl> getFunc() { return as<DeclRefBase>(getOperand(0)); }
+
     void _toTextOverride(StringBuilder& out);
-    HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
 };
 
 class ForwardDifferentiateVal : public DifferentiateVal
 {
     SLANG_AST_CLASS(ForwardDifferentiateVal)
+    ForwardDifferentiateVal(DeclRef<Decl> inFunc)
+        : DifferentiateVal(inFunc)
+    {}
 };
 
 class BackwardDifferentiateVal : public DifferentiateVal
 {
     SLANG_AST_CLASS(BackwardDifferentiateVal)
+
+    BackwardDifferentiateVal(DeclRef<Decl> inFunc)
+        : DifferentiateVal(inFunc)
+    {}
 };
 
 class BackwardDifferentiateIntermediateTypeVal : public DifferentiateVal
 {
     SLANG_AST_CLASS(BackwardDifferentiateIntermediateTypeVal)
+
+    BackwardDifferentiateIntermediateTypeVal(DeclRef<Decl> inFunc)
+        : DifferentiateVal(inFunc)
+    {}
 };
 
 class BackwardDifferentiatePrimalVal : public DifferentiateVal
 {
     SLANG_AST_CLASS(BackwardDifferentiatePrimalVal)
+
+    BackwardDifferentiatePrimalVal(DeclRef<Decl> inFunc)
+        : DifferentiateVal(inFunc)
+    {}
 };
 
 class BackwardDifferentiatePropagateVal : public DifferentiateVal
 {
     SLANG_AST_CLASS(BackwardDifferentiatePropagateVal)
+
+    BackwardDifferentiatePropagateVal(DeclRef<Decl> inFunc)
+        : DifferentiateVal(inFunc)
+    {}
 };
 
+
+template<typename F>
+void SubstitutionSet::forEachGenericSubstitution(F func) const
+{
+    if (!declRef)
+        return;
+    for (auto subst = declRef; subst; subst = subst->getBase())
+    {
+        if (auto genSubst = as<GenericAppDeclRef>(subst))
+            func(genSubst->getGenericDecl(), genSubst->getArgs());
+    }
+}
+
+template<typename F>
+void SubstitutionSet::forEachSubstitutionArg(F func) const
+{
+    if (!declRef)
+        return;
+    for (auto subst = declRef; subst; subst = subst->getBase())
+    {
+        if (auto genSubst = as<GenericAppDeclRef>(subst))
+        {
+            for (auto arg : genSubst->getArgs())
+                func(arg);
+        }
+        else if (auto thisSubst = as<LookupDeclRef>(subst))
+        {
+            func(thisSubst->getWitness()->getSub());
+        }
+    }
+}
 } // namespace Slang

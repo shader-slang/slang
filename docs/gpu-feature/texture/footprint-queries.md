@@ -10,7 +10,7 @@ There are many GPU rendering techniques that involve generating a texture (e.g.,
 As one example, consider rendering a shadow map that will be accessed when shading a g-buffer.
 Depending on the geometry that was rendered into the g-buffer, and the occlusion that might exist, some parts of the shadow map might not be needed at all.
 
-In principle, an application could use a compute pass on the g-buffer to compute, for each pixel, the part of the shadow-map textuer that it will access - its footprint.
+In principle, an application could use a compute pass on the g-buffer to compute, for each pixel, the part of the shadow-map texture that it will access - its footprint.
 The application could then aggregate these footprints into a stencil mask or other data structure that could be used to optimize the rendering pass that generates the shadow map.
 
 Unfortunately, it is almost impossible for applications to accurately and reliably predict the texel data that particular sampling operations will require, once non-trivial texture filtering modes are considered.
@@ -32,7 +32,7 @@ Rather than exactly mirror the Vulkan GLSL extension or the NVAPI functions, Sla
 
 ## Basics
 
-An typical 2D texture sampling operation is performed using the `Sample()` method on `Texture2D`:
+A typical 2D texture sampling operation is performed using the `Sample()` method on `Texture2D`:
 
 ```hlsl
 Texture2D<float4> texture = ...;
@@ -44,7 +44,7 @@ float4 color = texture.Sample(
     sampler, coords);
 ```
 
-To query the footprint that would be accesed by this operation, we can use an operation like:
+To query the footprint that would be accessed by this operation, we can use an operation like:
 
 ```hlsl
 uint granularity = ...;
@@ -173,7 +173,7 @@ struct TextureFootprint2D
     property isSingleLevel  : bool          { get; }
 }
 
-struct TextureFootprint2D
+struct TextureFootprint3D
 {
     typealias Anchor        = uint3;
     typealias Offset        = uint3;

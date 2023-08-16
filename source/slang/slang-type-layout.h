@@ -725,28 +725,6 @@ public:
     Index paramIndex = 0;
 };
 
-    /// Layout information for a tagged union type.
-class TaggedUnionTypeLayout : public TypeLayout
-{
-public:
-        /// The layouts of each of the case types.
-        ///
-        /// The order of entries in this array matches
-        /// the order of case types on the original
-        /// `TaggedUnionType`, and the index of a case
-        /// type is also the tag value for that case.
-        ///
-    List<RefPtr<TypeLayout>> caseTypeLayouts;
-
-        /// The byte offset for the tag field.
-        ///
-        /// The tag field will always be allocated as
-        /// a `uint`, so we don't store a separate layout
-        /// for it.
-        ///
-    LayoutSize tagOffset;
-};
-
     /// Layout information for an interface/existential type
     ///
     /// This class is used to represent the layout of an interface type
@@ -911,13 +889,6 @@ public:
         /// Not useful for reflection, but valuable for code generation.
         ///
     Dictionary<GlobalGenericParamDecl*, Val*> globalGenericArgs;
-
-        /// Layouts for all tagged union types required by this program
-        ///
-        /// These are any tagged union types used by the specialization
-        /// arguments that have been used to specialize the program.
-        ///
-    List<RefPtr<TypeLayout>> taggedUnionTypeLayouts;
 
         /// Holds all of the string literals that have been hashed
     StringSlicePool hashedStringLiteralPool;
@@ -1293,7 +1264,14 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
 // Create a full type-layout object for a type,
 // according to the layout rules in `context`.
 RefPtr<TypeLayout> createTypeLayout(
-    TypeLayoutContext const&    context,
+    TypeLayoutContext&          context,
+    Type*                       type);
+
+// A wrapper for createTypeLayout which copies the context applying the
+// provided rules with TypeLayoutContext::with
+RefPtr<TypeLayout> createTypeLayoutWith(
+    const TypeLayoutContext&    context,
+    LayoutRulesImpl*            rules,
     Type*                       type);
 
 //

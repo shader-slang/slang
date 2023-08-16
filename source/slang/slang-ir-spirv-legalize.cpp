@@ -3,10 +3,12 @@
 
 #include "slang-ir-glsl-legalize.h"
 
+#include "slang-ir-layout-on-types.h"
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
 #include "slang-emit-base.h"
 #include "slang-glsl-extension-tracker.h"
+#include "slang-type-layout.h"
 
 namespace Slang
 {
@@ -67,12 +69,29 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     {
                         storageClass = SpvStorageClassInput;
                     }
+                    else if (semanticName == "sv_groupindex")
+                    {
+                        storageClass = SpvStorageClassInput;
+                    }
+                }
+                else if(const auto parameterGroupTypeLayout =
+                        as<IRParameterGroupTypeLayout>(layout->getTypeLayout()))
+                {
+                    storageClass = SpvStorageClassUniform;
                 }
             }
+
+            // Strip any HLSL wrappers
+            auto innerType = inst->getFullType();
+            if(const auto constantBufferType = as<IRConstantBufferType>(innerType))
+            {
+                innerType = constantBufferType->getElementType();
+            }
+
             // Make a pointer type of storageClass.
             IRBuilder builder(m_sharedContext->m_irModule);
             builder.setInsertBefore(inst);
-            ptrType = builder.getPtrType(kIROp_PtrType, inst->getFullType(), storageClass);
+            ptrType = builder.getPtrType(kIROp_PtrType, innerType, storageClass);
             inst->setFullType(ptrType);
             // Insert an explicit load at each use site.
             List<IRUse*> uses;
@@ -105,41 +124,40 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             return;
         }
 
-        auto varLayout = getVarLayout(inst);
-        if (!varLayout)
-            return;
-
         SpvStorageClass storageClass = SpvStorageClassPrivate;
-        for (auto rr : varLayout->getOffsetAttrs())
-        {
-            switch (rr->getResourceKind())
-            {
-            case LayoutResourceKind::Uniform:
-            case LayoutResourceKind::ShaderResource:
-            case LayoutResourceKind::DescriptorTableSlot:
-                storageClass = SpvStorageClassUniform;
-                break;
-            case LayoutResourceKind::VaryingInput:
-                storageClass = SpvStorageClassInput;
-                break;
-            case LayoutResourceKind::VaryingOutput:
-                storageClass = SpvStorageClassOutput;
-                break;
-            case LayoutResourceKind::UnorderedAccess:
-                storageClass = SpvStorageClassStorageBuffer;
-                break;
-            case LayoutResourceKind::PushConstantBuffer:
-                storageClass = SpvStorageClassPushConstant;
-                break;
-            default:
-                break;
-            }
-        }
-        auto rate = inst->getRate();
-        if (as<IRGroupSharedRate>(rate))
+        if (as<IRGroupSharedRate>(inst->getRate()))
         {
             storageClass = SpvStorageClassWorkgroup;
         }
+        else if (const auto varLayout = getVarLayout(inst))
+        {
+            for (auto rr : varLayout->getOffsetAttrs())
+            {
+                switch (rr->getResourceKind())
+                {
+                case LayoutResourceKind::Uniform:
+                case LayoutResourceKind::ShaderResource:
+                case LayoutResourceKind::DescriptorTableSlot:
+                    storageClass = SpvStorageClassUniform;
+                    break;
+                case LayoutResourceKind::VaryingInput:
+                    storageClass = SpvStorageClassInput;
+                    break;
+                case LayoutResourceKind::VaryingOutput:
+                    storageClass = SpvStorageClassOutput;
+                    break;
+                case LayoutResourceKind::UnorderedAccess:
+                    storageClass = SpvStorageClassStorageBuffer;
+                    break;
+                case LayoutResourceKind::PushConstantBuffer:
+                    storageClass = SpvStorageClassPushConstant;
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
+
         IRBuilder builder(m_sharedContext->m_irModule);
         builder.setInsertBefore(inst);
         auto newPtrType =
@@ -178,28 +196,63 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
-    void processGetElementPtr(IRGetElementPtr* inst)
+    // Replace getElement(x, i) with, y = store(x); p = getElementPtr(y, i); load(p)
+    // SPIR-V has no support for dynamic indexing into values like we do.
+    // It may be advantageous however to do this further up the pipeline
+    void processGetElement(IRGetElement* inst)
     {
-        if (auto ptrType = as<IRPtrTypeBase>(inst->getBase()->getDataType()))
+        const auto x = inst->getBase();
+        List<IRInst*> indices;
+        IRGetElement* c = inst;
+        do
+        {
+            indices.add(c->getIndex());
+        } while(c = as<IRGetElement>(c->getBase()), c);
+        IRBuilder builder(m_sharedContext->m_irModule);
+        builder.setInsertBefore(inst);
+        IRInst* y = builder.emitVar(x->getDataType(), SpvStorageClassFunction);
+        builder.emitStore(y, x);
+        for(Index i = indices.getCount() - 1; i >= 0; --i)
+            y = builder.emitElementAddress(y, indices[i]);
+        const auto newInst = builder.emitLoad(y);
+        inst->replaceUsesWith(newInst);
+        inst->removeAndDeallocate();
+        addUsersToWorkList(newInst);
+    }
+
+    void processGetElementPtrImpl(IRInst* gepInst, IRInst* base, IRInst* index)
+    {
+        if (auto ptrType = as<IRPtrTypeBase>(base->getDataType()))
         {
             if (!ptrType->hasAddressSpace())
                 return;
-            auto oldResultType = as<IRPtrTypeBase>(inst->getDataType());
+            auto oldResultType = as<IRPtrTypeBase>(gepInst->getDataType());
             if (oldResultType->getAddressSpace() != ptrType->getAddressSpace())
             {
                 IRBuilder builder(m_sharedContext->m_irModule);
-                builder.setInsertBefore(inst);
+                builder.setInsertBefore(gepInst);
                 auto newPtrType = builder.getPtrType(
                     oldResultType->getOp(),
                     oldResultType->getValueType(),
                     ptrType->getAddressSpace());
+                IRInst* args[2] = { base, index };
                 auto newInst =
-                    builder.emitElementAddress(newPtrType, inst->getBase(), inst->getIndex());
-                inst->replaceUsesWith(newInst);
-                inst->removeAndDeallocate();
+                    builder.emitIntrinsicInst(newPtrType, gepInst->getOp(), 2, args);
+                gepInst->replaceUsesWith(newInst);
+                gepInst->removeAndDeallocate();
                 addUsersToWorkList(newInst);
             }
         }
+    }
+
+    void processGetElementPtr(IRGetElementPtr* gepInst)
+    {
+        processGetElementPtrImpl(gepInst, gepInst->getBase(), gepInst->getIndex());
+    }
+
+    void processRWStructuredBufferGetElementPtr(IRRWStructuredBufferGetElementPtr* gepInst)
+    {
+        processGetElementPtrImpl(gepInst, gepInst->getBase(), gepInst->getIndex());
     }
 
     void processFieldAddress(IRFieldAddress* inst)
@@ -228,13 +281,34 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
     void processStructuredBufferType(IRHLSLStructuredBufferTypeBase* inst)
     {
+        // const auto elementTypeLayout = inst->getElementType()->findDecoration<IRTypeLayout>();
+        // SLANG_ASSERT(elementTypeLayout);
+        const auto typeLayoutDecoration = inst->findDecoration<IRLayoutDecoration>();
+        SLANG_ASSERT(typeLayoutDecoration);
+        const auto typeLayout = as<IRStructuredBufferTypeLayout>(typeLayoutDecoration->getLayout());
+        SLANG_ASSERT(typeLayout);
+        const auto elemTypeLayout = typeLayout->getElementTypeLayout();
+        SLANG_ASSERT(elemTypeLayout);
+
         IRBuilder builder(m_sharedContext->m_irModule);
+
         builder.setInsertBefore(inst);
-        auto arrayType = builder.getUnsizedArrayType(inst->getElementType());
-        auto structType = builder.createStructType();
-        auto arrayKey = builder.createStructKey();
+        const auto arrayType = builder.getUnsizedArrayType(inst->getElementType());
+        IRArrayTypeLayout::Builder arrayTypeLayoutBuilder(&builder, elemTypeLayout);
+        const auto arrayTypeLayout = arrayTypeLayoutBuilder.build();
+        IRVarLayout::Builder varLayoutBuilder(&builder, arrayTypeLayout);
+        varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::Uniform);
+        const auto arrayFieldVarLayout = varLayoutBuilder.build();
+
+        const auto structType = builder.createStructType();
+        IRStructTypeLayout::Builder structTypeLayoutBuilder(&builder);
+        const auto arrayKey = builder.createStructKey();
         builder.createStructField(structType, arrayKey, arrayType);
-        auto ptrType = builder.getPtrType(kIROp_PtrType, structType, SpvStorageClassStorageBuffer);
+        structTypeLayoutBuilder.addField(arrayKey, arrayFieldVarLayout);
+        const auto structTypeLayout = structTypeLayoutBuilder.build();
+
+        const auto ptrType = builder.getPtrType(kIROp_PtrType, structType, SpvStorageClassStorageBuffer);
+
         StringBuilder nameSb;
         switch (inst->getOp())
         {
@@ -253,6 +327,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
         builder.addNameHintDecoration(structType, nameSb.getUnownedSlice());
         builder.addDecoration(structType, kIROp_SPIRVBufferBlockDecoration);
+        SLANG_ASSERT(!structType->findDecoration<IRLayoutDecoration>());
+        builder.addLayoutDecoration(structType, structTypeLayout);
         inst->replaceUsesWith(ptrType);
         inst->removeAndDeallocate();
         addUsersToWorkList(ptrType);
@@ -276,11 +352,17 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             case kIROp_Call:
                 processCall(as<IRCall>(inst));
                 break;
+            case kIROp_GetElement:
+                processGetElement(as<IRGetElement>(inst));
+                break;
             case kIROp_GetElementPtr:
                 processGetElementPtr(as<IRGetElementPtr>(inst));
                 break;
             case kIROp_FieldAddress:
                 processFieldAddress(as<IRFieldAddress>(inst));
+                break;
+            case kIROp_RWStructuredBufferGetElementPtr:
+                processRWStructuredBufferGetElementPtr(as<IRRWStructuredBufferGetElementPtr>(inst));
                 break;
             case kIROp_HLSLStructuredBufferType:
             case kIROp_HLSLRWStructuredBufferType:
@@ -297,6 +379,23 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     }
 };
 
+SpvSnippet* SPIRVEmitSharedContext::getParsedSpvSnippet(IRTargetIntrinsicDecoration* intrinsic)
+{
+    RefPtr<SpvSnippet> snippet;
+    if (m_parsedSpvSnippets.tryGetValue(intrinsic, snippet))
+    {
+        return snippet.Ptr();
+    }
+    snippet = SpvSnippet::parse(intrinsic->getDefinition());
+    if(!snippet)
+    {
+        m_sink->diagnose(intrinsic, Diagnostics::snippetParsingFailed, intrinsic->getDefinition());
+        return nullptr;
+    }
+    m_parsedSpvSnippets[intrinsic] = snippet;
+    return snippet;
+}
+
 void legalizeSPIRV(SPIRVEmitSharedContext* sharedContext, IRModule* module)
 {
     SPIRVLegalizationContext context(sharedContext, module);
@@ -309,6 +408,7 @@ void legalizeIRForSPIRV(
     const List<IRFunc*>& entryPoints,
     CodeGenContext* codeGenContext)
 {
+    placeTypeLayoutsOnTypes(module, codeGenContext);
     GLSLExtensionTracker extensionTracker;
     legalizeEntryPointsForGLSL(module->getSession(), module, entryPoints, codeGenContext, &extensionTracker);
     legalizeSPIRV(context, module);

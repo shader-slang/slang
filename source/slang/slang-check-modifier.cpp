@@ -310,12 +310,12 @@ namespace Slang
                     {
                         return false;
                     }
-                    if (intValue->value < 1)
+                    if (intValue->getValue() < 1)
                     {
-                        getSink()->diagnose(attr, Diagnostics::nonPositiveNumThreads, intValue->value);
+                        getSink()->diagnose(attr, Diagnostics::nonPositiveNumThreads, intValue->getValue());
                         return false;
                     }
-                    value = int32_t(intValue->value);
+                    value = int32_t(intValue->getValue());
                 }
                 values[i] = value;
             }
@@ -341,13 +341,13 @@ namespace Slang
             }
 
             const IRIntegerValue kMaxAnyValueSize = 0x7FFF;
-            if (value->value > kMaxAnyValueSize)
+            if (value->getValue() > kMaxAnyValueSize)
             {
                 getSink()->diagnose(anyValueSizeAttr->loc, Diagnostics::anyValueSizeExceedsLimit, kMaxAnyValueSize);
                 return false;
             }
 
-            anyValueSizeAttr->size = int32_t(value->value);
+            anyValueSizeAttr->size = int32_t(value->getValue());
         }
         else if (auto bindingAttr = as<GLSLBindingAttribute>(attr))
         {
@@ -369,8 +369,8 @@ namespace Slang
                 return false;
             }
 
-            bindingAttr->binding = int32_t(binding->value);
-            bindingAttr->set = int32_t(set->value);
+            bindingAttr->binding = int32_t(binding->getValue());
+            bindingAttr->set = int32_t(set->getValue());
         }
         else if (auto simpleLayoutAttr = as<GLSLSimpleIntegerLayoutAttribute>(attr))
         {
@@ -388,7 +388,7 @@ namespace Slang
                 return false;
             }
 
-            simpleLayoutAttr->value = int32_t(value->value);
+            simpleLayoutAttr->value = int32_t(value->getValue());
         }
         else if (auto maxVertexCountAttr = as<MaxVertexCountAttribute>(attr))
         {
@@ -397,7 +397,7 @@ namespace Slang
 
             if (!val) return false;
 
-            maxVertexCountAttr->value = (int32_t)val->value;
+            maxVertexCountAttr->value = (int32_t)val->getValue();
         }
         else if (auto instanceAttr = as<InstanceAttribute>(attr))
         {
@@ -406,7 +406,7 @@ namespace Slang
 
             if (!val) return false;
 
-            instanceAttr->value = (int32_t)val->value;
+            instanceAttr->value = (int32_t)val->getValue();
         }
         else if (auto entryPointAttr = as<EntryPointAttribute>(attr))
         {
@@ -486,7 +486,7 @@ namespace Slang
                 //IntVal* outIntVal;
                 if (auto cInt = checkConstantEnumVal(attr->args[0]))
                 {
-                    targetClassId = (uint32_t)(cInt->value);
+                    targetClassId = (uint32_t)(cInt->getValue());
                 }
                 else
                 {
@@ -515,7 +515,7 @@ namespace Slang
             }
             auto cint = checkConstantIntVal(attr->args[0]);
             if (cint)
-                forceUnrollAttr->maxIterations = (int32_t)cint->value;
+                forceUnrollAttr->maxIterations = (int32_t)cint->getValue();
         }
         else if (auto maxItersAttrs = as<MaxItersAttribute>(attr))
         {
@@ -528,7 +528,7 @@ namespace Slang
                 auto cint = checkConstantIntVal(attr->args[0]);
                 if (cint)
                 {
-                    maxItersAttrs->value = (int32_t) cint->value;
+                    maxItersAttrs->value = (int32_t) cint->getValue();
                 }
             }
         }
@@ -547,10 +547,12 @@ namespace Slang
                     bool typeChecked = false;
                     if (auto basicType = as<BasicExpressionType>(paramDecl->getType()))
                     {
-                        if (basicType->baseType == BaseType::Int)
+                        if (basicType->getBaseType() == BaseType::Int)
                         {
                             if (auto cint = checkConstantIntVal(arg))
                             {
+                                for (Index ci = attr->intArgVals.getCount(); ci < paramIndex + 1; ci++)
+                                    attr->intArgVals.add(nullptr);
                                 attr->intArgVals[(uint32_t)paramIndex] = cint;
                             }
                             typeChecked = true;
@@ -578,7 +580,7 @@ namespace Slang
             SLANG_ASSERT(attr->args.getCount() == 1);
             auto cint = checkConstantIntVal(attr->args[0]);
             if (cint)
-                diffAttr->maxOrder = (int32_t)cint->value;
+                diffAttr->maxOrder = (int32_t)cint->getValue();
         }
         else if (auto formatAttr = as<FormatAttribute>(attr))
         {
@@ -652,7 +654,7 @@ namespace Slang
 
             if (!val) return false;
 
-            rayPayloadAttr->location = (int32_t)val->value;
+            rayPayloadAttr->location = (int32_t)val->getValue();
         }
         else if (auto callablePayloadAttr = as<VulkanCallablePayloadAttribute>(attr))
         {
@@ -661,7 +663,7 @@ namespace Slang
 
             if (!val) return false;
 
-            callablePayloadAttr->location = (int32_t)val->value;
+            callablePayloadAttr->location = (int32_t)val->getValue();
         }
         else if (auto hitObjectAttributesAttr = as<VulkanHitObjectAttributesAttribute>(attr))
         {
@@ -670,7 +672,7 @@ namespace Slang
 
             if (!val) return false;
 
-            hitObjectAttributesAttr->location = (int32_t)val->value;
+            hitObjectAttributesAttr->location = (int32_t)val->getValue();
         }
         else if (as<UserDefinedDerivativeAttribute>(attr) || as<PrimalSubstituteAttribute>(attr))
         {
@@ -980,6 +982,37 @@ namespace Slang
             }
             packOffsetModifier->uniformOffset = uniformOffset;
             return packOffsetModifier;
+        }
+
+        if(auto targetIntrinsic = as<TargetIntrinsicModifier>(m))
+        {
+            // TODO: verify that the predicate is one we understand
+            if(targetIntrinsic->scrutinee.name)
+            {
+                if(auto genDecl = as<ContainerDecl>(syntaxNode))
+                {
+                    auto scrutineeResults = lookUp(
+                        m_astBuilder,
+                        this,
+                        targetIntrinsic->scrutinee.name,
+                        genDecl->ownedScope);
+                    if(!scrutineeResults.isValid())
+                    {
+                        getSink()->diagnose(
+                            targetIntrinsic->scrutinee.loc,
+                            Diagnostics::undefinedIdentifier2,
+                            targetIntrinsic->scrutinee.name);
+                    }
+                    if(scrutineeResults.isOverloaded())
+                    {
+                        getSink()->diagnose(
+                            targetIntrinsic->scrutinee.loc,
+                            Diagnostics::ambiguousReference,
+                            targetIntrinsic->scrutinee.name);
+                    }
+                    targetIntrinsic->scrutineeDeclRef = scrutineeResults.item.declRef;
+                }
+            }
         }
 
         // Default behavior is to leave things as they are,

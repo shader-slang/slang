@@ -1005,6 +1005,25 @@ bool isTypeEqual(IRType* a, IRType* b);
 // True if this is an integral IRBasicType, not including Char or Ptr types
 bool isIntegralType(IRType* t);
 
+bool isFloatingType(IRType* t);
+
+struct IntInfo
+{
+    Int width;
+    bool isSigned;
+    bool operator==(const IntInfo& i) const { return width == i.width && isSigned == i.isSigned; }
+};
+
+IntInfo getIntTypeInfo(const IRType* intType);
+
+struct FloatInfo
+{
+    Int width;
+    bool operator==(const FloatInfo& i) const { return width == i.width; }
+};
+
+FloatInfo getFloatingTypeInfo(const IRType* floatType);
+
 bool isIntegralScalarOrCompositeType(IRType* t);
 
 void findAllInstsBreadthFirst(IRInst* inst, List<IRInst*>& outInsts);
@@ -1534,6 +1553,7 @@ struct IRMatrixType : IRType
     IRType* getElementType() { return (IRType*)getOperand(0); }
     IRInst* getRowCount() { return getOperand(1); }
     IRInst* getColumnCount() { return getOperand(2); }
+    IRInst* getLayout() { return getOperand(3); }
 
     IR_LEAF_ISA(MatrixType)
 };
@@ -1622,6 +1642,12 @@ struct IRRTTIPointerType : IRRawPointerTypeBase
     IR_LEAF_ISA(RTTIPointerType)
 };
 
+struct IRHLSLConstBufferPointerType : IRPtrTypeBase
+{
+    IR_LEAF_ISA(HLSLConstBufferPointerType)
+    IRInst* getBaseAlignment() { return getOperand(1); }
+};
+
 struct IRGlobalHashedStringLiterals : IRInst
 {
     IR_LEAF_ISA(GlobalHashedStringLiterals)
@@ -1646,6 +1672,10 @@ struct IRFuncType : IRType
     IRType* getResultType() { return (IRType*) getOperand(0); }
     UInt getParamCount() { return getOperandCount() - 1; }
     IRType* getParamType(UInt index) { return (IRType*)getOperand(1 + index); }
+    IROperandList<IRType> getParamTypes()
+    {
+        return IROperandList<IRType>(getOperands() + 1, getOperands() + getOperandCount());
+    }
 
     IR_LEAF_ISA(FuncType)
 };
@@ -1747,11 +1777,6 @@ struct IRInterfaceRequirementEntry : IRInst
 struct IRInterfaceType : IRType
 {
     IR_LEAF_ISA(InterfaceType)
-};
-
-struct IRTaggedUnionType : IRType
-{
-    IR_LEAF_ISA(TaggedUnionType)
 };
 
 struct IRConjunctionType : IRType
@@ -2009,6 +2034,7 @@ public:
     {
         hashCode = _getHashCode();
     }
+    IRInstKey& operator=(const IRInstKey&) = default;
     HashCode getHashCode() const { return hashCode; }
     IRInst* getInst() const { return inst; }
 

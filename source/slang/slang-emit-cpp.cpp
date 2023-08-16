@@ -1391,13 +1391,24 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
                 auto outerPrec = getInfo(EmitOp::General);
                 auto prec = getInfo(EmitOp::Postfix);
                 emitOperand(baseInst, leftSide(outerPrec, prec));
-                m_writer->emit("->rows + ");
+                m_writer->emit("->rows + (");
                 emitOperand(getElementInst->getIndex(), getInfo(EmitOp::General));
-                m_writer->emit(")");
+                m_writer->emit("))");
                 return true;
             }
             return false;
         }
+        case kIROp_RWStructuredBufferGetElementPtr:
+            {
+                m_writer->emit("(&(");
+                auto base = inst->getOperand(0);
+                auto outerPrec = getInfo(EmitOp::General);
+                emitOperand(base, outerPrec);
+                m_writer->emit("[");
+                emitOperand(inst->getOperand(1), EmitOpInfo());
+                m_writer->emit("]))");
+                return true;
+            }
         case kIROp_swizzle:
         {
             // For C++ we don't need to emit a swizzle function

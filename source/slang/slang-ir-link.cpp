@@ -240,7 +240,6 @@ IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
     case kIROp_GlobalGenericParam:
     case kIROp_WitnessTable:
     case kIROp_InterfaceType:
-    case kIROp_TaggedUnionType:
         return cloneGlobalValue(this, originalValue);
 
     case kIROp_BoolLit:
@@ -596,10 +595,8 @@ IRGeneric* cloneGenericImpl(
         // Generic parameter list does not match, bail.
         if (clonedParam || originalParam)
             continue;
-        for (auto kv : paramMapping)
-        {
-            registerClonedValue(context, kv.key, kv.value);
-        }
+        for (const auto& [key, value] : paramMapping)
+            registerClonedValue(context, key, value);
 
         IRBuilder builderStorage = *builder;
         IRBuilder* decorBuilder = &builderStorage;

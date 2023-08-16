@@ -470,6 +470,11 @@ static SlangResult _parseGCCFamilyLine(SliceAllocator& allocator, const UnownedS
         cmdLine.addArg("-std=c++17");
     }
 
+    // Our generated code very often casts between dissimilar types with the
+    // knowledge that they have the same representation. This is strictly
+    // speaking UB, and GCC 10+ is happy to take advantage of this, stop it.
+    cmdLine.addArg("-fno-strict-aliasing");
+
     // TODO(JS): Here we always set -m32 on x86. It could be argued it is only necessary when creating a shared library
     // but if we create an object file, we don't know what to choose because we don't know what final usage is.
     // It could also be argued that the platformKind could define the actual desired target - but as it stands

@@ -27,7 +27,7 @@ namespace Slang
         {
             IRType* originalType;
             IRIntegerValue anyValueSize;
-            bool operator ==(MarshallingFunctionKey other)
+            bool operator ==(MarshallingFunctionKey other) const
             {
                 return originalType == other.originalType && anyValueSize == other.anyValueSize;
             }
@@ -387,7 +387,11 @@ namespace Slang
             // Initialize fields to 0 to prevent downstream compiler error.
             for (uint32_t offset = 0; offset < (uint32_t)anyValInfo->fieldKeys.getCount(); offset++)
             {
-                auto fieldAddr = builder.emitFieldAddress(builder.getUIntType(), resultVar, anyValInfo->fieldKeys[offset]);
+                auto fieldAddr = builder.emitFieldAddress(
+                    builder.getPtrType(builder.getUIntType()),
+                    resultVar,
+                    anyValInfo->fieldKeys[offset]
+                );
                 builder.emitStore(fieldAddr, builder.getIntValue(builder.getUIntType(), 0));
             }
 
