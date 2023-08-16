@@ -183,7 +183,7 @@ namespace Slang
         for (auto interfaceType : interfaceTypes)
         {
             HashSet<IRInterfaceType*> dependencySet;
-            for (auto impl : mapInterfaceToImplementations[interfaceType].getValue())
+            for (auto impl : mapInterfaceToImplementations[interfaceType])
             {
                 auto dependencies = findDependenciesOfTypeInSet((IRType*)impl, interfaceTypes);
                 for (auto dependency : dependencies)
@@ -198,13 +198,13 @@ namespace Slang
         //
         List<IRInterfaceType*> sortedInterfaceTypes = sortTopologically(interfaceTypes, [&](IRInterfaceType* interfaceType)
         {
-            return interfaceDependencyMap[interfaceType].getValue();
+            return interfaceDependencyMap[interfaceType];
         });
 
         for (auto interfaceType : sortedInterfaceTypes)
         {
             IRIntegerValue maxAnyValueSize = -1;
-            for (auto implType : mapInterfaceToImplementations[interfaceType].getValue())
+            for (auto implType : mapInterfaceToImplementations[interfaceType])
             {                            
                 IRSizeAndAlignment sizeAndAlignment;
                 getNaturalSizeAndAlignment(targetReq, (IRType*)implType, &sizeAndAlignment);
