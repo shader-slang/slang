@@ -317,7 +317,7 @@ namespace Slang
     IRInst* IRArrayTypeBase::getElementCount()
     {
         if (auto arrayType = as<IRArrayType>(this))
-            return arrayType->getElementCount();
+            return arrayType->getOperand(1);
 
         return nullptr;
     }
