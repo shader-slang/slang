@@ -291,10 +291,8 @@ namespace Slang
             }
 
             // Replace all result types with lowered struct types.
-            for (auto kv : loweredResultTypes)
-            {
-                kv.key->replaceUsesWith(kv.value->loweredType);
-            }
+            for (const auto& [key, value] : loweredResultTypes)
+                key->replaceUsesWith(value->loweredType);
         }
     };
     

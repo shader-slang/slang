@@ -12,13 +12,13 @@ namespace debug
 struct ShaderOffsetKey
 {
     ShaderOffset offset;
-    bool operator==(ShaderOffsetKey other)
+    bool operator==(ShaderOffsetKey other) const
     {
         return offset.bindingArrayIndex == other.offset.bindingArrayIndex &&
             offset.bindingRangeIndex == other.offset.bindingRangeIndex &&
             offset.uniformOffset == other.offset.uniformOffset;
     }
-    Slang::HashCode getHashCode()
+    Slang::HashCode getHashCode() const
     {
         return Slang::combineHash(
             (Slang::HashCode)offset.uniformOffset,

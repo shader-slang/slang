@@ -595,10 +595,8 @@ IRGeneric* cloneGenericImpl(
         // Generic parameter list does not match, bail.
         if (clonedParam || originalParam)
             continue;
-        for (auto kv : paramMapping)
-        {
-            registerClonedValue(context, kv.key, kv.value);
-        }
+        for (const auto& [key, value] : paramMapping)
+            registerClonedValue(context, key, value);
 
         IRBuilder builderStorage = *builder;
         IRBuilder* decorBuilder = &builderStorage;

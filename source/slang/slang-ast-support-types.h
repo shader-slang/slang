@@ -1413,7 +1413,7 @@ namespace Slang
             witnessTable,
         };
 
-        Flavor getFlavor()
+        Flavor getFlavor() const
         {
             return m_flavor;
         }

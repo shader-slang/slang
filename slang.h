@@ -287,8 +287,7 @@ convention for interface methods.
 #endif
 
 #ifndef SLANG_COMPILE_TIME_ASSERT
-//  TODO(C++17), can use terse static_assert
-#   define SLANG_COMPILE_TIME_ASSERT(x) static_assert(x, #x)
+#   define SLANG_COMPILE_TIME_ASSERT(x) static_assert(x)
 #endif
 
 #ifndef SLANG_OFFSET_OF
@@ -2413,7 +2412,7 @@ extern "C"
 
         /// Compute a string hash.
         /// Count should *NOT* include terminating zero.
-    SLANG_API int spComputeStringHash(const char* chars, size_t count);
+    SLANG_API SlangUInt32 spComputeStringHash(const char* chars, size_t count);
 
         /// Get a type layout representing reflection information for the global-scope prameters.
     SLANG_API SlangReflectionTypeLayout* spReflection_getGlobalParamsTypeLayout(

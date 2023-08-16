@@ -57,7 +57,7 @@ namespace Slang {
 #define SLANG_STATE_TYPE_SIZE(x) uint32_t(sizeof(x)), 
 
 // A function to calculate the hash related in list in part to how the types used are sized. Can catch crude breaking binary differences.
-static HashCode32 _calcTypeHash()
+static StableHashCode32 _calcTypeHash()
 {
     typedef ReproUtil Util;
     const uint32_t sizes[] =
@@ -67,9 +67,9 @@ static HashCode32 _calcTypeHash()
     return getStableHashCode32((const char*)&sizes, sizeof(sizes));
 }
 
-static HashCode32 _getTypeHash()
+static StableHashCode32 _getTypeHash()
 {
-    static HashCode32 s_hash = _calcTypeHash();
+    static StableHashCode32 s_hash = _calcTypeHash();
     return s_hash;
 }
 
@@ -278,15 +278,11 @@ struct StoreContext
         OffsetBase& base = m_container->asBase();
 
         Index index = 0;
-        for (const auto& srcDefine : srcDefines)
+        for (const auto& [srcDefineName, srcDefineVal] : srcDefines)
         {
-            // Do allocation before setting
-            const auto key = fromString(srcDefine.key);
-            const auto value = fromString(srcDefine.value);
-
             auto& dstDefine = base[dstDefines[index]];
-            dstDefine.first = key;
-            dstDefine.second = value;
+            dstDefine.first = fromString(srcDefineName);
+            dstDefine.second = fromString(srcDefineVal);
 
             index++;
         }
@@ -447,7 +443,7 @@ static String _scrubName(const String& in)
             {
                 const auto& srcTargetInfos = request->m_targetInfos;
 
-                if (RefPtr<EndToEndCompileRequest::TargetInfo>* infosPtr = srcTargetInfos.tryGetValue(srcTargetRequest))
+                if (const RefPtr<EndToEndCompileRequest::TargetInfo>* infosPtr = srcTargetInfos.tryGetValue(srcTargetRequest))
                 {
                     EndToEndCompileRequest::TargetInfo* infos = *infosPtr;
 
@@ -456,13 +452,13 @@ static String _scrubName(const String& in)
                     Offset32Array<OutputState> dstOutputStates = inOutContainer.newArray<OutputState>(entryPointOutputPaths.getCount());
 
                     Index index = 0;
-                    for (const auto& pair : entryPointOutputPaths)
+                    for (const auto& [key, value] : entryPointOutputPaths)
                     {
-                        Offset32Ptr<OffsetString> outputPath = inOutContainer.newString(pair.value.getUnownedSlice());
+                        Offset32Ptr<OffsetString> outputPath = inOutContainer.newString(value.getUnownedSlice());
 
                         auto& dstOutputState = base[dstOutputStates[index]];
 
-                        dstOutputState.entryPointIndex = int32_t(pair.key);
+                        dstOutputState.entryPointIndex = int32_t(key);
                         dstOutputState.outputPath = outputPath;
 
                         index++;
@@ -545,10 +541,10 @@ static String _scrubName(const String& in)
             Offset32Array<PathAndPathInfo> pathMap = inOutContainer.newArray<PathAndPathInfo>(srcFiles.getCount());
 
             Index index = 0;
-            for (const auto& pair : srcFiles)
+            for (const auto& [key, value] : srcFiles)
             {
-                const auto path = context.fromString(pair.key);
-                const auto pathInfo = context.addPathInfo(pair.value);
+                const auto path = context.fromString(key);
+                const auto pathInfo = context.addPathInfo(value);
 
                 PathAndPathInfo& dstInfo = base[pathMap[index]];
                 dstInfo.path = path;
@@ -637,9 +633,9 @@ static String _scrubName(const String& in)
         auto dstSourceFiles = inOutContainer.newArray<Offset32Ptr<SourceFileState>>(srcSourceFiles.getCount());
 
         Index index = 0;
-        for (const auto& pair : srcSourceFiles)
+        for (const auto& [_, value] : srcSourceFiles)
         {
-            base[dstSourceFiles[index]] = pair.value; 
+            base[dstSourceFiles[index]] = value;
             index++;
         }
         base[requestState]->sourceFiles = dstSourceFiles;
@@ -873,9 +869,8 @@ struct LoadContext
 
     // Put all the path infos in the cache system
     {
-        for (const auto& pair : context.m_fileToPathInfoMap)
+        for (const auto& [_, pathInfo] : context.m_fileToPathInfoMap)
         {
-            CacheFileSystem::PathInfo* pathInfo = pair.value;
             SLANG_ASSERT(pathInfo->m_uniqueIdentity.getLength());
             dstUniqueMap.add(pathInfo->m_uniqueIdentity, pathInfo);
 
@@ -1069,10 +1064,8 @@ struct LoadContext
         }
         // Put all the path infos in the cache system
         {
-            for (const auto& pair : context.m_fileToPathInfoMap)
+            for (const auto& [_, pathInfo] : context.m_fileToPathInfoMap)
             {
-                CacheFileSystem::PathInfo* pathInfo = pair.value;
-
                 // TODO(JS): It's not 100% clear why we are ending up 
                 // with entries that don't have a unique identity.
                 // For now we ignore adding to the unique map, because 
@@ -1105,7 +1098,7 @@ struct LoadContext
     Header header;
     header.m_chunk.type = kSlangStateFourCC;
     header.m_semanticVersion = g_semanticVersion;
-    header.m_typeHash = uint32_t(_getTypeHash());
+    header.m_typeHash = _getTypeHash();
 
     return RiffUtil::writeData(&header.m_chunk, sizeof(header),container.getData(), container.getDataCount(), stream);
 }
@@ -1152,7 +1145,7 @@ struct LoadContext
         return SLANG_FAIL;
     }
 
-    if (header.m_typeHash != uint32_t(_getTypeHash()))
+    if (header.m_typeHash != _getTypeHash())
     {
         sink->diagnose(SourceLoc(), Diagnostics::riffHashMismatch);
         return SLANG_FAIL;

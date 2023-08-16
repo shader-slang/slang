@@ -1064,9 +1064,9 @@ void DocMarkdownWriter::writeAggType(const ASTMarkup::Entry& entry, AggTypeDeclB
         auto& memberDict = aggTypeDecl->getMemberDictionary();
 
         List<Decl*> uniqueMethods;
-        for (const auto& pair : memberDict)
+        for (const auto& [_, decl] : memberDict)
         {
-            CallableDecl* callableDecl = as<CallableDecl>(pair.value);
+            CallableDecl* callableDecl = as<CallableDecl>(decl);
             if (callableDecl && isVisible(callableDecl))
             {
                 uniqueMethods.add(callableDecl);

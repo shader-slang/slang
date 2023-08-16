@@ -3864,11 +3864,8 @@ static Token ReadToken(Preprocessor* preprocessor)
 // clean up after an environment
 Environment::~Environment()
 {
-    for (auto pair : this->macros)
-    {
-        auto macro = pair.value;
+    for (const auto& [_, macro] : this->macros)
         delete macro;
-    }
 }
 
 // Add a simple macro definition from a string (e.g., for a
@@ -4066,10 +4063,8 @@ TokenList preprocessSource(
 
     if(desc.defines)
     {
-        for (auto p : *desc.defines)
-        {
-            DefineMacro(&preprocessor, p.key, p.value);
-        }
+        for (const auto& [key, value] : *desc.defines)
+            DefineMacro(&preprocessor, key, value);
     }
 
     {

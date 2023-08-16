@@ -1537,14 +1537,14 @@ void LanguageServer::publishDiagnostics()
 
     // Send updates to clear diagnostics for files that no longer have any messages.
     List<String> filesToRemove;
-    for (auto& file : m_lastPublishedDiagnostics)
+    for (const auto& [filepath, _] : m_lastPublishedDiagnostics)
     {
-        if (!version->diagnostics.containsKey(file.key))
+        if (!version->diagnostics.containsKey(filepath))
         {
             PublishDiagnosticsParams args;
-            args.uri = URI::fromLocalFilePath(file.key.getUnownedSlice()).uri;
+            args.uri = URI::fromLocalFilePath(filepath.getUnownedSlice()).uri;
             m_connection->sendCall(UnownedStringSlice("textDocument/publishDiagnostics"), &args);
-            filesToRemove.add(file.key);
+            filesToRemove.add(filepath);
         }
     }
     for (auto& toRemove : filesToRemove)
@@ -1552,17 +1552,17 @@ void LanguageServer::publishDiagnostics()
         m_lastPublishedDiagnostics.remove(toRemove);
     }
     // Send updates for any files whose diagnostic messages has changed since last update.
-    for (auto& list : version->diagnostics)
+    for (const auto& [listKey, listValue] : version->diagnostics)
     {
-        auto lastPublished = m_lastPublishedDiagnostics.tryGetValue(list.key);
-        if (!lastPublished || *lastPublished != list.value.originalOutput)
+        auto lastPublished = m_lastPublishedDiagnostics.tryGetValue(listKey);
+        if (!lastPublished || *lastPublished != listValue.originalOutput)
         {
             PublishDiagnosticsParams args;
-            args.uri = URI::fromLocalFilePath(list.key.getUnownedSlice()).uri;
-            for (auto& d : list.value.messages)
+            args.uri = URI::fromLocalFilePath(listKey.getUnownedSlice()).uri;
+            for (auto& d : listValue.messages)
                 args.diagnostics.add(d);
             m_connection->sendCall(UnownedStringSlice("textDocument/publishDiagnostics"), &args);
-            m_lastPublishedDiagnostics[list.key] = list.value.originalOutput;
+            m_lastPublishedDiagnostics[listKey] = listValue.originalOutput;
         }
     }
 }
