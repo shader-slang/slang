@@ -42,7 +42,7 @@ public struct NullDifferential : IDifferentiable
 
     [Differentiable]
     [ForceInline]
-    static Differential dmul<T: __BuiltinFloatingPointType>(T, Differential) { return { 0 }; }
+    static Differential dmul<T: __BuiltinRealType>(T, Differential) { return { 0 }; }
 };
 
 // Existential check for null differential type

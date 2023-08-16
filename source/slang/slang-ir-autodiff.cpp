@@ -2061,6 +2061,30 @@ void lowerNullCheckInsts(IRModule* module, AutoDiffSharedContext* context)
     pass.processModule();
 }
 
+void releaseNullDifferentialType(AutoDiffSharedContext* context)
+{
+    if (auto nullStruct = context->nullDifferentialStructType)
+    {
+        if (auto publicDecoration = nullStruct->findDecoration<IRPublicDecoration>())
+            publicDecoration->removeAndDeallocate();
+        if (auto exportDecoration = nullStruct->findDecoration<IRExportDecoration>())
+            exportDecoration->removeAndDeallocate();
+        if (auto keepAliveDecoration = nullStruct->findDecoration<IRKeepAliveDecoration>())
+            keepAliveDecoration->removeAndDeallocate();
+    }
+
+    if (auto nullWitness = context->nullDifferentialWitness)
+    {
+        if (auto publicDecoration = nullWitness->findDecoration<IRPublicDecoration>())
+            publicDecoration->removeAndDeallocate();
+        if (auto exportDecoration = nullWitness->findDecoration<IRExportDecoration>())
+            exportDecoration->removeAndDeallocate();
+        if (auto keepAliveDecoration = nullWitness->findDecoration<IRKeepAliveDecoration>())
+            keepAliveDecoration->removeAndDeallocate();
+    }
+
+}
+
 bool finalizeAutoDiffPass(IRModule* module)
 {
     bool modified = false;
@@ -2084,18 +2108,10 @@ bool finalizeAutoDiffPass(IRModule* module)
     // Remove auto-diff related decorations.
     stripAutoDiffDecorations(module);
 
-    // Remove public decoration from null-differential type
+    // Remove keep-alive decorations from null-differential type
     // so it can be DCE'd if unused.
     // 
-    if (autodiffContext.nullDifferentialStructType)
-    {
-        if (auto publicDecoration = autodiffContext.nullDifferentialStructType->findDecoration<IRPublicDecoration>())
-            publicDecoration->removeAndDeallocate();
-        if (auto exportDecoration = autodiffContext.nullDifferentialStructType->findDecoration<IRExportDecoration>())
-            exportDecoration->removeAndDeallocate();
-        if (auto keepAliveDecoration = autodiffContext.nullDifferentialStructType->findDecoration<IRKeepAliveDecoration>())
-            keepAliveDecoration->removeAndDeallocate();
-    }
+    releaseNullDifferentialType(&autodiffContext);
 
     return false;
 }
