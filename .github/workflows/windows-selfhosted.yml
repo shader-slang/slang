@@ -38,11 +38,5 @@ jobs:
         MSBuild.exe slang.sln -v:m -m -property:Configuration=${{matrix.configuration}} -property:Platform=${{matrix.platform}} -property:WindowsTargetPlatformVersion=10.0.19041.0 -maxcpucount:12
     - name: test
       run: |
-        $slangTestBinDir = ".\bin\windows-${{matrix.testPlatform}}\${{matrix.configuration}}\";
-        <#
-        $spirvToolsBinDir = ".\external\slang-binaries\spirv-tools\windows-${{matrix.testPlatform}}\bin\";
-        $env:Path += ";$slangTestBinDir;$spirvToolsBinDir";
-        & "$slangTestBinDir\slang-test.exe" -bindir "$slangTestBinDir\" -platform ${{matrix.testPlatform}} -configuration ${{matrix.configuration}} -category ${{matrix.testCategory}} -api all-cpu 2>&1;
-        #>
-        "$slangTestBinDir\slang-test.exe" tests/ -use-test-server -emit-spirv-directly -expected-failure-list tests/expected-failure.txt -api vk 2>&1
+        ".\bin\windows-${{matrix.testPlatform}}\${{matrix.configuration}}\slang-test.exe" tests/ -use-test-server -emit-spirv-directly -expected-failure-list tests/expected-failure.txt -api vk 2>&1
       shell: cmd
