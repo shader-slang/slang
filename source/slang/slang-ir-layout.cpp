@@ -280,7 +280,11 @@ case kIROp_##TYPE##Type:                                        \
     default:
         break;
     }
-
+    if (as<IRResourceTypeBase>(type) || as<IRSamplerStateTypeBase>(type))
+    {
+        *outSizeAndAlignment = IRSizeAndAlignment(8, 8);
+        return SLANG_OK;
+    }
     return SLANG_FAIL;
 }
 
@@ -357,7 +361,7 @@ Result getOffset(IRTypeLayoutRules* rules, IRStructField* field, IRIntegerValue*
     IRSizeAndAlignment structTypeLayout;
     SLANG_RETURN_ON_FAIL(getSizeAndAlignment(rules, structType, &structTypeLayout));
 
-    if (auto decor = field->findDecoration<IROffsetDecoration>())
+    if (auto decor = findOffsetDecorationForLayout(field, rules->ruleName))
     {
         *outOffset = decor->getOffset();
         return SLANG_OK;
@@ -427,67 +431,15 @@ struct Std140LayoutRules : IRTypeLayoutRules
     }
 };
 
-Result getNaturalSizeAndAlignment(TargetRequest* target, IRType* type, IRSizeAndAlignment* outSizeAndAlignment)
+Result getNaturalSizeAndAlignment(IRType* type, IRSizeAndAlignment* outSizeAndAlignment)
 {
-    SLANG_UNUSED(target);
+    return getSizeAndAlignment(IRTypeLayoutRules::getNatural(), type, outSizeAndAlignment);
 
-    if( auto decor = type->findDecoration<IRNaturalSizeAndAlignmentDecoration>() )
-    {
-        *outSizeAndAlignment = IRSizeAndAlignment(decor->getSize(), (int)decor->getAlignment());
-        return SLANG_OK;
-    }
-
-    IRSizeAndAlignment sizeAndAlignment;
-    SLANG_RETURN_ON_FAIL(getSizeAndAlignment(IRTypeLayoutRules::getNatural(), type, &sizeAndAlignment));
-
-    if( auto module = type->getModule() )
-    {
-        IRBuilder builder(module);
-
-        auto intType = builder.getIntType();
-        builder.addDecoration(
-            type,
-            kIROp_NaturalSizeAndAlignmentDecoration,
-            builder.getIntValue(intType, sizeAndAlignment.size),
-            builder.getIntValue(intType, sizeAndAlignment.alignment));
-    }
-
-    *outSizeAndAlignment = sizeAndAlignment;
-    return SLANG_OK;
 }
 
-
-Result getNaturalOffset(TargetRequest* target, IRStructField* field, IRIntegerValue* outOffset)
+Result getNaturalOffset(IRStructField* field, IRIntegerValue* outOffset)
 {
-    if( auto decor = field->findDecoration<IRNaturalOffsetDecoration>() )
-    {
-        *outOffset = decor->getOffset();
-        return SLANG_OK;
-    }
-
-    // Offsets are computed as part of layout out types,
-    // so we expect that layout of the "parent" type
-    // of the field should add an offset to it if
-    // possible.
-
-    auto structType = as<IRStructType>(field->getParent());
-    if(!structType)
-        return SLANG_FAIL;
-
-    IRSizeAndAlignment structTypeLayout;
-    SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(target, structType, &structTypeLayout));
-
-    if( auto decor = field->findDecoration<IRNaturalOffsetDecoration>() )
-    {
-        *outOffset = decor->getOffset();
-        return SLANG_OK;
-    }
-
-    // If attempting to lay out the parent type didn't
-    // cause the field to get an offset, then we are
-    // in an unexpected case with no easy answer.
-    //
-    return SLANG_FAIL;
+    return getOffset(IRTypeLayoutRules::getNatural(), field, outOffset);
 }
 
 
@@ -495,67 +447,14 @@ Result getNaturalOffset(TargetRequest* target, IRStructField* field, IRIntegerVa
 // Std430 Layout
 //////////////////////////
 
-Result getStd430SizeAndAlignment(TargetRequest* target, IRType* type, IRSizeAndAlignment* outSizeAndAlignment)
+Result getStd430SizeAndAlignment(IRType* type, IRSizeAndAlignment* outSizeAndAlignment)
 {
-    SLANG_UNUSED(target);
-
-    if (auto decor = type->findDecoration<IRStd430SizeAndAlignmentDecoration>())
-    {
-        *outSizeAndAlignment = IRSizeAndAlignment(decor->getSize(), (int)decor->getAlignment());
-        return SLANG_OK;
-    }
-
-    IRSizeAndAlignment sizeAndAlignment;
-    SLANG_RETURN_ON_FAIL(getSizeAndAlignment(IRTypeLayoutRules::getStd430(), type, &sizeAndAlignment));
-
-    if (auto module = type->getModule())
-    {
-        IRBuilder builder(module);
-
-        auto intType = builder.getIntType();
-        builder.addDecoration(
-            type,
-            kIROp_Std430SizeAndAlignmentDecoration,
-            builder.getIntValue(intType, sizeAndAlignment.size),
-            builder.getIntValue(intType, sizeAndAlignment.alignment));
-    }
-
-    *outSizeAndAlignment = sizeAndAlignment;
-    return SLANG_OK;
+    return getSizeAndAlignment(IRTypeLayoutRules::getStd430(), type, outSizeAndAlignment);
 }
 
-
-Result getStd430Offset(TargetRequest* target, IRStructField* field, IRIntegerValue* outOffset)
+Result getStd430Offset(IRStructField* field, IRIntegerValue* outOffset)
 {
-    if (auto decor = field->findDecoration<IRStd430OffsetDecoration>())
-    {
-        *outOffset = decor->getOffset();
-        return SLANG_OK;
-    }
-
-    // Offsets are computed as part of layout out types,
-    // so we expect that layout of the "parent" type
-    // of the field should add an offset to it if
-    // possible.
-
-    auto structType = as<IRStructType>(field->getParent());
-    if (!structType)
-        return SLANG_FAIL;
-
-    IRSizeAndAlignment structTypeLayout;
-    SLANG_RETURN_ON_FAIL(getStd430SizeAndAlignment(target, structType, &structTypeLayout));
-
-    if (auto decor = field->findDecoration<IRStd430OffsetDecoration>())
-    {
-        *outOffset = decor->getOffset();
-        return SLANG_OK;
-    }
-
-    // If attempting to lay out the parent type didn't
-    // cause the field to get an offset, then we are
-    // in an unexpected case with no easy answer.
-    //
-    return SLANG_FAIL;
+    return getOffset(IRTypeLayoutRules::getStd430(), field, outOffset);
 }
 
 IRTypeLayoutRules* IRTypeLayoutRules::getStd430()

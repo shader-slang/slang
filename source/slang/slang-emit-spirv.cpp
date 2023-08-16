@@ -1266,7 +1266,7 @@ struct SPIRVEmitContext
                 else
                 {
                     IRSizeAndAlignment sizeAndAlignment;
-                    getNaturalSizeAndAlignment(this->m_targetRequest, elementType, &sizeAndAlignment);
+                    getNaturalSizeAndAlignment(elementType, &sizeAndAlignment);
                     stride = (int)sizeAndAlignment.getStride();
                 }
                 emitOpDecorateArrayStride(

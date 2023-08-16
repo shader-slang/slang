@@ -593,19 +593,6 @@ IR_SIMPLE_DECORATION(ForceInlineDecoration)
 
 IR_SIMPLE_DECORATION(ForceUnrollDecoration)
 
-
-struct IRNaturalSizeAndAlignmentDecoration : IRDecoration
-{
-    enum { kOp = kIROp_NaturalSizeAndAlignmentDecoration };
-    IR_LEAF_ISA(NaturalSizeAndAlignmentDecoration)
-
-    IRIntLit* getSizeOperand() { return cast<IRIntLit>(getOperand(0)); }
-    IRIntLit* getAlignmentOperand() { return cast<IRIntLit>(getOperand(1)); }
-
-    IRIntegerValue getSize() { return getSizeOperand()->getValue(); }
-    IRIntegerValue getAlignment() { return getAlignmentOperand()->getValue(); }
-};
-
 struct IRSizeAndAlignmentDecoration : IRDecoration
 {
     IR_LEAF_ISA(SizeAndAlignmentDecoration)
@@ -625,38 +612,6 @@ struct IROffsetDecoration : IRDecoration
     IRTypeLayoutRuleName getLayoutName() { return IRTypeLayoutRuleName(cast<IRIntLit>(getOperand(0))->getValue()); }
 
     IRIntLit* getOffsetOperand() { return cast<IRIntLit>(getOperand(1)); }
-    IRIntegerValue getOffset() { return getOffsetOperand()->getValue(); }
-};
-
-struct IRNaturalOffsetDecoration : IRDecoration
-{
-    enum { kOp = kIROp_NaturalOffsetDecoration };
-    IR_LEAF_ISA(NaturalOffsetDecoration)
-
-    IRIntLit* getOffsetOperand() { return cast<IRIntLit>(getOperand(0)); }
-
-    IRIntegerValue getOffset() { return getOffsetOperand()->getValue(); }
-};
-
-struct IRStd430SizeAndAlignmentDecoration : IRDecoration
-{
-    enum { kOp = kIROp_Std430SizeAndAlignmentDecoration };
-    IR_LEAF_ISA(Std430SizeAndAlignmentDecoration)
-
-    IRIntLit* getSizeOperand() { return cast<IRIntLit>(getOperand(0)); }
-    IRIntLit* getAlignmentOperand() { return cast<IRIntLit>(getOperand(1)); }
-
-    IRIntegerValue getSize() { return getSizeOperand()->getValue(); }
-    IRIntegerValue getAlignment() { return getAlignmentOperand()->getValue(); }
-};
-
-struct IRStd430OffsetDecoration : IRDecoration
-{
-    enum { kOp = kIROp_Std430OffsetDecoration };
-    IR_LEAF_ISA(Std430OffsetDecoration)
-
-    IRIntLit* getOffsetOperand() { return cast<IRIntLit>(getOperand(0)); }
-
     IRIntegerValue getOffset() { return getOffsetOperand()->getValue(); }
 };
 
