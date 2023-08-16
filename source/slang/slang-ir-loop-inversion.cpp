@@ -22,6 +22,15 @@ static bool isSameBlockOrTrivialBranch(IRBlock* target, IRBlock* scrutinee)
 
 static bool isSmallBlock(IRBlock* c)
 {
+    // Somewhat arbitrarily, 4 instructions, enough for:
+    // - Arith
+    // - Comparison
+    // - Negation
+    // - Terminator
+    Int n = 0;
+    for([[maybe_unused]] const auto i : c->getOrdinaryInsts())
+        if(++n > 4)
+            return false;
     return true;
 }
 
