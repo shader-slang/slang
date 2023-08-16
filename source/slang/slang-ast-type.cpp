@@ -103,7 +103,7 @@ Val* DeclRefType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSe
     //
     if (as<DirectDeclRef>(substDeclRef.declRefBase))
     {
-        if (auto thisDecl = as<ThisTypeDecl>(substDeclRef.getDecl()))
+        if (as<ThisTypeDecl>(substDeclRef.getDecl()))
         {
             auto lookupDeclRef = subst.findLookupDeclRef();
             if (lookupDeclRef && lookupDeclRef->getSupDecl() == substDeclRef.getDecl()->parentDecl)

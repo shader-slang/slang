@@ -2855,6 +2855,24 @@ struct IRCastFloatToInt : IRInst
     IR_LEAF_ISA(CastFloatToInt)
 };
 
+struct IRDebugSource : IRInst
+{
+    IR_LEAF_ISA(DebugSource)
+    IRInst* getFileName() { return getOperand(0); }
+    IRInst* getSource() { return getOperand(1); }
+};
+
+struct IRDebugLine : IRInst
+{
+    IR_LEAF_ISA(DebugLine)
+    IRInst* getSource() { return getOperand(0); }
+    IRInst* getLineStart() { return getOperand(1); }
+    IRInst* getLineEnd() { return getOperand(2); }
+    IRInst* getColStart() { return getOperand(3); }
+    IRInst* getColEnd() { return getOperand(4); }
+};
+
+
 struct IRBuilderSourceLocRAII;
 
 struct IRBuilder
@@ -3183,6 +3201,9 @@ public:
     {
         return getAttributedType(baseType, attributes.getCount(), attributes.getBuffer());
     }
+
+    IRInst* emitDebugSource(UnownedStringSlice fileName, UnownedStringSlice source);
+    IRInst* emitDebugLine(IRInst* source, IRIntegerValue lineStart, IRIntegerValue lineEnd, IRIntegerValue colStart, IRIntegerValue colEnd);
 
         /// Emit an LiveRangeStart instruction indicating the referenced item is live following this instruction
     IRLiveRangeStart* emitLiveRangeStart(IRInst* referenced);
