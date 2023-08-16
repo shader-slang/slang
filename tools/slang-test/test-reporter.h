@@ -123,6 +123,7 @@ class TestReporter : public ITestReporter
     int m_passedTestCount;
     int m_failedTestCount;
     int m_ignoredTestCount;
+    int m_expectedFailedTestCount;
 
     int m_maxFailTestResults;                   ///< Maximum amount of results per test. If 0 it's infinite.
 

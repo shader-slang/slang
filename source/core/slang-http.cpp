@@ -348,7 +348,7 @@ SlangResult HTTPPacketConnection::waitForResult(Int timeOutInMs)
         const auto prevCount = m_readStream->getCount();
 
         SLANG_RETURN_ON_FAIL(update());
-
+        
         if (m_readState == ReadState::Done)
         {
             break;

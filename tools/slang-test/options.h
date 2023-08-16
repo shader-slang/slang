@@ -113,7 +113,7 @@ struct Options
     Slang::String adapter;
 
     // Maximum number of test servers to run.
-    int serverCount = 4;
+    int serverCount = 1;
 
     bool emitSPIRVDirectly = false;
 

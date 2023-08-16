@@ -210,6 +210,7 @@ void TestReporter::consolidateWith(TestReporter* other)
     m_failedTestCount += other->m_failedTestCount;
     m_ignoredTestCount += other->m_ignoredTestCount;
     m_passedTestCount += other->m_passedTestCount;
+    m_expectedFailedTestCount += other->m_expectedFailedTestCount;
     m_totalTestCount += other->m_totalTestCount;
 }
 
@@ -315,8 +316,10 @@ void TestReporter::_addResult(TestInfo info)
             break;
 
         case TestResult::Pass:
-        case TestResult::ExpectedFail:
             m_passedTestCount++;
+            break;
+        case TestResult::ExpectedFail:
+            m_expectedFailedTestCount++;
             break;
 
         case TestResult::Ignored:
@@ -571,7 +574,7 @@ void TestReporter::message(TestMessageType type, const char* messageContent)
 
 bool TestReporter::didAllSucceed() const
 {
-    return m_passedTestCount == (m_totalTestCount - m_ignoredTestCount);
+    return m_passedTestCount + m_expectedFailedTestCount == (m_totalTestCount - m_ignoredTestCount);
 }
 
 void TestReporter::outputSummary()
@@ -603,8 +606,25 @@ void TestReporter::outputSummary()
             {
                 printf(", %d tests ignored", ignoredCount);
             }
+            if (m_expectedFailedTestCount)
+            {
+                printf(", %d tests failed expectedly", m_expectedFailedTestCount);
+                printf("\n===\n\n");
+                printf("\npassing tests that are expected to fail:\n");
+                printf("---\n");
+                for (const auto& testInfo : m_testInfos)
+                {
+                    if (testInfo.testResult == TestResult::Pass)
+                    {
+                        if (m_expectedFailureList.contains(testInfo.name))
+                        {
+                            printf("%s\n", testInfo.name.getBuffer());
+                        }
+                    }
+                }
+                printf("---\n");
+            }
             printf("\n===\n\n");
-
             if (m_failedTestCount)
             {
                 printf("failing tests:\n");
@@ -618,6 +638,7 @@ void TestReporter::outputSummary()
                 }
                 printf("---\n");
             }
+            
             break;
         }
         
