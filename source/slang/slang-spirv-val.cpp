@@ -21,22 +21,25 @@ static SlangResult disassembleSPIRV(const List<uint8_t>& spirv, String& outErr, 
     in->close();
 
     // Wait for it to finish
-    if(!p->waitForTermination(1000))
-        return SLANG_FAIL;
-
-    // TODO: allow inheriting stderr in Process
     List<Byte> outData;
-    SLANG_RETURN_ON_FAIL(StreamUtil::readAll(out, 0, outData));
-    outErr = String(
+    List<Byte> outErrData;
+    while (!out->isEnd() || !err->isEnd())
+    {
+        if (!out->isEnd())
+            StreamUtil::readAll(out, 0, outData);
+        if (!err->isEnd())
+            StreamUtil::readAll(err, 0, outErrData);
+    }
+    SLANG_RETURN_ON_FAIL(p->waitForTermination(10));
+
+    outDis = String(
         reinterpret_cast<const char*>(outData.begin()),
         reinterpret_cast<const char*>(outData.end())
     );
 
-    outData.clear();
-    SLANG_RETURN_ON_FAIL(StreamUtil::readAll(err, 0, outData));
-    outDis = String(
-        reinterpret_cast<const char*>(outData.begin()),
-        reinterpret_cast<const char*>(outData.end())
+    outErr = String(
+        reinterpret_cast<const char*>(outErrData.begin()),
+        reinterpret_cast<const char*>(outErrData.end())
     );
 
     const auto ret = p->getReturnValue();

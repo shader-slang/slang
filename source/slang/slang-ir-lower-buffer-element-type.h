@@ -5,6 +5,8 @@ namespace Slang
 {
     struct IRModule;
     class TargetRequest;
+    struct IRTypeLayoutRules;
+    struct IRType;
 
     // For each struct type S used as element type of a ConstantBuffer, ParameterBlock or [RW]StructuredBuffer,
     // we create a lowered type L, where matrix types are lowered to arrays of vectors based on major-ness,
@@ -15,6 +17,9 @@ namespace Slang
     //
     void lowerBufferElementTypeToStorageType(TargetRequest* target, IRModule* module);
 
+
+    // Returns the type layout rules should be used for a buffer resource type.
+    IRTypeLayoutRules* getTypeLayoutRuleForBuffer(TargetRequest* target, IRType* bufferType);
 }
 
 #endif

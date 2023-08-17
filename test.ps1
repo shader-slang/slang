@@ -1,0 +1,1 @@
+& ".\bin\windows-x64\release\slang-test.exe" tests/  -use-test-server -emit-spirv-directly -expected-failure-list tests/expected-failure.txt -api vk 2>&1;

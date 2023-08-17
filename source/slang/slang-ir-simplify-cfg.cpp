@@ -444,6 +444,30 @@ static bool trySimplifyIfElse(IRBuilder& builder, IRIfElse* ifElseInst)
             return true;
         }
     }
+    else
+    {
+        // Otherwise, we can try to remove at least remove one of the trivial branches
+        // Remove either the true or false block if it jumps to the after block
+        // with no parameters.
+
+        const auto afterBlock = ifElseInst->getAfterBlock();
+        if(!afterBlock->getFirstParam())
+        {
+            const auto trueBlock = ifElseInst->getTrueBlock();
+            const auto falseBlock = ifElseInst->getFalseBlock();
+
+            if(isTrueBranchTrivial && trueBlock != afterBlock && !trueBlock->hasMoreThanOneUse())
+            {
+                trueBlock->replaceUsesWith(afterBlock);
+                trueBlock->removeAndDeallocate();
+            }
+            else if(isFalseBranchTrivial && falseBlock != afterBlock && !falseBlock->hasMoreThanOneUse())
+            {
+                falseBlock->replaceUsesWith(afterBlock);
+                falseBlock->removeAndDeallocate();
+            }
+        }
+    }
     return false;
 }
 

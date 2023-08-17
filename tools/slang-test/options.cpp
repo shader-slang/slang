@@ -3,7 +3,6 @@
 
 #include "../../source/core/slang-string-util.h"
 #include "../../source/core/slang-io.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -290,6 +289,27 @@ static bool _isSubCommand(const char* arg)
         else if (strcmp(arg, "-skip-api-detection") == 0)
         {
             optionsOut->skipApiDetection = true;
+        }
+        else if (strcmp(arg, "-emit-spirv-directly") == 0)
+        {
+            optionsOut->emitSPIRVDirectly = true;
+        }
+        else if (strcmp(arg, "-expected-failure-list") == 0)
+        {
+            if (argCursor == argEnd)
+            {
+                stdError.print("error: expected operand for '%s'\n", arg);
+                return SLANG_FAIL;
+            }
+            auto fileName = *argCursor++;
+            String text;
+            File::readAllText(fileName, text);
+            List<UnownedStringSlice> lines;
+            StringUtil::split(text.getUnownedSlice(), '\n', lines);
+            for (auto line : lines)
+            {
+                optionsOut->expectedFailureList.add(line);
+            }
         }
         else
         {

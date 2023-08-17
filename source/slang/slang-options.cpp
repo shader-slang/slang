@@ -2765,7 +2765,7 @@ SlangResult OptionsParser::_parse(
             }
         }
 
-        if (m_defaultTarget.targetFlags)
+        if (m_defaultTarget.targetFlags != kDefaultTargetFlags)
         {
             if (m_rawTargets.getCount() == 0)
             {

@@ -57,7 +57,8 @@ static String _getText(const ConstArrayView<Byte>& bytes)
         const auto preCount = _getCount(outStdOut) + _getCount(outStdError);
 
         SLANG_RETURN_ON_FAIL(StreamUtil::readOrDiscard(stdOutStream, 0, outStdOut));
-        SLANG_RETURN_ON_FAIL(StreamUtil::readOrDiscard(stdErrorStream, 0, outStdError));
+        if (stdErrorStream)
+            SLANG_RETURN_ON_FAIL(StreamUtil::readOrDiscard(stdErrorStream, 0, outStdError));
 
         const auto postCount = _getCount(outStdOut) + _getCount(outStdError);
 
@@ -69,9 +70,16 @@ static String _getText(const ConstArrayView<Byte>& bytes)
     }
 
     // Read anything remaining
-    SLANG_RETURN_ON_FAIL(StreamUtil::readOrDiscardAll(stdOutStream, 0, outStdOut));
-    SLANG_RETURN_ON_FAIL(StreamUtil::readOrDiscardAll(stdErrorStream, 0, outStdError));
-
+    for(;;)
+    {
+        const auto preCount = _getCount(outStdOut) + _getCount(outStdError);
+        StreamUtil::readOrDiscard(stdOutStream, 0, outStdOut);
+        if (stdErrorStream)
+            StreamUtil::readOrDiscard(stdErrorStream, 0, outStdError);
+        const auto postCount = _getCount(outStdOut) + _getCount(outStdError);
+        if (preCount == postCount)
+            break;
+    }
     return SLANG_OK;
 }
 

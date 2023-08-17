@@ -208,18 +208,18 @@ struct ByteAddressBufferLegalizationContext
     {
         if (target->getHLSLToVulkanLayoutOptions() && target->getHLSLToVulkanLayoutOptions()->shouldUseGLLayout())
         {
-            return getStd430Offset(target, field, outOffset);
+            return getStd430Offset(field, outOffset);
         }
-        return getNaturalOffset(target, field, outOffset);
+        return getNaturalOffset(field, outOffset);
     }
 
     SlangResult getSizeAndAlignment(TargetRequest* target, IRType* type, IRSizeAndAlignment* outSizeAlignment)
     {
         if (target->getHLSLToVulkanLayoutOptions() && target->getHLSLToVulkanLayoutOptions()->shouldUseGLLayout())
         {
-            return getStd430SizeAndAlignment(target, type, outSizeAlignment);
+            return getStd430SizeAndAlignment(type, outSizeAlignment);
         }
-        return getNaturalSizeAndAlignment(target, type, outSizeAlignment);
+        return getNaturalSizeAndAlignment(type, outSizeAlignment);
     }
 
     // The core workhorse routine for the load case is `emitLegalLoad`,
@@ -456,7 +456,7 @@ struct ByteAddressBufferLegalizationContext
         // the "stride" of the element type.
         //
         IRSizeAndAlignment elementLayout;
-        SLANG_RETURN_NULL_ON_FAIL(getNaturalSizeAndAlignment(m_target, elementType, &elementLayout));
+        SLANG_RETURN_NULL_ON_FAIL(getNaturalSizeAndAlignment(elementType, &elementLayout));
         IRIntegerValue elementStride = elementLayout.getStride();
 
         // We will collect all the element values into an array so
@@ -546,7 +546,7 @@ struct ByteAddressBufferLegalizationContext
                 auto offsetType = offset->getDataType();
 
                 IRSizeAndAlignment typeLayout;
-                SLANG_RETURN_NULL_ON_FAIL(getNaturalSizeAndAlignment(m_target, type, &typeLayout));
+                SLANG_RETURN_NULL_ON_FAIL(getNaturalSizeAndAlignment(type, &typeLayout));
                 auto typeStrideVal = typeLayout.getStride();
 
                 auto typeStrideInst = m_builder.getIntValue(offsetType, typeStrideVal);
@@ -950,7 +950,7 @@ struct ByteAddressBufferLegalizationContext
                 auto indexType = offset->getDataType();
 
                 IRSizeAndAlignment typeLayout;
-                SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(m_target, type, &typeLayout));
+                SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(type, &typeLayout));
 
                 auto typeStride = m_builder.getIntValue(indexType, typeLayout.getStride());
 
@@ -978,7 +978,7 @@ struct ByteAddressBufferLegalizationContext
         // We iterate over the elements and fetch then store each one.
         //
         IRSizeAndAlignment elementLayout;
-        SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(m_target, elementType, &elementLayout));
+        SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(elementType, &elementLayout));
         IRIntegerValue elementStride = elementLayout.getStride();
 
         auto indexType = m_builder.getIntType();

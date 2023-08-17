@@ -555,6 +555,15 @@ enum class SideEffectAnalysisOptions
     UseDominanceTree,
 };
 
+enum class IRTypeLayoutRuleName
+{
+    Natural,
+    Scalar = Natural,
+    Std430,
+    Std140,
+    _Count,
+};
+
 // Every value in the IR is an instruction (even things
 // like literal values).
 //
@@ -1472,13 +1481,28 @@ struct IRArrayTypeBase : IRType
     // for an `IRUnsizedArrayType`.
     IRInst* getElementCount();
 
+    IRInst* getArrayStride()
+    {
+        switch (m_op)
+        {
+        case kIROp_ArrayType:
+            if (getOperandCount() == 3)
+                return getOperand(2);
+            return nullptr;
+
+        case kIROp_UnsizedArrayType:
+            if (getOperandCount() == 2)
+                return getOperand(1);
+            return nullptr;
+        }
+        return nullptr;
+    }
+
     IR_PARENT_ISA(ArrayTypeBase)
 };
 
 struct IRArrayType: IRArrayTypeBase
 {
-    IRInst* getElementCount() { return getOperand(1); }
-
     IR_LEAF_ISA(ArrayType)
 };
 

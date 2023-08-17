@@ -317,7 +317,7 @@ namespace Slang
     IRInst* IRArrayTypeBase::getElementCount()
     {
         if (auto arrayType = as<IRArrayType>(this))
-            return arrayType->getElementCount();
+            return arrayType->getOperand(1);
 
         return nullptr;
     }
@@ -2809,6 +2809,29 @@ namespace Slang
             operands);
     }
 
+    IRArrayType* IRBuilder::getArrayType(
+        IRType* elementType,
+        IRInst* elementCount,
+        IRInst* stride)
+    {
+        IRInst* operands[] = { elementType, elementCount, stride };
+        return (IRArrayType*)getType(
+            kIROp_ArrayType,
+            sizeof(operands) / sizeof(operands[0]),
+            operands);
+    }
+
+    IRUnsizedArrayType* IRBuilder::getUnsizedArrayType(
+        IRType* elementType,
+        IRInst* stride)
+    {
+        IRInst* operands[] = { elementType, stride };
+        return (IRUnsizedArrayType*)getType(
+            kIROp_UnsizedArrayType,
+            sizeof(operands) / sizeof(operands[0]),
+            operands);
+    }
+
     IRVectorType* IRBuilder::getVectorType(
         IRType* elementType,
         IRInst* elementCount)
@@ -5145,7 +5168,7 @@ namespace Slang
         return inst;
     }
 
-    IRInst* IRBuilder::emitIfElse(
+    IRIfElse* IRBuilder::emitIfElse(
         IRInst*     val,
         IRBlock*    trueBlock,
         IRBlock*    falseBlock,

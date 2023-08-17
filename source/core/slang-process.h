@@ -23,6 +23,7 @@ public:
         {
             // Ignored on non-Windows platforms
             AttachDebugger = 0x01,
+            DisableStdErrRedirection = 0x02
         };
     };
 

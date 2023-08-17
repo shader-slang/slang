@@ -4,6 +4,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-specialize-function-call.h"
 #include "slang-ir-ssa-simplification.h"
+#include "slang-ir-util.h"
 #include "slang-ir.h"
 
 namespace Slang
@@ -12,22 +13,6 @@ namespace Slang
 //
 // Some helpers
 //
-
-// Run an operation over every block in a module
-template<typename F>
-static void overAllBlocks(IRModule* module, F f)
-{
-    for (auto globalInst : module->getGlobalInsts())
-    {
-        if (auto func = as<IRGlobalValueWithCode>(globalInst))
-        {
-            for (auto block : func->getBlocks())
-            {
-                f(block);
-            }
-        }
-    }
-}
 
 static bool uses(IRInst* used, IRInst* user)
 {

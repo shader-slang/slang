@@ -235,7 +235,7 @@ SpvInst* emitOpTypeArray(IRInst* inst, const T1& elementType, const T2& length)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
-    return emitInstMemoized(
+    return emitInst(
         getSection(SpvLogicalSectionID::ConstantsAndTypes),
         inst,
         SpvOpTypeArray,
@@ -250,7 +250,7 @@ template<typename T>
 SpvInst* emitOpTypeRuntimeArray(IRInst* inst, const T& elementType)
 {
     static_assert(isSingular<T>);
-    return emitInstMemoized(
+    return emitInst(
         getSection(SpvLogicalSectionID::ConstantsAndTypes),
         inst,
         SpvOpTypeRuntimeArray,
@@ -264,7 +264,7 @@ template<typename Ts>
 SpvInst* emitOpTypeStruct(IRInst* inst, const Ts& member0TypeMember1TypeEtc)
 {
     static_assert(isPlural<Ts>);
-    return emitInstMemoized(
+    return emitInst(
         getSection(SpvLogicalSectionID::ConstantsAndTypes),
         inst,
         SpvOpTypeStruct,
