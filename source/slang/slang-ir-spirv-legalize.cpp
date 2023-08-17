@@ -273,7 +273,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         IRInst* y = nullptr;
         if (!m_mapArrayValueToVar.tryGetValue(x, y))
         {
-            builder.setInsertAfter(x);
+            setInsertAfterOrdinaryInst(&builder, x);
             y = builder.emitVar(x->getDataType(), SpvStorageClassFunction);
             builder.emitStore(y, x);
             m_mapArrayValueToVar.set(x, y);
