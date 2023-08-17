@@ -540,10 +540,27 @@ struct CFGNormalizationPass
                 }
 
                 // Right now, we only support loops where the loop is on the true side of
-                // the condition. If we ever encounter the other case, fill in logic to
-                // flip the condition.
+                // the condition. If we encounter the other case, flip the condition.
                 //
-                SLANG_RELEASE_ASSERT(isLoopOnTrueSide);
+                if(!isLoopOnTrueSide)
+                {
+                    IRBuilderInsertLocScope locScope{&builder};
+                    // Invert the cond
+                    builder.setInsertBefore(ifElse);
+                    const auto c = ifElse->getCondition();
+                    const auto negatedCond = c->getOp() == kIROp_Not
+                        ? c->getOperand(0)
+                        : builder.emitNot(builder.getBoolType(), c);
+                    ifElse->condition.set(negatedCond);
+                    const auto t = ifElse->getTrueBlock();
+                    const auto f = ifElse->getFalseBlock();
+                    ifElse->trueBlock.set(f);
+                    ifElse->falseBlock.set(t);
+
+                    // Invert our discovered state
+                    std::swap(trueEndPoint, falseEndPoint);
+                    isLoopOnTrueSide = true;
+                }
 
                 // Expect atleast one basic block (other than the condition block), in
                 // the loop.
