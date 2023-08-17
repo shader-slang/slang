@@ -904,11 +904,14 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// Overrides the floating mode for the target function
     INST(FloatingPointModeOverrideDecoration, FloatingPointModeOverride, 1, 0)
 
-        /// Marks a struct type as being used as a structured buffer block.
         /// Recognized by SPIRV-emit pass so we can emit a SPIRV `BufferBlock` decoration.
     INST(SPIRVBufferBlockDecoration, spvBufferBlock, 0, 0)
 
-    INST_RANGE(Decoration, HighLevelDeclDecoration, SPIRVBufferBlockDecoration)
+        /// Recognized by SPIRV-emit pass so we can emit a SPIRV `Block` decoration.
+    INST(SPIRVBlockDecoration, spvBlock, 0, 0)
+
+
+    INST_RANGE(Decoration, HighLevelDeclDecoration, SPIRVBlockDecoration)
 
     //
 

@@ -3022,6 +3022,7 @@ T mul(vector<T, N> x, vector<T, N> y)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "($1 * $0)")
+__target_intrinsic(spirv, "OpMatrixTimesVector resultType resultId _1 _0")
 [__readNone]
 vector<T, M> mul(vector<T, N> left, matrix<T, N, M> right)
 {
@@ -3078,6 +3079,7 @@ vector<T, M> mul(vector<T, N> left, matrix<T, N, M> right)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "($1 * $0)")
+__target_intrinsic(spirv, "OpVectorTimesMatrix resultType resultId _1 _0")
 [__readNone]
 vector<T,N> mul(matrix<T,N,M> left, vector<T,M> right)
 {
@@ -3134,6 +3136,7 @@ vector<T,N> mul(matrix<T,N,M> left, vector<T,M> right)
 __generic<T : __BuiltinFloatingPointType, let R : int, let N : int, let C : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "($1 * $0)")
+__target_intrinsic(spirv, "OpMatrixTimesMatrix resultType resultId _1 _0")
 [__readNone]
 matrix<T,R,C> mul(matrix<T,R,N> right, matrix<T,N,C> left)
 {
