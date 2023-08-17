@@ -34,11 +34,20 @@ static bool isSmallBlock(IRBlock* c)
     return true;
 }
 
+static bool hasIrrelevantContinueBlock(IRLoop* loop)
+{
+    const auto c = loop->getContinueBlock();
+    return c == loop->getTargetBlock() || c->getPredecessors().getCount() <= 1;
+}
+
 // Loops are suitable for inversion if:
 // - The loop jumps to a conditional branch which has the break block as one of
 //   its successors (or a trivial break block which we erase) and the other
 //   successor is empty
 // - The conditional block is "small", because we will be duplicating it
+// - The loop's continue block is irrelevant, because we'll need to change it,
+//   either by being the loop header already or by having only a single use
+//   within the loop body
 static bool isSuitableForInversion(IRLoop* loop)
 {
     const auto nextBlock = loop->getTargetBlock();
@@ -50,6 +59,9 @@ static bool isSuitableForInversion(IRLoop* loop)
         return false;
 
     if(!isSmallBlock(nextBlock))
+        return false;
+
+    if(!hasIrrelevantContinueBlock(loop))
         return false;
 
     const auto t = branch->getTrueBlock();
@@ -249,12 +261,18 @@ static void invertLoop(IRBuilder& builder, IRLoop* loop)
     // conditional, d, as we know that it won't break out of the loop on the
     // first iteration
     //
+    // Since we're only here if the continue block is irrelevant (either the
+    // target block already or has a single predecessor) we can set it to the
+    // loop header.
+    //
     // Beyond just retargeting the loop instruction, we need to make sure any
     // parameters the loop instruction is passing to c1 are instead passed to
     // 'd', and because we've added parameters to 'd' we need to forward them
     // from c1 also which we will accomplish using a new block, e3,
+    //
     loop->block.set(d);
     loop->breakBlock.set(e1);
+    loop->continueBlock.set(loop->getTargetBlock());
     SLANG_ASSERT(d->getFirstParam() == nullptr);
     c1->insertBefore(b);
     e1->insertAfter(c1);

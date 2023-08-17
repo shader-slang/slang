@@ -554,11 +554,12 @@ void eliminateContinueBlocks(IRModule* module, IRLoop* loopInst)
     //  where a continue is replaced with a "break" into breakableRegionBreakBlock.
     //
 
-    if (loopInst->getContinueBlock() == loopInst->getTargetBlock())
+    auto continueBlock = loopInst->getContinueBlock();
+
+    if (continueBlock == loopInst->getTargetBlock())
         return;
 
     // If the continue block is not reachable, remove it.
-    auto continueBlock = loopInst->getContinueBlock();
     if (continueBlock && !continueBlock->hasMoreThanOneUse())
     {
         loopInst->continueBlock.set(loopInst->getTargetBlock());
