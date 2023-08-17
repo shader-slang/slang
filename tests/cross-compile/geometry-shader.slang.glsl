@@ -80,12 +80,12 @@ void main()
         int ii_1 = ii_0 + 1;
         if(ii_1 < 3)
         {
-            ii_0 = ii_1;
         }
         else
         {
             break;
         }
+        ii_0 = ii_1;
     }
     return;
 }
