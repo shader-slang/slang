@@ -272,7 +272,9 @@ static void invertLoop(IRBuilder& builder, IRLoop* loop)
     //
     loop->block.set(d);
     loop->breakBlock.set(e1);
-    loop->continueBlock.set(loop->getTargetBlock());
+    // TODO: This really upsets a few later passes, why isn't it ok to do given
+    // our "irrelevant continue" condition?
+    // loop->continueBlock.set(loop->getTargetBlock());
     SLANG_ASSERT(d->getFirstParam() == nullptr);
     c1->insertBefore(b);
     e1->insertAfter(c1);
