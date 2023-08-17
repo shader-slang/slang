@@ -76,9 +76,9 @@ SlangResult debugValidateSPIRV(const List<uint8_t>& spirv)
     fwrite(outData.getBuffer(), outData.getCount(), 1, stderr);
     outData.clear();
     SLANG_RETURN_ON_FAIL(StreamUtil::readAll(err, 0, outData));
-    fwrite(outData.getBuffer(), outData.getCount(), 1, stderr);
-    const auto ret = p->getReturnValue();
 
+    // If we failed, dump the spirv first.
+    const auto ret = p->getReturnValue();
     if(ret != 0)
     {
         String spirvDisErr;
@@ -87,6 +87,8 @@ SlangResult debugValidateSPIRV(const List<uint8_t>& spirv)
         fwrite(spirvDisErr.getBuffer(), spirvDisErr.getLength(), 1, stderr);
         fwrite(spirvDis.getBuffer(), spirvDis.getLength(), 1, stderr);
     }
+
+    fwrite(outData.getBuffer(), outData.getCount(), 1, stderr);
 
     return ret == 0 ? SLANG_OK : SLANG_FAIL;
 }
