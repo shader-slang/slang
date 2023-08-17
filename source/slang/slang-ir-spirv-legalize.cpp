@@ -137,7 +137,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 }
                 builder.addDecoration(innerType, kIROp_SPIRVBlockDecoration);
             }
-            
+
             // Make a pointer type of storageClass.
             builder.setInsertBefore(inst);
             ptrType = builder.getPtrType(kIROp_PtrType, innerType, storageClass);
