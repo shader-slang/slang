@@ -88,7 +88,7 @@ void lowerReinterpret(TargetRequest* targetReq, IRModule* module, DiagnosticSink
     // Before processing reinterpret insts, ensure that existential types without 
     // user-defined sizes have inferred sizes where possible.
     // 
-    inferAnyValueSizeWhereNecessary(targetReq, module);
+    inferAnyValueSizeWhereNecessary(module);
 
     ReinterpretLoweringContext context;
     context.module = module;
