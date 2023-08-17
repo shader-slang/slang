@@ -9,6 +9,7 @@ static SlangResult disassembleSPIRV(const List<uint8_t>& spirv, String& outErr, 
     CommandLine commandLine;
     commandLine.m_executableLocation.setName("spirv-dis");
     commandLine.addArg("--comment");
+    commandLine.addArg("--color");
     RefPtr<Process> p;
 
     // If we failed to even start the process, then validation isn't available
