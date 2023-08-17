@@ -3751,7 +3751,7 @@ public:
         IRBlock*    trueBlock,
         IRBlock*    afterBlock);
 
-    IRInst* emitIfElse(
+    IRIfElse* emitIfElse(
         IRInst*    val,
         IRBlock*    trueBlock,
         IRBlock*    falseBlock,

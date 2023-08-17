@@ -1,55 +1,49 @@
 #pragma pack_matrix(column_major)
+#ifdef SLANG_HLSL_ENABLE_NVAPI
+#include "nvHLSLExtns.h"
+#endif
+#pragma warning(disable: 3557)
 
-#line 6 "tests/cross-compile/loop-attribs.slang"
-vector<float,4> main() : SV_TARGET
+float4 main() : SV_TARGET
 {
-    int i_0;
-    float sum_0;
-    int j_0;
-    float sum_1;
-    i_0 = int(0);
-    sum_0 = 0.00000000000000000000;
+    float _S1 = 0.0;
+    int i_0 = int(0);
+    float sum_0 = 0.0;
     [loop]
     for(;;)
     {
-
-#line 11
-        if(i_0 < int(100))
+        float sum_1 = sum_0 + float(i_0);
+        _S1 = sum_1;
+        int i_1 = i_0 + int(1);
+        if(i_1 < int(100))
         {
+            i_0 = i_1;
+            sum_0 = sum_1;
         }
         else
         {
             break;
         }
-        float _S1 = sum_0 + (float) i_0;
-
-#line 11
-        int _S2 = i_0 + (int) int(1);
-        i_0 = _S2;
-        sum_0 = _S1;
     }
-    j_0 = int(0);
-    sum_1 = sum_0;
+    float _S2 = 0.0;
+    int j_0 = int(0);
+    sum_0 = _S1;
     [unroll]
     for(;;)
     {
-
-#line 15
-        if(j_0 < int(100))
+        float sum_2 = sum_0 + float(j_0);
+        _S2 = sum_2;
+        int j_1 = j_0 + int(1);
+        if(j_1 < int(100))
         {
+            j_0 = j_1;
+            sum_0 = sum_2;
         }
         else
         {
             break;
         }
-        float _S3 = sum_1 + (float) j_0;
-
-#line 15
-        int _S4 = j_0 + (int) int(1);
-        j_0 = _S4;
-        sum_1 = _S3;
     }
-
-#line 18
-    return vector<float,4>(sum_1, (float) int(0), (float) int(0), (float) int(0));
+    return float4(_S2, 0.0, 0.0, 0.0);
 }
+

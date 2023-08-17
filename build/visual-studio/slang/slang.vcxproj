@@ -406,6 +406,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ir-legalize-varying-params.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-link.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-liveness.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-loop-inversion.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-loop-unroll.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-binding-query.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-bit-cast.h" />
@@ -615,6 +616,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ir-legalize-varying-params.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-link.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-liveness.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-loop-inversion.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-loop-unroll.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-binding-query.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-bit-cast.cpp" />
