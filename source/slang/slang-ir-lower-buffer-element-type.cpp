@@ -364,7 +364,7 @@ namespace Slang
                     Index fieldId = 0;
                     for (auto field : structType->getFields())
                     {
-                        auto fieldVal = builder.emitFieldExtract(type, param, field->getKey());
+                        auto fieldVal = builder.emitFieldExtract(field->getFieldType(), param, field->getKey());
                         auto packedField = fieldLoweredTypeInfo[fieldId].convertOriginalToLowered
                             ? builder.emitCallInst(fieldLoweredTypeInfo[fieldId].loweredType, fieldLoweredTypeInfo[fieldId].convertOriginalToLowered, 1, &fieldVal)
                             : fieldVal;
