@@ -385,7 +385,7 @@ IRType* AutoDiffTranscriberBase::getOrCreateDiffPairType(IRBuilder* builder, IRI
 IRType* AutoDiffTranscriberBase::differentiateType(IRBuilder* builder, IRType* origType)
 {
     // Special-case for differentiable existential types.
-    if (as<IRInterfaceType>(origType))
+    if (as<IRInterfaceType>(origType) || as<IRAssociatedType>(origType))
     {
         if (differentiableTypeConformanceContext.lookUpConformanceForType(origType))
             return autoDiffSharedContext->differentiableInterfaceType;

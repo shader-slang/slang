@@ -171,7 +171,13 @@ namespace Slang
                 if (!witnessTable || witnessTable->getDataType() != witnessTableType)
                     continue;
 
-                implList.add(witnessTable->getConcreteType());
+                auto concreteImpl = witnessTable->getConcreteType();
+
+                // Only consider implementations at the top-level (ignore those nested
+                // in generics)
+                // 
+                if (concreteImpl->getParent() == module->getModuleInst())
+                    implList.add(concreteImpl);
             }
             
             mapInterfaceToImplementations.add(interfaceType, implList);

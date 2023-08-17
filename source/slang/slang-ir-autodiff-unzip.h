@@ -286,7 +286,8 @@ struct DiffUnzipPass
         if (auto fwdPairResultType = as<IRDifferentialPairType>(mixedDecoration->getPairType()))
         {
             primalType = fwdPairResultType->getValueType();
-            diffType = (IRType*)diffTypeContext.getDifferentialForType(&globalBuilder, primalType);
+            diffType = (IRType*)diffTypeContext.getDiffTypeFromPairType(&globalBuilder, fwdPairResultType);
+            SLANG_ASSERT(diffType);
             resultType = fwdPairResultType;
         }
 

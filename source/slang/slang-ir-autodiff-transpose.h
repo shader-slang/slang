@@ -596,8 +596,6 @@ struct DiffTransposePass
                         {
                             SLANG_UNEXPECTED("Expected an pointer-typed differential variable.");
                         }
-                        //if (auto dzero = emitDZero(&builder, varInst))
-                        //    builder.emitStore(varInst, dzero);
                     }
                 }
                 inst = nextInst;
@@ -1492,6 +1490,9 @@ struct DiffTransposePass
             
             case kIROp_Reinterpret: 
                 return transposeReinterpret(builder, fwdInst, revValue);
+            
+            case kIROp_PackAnyValue: 
+                return transposePackAnyValue(builder, fwdInst, revValue);
 
             case kIROp_LoadReverseGradient:
             case kIROp_ReverseGradientDiffPairRef:
@@ -2084,6 +2085,21 @@ struct DiffTransposePass
                     RevGradient::Flavor::Simple,
                     fwdInst->getOperand(0),
                     builder->emitReinterpret(
+                        fwdInst->getOperand(0)->getDataType(),
+                        revValue),
+                    fwdInst)));
+    }
+
+    
+    TranspositionResult transposePackAnyValue(IRBuilder* builder, IRInst* fwdInst, IRInst* revValue)
+    {
+        // (A = packAnyValue<T, U>(B)) -> (dB += unpackAnyValue<U, T>(dA))
+        return TranspositionResult(
+            List<RevGradient>(
+                RevGradient(
+                    RevGradient::Flavor::Simple,
+                    fwdInst->getOperand(0),
+                    builder->emitUnpackAnyValue(
                         fwdInst->getOperand(0)->getDataType(),
                         revValue),
                     fwdInst)));
@@ -2811,7 +2827,7 @@ struct DiffTransposePass
             auto diffDiffPairType = builder->getDifferentialPairUserCodeType(diffType, diffWitness);
             return builder->emitMakeDifferentialPairUserCode(diffDiffPairType, primalZero, diffZero);
         }
-        else if (auto interfaceType = as<IRInterfaceType>(primalType))
+        else if (as<IRInterfaceType>(primalType) || as<IRAssociatedType>(primalType))
         {
             // Pack a null value into an existential type.
             auto existentialZero = builder->emitMakeExistential(
@@ -2889,12 +2905,12 @@ struct DiffTransposePass
             auto diffDiffPairType = builder->getDifferentialPairUserCodeType(diffType, diffWitness);
             return builder->emitMakeDifferentialPairUserCode(diffDiffPairType, primal, diff);
         }
-        else if (auto interfaceType = as<IRInterfaceType>(primalType))
+        else if (as<IRInterfaceType>(primalType) || as<IRAssociatedType>(primalType))
         {
             // If our type is existential, we need to handle the case where 
             // one or both of our operands are null-type. 
             // 
-            return emitDAddForExistentialType(builder, interfaceType, op1, op2);
+            return emitDAddForExistentialType(builder, primalType, op1, op2);
         }
 
         auto addMethod = diffTypeContext.getAddMethodForType(builder, primalType);

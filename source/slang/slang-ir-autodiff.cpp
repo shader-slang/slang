@@ -59,13 +59,9 @@ static IRInst* _getDiffTypeFromPairType(AutoDiffSharedContext*sharedContext, IRB
     auto witness = type->getWitness();
     SLANG_RELEASE_ASSERT(witness);
 
-    // Special case when the primal tpe is an InterfaceType.
-    if (auto primalInterfaceType = as<IRInterfaceType>(type->getValueType()))
+    // Special case when the primal type is an InterfaceType/AssociatedType
+    if (as<IRInterfaceType>(type->getValueType()) || as<IRAssociatedType>(type->getValueType()))
     {
-        // The witness should just be a struct key or requirement entry.
-        SLANG_ASSERT(as<IRStructKey>(type->getWitness()) || 
-            as<IRInterfaceRequirementEntry>(type->getWitness()));
-
         // The differential type is the IDifferentiable interface type.
         return sharedContext->differentiableInterfaceType;
     }
@@ -548,6 +544,8 @@ IRInst *DifferentiableTypeConformanceContext::tryExtractConformanceFromInterface
         for (auto node : lookupKeyPath)
         {
             differentialTypeWitness = builder->emitLookupInterfaceMethodInst((IRType*)node->getRequirementVal(), differentialTypeWitness, node->getRequirementKey());
+            // Lookup insts are always primal values.
+            builder->markInstAsPrimal(differentialTypeWitness);
         }
         return differentialTypeWitness;
     }

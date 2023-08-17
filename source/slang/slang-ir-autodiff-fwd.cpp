@@ -1892,6 +1892,9 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
 
     case kIROp_ExtractExistentialValue:
         return transcribeSingleOperandInst(builder, origInst);
+
+    case kIROp_PackAnyValue:
+        return transcribeSingleOperandInst(builder, origInst);
         
     case kIROp_MakeExistential:
         return transcribeMakeExistential(builder, as<IRMakeExistential>(origInst));
@@ -1955,7 +1958,6 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_ImageSubscript:
     case kIROp_ImageLoad:
     case kIROp_ImageStore:
-    case kIROp_PackAnyValue:
     case kIROp_UnpackAnyValue:
     case kIROp_GetNativePtr:
     case kIROp_CastIntToFloat:
