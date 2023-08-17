@@ -395,11 +395,27 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         //       - the back-edge block must structurally post dominate the
         //         Continue Target
 
+        // If the continue block has only a single predecessor, pretend like it
+        // is just ordinary control flow
+        //
+        // TODO: could this fail in cases like this, where it had a single
+        // predecessor, but it's still nested inside a region?
+        // do{
+        //   if(x)
+        //     continue;
+        //   unreachable
+        // } while(foo)
+        const auto t = loop->getTargetBlock();
+        auto c = loop->getContinueBlock();
+        if(c->getPredecessors().getCount() <= 1)
+        {
+            c = t;
+            loop->continueBlock.set(c);
+        }
+
         // Our IR allows multiple back-edges to a loop header if this is also
         // the loop continue block. SPIR-V does not so replace them with a
         // single intermediate block
-        const auto t = loop->getTargetBlock();
-        const auto c = loop->getContinueBlock();
         if(c == t)
         {
             // Subtract one predecessor for the loop entry
