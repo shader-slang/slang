@@ -98,19 +98,19 @@ static IRParam* duplicateToParamWithDecorations(IRBuilder& builder, IRCloneEnv& 
 
 // Given
 // s: ...1 loop break=b next=c1
-// c1: if x then goto b else goto d
+// c1: if x then goto b else goto d (merge at d)
 // d: goto c1
 // b: ...2
 //
 // Produce:
-// s: ...1 goto c1
-// c1: if x then goto e1 else goto l
-// e1: goto b
-// l: loop break=b next=d
-// d: goto c2:
-// c2: if x then goto e2 else goto e3
-// e3: goto d
+// s: ...1 goto c2
+// c2: if x then goto e2 else goto l (merge at b)
 // e2: goto b
+// l: loop break=b next=d
+// d: goto c1:
+// c1: if x then goto e1 else goto e3 (merge at e3)
+// e3: goto d
+// e1: goto b
 // b: ...2
 //
 // s is the Start block
@@ -126,7 +126,7 @@ static void invertLoop(IRBuilder& builder, IRLoop* loop)
     auto domTree = computeDominatorTree(s->getParent());
     SLANG_ASSERT(s);
     const auto c1 = loop->getTargetBlock();
-    const auto c1Terminator = as<IRConditionalBranch>(c1->getTerminator());
+    const auto c1Terminator = as<IRIfElse>(c1->getTerminator());
     SLANG_ASSERT(c1Terminator);
     const auto b = loop->getBreakBlock();
     auto& c1dUse = c1Terminator->getTrueBlock() == b ? c1Terminator->falseBlock : c1Terminator->trueBlock;
@@ -164,6 +164,7 @@ static void invertLoop(IRBuilder& builder, IRLoop* loop)
     e1->insertAfter(c1);
     builder.emitBranch(b, c1Params.getCount(), c1Params.getBuffer());
     c1bUse.set(e1);
+    c1Terminator->afterBlock.set(d);
     // Similarly, we have to replace any existing 'break's to break via e1
     traverseUses(b, [&](IRUse* u){
         auto userBlock = u->getUser()->getParent();
@@ -173,7 +174,7 @@ static void invertLoop(IRBuilder& builder, IRLoop* loop)
     });
     // We now have
     // s: ...1 loop break=b next=c1
-    // c1: if x then goto e1 else goto d
+    // c1: if x then goto e1 else goto d (merge at d)
     // e1: goto b
     // d: goto c1
     // b: ...2
@@ -192,9 +193,9 @@ static void invertLoop(IRBuilder& builder, IRLoop* loop)
     c2Terminator->removeAndDeallocate();
     // We now have
     // s: ...1 loop break=b next=c1
-    // c2: if x then goto e2 else goto d
+    // c2: if x then goto e2 else goto d (merge at b)
     // e2: goto b
-    // c1: if x then goto e1 else goto d
+    // c1: if x then goto e1 else goto d (merge at d)
     // e1: goto b
     // d: goto c1
     // b: ...2
@@ -205,10 +206,10 @@ static void invertLoop(IRBuilder& builder, IRLoop* loop)
     loop->insertAtEnd(l);
     // We now have
     // s: ...1 no-termiator
-    // c2: if x then goto e2 else goto d
+    // c2: if x then goto e2 else goto d (merge at b)
     // e2: goto b
     // l: loop break=b next=c1
-    // c1: if x then goto e1 else goto d
+    // c1: if x then goto e1 else goto d (merge at d)
     // e1: goto b
     // d: goto c1
     // b: ...2
@@ -222,10 +223,10 @@ static void invertLoop(IRBuilder& builder, IRLoop* loop)
     builder.emitBranch(c2, as.getCount(), as.getBuffer());
     // We now have
     // s: ...1, goto c2
-    // c2: if x then goto e2 else goto d
+    // c2: if x then goto e2 else goto d (merge at b)
     // e2: goto b
     // l: loop break=b next=c1
-    // c1: if x then goto e1 else goto d
+    // c1: if x then goto e1 else goto d (merge at d)
     // e1: goto b
     // d: goto c1
     // b: ...2
@@ -235,10 +236,10 @@ static void invertLoop(IRBuilder& builder, IRLoop* loop)
     c2dUse.set(l);
     // We now have
     // s: ...1, goto c2
-    // c2: if x then goto e2 else goto l
+    // c2: if x then goto e2 else goto l (merge at b)
     // e2: goto b
     // l: loop break=b next=c1
-    // c1: if x then goto e1 else goto d
+    // c1: if x then goto e1 else goto d (merge at d)
     // e1: goto b
     // d: goto c1
     // b: ...2
@@ -274,13 +275,14 @@ static void invertLoop(IRBuilder& builder, IRLoop* loop)
     e3->insertAfter(c1);
     builder.emitBranch(d, ps.getCount(), ps.getBuffer());
     c1dUse.set(e3);
+    c1Terminator->afterBlock.set(e3);
     // We now have the desired output
     // s: ...1, goto c2
-    // c2: if x then goto e2 else goto l
+    // c2: if x then goto e2 else goto l (merge at b)
     // e2: goto b
     // l: loop break=e1 next=d
     // d: goto c1
-    // c1: if x then goto e1 else goto e3
+    // c1: if x then goto e1 else goto e3 (merge at e3)
     // e3: goto d
     // e1: goto b
     // b: ...2
