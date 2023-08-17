@@ -2813,6 +2813,16 @@ void collectParameterLists(
                     auto noDiffAttr = context->astBuilder->getNoDiffModifierVal();
                     thisType = context->astBuilder->getModifiedType(thisType, 1, &noDiffAttr);
                 }
+                else if (auto fwdDerivDeclRef = declRef.as<ForwardDerivativeRequirementDecl>())
+                {
+                    thisType = fwdDerivDeclRef.getDecl()->diffThisType;
+                }
+                else if (auto bwdDerivDeclRef = declRef.as<BackwardDerivativeRequirementDecl>())
+                {
+                    thisType = bwdDerivDeclRef.getDecl()->diffThisType;
+                    innerThisParamDirection = kParameterDirection_InOut;
+                }
+
                 addThisParameter(innerThisParamDirection, thisType, ioParameterLists);
             }
         }
@@ -7235,7 +7245,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
         auto assocType = context->irBuilder->getAssociatedType(
             constraintInterfaces.getArrayView().arrayView);
-        context->setValue(decl, assocType);
+        context->setValue(decl, assocType); 
         return LoweredValInfo::simple(assocType);
     }
 
@@ -8446,14 +8456,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         addNameHint(subContext, irFunc, decl);
         addLinkageDecoration(subContext, irFunc, decl);
 
-        if (decl->body)
-        {
-            if (auto differentialAttr = decl->findModifier<DifferentiableAttribute>())
-            {
-                lowerDifferentiableAttribute(subContext, irFunc, differentialAttr);
-            }
-        }
-
         // Always force inline diff setter accessor to prevent downstream compiler from complaining
         // fields are not fully initialized for the first `inout` parameter.
         if (as<SetterDecl>(decl))
@@ -8927,6 +8929,17 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 getBuilder()->addDecoration(irFunc, kIROp_PreferRecomputeDecoration);
             }
         }
+
+        if (auto diffAttr = decl->findModifier<DifferentiableAttribute>())
+        {
+            if (decl->body)
+            {
+                subContext->irBuilder->setInsertInto(irFunc->getParent());
+                lowerDifferentiableAttribute(subContext, irFunc, diffAttr);
+                subContext->irBuilder->setInsertInto(irFunc);
+            }
+        }
+
         // For convenience, ensure that any additional global
         // values that were emitted while outputting the function
         // body appear before the function itself in the list

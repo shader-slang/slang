@@ -913,7 +913,7 @@ namespace Slang
             {
                 primalType = diffPairType->getValueType();
                 diffType = (IRType*)differentiableTypeConformanceContext
-                               .getDifferentialTypeFromDiffPairType(builder, diffPairType);
+                               .getDiffTypeFromPairType(builder, diffPairType);
             }
 
             // Now we handle each combination of parameter direction x differentiability.

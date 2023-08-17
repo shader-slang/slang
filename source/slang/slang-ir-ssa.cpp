@@ -412,7 +412,7 @@ PhiInfo* addPhi(
     {
         valueType = context->getBuilder()->getRateQualifiedType(rate, valueType);
     }
-    IRParam* phi = builder->createParam(valueType);
+    IRParam* phi = builder->emitParam(valueType);
     cloneRelevantDecorations(var, phi);
 
     RefPtr<PhiInfo> phiInfo = new PhiInfo();
@@ -503,6 +503,7 @@ IRInst* tryRemoveTrivialPhi(
     // replace uses of the phi (including its possible uses
     // of itself) with the unique non-phi value.
     phi->replaceUsesWith(same);
+    phi->removeAndDeallocate();
 
     // Clear out the operands to the phi, since they won't
     // actually get used in the program any more.
@@ -849,11 +850,12 @@ void processBlock(
     // leave them as-is, or replace them with a value
     // that we look up with local/global value numbering
 
-    IRInst* next = nullptr;
-    for (auto ii = block->getFirstInst(); ii; ii = next)
-    {
-        next = ii->getNextInst();
+    List<IRInst*> workList;
+    for (auto ii = block->getFirstInst(); ii; ii = ii->getNextInst())
+        workList.add(ii);
 
+    for (auto& ii : workList)
+    {
         // Any new instructions we create to represent
         // the new value will get inserted before whatever
         // instruction we are working with.
@@ -1117,6 +1119,14 @@ bool constructSSA(ConstructSSAContext* context)
     {
         auto blockInfo = *context->blockInfos.tryGetValue(bb);
 
+        // First remove phis from their parent blocks.
+        for (auto phiInfo : blockInfo->phis)
+            if (!phiInfo->replacement)
+                phiInfo->phi->removeFromParent();
+
+        // Then, add them back in a consistent order, and add predecessor
+        // args in the same order.
+        // 
         for (auto phiInfo : blockInfo->phis)
         {
             // If we replaced this phi with another value,

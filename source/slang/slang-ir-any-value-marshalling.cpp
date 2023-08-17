@@ -1,5 +1,6 @@
 #include "slang-ir-any-value-marshalling.h"
 
+#include "../core/slang-math.h"
 #include "slang-ir-generics-lowering-context.h"
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
@@ -781,6 +782,46 @@ namespace Slang
             auto interfaceType = cast<IRInterfaceType>(existentialValue->getDataType());
             auto size = SharedGenericsLoweringContext::getInterfaceAnyValueSize(interfaceType, interfaceType->sourceLoc);
             return alignUp(offset, 4) + alignUp((SlangInt)size, 4);
+        }
+        case kIROp_LookupWitness:
+        {
+            auto witnessTableVal = type->getOperand(0);
+            auto key = type->getOperand(1);
+            IRType* assocType = nullptr;
+            if (auto witnessTableType = as<IRWitnessTableTypeBase>(witnessTableVal->getDataType()))
+            {
+                auto interfaceType = as<IRInterfaceType>(witnessTableType->getConformanceType());
+
+                // Walk through interface operands to find a match, the result should be an 
+                // associated type entry.
+                //
+                for (UIndex ii = 0; ii < interfaceType->getOperandCount(); ii++)
+                {
+                    auto entry = cast<IRInterfaceRequirementEntry>(interfaceType->getOperand(ii));
+                    if (entry->getRequirementKey() == key && 
+                        as<IRAssociatedType>(entry->getRequirementVal()))
+                    {
+                        assocType = (IRType*)entry->getRequirementVal();
+                        break;
+                    }
+                }
+            }
+
+            if (!assocType)
+                return -1;
+            
+            IRIntegerValue anyValueSize = kInvalidAnyValueSize;
+            for (UInt i = 0; i < assocType->getOperandCount(); i++)
+            {
+                anyValueSize = Math::Min(
+                    anyValueSize,
+                    SharedGenericsLoweringContext::getInterfaceAnyValueSize(assocType->getOperand(i), type->sourceLoc));
+            }
+
+            if (anyValueSize == kInvalidAnyValueSize)
+                return -1;
+            
+            return alignUp(offset, 4) + alignUp((SlangInt)anyValueSize, 4);
         }
         default:
             if (as<IRTextureTypeBase>(type) || as<IRSamplerStateTypeBase>(type))

@@ -2,6 +2,7 @@
 #include "slang-ir-lower-generics.h"
 
 #include "slang-ir-any-value-marshalling.h"
+#include "slang-ir-any-value-inference.h"
 #include "slang-ir-augment-make-existential.h"
 #include "slang-ir-generics-lowering-context.h"
 #include "slang-ir-lower-existential.h"
@@ -15,7 +16,10 @@
 #include "slang-ir-witness-table-wrapper.h"
 #include "slang-ir-ssa-simplification.h"
 #include "slang-ir-util.h"
+#include "slang-ir-layout.h"
+
 #include "../core/slang-performance-profiler.h"
+#include "../core/slang-func-ptr.h"
 
 namespace Slang
 {
@@ -212,6 +216,8 @@ namespace Slang
         sharedContext.sink = sink;
 
         checkTypeConformanceExists(&sharedContext);
+
+        inferAnyValueSizeWhereNecessary(module);
 
         // Replace all `makeExistential` insts with `makeExistentialWithRTTI`
         // before making any other changes. This is necessary because a parameter of

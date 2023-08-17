@@ -369,17 +369,30 @@ IRType* AutoDiffTranscriberBase::getOrCreateDiffPairType(IRBuilder* builder, IRI
                 autoDiffSharedContext->differentialAssocTypeWitnessStructKey);
         }
     }
+    
+    // Obtain the witness that primalType conforms to IDifferentiable.
     if (!witness)
         witness = tryGetDifferentiableWitness(builder, originalType);
     SLANG_RELEASE_ASSERT(witness);
 
-    return builder->getDifferentialPairType(
+    auto pairType = builder->getDifferentialPairType(
         (IRType*)primalType,
         witness);
+
+    return pairType;
 }
 
 IRType* AutoDiffTranscriberBase::differentiateType(IRBuilder* builder, IRType* origType)
 {
+    // Special-case for differentiable existential types.
+    if (as<IRInterfaceType>(origType) || as<IRAssociatedType>(origType))
+    {
+        if (differentiableTypeConformanceContext.lookUpConformanceForType(origType))
+            return autoDiffSharedContext->differentiableInterfaceType;
+        else
+            return nullptr;
+    }
+
     auto primalType = lookupPrimalInst(builder, origType, origType);
     if (primalType->getOp() == kIROp_Param &&
         primalType->getParent() && primalType->getParent()->getParent() &&
@@ -482,72 +495,17 @@ IRType* AutoDiffTranscriberBase::_differentiateTypeImpl(IRBuilder* builder, IRTy
     }
 }
 
-// Given an interface type, return the lookup path from a witness table of `type` to a witness table of `IDifferentiable`.
-static bool _findDifferentiableInterfaceLookupPathImpl(
-    HashSet<IRInst*>& processedTypes,
-    IRInterfaceType* idiffType,
-    IRInterfaceType* type,
-    List<IRInterfaceRequirementEntry*>& currentPath)
+bool AutoDiffTranscriberBase::isExistentialType(IRType *type)
 {
-    if (processedTypes.contains(type))
-        return false;
-    processedTypes.add(type);
-
-    List<IRInterfaceRequirementEntry*> lookupKeyPath;
-    for (UInt i = 0; i < type->getOperandCount(); i++)
+    switch (type->getOp())
     {
-        auto entry = as<IRInterfaceRequirementEntry>(type->getOperand(i));
-        if (!entry) continue;
-        if (auto wt = as<IRWitnessTableTypeBase>(entry->getRequirementVal()))
-        {
-            currentPath.add(entry);
-            if (wt->getConformanceType() == idiffType)
-            {
-                return true;
-            }
-            else if (auto subInterfaceType = as<IRInterfaceType>(wt->getConformanceType()))
-            {
-                if (_findDifferentiableInterfaceLookupPathImpl(processedTypes, idiffType, subInterfaceType, currentPath))
-                    return true;
-            }
-            currentPath.removeLast();
-        }
+        case kIROp_ExtractExistentialType:
+        case kIROp_InterfaceType:
+        case kIROp_AssociatedType:
+            return true;
+        default:
+            return false;
     }
-    return false;
-}
-
-List<IRInterfaceRequirementEntry*> AutoDiffTranscriberBase::findDifferentiableInterfaceLookupPath(
-    IRInterfaceType* idiffType,
-    IRInterfaceType* type)
-{
-    List<IRInterfaceRequirementEntry*> currentPath;
-    HashSet<IRInst*> processedTypes;
-    _findDifferentiableInterfaceLookupPathImpl(processedTypes, idiffType, type, currentPath);
-    return currentPath;
-}
-
-IRInst* AutoDiffTranscriberBase::tryExtractConformanceFromInterfaceType(
-    IRBuilder* builder,
-    IRInterfaceType* interfaceType,
-    IRWitnessTable* witnessTable)
-{
-    SLANG_RELEASE_ASSERT(interfaceType);
-
-    List<IRInterfaceRequirementEntry*> lookupKeyPath = findDifferentiableInterfaceLookupPath(
-        autoDiffSharedContext->differentiableInterfaceType, interfaceType);
-
-    IRInst* differentialTypeWitness = witnessTable;
-    if (lookupKeyPath.getCount())
-    {
-        // `interfaceType` does conform to `IDifferentiable`.
-        for (auto node : lookupKeyPath)
-        {
-            differentialTypeWitness = builder->emitLookupInterfaceMethodInst((IRType*)node->getRequirementVal(), differentialTypeWitness, node->getRequirementKey());
-        }
-        return differentialTypeWitness;
-    }
-
-    return nullptr;
 }
 
 InstPair AutoDiffTranscriberBase::transcribeExtractExistentialWitnessTable(IRBuilder* builder, IRInst* origInst)
@@ -569,7 +527,7 @@ InstPair AutoDiffTranscriberBase::transcribeExtractExistentialWitnessTable(IRBui
     if (!interfaceType)
         return InstPair(primalResult, nullptr);
     
-    if (auto differentialWitnessTable = tryExtractConformanceFromInterfaceType(
+    if (auto differentialWitnessTable = differentiableTypeConformanceContext.tryExtractConformanceFromInterfaceType(
             builder, interfaceType, (IRWitnessTable*)primalResult))
     {
         // `interfaceType` does conform to `IDifferentiable`.
@@ -630,7 +588,7 @@ IRType* AutoDiffTranscriberBase::differentiateExtractExistentialType(IRBuilder* 
     auto interfaceType = as<IRInterfaceType>(unwrapAttributedType(origType->getOperand(0)->getDataType()));
     if (!interfaceType)
         return nullptr;
-    List<IRInterfaceRequirementEntry*> lookupKeyPath = findDifferentiableInterfaceLookupPath(
+    List<IRInterfaceRequirementEntry*> lookupKeyPath = differentiableTypeConformanceContext.findDifferentiableInterfaceLookupPath(
         autoDiffSharedContext->differentiableInterfaceType, interfaceType);
 
     if (lookupKeyPath.getCount())
@@ -737,6 +695,13 @@ InstPair AutoDiffTranscriberBase::transcribeLookupInterfaceMethod(IRBuilder* bui
                 (IRType*)primalDiffType,
                 primal,
                 autoDiffSharedContext->differentialAssocTypeWitnessStructKey);
+
+            // Mark both as primal since we're working with types 
+            // (which don't need transposing)
+            // 
+            builder->markInstAsPrimal(primalDiffType);
+            builder->markInstAsPrimal(diffWitness);
+
             return InstPair(primal, diffWitness);
         }
     }
@@ -762,12 +727,31 @@ InstPair AutoDiffTranscriberBase::transcribeLookupInterfaceMethod(IRBuilder* bui
 // result, it's useful to have a method to generate zero literals of any (arithmetic) type.
 // The current implementation requires that types are defined linearly.
 // 
-IRInst* AutoDiffTranscriberBase::getDifferentialZeroOfType(IRBuilder* builder, IRType* originalType)
+IRInst* AutoDiffTranscriberBase::getDifferentialZeroOfType(
+    IRBuilder* builder, IRType* originalType)
 {
     originalType = (IRType*)unwrapAttributedType(originalType);
     auto primalType = (IRType*)lookupPrimalInst(builder, originalType);
     if (auto diffType = differentiateType(builder, originalType))
     {
+        IRInst* diffWitnessTable = nullptr;
+        IRType* diffOuterType = nullptr;
+        if (isExistentialType(diffType))
+        {
+            // Emit null differential & pack it into an IDifferentiable existential.
+
+            auto nullDiffValue = differentiableTypeConformanceContext.emitNullDifferential(builder);
+            builder->markInstAsDifferential(nullDiffValue, autoDiffSharedContext->nullDifferentialStructType);
+
+            auto nullDiffExistential = builder->emitMakeExistential(
+                diffType,
+                nullDiffValue,
+                autoDiffSharedContext->nullDifferentialWitness);
+            builder->markInstAsDifferential(nullDiffExistential, primalType);
+
+            return nullDiffExistential;
+        }
+
         switch (diffType->getOp())
         {
         case kIROp_DifferentialPairType:
@@ -812,7 +796,7 @@ IRInst* AutoDiffTranscriberBase::getDifferentialZeroOfType(IRBuilder* builder, I
             // zero method from the same witness table.
             auto wt = lookupInterface->getWitnessTable();
             zeroMethod = builder->emitLookupInterfaceMethodInst(builder->getFuncType(List<IRType*>(), diffType), wt, autoDiffSharedContext->zeroMethodStructKey);
-            builder->markInstAsDifferential(zeroMethod);
+            builder->markInstAsPrimal(zeroMethod);
         }
         else
         {
@@ -825,7 +809,18 @@ IRInst* AutoDiffTranscriberBase::getDifferentialZeroOfType(IRBuilder* builder, I
         auto callInst = builder->emitCallInst((IRType*)diffType, zeroMethod, emptyArgList);
         builder->markInstAsDifferential(callInst, primalType);
 
-        return callInst;
+        if (diffOuterType && isExistentialType(diffOuterType))
+        {
+            // Need to wrap the result back into an existential.
+            auto existentialZero = builder->emitMakeExistential(
+                diffOuterType,
+                callInst,
+                diffWitnessTable);
+            builder->markInstAsDifferential(existentialZero, primalType);
+            return existentialZero;
+        }
+        else
+            return callInst;
     }
     else
     {

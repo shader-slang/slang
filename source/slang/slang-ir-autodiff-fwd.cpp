@@ -142,6 +142,23 @@ InstPair ForwardDiffTranscriber::transcribeUndefined(IRBuilder* builder, IRInst*
     return InstPair(primalVal, nullptr);
 }
 
+InstPair ForwardDiffTranscriber::transcribeReinterpret(IRBuilder* builder, IRInst* origInst)
+{
+    auto primalVal = maybeCloneForPrimalInst(builder, origInst);
+
+    IRInst* diffVal = nullptr;
+
+    if (IRType* const diffType = differentiateType(builder, origInst->getFullType()))
+    {
+        if (auto diffOperand = findOrTranscribeDiffInst(builder, origInst->getOperand(0)))
+        {
+            diffVal = builder->emitReinterpret(diffType, diffOperand);
+        }
+    }
+
+    return InstPair(primalVal, diffVal);
+}
+
 InstPair ForwardDiffTranscriber::transcribeVar(IRBuilder* builder, IRVar* origVar)
 {
     if (IRType* diffType = differentiateType(builder, origVar->getDataType()->getValueType()))
@@ -230,10 +247,12 @@ InstPair ForwardDiffTranscriber::transcribeBinaryArith(IRBuilder* builder, IRIns
                             diffLeft,
                             builder->getFloatValue(
                                 constant->getDataType(), 1.0 / constant->getValue()));
+                        builder->markInstAsDifferential(diff, resultType);
                     }
                     else
                     {
                         diff = builder->emitDiv(diffType, diffLeft, primalRight);
+                        builder->markInstAsDifferential(diff, resultType);
                     }
                     return InstPair(primalArith, diff);
                 }
@@ -247,6 +266,7 @@ InstPair ForwardDiffTranscriber::transcribeBinaryArith(IRBuilder* builder, IRIns
                 
                     auto diffSub = builder->emitSub(diffType, diffLeftTimesRight, diffRightTimesLeft);
                     builder->markInstAsDifferential(diffSub, resultType);
+
                     auto diffMul = builder->emitMul(primalRight->getFullType(), primalRight, primalRight);
                     builder->markInstAsPrimal(diffMul);
 
@@ -661,7 +681,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
                 auto pairPtrType = as<IRPtrTypeBase>(pairType);
                 auto pairValType = as<IRDifferentialPairType>(
                     pairPtrType ? pairPtrType->getValueType() : pairType);
-                auto diffType = differentiableTypeConformanceContext.getDifferentialTypeFromDiffPairType(&argBuilder, pairValType);
+                auto diffType = differentiableTypeConformanceContext.getDiffTypeFromPairType(&argBuilder, pairValType);
                 if (auto ptrParamType = as<IRPtrTypeBase>(diffParamType))
                 {
                     // Create temp var to pass in/out arguments.
@@ -698,6 +718,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
                         {
                             auto newDiffVal = afterBuilder.emitDifferentialPairGetDifferential((IRType*)diffType, newVal);
                             afterBuilder.markInstAsDifferential(newDiffVal, pairValType->getValueType());
+
                             auto storeInst = afterBuilder.emitStore(diffArg, newDiffVal);
                             afterBuilder.markInstAsDifferential(storeInst, pairValType->getValueType());
                         }
@@ -1389,16 +1410,19 @@ InstPair ForwardDiffTranscriber::transcribeMakeExistential(IRBuilder* builder, I
     SLANG_RELEASE_ASSERT(primalInterfaceType);
 
     // If the interface type of the existential is differentiable, we emit a make existential
-    // of IDifferentiable interface type and the witness table of the original type's conformance
+    // of IDifferentiable.Differential type and the witness table of the original type's conformance
     // to IDifferentiable.
     //
-    if (auto differentialWitnessTable = tryExtractConformanceFromInterfaceType(
+    if (auto differentialWitnessTable = differentiableTypeConformanceContext.tryExtractConformanceFromInterfaceType(
         builder, primalInterfaceType, (IRWitnessTable*)primalWitnessTable))
     {
         if (auto diffBase = findOrTranscribeDiffInst(builder, origBase))
         {
+            auto differentialAssociatedType = differentiateType(builder, primalInterfaceType);
+            SLANG_ASSERT(differentialAssociatedType);
+
             diffResult = builder->emitMakeExistential(
-                autoDiffSharedContext->differentiableInterfaceType,
+                differentialAssociatedType,
                 diffBase,
                 differentialWitnessTable);
         }
@@ -1735,6 +1759,7 @@ InstPair ForwardDiffTranscriber::transcribeFunc(IRBuilder* inBuilder, IRFunc* pr
                     {
                         auto diffVal = builder.emitLoad(writeBack.value.differential);
                         builder.markInstAsDifferential(diffVal, primalVal->getFullType());
+
                         valToStore = builder.emitMakeDifferentialPair(cast<IRPtrTypeBase>(param->getFullType())->getValueType(),
                             primalVal, diffVal);
                         builder.markInstAsMixedDifferential(valToStore, valToStore->getFullType());
@@ -1867,6 +1892,9 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
 
     case kIROp_ExtractExistentialValue:
         return transcribeSingleOperandInst(builder, origInst);
+
+    case kIROp_PackAnyValue:
+        return transcribeSingleOperandInst(builder, origInst);
         
     case kIROp_MakeExistential:
         return transcribeMakeExistential(builder, as<IRMakeExistential>(origInst));
@@ -1874,10 +1902,16 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_ExtractExistentialType:
     {
         IRInst* witnessTable;
+        auto diffType = differentiateExtractExistentialType(
+                builder, as<IRExtractExistentialType>(origInst), witnessTable);
+
+        // Mark types as primal since they are not transposable.
+        if (diffType)
+            builder->markInstAsPrimal(diffType);
+
         return InstPair(
             maybeCloneForPrimalInst(builder, origInst),
-            differentiateExtractExistentialType(
-                builder, as<IRExtractExistentialType>(origInst), witnessTable));
+            diffType);
     }
     case kIROp_ExtractExistentialWitnessTable:
         return transcribeExtractExistentialWitnessTable(builder, origInst);
@@ -1890,6 +1924,9 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
 
     case kIROp_undefined:
         return transcribeUndefined(builder, origInst);
+    
+    case kIROp_Reinterpret:
+        return transcribeReinterpret(builder, origInst);
 
         // Differentiable insts that should have been lowered in a previous pass.
     case kIROp_SwizzledStore: 
@@ -1901,7 +1938,6 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
         SLANG_RELEASE_ASSERT(lookupDiffInst(swizzledStore->getDest(), nullptr) == nullptr);
         return transcribeNonDiffInst(builder, swizzledStore);
     }
-
         // Known non-differentiable insts.
     case kIROp_Not:
     case kIROp_BitAnd:
@@ -1918,12 +1954,10 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_RWStructuredBufferLoadStatus:
     case kIROp_RWStructuredBufferStore:
     case kIROp_RWStructuredBufferGetElementPtr:
-    case kIROp_Reinterpret:
     case kIROp_IsType:
     case kIROp_ImageSubscript:
     case kIROp_ImageLoad:
     case kIROp_ImageStore:
-    case kIROp_PackAnyValue:
     case kIROp_UnpackAnyValue:
     case kIROp_GetNativePtr:
     case kIROp_CastIntToFloat:
@@ -1936,6 +1970,11 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
         // A call to createDynamicObject<T>(arbitraryData) cannot provide a diff value,
         // so we treat this inst as non differentiable.
         // We can extend the frontend and IR with a separate op-code that can provide an explicit diff value.
+        // 
+        // However, we can't skip this instruction since it also produces a _type_ which may be used by
+        // other differentiable instructions. Therefore, we'll create another existential object but with
+        // a dzero() for it's value.
+        // 
     case kIROp_CreateExistentialObject:
         return transcribeNonDiffInst(builder, origInst);
 
