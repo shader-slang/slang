@@ -3,12 +3,12 @@
 
 #include "slang-ir-glsl-legalize.h"
 
-#include "slang-ir-layout-on-types.h"
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
 #include "slang-emit-base.h"
 #include "slang-glsl-extension-tracker.h"
-#include "slang-type-layout.h"
+#include "slang-ir-lower-buffer-element-type.h"
+#include "slang-ir-layout.h"
 
 namespace Slang
 {
@@ -57,6 +57,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         auto ptrType = as<IRPtrTypeBase>(inst->getDataType());
         if (!ptrType)
         {
+            if (as<IRResourceTypeBase>(inst))
+                return;
+
             SpvStorageClass storageClass = SpvStorageClassPrivate;
             // Figure out storage class based on var layout.
             if (auto layout = getVarLayout(inst))
@@ -86,6 +89,12 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             if(const auto constantBufferType = as<IRConstantBufferType>(innerType))
             {
                 innerType = constantBufferType->getElementType();
+                storageClass = SpvStorageClassUniform;
+            }
+            else if (auto paramBlockType = as<IRParameterBlockType>(innerType))
+            {
+                innerType = paramBlockType->getElementType();
+                storageClass = SpvStorageClassUniform;
             }
 
             // Make a pointer type of storageClass.
@@ -255,6 +264,43 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         processGetElementPtrImpl(gepInst, gepInst->getBase(), gepInst->getIndex());
     }
 
+    void processStructuredBufferLoad(IRInst* loadInst)
+    {
+        auto sb = loadInst->getOperand(0);
+        auto index = loadInst->getOperand(1);
+        IRBuilder builder(sb);
+        builder.setInsertBefore(loadInst);
+        IRInst* args[] = { sb, index };
+        auto addrInst = builder.emitIntrinsicInst(
+            builder.getPtrType(kIROp_PtrType, loadInst->getFullType(), SpvStorageClassStorageBuffer),
+            kIROp_RWStructuredBufferGetElementPtr,
+            2,
+            args);
+        auto value = builder.emitLoad(addrInst);
+        loadInst->replaceUsesWith(value);
+        loadInst->removeAndDeallocate();
+        addUsersToWorkList(value);
+    }
+
+    void processRWStructuredBufferStore(IRInst* storeInst)
+    {
+        auto sb = storeInst->getOperand(0);
+        auto index = storeInst->getOperand(1);
+        auto value = storeInst->getOperand(2);
+        IRBuilder builder(sb);
+        builder.setInsertBefore(storeInst);
+        IRInst* args[] = { sb, index };
+        auto addrInst = builder.emitIntrinsicInst(
+            builder.getPtrType(kIROp_PtrType, value->getFullType(), SpvStorageClassStorageBuffer),
+            kIROp_RWStructuredBufferGetElementPtr,
+            2,
+            args);
+        auto newStore = builder.emitStore(addrInst, value);
+        storeInst->replaceUsesWith(newStore);
+        storeInst->removeAndDeallocate();
+        addUsersToWorkList(newStore);
+    }
+
     void processFieldAddress(IRFieldAddress* inst)
     {
         if (auto ptrType = as<IRPtrTypeBase>(inst->getBase()->getDataType()))
@@ -279,33 +325,24 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
-    void processStructuredBufferType(IRHLSLStructuredBufferTypeBase* inst)
+    void processStructuredBufferType(IRHLSLStructuredBufferTypeBase * inst)
     {
-        // const auto elementTypeLayout = inst->getElementType()->findDecoration<IRTypeLayout>();
-        // SLANG_ASSERT(elementTypeLayout);
-        const auto typeLayoutDecoration = inst->findDecoration<IRLayoutDecoration>();
-        SLANG_ASSERT(typeLayoutDecoration);
-        const auto typeLayout = as<IRStructuredBufferTypeLayout>(typeLayoutDecoration->getLayout());
-        SLANG_ASSERT(typeLayout);
-        const auto elemTypeLayout = typeLayout->getElementTypeLayout();
-        SLANG_ASSERT(elemTypeLayout);
+        auto layoutRules = getTypeLayoutRuleForBuffer(m_sharedContext->m_targetRequest, inst);
 
         IRBuilder builder(m_sharedContext->m_irModule);
 
         builder.setInsertBefore(inst);
-        const auto arrayType = builder.getUnsizedArrayType(inst->getElementType());
-        IRArrayTypeLayout::Builder arrayTypeLayoutBuilder(&builder, elemTypeLayout);
-        const auto arrayTypeLayout = arrayTypeLayoutBuilder.build();
-        IRVarLayout::Builder varLayoutBuilder(&builder, arrayTypeLayout);
-        varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::Uniform);
-        const auto arrayFieldVarLayout = varLayoutBuilder.build();
+        auto elementType = inst->getElementType();
+        IRSizeAndAlignment elementSize;
+        getSizeAndAlignment(layoutRules, elementType, &elementSize);
+        elementSize = layoutRules->alignCompositeElement(elementSize);
 
+        const auto arrayType = builder.getUnsizedArrayType(inst->getElementType(), builder.getIntValue(builder.getIntType(), elementSize.getStride()));
         const auto structType = builder.createStructType();
-        IRStructTypeLayout::Builder structTypeLayoutBuilder(&builder);
         const auto arrayKey = builder.createStructKey();
         builder.createStructField(structType, arrayKey, arrayType);
-        structTypeLayoutBuilder.addField(arrayKey, arrayFieldVarLayout);
-        const auto structTypeLayout = structTypeLayoutBuilder.build();
+        IRSizeAndAlignment structSize;
+        getSizeAndAlignment(layoutRules, structType, &structSize);
 
         const auto ptrType = builder.getPtrType(kIROp_PtrType, structType, SpvStorageClassStorageBuffer);
 
@@ -321,14 +358,15 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         case kIROp_HLSLConsumeStructuredBufferType:
             nameSb << "ConsumeStructuredBuffer";
             break;
+        case kIROp_HLSLRasterizerOrderedStructuredBufferType:
+            nameSb << "RasterizerOrderedStructuredBuffer";
+            break;
         default:
             nameSb << "StructuredBuffer";
             break;
         }
         builder.addNameHintDecoration(structType, nameSb.getUnownedSlice());
         builder.addDecoration(structType, kIROp_SPIRVBufferBlockDecoration);
-        SLANG_ASSERT(!structType->findDecoration<IRLayoutDecoration>());
-        builder.addLayoutDecoration(structType, structTypeLayout);
         inst->replaceUsesWith(ptrType);
         inst->removeAndDeallocate();
         addUsersToWorkList(ptrType);
@@ -363,6 +401,15 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 break;
             case kIROp_RWStructuredBufferGetElementPtr:
                 processRWStructuredBufferGetElementPtr(as<IRRWStructuredBufferGetElementPtr>(inst));
+                break;
+            case kIROp_RWStructuredBufferLoad:
+            case kIROp_StructuredBufferLoad:
+            case kIROp_RWStructuredBufferLoadStatus:
+            case kIROp_StructuredBufferLoadStatus:
+                processStructuredBufferLoad(inst);
+                break;
+            case kIROp_RWStructuredBufferStore:
+                processRWStructuredBufferStore(inst);
                 break;
             case kIROp_HLSLStructuredBufferType:
             case kIROp_HLSLRWStructuredBufferType:
@@ -408,7 +455,6 @@ void legalizeIRForSPIRV(
     const List<IRFunc*>& entryPoints,
     CodeGenContext* codeGenContext)
 {
-    placeTypeLayoutsOnTypes(module, codeGenContext);
     GLSLExtensionTracker extensionTracker;
     legalizeEntryPointsForGLSL(module->getSession(), module, entryPoints, codeGenContext, &extensionTracker);
     legalizeSPIRV(context, module);

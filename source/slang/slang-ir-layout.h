@@ -18,7 +18,6 @@
 
 #include "slang-ir.h"
 
-
 namespace Slang
 {
 class TargetRequest;
@@ -51,13 +50,29 @@ struct IRSizeAndAlignment
     }
 };
 
+struct IRTypeLayoutRules
+{
+public:
+    IRTypeLayoutRuleName ruleName;
+    virtual IRSizeAndAlignment alignCompositeElement(IRSizeAndAlignment elementSize) = 0;
+    virtual IRSizeAndAlignment getVectorSizeAndAlignment(IRSizeAndAlignment element, IRIntegerValue count) = 0;
+    static IRTypeLayoutRules* getStd430();
+    static IRTypeLayoutRules* getStd140();
+    static IRTypeLayoutRules* getNatural();
+    static IRTypeLayoutRules* get(IRTypeLayoutRuleName name);
+};
+
+Result getOffset(IRTypeLayoutRules* rules, IRStructField* field, IRIntegerValue* outOffset);
+
+Result getSizeAndAlignment(IRTypeLayoutRules* rules, IRType* type, IRSizeAndAlignment* outSizeAndAlignment);
+
     /// Compute (if necessary) and return the natural size and alignment of `type`.
     ///
     /// This operation may fail if `type` is not one that can be stored in
     /// general-purpose memory for the current target. In that case the
     /// type is considered to have no natural layout.
     ///
-Result getNaturalSizeAndAlignment(TargetRequest* target, IRType* type, IRSizeAndAlignment* outSizeAndAlignment);
+Result getNaturalSizeAndAlignment(IRType* type, IRSizeAndAlignment* outSizeAndAlignment);
 
     /// Compute (if necessary) and return the natural offset of `field`
     ///
@@ -65,7 +80,7 @@ Result getNaturalSizeAndAlignment(TargetRequest* target, IRType* type, IRSizeAnd
     /// that can be stored in general-purpose memory. In that case, the
     /// field is considered to have no natural offset.
     ///
-Result getNaturalOffset(TargetRequest* target, IRStructField* field, IRIntegerValue* outOffset);
+Result getNaturalOffset(IRStructField* field, IRIntegerValue* outOffset);
 
 /// Compute (if necessary) and return the std430 size and alignment of `type`.
 ///
@@ -73,7 +88,7 @@ Result getNaturalOffset(TargetRequest* target, IRStructField* field, IRIntegerVa
 /// general-purpose memory for the current target. In that case the
 /// type is considered to have no std430 layout.
 ///
-Result getStd430SizeAndAlignment(TargetRequest* target, IRType* type, IRSizeAndAlignment* outSizeAndAlignment);
+Result getStd430SizeAndAlignment(IRType* type, IRSizeAndAlignment* outSizeAndAlignment);
 
 /// Compute (if necessary) and return the std430 offset of `field`
 ///
@@ -81,7 +96,7 @@ Result getStd430SizeAndAlignment(TargetRequest* target, IRType* type, IRSizeAndA
 /// that can be stored in general-purpose memory. In that case, the
 /// field is considered to have no std430 offset.
 ///
-Result getStd430Offset(TargetRequest* target, IRStructField* field, IRIntegerValue* outOffset);
+Result getStd430Offset(IRStructField* field, IRIntegerValue* outOffset);
 
 }
 
