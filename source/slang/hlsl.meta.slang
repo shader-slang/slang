@@ -904,8 +904,9 @@ __generic<T : __BuiltinType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "all(bvec$N0($0))")
 __target_intrinsic(spirv, boolean(T), "OpAll resultType resultId _0")
-__target_intrinsic(spirv, integral(T), "%c = OpINotEqual resultType resultId _0 const(,0); OpAll resultType resultId %c")
-__target_intrinsic(spirv, floating(T), "%c = OpFUnordNotEqual resultType resultId _0 const(,0); OpAll resultType resultId %c")
+// TODO: correct resultType in here
+// __target_intrinsic(spirv, integral(T), "%c = OpINotEqual {vector<bool,N>} resultId _0 const(,0); OpAll resultType resultId %c")
+// __target_intrinsic(spirv, floating(T), "%c = OpFUnordNotEqual {vector<bool,N>} resultId _0 const(,0); OpAll resultType resultId %c")
 [__readNone]
 bool all(vector<T,N> x)
 {
