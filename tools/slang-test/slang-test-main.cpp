@@ -2992,6 +2992,10 @@ static void _addRenderTestOptions(const Options& options, CommandLine& ioCmdLine
         ioCmdLine.addArg("-adapter");
         ioCmdLine.addArg(options.adapter);
     }
+    if (options.emitSPIRVDirectly)
+    {
+        ioCmdLine.addArg("-emit-spirv-directly");
+    }
 }
 
 static SlangResult _extractProfileTime(const UnownedStringSlice& text, double& timeOut)
@@ -4117,7 +4121,7 @@ void runTestsInDirectory(
         auto threadFunc = [&](int threadId)
         {
             TestReporter reporter;
-            reporter.init(context->options.outputMode, true);
+            reporter.init(context->options.outputMode, context->options.expectedFailureList, true);
             TestReporter::SuiteScope suiteScope(&reporter, "tests");
             context->setThreadIndex(threadId);
             context->setTestReporter(&reporter);
@@ -4275,10 +4279,6 @@ static SlangResult runUnitTestModule(TestContext* context, TestOptions& testOpti
 
 SlangResult innerMain(int argc, char** argv)
 {
-    // Disable buffering for out and std out
-    StreamUtil::setStreamBufferStyle(StdStreamType::Out, StreamBufferStyle::None);
-    StreamUtil::setStreamBufferStyle(StdStreamType::ErrorOut, StreamBufferStyle::None);
-
     auto stdWriters = StdWriters::initDefaultSingleton();
 
     // The context holds useful things used during testing
@@ -4457,7 +4457,7 @@ SlangResult innerMain(int argc, char** argv)
     {
         // Setup the reporter
         TestReporter reporter;
-        SLANG_RETURN_ON_FAIL(reporter.init(options.outputMode));
+        SLANG_RETURN_ON_FAIL(reporter.init(options.outputMode, options.expectedFailureList));
 
         context.setTestReporter(&reporter);
 

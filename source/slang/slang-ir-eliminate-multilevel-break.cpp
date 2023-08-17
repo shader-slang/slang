@@ -193,6 +193,14 @@ struct EliminateMultiLevelBreakContext
             {
                 if (as<IRBlock>(terminator->getParent()) == block)
                 {
+                    // Don't double count instructions like
+                    // ifElse(cond, true, after, after)
+                    if(const auto ifElse = as<IRIfElse>(terminator))
+                    {
+                        if(&ifElse->afterBlock == use)
+                            continue;
+                    }
+
                     relevantUses.add(use);
                 }
             }

@@ -76,7 +76,7 @@ TestReporter::TestReporter() :
     m_passedTestCount = 0;
     m_failedTestCount = 0;
     m_ignoredTestCount = 0;
-
+    m_expectedFailedTestCount = 0;
     m_maxFailTestResults = 10;
 
     m_inTest = false;
@@ -84,10 +84,11 @@ TestReporter::TestReporter() :
     m_isVerbose = false;
 }
 
-Result TestReporter::init(TestOutputMode outputMode, bool isSubReporter)
+Result TestReporter::init(TestOutputMode outputMode, const HashSet<String>& expectedFailureList, bool isSubReporter)
 {
     m_outputMode = outputMode;
     m_isSubReporter = isSubReporter;
+    m_expectedFailureList = expectedFailureList;
     return SLANG_OK;
 }
 
@@ -141,7 +142,8 @@ void TestReporter::addResult(TestResult result)
     assert(m_inTest);
 
     std::lock_guard<std::recursive_mutex> lock(m_mutex);
-
+    if (result == TestResult::Fail && m_expectedFailureList.contains(m_currentInfo.name))
+        result = TestResult::ExpectedFail;
     m_currentInfo.testResult = combine(m_currentInfo.testResult, result);
     m_numCurrentResults++;
 }
@@ -158,6 +160,7 @@ void TestReporter::addResultWithLocation(TestResult result, const char* testText
     assert(m_inTest);
 
     std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    result = adjustResult(m_currentInfo.name.getUnownedSlice(), result);
 
     m_numCurrentResults++;
 
@@ -207,6 +210,7 @@ void TestReporter::consolidateWith(TestReporter* other)
     m_failedTestCount += other->m_failedTestCount;
     m_ignoredTestCount += other->m_ignoredTestCount;
     m_passedTestCount += other->m_passedTestCount;
+    m_expectedFailedTestCount += other->m_expectedFailedTestCount;
     m_totalTestCount += other->m_totalTestCount;
 }
 
@@ -295,12 +299,13 @@ static void _appendTime(double timeInSec, StringBuilder& out)
     out << timeInSec << "ns";
 }
 
-void TestReporter::_addResult(const TestInfo& info)
+void TestReporter::_addResult(TestInfo info)
 {
     if (info.testResult == TestResult::Ignored && m_hideIgnored)
     {
         return;
     }
+    info.testResult = adjustResult(info.name.getUnownedSlice(), info.testResult);
 
     m_totalTestCount++;
 
@@ -312,6 +317,9 @@ void TestReporter::_addResult(const TestInfo& info)
 
         case TestResult::Pass:
             m_passedTestCount++;
+            break;
+        case TestResult::ExpectedFail:
+            m_expectedFailedTestCount++;
             break;
 
         case TestResult::Ignored:
@@ -332,6 +340,9 @@ void TestReporter::_addResult(const TestInfo& info)
         {
         case TestResult::Fail:
             resultString = "FAILED";
+            break;
+        case TestResult::ExpectedFail:
+            resultString = "failed(expected)";
             break;
         case TestResult::Pass:
             resultString = "passed";
@@ -383,7 +394,8 @@ void TestReporter::_addResult(const TestInfo& info)
                     }
                     break;
                 }
-                case TestResult::Pass:     
+                case TestResult::Pass:
+                case TestResult::ExpectedFail:
                 {
                     StringBuilder message;
                     message << info.message;
@@ -443,6 +455,8 @@ void TestReporter::_addResult(const TestInfo& info)
                 case TestResult::Fail:      resultString = "Failed";  break;
                 case TestResult::Pass:      resultString = "Passed";  break;
                 case TestResult::Ignored:   resultString = "Ignored"; break;
+                case TestResult::ExpectedFail:   resultString = "ExpectedFail"; break;
+
                 default:
                     assert(!"unexpected");
                     break;
@@ -560,7 +574,7 @@ void TestReporter::message(TestMessageType type, const char* messageContent)
 
 bool TestReporter::didAllSucceed() const
 {
-    return m_passedTestCount == (m_totalTestCount - m_ignoredTestCount);
+    return m_failedTestCount == 0;
 }
 
 void TestReporter::outputSummary()
@@ -592,8 +606,25 @@ void TestReporter::outputSummary()
             {
                 printf(", %d tests ignored", ignoredCount);
             }
+            if (m_expectedFailedTestCount)
+            {
+                printf(", %d tests failed expectedly", m_expectedFailedTestCount);
+                printf("\n===\n\n");
+                printf("\npassing tests that are expected to fail:\n");
+                printf("---\n");
+                for (const auto& testInfo : m_testInfos)
+                {
+                    if (testInfo.testResult == TestResult::Pass)
+                    {
+                        if (m_expectedFailureList.contains(testInfo.name))
+                        {
+                            printf("%s\n", testInfo.name.getBuffer());
+                        }
+                    }
+                }
+                printf("---\n");
+            }
             printf("\n===\n\n");
-
             if (m_failedTestCount)
             {
                 printf("failing tests:\n");
@@ -607,6 +638,7 @@ void TestReporter::outputSummary()
                 }
                 printf("---\n");
             }
+            
             break;
         }
         
@@ -713,4 +745,11 @@ void TestReporter::endSuite()
     }
     
     m_suiteStack.removeLast();
+}
+
+TestResult TestReporter::adjustResult(UnownedStringSlice testName, TestResult result)
+{
+    if (result == TestResult::Fail && m_expectedFailureList.contains(testName))
+        result = TestResult::ExpectedFail;
+    return result;
 }
