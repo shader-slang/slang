@@ -174,11 +174,8 @@ static void _foldAndSimplifyLoopIteration(
             auto b = clonedBlocks[i];
             if (b)
             {
-                if (i != insertIndex)
-                {
-                    clonedBlocks[insertIndex] = b;
-                    insertIndex++;
-                }
+                clonedBlocks[insertIndex] = b;
+                insertIndex++;
             }
         }
         clonedBlocks.setCount(insertIndex);
