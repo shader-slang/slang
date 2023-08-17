@@ -5124,11 +5124,13 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // by `continue` or `break` statements.
         auto loopHead = createBlock();
         auto bodyLabel = createBlock();
+        // A `continue` inside a `while` loop jumps to the end of the loop, to
+        // then immediately follow the back edge to the top
+        // While we could jump to the loop head directly, this would mean more
+        // than one back-edge which complicated the SPIR-V backend (TODO: we
+        // should add this check to our IR validate machinery)
+        auto continueLabel = createBlock();
         auto breakLabel = createBlock();
-
-        // A `continue` inside a `while` loop always
-        // jumps to the head of hte loop.
-        auto continueLabel = loopHead;
 
         // Register the `break` and `continue` labels so
         // that we can find them for nested statements.
@@ -5164,7 +5166,9 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // Emit the body of the loop
         insertBlock(bodyLabel);
         lowerStmt(context, stmt->statement);
+        emitBranchIfNeeded(continueLabel);
 
+        insertBlock(continueLabel);
         // At the end of the body we need to jump back to the top.
         emitBranchIfNeeded(loopHead);
 
