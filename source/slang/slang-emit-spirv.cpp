@@ -3327,7 +3327,7 @@ SlangResult emitSPIRVFromIR(
     auto targetRequest = codeGenContext->getTargetReq();
     auto sink = codeGenContext->getSink();
 
-#if 1
+#if 0
     {
         DiagnosticSinkWriter writer(codeGenContext->getSink());
         dumpIR(
@@ -3342,7 +3342,7 @@ SlangResult emitSPIRVFromIR(
     SPIRVEmitContext context(irModule, targetRequest, sink);
     legalizeIRForSPIRV(&context, irModule, irEntryPoints, codeGenContext);
 
-#if 1
+#if 0
     {
         DiagnosticSinkWriter writer(codeGenContext->getSink());
         dumpIR(
