@@ -419,8 +419,11 @@ void WinProcess::kill(int32_t returnCode)
             WinHandle childStdInWriteTmp;
             // create stdout pipe for child process
             SLANG_RETURN_FAIL_ON_FALSE(CreatePipe(childStdOutReadTmp.writeRef(), childStdOutWrite.writeRef(), &securityAttributes, bufferSize));
-            // create stderr pipe for child process
-            SLANG_RETURN_FAIL_ON_FALSE(CreatePipe(childStdErrReadTmp.writeRef(), childStdErrWrite.writeRef(), &securityAttributes, bufferSize));
+            if ((flags & Process::Flag::DisableStdErrRedirection) == 0)
+            {
+                // create stderr pipe for child process
+                SLANG_RETURN_FAIL_ON_FALSE(CreatePipe(childStdErrReadTmp.writeRef(), childStdErrWrite.writeRef(), &securityAttributes, bufferSize));
+            }
             // create stdin pipe for child process        
             SLANG_RETURN_FAIL_ON_FALSE(CreatePipe(childStdInRead.writeRef(), childStdInWriteTmp.writeRef(), &securityAttributes, bufferSize));
 
@@ -431,7 +434,8 @@ void WinProcess::kill(int32_t returnCode)
             // create a non-inheritable duplicate of the stdout reader        
             SLANG_RETURN_FAIL_ON_FALSE(DuplicateHandle(currentProcess, childStdOutReadTmp, currentProcess, childStdOutRead.writeRef(), 0, FALSE, DUPLICATE_SAME_ACCESS));
             // create a non-inheritable duplicate of the stderr reader
-            SLANG_RETURN_FAIL_ON_FALSE(DuplicateHandle(currentProcess, childStdErrReadTmp, currentProcess, childStdErrRead.writeRef(), 0, FALSE, DUPLICATE_SAME_ACCESS));
+            if (childStdErrReadTmp)
+                SLANG_RETURN_FAIL_ON_FALSE(DuplicateHandle(currentProcess, childStdErrReadTmp, currentProcess, childStdErrRead.writeRef(), 0, FALSE, DUPLICATE_SAME_ACCESS));
             // create a non-inheritable duplicate of the stdin writer
             SLANG_RETURN_FAIL_ON_FALSE(DuplicateHandle(currentProcess, childStdInWriteTmp, currentProcess, childStdInWrite.writeRef(), 0, FALSE, DUPLICATE_SAME_ACCESS));
         }
@@ -522,7 +526,8 @@ void WinProcess::kill(int32_t returnCode)
     }
 
     RefPtr<Stream> streams[Index(StdStreamType::CountOf)];
-    streams[Index(StdStreamType::ErrorOut)] = new WinPipeStream(childStdErrRead.detach(), FileAccess::Read);
+    if (childStdErrRead)
+        streams[Index(StdStreamType::ErrorOut)] = new WinPipeStream(childStdErrRead.detach(), FileAccess::Read);
     streams[Index(StdStreamType::Out)] = new WinPipeStream(childStdOutRead.detach(), FileAccess::Read);
     streams[Index(StdStreamType::In)] = new WinPipeStream(childStdInWrite.detach(), FileAccess::Write);
 

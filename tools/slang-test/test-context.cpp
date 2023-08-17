@@ -186,11 +186,12 @@ SlangResult TestContext::_createJSONRPCConnection(RefPtr<JSONRPCConnection>& out
     {
         CommandLine cmdLine;
         cmdLine.setExecutableLocation(ExecutableLocation(exeDirectoryPath, "test-server"));
-        SLANG_RETURN_ON_FAIL(Process::create(cmdLine, Process::Flag::AttachDebugger, process));
+        SLANG_RETURN_ON_FAIL(Process::create(cmdLine, Process::Flag::AttachDebugger | Process::Flag::DisableStdErrRedirection, process));
     }
 
     Stream* writeStream = process->getStream(StdStreamType::In);
     RefPtr<BufferedReadStream> readStream(new BufferedReadStream(process->getStream(StdStreamType::Out)));
+    RefPtr<BufferedReadStream> readErrStream(new BufferedReadStream(process->getStream(StdStreamType::ErrorOut)));
 
     RefPtr<HTTPPacketConnection> connection = new HTTPPacketConnection(readStream, writeStream);
     RefPtr<JSONRPCConnection> rpcConnection = new JSONRPCConnection;

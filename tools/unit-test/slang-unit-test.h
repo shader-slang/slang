@@ -9,6 +9,7 @@ enum class TestResult
     // and a fail, is still a fail overall. 
     Ignored,
     Pass,
+    ExpectedFail,
     Fail,
 };
 
