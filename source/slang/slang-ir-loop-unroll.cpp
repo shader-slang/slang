@@ -174,11 +174,8 @@ static void _foldAndSimplifyLoopIteration(
             auto b = clonedBlocks[i];
             if (b)
             {
-                if (i != insertIndex)
-                {
-                    clonedBlocks[insertIndex] = b;
-                    insertIndex++;
-                }
+                clonedBlocks[insertIndex] = b;
+                insertIndex++;
             }
         }
         clonedBlocks.setCount(insertIndex);
@@ -554,11 +551,12 @@ void eliminateContinueBlocks(IRModule* module, IRLoop* loopInst)
     //  where a continue is replaced with a "break" into breakableRegionBreakBlock.
     //
 
-    if (loopInst->getContinueBlock() == loopInst->getTargetBlock())
+    auto continueBlock = loopInst->getContinueBlock();
+
+    if (continueBlock == loopInst->getTargetBlock())
         return;
 
     // If the continue block is not reachable, remove it.
-    auto continueBlock = loopInst->getContinueBlock();
     if (continueBlock && !continueBlock->hasMoreThanOneUse())
     {
         loopInst->continueBlock.set(loopInst->getTargetBlock());

@@ -34,11 +34,20 @@ static bool isSmallBlock(IRBlock* c)
     return true;
 }
 
+static bool hasIrrelevantContinueBlock(IRLoop* loop)
+{
+    const auto c = loop->getContinueBlock();
+    return c == loop->getTargetBlock() || c->getPredecessors().getCount() <= 1;
+}
+
 // Loops are suitable for inversion if:
 // - The loop jumps to a conditional branch which has the break block as one of
 //   its successors (or a trivial break block which we erase) and the other
 //   successor is empty
 // - The conditional block is "small", because we will be duplicating it
+// - The loop's continue block is irrelevant, because we'll need to change it,
+//   either by being the loop header already or by having only a single use
+//   within the loop body
 static bool isSuitableForInversion(IRLoop* loop)
 {
     const auto nextBlock = loop->getTargetBlock();
@@ -50,6 +59,9 @@ static bool isSuitableForInversion(IRLoop* loop)
         return false;
 
     if(!isSmallBlock(nextBlock))
+        return false;
+
+    if(!hasIrrelevantContinueBlock(loop))
         return false;
 
     const auto t = branch->getTrueBlock();
@@ -98,19 +110,19 @@ static IRParam* duplicateToParamWithDecorations(IRBuilder& builder, IRCloneEnv& 
 
 // Given
 // s: ...1 loop break=b next=c1
-// c1: if x then goto b else goto d
+// c1: if x then goto b else goto d (merge at d)
 // d: goto c1
 // b: ...2
 //
 // Produce:
-// s: ...1 goto c1
-// c1: if x then goto e1 else goto l
-// e1: goto b
-// l: loop break=b next=d
-// d: goto c2:
-// c2: if x then goto e2 else goto e3
-// e3: goto d
+// s: ...1 goto c2
+// c2: if x then goto e2 else goto l (merge at b)
 // e2: goto b
+// l: loop break=b next=d
+// d: goto c1:
+// c1: if x then goto e1 else goto e3 (merge at e3)
+// e3: goto d
+// e1: goto b
 // b: ...2
 //
 // s is the Start block
@@ -126,7 +138,7 @@ static void invertLoop(IRBuilder& builder, IRLoop* loop)
     auto domTree = computeDominatorTree(s->getParent());
     SLANG_ASSERT(s);
     const auto c1 = loop->getTargetBlock();
-    const auto c1Terminator = as<IRConditionalBranch>(c1->getTerminator());
+    const auto c1Terminator = as<IRIfElse>(c1->getTerminator());
     SLANG_ASSERT(c1Terminator);
     const auto b = loop->getBreakBlock();
     auto& c1dUse = c1Terminator->getTrueBlock() == b ? c1Terminator->falseBlock : c1Terminator->trueBlock;
@@ -164,6 +176,7 @@ static void invertLoop(IRBuilder& builder, IRLoop* loop)
     e1->insertAfter(c1);
     builder.emitBranch(b, c1Params.getCount(), c1Params.getBuffer());
     c1bUse.set(e1);
+    c1Terminator->afterBlock.set(d);
     // Similarly, we have to replace any existing 'break's to break via e1
     traverseUses(b, [&](IRUse* u){
         auto userBlock = u->getUser()->getParent();
@@ -173,7 +186,7 @@ static void invertLoop(IRBuilder& builder, IRLoop* loop)
     });
     // We now have
     // s: ...1 loop break=b next=c1
-    // c1: if x then goto e1 else goto d
+    // c1: if x then goto e1 else goto d (merge at d)
     // e1: goto b
     // d: goto c1
     // b: ...2
@@ -192,9 +205,9 @@ static void invertLoop(IRBuilder& builder, IRLoop* loop)
     c2Terminator->removeAndDeallocate();
     // We now have
     // s: ...1 loop break=b next=c1
-    // c2: if x then goto e2 else goto d
+    // c2: if x then goto e2 else goto d (merge at b)
     // e2: goto b
-    // c1: if x then goto e1 else goto d
+    // c1: if x then goto e1 else goto d (merge at d)
     // e1: goto b
     // d: goto c1
     // b: ...2
@@ -205,10 +218,10 @@ static void invertLoop(IRBuilder& builder, IRLoop* loop)
     loop->insertAtEnd(l);
     // We now have
     // s: ...1 no-termiator
-    // c2: if x then goto e2 else goto d
+    // c2: if x then goto e2 else goto d (merge at b)
     // e2: goto b
     // l: loop break=b next=c1
-    // c1: if x then goto e1 else goto d
+    // c1: if x then goto e1 else goto d (merge at d)
     // e1: goto b
     // d: goto c1
     // b: ...2
@@ -222,10 +235,10 @@ static void invertLoop(IRBuilder& builder, IRLoop* loop)
     builder.emitBranch(c2, as.getCount(), as.getBuffer());
     // We now have
     // s: ...1, goto c2
-    // c2: if x then goto e2 else goto d
+    // c2: if x then goto e2 else goto d (merge at b)
     // e2: goto b
     // l: loop break=b next=c1
-    // c1: if x then goto e1 else goto d
+    // c1: if x then goto e1 else goto d (merge at d)
     // e1: goto b
     // d: goto c1
     // b: ...2
@@ -235,10 +248,10 @@ static void invertLoop(IRBuilder& builder, IRLoop* loop)
     c2dUse.set(l);
     // We now have
     // s: ...1, goto c2
-    // c2: if x then goto e2 else goto l
+    // c2: if x then goto e2 else goto l (merge at b)
     // e2: goto b
     // l: loop break=b next=c1
-    // c1: if x then goto e1 else goto d
+    // c1: if x then goto e1 else goto d (merge at d)
     // e1: goto b
     // d: goto c1
     // b: ...2
@@ -248,12 +261,20 @@ static void invertLoop(IRBuilder& builder, IRLoop* loop)
     // conditional, d, as we know that it won't break out of the loop on the
     // first iteration
     //
+    // Since we're only here if the continue block is irrelevant (either the
+    // target block already or has a single predecessor) we can set it to the
+    // loop header.
+    //
     // Beyond just retargeting the loop instruction, we need to make sure any
     // parameters the loop instruction is passing to c1 are instead passed to
     // 'd', and because we've added parameters to 'd' we need to forward them
     // from c1 also which we will accomplish using a new block, e3,
+    //
     loop->block.set(d);
     loop->breakBlock.set(e1);
+    // TODO: This really upsets a few later passes, why isn't it ok to do given
+    // our "irrelevant continue" condition?
+    // loop->continueBlock.set(loop->getTargetBlock());
     SLANG_ASSERT(d->getFirstParam() == nullptr);
     c1->insertBefore(b);
     e1->insertAfter(c1);
@@ -274,13 +295,14 @@ static void invertLoop(IRBuilder& builder, IRLoop* loop)
     e3->insertAfter(c1);
     builder.emitBranch(d, ps.getCount(), ps.getBuffer());
     c1dUse.set(e3);
+    c1Terminator->afterBlock.set(e3);
     // We now have the desired output
     // s: ...1, goto c2
-    // c2: if x then goto e2 else goto l
+    // c2: if x then goto e2 else goto l (merge at b)
     // e2: goto b
     // l: loop break=e1 next=d
     // d: goto c1
-    // c1: if x then goto e1 else goto e3
+    // c1: if x then goto e1 else goto e3 (merge at e3)
     // e3: goto d
     // e1: goto b
     // b: ...2

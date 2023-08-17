@@ -3,6 +3,7 @@
 
 #include "slang-ir-glsl-legalize.h"
 
+#include "slang-ir-clone.h"
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
 #include "slang-emit-base.h"
@@ -372,6 +373,123 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         addUsersToWorkList(ptrType);
     }
 
+    void processLoop(IRLoop* loop)
+    {
+
+        // 2.11.1. Rules for Structured Control-flow Declarations
+        // Structured control flow declarations must satisfy the following
+        // rules:
+        //   - the merge block declared by a header block must not be a merge
+        //     block declared by any other header block
+        //   - each header block must strictly structurally dominate its merge
+        //     block
+        //   - all back edges must branch to a loop header, with each loop
+        //     header having exactly one back edge branching to it
+        //   - for a given loop header, its merge block, OpLoopMerge Continue
+        //     Target, and corresponding back-edge block:
+        //       - the Continue Target and merge block must be different blocks
+        //       - the loop header must structurally dominate the Continue
+        //         Target
+        //       - the Continue Target must structurally dominate the back-edge
+        //         block
+        //       - the back-edge block must structurally post dominate the
+        //         Continue Target
+
+        // If the continue block has only a single predecessor, pretend like it
+        // is just ordinary control flow
+        //
+        // TODO: could this fail in cases like this, where it had a single
+        // predecessor, but it's still nested inside a region?
+        // do{
+        //   if(x)
+        //     continue;
+        //   unreachable
+        // } while(foo)
+        const auto t = loop->getTargetBlock();
+        auto c = loop->getContinueBlock();
+        if(c->getPredecessors().getCount() <= 1)
+        {
+            c = t;
+            loop->continueBlock.set(c);
+        }
+
+        // Our IR allows multiple back-edges to a loop header if this is also
+        // the loop continue block. SPIR-V does not so replace them with a
+        // single intermediate block
+        if(c == t)
+        {
+            // Subtract one predecessor for the loop entry
+            const auto numBackEdges = c->getPredecessors().getCount() - 1;
+
+            // If we have multiple back-edges, make a new block at the end of
+            // the loop to be the new continue block which jumps straight to
+            // the loop header.
+            //
+            // If we have a single back-edge, we still may need to perform this
+            // transformation to make sure that the back-edge block
+            // structurally post-dominates the continue target. For example
+            // consider the loop:
+            //
+            // int i = 0;
+            // while(true)
+            //     if(foo()) break;
+            //
+            // If we translate this to
+            // loop target=t break=b, continue=t
+            // t: if foo goto x else goto y
+            // x: goto b -- break
+            // y: goto t
+            // b: ...
+            //
+            // The back edge block, y, does not post-dominate the continue target, t.
+            //
+            // So we transform this to:
+            //
+            // loop target=t break=b, continue=c
+            // t: if foo goto x else goto y
+            // x: goto b -- break
+            // y: goto c
+            // c: goto t
+            // b: ...
+            //
+            // Now the back edge block and the continue target are one and the
+            // same, so the condition trivially holds.
+            //
+            // TODO: We don't need to always perform this, we could replace the
+            // below condition with `numBackEdges > 1 ||
+            //     !postDominates(backJumpingBlock, c)`
+            if(numBackEdges > 0)
+            {
+                IRBuilder builder(m_sharedContext->m_irModule);
+                builder.setInsertInto(loop->getParent());
+                IRCloneEnv cloneEnv;
+                cloneEnv.squashChildrenMapping = true;
+
+                // Insert a new continue block at the end of the loop
+                const auto newContinueBlock = builder.emitBlock();
+                newContinueBlock->insertBefore(loop->getBreakBlock());
+
+                // This block simply branches to the loop header, forwarding
+                // any params
+                List<IRInst*> ps;
+                for(const auto p : c->getParams())
+                {
+                    const auto q = cast<IRParam>(cloneInst(&cloneEnv, &builder, p));
+                    newContinueBlock->addParam(q);
+                    ps.add(q);
+                }
+                // Replace all jumps to our loop header/old continue block
+                c->replaceUsesWith(newContinueBlock);
+
+                // Restore the target block
+                loop->block.set(t);
+
+                // Branch to the target in our new continue block
+                builder.emitBranch(t, ps.getCount(), ps.getBuffer());
+            }
+        }
+    }
+
     void processModule()
     {
         addToWorkList(m_module->getModuleInst());
@@ -414,6 +532,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             case kIROp_HLSLStructuredBufferType:
             case kIROp_HLSLRWStructuredBufferType:
                 processStructuredBufferType(as<IRHLSLStructuredBufferTypeBase>(inst));
+                break;
+            case kIROp_loop:
+                processLoop(as<IRLoop>(inst));
                 break;
             default:
                 for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
