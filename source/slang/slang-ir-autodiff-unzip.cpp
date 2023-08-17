@@ -417,7 +417,7 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
                             inst->getFullType(),
                             intermediateVar,
                             structKeyDecor->getStructKey());
-                        iuse->set(val);
+                        builder.replaceOperand(iuse, val);
                     }
                 }
                 instsToRemove.add(inst);

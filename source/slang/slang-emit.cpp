@@ -5,6 +5,7 @@
 
 #include "../compiler-core/slang-name.h"
 
+#include "slang-ir-any-value-inference.h"
 #include "slang-ir-bind-existentials.h"
 #include "slang-ir-byte-address-legalize.h"
 #include "slang-ir-collect-global-uniforms.h"

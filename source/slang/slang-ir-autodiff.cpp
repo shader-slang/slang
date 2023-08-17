@@ -35,6 +35,15 @@ IRInst* _lookupWitness(IRBuilder* builder, IRInst* witness, IRInst* requirementK
                 return entry->getSatisfyingVal();
         }
     }
+    else if (auto interfaceType = as<IRInterfaceType>(witness))
+    {
+        for (UIndex ii = 0; ii < interfaceType->getOperandCount(); ii++)
+        {
+            auto entry = cast<IRInterfaceRequirementEntry>(interfaceType->getOperand(ii));
+            if (entry->getRequirementKey() == requirementKey)
+                return entry->getRequirementVal();
+        }
+    }
     else
     {
         return builder->emitLookupInterfaceMethodInst(
@@ -47,8 +56,17 @@ IRInst* _lookupWitness(IRBuilder* builder, IRInst* witness, IRInst* requirementK
 
 static IRInst* _getDiffTypeFromPairType(AutoDiffSharedContext*sharedContext, IRBuilder* builder, IRDifferentialPairTypeBase* type)
 {
-    auto witnessTable = type->getWitness();
-    return _lookupWitness(builder, witnessTable, sharedContext->differentialAssocTypeStructKey);
+    auto witness = type->getWitness();
+    SLANG_RELEASE_ASSERT(witness);
+
+    // Special case when the primal type is an InterfaceType/AssociatedType
+    if (as<IRInterfaceType>(type->getValueType()) || as<IRAssociatedType>(type->getValueType()))
+    {
+        // The differential type is the IDifferentiable interface type.
+        return sharedContext->differentiableInterfaceType;
+    }
+    
+    return _lookupWitness(builder, witness, sharedContext->differentialAssocTypeStructKey);
 }
 
 static IRInst* _getDiffTypeWitnessFromPairType(AutoDiffSharedContext* sharedContext, IRBuilder* builder, IRDifferentialPairTypeBase* type)
@@ -332,6 +350,8 @@ AutoDiffSharedContext::AutoDiffSharedContext(IRModuleInst* inModuleInst)
         zeroMethodStructKey = findZeroMethodStructKey();
         addMethodStructKey = findAddMethodStructKey();
         mulMethodStructKey = findMulMethodStructKey();
+        nullDifferentialStructType = findNullDifferentialStructType();
+        nullDifferentialWitness = findNullDifferentialWitness();
 
         if (differentialAssocTypeStructKey)
             isInterfaceAvailable = true;
@@ -361,6 +381,47 @@ IRInst* AutoDiffSharedContext::findDifferentiableInterface()
     }
     return nullptr;
 }
+
+IRStructType* AutoDiffSharedContext::findNullDifferentialStructType()
+{
+    if (auto module = as<IRModuleInst>(moduleInst))
+    {
+        for (auto globalInst : module->getGlobalInsts())
+        {
+            // TODO: Also a particularly dangerous way to look for a struct...
+            if (auto structType = as<IRStructType>(globalInst))
+            {
+                if (auto decor = structType->findDecoration<IRNameHintDecoration>())
+                {
+                    if (decor->getName() == toSlice("NullDifferential"))
+                    {
+                        return structType;
+                    }
+                }
+            }
+        }
+    }
+    return nullptr;
+}
+
+IRInst* AutoDiffSharedContext::findNullDifferentialWitness()
+{
+    if (auto module = as<IRModuleInst>(moduleInst))
+    {
+        for (auto globalInst : module->getGlobalInsts())
+        {
+            if (auto witnessTable = as<IRWitnessTable>(globalInst))
+            {
+                if (witnessTable->getConformanceType() == differentiableInterfaceType
+                    && witnessTable->getConcreteType() == nullDifferentialStructType)
+                    return witnessTable;
+            }
+        }
+    }
+
+    return nullptr;
+}
+
 
 IRStructKey* AutoDiffSharedContext::getIDifferentiableStructKeyAtIndex(UInt index)
 {
@@ -442,11 +503,9 @@ IRInst* DifferentiableTypeConformanceContext::lookUpInterfaceMethod(IRBuilder* b
 }
 
 IRInst* DifferentiableTypeConformanceContext::getDifferentialTypeFromDiffPairType(
-    IRBuilder* builder, IRDifferentialPairTypeBase* diffPairType)
+    IRBuilder*, IRDifferentialPairTypeBase*)
 {
-    auto witness = diffPairType->getWitness();
-    SLANG_RELEASE_ASSERT(witness);
-    return _lookupWitness(builder, witness, sharedContext->differentialAssocTypeStructKey);
+    SLANG_UNIMPLEMENTED_X("");
 }
 
 IRInst* DifferentiableTypeConformanceContext::getDiffTypeFromPairType(IRBuilder* builder, IRDifferentialPairTypeBase* type)
@@ -469,6 +528,189 @@ IRInst* DifferentiableTypeConformanceContext::getDiffAddMethodFromPairType(IRBui
 {
     auto witnessTable = type->getWitness();
     return _lookupWitness(builder, witnessTable, sharedContext->addMethodStructKey);
+}
+
+IRInst *DifferentiableTypeConformanceContext::tryExtractConformanceFromInterfaceType(IRBuilder *builder, IRInterfaceType *interfaceType, IRWitnessTable *witnessTable)
+{
+    SLANG_RELEASE_ASSERT(interfaceType);
+
+    List<IRInterfaceRequirementEntry*> lookupKeyPath = findDifferentiableInterfaceLookupPath(
+        sharedContext->differentiableInterfaceType, interfaceType);
+
+    IRInst* differentialTypeWitness = witnessTable;
+    if (lookupKeyPath.getCount())
+    {
+        // `interfaceType` does conform to `IDifferentiable`.
+        for (auto node : lookupKeyPath)
+        {
+            differentialTypeWitness = builder->emitLookupInterfaceMethodInst((IRType*)node->getRequirementVal(), differentialTypeWitness, node->getRequirementKey());
+            // Lookup insts are always primal values.
+            builder->markInstAsPrimal(differentialTypeWitness);
+        }
+        return differentialTypeWitness;
+    }
+
+    return nullptr;
+}
+
+// Given an interface type, return the lookup path from a witness table of `type` to a witness table of `IDifferentiable`.
+static bool _findDifferentiableInterfaceLookupPathImpl(
+    HashSet<IRInst*>& processedTypes,
+    IRInterfaceType* idiffType,
+    IRInterfaceType* type,
+    List<IRInterfaceRequirementEntry*>& currentPath)
+{
+    if (processedTypes.contains(type))
+        return false;
+    processedTypes.add(type);
+
+    List<IRInterfaceRequirementEntry*> lookupKeyPath;
+    for (UInt i = 0; i < type->getOperandCount(); i++)
+    {
+        auto entry = as<IRInterfaceRequirementEntry>(type->getOperand(i));
+        if (!entry) continue;
+        if (auto wt = as<IRWitnessTableTypeBase>(entry->getRequirementVal()))
+        {
+            currentPath.add(entry);
+            if (wt->getConformanceType() == idiffType)
+            {
+                return true;
+            }
+            else if (auto subInterfaceType = as<IRInterfaceType>(wt->getConformanceType()))
+            {
+                if (_findDifferentiableInterfaceLookupPathImpl(processedTypes, idiffType, subInterfaceType, currentPath))
+                    return true;
+            }
+            currentPath.removeLast();
+        }
+    }
+    return false;
+}
+
+List<IRInterfaceRequirementEntry *> DifferentiableTypeConformanceContext::findDifferentiableInterfaceLookupPath(IRInterfaceType *idiffType, IRInterfaceType *type)
+{
+    List<IRInterfaceRequirementEntry*> currentPath;
+    HashSet<IRInst*> processedTypes;
+    _findDifferentiableInterfaceLookupPathImpl(processedTypes, idiffType, type, currentPath);
+    return currentPath;
+}
+
+IRFunc *DifferentiableTypeConformanceContext::getOrCreateExistentialDAddMethod()
+{
+    if (this->existentialDAddFunc)
+        return this->existentialDAddFunc;
+
+    SLANG_ASSERT(sharedContext->differentiableInterfaceType);
+    SLANG_ASSERT(sharedContext->nullDifferentialWitness);
+    
+    auto builder = IRBuilder(this->sharedContext->moduleInst);
+
+    existentialDAddFunc = builder.createFunc();
+    existentialDAddFunc->setFullType(builder.getFuncType(
+        List<IRType*>({
+            sharedContext->differentiableInterfaceType,
+            sharedContext->differentiableInterfaceType,
+        }),
+        sharedContext->differentiableInterfaceType));
+    
+    builder.setInsertInto(existentialDAddFunc);
+    auto entryBlock = builder.emitBlock();
+
+    builder.setInsertInto(entryBlock);
+
+    // Insert parameters.
+    auto aObj = builder.emitParam(sharedContext->differentiableInterfaceType);
+    auto bObj = builder.emitParam(sharedContext->differentiableInterfaceType);
+    
+    // Check if a.type == null_differential.type
+    auto aObjWitnessIsNull = builder.emitIsDifferentialNull(aObj);
+    
+    // If aObjWitnessTable is null, return bObj.
+    auto aObjWitnessIsNullBlock = builder.emitBlock();
+    builder.setInsertInto(aObjWitnessIsNullBlock);
+    builder.emitReturn(bObj);
+
+    auto aObjWitnessIsNotNullBlock = builder.emitBlock();
+    builder.setInsertInto(aObjWitnessIsNotNullBlock);
+    
+    // Check if b.type == null_differential.type
+    auto bObjWitnessIsNull = builder.emitIsDifferentialNull(bObj);
+
+    // If bObjWitnessTable is null, return aObj.
+    auto bObjWitnessIsNullBlock = builder.emitBlock();
+    builder.setInsertInto(bObjWitnessIsNullBlock);
+    builder.emitReturn(aObj);
+
+    auto bObjWitnessIsNotNullBlock = builder.emitBlock();
+
+    // Emit aObj.type::dadd(aObj.val, bObj.val)
+    //
+    // Important: we're looking up dadd on the differential type, and 
+    // not the primal type. This assumes that the two methods are identical,
+    // which (mathematically) they should be.
+    // 
+    auto concreteDiffTypeWitnessTable = builder.emitExtractExistentialWitnessTable(aObj);
+
+    // Extract func type from the witness table type.
+    IRFuncType* dAddFuncType = nullptr;
+    for (UIndex ii = 0; ii < sharedContext->differentiableInterfaceType->getOperandCount(); ii++)
+    {
+        auto entry = cast<IRInterfaceRequirementEntry>(sharedContext->differentiableInterfaceType->getOperand(ii));
+        if (entry->getRequirementKey() == sharedContext->addMethodStructKey)
+        {
+            dAddFuncType = cast<IRFuncType>(entry->getRequirementVal());
+            break;
+        }
+    }
+
+    SLANG_ASSERT(dAddFuncType);
+
+    auto dAddMethod = builder.emitLookupInterfaceMethodInst(
+        dAddFuncType,
+        concreteDiffTypeWitnessTable,
+        sharedContext->addMethodStructKey);
+    
+    // Call
+    auto dAddResult = builder.emitCallInst(
+        dAddFuncType->getResultType(),
+        dAddMethod,
+        List<IRInst*>({
+            builder.emitExtractExistentialValue(dAddFuncType->getParamType(0), aObj),
+            builder.emitExtractExistentialValue(dAddFuncType->getParamType(1), bObj)}));
+    
+    // Wrap result in existential.
+    auto existentialDiffType = builder.emitMakeExistential(
+        sharedContext->differentiableInterfaceType,
+        dAddResult,
+        concreteDiffTypeWitnessTable);
+    
+    builder.emitReturn(existentialDiffType);
+
+    // Emit an unreachable block to act as the after block.
+    auto unreachableBlock = builder.emitBlock();
+    builder.setInsertInto(unreachableBlock);
+    builder.emitUnreachable();
+
+    // Link up conditional blocks.
+    builder.setInsertInto(entryBlock);
+    builder.emitIfElse(
+        aObjWitnessIsNull,
+        aObjWitnessIsNullBlock,
+        aObjWitnessIsNotNullBlock,
+        unreachableBlock);
+    
+    builder.setInsertInto(aObjWitnessIsNotNullBlock);
+    builder.emitIfElse(
+        bObjWitnessIsNull,
+        bObjWitnessIsNullBlock,
+        bObjWitnessIsNotNullBlock,
+        unreachableBlock);
+
+    builder.addNameHintDecoration(existentialDAddFunc, UnownedStringSlice("__existential_dadd"));
+    builder.addBackwardDifferentiableDecoration(existentialDAddFunc);
+    
+    this->existentialDAddFunc = existentialDAddFunc;
+    return existentialDAddFunc;
 }
 
 void DifferentiableTypeConformanceContext::buildGlobalWitnessDictionary()
@@ -745,9 +987,20 @@ IRInst* DifferentiableTypeConformanceContext::getArrayWitness(IRBuilder* builder
     return table;
 }
 
-IRInst* DifferentiableTypeConformanceContext::getExtractExistensialTypeWitness(IRBuilder*, IRExtractExistentialType*)
+IRInst* DifferentiableTypeConformanceContext::getExtractExistensialTypeWitness(
+    IRBuilder* builder,
+    IRExtractExistentialType* extractExistentialType)
 {
-    SLANG_UNIMPLEMENTED_X("TODO: Implement");
+    // Check that the type's base is differentiable
+    if (differentiateType(builder, extractExistentialType->getOperand(0)->getDataType()))
+    {
+        return tryExtractConformanceFromInterfaceType(
+            builder,
+            cast<IRInterfaceType>(extractExistentialType->getOperand(0)->getDataType()),
+            (IRWitnessTable*)builder->emitExtractExistentialWitnessTable(extractExistentialType->getOperand(0)));
+    }
+    
+    return nullptr;
 }
 
 
@@ -1761,6 +2014,71 @@ void removeDetachInsts(IRModule* module)
     pass.processModule();
 }
 
+struct LowerNullCheckPass : InstPassBase
+{
+    LowerNullCheckPass(IRModule* module, AutoDiffSharedContext* context) :
+        InstPassBase(module), context(context)
+    {
+    }
+    void processModule()
+    {
+        List<IRInst*> nullCheckInsts;
+        processInstsOfType<IRIsDifferentialNull>(kIROp_IsDifferentialNull, [&](IRIsDifferentialNull* isDiffNullInst)
+            {
+                IRBuilder builder(module);
+                builder.setInsertBefore(isDiffNullInst);
+
+                // Extract existential type from the operand.
+                auto operand = isDiffNullInst->getBase();
+                auto operandConcreteWitness = builder.emitExtractExistentialWitnessTable(operand);
+                auto witnessID = builder.emitGetSequentialIDInst(operandConcreteWitness);
+
+                auto nullDiffWitnessTable = context->nullDifferentialWitness;
+                auto nullDiffWitnessID = builder.emitGetSequentialIDInst(nullDiffWitnessTable);
+
+                // Compare the concrete type with the null differential witness table.
+                auto isDiffNull = builder.emitEql(witnessID, nullDiffWitnessID);
+
+                isDiffNullInst->replaceUsesWith(isDiffNull);
+                nullCheckInsts.add(isDiffNullInst);
+            });
+
+        for (auto nullCheckInst : nullCheckInsts)
+        {
+            nullCheckInst->removeAndDeallocate();
+        }
+    }
+
+    private:
+    AutoDiffSharedContext* context;
+};
+
+void lowerNullCheckInsts(IRModule* module, AutoDiffSharedContext* context)
+{
+    LowerNullCheckPass pass(module, context);
+    pass.processModule();
+}
+
+void releaseNullDifferentialType(AutoDiffSharedContext* context)
+{
+    if (auto nullStruct = context->nullDifferentialStructType)
+    {
+        if (auto publicDecoration = nullStruct->findDecoration<IRPublicDecoration>())
+            publicDecoration->removeAndDeallocate();
+        if (auto keepAliveDecoration = nullStruct->findDecoration<IRKeepAliveDecoration>())
+            keepAliveDecoration->removeAndDeallocate();
+    }
+
+    if (auto nullWitness = context->nullDifferentialWitness)
+    {
+        if (auto publicDecoration = nullWitness->findDecoration<IRPublicDecoration>())
+            publicDecoration->removeAndDeallocate();
+        if (auto keepAliveDecoration = nullWitness->findDecoration<IRKeepAliveDecoration>())
+            keepAliveDecoration->removeAndDeallocate();
+    }
+
+}
+
 bool finalizeAutoDiffPass(IRModule* module)
 {
     bool modified = false;
@@ -1777,17 +2095,25 @@ bool finalizeAutoDiffPass(IRModule* module)
 
     removeDetachInsts(module);
 
+    lowerNullCheckInsts(module, &autodiffContext);
+
     stripNoDiffTypeAttribute(module);
 
     // Remove auto-diff related decorations.
     stripAutoDiffDecorations(module);
+
+    // Remove keep-alive decorations from null-differential type
+    // so it can be DCE'd if unused.
+    // 
+    releaseNullDifferentialType(&autodiffContext);
 
     return modified;
 }
 
 IRBlock* getBlock(IRInst* inst)
 {
-    SLANG_RELEASE_ASSERT(inst);
+    if (!inst)
+        return nullptr;
 
     if (auto block = as<IRBlock>(inst))
         return block;

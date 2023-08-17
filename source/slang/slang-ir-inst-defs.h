@@ -362,6 +362,9 @@ INST(PrimalParamRef, PrimalParamRef, 1, 0)
 // to represent a reference to an inout parameter for use in the back-prop part of the computation.
 INST(DiffParamRef, DiffParamRef, 1, 0)
 
+// Check that the value is a differential null value.
+INST(IsDifferentialNull, IsDifferentialNull, 1, 0)
+
 INST(FieldExtract, get_field, 2, 0)
 INST(FieldAddress, get_field_addr, 2, 0)
 
@@ -935,8 +938,8 @@ INST(WrapExistential,                   wrapExistential,                1, 0)
 INST(GetValueFromBoundInterface,        getValueFromBoundInterface,     1, 0)
 
 INST(ExtractExistentialValue,           extractExistentialValue,        1, 0)
-INST(ExtractExistentialType,            extractExistentialType,         1, 0)
-INST(ExtractExistentialWitnessTable,    extractExistentialWitnessTable, 1, 0)
+INST(ExtractExistentialType,            extractExistentialType,         1, HOISTABLE)
+INST(ExtractExistentialWitnessTable,    extractExistentialWitnessTable, 1, HOISTABLE)
 
 INST(ExtractTaggedUnionTag,             extractTaggedUnionTag,      1, 0)
 INST(ExtractTaggedUnionPayload,         extractTaggedUnionPayload,  1, 0)

@@ -819,6 +819,7 @@ struct IRDifferentialInstDecoration : IRAutodiffInstDecoration
 
     IRType* getPrimalType() { return (IRType*)(getOperand(0)); }
     IRInst* getPrimalInst() { return getOperand(1); }
+    IRInst* getWitness() { return getOperand(2); }
 };
 
 struct IRPrimalInstDecoration : IRAutodiffInstDecoration
@@ -1016,6 +1017,17 @@ struct IRBackwardDifferentiate : IRInst
     IRInst* getBaseFn() { return getOperand(0); }
 
     IR_LEAF_ISA(BackwardDifferentiate)
+};
+
+struct IRIsDifferentialNull : IRInst
+{
+    enum
+    {
+        kOp = kIROp_IsDifferentialNull
+    };
+    IRInst* getBase() { return getOperand(0); }
+
+    IR_LEAF_ISA(IsDifferentialNull)
 };
 
 // Retrieves the primal substitution function for the given function.
@@ -3223,6 +3235,7 @@ public:
     IRInst* emitBackwardDifferentiatePropagateInst(IRType* type, IRInst* baseFn);
     IRInst* emitPrimalSubstituteInst(IRType* type, IRInst* baseFn);
     IRInst* emitDetachDerivative(IRType* type, IRInst* value);
+    IRInst* emitIsDifferentialNull(IRInst* value);
 
     IRInst* emitDispatchKernelInst(IRType* type, IRInst* baseFn, IRInst* threadGroupSize, IRInst* dispatchSize, Int argCount, IRInst* const* inArgs);
     IRInst* emitCudaKernelLaunch(IRInst* baseFn, IRInst* gridDim, IRInst* blockDim, IRInst* argsArray, IRInst* cudaStream);
@@ -4175,6 +4188,12 @@ public:
     void markInstAsDifferential(IRInst* value, IRType* primalType, IRInst* primalInst)
     {
         addDecoration(value, kIROp_DifferentialInstDecoration, primalType, primalInst);
+    }
+
+    void markInstAsDifferential(IRInst* value, IRType* primalType, IRInst* primalInst, IRInst* witnessTable)
+    {
+        IRInst* args[] = { primalType, primalInst, witnessTable };
+        addDecoration(value, kIROp_DifferentialInstDecoration, args, 3);
     }
 
     void addCOMWitnessDecoration(IRInst* value, IRInst* witnessTable)

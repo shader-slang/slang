@@ -500,6 +500,12 @@ namespace Slang
         // Don't synthesize for ThisType.
         if (as<ThisTypeDecl>(subType->getDeclRef().getDecl()))
             return nullptr;
+        
+        // If the inner most subtype is itself an associated type, then we're dealing
+        // with an abstract type. There's not need to synthesize anythin at this point.
+        // 
+        if (as<AssocTypeDecl>(subType->getDeclRef().getDecl()))
+            return nullptr;
 
         // If we reach here, we are expecting a synthesized decl defined in `subType`.
         // Instead of returning a DeclRefExpr to the requirement decl, we synthesize a placeholder decl

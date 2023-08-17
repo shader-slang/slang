@@ -88,7 +88,7 @@ struct DiffUnzipPass
             }
             if (auto pairType = as<IRDifferentialPairType>(type))
             {
-                IRInst* diffType = diffTypeContext.getDifferentialTypeFromDiffPairType(builder, pairType);
+                IRInst* diffType = diffTypeContext.getDiffTypeFromPairType(builder, pairType);
                 if (as<IRPtrTypeBase>(primalParam->getFullType()))
                     diffType = builder->getPtrType(primalParam->getFullType()->getOp(), (IRType*)diffType);
                 auto primalRef = builder->emitPrimalParamRef(primalParam);
@@ -286,7 +286,8 @@ struct DiffUnzipPass
         if (auto fwdPairResultType = as<IRDifferentialPairType>(mixedDecoration->getPairType()))
         {
             primalType = fwdPairResultType->getValueType();
-            diffType = (IRType*)diffTypeContext.getDifferentialForType(&globalBuilder, primalType);
+            diffType = (IRType*)diffTypeContext.getDiffTypeFromPairType(&globalBuilder, fwdPairResultType);
+            SLANG_ASSERT(diffType);
             resultType = fwdPairResultType;
         }
 

@@ -33,7 +33,6 @@ namespace Slang
         Dictionary<IRInterfaceType*, IRInterfaceType*> loweredInterfaceTypes;
         Dictionary<IRInterfaceType*, IRInterfaceType*> mapLoweredInterfaceToOriginal;
 
-
         // Dictionaries for interface type requirement key-value lookups.
         // Used by `findInterfaceRequirementVal`.
         Dictionary<IRInterfaceType*, Dictionary<IRInst*, IRInst*>> mapInterfaceRequirementKeyValue;
