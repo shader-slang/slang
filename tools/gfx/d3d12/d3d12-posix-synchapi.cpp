@@ -124,14 +124,19 @@ BOOL SetEvent(HANDLE h)
     }
 }
 
-DWORD WaitForSingleObject(HANDLE h, DWORD ms)
+DWORD WaitForSingleObject(const HANDLE h, const DWORD ms)
 {
     int fd = _handleToFD(h);
     bool manualReset = _handleToFlags(h) & CREATE_EVENT_MANUAL_RESET;
     pollfd pfd{fd, POLLIN, 0};
     uint64_t x;
     int r = 0;
-    int nEvents = poll(&pfd, 1, ms);
+    // Implement unlimited waits as timing out with WAIT_FAILED after 5
+    // seconds. It's probably something fishy with d3dvk-proton or our synchapi
+    // implementation
+    const bool isInfinite = ms == INFINITE;
+    const DWORD fiveSeconds = 5000;
+    int nEvents = poll(&pfd, 1, isInfinite ? fiveSeconds : ms);
     if(pfd.revents != POLLIN)
     {
         return WAIT_FAILED;
@@ -142,7 +147,7 @@ DWORD WaitForSingleObject(HANDLE h, DWORD ms)
     }
     if (nEvents == 0)
     {
-        return WAIT_TIMEOUT;
+        return isInfinite ? WAIT_FAILED : WAIT_TIMEOUT;
     }
     if(manualReset)
     {
@@ -155,7 +160,7 @@ DWORD WaitForSingleObject(HANDLE h, DWORD ms)
     }
     if(r == -1 && errno == EAGAIN)
     {
-        return WAIT_TIMEOUT;
+        return isInfinite ? WAIT_FAILED : WAIT_TIMEOUT;
     }
     return WAIT_FAILED;
 }
@@ -164,12 +169,19 @@ DWORD WaitForMultipleObjects(
     DWORD        n,
     const HANDLE *hs,
     BOOL         bWaitAll,
-    DWORD        dwMilliseconds)
+    DWORD        requestedMs)
 {
     if(n == 0)
     {
         return bWaitAll ? WAIT_OBJECT_0 : WAIT_FAILED;
     }
+
+    // Bail out of infinite waits after 5 seconds as it's probably a
+    // driver/vkd3d-proton/synchapi bug
+    const bool isInfinite = requestedMs == INFINITE;
+    const DWORD fiveSeconds = 5000;
+    const auto dwMilliseconds = isInfinite ? fiveSeconds : requestedMs;
+
     DWORD res;
     int fds[n];
     int flagss[n];
@@ -281,7 +293,7 @@ DWORD WaitForMultipleObjects(
             // If we got here without seeing enough events, we must have timed out
             if(nSeenEvents < n)
             {
-                res = WAIT_TIMEOUT;
+                res = isInfinite ? WAIT_FAILED : WAIT_TIMEOUT;
                 goto end;
             }
 
@@ -415,7 +427,7 @@ DWORD WaitForMultipleObjects(
         }
         if(nEvents == 0)
         {
-            res = WAIT_TIMEOUT;
+            res = isInfinite ? WAIT_FAILED : WAIT_TIMEOUT;
             goto end;
         }
         // Try reads until we get one
