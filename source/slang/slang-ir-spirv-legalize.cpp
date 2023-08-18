@@ -10,6 +10,7 @@
 #include "slang-glsl-extension-tracker.h"
 #include "slang-ir-lower-buffer-element-type.h"
 #include "slang-ir-layout.h"
+#include "slang-ir-util.h"
 
 namespace Slang
 {
@@ -52,6 +53,36 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     {
     }
 
+    // Wraps the element type of a constant buffer or parameter block in a struct if it is not already a struct,
+    // returns the newly created struct type.
+    IRType* wrapConstantBufferElement(IRInst* cbParamInst)
+    {
+        auto innerType = as<IRParameterGroupType>(cbParamInst->getDataType())->getElementType();
+        IRBuilder builder(cbParamInst);
+        builder.setInsertBefore(cbParamInst);
+        auto structType = builder.createStructType();
+        StringBuilder sb;
+        sb << "cbuffer_";
+        getTypeNameHint(sb, innerType);
+        sb << "_t";
+        builder.addNameHintDecoration(structType, sb.produceString().getUnownedSlice());
+        auto key = builder.createStructKey();
+        builder.createStructField(structType, key, innerType);
+        builder.setInsertBefore(cbParamInst);
+        auto newCbType = builder.getType(cbParamInst->getDataType()->getOp(), structType);
+        cbParamInst->setFullType(newCbType);
+        auto rules = getTypeLayoutRuleForBuffer(m_sharedContext->m_targetRequest, cbParamInst->getDataType());
+        IRSizeAndAlignment sizeAlignment;
+        getSizeAndAlignment(rules, structType, &sizeAlignment);
+        traverseUses(cbParamInst, [&](IRUse* use)
+        {
+            builder.setInsertBefore(use->getUser());
+            auto addr = builder.emitFieldAddress(builder.getPtrType(kIROp_PtrType, innerType, SpvStorageClassUniform), cbParamInst, key);
+            use->set(addr);
+        });
+        return structType;
+    }
+
     void processGlobalParam(IRGlobalParam* inst)
     {
         // If the global param is not a pointer type, make it so and insert explicit load insts.
@@ -86,34 +117,45 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             }
 
             // Strip any HLSL wrappers
+            IRBuilder builder(m_sharedContext->m_irModule);
+            bool needLoad = true;
             auto innerType = inst->getFullType();
-            if(const auto constantBufferType = as<IRConstantBufferType>(innerType))
+            if (as<IRConstantBufferType>(innerType) || as<IRParameterBlockType>(innerType))
             {
-                innerType = constantBufferType->getElementType();
+                innerType = as<IRUniformParameterGroupType>(innerType)->getElementType();
                 storageClass = SpvStorageClassUniform;
-            }
-            else if (auto paramBlockType = as<IRParameterBlockType>(innerType))
-            {
-                innerType = paramBlockType->getElementType();
-                storageClass = SpvStorageClassUniform;
+                // Constant buffer is already treated like a pointer type, and
+                // we are not adding another layer of indirection when replacing it
+                // with a pointer type. Therefore we don't need to insert a load at
+                // use sites.
+                needLoad = false;
+                // If inner element type is not a struct type, we need to wrap it with
+                // a struct.
+                if (!as<IRStructType>(innerType))
+                {
+                    innerType = wrapConstantBufferElement(inst);
+                }
+                builder.addDecoration(innerType, kIROp_SPIRVBlockDecoration);
             }
 
             // Make a pointer type of storageClass.
-            IRBuilder builder(m_sharedContext->m_irModule);
             builder.setInsertBefore(inst);
             ptrType = builder.getPtrType(kIROp_PtrType, innerType, storageClass);
             inst->setFullType(ptrType);
-            // Insert an explicit load at each use site.
-            List<IRUse*> uses;
-            for (auto use = inst->firstUse; use; use = use->nextUse)
+            if (needLoad)
             {
-                uses.add(use);
-            }
-            for (auto use : uses)
-            {
-                builder.setInsertBefore(use->getUser());
-                auto loadedValue = builder.emitLoad(inst);
-                use->set(loadedValue);
+                // Insert an explicit load at each use site.
+                List<IRUse*> uses;
+                for (auto use = inst->firstUse; use; use = use->nextUse)
+                {
+                    uses.add(use);
+                }
+                for (auto use : uses)
+                {
+                    builder.setInsertBefore(use->getUser());
+                    auto loadedValue = builder.emitLoad(inst);
+                    use->set(loadedValue);
+                }
             }
         }
         processGlobalVar(inst);
@@ -206,22 +248,37 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
-    // Replace getElement(x, i) with, y = store(x); p = getElementPtr(y, i); load(p)
-    // SPIR-V has no support for dynamic indexing into values like we do.
+    Dictionary<IRInst*, IRInst*> m_mapArrayValueToVar;
+
+    // Replace getElement(x, i) with, y = store(x); p = getElementPtr(y, i); load(p),
+    // when i is not a constant. SPIR-V has no support for dynamic indexing into values like we do.
     // It may be advantageous however to do this further up the pipeline
     void processGetElement(IRGetElement* inst)
     {
-        const auto x = inst->getBase();
+        IRInst* x = nullptr;
         List<IRInst*> indices;
         IRGetElement* c = inst;
         do
         {
+            if (as<IRIntLit>(c->getIndex()))
+                break;
+            x = c->getBase();
             indices.add(c->getIndex());
         } while(c = as<IRGetElement>(c->getBase()), c);
+
+        if (!x)
+            return;
+
         IRBuilder builder(m_sharedContext->m_irModule);
+        IRInst* y = nullptr;
+        if (!m_mapArrayValueToVar.tryGetValue(x, y))
+        {
+            setInsertAfterOrdinaryInst(&builder, x);
+            y = builder.emitVar(x->getDataType(), SpvStorageClassFunction);
+            builder.emitStore(y, x);
+            m_mapArrayValueToVar.set(x, y);
+        }
         builder.setInsertBefore(inst);
-        IRInst* y = builder.emitVar(x->getDataType(), SpvStorageClassFunction);
-        builder.emitStore(y, x);
         for(Index i = indices.getCount() - 1; i >= 0; --i)
             y = builder.emitElementAddress(y, indices[i]);
         const auto newInst = builder.emitLoad(y);
@@ -367,7 +424,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             break;
         }
         builder.addNameHintDecoration(structType, nameSb.getUnownedSlice());
-        builder.addDecoration(structType, kIROp_SPIRVBufferBlockDecoration);
+        builder.addDecoration(structType, kIROp_SPIRVBlockDecoration);
         inst->replaceUsesWith(ptrType);
         inst->removeAndDeallocate();
         addUsersToWorkList(ptrType);
