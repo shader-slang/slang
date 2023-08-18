@@ -29,6 +29,7 @@
 #include "slang-ir-lower-error-handling.h"
 #include "slang-ir-obfuscate-loc.h"
 #include "slang-ir-use-uninitialized-out-param.h"
+#include "slang-ir-peephole.h"
 
 #include "slang-mangle.h"
 #include "slang-type-layout.h"
@@ -8761,6 +8762,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // Register the value now, to avoid any possible infinite recursion when lowering ForwardDerivativeAttribute
         context->setGlobalValue(decl, LoweredValInfo::simple(findOuterMostGeneric(irFunc)));
 
+        bool isInline = false;
+
         for (auto modifier : decl->modifiers)
         {
             if (as<RequiresNVAPIAttribute>(modifier))
@@ -8858,10 +8861,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             else if (as<UnsafeForceInlineEarlyAttribute>(modifier))
             {
                 getBuilder()->addDecoration(irFunc, kIROp_UnsafeForceInlineEarlyDecoration);
+                isInline = true;
             }
             else if (as<ForceInlineAttribute>(modifier))
             {
                 getBuilder()->addDecoration(irFunc, kIROp_ForceInlineDecoration);
+                isInline = true;
             }
             else if (as<TreatAsDifferentiableAttribute>(modifier))
             {
@@ -8871,6 +8876,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 auto op = getBuilder()->getIntValue(getBuilder()->getIntType(), intrinsicOp->op);
                 getBuilder()->addDecoration(irFunc, kIROp_IntrinsicOpDecoration, op);
+                isInline = true;
             }
             else if (as<UserDefinedDerivativeAttribute>(modifier) || as<PrimalSubstituteAttribute>(modifier))
             {
@@ -8927,6 +8933,21 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             else if (as<PreferRecomputeAttribute>(modifier))
             {
                 getBuilder()->addDecoration(irFunc, kIROp_PreferRecomputeDecoration);
+            }
+        }
+
+        if (!isInline)
+        {
+            // If there are any constant expr rate parameters, we should inline this function.
+            // TODO: consider specializing them instead of inlining.
+            for (auto param : decl->getParameters())
+            {
+                if (param->hasModifier<ConstExprModifier>())
+                {
+                    getBuilder()->addDecoration(irFunc, kIROp_ForceInlineDecoration);
+                    isInline = true;
+                    break;
+                }
             }
         }
 
@@ -9698,6 +9719,8 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     constructSSA(module);
     simplifyCFG(module);
     applySparseConditionalConstantPropagation(module, compileRequest->getSink());
+    peepholeOptimize(module);
+
     for (auto inst : module->getGlobalInsts())
     {
         if (auto func = as<IRGlobalValueWithCode>(inst))
@@ -9732,14 +9755,28 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // - If sccp is unable to eliminate the outer 'if' then we end up with
     //   duplicated code the the conditional value. Users don't tend to put
     //   huge gobs of code in the conditional expression in loops however.
+
     invertLoops(module);
 
     // Next, attempt to promote local variables to SSA
     // temporaries and do basic simplifications.
     //
-    constructSSA(module);
-    simplifyCFG(module);
-    applySparseConditionalConstantPropagation(module, compileRequest->getSink());
+    for (;;)
+    {
+        bool changed = false;
+        performMandatoryEarlyInlining(module);
+        changed |= constructSSA(module);
+        simplifyCFG(module);
+        changed |= applySparseConditionalConstantPropagation(module, compileRequest->getSink());
+        changed |= peepholeOptimize(module);
+        for (auto inst : module->getGlobalInsts())
+        {
+            if (auto func = as<IRGlobalValueWithCode>(inst))
+                eliminateDeadCode(func);
+        }
+        if (!changed)
+            break;
+    }
 
     // Propagate `constexpr`-ness through the dataflow graph (and the
     // call graph) based on constraints imposed by different instructions.

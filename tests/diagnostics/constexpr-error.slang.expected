@@ -6,9 +6,15 @@ tests/diagnostics/constexpr-error.slang(27): error 40006: expected a compile-tim
 tests/diagnostics/constexpr-error.slang(35): error 40006: expected a compile-time constant
     result += t.Sample(s, uv, int2(ii));
                                   ^
+tests/diagnostics/constexpr-error.slang(39): error 40006: expected a compile-time constant
+    for(uint jj = 0; jj < uv.y; jj++)
+                     ^~
 tests/diagnostics/constexpr-error.slang(41): error 40006: expected a compile-time constant
         result += t.Sample(s, uv, int2(jj));
                                       ^
+tests/diagnostics/constexpr-error.slang(39): error 40006: expected a compile-time constant
+    for(uint jj = 0; jj < uv.y; jj++)
+                                  ^~
 }
 standard output = {
 }

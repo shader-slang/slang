@@ -643,7 +643,6 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(FlattenDecoration,                 flatten,                0, 0)
     INST(LoopControlDecoration,             loopControl,            1, 0)
     INST(LoopMaxItersDecoration,            loopMaxIters,           1, 0)
-    INST(LoopInferredMaxItersDecoration,    loopInferredMaxIters,   2, 0)
     INST(LoopExitPrimalValueDecoration,     loopExitPrimalValue,    2, 0)
     INST(IntrinsicOpDecoration, intrinsicOp, 1, 0)
     /* TargetSpecificDecoration */

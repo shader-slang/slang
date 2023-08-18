@@ -28,6 +28,7 @@ void g(float x)
     for (int i = 0; i < 5; i++) // Not ok, we can't infer the loop iterations because the body modifies induction var.
     {
         i = (int)x;
+        no_diff debugBreak();
     }
     return;
 }

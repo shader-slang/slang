@@ -28,6 +28,7 @@ float h(float x)
     // error: dynamic loop without [MaxIters] or [ForceUnroll]
     for (int i = 0; i < (int)x; i++)
     {
+        no_diff debugBreak();
     }
 
     return val;
