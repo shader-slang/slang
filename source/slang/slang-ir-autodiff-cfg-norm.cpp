@@ -790,6 +790,8 @@ void normalizeCFG(
     disableIRValidationAtInsert();
     constructSSA(module, func);
     enableIRValidationAtInsert();
+
+    module->invalidateAnalysisForInst(func);
 #if _DEBUG
     validateIRInst(maybeFindOuterGeneric(func));
 #endif
