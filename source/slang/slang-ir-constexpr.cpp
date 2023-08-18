@@ -75,6 +75,7 @@ bool opCanBeConstExpr(IROp op)
     case kIROp_IntLit:
     case kIROp_FloatLit:
     case kIROp_BoolLit:
+    case kIROp_Param:
     case kIROp_Add:
     case kIROp_Sub:
     case kIROp_Mul:
@@ -143,13 +144,19 @@ bool opCanBeConstExpr(IROp op)
     }
 }
 
-bool opCanBeConstExpr(IRInst* value)
+bool opCanBeConstExprByForwardPass(IRInst* value)
 {
     // TODO: realistically need to special-case `call`
     // operations here, so that we check whether the
     // callee function is fixed/known, and if it is
     // whether it has been declared as constant-foldable
+    if (value->getOp() == kIROp_Param)
+        return false;
+    return opCanBeConstExpr(value->getOp());
+}
 
+bool opCanBeConstExprByBackwardPass(IRInst* value)
+{
     return opCanBeConstExpr(value->getOp());
 }
 
@@ -157,8 +164,6 @@ void markConstExpr(
     PropagateConstExprContext*  context,
     IRInst*                    value)
 {
-    if (value->_debugUID == 1255)
-        printf("break");
     Slang::markConstExpr(context->getBuilder(), value);
 }
 
@@ -173,14 +178,14 @@ void maybeAddToWorkList(
     }
 }
 
-bool maybeMarkConstExpr(
+bool maybeMarkConstExprBackwardPass(
     PropagateConstExprContext* context,
     IRInst* value)
 {
     if (isConstExpr(value))
         return false;
 
-    if (!opCanBeConstExpr(value))
+    if (!opCanBeConstExprByBackwardPass(value))
         return false;
 
     markConstExpr(context, value);
@@ -228,99 +233,18 @@ bool maybeMarkConstExpr(
     return true;
 }
 
-// Work through the closure of all dependencies of `instIn` and check
-// if `instIn` and their dependencies are all constexpr given insts
-// in `tentativeConstExprInsts` are considered constexpr.
-bool canInstBeConstExprWithTentativeConstExprInsts(
-    HashSet<IRInst*>& tentativeConstExprInsts,
-    IRInst* instIn)
+IRLoop* isLoopPhi(IRParam* param)
 {
-    List<IRInst*> workList;
-    workList.add(instIn);
-    for (Index i = 0; i < workList.getCount(); i++)
-    {
-        auto inst = workList[i];
-        if (tentativeConstExprInsts.contains(inst))
-            continue;
-        if (isConstExpr(inst))
-            continue;
-        if (opCanBeConstExpr(inst->getOp()))
-        {
-            bool canInstBeConstExpr = true;
-            for (UInt argIndex = 0; argIndex < inst->getOperandCount(); argIndex++)
-            {
-                auto arg = inst->getOperand(argIndex);
-                if (!isConstExpr(arg) && !tentativeConstExprInsts.contains(arg))
-                {
-                    workList.add(arg);
-                    canInstBeConstExpr = false;
-                }
-            }
-            if (canInstBeConstExpr)
-            {
-                tentativeConstExprInsts.add(inst);
-                continue;
-            }
-        }
-        // We found an inst that is not constexpr even if all insts in
-        // `tentativeConstExprInsts` are treated as constexpr.
-        // This means that the inst as well as other insts in tentativeConstExpr
-        // should be be treated as constexpr.
-        return false;
-    }
-    return true;
-}
-
-bool isLoopPhi(IRParam* param, IRLoop*& loopInst)
-{
-    loopInst = nullptr;
     IRBlock* bb = cast<IRBlock>(param->getParent());
     for (auto pred : bb->getPredecessors())
     {
         auto loop = as<IRLoop>(pred->getTerminator());
         if (loop)
         {
-            loopInst = loop;
-            return true;
+            return loop;
         }
     }
-    return false;
-}
-
-bool isConstExprLoopPhi(HashSet<IRInst*>& tentativeConstExprInsts, IRParam* param, IRLoop*& loopInst)
-{
-    // If we see a phi node in unrolled loops we should
-    // consider if the closure of all insts computed
-    // from it is constexpr if we treat the phi as
-    // constexpr. If we succeed then the phi node is
-    // indeed a constexpr after unrolling the loop. This
-    // special test is needed to allow cases where a
-    // loop counter is as argument to a constexpr
-    // parameter.
-    bool isPhiConstExpr = true;
-    IRBlock* bb = cast<IRBlock>(param->getParent());
-    if (!isLoopPhi(param, loopInst))
-        return false;
-
-    UInt index = (UInt)bb->getParamIndex(param);
-    tentativeConstExprInsts.add(param);
-    
-    for (auto pred : bb->getPredecessors())
-    {
-        auto jump = as<IRUnconditionalBranch>(pred->getTerminator());
-        SLANG_ASSERT(jump->getArgCount() > index);
-        auto arg = jump->getArg(index);
-        if (isConstExpr(arg))
-            continue;
-        if (canInstBeConstExprWithTentativeConstExprInsts(tentativeConstExprInsts, arg))
-            continue;
-        isPhiConstExpr = false;
-    }
-    if (loopInst && isPhiConstExpr)
-    {
-        return true;
-    }
-    return false;
+    return nullptr;
 }
 
 // Produce an estimate on whether a loop is unrollable, by checking
@@ -381,7 +305,7 @@ bool propagateConstExprForward(
                     continue;
 
                 // Is the operation one that we can actually make be constexpr?
-                if(!opCanBeConstExpr(ii))
+                if(!opCanBeConstExprByForwardPass(ii))
                     continue;
 
                 // Are all arguments `constexpr`?
@@ -449,28 +373,12 @@ bool propagateConstExprBackward(
                         if(isConstExpr(arg))
                             continue;
 
-                        if(!opCanBeConstExpr(arg))
+                        if(!opCanBeConstExprByBackwardPass(arg))
                             continue;
 
-                        if( maybeMarkConstExpr(context, arg) )
+                        if( maybeMarkConstExprBackwardPass(context, arg) )
                         {
                             changedThisIteration = true;
-                        }
-                    }
-                    // If the instruction is a loop phi node, we should check
-                    // if the phi arguments are constexpr.
-                    if (auto phiParam = as<IRParam>(ii))
-                    {
-                        if (bb != code->getFirstBlock())
-                        {
-                            IRLoop* loopInst;
-                            HashSet<IRInst*> tentativeConstExprInsts;
-
-                            if (isConstExprLoopPhi(tentativeConstExprInsts, phiParam, loopInst))
-                            {
-                                for (auto inst : tentativeConstExprInsts)
-                                    changedThisIteration |= maybeMarkConstExpr(context, inst);
-                            }
                         }
                     }
                 }
@@ -536,7 +444,7 @@ bool propagateConstExprBackward(
 
                                 if(isConstExpr(param))
                                 {
-                                    if(maybeMarkConstExpr(context, arg))
+                                    if(maybeMarkConstExprBackwardPass(context, arg))
                                     {
                                         changedThisIteration = true;
                                     }
@@ -564,7 +472,7 @@ bool propagateConstExprBackward(
                                 auto arg = callInst->getOperand(firstCallArg + pp);
                                 if( isConstExpr(paramType) )
                                 {
-                                    if( maybeMarkConstExpr(context, arg) )
+                                    if(maybeMarkConstExprBackwardPass(context, arg) )
                                     {
                                         changedThisIteration = true;
                                     }
@@ -600,7 +508,7 @@ bool propagateConstExprBackward(
                         SLANG_RELEASE_ASSERT(operandIndex < terminator->getOperandCount());
 
                         auto operand = terminator->getOperand(operandIndex);
-                        if( maybeMarkConstExpr(context, operand) )
+                        if(maybeMarkConstExprBackwardPass(context, operand) )
                         {
                             changedThisIteration = true;
                         }
@@ -641,8 +549,7 @@ void validateConstExpr(
                     {
                         if (auto param = as<IRParam>(arg))
                         {
-                            IRLoop* loopInst;
-                            if (isLoopPhi(param, loopInst))
+                            if (IRLoop * loopInst = isLoopPhi(param))
                             {
                                 // If the param is a phi node in a loop that
                                 // does not depend on non-constexpr values, we
