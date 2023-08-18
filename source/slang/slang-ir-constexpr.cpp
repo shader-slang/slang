@@ -157,9 +157,76 @@ void markConstExpr(
     PropagateConstExprContext*  context,
     IRInst*                    value)
 {
+    if (value->_debugUID == 1255)
+        printf("break");
     Slang::markConstExpr(context->getBuilder(), value);
 }
 
+void maybeAddToWorkList(
+    PropagateConstExprContext* context,
+    IRInst* gv)
+{
+    if (!context->onWorkList.contains(gv))
+    {
+        context->workList.add(gv);
+        context->onWorkList.add(gv);
+    }
+}
+
+bool maybeMarkConstExpr(
+    PropagateConstExprContext* context,
+    IRInst* value)
+{
+    if (isConstExpr(value))
+        return false;
+
+    if (!opCanBeConstExpr(value))
+        return false;
+
+    markConstExpr(context, value);
+
+    // TODO: we should only allow function parameters to be
+    // changed to be `constexpr` when we are compiling "application"
+    // code, and not library code.
+    // (Or eventually we'd have a rule that only non-`public` symbols
+    // can have this kind of propagation applied).
+
+    if (value->getOp() == kIROp_Param)
+    {
+        auto param = (IRParam*)value;
+        auto block = (IRBlock*)param->parent;
+        auto code = block->getParent();
+
+        if (block == code->getFirstBlock())
+        {
+            // We've just changed a function parameter to
+            // be `constexpr`. We need to remember that
+            // fact so taht we can mark callers of this
+            // function as `constexpr` themselves.
+
+            for (auto u = code->firstUse; u; u = u->nextUse)
+            {
+                auto user = u->getUser();
+
+                switch (user->getOp())
+                {
+                case kIROp_Call:
+                {
+                    auto inst = (IRCall*)user;
+                    auto caller = as<IRGlobalValueWithCode>(inst->getParent()->getParent());
+                    maybeAddToWorkList(context, caller);
+                }
+                break;
+
+                default:
+                    break;
+                }
+            }
+        }
+    }
+
+    return true;
+}
 
 // Work through the closure of all dependencies of `instIn` and check
 // if `instIn` and their dependencies are all constexpr given insts
@@ -220,7 +287,7 @@ bool isLoopPhi(IRParam* param, IRLoop*& loopInst)
     return false;
 }
 
-bool isConstExprLoopPhi(PropagateConstExprContext* context, IRParam* param, IRLoop*& loopInst)
+bool isConstExprLoopPhi(HashSet<IRInst*>& tentativeConstExprInsts, IRParam* param, IRLoop*& loopInst)
 {
     // If we see a phi node in unrolled loops we should
     // consider if the closure of all insts computed
@@ -236,7 +303,6 @@ bool isConstExprLoopPhi(PropagateConstExprContext* context, IRParam* param, IRLo
         return false;
 
     UInt index = (UInt)bb->getParamIndex(param);
-    HashSet<IRInst*> tentativeConstExprInsts;
     tentativeConstExprInsts.add(param);
     
     for (auto pred : bb->getPredecessors())
@@ -252,8 +318,6 @@ bool isConstExprLoopPhi(PropagateConstExprContext* context, IRParam* param, IRLo
     }
     if (loopInst && isPhiConstExpr)
     {
-        for (auto inst : tentativeConstExprInsts)
-            markConstExpr(context, inst);
         return true;
     }
     return false;
@@ -316,15 +380,6 @@ bool propagateConstExprForward(
                 if(isConstExpr(ii))
                     continue;
 
-                if (auto param = as<IRParam>(ii))
-                {
-                    if (bb != code->getFirstBlock())
-                    {
-                        IRLoop* loopInst;
-                        if (isConstExprLoopPhi(context, param, loopInst))
-                            continue;
-                    }
-                }
                 // Is the operation one that we can actually make be constexpr?
                 if(!opCanBeConstExpr(ii))
                     continue;
@@ -358,71 +413,6 @@ bool propagateConstExprForward(
     }
 }
 
-void maybeAddToWorkList(
-    PropagateConstExprContext*  context,
-    IRInst*                     gv)
-{
-    if( !context->onWorkList.contains(gv) )
-    {
-        context->workList.add(gv);
-        context->onWorkList.add(gv);
-    }
-}
-
-bool maybeMarkConstExpr(
-    PropagateConstExprContext*  context,
-    IRInst*                    value)
-{
-    if(isConstExpr(value))
-        return false;
-
-    if(!opCanBeConstExpr(value))
-        return false;
-
-    markConstExpr(context, value);
-
-    // TODO: we should only allow function parameters to be
-    // changed to be `constexpr` when we are compiling "application"
-    // code, and not library code.
-    // (Or eventually we'd have a rule that only non-`public` symbols
-    // can have this kind of propagation applied).
-
-    if(value->getOp() == kIROp_Param)
-    {
-        auto param = (IRParam*) value;
-        auto block = (IRBlock*) param->parent;
-        auto code = block->getParent();
-
-        if(block == code->getFirstBlock())
-        {
-            // We've just changed a function parameter to
-            // be `constexpr`. We need to remember that
-            // fact so taht we can mark callers of this
-            // function as `constexpr` themselves.
-
-            for( auto u = code->firstUse; u; u = u->nextUse )
-            {
-                auto user = u->getUser();
-
-                switch( user->getOp() )
-                {
-                case kIROp_Call:
-                    {
-                        auto inst = (IRCall*) user;
-                        auto caller = as<IRGlobalValueWithCode>(inst->getParent()->getParent());
-                        maybeAddToWorkList(context, caller);
-                    }
-                    break;
-
-                default:
-                    break;
-                }
-            }
-        }
-    }
-
-    return true;
-}
 
 // Propagate `constexpr`-ness in a backward direction, from an instruction
 // to its operands.
@@ -465,6 +455,22 @@ bool propagateConstExprBackward(
                         if( maybeMarkConstExpr(context, arg) )
                         {
                             changedThisIteration = true;
+                        }
+                    }
+                    // If the instruction is a loop phi node, we should check
+                    // if the phi arguments are constexpr.
+                    if (auto phiParam = as<IRParam>(ii))
+                    {
+                        if (bb != code->getFirstBlock())
+                        {
+                            IRLoop* loopInst;
+                            HashSet<IRInst*> tentativeConstExprInsts;
+
+                            if (isConstExprLoopPhi(tentativeConstExprInsts, phiParam, loopInst))
+                            {
+                                for (auto inst : tentativeConstExprInsts)
+                                    changedThisIteration |= maybeMarkConstExpr(context, inst);
+                            }
                         }
                     }
                 }
