@@ -155,8 +155,24 @@ bool opCanBeConstExprByForwardPass(IRInst* value)
     return opCanBeConstExpr(value->getOp());
 }
 
+IRLoop* isLoopPhi(IRParam* param)
+{
+    IRBlock* bb = cast<IRBlock>(param->getParent());
+    for (auto pred : bb->getPredecessors())
+    {
+        auto loop = as<IRLoop>(pred->getTerminator());
+        if (loop)
+        {
+            return loop;
+        }
+    }
+    return nullptr;
+}
+
 bool opCanBeConstExprByBackwardPass(IRInst* value)
 {
+    if (value->getOp() == kIROp_Param)
+        return isLoopPhi(as<IRParam>(value));
     return opCanBeConstExpr(value->getOp());
 }
 
@@ -231,20 +247,6 @@ bool maybeMarkConstExprBackwardPass(
     }
 
     return true;
-}
-
-IRLoop* isLoopPhi(IRParam* param)
-{
-    IRBlock* bb = cast<IRBlock>(param->getParent());
-    for (auto pred : bb->getPredecessors())
-    {
-        auto loop = as<IRLoop>(pred->getTerminator());
-        if (loop)
-        {
-            return loop;
-        }
-    }
-    return nullptr;
 }
 
 // Produce an estimate on whether a loop is unrollable, by checking
@@ -500,14 +502,13 @@ bool propagateConstExprBackward(
 
                     for(auto pred : bb->getPredecessors())
                     {
-                        auto terminator = pred->getLastInst();
-                        if(terminator->getOp() != kIROp_unconditionalBranch)
+                        auto terminator = as<IRUnconditionalBranch>(pred->getLastInst());
+                        if(!terminator)
                             continue;
 
-                        UInt operandIndex = paramIndex + 1;
-                        SLANG_RELEASE_ASSERT(operandIndex < terminator->getOperandCount());
+                        SLANG_RELEASE_ASSERT(paramIndex < terminator->getArgCount());
 
-                        auto operand = terminator->getOperand(operandIndex);
+                        auto operand = terminator->getArg(paramIndex);
                         if(maybeMarkConstExprBackwardPass(context, operand) )
                         {
                             changedThisIteration = true;
