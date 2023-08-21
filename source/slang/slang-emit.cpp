@@ -31,6 +31,7 @@
 #include "slang-ir-legalize-varying-params.h"
 #include "slang-ir-link.h"
 #include "slang-ir-com-interface.h"
+#include "slang-ir-lower-append-consume-structured-buffer.h"
 #include "slang-ir-lower-binding-query.h"
 #include "slang-ir-lower-generics.h"
 #include "slang-ir-lower-tuple-types.h"
@@ -493,6 +494,14 @@ Result linkAndOptimizeIR(
     simplifyIR(irModule, sink);
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
+
+    // On non-HLSL targets, there isn't an implementation of `AppendStructuredBuffer`
+    // and `ConsumeStructuredBuffer` types, so we lower them into normal struct types
+    // of `RWStructuredBuffer` typed fields now.
+    if (target != CodeGenTarget::HLSL)
+    {
+        lowerAppendConsumeStructuredBuffers(targetRequest, irModule, sink);
+    }
 
     // We don't need the legalize pass for C/C++ based types
     if(options.shouldLegalizeExistentialAndResourceTypes )

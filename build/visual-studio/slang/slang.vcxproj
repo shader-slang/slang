@@ -408,6 +408,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ir-liveness.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-loop-inversion.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-loop-unroll.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-lower-append-consume-structured-buffer.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-binding-query.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-bit-cast.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-buffer-element-type.h" />
@@ -618,6 +619,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ir-liveness.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-loop-inversion.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-loop-unroll.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-lower-append-consume-structured-buffer.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-binding-query.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-bit-cast.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-buffer-element-type.cpp" />

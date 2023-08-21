@@ -715,6 +715,7 @@ static LayoutResourceKind _getHLSLLayoutResourceKind(ShaderParameterKind kind)
         case ShaderParameterKind::MutableRawBuffer:
         case ShaderParameterKind::MutableBuffer:
         case ShaderParameterKind::MutableTexture:
+        case ShaderParameterKind::AppendConsumeStructuredBuffer:
             return LayoutResourceKind::UnorderedAccess;
 
         case ShaderParameterKind::SamplerState:
@@ -728,6 +729,13 @@ struct GLSLObjectLayoutRulesImpl : ObjectLayoutRulesImpl
 {
     virtual SimpleLayoutInfo GetObjectLayout(ShaderParameterKind kind, const Options& options) override
     {
+        int slotCount = 1;
+
+        // In Vulkan GLSL, pretty much every object is just a descriptor-table slot.
+        // Except for AppendConsumeStructuredBuffer, which takes two slots.
+        if (kind == ShaderParameterKind::AppendConsumeStructuredBuffer)
+            slotCount = 2;
+
         if (options.hlslToVulkanKindFlags)
         {
             // Is this an HLSL kind that might be shifted
@@ -745,14 +753,12 @@ struct GLSLObjectLayoutRulesImpl : ObjectLayoutRulesImpl
                 {
                     // We are going to consume a HLSL layout kind
                     // Later we will do shifting as necessary
-                    return SimpleLayoutInfo(hlslLayoutKind, 1);
+                    return SimpleLayoutInfo(hlslLayoutKind, slotCount);
                 }
             }
         }
 
-        // In Vulkan GLSL, pretty much every object is just a descriptor-table slot.
-        // We can refine this method once we support a case where this isn't true.
-        return SimpleLayoutInfo(LayoutResourceKind::DescriptorTableSlot, 1);
+        return SimpleLayoutInfo(LayoutResourceKind::DescriptorTableSlot, slotCount);
     }
 };
 GLSLObjectLayoutRulesImpl kGLSLObjectLayoutRulesImpl;
@@ -799,6 +805,7 @@ struct HLSLObjectLayoutRulesImpl : ObjectLayoutRulesImpl
         case ShaderParameterKind::MutableRawBuffer:
         case ShaderParameterKind::MutableBuffer:
         case ShaderParameterKind::MutableTexture:
+        case ShaderParameterKind::AppendConsumeStructuredBuffer:
             return SimpleLayoutInfo(LayoutResourceKind::UnorderedAccess, 1);
 
         case ShaderParameterKind::SamplerState:
@@ -974,6 +981,7 @@ struct CPUObjectLayoutRulesImpl : ObjectLayoutRulesImpl
                 
             case ShaderParameterKind::StructuredBuffer:            
             case ShaderParameterKind::MutableStructuredBuffer:
+            case ShaderParameterKind::AppendConsumeStructuredBuffer:
                 // It's a ptr and a size of the amount of elements
                 return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*) * 2, SLANG_ALIGN_OF(void*));
 
@@ -1033,6 +1041,7 @@ struct CUDAObjectLayoutRulesImpl : CPUObjectLayoutRulesImpl
 
             case ShaderParameterKind::StructuredBuffer:
             case ShaderParameterKind::MutableStructuredBuffer:
+            case ShaderParameterKind::AppendConsumeStructuredBuffer:
             {
                 // It's a ptr and a count of the amount of elements
                 const size_t size = _roundToAlignment(sizeof(CUDAPtr) + sizeof(CUDACount), sizeof(CUDAPtr));
@@ -3763,8 +3772,8 @@ static TypeLayoutResult _createTypeLayout(
     CASE(HLSLStructuredBufferType,                  StructuredBuffer);
     CASE(HLSLRWStructuredBufferType,                MutableStructuredBuffer);
     CASE(HLSLRasterizerOrderedStructuredBufferType, MutableStructuredBuffer);
-    CASE(HLSLAppendStructuredBufferType,            MutableStructuredBuffer);
-    CASE(HLSLConsumeStructuredBufferType,           MutableStructuredBuffer);
+    CASE(HLSLAppendStructuredBufferType,            AppendConsumeStructuredBuffer);
+    CASE(HLSLConsumeStructuredBufferType,           AppendConsumeStructuredBuffer);
 
 #undef CASE
 

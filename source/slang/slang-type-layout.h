@@ -935,6 +935,8 @@ enum class ShaderParameterKind
     MutableImage,
 
     RegisterSpace,
+
+    AppendConsumeStructuredBuffer,
 };
 
 struct SimpleLayoutRulesImpl

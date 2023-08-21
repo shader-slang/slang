@@ -455,6 +455,66 @@ void CLikeSourceEmitter::emitRTTIObject(IRRTTIObject* rttiObject)
     // This is only used in targets that support dynamic dispatching.
 }
 
+void CLikeSourceEmitter::defaultEmitInstStmt(IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_AtomicCounterIncrement:
+        {
+            auto oldValName = getName(inst);
+            m_writer->emit("int ");
+            m_writer->emit(oldValName);
+            m_writer->emit(";\n");
+            m_writer->emit("InterlockedAdd(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(", 1, ");
+            m_writer->emit(oldValName);
+            m_writer->emit(");\n");
+        }
+        break;
+    case kIROp_AtomicCounterDecrement:
+        {
+            auto oldValName = getName(inst);
+            m_writer->emit("int ");
+            m_writer->emit(oldValName);
+            m_writer->emit(";\n");
+            m_writer->emit("InterlockedAdd(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(", -1, ");
+            m_writer->emit(oldValName);
+            m_writer->emit(");\n");
+        }
+        break;
+    case kIROp_StructuredBufferGetDimensions:
+        {
+            auto count = _generateUniqueName(UnownedStringSlice("_elementCount"));
+            auto stride = _generateUniqueName(UnownedStringSlice("_stride"));
+
+            m_writer->emit("uint ");
+            m_writer->emit(count);
+            m_writer->emit(";\n");
+            m_writer->emit("uint ");
+            m_writer->emit(stride);
+            m_writer->emit(";\n");
+            emitOperand(inst->getOperand(0), leftSide(getInfo(EmitOp::General), getInfo(EmitOp::Postfix)));
+            m_writer->emit(".GetDimensions(");
+            m_writer->emit(count);
+            m_writer->emit(", ");
+            m_writer->emit(stride);
+            m_writer->emit(");\n");
+            emitInstResultDecl(inst);
+            m_writer->emit("uint2(");
+            m_writer->emit(count);
+            m_writer->emit(", ");
+            m_writer->emit(stride);
+            m_writer->emit(");\n");
+        }
+        break;
+    default:
+        diagnoseUnhandledInst(inst);
+    }
+}
+
 
 void CLikeSourceEmitter::emitTypeImpl(IRType* type, const StringSliceLoc* nameAndLoc)
 {
@@ -1874,6 +1934,16 @@ void CLikeSourceEmitter::emitInstExpr(IRInst* inst, const EmitOpInfo& inOuterPre
     defaultEmitInstExpr(inst, inOuterPrec);
 }
 
+void CLikeSourceEmitter::emitInstStmt(IRInst* inst)
+{
+    // Try target specific impl first
+    if (tryEmitInstStmtImpl(inst))
+    {
+        return;
+    }
+    defaultEmitInstStmt(inst);
+}
+
 void CLikeSourceEmitter::diagnoseUnhandledInst(IRInst* inst)
 {
     getSink()->diagnose(inst, Diagnostics::unimplemented, "unexpected IR opcode during code emit");
@@ -2190,6 +2260,23 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
             m_writer->emit(", ");
             emitOperand(inst->getOperand(2), EmitOpInfo());
             m_writer->emit(")");
+        }
+        break;
+
+    case kIROp_StructuredBufferAppend:
+        {
+            auto outer = getInfo(EmitOp::General);
+            emitOperand(inst->getOperand(0), leftSide(outer, getInfo(EmitOp::Postfix)));
+            m_writer->emit(".Append(");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit(")");
+        }
+        break;
+    case kIROp_StructuredBufferConsume:
+        {
+            auto outer = getInfo(EmitOp::General);
+            emitOperand(inst->getOperand(0), leftSide(outer, getInfo(EmitOp::Postfix)));
+            m_writer->emit(".Consume()");
         }
         break;
 
@@ -2562,7 +2649,10 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
 
         // Insts that needs to be emitted as code blocks.
     case kIROp_CudaKernelLaunch:
-        emitInstStmtImpl(inst);
+    case kIROp_AtomicCounterIncrement:
+    case kIROp_AtomicCounterDecrement:
+    case kIROp_StructuredBufferGetDimensions:
+        emitInstStmt(inst);
         break;
 
     case kIROp_LiveRangeStart:

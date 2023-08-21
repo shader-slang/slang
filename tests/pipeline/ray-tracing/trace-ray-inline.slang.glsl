@@ -28,7 +28,7 @@ layout(std140) uniform _S1
 layout(binding = 0)
 uniform accelerationStructureEXT myAccelerationStructure_0;
 
-layout(std430, binding = 1) buffer _S2 {
+layout(std430, binding = 1) buffer StructuredBuffer_int_t_0 {
     int _data[];
 } resultBuffer_0;
 struct MyProceduralHitAttrs_0
@@ -81,40 +81,37 @@ void main()
     rayQueryEXT query_0;
     MyRayPayload_0 payload_5;
     payload_5.value_1 = -1;
-    rayQueryInitializeEXT((query_0), (myAccelerationStructure_0), (C_0.rayFlags_0 | 512), (C_0.instanceMask_0), (C_0.origin_0), (C_0.tMin_0), (C_0.direction_0), (C_0.tMax_0));
+    rayQueryInitializeEXT((query_0), (myAccelerationStructure_0), (C_0.rayFlags_0 | 512U), (C_0.instanceMask_0), (C_0.origin_0), (C_0.tMin_0), (C_0.direction_0), (C_0.tMax_0));
     MyProceduralHitAttrs_0 committedProceduralAttrs_0;
     for(;;)
     {
-        bool _S3 = rayQueryProceedEXT(query_0);
-        if(!_S3)
+        bool _S2 = rayQueryProceedEXT(query_0);
+        if(!_S2)
         {
             break;
         }
-        uint _S4 = (rayQueryGetIntersectionTypeEXT((query_0), false));
+        uint _S3 = (rayQueryGetIntersectionTypeEXT((query_0), false));
         MyProceduralHitAttrs_0 committedProceduralAttrs_1;
-        switch(_S4)
+        switch(_S3)
         {
         case 1U:
             {
                 MyProceduralHitAttrs_0 candidateProceduralAttrs_0;
                 candidateProceduralAttrs_0.value_0 = 0;
                 float tHit_1 = 0.0;
-                bool _S5 = myProceduralIntersection_0(tHit_1, candidateProceduralAttrs_0);
-                if(_S5)
+                bool _S4 = myProceduralIntersection_0(tHit_1, candidateProceduralAttrs_0);
+                if(_S4)
                 {
-                    bool _S6 = myProceduralAnyHit_0(payload_5);
-                    if(_S6)
+                    bool _S5 = myProceduralAnyHit_0(payload_5);
+                    if(_S5)
                     {
                         rayQueryGenerateIntersectionEXT(query_0, tHit_1);
-                        MyProceduralHitAttrs_0 _S7 = candidateProceduralAttrs_0;
+                        MyProceduralHitAttrs_0 _S6 = candidateProceduralAttrs_0;
                         if(C_0.shouldStopAtFirstHit_0 != 0U)
                         {
                             rayQueryTerminateEXT(query_0);
                         }
-                        else
-                        {
-                        }
-                        committedProceduralAttrs_1 = _S7;
+                        committedProceduralAttrs_1 = _S6;
                     }
                     else
                     {
@@ -129,20 +126,14 @@ void main()
             }
         case 0U:
             {
-                bool _S8 = myTriangleAnyHit_0(payload_5);
-                if(_S8)
+                bool _S7 = myTriangleAnyHit_0(payload_5);
+                if(_S7)
                 {
                     rayQueryConfirmIntersectionEXT(query_0);
                     if(C_0.shouldStopAtFirstHit_0 != 0U)
                     {
                         rayQueryTerminateEXT(query_0);
                     }
-                    else
-                    {
-                    }
-                }
-                else
-                {
                 }
                 committedProceduralAttrs_1 = committedProceduralAttrs_0;
                 break;
@@ -155,8 +146,8 @@ void main()
         }
         committedProceduralAttrs_0 = committedProceduralAttrs_1;
     }
-    uint _S9 = (rayQueryGetIntersectionTypeEXT((query_0), true));
-    switch(_S9)
+    uint _S8 = (rayQueryGetIntersectionTypeEXT((query_0), true));
+    switch(_S8)
     {
     case 1U:
         {
@@ -178,6 +169,8 @@ void main()
             break;
         }
     }
-    ((resultBuffer_0)._data[(index_0)]) = payload_5.value_1;
+    resultBuffer_0._data[index_0] = payload_5.value_1;
     return;
 }
+
+

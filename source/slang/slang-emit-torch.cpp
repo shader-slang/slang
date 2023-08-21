@@ -65,12 +65,12 @@ void emitTorchScalarTypeName(SourceWriter* m_writer, IRInst* type)
     }
 }
 
-void TorchCppSourceEmitter::emitInstStmtImpl(IRInst* inst)
+bool TorchCppSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
 {
     switch (inst->getOp())
     {
     default:
-        return;
+        return false;
     case kIROp_CudaKernelLaunch:
         {
             m_writer->emit("AT_CUDA_CHECK(cudaLaunchKernel(");
@@ -101,7 +101,7 @@ void TorchCppSourceEmitter::emitInstStmtImpl(IRInst* inst)
             emitOperand(inst->getOperand(4), getInfo(EmitOp::General));
             m_writer->emit(")));\n");
         
-            break;
+            return true;
         }
     }
 }

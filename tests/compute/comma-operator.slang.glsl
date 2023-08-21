@@ -3,7 +3,7 @@
 
 //TEST_IGNORE_FILE:
 
-layout(std430, binding = 0) buffer _S1 {
+layout(std430, binding = 0) buffer StructuredBuffer_int_t_0 {
     int _data[];
 } outputBuffer_0;
 

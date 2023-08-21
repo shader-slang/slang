@@ -2144,6 +2144,25 @@ struct IRRWStructuredBufferGetElementPtr : IRInst
     IRInst* getIndex() { return getOperand(1); }
 };
 
+struct IRStructuredBufferAppend : IRInst
+{
+    IR_LEAF_ISA(StructuredBufferAppend);
+    IRInst* getBuffer() { return getOperand(0); }
+    IRInst* getElement() { return getOperand(1); }
+};
+
+struct IRStructuredBufferConsume : IRInst
+{
+    IR_LEAF_ISA(StructuredBufferConsume);
+    IRInst* getBuffer() { return getOperand(0); }
+};
+
+struct IRStructuredBufferGetDimensions : IRInst
+{
+    IR_LEAF_ISA(StructuredBufferGetDimensions);
+    IRInst* getBuffer() { return getOperand(0); }
+};
+
 struct IRLoadReverseGradient : IRInst
 {
     IR_LEAF_ISA(LoadReverseGradient)
