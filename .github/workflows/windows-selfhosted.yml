@@ -47,5 +47,5 @@ jobs:
       run: |
         $ErrorActionPreference = "SilentlyContinue"
         $env:Path += ';.\external\slang-binaries\spirv-tools\windows-${{matrix.testPlatform}}\bin\'
-        .\bin\windows-${{matrix.testPlatform}}\${{matrix.configuration}}\slang-test.exe -use-test-server -api vk
+        .\bin\windows-${{matrix.testPlatform}}\${{matrix.configuration}}\slang-test.exe -use-test-server -api all-cpu
       
