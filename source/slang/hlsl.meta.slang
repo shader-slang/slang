@@ -14,6 +14,15 @@ __generic<T>
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
 uint2 __structuredBufferGetDimensions(ConsumeStructuredBuffer<T> buffer);
 
+__intrinsic_op($(kIROp_StructuredBufferGetDimensions))
+uint2 __structuredBufferGetDimensions<T>(StructuredBuffer<T> buffer);
+
+__intrinsic_op($(kIROp_StructuredBufferGetDimensions))
+uint2 __structuredBufferGetDimensions<T>(RWStructuredBuffer<T> buffer);
+
+__intrinsic_op($(kIROp_StructuredBufferGetDimensions))
+uint2 __structuredBufferGetDimensions<T>(RasterizerOrderedStructuredBuffer<T> buffer);
+
 __generic<T>
 __magic_type(HLSLAppendStructuredBufferType)
 __intrinsic_type($(kIROp_HLSLAppendStructuredBufferType))
@@ -37,35 +46,61 @@ __magic_type(HLSLByteAddressBufferType)
 __intrinsic_type($(kIROp_HLSLByteAddressBufferType))
 struct ByteAddressBuffer
 {
-    __target_intrinsic(glsl, "$1 = $0._data.length() * 4")
     [__readNone]
-    void GetDimensions(
-        out uint dim);
+    __target_intrinsic(hlsl)
+    __target_intrinsic(cpp)
+    __target_intrinsic(cuda)
+    [__unsafeForceInlineEarly]
+    void GetDimensions(out uint dim);
 
-    __target_intrinsic(glsl, "$0._data[$1/4]")
+    [__unsafeForceInlineEarly]
+    __specialized_for_target(spirv)
+    __specialized_for_target(glsl)
+    void GetDimensions(out uint dim)
+    {
+        dim = __structuredBufferGetDimensions(__getEquivalentStructuredBuffer<uint>(this)).x*4;
+    }
+
     [__readNone]
-    uint Load(int location);
+    [ForceInline]
+    __target_intrinsic(hlsl)
+    uint Load(int location)
+    {
+        return __byteAddressBufferLoad<uint>(this, location);
+    }
 
     [__readNone]
     uint Load(int location, out uint status);
 
-    __target_intrinsic(glsl, "uvec2($0._data[$1/4], $0._data[$1/4+1])")
     [__readNone]
-    uint2 Load2(int location);
+    [ForceInline]
+    __target_intrinsic(hlsl)
+    uint2 Load2(int location)
+    {
+        return __byteAddressBufferLoad<uint2>(this, location);
+    }
 
     [__readNone]
     uint2 Load2(int location, out uint status);
 
-    __target_intrinsic(glsl, "uvec3($0._data[$1/4], $0._data[$1/4+1], $0._data[$1/4+2])")
     [__readNone]
-    uint3 Load3(int location);
+    [ForceInline]
+    __target_intrinsic(hlsl)
+    uint3 Load3(int location)
+    {
+        return __byteAddressBufferLoad<uint3>(this, location);
+    }
 
     [__readNone]
     uint3 Load3(int location, out uint status);
 
-    __target_intrinsic(glsl, "uvec4($0._data[$1/4], $0._data[$1/4+1], $0._data[$1/4+2], $0._data[$1/4+3])")
     [__readNone]
-    uint4 Load4(int location);
+    [ForceInline]
+    __target_intrinsic(hlsl)
+    uint4 Load4(int location)
+    {
+        return __byteAddressBufferLoad<uint4>(this, location);
+    }
 
     [__readNone]
     uint4 Load4(int location, out uint status);
@@ -244,11 +279,16 @@ __magic_type(HLSLStructuredBufferType)
 __intrinsic_type($(kIROp_HLSLStructuredBufferType))
 struct StructuredBuffer
 {
-    __target_intrinsic(glsl, "$1 = $0._data.length(); $2 = 0")
     [__readNone]
+    [__unsafeForceInlineEarly]
     void GetDimensions(
         out uint numStructs,
-        out uint stride);
+        out uint stride)
+    {
+        let rs = __structuredBufferGetDimensions(this);
+        numStructs = rs.x;
+        stride = rs.y;
+    }
 
     __intrinsic_op($(kIROp_StructuredBufferLoad))
     __target_intrinsic(glsl, "$0._data[$1]")
@@ -321,34 +361,56 @@ struct $(item.name)
     // Note(tfoley): supports all operations from `ByteAddressBuffer`
     // TODO(tfoley): can this be made a sub-type?
 
-    __target_intrinsic(glsl, "$1 = $0._data.length() * 4")
-    void GetDimensions(
-        out uint dim);
+    __target_intrinsic(hlsl)
+    __target_intrinsic(cpp)
+    __target_intrinsic(cuda)
+    [__unsafeForceInlineEarly]
+    void GetDimensions(out uint dim);
 
-    __target_intrinsic(glsl, "$0._data[$1/4]")
+    [__unsafeForceInlineEarly]
+    __specialized_for_target(spirv)
+    __specialized_for_target(glsl)
+    void GetDimensions(out uint dim)
+    {
+        dim = __structuredBufferGetDimensions(__getEquivalentStructuredBuffer<uint>(this)).x*4;
+    }
+
+    __target_intrinsic(hlsl)
     [__NoSideEffect]
-    uint Load(int location);
+    uint Load(int location)
+    {
+        return __byteAddressBufferLoad<uint>(this, location);
+    }
 
     [__NoSideEffect]
     uint Load(int location, out uint status);
 
-    __target_intrinsic(glsl, "uvec2($0._data[$1/4], $0._data[$1/4+1])")
+    __target_intrinsic(hlsl)
     [__NoSideEffect]
-    uint2 Load2(int location);
+    uint2 Load2(int location)
+    {
+        return __byteAddressBufferLoad<uint2>(this, location);
+    }
 
     [__NoSideEffect]
     uint2 Load2(int location, out uint status);
 
-    __target_intrinsic(glsl, "uvec3($0._data[$1/4], $0._data[$1/4+1], $0._data[$1/4+2])")
+    __target_intrinsic(hlsl)
     [__NoSideEffect]
-    uint3 Load3(int location);
+    uint3 Load3(int location)
+    {
+        return __byteAddressBufferLoad<uint3>(this, location);
+    }
 
     [__NoSideEffect]
     uint3 Load3(int location, out uint status);
 
-    __target_intrinsic(glsl, "uvec4($0._data[$1/4], $0._data[$1/4+1], $0._data[$1/4+2], $0._data[$1/4+3])")
+    __target_intrinsic(hlsl)
     [__NoSideEffect]
-    uint4 Load4(int location);
+    uint4 Load4(int location)
+    {
+        return __byteAddressBufferLoad<uint4>(this, location);
+    }
 
     [__NoSideEffect]
     uint4 Load4(int location, out uint status);
@@ -689,25 +751,39 @@ ${{{{
         UINT dest,
         UINT value);
 
-    __target_intrinsic(glsl, "$0._data[$1/4] = $2")
+    __target_intrinsic(hlsl)
+    [ForceInline]
     void Store(
         uint address,
-        uint value);
+        uint value)
+    {
+        __byteAddressBufferStore(this, address, value);
+    }
 
-    __target_intrinsic(glsl, "$0._data[$1/4] = $2.x, $0._data[$1/4+1] = $2.y")
-    void Store2(
-        uint address,
-        uint2 value);
+    __target_intrinsic(hlsl)
+    [ForceInline]
+    void Store2(uint address, uint2 value)
+    {
+        __byteAddressBufferStore(this, address, value);
+    }
 
-    __target_intrinsic(glsl, "$0._data[$1/4] = $2.x, $0._data[$1/4+1] = $2.y, $0._data[$1/4+2] = $2.z")
+    __target_intrinsic(hlsl)
+    [ForceInline]
     void Store3(
         uint address,
-        uint3 value);
+        uint3 value)
+    {
+        __byteAddressBufferStore(this, address, value);
+    }
 
-    __target_intrinsic(glsl, "$0._data[$1/4] = $2.x, $0._data[$1/4+1] = $2.y, $0._data[$1/4+2] = $2.z, $0._data[$1/4+3] = $2.w")
+    __target_intrinsic(hlsl)
+    [ForceInline]
     void Store4(
         uint address,
-        uint4 value);
+        uint4 value)
+    {
+        __byteAddressBufferStore(this, address, value);
+    }
 
     void Store<T>(int offset, T value)
     {
@@ -738,10 +814,17 @@ struct $(item.name)
 {
     uint DecrementCounter();
 
-    __target_intrinsic(glsl, "$1 = $0._data.length(); $2 = 0")
+    [__readNone]
+    [__unsafeForceInlineEarly]
+    __target_intrinsic(hlsl)
     void GetDimensions(
         out uint numStructs,
-        out uint stride);
+        out uint stride)
+    {
+        let rs = __structuredBufferGetDimensions(this);
+        numStructs = rs.x;
+        stride = rs.y;
+    }
 
     uint IncrementCounter();
 
@@ -1849,6 +1932,12 @@ __generic<T : __BuiltinFloatingPointType> vector<T,4> dst(vector<T,4> x, vector<
 // Given a RWByteAddressBuffer allow it to be interpretted as a RWStructuredBuffer
 __intrinsic_op($(kIROp_GetEquivalentStructuredBuffer))
 RWStructuredBuffer<T> __getEquivalentStructuredBuffer<T>(RWByteAddressBuffer b);
+
+__intrinsic_op($(kIROp_GetEquivalentStructuredBuffer))
+StructuredBuffer<T> __getEquivalentStructuredBuffer<T>(ByteAddressBuffer b);
+
+__intrinsic_op($(kIROp_GetEquivalentStructuredBuffer))
+RasterizerOrderedStructuredBuffer<T> __getEquivalentStructuredBuffer<T>(RasterizerOrderedByteAddressBuffer b);
 
 // Error message
 

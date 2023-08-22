@@ -500,6 +500,7 @@ namespace Slang
                             case kIROp_StructuredBufferLoadStatus:
                             case kIROp_RWStructuredBufferLoad:
                             case kIROp_RWStructuredBufferLoadStatus:
+                            case kIROp_StructuredBufferConsume:
                                 {
                                     IRCloneEnv cloneEnv = {};
                                     builder.setInsertBefore(user);
@@ -512,6 +513,7 @@ namespace Slang
                                 }
                             case kIROp_Store:
                             case kIROp_RWStructuredBufferStore:
+                            case kIROp_StructuredBufferAppend:
                                 {
                                     // Use must be the dest operand of the store inst.
                                     if (use != user->getOperands() + 0)
@@ -524,6 +526,8 @@ namespace Slang
                                         store->val.set(packedVal);
                                     else if (auto sbStore = as<IRRWStructuredBufferStore>(user))
                                         sbStore->setOperand(2, packedVal);
+                                    else if (auto sbAppend = as<IRStructuredBufferAppend>(user))
+                                        sbAppend->setOperand(1, packedVal);
                                     else
                                         SLANG_UNREACHABLE("unhandled store type");
                                     break;
@@ -564,6 +568,8 @@ namespace Slang
                                 break;
                             case kIROp_RWStructuredBufferGetElementPtr:
                                 ptrValsWorkList.add(user);
+                                break;
+                            case kIROp_StructuredBufferGetDimensions:
                                 break;
                             default:
                                 SLANG_UNREACHABLE("unhandled inst of a buffer/pointer value that needs storage lowering.");

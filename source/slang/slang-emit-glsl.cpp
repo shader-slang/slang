@@ -8,6 +8,7 @@
 #include "slang-mangled-lexer.h"
 
 #include "slang-legalize-types.h"
+#include "slang-ir-layout.h"
 
 #include <assert.h>
 
@@ -2034,6 +2035,22 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit("atomicAdd(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
             m_writer->emit(", -1);\n");
+            return true;
+        }
+    case kIROp_StructuredBufferGetDimensions:
+        {
+            emitInstResultDecl(inst);
+            m_writer->emit("uvec2(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit("._data.length(), ");
+            auto elementType = as<IRHLSLStructuredBufferTypeBase>(inst->getOperand(0)->getDataType())->getElementType();
+            IRIntegerValue stride = 0;
+            if (auto sizeDecor = elementType->findDecoration<IRSizeAndAlignmentDecoration>())
+            {
+                stride = align(sizeDecor->getSize(), (int)sizeDecor->getAlignment());
+            }
+            m_writer->emit(stride);
+            m_writer->emit(");\n");
             return true;
         }
     default:

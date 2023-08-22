@@ -709,7 +709,6 @@ IRFunc *DifferentiableTypeConformanceContext::getOrCreateExistentialDAddMethod()
     builder.addNameHintDecoration(existentialDAddFunc, UnownedStringSlice("__existential_dadd"));
     builder.addBackwardDifferentiableDecoration(existentialDAddFunc);
     
-    this->existentialDAddFunc = existentialDAddFunc;
     return existentialDAddFunc;
 }
 

@@ -15,7 +15,6 @@ struct S_0
 {
     vec4 f_0;
 };
-
 layout(binding = 1)
 layout(std140) uniform _S2
 {
@@ -27,18 +26,14 @@ layout(std430, binding = 2) readonly buffer StructuredBuffer_S_t_0 {
 layout(std430, binding = 3) buffer StructuredBuffer_float4_t_0 {
     vec4 _data[];
 } sb2_0[5];
-layout(std430, binding = 4) readonly buffer _S3
-{
+layout(std430, binding = 4) readonly buffer StructuredBuffer_uint_t_0 {
     uint _data[];
 } bb_0[6];
 layout(location = 0)
-out vec4 _S4;
+out vec4 _S3;
 
 void main()
 {
-
-    uint _S5 = ((bb_0[C_0.index_0])._data[(int(C_0.index_0 * 4U))/4]);
-    _S4 = cb_0[C_0.index_0].f_0 + sb1_0[C_0.index_0]._data[C_0.index_0].f_0 + sb2_0[C_0.index_0]._data[C_0.index_0] + vec4(float(_S5));
+    _S3 = cb_0[C_0.index_0].f_0 + sb1_0[C_0.index_0]._data[C_0.index_0].f_0 + sb2_0[C_0.index_0]._data[C_0.index_0] + vec4(float(bb_0[C_0.index_0]._data[int(C_0.index_0 * 4U) / 4]));
     return;
 }
-

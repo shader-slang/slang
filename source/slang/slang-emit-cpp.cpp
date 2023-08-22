@@ -1192,6 +1192,40 @@ const UnownedStringSlice* CPPSourceEmitter::getVectorElementNames(IRVectorType* 
     return getVectorElementNames(basicType->getBaseType(), elemCount);
 }
 
+bool CPPSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_StructuredBufferGetDimensions:
+    {
+        auto count = _generateUniqueName(UnownedStringSlice("_elementCount"));
+        auto stride = _generateUniqueName(UnownedStringSlice("_stride"));
+
+        m_writer->emit("uint ");
+        m_writer->emit(count);
+        m_writer->emit(";\n");
+        m_writer->emit("uint ");
+        m_writer->emit(stride);
+        m_writer->emit(";\n");
+        emitOperand(inst->getOperand(0), leftSide(getInfo(EmitOp::General), getInfo(EmitOp::Postfix)));
+        m_writer->emit(".GetDimensions(&");
+        m_writer->emit(count);
+        m_writer->emit(", &");
+        m_writer->emit(stride);
+        m_writer->emit(");\n");
+        emitInstResultDecl(inst);
+        m_writer->emit("uint2(");
+        m_writer->emit(count);
+        m_writer->emit(", ");
+        m_writer->emit(stride);
+        m_writer->emit(");\n");
+        return true;
+    }
+    default:
+        return false;
+    }
+}
+
 bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec)
 {
     switch (inst->getOp())
