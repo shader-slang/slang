@@ -10,7 +10,7 @@ layout(row_major) buffer;
 layout(binding = 0)
 uniform accelerationStructureEXT scene_0;
 
-layout(std430, binding = 1) buffer _S1 {
+layout(std430, binding = 1) buffer StructuredBuffer_uint_t_0 {
     uint _data[];
 } outputBuffer_0;
 struct MyAttributes_0
@@ -58,19 +58,19 @@ MyAttributes_0 HitObject_GetAttributes_0(hitObjectNV this_0)
 void accumulate_0(inout uint value_2, hitObjectNV hit_0)
 {
     value_2 = value_2 * 256U;
-    bool _S2 = (hitObjectIsHitNV((hit_0)));
-    if(_S2)
+    bool _S1 = (hitObjectIsHitNV((hit_0)));
+    if(_S1)
     {
-        MyAttributes_0 _S3 = HitObject_GetAttributes_0(hit_0);
-        value_2 = value_2 + (16U + _S3.value_0);
+        MyAttributes_0 _S2 = HitObject_GetAttributes_0(hit_0);
+        value_2 = value_2 + (16U + _S2.value_0);
     }
     return;
 }
 
 void main()
 {
-    uvec3 _S4 = ((gl_LaunchIDEXT));
-    uint idx_1 = _S4.x;
+    uvec3 _S3 = ((gl_LaunchIDEXT));
+    uint idx_1 = _S3.x;
     uint r_0 = 0U;
     RayDesc_0 ray_1 = makeRay_0(idx_1, 0U);
     hitObjectNV hitObj_0;

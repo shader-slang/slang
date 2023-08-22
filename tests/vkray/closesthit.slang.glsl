@@ -3,17 +3,17 @@
 #extension GL_NV_ray_tracing : require
 
 #define tmp_shaderrecord    _S1
-#define tmp_colors          _S2
-#define tmp_hitattrs        _S3
-#define tmp_payload         _S4
-#define tmp_customidx       _S5
-#define tmp_instanceid      _S6
-#define tmp_add_0           _S7
-#define tmp_primid          _S8
-#define tmp_add_1           _S9
-#define tmp_hitkind         _S10
-#define tmp_hitt            _S11
-#define tmp_tmin            _S12
+#define tmp_colors          StructuredBuffer_float4_t_0
+#define tmp_hitattrs        _S2
+#define tmp_payload         _S3
+#define tmp_customidx       _S4
+#define tmp_instanceid      _S5
+#define tmp_add_0           _S6
+#define tmp_primid          _S7
+#define tmp_add_1           _S8
+#define tmp_hitkind         _S9
+#define tmp_hitt            _S10
+#define tmp_tmin            _S11
 
 struct SLANG_ParameterGroup_ShaderRecord_0
 {

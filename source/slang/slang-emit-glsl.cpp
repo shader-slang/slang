@@ -201,8 +201,11 @@ void GLSLSourceEmitter::_emitGLSLStructuredBuffer(IRGlobalParam* varDecl, IRHLSL
     m_writer->emit("buffer ");
 
     // Generate a dummy name for the block
-    m_writer->emit("_S");
-    m_writer->emit(m_uniqueIDCounter++);
+    StringBuilder blockTypeName;
+    blockTypeName << "StructuredBuffer_";
+    getTypeNameHint(blockTypeName, structuredBufferType->getElementType());
+    blockTypeName << "_t";
+    m_writer->emit(_generateUniqueName(blockTypeName.produceString().getUnownedSlice()));
 
     m_writer->emit(" {\n");
     m_writer->indent();
@@ -2005,6 +2008,37 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 
     // Not handled
     return false;
+}
+
+bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_AtomicCounterIncrement:
+        {
+            auto oldValName = getName(inst);
+            m_writer->emit("int ");
+            m_writer->emit(oldValName);
+            m_writer->emit(" = ");
+            m_writer->emit("atomicAdd(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(", 1);\n");
+            return true;
+        }
+    case kIROp_AtomicCounterDecrement:
+        {
+            auto oldValName = getName(inst);
+            m_writer->emit("int ");
+            m_writer->emit(oldValName);
+            m_writer->emit(" = ");
+            m_writer->emit("atomicAdd(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(", -1);\n");
+            return true;
+        }
+    default:
+        return false;
+    }
 }
 
 void GLSLSourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)

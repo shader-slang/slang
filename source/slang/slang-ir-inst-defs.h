@@ -447,6 +447,14 @@ INST(RWStructuredBufferStore, rwstructuredBufferStore, 3, 0)
 
 INST(RWStructuredBufferGetElementPtr, rwstructuredBufferGetElementPtr, 2, 0)
 
+// Append/Consume-StructuredBuffer operations
+INST(StructuredBufferAppend, StructuredBufferAppend, 1, 0)
+INST(StructuredBufferConsume, StructuredBufferConsume, 1, 0)
+INST(StructuredBufferGetDimensions, StructuredBufferGetDimensions, 1, 0)
+
+INST(AtomicCounterIncrement, AtomicCounterIncrement, 1, 0)
+INST(AtomicCounterDecrement, AtomicCounterDecrement, 1, 0)
+
 INST(MeshOutputRef, meshOutputRef, 2, 0)
 
 // Construct a vector from a scalar

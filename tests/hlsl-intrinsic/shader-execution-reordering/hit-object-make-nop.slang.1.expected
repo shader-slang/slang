@@ -7,20 +7,20 @@ standard output = {
 #extension GL_NV_shader_invocation_reorder : require
 layout(row_major) uniform;
 layout(row_major) buffer;
-layout(std430, binding = 0) buffer _S1 {
+layout(std430, binding = 0) buffer StructuredBuffer_uint_t_0 {
     uint _data[];
 } outputBuffer_0;
 void main()
 {
-    uvec3 _S2 = ((gl_LaunchIDEXT));
-    ivec2 launchID_0 = ivec2(_S2.xy);
-    uvec3 _S3 = ((gl_LaunchSizeEXT));
+    uvec3 _S1 = ((gl_LaunchIDEXT));
+    ivec2 launchID_0 = ivec2(_S1.xy);
+    uvec3 _S2 = ((gl_LaunchSizeEXT));
     int idx_0 = launchID_0.x;
     hitObjectNV hitObj_0;
     hitObjectRecordEmptyNV((hitObj_0));
-    uint _S4 = uint(idx_0);
-    bool _S5 = (hitObjectIsEmptyNV((hitObj_0)));
-    outputBuffer_0._data[_S4] = uint(_S5);
+    uint _S3 = uint(idx_0);
+    bool _S4 = (hitObjectIsEmptyNV((hitObj_0)));
+    outputBuffer_0._data[_S3] = uint(_S4);
     return;
 }
 

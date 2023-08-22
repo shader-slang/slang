@@ -15,7 +15,7 @@
 #endif
 
 layout(std430, binding = 0)
-buffer _S1 {
+buffer StructuredBuffer_float_t_0 {
     float _data[];
 } buffer_0;
 
@@ -25,14 +25,14 @@ struct EntryPointParams_0
 };
 
 layout(shaderRecordEXT)
-buffer _S2
+buffer _S1
 {
     float value_0;
-} _S3;
+} _S2;
 
 void main()
 {
-    uvec3 _S4 = gl_LaunchIDEXT;
-    buffer_0._data[_S4.x] = _S3.value_0;
+    uvec3 _S3 = gl_LaunchIDEXT;
+    buffer_0._data[_S3.x] = _S2.value_0;
     return;
 }

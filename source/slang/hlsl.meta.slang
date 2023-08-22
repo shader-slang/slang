@@ -7,15 +7,30 @@ typedef uint UINT;
 [ForceInline] float3 __asFloat3(float3 v) { return v; }
 
 __generic<T>
+__intrinsic_op($(kIROp_StructuredBufferGetDimensions))
+uint2 __structuredBufferGetDimensions(AppendStructuredBuffer<T> buffer);
+
+__generic<T>
+__intrinsic_op($(kIROp_StructuredBufferGetDimensions))
+uint2 __structuredBufferGetDimensions(ConsumeStructuredBuffer<T> buffer);
+
+__generic<T>
 __magic_type(HLSLAppendStructuredBufferType)
 __intrinsic_type($(kIROp_HLSLAppendStructuredBufferType))
 struct AppendStructuredBuffer
 {
+    __intrinsic_op($(kIROp_StructuredBufferAppend))
     void Append(T value);
 
+    [ForceInline]
     void GetDimensions(
         out uint numStructs,
-        out uint stride);
+        out uint stride)
+    {
+        let result = __structuredBufferGetDimensions(this);
+        numStructs = result.x;
+        stride = result.y;
+    }
 };
 
 __magic_type(HLSLByteAddressBufferType)
@@ -257,11 +272,18 @@ __magic_type(HLSLConsumeStructuredBufferType)
 __intrinsic_type($(kIROp_HLSLConsumeStructuredBufferType))
 struct ConsumeStructuredBuffer
 {
+    __intrinsic_op($(kIROp_StructuredBufferConsume))
     T Consume();
 
+    [ForceInline]
     void GetDimensions(
         out uint numStructs,
-        out uint stride);
+        out uint stride)
+    {
+        let result = __structuredBufferGetDimensions(this);
+        numStructs = result.x;
+        stride = result.y;
+    }
 };
 
 __generic<T, let N : int>
@@ -904,8 +926,9 @@ __generic<T : __BuiltinType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "all(bvec$N0($0))")
 __target_intrinsic(spirv, boolean(T), "OpAll resultType resultId _0")
-__target_intrinsic(spirv, integral(T), "%c = OpINotEqual resultType resultId _0 const(,0); OpAll resultType resultId %c")
-__target_intrinsic(spirv, floating(T), "%c = OpFUnordNotEqual resultType resultId _0 const(,0); OpAll resultType resultId %c")
+// TODO: correct resultType in here
+// __target_intrinsic(spirv, integral(T), "%c = OpINotEqual {vector<bool,N>} resultId _0 const(,0); OpAll resultType resultId %c")
+// __target_intrinsic(spirv, floating(T), "%c = OpFUnordNotEqual {vector<bool,N>} resultId _0 const(,0); OpAll resultType resultId %c")
 [__readNone]
 bool all(vector<T,N> x)
 {
