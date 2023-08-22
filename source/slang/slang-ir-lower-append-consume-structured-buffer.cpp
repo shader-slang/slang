@@ -177,12 +177,28 @@ namespace Slang
                         IRBuilder subBuilder(typeUser);
                         IRVarLayout::Builder newVarLayoutBuilder(&subBuilder, typeLayout);
                         newVarLayoutBuilder.cloneEverythingButOffsetsFrom(varLayout);
+                        IRVarOffsetAttr* uavOffsetAttr = nullptr;
+                        IRVarOffsetAttr* descriptorTableSlotOffsetAttr = nullptr;
+
                         for (auto offsetAttr : varLayout->getOffsetAttrs())
                         {
+                            if (offsetAttr->getResourceKind() == LayoutResourceKind::UnorderedAccess)
+                                uavOffsetAttr = offsetAttr;
+                            else if (offsetAttr->getResourceKind() == LayoutResourceKind::DescriptorTableSlot)
+                                descriptorTableSlotOffsetAttr = offsetAttr;
                             auto info = newVarLayoutBuilder.findOrAddResourceInfo(offsetAttr->getResourceKind());
                             info->offset = offsetAttr->getOffset();
                             info->space = offsetAttr->getSpace();
                             info->kind = offsetAttr->getResourceKind();
+                        }
+                        // If the user provided an layout offset for UAV but not for descriptor table slot, then
+                        // we use the UAV offset for the descriptor table slot offset.
+                        if (uavOffsetAttr && !descriptorTableSlotOffsetAttr)
+                        {
+                            auto info = newVarLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::DescriptorTableSlot);
+                            info->offset = uavOffsetAttr->getOffset();
+                            info->space = uavOffsetAttr->getSpace();
+                            info->kind = LayoutResourceKind::DescriptorTableSlot;
                         }
                         auto newVarLayout = newVarLayoutBuilder.build();
                         subBuilder.addLayoutDecoration(typeUser, newVarLayout);

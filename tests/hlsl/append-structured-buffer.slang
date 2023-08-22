@@ -1,5 +1,5 @@
 
-//TEST:SIMPLE(filecheck=GLSL):-target glsl -profile glsl_450 -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -profile glsl_450 -stage compute -entry computeMain -fvk-u-shift 10 0
 //TEST:SIMPLE(filecheck=SPIRV):-target spirv -profile glsl_450 -stage compute -entry computeMain
 
 //DISABLED_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type -xslang -fvk-use-gl-layout
@@ -9,11 +9,11 @@ RWStructuredBuffer<float> outputBuffer;
 
 AppendStructuredBuffer<float2> appendBuffer;
 
-// GLSL: layout(std430, binding = 1) buffer StructuredBuffer_float2_t
+// GLSL: layout(std430, binding = 11) buffer StructuredBuffer_float2_t
 // GLSL: vec2 _data[];
 // GLSL: } appendBuffer_elements_0
 
-// GLSL: layout(std430, binding = 2) buffer StructuredBuffer_int_t
+// GLSL: layout(std430, binding = 12) buffer StructuredBuffer_int_t
 // GLSL: int _data[];
 // GLSL: } appendBuffer_counter
 
