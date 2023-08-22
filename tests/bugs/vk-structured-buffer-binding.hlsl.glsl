@@ -2,25 +2,23 @@
 //TEST_IGNORE_FILE:
 
 #version 450
+layout(row_major) uniform;
+layout(row_major) buffer;
 
-#define gDoneGroups gDoneGroups_0
-#define uv _S3
-#define SV_Target _S2
-
-layout(std430, binding = 3, set = 4)
-buffer _S1
-{
+layout(std430, binding = 3, set = 4) buffer StructuredBuffer_uint_t_0 {
     uint _data[];
-} gDoneGroups;
+} gDoneGroups_0;
 
 layout(location = 0)
-out vec4 SV_Target;
+out vec4 _S1;
 
 layout(location = 0)
-in vec3 uv;
+in vec3 _S2;
 
 void main()
 {
-    SV_Target = vec4(gDoneGroups._data[uint(int(uv.z))]);
+    _S1 = vec4(float(gDoneGroups_0._data[uint(int(_S2.z))]));
     return;
 }
+
+
