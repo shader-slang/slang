@@ -51,7 +51,7 @@ struct CommandOptions
     struct ValuePair
     {
         const char* name;
-        const char* description;
+        const char* description = nullptr;
     };
 
     struct Category
