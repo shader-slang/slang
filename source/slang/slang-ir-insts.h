@@ -2337,6 +2337,7 @@ struct IRSwitch : IRTerminatorInst
     UInt getCaseCount() { return (getOperandCount() - 3) / 2; }
     IRInst* getCaseValue(UInt index) { return            getOperand(3 + index*2 + 0); }
     IRBlock* getCaseLabel(UInt index) { return (IRBlock*) getOperand(3 + index*2 + 1); }
+    IRUse* getCaseLabelUse(UInt index) { return getOperands() + 3 + index * 2 + 1; }
 };
 
 struct IRThrow : IRTerminatorInst

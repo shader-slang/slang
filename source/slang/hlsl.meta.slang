@@ -2934,7 +2934,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_max($0, $1)")
 __target_intrinsic(cpp, "$P_max($0, $1)")
-__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMax, UMax, SMax) _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMax, UMax, SMax) _0 _1")
 [__readNone]
 T max(T x, T y);
 // Note: a stdlib implementation of `max` (or `min`) will require splitting
@@ -2945,7 +2945,7 @@ T max(T x, T y);
 __generic<T : __BuiltinIntegerType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMax, UMax, SMax) _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMax, UMax, SMax) _0 _1")
 [__readNone]
 vector<T, N> max(vector<T, N> x, vector<T, N> y)
 {
@@ -2965,14 +2965,14 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_max($0, $1)")
 __target_intrinsic(cpp, "$P_max($0, $1)")
-__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMax, UMax, SMax) _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMax, UMax, SMax) _0 _1")
 [__readNone]
 T max(T x, T y);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMax, UMax, SMax) _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMax, UMax, SMax) _0 _1")
 [__readNone]
 vector<T, N> max(vector<T, N> x, vector<T, N> y)
 {
@@ -2993,14 +2993,14 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_min($0, $1)")
 __target_intrinsic(cpp, "$P_min($0, $1)")
-__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMin, UMin, SMin) _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMin, UMin, SMin) _0 _1")
 [__readNone]
 T min(T x, T y);
 
 __generic<T : __BuiltinIntegerType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMin, UMin, SMin) _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMin, UMin, SMin) _0 _1")
 [__readNone]
 vector<T,N> min(vector<T,N> x, vector<T,N> y)
 {
@@ -3020,14 +3020,14 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_min($0, $1)")
 __target_intrinsic(cpp, "$P_min($0, $1)")
-__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMin, UMin, SMin) _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMin, UMin, SMin) _0 _1")
 [__readNone]
 T min(T x, T y);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMin, UMin, SMin) _0")
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fus(FMin, UMin, SMin) _0 _1")
 [__readNone]
 vector<T,N> min(vector<T,N> x, vector<T,N> y)
 {

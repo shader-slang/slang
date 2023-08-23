@@ -83,7 +83,7 @@ struct ExtractPrimalFuncContext
 
         SLANG_RELEASE_ASSERT(originalFuncType);
         List<IRType*> paramTypes;
-        for (Index i = 0; i < ((Count) originalFuncType->getParamCount()) - 1; i++)
+        for (UInt i = 0; i < originalFuncType->getParamCount(); i++)
             paramTypes.add((IRType*)migrationContext.cloneInst(&builder, originalFuncType->getParamType(i)));
         paramTypes.add(builder.getOutType((IRType*)outIntermediateType));
         auto resultType = (IRType*)migrationContext.cloneInst(&builder, originalFuncType->getResultType());
