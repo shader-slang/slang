@@ -224,6 +224,22 @@ bool isOne(IRInst* inst);
 void initializeScratchData(IRInst* inst);
 void resetScratchDataBit(IRInst* inst, int bitIndex);
 
+List<IRBlock*> collectBlocksInRegion(
+    IRDominatorTree* dom,
+    IRLoop* loop);
+
+List<IRBlock*> collectBlocksInRegion(
+    IRDominatorTree* dom,
+    IRSwitch* switchInst);
+
+List<IRBlock*> collectBlocksInRegion(
+    IRDominatorTree* dom,
+    IRBlock* breakBlock,
+    IRBlock* firstBlock,
+    bool includeFirstBlock);
+
+List<IRBlock*> collectBlocksInRegion(IRGlobalValueWithCode* func,  IRLoop* loopInst);
+
 // Run an operation over every block in a module
 template<typename F>
 static void overAllBlocks(IRModule* module, F f)

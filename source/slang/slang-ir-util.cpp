@@ -998,6 +998,88 @@ void resetScratchDataBit(IRInst* inst, int bitIndex)
     }
 }
 
+List<IRBlock*> collectBlocksInRegion(
+    IRDominatorTree* dom,
+    IRLoop* loop)
+{
+    return collectBlocksInRegion(dom, loop->getBreakBlock(), loop->getTargetBlock(), true);
+}
+
+List<IRBlock*> collectBlocksInRegion(
+    IRDominatorTree* dom,
+    IRSwitch* switchInst)
+{
+    return collectBlocksInRegion(dom, switchInst->getBreakLabel(), as<IRBlock>(switchInst->getParent()), false);
+}
+
+List<IRBlock*> collectBlocksInRegion(
+    IRDominatorTree* dom,
+    IRBlock* breakBlock,
+    IRBlock* firstBlock,
+    bool includeFirstBlock)
+{
+    List<IRBlock*> regionBlocks;
+    HashSet<IRBlock*> regionBlocksSet;
+    auto addBlock = [&](IRBlock* block)
+    {
+        if (regionBlocksSet.add(block))
+            regionBlocks.add(block);
+    };
+    //auto firstBlock = as<IRBlock>(regionInst->block.get());
+    //auto breakBlock = as<IRBlock>(regionInst->breakBlock.get());
+
+    // Use dominator tree heirarchy to find break blocks of
+    // all parent regions. We'll need to this to detect breaks 
+    // to outer regions (particularly when our region has no reachable 
+    // break block of its own)
+    // 
+    HashSet<IRBlock*> parentBreakBlocksSet;
+    for (IRBlock* currBlock = dom->getImmediateDominator(firstBlock); 
+        currBlock;
+        currBlock = dom->getImmediateDominator(currBlock))
+    {
+        if (auto loopInst = as<IRLoop>(currBlock->getTerminator()))
+            parentBreakBlocksSet.add(loopInst->getBreakBlock());
+        else if (auto switchInst = as<IRSwitch>(currBlock->getTerminator()))
+            parentBreakBlocksSet.add(switchInst->getBreakLabel());
+    }
+
+    addBlock(firstBlock);
+    for (Index i = 0; i < regionBlocks.getCount(); i++)
+    {
+        auto block = regionBlocks[i];
+        for (auto succ : block->getSuccessors())
+        {
+            if (succ == breakBlock)
+                continue;
+            if (!dom->dominates(firstBlock, succ))
+                continue;
+            if (!as<IRUnreachable>(breakBlock->getTerminator()))
+            {
+                if (dom->dominates(breakBlock, succ))
+                    continue;
+            }
+            if (parentBreakBlocksSet.contains(succ))
+                continue;
+            addBlock(succ);
+        }
+    }
+
+    if (!includeFirstBlock)
+    {
+        regionBlocksSet.remove(firstBlock);
+        regionBlocks.remove(firstBlock);
+    }
+
+    return regionBlocks;
+}
+
+List<IRBlock*> collectBlocksInRegion(IRGlobalValueWithCode* func,  IRLoop* loopInst)
+{
+    auto dom = computeDominatorTree(func);
+    return collectBlocksInRegion(dom, loopInst);
+}
+
 UnownedStringSlice getBasicTypeNameHint(IRType* basicType)
 {
     switch (basicType->getOp())

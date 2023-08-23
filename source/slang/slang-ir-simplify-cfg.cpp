@@ -102,19 +102,29 @@ static bool isTrivialSingleIterationLoop(
     // Track the break block backwards through the dominator tree, and see if we find a loop block
     // that is not the current loop.
     //
-    auto currBlock = loop->getBreakBlock();
-    for (;;)
+    auto breakBlockUse = loop->getBreakBlock()->firstUse;
+    if (breakBlockUse)
     {
-        auto parent = context.domTree->getImmediateDominator(currBlock);
-        if (!parent)
-            break;
-        currBlock = parent;
-        if (auto _loop = as<IRLoop>(currBlock->getTerminator()))
+        auto breakInst = breakBlockUse->getUser();
+        for (auto currBlock = as<IRBlock>(breakInst->getParent());
+             currBlock;
+             currBlock = context.domTree->getImmediateDominator(currBlock))
         {
-            if (loop != _loop)
-                return false;
-            if (loop == _loop)
+            auto terminator = currBlock->getTerminator();
+            if (terminator == loop)
                 break;
+            
+            switch (terminator->getOp())
+            {
+            case kIROp_loop:
+                if (collectBlocksInRegion(context.domTree, as<IRLoop>(terminator)).contains(currBlock))
+                    return false;
+                break;
+            case kIROp_Switch:
+                if (collectBlocksInRegion(context.domTree, as<IRSwitch>(terminator)).contains(currBlock))
+                    return false;
+                break;
+            }
         }
     }
 
@@ -123,7 +133,7 @@ static bool isTrivialSingleIterationLoop(
 
 static bool doesLoopHasSideEffect(IRGlobalValueWithCode* func, IRLoop* loopInst)
 {
-    auto blocks = collectBlocksInLoop(func, loopInst);
+    auto blocks = collectBlocksInRegion(func, loopInst);
     HashSet<IRBlock*> loopBlocks;
     for (auto b : blocks)
         loopBlocks.add(b);
