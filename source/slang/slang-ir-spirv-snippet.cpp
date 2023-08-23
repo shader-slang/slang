@@ -147,7 +147,6 @@ RefPtr<SpvSnippet> SpvSnippet::parse(UnownedStringSlice definition)
                             throw Misc::TextFormatException(
                                 "Text parsing error: Unrecognized SPIR-V GLSLstd450 opcode: " + opName);
                         }
-                        printf("BNBBB: %d\n", glslOpcode);
                         return (SpvWord)glslOpcode;
                     }
                 }

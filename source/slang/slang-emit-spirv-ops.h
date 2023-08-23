@@ -1058,6 +1058,19 @@ SpvInst* emitOpCompositeConstruct(
     return emitInst(parent, inst, SpvOpCompositeConstruct, idResultType, kResultID, constituent1, constituent2);
 }
 
+template<typename T, typename Ts>
+SpvInst* emitOpConstantComposite(
+    SpvInstParent* parent,
+    IRInst* inst,
+    const T& idResultType,
+    const Ts& constituents
+)
+{
+    static_assert(isSingular<T>);
+    static_assert(isPlural<Ts>);
+    return emitInst(parent, inst, SpvOpConstantComposite, idResultType, kResultID, constituents);
+}
+
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCompositeExtract
 template<typename T1, typename T2, Index N>
 SpvInst* emitOpCompositeExtract(
