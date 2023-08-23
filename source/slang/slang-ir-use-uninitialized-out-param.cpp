@@ -3,7 +3,6 @@
 #include "slang-ir-dataflow.h"
 #include "slang-ir-util.h"
 #include "slang-ir-reachability.h"
-#include "slang-product-lattice.h"
 #include <limits>
 
 namespace Slang
@@ -13,6 +12,95 @@ namespace Slang
 
     namespace UninitializedDetail
     {
+        template<typename ElemType, Index ElemBits>
+        struct BitPackedShortList
+        {
+            using BackingType = uint64_t;
+
+            BitPackedShortList() = default;
+            explicit BitPackedShortList(Index n, ElemType init)
+            {
+                // BackingType rep = 0;
+                // for(Index i = 0; i < kBackingTypeBits / ElemBits; ++i)
+                //     rep |= static_cast<BackingType>(init) << (i * ElemBits);
+                Index requiredBits = ElemBits * n;
+                Index requiredBackingValues = (requiredBits + kBackingTypeBits - 1) / kBackingTypeBits;
+                for(Index i = 0; i < requiredBackingValues; ++i)
+                    m_backingBits.add(0);
+                for(Index i = 0; i < n; ++i)
+                    orElem(i, init);
+            }
+            BitPackedShortList(const BitPackedShortList& other) = default;
+            BitPackedShortList& operator=(const BitPackedShortList& other) = default;
+            BitPackedShortList(BitPackedShortList&& other) = default;
+            BitPackedShortList& operator=(BitPackedShortList&& other) = default;
+
+            ElemType getElem(const Index i) const
+            {
+                const auto u = (i * ElemBits) / kBackingTypeBits;
+                const auto s = (i * ElemBits) % kBackingTypeBits;
+                return static_cast<ElemType>((m_backingBits[u] >> s) & kElemMask);
+            }
+            void setElem(const Index i, ElemType e)
+            {
+                const auto u = (i * ElemBits) / kBackingTypeBits;
+                const auto s = (i * ElemBits) % kBackingTypeBits;
+                const BackingType clearMask = ~(kElemMask << s);
+                const BackingType setMask = static_cast<BackingType>(e) << s;
+                BackingType& b = m_backingBits[u];
+                b &= clearMask;
+                b |= setMask;
+            }
+            void orElem(const Index i, ElemType e)
+            {
+                const auto u = (i * ElemBits) / kBackingTypeBits;
+                const auto s = (i * ElemBits) % kBackingTypeBits;
+                const BackingType setMask = static_cast<BackingType>(e) << s;
+                BackingType& b = m_backingBits[u];
+                b |= setMask;
+            }
+            // TODO: This checks the extra bits beyond what was initialized at
+            // the start, we should make sure to zero these out.
+            bool operator!=(const BitPackedShortList& other) const
+            {
+                return m_backingBits != other.m_backingBits;
+            }
+            auto operator&=(const BitPackedShortList& other)
+            {
+                SLANG_ASSERT(m_backingBits.getCount() == other.m_backingBits.getCount());
+                for(Index i = 0; i < m_backingBits.getCount(); ++i)
+                    m_backingBits[i] &= other.m_backingBits[i];
+                return *this;
+            }
+            friend auto operator&(BitPackedShortList a, const BitPackedShortList& b)
+            {
+                a &= b;
+                return std::move(a);
+            }
+            auto operator|=(const BitPackedShortList& other)
+            {
+                SLANG_ASSERT(m_backingBits.getCount() == other.m_backingBits.getCount());
+                for(Index i = 0; i < m_backingBits.getCount(); ++i)
+                    m_backingBits[i] |= other.m_backingBits[i];
+                return *this;
+            }
+            friend auto operator|(BitPackedShortList a, const BitPackedShortList& b)
+            {
+                a |= b;
+                return a;
+            }
+
+        private:
+            static constexpr Index kBackingTypeBits = std::numeric_limits<BackingType>::digits;
+            static constexpr BackingType kElemMask = (1 << ElemBits) - 1;
+            // At least one element needs to fit into each backing bit block
+            static_assert(ElemBits < kBackingTypeBits);
+            // Elements needs to neatly divide the blocks
+            static_assert(kBackingTypeBits % ElemBits == 0);
+
+            ShortList<BackingType, 4> m_backingBits;
+        };
+
         enum V
         {
             Bottom             = 0b00,
@@ -22,27 +110,11 @@ namespace Slang
         };
 
         // Our join semilattice to dataflow over
-        // struct Initialization
-        // {
-        //     bool join(Initialization other)
-        //     {
-        //         V joined = V(v | other.v);
-        //         if(joined != v)
-        //         {
-        //             v = joined;
-        //             return true;
-        //         }
-        //         return false;
-        //     }
-        //     static auto bottom() { return Initialization{Bottom}; }
-        //
-        //     V v;
-        // };
-
-        // Our join semilattice to dataflow over
         struct Initialization
         {
-            bool join(Initialization other)
+            using BitStorage = BitPackedShortList<V, 2>;
+
+            bool join(const Initialization& other)
             {
                 bool changed = false;
                 auto joined = v | other.v;
@@ -53,34 +125,22 @@ namespace Slang
                 }
                 return changed;
             }
-            static auto bottom() { return Initialization{0}; }
-            static auto allUninitialized() { return Initialization{0xAAAAAAAAAAAAAAAA}; }
-            V getElem(int i) const
+            static auto bottom(Index n) { return Initialization{BitStorage(n, Bottom)}; }
+            static auto allUninitialized(Index n) { return Initialization{BitStorage(n, Uninitialized)}; }
+            V getElem(Index i) const
             {
-                SLANG_ASSERT(i < maxElements);
-                return V((v >> i*2) & 0b11);
+                return v.getElem(i);
             }
-            void joinElem(int i, V o)
+            void joinElem(Index i, V o)
             {
-                SLANG_ASSERT(i < maxElements);
-                v |= (o << i*2);
+                v.orElem(i, o);
             }
-            void setElem(int i, V o)
+            void setElem(Index i, V o)
             {
-                SLANG_ASSERT(i < maxElements);
-                v &= ~(0b11 << i*2);
-                v |= o << i*2;
+                v.setElem(i, o);
             }
 
-            // Keep track of the 32 most significant elements
-            // If there are more than 32 elements, track the first 31 and the
-            // remainder.
-            uint64_t v;
-            static const int maxElements = std::numeric_limits<uint64_t>::digits / 2;
-            static const int overflowElementIndex = maxElements - 1;
-
-            // Hierarchical structs probably permit a more elaborate
-            // representation...
+            BitStorage v;
         };
 
         struct LeafRange
@@ -98,7 +158,7 @@ namespace Slang
         struct LoadSite
         {
             LeafRange loadRange;
-            uint64_t initializationState;
+            Initialization initializationState;
         };
 
         // Our dataflow context
@@ -125,12 +185,12 @@ namespace Slang
                         }
                     }
                     if(auto l = loadsAndReturns.tryGetValue(i))
-                        l->initializationState = next.v;
+                        l->initializationState = next;
                 }
                 return out.join(next);
             }
             const List<StoreSite>& stores;
-            const Dictionary<IRInst*, LoadSite>& loadsAndReturns;
+            Dictionary<IRInst*, LoadSite>& loadsAndReturns;
         };
 
         // A tree stored in preorder
