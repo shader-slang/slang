@@ -53,6 +53,8 @@ protected:
     virtual void _emitType(IRType* type, DeclaratorInfo* declarator) SLANG_OVERRIDE;
     virtual void emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount) SLANG_OVERRIDE;
     virtual bool tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
+    virtual bool tryEmitInstStmtImpl(IRInst* inst) SLANG_OVERRIDE;
+
     virtual void emitPreModuleImpl() SLANG_OVERRIDE;
     virtual void emitSimpleValueImpl(IRInst* value) SLANG_OVERRIDE;
     virtual void emitSimpleFuncParamImpl(IRParam* param) SLANG_OVERRIDE;

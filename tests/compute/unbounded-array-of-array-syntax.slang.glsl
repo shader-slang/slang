@@ -1,4 +1,3 @@
-//TEST_IGNORE_FILE:
 #version 450
 #extension GL_EXT_nonuniform_qualifier : require
 layout(row_major) uniform;
@@ -15,9 +14,8 @@ void main()
     int index_0 = int(gl_GlobalInvocationID.x);
     int innerIndex_0 = index_0 & 3;
     int _S1 = nonuniformEXT(index_0 >> 2);
-    uint bufferCount_0;
-    uint bufferStride_0;
-    (bufferCount_0) = (g_aoa_0[_S1])._data.length(); (bufferStride_0) = 0;
+    uvec2 _S2 = uvec2(g_aoa_0[_S1]._data.length(), 0);
+    uint bufferCount_0 = _S2.x;
     int innerIndex_1;
     if(innerIndex_0 >= int(bufferCount_0))
     {

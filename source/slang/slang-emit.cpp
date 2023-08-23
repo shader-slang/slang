@@ -650,6 +650,8 @@ Result linkAndOptimizeIR(
             break;
 
         case CodeGenTarget::GLSL:
+        case CodeGenTarget::SPIRV:
+        case CodeGenTarget::SPIRVAssembly:
             // For GLSL targets, we want to translate the vector load/store
             // operations into scalar ops. This is in part as a simplification,
             // but it also ensures that our generated code respects the lax
@@ -793,6 +795,7 @@ Result linkAndOptimizeIR(
     switch (target)
     {
     case CodeGenTarget::GLSL:
+    case CodeGenTarget::SPIRV:
         {
             legalizeImageSubscriptForGLSL(irModule);
             legalizeConstantBufferLoadForGLSL(irModule);

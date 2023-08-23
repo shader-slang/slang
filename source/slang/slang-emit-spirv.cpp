@@ -1822,6 +1822,8 @@ struct SPIRVEmitContext
             return emitStore(parent, as<IRStore>(inst));
         case kIROp_RWStructuredBufferGetElementPtr:
             return emitStructuredBufferGetElementPtr(parent, inst);
+        case kIROp_StructuredBufferGetDimensions:
+            return emitStructuredBufferGetDimensions(parent, inst);
         case kIROp_swizzle:
             return emitSwizzle(parent, as<IRSwizzle>(inst));
         case kIROp_IntCast:
@@ -2913,6 +2915,21 @@ struct SPIRVEmitContext
         IRBuilder builder(inst);
         auto addr = emitInst(parent, inst, SpvOpAccessChain, inst->getDataType(), kResultID, inst->getOperand(0), emitIntConstant(0, builder.getIntType()), inst->getOperand(1));
         return addr;
+    }
+
+    SpvInst* emitStructuredBufferGetDimensions(SpvInstParent* parent, IRInst* inst)
+    {
+        IRBuilder builder(inst);
+        auto arrayLength = emitInst(parent, nullptr, SpvOpArrayLength, builder.getUIntType(), kResultID, inst->getOperand(0), SpvLiteralInteger::from32(0));
+        auto elementType = as<IRPtrType>(inst->getOperand(0)->getDataType())->getValueType();
+        IRIntegerValue stride = 0;
+        if (auto sizeDecor = elementType->findDecoration<IRSizeAndAlignmentDecoration>())
+        {
+            stride = align(sizeDecor->getSize(), (int)sizeDecor->getAlignment());
+        }
+        auto strideOperand = emitIntConstant(stride, builder.getUIntType());
+        auto result = emitOpCompositeConstruct(parent, inst, inst->getDataType(), arrayLength, strideOperand);
+        return result;
     }
 
     SpvInst* emitSwizzle(SpvInstParent* parent, IRSwizzle* inst)

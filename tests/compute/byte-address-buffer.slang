@@ -28,7 +28,7 @@ void test(int val)
 	uint4 quad = inputBuffer.Load4(int(tmp * 4));
 	tmp = (quad.x + quad.y + quad.z + quad.w) & 0xF;
 
-	outputBuffer.Store(val * 4, tmp);
+	outputBuffer.Store(val*4, tmp);
 }
 
 [numthreads(4, 1, 1)]
