@@ -3,246 +3,179 @@
 #include "slang-ir-dataflow.h"
 #include "slang-ir-util.h"
 #include "slang-ir-reachability.h"
-#include <limits>
+#include "../core/slang-bit-packed-short-list.h"
 
 namespace Slang
 {
-    class DiagnosticSink;
-    struct IRModule;
-
-    namespace UninitializedDetail
+    // The values which make up the components in our product join semilattice,
+    // so valued as to enable use of bitwise or as a join operation.
+    enum V
     {
-        template<typename ElemType, Index ElemBits>
-        struct BitPackedShortList
+        Bottom             = 0b00,
+        Initialized        = 0b01,
+        Uninitialized      = 0b10,
+        MaybeUninitialized = 0b11,
+    };
+
+    // Our join semilattice to dataflow over, a product of several `V`s
+    struct Initialization
+    {
+        using BitStorage = BitPackedShortList<V, 2>;
+
+        bool join(const Initialization& other)
         {
-            using BackingType = uint64_t;
-
-            BitPackedShortList() = default;
-            explicit BitPackedShortList(Index n, ElemType init)
+            bool changed = false;
+            const auto joined = v | other.v;
+            if(joined != v)
             {
-                // BackingType rep = 0;
-                // for(Index i = 0; i < kBackingTypeBits / ElemBits; ++i)
-                //     rep |= static_cast<BackingType>(init) << (i * ElemBits);
-                Index requiredBits = ElemBits * n;
-                Index requiredBackingValues = (requiredBits + kBackingTypeBits - 1) / kBackingTypeBits;
-                for(Index i = 0; i < requiredBackingValues; ++i)
-                    m_backingBits.add(0);
-                for(Index i = 0; i < n; ++i)
-                    orElem(i, init);
+                v = joined;
+                changed = true;
             }
-            BitPackedShortList(const BitPackedShortList& other) = default;
-            BitPackedShortList& operator=(const BitPackedShortList& other) = default;
-            BitPackedShortList(BitPackedShortList&& other) = default;
-            BitPackedShortList& operator=(BitPackedShortList&& other) = default;
-
-            ElemType getElem(const Index i) const
-            {
-                const auto u = (i * ElemBits) / kBackingTypeBits;
-                const auto s = (i * ElemBits) % kBackingTypeBits;
-                return static_cast<ElemType>((m_backingBits[u] >> s) & kElemMask);
-            }
-            void setElem(const Index i, ElemType e)
-            {
-                const auto u = (i * ElemBits) / kBackingTypeBits;
-                const auto s = (i * ElemBits) % kBackingTypeBits;
-                const BackingType clearMask = ~(kElemMask << s);
-                const BackingType setMask = static_cast<BackingType>(e) << s;
-                BackingType& b = m_backingBits[u];
-                b &= clearMask;
-                b |= setMask;
-            }
-            void orElem(const Index i, ElemType e)
-            {
-                const auto u = (i * ElemBits) / kBackingTypeBits;
-                const auto s = (i * ElemBits) % kBackingTypeBits;
-                const BackingType setMask = static_cast<BackingType>(e) << s;
-                BackingType& b = m_backingBits[u];
-                b |= setMask;
-            }
-            // TODO: This checks the extra bits beyond what was initialized at
-            // the start, we should make sure to zero these out.
-            bool operator!=(const BitPackedShortList& other) const
-            {
-                return m_backingBits != other.m_backingBits;
-            }
-            auto operator&=(const BitPackedShortList& other)
-            {
-                SLANG_ASSERT(m_backingBits.getCount() == other.m_backingBits.getCount());
-                for(Index i = 0; i < m_backingBits.getCount(); ++i)
-                    m_backingBits[i] &= other.m_backingBits[i];
-                return *this;
-            }
-            friend auto operator&(BitPackedShortList a, const BitPackedShortList& b)
-            {
-                a &= b;
-                return std::move(a);
-            }
-            auto operator|=(const BitPackedShortList& other)
-            {
-                SLANG_ASSERT(m_backingBits.getCount() == other.m_backingBits.getCount());
-                for(Index i = 0; i < m_backingBits.getCount(); ++i)
-                    m_backingBits[i] |= other.m_backingBits[i];
-                return *this;
-            }
-            friend auto operator|(BitPackedShortList a, const BitPackedShortList& b)
-            {
-                a |= b;
-                return a;
-            }
-
-        private:
-            static constexpr Index kBackingTypeBits = std::numeric_limits<BackingType>::digits;
-            static constexpr BackingType kElemMask = (1 << ElemBits) - 1;
-            // At least one element needs to fit into each backing bit block
-            static_assert(ElemBits < kBackingTypeBits);
-            // Elements needs to neatly divide the blocks
-            static_assert(kBackingTypeBits % ElemBits == 0);
-
-            ShortList<BackingType, 4> m_backingBits;
-        };
-
-        enum V
+            return changed;
+        }
+        static auto bottom(Index n) { return Initialization{BitStorage(n, Bottom)}; }
+        static auto allUninitialized(Index n) { return Initialization{BitStorage(n, Uninitialized)}; }
+        V getElem(Index i) const
         {
-            Bottom             = 0b00,
-            Initialized        = 0b01,
-            Uninitialized      = 0b10,
-            MaybeUninitialized = 0b11,
-        };
-
-        // Our join semilattice to dataflow over
-        struct Initialization
+            return v.getElem(i);
+        }
+        void joinElem(Index i, V o)
         {
-            using BitStorage = BitPackedShortList<V, 2>;
-
-            bool join(const Initialization& other)
-            {
-                bool changed = false;
-                auto joined = v | other.v;
-                if(joined != v)
-                {
-                    v = joined;
-                    changed = true;
-                }
-                return changed;
-            }
-            static auto bottom(Index n) { return Initialization{BitStorage(n, Bottom)}; }
-            static auto allUninitialized(Index n) { return Initialization{BitStorage(n, Uninitialized)}; }
-            V getElem(Index i) const
-            {
-                return v.getElem(i);
-            }
-            void joinElem(Index i, V o)
-            {
-                v.orElem(i, o);
-            }
-            void setElem(Index i, V o)
-            {
-                v.setElem(i, o);
-            }
-
-            BitStorage v;
-        };
-
-        struct LeafRange
+            v.orElem(i, o);
+        }
+        void setElem(Index i, V o)
         {
-            Index begin;
-            Index end;
-        };
-
-        struct StoreSite
-        {
-            IRInst* storeInst;
-            LeafRange storeRange;
-        };
-
-        struct LoadSite
-        {
-            LeafRange loadRange;
-            Initialization initializationState;
-        };
-
-        // Our dataflow context
-        struct UninitializedDataFlow : BasicBlockForwardDataFlow
-        {
-            using Domain = Initialization;
-            //
-            // The transfer function changes nothing, unless there is a write to
-            // the variable, in which case it becomes Initialized
-            //
-            bool transfer(IRBlock* bb, Initialization& out, const Initialization& in)
-            {
-                Initialization next = in;
-                // No need to check anything if it's already initialized, it can't
-                // become uninitialized
-                for(auto i = bb->getFirstInst(); i; i = i->getNextInst())
-                {
-                    for(const auto& s : stores)
-                    {
-                        if(i == s.storeInst)
-                        {
-                            for(Index m = s.storeRange.begin; m < s.storeRange.end; ++m)
-                                next.setElem(m, Initialized);
-                        }
-                    }
-                    if(auto l = loadsAndReturns.tryGetValue(i))
-                        l->initializationState = next;
-                }
-                return out.join(next);
-            }
-            const List<StoreSite>& stores;
-            Dictionary<IRInst*, LoadSite>& loadsAndReturns;
-        };
-
-        // A tree stored in preorder
-        template<typename T>
-        struct Branch
-        {
-            // The index of the next sibling
-            // leaf nodes are those which point directly to the next index
-            Index next;
-            T data;
-        };
-
-        struct NestingMember 
-        {
-            IRStructKey* key;
-            // If we imagine a totally flat struct, these indices represent the
-            // range of leaves this member encompasses.
-            LeafRange leafRange;
-        };
-
-        using MemberTree = List<Branch<NestingMember>>;
-
-        //
-        // Perform a preorder traversal over the struct hierarchy
-        // Maintain a tree in 'memberTree' which will allow us to construct
-        // initialization state for portions of a struct
-        //
-        static MemberTree flattenStruct(IRType* type)
-        {
-            MemberTree tree;
-            Index leafIndex = 0;
-            auto walkStructType = [&](auto& go, IRType* t) -> Branch<NestingMember>&
-            {
-                Index i = tree.getCount();
-                tree.add(Branch<NestingMember>{0, {nullptr, {leafIndex, leafIndex}}});
-                if(auto structType = as<IRStructType>(t))
-                {
-                    for(auto field : structType->getFields())
-                        go(go, field->getFieldType()).data.key = field->getKey();
-                }
-                else
-                {
-                    leafIndex++;
-                }
-                tree[i].next = tree.getCount();
-                tree[i].data.leafRange.end = leafIndex;
-                return tree[i];
-            };
-            walkStructType(walkStructType, type);
-            return tree;
+            v.setElem(i, o);
         }
 
+        BitStorage v;
+    };
+
+    //
+    // Now we define a small tree type, which we'll use to construct a mask of
+    // `V` covering elements in a struct.
+    //
+    struct LeafRange
+    {
+        Index begin;
+        Index end;
+    };
+
+    // A tree stored in preorder, represented as a linked list, where each
+    // vertex contains the index of its next sibling. Anything between that
+    // vertex and the sibling is a descendent of that vertex.
+    template<typename T>
+    struct Branch
+    {
+        // The index of the next sibling
+        // leaf nodes are those which point directly to the next index
+        Index next;
+        T data;
+    };
+
+    // Each vertex stores the struct member which is represents in the nesting.
+    struct NestingMember
+    {
+        IRStructKey* key;
+        // If we imagine a totally flat struct, these indices represent the
+        // range of leaves this member encompasses. The union of all children's
+        // ranges, or if this is a leaf then the singleton index of this
+        // position in the structure.
+        LeafRange leafRange;
+    };
+
+    // A tree is a flat list of all the branches in the tree, stored in
+    // preorder
+    using MemberTree = List<Branch<NestingMember>>;
+
+    //
+    // Our dataflow setup
+    //
+
+    // An instruction which is writing to some portion of our out parameter, we
+    // hold onto the storing instruction and the range of the structure it
+    // writes to.
+    struct StoreSite
+    {
+        IRInst* storeInst;
+        LeafRange storeRange;
+    };
+
+    // For loads, we remember the range of values being loaded and also their
+    // calculated initialization state.
+    struct LoadSite
+    {
+        LeafRange loadRange;
+        Initialization initializationState;
+    };
+
+    //
+    // Our dataflow context
+    //
+    struct UninitializedDataFlow : BasicBlockForwardDataFlow
+    {
+        using Domain = Initialization;
+        //
+        // The transfer function changes nothing, unless there is a write to
+        // the variable, in which case it becomes Initialized
+        //
+        bool transfer(IRBlock* bb, Initialization& out, const Initialization& in)
+        {
+            Initialization next = in;
+            // No need to check anything if it's already initialized, it can't
+            // become uninitialized
+            for(auto i = bb->getFirstInst(); i; i = i->getNextInst())
+            {
+                // If we encounter one of our stores, mark that location
+                // as initialized.
+                for(const auto& s : stores)
+                {
+                    if(i == s.storeInst)
+                    {
+                        for(Index m = s.storeRange.begin; m < s.storeRange.end; ++m)
+                            next.setElem(m, Initialized);
+                    }
+                }
+                // If we encounter one of our loads, remember the
+                // initialization state at this point. This might be updated
+                // several times as we revisit blocks in the dataflow run
+                if(auto l = loadsAndReturns.tryGetValue(i))
+                    l->initializationState = next;
+            }
+            return out.join(next);
+        }
+        const List<StoreSite>& stores;
+        Dictionary<IRInst*, LoadSite>& loadsAndReturns;
+    };
+
+    //
+    // Perform a preorder traversal over the struct hierarchy
+    // Maintain a tree in 'memberTree' which will allow us to construct
+    // initialization state for portions of a struct
+    //
+    static MemberTree flattenStruct(IRType* type)
+    {
+        MemberTree tree;
+        Index leafIndex = 0;
+        auto walkStructType = [&](auto& go, IRType* t) -> Branch<NestingMember>&
+        {
+            Index i = tree.getCount();
+            tree.add(Branch<NestingMember>{0, {nullptr, {leafIndex, leafIndex}}});
+            if(auto structType = as<IRStructType>(t))
+            {
+                for(auto field : structType->getFields())
+                    go(go, field->getFieldType()).data.key = field->getKey();
+            }
+            else
+            {
+                leafIndex++;
+            }
+            tree[i].next = tree.getCount();
+            tree[i].data.leafRange.end = leafIndex;
+            return tree[i];
+        };
+        walkStructType(walkStructType, type);
+        return tree;
     }
 
     static void checkForUsingUninitializedOutParam(
@@ -251,8 +184,6 @@ namespace Slang
         ReachabilityContext& reachability,
         IRParam* param)
     {
-        using namespace UninitializedDetail;
-
         auto outType = as<IROutType>(param->getDataType());
         SLANG_ASSERT(outType);
         auto type = outType->getValueType();
@@ -266,8 +197,6 @@ namespace Slang
         Dictionary<IRInst*, LoadSite> loadsAndReturns;
         List<IRBlock*> loadingBlocks;
         auto walkAddressUses = [&](
-            // walkAddressUses, the C++ compiler isn't smart enough to allow
-            // the recursive call here
             auto& go,
             // The address under consideration, it will be the address of our
             // out parameter or some member nested underneath it
