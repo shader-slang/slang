@@ -383,8 +383,8 @@ namespace Slang
         CompileRequestBase*  compileRequest,
         IRModule*               module)
     {
-        //if (!compileRequest->shouldValidateIR)
-           // return;
+        if (!compileRequest->shouldValidateIR)
+            return;
 
         auto sink = compileRequest->getSink();
         validateIRModule(module, sink);
@@ -394,8 +394,8 @@ namespace Slang
         CodeGenContext* codeGenContext,
         IRModule* module)
     {
-        //if (!codeGenContext->shouldValidateIR())
-            //return;
+        if (!codeGenContext->shouldValidateIR())
+            return;
 
         auto sink = codeGenContext->getSink();
         validateIRModule(module, sink);
