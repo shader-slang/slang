@@ -526,30 +526,24 @@ namespace Slang
         }
 
         // Check if both are integer values in general
-        if (auto fstInt = as<IntVal>(fst))
+        const auto fstInt = as<IntVal>(fst);
+        const auto sndInt = as<IntVal>(snd);
+        if (fstInt && sndInt)
         {
-            if (auto tc = as<TypeCastIntVal>(fstInt))
-                fstInt = as<IntVal>(tc->getBase());
-            if (auto sndInt = as<IntVal>(snd))
-            {
-                if (auto tc = as<TypeCastIntVal>(sndInt))
-                    sndInt = as<IntVal>(tc->getBase());
-                auto fstParam = as<GenericParamIntVal>(fstInt);
-                auto sndParam = as<GenericParamIntVal>(sndInt);
+            const auto paramUnderCast = [](IntVal* i){
+                if(const auto c = as<TypeCastIntVal>(i))
+                    i = as<IntVal>(c->getBase());
+                return as<GenericParamIntVal>(i);
+            };
+            auto fstParam = paramUnderCast(fstInt);
+            auto sndParam = paramUnderCast(sndInt);
 
-                bool okay = false;
-                if (fstParam)
-                {
-                    if(TryUnifyIntParam(constraints, fstParam->getDeclRef(), sndInt))
-                        okay = true;
-                }
-                if (sndParam)
-                {
-                    if(TryUnifyIntParam(constraints, sndParam->getDeclRef(), fstInt))
-                        okay = true;
-                }
-                return okay;
-            }
+            bool okay = false;
+            if (fstParam)
+                okay |= TryUnifyIntParam(constraints, fstParam->getDeclRef(), sndInt);
+            if (sndParam)
+                okay |= TryUnifyIntParam(constraints, sndParam->getDeclRef(), fstInt);
+            return okay;
         }
 
         if (auto fstWit = as<DeclaredSubtypeWitness>(fst))
