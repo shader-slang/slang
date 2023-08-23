@@ -1227,8 +1227,6 @@ SlangResult emitSPIRVForEntryPointsDirectly(
         linkingAndOptimizationOptions,
         linkedIR));
 
-    validateIRModule(linkedIR.module, codeGenContext->getSink());
-    
     auto irModule = linkedIR.module;
     auto irEntryPoints = linkedIR.entryPoints;
 
