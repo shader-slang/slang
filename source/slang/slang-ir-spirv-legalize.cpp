@@ -346,12 +346,17 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
         IRBuilder builder(m_sharedContext->m_irModule);
         IRInst* y = nullptr;
+        builder.setInsertBefore(inst);
         if (!m_mapArrayValueToVar.tryGetValue(x, y))
         {
-            setInsertAfterOrdinaryInst(&builder, x);
+            if (x->getParent()->getOp() == kIROp_Module)
+                builder.setInsertBefore(inst);
+            else
+                setInsertAfterOrdinaryInst(&builder, x);
             y = builder.emitVar(x->getDataType(), SpvStorageClassFunction);
             builder.emitStore(y, x);
-            m_mapArrayValueToVar.set(x, y);
+            if (x->getParent()->getOp() != kIROp_Module)
+                m_mapArrayValueToVar.set(x, y);
         }
         builder.setInsertBefore(inst);
         for(Index i = indices.getCount() - 1; i >= 0; --i)

@@ -336,16 +336,18 @@ namespace Slang
         validateIRInstOperands(context, inst);
         context->seenInsts.add(inst);
 
+        if (auto code = as<IRGlobalValueWithCode>(inst))
+        {
+            context->domTree = computeDominatorTree(code);
+            validateCodeBody(context, code);
+        }
+
         // If `inst` is itself a parent instruction, then we need to recursively
         // validate its children.
         validateIRInstChildren(context, inst);
 
         if (auto code = as<IRGlobalValueWithCode>(inst))
-        {
-            context->domTree = computeDominatorTree(code);
-            validateCodeBody(context, code);
             context->domTree = nullptr;
-        }
     }
 
     void validateIRInst(IRInst* inst)
@@ -381,8 +383,8 @@ namespace Slang
         CompileRequestBase*  compileRequest,
         IRModule*               module)
     {
-        if (!compileRequest->shouldValidateIR)
-            return;
+        //if (!compileRequest->shouldValidateIR)
+           // return;
 
         auto sink = compileRequest->getSink();
         validateIRModule(module, sink);
@@ -392,8 +394,8 @@ namespace Slang
         CodeGenContext* codeGenContext,
         IRModule* module)
     {
-        if (!codeGenContext->shouldValidateIR())
-            return;
+        //if (!codeGenContext->shouldValidateIR())
+            //return;
 
         auto sink = codeGenContext->getSink();
         validateIRModule(module, sink);

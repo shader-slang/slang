@@ -463,12 +463,14 @@ Result linkAndOptimizeIR(
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
     simplifyIR(irModule, sink);
+    validateIRModuleIfEnabled(codeGenContext, irModule);
 
     if (!ArtifactDescUtil::isCpuLikeTarget(artifactDesc))
     {
         // We could fail because (perhaps, somehow) end up with getStringHash that the operand is not a string literal
         SLANG_RETURN_ON_FAIL(checkGetStringHashInsts(irModule, sink));
     }
+    validateIRModuleIfEnabled(codeGenContext, irModule);
 
     // For targets that supports dynamic dispatch, we need to lower the
     // generics / interface types to ordinary functions and types using
@@ -1227,6 +1229,8 @@ SlangResult emitSPIRVForEntryPointsDirectly(
         linkingAndOptimizationOptions,
         linkedIR));
 
+    validateIRModule(linkedIR.module, codeGenContext->getSink());
+    
     auto irModule = linkedIR.module;
     auto irEntryPoints = linkedIR.entryPoints;
 

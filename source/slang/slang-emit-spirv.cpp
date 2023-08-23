@@ -1395,6 +1395,8 @@ struct SPIRVEmitContext
              return emitGlobalParam(as<IRGlobalParam>(inst));
         case kIROp_GlobalVar:
             return emitGlobalVar(as<IRGlobalVar>(inst));
+        case kIROp_Var:
+            return emitVar(getSection(SpvLogicalSectionID::GlobalVariables), inst);
         // ...
 
         case kIROp_Specialize:
@@ -3035,6 +3037,40 @@ struct SPIRVEmitContext
         SLANG_ASSERT(!as<IRVectorType>(fromTypeV) == !as<IRVectorType>(toTypeV));
         const auto fromType = dropVector(fromTypeV);
         const auto toType = dropVector(toTypeV);
+
+        if (as<IRBoolType>(fromType))
+        {
+            // Cast from bool to int.
+            IRBuilder builder(inst);
+            builder.setInsertBefore(inst);
+            auto zero = builder.getIntValue(toType, 0);
+            auto one = builder.getIntValue(toType, 1);
+            if (auto vecType = as<IRVectorType>(toTypeV))
+            {
+                auto zeroV = emitSplat(parent, nullptr, zero, getIntVal(vecType->getElementCount()));
+                auto oneV = emitSplat(parent, nullptr, one, getIntVal(vecType->getElementCount()));
+                return emitInst(parent, inst, SpvOpSelect, inst->getFullType(), kResultID, inst->getOperand(0),
+                    oneV, zeroV);
+            }
+            return emitInst(parent, inst, SpvOpSelect, inst->getFullType(), kResultID, inst->getOperand(0), one, zero);
+        }
+        else if (as<IRBoolType>(toType))
+        {
+            // Cast from int to bool.
+            IRBuilder builder(inst);
+            builder.setInsertBefore(inst);
+            auto zero = builder.getIntValue(fromType, 0);
+            if (auto vecType = as<IRVectorType>(toTypeV))
+            {
+                auto zeroV = emitSplat(parent, nullptr, zero, getIntVal(vecType->getElementCount()));
+                return emitOpINotEqual(parent, inst, inst->getFullType(), inst->getOperand(0), zeroV);
+            }
+            else
+            {
+                return emitOpINotEqual(parent, inst, inst->getFullType(), inst->getOperand(0), zero);
+            }
+        }
+
         SLANG_ASSERT(isIntegralType(fromType));
         SLANG_ASSERT(isIntegralType(toType));
 
@@ -3100,6 +3136,24 @@ struct SPIRVEmitContext
         const auto fromType = dropVector(fromTypeV);
         const auto toType = dropVector(toTypeV);
         SLANG_ASSERT(isFloatingType(fromType));
+
+        if (as<IRBoolType>(toType))
+        {
+            // Float to bool cast.
+            IRBuilder builder(inst);
+            builder.setInsertBefore(inst);
+            auto zero = builder.getIntValue(fromType, 0);
+            if (auto vecType = as<IRVectorType>(toTypeV))
+            {
+                auto zeroV = emitSplat(parent, nullptr, zero, getIntVal(vecType->getElementCount()));
+                return emitInst(parent, inst, SpvOpFUnordNotEqual, inst->getFullType(), kResultID, inst->getOperand(0), zeroV);
+            }
+            else
+            {
+                return emitInst(parent, inst, SpvOpFUnordNotEqual, inst->getFullType(), kResultID, inst->getOperand(0), zero);
+            }
+        }
+
         SLANG_ASSERT(isIntegralType(toType));
 
         const auto toInfo = getIntTypeInfo(toType);
@@ -3323,7 +3377,7 @@ struct SPIRVEmitContext
             opCode = isSigned ? SpvOpSRem : SpvOpUMod;
             break;
         case kIROp_FRem:
-            opCode = SpvOpFRem;
+            opCode = SpvOpFMod;
             break;
         case kIROp_Less:
             opCode = isFloatingPoint ? SpvOpFOrdLessThan

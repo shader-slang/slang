@@ -1048,6 +1048,9 @@ __generic<T : __BuiltinType>
 __target_intrinsic(cpp, "bool($0)")
 __target_intrinsic(cuda, "bool($0)")
 __target_intrinsic(glsl, "bool($0)")
+__target_intrinsic(spirv, boolean(T), "OpCopyObject resultType resultId _0")
+__target_intrinsic(spirv, integral(T), "OpINotEqual resultType resultId _0 const(,0)")
+__target_intrinsic(spirv, floating(T), "OpFUnordNotEqual resultType resultId _0 const(,0)")
 [__readNone]
 bool any(T x);
 

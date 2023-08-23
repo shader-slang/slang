@@ -34,8 +34,8 @@ void computeMain(uint3       dispatchThreadID : SV_DispatchThreadID)
         var rawObj = gObj.Load(i);
         IInterface dynamicObj = createDynamicObject<IInterface, UserDefinedPackedType>(rawObj.flags, rawObj);
         result += dynamicObj.run();
+        gOutputBuffer[0] = result;
     }
-    gOutputBuffer[0] = result;
 }
 
 struct FloatVal : IInterface
