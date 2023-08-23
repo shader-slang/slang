@@ -40,7 +40,8 @@ List<InOutPair<typename T::Domain>> dataFlow(
     T& context,
     List<typename T::Node> ns,
     P isSuccessor,
-    typename T::Domain initialInput = T::Domain::bottom(),
+    typename T::Domain bottom,
+    typename T::Domain initialInput,
     UInt maxNumUpdates = std::numeric_limits<UInt>::max())
 {
     using Node = typename T::Node;
@@ -55,7 +56,7 @@ List<InOutPair<typename T::Domain>> dataFlow(
 
     // If we can't evaluate our transfer function, return the only possible value
     if(maxNumUpdates == 0)
-        return List<InOutPair<Domain>>::makeRepeated(InOutPair<Domain>{initialInput, Domain::bottom()}, ns.getCount());
+        return List<InOutPair<Domain>>::makeRepeated(InOutPair<Domain>{initialInput, bottom}, ns.getCount());
 
     // Our algorithm state, `infos` tracks the input output of each node as
     // well as if it should be recomputed
@@ -65,7 +66,7 @@ List<InOutPair<typename T::Domain>> dataFlow(
 
     // Construct our work queue
     List<Node> dependencies = ns;
-    const Info initialInfo{initialInput, Domain::bottom(), true, 0};
+    const Info initialInfo{bottom, bottom, true, 0};
     // Add our roots to the dependencies to explore
     for(auto n : dependencies)
     {
@@ -80,13 +81,23 @@ List<InOutPair<typename T::Domain>> dataFlow(
         // For each of the predecessors of this node, if we haven't already
         // added it to infos, add it to that, the workQueue and the list of
         // dependencies to explore.
+        bool hasNoPredecessors = true;
         for(const auto& p : context.predecessors(n))
         {
+            hasNoPredecessors = false;
             if(infos.addIfNotExists(p, initialInfo))
             {
                 dependencies.add(p);
                 workQueue.push(p);
             }
+        }
+        // Is we have no predecessor nodes then we should use the initial input
+        // the user passed us.
+        if(hasNoPredecessors)
+        {
+            auto i = infos.tryGetValue(n);
+            SLANG_ASSERT(i);
+            i->in = initialInput;
         }
     }
 

@@ -27,7 +27,8 @@ namespace Slang
         T context,
         List<IRBlock*> blocksToQuery,
         ReachabilityContext& reachability,
-        typename T::Domain initialInput = T::Domain::bottom())
+        typename T::Domain bottom,
+        typename T::Domain initialInput)
     {
         static_assert(std::is_base_of_v<BasicBlockForwardDataFlow, T>);
         auto isSuccessor = [&reachability](IRBlock* x, IRBlock* y){
@@ -37,6 +38,7 @@ namespace Slang
             context,
             blocksToQuery,
             isSuccessor,
+            bottom,
             initialInput);
     }
 
@@ -45,7 +47,8 @@ namespace Slang
         T context,
         List<IRBlock*> blocksToQuery,
         ReachabilityContext& reachability,
-        typename T::Domain initialInput = T::Domain::bottom())
+        typename T::Domain bottom,
+        typename T::Domain initialInput)
     {
         static_assert(std::is_base_of_v<BasicBlockBackwardDataFlow, T>);
         auto isSuccessor = [&reachability](IRBlock* y, IRBlock* x){
@@ -55,6 +58,7 @@ namespace Slang
             context,
             blocksToQuery,
             isSuccessor,
+            bottom,
             initialInput);
     }
 }
