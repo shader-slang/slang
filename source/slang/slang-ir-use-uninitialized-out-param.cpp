@@ -259,18 +259,36 @@ namespace Slang
 
         const auto memberTree = flattenStruct(type);
         const LeafRange everythingRange = memberTree[0].data.leafRange;
+        const Index numFlatMembers = everythingRange.end;
 
         // Collect all sub-addresses from the param.
         List<StoreSite> stores;
         Dictionary<IRInst*, LoadSite> loadsAndReturns;
         List<IRBlock*> loadingBlocks;
-        auto walkAddressUses = [&](auto& go, IRInst* addr, const Index addrMemberIndex) -> void
+        auto walkAddressUses = [&](
+            // walkAddressUses, the C++ compiler isn't smart enough to allow
+            // the recursive call here
+            auto& go,
+            // The address under consideration, it will be the address of our
+            // out parameter or some member nested underneath it
+            IRInst* addr,
+            // The index of this member in our flattened representation
+            const Index addrMemberIndex,
+            // If this is true then we'll keep following IRFieldAddress
+            // instructions, if it's false then we'll never advance addrMemberIndex
+            const bool allowDescent) -> void
         {
             for (auto use = addr->firstUse; use; use = use->nextUse)
             {
                 instMatch_(use->getUser(),
                     [&](IRFieldAddress* fa)
                     {
+                        // If we're not allowed to make the leaves more
+                        // specific, then all we can do is recurse with our
+                        // given addrMemberIndex
+                        if(!allowDescent)
+                            return go(go, fa, addrMemberIndex, false);
+
                         auto key = as<IRStructKey>(fa->getField());
                         // TODO: Is this assert correct?
                         SLANG_ASSERT(key);
@@ -283,12 +301,14 @@ namespace Slang
                             childMemberIndex = memberTree[childMemberIndex].next;
                             SLANG_ASSERT(childMemberIndex < memberTree.getCount());
                         }
-                        int i = Initialization::overflowElementIndex;
-                        return go(go, use->getUser(), childMemberIndex);
+                        return go(go, fa, childMemberIndex, true);
                     },
-                    [&](IRGetElementPtr*)
+                    [&](IRGetElementPtr* gep)
                     {
-                        // SLANG_ASSERT(!"TODO");
+                        // For now, treat a write to any element as a write to
+                        // all elements, as we don't track individual elements
+                        // We do this by recursing with allowDescent = false;
+                        return go(go, gep, addrMemberIndex, false);
                     },
                     [&](IRStore* store)
                     {
@@ -297,12 +317,15 @@ namespace Slang
                     },
                     [&](IRSwizzledStore* store)
                     {
+                        // TODO: track individual vector elements
                         if(addr == store->getDest())
                             stores.add({store, memberTree[addrMemberIndex].data.leafRange});
                     },
                     [&](IRCall* call)
                     {
-                        // TODO: Take into account the polarity of this argument
+                        // TODO: Take into account the polarity of this
+                        // argument, only set as a store if we're passing as an
+                        // out parameter
                         stores.add({call, memberTree[addrMemberIndex].data.leafRange});
                     },
                     [&](IRLoad* load)
@@ -311,7 +334,11 @@ namespace Slang
                         SLANG_ASSERT(bb);
                         if(!loadingBlocks.contains(bb))
                             loadingBlocks.add(bb);
-                        loadsAndReturns.add(load, {memberTree[addrMemberIndex].data.leafRange, Uninitialized});
+                        loadsAndReturns.add(
+                            load,
+                            {memberTree[addrMemberIndex].data.leafRange,
+                             Initialization::allUninitialized(numFlatMembers)
+                            });
                     },
                     [&](IRInst*)
                     {
@@ -320,7 +347,7 @@ namespace Slang
                 );
             }
         };
-        walkAddressUses(walkAddressUses, param, 0);
+        walkAddressUses(walkAddressUses, param, 0, true);
 
         // Also add a reference to the whole value on each return
         for(auto bb : func->getBlocks())
@@ -330,7 +357,7 @@ namespace Slang
             {
                 if(!loadingBlocks.contains(bb))
                     loadingBlocks.add(bb);
-                loadsAndReturns.add(t, {everythingRange, Uninitialized});
+                loadsAndReturns.add(t, {everythingRange, Initialization::allUninitialized(numFlatMembers)});
             }
         }
 
@@ -342,7 +369,8 @@ namespace Slang
             context,
             loadingBlocks,
             reachability,
-            Initialization::allUninitialized());
+            Initialization::bottom(numFlatMembers),
+            Initialization::allUninitialized(numFlatMembers));
 
         //
         // Walk over all of our instructions under investigation,
@@ -350,17 +378,18 @@ namespace Slang
         // If their value was uninitialized when they loaded, produce a
         // diagnostic
         //
-        for(auto l : loadsAndReturns)
+        for(const auto& [inst, site] : loadsAndReturns)
         {
-            uint64_t status = l.value.initializationState;
-            auto range = l.value.loadRange;
+            Initialization status = site.initializationState;
+            auto range = site.loadRange;
 
             bool areAllLeavesInitialized = true;
             bool areNoLeavesInitialized = true;
             bool areAnyLeavesMaybeUninitialized = false;
             for(Index i = range.begin; i < range.end; ++i)
             {
-                const auto leaf = (status >> (i * 2)) & 0b11;
+                const auto leaf = status.getElem(i);
+                SLANG_ASSERT(leaf != Bottom);
                 const bool isLeafInitialized = leaf == Initialized;
                 const bool isLeafMaybeUninitialized = leaf == MaybeUninitialized;
                 areAllLeavesInitialized = areAllLeavesInitialized && isLeafInitialized;
@@ -372,7 +401,7 @@ namespace Slang
             if(areAllLeavesInitialized)
                 continue;
 
-            const bool isReturn = as<IRReturn>(l.key);
+            const bool isReturn = as<IRReturn>(inst);
             const bool isMaybe = areAnyLeavesMaybeUninitialized;
             const bool isPartially = !areAllLeavesInitialized && !areNoLeavesInitialized;
             const auto d =
@@ -385,7 +414,7 @@ namespace Slang
                 :  isReturn &&  isMaybe && !isPartially ? Diagnostics::returningWithMaybeUninitializedOut
                 :  isReturn &&  isMaybe &&  isPartially ? Diagnostics::returningWithMaybePartiallyUninitializedOut
                 : (SLANG_UNREACHABLE("impossible"), Diagnostics::internalCompilerError);
-            sink->diagnose(l.key, d, param);
+            sink->diagnose(inst, d, param);
         }
     }
 
