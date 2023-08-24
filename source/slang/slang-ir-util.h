@@ -235,23 +235,25 @@ List<IRBlock*> collectBlocksInRegion(
 List<IRBlock*> collectBlocksInRegion(
     IRDominatorTree* dom,
     IRSwitch* switchInst,
-    List<IRBlock*>& multiLevelBreakBlocks);
+    bool* outHasMultilevelBreaks);
 
 List<IRBlock*> collectBlocksInRegion(
     IRDominatorTree* dom,
     IRLoop* loop,
-    List<IRBlock*>& multiLevelBreakBlocks);
+    bool* outHasMultilevelBreaks);
 
 List<IRBlock*> collectBlocksInRegion(
     IRDominatorTree* dom,
     IRBlock* breakBlock,
     IRBlock* firstBlock,
     bool includeFirstBlock,
-    List<IRBlock*>& multiLevelBreakBlocks);
+    bool* outHasMultilevelBreaks);
 
-List<IRBlock*> collectBlocksInRegion(IRGlobalValueWithCode* func,  IRLoop* loopInst, List<IRBlock*>& multiLevelBreakBlocks);
+List<IRBlock*> collectBlocksInRegion(IRGlobalValueWithCode* func,  IRLoop* loopInst, bool* outHasMultilevelBreaks);
 
 List<IRBlock*> collectBlocksInRegion(IRGlobalValueWithCode* func,  IRLoop* loopInst);
+
+HashSet<IRBlock*> getParentBreakBlockSet(IRDominatorTree* dom, IRBlock* block);
 
 // Run an operation over every block in a module
 template<typename F>

@@ -9,7 +9,7 @@
 namespace Slang
 {
     
-bool isUnreachable(IRBlock* block)
+bool isUnreachableRootBlock(IRBlock* block)
 {
     return block->getPredecessors().getCount() == 0;
 }
@@ -114,7 +114,7 @@ struct EliminateMultiLevelBreakContext
                         collectBreakableRegionBlocks(*childRegion);
                         info.childRegions.add(childRegion);
                         block = childRegion->getBreakBlock();
-                        if (!isUnreachable(block) && info.blockSet.add(block))
+                        if (!isUnreachableRootBlock(block) && info.blockSet.add(block))
                         {
                             info.blocks.add(block);
                         }
@@ -164,7 +164,7 @@ struct EliminateMultiLevelBreakContext
                 l->forEach(
                     [&](BreakableRegionInfo* region)
                     {
-                        if(!isUnreachable(region->getBreakBlock()))
+                        if(!isUnreachableRootBlock(region->getBreakBlock()))
                             mapBreakBlockToRegion.add(region->getBreakBlock(), region);
                         for (auto block : region->blocks)
                             mapBlockToRegion.add(block, region);
@@ -269,7 +269,7 @@ struct EliminateMultiLevelBreakContext
             l->forEach(
                 [&](BreakableRegionInfo* region)
                 {
-                    if (isUnreachable(region->getBreakBlock()))
+                    if (isUnreachableRootBlock(region->getBreakBlock()))
                     {
                         if (mapBreakBlocksToRegion.containsKey(region->getBreakBlock()))
                         {

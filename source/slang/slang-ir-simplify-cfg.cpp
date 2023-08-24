@@ -29,6 +29,32 @@ static BreakableRegion* findBreakableRegion(Region* region)
     }
 }
 
+static bool isBlockInRegion(IRDominatorTree* domTree, IRTerminatorInst* regionHeader, IRBlock* block)
+{
+    auto headerBlock = cast<IRBlock>(regionHeader->getParent());
+    IRBlock* breakBlock = nullptr;
+    if (auto loop = as<IRLoop>(regionHeader))
+        breakBlock = loop->getBreakBlock();
+    else if (auto switchInst = as<IRSwitch>(regionHeader))
+        breakBlock = switchInst->getBreakLabel();
+
+    auto parentBreakBlocks = getParentBreakBlockSet(domTree, headerBlock);
+    
+    if (!domTree->dominates(headerBlock, block))
+        return false;
+
+    if (domTree->dominates(breakBlock, block))
+        return false;
+    
+    for (auto parentBreakBlock : parentBreakBlocks)
+    {
+        if (domTree->dominates(parentBreakBlock, block))
+            return false;
+    }
+
+    return true;
+}
+
 // Test if a loop is trivial: a trivial loop runs for a single iteration without any back edges, and
 // there is only one break out of the loop at the very end. The function generates `regionTree` if
 // it is needed and hasn't been generated yet.
@@ -106,8 +132,6 @@ static bool isTrivialSingleIterationLoop(
     
     if (breakPredList.getCount() > 0)
     {
-        //auto breakInst = breakBlockUse->getUser();
-        //auto breakOriginBlock = as<IRBlock>(breakInst->getParent());
         auto breakOriginBlock = *loop->getBreakBlock()->getPredecessors().begin();
 
         for (auto currBlock = breakOriginBlock;
@@ -124,11 +148,11 @@ static bool isTrivialSingleIterationLoop(
             switch (terminator->getOp())
             {
             case kIROp_loop:
-                if (collectBlocksInRegion(context.domTree, as<IRLoop>(terminator)).contains(breakOriginBlock))
+                if (isBlockInRegion(context.domTree, as<IRLoop>(terminator), breakOriginBlock))
                     return false;
                 break;
             case kIROp_Switch:
-                if (collectBlocksInRegion(context.domTree, as<IRSwitch>(terminator)).contains(breakOriginBlock))
+                if (isBlockInRegion(context.domTree, as<IRSwitch>(terminator), breakOriginBlock))
                     return false;
                 break;
             default:
@@ -142,11 +166,11 @@ static bool isTrivialSingleIterationLoop(
 
 static bool doesLoopHasSideEffect(IRGlobalValueWithCode* func, IRLoop* loopInst)
 {
-    List<IRBlock*> multiLevelBreakBlocks;
-    auto blocks = collectBlocksInRegion(func, loopInst, multiLevelBreakBlocks);
+    bool hasMultiLevelBreaks = false;
+    auto blocks = collectBlocksInRegion(func, loopInst, &hasMultiLevelBreaks);
 
     // We'll currently not deal with loops that contain multi-level breaks.
-    if (multiLevelBreakBlocks.getCount() > 0)
+    if (hasMultiLevelBreaks)
         return true;
 
     HashSet<IRBlock*> loopBlocks;

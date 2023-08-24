@@ -344,6 +344,13 @@ void computeReachableSet(IRGlobalValueWithCode* code, HashSet<IRBlock*>& outSet)
 /// Compute a postorder traversal of the blocks in `code`, writing the resulting order to `outOrder`.
 void computePostorder(IRGlobalValueWithCode* code, List<IRBlock*>& outOrder)
 {
+    HashSet<IRBlock*> reachableSet;
+    computePostorder(code, outOrder, reachableSet);
+}
+
+/// Compute a postorder traversal of the blocks in `code`, writing the resulting order to `outOrder`.
+void computePostorder(IRGlobalValueWithCode* code, List<IRBlock*>& outOrder, HashSet<IRBlock*>& outReachableSet)
+{
     PostorderComputationContext context;
     context.order = &outOrder;
     if (code->getFirstBlock())
@@ -360,6 +367,7 @@ void computePostorder(IRGlobalValueWithCode* code, List<IRBlock*>& outOrder)
     }
     prefix.addRange(outOrder);
     outOrder = _Move(prefix);
+    outReachableSet = _Move(context.visited);
 }
 
 void computePostorderOnReverseCFG(IRGlobalValueWithCode* code, List<IRBlock*>& outOrder)
@@ -438,8 +446,7 @@ struct DominatorTreeComputationContext
     void iterativelyComputeImmediateDominators(IRGlobalValueWithCode* code)
     {
         // First we compute the postorder traversal order for the blocks in the CFG.
-        computePostorder(code, postorder);
-        computeReachableSet(code, reachableSet);
+        computePostorder(code, postorder, reachableSet);
 
         // We will initialize our map from the block objects to their "name"
         // (index in the traversal order), before moving on.

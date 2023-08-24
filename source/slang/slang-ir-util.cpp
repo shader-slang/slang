@@ -1001,33 +1001,51 @@ void resetScratchDataBit(IRInst* inst, int bitIndex)
 List<IRBlock*> collectBlocksInRegion(
     IRDominatorTree* dom,
     IRLoop* loop,
-    List<IRBlock*>& multiLevelBreakBlocks)
+    bool* outHasMultiLevelBreaks)
 {
-    return collectBlocksInRegion(dom, loop->getBreakBlock(), loop->getTargetBlock(), true, multiLevelBreakBlocks);
+    return collectBlocksInRegion(dom, loop->getBreakBlock(), loop->getTargetBlock(), true, outHasMultiLevelBreaks);
 }
 
 List<IRBlock*> collectBlocksInRegion(
     IRDominatorTree* dom,
     IRLoop* loop)
 {
-    List<IRBlock*> multiLevelBreakBlocks;
-    return collectBlocksInRegion(dom, loop->getBreakBlock(), loop->getTargetBlock(), true, multiLevelBreakBlocks);
+    bool hasMultiLevelBreaks = false;
+    return collectBlocksInRegion(dom, loop->getBreakBlock(), loop->getTargetBlock(), true, &hasMultiLevelBreaks);
 }
 
 List<IRBlock*> collectBlocksInRegion(
     IRDominatorTree* dom,
     IRSwitch* switchInst,
-    List<IRBlock*>& multiLevelBreakBlocks)
+    bool* outHasMultiLevelBreaks)
 {
-    return collectBlocksInRegion(dom, switchInst->getBreakLabel(), as<IRBlock>(switchInst->getParent()), false, multiLevelBreakBlocks);
+    return collectBlocksInRegion(dom, switchInst->getBreakLabel(), as<IRBlock>(switchInst->getParent()), false, outHasMultiLevelBreaks);
 }
 
 List<IRBlock*> collectBlocksInRegion(
     IRDominatorTree* dom,
     IRSwitch* switchInst)
 {
-    List<IRBlock*> multiLevelBreakBlocks;
-    return collectBlocksInRegion(dom, switchInst->getBreakLabel(), as<IRBlock>(switchInst->getParent()), false, multiLevelBreakBlocks);
+    bool hasMultiLevelBreaks = false;
+    return collectBlocksInRegion(dom, switchInst->getBreakLabel(), as<IRBlock>(switchInst->getParent()), false, &hasMultiLevelBreaks);
+}
+
+HashSet<IRBlock*> getParentBreakBlockSet(IRDominatorTree* dom, IRBlock* block)
+{
+    HashSet<IRBlock*> parentBreakBlocksSet;
+    for (IRBlock* currBlock = dom->getImmediateDominator(block); 
+        currBlock;
+        currBlock = dom->getImmediateDominator(currBlock))
+    {
+        if (auto loopInst = as<IRLoop>(currBlock->getTerminator()))
+            if (!dom->dominates(loopInst->getBreakBlock(), block))
+                parentBreakBlocksSet.add(loopInst->getBreakBlock());
+        else if (auto switchInst = as<IRSwitch>(currBlock->getTerminator()))
+            if (!dom->dominates(switchInst->getBreakLabel(), block))
+                parentBreakBlocksSet.add(switchInst->getBreakLabel());
+    }
+
+    return parentBreakBlocksSet;
 }
 
 List<IRBlock*> collectBlocksInRegion(
@@ -1035,7 +1053,7 @@ List<IRBlock*> collectBlocksInRegion(
     IRBlock* breakBlock,
     IRBlock* firstBlock,
     bool includeFirstBlock,
-    List<IRBlock*>& multiLevelBreakBlocks)
+    bool* outHasMultiLevelBreaks)
 {
     List<IRBlock*> regionBlocks;
     HashSet<IRBlock*> regionBlocksSet;
@@ -1050,16 +1068,9 @@ List<IRBlock*> collectBlocksInRegion(
     // to outer regions (particularly when our region has no reachable 
     // break block of its own)
     // 
-    HashSet<IRBlock*> parentBreakBlocksSet;
-    for (IRBlock* currBlock = dom->getImmediateDominator(firstBlock); 
-        currBlock;
-        currBlock = dom->getImmediateDominator(currBlock))
-    {
-        if (auto loopInst = as<IRLoop>(currBlock->getTerminator()))
-            parentBreakBlocksSet.add(loopInst->getBreakBlock());
-        else if (auto switchInst = as<IRSwitch>(currBlock->getTerminator()))
-            parentBreakBlocksSet.add(switchInst->getBreakLabel());
-    }
+    HashSet<IRBlock*> parentBreakBlocksSet = getParentBreakBlockSet(dom, firstBlock);
+
+    *outHasMultiLevelBreaks = false;
 
     addBlock(firstBlock);
     for (Index i = 0; i < regionBlocks.getCount(); i++)
@@ -1069,7 +1080,7 @@ List<IRBlock*> collectBlocksInRegion(
         {
             if (parentBreakBlocksSet.contains(succ) && succ != breakBlock)
             {
-                multiLevelBreakBlocks.add(succ);
+                *outHasMultiLevelBreaks = true;
                 continue;
             }
 
@@ -1096,17 +1107,17 @@ List<IRBlock*> collectBlocksInRegion(
     return regionBlocks;
 }
 
-List<IRBlock *> collectBlocksInRegion(IRGlobalValueWithCode *func, IRLoop *loopInst, List<IRBlock*> &multiLevelBreakBlocks)
+List<IRBlock *> collectBlocksInRegion(IRGlobalValueWithCode *func, IRLoop *loopInst, bool* outHasMultiLevelBreaks)
 {
     auto dom = computeDominatorTree(func);
-    return collectBlocksInRegion(dom, loopInst, multiLevelBreakBlocks);
+    return collectBlocksInRegion(dom, loopInst, outHasMultiLevelBreaks);
 }
 
 List<IRBlock*> collectBlocksInRegion(IRGlobalValueWithCode* func, IRLoop* loopInst)
 {
     auto dom = computeDominatorTree(func);
-    List<IRBlock*> multiLevelBreakBlocks;
-    return collectBlocksInRegion(dom, loopInst, multiLevelBreakBlocks);
+    bool hasMultiLevelBreaks = false;
+    return collectBlocksInRegion(dom, loopInst, &hasMultiLevelBreaks);
 }
 
 UnownedStringSlice getBasicTypeNameHint(IRType* basicType)

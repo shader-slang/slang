@@ -173,6 +173,7 @@ namespace Slang
     RefPtr<IRDominatorTree> computeDominatorTree(IRGlobalValueWithCode* code);
 
     void computePostorder(IRGlobalValueWithCode* code, List<IRBlock*>& outOrder);
+    void computePostorder(IRGlobalValueWithCode* code, List<IRBlock*>& outOrder, HashSet<IRBlock*>& outReachableSet);
     void computePostorderOnReverseCFG(IRGlobalValueWithCode* code, List<IRBlock*>& outOrder);
 
     inline List<IRBlock*> getPostorder(IRGlobalValueWithCode* code)
