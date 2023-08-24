@@ -224,14 +224,10 @@ namespace Slang
 
             if (auto matrixType = as<IRMatrixType>(type))
             {
-                switch (target->getTarget())
+                // For spirv, we always want to lower all matrix types, because matrix types
+                // are considered abstract types.
+                if (!target->shouldEmitSPIRVDirectly())
                 {
-                case CodeGenTarget::SPIRV:
-                case CodeGenTarget::SPIRVAssembly:
-                    // For spirv, we always want to lower all matrix types, because matrix types
-                    // are considered abstract types.
-                    break;
-                default:
                     // For other targets, we only lower the matrix types if they differ from the default
                     // matrix layout.
                     if (getIntVal(matrixType->getLayout()) == defaultMatrixLayout)
@@ -239,7 +235,6 @@ namespace Slang
                         info.loweredType = type;
                         return info;
                     }
-                    break;
                 }
 
                 auto loweredType = builder.createStructType();
