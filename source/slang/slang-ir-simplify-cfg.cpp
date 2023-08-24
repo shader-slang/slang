@@ -102,11 +102,15 @@ static bool isTrivialSingleIterationLoop(
     // Track the break block backwards through the dominator tree, and see if we find a loop block
     // that is not the current loop.
     //
-    auto breakBlockUse = loop->getBreakBlock()->firstUse;
-    if (breakBlockUse)
+    auto breakPredList = loop->getBreakBlock()->getPredecessors();
+    
+    if (breakPredList.getCount() > 0)
     {
-        auto breakInst = breakBlockUse->getUser();
-        for (auto currBlock = as<IRBlock>(breakInst->getParent());
+        //auto breakInst = breakBlockUse->getUser();
+        //auto breakOriginBlock = as<IRBlock>(breakInst->getParent());
+        auto breakOriginBlock = *loop->getBreakBlock()->getPredecessors().begin();
+
+        for (auto currBlock = breakOriginBlock;
              currBlock;
              currBlock = context.domTree->getImmediateDominator(currBlock))
         {
@@ -114,15 +118,20 @@ static bool isTrivialSingleIterationLoop(
             if (terminator == loop)
                 break;
             
+            // Check if the break originated from an inner breakable region.
+            // If so, the outer loop cannot be trivially removed.
+            // 
             switch (terminator->getOp())
             {
             case kIROp_loop:
-                if (collectBlocksInRegion(context.domTree, as<IRLoop>(terminator)).contains(currBlock))
+                if (collectBlocksInRegion(context.domTree, as<IRLoop>(terminator)).contains(breakOriginBlock))
                     return false;
                 break;
             case kIROp_Switch:
-                if (collectBlocksInRegion(context.domTree, as<IRSwitch>(terminator)).contains(currBlock))
+                if (collectBlocksInRegion(context.domTree, as<IRSwitch>(terminator)).contains(breakOriginBlock))
                     return false;
+                break;
+            default:
                 break;
             }
         }
@@ -133,7 +142,13 @@ static bool isTrivialSingleIterationLoop(
 
 static bool doesLoopHasSideEffect(IRGlobalValueWithCode* func, IRLoop* loopInst)
 {
-    auto blocks = collectBlocksInRegion(func, loopInst);
+    List<IRBlock*> multiLevelBreakBlocks;
+    auto blocks = collectBlocksInRegion(func, loopInst, multiLevelBreakBlocks);
+
+    // We'll currently not deal with loops that contain multi-level breaks.
+    if (multiLevelBreakBlocks.getCount() > 0)
+        return true;
+
     HashSet<IRBlock*> loopBlocks;
     for (auto b : blocks)
         loopBlocks.add(b);

@@ -234,9 +234,22 @@ List<IRBlock*> collectBlocksInRegion(
 
 List<IRBlock*> collectBlocksInRegion(
     IRDominatorTree* dom,
+    IRSwitch* switchInst,
+    List<IRBlock*>& multiLevelBreakBlocks);
+
+List<IRBlock*> collectBlocksInRegion(
+    IRDominatorTree* dom,
+    IRLoop* loop,
+    List<IRBlock*>& multiLevelBreakBlocks);
+
+List<IRBlock*> collectBlocksInRegion(
+    IRDominatorTree* dom,
     IRBlock* breakBlock,
     IRBlock* firstBlock,
-    bool includeFirstBlock);
+    bool includeFirstBlock,
+    List<IRBlock*>& multiLevelBreakBlocks);
+
+List<IRBlock*> collectBlocksInRegion(IRGlobalValueWithCode* func,  IRLoop* loopInst, List<IRBlock*>& multiLevelBreakBlocks);
 
 List<IRBlock*> collectBlocksInRegion(IRGlobalValueWithCode* func,  IRLoop* loopInst);
 

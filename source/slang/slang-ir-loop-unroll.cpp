@@ -401,7 +401,7 @@ static bool _unrollLoop(
 
             firstIterationBreakBlock->removeAndDeallocateAllDecorationsAndChildren();
             builder.setInsertInto(firstIterationBreakBlock);
-            builder.emitBranch(unreachableBlock);
+            builder.emitUnreachable();
 
             break;
         }

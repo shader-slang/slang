@@ -114,6 +114,9 @@ namespace Slang
         /// Dictionary used to accelerate `getBlockIndex`
         Dictionary<IRBlock*, Int>   mapBlockToIndex;
 
+        /// Reachability information for the CFG
+        HashSet<IRBlock*>           reachableSet;
+
         //
         // In order to accelerate queries on the tree structure, we will order the tree nodes
         // carefully, so that all of the descendants of a node are contiguous, with all of

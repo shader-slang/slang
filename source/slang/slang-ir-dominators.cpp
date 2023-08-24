@@ -188,7 +188,7 @@ Int IRDominatorTree::getBlockIndex(IRBlock* block)
 
 bool IRDominatorTree::isUnreachable(IRBlock* block)
 {
-    return !mapBlockToIndex.containsKey(block);
+    return !reachableSet.contains(block);
 }
 
 
@@ -333,6 +333,14 @@ struct PostorderComputationContext : public DepthFirstSearchContext
     }
 };
 
+void computeReachableSet(IRGlobalValueWithCode* code, HashSet<IRBlock*>& outSet)
+{
+    DepthFirstSearchContext context;
+    if (code->getFirstBlock())
+        context.walk(code->getFirstBlock(), [](IRBlock* block) {return block->getSuccessors(); });
+    outSet = _Move(context.visited);
+}
+
 /// Compute a postorder traversal of the blocks in `code`, writing the resulting order to `outOrder`.
 void computePostorder(IRGlobalValueWithCode* code, List<IRBlock*>& outOrder)
 {
@@ -397,6 +405,10 @@ struct DominatorTreeComputationContext
     // traversal, so that we can look up a block based on its "name"
     //
     List<IRBlock*> postorder;
+    // 
+    // Also maintain a set of reachable blocks.
+    //
+    HashSet<IRBlock*> reachableSet;
 
     //
     // We need a way to map our actual IR blocks to their names for
@@ -427,6 +439,7 @@ struct DominatorTreeComputationContext
     {
         // First we compute the postorder traversal order for the blocks in the CFG.
         computePostorder(code, postorder);
+        computeReachableSet(code, reachableSet);
 
         // We will initialize our map from the block objects to their "name"
         // (index in the traversal order), before moving on.
@@ -746,6 +759,7 @@ struct DominatorTreeComputationContext
         RefPtr<IRDominatorTree> dominatorTree = new IRDominatorTree();
         dominatorTree->code = code;
         dominatorTree->nodes.setCount(blockCount);
+        dominatorTree->reachableSet = _Move(reachableSet);
 
         // We will iterate over all of the blocks, and fill in the corresponding
         // dominator tree node for each.
