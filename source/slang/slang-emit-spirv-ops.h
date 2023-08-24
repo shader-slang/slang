@@ -1012,14 +1012,14 @@ SpvInst* emitOpMemberDecorateUserSemantic(
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpVectorShuffle
-template<typename T1, typename T2, typename T3, Index N>
+template<typename T1, typename T2, typename T3>
 SpvInst* emitOpVectorShuffle(
     SpvInstParent* parent,
     IRInst* inst,
     const T1& idResultType,
     const T2& vector1,
     const T3& vector2,
-    const Array<SpvLiteralInteger, N>& components
+    ArrayView<SpvLiteralInteger> components
 )
 {
     static_assert(isSingular<T1>);

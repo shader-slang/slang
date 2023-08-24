@@ -3771,6 +3771,32 @@ namespace Slang
         }
         if (targetVectorType->getElementCount() != sourceVectorType->getElementCount())
         {
+            auto fromCount = as<IRIntLit>(sourceVectorType->getElementCount());
+            auto toCount = as<IRIntLit>(targetVectorType->getElementCount());
+            if (fromCount && toCount)
+            {
+                if (toCount->getValue() < fromCount->getValue())
+                {
+                    List<UInt> indices;
+                    for (UInt i = 0; i < (UInt)toCount->getValue(); i++)
+                        indices.add(i);
+                    return emitSwizzle(targetVectorType, value, (UInt)indices.getCount(), indices.getBuffer());
+                }
+                else if (toCount->getValue() > fromCount->getValue())
+                {
+                    List<IRInst*> args;
+                    for (UInt i = 0; i < (UInt)fromCount->getValue(); i++)
+                    {
+                        auto element = emitSwizzle(sourceVectorType->getElementType(), value , 1, &i);
+                        args.add(element);
+                    }
+                    for (IRIntegerValue i = fromCount->getValue(); i < toCount->getValue(); i++)
+                    {
+                        args.add(emitDefaultConstruct(targetVectorType->getElementType()));
+                    }
+                    return emitMakeVector(targetVectorType, args);
+                }
+            }
             auto reshape = emitIntrinsicInst(
                 getVectorType(
                     sourceVectorType->getElementType(), targetVectorType->getElementCount()),

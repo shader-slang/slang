@@ -97,23 +97,15 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             // Figure out storage class based on var layout.
             if (auto layout = getVarLayout(inst))
             {
-                if (auto systemValueAttr = layout->findAttr<IRSystemValueSemanticAttr>())
+                auto cls = getGlobalParamStorageClass(layout);
+                if (cls != SpvStorageClassMax)
+                    storageClass = cls;
+                else if (auto systemValueAttr = layout->findAttr<IRSystemValueSemanticAttr>())
                 {
                     String semanticName = systemValueAttr->getName();
                     semanticName = semanticName.toLower();
-                    if (semanticName == "sv_dispatchthreadid")
-                    {
+                    if (semanticName == "sv_pointsize")
                         storageClass = SpvStorageClassInput;
-                    }
-                    else if (semanticName == "sv_groupindex")
-                    {
-                        storageClass = SpvStorageClassInput;
-                    }
-                }
-                else if(const auto parameterGroupTypeLayout =
-                        as<IRParameterGroupTypeLayout>(layout->getTypeLayout()))
-                {
-                    storageClass = SpvStorageClassUniform;
                 }
             }
 
@@ -121,10 +113,13 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             IRBuilder builder(m_sharedContext->m_irModule);
             bool needLoad = true;
             auto innerType = inst->getFullType();
-            if (as<IRConstantBufferType>(innerType) || as<IRParameterBlockType>(innerType))
+            auto cbufferType = as<IRConstantBufferType>(innerType);
+            auto paramBlockType = as<IRParameterBlockType>(innerType);
+            if (cbufferType || paramBlockType)
             {
                 innerType = as<IRUniformParameterGroupType>(innerType)->getElementType();
-                storageClass = SpvStorageClassUniform;
+                if (storageClass == SpvStorageClassPrivate)
+                    storageClass = SpvStorageClassUniform;
                 // Constant buffer is already treated like a pointer type, and
                 // we are not adding another layer of indirection when replacing it
                 // with a pointer type. Therefore we don't need to insert a load at
@@ -137,6 +132,38 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     innerType = wrapConstantBufferElement(inst);
                 }
                 builder.addDecoration(innerType, kIROp_SPIRVBlockDecoration);
+                
+                auto varLayoutInst = inst->findDecoration<IRLayoutDecoration>();
+                if (paramBlockType)
+                {
+                    // A parameter block typed global parameter will have a VarLayout
+                    // that contains an OffsetAttr(RegisterSpace, spaceId).
+                    // We need to turn this VarLayout into a standard cbuffer VarLayout
+                    // in the form of OffsetAttr(ConstantBuffer, 0, spaceId).
+                    builder.setInsertBefore(inst);
+                    IRVarLayout* varLayout = nullptr;
+                    if (varLayoutInst)
+                        varLayout = as<IRVarLayout>(varLayoutInst->getLayout());
+                    if (varLayout)
+                    {
+                        auto registerSpaceOffsetAttr = varLayout->findOffsetAttr(LayoutResourceKind::RegisterSpace);
+                        if (registerSpaceOffsetAttr)
+                        {
+                            List<IRInst*> operands;
+                            for (UInt i = 0; i < varLayout->getOperandCount(); i++)
+                                operands.add(varLayout->getOperand(i));
+                            operands.add(builder.getVarOffsetAttr(LayoutResourceKind::ConstantBuffer, 0, registerSpaceOffsetAttr->getOffset()));
+                            auto newLayout = builder.getVarLayout(operands);
+                            varLayoutInst->setOperand(0, newLayout);
+                            varLayout->removeAndDeallocate();
+                        }
+                    }
+                }
+                else if (storageClass == SpvStorageClassPushConstant)
+                {
+                    // Push constant params does not need a VarLayout.
+                    varLayoutInst->removeAndDeallocate();
+                }
             }
 
             // Make a pointer type of storageClass.
@@ -162,6 +189,70 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         processGlobalVar(inst);
     }
 
+    SpvStorageClass getStorageClassFromGlobalParamResourceKind(LayoutResourceKind kind)
+    {
+        SpvStorageClass storageClass = SpvStorageClassMax;
+        switch (kind)
+        {
+        case LayoutResourceKind::Uniform:
+        case LayoutResourceKind::DescriptorTableSlot:
+        case LayoutResourceKind::ConstantBuffer:
+            storageClass = SpvStorageClassUniform;
+            break;
+        case LayoutResourceKind::VaryingInput:
+            storageClass = SpvStorageClassInput;
+            break;
+        case LayoutResourceKind::VaryingOutput:
+            storageClass = SpvStorageClassOutput;
+            break;
+        case LayoutResourceKind::ShaderResource:
+        case LayoutResourceKind::UnorderedAccess:
+            storageClass = SpvStorageClassStorageBuffer;
+            break;
+        case LayoutResourceKind::PushConstantBuffer:
+            storageClass = SpvStorageClassPushConstant;
+            break;
+        case LayoutResourceKind::RayPayload:
+            storageClass = SpvStorageClassRayPayloadKHR;
+            break;
+        case LayoutResourceKind::CallablePayload:
+            storageClass = SpvStorageClassCallableDataKHR;
+            break;
+        case LayoutResourceKind::HitAttributes:
+            storageClass = SpvStorageClassHitAttributeKHR;
+            break;
+        case LayoutResourceKind::ShaderRecord:
+            storageClass = SpvStorageClassShaderRecordBufferKHR;
+            break;
+        default:
+            break;
+        }
+        return storageClass;
+    }
+
+    SpvStorageClass getGlobalParamStorageClass(IRVarLayout* varLayout)
+    {
+        SpvStorageClass result = SpvStorageClassMax;
+        for (auto rr : varLayout->getOffsetAttrs())
+        {
+            auto storageClass = getStorageClassFromGlobalParamResourceKind(rr->getResourceKind());
+            // If we haven't inferred a storage class yet, use the one we just found.
+            if (result == SpvStorageClassMax)
+                result = storageClass;
+            else if (result != storageClass)
+            {
+                // If we have inferred a storage class, and it is different from the one we just found,
+                // then we have conflicting uses of the resource, and we cannot infer a storage class.
+                // An exception is that a uniform storage class can be further specialized by PushConstants.
+                if (result == SpvStorageClassUniform)
+                    result = storageClass;
+                else
+                    SLANG_UNEXPECTED("Var layout contains conflicting resource uses, cannot resolve a storage class.");
+            }
+        }
+        return result;
+    }
+
     void processGlobalVar(IRInst* inst)
     {
         auto oldPtrType = as<IRPtrTypeBase>(inst->getDataType());
@@ -184,31 +275,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
         else if (const auto varLayout = getVarLayout(inst))
         {
-            for (auto rr : varLayout->getOffsetAttrs())
-            {
-                switch (rr->getResourceKind())
-                {
-                case LayoutResourceKind::Uniform:
-                case LayoutResourceKind::ShaderResource:
-                case LayoutResourceKind::DescriptorTableSlot:
-                    storageClass = SpvStorageClassUniform;
-                    break;
-                case LayoutResourceKind::VaryingInput:
-                    storageClass = SpvStorageClassInput;
-                    break;
-                case LayoutResourceKind::VaryingOutput:
-                    storageClass = SpvStorageClassOutput;
-                    break;
-                case LayoutResourceKind::UnorderedAccess:
-                    storageClass = SpvStorageClassStorageBuffer;
-                    break;
-                case LayoutResourceKind::PushConstantBuffer:
-                    storageClass = SpvStorageClassPushConstant;
-                    break;
-                default:
-                    break;
-                }
-            }
+            auto cls = getGlobalParamStorageClass(varLayout);
+            if (cls != SpvStorageClassMax)
+                storageClass = cls;
         }
 
         IRBuilder builder(m_sharedContext->m_irModule);
@@ -312,15 +381,18 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             writeBacks.add(WriteBackPair{ arg, tempVar });
         }
         SLANG_ASSERT((UInt)newArgs.getCount() == inst->getArgCount());
-        auto newCall = builder.emitCallInst(inst->getFullType(), inst->getCallee(), newArgs);
-        for (auto wb : writeBacks)
+        if (writeBacks.getCount())
         {
-            auto newVal = builder.emitLoad(wb.tempVar);
-            builder.emitStore(wb.originalAddrArg, newVal);
+            auto newCall = builder.emitCallInst(inst->getFullType(), inst->getCallee(), newArgs);
+            for (auto wb : writeBacks)
+            {
+                auto newVal = builder.emitLoad(wb.tempVar);
+                builder.emitStore(wb.originalAddrArg, newVal);
+            }
+            inst->replaceUsesWith(newCall);
+            inst->removeAndDeallocate();
+            addUsersToWorkList(newCall);
         }
-        inst->replaceUsesWith(newCall);
-        inst->removeAndDeallocate();
-        addUsersToWorkList(newCall);
     }
 
     Dictionary<IRInst*, IRInst*> m_mapArrayValueToVar;
@@ -346,12 +418,17 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
         IRBuilder builder(m_sharedContext->m_irModule);
         IRInst* y = nullptr;
+        builder.setInsertBefore(inst);
         if (!m_mapArrayValueToVar.tryGetValue(x, y))
         {
-            setInsertAfterOrdinaryInst(&builder, x);
+            if (x->getParent()->getOp() == kIROp_Module)
+                builder.setInsertBefore(inst);
+            else
+                setInsertAfterOrdinaryInst(&builder, x);
             y = builder.emitVar(x->getDataType(), SpvStorageClassFunction);
             builder.emitStore(y, x);
-            m_mapArrayValueToVar.set(x, y);
+            if (x->getParent()->getOp() != kIROp_Module)
+                m_mapArrayValueToVar.set(x, y);
         }
         builder.setInsertBefore(inst);
         for(Index i = indices.getCount() - 1; i >= 0; --i)

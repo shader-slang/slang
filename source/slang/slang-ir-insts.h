@@ -99,7 +99,9 @@ struct IRTargetSpecificDecoration : IRDecoration
     IRType* getTypeScrutinee()
     {
         SLANG_ASSERT(getOperandCount() == 4);
-        const auto t = as<IRType>(getOperand(3));
+        // Note: cannot use as<IRType> here because the operand can be
+        // an `IRParam` representing a generic type.
+        const auto t = (IRType*)(getOperand(3));
         SLANG_ASSERT(t);
         return t;
     }

@@ -1339,7 +1339,7 @@ struct RWByteAddressBuffer
     template <typename T>
     SLANG_CUDA_CALL T* _getPtrAt(size_t index)
     {
-        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, 4, sizeInBytes);
+        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, sizeof(T), sizeInBytes);
         return (T*)(((char*)data) + index);
     }
     

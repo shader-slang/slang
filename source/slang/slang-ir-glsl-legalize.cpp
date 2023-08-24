@@ -1488,8 +1488,24 @@ ScalarizedVal adaptType(
     IRBuilder*              builder,
     IRInst*                 val,
     IRType*                 toType,
-    IRType*                 /*fromType*/)
+    IRType*                 fromType)
 {
+    if (auto fromVector = as<IRVectorType>(fromType))
+    {
+        if (auto toVector = as<IRVectorType>(toType))
+        {
+            if (fromVector->getElementCount() != toVector->getElementCount())
+            {
+                fromType = builder->getVectorType(fromVector->getElementType(), toVector->getElementCount());
+                val = builder->emitVectorReshape(fromType, val);
+            }
+        }
+        else if (auto toBasicType = as<IRBasicType>(toType))
+        {
+            UInt index = 0;
+            val = builder->emitSwizzle(fromVector->getElementType(), val, 1, &index);
+        }
+    }
     // TODO: actually consider what needs to go on here...
     return ScalarizedVal::value(builder->emitCast(
         toType,

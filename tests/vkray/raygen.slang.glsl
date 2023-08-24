@@ -2,24 +2,6 @@
 #extension GL_EXT_ray_tracing : require
 layout(row_major) uniform;
 layout(row_major) buffer;
-struct ReflectionRay_0
-{
-    float color_1;
-};
-
-layout(location = 0)
-rayPayloadEXT
-ReflectionRay_0 p_0;
-
-struct ShadowRay_0
-{
-    float hitDistance_0;
-};
-
-layout(location = 1)
-rayPayloadEXT
-ShadowRay_0 p_1;
-
 layout(binding = 0)
 uniform texture2D samplerPosition_0;
 
@@ -49,7 +31,32 @@ layout(std140) uniform _S1
     vec4 viewPos_0;
     mat4x4 view_0;
     mat4x4 model_0;
-} ubo_0;
+}ubo_0;
+layout(binding = 5)
+uniform accelerationStructureEXT as_0;
+
+layout(rgba32f)
+layout(binding = 4)
+uniform image2D outputImage_0;
+
+struct ReflectionRay_0
+{
+    float color_1;
+};
+
+layout(location = 0)
+rayPayloadEXT
+ReflectionRay_0 p_0;
+
+struct ShadowRay_0
+{
+    float hitDistance_0;
+};
+
+layout(location = 1)
+rayPayloadEXT
+ShadowRay_0 p_1;
+
 struct RayDesc_0
 {
     vec3 Origin_0;
@@ -74,17 +81,10 @@ void TraceRay_1(accelerationStructureEXT AccelerationStructure_1, uint RayFlags_
     return;
 }
 
-layout(binding = 5)
-uniform accelerationStructureEXT as_0;
-
 float saturate_0(float x_0)
 {
     return clamp(x_0, 0.0, 1.0);
 }
-
-layout(rgba32f)
-layout(binding = 4)
-uniform image2D outputImage_0;
 
 void main()
 {

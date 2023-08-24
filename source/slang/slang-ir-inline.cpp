@@ -84,6 +84,10 @@ struct InliningPassBase
         {
             changed = considerCallSiteInFunc(func);
         }
+        else if (auto call = as<IRCall>(inst))
+        {
+            considerCallSite(call);
+        }
 
         // Recursively consider the children of inst.
         for (auto child : inst->getModifiableChildren())
