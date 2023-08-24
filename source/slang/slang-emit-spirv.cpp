@@ -1444,6 +1444,8 @@ struct SPIRVEmitContext
                 }
                 return result;
             }
+        case kIROp_GetStringHash:
+            return emitGetStringHash(inst);
         default:
             {
                 String e = "Unhandled global inst in spirv-emit:\n"
@@ -2015,6 +2017,28 @@ struct SPIRVEmitContext
             return emitInst(parent, inst, SpvOpSelect, inst->getFullType(), kResultID, OperandsOf(inst));
         case kIROp_DebugLine:
             return emitDebugLine(parent, as<IRDebugLine>(inst));
+        case kIROp_GetStringHash:
+            return emitGetStringHash(inst);
+
+        }
+    }
+
+    SpvInst* emitGetStringHash(IRInst* inst)
+    {
+        auto getStringHashInst = as<IRGetStringHash>(inst);
+        auto stringLit = getStringHashInst->getStringLit();
+
+        if (stringLit)
+        {
+            auto slice = stringLit->getStringSlice();
+            return emitIntConstant(getStableHashCode32(slice.begin(), slice.getLength()).hash, inst->getDataType());
+        }
+        else
+        {
+            // Couldn't handle 
+            String e = "Unhandled local inst in spirv-emit:\n"
+                + dumpIRToString(inst, { IRDumpOptions::Mode::Detailed, 0 });
+            SLANG_UNIMPLEMENTED_X(e.getBuffer());
         }
     }
 
