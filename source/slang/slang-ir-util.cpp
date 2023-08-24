@@ -1118,6 +1118,7 @@ List<IRBlock*> collectBlocksInRegion(IRGlobalValueWithCode* func, IRLoop* loopIn
     auto dom = computeDominatorTree(func);
     bool hasMultiLevelBreaks = false;
     return collectBlocksInRegion(dom, loopInst, &hasMultiLevelBreaks);
+}
 
 IRVarLayout* findVarLayout(IRInst* value)
 {
