@@ -683,6 +683,83 @@ struct PeepholeContext : InstPassBase
                 }
             }
             break;
+        case kIROp_VectorReshape:
+            {
+                auto fromType = as<IRVectorType>(inst->getOperand(0)->getDataType());
+                auto resultType = as<IRVectorType>(inst->getDataType());
+                if (!resultType)
+                {
+                    if (!fromType)
+                    {
+                        inst->replaceUsesWith(inst->getOperand(0));
+                        maybeRemoveOldInst(inst);
+                        changed = true;
+                        break;
+                    }
+                    IRBuilder builder(inst);
+                    builder.setInsertBefore(inst);
+                    UInt index = 0;
+                    auto newInst = builder.emitSwizzle(resultType, inst->getOperand(0), 1, &index);
+                    inst->replaceUsesWith(newInst);
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                    break;
+                }
+                auto fromCount = as<IRIntLit>(fromType->getElementCount());
+                if (!fromCount)
+                    break;
+                auto toCount = as<IRIntLit>(resultType->getElementCount());
+                if (!toCount)
+                    break;
+                IRBuilder builder(inst);
+                builder.setInsertBefore(inst);
+                auto newInst = builder.emitVectorReshape(resultType, inst->getOperand(0));
+                if (newInst != inst)
+                {
+                    inst->replaceUsesWith(newInst);
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
+            }
+            break;
+        case kIROp_MatrixReshape:
+            {
+                auto fromType = as<IRMatrixType>(inst->getOperand(0)->getDataType());
+                auto resultType = as<IRMatrixType>(inst->getDataType());
+                SLANG_ASSERT(fromType && resultType);
+                auto fromRows = as<IRIntLit>(fromType->getRowCount());
+                if (!fromRows) break;
+                auto fromCols = as<IRIntLit>(fromType->getColumnCount());
+                if (!fromCols) break;
+                auto toRows = as<IRIntLit>(resultType->getRowCount());
+                if (!toRows) break;
+                auto toCols = as<IRIntLit>(resultType->getColumnCount());
+                if (!toCols) break;
+                List<IRInst*> rows;
+                IRBuilder builder(inst);
+                builder.setInsertBefore(inst);
+                auto toRowType = builder.getVectorType(resultType->getElementType(), resultType->getColumnCount());
+                for (IRIntegerValue i = 0; i < toRows->getValue(); i++)
+                {
+                    if (i < fromRows->getValue())
+                    {
+                        auto originalRow = builder.emitElementExtract(inst->getOperand(0), i);
+                        auto resizedRow = builder.emitVectorReshape(toRowType, originalRow);
+                        rows.add(resizedRow);
+                    }
+                    else
+                    {
+                        auto zero = builder.emitDefaultConstruct(resultType->getElementType());
+                        auto row = builder.emitMakeVectorFromScalar(toRowType, zero);
+                        rows.add(row);
+                    }
+                }
+                auto newInst = builder.emitMakeMatrix(resultType, (UInt)rows.getCount(), rows.getBuffer());
+                inst->replaceUsesWith(newInst);
+                maybeRemoveOldInst(inst);
+                changed = true;
+            }
+            break;
         case kIROp_Add:
         case kIROp_Mul:
         case kIROp_Sub:

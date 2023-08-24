@@ -1168,16 +1168,22 @@ struct SPIRVEmitContext
 
         // > OpTypeInt
 
-        case kIROp_UInt8Type:
         case kIROp_UInt16Type:
+        case kIROp_Int16Type:
+        case kIROp_UInt8Type:
         case kIROp_UIntType:
         case kIROp_UInt64Type:
         case kIROp_Int8Type:
-        case kIROp_Int16Type:
         case kIROp_IntType:
         case kIROp_Int64Type:
             {
                 const IntInfo i = getIntTypeInfo(as<IRType>(inst));
+                if (i.width == 16)
+                    requireSPIRVCapability(SpvCapabilityInt16);
+                else if (i.width == 64)
+                    requireSPIRVCapability(SpvCapabilityInt64);
+                else if (i.width == 8)
+                    requireSPIRVCapability(SpvCapabilityInt8);
                 return emitOpTypeInt(
                     inst,
                     SpvLiteralInteger::from32(int32_t(i.width)),
@@ -1882,10 +1888,6 @@ struct SPIRVEmitContext
             return emitIntToFloatCast(parent, as<IRCastIntToFloat>(inst));
         case kIROp_CastFloatToInt:
             return emitFloatToIntCast(parent, as<IRCastFloatToInt>(inst));
-        case kIROp_MatrixReshape:
-        case kIROp_VectorReshape:
-            // TODO: break emitConstruct into separate functions for each opcode.
-            return emitConstruct(parent, inst);
         case kIROp_BitCast:
             return emitOpBitcast(
                 parent,
@@ -2828,6 +2830,9 @@ struct SPIRVEmitContext
         case SpvSnippet::ASMType::Int:
             result = emitIntConstant((IRIntegerValue)constant.intValues[0], builder.getIntType());
             break;
+        case SpvSnippet::ASMType::UInt16:
+            result = emitIntConstant((IRIntegerValue)constant.intValues[0], builder.getType(kIROp_UInt16Type));
+            break;
         case SpvSnippet::ASMType::UInt2:
             {
                 auto uintType = builder.getType(kIROp_UIntType);
@@ -2856,11 +2861,17 @@ struct SPIRVEmitContext
         case SpvSnippet::ASMType::Float:
             irType = builder.getType(kIROp_FloatType);
             break;
+        case SpvSnippet::ASMType::Half:
+            irType = builder.getType(kIROp_HalfType);
+            break;
         case SpvSnippet::ASMType::Int:
             irType = builder.getIntType();
             break;
         case SpvSnippet::ASMType::UInt:
             irType = builder.getUIntType();
+            break;
+        case SpvSnippet::ASMType::UInt16:
+            irType = builder.getType(kIROp_UInt16Type);
             break;
         case SpvSnippet::ASMType::Float2:
             irType = builder.getVectorType(
@@ -3583,16 +3594,28 @@ struct SPIRVEmitContext
             opCode = SpvOpLogicalNot;
             break;
         case kIROp_BitAnd:
-            opCode = SpvOpBitwiseAnd;
+            if (isBool)
+                opCode = SpvOpLogicalAnd;
+            else
+                opCode = SpvOpBitwiseAnd;
             break;
         case kIROp_BitOr:
-            opCode = SpvOpBitwiseOr;
+            if (isBool)
+                opCode = SpvOpLogicalOr;
+            else
+                opCode = SpvOpBitwiseOr;
             break;
         case kIROp_BitXor:
-            opCode = SpvOpBitwiseXor;
+            if (isBool)
+                opCode = SpvOpLogicalNotEqual;
+            else
+                opCode = SpvOpBitwiseXor;
             break;
         case kIROp_BitNot:
-            opCode = SpvOpBitReverse;
+            if (isBool)
+                opCode = SpvOpLogicalNot;
+            else
+                opCode = SpvOpBitReverse;
             break;
         case kIROp_Rsh:
             opCode = isSigned ? SpvOpShiftRightArithmetic : SpvOpShiftRightLogical;

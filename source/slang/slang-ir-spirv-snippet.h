@@ -64,6 +64,8 @@ struct SpvSnippet : public RefObject
         None,
         Int,
         UInt,
+        UInt16,
+        Half,
         Float,
         Double,
         FloatOrDouble, // Float or double type, depending on the result type of the intrinsic.
@@ -83,6 +85,7 @@ struct SpvSnippet : public RefObject
             {
                 switch (type)
                 {
+                case ASMType::Half:
                 case ASMType::Float:
                 case ASMType::Double:
                 case ASMType::Float2:
@@ -102,6 +105,7 @@ struct SpvSnippet : public RefObject
                 return false;
             switch (type)
             {
+            case ASMType::Half:
             case ASMType::Float:
             case ASMType::Double:
             case ASMType::FloatOrDouble:
@@ -112,6 +116,7 @@ struct SpvSnippet : public RefObject
             case ASMType::Int:
                 return intValues[0] == other.intValues[0];
             case ASMType::UInt:
+            case ASMType::UInt16:
                 return intValues[0] == other.intValues[0];
             case ASMType::UInt2:
                 return intValues[0] == other.intValues[0] && intValues[1] == other.intValues[1];

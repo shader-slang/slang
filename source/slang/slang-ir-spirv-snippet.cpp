@@ -28,6 +28,8 @@ SpvSnippet::ASMType parseASMType(Slang::Misc::TokenReader& tokenReader)
         return SpvSnippet::ASMType::Double;
     else if (word == "uint2")
         return SpvSnippet::ASMType::UInt2;
+    else if (word == "uint16_t")
+        return SpvSnippet::ASMType::UInt16;
     else if (word == "float2")
         return SpvSnippet::ASMType::Float2;
     else if (word == "int")
@@ -36,6 +38,8 @@ SpvSnippet::ASMType parseASMType(Slang::Misc::TokenReader& tokenReader)
         return SpvSnippet::ASMType::UInt;
     else if (word == "_p")
         return SpvSnippet::ASMType::FloatOrDouble;
+    else if (word == "half")
+        return SpvSnippet::ASMType::Half;
     return SpvSnippet::ASMType::None;
 }
 
