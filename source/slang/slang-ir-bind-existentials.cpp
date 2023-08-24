@@ -351,8 +351,7 @@ struct BindExistentialSlots
                 inst,
                 slotOperandCount,
                 slotOperands.getBuffer());
-
-            use->set(newVal);
+            builder.replaceOperand(use, newVal);
         }
     }
 };

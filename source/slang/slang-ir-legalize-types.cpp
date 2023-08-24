@@ -1954,13 +1954,6 @@ static LegalVal legalizeInst(
     }
 }
 
-IRVarLayout* findVarLayout(IRInst* value)
-{
-    if (auto layoutDecoration = value->findDecoration<IRLayoutDecoration>())
-        return as<IRVarLayout>(layoutDecoration->getLayout());
-    return nullptr;
-}
-
 static UnownedStringSlice findNameHint(IRInst* inst)
 {
     if( auto nameHintDecoration = inst->findDecoration<IRNameHintDecoration>() )

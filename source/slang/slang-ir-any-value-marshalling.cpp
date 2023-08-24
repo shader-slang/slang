@@ -241,7 +241,6 @@ namespace Slang
                 {
                 case kIROp_IntType:
                 case kIROp_FloatType:
-                case kIROp_BoolType:
 #if SLANG_PTR_IS_32
                 case kIROp_IntPtrType:
 #endif
@@ -251,6 +250,23 @@ namespace Slang
                     {
                         auto srcVal = builder->emitLoad(concreteVar);
                         auto dstVal = builder->emitBitCast(builder->getUIntType(), srcVal);
+                        auto dstAddr = builder->emitFieldAddress(
+                            uintPtrType,
+                            anyValueVar,
+                            anyValInfo->fieldKeys[fieldOffset]);
+                        builder->emitStore(dstAddr, dstVal);
+                    }
+                    advanceOffset(4);
+                    break;
+                }
+                case kIROp_BoolType:
+                {
+                    ensureOffsetAt4ByteBoundary();
+                    if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
+                    {
+                        auto srcVal = builder->emitLoad(concreteVar);
+                        IRInst* args[] = {srcVal, builder->getIntValue(builder->getUIntType(), 1), builder->getIntValue(builder->getUIntType(), 0) };
+                        auto dstVal = builder->emitIntrinsicInst(builder->getUIntType(), kIROp_Select, 3, args);
                         auto dstAddr = builder->emitFieldAddress(
                             uintPtrType,
                             anyValueVar,
@@ -416,7 +432,6 @@ namespace Slang
                 {
                 case kIROp_IntType:
                 case kIROp_FloatType:
-                case kIROp_BoolType:
                 {
                     ensureOffsetAt4ByteBoundary();
                     if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
@@ -427,6 +442,22 @@ namespace Slang
                             anyValInfo->fieldKeys[fieldOffset]);
                         auto srcVal = builder->emitLoad(srcAddr);
                         srcVal = builder->emitBitCast(dataType, srcVal);
+                        builder->emitStore(concreteVar, srcVal);
+                    }
+                    advanceOffset(4);
+                    break;
+                }
+                case kIROp_BoolType:
+                {
+                    ensureOffsetAt4ByteBoundary();
+                    if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
+                    {
+                        auto srcAddr = builder->emitFieldAddress(
+                            uintPtrType,
+                            anyValueVar,
+                            anyValInfo->fieldKeys[fieldOffset]);
+                        auto srcVal = builder->emitLoad(srcAddr);
+                        srcVal = builder->emitNeq(srcVal, builder->getIntValue(builder->getUIntType(), 0));
                         builder->emitStore(concreteVar, srcVal);
                     }
                     advanceOffset(4);

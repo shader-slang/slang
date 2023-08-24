@@ -1118,6 +1118,13 @@ List<IRBlock*> collectBlocksInRegion(IRGlobalValueWithCode* func, IRLoop* loopIn
     auto dom = computeDominatorTree(func);
     bool hasMultiLevelBreaks = false;
     return collectBlocksInRegion(dom, loopInst, &hasMultiLevelBreaks);
+
+IRVarLayout* findVarLayout(IRInst* value)
+{
+    if (auto layoutDecoration = value->findDecoration<IRLayoutDecoration>())
+        return as<IRVarLayout>(layoutDecoration->getLayout());
+    return nullptr;
+
 }
 
 UnownedStringSlice getBasicTypeNameHint(IRType* basicType)

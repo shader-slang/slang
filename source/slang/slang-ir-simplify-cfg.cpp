@@ -522,17 +522,74 @@ static bool trySimplifyIfElse(IRBuilder& builder, IRIfElse* ifElseInst)
 
 static bool trySimplifySwitch(IRBuilder& builder, IRSwitch* switchInst)
 {
+    // First, we fuse switch case blocks that is a trivial branch.
+    // If we see:
+    // ```
+    //     someBlock:
+    //         switch(..., case_block_A, ...)
+    //     case_block_A:
+    //         branch blockB;
+    // ```
+    // Then we fold blockB into the switch case operand:
+    // ```
+    //     someBlock:
+    //         switch(..., blockB, ...)
+    // ```
+    // We can do this if `blockB` is not a merge block.
+    //
+    bool changed = false;
+    auto fuseSwitchCaseBlock = [&](IRUse* targetUse)
+    {
+        for (;;)
+        {
+            auto block = as<IRBlock>(targetUse->get());
+            if (block->getFirstInst()->getOp() != kIROp_unconditionalBranch)
+                return;
+            auto branch = as<IRUnconditionalBranch>(block->getFirstInst());
+            // We can't fuse the block if there are phi arguments.
+            if (branch->getArgCount() != 0)
+                return;
+            auto target = branch->getTargetBlock();
+            if (target == switchInst->getBreakLabel())
+                return;
+            // target must not be used as a merge block of other control flow constructs.
+            for (auto use = target->firstUse; use; use = use->nextUse)
+            {
+                if (use->getUser() == switchInst || use->getUser() == branch)
+                    continue;
+                switch (use->getUser()->getOp())
+                {
+                case kIROp_loop:
+                case kIROp_ifElse:
+                case kIROp_Switch:
+                    // If the target block is used by a special control flow inst,
+                    // it is likely a merge block and we can't fuse it.
+                    return;
+                default:
+                    break;
+                }
+            }
+            targetUse->set(target);
+            changed = true;
+        }
+    };
+
+    fuseSwitchCaseBlock(&switchInst->defaultLabel);
+    for (UInt i = 0; i < switchInst->getCaseCount(); i++)
+        fuseSwitchCaseBlock(switchInst->getCaseLabelUse(i));
+
+    // Next, we check if all switch cases are jumping to the same target.
     if (!isTrivialSwitch(switchInst))
-        return false;
+        return changed;
     if (switchInst->getCaseCount() == 0)
-        return false;
+        return changed;
 
     auto termInst = as<IRUnconditionalBranch>(switchInst->getCaseLabel(0)->getTerminator());
     if (!termInst)
-        return false;
+        return changed;
 
     if (!arePhiArgsEquivalentInBranches(switchInst))
-        return false;
+        return changed;
 
     List<IRInst*> args;
     for (UInt i = 0; i < termInst->getArgCount(); i++)
@@ -712,7 +769,7 @@ static bool removeTrivialPhiParams(IRBlock* block)
         }
         if (targetVal)
         {
-            params[i]->replaceUsesWith(args[i].knownValue);
+            params[i]->replaceUsesWith(targetVal);
             params[i]->removeAndDeallocate();
             for (auto termInst : termInsts)
                 termInst->removeArgument((UInt)i);
@@ -758,6 +815,7 @@ static bool processFunc(IRGlobalValueWithCode* func)
                     {
                         loop->continueBlock.set(loop->getTargetBlock());
                         continueBlock->removeAndDeallocate();
+                        changed = true;
                     }
 
                     // If there isn't any actual back jumps into loop target and there is a trivial

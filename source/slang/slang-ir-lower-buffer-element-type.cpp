@@ -224,10 +224,18 @@ namespace Slang
 
             if (auto matrixType = as<IRMatrixType>(type))
             {
-                if (getIntVal(matrixType->getLayout()) == defaultMatrixLayout)
+                // For spirv, we always want to lower all matrix types, because matrix types
+                // are considered abstract types.
+                if (!target->shouldEmitSPIRVDirectly())
                 {
-                    info.loweredType = type;
-                    return info;
+                    // For other targets, we only lower the matrix types if they differ from the default
+                    // matrix layout.
+                    if (getIntVal(matrixType->getLayout()) == defaultMatrixLayout &&
+                        rules->ruleName == IRTypeLayoutRuleName::Natural)
+                    {
+                        info.loweredType = type;
+                        return info;
+                    }
                 }
 
                 auto loweredType = builder.createStructType();
@@ -264,7 +272,7 @@ namespace Slang
             else if (auto arrayType = as<IRArrayType>(type))
             {
                 auto loweredInnerTypeInfo = getLoweredTypeInfo(arrayType->getElementType(), rules);
-                if (!loweredInnerTypeInfo.convertLoweredToOriginal && rules->ruleName == IRTypeLayoutRuleName::Natural)
+                if (!loweredInnerTypeInfo.convertLoweredToOriginal)
                 {
                     info.loweredType = type;
                     return info;
@@ -376,6 +384,45 @@ namespace Slang
                 }
 
                 return info;
+            }
+
+            switch (target->getTarget())
+            {
+            case CodeGenTarget::SPIRV:
+            case CodeGenTarget::SPIRVAssembly:
+                if (as<IRBoolType>(type))
+                {
+                    // Bool is an abstract type in SPIRV, so we need to lower them into an int.
+                    info.loweredType = builder.getIntType();
+                    // Create unpack func.
+                    {
+                        builder.setInsertAfter(type);
+                        info.convertLoweredToOriginal = builder.createFunc();
+                        builder.setInsertInto(info.convertLoweredToOriginal);
+                        builder.addNameHintDecoration(info.convertLoweredToOriginal, UnownedStringSlice("unpackStorage"));
+                        info.convertLoweredToOriginal->setFullType(builder.getFuncType(1, (IRType**)&info.loweredType, type));
+                        builder.emitBlock();
+                        auto loweredParam = builder.emitParam(info.loweredType);
+                        auto result = builder.emitCast(type, loweredParam);
+                        builder.emitReturn(result);
+                    }
+
+                    // Create pack func.
+                    {
+                        builder.setInsertAfter(info.convertLoweredToOriginal);
+                        info.convertOriginalToLowered = builder.createFunc();
+                        builder.setInsertInto(info.convertOriginalToLowered);
+                        builder.addNameHintDecoration(info.convertOriginalToLowered, UnownedStringSlice("packStorage"));
+                        info.convertOriginalToLowered->setFullType(builder.getFuncType(1, (IRType**)&type, info.loweredType));
+                        builder.emitBlock();
+                        auto param = builder.emitParam(type);
+                        auto result = builder.emitCast(info.loweredType, param);
+                        builder.emitReturn(result);
+                    }
+                }
+                break;
+            default:
+                break;
             }
 
             info.loweredType = type;
@@ -506,7 +553,7 @@ namespace Slang
                                     builder.setInsertBefore(user);
                                     auto newLoad = cloneInst(&cloneEnv, &builder, user);
                                     newLoad->setFullType(loweredElementTypeInfo.loweredType);
-                                    auto unpackedVal = builder.emitCallInst(elementType, loweredElementTypeInfo.convertLoweredToOriginal, 1, &newLoad);
+                                    auto unpackedVal = builder.emitCallInst((IRType*)originalElementType, loweredElementTypeInfo.convertLoweredToOriginal, 1, &newLoad);
                                     user->replaceUsesWith(unpackedVal);
                                     user->removeAndDeallocate();
                                     break;

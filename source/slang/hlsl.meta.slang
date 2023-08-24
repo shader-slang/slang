@@ -1048,6 +1048,9 @@ __generic<T : __BuiltinType>
 __target_intrinsic(cpp, "bool($0)")
 __target_intrinsic(cuda, "bool($0)")
 __target_intrinsic(glsl, "bool($0)")
+__target_intrinsic(spirv, boolean(T), "OpCopyObject resultType resultId _0")
+__target_intrinsic(spirv, integral(T), "OpINotEqual resultType resultId _0 const(,0)")
+__target_intrinsic(spirv, floating(T), "OpFUnordNotEqual resultType resultId _0 const(,0)")
 [__readNone]
 bool any(T x);
 
@@ -1375,6 +1378,7 @@ matrix<uint,N,M> asuint(matrix<uint,N,M> x)
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "uint16_t(packHalf2x16(vec2($0, 0.0)))")
 __target_intrinsic(cuda, "__half_as_ushort")
+__target_intrinsic(spirv, "OpBitcast resultType resultId _0")
 [__readNone]
 uint16_t asuint16(float16_t value);
 
@@ -1391,6 +1395,7 @@ matrix<uint16_t,R,C> asuint16<let R : int, let C : int>(matrix<float16_t,R,C> va
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "float16_t(unpackHalf2x16($0).x)")
 __target_intrinsic(cuda, "__ushort_as_half")
+__target_intrinsic(spirv, "OpBitcast resultType resultId _0")
 [__readNone]
 float16_t asfloat16(uint16_t value);
 
@@ -1406,12 +1411,14 @@ matrix<float16_t,R,C> asfloat16<let R : int, let C : int>(matrix<uint16_t,R,C> v
 
 __target_intrinsic(hlsl)
 __target_intrinsic(cuda, "__half_as_short")
+__target_intrinsic(spirv, "OpBitcast resultType resultId _0")
 [__unsafeForceInlineEarly][__readNone] int16_t asint16(float16_t value) { return asuint16(value); }
 __target_intrinsic(hlsl) [__unsafeForceInlineEarly][__readNone] vector<int16_t,N> asint16<let N : int>(vector<float16_t,N> value) { return asuint16(value); }
 __target_intrinsic(hlsl) [__unsafeForceInlineEarly][__readNone] matrix<int16_t,R,C> asint16<let R : int, let C : int>(matrix<float16_t,R,C> value) { return asuint16(value); }
 
 __target_intrinsic(hlsl)
 __target_intrinsic(cuda, "__short_as_half")
+__target_intrinsic(spirv, "OpBitcast resultType resultId _0")
 [__readNone]
 [__unsafeForceInlineEarly] float16_t asfloat16(int16_t value) { return asfloat16(asuint16(value)); }
 
@@ -2086,6 +2093,10 @@ __glsl_version(420)
 __target_intrinsic(hlsl)
 __cuda_sm_version(6.0)
 __target_intrinsic(cuda, "__half2float(__ushort_as_half($0))")
+__target_intrinsic(spirv, R"(
+                    %lowBits = OpUConvert _type(uint16_t) resultId _0;
+                    %half = OpBitcast _type(half) resultId %lowBits;
+                    OpFConvert resultType resultId %half)")
 [__readNone]
 float f16tof32(uint value);
 
@@ -2105,6 +2116,10 @@ __glsl_version(420)
 __target_intrinsic(hlsl)
 __cuda_sm_version(6.0)
 __target_intrinsic(cuda, "__half_as_ushort(__float2half($0))")
+__target_intrinsic(spirv, R"(
+                    %half = OpFConvert _type(half) resultId _0;
+                    %lowBits = OpBitcast _type(uint16_t) resultId %half;
+                    OpUConvert resultType resultId %lowBits)")
 [__readNone]
 uint f32tof16(float value);
 
@@ -2123,6 +2138,7 @@ vector<uint, N> f32tof16(vector<float, N> value)
 
 __target_intrinsic(glsl, "unpackHalf2x16($0).x")
 __target_intrinsic(cuda, "__half2float")
+__target_intrinsic(spirv, "OpFConvert resultType resultId _0")
 __glsl_version(420)
 [__readNone]
 float f16tof32(float16_t value);
@@ -2130,6 +2146,7 @@ float f16tof32(float16_t value);
 __generic<let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(cuda, "__half2float")
+__target_intrinsic(spirv, "OpFConvert resultType resultId _0")
 [__readNone]
 vector<float, N> f16tof32(vector<float16_t, N> value)
 {
@@ -2140,11 +2157,13 @@ vector<float, N> f16tof32(vector<float16_t, N> value)
 __target_intrinsic(glsl, "packHalf2x16(vec2($0,0.0))")
 __glsl_version(420)
 __target_intrinsic(cuda, "__float2half")
+__target_intrinsic(spirv, "OpFConvert resultType resultId _0")
 [__readNone]
 float16_t f32tof16_(float value);
 
 __generic<let N : int>
 __target_intrinsic(cuda, "__float2half")
+__target_intrinsic(spirv, "OpFConvert resultType resultId _0")
 [__readNone]
 vector<float16_t, N> f32tof16_(vector<float, N> value)
 {

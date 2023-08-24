@@ -1,4 +1,5 @@
 #include "slang-emit-base.h"
+#include "slang-ir-util.h"
 
 namespace Slang
 {
@@ -45,11 +46,7 @@ void SourceEmitterBase::handleRequiredCapabilities(IRInst* inst)
 
 IRVarLayout* SourceEmitterBase::getVarLayout(IRInst* var)
 {
-    auto decoration = var->findDecoration<IRLayoutDecoration>();
-    if (!decoration)
-        return nullptr;
-
-    return as<IRVarLayout>(decoration->getLayout());
+    return findVarLayout(var);
 }
 
 BaseType SourceEmitterBase::extractBaseType(IRType* inType)
