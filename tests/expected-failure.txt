@@ -1,5 +1,4 @@
 tests/autodiff/global-param-hoisting.slang.1 (vk)
-tests/autodiff/matrix-arithmetic-fwd.slang.1 (vk)
 tests/bugs/atomic-coerce.slang.1 (vk)
 tests/bugs/bool-op.slang.1 (vk)
 tests/bugs/buffer-swizzle-store.slang.1 (vk)

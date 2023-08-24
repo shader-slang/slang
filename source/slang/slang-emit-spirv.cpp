@@ -3597,14 +3597,9 @@ struct SPIRVEmitContext
         }
     }
 
-    SpvInst* emitArithmetic(SpvInstParent* parent, IRInst* inst)
+    SpvInst* emitVectorOrScalarArithmetic(SpvInstParent* parent, IRInst* instToRegister, IRInst* type, IROp op, UInt operandCount, ArrayView<IRInst*> operands)
     {
-        IRType* elementType = dropVector(inst->getOperand(0)->getDataType());
-        if (const auto matrixType = as<IRMatrixType>(inst->getDataType()))
-        {
-            //TODO: implement.
-            SLANG_ASSERT(!"unimplemented: matrix arithemetic");
-        }
+        IRType* elementType = dropVector(operands[0]->getDataType());
         IRBasicType* basicType = as<IRBasicType>(elementType);
         bool isFloatingPoint = false;
         bool isBool = false;
@@ -3623,7 +3618,7 @@ struct SPIRVEmitContext
         }
         SpvOp opCode = SpvOpUndef;
         bool isSigned = isSignedType(basicType);
-        switch (inst->getOp())
+        switch (op)
         {
         case kIROp_Add:
             opCode = isFloatingPoint ? SpvOpFAdd : SpvOpIAdd;
@@ -3645,26 +3640,26 @@ struct SPIRVEmitContext
             break;
         case kIROp_Less:
             opCode = isFloatingPoint ? SpvOpFOrdLessThan
-                                     : isSigned ? SpvOpSLessThan : SpvOpULessThan;
+                : isSigned ? SpvOpSLessThan : SpvOpULessThan;
             break;
         case kIROp_Leq:
             opCode = isFloatingPoint ? SpvOpFOrdLessThanEqual
-                                     : isSigned ? SpvOpSLessThanEqual : SpvOpULessThanEqual;
+                : isSigned ? SpvOpSLessThanEqual : SpvOpULessThanEqual;
             break;
         case kIROp_Eql:
             opCode = isFloatingPoint ? SpvOpFOrdEqual : isBool ? SpvOpLogicalEqual : SpvOpIEqual;
             break;
         case kIROp_Neq:
             opCode = isFloatingPoint ? SpvOpFOrdNotEqual
-                                     : isBool ? SpvOpLogicalNotEqual : SpvOpINotEqual;
+                : isBool ? SpvOpLogicalNotEqual : SpvOpINotEqual;
             break;
         case kIROp_Geq:
             opCode = isFloatingPoint ? SpvOpFOrdGreaterThanEqual
-                                     : isSigned ? SpvOpSGreaterThanEqual : SpvOpUGreaterThanEqual;
+                : isSigned ? SpvOpSGreaterThanEqual : SpvOpUGreaterThanEqual;
             break;
         case kIROp_Greater:
             opCode = isFloatingPoint ? SpvOpFOrdGreaterThan
-                                     : isSigned ? SpvOpSGreaterThan : SpvOpUGreaterThan;
+                : isSigned ? SpvOpSGreaterThan : SpvOpUGreaterThan;
             break;
         case kIROp_Neg:
             opCode = isFloatingPoint ? SpvOpFNegate : SpvOpSNegate;
@@ -3712,20 +3707,20 @@ struct SPIRVEmitContext
             SLANG_ASSERT(!"unknown arithmetic opcode");
             break;
         }
-        if(inst->getOperandCount() == 1)
+        if (operandCount == 1)
         {
-            return emitInst(parent, inst, opCode, inst->getDataType(), kResultID, OperandsOf(inst));
+            return emitInst(parent, instToRegister, opCode, type, kResultID, operands);
         }
-        else if(inst->getOperandCount() == 2)
+        else if (operandCount == 2)
         {
-            auto l = inst->getOperand(0);
+            auto l = operands[0];
             const auto lVec = as<IRVectorType>(l->getDataType());
-            auto r = inst->getOperand(1);
+            auto r = operands[1];
             const auto rVec = as<IRVectorType>(r->getDataType());
-            const auto go = [&](const auto l, const auto r){
-                return emitInst(parent, inst, opCode, inst->getDataType(), kResultID, l, r);
+            const auto go = [&](const auto l, const auto r) {
+                return emitInst(parent, instToRegister, opCode, type, kResultID, l, r);
             };
-            if(lVec && !rVec)
+            if (lVec && !rVec)
             {
                 const auto len = as<IRIntLit>(lVec->getElementCount());
                 SLANG_ASSERT(len);
@@ -3740,6 +3735,45 @@ struct SPIRVEmitContext
             return go(l, r);
         }
         SLANG_UNREACHABLE("Arithmetic op with 0 or more than 2 operands");
+    }
+
+
+    SpvInst* emitArithmetic(SpvInstParent* parent, IRInst* inst)
+    {
+        if (const auto matrixType = as<IRMatrixType>(inst->getDataType()))
+        {
+            auto rowCount = getIntVal(matrixType->getRowCount());
+            auto colCount = getIntVal(matrixType->getColumnCount());
+            IRBuilder builder(inst);
+            builder.setInsertBefore(inst);
+            auto rowVectorType = builder.getVectorType(matrixType->getElementType(), colCount);
+            List<SpvInst*> rows;
+            for (IRIntegerValue i = 0; i < rowCount; i++)
+            {
+                List<IRInst*> operands;
+                for (UInt j = 0; j < inst->getOperandCount(); j++)
+                {
+                    auto originalOperand = inst->getOperand(j);
+                    if (as<IRMatrixType>(originalOperand->getDataType()))
+                    {
+                        auto operand = builder.emitElementExtract(originalOperand, i);
+                        emitLocalInst(parent, operand);
+                        operands.add(operand);
+                    }
+                    else
+                    {
+                        operands.add(originalOperand);
+                    }
+                }
+                rows.add(emitVectorOrScalarArithmetic(parent, nullptr, rowVectorType, inst->getOp(), inst->getOperandCount(), operands.getArrayView()));
+            }
+            return emitCompositeConstruct(parent, inst, inst->getDataType(), rows);
+        }
+
+        Array<IRInst*, 4> operands;
+        for (UInt i = 0; i < inst->getOperandCount(); i++)
+            operands.add(inst->getOperand(i));
+        return emitVectorOrScalarArithmetic(parent, inst, inst->getDataType(), inst->getOp(), inst->getOperandCount(), operands.getView());
     }
 
     SpvInst* emitDebugLine(SpvInstParent* parent, IRDebugLine* debugLine)
