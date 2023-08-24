@@ -3223,7 +3223,7 @@ struct SPIRVEmitContext
     {
         auto resultVectorType = as<IRVectorType>(inst->getDataType());
         List<SpvLiteralInteger> shuffleIndices;
-        shuffleIndices.setCount(getIntVal(resultVectorType->getElementCount()));
+        shuffleIndices.setCount((Index)getIntVal(resultVectorType->getElementCount()));
         for (Index i = 0; i < shuffleIndices.getCount(); i++)
             shuffleIndices[i] = SpvLiteralInteger::from32((int32_t)i);
         for (UInt i = 0; i < inst->getElementCount(); i++)
