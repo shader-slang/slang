@@ -60,6 +60,7 @@ static const char* hlslSemanticNames[] = {
     "SV_IsFrontFace",
     "SV_OutputControlPointID",
     "SV_Position",
+    "SV_PointSize",
     "SV_PrimitiveID",
     "SV_RenderTargetArrayIndex",
     "SV_SampleIndex",

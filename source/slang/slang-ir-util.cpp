@@ -998,6 +998,13 @@ void resetScratchDataBit(IRInst* inst, int bitIndex)
     }
 }
 
+IRVarLayout* findVarLayout(IRInst* value)
+{
+    if (auto layoutDecoration = value->findDecoration<IRLayoutDecoration>())
+        return as<IRVarLayout>(layoutDecoration->getLayout());
+    return nullptr;
+}
+
 UnownedStringSlice getBasicTypeNameHint(IRType* basicType)
 {
     switch (basicType->getOp())

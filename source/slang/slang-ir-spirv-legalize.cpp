@@ -99,15 +99,16 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             {
                 if (auto systemValueAttr = layout->findAttr<IRSystemValueSemanticAttr>())
                 {
-                    String semanticName = systemValueAttr->getName();
-                    semanticName = semanticName.toLower();
-                    if (semanticName == "sv_dispatchthreadid")
-                    {
+                    if (layout->findOffsetAttr(LayoutResourceKind::VaryingInput))
                         storageClass = SpvStorageClassInput;
-                    }
-                    else if (semanticName == "sv_groupindex")
+                    else if (layout->findOffsetAttr(LayoutResourceKind::VaryingOutput))
+                        storageClass = SpvStorageClassOutput;
+                    else
                     {
-                        storageClass = SpvStorageClassInput;
+                        String semanticName = systemValueAttr->getName();
+                        semanticName = semanticName.toLower();
+                        if (semanticName == "sv_pointsize")
+                            storageClass = SpvStorageClassInput;
                     }
                 }
                 else if(const auto parameterGroupTypeLayout =
@@ -121,7 +122,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             IRBuilder builder(m_sharedContext->m_irModule);
             bool needLoad = true;
             auto innerType = inst->getFullType();
-            if (as<IRConstantBufferType>(innerType) || as<IRParameterBlockType>(innerType))
+            auto cbufferType = as<IRConstantBufferType>(innerType);
+            auto paramBlockType = as<IRParameterBlockType>(innerType);
+            if (cbufferType || paramBlockType)
             {
                 innerType = as<IRUniformParameterGroupType>(innerType)->getElementType();
                 storageClass = SpvStorageClassUniform;
@@ -137,6 +140,33 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     innerType = wrapConstantBufferElement(inst);
                 }
                 builder.addDecoration(innerType, kIROp_SPIRVBlockDecoration);
+                
+                if (paramBlockType)
+                {
+                    // A parameter block typed global parameter will have a VarLayout
+                    // that contains an OffsetAttr(RegisterSpace, spaceId).
+                    // We need to turn this VarLayout into a standard cbuffer VarLayout
+                    // in the form of OffsetAttr(ConstantBuffer, 0, spaceId).
+                    builder.setInsertBefore(inst);
+                    auto varLayoutInst = inst->findDecoration<IRLayoutDecoration>();
+                    IRVarLayout* varLayout = nullptr;
+                    if (varLayoutInst)
+                        varLayout = as<IRVarLayout>(varLayoutInst->getLayout());
+                    if (varLayout)
+                    {
+                        auto registerSpaceOffsetAttr = varLayout->findOffsetAttr(LayoutResourceKind::RegisterSpace);
+                        if (registerSpaceOffsetAttr)
+                        {
+                            List<IRInst*> operands;
+                            for (UInt i = 0; i < varLayout->getOperandCount(); i++)
+                                operands.add(varLayout->getOperand(i));
+                            operands.add(builder.getVarOffsetAttr(LayoutResourceKind::ConstantBuffer, 0, registerSpaceOffsetAttr->getOffset()));
+                            auto newLayout = builder.getVarLayout(operands);
+                            varLayoutInst->setOperand(0, newLayout);
+                            varLayout->removeAndDeallocate();
+                        }
+                    }
+                }
             }
 
             // Make a pointer type of storageClass.

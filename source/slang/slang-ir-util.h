@@ -224,6 +224,8 @@ bool isOne(IRInst* inst);
 void initializeScratchData(IRInst* inst);
 void resetScratchDataBit(IRInst* inst, int bitIndex);
 
+IRVarLayout* findVarLayout(IRInst* value);
+
 // Run an operation over every block in a module
 template<typename F>
 static void overAllBlocks(IRModule* module, F f)

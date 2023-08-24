@@ -1470,6 +1470,8 @@ struct SPIRVEmitContext
 
     void emitVarLayout(SpvInst* varInst, IRVarLayout* layout)
     {
+        bool needDefaultSetBindingDecoration = false;
+        bool hasExplicitSetBinding = false;
         for (auto rr : layout->getOffsetAttrs())
         {
             UInt index = rr->getOffset();
@@ -1500,15 +1502,6 @@ struct SPIRVEmitContext
                     varInst,
                     SpvLiteralInteger::from32(int32_t(index))
                 );
-                if (space)
-                {
-                    emitOpDecorateIndex(
-                        getSection(SpvLogicalSectionID::Annotations),
-                        nullptr,
-                        varInst,
-                        SpvLiteralInteger::from32(int32_t(space))
-                    );
-                }
                 break;
 
             case LayoutResourceKind::SpecializationConstant:
@@ -1529,18 +1522,39 @@ struct SPIRVEmitContext
                     getSection(SpvLogicalSectionID::Annotations),
                     nullptr,
                     varInst,
-                    SpvLiteralInteger::from32(int32_t(index))
-                );
+                    SpvLiteralInteger::from32(int32_t(index)));
+                if (space)
+                {
+                    emitOpDecorateDescriptorSet(
+                        getSection(SpvLogicalSectionID::Annotations),
+                        nullptr,
+                        varInst,
+                        SpvLiteralInteger::from32(int32_t(space)));
+                }
+                else
+                {
+                    needDefaultSetBindingDecoration = true;
+                }
+                break;
+            case LayoutResourceKind::RegisterSpace:
                 emitOpDecorateDescriptorSet(
                     getSection(SpvLogicalSectionID::Annotations),
                     nullptr,
                     varInst,
-                    SpvLiteralInteger::from32(int32_t(space))
-                );
+                    SpvLiteralInteger::from32(int32_t(index)));
+                hasExplicitSetBinding = true;
                 break;
             default:
                 break;
             }
+        }
+        if (needDefaultSetBindingDecoration && !hasExplicitSetBinding)
+        {
+            emitOpDecorateDescriptorSet(
+                getSection(SpvLogicalSectionID::Annotations),
+                nullptr,
+                varInst,
+                SpvLiteralInteger::from32(int32_t(0)));
         }
     }
         /// Emit a global parameter definition.
@@ -2370,14 +2384,168 @@ struct SPIRVEmitContext
             {
                 String semanticName = systemValueAttr->getName();
                 semanticName = semanticName.toLower();
-                if (semanticName == "sv_dispatchthreadid")
+                if (semanticName == "sv_position")
+                {
+                    auto importDecor = inst->findDecoration<IRImportDecoration>();
+                    if (importDecor->getMangledName() == "gl_FragCoord")
+                        return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInFragCoord);
+                    else
+                        return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPosition);
+                }
+                else if (semanticName == "sv_target")
+                {
+                    // Note: we do *not* need to generate some kind of `gl_`
+                    // builtin for fragment-shader outputs: they are just
+                    // ordinary `out` variables, with ordinary `location`s,
+                    // as far as GLSL is concerned.
+                    return nullptr;
+                }
+                else if (semanticName == "sv_clipdistance")
+                {
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInClipDistance);
+                }
+                else if (semanticName == "sv_culldistance")
+                {
+                    requireSPIRVCapability(SpvCapabilityCullDistance);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInCullDistance);
+                }
+                else if (semanticName == "sv_coverage")
+                {
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInSampleMask);
+                }
+                else if (semanticName == "sv_innercoverage")
+                {
+                    requireSPIRVCapability(SpvCapabilityFragmentFullyCoveredEXT);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInFullyCoveredEXT);
+                }
+                else if (semanticName == "sv_depth")
+                {
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInFragDepth);
+                }
+                else if (semanticName == "sv_depthgreaterequal")
+                {
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInFragDepth);
+                }
+                else if (semanticName == "sv_depthlessequal")
+                {
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInFragDepth);
+                }
+                else if (semanticName == "sv_dispatchthreadid")
                 {
                     return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInGlobalInvocationId);
+                }
+                else if (semanticName == "sv_domainlocation")
+                {
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInTessCoord);
+                }
+                else if (semanticName == "sv_groupid")
+                {
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInWorkgroupId);
                 }
                 else if (semanticName == "sv_groupindex")
                 {
                     return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInLocalInvocationIndex);
                 }
+                else if (semanticName == "sv_groupthreadid")
+                {
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInLocalInvocationId);
+                }
+                else if (semanticName == "sv_gsinstanceid")
+                {
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInInvocationId);
+                }
+                else if (semanticName == "sv_instanceid")
+                {
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInInstanceIndex);
+                }
+                else if (semanticName == "sv_isfrontface")
+                {
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInFrontFacing);
+                }
+                else if (semanticName == "sv_outputcontrolpointid")
+                {
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInInvocationId);
+                }
+                else if (semanticName == "sv_pointsize")
+                {
+                    // float in hlsl & glsl
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPointSize);
+                }
+                else if (semanticName == "sv_primitiveid")
+                {
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPrimitiveId);
+                }
+                else if (semanticName == "sv_rendertargetarrayindex")
+                {
+                    requireSPIRVCapability(SpvCapabilityShaderLayer);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInLayer);
+                }
+                else if (semanticName == "sv_sampleindex")
+                {
+                    requireSPIRVCapability(SpvCapabilitySampleRateShading);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInSampleId);
+                }
+                else if (semanticName == "sv_stencilref")
+                {
+                    requireSPIRVCapability(SpvCapabilityStencilExportEXT);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInFragStencilRefEXT);
+                }
+                else if (semanticName == "sv_tessfactor")
+                {
+                    requireSPIRVCapability(SpvCapabilityTessellation);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInTessLevelOuter);
+                }
+                else if (semanticName == "sv_vertexid")
+                {
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInVertexId);
+                }
+                else if (semanticName == "sv_viewid")
+                {
+                    requireSPIRVCapability(SpvCapabilityMultiView);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInViewIndex);
+                }
+                else if (semanticName == "sv_viewportarrayindex")
+                {
+                    requireSPIRVCapability(SpvCapabilityShaderViewportIndex);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInViewportIndex);
+                }
+                else if (semanticName == "nv_x_right")
+                {
+                    SLANG_UNIMPLEMENTED_X("spirv emit for nv_x_right");
+                }
+                else if (semanticName == "nv_viewport_mask")
+                {
+                    requireSPIRVCapability(SpvCapabilityPerViewAttributesNV);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInViewportMaskPerViewNV);
+                }
+                else if (semanticName == "sv_barycentrics")
+                {
+                    if (m_targetRequest->getTargetCaps().implies(CapabilityAtom::GL_NV_fragment_shader_barycentric))
+                    {
+                        requireSPIRVCapability(SpvCapabilityFragmentBarycentricNV);
+                        return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInBaryCoordNV);
+                    }
+                    else
+                    {
+                        requireSPIRVCapability(SpvCapabilityFragmentBarycentricKHR);
+                        return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInBaryCoordKHR);
+                    }
+
+                    // TODO: There is also the `gl_BaryCoordNoPerspNV` builtin, which
+                    // we ought to use if the `noperspective` modifier has been
+                    // applied to this varying input.
+                }
+                else if (semanticName == "sv_cullprimitive")
+                {
+                    requireSPIRVCapability(SpvCapabilityMeshShadingEXT);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInCullPrimitiveEXT);
+                }
+                else if (semanticName == "sv_shadingrate")
+                {
+                    requireSPIRVCapability(SpvCapabilityFragmentShadingRateKHR);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPrimitiveShadingRateKHR);
+                }
+                SLANG_UNREACHABLE("Unimplemented system value in spirv emit.");
             }
         }
         return nullptr;
