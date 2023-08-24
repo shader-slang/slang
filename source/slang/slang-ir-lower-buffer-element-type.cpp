@@ -230,7 +230,8 @@ namespace Slang
                 {
                     // For other targets, we only lower the matrix types if they differ from the default
                     // matrix layout.
-                    if (getIntVal(matrixType->getLayout()) == defaultMatrixLayout)
+                    if (getIntVal(matrixType->getLayout()) == defaultMatrixLayout &&
+                        rules->ruleName == IRTypeLayoutRuleName::Natural)
                     {
                         info.loweredType = type;
                         return info;
@@ -271,7 +272,7 @@ namespace Slang
             else if (auto arrayType = as<IRArrayType>(type))
             {
                 auto loweredInnerTypeInfo = getLoweredTypeInfo(arrayType->getElementType(), rules);
-                if (!loweredInnerTypeInfo.convertLoweredToOriginal || rules->ruleName == IRTypeLayoutRuleName::Natural)
+                if (!loweredInnerTypeInfo.convertLoweredToOriginal)
                 {
                     info.loweredType = type;
                     return info;
