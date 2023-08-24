@@ -1876,6 +1876,10 @@ struct SPIRVEmitContext
             return emitLoad(parent, as<IRLoad>(inst));
         case kIROp_Store:
             return emitStore(parent, as<IRStore>(inst));
+        case kIROp_SwizzledStore:
+            return emitSwizzledStore(parent, as<IRSwizzledStore>(inst));
+        case kIROp_swizzleSet:
+            return emitSwizzleSet(parent, as<IRSwizzleSet>(inst));
         case kIROp_RWStructuredBufferGetElementPtr:
             return emitStructuredBufferGetElementPtr(parent, inst);
         case kIROp_StructuredBufferGetDimensions:
@@ -3158,6 +3162,46 @@ struct SPIRVEmitContext
     SpvInst* emitStore(SpvInstParent* parent, IRStore* inst)
     {
         return emitOpStore(parent, inst, inst->getPtr(), inst->getVal());
+    }
+
+    SpvInst* emitSwizzledStore(SpvInstParent* parent, IRSwizzledStore* inst)
+    {
+        auto sourceVectorType = as<IRVectorType>(inst->getSource()->getDataType());
+        SLANG_ASSERT(sourceVectorType);
+        auto sourceElementType = sourceVectorType->getElementType();
+        SLANG_ASSERT(getIntVal(sourceVectorType->getElementCount()) == (IRIntegerValue)inst->getElementCount());
+        SpvInst* result = nullptr;
+        IRBuilder builder(inst);
+        builder.setInsertBefore(inst);
+        auto destPtrType = as<IRPtrTypeBase>(inst->getDest()->getDataType());
+        SpvStorageClass addrSpace = SpvStorageClassFunction;
+        if (destPtrType->hasAddressSpace())
+            addrSpace = (SpvStorageClass)destPtrType->getAddressSpace();
+        auto ptrElementType = builder.getPtrType(kIROp_PtrType, sourceElementType, addrSpace);
+        for (UInt i = 0; i < inst->getElementCount(); i++)
+        {
+            auto index = inst->getElementIndex(i);
+            auto addr = emitOpAccessChain(parent, nullptr, ptrElementType, inst->getDest(), makeArray(index));
+            auto val = emitOpCompositeExtract(parent, nullptr, sourceElementType, inst->getSource(), makeArray(SpvLiteralInteger::from32((int32_t)i)));
+            result = emitOpStore(parent, (i == inst->getElementCount() - 1 ? inst : nullptr), addr, val);
+        }
+        return result;
+    }
+
+    SpvInst* emitSwizzleSet(SpvInstParent* parent, IRSwizzleSet* inst)
+    {
+        auto resultVectorType = as<IRVectorType>(inst->getDataType());
+        List<SpvLiteralInteger> shuffleIndices;
+        shuffleIndices.setCount(getIntVal(resultVectorType->getElementCount()));
+        for (Index i = 0; i < shuffleIndices.getCount(); i++)
+            shuffleIndices[i] = SpvLiteralInteger::from32((int32_t)i);
+        for (UInt i = 0; i < inst->getElementCount(); i++)
+        {
+            auto destIndex = (int32_t)getIntVal(inst->getElementIndex(i));
+            SLANG_ASSERT(destIndex < shuffleIndices.getCount());
+            shuffleIndices[destIndex] = SpvLiteralInteger::from32((int32_t)(i + shuffleIndices.getCount()));
+        }
+        return emitOpVectorShuffle(parent, inst, inst->getFullType(), inst->getBase(), inst->getSource(), shuffleIndices.getArrayView());
     }
 
     SpvInst* emitStructuredBufferGetElementPtr(SpvInstParent* parent, IRInst* inst)
