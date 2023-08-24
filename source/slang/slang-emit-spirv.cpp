@@ -2260,7 +2260,14 @@ struct SPIRVEmitContext
         for (auto field : structType->getFields())
         {
             IRIntegerValue offset = 0;
-            getOffset(IRTypeLayoutRules::get(layoutRuleName), field, &offset);
+            if (auto offsetDecor = field->getKey()->findDecoration<IRPackOffsetDecoration>())
+            {
+                offset = (getIntVal(offsetDecor->getRegisterOffset()) * 4 + getIntVal(offsetDecor->getComponentOffset())) * 4;
+            }
+            else
+            {
+                getOffset(IRTypeLayoutRules::get(layoutRuleName), field, &offset);
+            }
             emitOpMemberDecorateOffset(
                 getSection(SpvLogicalSectionID::Annotations),
                 nullptr,
