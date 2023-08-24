@@ -3194,10 +3194,6 @@ void CLikeSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
         emitEntryPointAttributes(func, entryPointDecor);
     }
 
-    // Deal with required features/capabilities of the function
-    //
-    handleRequiredCapabilitiesImpl(func);
-
     emitFunctionPreambleImpl(func);
 
     auto name = getName(func);
@@ -3855,6 +3851,10 @@ static bool _shouldSkipFuncEmit(IRInst* func)
 void CLikeSourceEmitter::emitGlobalInstImpl(IRInst* inst)
 {
     m_writer->advanceToSourceLocation(inst->sourceLoc);
+
+    // Deal with required features/capabilities of the global inst
+    //
+    handleRequiredCapabilitiesImpl(inst);
 
     switch(inst->getOp())
     {

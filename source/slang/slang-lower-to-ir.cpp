@@ -7753,6 +7753,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             if (as<NonCopyableTypeAttribute>(modifier))
                 subBuilder->addNonCopyableTypeDecoration(irAggType);
         }
+
+        addTargetRequirementDecorations(irAggType, decl);
      
         auto finalFinishedVal = finishOuterGenerics(subBuilder, irAggType, outerGeneric);
         // Confirm that _getFinishOuterGenericsReturnValue above returned the same result
@@ -8367,6 +8369,32 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
     }
 
+    void addTargetRequirementDecorations(IRInst* inst, Decl* decl)
+    {
+        // If this declaration requires certain GLSL extension (or a particular GLSL version)
+        // for it to be usable, then declare that here. Similarly for SPIR-V or CUDA
+        //
+        // TODO: We should wrap this an `SpecializedForTargetModifier` together into a single
+        // case for enumerating the "capabilities" that a declaration requires.
+        //
+        for (auto extensionMod : decl->getModifiersOfType<RequiredGLSLExtensionModifier>())
+        {
+            getBuilder()->addRequireGLSLExtensionDecoration(inst, extensionMod->extensionNameToken.getContent());
+        }
+        for (auto versionMod : decl->getModifiersOfType<RequiredGLSLVersionModifier>())
+        {
+            getBuilder()->addRequireGLSLVersionDecoration(inst, Int(getIntegerLiteralValue(versionMod->versionNumberToken)));
+        }
+        for (auto versionMod : decl->getModifiersOfType<RequiredSPIRVVersionModifier>())
+        {
+            getBuilder()->addRequireSPIRVVersionDecoration(inst, versionMod->version);
+        }
+        for (auto versionMod : decl->getModifiersOfType<RequiredCUDASMVersionModifier>())
+        {
+            getBuilder()->addRequireCUDASMVersionDecoration(inst, versionMod->version);
+        }
+    }
+
         /// Is `decl` a member function (or effectively a member function) when considered as a stdlib declaration?
     bool isStdLibMemberFuncDecl(
         Decl*   inDecl)
@@ -8837,6 +8865,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         addTargetIntrinsicDecorations(subContext, irFunc, decl);
 
         addCatchAllIntrinsicDecorationIfNeeded(irFunc, decl);
+
+        addTargetRequirementDecorations(irFunc, decl);
 
         // Register the value now, to avoid any possible infinite recursion when lowering ForwardDerivativeAttribute
         context->setGlobalValue(decl, LoweredValInfo::simple(findOuterMostGeneric(irFunc)));
