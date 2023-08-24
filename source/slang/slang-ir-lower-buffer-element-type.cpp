@@ -553,7 +553,7 @@ namespace Slang
                                     builder.setInsertBefore(user);
                                     auto newLoad = cloneInst(&cloneEnv, &builder, user);
                                     newLoad->setFullType(loweredElementTypeInfo.loweredType);
-                                    auto unpackedVal = builder.emitCallInst(elementType, loweredElementTypeInfo.convertLoweredToOriginal, 1, &newLoad);
+                                    auto unpackedVal = builder.emitCallInst((IRType*)originalElementType, loweredElementTypeInfo.convertLoweredToOriginal, 1, &newLoad);
                                     user->replaceUsesWith(unpackedVal);
                                     user->removeAndDeallocate();
                                     break;

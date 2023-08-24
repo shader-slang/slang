@@ -97,24 +97,15 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             // Figure out storage class based on var layout.
             if (auto layout = getVarLayout(inst))
             {
-                if (auto systemValueAttr = layout->findAttr<IRSystemValueSemanticAttr>())
+                auto cls = getGlobalParamStorageClass(layout);
+                if (cls != SpvStorageClassMax)
+                    storageClass = cls;
+                else if (auto systemValueAttr = layout->findAttr<IRSystemValueSemanticAttr>())
                 {
-                    if (layout->findOffsetAttr(LayoutResourceKind::VaryingInput))
+                    String semanticName = systemValueAttr->getName();
+                    semanticName = semanticName.toLower();
+                    if (semanticName == "sv_pointsize")
                         storageClass = SpvStorageClassInput;
-                    else if (layout->findOffsetAttr(LayoutResourceKind::VaryingOutput))
-                        storageClass = SpvStorageClassOutput;
-                    else
-                    {
-                        String semanticName = systemValueAttr->getName();
-                        semanticName = semanticName.toLower();
-                        if (semanticName == "sv_pointsize")
-                            storageClass = SpvStorageClassInput;
-                    }
-                }
-                else if(const auto parameterGroupTypeLayout =
-                        as<IRParameterGroupTypeLayout>(layout->getTypeLayout()))
-                {
-                    storageClass = SpvStorageClassUniform;
                 }
             }
 
@@ -127,7 +118,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             if (cbufferType || paramBlockType)
             {
                 innerType = as<IRUniformParameterGroupType>(innerType)->getElementType();
-                storageClass = SpvStorageClassUniform;
+                SLANG_ASSERT(storageClass != SpvStorageClassPrivate);
+
                 // Constant buffer is already treated like a pointer type, and
                 // we are not adding another layer of indirection when replacing it
                 // with a pointer type. Therefore we don't need to insert a load at
@@ -192,6 +184,58 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         processGlobalVar(inst);
     }
 
+    SpvStorageClass getStorageClassFromGlobalParamResourceKind(LayoutResourceKind kind)
+    {
+        SpvStorageClass storageClass = SpvStorageClassMax;
+        switch (kind)
+        {
+        case LayoutResourceKind::Uniform:
+        case LayoutResourceKind::DescriptorTableSlot:
+        case LayoutResourceKind::ConstantBuffer:
+            storageClass = SpvStorageClassUniform;
+            break;
+        case LayoutResourceKind::VaryingInput:
+            storageClass = SpvStorageClassInput;
+            break;
+        case LayoutResourceKind::VaryingOutput:
+            storageClass = SpvStorageClassOutput;
+            break;
+        case LayoutResourceKind::ShaderResource:
+        case LayoutResourceKind::UnorderedAccess:
+            storageClass = SpvStorageClassStorageBuffer;
+            break;
+        case LayoutResourceKind::PushConstantBuffer:
+            storageClass = SpvStorageClassPushConstant;
+            break;
+        case LayoutResourceKind::RayPayload:
+            storageClass = SpvStorageClassRayPayloadKHR;
+            break;
+        case LayoutResourceKind::CallablePayload:
+            storageClass = SpvStorageClassCallableDataKHR;
+            break;
+        case LayoutResourceKind::HitAttributes:
+            storageClass = SpvStorageClassHitAttributeKHR;
+            break;
+        case LayoutResourceKind::ShaderRecord:
+            storageClass = SpvStorageClassShaderRecordBufferKHR;
+            break;
+        default:
+            break;
+        }
+        return storageClass;
+    }
+
+    SpvStorageClass getGlobalParamStorageClass(IRVarLayout* varLayout)
+    {
+        for (auto rr : varLayout->getOffsetAttrs())
+        {
+            auto storageClass = getStorageClassFromGlobalParamResourceKind(rr->getResourceKind());
+            if (storageClass != SpvStorageClassMax)
+                return storageClass;
+        }
+        return SpvStorageClassMax;
+    }
+
     void processGlobalVar(IRInst* inst)
     {
         auto oldPtrType = as<IRPtrTypeBase>(inst->getDataType());
@@ -214,31 +258,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
         else if (const auto varLayout = getVarLayout(inst))
         {
-            for (auto rr : varLayout->getOffsetAttrs())
-            {
-                switch (rr->getResourceKind())
-                {
-                case LayoutResourceKind::Uniform:
-                case LayoutResourceKind::ShaderResource:
-                case LayoutResourceKind::DescriptorTableSlot:
-                    storageClass = SpvStorageClassUniform;
-                    break;
-                case LayoutResourceKind::VaryingInput:
-                    storageClass = SpvStorageClassInput;
-                    break;
-                case LayoutResourceKind::VaryingOutput:
-                    storageClass = SpvStorageClassOutput;
-                    break;
-                case LayoutResourceKind::UnorderedAccess:
-                    storageClass = SpvStorageClassStorageBuffer;
-                    break;
-                case LayoutResourceKind::PushConstantBuffer:
-                    storageClass = SpvStorageClassPushConstant;
-                    break;
-                default:
-                    break;
-                }
-            }
+            auto cls = getGlobalParamStorageClass(varLayout);
+            if (cls != SpvStorageClassMax)
+                storageClass = cls;
         }
 
         IRBuilder builder(m_sharedContext->m_irModule);
@@ -342,15 +364,18 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             writeBacks.add(WriteBackPair{ arg, tempVar });
         }
         SLANG_ASSERT((UInt)newArgs.getCount() == inst->getArgCount());
-        auto newCall = builder.emitCallInst(inst->getFullType(), inst->getCallee(), newArgs);
-        for (auto wb : writeBacks)
+        if (writeBacks.getCount())
         {
-            auto newVal = builder.emitLoad(wb.tempVar);
-            builder.emitStore(wb.originalAddrArg, newVal);
+            auto newCall = builder.emitCallInst(inst->getFullType(), inst->getCallee(), newArgs);
+            for (auto wb : writeBacks)
+            {
+                auto newVal = builder.emitLoad(wb.tempVar);
+                builder.emitStore(wb.originalAddrArg, newVal);
+            }
+            inst->replaceUsesWith(newCall);
+            inst->removeAndDeallocate();
+            addUsersToWorkList(newCall);
         }
-        inst->replaceUsesWith(newCall);
-        inst->removeAndDeallocate();
-        addUsersToWorkList(newCall);
     }
 
     Dictionary<IRInst*, IRInst*> m_mapArrayValueToVar;
