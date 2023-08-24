@@ -1566,7 +1566,6 @@ struct SPIRVEmitContext
         /// Emit a global parameter definition.
     SpvInst* emitGlobalParam(IRGlobalParam* param)
     {
-        auto layout = getVarLayout(param);
         auto storageClass = SpvStorageClassUniform;
         if (auto ptrType = as<IRPtrTypeBase>(param->getDataType()))
         {
@@ -1584,7 +1583,8 @@ struct SPIRVEmitContext
             param->getDataType(),
             storageClass
         );
-        emitVarLayout(varInst, layout);
+        if (auto layout = getVarLayout(param))
+            emitVarLayout(varInst, layout);
         return varInst;   
     }
 
@@ -1637,6 +1637,8 @@ struct SPIRVEmitContext
         /// Emit a declaration for the given `irFunc`
     SpvInst* emitFuncDeclaration(IRFunc* irFunc)
     {
+        if (irFunc->findDecorationImpl(kIROp_SPIRVOpDecoration))
+            return nullptr;
         // For now we aren't handling function declarations;
         // we expect to deal only with fully linked modules.
         //
@@ -2742,6 +2744,14 @@ struct SPIRVEmitContext
                 funcValue, m_targetRequest->getTargetCaps()))
         {
             return emitIntrinsicCallExpr(parent, static_cast<IRCall*>(inst), targetIntrinsic);
+        }
+        else if (auto spvOpDecor = funcValue->findDecorationImpl(kIROp_SPIRVOpDecoration))
+        {
+            SpvOp op = (SpvOp)getIntVal(spvOpDecor->getOperand(0));
+            List<IRInst*> args;
+            for (UInt i = 0; i < inst->getArgCount(); i++)
+                args.add(inst->getArg(i));
+            return emitInst(parent, inst, op, inst->getFullType(), kResultID, args);
         }
         else
         {

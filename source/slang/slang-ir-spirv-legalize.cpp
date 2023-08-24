@@ -118,8 +118,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             if (cbufferType || paramBlockType)
             {
                 innerType = as<IRUniformParameterGroupType>(innerType)->getElementType();
-                SLANG_ASSERT(storageClass != SpvStorageClassPrivate);
-
+                if (storageClass == SpvStorageClassPrivate)
+                    storageClass = SpvStorageClassUniform;
                 // Constant buffer is already treated like a pointer type, and
                 // we are not adding another layer of indirection when replacing it
                 // with a pointer type. Therefore we don't need to insert a load at
@@ -133,6 +133,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 }
                 builder.addDecoration(innerType, kIROp_SPIRVBlockDecoration);
                 
+                auto varLayoutInst = inst->findDecoration<IRLayoutDecoration>();
                 if (paramBlockType)
                 {
                     // A parameter block typed global parameter will have a VarLayout
@@ -140,7 +141,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     // We need to turn this VarLayout into a standard cbuffer VarLayout
                     // in the form of OffsetAttr(ConstantBuffer, 0, spaceId).
                     builder.setInsertBefore(inst);
-                    auto varLayoutInst = inst->findDecoration<IRLayoutDecoration>();
                     IRVarLayout* varLayout = nullptr;
                     if (varLayoutInst)
                         varLayout = as<IRVarLayout>(varLayoutInst->getLayout());
@@ -158,6 +158,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                             varLayout->removeAndDeallocate();
                         }
                     }
+                }
+                else if (storageClass == SpvStorageClassPushConstant)
+                {
+                    // Push constant params does not need a VarLayout.
+                    varLayoutInst->removeAndDeallocate();
                 }
             }
 
@@ -227,13 +232,25 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
     SpvStorageClass getGlobalParamStorageClass(IRVarLayout* varLayout)
     {
+        SpvStorageClass result = SpvStorageClassMax;
         for (auto rr : varLayout->getOffsetAttrs())
         {
             auto storageClass = getStorageClassFromGlobalParamResourceKind(rr->getResourceKind());
-            if (storageClass != SpvStorageClassMax)
-                return storageClass;
+            // If we haven't inferred a storage class yet, use the one we just found.
+            if (result == SpvStorageClassMax)
+                result = storageClass;
+            else if (result != storageClass)
+            {
+                // If we have inferred a storage class, and it is different from the one we just found,
+                // then we have conflicting uses of the resource, and we cannot infer a storage class.
+                // An exception is that a uniform storage class can be further specialized by PushConstants.
+                if (result == SpvStorageClassUniform)
+                    result = storageClass;
+                else
+                    SLANG_UNEXPECTED("Var layout contains conflicting resource uses, cannot resolve a storage class.");
+            }
         }
-        return SpvStorageClassMax;
+        return result;
     }
 
     void processGlobalVar(IRInst* inst)
