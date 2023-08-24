@@ -132,6 +132,14 @@ class RequiredSPIRVVersionModifier : public Modifier
 };
 
 // A modifier to tag something as an intrinsic that requires
+// a certain SPIRV capability to be enabled when used.
+class RequiredSPIRVCapabilityModifier : public Modifier
+{
+    SLANG_AST_CLASS(RequiredSPIRVCapabilityModifier)
+    int32_t capability;
+};
+
+// A modifier to tag something as an intrinsic that requires
 // a certain CUDA SM version to be enabled when used. Specified as "major.minor"
 class RequiredCUDASMVersionModifier : public Modifier 
 {

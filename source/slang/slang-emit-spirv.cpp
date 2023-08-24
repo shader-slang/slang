@@ -2766,6 +2766,14 @@ struct SPIRVEmitContext
         });
     }
 
+    void handleRequiredCapabilitiesImpl(IRInst* inst) override
+    {
+        if (auto decor = inst->findDecorationImpl(kIROp_RequireSPIRVCapabilityDecoration))
+        {
+            requireSPIRVCapability((SpvCapability)getIntVal(decor->getOperand(0)));
+        }
+    }
+
     SpvInst* emitCall(SpvInstParent* parent, IRCall* inst)
     {
         auto funcValue = inst->getCallee();

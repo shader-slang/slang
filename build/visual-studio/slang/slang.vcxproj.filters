@@ -1148,6 +1148,9 @@
     <ClCompile Include="..\..\..\source\slang\slang-lookup-glslstd450.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-lookup-spvcapability.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-lookup-spvop.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
