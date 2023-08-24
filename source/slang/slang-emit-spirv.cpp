@@ -2766,14 +2766,6 @@ struct SPIRVEmitContext
         });
     }
 
-    void handleRequiredCapabilitiesImpl(IRInst* inst) override
-    {
-        if (auto decor = inst->findDecorationImpl(kIROp_RequireSPIRVCapabilityDecoration))
-        {
-            requireSPIRVCapability((SpvCapability)getIntVal(decor->getOperand(0)));
-        }
-    }
-
     SpvInst* emitCall(SpvInstParent* parent, IRCall* inst)
     {
         auto funcValue = inst->getCallee();
@@ -3813,27 +3805,15 @@ struct SPIRVEmitContext
 
     void handleRequiredCapabilitiesImpl(IRInst* inst)
     {
-        // TODO: declare required SPV capabilities.
-
         for (auto decoration : inst->getDecorations())
         {
             switch (decoration->getOp())
             {
             default:
                 break;
-
-            case kIROp_RequireGLSLExtensionDecoration:
-                {
-                    break;
-                }
-            case kIROp_RequireGLSLVersionDecoration:
-                {
-                    break;
-                }
-            case kIROp_RequireSPIRVVersionDecoration:
-                {
-                    break;
-                }
+            case kIROp_RequireSPIRVCapabilityDecoration:
+                requireSPIRVCapability((SpvCapability)getIntVal(decoration->getOperand(0)));
+                break;
             }
         }
     }
