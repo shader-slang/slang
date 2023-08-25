@@ -1314,7 +1314,16 @@ namespace Slang
 
         case '?': _advance(lexer); return TokenType::QuestionMark;
         case '@': _advance(lexer); return TokenType::At;
-        case '$': _advance(lexer); return TokenType::Dollar;
+        case '$':
+        {
+            _advance(lexer);
+            if(_peek(lexer) == '$')
+            {
+                _advance(lexer);
+                return TokenType::DollarDollar;
+            }
+            return TokenType::Dollar;
+        }
 
         }
 

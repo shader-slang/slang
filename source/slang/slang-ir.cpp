@@ -5664,6 +5664,84 @@ namespace Slang
         return inst;
     }
 
+    IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandLiteral(IRInst* literal)
+    {
+        SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
+        const auto i = createInst<IRSPIRVAsmOperand>(
+            this,
+            kIROp_SPIRVAsmOperandLiteral,
+            literal->getFullType(),
+            literal
+        );
+        addInst(i);
+        return i;
+    }
+
+    IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandInst(IRInst* inst)
+    {
+        SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
+        const auto i = createInst<IRSPIRVAsmOperand>(
+            this,
+            kIROp_SPIRVAsmOperandInst,
+            inst->getFullType(),
+            inst
+        );
+        addInst(i);
+        return i;
+    }
+
+    IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandId(IRInst* inst)
+    {
+        SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
+        const auto i = createInst<IRSPIRVAsmOperand>(
+            this,
+            kIROp_SPIRVAsmOperandId,
+            inst->getFullType(),
+            inst
+        );
+        addInst(i);
+        return i;
+    }
+
+    IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandEnum(IRInst* inst)
+    {
+        SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
+        const auto i = createInst<IRSPIRVAsmOperand>(
+            this,
+            kIROp_SPIRVAsmOperandEnum,
+            inst->getFullType(),
+            inst
+        );
+        addInst(i);
+        return i;
+    }
+
+    IRSPIRVAsmInst* IRBuilder::emitSPIRVAsmInst(IRInst* opcode, List<IRInst*> operands)
+    {
+        SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
+        operands.insert(0, opcode);
+        const auto i = createInst<IRSPIRVAsmInst>(
+            this,
+            kIROp_SPIRVAsmInst,
+            getVoidType(),
+            operands.getCount(),
+            operands.getBuffer()
+        );
+        addInst(i);
+        return i;
+    }
+
+    IRSPIRVAsm* IRBuilder::emitSPIRVAsm(IRType* type)
+    {
+        const auto asmInst = createInst<IRSPIRVAsm>(
+            this,
+            kIROp_SPIRVAsm,
+            type
+        );
+        addInst(asmInst);
+        return asmInst;
+    }
+
     //
     // Decorations
     //
@@ -6158,6 +6236,9 @@ namespace Slang
         if(as<IRType>(inst))
             return true;
 
+        if(as<IRSPIRVAsmOperand>(inst))
+            return true;
+
         return false;
     }
 
@@ -6370,7 +6451,6 @@ namespace Slang
     {
         auto opInfo = getIROpInfo(inst->getOp());
 
-        dumpIndent(context);
         dump(context, opInfo.name);
         dump(context, " ");
         dumpID(context, inst);
@@ -6398,6 +6478,7 @@ namespace Slang
         }
 
         context->indent--;
+        dumpIndent(context);
         dump(context, "}\n");
     }
 
@@ -6468,6 +6549,25 @@ namespace Slang
             }
         }
 
+        // Special case the SPIR-V asm operands as the distinction here is
+        // clear anyway to the user
+        switch(op)
+        {
+        case kIROp_SPIRVAsmOperandEnum:
+            dumpInstExpr(context, inst->getOperand(0));
+            return;
+        case kIROp_SPIRVAsmOperandLiteral:
+            dumpInstExpr(context, inst->getOperand(0));
+            return;
+        case kIROp_SPIRVAsmOperandInst:
+            dumpInstExpr(context, inst->getOperand(0));
+            return;
+        case kIROp_SPIRVAsmOperandId:
+            dump(context, "%");
+            dumpInstExpr(context, inst->getOperand(0));
+            return;
+        }
+
         dump(context, opInfo.name);
         dumpInstOperandList(context, inst);
     }
@@ -6501,6 +6601,7 @@ namespace Slang
 
         case kIROp_WitnessTable:
         case kIROp_StructType:
+        case kIROp_SPIRVAsm:
             dumpIRParentInst(context, inst);
             return;
 

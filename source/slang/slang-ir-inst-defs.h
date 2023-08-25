@@ -1053,6 +1053,26 @@ INST(DifferentiableTypeDictionaryItem, DifferentiableTypeDictionaryItem, 0, 0)
 INST(DebugSource, DebugSource, 2, HOISTABLE)
 INST(DebugLine, DebugLine, 5, 0)
 
+/* Inline assembly */
+INST(SPIRVAsm, SPIRVAsm, 0, PARENT)
+INST(SPIRVAsmInst, SPIRVAsmInst, 1, 0)
+    // These instruction serve to inform the backend precisely how to emit each
+    // instruction, consider the difference between emitting a literal integer
+    // and a reference to a literal integer instruction
+    //
+    // A literal string or 32-bit integer to be passed as operands
+    INST(SPIRVAsmOperandLiteral, SPIRVAsmOperandLiteral, 1, 0)
+    // A reference to a slang IRInst, either a value or a type
+    INST(SPIRVAsmOperandInst, SPIRVAsmOperandInst, 1, 0)
+    // A named enumerator, the value of which is determined in the backend
+    // It can also have the value "result", indicating that the result-id of
+    // the asm block should be used
+    INST(SPIRVAsmOperandEnum, SPIRVAsmOperandEnum, 1, 0)
+    // A string which is given a unique ID in the backend, used to refer to
+    // results of other instrucions in the same asm block
+    INST(SPIRVAsmOperandId, SPIRVAsmOperandId, 1, 0)
+INST_RANGE(SPIRVAsmOperand, SPIRVAsmOperandLiteral, SPIRVAsmOperandId)
+
 #undef PARENT
 #undef USE_OTHER
 #undef INST_RANGE

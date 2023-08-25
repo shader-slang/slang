@@ -10,6 +10,7 @@
 #include "slang-ir-spirv-snippet.h"
 #include "slang-ir-spirv-legalize.h"
 #include "slang-spirv-val.h"
+#include "slang-lookup-spirv.h"
 #include "spirv/unified1/spirv.h"
 #include "../core/slang-memory-arena.h"
 #include <type_traits>
@@ -577,13 +578,18 @@ struct SPIRVEmitContext
     //
     // We will allocate <id>s on emand as they are needed.
 
+    SpvWord freshID()
+    {
+        return m_nextID++;
+    }
+
         /// Get the <id> for `inst`, or assign one if it doesn't have one yet
     SpvWord getID(SpvInst* inst)
     {
         auto id = inst->id;
         if( !id )
         {
-            id = m_nextID++;
+            id = freshID();
             inst->id = id;
         }
         return id;
@@ -2019,7 +2025,10 @@ struct SPIRVEmitContext
             return emitDebugLine(parent, as<IRDebugLine>(inst));
         case kIROp_GetStringHash:
             return emitGetStringHash(inst);
-
+        case kIROp_undefined:
+            return emitOpUndef(parent, inst, inst->getDataType());
+        case kIROp_SPIRVAsm:
+            return emitSPIRVAsm(parent, as<IRSPIRVAsm>(inst));
         }
     }
 
@@ -3787,6 +3796,116 @@ struct SPIRVEmitContext
             debugLine->getLineEnd(),
             debugLine->getColStart(),
             debugLine->getColEnd());
+    }
+
+    SpvInst* emitSPIRVAsm(SpvInstParent* parent, IRSPIRVAsm* inst)
+    {
+        SpvInst* last = nullptr;
+
+        // This keeps track of the named IDs used in the asm block
+        Dictionary<UnownedStringSlice, SpvWord> idMap;
+
+        for(const auto spvInst : inst->getInsts())
+        {
+            const bool isLast = spvInst == inst->getLastChild();
+            const auto opcodeString = spvInst->getOpcodeString();
+            SpvOp opcode;
+            const bool foundOpCode = lookupSpvOp(opcodeString, opcode)
+                || lookupSpvOp((String("Op") + opcodeString).getUnownedSlice(), opcode);
+            if(!foundOpCode)
+            {
+                m_sink->diagnose(
+                    spvInst->getOpcode(),
+                    Diagnostics::unrecognizedSPIRVOpcode,
+                    opcodeString
+                );
+                return nullptr;
+            }
+
+            const auto parentForOpCode = [this](SpvOp opcode, SpvInstParent* defaultParent){
+                return
+                    opcode == SpvOpConstant ? getSection(SpvLogicalSectionID::ConstantsAndTypes)
+                    : opcode == SpvOpName ? getSection(SpvLogicalSectionID::DebugNames)
+                    : defaultParent;
+            };
+
+            last = emitInstCustomOperandFunc(
+                parentForOpCode(opcode, parent),
+                // We want the "result instruction" to refer to the top level
+                // block which assumes its value, the others are free to refer
+                // to whatever, so just use the internal spv inst rep
+                // TODO: This is not correct, because the instruction which is
+                // assigned to result is not necessarily the last instruction
+                isLast ? as<IRInst>(inst) : spvInst,
+                opcode,
+                [&](){
+                    for(const auto operand : spvInst->getSPIRVOperands())
+                    {
+                        switch(operand->getOp())
+                        {
+                        case kIROp_SPIRVAsmOperandLiteral:
+                        {
+                            const auto v = as<IRConstant>(operand->getValue());
+                            SLANG_ASSERT(v);
+                            switch(v->getOp())
+                            {
+                            case kIROp_StringLit:
+                                emitOperand(SpvLiteralBits::fromUnownedStringSlice(v->getStringSlice()));
+                                break;
+                            case kIROp_IntLit:
+                            {
+                                // TODO: range checking
+                                const auto i = cast<IRIntLit>(v)->getValue();
+                                emitOperand(SpvLiteralInteger::from32(uint32_t(i)));
+                                break;
+                            }
+                            default:
+                                SLANG_UNREACHABLE("Unhandled case in emitSPIRVAsm");
+                            }
+                            break;
+                        }
+                        case kIROp_SPIRVAsmOperandInst:
+                        {
+                            const auto i = operand->getValue();
+                            emitOperand(ensureInst(i));
+                            break;
+                        }
+                        case kIROp_SPIRVAsmOperandEnum:
+                        {
+                            const auto s = cast<IRStringLit>(operand->getValue())->getStringSlice();
+                            if(s == "result")
+                            {
+                                SLANG_ASSERT(isLast);
+                                emitOperand(kResultID);
+                            }
+                            else
+                                SLANG_UNIMPLEMENTED_X("lookup enum operands in spirv_asm");
+                            break;
+                        }
+                        case kIROp_SPIRVAsmOperandId:
+                        {
+                            const auto idName = cast<IRStringLit>(operand->getValue())->getStringSlice();
+                            SpvWord id;
+                            if(!idMap.tryGetValue(idName, id))
+                            {
+                                id = freshID();
+                                idMap.set(idName, id);
+                            }
+                            emitOperand(id);
+                            break;
+                        }
+                        default:
+                            SLANG_UNREACHABLE("Unhandled case in emitSPIRVAsm");
+                        }
+                    }
+                }
+            );
+        }
+
+        for(const auto& [name, id] : idMap)
+            emitOpName(getSection(SpvLogicalSectionID::DebugNames), nullptr, id, name);
+
+        return last;
     }
 
     OrderedHashSet<SpvCapability> m_capabilities;

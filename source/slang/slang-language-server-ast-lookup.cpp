@@ -405,6 +405,18 @@ public:
     {
         return dispatchIfNotNull(expr->originalExpr);
     }
+    bool visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
+    {
+        for(const auto& i : expr->insts)
+        {
+            if(dispatchIfNotNull(i.opcode.expr))
+                return true;
+            for(const auto& o : i.operands)
+                if(dispatchIfNotNull(o.expr))
+                    return true;
+        }
+        return false;
+    }
     bool visitModifiedTypeExpr(ModifiedTypeExpr* expr) { return dispatchIfNotNull(expr->base.exp); }
     bool visitFuncTypeExpr(FuncTypeExpr* expr)
     {

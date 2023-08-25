@@ -282,6 +282,17 @@ struct ASTIterator
         {
             dispatchIfNotNull(expr->innerExpr);
         }
+
+        void visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
+        {
+            iterator->maybeDispatchCallback(expr);
+            for(const auto& i : expr->insts)
+            {
+                dispatchIfNotNull(i.opcode.expr);
+                for(const auto& o : i.operands)
+                    dispatchIfNotNull(o.expr);
+            }
+        }
     };
 
     struct ASTIteratorStmtVisitor : public StmtVisitor<ASTIteratorStmtVisitor>
