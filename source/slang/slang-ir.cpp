@@ -6448,7 +6448,6 @@ namespace Slang
     {
         auto opInfo = getIROpInfo(inst->getOp());
 
-        dumpIndent(context);
         dump(context, opInfo.name);
         dump(context, " ");
         dumpID(context, inst);
@@ -6476,6 +6475,7 @@ namespace Slang
         }
 
         context->indent--;
+        dumpIndent(context);
         dump(context, "}\n");
     }
 
