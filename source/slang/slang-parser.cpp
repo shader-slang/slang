@@ -2,6 +2,7 @@
 
 #include <assert.h>
 #include <float.h>
+#include <optional>
 
 #include "slang-compiler.h"
 #include "slang-lookup.h"
@@ -6146,6 +6147,107 @@ namespace Slang
         }
     }
 
+    static std::optional<SPIRVAsmOperand> parseSPIRVAsmOperand(Parser* parser)
+    {
+        if(AdvanceIf(parser, TokenType::OpMod))
+        {
+            if(parser->LookAheadToken(TokenType::IntegerLiteral)
+                || parser->LookAheadToken(TokenType::Identifier))
+            {
+                return SPIRVAsmOperand{SPIRVAsmOperand::Id, parser->ReadToken()};
+            }
+        }
+        else if(parser->LookAheadToken(TokenType::Identifier))
+        {
+            return SPIRVAsmOperand{SPIRVAsmOperand::NamedValue, parser->ReadToken()};
+        }
+        else if(parser->LookAheadToken(TokenType::IntegerLiteral))
+        {
+            return SPIRVAsmOperand{SPIRVAsmOperand::LiteralInteger, parser->ReadToken()};
+        }
+        else if(AdvanceIf(parser, TokenType::Dollar))
+        {
+            // $ident or $$ident
+            const auto flavor = AdvanceIf(parser, TokenType::Dollar)
+                ? SPIRVAsmOperand::SlangType
+                : SPIRVAsmOperand::SlangValue;
+
+            const auto tok = parser->ReadToken(TokenType::Identifier);
+
+            VarExpr* varExpr = parser->astBuilder->create<VarExpr>();
+            varExpr->scope = parser->currentScope;
+            parser->FillPosition(varExpr);
+            auto nameAndLoc = NameLoc(tok);
+            varExpr->name = nameAndLoc.name;
+            return SPIRVAsmOperand{flavor, tok, varExpr};
+        }
+
+        Unexpected(parser);
+        return std::nullopt;
+    }
+
+    static std::optional<SPIRVAsmInst> parseSPIRVAsmInst(Parser* parser)
+    {
+        SPIRVAsmInst ret;
+
+        const auto resultOrOpcode = parseSPIRVAsmOperand(parser);
+        if(!resultOrOpcode)
+            return std::nullopt;
+
+        // We can enable this when we have a way of determining the index of
+        // the result id operand to each instruction, otherwise we don't know
+        // at which position in the operand list to insert this.
+#if 0
+        if(AdvanceIf(parser, TokenType::OpEql))
+        {
+            const auto opcode = parseSPIRVAsmOperand(parser);
+            if(!opcode)
+                return std::nullopt;
+            ret.opcode = *opcode;
+            ret.operands.insert(???, *resultOrOpcode);
+        }
+        else
+#endif
+        {
+            ret.opcode = *resultOrOpcode;
+        }
+
+        // TODO: diagnose wrong opcode flavor here
+
+        while(!(parser->LookAheadToken(TokenType::RBrace)
+            || parser->LookAheadToken(TokenType::Semicolon)))
+        {
+            if(const auto operand = parseSPIRVAsmOperand(parser))
+                ret.operands.add(*operand);
+            else
+                return std::nullopt;
+        }
+
+        return ret;
+    }
+
+    static Expr* parseSPIRVAsmExpr(Parser* parser)
+    {
+        SPIRVAsmExpr* asmExpr = parser->astBuilder->create<SPIRVAsmExpr>();
+
+        parser->ReadToken(TokenType::LBrace);
+        while(!parser->tokenReader.isAtEnd())
+        {
+            if(parser->LookAheadToken(TokenType::RBrace))
+                break;
+            if(const auto inst = parseSPIRVAsmInst(parser))
+                asmExpr->insts.add(*inst);
+            else
+                return nullptr;
+            if(parser->LookAheadToken(TokenType::RBrace))
+                break;
+            parser->ReadToken(TokenType::Semicolon);
+        }
+        parser->ReadToken(TokenType::RBrace);
+
+        return asmExpr;
+    }
+
     static Expr* parsePrefixExpr(Parser* parser)
     {
         auto tokenType = peekTokenType(parser);
@@ -6178,7 +6280,10 @@ namespace Slang
                 }
                 return newExpr;
             }
-            
+            else if (AdvanceIf(parser, "spirv_asm"))
+            {
+                return parseSPIRVAsmExpr(parser);
+            }
 
             return parsePostfixExpr(parser);
         }

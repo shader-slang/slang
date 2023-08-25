@@ -631,4 +631,40 @@ public:
     List<Val*> knownGenericArgs;
 };
 
+class SPIRVAsmOperand
+{
+    SLANG_VALUE_CLASS(SPIRVAsmOperand);
+
+public:
+    enum Flavor
+    {
+        LiteralInteger, // No prefix
+        Id, // Prefixed with %
+        NamedValue, // An identifier
+        SlangValue,
+        SlangType,
+    };
+    Flavor flavor;
+    Token token;
+    Expr* expr = nullptr;
+    TypeExp type = TypeExp();
+};
+
+class SPIRVAsmInst
+{
+    SLANG_VALUE_CLASS(SPIRVAsmInst);
+
+public:
+    SPIRVAsmOperand opcode;
+    List<SPIRVAsmOperand> operands;
+};
+
+class SPIRVAsmExpr : public Expr
+{
+    SLANG_AST_CLASS(SPIRVAsmExpr);
+
+public:
+    List<SPIRVAsmInst> insts;
+};
+
 } // namespace Slang

@@ -238,8 +238,12 @@ DIAGNOSTIC(20014, Error, classIsReservedKeyword, "'class' is a reserved keyword 
 
 DIAGNOSTIC(20101, Warning, unintendedEmptyStatement, "potentially unintended empty statement at this location; use {} instead.")
 
-// 29xxx - Snippet parsing
+// 29xxx - Snippet parsing and inline asm
 DIAGNOSTIC(29000, Error, snippetParsingFailed, "unable to parse target intrinsic snippet: $0")
+
+DIAGNOSTIC(29100, Error, unrecognizedSPIRVOpcode, "unrecognized spirv opcode: $0")
+DIAGNOSTIC(29101, Error, misplacedResultIdMarker, "the result-id marker must only be used in the last instruction of a spriv_asm expression")
+DIAGNOSTIC(29102, Note,  considerOpCopyObject, "consider adding an OpCopyObject instruction to the end of the spirv_asm expression")
 
 
 //

@@ -282,6 +282,11 @@ struct ASTIterator
         {
             dispatchIfNotNull(expr->innerExpr);
         }
+
+        void visitSPIRVAsmExpr(SPIRVAsmExpr*)
+        {
+            SLANG_UNIMPLEMENTED_X(__func__);
+        }
     };
 
     struct ASTIteratorStmtVisitor : public StmtVisitor<ASTIteratorStmtVisitor>

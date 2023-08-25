@@ -644,6 +644,21 @@ struct ASTDumpContext
         m_writer->emit(")");
     }
 
+    void dump(const SPIRVAsmOperand&)
+    {
+        SLANG_UNIMPLEMENTED_X(__func__);
+    }
+
+    void dump(const SPIRVAsmInst&)
+    {
+        SLANG_UNIMPLEMENTED_X(__func__);
+    }
+
+    void dump(const SPIRVAsmExpr&)
+    {
+        SLANG_UNIMPLEMENTED_X(__func__);
+    }
+
     void dumpObjectFull(NodeBase* node);
 
     ASTDumpContext(SourceWriter* writer, ASTDumpUtil::Flags flags, ASTDumpUtil::Style dumpStyle):

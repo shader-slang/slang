@@ -5664,6 +5664,84 @@ namespace Slang
         return inst;
     }
 
+    IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandLiteral(IRInst* literal)
+    {
+        SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
+        const auto i = createInst<IRSPIRVAsmOperand>(
+            this,
+            kIROp_SPIRVAsmOperandLiteral,
+            literal->getFullType(),
+            literal
+        );
+        addInst(i);
+        return i;
+    }
+
+    IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandInst(IRInst* inst)
+    {
+        SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
+        const auto i = createInst<IRSPIRVAsmOperand>(
+            this,
+            kIROp_SPIRVAsmOperandInst,
+            inst->getFullType(),
+            inst
+        );
+        addInst(i);
+        return i;
+    }
+
+    IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandId(IRInst* inst)
+    {
+        SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
+        const auto i = createInst<IRSPIRVAsmOperand>(
+            this,
+            kIROp_SPIRVAsmOperandId,
+            inst->getFullType(),
+            inst
+        );
+        addInst(i);
+        return i;
+    }
+
+    IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandEnum(IRInst* inst)
+    {
+        SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
+        const auto i = createInst<IRSPIRVAsmOperand>(
+            this,
+            kIROp_SPIRVAsmOperandEnum,
+            inst->getFullType(),
+            inst
+        );
+        addInst(i);
+        return i;
+    }
+
+    IRSPIRVAsmInst* IRBuilder::emitSPIRVAsmInst(IRInst* opcode, List<IRInst*> operands)
+    {
+        SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
+        operands.insert(0, opcode);
+        const auto i = createInst<IRSPIRVAsmInst>(
+            this,
+            kIROp_SPIRVAsmInst,
+            getVoidType(),
+            operands.getCount(),
+            operands.getBuffer()
+        );
+        addInst(i);
+        return i;
+    }
+
+    IRSPIRVAsm* IRBuilder::emitSPIRVAsm(IRType* type)
+    {
+        const auto asmInst = createInst<IRSPIRVAsm>(
+            this,
+            kIROp_SPIRVAsm,
+            type
+        );
+        addInst(asmInst);
+        return asmInst;
+    }
+
     //
     // Decorations
     //

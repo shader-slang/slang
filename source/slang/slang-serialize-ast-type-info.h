@@ -237,6 +237,9 @@ struct SerialTypeInfo<RequirementWitness::Flavor> : public SerialConvertTypeInfo
 // RequirementWitness
 SLANG_VALUE_TYPE_INFO(RequirementWitness)
 
+// SPIRVAsm
+SLANG_VALUE_TYPE_INFO(SPIRVAsmOperand)
+SLANG_VALUE_TYPE_INFO(SPIRVAsmInst)
 
 } // namespace Slang
 
