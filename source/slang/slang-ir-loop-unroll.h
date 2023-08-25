@@ -16,8 +16,6 @@ namespace Slang
 
     bool unrollLoopsInModule(IRModule* module, DiagnosticSink* sink);
 
-    List<IRBlock*> collectBlocksInLoop(IRGlobalValueWithCode* func, IRLoop* loop);
-
     // Turn a loop with continue block into a loop with only back jumps and breaks.
     // Each iteration will be wrapped in a breakable region, where everything before `continue`
     // is within the breakable region, and everything after `continue` is outside the breakable

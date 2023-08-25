@@ -998,11 +998,134 @@ void resetScratchDataBit(IRInst* inst, int bitIndex)
     }
 }
 
+List<IRBlock*> collectBlocksInRegion(
+    IRDominatorTree* dom,
+    IRLoop* loop,
+    bool* outHasMultiLevelBreaks)
+{
+    return collectBlocksInRegion(dom, loop->getBreakBlock(), loop->getTargetBlock(), true, outHasMultiLevelBreaks);
+}
+
+List<IRBlock*> collectBlocksInRegion(
+    IRDominatorTree* dom,
+    IRLoop* loop)
+{
+    bool hasMultiLevelBreaks = false;
+    return collectBlocksInRegion(dom, loop->getBreakBlock(), loop->getTargetBlock(), true, &hasMultiLevelBreaks);
+}
+
+List<IRBlock*> collectBlocksInRegion(
+    IRDominatorTree* dom,
+    IRSwitch* switchInst,
+    bool* outHasMultiLevelBreaks)
+{
+    return collectBlocksInRegion(dom, switchInst->getBreakLabel(), as<IRBlock>(switchInst->getParent()), false, outHasMultiLevelBreaks);
+}
+
+List<IRBlock*> collectBlocksInRegion(
+    IRDominatorTree* dom,
+    IRSwitch* switchInst)
+{
+    bool hasMultiLevelBreaks = false;
+    return collectBlocksInRegion(dom, switchInst->getBreakLabel(), as<IRBlock>(switchInst->getParent()), false, &hasMultiLevelBreaks);
+}
+
+HashSet<IRBlock*> getParentBreakBlockSet(IRDominatorTree* dom, IRBlock* block)
+{
+    HashSet<IRBlock*> parentBreakBlocksSet;
+    for (IRBlock* currBlock = dom->getImmediateDominator(block); 
+        currBlock;
+        currBlock = dom->getImmediateDominator(currBlock))
+    {
+        if (auto loopInst = as<IRLoop>(currBlock->getTerminator()))
+            if (!dom->dominates(loopInst->getBreakBlock(), block))
+                parentBreakBlocksSet.add(loopInst->getBreakBlock());
+        else if (auto switchInst = as<IRSwitch>(currBlock->getTerminator()))
+            if (!dom->dominates(switchInst->getBreakLabel(), block))
+                parentBreakBlocksSet.add(switchInst->getBreakLabel());
+    }
+
+    return parentBreakBlocksSet;
+}
+
+List<IRBlock*> collectBlocksInRegion(
+    IRDominatorTree* dom,
+    IRBlock* breakBlock,
+    IRBlock* firstBlock,
+    bool includeFirstBlock,
+    bool* outHasMultiLevelBreaks)
+{
+    List<IRBlock*> regionBlocks;
+    HashSet<IRBlock*> regionBlocksSet;
+    auto addBlock = [&](IRBlock* block)
+    {
+        if (regionBlocksSet.add(block))
+            regionBlocks.add(block);
+    };
+
+    // Use dominator tree heirarchy to find break blocks of
+    // all parent regions. We'll need to this to detect breaks 
+    // to outer regions (particularly when our region has no reachable 
+    // break block of its own)
+    // 
+    HashSet<IRBlock*> parentBreakBlocksSet = getParentBreakBlockSet(dom, firstBlock);
+
+    *outHasMultiLevelBreaks = false;
+
+    addBlock(firstBlock);
+    for (Index i = 0; i < regionBlocks.getCount(); i++)
+    {
+        auto block = regionBlocks[i];
+        for (auto succ : block->getSuccessors())
+        {
+            if (parentBreakBlocksSet.contains(succ) && succ != breakBlock)
+            {
+                *outHasMultiLevelBreaks = true;
+                continue;
+            }
+
+            if (succ == breakBlock)
+                continue;
+            if (!dom->dominates(firstBlock, succ))
+                continue;
+            if (!as<IRUnreachable>(breakBlock->getTerminator()))
+            {
+                if (dom->dominates(breakBlock, succ))
+                    continue;
+            }
+
+            addBlock(succ);
+        }
+    }
+
+    if (!includeFirstBlock)
+    {
+        regionBlocksSet.remove(firstBlock);
+        regionBlocks.remove(firstBlock);
+    }
+
+    return regionBlocks;
+}
+
+List<IRBlock *> collectBlocksInRegion(IRGlobalValueWithCode *func, IRLoop *loopInst, bool* outHasMultiLevelBreaks)
+{
+    auto dom = computeDominatorTree(func);
+    return collectBlocksInRegion(dom, loopInst, outHasMultiLevelBreaks);
+}
+
+List<IRBlock*> collectBlocksInRegion(IRGlobalValueWithCode* func, IRLoop* loopInst)
+{
+    auto dom = computeDominatorTree(func);
+    bool hasMultiLevelBreaks = false;
+    return collectBlocksInRegion(dom, loopInst, &hasMultiLevelBreaks);
+}
+
 IRVarLayout* findVarLayout(IRInst* value)
 {
     if (auto layoutDecoration = value->findDecoration<IRLayoutDecoration>())
         return as<IRVarLayout>(layoutDecoration->getLayout());
     return nullptr;
+
 }
 
 UnownedStringSlice getBasicTypeNameHint(IRType* basicType)

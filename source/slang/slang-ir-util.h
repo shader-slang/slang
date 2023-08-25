@@ -224,6 +224,37 @@ bool isOne(IRInst* inst);
 void initializeScratchData(IRInst* inst);
 void resetScratchDataBit(IRInst* inst, int bitIndex);
 
+List<IRBlock*> collectBlocksInRegion(
+    IRDominatorTree* dom,
+    IRLoop* loop);
+
+List<IRBlock*> collectBlocksInRegion(
+    IRDominatorTree* dom,
+    IRSwitch* switchInst);
+
+List<IRBlock*> collectBlocksInRegion(
+    IRDominatorTree* dom,
+    IRSwitch* switchInst,
+    bool* outHasMultilevelBreaks);
+
+List<IRBlock*> collectBlocksInRegion(
+    IRDominatorTree* dom,
+    IRLoop* loop,
+    bool* outHasMultilevelBreaks);
+
+List<IRBlock*> collectBlocksInRegion(
+    IRDominatorTree* dom,
+    IRBlock* breakBlock,
+    IRBlock* firstBlock,
+    bool includeFirstBlock,
+    bool* outHasMultilevelBreaks);
+
+List<IRBlock*> collectBlocksInRegion(IRGlobalValueWithCode* func,  IRLoop* loopInst, bool* outHasMultilevelBreaks);
+
+List<IRBlock*> collectBlocksInRegion(IRGlobalValueWithCode* func,  IRLoop* loopInst);
+
+HashSet<IRBlock*> getParentBreakBlockSet(IRDominatorTree* dom, IRBlock* block);
+
 IRVarLayout* findVarLayout(IRInst* value);
 
 // Run an operation over every block in a module

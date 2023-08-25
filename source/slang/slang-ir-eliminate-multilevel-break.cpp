@@ -8,6 +8,11 @@
 
 namespace Slang
 {
+    
+bool isUnreachableRootBlock(IRBlock* block)
+{
+    return block->getPredecessors().getCount() == 0;
+}
 
 struct EliminateMultiLevelBreakContext
 {
@@ -29,6 +34,23 @@ struct EliminateMultiLevelBreakContext
                 return as<IRLoop>(headerInst)->getBreakBlock();
             case kIROp_Switch:
                 return as<IRSwitch>(headerInst)->getBreakLabel();
+            default:
+                SLANG_UNREACHABLE("Unknown breakable inst");
+            }
+        }
+
+        void replaceBreakBlock(IRBuilder* builder, IRBlock* block)
+        {
+            switch (headerInst->getOp())
+            {
+            case kIROp_loop:
+                builder->replaceOperand(
+                    &(as<IRLoop>(headerInst)->breakBlock), block);
+                break;
+            case kIROp_Switch:
+                builder->replaceOperand(
+                    &(as<IRSwitch>(headerInst)->breakLabel), block);
+                break;
             default:
                 SLANG_UNREACHABLE("Unknown breakable inst");
             }
@@ -58,11 +80,6 @@ struct EliminateMultiLevelBreakContext
         Dictionary<IRBlock*, BreakableRegionInfo*> mapBlockToRegion;
         HashSet<IRBlock*> processedBlocks;
         List<MultiLevelBreakInfo> multiLevelBreaks;
-
-        bool isUnreachable(IRBlock* block)
-        {
-            return block->getPredecessors().getCount() == 0;
-        }
 
         void collectBreakableRegionBlocks(BreakableRegionInfo& info)
         {
@@ -97,7 +114,7 @@ struct EliminateMultiLevelBreakContext
                         collectBreakableRegionBlocks(*childRegion);
                         info.childRegions.add(childRegion);
                         block = childRegion->getBreakBlock();
-                        if (!isUnreachable(block) && info.blockSet.add(block))
+                        if (!isUnreachableRootBlock(block) && info.blockSet.add(block))
                         {
                             info.blocks.add(block);
                         }
@@ -147,7 +164,7 @@ struct EliminateMultiLevelBreakContext
                 l->forEach(
                     [&](BreakableRegionInfo* region)
                     {
-                        if(!isUnreachable(region->getBreakBlock()))
+                        if(!isUnreachableRootBlock(region->getBreakBlock()))
                             mapBreakBlockToRegion.add(region->getBreakBlock(), region);
                         for (auto block : region->blocks)
                             mapBlockToRegion.add(block, region);
@@ -240,6 +257,50 @@ struct EliminateMultiLevelBreakContext
         return changed;
     }
 
+    void duplicateUnreachableBreakBlocks(FuncContext* context)
+    {
+        Dictionary<IRBlock*, BreakableRegionInfo*> mapBreakBlocksToRegion;
+
+        // If we already have a region mapped for a break block, and the break block
+        // is unreachable, create a new unreachable block and map it.
+        // 
+        for (auto& l : context->regions)
+        {
+            l->forEach(
+                [&](BreakableRegionInfo* region)
+                {
+                    if (isUnreachableRootBlock(region->getBreakBlock()))
+                    {
+                        if (mapBreakBlocksToRegion.containsKey(region->getBreakBlock()))
+                        {
+                            if (mapBreakBlocksToRegion[region->getBreakBlock()] != region)
+                            {
+                                // We have a break block that is unreachable, and we have already
+                                // mapped it to a region, and that region is not the current region.
+                                // 
+                                // We need to create a new unreachable block, and map it to the
+                                // current region.
+                                // 
+                                IRBuilder builder(irModule);
+                                builder.setInsertInto(region->getBreakBlock()->getParent());
+                                auto newBreakBlock = builder.createBlock();
+                                newBreakBlock->insertAfter(region->getBreakBlock());
+                                builder.setInsertInto(newBreakBlock);
+                                builder.emitUnreachable();
+                                mapBreakBlocksToRegion.add(newBreakBlock, region);
+                                region->replaceBreakBlock(&builder, newBreakBlock);
+                                return;
+                            }
+                        }
+                        else
+                            mapBreakBlocksToRegion.add(region->getBreakBlock(), region);
+                    }
+                    else
+                        mapBreakBlocksToRegion.add(region->getBreakBlock(), region);
+                });
+        }
+    }
+    
     void processFunc(IRGlobalValueWithCode* func)
     {
         
@@ -263,6 +324,9 @@ struct EliminateMultiLevelBreakContext
 
         if (funcInfo.multiLevelBreaks.getCount() == 0)
             return;
+
+        // Duplicate unreachable break blocks so that each break block is only mapped to a single
+        duplicateUnreachableBreakBlocks(&funcInfo);
 
         IRBuilder builder(irModule);
         builder.setInsertInto(func);

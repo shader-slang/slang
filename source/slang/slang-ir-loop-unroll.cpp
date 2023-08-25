@@ -48,45 +48,6 @@ static bool _eliminateDeadBlocks(List<IRBlock*>& blocks, IRBlock* unreachableBlo
     return changed;
 }
 
-List<IRBlock*> _collectBlocksInLoop(IRDominatorTree* dom, IRLoop* loopInst)
-{
-    List<IRBlock*> loopBlocks;
-    HashSet<IRBlock*> loopBlocksSet;
-    auto addBlock = [&](IRBlock* block)
-    {
-        if (loopBlocksSet.add(block))
-            loopBlocks.add(block);
-    };
-    auto firstBlock = as<IRBlock>(loopInst->block.get());
-    auto breakBlock = as<IRBlock>(loopInst->breakBlock.get());
-
-    addBlock(firstBlock);
-    for (Index i = 0; i < loopBlocks.getCount(); i++)
-    {
-        auto block = loopBlocks[i];
-        for (auto succ : block->getSuccessors())
-        {
-            if (succ == breakBlock)
-                continue;
-            if (!dom->dominates(firstBlock, succ))
-                continue;
-            if (!as<IRUnreachable>(breakBlock->getTerminator()))
-            {
-                if (dom->dominates(breakBlock, succ))
-                    continue;
-            }
-            addBlock(succ);
-        }
-    }
-    return loopBlocks;
-}
-
-List<IRBlock*> collectBlocksInLoop(IRGlobalValueWithCode* func,  IRLoop* loopInst)
-{
-    auto dom = computeDominatorTree(func);
-    return _collectBlocksInLoop(dom, loopInst);
-}
-
 static int _getLoopMaxIterationsToUnroll(IRLoop* loopInst)
 {
     static constexpr int kMaxIterationsToAttempt = 4096;
@@ -440,7 +401,7 @@ static bool _unrollLoop(
 
             firstIterationBreakBlock->removeAndDeallocateAllDecorationsAndChildren();
             builder.setInsertInto(firstIterationBreakBlock);
-            builder.emitBranch(unreachableBlock);
+            builder.emitUnreachable();
 
             break;
         }
@@ -487,7 +448,7 @@ bool unrollLoopsInFunc(
         // Remove any continue jumps from the loop.
         eliminateContinueBlocks(module, loop);
 
-        auto blocks = collectBlocksInLoop(func, loop);
+        auto blocks = collectBlocksInRegion(func, loop);
         auto loopLoc = loop->sourceLoc;
         if (!_unrollLoop(module, loop, blocks))
         {

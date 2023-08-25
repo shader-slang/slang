@@ -29,6 +29,32 @@ static BreakableRegion* findBreakableRegion(Region* region)
     }
 }
 
+static bool isBlockInRegion(IRDominatorTree* domTree, IRTerminatorInst* regionHeader, IRBlock* block)
+{
+    auto headerBlock = cast<IRBlock>(regionHeader->getParent());
+    IRBlock* breakBlock = nullptr;
+    if (auto loop = as<IRLoop>(regionHeader))
+        breakBlock = loop->getBreakBlock();
+    else if (auto switchInst = as<IRSwitch>(regionHeader))
+        breakBlock = switchInst->getBreakLabel();
+
+    auto parentBreakBlocks = getParentBreakBlockSet(domTree, headerBlock);
+    
+    if (!domTree->dominates(headerBlock, block))
+        return false;
+
+    if (domTree->dominates(breakBlock, block))
+        return false;
+    
+    for (auto parentBreakBlock : parentBreakBlocks)
+    {
+        if (domTree->dominates(parentBreakBlock, block))
+            return false;
+    }
+
+    return true;
+}
+
 // Test if a loop is trivial: a trivial loop runs for a single iteration without any back edges, and
 // there is only one break out of the loop at the very end. The function generates `regionTree` if
 // it is needed and hasn't been generated yet.
@@ -102,19 +128,36 @@ static bool isTrivialSingleIterationLoop(
     // Track the break block backwards through the dominator tree, and see if we find a loop block
     // that is not the current loop.
     //
-    auto currBlock = loop->getBreakBlock();
-    for (;;)
+    auto breakPredList = loop->getBreakBlock()->getPredecessors();
+    
+    if (breakPredList.getCount() > 0)
     {
-        auto parent = context.domTree->getImmediateDominator(currBlock);
-        if (!parent)
-            break;
-        currBlock = parent;
-        if (auto _loop = as<IRLoop>(currBlock->getTerminator()))
+        auto breakOriginBlock = *loop->getBreakBlock()->getPredecessors().begin();
+
+        for (auto currBlock = breakOriginBlock;
+             currBlock;
+             currBlock = context.domTree->getImmediateDominator(currBlock))
         {
-            if (loop != _loop)
-                return false;
-            if (loop == _loop)
+            auto terminator = currBlock->getTerminator();
+            if (terminator == loop)
                 break;
+            
+            // Check if the break originated from an inner breakable region.
+            // If so, the outer loop cannot be trivially removed.
+            // 
+            switch (terminator->getOp())
+            {
+            case kIROp_loop:
+                if (isBlockInRegion(context.domTree, as<IRLoop>(terminator), breakOriginBlock))
+                    return false;
+                break;
+            case kIROp_Switch:
+                if (isBlockInRegion(context.domTree, as<IRSwitch>(terminator), breakOriginBlock))
+                    return false;
+                break;
+            default:
+                break;
+            }
         }
     }
 
@@ -123,7 +166,13 @@ static bool isTrivialSingleIterationLoop(
 
 static bool doesLoopHasSideEffect(IRGlobalValueWithCode* func, IRLoop* loopInst)
 {
-    auto blocks = collectBlocksInLoop(func, loopInst);
+    bool hasMultiLevelBreaks = false;
+    auto blocks = collectBlocksInRegion(func, loopInst, &hasMultiLevelBreaks);
+
+    // We'll currently not deal with loops that contain multi-level breaks.
+    if (hasMultiLevelBreaks)
+        return true;
+
     HashSet<IRBlock*> loopBlocks;
     for (auto b : blocks)
         loopBlocks.add(b);

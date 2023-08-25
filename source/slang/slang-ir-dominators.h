@@ -114,6 +114,9 @@ namespace Slang
         /// Dictionary used to accelerate `getBlockIndex`
         Dictionary<IRBlock*, Int>   mapBlockToIndex;
 
+        /// Reachability information for the CFG
+        HashSet<IRBlock*>           reachableSet;
+
         //
         // In order to accelerate queries on the tree structure, we will order the tree nodes
         // carefully, so that all of the descendants of a node are contiguous, with all of
@@ -170,6 +173,7 @@ namespace Slang
     RefPtr<IRDominatorTree> computeDominatorTree(IRGlobalValueWithCode* code);
 
     void computePostorder(IRGlobalValueWithCode* code, List<IRBlock*>& outOrder);
+    void computePostorder(IRGlobalValueWithCode* code, List<IRBlock*>& outOrder, HashSet<IRBlock*>& outReachableSet);
     void computePostorderOnReverseCFG(IRGlobalValueWithCode* code, List<IRBlock*>& outOrder);
 
     inline List<IRBlock*> getPostorder(IRGlobalValueWithCode* code)
