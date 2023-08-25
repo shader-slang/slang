@@ -6236,6 +6236,9 @@ namespace Slang
         if(as<IRType>(inst))
             return true;
 
+        if(as<IRSPIRVAsmOperand>(inst))
+            return true;
+
         return false;
     }
 
@@ -6546,6 +6549,25 @@ namespace Slang
             }
         }
 
+        // Special case the SPIR-V asm operands as the distinction here is
+        // clear anyway to the user
+        switch(op)
+        {
+        case kIROp_SPIRVAsmOperandEnum:
+            dumpInstExpr(context, inst->getOperand(0));
+            return;
+        case kIROp_SPIRVAsmOperandLiteral:
+            dumpInstExpr(context, inst->getOperand(0));
+            return;
+        case kIROp_SPIRVAsmOperandInst:
+            dumpInstExpr(context, inst->getOperand(0));
+            return;
+        case kIROp_SPIRVAsmOperandId:
+            dump(context, "%");
+            dumpInstExpr(context, inst->getOperand(0));
+            return;
+        }
+
         dump(context, opInfo.name);
         dumpInstOperandList(context, inst);
     }
@@ -6579,6 +6601,7 @@ namespace Slang
 
         case kIROp_WitnessTable:
         case kIROp_StructType:
+        case kIROp_SPIRVAsm:
             dumpIRParentInst(context, inst);
             return;
 
