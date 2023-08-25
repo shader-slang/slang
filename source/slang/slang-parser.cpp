@@ -7,6 +7,7 @@
 #include "slang-compiler.h"
 #include "slang-lookup.h"
 #include "slang-visitor.h"
+#include "slang-lookup-spirv.h"
 
 #include "../core/slang-semantic-version.h"
 
@@ -6649,6 +6650,18 @@ namespace Slang
         return nullptr;
     }
 
+    static NodeBase* parseSPIRVCapabilityModifier(Parser* parser, void*)
+    {
+        Token token;
+        token = parser->ReadToken();
+        auto modifier = parser->astBuilder->create<RequiredSPIRVCapabilityModifier>();
+        SpvCapability cap;
+        if (!lookupSpvCapability(token.getContent(), cap))
+            parser->sink->diagnose(token, Diagnostics::unknownSPIRVCapability, token);
+        modifier->capability = (int32_t)cap;
+        return modifier;
+    }
+
     static NodeBase* parseCUDASMVersionModifier(Parser* parser, void* /*userData*/)
     {
         Token token;
@@ -7007,6 +7020,7 @@ namespace Slang
         _makeParseModifier("__glsl_extension",      parseGLSLExtensionModifier),
         _makeParseModifier("__glsl_version",        parseGLSLVersionModifier),
         _makeParseModifier("__spirv_version",       parseSPIRVVersionModifier),
+        _makeParseModifier("__spirv_capability",    parseSPIRVCapabilityModifier),
         _makeParseModifier("__cuda_sm_version",     parseCUDASMVersionModifier),
 
         _makeParseModifier("__builtin_type",        parseBuiltinTypeModifier),

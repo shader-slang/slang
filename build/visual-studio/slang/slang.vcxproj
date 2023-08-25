@@ -688,6 +688,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-language-server.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-legalize-types.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-lookup-glslstd450.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-lookup-spvcapability.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-lookup-spvop.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-lookup.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-lower-to-ir.cpp" />

@@ -8838,29 +8838,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         addCatchAllIntrinsicDecorationIfNeeded(irFunc, decl);
 
-        // If this declaration requires certain GLSL extension (or a particular GLSL version)
-        // for it to be usable, then declare that here.
-        //
-        // TODO: We should wrap this an `SpecializedForTargetModifier` together into a single
-        // case for enumerating the "capabilities" that a declaration requires.
-        //
-        for (auto extensionMod : decl->getModifiersOfType<RequiredGLSLExtensionModifier>())
-        {
-            getBuilder()->addRequireGLSLExtensionDecoration(irFunc, extensionMod->extensionNameToken.getContent());
-        }
-        for (auto versionMod : decl->getModifiersOfType<RequiredGLSLVersionModifier>())
-        {
-            getBuilder()->addRequireGLSLVersionDecoration(irFunc, Int(getIntegerLiteralValue(versionMod->versionNumberToken)));
-        }
-        for (auto versionMod : decl->getModifiersOfType<RequiredSPIRVVersionModifier>())
-        {
-            getBuilder()->addRequireSPIRVVersionDecoration(irFunc, versionMod->version);
-        }
-        for (auto versionMod : decl->getModifiersOfType<RequiredCUDASMVersionModifier>())
-        {
-            getBuilder()->addRequireCUDASMVersionDecoration(irFunc, versionMod->version);
-        }
-
         // Register the value now, to avoid any possible infinite recursion when lowering ForwardDerivativeAttribute
         context->setGlobalValue(decl, LoweredValInfo::simple(findOuterMostGeneric(irFunc)));
 
@@ -9036,6 +9013,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 getBuilder()->addDecoration(irFunc, kIROp_PreferRecomputeDecoration);
             }
+            else if (auto extensionMod = as<RequiredGLSLExtensionModifier>(modifier))
+                getBuilder()->addRequireGLSLExtensionDecoration(irFunc, extensionMod->extensionNameToken.getContent());
+            else if (auto versionMod = as<RequiredGLSLVersionModifier>(modifier))
+                getBuilder()->addRequireGLSLVersionDecoration(irFunc, Int(getIntegerLiteralValue(versionMod->versionNumberToken)));
+            else if (auto spvVersion = as<RequiredSPIRVVersionModifier>(modifier))
+                getBuilder()->addRequireSPIRVVersionDecoration(irFunc, spvVersion->version);
+            else if (auto capMod = as<RequiredSPIRVCapabilityModifier>(modifier))
+                getBuilder()->addRequireSPIRVCapabilityDecoration(irFunc, capMod->capability);
+            else if (auto cudasmVersion = as<RequiredCUDASMVersionModifier>(modifier))
+                getBuilder()->addRequireCUDASMVersionDecoration(irFunc, cudasmVersion->version);
         }
 
         if (!isInline)

@@ -676,6 +676,7 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(VulkanHitObjectAttributesDecoration, vulkanHitObjectAttributes, 0, 0)
 
     INST(RequireSPIRVVersionDecoration,     requireSPIRVVersion,    1, 0)
+    INST(RequireSPIRVCapabilityDecoration,  requireSPIRVCapability, 1, 0)
     INST(RequireGLSLVersionDecoration,      requireGLSLVersion,     1, 0)
     INST(RequireGLSLExtensionDecoration,    requireGLSLExtension,   1, 0)
     INST(RequireCUDASMVersionDecoration,    requireCUDASMVersion,   1, 0)

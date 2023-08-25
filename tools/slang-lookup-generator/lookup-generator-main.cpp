@@ -6,6 +6,7 @@
 #include "../../source/compiler-core/slang-lexer.h"
 #include "../../source/core/slang-io.h"
 #include "../../source/core/slang-secure-crt.h"
+#include "../../source/core/slang-string-util.h"
 
 using namespace Slang;
 
@@ -310,7 +311,7 @@ int main(int argc, const char* const* argv)
         return 1;
     }
 
-    const char* const inJsonPath = argv[1];
+    const char* const inPath = argv[1];
     const char* const outCppPath = argv[2];
     const char* const enumName = argv[3];
     const char* const enumerantPrefix = argv[4];
@@ -322,20 +323,36 @@ int main(int argc, const char* const* argv)
     DiagnosticSink sink(&sourceManager, Lexer::sourceLocationLexer);
     sink.writer = writer;
 
-    JSONContainer container(sink.getSourceManager());
-    JSONBuilder   builder(&container);
-    if (SLANG_FAILED(parseJson(inJsonPath, &sink, builder)))
-    {
-        sink.diagnoseRaw(Severity::Error, "Json parsing failed\n");
-        return 1;
-    }
+    List<String> opnames;
 
-    UnownedStringSlice error;
-    const List<String> opnames = extractOpNames(error, builder.getRootValue(), container);
-    if (error.getLength())
+    if (String(inPath).endsWith("json"))
     {
-        sink.diagnoseRaw(Severity::Error, error);
-        return 1;
+        // If source is a json file parse it.
+        JSONContainer container(sink.getSourceManager());
+        JSONBuilder   builder(&container);
+        if (SLANG_FAILED(parseJson(inPath, &sink, builder)))
+        {
+            sink.diagnoseRaw(Severity::Error, "Json parsing failed\n");
+            return 1;
+        }
+
+        UnownedStringSlice error;
+        opnames = extractOpNames(error, builder.getRootValue(), container);
+        if (error.getLength())
+        {
+            sink.diagnoseRaw(Severity::Error, error);
+            return 1;
+        }
+    }
+    else
+    {
+        // Otherwise, we assume the input is a text file with one name per line.
+        String content;
+        File::readAllText(inPath, content);
+        List<UnownedStringSlice> words;
+        StringUtil::split(content.getUnownedSlice(), '\n', words);
+        for (auto w : words)
+            opnames.add(w);
     }
 
     HashParams hashParams;
