@@ -3913,7 +3913,8 @@ namespace Slang
                     typeExpr = CheckProperType(typeExpr);
                     operand.expr = typeExpr.exp;
                 }
-                else if(operand.flavor == SPIRVAsmOperand::SlangValue)
+                else if(operand.flavor == SPIRVAsmOperand::SlangValue
+                    || operand.flavor == SPIRVAsmOperand::SlangValueAddr)
                 {
                     // This is a $expr operand, check the expr
                     operand.expr = dispatch(operand.expr);

@@ -3289,6 +3289,24 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                     }
                     return builder->emitSPIRVAsmOperandInst(i);
                 }
+            case SPIRVAsmOperand::SlangValueAddr:
+                {
+                    IRInst* i;
+                    {
+                        IRBuilderInsertLocScope insertScope(builder);
+                        builder->setInsertBefore(spirvAsmInst);
+                        const auto addr = tryGetAddress(
+                            context,
+                            lowerLValueExpr(context, operand.expr),
+                            TryGetAddressMode::Default
+                        );
+                        if(addr.flavor == LoweredValInfo::Flavor::Ptr)
+                            i = addr.val;
+                        else
+                            context->getSink()->diagnose(operand.expr, Diagnostics::noSuchAddress);
+                    }
+                    return builder->emitSPIRVAsmOperandInst(i);
+                }
             case SPIRVAsmOperand::SlangType:
                 {
                     IRInst* i;

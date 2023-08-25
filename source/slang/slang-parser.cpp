@@ -6149,29 +6149,7 @@ namespace Slang
 
     static std::optional<SPIRVAsmOperand> parseSPIRVAsmOperand(Parser* parser)
     {
-        if(AdvanceIf(parser, TokenType::OpMod))
-        {
-            if(parser->LookAheadToken(TokenType::IntegerLiteral)
-                || parser->LookAheadToken(TokenType::Identifier))
-            {
-                return SPIRVAsmOperand{SPIRVAsmOperand::Id, parser->ReadToken()};
-            }
-        }
-        else if(parser->LookAheadToken(TokenType::Identifier))
-        {
-            return SPIRVAsmOperand{SPIRVAsmOperand::NamedValue, parser->ReadToken()};
-        }
-        else if(parser->LookAheadToken(TokenType::IntegerLiteral))
-        {
-            return SPIRVAsmOperand{SPIRVAsmOperand::LiteralInteger, parser->ReadToken()};
-        }
-        else if(AdvanceIf(parser, TokenType::Dollar))
-        {
-            // $ident or $$ident
-            const auto flavor = AdvanceIf(parser, TokenType::Dollar)
-                ? SPIRVAsmOperand::SlangType
-                : SPIRVAsmOperand::SlangValue;
-
+        const auto slangIdentOperand = [&](auto flavor){
             const auto tok = parser->ReadToken(TokenType::Identifier);
 
             VarExpr* varExpr = parser->astBuilder->create<VarExpr>();
@@ -6180,6 +6158,41 @@ namespace Slang
             auto nameAndLoc = NameLoc(tok);
             varExpr->name = nameAndLoc.name;
             return SPIRVAsmOperand{flavor, tok, varExpr};
+        };
+
+        // A regular identifier
+        if(parser->LookAheadToken(TokenType::Identifier))
+        {
+            return SPIRVAsmOperand{SPIRVAsmOperand::NamedValue, parser->ReadToken()};
+        }
+        // A literal integer
+        else if(parser->LookAheadToken(TokenType::IntegerLiteral))
+        {
+            return SPIRVAsmOperand{SPIRVAsmOperand::LiteralInteger, parser->ReadToken()};
+        }
+        // A %foo id
+        else if(AdvanceIf(parser, TokenType::OpMod))
+        {
+            if(parser->LookAheadToken(TokenType::IntegerLiteral)
+                || parser->LookAheadToken(TokenType::Identifier))
+            {
+                return SPIRVAsmOperand{SPIRVAsmOperand::Id, parser->ReadToken()};
+            }
+        }
+        // A &foo variable reference (for the address of foo)
+        else if(AdvanceIf(parser, TokenType::OpBitAnd))
+        {
+            return slangIdentOperand(SPIRVAsmOperand::SlangValueAddr);
+        }
+        // A $foo variable
+        else if(AdvanceIf(parser, TokenType::Dollar))
+        {
+            return slangIdentOperand(SPIRVAsmOperand::SlangValue);
+        }
+        // A $$foo type
+        else if(AdvanceIf(parser, TokenType::DollarDollar))
+        {
+            return slangIdentOperand(SPIRVAsmOperand::SlangType);
         }
 
         Unexpected(parser);

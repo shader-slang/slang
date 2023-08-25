@@ -244,6 +244,7 @@ DIAGNOSTIC(29000, Error, snippetParsingFailed, "unable to parse target intrinsic
 DIAGNOSTIC(29100, Error, unrecognizedSPIRVOpcode, "unrecognized spirv opcode: $0")
 DIAGNOSTIC(29101, Error, misplacedResultIdMarker, "the result-id marker must only be used in the last instruction of a spriv_asm expression")
 DIAGNOSTIC(29102, Note,  considerOpCopyObject, "consider adding an OpCopyObject instruction to the end of the spirv_asm expression")
+DIAGNOSTIC(29103, Note,  noSuchAddress, "unable to take the address of this address-of asm operand")
 
 
 //

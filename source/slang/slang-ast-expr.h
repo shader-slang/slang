@@ -642,6 +642,7 @@ public:
         Id, // Prefixed with %
         NamedValue, // An identifier
         SlangValue,
+        SlangValueAddr,
         SlangType,
     };
     Flavor flavor;
