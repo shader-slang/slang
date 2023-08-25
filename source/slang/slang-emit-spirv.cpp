@@ -2025,6 +2025,8 @@ struct SPIRVEmitContext
             return emitDebugLine(parent, as<IRDebugLine>(inst));
         case kIROp_GetStringHash:
             return emitGetStringHash(inst);
+        case kIROp_undefined:
+            return emitOpUndef(parent, inst, inst->getDataType());
         case kIROp_SPIRVAsm:
             return emitSPIRVAsm(parent, as<IRSPIRVAsm>(inst));
         }
