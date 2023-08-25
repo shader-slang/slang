@@ -233,8 +233,8 @@ DIAGNOSTIC(20008, Error, invalidOperator, "invalid operator '$0'.")
 DIAGNOSTIC(20011, Error, unexpectedColon, "unexpected ':'.")
 DIAGNOSTIC(20012, Error, invalidSPIRVVersion, "Expecting SPIR-V version as either 'major.minor', or quoted if has patch (eg for SPIR-V 1.2, '1.2' or \"1.2\"')")
 DIAGNOSTIC(20013, Error, invalidCUDASMVersion, "Expecting CUDA SM version as either 'major.minor', or quoted if has patch (eg for '7.0' or \"7.0\"')")
-
 DIAGNOSTIC(20014, Error, classIsReservedKeyword, "'class' is a reserved keyword in this context; use 'struct' instead.")
+DIAGNOSTIC(20015, Error, unknownSPIRVCapability, "unknown SPIR-V capability '$0'.")
 
 DIAGNOSTIC(20101, Warning, unintendedEmptyStatement, "potentially unintended empty statement at this location; use {} instead.")
 

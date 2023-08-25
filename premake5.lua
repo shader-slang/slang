@@ -1410,7 +1410,13 @@ generatorProject("generate-lookup-tables")
             header = "spirv/unified1/spirv.h",
             prefix = "Spv",
             type = "SpvOp"
-        }
+        },
+        {
+            json = "external/spirv/spirv-capabilities.txt",
+            header = "spirv/unified1/spirv.h",
+            prefix = "SpvCapability",
+            type = "SpvCapability"
+        },
     }
     for _, t in pairs(tables) do
         files {t.json}
@@ -1601,7 +1607,8 @@ standardProject("slang", "source/slang")
     -- Similarly for any generated lookup tables
     files {
         "source/slang/slang-lookup-spvop.cpp",
-        "source/slang/slang-lookup-glslstd450.cpp"
+        "source/slang/slang-lookup-glslstd450.cpp",
+        "source/slang/slang-lookup-spvcapability.cpp",
     }
 
     --
