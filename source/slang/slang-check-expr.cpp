@@ -3895,4 +3895,64 @@ namespace Slang
 
         return expr;
     }
+
+    Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
+    {
+        // We will iterate over all the operands in all the insts and check
+        // them
+        for(auto& inst : expr->insts)
+        {
+            const bool isLast = &inst == &expr->insts.getLast();
+            for(auto& operand : inst.operands)
+            {
+                if(operand.flavor == SPIRVAsmOperand::SlangType)
+                {
+                    // This is a $$type operand, fill in the TypeExp member of the operand
+                    TypeExp& typeExpr = operand.type;
+                    typeExpr.exp = operand.expr;
+                    typeExpr = CheckProperType(typeExpr);
+                    operand.expr = typeExpr.exp;
+                }
+                else if(operand.flavor == SPIRVAsmOperand::SlangValue
+                    || operand.flavor == SPIRVAsmOperand::SlangValueAddr)
+                {
+                    // This is a $expr operand, check the expr
+                    operand.expr = dispatch(operand.expr);
+                }
+                else if(operand.flavor == SPIRVAsmOperand::NamedValue
+                    && operand.token.getContent() == "result")
+                {
+                    // This is the <result-id> marker, check that it only
+                    // appears in the last instruction.
+
+                    // TODO: We could consider relaxing this, because SPIR-V
+                    // does have forward references for decorations and such
+                    if (!isLast)
+                    {
+                        getSink()->diagnose(operand.token, Diagnostics::misplacedResultIdMarker);
+                        getSink()->diagnoseWithoutSourceView(expr, Diagnostics::considerOpCopyObject);
+                    }
+                }
+            }
+        }
+
+        // Assign the type of this expression from the type of the last
+        // instruction, otherwise void
+        if(expr->insts.getCount())
+        {
+            // TODO: we trust that this is correct, but could should verify
+            const auto lastOperands = expr->insts.getLast().operands;
+            if(lastOperands.getCount() >= 2
+                && lastOperands[0].flavor == SPIRVAsmOperand::SlangType
+                && lastOperands[1].flavor == SPIRVAsmOperand::NamedValue
+                && lastOperands[1].token.getContent() == "result")
+            {
+                expr->type = lastOperands[0].type.type;
+            }
+        }
+        if(!expr->type)
+            expr->type = m_astBuilder->getVoidType();
+
+        return expr;
+    }
 }

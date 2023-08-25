@@ -174,6 +174,23 @@
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">../../../external/spirv-headers/include/spirv/unified1/spirv.core.grammar.json;../../../bin/windows-x64/release/slang-lookup-generator.exe</AdditionalInputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release aarch64|ARM64'">../../../external/spirv-headers/include/spirv/unified1/spirv.core.grammar.json;../../../bin/windows-aarch64/release/slang-lookup-generator.exe</AdditionalInputs>
     </CustomBuild>
+    <CustomBuild Include="..\..\..\external\spirv\spirv-capabilities.txt">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">"../../../bin/windows-x86/debug/slang-lookup-generator" %(FullPath) $(SolutionDir)/source/slang/slang-lookup-spvcapability.cpp SpvCapability SpvCapability spirv/unified1/spirv.h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">"../../../bin/windows-x64/debug/slang-lookup-generator" %(FullPath) $(SolutionDir)/source/slang/slang-lookup-spvcapability.cpp SpvCapability SpvCapability spirv/unified1/spirv.h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug aarch64|ARM64'">"../../../bin/windows-aarch64/debug/slang-lookup-generator" %(FullPath) $(SolutionDir)/source/slang/slang-lookup-spvcapability.cpp SpvCapability SpvCapability spirv/unified1/spirv.h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"../../../bin/windows-x86/release/slang-lookup-generator" %(FullPath) $(SolutionDir)/source/slang/slang-lookup-spvcapability.cpp SpvCapability SpvCapability spirv/unified1/spirv.h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">"../../../bin/windows-x64/release/slang-lookup-generator" %(FullPath) $(SolutionDir)/source/slang/slang-lookup-spvcapability.cpp SpvCapability SpvCapability spirv/unified1/spirv.h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release aarch64|ARM64'">"../../../bin/windows-aarch64/release/slang-lookup-generator" %(FullPath) $(SolutionDir)/source/slang/slang-lookup-spvcapability.cpp SpvCapability SpvCapability spirv/unified1/spirv.h</Command>
+      <Outputs>../../../source/slang/slang-lookup-spvcapability.cpp</Outputs>
+      <Message>slang-lookup-generator for slang-lookup-spvcapability.cpp</Message>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">../../../external/spirv/spirv-capabilities.txt;../../../bin/windows-x86/debug/slang-lookup-generator.exe</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">../../../external/spirv/spirv-capabilities.txt;../../../bin/windows-x64/debug/slang-lookup-generator.exe</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug aarch64|ARM64'">../../../external/spirv/spirv-capabilities.txt;../../../bin/windows-aarch64/debug/slang-lookup-generator.exe</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">../../../external/spirv/spirv-capabilities.txt;../../../bin/windows-x86/release/slang-lookup-generator.exe</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">../../../external/spirv/spirv-capabilities.txt;../../../bin/windows-x64/release/slang-lookup-generator.exe</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release aarch64|ARM64'">../../../external/spirv/spirv-capabilities.txt;../../../bin/windows-aarch64/release/slang-lookup-generator.exe</AdditionalInputs>
+    </CustomBuild>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

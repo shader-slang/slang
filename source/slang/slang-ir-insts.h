@@ -2883,6 +2883,49 @@ struct IRDebugLine : IRInst
     IRInst* getColEnd() { return getOperand(4); }
 };
 
+struct IRSPIRVAsmOperand : IRInst
+{
+    IR_PARENT_ISA(SPIRVAsmOperand);
+    IRInst* getValue()
+    {
+        return getOperand(0);
+    }
+};
+
+struct IRSPIRVAsmInst : IRInst
+{
+    IR_LEAF_ISA(SPIRVAsmInst);
+
+    IRSPIRVAsmOperand* getOpcode()
+    {
+        // TODO: This only supports known opcodes at the moment, eventually we'll want
+        // another child of IRSPIRVAsm which just stores raw words
+        const auto opcodeOperand = cast<IRSPIRVAsmOperand>(getOperand(0));
+        SLANG_ASSERT(opcodeOperand->getOp() == kIROp_SPIRVAsmOperandEnum);
+        return opcodeOperand;
+    }
+
+    UnownedStringSlice getOpcodeString()
+    {
+        const auto opcodeOperand = getOpcode();
+        const auto opcodeStringLit = cast<IRStringLit>(opcodeOperand->getValue());
+        return opcodeStringLit->getStringSlice();
+    }
+
+    IROperandList<IRSPIRVAsmOperand> getSPIRVOperands()
+    {
+        return IROperandList<IRSPIRVAsmOperand>(getOperands() + 1, getOperands() + getOperandCount());
+    }
+};
+
+struct IRSPIRVAsm : IRInst
+{
+    IR_LEAF_ISA(SPIRVAsm);
+    IRFilteredInstList<IRSPIRVAsmInst> getInsts()
+    {
+        return IRFilteredInstList<IRSPIRVAsmInst>(getFirstChild(), getLastChild());
+    }
+};
 
 struct IRBuilderSourceLocRAII;
 
@@ -3870,6 +3913,13 @@ public:
     IRInst* emitShr(IRType* type, IRInst* op0, IRInst* op1);
     IRInst* emitShl(IRType* type, IRInst* op0, IRInst* op1);
 
+    IRSPIRVAsmOperand* emitSPIRVAsmOperandLiteral(IRInst* literal);
+    IRSPIRVAsmOperand* emitSPIRVAsmOperandInst(IRInst* inst);
+    IRSPIRVAsmOperand* emitSPIRVAsmOperandId(IRInst* inst);
+    IRSPIRVAsmOperand* emitSPIRVAsmOperandEnum(IRInst* inst);
+    IRSPIRVAsmInst* emitSPIRVAsmInst(IRInst* opcode, List<IRInst*> operands);
+    IRSPIRVAsm* emitSPIRVAsm(IRType* type);
+
     //
     // Decorations
     //
@@ -4074,6 +4124,11 @@ public:
     {
         SemanticVersion::IntegerType intValue = version.toInteger();
         addDecoration(value, kIROp_RequireSPIRVVersionDecoration, getIntValue(getBasicType(BaseType::UInt64), intValue));
+    }
+
+    void addRequireSPIRVCapabilityDecoration(IRInst* value, int32_t capabilityName)
+    {
+        addDecoration(value, kIROp_RequireSPIRVCapabilityDecoration, getIntValue(getIntType(), IRIntegerValue(capabilityName)));
     }
 
     void addRequireCUDASMVersionDecoration(IRInst* value, const SemanticVersion& version)

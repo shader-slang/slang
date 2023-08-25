@@ -233,13 +233,18 @@ DIAGNOSTIC(20008, Error, invalidOperator, "invalid operator '$0'.")
 DIAGNOSTIC(20011, Error, unexpectedColon, "unexpected ':'.")
 DIAGNOSTIC(20012, Error, invalidSPIRVVersion, "Expecting SPIR-V version as either 'major.minor', or quoted if has patch (eg for SPIR-V 1.2, '1.2' or \"1.2\"')")
 DIAGNOSTIC(20013, Error, invalidCUDASMVersion, "Expecting CUDA SM version as either 'major.minor', or quoted if has patch (eg for '7.0' or \"7.0\"')")
-
 DIAGNOSTIC(20014, Error, classIsReservedKeyword, "'class' is a reserved keyword in this context; use 'struct' instead.")
+DIAGNOSTIC(20015, Error, unknownSPIRVCapability, "unknown SPIR-V capability '$0'.")
 
 DIAGNOSTIC(20101, Warning, unintendedEmptyStatement, "potentially unintended empty statement at this location; use {} instead.")
 
-// 29xxx - Snippet parsing
+// 29xxx - Snippet parsing and inline asm
 DIAGNOSTIC(29000, Error, snippetParsingFailed, "unable to parse target intrinsic snippet: $0")
+
+DIAGNOSTIC(29100, Error, unrecognizedSPIRVOpcode, "unrecognized spirv opcode: $0")
+DIAGNOSTIC(29101, Error, misplacedResultIdMarker, "the result-id marker must only be used in the last instruction of a spriv_asm expression")
+DIAGNOSTIC(29102, Note,  considerOpCopyObject, "consider adding an OpCopyObject instruction to the end of the spirv_asm expression")
+DIAGNOSTIC(29103, Note,  noSuchAddress, "unable to take the address of this address-of asm operand")
 
 
 //

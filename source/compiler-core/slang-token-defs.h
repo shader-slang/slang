@@ -85,6 +85,7 @@ PUNCTUATION(Colon,          ":")
 PUNCTUATION(RightArrow,     "->")
 PUNCTUATION(At,             "@")
 PUNCTUATION(Dollar,         "$")
+PUNCTUATION(DollarDollar,   "$$")
 PUNCTUATION(Pound,          "#")
 PUNCTUATION(PoundPound,     "##")
 

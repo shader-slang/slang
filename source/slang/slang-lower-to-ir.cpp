@@ -3244,6 +3244,108 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
+    LoweredValInfo visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
+    {
+        // Although the surface syntax can have an empty ASM block, the IR asm
+        // block must have at least one inst
+        if(!expr->insts.getCount())
+            return LoweredValInfo{};
+
+        auto builder = context->irBuilder;
+
+        const auto type = lowerType(context, expr->type);
+        const auto spirvAsmInst = builder->emitSPIRVAsm(type);
+
+        const auto lowerOperand = [&](const SPIRVAsmOperand& operand) -> IRSPIRVAsmOperand* {
+            switch(operand.flavor)
+            {
+            case SPIRVAsmOperand::Literal:
+                {
+                    if(operand.token.type == TokenType::IntegerLiteral)
+                    {
+                        const auto v = getIntegerLiteralValue(operand.token);
+                        // TODO: we should sign-extend these where appropriate,
+                        // difficult because it requires information on usage...
+                        return builder->emitSPIRVAsmOperandLiteral(
+                            builder->getIntValue(builder->getUIntType(), v));
+                    }
+                    else if(operand.token.type == TokenType::StringLiteral)
+                    {
+                        const auto v = getStringLiteralTokenValue(operand.token);
+                        return builder->emitSPIRVAsmOperandLiteral(
+                            builder->getStringValue(v.getUnownedSlice()));
+                    }
+                    SLANG_UNREACHABLE("Unhandled literal type in visitSPIRVAsmExpr");
+                }
+            case SPIRVAsmOperand::Id:
+                {
+                    const auto id = operand.token.getContent();
+                    return builder->emitSPIRVAsmOperandId(
+                        builder->getStringValue(id));
+                }
+            case SPIRVAsmOperand::NamedValue:
+                {
+                    const auto id = operand.token.getContent();
+                    return builder->emitSPIRVAsmOperandEnum(
+                        builder->getStringValue(id));
+                }
+            case SPIRVAsmOperand::SlangValue:
+                {
+                    IRInst* i;
+                    {
+                        IRBuilderInsertLocScope insertScope(builder);
+                        builder->setInsertBefore(spirvAsmInst);
+                        i = getSimpleVal(context, lowerRValueExpr(context, operand.expr));
+                    }
+                    return builder->emitSPIRVAsmOperandInst(i);
+                }
+            case SPIRVAsmOperand::SlangValueAddr:
+                {
+                    IRInst* i;
+                    {
+                        IRBuilderInsertLocScope insertScope(builder);
+                        builder->setInsertBefore(spirvAsmInst);
+                        const auto addr = tryGetAddress(
+                            context,
+                            lowerLValueExpr(context, operand.expr),
+                            TryGetAddressMode::Default
+                        );
+                        if(addr.flavor == LoweredValInfo::Flavor::Ptr)
+                            i = addr.val;
+                        else
+                        {
+                            context->getSink()->diagnose(operand.expr, Diagnostics::noSuchAddress);
+                            return nullptr;
+                        }
+                    }
+                    return builder->emitSPIRVAsmOperandInst(i);
+                }
+            case SPIRVAsmOperand::SlangType:
+                {
+                    IRInst* i;
+                    {
+                        IRBuilderInsertLocScope insertScope(builder);
+                        builder->setInsertBefore(spirvAsmInst);
+                        i = lowerType(context, operand.type.type);
+                    }
+                    return builder->emitSPIRVAsmOperandInst(i);
+                }
+            }
+            SLANG_UNREACHABLE("Unhandled case in visitSPIRVAsmExpr");
+        };
+        IRBuilderInsertLocScope insertScope(builder);
+        builder->setInsertInto(spirvAsmInst);
+        for(const auto& inst : expr->insts)
+        {
+            const auto opcode = lowerOperand(inst.opcode);
+            List<IRInst*> operands;
+            for(const auto& operand : inst.operands)
+                operands.add(lowerOperand(operand));
+            builder->emitSPIRVAsmInst(opcode, operands);
+        }
+        return LoweredValInfo::simple(spirvAsmInst);
+    }
+
     LoweredValInfo visitIndexExpr(IndexExpr* expr)
     {
         auto type = lowerType(context, expr->type);
@@ -8736,29 +8838,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         addCatchAllIntrinsicDecorationIfNeeded(irFunc, decl);
 
-        // If this declaration requires certain GLSL extension (or a particular GLSL version)
-        // for it to be usable, then declare that here.
-        //
-        // TODO: We should wrap this an `SpecializedForTargetModifier` together into a single
-        // case for enumerating the "capabilities" that a declaration requires.
-        //
-        for (auto extensionMod : decl->getModifiersOfType<RequiredGLSLExtensionModifier>())
-        {
-            getBuilder()->addRequireGLSLExtensionDecoration(irFunc, extensionMod->extensionNameToken.getContent());
-        }
-        for (auto versionMod : decl->getModifiersOfType<RequiredGLSLVersionModifier>())
-        {
-            getBuilder()->addRequireGLSLVersionDecoration(irFunc, Int(getIntegerLiteralValue(versionMod->versionNumberToken)));
-        }
-        for (auto versionMod : decl->getModifiersOfType<RequiredSPIRVVersionModifier>())
-        {
-            getBuilder()->addRequireSPIRVVersionDecoration(irFunc, versionMod->version);
-        }
-        for (auto versionMod : decl->getModifiersOfType<RequiredCUDASMVersionModifier>())
-        {
-            getBuilder()->addRequireCUDASMVersionDecoration(irFunc, versionMod->version);
-        }
-
         // Register the value now, to avoid any possible infinite recursion when lowering ForwardDerivativeAttribute
         context->setGlobalValue(decl, LoweredValInfo::simple(findOuterMostGeneric(irFunc)));
 
@@ -8934,6 +9013,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 getBuilder()->addDecoration(irFunc, kIROp_PreferRecomputeDecoration);
             }
+            else if (auto extensionMod = as<RequiredGLSLExtensionModifier>(modifier))
+                getBuilder()->addRequireGLSLExtensionDecoration(irFunc, extensionMod->extensionNameToken.getContent());
+            else if (auto versionMod = as<RequiredGLSLVersionModifier>(modifier))
+                getBuilder()->addRequireGLSLVersionDecoration(irFunc, Int(getIntegerLiteralValue(versionMod->versionNumberToken)));
+            else if (auto spvVersion = as<RequiredSPIRVVersionModifier>(modifier))
+                getBuilder()->addRequireSPIRVVersionDecoration(irFunc, spvVersion->version);
+            else if (auto capMod = as<RequiredSPIRVCapabilityModifier>(modifier))
+                getBuilder()->addRequireSPIRVCapabilityDecoration(irFunc, capMod->capability);
+            else if (auto cudasmVersion = as<RequiredCUDASMVersionModifier>(modifier))
+                getBuilder()->addRequireCUDASMVersionDecoration(irFunc, cudasmVersion->version);
         }
 
         if (!isInline)

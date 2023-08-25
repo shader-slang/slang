@@ -644,6 +644,55 @@ struct ASTDumpContext
         m_writer->emit(")");
     }
 
+    void dump(const SPIRVAsmOperand& operand)
+    {
+        switch(operand.flavor)
+        {
+        case SPIRVAsmOperand::Id:
+            m_writer->emit("%");
+            break;
+        case SPIRVAsmOperand::Literal:
+        case SPIRVAsmOperand::NamedValue:
+            break;
+        case SPIRVAsmOperand::SlangValue:
+            m_writer->emit("$");
+            break;
+        case SPIRVAsmOperand::SlangValueAddr:
+            m_writer->emit("&");
+            break;
+        case SPIRVAsmOperand::SlangType:
+            m_writer->emit("$$");
+            break;
+        default:
+            SLANG_UNREACHABLE("Unhandled case in ast dump for SPIRVAsmOperand");
+        }
+        if(operand.expr)
+            dump(operand.expr);
+        else
+            dump(operand.token);
+    }
+
+    void dump(const SPIRVAsmInst& inst)
+    {
+        dump(inst.opcode);
+        for(const auto& o : inst.operands)
+            dump(o);
+    }
+
+    void dump(const SPIRVAsmExpr& expr)
+    {
+        m_writer->emit("spirv_asm\n");
+        m_writer->emit("{\n");
+        m_writer->indent();
+        for(const auto& i : expr.insts)
+        {
+            dump(i);
+            m_writer->emit(";\n");
+        }
+        m_writer->dedent();
+        m_writer->emit("}");
+    }
+
     void dumpObjectFull(NodeBase* node);
 
     ASTDumpContext(SourceWriter* writer, ASTDumpUtil::Flags flags, ASTDumpUtil::Style dumpStyle):
