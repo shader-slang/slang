@@ -405,9 +405,17 @@ public:
     {
         return dispatchIfNotNull(expr->originalExpr);
     }
-    bool visitSPIRVAsmExpr(SPIRVAsmExpr*)
+    bool visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
     {
-        SLANG_UNIMPLEMENTED_X(__func__);
+        for(const auto& i : expr->insts)
+        {
+            if(dispatchIfNotNull(i.opcode.expr))
+                return true;
+            for(const auto& o : i.operands)
+                if(dispatchIfNotNull(o.expr))
+                    return true;
+        }
+        return false;
     }
     bool visitModifiedTypeExpr(ModifiedTypeExpr* expr) { return dispatchIfNotNull(expr->base.exp); }
     bool visitFuncTypeExpr(FuncTypeExpr* expr)

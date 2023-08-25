@@ -283,9 +283,15 @@ struct ASTIterator
             dispatchIfNotNull(expr->innerExpr);
         }
 
-        void visitSPIRVAsmExpr(SPIRVAsmExpr*)
+        void visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
         {
-            SLANG_UNIMPLEMENTED_X(__func__);
+            iterator->maybeDispatchCallback(expr);
+            for(const auto& i : expr->insts)
+            {
+                dispatchIfNotNull(i.opcode.expr);
+                for(const auto& o : i.operands)
+                    dispatchIfNotNull(o.expr);
+            }
         }
     };
 
