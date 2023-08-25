@@ -3313,7 +3313,10 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                         if(addr.flavor == LoweredValInfo::Flavor::Ptr)
                             i = addr.val;
                         else
+                        {
                             context->getSink()->diagnose(operand.expr, Diagnostics::noSuchAddress);
+                            return nullptr;
+                        }
                     }
                     return builder->emitSPIRVAsmOperandInst(i);
                 }
