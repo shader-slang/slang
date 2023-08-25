@@ -6154,9 +6154,8 @@ namespace Slang
 
             VarExpr* varExpr = parser->astBuilder->create<VarExpr>();
             varExpr->scope = parser->currentScope;
-            parser->FillPosition(varExpr);
-            auto nameAndLoc = NameLoc(tok);
-            varExpr->name = nameAndLoc.name;
+            varExpr->loc = tok.getLoc();
+            varExpr->name = tok.getName();
             return SPIRVAsmOperand{flavor, tok, varExpr};
         };
 
