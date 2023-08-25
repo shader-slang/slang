@@ -3823,8 +3823,9 @@ struct SPIRVEmitContext
             }
 
             const auto parentForOpCode = [this](SpvOp opcode, SpvInstParent* defaultParent){
-                return opcode == SpvOpConstant
-                    ? getSection(SpvLogicalSectionID::ConstantsAndTypes)
+                return
+                    opcode == SpvOpConstant ? getSection(SpvLogicalSectionID::ConstantsAndTypes)
+                    : opcode == SpvOpName ? getSection(SpvLogicalSectionID::DebugNames)
                     : defaultParent;
             };
 
@@ -3900,6 +3901,10 @@ struct SPIRVEmitContext
                 }
             );
         }
+
+        for(const auto& [name, id] : idMap)
+            emitOpName(getSection(SpvLogicalSectionID::DebugNames), nullptr, id, name);
+
         return last;
     }
 
