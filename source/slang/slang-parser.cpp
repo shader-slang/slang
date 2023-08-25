@@ -6165,10 +6165,11 @@ namespace Slang
         {
             return SPIRVAsmOperand{SPIRVAsmOperand::NamedValue, parser->ReadToken()};
         }
-        // A literal integer
-        else if(parser->LookAheadToken(TokenType::IntegerLiteral))
+        // A literal integer or string
+        else if(parser->LookAheadToken(TokenType::IntegerLiteral)
+            || parser->LookAheadToken(TokenType::StringLiteral))
         {
-            return SPIRVAsmOperand{SPIRVAsmOperand::LiteralInteger, parser->ReadToken()};
+            return SPIRVAsmOperand{SPIRVAsmOperand::Literal, parser->ReadToken()};
         }
         // A %foo id
         else if(AdvanceIf(parser, TokenType::OpMod))

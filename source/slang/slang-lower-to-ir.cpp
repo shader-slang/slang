@@ -3256,16 +3256,26 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         const auto type = lowerType(context, expr->type);
         const auto spirvAsmInst = builder->emitSPIRVAsm(type);
 
-        const auto lowerOperand = [&](const SPIRVAsmOperand& operand) {
+        const auto lowerOperand = [&](const SPIRVAsmOperand& operand) -> IRSPIRVAsmOperand* {
             switch(operand.flavor)
             {
-            case SPIRVAsmOperand::LiteralInteger:
+            case SPIRVAsmOperand::Literal:
                 {
-                    const auto v = getIntegerLiteralValue(operand.token);
-                    // TODO: we should sign-extend these where appropriate,
-                    // difficult because it requires information on usage...
-                    return builder->emitSPIRVAsmOperandLiteral(
-                        builder->getIntValue(builder->getUIntType(), v));
+                    if(operand.token.type == TokenType::IntegerLiteral)
+                    {
+                        const auto v = getIntegerLiteralValue(operand.token);
+                        // TODO: we should sign-extend these where appropriate,
+                        // difficult because it requires information on usage...
+                        return builder->emitSPIRVAsmOperandLiteral(
+                            builder->getIntValue(builder->getUIntType(), v));
+                    }
+                    else if(operand.token.type == TokenType::StringLiteral)
+                    {
+                        const auto v = getStringLiteralTokenValue(operand.token);
+                        return builder->emitSPIRVAsmOperandLiteral(
+                            builder->getStringValue(v.getUnownedSlice()));
+                    }
+                    SLANG_UNREACHABLE("Unhandled literal type in visitSPIRVAsmExpr");
                 }
             case SPIRVAsmOperand::Id:
                 {

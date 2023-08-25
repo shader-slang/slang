@@ -638,7 +638,7 @@ class SPIRVAsmOperand
 public:
     enum Flavor
     {
-        LiteralInteger, // No prefix
+        Literal, // No prefix
         Id, // Prefixed with %
         NamedValue, // An identifier
         SlangValue,
