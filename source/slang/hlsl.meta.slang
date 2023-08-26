@@ -4211,11 +4211,28 @@ WaveMask WaveGetActiveMask()
 }
 
 __glsl_extension(GL_KHR_shader_subgroup_basic)
+__spirv_capability(GroupNonUniformBallot)
 __spirv_version(1.3)
-__target_intrinsic(glsl, "subgroupElect()")
-__target_intrinsic(cuda, "(($0 & -$0) == (WarpMask(1) << _getLaneId()))")
-__target_intrinsic(hlsl, "WaveIsFirstLane()")
-bool WaveMaskIsFirstLane(WaveMask mask);
+bool WaveMaskIsFirstLane(WaveMask mask)
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupElect()";
+    case cuda:
+        __intrinsic_asm "(($0 & -$0) == (WarpMask(1) << _getLaneId()))";
+    case hlsl:
+        __intrinsic_asm "WaveIsFirstLane()";
+    case spirv:
+        let _scope = 3u; // subgroup
+        return spirv_asm
+        {
+            OpGroupNonUniformElect $$bool result $_scope
+        };
+    default:
+        return false;
+    }
+}
 
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
@@ -4983,12 +5000,25 @@ __target_intrinsic(cuda, "_getLaneId()")
 uint WaveGetLaneIndex();
 
 __glsl_extension(GL_KHR_shader_subgroup_basic)
+__spirv_capability(GroupNonUniformBallot)
 __spirv_version(1.3)
-__target_intrinsic(glsl, "subgroupElect()")
-__target_intrinsic(hlsl)
 bool WaveIsFirstLane()
 {
-    return WaveMaskIsFirstLane(WaveGetActiveMask());
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupElect()";
+    case hlsl:
+        __intrinsic_asm "WaveIsFirstLane()";
+    case spirv:
+        let _scope = 3u; // subgroup
+        return spirv_asm
+        {
+            OpGroupNonUniformElect $$bool result $_scope
+        };
+    default:
+        return WaveMaskIsFirstLane(WaveGetActiveMask());
+    }
 }
 
 // It's useful to have a wave uint4 version of countbits, because some wave functions return uint4.
