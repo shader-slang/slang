@@ -5717,6 +5717,49 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         }
     }
 
+    void visitTargetSwitchStmt(TargetSwitchStmt* stmt)
+    {
+        auto builder = getBuilder();
+        startBlockIfNeeded(stmt);
+        auto initialBlock = builder->getBlock();
+        auto breakLabel = builder->createBlock();
+        context->shared->breakLabels.add(stmt, breakLabel);
+        builder->setInsertInto(initialBlock->getParent());
+        List<IRInst*> args;
+        args.add(breakLabel);
+        Dictionary<Stmt*, IRBlock*> mapCaseStmtToBlock;
+        for (auto targetCase : stmt->targetCases)
+        {
+            IRBlock* caseBlock = nullptr;
+            if (!mapCaseStmtToBlock.tryGetValue(targetCase->body, caseBlock))
+            {
+                caseBlock = builder->emitBlock();
+                lowerStmt(context, targetCase->body);
+                mapCaseStmtToBlock.add(targetCase->body, caseBlock);
+                if (!builder->getBlock()->getTerminator())
+                    builder->emitBranch(breakLabel);
+            }
+            args.add(builder->getIntValue(builder->getIntType(), targetCase->capability));
+            args.add(caseBlock);
+        }
+        context->shared->breakLabels.remove(stmt);
+        builder->setInsertInto(initialBlock);
+        builder->emitIntrinsicInst(nullptr, kIROp_TargetSwitch, (UInt)args.getCount(), args.getBuffer());
+        insertBlock(breakLabel);
+    }
+
+    void visitTargetCaseStmt(TargetCaseStmt*)
+    {
+        SLANG_UNREACHABLE("lowering target case");
+    }
+
+    void visitIntrinsicAsmStmt(IntrinsicAsmStmt* stmt)
+    {
+        auto builder = getBuilder();
+        IRInst* arg = builder->getStringValue(stmt->asmText.getUnownedSlice());
+        builder->emitIntrinsicInst(nullptr, kIROp_GenericAsm, 1, &arg);
+    }
+
     void visitSwitchStmt(SwitchStmt* stmt)
     {
         auto builder = getBuilder();

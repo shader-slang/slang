@@ -512,6 +512,7 @@ namespace Slang
         case kIROp_Unreachable:
         case kIROp_MissingReturn:
         case kIROp_discard:
+        case kIROp_GenericAsm:
             break;
 
         case kIROp_unconditionalBranch:
@@ -538,7 +539,11 @@ namespace Slang
             end = operands + terminator->getOperandCount() + 1;
             stride = 2;
             break;
-
+        case kIROp_TargetSwitch:
+            begin = operands + 2;
+            end = operands + terminator->getOperandCount() + 1;
+            stride = 2;
+            break;
         default:
             SLANG_UNEXPECTED("unhandled terminator instruction");
             UNREACHABLE_RETURN(IRBlock::SuccessorList(nullptr, nullptr));
@@ -5740,6 +5745,12 @@ namespace Slang
         );
         addInst(asmInst);
         return asmInst;
+    }
+
+    IRInst* IRBuilder::emitGenericAsm(UnownedStringSlice asmText)
+    {
+        IRInst* arg = getStringValue(asmText);
+        return emitIntrinsicInst(nullptr, kIROp_GenericAsm, 1, &arg);
     }
 
     //

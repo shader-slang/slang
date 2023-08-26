@@ -996,29 +996,78 @@ matrix<T, N, M> acos(matrix<T, N, M> x)
 
 // Test if all components are non-zero (HLSL SM 1.0)
 __generic<T : __BuiltinType>
-__target_intrinsic(cpp, "bool($0)")
-__target_intrinsic(cuda, "bool($0)")
-__target_intrinsic(glsl, "bool($0)")
-__target_intrinsic(spirv, boolean(T), "OpCopyObject resultType resultId _0")
-__target_intrinsic(spirv, integral(T), "OpINotEqual resultType resultId _0 const(,0)")
-__target_intrinsic(spirv, floating(T), "OpFUnordNotEqual resultType resultId _0 const(,0)")
 [__readNone]
-bool all(T x);
+bool all(T x)
+{
+    __target_switch
+    {
+    default:
+        __intrinsic_asm "bool($0)";
+    case hlsl:
+        __intrinsic_asm "all";
+    case spirv:
+        let zero = __default<T>();
+        if (__isInt<T>())
+            return spirv_asm
+            {
+                OpINotEqual $$bool result $x $zero
+            };
+        else if (__isFloat<T>())
+            return spirv_asm
+            {
+                OpFUnordNotEqual $$bool result $x $zero
+            };
+        else if (__isBool<T>())
+            return __slang_noop_cast<bool>(x);
+    }
+}
 
 __generic<T : __BuiltinType, let N : int>
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl, "all(bvec$N0($0))")
-__target_intrinsic(spirv, boolean(T), "OpAll resultType resultId _0")
+//__target_intrinsic(hlsl)
+//__target_intrinsic(glsl, "all(bvec$N0($0))")
+//__target_intrinsic(spirv, boolean(T), "OpAll resultType resultId _0")
 // TODO: correct resultType in here
 // __target_intrinsic(spirv, integral(T), "%c = OpINotEqual {vector<bool,N>} resultId _0 const(,0); OpAll resultType resultId %c")
 // __target_intrinsic(spirv, floating(T), "%c = OpFUnordNotEqual {vector<bool,N>} resultId _0 const(,0); OpAll resultType resultId %c")
 [__readNone]
 bool all(vector<T,N> x)
 {
-    bool result = true;
-    for(int i = 0; i < N; ++i)
-        result = result && all(x[i]);
-    return result;
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "all";
+    case glsl:
+        __intrinsic_asm "all(bvec$N0($0))";
+    case spirv:
+        if (__isBool<T>())
+            return spirv_asm
+            {
+                OpAll $$bool result $x
+            };
+        else if (__isInt<T>())
+        {
+            let zero = __default<vector<T,N>>();
+            return spirv_asm
+            {
+                OpINotEqual $$vector<bool,N> %castResult $x $zero;
+                OpAll $$bool result %castResult
+            };
+        }
+        else
+        {
+            let zero = __default<T>();
+            return spirv_asm
+            {
+                OpFUnordNotEqual $$vector<bool,N> %castResult $x $zero;
+                OpAll $$bool result %castResult
+            };
+        }
+    default:
+        bool result = true;
+        for(int i = 0; i < N; ++i)
+            result = result && all(x[i]);
+        return result;
+    }
 }
 
 __generic<T : __BuiltinType, let N : int, let M : int>
@@ -1045,25 +1094,72 @@ void AllMemoryBarrierWithGroupSync();
 // Test if any components is non-zero (HLSL SM 1.0)
 
 __generic<T : __BuiltinType>
-__target_intrinsic(cpp, "bool($0)")
-__target_intrinsic(cuda, "bool($0)")
-__target_intrinsic(glsl, "bool($0)")
-__target_intrinsic(spirv, boolean(T), "OpCopyObject resultType resultId _0")
-__target_intrinsic(spirv, integral(T), "OpINotEqual resultType resultId _0 const(,0)")
-__target_intrinsic(spirv, floating(T), "OpFUnordNotEqual resultType resultId _0 const(,0)")
 [__readNone]
-bool any(T x);
+bool any(T x)
+{
+    __target_switch
+    {
+    default:
+        __intrinsic_asm "bool($0)";
+    case hlsl:
+        __intrinsic_asm "any";
+    case spirv:
+        let zero = __default<T>();
+        if (__isInt<T>())
+            return spirv_asm
+            {
+                OpINotEqual $$bool result $x $zero
+            };
+        else if (__isFloat<T>())
+            return spirv_asm
+            {
+                OpFUnordNotEqual $$bool result $x $zero
+            };
+        else if (__isBool<T>())
+            return __slang_noop_cast<bool>(x);
+    }
+}
 
 __generic<T : __BuiltinType, let N : int>
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl, "any(bvec$N0($0))")
 [__readNone]
 bool any(vector<T, N> x)
 {
-    bool result = false;
-    for(int i = 0; i < N; ++i)
-        result = result || any(x[i]);
-    return result;
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "any";
+    case glsl:
+        __intrinsic_asm "any(bvec$N0($0))";
+    case spirv:
+        if (__isBool<T>())
+            return spirv_asm
+            {
+                OpAny $$bool result $x
+            };
+        else if (__isInt<T>())
+        {
+            let zero = __default<vector<T,N>>();
+            return spirv_asm
+            {
+                OpINotEqual $$vector<bool,N> %castResult $x $zero;
+                OpAny $$bool result %castResult
+            };
+        }
+        else
+        {
+            let zero = __default<T>();
+            return spirv_asm
+            {
+                OpFUnordNotEqual $$vector<bool,N> %castResult $x $zero;
+                OpAny $$bool result %castResult
+            };
+        }
+    default:
+        bool result = false;
+        for(int i = 0; i < N; ++i)
+            result = result || any(x[i]);
+        return result;
+    }
 }
 
 __generic<T : __BuiltinType, let N : int, let M : int>

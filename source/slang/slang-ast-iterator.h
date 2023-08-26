@@ -372,6 +372,21 @@ struct ASTIterator
             iterator->visitExpr(stmt->expr);
         }
 
+        void visitTargetSwitchStmt(TargetSwitchStmt* stmt)
+        {
+            iterator->maybeDispatchCallback(stmt);
+            for (auto c : stmt->targetCases)
+                dispatchIfNotNull(c);
+        }
+
+        void visitTargetCaseStmt(TargetCaseStmt* stmt)
+        {
+            iterator->maybeDispatchCallback(stmt);
+            iterator->visitStmt(stmt->body);
+        }
+
+        void visitIntrinsicAsmStmt(IntrinsicAsmStmt*) {}
+
         void visitDefaultStmt(DefaultStmt* stmt) { iterator->maybeDispatchCallback(stmt); }
 
         void visitIfStmt(IfStmt* stmt)

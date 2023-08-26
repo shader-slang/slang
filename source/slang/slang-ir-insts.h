@@ -2342,6 +2342,16 @@ struct IRSwitch : IRTerminatorInst
     IRUse* getCaseLabelUse(UInt index) { return getOperands() + 3 + index * 2 + 1; }
 };
 
+// A compile-time switch based on the current code generation target.
+struct IRTargetSwitch : IRTerminatorInst
+{
+    IR_LEAF_ISA(TargetSwitch)
+    IRInst* getBreakBlock() { return getOperand(0); }
+    UInt getCaseCount() { return (getOperandCount() - 1) / 2; }
+    IRBlock* getCaseBlock(UInt index) { return (IRBlock*)getOperand(index * 2 + 2); }
+    IRInst* getCaseValue(UInt index) { return getOperand(index * 2 + 1); }
+};
+
 struct IRThrow : IRTerminatorInst
 {
     IR_LEAF_ISA(Throw);
@@ -2925,6 +2935,12 @@ struct IRSPIRVAsm : IRInst
     {
         return IRFilteredInstList<IRSPIRVAsmInst>(getFirstChild(), getLastChild());
     }
+};
+
+struct IRGenericAsm : IRInst
+{
+    IR_LEAF_ISA(GenericAsm)
+    UnownedStringSlice getAsm() { return as<IRStringLit>(getOperand(0))->getStringSlice(); }
 };
 
 struct IRBuilderSourceLocRAII;
@@ -3919,7 +3935,7 @@ public:
     IRSPIRVAsmOperand* emitSPIRVAsmOperandEnum(IRInst* inst);
     IRSPIRVAsmInst* emitSPIRVAsmInst(IRInst* opcode, List<IRInst*> operands);
     IRSPIRVAsm* emitSPIRVAsm(IRType* type);
-
+    IRInst* emitGenericAsm(UnownedStringSlice asmText);
     //
     // Decorations
     //
