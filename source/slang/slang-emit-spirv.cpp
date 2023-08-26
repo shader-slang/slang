@@ -3809,11 +3809,10 @@ struct SPIRVEmitContext
         {
             const bool isLast = spvInst == inst->getLastChild();
             const auto opcodeString = spvInst->getOpcodeString();
-            SpvOp opcode;
-            const bool foundOpCode = lookupSpvOp(opcodeString, opcode)
-                || lookupSpvOp((String("Op") + opcodeString).getUnownedSlice(), opcode);
-            if(!foundOpCode)
+            SpvOp opcode = m_grammarInfo->lookupSpvOp(opcodeString);
+            if(opcode == SpvOpMax)
             {
+                // TODO: https://github.com/shader-slang/slang/issues/3155
                 m_sink->diagnose(
                     spvInst->getOpcode(),
                     Diagnostics::unrecognizedSPIRVOpcode,

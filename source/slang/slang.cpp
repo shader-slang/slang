@@ -220,6 +220,9 @@ void Session::init()
     m_languagePreludes[Index(SourceLanguage::CUDA)] = get_slang_cuda_prelude();
     m_languagePreludes[Index(SourceLanguage::CPP)] = get_slang_cpp_prelude();
     m_languagePreludes[Index(SourceLanguage::HLSL)] = get_slang_hlsl_prelude();
+
+    if(!spirvCoreGrammarInfo)
+        spirvCoreGrammarInfo = getEmbeddedSPIRVCoreGrammarInfo();
 }
 
 void Session::_initCodeGenTransitionMap()
@@ -803,6 +806,34 @@ IDownstreamCompiler* Session::getDownstreamCompiler(CodeGenTarget source, CodeGe
 {
     PassThroughMode compilerType = (PassThroughMode)getDownstreamCompilerForTransition(SlangCompileTarget(source), SlangCompileTarget(target));
     return getOrLoadDownstreamCompiler(compilerType, nullptr);
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL Session::setSPIRVCoreGrammar(char const* jsonPath)
+{
+    if(!jsonPath)
+    {
+        spirvCoreGrammarInfo = getEmbeddedSPIRVCoreGrammarInfo();
+        SLANG_ASSERT(spirvCoreGrammarInfo);
+    }
+    else
+    {
+        SourceManager* sourceManager = getBuiltinSourceManager();
+        SLANG_ASSERT(sourceManager);
+        DiagnosticSink sink(sourceManager, Lexer::sourceLocationLexer);
+
+        String contents;
+        const auto readRes = File::readAllText(jsonPath, contents);
+        if(SLANG_FAILED(readRes))
+        {
+            sink.diagnose(SourceLoc{}, Diagnostics::unableToReadFile, jsonPath);
+            return readRes;
+        }
+        const auto pathInfo = PathInfo::makeFromString(jsonPath);
+        const auto sourceFile = sourceManager->createSourceFileWithString(pathInfo, contents);
+        const auto sourceView = sourceManager->createSourceView(sourceFile, nullptr, SourceLoc());
+        spirvCoreGrammarInfo = loadSPIRVCoreGrammarInfo(*sourceView, sink);
+    }
+    return spirvCoreGrammarInfo ? SLANG_OK : SLANG_FAIL;
 }
 
 Profile getEffectiveProfile(EntryPoint* entryPoint, TargetRequest* target)

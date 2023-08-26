@@ -3,8 +3,53 @@
 
 #include "slang-rtti-info.h"
 
-namespace Slang {
+// Some macros to help generate StructRttiInfo for structs without too much
+// boilerplate, use as so:
+//
+// struct MyStruct
+// {
+//     int an_optional_field;
+//     List<UnownedStringSlice> a_list_of_strings_field;
+// }
+// SLANG_MAKE_STRUCT_RTTI_INFO(
+//     MyStruct,
+//     SLANG_OPTIONAL_RTTI_FIELD(an_optional_field),
+//     SLANG_RTTI_FIELD(a_list_of_strings_field)
+//  );
+//
+// This allows parsing JSON objects like
+// {
+//     "an_optional_field": 10,
+//     "a_list_of_strings_field": ["hello", "world"]
+// }
+//
+// Convert from such JSON objects using JSONToNativeConverter::convert
 
+#define SLANG_MAKE_STRUCT_RTTI_INFO(S, ...) \
+    template<> \
+    struct GetRttiInfo<S> \
+    { \
+        static const RttiInfo* get() \
+        { \
+            using S_ = S; \
+            const static StructRttiInfo::Field fs[] = {__VA_ARGS__}; \
+            const auto ignoreUnknownFields = true; \
+            const static auto ret = StructRttiInfo{ \
+                {{RttiInfo::Kind::Struct, alignof(S), sizeof(S)}, #S}, \
+                nullptr, \
+                SLANG_COUNT_OF(fs), \
+                fs, \
+                ignoreUnknownFields \
+            }; \
+            return &ret; \
+        } \
+    };
+#define SLANG_RTTI_FIELD_IMPL(m, name, flags) \
+    {name, GetRttiInfo<decltype(S_::m)>::get(), offsetof(S_, m), flags}
+#define SLANG_RTTI_FIELD(m) SLANG_RTTI_FIELD_IMPL(m, #m, 0)
+#define SLANG_OPTIONAL_RTTI_FIELD(m) SLANG_RTTI_FIELD_IMPL(m, #m, StructRttiInfo::Flag::Optional)
+
+namespace Slang {
 
 struct RttiUtil
 {

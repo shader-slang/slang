@@ -9,6 +9,7 @@
 #include "slang-math.h"
 #include "slang-hash.h"
 #include "../../external/unordered_dense/include/ankerl/unordered_dense.h"
+#include <initializer_list>
 
 namespace Slang
 {
@@ -87,6 +88,16 @@ namespace Slang
         using ThisType = Dictionary<TKey, TValue, Hash, KeyEqual>;
         InnerMap map;
     public:
+        Dictionary() = default;
+        Dictionary(const Dictionary&) = default;
+        Dictionary(Dictionary&&) = default;
+        ThisType& operator=(const ThisType&) = default;
+        ThisType& operator=(ThisType&&) = default;
+        Dictionary(std::initializer_list<typename InnerMap::value_type> inits)
+            : map(std::move(inits))
+        {
+        }
+
         //
         // Types
         //

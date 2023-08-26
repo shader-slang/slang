@@ -3,6 +3,7 @@
 #include "slang-ir-spirv-snippet.h"
 #include "slang-lookup-spirv.h"
 #include "../core/slang-token-reader.h"
+#include "../compiler-core/slang-spirv-core-grammar.h"
 
 namespace Slang
 {
@@ -85,7 +86,9 @@ SpvWord readWordOrWordLiteral(Misc::TokenReader& reader)
     return ret;
 }
 
-RefPtr<SpvSnippet> SpvSnippet::parse(UnownedStringSlice definition)
+RefPtr<SpvSnippet> SpvSnippet::parse(
+    const SPIRVCoreGrammarInfo& spirvGrammar,
+    UnownedStringSlice definition)
 {
     RefPtr<SpvSnippet> snippet = new SpvSnippet();
     try
@@ -118,7 +121,8 @@ RefPtr<SpvSnippet> SpvSnippet::parse(UnownedStringSlice definition)
             case Slang::Misc::TokenType::Identifier:
             {
                 auto opName = tokenReader.ReadWord();
-                if(!lookupSpvOp(opName.getUnownedSlice(), opCode))
+                opCode = spirvGrammar.lookupSpvOp(opName.getUnownedSlice());
+                if(opCode == SpvOpMax)
                 {
                     throw Misc::TextFormatException(
                         "Text parsing error: Unrecognized SPIR-V opcode: " + opName);
