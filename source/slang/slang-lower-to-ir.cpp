@@ -9063,7 +9063,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             else if (auto spvVersion = as<RequiredSPIRVVersionModifier>(modifier))
                 getBuilder()->addRequireSPIRVVersionDecoration(irFunc, spvVersion->version);
             else if (auto capMod = as<RequiredSPIRVCapabilityModifier>(modifier))
-                getBuilder()->addRequireSPIRVCapabilityDecoration(irFunc, capMod->capability);
+                getBuilder()->addRequireSPIRVCapabilityDecoration(irFunc, capMod->capability, capMod->extensionName.getUnownedSlice());
             else if (auto cudasmVersion = as<RequiredCUDASMVersionModifier>(modifier))
                 getBuilder()->addRequireCUDASMVersionDecoration(irFunc, cudasmVersion->version);
         }

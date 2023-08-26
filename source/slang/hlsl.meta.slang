@@ -4162,22 +4162,52 @@ matrix<T, N, M> trunc(matrix<T, N, M> x)
 typedef uint WaveMask;
 
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
+__spirv_capability(GroupNonUniformBallot)
 __spirv_version(1.3)
-__target_intrinsic(glsl, "subgroupBallot(true).x")
-__target_intrinsic(cuda, "__activemask()")
-__target_intrinsic(hlsl, "WaveActiveBallot(true).x")
-WaveMask WaveGetConvergedMask();
+WaveMask WaveGetConvergedMask()
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupBallot(true).x";
+    case hlsl:
+        __intrinsic_asm "WaveActiveBallot(true).x";
+    case cuda:
+        __intrinsic_asm "__activemask()";
+    case spirv:
+        let _true = true;
+        let _scope = 3; // subgroup
+        return (spirv_asm
+        {
+            OpGroupNonUniformBallot $$uint4 result $_scope $_true
+        }).x;
+    }
+}
 
 __intrinsic_op($(kIROp_WaveGetActiveMask))
 WaveMask __WaveGetActiveMask();
 
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
+__spirv_capability(GroupNonUniformBallot)
 __spirv_version(1.3)
-__target_intrinsic(glsl, "subgroupBallot(true).x")
-__target_intrinsic(hlsl, "WaveActiveBallot(true).x")
 WaveMask WaveGetActiveMask()
 {
-    return __WaveGetActiveMask();
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupBallot(true).x";
+    case hlsl:
+        __intrinsic_asm "WaveActiveBallot(true).x";
+    case spirv:
+        let _true = true;
+        let _scope = 3; // subgroup
+        return (spirv_asm
+        {
+            OpGroupNonUniformBallot $$uint4 result $_scope $_true
+        }).x;
+    default:
+        return __WaveGetActiveMask();
+    }
 }
 
 __glsl_extension(GL_KHR_shader_subgroup_basic)
@@ -4209,11 +4239,19 @@ __target_intrinsic(hlsl, "WaveActiveBallot($1)")
 WaveMask WaveMaskBallot(WaveMask mask, bool condition);
 
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
-__target_intrinsic(cuda, "__popc(__ballot_sync($0, $1))")
-__target_intrinsic(hlsl, "WaveActiveCountBits($1)")
+__spirv_version(1.3)
+__spirv_capability(GroupNonUniformBallot)
 uint WaveMaskCountBits(WaveMask mask, bool value)
 {
-    return _WaveCountBits(WaveActiveBallot(value));
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm  "__popc(__ballot_sync($0, $1))";
+    case hlsl:
+        __intrinsic_asm  "WaveActiveCountBits($1)";
+    default:
+        return _WaveCountBits(WaveActiveBallot(value));
+    }
 }
 
 // Waits until all warp lanes named in mask have executed a WaveMaskSharedSync (with the same mask)
@@ -4906,11 +4944,24 @@ bool WaveActiveAnyTrue(bool condition)
 
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
-__target_intrinsic(glsl, "subgroupBallot($0)")
-__target_intrinsic(hlsl)
+__spirv_capability(GroupNonUniformBallot)
 uint4 WaveActiveBallot(bool condition)
 {
-    return WaveMaskBallot(WaveGetActiveMask(), condition);
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupBallot($0)";
+    case hlsl:
+        __intrinsic_asm "WaveActiveBallot";
+    case spirv:
+        let _scope = 3u; // Subgroup
+        return spirv_asm
+        {
+            OpGroupNonUniformBallot $$uint4 result $_scope $condition
+        };
+    default:
+        return WaveMaskBallot(WaveGetActiveMask(), condition);
+    }
 }
 
 __target_intrinsic(hlsl)
@@ -4942,17 +4993,28 @@ bool WaveIsFirstLane()
 
 // It's useful to have a wave uint4 version of countbits, because some wave functions return uint4.
 // This implementation tries to limit the amount of work required by the actual lane count.
+__spirv_capability(GroupNonUniformBallot)
 uint _WaveCountBits(uint4 value)
 {
-    // Assume since WaveGetLaneCount should be known at compile time, the branches will hopefully boil away
-    const uint waveLaneCount = WaveGetLaneCount();
-    switch ((waveLaneCount - 1) / 32)
+    __target_switch
     {
-        default:
-        case 0: return countbits(value.x);
-        case 1: return countbits(value.x) + countbits(value.y);
-        case 2: return countbits(value.x) + countbits(value.y) + countbits(value.z);
-        case 3: return countbits(value.x) + countbits(value.y) + countbits(value.z) + countbits(value.w);
+    case spirv:
+        let _scope = 3u; // Subgroup
+        return spirv_asm
+        {
+            OpGroupNonUniformBallotBitCount $$uint result $_scope 0 $value
+        };
+    default:
+        // Assume since WaveGetLaneCount should be known at compile time, the branches will hopefully boil away
+        const uint waveLaneCount = WaveGetLaneCount();
+        switch ((waveLaneCount - 1) / 32)
+        {
+            default:
+            case 0: return countbits(value.x);
+            case 1: return countbits(value.x) + countbits(value.y);
+            case 2: return countbits(value.x) + countbits(value.y) + countbits(value.z);
+            case 3: return countbits(value.x) + countbits(value.y) + countbits(value.z) + countbits(value.w);
+        }
     }
 }
 

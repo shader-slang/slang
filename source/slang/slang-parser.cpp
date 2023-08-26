@@ -4240,6 +4240,8 @@ namespace Slang
                     Diagnostics::unexpectedTokenExpectedTokenType,
                     parser->tokenReader.peekToken(),
                     "'case' or 'default'");
+                parser->isRecovering = true;
+                goto recover;
             }
             else
             {
@@ -4285,6 +4287,7 @@ namespace Slang
                     stmt->targetCases.add(targetCase);
                 }
             }
+        recover:;
             TryRecover(parser);
         }
         return stmt;
@@ -6761,13 +6764,19 @@ namespace Slang
 
     static NodeBase* parseSPIRVCapabilityModifier(Parser* parser, void*)
     {
-        Token token;
-        token = parser->ReadToken();
+        parser->ReadToken(TokenType::LParent);
+        Token token = parser->ReadToken(TokenType::Identifier);
         auto modifier = parser->astBuilder->create<RequiredSPIRVCapabilityModifier>();
         SpvCapability cap;
         if (!lookupSpvCapability(token.getContent(), cap))
             parser->sink->diagnose(token, Diagnostics::unknownSPIRVCapability, token);
+        if (AdvanceIf(parser, TokenType::Comma))
+        {
+            auto extensionName = parser->ReadToken(TokenType::Identifier);
+            modifier->extensionName = extensionName.getContent();
+        }
         modifier->capability = (int32_t)cap;
+        parser->ReadToken(TokenType::RParent);
         return modifier;
     }
 

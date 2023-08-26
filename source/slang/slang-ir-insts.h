@@ -4142,9 +4142,23 @@ public:
         addDecoration(value, kIROp_RequireSPIRVVersionDecoration, getIntValue(getBasicType(BaseType::UInt64), intValue));
     }
 
-    void addRequireSPIRVCapabilityDecoration(IRInst* value, int32_t capabilityName)
+    void addRequireSPIRVCapabilityDecoration(IRInst* value, int32_t capabilityName, UnownedStringSlice extensionName)
     {
-        addDecoration(value, kIROp_RequireSPIRVCapabilityDecoration, getIntValue(getIntType(), IRIntegerValue(capabilityName)));
+        if (extensionName.getLength())
+        {
+            addDecoration(
+                value,
+                kIROp_RequireSPIRVCapabilityDecoration,
+                getIntValue(getIntType(), IRIntegerValue(capabilityName)),
+                getStringValue(extensionName));
+        }
+        else
+        {
+            addDecoration(
+                value,
+                kIROp_RequireSPIRVCapabilityDecoration,
+                getIntValue(getIntType(), IRIntegerValue(capabilityName)));
+        }
     }
 
     void addRequireCUDASMVersionDecoration(IRInst* value, const SemanticVersion& version)

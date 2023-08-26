@@ -3932,6 +3932,12 @@ struct SPIRVEmitContext
                 break;
             case kIROp_RequireSPIRVCapabilityDecoration:
                 requireSPIRVCapability((SpvCapability)getIntVal(decoration->getOperand(0)));
+                if (decoration->getOperandCount() == 2)
+                {
+                    auto stringLit = as<IRStringLit>(decoration->getOperand(1));
+                    if (stringLit->getStringSlice().getLength())
+                        ensureExtensionDeclaration(stringLit->getStringSlice());
+                }
                 break;
             }
         }
