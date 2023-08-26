@@ -150,7 +150,7 @@ enum class OptionKind
     SaveStdLibBinSource,
     TrackLiveness,
 
-    // Depreciated
+    // Deprecated
     ParameterBlocksUseRegisterSpaces,
 
     CountOf,
@@ -224,7 +224,7 @@ void initCommandOptions(CommandOptions& options)
     options.addCategory(CategoryKind::Option, "Debugging", "Compiler debugging/instrumentation options");
     options.addCategory(CategoryKind::Option, "Experimental", "Experimental options (use at your own risk)");
     options.addCategory(CategoryKind::Option, "Internal", "Internal-use options (use at your own risk)");
-    options.addCategory(CategoryKind::Option, "Depreciated", "Deprecated options (allowed but ignored; may be removed in future)");
+    options.addCategory(CategoryKind::Option, "Deprecated", "Deprecated options (allowed but ignored; may be removed in future)");
 
     // Do the easy ones
     {
@@ -626,15 +626,15 @@ void initCommandOptions(CommandOptions& options)
     };
     _addOptions(makeConstArrayView(internalOpts), options);
 
-    /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Depreciated !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+    /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Deprecated !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-    options.setCategory("Depreciated");
+    options.setCategory("Deprecated");
 
-    const Option depreciatedOpts[] = 
+    const Option deprecatedOpts[] =
     {
         { OptionKind::ParameterBlocksUseRegisterSpaces, "-parameter-blocks-use-register-spaces", nullptr, "Parameter blocks will use register spaces" },
     };
-    _addOptions(makeConstArrayView(depreciatedOpts), options);
+    _addOptions(makeConstArrayView(deprecatedOpts), options);
 
     // We can now check that the whole range is available. If this fails it means there 
     // is an enum in the list that hasn't been setup as an option!
