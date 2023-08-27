@@ -111,12 +111,12 @@ SLANG_MAKE_STRUCT_RTTI_INFO(
     SLANG_RTTI_FIELD(operand_kinds)
 );
 
-static Dictionary<String, SpvWord> operandKindToDict(
+static Dictionary<UnownedStringSlice, SpvWord> operandKindToDict(
         JSONContainer& container,
         DiagnosticSink& sink,
         const OperandKind& k)
 {
-    Dictionary<String, SpvWord> dict;
+    Dictionary<UnownedStringSlice, SpvWord> dict;
     dict.reserve(k.enumerants.getCount());
     for(const auto& e : k.enumerants)
     {
@@ -184,12 +184,18 @@ RefPtr<SPIRVCoreGrammarInfo> loadSPIRVCoreGrammarInfo(SourceView& source, Diagno
     {
         const auto d = operandKindToDict(container, sink, k);
         for(const auto& [n, v] : d)
-            res->anyEnum.dict.add(k.kind + n, v);
+        {
+            // Add the string to this slice pool as we'll be taking ownership
+            // of it shortly but don't want to invalidate it in the meantime.
+            const auto s = container.getStringSlicePool().addAndGetSlice(String(k.kind) + n);
+            res->anyEnum.dict.add(s, v);
+        }
 
         if(k.kind == "Capability")
             for(const auto& [n, v] : d)
                 res->spvCapabilities.dict.add(n, SpvCapability(v));
     }
+    res->strings.swapWith(container.getStringSlicePool());
     return res;
 }
 }

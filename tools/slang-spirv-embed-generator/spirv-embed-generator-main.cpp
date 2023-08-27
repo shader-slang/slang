@@ -11,7 +11,7 @@ using namespace Slang;
 
 template<typename T>
 String dictToPerfectHash(
-    const Dictionary<String, T>& dict,
+    const Dictionary<UnownedStringSlice, T>& dict,
     const UnownedStringSlice& type,
     const bool isMask)
 {
@@ -26,7 +26,7 @@ String dictToPerfectHash(
     const auto prefix = isMask ? "0x" : "";
     for(const auto& v : hashParams.destTable)
     {
-        const auto s = prefix + String(dict.getValue(v), radix);
+        const auto s = prefix + String(dict.getValue(v.getUnownedSlice()), radix);
         hashParams.valueTable.add("static_cast<" + String(type) + ">(" + s + ")");
     }
     return perfectHashToEmbeddableCpp(hashParams, type);
