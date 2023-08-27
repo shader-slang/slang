@@ -3809,7 +3809,7 @@ struct SPIRVEmitContext
         {
             const bool isLast = spvInst == inst->getLastChild();
             const auto opcodeString = spvInst->getOpcodeString();
-            SpvOp opcode = m_grammarInfo->lookupSpvOp(opcodeString);
+            SpvOp opcode = m_grammarInfo->spvOps.lookup(opcodeString);
             if(opcode == SpvOpMax)
             {
                 // TODO: https://github.com/shader-slang/slang/issues/3155

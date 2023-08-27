@@ -11,6 +11,7 @@ using SpvWord = uint32_t;
 //
 // Structs which mirror the structure of spirv.core.grammar.json
 //
+// Commented members are those which currently don't use
 struct InstructionPrintingClass
 {
     UnownedStringSlice tag;
@@ -103,9 +104,9 @@ RefPtr<SPIRVCoreGrammarInfo> loadSPIRVCoreGrammarInfo(SourceView& source, Diagno
     // Convert to the internal representation
     //
     RefPtr<SPIRVCoreGrammarInfo> res{new SPIRVCoreGrammarInfo};
-    res->opcodes.reserve(spec.instructions.getCount());
+    res->spvOps.dict.reserve(spec.instructions.getCount());
     for(const auto& i : spec.instructions)
-        res->opcodes.add(i.opname, SpvOp(i.opcode));
+        res->spvOps.dict.add(i.opname, SpvOp(i.opcode));
     return res;
 }
 }

@@ -802,7 +802,7 @@ RefPtr<SPIRVCoreGrammarInfo> getEmbeddedSPIRVCoreGrammarInfo()
 {
     static SPIRVCoreGrammarInfo info = [](){
         SPIRVCoreGrammarInfo info;
-        info.lookupSpvOpEmbedded = &lookupSpvOp;
+        info.spvOps.embedded = &lookupSpvOp;
         info.addReference();
         return info;
     }();

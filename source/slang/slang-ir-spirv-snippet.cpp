@@ -121,7 +121,7 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
             case Slang::Misc::TokenType::Identifier:
             {
                 auto opName = tokenReader.ReadWord();
-                opCode = spirvGrammar.lookupSpvOp(opName.getUnownedSlice());
+                opCode = spirvGrammar.spvOps.lookup(opName.getUnownedSlice());
                 if(opCode == SpvOpMax)
                 {
                     throw Misc::TextFormatException(

@@ -9,20 +9,26 @@ namespace Slang
 {
     struct SPIRVCoreGrammarInfo : public RefObject
     {
+        template<typename T, T onFailure>
+        struct Lookup
+        {
+            T lookup(const UnownedStringSlice& name) const
+            {
+                T ret = onFailure;
+                if(embedded)
+                    embedded(name, ret);
+                else
+                    dict.tryGetValue(name, ret);
+                return ret;
+            }
+
+            bool (*embedded)(const UnownedStringSlice&, T&) = nullptr;
+            Dictionary<String, T> dict;
+        };
+
         // Returns SpvOpMax (0x7fffffff) on failure, which couldn't possibly be
         // a valid 16 bit opcode
-        SpvOp lookupSpvOp(const UnownedStringSlice& opname) const
-        {
-            SpvOp ret = SpvOpMax;
-            if(lookupSpvOpEmbedded)
-                lookupSpvOpEmbedded(opname, ret);
-            else
-                opcodes.tryGetValue(opname, ret) || opcodes.tryGetValue(String("Op") + opname, ret);
-            return ret;
-        }
-
-        bool (*lookupSpvOpEmbedded)(const UnownedStringSlice&, SpvOp&) = nullptr;
-        Dictionary<String, SpvOp> opcodes;
+        Lookup<SpvOp, SpvOpMax> spvOps;
     };
 
     class DiagnosticSink;

@@ -37,7 +37,7 @@ void writeInfo(
 
     HashParams hashParams;
     List<String> opnames;
-    for(const auto& [opname, opcode] : info.opcodes)
+    for(const auto& [opname, opcode] : info.spvOps.dict)
         opnames.add(opname);
     auto r = minimalPerfectHash(opnames, hashParams);
     SLANG_ASSERT(r == HashFindResult::Success);
@@ -51,7 +51,7 @@ void writeInfo(
     line("{");
     line("    static SPIRVCoreGrammarInfo info = [](){");
     line("        SPIRVCoreGrammarInfo info;");
-    line("        info.lookupSpvOpEmbedded = &lookupSpvOp;");
+    line("        info.spvOps.embedded = &lookupSpvOp;");
 
     //
     line("        info.addReference();");
