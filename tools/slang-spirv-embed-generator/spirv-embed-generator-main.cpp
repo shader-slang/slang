@@ -9,6 +9,21 @@
 
 using namespace Slang;
 
+template<typename T>
+String dictToPerfectHash(
+    const Dictionary<String, T>& dict,
+    const UnownedStringSlice& type,
+    const UnownedStringSlice& prefix)
+{
+    HashParams hashParams;
+    List<String> names;
+    for(const auto& [name, val] : dict)
+        names.add(name);
+    auto r = minimalPerfectHash(names, hashParams);
+    SLANG_ASSERT(r == HashFindResult::Success);
+    return perfectHashToEmbeddableCpp(hashParams, type, prefix);
+}
+
 void writeInfo(
     const char* const outCppPath,
     const SPIRVCoreGrammarInfo& info)
@@ -35,16 +50,16 @@ void writeInfo(
     line("namespace Slang");
     line("{");
 
-    HashParams hashParams;
-    List<String> opnames;
-    for(const auto& [opname, opcode] : info.spvOps.dict)
-        opnames.add(opname);
-    auto r = minimalPerfectHash(opnames, hashParams);
-    SLANG_ASSERT(r == HashFindResult::Success);
-    w.put(perfectHashToEmbeddableCpp(
-        hashParams,
+    w.put(dictToPerfectHash(
+        info.spvOps.dict,
         UnownedStringSlice("SpvOp"),
         UnownedStringSlice("Spv")
+    ).getBuffer());
+
+    w.put(dictToPerfectHash(
+        info.spvCapabilities.dict,
+        UnownedStringSlice("SpvCapability"),
+        UnownedStringSlice("SpvCapability")
     ).getBuffer());
 
     line("RefPtr<SPIRVCoreGrammarInfo> getEmbeddedSPIRVCoreGrammarInfo()");
@@ -52,6 +67,7 @@ void writeInfo(
     line("    static SPIRVCoreGrammarInfo info = [](){");
     line("        SPIRVCoreGrammarInfo info;");
     line("        info.spvOps.embedded = &lookupSpvOp;");
+    line("        info.spvCapabilities.embedded = &lookupSpvCapability;");
 
     //
     line("        info.addReference();");

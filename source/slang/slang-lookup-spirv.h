@@ -6,5 +6,4 @@
 namespace Slang
 {
 bool lookupGLSLstd450(const UnownedStringSlice& str, GLSLstd450& value);
-bool lookupSpvCapability(const UnownedStringSlice& str, SpvCapability& value);
 }

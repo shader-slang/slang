@@ -6655,8 +6655,10 @@ namespace Slang
         Token token;
         token = parser->ReadToken();
         auto modifier = parser->astBuilder->create<RequiredSPIRVCapabilityModifier>();
-        SpvCapability cap;
-        if (!lookupSpvCapability(token.getContent(), cap))
+        const SPIRVCoreGrammarInfo& spirvInfo =
+            parser->astBuilder->getGlobalSession()->getSPIRVCoreGrammarInfo();
+        const SpvCapability cap = spirvInfo.spvCapabilities.lookup(token.getContent());
+        if (cap == SpvCapabilityMax)
             parser->sink->diagnose(token, Diagnostics::unknownSPIRVCapability, token);
         modifier->capability = (int32_t)cap;
         return modifier;

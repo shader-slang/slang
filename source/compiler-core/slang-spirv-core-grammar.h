@@ -29,6 +29,9 @@ namespace Slang
         // Returns SpvOpMax (0x7fffffff) on failure, which couldn't possibly be
         // a valid 16 bit opcode
         Lookup<SpvOp, SpvOpMax> spvOps;
+
+        // Returns SpvCapabilityMax (0x7fffffff) on failure
+        Lookup<SpvCapability, SpvCapabilityMax> spvCapabilities;
     };
 
     class DiagnosticSink;
