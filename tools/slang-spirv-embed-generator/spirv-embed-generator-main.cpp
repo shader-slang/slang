@@ -78,7 +78,7 @@ void writeInfo(
 
     line("RefPtr<SPIRVCoreGrammarInfo> getEmbeddedSPIRVCoreGrammarInfo()");
     line("{");
-    line("    static SPIRVCoreGrammarInfo info = [](){");
+    line("    static SPIRVCoreGrammarInfo embedded = [](){");
     line("        SPIRVCoreGrammarInfo info;");
     line("        info.spvOps.embedded = &lookupSpvOp;");
     line("        info.spvCapabilities.embedded = &lookupSpvCapability;");
@@ -88,7 +88,7 @@ void writeInfo(
     line("        info.addReference();");
     line("        return info;");
     line("    }();");
-    line("    return &info;");
+    line("    return &embedded;");
     line("}");
     line("}");
 

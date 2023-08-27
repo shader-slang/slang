@@ -2118,7 +2118,7 @@ bool lookupSpvWord(const UnownedStringSlice& str, SpvWord& value)
 
 RefPtr<SPIRVCoreGrammarInfo> getEmbeddedSPIRVCoreGrammarInfo()
 {
-    static SPIRVCoreGrammarInfo info = [](){
+    static SPIRVCoreGrammarInfo embedded = [](){
         SPIRVCoreGrammarInfo info;
         info.spvOps.embedded = &lookupSpvOp;
         info.spvCapabilities.embedded = &lookupSpvCapability;
@@ -2126,6 +2126,6 @@ RefPtr<SPIRVCoreGrammarInfo> getEmbeddedSPIRVCoreGrammarInfo()
         info.addReference();
         return info;
     }();
-    return &info;
+    return &embedded;
 }
 }

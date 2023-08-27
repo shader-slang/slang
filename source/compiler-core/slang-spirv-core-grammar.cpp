@@ -187,8 +187,8 @@ RefPtr<SPIRVCoreGrammarInfo> loadSPIRVCoreGrammarInfo(SourceView& source, Diagno
             res->anyEnum.dict.add(k.kind + n, v);
 
         if(k.kind == "Capability")
-            for(const auto& [k, v] : d)
-                res->spvCapabilities.dict.add(k, SpvCapability(v));
+            for(const auto& [n, v] : d)
+                res->spvCapabilities.dict.add(n, SpvCapability(v));
     }
     return res;
 }
