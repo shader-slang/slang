@@ -29,21 +29,9 @@ HashFindResult minimalPerfectHash(const List<String>& ss, HashParams& hashParams
 
     const auto hash = [&](const String& s, const HashCode64 salt = 0) -> UInt32
     {
-        //
-        // The current getStableHashCode is susceptible to patterns of
-        // collisions causing the search to fail for the SPIR-V opnames; it
-        // performs poorly on short strings, taking over 300000 iterations to
-        // diverge on "Ceil" and "FMix" (and place them in already unoccupied
-        // slots)!
-        //
-        // Use FNV Hash here which seem perform much better on these short inputs
-        // https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function
-        //
-        // If you change this, don't forget to also sync the version below in
-        // the printing code.
-        UInt64 h = salt;
-        for (const char c : s) h = ((h * 0x00000100000001B3) ^ c);
-        return h % nBuckets;
+        // // If you change this, don't forget to also sync the version below in
+        // // the printing code.
+        return combineHash(getHashCode(s), getHashCode(salt)) % nBuckets;
     };
 
     // Assign the inputs into their buckets according to the hash without salt.
@@ -137,9 +125,16 @@ String perfectHashToEmbeddableCpp(
     StringBuilder sb;
     StringWriter writer(&sb, WriterFlags(0));
     WriterHelper w(&writer);
+    const auto line = [&](const char* l){
+        w.put(l);
+        w.put("\n");
+    };
 
-    w.print("static const unsigned tableSalt[%ld] =", hashParams.saltTable.getCount());
-    w.print("{\n   ");
+    w.print("bool lookup%s(const UnownedStringSlice& str, %s& value)\n", String(valueType).getBuffer(), String(valueType).getBuffer());
+    line("{");
+
+    w.print("    static const unsigned tableSalt[%ld] = {\n", hashParams.saltTable.getCount());
+    w.print("       ");
     for (Index i = 0; i < hashParams.saltTable.getCount(); ++i)
     {
         const auto salt = hashParams.saltTable[i];
@@ -148,7 +143,7 @@ String perfectHashToEmbeddableCpp(
             w.print(" %d,", salt);
             if (i % 16 == 15)
             {
-                w.print("\n   ");
+                w.print("\n       ");
             }
         }
         else
@@ -156,50 +151,40 @@ String perfectHashToEmbeddableCpp(
             w.print(" %d", salt);
         }
     }
-    w.print("\n};\n");
-    w.print("\n");
+    line("\n    };");
+    line("");
 
-    w.print("struct KV\n");
-    w.print("{\n");
-    w.print("    const char* name;\n");
-    w.print("    %s value;\n", String(valueType).getBuffer());
-    w.print("};\n");
-    w.print("\n");
+    w.print("    using KV = std::pair<const char*, %s>;\n", String(valueType).getBuffer());
+    line("");
 
-    w.print("static const KV words[%ld] =\n", hashParams.destTable.getCount());
-    w.print("{\n");
+    w.print("    static const KV words[%ld] =\n", hashParams.destTable.getCount());
+    line("    {");
     for (const auto& s : hashParams.destTable)
     {
-        w.print("    {\"%s\", %s%s},\n", s.getBuffer(), String(valuePrefix).getBuffer(), s.getBuffer());
+        w.print("        {\"%s\", %s%s},\n", s.getBuffer(), String(valuePrefix).getBuffer(), s.getBuffer());
     }
-    w.print("};\n");
-    w.print("\n");
+    line("    };");
+    line("");
 
     // Make sure to update the hash function in the search function above if
     // you change this.
-    w.print("static UInt32 hash(const UnownedStringSlice& str, UInt32 salt)\n");
-    w.print("{\n");
-    w.print("    UInt64 h = salt;\n");
-    w.print("    for(const char c : str)\n");
-    w.print("        h = ((h * 0x00000100000001B3) ^ c);\n");
-    w.print("    return h %% (sizeof(tableSalt)/sizeof(tableSalt[0]));\n");
-    w.print("}\n");
-    w.print("\n");
+    line("    static const auto hash = [](const UnownedStringSlice& str, UInt32 salt){");
+    w.print("        return combineHash(getHashCode(str), getHashCode(salt)) %% %ld;\n", hashParams.saltTable.getCount());
+    line("    };");
+    line("");
 
-    w.print("bool lookup%s(const UnownedStringSlice& str, %s& value)\n", String(valueType).getBuffer(), String(valueType).getBuffer());
-    w.print("{\n");
-    w.print("    const auto i = hash(str, tableSalt[hash(str, 0)]);\n");
-    w.print("    if(str == words[i].name)\n");
-    w.print("    {\n");
-    w.print("        value = words[i].value;\n");
-    w.print("        return true;\n");
-    w.print("    }\n");
-    w.print("    else\n");
-    w.print("    {\n");
-    w.print("        return false;\n");
-    w.print("    }\n");
-    w.print("}\n");
-    w.print("\n");
+    line("    const auto i = hash(str, tableSalt[hash(str, 0)]);");
+    line("    if(str == words[i].first)");
+    line("    {");
+    line("        value = words[i].second;");
+    line("        return true;");
+    line("    }");
+    line("    else");
+    line("    {");
+    line("        return false;");
+    line("    }");
+    line("}");
+    line("");
 
     return sb;
 }
