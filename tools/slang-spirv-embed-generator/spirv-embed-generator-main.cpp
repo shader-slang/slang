@@ -13,15 +13,23 @@ template<typename T>
 String dictToPerfectHash(
     const Dictionary<String, T>& dict,
     const UnownedStringSlice& type,
-    const UnownedStringSlice& prefix)
+    const bool isMask)
 {
-    HashParams hashParams;
+    HashParams<String> hashParams;
     List<String> names;
     for(const auto& [name, val] : dict)
         names.add(name);
     auto r = minimalPerfectHash(names, hashParams);
     SLANG_ASSERT(r == HashFindResult::Success);
-    return perfectHashToEmbeddableCpp(hashParams, type, prefix);
+    hashParams.valueTable.reserve(hashParams.destTable.getCount());
+    const auto radix = isMask ? 16 : 10;
+    const auto prefix = isMask ? "0x" : "";
+    for(const auto& v : hashParams.destTable)
+    {
+        const auto s = prefix + String(dict.getValue(v), radix);
+        hashParams.valueTable.add("static_cast<" + String(type) + ">(" + s + ")");
+    }
+    return perfectHashToEmbeddableCpp(hashParams, type);
 }
 
 void writeInfo(
@@ -53,13 +61,19 @@ void writeInfo(
     w.put(dictToPerfectHash(
         info.spvOps.dict,
         UnownedStringSlice("SpvOp"),
-        UnownedStringSlice("Spv")
+        false
     ).getBuffer());
 
     w.put(dictToPerfectHash(
         info.spvCapabilities.dict,
         UnownedStringSlice("SpvCapability"),
-        UnownedStringSlice("SpvCapability")
+        false
+    ).getBuffer());
+
+    w.put(dictToPerfectHash(
+        info.anyEnum.dict,
+        UnownedStringSlice("SpvWord"),
+        false
     ).getBuffer());
 
     line("RefPtr<SPIRVCoreGrammarInfo> getEmbeddedSPIRVCoreGrammarInfo()");
@@ -68,6 +82,7 @@ void writeInfo(
     line("        SPIRVCoreGrammarInfo info;");
     line("        info.spvOps.embedded = &lookupSpvOp;");
     line("        info.spvCapabilities.embedded = &lookupSpvCapability;");
+    line("        info.anyEnum.embedded = &lookupSpvWord;");
 
     //
     line("        info.addReference();");

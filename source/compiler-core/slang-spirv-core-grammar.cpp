@@ -111,6 +111,42 @@ SLANG_MAKE_STRUCT_RTTI_INFO(
     SLANG_RTTI_FIELD(operand_kinds)
 );
 
+static Dictionary<String, SpvWord> operandKindToDict(
+        JSONContainer& container,
+        DiagnosticSink& sink,
+        const OperandKind& k)
+{
+    Dictionary<String, SpvWord> dict;
+    dict.reserve(k.enumerants.getCount());
+    for(const auto& e : k.enumerants)
+    {
+        SpvWord valueInt = 0;
+        switch(e.value.getKind())
+        {
+            case JSONValue::Kind::Integer:
+            {
+                // TODO: Range check here?
+                valueInt = SpvWord(container.asInteger(e.value));
+                break;
+            }
+            case JSONValue::Kind::String:
+            {
+                Int i = 0;
+                const auto str = container.getString(e.value);
+                if(SLANG_FAILED(StringUtil::parseInt(str, i)))
+                    sink.diagnose(e.value.loc, MiscDiagnostics::spirvCoreGrammarJSONParseFailure);
+                // TODO: Range check here?
+                valueInt = SpvWord(i);
+                break;
+             }
+             default:
+                sink.diagnose(e.value.loc, MiscDiagnostics::spirvCoreGrammarJSONParseFailure);
+        }
+        dict.add(e.enumerant, valueInt);
+    }
+    return dict;
+}
+
 //
 //
 //
@@ -146,37 +182,13 @@ RefPtr<SPIRVCoreGrammarInfo> loadSPIRVCoreGrammarInfo(SourceView& source, Diagno
         res->spvOps.dict.add(i.opname, SpvOp(i.opcode));
     for(const auto& k : spec.operand_kinds)
     {
+        const auto d = operandKindToDict(container, sink, k);
+        for(const auto& [n, v] : d)
+            res->anyEnum.dict.add(k.kind + n, v);
+
         if(k.kind == "Capability")
-        {
-            res->spvCapabilities.dict.reserve(k.enumerants.getCapacity());
-            for(const auto& e : k.enumerants)
-            {
-                SpvCapability valueInt;
-                switch(e.value.getKind())
-                {
-                    case JSONValue::Kind::Integer:
-                    {
-                        // TODO: Range check here?
-                        valueInt = SpvCapability(container.asInteger(e.value));
-                        break;
-                    }
-                    case JSONValue::Kind::String:
-                    {
-                        Int i = 0;
-                        const auto str = container.getString(e.value);
-                        if(SLANG_FAILED(StringUtil::parseInt(str, i)))
-                            sink.diagnose(e.value.loc, MiscDiagnostics::spirvCoreGrammarJSONParseFailure);
-                        // TODO: Range check here?
-                        valueInt = SpvCapability(i);
-                        break;
-                     }
-                     default:
-                        sink.diagnose(e.value.loc, MiscDiagnostics::spirvCoreGrammarJSONParseFailure);
-                }
-                res->spvCapabilities.dict.add(e.enumerant, valueInt);
-            }
-            break;
-        }
+            for(const auto& [k, v] : d)
+                res->spvCapabilities.dict.add(k, SpvCapability(v));
     }
     return res;
 }

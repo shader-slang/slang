@@ -74,7 +74,7 @@ void writeHashFile(
     const char*        valueType,
     const char*        valuePrefix,
     const List<String> includes,
-    const HashParams&  hashParams)
+    const HashParams<String>& hashParams)
 {
     StringBuilder sb;
     StringWriter writer(&sb, WriterFlags(0));
@@ -98,8 +98,7 @@ void writeHashFile(
 
     w.put(perfectHashToEmbeddableCpp(
         hashParams,
-        UnownedStringSlice(valueType),
-        UnownedStringSlice(valuePrefix)
+        UnownedStringSlice(valueType)
     ).getBuffer());
 
     w.print("}\n");
@@ -164,8 +163,8 @@ int main(int argc, const char* const* argv)
             opnames.add(w);
     }
 
-    HashParams hashParams;
-    auto       r = minimalPerfectHash(opnames, hashParams);
+    HashParams<String> hashParams;
+    auto r = minimalPerfectHash(opnames, hashParams);
     switch (r)
     {
     case HashFindResult::UnavoidableHashCollision:
@@ -185,6 +184,9 @@ int main(int argc, const char* const* argv)
     case HashFindResult::Success:;
     }
 
+    hashParams.valueTable.reserve(hashParams.destTable.getCount());
+    for(const auto& v : hashParams.destTable)
+        hashParams.valueTable.add(enumerantPrefix + v);
     writeHashFile(
         outCppPath,
         enumName,

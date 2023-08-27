@@ -8,7 +8,7 @@ namespace Slang
 
 // Implemented according to "Hash, displace, and compress"
 // https://cmph.sourceforge.net/papers/esa09.pdf
-HashFindResult minimalPerfectHash(const List<String>& ss, HashParams& hashParams)
+HashFindResult minimalPerfectHash(const List<String>& ss, HashParams<String>& hashParams)
 {
     // Check for uniqueness
     for (Index i = 0; i < ss.getCount(); ++i)
@@ -51,14 +51,10 @@ HashFindResult minimalPerfectHash(const List<String>& ss, HashParams& hashParams
     // word not in our language.
     hashParams.saltTable.setCount(nBuckets);
     for (auto& s : hashParams.saltTable)
-    {
         s = 0;
-    }
     hashParams.destTable.setCount(nBuckets);
     for (auto& s : hashParams.destTable)
-    {
         s.reduceLength(0);
-    }
 
     // This mask will, in each salt tryout, be used to prevent collisions
     // within a single bucket.
@@ -117,11 +113,11 @@ HashFindResult minimalPerfectHash(const List<String>& ss, HashParams& hashParams
     return HashFindResult::Success;
 }
 
-String perfectHashToEmbeddableCpp(
-    const HashParams& hashParams,
-    const UnownedStringSlice& valueType,
-    const UnownedStringSlice& valuePrefix)
+String perfectHashToEmbeddableCpp( const HashParams<String>& hashParams, const UnownedStringSlice& valueType)
 {
+    SLANG_ASSERT(hashParams.valueTable.getCount() == hashParams.destTable.getCount());
+    SLANG_ASSERT(hashParams.saltTable.getCount() == hashParams.destTable.getCount());
+
     StringBuilder sb;
     StringWriter writer(&sb, WriterFlags(0));
     WriterHelper w(&writer);
@@ -159,9 +155,15 @@ String perfectHashToEmbeddableCpp(
 
     w.print("    static const KV words[%ld] =\n", hashParams.destTable.getCount());
     line("    {");
-    for (const auto& s : hashParams.destTable)
+    for (Index i = 0; i < hashParams.destTable.getCount(); ++i)
     {
-        w.print("        {\"%s\", %s%s},\n", s.getBuffer(), String(valuePrefix).getBuffer(), s.getBuffer());
+        const auto s = hashParams.destTable[i];
+        const auto v = hashParams.valueTable[i];
+        w.print(
+            "        {\"%s\", %s},\n",
+            s.getBuffer(),
+            v.getBuffer()
+        );
     }
     line("    };");
     line("");
