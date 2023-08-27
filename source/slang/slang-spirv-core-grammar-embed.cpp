@@ -2116,7 +2116,7 @@ bool lookupSpvWord(const UnownedStringSlice& str, SpvWord& value)
     }
 }
 
-RefPtr<SPIRVCoreGrammarInfo> getEmbeddedSPIRVCoreGrammarInfo()
+RefPtr<SPIRVCoreGrammarInfo> SPIRVCoreGrammarInfo::getEmbeddedVersion()
 {
     static SPIRVCoreGrammarInfo embedded = [](){
         SPIRVCoreGrammarInfo info;

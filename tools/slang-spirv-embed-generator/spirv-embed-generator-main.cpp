@@ -76,7 +76,7 @@ void writeInfo(
         false
     ).getBuffer());
 
-    line("RefPtr<SPIRVCoreGrammarInfo> getEmbeddedSPIRVCoreGrammarInfo()");
+    line("RefPtr<SPIRVCoreGrammarInfo> SPIRVCoreGrammarInfo::getEmbeddedVersion()");
     line("{");
     line("    static SPIRVCoreGrammarInfo embedded = [](){");
     line("        SPIRVCoreGrammarInfo info;");
@@ -123,7 +123,7 @@ int main(int argc, const char* const* argv)
     SourceFile* sourceFile = sourceManager.createSourceFileWithString(pathInfo, contents);
     SourceView* sourceView = sourceManager.createSourceView(sourceFile, nullptr, SourceLoc());
 
-    RefPtr<SPIRVCoreGrammarInfo> info = loadSPIRVCoreGrammarInfo(*sourceView, sink);
+    RefPtr<SPIRVCoreGrammarInfo> info = SPIRVCoreGrammarInfo::loadFromJSON(*sourceView, sink);
 
     writeInfo(outCppPath, *info);
 

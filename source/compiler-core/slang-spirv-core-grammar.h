@@ -10,9 +10,14 @@
 namespace Slang
 {
     using SpvWord = uint32_t;
+    class DiagnosticSink;
+    class SourceView;
 
     struct SPIRVCoreGrammarInfo : public RefObject
     {
+        static RefPtr<SPIRVCoreGrammarInfo> loadFromJSON(SourceView& source, DiagnosticSink& sink);
+        static RefPtr<SPIRVCoreGrammarInfo> getEmbeddedVersion();
+
         template<typename T, typename K = UnownedStringSlice>
         struct LookupOpt
         {
@@ -51,14 +56,10 @@ namespace Slang
         // Returns std::nullopt on failure
         LookupOpt<SpvWord> anyEnum;
 
+    private:
+
         // If this is loaded from JSON, we keep the strings around instead of
         // copying them as dictionary keys
         StringSlicePool strings = StringSlicePool(StringSlicePool::Style::Empty);
     };
-
-    class DiagnosticSink;
-    class SourceView;
-
-    RefPtr<SPIRVCoreGrammarInfo> loadSPIRVCoreGrammarInfo(SourceView& source, DiagnosticSink& sink);
-    RefPtr<SPIRVCoreGrammarInfo> getEmbeddedSPIRVCoreGrammarInfo();
 }

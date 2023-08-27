@@ -150,7 +150,7 @@ static Dictionary<UnownedStringSlice, SpvWord> operandKindToDict(
 //
 //
 //
-RefPtr<SPIRVCoreGrammarInfo> loadSPIRVCoreGrammarInfo(SourceView& source, DiagnosticSink& sink)
+RefPtr<SPIRVCoreGrammarInfo> SPIRVCoreGrammarInfo::loadFromJSON(SourceView& source, DiagnosticSink& sink)
 {
     //
     // Load the JSON

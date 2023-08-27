@@ -222,7 +222,7 @@ void Session::init()
     m_languagePreludes[Index(SourceLanguage::HLSL)] = get_slang_hlsl_prelude();
 
     if(!spirvCoreGrammarInfo)
-        spirvCoreGrammarInfo = getEmbeddedSPIRVCoreGrammarInfo();
+        spirvCoreGrammarInfo = SPIRVCoreGrammarInfo::getEmbeddedVersion();
 }
 
 void Session::_initCodeGenTransitionMap()
@@ -812,7 +812,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::setSPIRVCoreGrammar(char const* 
 {
     if(!jsonPath)
     {
-        spirvCoreGrammarInfo = getEmbeddedSPIRVCoreGrammarInfo();
+        spirvCoreGrammarInfo = SPIRVCoreGrammarInfo::getEmbeddedVersion();
         SLANG_ASSERT(spirvCoreGrammarInfo);
     }
     else
@@ -831,7 +831,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::setSPIRVCoreGrammar(char const* 
         const auto pathInfo = PathInfo::makeFromString(jsonPath);
         const auto sourceFile = sourceManager->createSourceFileWithString(pathInfo, contents);
         const auto sourceView = sourceManager->createSourceView(sourceFile, nullptr, SourceLoc());
-        spirvCoreGrammarInfo = loadSPIRVCoreGrammarInfo(*sourceView, sink);
+        spirvCoreGrammarInfo = SPIRVCoreGrammarInfo::loadFromJSON(*sourceView, sink);
     }
     return spirvCoreGrammarInfo ? SLANG_OK : SLANG_FAIL;
 }
