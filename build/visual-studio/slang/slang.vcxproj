@@ -688,8 +688,6 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-language-server.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-legalize-types.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-lookup-glslstd450.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-lookup-spvcapability.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-lookup-spvop.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-lookup.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-lower-to-ir.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-mangle.cpp" />
@@ -712,6 +710,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-serialize-source-loc.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-serialize-types.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-serialize.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-spirv-core-grammar-embed.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-spirv-val.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-stdlib-api.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-stdlib.cpp" />
