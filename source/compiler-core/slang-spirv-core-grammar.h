@@ -56,6 +56,20 @@ namespace Slang
         // Returns std::nullopt on failure
         LookupOpt<SpvWord> anyEnum;
 
+        struct OpInfo
+        {
+            enum Class
+            {
+                Other,
+                TypeDeclaration,
+                ConstantCreation
+            };
+            Class class_;
+            int resultTypeIndex = -1;
+            int resultIdIndex = -1;
+        };
+        LookupOpt<OpInfo, SpvOp> opInfo;
+
     private:
 
         // If this is loaded from JSON, we keep the strings around instead of

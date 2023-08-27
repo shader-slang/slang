@@ -76,6 +76,32 @@ void writeInfo(
         false
     ).getBuffer());
 
+    line("static bool getOpInfo(const SpvOp& op, SPIRVCoreGrammarInfo::OpInfo& info)");
+    line("{");
+    line("    switch(op)");
+    line("    {");
+    for(const auto [o, i] : info.opInfo.dict)
+    {
+        const char* classStr;
+        switch(i.class_)
+        {
+            case SPIRVCoreGrammarInfo::OpInfo::Other: classStr = "Other"; break;
+            case SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration: classStr = "TypeDeclaration"; break;
+            case SPIRVCoreGrammarInfo::OpInfo::ConstantCreation: classStr = "ConstantCreation"; break;
+        }
+        w.print(
+            "        case %d: info = {SPIRVCoreGrammarInfo::OpInfo::%s, %d, %d}; return true;\n",
+            o,
+            classStr,
+            i.resultTypeIndex,
+            i.resultIdIndex
+        );
+    }
+    line("        default: return false;");
+    line("    }");
+    line("}");
+    line("");
+
     line("RefPtr<SPIRVCoreGrammarInfo> SPIRVCoreGrammarInfo::getEmbeddedVersion()");
     line("{");
     line("    static SPIRVCoreGrammarInfo embedded = [](){");
@@ -83,6 +109,7 @@ void writeInfo(
     line("        info.spvOps.embedded = &lookupSpvOp;");
     line("        info.spvCapabilities.embedded = &lookupSpvCapability;");
     line("        info.anyEnum.embedded = &lookupSpvWord;");
+    line("        info.opInfo.embedded = &getOpInfo;");
 
     //
     line("        info.addReference();");

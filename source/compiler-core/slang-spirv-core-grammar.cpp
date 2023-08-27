@@ -179,7 +179,25 @@ RefPtr<SPIRVCoreGrammarInfo> SPIRVCoreGrammarInfo::loadFromJSON(SourceView& sour
     RefPtr<SPIRVCoreGrammarInfo> res{new SPIRVCoreGrammarInfo};
     res->spvOps.dict.reserve(spec.instructions.getCount());
     for(const auto& i : spec.instructions)
+    {
         res->spvOps.dict.add(i.opname, SpvOp(i.opcode));
+        const auto class_ =
+              i.class_ == "Type-Declaration" ? OpInfo::TypeDeclaration
+            : i.class_ == "Constant-Creation" ? OpInfo::ConstantCreation
+            : OpInfo::Other;
+        const auto resultTypeIndex
+            = i.operands.findFirstIndex([](const auto& o){return o.kind == "IdResultType";});
+        const auto resultIdIndex
+            = i.operands.findFirstIndex([](const auto& o){return o.kind == "IdResult";});
+        // There are duplicate opcodes in the json (for renamed instructions,
+        // or the same instruction with different capabilities), for now just
+        // keep the first one.
+        res->opInfo.dict.addIfNotExists(SpvOp(i.opcode), {
+            class_,
+            static_cast<int>(resultTypeIndex),
+            static_cast<int>(resultIdIndex),
+        });
+    }
     for(const auto& k : spec.operand_kinds)
     {
         const auto d = operandKindToDict(container, sink, k);
