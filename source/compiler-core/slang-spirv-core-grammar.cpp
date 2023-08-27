@@ -195,6 +195,7 @@ RefPtr<SPIRVCoreGrammarInfo> SPIRVCoreGrammarInfo::loadFromJSON(SourceView& sour
             for(const auto& [n, v] : d)
                 res->spvCapabilities.dict.add(n, SpvCapability(v));
     }
+    // Steal the strings from the JSON container before it dies
     res->strings.swapWith(container.getStringSlicePool());
     return res;
 }
