@@ -1,10 +1,11 @@
 #include <cstdio>
 
-#include "../../source/core/slang-io.h"
+#include "source/core/slang-io.h"
 #include "source/compiler-core/slang-diagnostic-sink.h"
+#include "source/compiler-core/slang-perfect-hash.h"
 #include "source/core/slang-writer.h"
-#include "../../source/compiler-core/slang-lexer.h"
 #include "source/compiler-core/slang-spirv-core-grammar.h"
+#include "source/compiler-core/slang-lexer.h"
 
 using namespace Slang;
 
@@ -30,26 +31,29 @@ void writeInfo(
     line("#include \"../core/slang-smart-pointer.h\"");
     line("#include \"../compiler-core/slang-spirv-core-grammar.h\"");
 
-
     //
     line("namespace Slang");
     line("{");
+
+    HashParams hashParams;
+    List<String> opnames;
+    for(const auto& [opname, opcode] : info.opcodes)
+        opnames.add(opname);
+    auto r = minimalPerfectHash(opnames, hashParams);
+    SLANG_ASSERT(r == HashFindResult::Success);
+    w.put(perfectHashToEmbeddableCpp(
+        hashParams,
+        UnownedStringSlice("SpvOp"),
+        UnownedStringSlice("Spv")
+    ).getBuffer());
+
     line("RefPtr<SPIRVCoreGrammarInfo> getEmbeddedSPIRVCoreGrammarInfo()");
     line("{");
     line("    static SPIRVCoreGrammarInfo info = [](){");
     line("        SPIRVCoreGrammarInfo info;");
-    line("        info.opcodes = Dictionary<String, SpvOp>{");
+    line("        info.lookupSpvOpEmbedded = &lookupSpvOp;");
 
     //
-    for(const auto& [opname, opcode] : info.opcodes)
-    {
-        String s{opname};
-        s = s + "\0";
-        w.print("            {String{\"%s\"}, Spv%s},\n", s.getBuffer(), s.getBuffer());
-    }
-
-    //
-    line("        };");
     line("        info.addReference();");
     line("        return info;");
     line("    }();");

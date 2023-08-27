@@ -14,11 +14,14 @@ namespace Slang
         SpvOp lookupSpvOp(const UnownedStringSlice& opname) const
         {
             SpvOp ret = SpvOpMax;
-            opcodes.tryGetValue(opname, ret)
-                || opcodes.tryGetValue(String("Op") + opname, ret);
+            if(lookupSpvOpEmbedded)
+                lookupSpvOpEmbedded(opname, ret);
+            else
+                opcodes.tryGetValue(opname, ret) || opcodes.tryGetValue(String("Op") + opname, ret);
             return ret;
         }
 
+        bool (*lookupSpvOpEmbedded)(const UnownedStringSlice&, SpvOp&) = nullptr;
         Dictionary<String, SpvOp> opcodes;
     };
 
