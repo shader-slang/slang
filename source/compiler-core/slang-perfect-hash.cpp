@@ -29,9 +29,22 @@ HashFindResult minimalPerfectHash(const List<String>& ss, HashParams& hashParams
 
     const auto hash = [&](const String& s, const HashCode64 salt = 0) -> UInt32
     {
-        // // If you change this, don't forget to also sync the version below in
-        // // the printing code.
-        return combineHash(getHashCode(s), getHashCode(salt)) % nBuckets;
+        //
+        // The current getStableHashCode is susceptible to patterns of
+        // collisions causing the search to fail for the SPIR-V opnames; it
+        // performs poorly on short strings, taking over 300000 iterations to
+        // diverge on "Ceil" and "FMix" (and place them in already unoccupied
+        // slots)!
+        //
+        // Use FNV Hash here which seem perform much better on these short inputs
+        // https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function
+        //
+        // If you change this, don't forget to also sync the version below in
+        // the printing code.
+        UInt32 h = salt;
+        for (const char c : s)
+            h = (h * 0x01000193) ^ c;
+        return h % nBuckets;
     };
 
     // Assign the inputs into their buckets according to the hash without salt.
@@ -116,6 +129,7 @@ HashFindResult minimalPerfectHash(const List<String>& ss, HashParams& hashParams
 String perfectHashToEmbeddableCpp(
     const HashParams& hashParams,
     const UnownedStringSlice& valueType,
+    const UnownedStringSlice& funcName,
     const List<String>& values)
 {
     SLANG_ASSERT(hashParams.saltTable.getCount() == hashParams.destTable.getCount());
@@ -129,7 +143,7 @@ String perfectHashToEmbeddableCpp(
         w.put("\n");
     };
 
-    w.print("bool lookup%s(const UnownedStringSlice& str, %s& value)\n", String(valueType).getBuffer(), String(valueType).getBuffer());
+    w.print("bool %s(const UnownedStringSlice& str, %s& value)\n", String(funcName).getBuffer(), String(valueType).getBuffer());
     line("{");
 
     w.print("    static const unsigned tableSalt[%ld] = {\n", hashParams.saltTable.getCount());
@@ -174,7 +188,10 @@ String perfectHashToEmbeddableCpp(
     // Make sure to update the hash function in the search function above if
     // you change this.
     line("    static const auto hash = [](const UnownedStringSlice& str, UInt32 salt){");
-    w.print("        return combineHash(getHashCode(str), getHashCode(salt)) %% %ld;\n", hashParams.saltTable.getCount());
+    line("        UInt32 h = salt;");
+    line("        for (const char c : str)");
+    line("            h = (h * 0x01000193) ^ c;");
+    w.print("        return h %% %ld;\n", hashParams.saltTable.getCount());
     line("    };");
     line("");
 

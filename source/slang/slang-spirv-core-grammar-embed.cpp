@@ -11,779 +11,782 @@ namespace Slang
 static bool lookupSpvOp(const UnownedStringSlice& str, SpvOp& value)
 {
     static const unsigned tableSalt[718] = {
-        2, 1, 7, 1, 0, 0, 1, 1, 3, 0, 3, 1, 2, 1, 2, 2,
-        3, 6, 1, 0, 1, 3, 2, 0, 1, 0, 1, 1, 1, 1, 0, 0,
-        1, 0, 1, 0, 0, 2, 1, 1, 1, 2, 5, 0, 2, 0, 1, 0,
-        1, 1, 0, 1, 1, 2, 1, 2, 2, 1, 1, 1, 1, 0, 2, 0,
-        3, 2, 1, 3, 1, 2, 0, 0, 3, 5, 0, 1, 0, 0, 0, 3,
-        0, 2, 0, 0, 0, 8, 3, 2, 1, 3, 1, 0, 0, 1, 1, 0,
-        0, 0, 0, 2, 1, 0, 2, 1, 0, 0, 4, 5, 1, 5, 0, 0,
-        0, 5, 0, 0, 0, 0, 1, 1, 0, 5, 0, 2, 12, 0, 0, 2,
-        0, 0, 2, 1, 0, 1, 2, 5, 0, 1, 4, 7, 1, 2, 1, 0,
-        2, 3, 0, 0, 4, 9, 0, 0, 3, 1, 4, 0, 0, 2, 2, 1,
-        2, 0, 6, 2, 1, 0, 1, 0, 0, 3, 3, 2, 2, 1, 1, 7,
-        2, 2, 2, 0, 0, 0, 3, 0, 4, 0, 1, 2, 1, 0, 0, 1,
-        1, 3, 6, 1, 0, 1, 3, 2, 1, 1, 0, 2, 5, 0, 1, 0,
-        1, 0, 7, 0, 4, 0, 1, 1, 2, 0, 0, 1, 2, 1, 1, 5,
-        0, 2, 0, 4, 0, 0, 8, 0, 0, 7, 3, 3, 10, 0, 0, 1,
-        1, 1, 0, 3, 4, 6, 0, 2, 2, 1, 12, 2, 0, 1, 3, 6,
-        2, 2, 3, 0, 0, 2, 0, 0, 1, 4, 4, 4, 1, 1, 1, 2,
-        7, 7, 4, 4, 3, 1, 0, 1, 10, 3, 1, 0, 6, 0, 1, 2,
-        0, 0, 1, 2, 3, 2, 2, 1, 10, 1, 0, 4, 1, 0, 1, 0,
-        2, 5, 3, 0, 1, 4, 0, 5, 3, 0, 0, 0, 17, 0, 1, 0,
-        0, 3, 1, 4, 0, 0, 3, 0, 1, 3, 1, 2, 2, 20, 0, 4,
-        0, 1, 0, 1, 6, 0, 0, 0, 0, 2, 0, 0, 1, 0, 0, 1,
-        5, 15, 2, 0, 0, 2, 1, 0, 2, 4, 0, 8, 0, 0, 0, 4,
-        0, 0, 0, 15, 0, 0, 0, 0, 2, 0, 2, 3, 2, 6, 9, 6,
-        0, 3, 0, 0, 0, 6, 2, 0, 1, 0, 5, 8, 14, 2, 4, 9,
-        1, 2, 0, 11, 7, 0, 3, 2, 3, 2, 0, 0, 3, 2, 8, 4,
-        0, 0, 4, 1, 8, 1, 0, 3, 5, 0, 2, 4, 0, 1, 2, 0,
-        6, 0, 5, 2, 28, 1, 1, 4, 12, 30, 10, 1, 0, 3, 18, 0,
-        1, 4, 1, 0, 1, 2, 0, 6, 6, 9, 1, 0, 0, 1, 1, 0,
-        14, 3, 4, 0, 14, 2, 3, 0, 0, 1, 1, 0, 14, 1, 5, 1,
-        15, 2, 0, 20, 3, 20, 5, 0, 10, 6, 0, 9, 4, 0, 0, 11,
-        1, 0, 2, 0, 0, 0, 0, 0, 29, 5, 1, 2, 0, 4, 0, 10,
-        10, 2, 9, 0, 1, 0, 5, 20, 0, 6, 0, 11, 2, 2, 8, 0,
-        1, 0, 4, 0, 0, 1, 0, 9, 3, 0, 2, 11, 2, 4, 0, 0,
-        28, 0, 10, 0, 0, 11, 0, 18, 7, 13, 2, 31, 2, 3, 5, 5,
-        0, 18, 1, 0, 1, 25, 1, 17, 6, 35, 2, 1, 62, 4, 0, 25,
-        48, 36, 11, 7, 2, 22, 0, 2, 1, 2, 48, 2, 0, 0, 0, 0,
-        0, 1, 5, 22, 0, 1, 2, 10, 0, 11, 0, 19, 2, 0, 0, 4,
-        5, 0, 3, 0, 1, 0, 0, 8, 3, 0, 9, 0, 0, 28, 9, 3,
-        51, 38, 2, 11, 0, 1, 0, 0, 5, 0, 1, 0, 0, 13, 27, 8,
-        11, 17, 0, 0, 64, 20, 126, 0, 1, 0, 62, 18, 0, 0, 0, 0,
-        2, 0, 0, 53, 119, 17, 81, 6, 20, 0, 0, 0, 48, 109, 5, 0,
-        0, 0, 46, 3, 22, 2, 160, 1, 49, 0, 0, 0, 0, 4, 124, 0,
-        0, 12, 4, 1, 0, 1, 1, 141, 3, 2, 7, 0, 0, 0, 0, 10,
-        40, 226, 445, 0, 6, 2, 0, 1, 2, 5, 0, 591, 0, 0
+        0, 8, 0, 1, 0, 2, 0, 0, 1, 0, 1, 0, 0, 0, 2, 1,
+        1, 0, 0, 4, 1, 2, 1, 0, 3, 3, 0, 1, 1, 0, 4, 10,
+        4, 2, 0, 0, 2, 0, 2, 9, 1, 3, 0, 5, 0, 0, 0, 0,
+        2, 0, 3, 0, 0, 1, 3, 0, 5, 1, 0, 1, 0, 5, 1, 0,
+        1, 0, 4, 2, 0, 2, 0, 3, 0, 2, 2, 2, 0, 0, 0, 0,
+        5, 0, 0, 8, 2, 8, 1, 2, 0, 2, 0, 6, 0, 3, 0, 2,
+        0, 1, 0, 0, 7, 0, 0, 0, 1, 4, 1, 0, 1, 1, 1, 0,
+        1, 2, 2, 1, 0, 4, 3, 1, 0, 0, 3, 3, 1, 1, 1, 3,
+        1, 1, 0, 1, 1, 1, 0, 2, 0, 2, 0, 0, 2, 3, 4, 5,
+        4, 0, 1, 0, 5, 0, 0, 7, 10, 7, 0, 1, 3, 1, 1, 1,
+        0, 0, 0, 1, 3, 0, 0, 4, 0, 0, 5, 7, 0, 5, 0, 0,
+        1, 1, 0, 0, 0, 1, 5, 11, 2, 2, 0, 1, 1, 2, 0, 0,
+        5, 3, 3, 1, 2, 2, 1, 4, 2, 0, 2, 7, 6, 0, 3, 0,
+        3, 3, 0, 4, 3, 3, 6, 1, 6, 0, 0, 0, 6, 2, 1, 1,
+        6, 0, 2, 0, 2, 2, 4, 2, 11, 0, 2, 0, 6, 2, 0, 15,
+        5, 4, 0, 7, 10, 1, 5, 1, 3, 0, 0, 1, 0, 5, 1, 2,
+        5, 3, 0, 12, 1, 0, 1, 0, 1, 1, 0, 1, 4, 2, 4, 4,
+        1, 0, 0, 0, 0, 1, 1, 0, 1, 7, 0, 0, 1, 2, 11, 0,
+        8, 1, 7, 1, 4, 5, 3, 5, 2, 9, 0, 4, 0, 7, 0, 4,
+        4, 1, 1, 1, 0, 4, 1, 8, 0, 0, 0, 0, 3, 5, 0, 0,
+        1, 0, 1, 7, 4, 5, 8, 4, 0, 0, 0, 0, 2, 1, 0, 5,
+        0, 2, 2, 8, 5, 0, 0, 7, 0, 1, 12, 0, 0, 1, 0, 4,
+        0, 5, 0, 0, 0, 11, 0, 1, 0, 1, 1, 0, 0, 0, 4, 5,
+        0, 0, 25, 9, 3, 9, 0, 24, 0, 1, 2, 2, 0, 2, 0, 0,
+        21, 4, 0, 0, 1, 4, 0, 3, 0, 1, 1, 1, 13, 0, 0, 0,
+        0, 0, 0, 1, 4, 1, 0, 0, 5, 8, 0, 0, 1, 0, 6, 4,
+        0, 1, 0, 0, 0, 1, 6, 3, 6, 9, 5, 0, 3, 5, 12, 4,
+        0, 34, 7, 1, 2, 2, 3, 0, 1, 13, 3, 0, 3, 5, 1, 1,
+        1, 7, 0, 0, 0, 0, 6, 6, 6, 0, 0, 5, 0, 0, 9, 0,
+        0, 5, 0, 0, 2, 9, 0, 0, 0, 27, 0, 32, 8, 0, 5, 9,
+        7, 0, 0, 28, 0, 0, 13, 1, 7, 0, 3, 0, 0, 2, 4, 0,
+        31, 0, 0, 2, 0, 1, 14, 0, 7, 3, 0, 0, 2, 10, 1, 1,
+        4, 0, 18, 0, 2, 0, 0, 0, 22, 0, 18, 13, 0, 0, 1, 0,
+        0, 6, 21, 17, 7, 0, 17, 5, 0, 70, 0, 0, 1, 27, 3, 14,
+        0, 0, 39, 9, 3, 2, 11, 17, 0, 2, 0, 21, 5, 1, 0, 3,
+        0, 2, 10, 5, 0, 2, 11, 0, 0, 2, 0, 15, 6, 0, 0, 1,
+        0, 5, 12, 11, 0, 8, 9, 2, 4, 0, 7, 0, 12, 0, 5, 21,
+        3, 0, 1, 0, 8, 0, 0, 1, 13, 0, 7, 12, 0, 0, 6, 1,
+        2, 0, 0, 36, 6, 0, 21, 0, 0, 3, 0, 3, 2, 0, 12, 0,
+        0, 25, 11, 1, 2, 0, 10, 0, 0, 0, 0, 3, 0, 40, 0, 2,
+        58, 2, 17, 39, 13, 2, 1, 0, 7, 0, 5, 22, 42, 36, 23, 0,
+        0, 50, 19, 0, 5, 0, 15, 3, 17, 0, 0, 9, 32, 23, 21, 0,
+        4, 1, 1, 0, 2, 11, 0, 0, 0, 14, 9, 0, 0, 35, 0, 75,
+        0, 4, 26, 0, 0, 232, 15, 83, 8, 401, 14, 2, 0, 0, 1, 0,
+        0, 16, 43, 7, 0, 3, 11, 246, 112, 40, 44, 676, 104, 4
     };
 
     using KV = std::pair<const char*, SpvOp>;
 
     static const KV words[718] =
     {
-        {"OpReservedWritePipe", static_cast<SpvOp>(277)},
-        {"OpSubgroupAvcMceGetInterMinorShapeINTEL", static_cast<SpvOp>(5742)},
-        {"OpSubgroupAvcMceGetDefaultIntraLumaModePenaltyINTEL", static_cast<SpvOp>(5725)},
-        {"OpGroupNonUniformUMin", static_cast<SpvOp>(354)},
-        {"OpUGreaterThan", static_cast<SpvOp>(172)},
-        {"OpSubgroupAvcSicSetBlockBasedRawSkipSadINTEL", static_cast<SpvOp>(5802)},
-        {"OpBranch", static_cast<SpvOp>(249)},
-        {"OpSubgroupAvcImeSetDualReferenceINTEL", static_cast<SpvOp>(5749)},
-        {"OpExpectKHR", static_cast<SpvOp>(5631)},
-        {"OpCompositeInsert", static_cast<SpvOp>(82)},
-        {"OpSource", static_cast<SpvOp>(3)},
-        {"OpSubgroupShuffleDownINTEL", static_cast<SpvOp>(5572)},
-        {"OpSubgroupAvcSicConvertToMcePayloadINTEL", static_cast<SpvOp>(5796)},
-        {"OpULessThan", static_cast<SpvOp>(176)},
-        {"OpTypeRuntimeArray", static_cast<SpvOp>(29)},
-        {"OpGroupNonUniformAll", static_cast<SpvOp>(334)},
-        {"OpSubgroupAvcSicEvaluateWithDualReferenceINTEL", static_cast<SpvOp>(5805)},
-        {"OpSubgroupAvcSicGetIpeLumaShapeINTEL", static_cast<SpvOp>(5809)},
-        {"OpSubgroupAvcMceGetInterMotionVectorCountINTEL", static_cast<SpvOp>(5744)},
-        {"OpArbitraryFloatLTINTEL", static_cast<SpvOp>(5852)},
-        {"OpSourceExtension", static_cast<SpvOp>(4)},
-        {"OpLifetimeStop", static_cast<SpvOp>(257)},
-        {"OpVectorTimesMatrix", static_cast<SpvOp>(144)},
-        {"OpTypeInt", static_cast<SpvOp>(21)},
-        {"OpGroupNonUniformBallotBitCount", static_cast<SpvOp>(342)},
-        {"OpGroupNonUniformAny", static_cast<SpvOp>(335)},
-        {"OpCooperativeMatrixLoadKHR", static_cast<SpvOp>(4457)},
-        {"OpISubBorrow", static_cast<SpvOp>(150)},
-        {"OpGroupNonUniformShuffle", static_cast<SpvOp>(345)},
-        {"OpArbitraryFloatCosPiINTEL", static_cast<SpvOp>(5872)},
-        {"OpHitObjectTraceRayNV", static_cast<SpvOp>(5260)},
-        {"OpHitObjectGetWorldRayDirectionNV", static_cast<SpvOp>(5272)},
-        {"OpRayQueryGetWorldRayDirectionKHR", static_cast<SpvOp>(6029)},
-        {"OpImageSampleProjImplicitLod", static_cast<SpvOp>(91)},
-        {"OpSDotAccSat", static_cast<SpvOp>(4453)},
-        {"OpFNegate", static_cast<SpvOp>(127)},
-        {"OpImageSparseSampleImplicitLod", static_cast<SpvOp>(305)},
-        {"OpSatConvertUToS", static_cast<SpvOp>(119)},
-        {"OpArbitraryFloatLogINTEL", static_cast<SpvOp>(5860)},
-        {"OpPtrNotEqual", static_cast<SpvOp>(402)},
-        {"OpGroupNonUniformPartitionNV", static_cast<SpvOp>(5296)},
-        {"OpFunctionCall", static_cast<SpvOp>(57)},
-        {"OpSpecConstantCompositeContinuedINTEL", static_cast<SpvOp>(6092)},
-        {"OpSubgroupAvcMceGetDefaultInterBaseMultiReferencePenaltyINTEL", static_cast<SpvOp>(5713)},
-        {"OpIAverageINTEL", static_cast<SpvOp>(5591)},
-        {"OpStore", static_cast<SpvOp>(62)},
-        {"OpFUnordNotEqual", static_cast<SpvOp>(183)},
-        {"OpEntryPoint", static_cast<SpvOp>(15)},
-        {"OpAtomicSMin", static_cast<SpvOp>(236)},
-        {"OpRayQueryGetIntersectionInstanceCustomIndexKHR", static_cast<SpvOp>(6019)},
-        {"OpDecorateId", static_cast<SpvOp>(332)},
-        {"OpExecutionModeId", static_cast<SpvOp>(331)},
-        {"OpSubgroupAvcMceSetDualReferenceInterlacedFieldPolaritiesINTEL", static_cast<SpvOp>(5731)},
-        {"OpArbitraryFloatExpINTEL", static_cast<SpvOp>(5864)},
-        {"OpEndInvocationInterlockEXT", static_cast<SpvOp>(5365)},
-        {"OpTypeCooperativeMatrixKHR", static_cast<SpvOp>(4456)},
-        {"OpSubgroupAvcImeEvaluateWithSingleReferenceINTEL", static_cast<SpvOp>(5757)},
-        {"OpGroupNonUniformBallotBitExtract", static_cast<SpvOp>(341)},
-        {"OpImageSampleExplicitLod", static_cast<SpvOp>(88)},
-        {"OpImageBlockMatchSADQCOM", static_cast<SpvOp>(4483)},
-        {"OpFixedSinINTEL", static_cast<SpvOp>(5926)},
-        {"OpBitCount", static_cast<SpvOp>(205)},
-        {"OpArbitraryFloatSinINTEL", static_cast<SpvOp>(5868)},
-        {"OpAsmCallINTEL", static_cast<SpvOp>(5611)},
-        {"OpArbitraryFloatASinPiINTEL", static_cast<SpvOp>(5874)},
-        {"OpConstantComposite", static_cast<SpvOp>(44)},
-        {"OpExecutionMode", static_cast<SpvOp>(16)},
-        {"OpSubgroupAvcImeEvaluateWithSingleReferenceStreaminINTEL", static_cast<SpvOp>(5759)},
-        {"OpGroupMemberDecorate", static_cast<SpvOp>(75)},
-        {"OpUMod", static_cast<SpvOp>(137)},
-        {"OpSubgroupAvcRefEvaluateWithDualReferenceINTEL", static_cast<SpvOp>(5787)},
-        {"OpGroupNonUniformIAdd", static_cast<SpvOp>(349)},
-        {"OpSubgroupAvcRefConvertToMceResultINTEL", static_cast<SpvOp>(5790)},
-        {"OpFMod", static_cast<SpvOp>(141)},
-        {"OpGroupNonUniformFAdd", static_cast<SpvOp>(350)},
-        {"OpFunctionPointerCallINTEL", static_cast<SpvOp>(5601)},
-        {"OpVariableLengthArrayINTEL", static_cast<SpvOp>(5818)},
-        {"OpHitObjectRecordMissMotionNV", static_cast<SpvOp>(5251)},
-        {"OpSubgroupAvcSicSetIntraLumaModeCostFunctionINTEL", static_cast<SpvOp>(5798)},
-        {"OpVectorTimesScalar", static_cast<SpvOp>(142)},
-        {"OpFUnordEqual", static_cast<SpvOp>(181)},
-        {"OpIEqual", static_cast<SpvOp>(170)},
-        {"OpSubgroupAvcMceGetBestInterDistortionsINTEL", static_cast<SpvOp>(5740)},
-        {"OpTypeAvcMceResultINTEL", static_cast<SpvOp>(5705)},
-        {"OpRayQueryConfirmIntersectionKHR", static_cast<SpvOp>(4476)},
-        {"OpSelect", static_cast<SpvOp>(169)},
-        {"OpWritePipe", static_cast<SpvOp>(275)},
-        {"OpSubgroupAvcImeSetWeightedSadINTEL", static_cast<SpvOp>(5756)},
-        {"OpTypeRayQueryKHR", static_cast<SpvOp>(4472)},
-        {"OpArbitraryFloatGTINTEL", static_cast<SpvOp>(5850)},
-        {"OpCopyMemory", static_cast<SpvOp>(63)},
-        {"OpSubgroupAvcMceSetSourceInterlacedFieldPolarityINTEL", static_cast<SpvOp>(5729)},
-        {"OpHitObjectGetAttributesNV", static_cast<SpvOp>(5266)},
-        {"OpFAdd", static_cast<SpvOp>(129)},
-        {"OpSetUserEventStatus", static_cast<SpvOp>(301)},
-        {"OpSubgroupAvcMceSetInterBaseMultiReferencePenaltyINTEL", static_cast<SpvOp>(5714)},
-        {"OpSubgroupAvcImeGetStreamoutSingleReferenceMajorShapeDistortionsINTEL", static_cast<SpvOp>(5771)},
-        {"OpUSubSatINTEL", static_cast<SpvOp>(5596)},
-        {"OpSubgroupAvcImeGetWeightingPatternMinimumDistortionINTEL", static_cast<SpvOp>(5780)},
-        {"OpGetKernelWorkGroupSize", static_cast<SpvOp>(295)},
-        {"OpGroupNonUniformBitwiseXor", static_cast<SpvOp>(361)},
-        {"OpSUDotAccSat", static_cast<SpvOp>(4455)},
-        {"OpFUnordLessThan", static_cast<SpvOp>(185)},
-        {"OpSubgroupAvcSicSetSkcForwardTransformEnableINTEL", static_cast<SpvOp>(5801)},
-        {"OpConstantCompositeContinuedINTEL", static_cast<SpvOp>(6091)},
-        {"OpGroupCommitWritePipe", static_cast<SpvOp>(288)},
-        {"OpAssumeTrueKHR", static_cast<SpvOp>(5630)},
-        {"OpConvertFToBF16INTEL", static_cast<SpvOp>(6116)},
-        {"OpTraceRayKHR", static_cast<SpvOp>(4445)},
-        {"OpArbitraryFloatRecipINTEL", static_cast<SpvOp>(5855)},
-        {"OpGroupIAddNonUniformAMD", static_cast<SpvOp>(5000)},
-        {"OpSubgroupAvcRefSetBidirectionalMixDisableINTEL", static_cast<SpvOp>(5784)},
-        {"OpSubgroupAvcMceConvertToRefPayloadINTEL", static_cast<SpvOp>(5734)},
-        {"OpTypeAvcSicResultINTEL", static_cast<SpvOp>(5712)},
-        {"OpImageSampleWeightedQCOM", static_cast<SpvOp>(4480)},
-        {"OpKill", static_cast<SpvOp>(252)},
-        {"OpVmeImageINTEL", static_cast<SpvOp>(5699)},
-        {"OpGroupNonUniformFMin", static_cast<SpvOp>(355)},
-        {"OpSetMeshOutputsEXT", static_cast<SpvOp>(5295)},
-        {"OpOuterProduct", static_cast<SpvOp>(147)},
-        {"OpArbitraryFloatCastToIntINTEL", static_cast<SpvOp>(5843)},
-        {"OpAtomicFAddEXT", static_cast<SpvOp>(6035)},
-        {"OpFRem", static_cast<SpvOp>(140)},
-        {"OpSubgroupImageBlockReadINTEL", static_cast<SpvOp>(5577)},
-        {"OpGetKernelNDrangeSubGroupCount", static_cast<SpvOp>(293)},
-        {"OpMemberDecorateString", static_cast<SpvOp>(5633)},
-        {"OpSourceContinued", static_cast<SpvOp>(2)},
-        {"OpTypeImage", static_cast<SpvOp>(25)},
-        {"OpCommitReadPipe", static_cast<SpvOp>(280)},
-        {"OpTypeDeviceEvent", static_cast<SpvOp>(35)},
-        {"OpTypeAvcImePayloadINTEL", static_cast<SpvOp>(5701)},
-        {"OpGroupNonUniformFMul", static_cast<SpvOp>(352)},
-        {"OpImageQuerySize", static_cast<SpvOp>(104)},
-        {"OpDecorateString", static_cast<SpvOp>(5632)},
-        {"OpGroupUMax", static_cast<SpvOp>(270)},
-        {"OpAliasScopeListDeclINTEL", static_cast<SpvOp>(5913)},
-        {"OpArbitraryFloatPowINTEL", static_cast<SpvOp>(5880)},
-        {"OpAtomicFlagClear", static_cast<SpvOp>(319)},
-        {"OpSubgroupAvcSicConvertToMceResultINTEL", static_cast<SpvOp>(5808)},
-        {"OpSubgroupAvcImeEvaluateWithSingleReferenceStreaminoutINTEL", static_cast<SpvOp>(5763)},
-        {"OpReorderThreadWithHitObjectNV", static_cast<SpvOp>(5279)},
-        {"OpAtomicXor", static_cast<SpvOp>(242)},
-        {"OpGroupAll", static_cast<SpvOp>(261)},
-        {"OpImageSparseSampleProjExplicitLod", static_cast<SpvOp>(310)},
-        {"OpSDotAccSatKHR", static_cast<SpvOp>(4453)},
-        {"OpFUnordLessThanEqual", static_cast<SpvOp>(189)},
-        {"OpIAddSatINTEL", static_cast<SpvOp>(5589)},
-        {"OpSubgroupAvcImeGetStreamoutSingleReferenceMajorShapeMotionVectorsINTEL", static_cast<SpvOp>(5770)},
-        {"OpGroupNonUniformBitwiseAnd", static_cast<SpvOp>(359)},
-        {"OpTypeAvcMcePayloadINTEL", static_cast<SpvOp>(5704)},
-        {"OpSubgroupAvcMceSetMotionVectorCostFunctionINTEL", static_cast<SpvOp>(5724)},
-        {"OpDPdxCoarse", static_cast<SpvOp>(213)},
-        {"OpPtrCastToCrossWorkgroupINTEL", static_cast<SpvOp>(5934)},
-        {"OpSwitch", static_cast<SpvOp>(251)},
-        {"OpGenericCastToPtrExplicit", static_cast<SpvOp>(123)},
-        {"OpSubgroupAvcSicGetMotionVectorMaskINTEL", static_cast<SpvOp>(5795)},
-        {"OpRayQueryGetIntersectionCandidateAABBOpaqueKHR", static_cast<SpvOp>(6026)},
-        {"OpArbitraryFloatCastFromIntINTEL", static_cast<SpvOp>(5842)},
-        {"OpImageSparseFetch", static_cast<SpvOp>(313)},
-        {"OpControlBarrierArriveINTEL", static_cast<SpvOp>(6142)},
-        {"OpSubgroupAvcMceGetDefaultHighPenaltyCostTableINTEL", static_cast<SpvOp>(5721)},
-        {"OpFUnordGreaterThan", static_cast<SpvOp>(187)},
-        {"OpArrayLength", static_cast<SpvOp>(68)},
-        {"OpGroupFMinNonUniformAMD", static_cast<SpvOp>(5002)},
-        {"OpCooperativeMatrixStoreNV", static_cast<SpvOp>(5360)},
-        {"OpSubgroupAvcMceSetSingleReferenceInterlacedFieldPolarityINTEL", static_cast<SpvOp>(5730)},
-        {"OpHitObjectTraceRayMotionNV", static_cast<SpvOp>(5256)},
-        {"OpEnqueueKernel", static_cast<SpvOp>(292)},
-        {"OpConvertFToS", static_cast<SpvOp>(110)},
-        {"OpDecorate", static_cast<SpvOp>(71)},
-        {"OpSUDotAccSatKHR", static_cast<SpvOp>(4455)},
-        {"OpGenericPtrMemSemantics", static_cast<SpvOp>(69)},
-        {"OpRayQueryGetIntersectionObjectRayOriginKHR", static_cast<SpvOp>(6028)},
-        {"OpGetKernelMaxNumSubgroups", static_cast<SpvOp>(326)},
-        {"OpGroupBitwiseXorKHR", static_cast<SpvOp>(6405)},
-        {"OpSubgroupAvcMceGetDefaultIntraChromaModeBasePenaltyINTEL", static_cast<SpvOp>(5727)},
-        {"OpCooperativeMatrixLoadNV", static_cast<SpvOp>(5359)},
-        {"OpFunctionParameter", static_cast<SpvOp>(55)},
-        {"OpInBoundsPtrAccessChain", static_cast<SpvOp>(70)},
-        {"OpGroupNonUniformLogicalOr", static_cast<SpvOp>(363)},
-        {"OpHitObjectGetInstanceCustomIndexNV", static_cast<SpvOp>(5271)},
-        {"OpDecorationGroup", static_cast<SpvOp>(73)},
-        {"OpRayQueryGetIntersectionInstanceIdKHR", static_cast<SpvOp>(6020)},
-        {"OpBitFieldUExtract", static_cast<SpvOp>(203)},
-        {"OpTypeArray", static_cast<SpvOp>(28)},
-        {"OpFragmentMaskFetchAMD", static_cast<SpvOp>(5011)},
-        {"OpHitObjectGetHitKindNV", static_cast<SpvOp>(5267)},
-        {"OpUnreachable", static_cast<SpvOp>(255)},
-        {"OpImageDrefGather", static_cast<SpvOp>(97)},
-        {"OpControlBarrier", static_cast<SpvOp>(224)},
-        {"OpGroupNonUniformBallotFindLSB", static_cast<SpvOp>(343)},
-        {"OpSConvert", static_cast<SpvOp>(114)},
-        {"OpImageSampleFootprintNV", static_cast<SpvOp>(5283)},
-        {"OpTypeStructContinuedINTEL", static_cast<SpvOp>(6090)},
-        {"OpUDotAccSat", static_cast<SpvOp>(4454)},
-        {"OpAtomicFMaxEXT", static_cast<SpvOp>(5615)},
-        {"OpImageQueryFormat", static_cast<SpvOp>(101)},
-        {"OpSpecConstantOp", static_cast<SpvOp>(52)},
-        {"OpSubgroupAvcSicSetIntraLumaShapePenaltyINTEL", static_cast<SpvOp>(5797)},
-        {"OpGroupNonUniformBallotFindMSB", static_cast<SpvOp>(344)},
-        {"OpHitObjectIsEmptyNV", static_cast<SpvOp>(5276)},
-        {"OpTypeAvcRefResultINTEL", static_cast<SpvOp>(5711)},
-        {"OpSpecConstantComposite", static_cast<SpvOp>(51)},
-        {"OpFOrdNotEqual", static_cast<SpvOp>(182)},
         {"OpIsValidEvent", static_cast<SpvOp>(300)},
-        {"OpUCountTrailingZerosINTEL", static_cast<SpvOp>(5586)},
-        {"OpGroupDecorate", static_cast<SpvOp>(74)},
-        {"OpINotEqual", static_cast<SpvOp>(171)},
-        {"OpSubgroupAvcImeEvaluateWithDualReferenceStreaminINTEL", static_cast<SpvOp>(5760)},
-        {"OpIgnoreIntersectionKHR", static_cast<SpvOp>(4448)},
-        {"OpSubgroupBlockWriteINTEL", static_cast<SpvOp>(5576)},
-        {"OpVectorShuffle", static_cast<SpvOp>(79)},
-        {"OpImageQuerySizeLod", static_cast<SpvOp>(103)},
-        {"OpUndef", static_cast<SpvOp>(1)},
-        {"OpSubgroupAvcSicGetBestIpeChromaDistortionINTEL", static_cast<SpvOp>(5811)},
-        {"OpGroupNonUniformQuadBroadcast", static_cast<SpvOp>(365)},
-        {"OpCompositeExtract", static_cast<SpvOp>(81)},
-        {"OpSubgroupAvcImeStripSingleReferenceStreamoutINTEL", static_cast<SpvOp>(5768)},
-        {"OpAtomicCompareExchangeWeak", static_cast<SpvOp>(231)},
-        {"OpIMul", static_cast<SpvOp>(132)},
-        {"OpSubgroupAvcMceGetDefaultInterDirectionPenaltyINTEL", static_cast<SpvOp>(5717)},
-        {"OpPtrDiff", static_cast<SpvOp>(403)},
-        {"OpFixedLogINTEL", static_cast<SpvOp>(5932)},
-        {"OpRayQueryGetIntersectionObjectToWorldKHR", static_cast<SpvOp>(6031)},
-        {"OpAtomicOr", static_cast<SpvOp>(241)},
-        {"OpSubgroupAvcMceConvertToImePayloadINTEL", static_cast<SpvOp>(5732)},
-        {"OpAbsUSubINTEL", static_cast<SpvOp>(5588)},
-        {"OpConvertUToF", static_cast<SpvOp>(112)},
-        {"OpArbitraryFloatACosINTEL", static_cast<SpvOp>(5875)},
-        {"OpGroupReserveWritePipePackets", static_cast<SpvOp>(286)},
-        {"OpIsNormal", static_cast<SpvOp>(159)},
-        {"OpFwidthCoarse", static_cast<SpvOp>(215)},
-        {"OpSampledImage", static_cast<SpvOp>(86)},
-        {"OpSubgroupAvcImeGetUnidirectionalEarlySearchTerminationINTEL", static_cast<SpvOp>(5778)},
-        {"OpSubgroupAvcImeGetTruncatedSearchIndicationINTEL", static_cast<SpvOp>(5777)},
-        {"OpSpecConstantTrue", static_cast<SpvOp>(48)},
-        {"OpIsHelperInvocationEXT", static_cast<SpvOp>(5381)},
-        {"OpTypeAvcImeResultDualReferenceStreamoutINTEL", static_cast<SpvOp>(5708)},
-        {"OpGroupSMaxNonUniformAMD", static_cast<SpvOp>(5007)},
-        {"OpGroupAsyncCopy", static_cast<SpvOp>(259)},
-        {"OpExecuteCallableKHR", static_cast<SpvOp>(4446)},
-        {"OpSubgroupImageMediaBlockReadINTEL", static_cast<SpvOp>(5580)},
-        {"OpEmitVertex", static_cast<SpvOp>(218)},
-        {"OpSubgroupAvcMceGetDefaultNonDcLumaIntraPenaltyINTEL", static_cast<SpvOp>(5726)},
-        {"OpSGreaterThan", static_cast<SpvOp>(173)},
-        {"OpLine", static_cast<SpvOp>(8)},
-        {"OpHitObjectGetShaderBindingTableRecordIndexNV", static_cast<SpvOp>(5258)},
-        {"OpArbitraryFloatDivINTEL", static_cast<SpvOp>(5849)},
-        {"OpGroupNonUniformRotateKHR", static_cast<SpvOp>(4431)},
-        {"OpTypePipeStorage", static_cast<SpvOp>(322)},
-        {"OpIsFinite", static_cast<SpvOp>(158)},
-        {"OpUAverageINTEL", static_cast<SpvOp>(5592)},
-        {"OpSubgroupAvcImeSetUnidirectionalMixDisableINTEL", static_cast<SpvOp>(5754)},
-        {"OpArbitraryFloatLog10INTEL", static_cast<SpvOp>(5862)},
-        {"OpFDiv", static_cast<SpvOp>(136)},
-        {"OpRayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetKHR", static_cast<SpvOp>(6021)},
-        {"OpSubgroupAvcImeSetSingleReferenceINTEL", static_cast<SpvOp>(5748)},
-        {"OpGroupNonUniformQuadSwap", static_cast<SpvOp>(366)},
-        {"OpRayQueryGetIntersectionFrontFaceKHR", static_cast<SpvOp>(6025)},
-        {"OpReadClockKHR", static_cast<SpvOp>(5056)},
-        {"OpGroupNonUniformFMax", static_cast<SpvOp>(358)},
-        {"OpGroupLogicalAndKHR", static_cast<SpvOp>(6406)},
-        {"OpGroupFMin", static_cast<SpvOp>(266)},
-        {"OpFMul", static_cast<SpvOp>(133)},
-        {"OpNamedBarrierInitialize", static_cast<SpvOp>(328)},
-        {"OpGroupUMinNonUniformAMD", static_cast<SpvOp>(5003)},
-        {"OpMemoryNamedBarrier", static_cast<SpvOp>(329)},
-        {"OpSubgroupAvcImeGetDualReferenceStreaminINTEL", static_cast<SpvOp>(5767)},
-        {"OpGroupCommitReadPipe", static_cast<SpvOp>(287)},
-        {"OpSubgroupImageMediaBlockWriteINTEL", static_cast<SpvOp>(5581)},
-        {"OpConvertPtrToU", static_cast<SpvOp>(117)},
-        {"OpGetKernelLocalSizeForSubgroupCount", static_cast<SpvOp>(325)},
-        {"OpGroupFAdd", static_cast<SpvOp>(265)},
-        {"OpLogicalNot", static_cast<SpvOp>(168)},
-        {"OpULessThanEqual", static_cast<SpvOp>(178)},
-        {"OpCooperativeMatrixLengthKHR", static_cast<SpvOp>(4460)},
-        {"OpHitObjectExecuteShaderNV", static_cast<SpvOp>(5264)},
-        {"OpSubgroupAvcMceSetInterDirectionPenaltyINTEL", static_cast<SpvOp>(5718)},
-        {"OpTraceMotionNV", static_cast<SpvOp>(5338)},
-        {"OpHitObjectGetWorldToObjectNV", static_cast<SpvOp>(5252)},
-        {"OpRayQueryGetIntersectionTypeKHR", static_cast<SpvOp>(4479)},
-        {"OpFOrdEqual", static_cast<SpvOp>(180)},
-        {"OpSubgroupAvcSicGetPackedIpeLumaModesINTEL", static_cast<SpvOp>(5812)},
-        {"OpConstant", static_cast<SpvOp>(43)},
-        {"OpSubgroupAvcMceGetDefaultInterMotionVectorCostTableINTEL", static_cast<SpvOp>(5720)},
-        {"OpFixedRecipINTEL", static_cast<SpvOp>(5924)},
-        {"OpArbitraryFloatSinCosINTEL", static_cast<SpvOp>(5870)},
-        {"OpFConvert", static_cast<SpvOp>(115)},
-        {"OpGroupNonUniformInverseBallot", static_cast<SpvOp>(340)},
-        {"OpGetKernelNDrangeMaxSubGroupSize", static_cast<SpvOp>(294)},
-        {"OpFixedRsqrtINTEL", static_cast<SpvOp>(5925)},
-        {"OpRayQueryGetWorldRayOriginKHR", static_cast<SpvOp>(6030)},
-        {"OpLifetimeStart", static_cast<SpvOp>(256)},
-        {"OpUGreaterThanEqual", static_cast<SpvOp>(174)},
-        {"OpSubgroupAvcSicGetBestIpeLumaDistortionINTEL", static_cast<SpvOp>(5810)},
-        {"OpImageFetch", static_cast<SpvOp>(95)},
-        {"OpFwidth", static_cast<SpvOp>(209)},
-        {"OpShiftLeftLogical", static_cast<SpvOp>(196)},
-        {"OpString", static_cast<SpvOp>(7)},
-        {"OpTypeAvcRefPayloadINTEL", static_cast<SpvOp>(5702)},
-        {"OpArbitraryFloatRSqrtINTEL", static_cast<SpvOp>(5856)},
-        {"OpHitObjectRecordHitWithIndexNV", static_cast<SpvOp>(5262)},
-        {"OpBitFieldSExtract", static_cast<SpvOp>(202)},
-        {"OpVectorInsertDynamic", static_cast<SpvOp>(78)},
-        {"OpArbitraryFloatCosINTEL", static_cast<SpvOp>(5869)},
-        {"OpArbitraryFloatLEINTEL", static_cast<SpvOp>(5853)},
-        {"OpTypeAvcImeResultSingleReferenceStreamoutINTEL", static_cast<SpvOp>(5707)},
-        {"OpSLessThan", static_cast<SpvOp>(177)},
-        {"OpBitwiseAnd", static_cast<SpvOp>(199)},
-        {"OpHitObjectGetObjectToWorldNV", static_cast<SpvOp>(5253)},
-        {"OpNoLine", static_cast<SpvOp>(317)},
-        {"OpHitObjectGetGeometryIndexNV", static_cast<SpvOp>(5269)},
-        {"OpArbitraryFloatSinCosPiINTEL", static_cast<SpvOp>(5840)},
-        {"OpConstantNull", static_cast<SpvOp>(46)},
-        {"OpBuildNDRange", static_cast<SpvOp>(304)},
-        {"OpArbitraryFloatCbrtINTEL", static_cast<SpvOp>(5857)},
-        {"OpSNegate", static_cast<SpvOp>(126)},
-        {"OpArbitraryFloatSqrtINTEL", static_cast<SpvOp>(5859)},
-        {"OpEmitMeshTasksEXT", static_cast<SpvOp>(5294)},
-        {"OpSUDot", static_cast<SpvOp>(4452)},
-        {"OpArbitraryFloatPowNINTEL", static_cast<SpvOp>(5882)},
-        {"OpAsmTargetINTEL", static_cast<SpvOp>(5609)},
-        {"OpMatrixTimesScalar", static_cast<SpvOp>(143)},
-        {"OpCopyMemorySized", static_cast<SpvOp>(64)},
-        {"OpFunction", static_cast<SpvOp>(54)},
-        {"OpRestoreMemoryINTEL", static_cast<SpvOp>(5820)},
-        {"OpLoopMerge", static_cast<SpvOp>(246)},
-        {"OpCompositeConstruct", static_cast<SpvOp>(80)},
-        {"OpCommitWritePipe", static_cast<SpvOp>(281)},
-        {"OpModuleProcessed", static_cast<SpvOp>(330)},
-        {"OpGroupIMulKHR", static_cast<SpvOp>(6401)},
-        {"OpHitObjectIsMissNV", static_cast<SpvOp>(5278)},
-        {"OpInBoundsAccessChain", static_cast<SpvOp>(66)},
-        {"OpFixedSinCosINTEL", static_cast<SpvOp>(5928)},
-        {"OpVariable", static_cast<SpvOp>(59)},
-        {"OpCooperativeMatrixMulAddKHR", static_cast<SpvOp>(4459)},
-        {"OpUConvert", static_cast<SpvOp>(113)},
-        {"OpIsNan", static_cast<SpvOp>(156)},
-        {"OpGenericCastToPtr", static_cast<SpvOp>(122)},
-        {"OpBitwiseXor", static_cast<SpvOp>(198)},
-        {"OpGroupFAddNonUniformAMD", static_cast<SpvOp>(5001)},
-        {"OpIAverageRoundedINTEL", static_cast<SpvOp>(5593)},
-        {"OpSubgroupAvcMceConvertToImeResultINTEL", static_cast<SpvOp>(5733)},
-        {"OpGroupIAdd", static_cast<SpvOp>(264)},
-        {"OpSubgroupShuffleINTEL", static_cast<SpvOp>(5571)},
-        {"OpHitObjectGetInstanceIdNV", static_cast<SpvOp>(5270)},
-        {"OpIAddCarry", static_cast<SpvOp>(149)},
-        {"OpSelectionMerge", static_cast<SpvOp>(247)},
-        {"OpEmitStreamVertex", static_cast<SpvOp>(220)},
-        {"OpSubgroupAvcImeSetEarlySearchTerminationThresholdINTEL", static_cast<SpvOp>(5755)},
-        {"OpGroupNonUniformUMax", static_cast<SpvOp>(357)},
-        {"OpTypeVector", static_cast<SpvOp>(23)},
-        {"OpGetNumPipePackets", static_cast<SpvOp>(283)},
-        {"OpAbsISubINTEL", static_cast<SpvOp>(5587)},
-        {"OpImageSparseGather", static_cast<SpvOp>(314)},
-        {"OpImageWrite", static_cast<SpvOp>(99)},
-        {"OpUnordered", static_cast<SpvOp>(163)},
-        {"OpRayQueryGetIntersectionWorldToObjectKHR", static_cast<SpvOp>(6032)},
-        {"OpImageQueryLevels", static_cast<SpvOp>(106)},
-        {"OpReleaseEvent", static_cast<SpvOp>(298)},
-        {"OpEndStreamPrimitive", static_cast<SpvOp>(221)},
-        {"OpSubgroupAvcImeEvaluateWithDualReferenceINTEL", static_cast<SpvOp>(5758)},
-        {"OpFragmentFetchAMD", static_cast<SpvOp>(5012)},
-        {"OpImageSparseRead", static_cast<SpvOp>(320)},
-        {"OpFixedSqrtINTEL", static_cast<SpvOp>(5923)},
-        {"OpFixedSinCosPiINTEL", static_cast<SpvOp>(5931)},
-        {"OpSubgroupAvcMceSetAcOnlyHaarINTEL", static_cast<SpvOp>(5728)},
-        {"OpHitObjectGetRayTMaxNV", static_cast<SpvOp>(5274)},
-        {"OpTypeVoid", static_cast<SpvOp>(19)},
-        {"OpSubgroupAvcImeGetStreamoutDualReferenceMajorShapeDistortionsINTEL", static_cast<SpvOp>(5774)},
-        {"OpAtomicExchange", static_cast<SpvOp>(229)},
-        {"OpExtension", static_cast<SpvOp>(10)},
-        {"OpQuantizeToF16", static_cast<SpvOp>(116)},
-        {"OpHitObjectGetCurrentTimeNV", static_cast<SpvOp>(5265)},
-        {"OpGroupNonUniformLogicalXor", static_cast<SpvOp>(364)},
-        {"OpTypeCooperativeMatrixNV", static_cast<SpvOp>(5358)},
-        {"OpRayQueryGetIntersectionBarycentricsKHR", static_cast<SpvOp>(6024)},
-        {"OpSubgroupAvcMceGetDefaultInterShapePenaltyINTEL", static_cast<SpvOp>(5715)},
-        {"OpAtomicUMax", static_cast<SpvOp>(239)},
-        {"OpAtomicIIncrement", static_cast<SpvOp>(232)},
-        {"OpFUnordGreaterThanEqual", static_cast<SpvOp>(191)},
-        {"OpCopyLogical", static_cast<SpvOp>(400)},
-        {"OpConstantPipeStorage", static_cast<SpvOp>(323)},
-        {"OpConvertSamplerToUNV", static_cast<SpvOp>(5394)},
-        {"OpAtomicUMin", static_cast<SpvOp>(237)},
-        {"OpConvertImageToUNV", static_cast<SpvOp>(5393)},
-        {"OpGroupNonUniformIMul", static_cast<SpvOp>(351)},
-        {"OpSubgroupAvcSicGetInterRawSadsINTEL", static_cast<SpvOp>(5816)},
-        {"OpLessOrGreater", static_cast<SpvOp>(161)},
-        {"OpFixedCosINTEL", static_cast<SpvOp>(5927)},
-        {"OpArbitraryFloatLog1pINTEL", static_cast<SpvOp>(5863)},
-        {"OpRayQueryGetIntersectionPrimitiveIndexKHR", static_cast<SpvOp>(6023)},
-        {"OpSubgroupAvcMceGetInterDirectionsINTEL", static_cast<SpvOp>(5743)},
-        {"OpImageTexelPointer", static_cast<SpvOp>(60)},
-        {"OpSubgroupAvcMceGetInterReferenceIdsINTEL", static_cast<SpvOp>(5745)},
-        {"OpUMul32x16INTEL", static_cast<SpvOp>(5598)},
-        {"OpReservedReadPipe", static_cast<SpvOp>(276)},
-        {"OpLogicalEqual", static_cast<SpvOp>(164)},
-        {"OpAtomicCompareExchange", static_cast<SpvOp>(230)},
-        {"OpUCountLeadingZerosINTEL", static_cast<SpvOp>(5585)},
-        {"OpSubgroupAvcSicInitializeINTEL", static_cast<SpvOp>(5791)},
-        {"OpImageSparseTexelsResident", static_cast<SpvOp>(316)},
-        {"OpLogicalAnd", static_cast<SpvOp>(167)},
-        {"OpSLessThanEqual", static_cast<SpvOp>(179)},
-        {"OpSubgroupAvcImeEvaluateWithSingleReferenceStreamoutINTEL", static_cast<SpvOp>(5761)},
-        {"OpNot", static_cast<SpvOp>(200)},
-        {"OpSubgroupAvcSicEvaluateWithMultiReferenceINTEL", static_cast<SpvOp>(5806)},
-        {"OpSubgroupAvcSicConfigureIpeLumaINTEL", static_cast<SpvOp>(5793)},
-        {"OpSatConvertSToU", static_cast<SpvOp>(118)},
-        {"OpSubgroupAvcImeConvertToMceResultINTEL", static_cast<SpvOp>(5765)},
-        {"OpSignBitSet", static_cast<SpvOp>(160)},
-        {"OpSubgroupAvcMceGetInterReferenceInterlacedFieldPolaritiesINTEL", static_cast<SpvOp>(5746)},
-        {"OpImageSparseSampleDrefImplicitLod", static_cast<SpvOp>(307)},
-        {"OpArbitraryFloatExp2INTEL", static_cast<SpvOp>(5865)},
-        {"OpIgnoreIntersectionNV", static_cast<SpvOp>(5335)},
-        {"OpUDotKHR", static_cast<SpvOp>(4451)},
-        {"OpHitObjectGetShaderRecordBufferHandleNV", static_cast<SpvOp>(5257)},
-        {"OpSubgroupShuffleUpINTEL", static_cast<SpvOp>(5573)},
-        {"OpTranspose", static_cast<SpvOp>(84)},
-        {"OpSGreaterThanEqual", static_cast<SpvOp>(175)},
-        {"OpCooperativeMatrixMulAddNV", static_cast<SpvOp>(5361)},
-        {"OpSDotKHR", static_cast<SpvOp>(4450)},
-        {"OpTypeAvcSicPayloadINTEL", static_cast<SpvOp>(5703)},
-        {"OpSubgroupAllKHR", static_cast<SpvOp>(4428)},
-        {"OpAliasScopeDeclINTEL", static_cast<SpvOp>(5912)},
-        {"OpCaptureEventProfilingInfo", static_cast<SpvOp>(302)},
-        {"OpGroupNonUniformSMax", static_cast<SpvOp>(356)},
-        {"OpGroupBitwiseOrKHR", static_cast<SpvOp>(6404)},
-        {"OpSubgroupAvcImeConvertToMcePayloadINTEL", static_cast<SpvOp>(5752)},
-        {"OpUAverageRoundedINTEL", static_cast<SpvOp>(5594)},
-        {"OpSubgroupAvcSicConfigureIpeLumaChromaINTEL", static_cast<SpvOp>(5794)},
-        {"OpTypeVmeImageINTEL", static_cast<SpvOp>(5700)},
-        {"OpCreateUserEvent", static_cast<SpvOp>(299)},
-        {"OpSubgroupShuffleXorINTEL", static_cast<SpvOp>(5574)},
-        {"OpTypeEvent", static_cast<SpvOp>(34)},
-        {"OpConvertUToSampledImageNV", static_cast<SpvOp>(5395)},
-        {"OpImageSparseSampleProjDrefExplicitLod", static_cast<SpvOp>(312)},
-        {"OpRetainEvent", static_cast<SpvOp>(297)},
-        {"OpMatrixTimesMatrix", static_cast<SpvOp>(146)},
-        {"OpLabel", static_cast<SpvOp>(248)},
-        {"OpLogicalOr", static_cast<SpvOp>(166)},
-        {"OpImageSampleProjDrefExplicitLod", static_cast<SpvOp>(94)},
-        {"OpTraceNV", static_cast<SpvOp>(5337)},
-        {"OpAll", static_cast<SpvOp>(155)},
-        {"OpEndPrimitive", static_cast<SpvOp>(219)},
-        {"OpSubgroupReadInvocationKHR", static_cast<SpvOp>(4432)},
-        {"OpPtrEqual", static_cast<SpvOp>(401)},
-        {"OpControlBarrierWaitINTEL", static_cast<SpvOp>(6143)},
-        {"OpFixedExpINTEL", static_cast<SpvOp>(5933)},
-        {"OpArbitraryFloatGEINTEL", static_cast<SpvOp>(5851)},
-        {"OpTraceRayMotionNV", static_cast<SpvOp>(5339)},
-        {"OpImageQueryLod", static_cast<SpvOp>(105)},
         {"OpTypeBufferSurfaceINTEL", static_cast<SpvOp>(6086)},
-        {"OpFwidthFine", static_cast<SpvOp>(212)},
-        {"OpWritePackedPrimitiveIndices4x8NV", static_cast<SpvOp>(5299)},
-        {"OpArbitraryFloatMulINTEL", static_cast<SpvOp>(5848)},
-        {"OpTypeStruct", static_cast<SpvOp>(30)},
-        {"OpTypeReserveId", static_cast<SpvOp>(36)},
-        {"OpISub", static_cast<SpvOp>(130)},
-        {"OpSubgroupAvcMceGetDefaultLowPenaltyCostTableINTEL", static_cast<SpvOp>(5723)},
-        {"OpRayQueryGenerateIntersectionKHR", static_cast<SpvOp>(4475)},
-        {"OpISubSatINTEL", static_cast<SpvOp>(5595)},
+        {"OpReservedWritePipe", static_cast<SpvOp>(277)},
+        {"OpFUnordGreaterThan", static_cast<SpvOp>(187)},
         {"OpMemoryBarrier", static_cast<SpvOp>(225)},
-        {"OpCopyObject", static_cast<SpvOp>(83)},
-        {"OpSubgroupImageBlockWriteINTEL", static_cast<SpvOp>(5578)},
-        {"OpTypeAvcImeSingleReferenceStreaminINTEL", static_cast<SpvOp>(5709)},
-        {"OpArbitraryFloatACosPiINTEL", static_cast<SpvOp>(5876)},
-        {"OpEnqueueMarker", static_cast<SpvOp>(291)},
-        {"OpDemoteToHelperInvocationEXT", static_cast<SpvOp>(5380)},
-        {"OpAtomicStore", static_cast<SpvOp>(228)},
-        {"OpTerminateRayKHR", static_cast<SpvOp>(4449)},
-        {"OpSubgroupAvcRefEvaluateWithMultiReferenceInterlacedINTEL", static_cast<SpvOp>(5789)},
-        {"OpArbitraryFloatASinINTEL", static_cast<SpvOp>(5873)},
-        {"OpArbitraryFloatATanPiINTEL", static_cast<SpvOp>(5878)},
-        {"OpCooperativeMatrixLengthNV", static_cast<SpvOp>(5362)},
-        {"OpDPdxFine", static_cast<SpvOp>(210)},
-        {"OpHitObjectGetObjectRayOriginNV", static_cast<SpvOp>(5255)},
-        {"OpGroupUMin", static_cast<SpvOp>(267)},
-        {"OpHitObjectRecordEmptyNV", static_cast<SpvOp>(5259)},
-        {"OpGroupAny", static_cast<SpvOp>(262)},
-        {"OpSubgroupAvcImeGetStreamoutSingleReferenceMajorShapeReferenceIdsINTEL", static_cast<SpvOp>(5772)},
-        {"OpConvertSampledImageToUNV", static_cast<SpvOp>(5396)},
-        {"OpImageSampleImplicitLod", static_cast<SpvOp>(87)},
-        {"OpHitObjectGetObjectRayDirectionNV", static_cast<SpvOp>(5254)},
-        {"OpImageQueryOrder", static_cast<SpvOp>(102)},
-        {"OpImageSparseSampleExplicitLod", static_cast<SpvOp>(306)},
-        {"OpSDot", static_cast<SpvOp>(4450)},
-        {"OpSubgroupAvcMceConvertToSicPayloadINTEL", static_cast<SpvOp>(5736)},
-        {"OpMemberName", static_cast<SpvOp>(6)},
-        {"OpGroupNonUniformSMin", static_cast<SpvOp>(353)},
-        {"OpReportIntersectionKHR", static_cast<SpvOp>(5334)},
-        {"OpSubgroupAvcSicEvaluateIpeINTEL", static_cast<SpvOp>(5803)},
-        {"OpSizeOf", static_cast<SpvOp>(321)},
-        {"OpImageGather", static_cast<SpvOp>(96)},
-        {"OpRayQueryGetIntersectionGeometryIndexKHR", static_cast<SpvOp>(6022)},
-        {"OpHitObjectGetPrimitiveIndexNV", static_cast<SpvOp>(5268)},
-        {"OpIsValidReserveId", static_cast<SpvOp>(282)},
-        {"OpReadPipe", static_cast<SpvOp>(274)},
-        {"OpHitObjectGetRayTMinNV", static_cast<SpvOp>(5275)},
-        {"OpRayQueryGetIntersectionTKHR", static_cast<SpvOp>(6018)},
-        {"OpTypeQueue", static_cast<SpvOp>(37)},
-        {"OpGroupSMax", static_cast<SpvOp>(271)},
-        {"OpSubgroupAvcRefSetBilinearFilterEnableINTEL", static_cast<SpvOp>(5785)},
-        {"OpSubgroupAvcImeSetMaxMotionVectorCountINTEL", static_cast<SpvOp>(5753)},
-        {"OpSubgroupAvcSicEvaluateWithMultiReferenceInterlacedINTEL", static_cast<SpvOp>(5807)},
-        {"OpImageSparseSampleDrefExplicitLod", static_cast<SpvOp>(308)},
-        {"OpRayQueryTerminateKHR", static_cast<SpvOp>(4474)},
-        {"OpBitcast", static_cast<SpvOp>(124)},
-        {"OpTypeAvcImeDualReferenceStreaminINTEL", static_cast<SpvOp>(5710)},
-        {"OpExecuteCallableNV", static_cast<SpvOp>(5344)},
-        {"OpImageBoxFilterQCOM", static_cast<SpvOp>(4481)},
-        {"OpGroupWaitEvents", static_cast<SpvOp>(260)},
-        {"OpSubgroupBallotKHR", static_cast<SpvOp>(4421)},
-        {"OpGroupNonUniformShuffleUp", static_cast<SpvOp>(347)},
-        {"OpSubgroupAvcImeEvaluateWithDualReferenceStreamoutINTEL", static_cast<SpvOp>(5762)},
-        {"OpSubgroupAvcImeGetBorderReachedINTEL", static_cast<SpvOp>(5776)},
-        {"OpBitFieldInsert", static_cast<SpvOp>(201)},
-        {"OpRayQueryGetIntersectionObjectRayDirectionKHR", static_cast<SpvOp>(6027)},
-        {"OpImageSparseDrefGather", static_cast<SpvOp>(315)},
-        {"OpGroupFMaxNonUniformAMD", static_cast<SpvOp>(5005)},
-        {"OpAtomicAnd", static_cast<SpvOp>(240)},
-        {"OpTypeAvcImeResultINTEL", static_cast<SpvOp>(5706)},
-        {"OpGroupNonUniformBitwiseOr", static_cast<SpvOp>(360)},
-        {"OpBitwiseOr", static_cast<SpvOp>(197)},
-        {"OpDemoteToHelperInvocation", static_cast<SpvOp>(5380)},
-        {"OpSubgroupAvcBmeInitializeINTEL", static_cast<SpvOp>(5782)},
-        {"OpFunctionEnd", static_cast<SpvOp>(56)},
-        {"OpFOrdGreaterThan", static_cast<SpvOp>(186)},
+        {"OpTraceRayKHR", static_cast<SpvOp>(4445)},
+        {"OpIsFinite", static_cast<SpvOp>(158)},
+        {"OpReorderThreadWithHitObjectNV", static_cast<SpvOp>(5279)},
+        {"OpLifetimeStop", static_cast<SpvOp>(257)},
         {"OpImage", static_cast<SpvOp>(100)},
-        {"OpHitObjectRecordHitWithIndexMotionNV", static_cast<SpvOp>(5250)},
-        {"OpArbitraryFloatLog2INTEL", static_cast<SpvOp>(5861)},
-        {"OpUMulExtended", static_cast<SpvOp>(151)},
-        {"OpGroupReserveReadPipePackets", static_cast<SpvOp>(285)},
-        {"OpHitObjectIsHitNV", static_cast<SpvOp>(5277)},
-        {"OpSubgroupAvcSicGetPackedSkcLumaSumThresholdINTEL", static_cast<SpvOp>(5815)},
-        {"OpSMod", static_cast<SpvOp>(139)},
-        {"OpRayQueryGetRayFlagsKHR", static_cast<SpvOp>(6017)},
-        {"OpAtomicIDecrement", static_cast<SpvOp>(233)},
-        {"OpSubgroupAvcFmeInitializeINTEL", static_cast<SpvOp>(5781)},
-        {"OpGetMaxPipePackets", static_cast<SpvOp>(284)},
-        {"OpSubgroupAvcSicSetIntraChromaModeCostFunctionINTEL", static_cast<SpvOp>(5799)},
-        {"OpReturn", static_cast<SpvOp>(253)},
-        {"OpSamplerImageAddressingModeNV", static_cast<SpvOp>(5397)},
-        {"OpUDot", static_cast<SpvOp>(4451)},
-        {"OpSubgroupAvcMceGetDefaultIntraLumaShapePenaltyINTEL", static_cast<SpvOp>(5719)},
-        {"OpExtInstImport", static_cast<SpvOp>(11)},
-        {"OpSubgroupAvcImeEvaluateWithDualReferenceStreaminoutINTEL", static_cast<SpvOp>(5764)},
-        {"OpSubgroupAvcImeGetStreamoutDualReferenceMajorShapeMotionVectorsINTEL", static_cast<SpvOp>(5773)},
-        {"OpFSub", static_cast<SpvOp>(131)},
-        {"OpAny", static_cast<SpvOp>(154)},
-        {"OpSubgroupAvcImeRefWindowSizeINTEL", static_cast<SpvOp>(5750)},
-        {"OpGroupLogicalXorKHR", static_cast<SpvOp>(6408)},
-        {"OpDPdy", static_cast<SpvOp>(208)},
-        {"OpGroupSMin", static_cast<SpvOp>(268)},
-        {"OpCooperativeMatrixStoreKHR", static_cast<SpvOp>(4458)},
-        {"OpRayQueryInitializeKHR", static_cast<SpvOp>(4473)},
-        {"OpVectorExtractDynamic", static_cast<SpvOp>(77)},
-        {"OpShiftRightLogical", static_cast<SpvOp>(194)},
-        {"OpSubgroupAvcImeGetSingleReferenceStreaminINTEL", static_cast<SpvOp>(5766)},
-        {"OpAtomicISub", static_cast<SpvOp>(235)},
-        {"OpGroupFMulKHR", static_cast<SpvOp>(6402)},
-        {"OpUDiv", static_cast<SpvOp>(134)},
-        {"OpConstantFunctionPointerINTEL", static_cast<SpvOp>(5600)},
-        {"OpGroupNonUniformBroadcastFirst", static_cast<SpvOp>(338)},
-        {"OpGroupBroadcast", static_cast<SpvOp>(263)},
-        {"OpSpecConstantFalse", static_cast<SpvOp>(49)},
-        {"OpGroupNonUniformLogicalAnd", static_cast<SpvOp>(362)},
-        {"OpSubgroupAvcMceGetMotionVectorsINTEL", static_cast<SpvOp>(5738)},
-        {"OpGroupNonUniformBallot", static_cast<SpvOp>(339)},
-        {"OpSubgroupAvcMceConvertToSicResultINTEL", static_cast<SpvOp>(5737)},
-        {"OpArbitraryFloatSubINTEL", static_cast<SpvOp>(5847)},
-        {"OpAtomicFMinEXT", static_cast<SpvOp>(5614)},
-        {"OpBranchConditional", static_cast<SpvOp>(250)},
-        {"OpTypeSampledImage", static_cast<SpvOp>(27)},
-        {"OpFPGARegINTEL", static_cast<SpvOp>(5949)},
-        {"OpBeginInvocationInterlockEXT", static_cast<SpvOp>(5364)},
-        {"OpGroupNonUniformBroadcast", static_cast<SpvOp>(337)},
-        {"OpAtomicFlagTestAndSet", static_cast<SpvOp>(318)},
-        {"OpPtrAccessChain", static_cast<SpvOp>(67)},
-        {"OpTypeSampler", static_cast<SpvOp>(26)},
-        {"OpImageSampleDrefImplicitLod", static_cast<SpvOp>(89)},
-        {"OpShiftRightArithmetic", static_cast<SpvOp>(195)},
-        {"OpSubgroupAvcRefEvaluateWithMultiReferenceINTEL", static_cast<SpvOp>(5788)},
-        {"OpMemberDecorate", static_cast<SpvOp>(72)},
-        {"OpMemoryModel", static_cast<SpvOp>(14)},
-        {"OpSubgroupAvcImeGetWeightingPatternMinimumMotionVectorINTEL", static_cast<SpvOp>(5779)},
-        {"OpSubgroupAvcMceGetInterDistortionsINTEL", static_cast<SpvOp>(5739)},
-        {"OpNop", static_cast<SpvOp>(0)},
-        {"OpDPdyCoarse", static_cast<SpvOp>(214)},
-        {"OpArbitraryFloatEQINTEL", static_cast<SpvOp>(5854)},
-        {"OpReturnValue", static_cast<SpvOp>(254)},
-        {"OpGroupNonUniformElect", static_cast<SpvOp>(333)},
-        {"OpSubgroupAvcImeStripDualReferenceStreamoutINTEL", static_cast<SpvOp>(5769)},
-        {"OpTypeFloat", static_cast<SpvOp>(22)},
-        {"OpGroupBitwiseAndKHR", static_cast<SpvOp>(6403)},
-        {"OpTypePointer", static_cast<SpvOp>(32)},
-        {"OpMatrixTimesVector", static_cast<SpvOp>(145)},
-        {"OpAccessChain", static_cast<SpvOp>(65)},
-        {"OpCapability", static_cast<SpvOp>(17)},
-        {"OpTypeNamedBarrier", static_cast<SpvOp>(327)},
-        {"OpConvertBF16ToFINTEL", static_cast<SpvOp>(6117)},
-        {"OpAtomicSMax", static_cast<SpvOp>(238)},
-        {"OpImageSparseSampleProjDrefImplicitLod", static_cast<SpvOp>(311)},
-        {"OpStencilAttachmentReadEXT", static_cast<SpvOp>(4162)},
-        {"OpConvertFToU", static_cast<SpvOp>(109)},
-        {"OpSubgroupAvcRefConvertToMcePayloadINTEL", static_cast<SpvOp>(5783)},
-        {"OpReserveWritePipePackets", static_cast<SpvOp>(279)},
-        {"OpRayQueryGetRayTMinKHR", static_cast<SpvOp>(6016)},
-        {"OpIMul32x16INTEL", static_cast<SpvOp>(5597)},
-        {"OpGetDefaultQueue", static_cast<SpvOp>(303)},
-        {"OpReserveReadPipePackets", static_cast<SpvOp>(278)},
-        {"OpGetKernelPreferredWorkGroupSizeMultiple", static_cast<SpvOp>(296)},
-        {"OpSpecConstant", static_cast<SpvOp>(50)},
-        {"OpAtomicIAdd", static_cast<SpvOp>(234)},
-        {"OpSubgroupAvcSicConfigureSkcINTEL", static_cast<SpvOp>(5792)},
-        {"OpSaveMemoryINTEL", static_cast<SpvOp>(5819)},
-        {"OpSubgroupAvcImeInitializeINTEL", static_cast<SpvOp>(5747)},
-        {"OpFixedCosPiINTEL", static_cast<SpvOp>(5930)},
-        {"OpAtomicLoad", static_cast<SpvOp>(227)},
-        {"OpTypeForwardPointer", static_cast<SpvOp>(39)},
-        {"OpTypeAccelerationStructureNV", static_cast<SpvOp>(5341)},
-        {"OpUDotAccSatKHR", static_cast<SpvOp>(4454)},
-        {"OpSubgroupFirstInvocationKHR", static_cast<SpvOp>(4422)},
-        {"OpDPdyFine", static_cast<SpvOp>(211)},
-        {"OpConvertUToSamplerNV", static_cast<SpvOp>(5392)},
-        {"OpArbitraryFloatATanINTEL", static_cast<SpvOp>(5877)},
-        {"OpTerminateInvocation", static_cast<SpvOp>(4416)},
-        {"OpUAddSatINTEL", static_cast<SpvOp>(5590)},
-        {"OpLoopControlINTEL", static_cast<SpvOp>(5887)},
-        {"OpGroupLogicalOrKHR", static_cast<SpvOp>(6407)},
-        {"OpArbitraryFloatPowRINTEL", static_cast<SpvOp>(5881)},
-        {"OpRayQueryGetIntersectionTriangleVertexPositionsKHR", static_cast<SpvOp>(5340)},
-        {"OpSubgroupAvcImeGetStreamoutDualReferenceMajorShapeReferenceIdsINTEL", static_cast<SpvOp>(5775)},
-        {"OpSubgroupAllEqualKHR", static_cast<SpvOp>(4430)},
-        {"OpSubgroupBlockReadINTEL", static_cast<SpvOp>(5575)},
-        {"OpImageSampleProjExplicitLod", static_cast<SpvOp>(92)},
-        {"OpPhi", static_cast<SpvOp>(245)},
-        {"OpReadPipeBlockingINTEL", static_cast<SpvOp>(5946)},
-        {"OpDPdx", static_cast<SpvOp>(207)},
-        {"OpSubgroupAvcMceSetInterShapePenaltyINTEL", static_cast<SpvOp>(5716)},
-        {"OpGroupUMaxNonUniformAMD", static_cast<SpvOp>(5006)},
-        {"OpTypeMatrix", static_cast<SpvOp>(24)},
-        {"OpMemberDecorateStringGOOGLE", static_cast<SpvOp>(5633)},
-        {"OpGroupNonUniformShuffleDown", static_cast<SpvOp>(348)},
-        {"OpConvertUToAccelerationStructureKHR", static_cast<SpvOp>(4447)},
-        {"OpName", static_cast<SpvOp>(5)},
-        {"OpSDiv", static_cast<SpvOp>(135)},
-        {"OpSubgroupAvcMceGetInterMajorShapeINTEL", static_cast<SpvOp>(5741)},
-        {"OpReorderThreadWithHintNV", static_cast<SpvOp>(5280)},
-        {"OpArbitraryFloatHypotINTEL", static_cast<SpvOp>(5858)},
-        {"OpTypeAccelerationStructureKHR", static_cast<SpvOp>(5341)},
-        {"OpImageRead", static_cast<SpvOp>(98)},
-        {"OpGroupSMinNonUniformAMD", static_cast<SpvOp>(5004)},
-        {"OpPtrCastToGeneric", static_cast<SpvOp>(121)},
-        {"OpTypeHitObjectNV", static_cast<SpvOp>(5281)},
-        {"OpLogicalNotEqual", static_cast<SpvOp>(165)},
-        {"OpConvertUToImageNV", static_cast<SpvOp>(5391)},
-        {"OpBitReverse", static_cast<SpvOp>(204)},
-        {"OpAsmINTEL", static_cast<SpvOp>(5610)},
+        {"OpSubgroupAvcImeConvertToMcePayloadINTEL", static_cast<SpvOp>(5752)},
+        {"OpImageQuerySizeLod", static_cast<SpvOp>(103)},
+        {"OpNamedBarrierInitialize", static_cast<SpvOp>(328)},
+        {"OpRayQueryGenerateIntersectionKHR", static_cast<SpvOp>(4475)},
+        {"OpGroupUMax", static_cast<SpvOp>(270)},
         {"OpHitObjectRecordMissNV", static_cast<SpvOp>(5263)},
-        {"OpIAdd", static_cast<SpvOp>(128)},
-        {"OpSubgroupAvcSicSetBilinearFilterEnableINTEL", static_cast<SpvOp>(5800)},
-        {"OpImageBlockMatchSSDQCOM", static_cast<SpvOp>(4482)},
-        {"OpTypeFunction", static_cast<SpvOp>(33)},
-        {"OpSMulExtended", static_cast<SpvOp>(152)},
-        {"OpConstantTrue", static_cast<SpvOp>(41)},
-        {"OpSubgroupAvcSicGetIpeChromaModeINTEL", static_cast<SpvOp>(5813)},
-        {"OpSubgroupAvcSicGetPackedSkcLumaCountThresholdINTEL", static_cast<SpvOp>(5814)},
-        {"OpCreatePipeFromPipeStorage", static_cast<SpvOp>(324)},
+        {"OpFOrdEqual", static_cast<SpvOp>(180)},
+        {"OpSUDot", static_cast<SpvOp>(4452)},
+        {"OpConvertSamplerToUNV", static_cast<SpvOp>(5394)},
         {"OpImageSparseSampleProjImplicitLod", static_cast<SpvOp>(309)},
-        {"OpExtInst", static_cast<SpvOp>(12)},
-        {"OpHitObjectRecordHitMotionNV", static_cast<SpvOp>(5249)},
-        {"OpReportIntersectionNV", static_cast<SpvOp>(5334)},
-        {"OpArbitraryFloatCastINTEL", static_cast<SpvOp>(5841)},
-        {"OpGroupFMax", static_cast<SpvOp>(269)},
-        {"OpSubgroupAvcMceConvertToRefResultINTEL", static_cast<SpvOp>(5735)},
-        {"OpCrossWorkgroupCastToPtrINTEL", static_cast<SpvOp>(5938)},
-        {"OpConstantSampler", static_cast<SpvOp>(45)},
-        {"OpTypeOpaque", static_cast<SpvOp>(31)},
-        {"OpDepthAttachmentReadEXT", static_cast<SpvOp>(4161)},
-        {"OpHitObjectRecordHitNV", static_cast<SpvOp>(5261)},
-        {"OpSRem", static_cast<SpvOp>(138)},
+        {"OpGroupNonUniformLogicalOr", static_cast<SpvOp>(363)},
+        {"OpArbitraryFloatSinCosINTEL", static_cast<SpvOp>(5870)},
+        {"OpImageFetch", static_cast<SpvOp>(95)},
+        {"OpSpecConstantCompositeContinuedINTEL", static_cast<SpvOp>(6092)},
+        {"OpSubgroupAvcImeRefWindowSizeINTEL", static_cast<SpvOp>(5750)},
+        {"OpGroupNonUniformBroadcastFirst", static_cast<SpvOp>(338)},
+        {"OpImageSampleProjImplicitLod", static_cast<SpvOp>(91)},
+        {"OpBitCount", static_cast<SpvOp>(205)},
+        {"OpSubgroupAvcMceGetInterMotionVectorCountINTEL", static_cast<SpvOp>(5744)},
+        {"OpAsmCallINTEL", static_cast<SpvOp>(5611)},
+        {"OpImageSparseSampleProjExplicitLod", static_cast<SpvOp>(310)},
+        {"OpFUnordNotEqual", static_cast<SpvOp>(183)},
+        {"OpGroupBitwiseAndKHR", static_cast<SpvOp>(6403)},
+        {"OpSpecConstantComposite", static_cast<SpvOp>(51)},
+        {"OpTypeCooperativeMatrixKHR", static_cast<SpvOp>(4456)},
+        {"OpGroupNonUniformRotateKHR", static_cast<SpvOp>(4431)},
+        {"OpFixedSqrtINTEL", static_cast<SpvOp>(5923)},
+        {"OpTerminateInvocation", static_cast<SpvOp>(4416)},
+        {"OpBitwiseOr", static_cast<SpvOp>(197)},
+        {"OpDecorationGroup", static_cast<SpvOp>(73)},
+        {"OpSpecConstantFalse", static_cast<SpvOp>(49)},
+        {"OpAccessChain", static_cast<SpvOp>(65)},
+        {"OpLoopMerge", static_cast<SpvOp>(246)},
+        {"OpImageSampleWeightedQCOM", static_cast<SpvOp>(4480)},
+        {"OpSubgroupAvcMceSetInterBaseMultiReferencePenaltyINTEL", static_cast<SpvOp>(5714)},
+        {"OpSDotAccSat", static_cast<SpvOp>(4453)},
+        {"OpSubgroupAvcImeSetEarlySearchTerminationThresholdINTEL", static_cast<SpvOp>(5755)},
+        {"OpSubgroupAvcMceGetBestInterDistortionsINTEL", static_cast<SpvOp>(5740)},
+        {"OpMemberDecorateStringGOOGLE", static_cast<SpvOp>(5633)},
+        {"OpUAverageINTEL", static_cast<SpvOp>(5592)},
+        {"OpVectorTimesMatrix", static_cast<SpvOp>(144)},
+        {"OpShiftRightLogical", static_cast<SpvOp>(194)},
+        {"OpAssumeTrueKHR", static_cast<SpvOp>(5630)},
+        {"OpGroupCommitWritePipe", static_cast<SpvOp>(288)},
+        {"OpGroupAsyncCopy", static_cast<SpvOp>(259)},
+        {"OpHitObjectTraceRayNV", static_cast<SpvOp>(5260)},
         {"OpAliasDomainDeclINTEL", static_cast<SpvOp>(5911)},
-        {"OpTerminateRayNV", static_cast<SpvOp>(5336)},
-        {"OpRayQueryProceedKHR", static_cast<SpvOp>(4477)},
-        {"OpFOrdLessThan", static_cast<SpvOp>(184)},
-        {"OpIsInf", static_cast<SpvOp>(157)},
+        {"OpUSubSatINTEL", static_cast<SpvOp>(5596)},
+        {"OpHitObjectGetWorldToObjectNV", static_cast<SpvOp>(5252)},
+        {"OpArbitraryFloatSinCosPiINTEL", static_cast<SpvOp>(5840)},
+        {"OpArbitraryFloatPowRINTEL", static_cast<SpvOp>(5881)},
+        {"OpSubgroupAvcMceGetMotionVectorsINTEL", static_cast<SpvOp>(5738)},
+        {"OpFwidth", static_cast<SpvOp>(209)},
+        {"OpLogicalNot", static_cast<SpvOp>(168)},
+        {"OpGenericPtrMemSemantics", static_cast<SpvOp>(69)},
+        {"OpSubgroupAvcMceGetDefaultInterShapePenaltyINTEL", static_cast<SpvOp>(5715)},
+        {"OpImageSparseSampleExplicitLod", static_cast<SpvOp>(306)},
+        {"OpArbitraryFloatExpINTEL", static_cast<SpvOp>(5864)},
+        {"OpPhi", static_cast<SpvOp>(245)},
+        {"OpUConvert", static_cast<SpvOp>(113)},
+        {"OpConstantCompositeContinuedINTEL", static_cast<SpvOp>(6091)},
+        {"OpUDotKHR", static_cast<SpvOp>(4451)},
+        {"OpGetDefaultQueue", static_cast<SpvOp>(303)},
+        {"OpFOrdGreaterThan", static_cast<SpvOp>(186)},
+        {"OpSUDotAccSat", static_cast<SpvOp>(4455)},
+        {"OpSubgroupAvcMceGetDefaultIntraLumaShapePenaltyINTEL", static_cast<SpvOp>(5719)},
+        {"OpTypeAvcMceResultINTEL", static_cast<SpvOp>(5705)},
+        {"OpImageQueryLod", static_cast<SpvOp>(105)},
+        {"OpControlBarrierWaitINTEL", static_cast<SpvOp>(6143)},
+        {"OpMemberDecorateString", static_cast<SpvOp>(5633)},
+        {"OpFUnordEqual", static_cast<SpvOp>(181)},
+        {"OpRayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetKHR", static_cast<SpvOp>(6021)},
+        {"OpTypeAvcImeResultINTEL", static_cast<SpvOp>(5706)},
+        {"OpSDiv", static_cast<SpvOp>(135)},
+        {"OpSubgroupAvcMceGetInterDirectionsINTEL", static_cast<SpvOp>(5743)},
+        {"OpSubgroupAvcImeEvaluateWithDualReferenceStreaminoutINTEL", static_cast<SpvOp>(5764)},
         {"OpDecorateStringGOOGLE", static_cast<SpvOp>(5632)},
-        {"OpHitObjectGetWorldRayOriginNV", static_cast<SpvOp>(5273)},
-        {"OpImageSampleProjDrefImplicitLod", static_cast<SpvOp>(93)},
-        {"OpArbitraryFloatExp10INTEL", static_cast<SpvOp>(5866)},
-        {"OpColorAttachmentReadEXT", static_cast<SpvOp>(4160)},
-        {"OpLoad", static_cast<SpvOp>(61)},
-        {"OpArbitraryFloatSinPiINTEL", static_cast<SpvOp>(5871)},
-        {"OpOrdered", static_cast<SpvOp>(162)},
-        {"OpSubgroupAnyKHR", static_cast<SpvOp>(4429)},
-        {"OpConvertUToPtr", static_cast<SpvOp>(120)},
-        {"OpFixedSinPiINTEL", static_cast<SpvOp>(5929)},
-        {"OpTypePipe", static_cast<SpvOp>(38)},
-        {"OpImageQuerySamples", static_cast<SpvOp>(107)},
-        {"OpTypeBool", static_cast<SpvOp>(20)},
-        {"OpSubgroupAvcMceGetDefaultMediumPenaltyCostTableINTEL", static_cast<SpvOp>(5722)},
-        {"OpGroupNonUniformShuffleXor", static_cast<SpvOp>(346)},
-        {"OpSubgroupAvcRefEvaluateWithSingleReferenceINTEL", static_cast<SpvOp>(5786)},
-        {"OpSubgroupAvcSicEvaluateWithSingleReferenceINTEL", static_cast<SpvOp>(5804)},
-        {"OpFOrdGreaterThanEqual", static_cast<SpvOp>(190)},
-        {"OpConstantFalse", static_cast<SpvOp>(42)},
-        {"OpSubgroupAvcImeAdjustRefOffsetINTEL", static_cast<SpvOp>(5751)},
-        {"OpFOrdLessThanEqual", static_cast<SpvOp>(188)},
-        {"OpConvertSToF", static_cast<SpvOp>(111)},
-        {"OpArbitraryFloatATan2INTEL", static_cast<SpvOp>(5879)},
-        {"OpSUDotKHR", static_cast<SpvOp>(4452)},
+        {"OpEndStreamPrimitive", static_cast<SpvOp>(221)},
+        {"OpSubgroupAvcMceSetMotionVectorCostFunctionINTEL", static_cast<SpvOp>(5724)},
+        {"OpHitObjectRecordMissMotionNV", static_cast<SpvOp>(5251)},
+        {"OpConvertUToSamplerNV", static_cast<SpvOp>(5392)},
+        {"OpGroupNonUniformSMin", static_cast<SpvOp>(353)},
+        {"OpTypePipeStorage", static_cast<SpvOp>(322)},
+        {"OpDecorate", static_cast<SpvOp>(71)},
+        {"OpArbitraryFloatDivINTEL", static_cast<SpvOp>(5849)},
+        {"OpCooperativeMatrixLoadKHR", static_cast<SpvOp>(4457)},
+        {"OpSubgroupAvcImeGetStreamoutSingleReferenceMajorShapeReferenceIdsINTEL", static_cast<SpvOp>(5772)},
+        {"OpImageQueryOrder", static_cast<SpvOp>(102)},
+        {"OpArbitraryFloatExp2INTEL", static_cast<SpvOp>(5865)},
+        {"OpSubgroupAvcImeGetStreamoutDualReferenceMajorShapeDistortionsINTEL", static_cast<SpvOp>(5774)},
+        {"OpINotEqual", static_cast<SpvOp>(171)},
+        {"OpGroupFMin", static_cast<SpvOp>(266)},
         {"OpDot", static_cast<SpvOp>(148)},
-        {"OpGroupNonUniformAllEqual", static_cast<SpvOp>(336)},
+        {"OpArbitraryFloatLEINTEL", static_cast<SpvOp>(5853)},
+        {"OpGroupNonUniformFMin", static_cast<SpvOp>(355)},
+        {"OpFixedCosINTEL", static_cast<SpvOp>(5927)},
+        {"OpDPdx", static_cast<SpvOp>(207)},
+        {"OpDPdy", static_cast<SpvOp>(208)},
+        {"OpVectorShuffle", static_cast<SpvOp>(79)},
+        {"OpSubgroupBlockWriteINTEL", static_cast<SpvOp>(5576)},
+        {"OpFunction", static_cast<SpvOp>(54)},
+        {"OpCommitWritePipe", static_cast<SpvOp>(281)},
+        {"OpImageBlockMatchSADQCOM", static_cast<SpvOp>(4483)},
+        {"OpImageQuerySize", static_cast<SpvOp>(104)},
+        {"OpImageTexelPointer", static_cast<SpvOp>(60)},
+        {"OpBranchConditional", static_cast<SpvOp>(250)},
+        {"OpEmitVertex", static_cast<SpvOp>(218)},
+        {"OpAtomicFlagTestAndSet", static_cast<SpvOp>(318)},
+        {"OpTypeAccelerationStructureNV", static_cast<SpvOp>(5341)},
+        {"OpGenericCastToPtr", static_cast<SpvOp>(122)},
+        {"OpSubgroupAvcRefConvertToMcePayloadINTEL", static_cast<SpvOp>(5783)},
+        {"OpBitReverse", static_cast<SpvOp>(204)},
+        {"OpSLessThan", static_cast<SpvOp>(177)},
+        {"OpGroupNonUniformElect", static_cast<SpvOp>(333)},
+        {"OpHitObjectGetGeometryIndexNV", static_cast<SpvOp>(5269)},
+        {"OpGroupNonUniformFMax", static_cast<SpvOp>(358)},
+        {"OpTypeEvent", static_cast<SpvOp>(34)},
+        {"OpSubgroupAvcSicConfigureSkcINTEL", static_cast<SpvOp>(5792)},
+        {"OpMatrixTimesScalar", static_cast<SpvOp>(143)},
+        {"OpISub", static_cast<SpvOp>(130)},
+        {"OpAtomicUMin", static_cast<SpvOp>(237)},
+        {"OpBitFieldSExtract", static_cast<SpvOp>(202)},
+        {"OpGroupFMulKHR", static_cast<SpvOp>(6402)},
+        {"OpGroupIAdd", static_cast<SpvOp>(264)},
+        {"OpAtomicStore", static_cast<SpvOp>(228)},
+        {"OpIMul", static_cast<SpvOp>(132)},
+        {"OpDPdyCoarse", static_cast<SpvOp>(214)},
+        {"OpSubgroupAvcRefEvaluateWithDualReferenceINTEL", static_cast<SpvOp>(5787)},
+        {"OpGroupNonUniformBitwiseOr", static_cast<SpvOp>(360)},
+        {"OpEmitMeshTasksEXT", static_cast<SpvOp>(5294)},
+        {"OpConvertUToImageNV", static_cast<SpvOp>(5391)},
+        {"OpSubgroupAvcMceGetDefaultIntraLumaModePenaltyINTEL", static_cast<SpvOp>(5725)},
+        {"OpQuantizeToF16", static_cast<SpvOp>(116)},
+        {"OpSUDotKHR", static_cast<SpvOp>(4452)},
+        {"OpSubgroupAvcImeGetStreamoutDualReferenceMajorShapeReferenceIdsINTEL", static_cast<SpvOp>(5775)},
+        {"OpSubgroupFirstInvocationKHR", static_cast<SpvOp>(4422)},
+        {"OpSGreaterThanEqual", static_cast<SpvOp>(175)},
+        {"OpString", static_cast<SpvOp>(7)},
+        {"OpUDiv", static_cast<SpvOp>(134)},
+        {"OpGetKernelNDrangeMaxSubGroupSize", static_cast<SpvOp>(294)},
+        {"OpSubgroupAvcMceGetInterReferenceInterlacedFieldPolaritiesINTEL", static_cast<SpvOp>(5746)},
+        {"OpSubgroupAvcRefSetBidirectionalMixDisableINTEL", static_cast<SpvOp>(5784)},
+        {"OpRayQueryTerminateKHR", static_cast<SpvOp>(4474)},
+        {"OpSConvert", static_cast<SpvOp>(114)},
+        {"OpArbitraryFloatATanINTEL", static_cast<SpvOp>(5877)},
+        {"OpReturnValue", static_cast<SpvOp>(254)},
+        {"OpSLessThanEqual", static_cast<SpvOp>(179)},
+        {"OpSNegate", static_cast<SpvOp>(126)},
+        {"OpTypeStruct", static_cast<SpvOp>(30)},
+        {"OpPtrDiff", static_cast<SpvOp>(403)},
+        {"OpFixedCosPiINTEL", static_cast<SpvOp>(5930)},
+        {"OpReportIntersectionKHR", static_cast<SpvOp>(5334)},
+        {"OpCopyLogical", static_cast<SpvOp>(400)},
+        {"OpLogicalOr", static_cast<SpvOp>(166)},
+        {"OpSubgroupAvcRefSetBilinearFilterEnableINTEL", static_cast<SpvOp>(5785)},
+        {"OpEntryPoint", static_cast<SpvOp>(15)},
+        {"OpRayQueryGetIntersectionFrontFaceKHR", static_cast<SpvOp>(6025)},
+        {"OpHitObjectGetObjectRayOriginNV", static_cast<SpvOp>(5255)},
+        {"OpLessOrGreater", static_cast<SpvOp>(161)},
+        {"OpBuildNDRange", static_cast<SpvOp>(304)},
+        {"OpSMulExtended", static_cast<SpvOp>(152)},
+        {"OpSubgroupAvcSicConfigureIpeLumaChromaINTEL", static_cast<SpvOp>(5794)},
+        {"OpReserveReadPipePackets", static_cast<SpvOp>(278)},
+        {"OpExtInst", static_cast<SpvOp>(12)},
+        {"OpArbitraryFloatPowINTEL", static_cast<SpvOp>(5880)},
+        {"OpSubgroupReadInvocationKHR", static_cast<SpvOp>(4432)},
+        {"OpGroupFAddNonUniformAMD", static_cast<SpvOp>(5001)},
+        {"OpSubgroupAvcMceGetDefaultNonDcLumaIntraPenaltyINTEL", static_cast<SpvOp>(5726)},
+        {"OpHitObjectGetHitKindNV", static_cast<SpvOp>(5267)},
+        {"OpSubgroupAvcImeGetDualReferenceStreaminINTEL", static_cast<SpvOp>(5767)},
+        {"OpShiftRightArithmetic", static_cast<SpvOp>(195)},
+        {"OpSUDotAccSatKHR", static_cast<SpvOp>(4455)},
+        {"OpArbitraryFloatPowNINTEL", static_cast<SpvOp>(5882)},
+        {"OpDecorateString", static_cast<SpvOp>(5632)},
+        {"OpReservedReadPipe", static_cast<SpvOp>(276)},
+        {"OpBitcast", static_cast<SpvOp>(124)},
+        {"OpSubgroupImageBlockWriteINTEL", static_cast<SpvOp>(5578)},
+        {"OpSubgroupAvcSicSetBlockBasedRawSkipSadINTEL", static_cast<SpvOp>(5802)},
+        {"OpSubgroupShuffleUpINTEL", static_cast<SpvOp>(5573)},
+        {"OpArrayLength", static_cast<SpvOp>(68)},
+        {"OpRayQueryProceedKHR", static_cast<SpvOp>(4477)},
+        {"OpAbsUSubINTEL", static_cast<SpvOp>(5588)},
+        {"OpGroupNonUniformBallotBitCount", static_cast<SpvOp>(342)},
+        {"OpFunctionPointerCallINTEL", static_cast<SpvOp>(5601)},
+        {"OpArbitraryFloatHypotINTEL", static_cast<SpvOp>(5858)},
+        {"OpGetKernelNDrangeSubGroupCount", static_cast<SpvOp>(293)},
+        {"OpFunctionParameter", static_cast<SpvOp>(55)},
+        {"OpFwidthCoarse", static_cast<SpvOp>(215)},
+        {"OpUDotAccSatKHR", static_cast<SpvOp>(4454)},
+        {"OpFOrdLessThanEqual", static_cast<SpvOp>(188)},
+        {"OpAtomicISub", static_cast<SpvOp>(235)},
+        {"OpHitObjectGetWorldRayDirectionNV", static_cast<SpvOp>(5272)},
+        {"OpNoLine", static_cast<SpvOp>(317)},
+        {"OpConvertFToBF16INTEL", static_cast<SpvOp>(6116)},
+        {"OpFMul", static_cast<SpvOp>(133)},
+        {"OpLogicalEqual", static_cast<SpvOp>(164)},
+        {"OpExecutionModeId", static_cast<SpvOp>(331)},
+        {"OpArbitraryFloatLog10INTEL", static_cast<SpvOp>(5862)},
+        {"OpIAdd", static_cast<SpvOp>(128)},
+        {"OpColorAttachmentReadEXT", static_cast<SpvOp>(4160)},
+        {"OpGroupFMaxNonUniformAMD", static_cast<SpvOp>(5005)},
+        {"OpSubgroupAvcMceSetSourceInterlacedFieldPolarityINTEL", static_cast<SpvOp>(5729)},
+        {"OpReorderThreadWithHintNV", static_cast<SpvOp>(5280)},
+        {"OpULessThan", static_cast<SpvOp>(176)},
+        {"OpSubgroupAvcMceGetInterMajorShapeINTEL", static_cast<SpvOp>(5741)},
+        {"OpLine", static_cast<SpvOp>(8)},
+        {"OpArbitraryFloatLTINTEL", static_cast<SpvOp>(5852)},
+        {"OpAtomicIDecrement", static_cast<SpvOp>(233)},
+        {"OpArbitraryFloatSqrtINTEL", static_cast<SpvOp>(5859)},
+        {"OpPtrNotEqual", static_cast<SpvOp>(402)},
+        {"OpHitObjectRecordHitMotionNV", static_cast<SpvOp>(5249)},
+        {"OpStore", static_cast<SpvOp>(62)},
+        {"OpArbitraryFloatATan2INTEL", static_cast<SpvOp>(5879)},
+        {"OpGroupNonUniformQuadBroadcast", static_cast<SpvOp>(365)},
+        {"OpSubgroupAvcMceSetSingleReferenceInterlacedFieldPolarityINTEL", static_cast<SpvOp>(5730)},
+        {"OpUMulExtended", static_cast<SpvOp>(151)},
+        {"OpGroupFAdd", static_cast<SpvOp>(265)},
+        {"OpSubgroupAvcMceGetDefaultIntraChromaModeBasePenaltyINTEL", static_cast<SpvOp>(5727)},
+        {"OpCopyObject", static_cast<SpvOp>(83)},
+        {"OpVectorExtractDynamic", static_cast<SpvOp>(77)},
+        {"OpEnqueueKernel", static_cast<SpvOp>(292)},
+        {"OpTypeQueue", static_cast<SpvOp>(37)},
+        {"OpSubgroupAvcImeSetWeightedSadINTEL", static_cast<SpvOp>(5756)},
+        {"OpTypeAvcMcePayloadINTEL", static_cast<SpvOp>(5704)},
+        {"OpRayQueryInitializeKHR", static_cast<SpvOp>(4473)},
+        {"OpArbitraryFloatGEINTEL", static_cast<SpvOp>(5851)},
+        {"OpSubgroupAvcSicGetPackedSkcLumaCountThresholdINTEL", static_cast<SpvOp>(5814)},
+        {"OpFSub", static_cast<SpvOp>(131)},
+        {"OpHitObjectRecordHitWithIndexNV", static_cast<SpvOp>(5262)},
+        {"OpSpecConstantOp", static_cast<SpvOp>(52)},
+        {"OpGroupNonUniformFMul", static_cast<SpvOp>(352)},
+        {"OpHitObjectGetInstanceIdNV", static_cast<SpvOp>(5270)},
+        {"OpSubgroupAvcMceConvertToRefPayloadINTEL", static_cast<SpvOp>(5734)},
+        {"OpFunctionEnd", static_cast<SpvOp>(56)},
+        {"OpGroupFMinNonUniformAMD", static_cast<SpvOp>(5002)},
+        {"OpSubgroupAvcSicGetPackedSkcLumaSumThresholdINTEL", static_cast<SpvOp>(5815)},
+        {"OpArbitraryFloatCbrtINTEL", static_cast<SpvOp>(5857)},
+        {"OpImageBlockMatchSSDQCOM", static_cast<SpvOp>(4482)},
+        {"OpEndPrimitive", static_cast<SpvOp>(219)},
+        {"OpIsHelperInvocationEXT", static_cast<SpvOp>(5381)},
+        {"OpImageWrite", static_cast<SpvOp>(99)},
+        {"OpGetNumPipePackets", static_cast<SpvOp>(283)},
+        {"OpConstant", static_cast<SpvOp>(43)},
+        {"OpGenericCastToPtrExplicit", static_cast<SpvOp>(123)},
+        {"OpSubgroupAvcMceGetInterDistortionsINTEL", static_cast<SpvOp>(5739)},
+        {"OpCooperativeMatrixStoreNV", static_cast<SpvOp>(5360)},
+        {"OpGroupDecorate", static_cast<SpvOp>(74)},
+        {"OpAbsISubINTEL", static_cast<SpvOp>(5587)},
+        {"OpVariable", static_cast<SpvOp>(59)},
+        {"OpDPdxCoarse", static_cast<SpvOp>(213)},
+        {"OpSDotAccSatKHR", static_cast<SpvOp>(4453)},
+        {"OpDemoteToHelperInvocation", static_cast<SpvOp>(5380)},
+        {"OpHitObjectRecordHitNV", static_cast<SpvOp>(5261)},
+        {"OpSubgroupAvcSicConvertToMcePayloadINTEL", static_cast<SpvOp>(5796)},
+        {"OpRayQueryGetIntersectionPrimitiveIndexKHR", static_cast<SpvOp>(6023)},
+        {"OpTypeArray", static_cast<SpvOp>(28)},
+        {"OpSubgroupAvcImeEvaluateWithSingleReferenceStreamoutINTEL", static_cast<SpvOp>(5761)},
+        {"OpRayQueryGetIntersectionInstanceIdKHR", static_cast<SpvOp>(6020)},
+        {"OpCrossWorkgroupCastToPtrINTEL", static_cast<SpvOp>(5938)},
+        {"OpTypeAvcImeResultSingleReferenceStreamoutINTEL", static_cast<SpvOp>(5707)},
+        {"OpArbitraryFloatLogINTEL", static_cast<SpvOp>(5860)},
+        {"OpGroupNonUniformQuadSwap", static_cast<SpvOp>(366)},
+        {"OpVmeImageINTEL", static_cast<SpvOp>(5699)},
+        {"OpFixedRsqrtINTEL", static_cast<SpvOp>(5925)},
+        {"OpUCountLeadingZerosINTEL", static_cast<SpvOp>(5585)},
+        {"OpAtomicFMaxEXT", static_cast<SpvOp>(5615)},
+        {"OpControlBarrier", static_cast<SpvOp>(224)},
+        {"OpSatConvertSToU", static_cast<SpvOp>(118)},
+        {"OpTypeAvcRefResultINTEL", static_cast<SpvOp>(5711)},
+        {"OpArbitraryFloatLog2INTEL", static_cast<SpvOp>(5861)},
+        {"OpGroupSMax", static_cast<SpvOp>(271)},
+        {"OpTypePipe", static_cast<SpvOp>(38)},
+        {"OpAtomicUMax", static_cast<SpvOp>(239)},
+        {"OpTypeImage", static_cast<SpvOp>(25)},
+        {"OpReadPipe", static_cast<SpvOp>(274)},
+        {"OpGroupNonUniformBroadcast", static_cast<SpvOp>(337)},
+        {"OpTypeFunction", static_cast<SpvOp>(33)},
+        {"OpTypeAvcImePayloadINTEL", static_cast<SpvOp>(5701)},
+        {"OpCreateUserEvent", static_cast<SpvOp>(299)},
+        {"OpSubgroupAvcBmeInitializeINTEL", static_cast<SpvOp>(5782)},
+        {"OpAtomicCompareExchangeWeak", static_cast<SpvOp>(231)},
+        {"OpSampledImage", static_cast<SpvOp>(86)},
+        {"OpConvertBF16ToFINTEL", static_cast<SpvOp>(6117)},
+        {"OpSubgroupAvcSicEvaluateIpeINTEL", static_cast<SpvOp>(5803)},
+        {"OpSubgroupAvcImeGetWeightingPatternMinimumDistortionINTEL", static_cast<SpvOp>(5780)},
+        {"OpAsmINTEL", static_cast<SpvOp>(5610)},
+        {"OpKill", static_cast<SpvOp>(252)},
+        {"OpGroupNonUniformShuffleDown", static_cast<SpvOp>(348)},
+        {"OpArbitraryFloatRecipINTEL", static_cast<SpvOp>(5855)},
+        {"OpIAverageRoundedINTEL", static_cast<SpvOp>(5593)},
+        {"OpUAddSatINTEL", static_cast<SpvOp>(5590)},
+        {"OpGroupNonUniformShuffle", static_cast<SpvOp>(345)},
+        {"OpDecorateId", static_cast<SpvOp>(332)},
         {"OpArbitraryFloatExpm1INTEL", static_cast<SpvOp>(5867)},
+        {"OpGroupBitwiseXorKHR", static_cast<SpvOp>(6405)},
+        {"OpSubgroupAvcImeEvaluateWithSingleReferenceStreaminoutINTEL", static_cast<SpvOp>(5763)},
+        {"OpArbitraryFloatASinPiINTEL", static_cast<SpvOp>(5874)},
+        {"OpSubgroupAvcSicSetIntraLumaShapePenaltyINTEL", static_cast<SpvOp>(5797)},
+        {"OpIsNormal", static_cast<SpvOp>(159)},
+        {"OpIEqual", static_cast<SpvOp>(170)},
+        {"OpArbitraryFloatACosPiINTEL", static_cast<SpvOp>(5876)},
+        {"OpGroupNonUniformIMul", static_cast<SpvOp>(351)},
+        {"OpMatrixTimesVector", static_cast<SpvOp>(145)},
+        {"OpSetMeshOutputsEXT", static_cast<SpvOp>(5295)},
+        {"OpFragmentFetchAMD", static_cast<SpvOp>(5012)},
+        {"OpShiftLeftLogical", static_cast<SpvOp>(196)},
+        {"OpSubgroupAvcRefConvertToMceResultINTEL", static_cast<SpvOp>(5790)},
+        {"OpDemoteToHelperInvocationEXT", static_cast<SpvOp>(5380)},
+        {"OpInBoundsAccessChain", static_cast<SpvOp>(66)},
+        {"OpCooperativeMatrixMulAddKHR", static_cast<SpvOp>(4459)},
+        {"OpAtomicIAdd", static_cast<SpvOp>(234)},
+        {"OpCopyMemorySized", static_cast<SpvOp>(64)},
+        {"OpSubgroupAvcMceGetInterMinorShapeINTEL", static_cast<SpvOp>(5742)},
+        {"OpImageSparseRead", static_cast<SpvOp>(320)},
+        {"OpTypeAvcRefPayloadINTEL", static_cast<SpvOp>(5702)},
+        {"OpArbitraryFloatExp10INTEL", static_cast<SpvOp>(5866)},
+        {"OpTypeAvcSicPayloadINTEL", static_cast<SpvOp>(5703)},
+        {"OpConvertFToS", static_cast<SpvOp>(110)},
+        {"OpISubSatINTEL", static_cast<SpvOp>(5595)},
+        {"OpVariableLengthArrayINTEL", static_cast<SpvOp>(5818)},
+        {"OpRayQueryGetIntersectionTriangleVertexPositionsKHR", static_cast<SpvOp>(5340)},
+        {"OpGroupNonUniformAllEqual", static_cast<SpvOp>(336)},
+        {"OpIsInf", static_cast<SpvOp>(157)},
+        {"OpIgnoreIntersectionKHR", static_cast<SpvOp>(4448)},
+        {"OpImageGather", static_cast<SpvOp>(96)},
+        {"OpRayQueryGetRayFlagsKHR", static_cast<SpvOp>(6017)},
+        {"OpGroupNonUniformShuffleUp", static_cast<SpvOp>(347)},
+        {"OpSubgroupAvcImeEvaluateWithDualReferenceStreaminINTEL", static_cast<SpvOp>(5760)},
+        {"OpRayQueryGetIntersectionTKHR", static_cast<SpvOp>(6018)},
+        {"OpHitObjectGetAttributesNV", static_cast<SpvOp>(5266)},
+        {"OpFUnordLessThanEqual", static_cast<SpvOp>(189)},
+        {"OpSubgroupAvcImeEvaluateWithSingleReferenceINTEL", static_cast<SpvOp>(5757)},
+        {"OpHitObjectGetObjectRayDirectionNV", static_cast<SpvOp>(5254)},
+        {"OpCooperativeMatrixStoreKHR", static_cast<SpvOp>(4458)},
+        {"OpSubgroupAvcMceSetInterShapePenaltyINTEL", static_cast<SpvOp>(5716)},
+        {"OpModuleProcessed", static_cast<SpvOp>(330)},
+        {"OpEmitStreamVertex", static_cast<SpvOp>(220)},
+        {"OpMemoryModel", static_cast<SpvOp>(14)},
+        {"OpDepthAttachmentReadEXT", static_cast<SpvOp>(4161)},
+        {"OpGroupNonUniformUMax", static_cast<SpvOp>(357)},
+        {"OpFwidthFine", static_cast<SpvOp>(212)},
+        {"OpImageSampleExplicitLod", static_cast<SpvOp>(88)},
+        {"OpUGreaterThanEqual", static_cast<SpvOp>(174)},
+        {"OpSubgroupShuffleDownINTEL", static_cast<SpvOp>(5572)},
+        {"OpHitObjectRecordHitWithIndexMotionNV", static_cast<SpvOp>(5250)},
+        {"OpIAverageINTEL", static_cast<SpvOp>(5591)},
+        {"OpFRem", static_cast<SpvOp>(140)},
+        {"OpSubgroupAvcImeAdjustRefOffsetINTEL", static_cast<SpvOp>(5751)},
+        {"OpSwitch", static_cast<SpvOp>(251)},
+        {"OpBitwiseAnd", static_cast<SpvOp>(199)},
+        {"OpUMod", static_cast<SpvOp>(137)},
+        {"OpAtomicXor", static_cast<SpvOp>(242)},
+        {"OpFAdd", static_cast<SpvOp>(129)},
+        {"OpRestoreMemoryINTEL", static_cast<SpvOp>(5820)},
+        {"OpPtrCastToCrossWorkgroupINTEL", static_cast<SpvOp>(5934)},
+        {"OpImageRead", static_cast<SpvOp>(98)},
+        {"OpTypeAvcImeResultDualReferenceStreamoutINTEL", static_cast<SpvOp>(5708)},
+        {"OpSubgroupAvcSicEvaluateWithDualReferenceINTEL", static_cast<SpvOp>(5805)},
+        {"OpCompositeExtract", static_cast<SpvOp>(81)},
+        {"OpSubgroupBlockReadINTEL", static_cast<SpvOp>(5575)},
+        {"OpSubgroupAvcMceConvertToImeResultINTEL", static_cast<SpvOp>(5733)},
+        {"OpSubgroupAvcMceConvertToRefResultINTEL", static_cast<SpvOp>(5735)},
+        {"OpGroupCommitReadPipe", static_cast<SpvOp>(287)},
+        {"OpConvertFToU", static_cast<SpvOp>(109)},
+        {"OpConvertUToF", static_cast<SpvOp>(112)},
+        {"OpCommitReadPipe", static_cast<SpvOp>(280)},
+        {"OpLabel", static_cast<SpvOp>(248)},
+        {"OpGroupUMinNonUniformAMD", static_cast<SpvOp>(5003)},
+        {"OpTypeNamedBarrier", static_cast<SpvOp>(327)},
+        {"OpConvertPtrToU", static_cast<SpvOp>(117)},
+        {"OpTypeVmeImageINTEL", static_cast<SpvOp>(5700)},
+        {"OpTypeVector", static_cast<SpvOp>(23)},
+        {"OpGroupNonUniformLogicalXor", static_cast<SpvOp>(364)},
+        {"OpSignBitSet", static_cast<SpvOp>(160)},
+        {"OpGetMaxPipePackets", static_cast<SpvOp>(284)},
+        {"OpSubgroupImageMediaBlockReadINTEL", static_cast<SpvOp>(5580)},
+        {"OpSubgroupAvcImeGetUnidirectionalEarlySearchTerminationINTEL", static_cast<SpvOp>(5778)},
+        {"OpArbitraryFloatCosPiINTEL", static_cast<SpvOp>(5872)},
+        {"OpReturn", static_cast<SpvOp>(253)},
+        {"OpFixedSinPiINTEL", static_cast<SpvOp>(5929)},
+        {"OpGetKernelMaxNumSubgroups", static_cast<SpvOp>(326)},
+        {"OpTypeDeviceEvent", static_cast<SpvOp>(35)},
+        {"OpSubgroupAvcSicConfigureIpeLumaINTEL", static_cast<SpvOp>(5793)},
+        {"OpArbitraryFloatASinINTEL", static_cast<SpvOp>(5873)},
+        {"OpArbitraryFloatSinINTEL", static_cast<SpvOp>(5868)},
+        {"OpArbitraryFloatATanPiINTEL", static_cast<SpvOp>(5878)},
+        {"OpArbitraryFloatCastFromIntINTEL", static_cast<SpvOp>(5842)},
+        {"OpHitObjectGetCurrentTimeNV", static_cast<SpvOp>(5265)},
+        {"OpFMod", static_cast<SpvOp>(141)},
+        {"OpAtomicSMax", static_cast<SpvOp>(238)},
+        {"OpGroupNonUniformBitwiseXor", static_cast<SpvOp>(361)},
+        {"OpUDotAccSat", static_cast<SpvOp>(4454)},
+        {"OpGroupSMinNonUniformAMD", static_cast<SpvOp>(5004)},
+        {"OpSubgroupAvcImeSetDualReferenceINTEL", static_cast<SpvOp>(5749)},
+        {"OpGroupAny", static_cast<SpvOp>(262)},
+        {"OpTypeStructContinuedINTEL", static_cast<SpvOp>(6090)},
+        {"OpTraceRayMotionNV", static_cast<SpvOp>(5339)},
+        {"OpHitObjectGetObjectToWorldNV", static_cast<SpvOp>(5253)},
+        {"OpGetKernelWorkGroupSize", static_cast<SpvOp>(295)},
+        {"OpFConvert", static_cast<SpvOp>(115)},
+        {"OpArbitraryFloatEQINTEL", static_cast<SpvOp>(5854)},
+        {"OpSubgroupAvcImeSetSingleReferenceINTEL", static_cast<SpvOp>(5748)},
+        {"OpGroupAll", static_cast<SpvOp>(261)},
+        {"OpCooperativeMatrixLengthKHR", static_cast<SpvOp>(4460)},
+        {"OpSMod", static_cast<SpvOp>(139)},
+        {"OpConvertSToF", static_cast<SpvOp>(111)},
+        {"OpImageQuerySamples", static_cast<SpvOp>(107)},
+        {"OpInBoundsPtrAccessChain", static_cast<SpvOp>(70)},
+        {"OpNot", static_cast<SpvOp>(200)},
+        {"OpUGreaterThan", static_cast<SpvOp>(172)},
+        {"OpSubgroupAvcMceConvertToSicPayloadINTEL", static_cast<SpvOp>(5736)},
+        {"OpSubgroupAvcSicSetBilinearFilterEnableINTEL", static_cast<SpvOp>(5800)},
+        {"OpRayQueryGetIntersectionTypeKHR", static_cast<SpvOp>(4479)},
+        {"OpSubgroupAvcSicSetSkcForwardTransformEnableINTEL", static_cast<SpvOp>(5801)},
+        {"OpImageSampleImplicitLod", static_cast<SpvOp>(87)},
+        {"OpHitObjectGetRayTMinNV", static_cast<SpvOp>(5275)},
+        {"OpGroupNonUniformBallotFindLSB", static_cast<SpvOp>(343)},
+        {"OpName", static_cast<SpvOp>(5)},
+        {"OpConvertUToPtr", static_cast<SpvOp>(120)},
+        {"OpSubgroupAvcMceGetDefaultInterMotionVectorCostTableINTEL", static_cast<SpvOp>(5720)},
+        {"OpAtomicOr", static_cast<SpvOp>(241)},
+        {"OpSubgroupAnyKHR", static_cast<SpvOp>(4429)},
+        {"OpSelect", static_cast<SpvOp>(169)},
+        {"OpImageSparseSampleProjDrefImplicitLod", static_cast<SpvOp>(311)},
+        {"OpFOrdLessThan", static_cast<SpvOp>(184)},
+        {"OpSDotKHR", static_cast<SpvOp>(4450)},
+        {"OpGroupReserveReadPipePackets", static_cast<SpvOp>(285)},
+        {"OpLogicalNotEqual", static_cast<SpvOp>(165)},
+        {"OpControlBarrierArriveINTEL", static_cast<SpvOp>(6142)},
+        {"OpDPdxFine", static_cast<SpvOp>(210)},
+        {"OpGroupNonUniformPartitionNV", static_cast<SpvOp>(5296)},
+        {"OpImageBoxFilterQCOM", static_cast<SpvOp>(4481)},
+        {"OpRayQueryGetIntersectionWorldToObjectKHR", static_cast<SpvOp>(6032)},
+        {"OpSubgroupAvcSicGetInterRawSadsINTEL", static_cast<SpvOp>(5816)},
+        {"OpSRem", static_cast<SpvOp>(138)},
+        {"OpSizeOf", static_cast<SpvOp>(321)},
+        {"OpUDot", static_cast<SpvOp>(4451)},
+        {"OpReleaseEvent", static_cast<SpvOp>(298)},
+        {"OpIgnoreIntersectionNV", static_cast<SpvOp>(5335)},
+        {"OpFOrdNotEqual", static_cast<SpvOp>(182)},
+        {"OpFOrdGreaterThanEqual", static_cast<SpvOp>(190)},
+        {"OpAll", static_cast<SpvOp>(155)},
+        {"OpExpectKHR", static_cast<SpvOp>(5631)},
+        {"OpSubgroupAvcMceSetDualReferenceInterlacedFieldPolaritiesINTEL", static_cast<SpvOp>(5731)},
+        {"OpCompositeInsert", static_cast<SpvOp>(82)},
+        {"OpImageSparseSampleImplicitLod", static_cast<SpvOp>(305)},
+        {"OpFixedLogINTEL", static_cast<SpvOp>(5932)},
+        {"OpMatrixTimesMatrix", static_cast<SpvOp>(146)},
+        {"OpTypeOpaque", static_cast<SpvOp>(31)},
+        {"OpCooperativeMatrixLengthNV", static_cast<SpvOp>(5362)},
+        {"OpExecuteCallableKHR", static_cast<SpvOp>(4446)},
+        {"OpImageDrefGather", static_cast<SpvOp>(97)},
+        {"OpFUnordLessThan", static_cast<SpvOp>(185)},
+        {"OpPtrAccessChain", static_cast<SpvOp>(67)},
+        {"OpTypeForwardPointer", static_cast<SpvOp>(39)},
+        {"OpAtomicCompareExchange", static_cast<SpvOp>(230)},
+        {"OpCooperativeMatrixLoadNV", static_cast<SpvOp>(5359)},
+        {"OpSubgroupAvcMceConvertToSicResultINTEL", static_cast<SpvOp>(5737)},
+        {"OpFragmentMaskFetchAMD", static_cast<SpvOp>(5011)},
+        {"OpImageSparseFetch", static_cast<SpvOp>(313)},
+        {"OpSubgroupAvcImeEvaluateWithSingleReferenceStreaminINTEL", static_cast<SpvOp>(5759)},
+        {"OpReadClockKHR", static_cast<SpvOp>(5056)},
+        {"OpSubgroupAvcRefEvaluateWithMultiReferenceInterlacedINTEL", static_cast<SpvOp>(5789)},
+        {"OpSubgroupAllEqualKHR", static_cast<SpvOp>(4430)},
+        {"OpFNegate", static_cast<SpvOp>(127)},
+        {"OpArbitraryFloatGTINTEL", static_cast<SpvOp>(5850)},
+        {"OpReportIntersectionNV", static_cast<SpvOp>(5334)},
+        {"OpUCountTrailingZerosINTEL", static_cast<SpvOp>(5586)},
+        {"OpBitFieldUExtract", static_cast<SpvOp>(203)},
+        {"OpCompositeConstruct", static_cast<SpvOp>(80)},
+        {"OpImageSparseGather", static_cast<SpvOp>(314)},
+        {"OpImageSparseSampleDrefExplicitLod", static_cast<SpvOp>(308)},
+        {"OpGetKernelLocalSizeForSubgroupCount", static_cast<SpvOp>(325)},
+        {"OpNop", static_cast<SpvOp>(0)},
+        {"OpTypeAvcSicResultINTEL", static_cast<SpvOp>(5712)},
+        {"OpAtomicSMin", static_cast<SpvOp>(236)},
+        {"OpLoad", static_cast<SpvOp>(61)},
+        {"OpIsNan", static_cast<SpvOp>(156)},
+        {"OpAny", static_cast<SpvOp>(154)},
+        {"OpIAddCarry", static_cast<SpvOp>(149)},
+        {"OpExtInstImport", static_cast<SpvOp>(11)},
+        {"OpLoopControlINTEL", static_cast<SpvOp>(5887)},
+        {"OpSubgroupAvcImeConvertToMceResultINTEL", static_cast<SpvOp>(5765)},
+        {"OpGroupNonUniformSMax", static_cast<SpvOp>(356)},
+        {"OpGroupSMin", static_cast<SpvOp>(268)},
+        {"OpConstantPipeStorage", static_cast<SpvOp>(323)},
+        {"OpIsValidReserveId", static_cast<SpvOp>(282)},
+        {"OpAliasScopeListDeclINTEL", static_cast<SpvOp>(5913)},
+        {"OpConvertUToAccelerationStructureKHR", static_cast<SpvOp>(4447)},
+        {"OpArbitraryFloatCastINTEL", static_cast<SpvOp>(5841)},
+        {"OpHitObjectGetShaderBindingTableRecordIndexNV", static_cast<SpvOp>(5258)},
+        {"OpSubgroupAvcImeStripSingleReferenceStreamoutINTEL", static_cast<SpvOp>(5768)},
+        {"OpSubgroupBallotKHR", static_cast<SpvOp>(4421)},
+        {"OpSubgroupAvcSicGetBestIpeLumaDistortionINTEL", static_cast<SpvOp>(5810)},
+        {"OpGroupNonUniformBallotFindMSB", static_cast<SpvOp>(344)},
+        {"OpTypeMatrix", static_cast<SpvOp>(24)},
+        {"OpTraceMotionNV", static_cast<SpvOp>(5338)},
+        {"OpGroupLogicalXorKHR", static_cast<SpvOp>(6408)},
+        {"OpSubgroupAvcImeGetStreamoutSingleReferenceMajorShapeDistortionsINTEL", static_cast<SpvOp>(5771)},
+        {"OpRayQueryConfirmIntersectionKHR", static_cast<SpvOp>(4476)},
+        {"OpArbitraryFloatRSqrtINTEL", static_cast<SpvOp>(5856)},
+        {"OpRayQueryGetRayTMinKHR", static_cast<SpvOp>(6016)},
+        {"OpUMul32x16INTEL", static_cast<SpvOp>(5598)},
+        {"OpReadPipeBlockingINTEL", static_cast<SpvOp>(5946)},
+        {"OpHitObjectIsEmptyNV", static_cast<SpvOp>(5276)},
+        {"OpImageSampleFootprintNV", static_cast<SpvOp>(5283)},
+        {"OpSubgroupAvcSicSetIntraLumaModeCostFunctionINTEL", static_cast<SpvOp>(5798)},
+        {"OpGroupLogicalOrKHR", static_cast<SpvOp>(6407)},
+        {"OpAtomicFlagClear", static_cast<SpvOp>(319)},
+        {"OpBeginInvocationInterlockEXT", static_cast<SpvOp>(5364)},
+        {"OpVectorInsertDynamic", static_cast<SpvOp>(78)},
+        {"OpRayQueryGetIntersectionBarycentricsKHR", static_cast<SpvOp>(6024)},
+        {"OpArbitraryFloatSubINTEL", static_cast<SpvOp>(5847)},
+        {"OpConvertSampledImageToUNV", static_cast<SpvOp>(5396)},
+        {"OpTypeAvcImeDualReferenceStreaminINTEL", static_cast<SpvOp>(5710)},
+        {"OpVectorTimesScalar", static_cast<SpvOp>(142)},
+        {"OpImageSampleProjDrefImplicitLod", static_cast<SpvOp>(93)},
+        {"OpTypeAvcImeSingleReferenceStreaminINTEL", static_cast<SpvOp>(5709)},
+        {"OpImageSparseSampleProjDrefExplicitLod", static_cast<SpvOp>(312)},
+        {"OpAtomicLoad", static_cast<SpvOp>(227)},
+        {"OpTypeFloat", static_cast<SpvOp>(22)},
+        {"OpGroupNonUniformUMin", static_cast<SpvOp>(354)},
+        {"OpSubgroupAvcMceSetAcOnlyHaarINTEL", static_cast<SpvOp>(5728)},
+        {"OpTypeSampler", static_cast<SpvOp>(26)},
+        {"OpTypeAccelerationStructureKHR", static_cast<SpvOp>(5341)},
+        {"OpGroupIAddNonUniformAMD", static_cast<SpvOp>(5000)},
+        {"OpFixedSinCosINTEL", static_cast<SpvOp>(5928)},
+        {"OpSubgroupAvcMceGetDefaultLowPenaltyCostTableINTEL", static_cast<SpvOp>(5723)},
+        {"OpGroupNonUniformAll", static_cast<SpvOp>(334)},
+        {"OpArbitraryFloatCastToIntINTEL", static_cast<SpvOp>(5843)},
+        {"OpGroupNonUniformShuffleXor", static_cast<SpvOp>(346)},
+        {"OpGroupUMin", static_cast<SpvOp>(267)},
+        {"OpUndef", static_cast<SpvOp>(1)},
+        {"OpTerminateRayNV", static_cast<SpvOp>(5336)},
+        {"OpTypeVoid", static_cast<SpvOp>(19)},
+        {"OpRayQueryGetIntersectionObjectToWorldKHR", static_cast<SpvOp>(6031)},
+        {"OpSubgroupAvcImeGetStreamoutDualReferenceMajorShapeMotionVectorsINTEL", static_cast<SpvOp>(5773)},
+        {"OpTypePointer", static_cast<SpvOp>(32)},
+        {"OpSubgroupAvcSicEvaluateWithMultiReferenceInterlacedINTEL", static_cast<SpvOp>(5807)},
+        {"OpTranspose", static_cast<SpvOp>(84)},
+        {"OpGroupSMaxNonUniformAMD", static_cast<SpvOp>(5007)},
+        {"OpSubgroupAvcImeStripDualReferenceStreamoutINTEL", static_cast<SpvOp>(5769)},
+        {"OpSubgroupAvcFmeInitializeINTEL", static_cast<SpvOp>(5781)},
+        {"OpPtrCastToGeneric", static_cast<SpvOp>(121)},
+        {"OpRetainEvent", static_cast<SpvOp>(297)},
+        {"OpConstantNull", static_cast<SpvOp>(46)},
+        {"OpImageSparseSampleDrefImplicitLod", static_cast<SpvOp>(307)},
+        {"OpArbitraryFloatACosINTEL", static_cast<SpvOp>(5875)},
+        {"OpExecuteCallableNV", static_cast<SpvOp>(5344)},
+        {"OpTerminateRayKHR", static_cast<SpvOp>(4449)},
+        {"OpImageSampleDrefImplicitLod", static_cast<SpvOp>(89)},
+        {"OpImageSampleProjExplicitLod", static_cast<SpvOp>(92)},
+        {"OpGroupNonUniformInverseBallot", static_cast<SpvOp>(340)},
+        {"OpSubgroupAvcMceGetDefaultInterDirectionPenaltyINTEL", static_cast<SpvOp>(5717)},
+        {"OpMemberDecorate", static_cast<SpvOp>(72)},
+        {"OpHitObjectRecordEmptyNV", static_cast<SpvOp>(5259)},
+        {"OpImageQueryLevels", static_cast<SpvOp>(106)},
+        {"OpSDot", static_cast<SpvOp>(4450)},
+        {"OpSubgroupAvcImeGetSingleReferenceStreaminINTEL", static_cast<SpvOp>(5766)},
+        {"OpFixedExpINTEL", static_cast<SpvOp>(5933)},
+        {"OpHitObjectGetPrimitiveIndexNV", static_cast<SpvOp>(5268)},
+        {"OpTypeRuntimeArray", static_cast<SpvOp>(29)},
+        {"OpHitObjectGetShaderRecordBufferHandleNV", static_cast<SpvOp>(5257)},
+        {"OpSubgroupAvcMceConvertToImePayloadINTEL", static_cast<SpvOp>(5732)},
+        {"OpCaptureEventProfilingInfo", static_cast<SpvOp>(302)},
+        {"OpRayQueryGetWorldRayDirectionKHR", static_cast<SpvOp>(6029)},
+        {"OpConstantFalse", static_cast<SpvOp>(42)},
+        {"OpArbitraryFloatLog1pINTEL", static_cast<SpvOp>(5863)},
+        {"OpHitObjectIsMissNV", static_cast<SpvOp>(5278)},
         {"OpWritePipeBlockingINTEL", static_cast<SpvOp>(5947)},
-        {"OpArbitraryFloatAddINTEL", static_cast<SpvOp>(5846)},
+        {"OpTypeCooperativeMatrixNV", static_cast<SpvOp>(5358)},
+        {"OpSubgroupShuffleXorINTEL", static_cast<SpvOp>(5574)},
+        {"OpSubgroupAvcImeSetMaxMotionVectorCountINTEL", static_cast<SpvOp>(5753)},
+        {"OpTypeInt", static_cast<SpvOp>(21)},
+        {"OpSubgroupAvcImeInitializeINTEL", static_cast<SpvOp>(5747)},
+        {"OpMemoryNamedBarrier", static_cast<SpvOp>(329)},
+        {"OpConstantComposite", static_cast<SpvOp>(44)},
+        {"OpHitObjectGetInstanceCustomIndexNV", static_cast<SpvOp>(5271)},
+        {"OpGroupWaitEvents", static_cast<SpvOp>(260)},
+        {"OpSubgroupAllKHR", static_cast<SpvOp>(4428)},
+        {"OpSubgroupImageMediaBlockWriteINTEL", static_cast<SpvOp>(5581)},
+        {"OpSatConvertUToS", static_cast<SpvOp>(119)},
+        {"OpArbitraryFloatCosINTEL", static_cast<SpvOp>(5869)},
+        {"OpSetUserEventStatus", static_cast<SpvOp>(301)},
+        {"OpGroupNonUniformIAdd", static_cast<SpvOp>(349)},
+        {"OpSubgroupAvcSicEvaluateWithSingleReferenceINTEL", static_cast<SpvOp>(5804)},
+        {"OpSubgroupAvcRefEvaluateWithMultiReferenceINTEL", static_cast<SpvOp>(5788)},
+        {"OpGroupUMaxNonUniformAMD", static_cast<SpvOp>(5006)},
+        {"OpRayQueryGetIntersectionObjectRayOriginKHR", static_cast<SpvOp>(6028)},
+        {"OpGetKernelPreferredWorkGroupSizeMultiple", static_cast<SpvOp>(296)},
+        {"OpSubgroupAvcSicGetMotionVectorMaskINTEL", static_cast<SpvOp>(5795)},
+        {"OpConstantFunctionPointerINTEL", static_cast<SpvOp>(5600)},
+        {"OpAsmTargetINTEL", static_cast<SpvOp>(5609)},
+        {"OpOrdered", static_cast<SpvOp>(162)},
+        {"OpFPGARegINTEL", static_cast<SpvOp>(5949)},
+        {"OpFixedSinINTEL", static_cast<SpvOp>(5926)},
+        {"OpRayQueryGetIntersectionGeometryIndexKHR", static_cast<SpvOp>(6022)},
+        {"OpSubgroupAvcImeEvaluateWithDualReferenceStreamoutINTEL", static_cast<SpvOp>(5762)},
+        {"OpUnreachable", static_cast<SpvOp>(255)},
+        {"OpSource", static_cast<SpvOp>(3)},
+        {"OpSamplerImageAddressingModeNV", static_cast<SpvOp>(5397)},
+        {"OpExtension", static_cast<SpvOp>(10)},
+        {"OpBitFieldInsert", static_cast<SpvOp>(201)},
+        {"OpCreatePipeFromPipeStorage", static_cast<SpvOp>(324)},
+        {"OpSubgroupAvcRefEvaluateWithSingleReferenceINTEL", static_cast<SpvOp>(5786)},
+        {"OpReserveWritePipePackets", static_cast<SpvOp>(279)},
+        {"OpTypeHitObjectNV", static_cast<SpvOp>(5281)},
+        {"OpTypeRayQueryKHR", static_cast<SpvOp>(4472)},
+        {"OpAtomicIIncrement", static_cast<SpvOp>(232)},
+        {"OpGroupIMulKHR", static_cast<SpvOp>(6401)},
+        {"OpExecutionMode", static_cast<SpvOp>(16)},
+        {"OpTypeReserveId", static_cast<SpvOp>(36)},
+        {"OpImageQueryFormat", static_cast<SpvOp>(101)},
+        {"OpBitwiseXor", static_cast<SpvOp>(198)},
+        {"OpSpecConstant", static_cast<SpvOp>(50)},
+        {"OpSGreaterThan", static_cast<SpvOp>(173)},
+        {"OpIAddSatINTEL", static_cast<SpvOp>(5589)},
+        {"OpSourceExtension", static_cast<SpvOp>(4)},
+        {"OpFUnordGreaterThanEqual", static_cast<SpvOp>(191)},
+        {"OpEndInvocationInterlockEXT", static_cast<SpvOp>(5365)},
+        {"OpSourceContinued", static_cast<SpvOp>(2)},
+        {"OpCooperativeMatrixMulAddNV", static_cast<SpvOp>(5361)},
+        {"OpAtomicExchange", static_cast<SpvOp>(229)},
+        {"OpSubgroupAvcMceGetDefaultHighPenaltyCostTableINTEL", static_cast<SpvOp>(5721)},
+        {"OpUAverageRoundedINTEL", static_cast<SpvOp>(5594)},
+        {"OpSubgroupAvcSicGetIpeChromaModeINTEL", static_cast<SpvOp>(5813)},
+        {"OpUnordered", static_cast<SpvOp>(163)},
+        {"OpWritePipe", static_cast<SpvOp>(275)},
+        {"OpSelectionMerge", static_cast<SpvOp>(247)},
+        {"OpPtrEqual", static_cast<SpvOp>(401)},
+        {"OpTypeBool", static_cast<SpvOp>(20)},
+        {"OpRayQueryGetIntersectionObjectRayDirectionKHR", static_cast<SpvOp>(6027)},
+        {"OpGroupNonUniformFAdd", static_cast<SpvOp>(350)},
+        {"OpTypeSampledImage", static_cast<SpvOp>(27)},
+        {"OpSubgroupAvcSicInitializeINTEL", static_cast<SpvOp>(5791)},
+        {"OpSubgroupAvcImeGetWeightingPatternMinimumMotionVectorINTEL", static_cast<SpvOp>(5779)},
+        {"OpGroupBroadcast", static_cast<SpvOp>(263)},
+        {"OpSaveMemoryINTEL", static_cast<SpvOp>(5819)},
+        {"OpConstantTrue", static_cast<SpvOp>(41)},
         {"OpImageSampleDrefExplicitLod", static_cast<SpvOp>(90)},
+        {"OpHitObjectTraceRayMotionNV", static_cast<SpvOp>(5256)},
+        {"OpRayQueryGetIntersectionCandidateAABBOpaqueKHR", static_cast<SpvOp>(6026)},
+        {"OpSpecConstantTrue", static_cast<SpvOp>(48)},
+        {"OpBranch", static_cast<SpvOp>(249)},
+        {"OpStencilAttachmentReadEXT", static_cast<SpvOp>(4162)},
+        {"OpHitObjectExecuteShaderNV", static_cast<SpvOp>(5264)},
+        {"OpGroupNonUniformBallot", static_cast<SpvOp>(339)},
+        {"OpGroupReserveWritePipePackets", static_cast<SpvOp>(286)},
+        {"OpImageSparseTexelsResident", static_cast<SpvOp>(316)},
+        {"OpGroupFMax", static_cast<SpvOp>(269)},
+        {"OpWritePackedPrimitiveIndices4x8NV", static_cast<SpvOp>(5299)},
+        {"OpImageSparseDrefGather", static_cast<SpvOp>(315)},
+        {"OpIMul32x16INTEL", static_cast<SpvOp>(5597)},
+        {"OpSubgroupAvcSicGetBestIpeChromaDistortionINTEL", static_cast<SpvOp>(5811)},
+        {"OpISubBorrow", static_cast<SpvOp>(150)},
+        {"OpArbitraryFloatSinPiINTEL", static_cast<SpvOp>(5871)},
+        {"OpCopyMemory", static_cast<SpvOp>(63)},
+        {"OpSubgroupAvcSicGetPackedIpeLumaModesINTEL", static_cast<SpvOp>(5812)},
+        {"OpGroupNonUniformLogicalAnd", static_cast<SpvOp>(362)},
+        {"OpSubgroupAvcMceGetDefaultMediumPenaltyCostTableINTEL", static_cast<SpvOp>(5722)},
+        {"OpFunctionCall", static_cast<SpvOp>(57)},
+        {"OpImageSampleProjDrefExplicitLod", static_cast<SpvOp>(94)},
+        {"OpAtomicFMinEXT", static_cast<SpvOp>(5614)},
+        {"OpSubgroupAvcMceGetInterReferenceIdsINTEL", static_cast<SpvOp>(5745)},
+        {"OpFixedRecipINTEL", static_cast<SpvOp>(5924)},
+        {"OpLogicalAnd", static_cast<SpvOp>(167)},
+        {"OpConvertImageToUNV", static_cast<SpvOp>(5393)},
+        {"OpCapability", static_cast<SpvOp>(17)},
+        {"OpSubgroupAvcSicConvertToMceResultINTEL", static_cast<SpvOp>(5808)},
+        {"OpArbitraryFloatAddINTEL", static_cast<SpvOp>(5846)},
+        {"OpSubgroupAvcSicEvaluateWithMultiReferenceINTEL", static_cast<SpvOp>(5806)},
+        {"OpMemberName", static_cast<SpvOp>(6)},
+        {"OpSubgroupShuffleINTEL", static_cast<SpvOp>(5571)},
+        {"OpSubgroupAvcMceGetDefaultInterBaseMultiReferencePenaltyINTEL", static_cast<SpvOp>(5713)},
+        {"OpHitObjectGetRayTMaxNV", static_cast<SpvOp>(5274)},
+        {"OpGroupNonUniformBitwiseAnd", static_cast<SpvOp>(359)},
+        {"OpSubgroupAvcImeEvaluateWithDualReferenceINTEL", static_cast<SpvOp>(5758)},
+        {"OpTraceNV", static_cast<SpvOp>(5337)},
+        {"OpFDiv", static_cast<SpvOp>(136)},
+        {"OpAtomicAnd", static_cast<SpvOp>(240)},
+        {"OpDPdyFine", static_cast<SpvOp>(211)},
+        {"OpULessThanEqual", static_cast<SpvOp>(178)},
+        {"OpGroupNonUniformAny", static_cast<SpvOp>(335)},
+        {"OpRayQueryGetIntersectionInstanceCustomIndexKHR", static_cast<SpvOp>(6019)},
+        {"OpGroupLogicalAndKHR", static_cast<SpvOp>(6406)},
+        {"OpHitObjectIsHitNV", static_cast<SpvOp>(5277)},
+        {"OpSubgroupImageBlockReadINTEL", static_cast<SpvOp>(5577)},
+        {"OpHitObjectGetWorldRayOriginNV", static_cast<SpvOp>(5273)},
+        {"OpAliasScopeDeclINTEL", static_cast<SpvOp>(5912)},
+        {"OpSubgroupAvcSicSetIntraChromaModeCostFunctionINTEL", static_cast<SpvOp>(5799)},
+        {"OpSubgroupAvcImeGetTruncatedSearchIndicationINTEL", static_cast<SpvOp>(5777)},
+        {"OpOuterProduct", static_cast<SpvOp>(147)},
+        {"OpEnqueueMarker", static_cast<SpvOp>(291)},
+        {"OpSubgroupAvcSicGetIpeLumaShapeINTEL", static_cast<SpvOp>(5809)},
+        {"OpSubgroupAvcMceSetInterDirectionPenaltyINTEL", static_cast<SpvOp>(5718)},
+        {"OpFixedSinCosPiINTEL", static_cast<SpvOp>(5931)},
+        {"OpArbitraryFloatMulINTEL", static_cast<SpvOp>(5848)},
+        {"OpSubgroupAvcImeSetUnidirectionalMixDisableINTEL", static_cast<SpvOp>(5754)},
+        {"OpSubgroupAvcImeGetStreamoutSingleReferenceMajorShapeMotionVectorsINTEL", static_cast<SpvOp>(5770)},
+        {"OpGroupMemberDecorate", static_cast<SpvOp>(75)},
+        {"OpConstantSampler", static_cast<SpvOp>(45)},
+        {"OpGroupNonUniformBallotBitExtract", static_cast<SpvOp>(341)},
+        {"OpRayQueryGetWorldRayOriginKHR", static_cast<SpvOp>(6030)},
+        {"OpGroupBitwiseOrKHR", static_cast<SpvOp>(6404)},
+        {"OpSubgroupAvcImeGetBorderReachedINTEL", static_cast<SpvOp>(5776)},
+        {"OpLifetimeStart", static_cast<SpvOp>(256)},
+        {"OpConvertUToSampledImageNV", static_cast<SpvOp>(5395)},
+        {"OpAtomicFAddEXT", static_cast<SpvOp>(6035)},
     };
 
     static const auto hash = [](const UnownedStringSlice& str, UInt32 salt){
-        return combineHash(getHashCode(str), getHashCode(salt)) % 718;
+        UInt32 h = salt;
+        for (const char c : str)
+            h = (h * 0x01000193) ^ c;
+        return h % 718;
     };
 
     const auto i = hash(str, tableSalt[hash(str, 0)]);
@@ -801,277 +804,280 @@ static bool lookupSpvOp(const UnownedStringSlice& str, SpvOp& value)
 static bool lookupSpvCapability(const UnownedStringSlice& str, SpvCapability& value)
 {
     static const unsigned tableSalt[245] = {
-        0, 4, 0, 0, 1, 0, 4, 0, 4, 7, 2, 0, 0, 0, 0, 1,
-        2, 6, 0, 1, 4, 0, 0, 1, 1, 1, 0, 1, 0, 0, 4, 1,
-        1, 1, 0, 0, 3, 0, 1, 1, 0, 0, 7, 1, 1, 2, 6, 7,
-        3, 0, 4, 0, 0, 1, 0, 0, 6, 2, 0, 0, 3, 0, 0, 0,
-        0, 3, 0, 0, 1, 12, 0, 1, 2, 0, 6, 2, 0, 1, 5, 1,
-        5, 1, 0, 6, 12, 0, 5, 9, 2, 11, 0, 0, 3, 2, 1, 0,
-        6, 0, 1, 1, 1, 3, 1, 0, 0, 0, 1, 5, 2, 1, 0, 9,
-        3, 3, 0, 1, 1, 0, 6, 0, 0, 0, 1, 0, 2, 3, 0, 1,
-        2, 2, 6, 4, 2, 0, 3, 2, 5, 7, 5, 3, 2, 2, 0, 1,
-        1, 13, 13, 1, 0, 1, 0, 0, 0, 1, 0, 16, 2, 0, 4, 13,
-        5, 1, 2, 3, 0, 10, 2, 8, 4, 0, 5, 1, 11, 6, 0, 7,
-        18, 10, 0, 55, 4, 12, 0, 0, 0, 1, 5, 0, 13, 13, 0, 2,
-        3, 0, 0, 0, 3, 1, 81, 1, 0, 0, 2, 23, 8, 0, 1, 11,
-        0, 13, 5, 0, 52, 12, 0, 0, 2, 8, 0, 7, 0, 8, 15, 11,
-        10, 72, 125, 0, 0, 36, 16, 1, 318, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 10, 10, 8
+        1, 2, 0, 1, 1, 1, 0, 0, 2, 2, 0, 0, 0, 8, 0, 5,
+        0, 0, 0, 0, 3, 2, 0, 1, 7, 3, 5, 3, 1, 2, 1, 0,
+        0, 0, 0, 0, 4, 0, 0, 2, 1, 23, 1, 0, 5, 2, 0, 1,
+        19, 0, 3, 0, 4, 1, 0, 1, 0, 4, 0, 8, 4, 3, 1, 2,
+        2, 1, 0, 3, 2, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 15,
+        0, 0, 8, 2, 1, 0, 1, 2, 1, 1, 2, 0, 2, 1, 0, 9,
+        0, 3, 2, 4, 2, 7, 1, 0, 5, 0, 0, 0, 1, 6, 0, 0,
+        1, 6, 2, 5, 1, 0, 2, 0, 7, 0, 0, 2, 4, 1, 14, 6,
+        0, 12, 0, 1, 0, 0, 0, 0, 4, 4, 25, 10, 0, 0, 0, 14,
+        1, 1, 3, 0, 6, 14, 1, 0, 1, 5, 0, 0, 1, 0, 2, 0,
+        2, 35, 0, 0, 4, 0, 0, 8, 1, 3, 4, 0, 7, 19, 2, 9,
+        2, 2, 12, 7, 2, 6, 0, 5, 1, 0, 3, 4, 2, 3, 14, 1,
+        0, 7, 2, 46, 5, 2, 0, 0, 14, 0, 57, 0, 14, 0, 3, 0,
+        0, 0, 25, 0, 32, 24, 49, 24, 1, 0, 27, 0, 0, 5, 3, 0,
+        63, 0, 0, 0, 104, 0, 0, 10, 0, 0, 83, 79, 45, 4, 0, 0,
+        231, 8, 133, 0, 14
     };
 
     using KV = std::pair<const char*, SpvCapability>;
 
     static const KV words[245] =
     {
-        {"UniformDecoration", static_cast<SpvCapability>(71)},
-        {"ComputeDerivativeGroupLinearNV", static_cast<SpvCapability>(5350)},
-        {"InputAttachmentArrayNonUniformIndexing", static_cast<SpvCapability>(5310)},
-        {"DenormFlushToZero", static_cast<SpvCapability>(4465)},
-        {"Shader", static_cast<SpvCapability>(1)},
-        {"AsmINTEL", static_cast<SpvCapability>(5606)},
-        {"ArbitraryPrecisionIntegersINTEL", static_cast<SpvCapability>(5844)},
-        {"VulkanMemoryModel", static_cast<SpvCapability>(5345)},
-        {"SampledCubeArray", static_cast<SpvCapability>(45)},
-        {"SubgroupDispatch", static_cast<SpvCapability>(58)},
-        {"ShaderClockKHR", static_cast<SpvCapability>(5055)},
-        {"Image1D", static_cast<SpvCapability>(44)},
-        {"UniformBufferArrayNonUniformIndexing", static_cast<SpvCapability>(5306)},
-        {"UniformTexelBufferArrayDynamicIndexing", static_cast<SpvCapability>(5304)},
-        {"VulkanMemoryModelDeviceScope", static_cast<SpvCapability>(5346)},
-        {"FPFastMathModeINTEL", static_cast<SpvCapability>(5837)},
-        {"GroupNonUniformRotateKHR", static_cast<SpvCapability>(6026)},
-        {"DerivativeControl", static_cast<SpvCapability>(51)},
-        {"AtomicStorageOps", static_cast<SpvCapability>(4445)},
-        {"ImageRect", static_cast<SpvCapability>(36)},
-        {"GroupNonUniformShuffle", static_cast<SpvCapability>(65)},
-        {"Linkage", static_cast<SpvCapability>(5)},
-        {"SplitBarrierINTEL", static_cast<SpvCapability>(6141)},
-        {"StorageBufferArrayNonUniformIndexing", static_cast<SpvCapability>(5308)},
-        {"FPGALoopControlsINTEL", static_cast<SpvCapability>(5888)},
-        {"InputAttachment", static_cast<SpvCapability>(40)},
-        {"SignedZeroInfNanPreserve", static_cast<SpvCapability>(4466)},
-        {"WorkgroupMemoryExplicitLayout8BitAccessKHR", static_cast<SpvCapability>(4429)},
-        {"StorageBuffer8BitAccess", static_cast<SpvCapability>(4448)},
-        {"RayTracingOpacityMicromapEXT", static_cast<SpvCapability>(5381)},
-        {"ShaderStereoViewNV", static_cast<SpvCapability>(5259)},
-        {"Sampled1D", static_cast<SpvCapability>(43)},
-        {"Float16Buffer", static_cast<SpvCapability>(8)},
-        {"FPGAClusterAttributesINTEL", static_cast<SpvCapability>(5904)},
-        {"NamedBarrier", static_cast<SpvCapability>(59)},
-        {"SubgroupAvcMotionEstimationIntraINTEL", static_cast<SpvCapability>(5697)},
-        {"FPGALatencyControlINTEL", static_cast<SpvCapability>(6171)},
-        {"ShadingRateNV", static_cast<SpvCapability>(5291)},
-        {"StorageUniformBufferBlock16", static_cast<SpvCapability>(4433)},
-        {"Float64", static_cast<SpvCapability>(10)},
-        {"CooperativeMatrixNV", static_cast<SpvCapability>(5357)},
-        {"ImageReadWriteLodAMD", static_cast<SpvCapability>(5015)},
-        {"StorageBufferArrayNonUniformIndexingEXT", static_cast<SpvCapability>(5308)},
-        {"InterpolationFunction", static_cast<SpvCapability>(52)},
-        {"FPMaxErrorINTEL", static_cast<SpvCapability>(6169)},
-        {"PipeStorage", static_cast<SpvCapability>(60)},
-        {"FragmentFullyCoveredEXT", static_cast<SpvCapability>(5265)},
-        {"CoreBuiltinsARM", static_cast<SpvCapability>(4165)},
-        {"DeviceEnqueue", static_cast<SpvCapability>(19)},
-        {"AtomicFloat32AddEXT", static_cast<SpvCapability>(6033)},
-        {"FPGAInvocationPipeliningAttributesINTEL", static_cast<SpvCapability>(5916)},
-        {"StorageImageArrayNonUniformIndexing", static_cast<SpvCapability>(5309)},
-        {"DotProduct", static_cast<SpvCapability>(6019)},
-        {"RayTracingPositionFetchKHR", static_cast<SpvCapability>(5336)},
-        {"ImageFootprintNV", static_cast<SpvCapability>(5282)},
-        {"TileImageColorReadAccessEXT", static_cast<SpvCapability>(4166)},
-        {"BindlessTextureNV", static_cast<SpvCapability>(5390)},
-        {"DotProductInputAllKHR", static_cast<SpvCapability>(6016)},
-        {"GroupNonUniformVote", static_cast<SpvCapability>(62)},
-        {"FragmentBarycentricNV", static_cast<SpvCapability>(5284)},
-        {"SampleMaskOverrideCoverageNV", static_cast<SpvCapability>(5249)},
-        {"DemoteToHelperInvocationEXT", static_cast<SpvCapability>(5379)},
-        {"SubgroupBufferBlockIOINTEL", static_cast<SpvCapability>(5569)},
-        {"TextureSampleWeightedQCOM", static_cast<SpvCapability>(4484)},
-        {"SampledImageArrayDynamicIndexing", static_cast<SpvCapability>(29)},
-        {"StorageImageArrayDynamicIndexing", static_cast<SpvCapability>(31)},
-        {"InputAttachmentArrayDynamicIndexing", static_cast<SpvCapability>(5303)},
-        {"StorageTexelBufferArrayDynamicIndexingEXT", static_cast<SpvCapability>(5305)},
-        {"GroupUniformArithmeticKHR", static_cast<SpvCapability>(6400)},
-        {"FragmentShaderSampleInterlockEXT", static_cast<SpvCapability>(5363)},
-        {"MinLod", static_cast<SpvCapability>(42)},
-        {"GroupNonUniform", static_cast<SpvCapability>(61)},
-        {"Matrix", static_cast<SpvCapability>(0)},
-        {"VariablePointersStorageBuffer", static_cast<SpvCapability>(4441)},
-        {"SampledImageArrayNonUniformIndexing", static_cast<SpvCapability>(5307)},
-        {"StorageImageExtendedFormats", static_cast<SpvCapability>(49)},
-        {"VariablePointers", static_cast<SpvCapability>(4442)},
-        {"RayTracingProvisionalKHR", static_cast<SpvCapability>(5353)},
-        {"GeometryShaderPassthroughNV", static_cast<SpvCapability>(5251)},
-        {"DrawParameters", static_cast<SpvCapability>(4427)},
-        {"TessellationPointSize", static_cast<SpvCapability>(23)},
-        {"TextureBlockMatchQCOM", static_cast<SpvCapability>(4486)},
-        {"WorkgroupMemoryExplicitLayout16BitAccessKHR", static_cast<SpvCapability>(4430)},
-        {"SubgroupImageMediaBlockIOINTEL", static_cast<SpvCapability>(5579)},
-        {"GroupNonUniformArithmetic", static_cast<SpvCapability>(63)},
-        {"AtomicStorage", static_cast<SpvCapability>(21)},
-        {"FPGAKernelAttributesINTEL", static_cast<SpvCapability>(5897)},
-        {"RuntimeDescriptorArray", static_cast<SpvCapability>(5302)},
-        {"CooperativeMatrixKHR", static_cast<SpvCapability>(6022)},
-        {"Int64", static_cast<SpvCapability>(11)},
-        {"UniformTexelBufferArrayDynamicIndexingEXT", static_cast<SpvCapability>(5304)},
-        {"FragmentShadingRateKHR", static_cast<SpvCapability>(4422)},
-        {"UniformAndStorageBuffer8BitAccess", static_cast<SpvCapability>(4449)},
-        {"UniformTexelBufferArrayNonUniformIndexingEXT", static_cast<SpvCapability>(5311)},
-        {"RoundingModeRTE", static_cast<SpvCapability>(4467)},
-        {"UniformBufferArrayDynamicIndexing", static_cast<SpvCapability>(28)},
-        {"Int8", static_cast<SpvCapability>(39)},
-        {"VulkanMemoryModelDeviceScopeKHR", static_cast<SpvCapability>(5346)},
-        {"LiteralSampler", static_cast<SpvCapability>(20)},
-        {"IndirectReferencesINTEL", static_cast<SpvCapability>(5604)},
-        {"USMStorageClassesINTEL", static_cast<SpvCapability>(5935)},
-        {"Vector16", static_cast<SpvCapability>(7)},
-        {"IOPipesINTEL", static_cast<SpvCapability>(5943)},
-        {"VectorComputeINTEL", static_cast<SpvCapability>(5617)},
-        {"StoragePushConstant16", static_cast<SpvCapability>(4435)},
-        {"GroupNonUniformShuffleRelative", static_cast<SpvCapability>(66)},
-        {"ShaderNonUniform", static_cast<SpvCapability>(5301)},
-        {"CullDistance", static_cast<SpvCapability>(33)},
-        {"ShaderViewportIndexLayerNV", static_cast<SpvCapability>(5254)},
-        {"GeometryStreams", static_cast<SpvCapability>(54)},
-        {"DotProductInputAll", static_cast<SpvCapability>(6016)},
-        {"GenericPointer", static_cast<SpvCapability>(38)},
-        {"DotProductInput4x8BitPackedKHR", static_cast<SpvCapability>(6018)},
-        {"PhysicalStorageBufferAddresses", static_cast<SpvCapability>(5347)},
-        {"FragmentMaskAMD", static_cast<SpvCapability>(5010)},
-        {"SubgroupVoteKHR", static_cast<SpvCapability>(4431)},
-        {"RuntimeAlignedAttributeINTEL", static_cast<SpvCapability>(5939)},
-        {"TileImageStencilReadAccessEXT", static_cast<SpvCapability>(4168)},
-        {"SubgroupAvcMotionEstimationChromaINTEL", static_cast<SpvCapability>(5698)},
-        {"StorageBuffer16BitAccess", static_cast<SpvCapability>(4433)},
-        {"RayTracingMotionBlurNV", static_cast<SpvCapability>(5341)},
-        {"BFloat16ConversionINTEL", static_cast<SpvCapability>(6115)},
-        {"FPGAArgumentInterfacesINTEL", static_cast<SpvCapability>(6174)},
-        {"RayQueryProvisionalKHR", static_cast<SpvCapability>(4471)},
-        {"FPGAKernelAttributesv2INTEL", static_cast<SpvCapability>(6161)},
-        {"Addresses", static_cast<SpvCapability>(4)},
-        {"UniformTexelBufferArrayNonUniformIndexing", static_cast<SpvCapability>(5311)},
-        {"AtomicFloat64MinMaxEXT", static_cast<SpvCapability>(5613)},
-        {"SampledBuffer", static_cast<SpvCapability>(46)},
-        {"DebugInfoModuleINTEL", static_cast<SpvCapability>(6114)},
-        {"Geometry", static_cast<SpvCapability>(2)},
-        {"LongConstantCompositeINTEL", static_cast<SpvCapability>(6089)},
-        {"FragmentShaderPixelInterlockEXT", static_cast<SpvCapability>(5378)},
-        {"VulkanMemoryModelKHR", static_cast<SpvCapability>(5345)},
-        {"ShaderViewportIndex", static_cast<SpvCapability>(70)},
-        {"DotProductKHR", static_cast<SpvCapability>(6019)},
-        {"Groups", static_cast<SpvCapability>(18)},
-        {"UniformAndStorageBuffer16BitAccess", static_cast<SpvCapability>(4434)},
-        {"VectorAnyINTEL", static_cast<SpvCapability>(5619)},
-        {"InputAttachmentArrayDynamicIndexingEXT", static_cast<SpvCapability>(5303)},
-        {"Float16ImageAMD", static_cast<SpvCapability>(5008)},
-        {"ShaderViewportIndexLayerEXT", static_cast<SpvCapability>(5254)},
-        {"ImageGatherExtended", static_cast<SpvCapability>(25)},
-        {"SampleMaskPostDepthCoverage", static_cast<SpvCapability>(4447)},
-        {"FragmentBarycentricKHR", static_cast<SpvCapability>(5284)},
-        {"TextureBoxFilterQCOM", static_cast<SpvCapability>(4485)},
-        {"ShaderSMBuiltinsNV", static_cast<SpvCapability>(5373)},
-        {"ImageReadWrite", static_cast<SpvCapability>(14)},
-        {"StorageImageMultisample", static_cast<SpvCapability>(27)},
-        {"ArbitraryPrecisionFixedPointINTEL", static_cast<SpvCapability>(5922)},
-        {"ComputeDerivativeGroupQuadsNV", static_cast<SpvCapability>(5288)},
-        {"IntegerFunctions2INTEL", static_cast<SpvCapability>(5584)},
-        {"AtomicFloat32MinMaxEXT", static_cast<SpvCapability>(5612)},
-        {"BitInstructions", static_cast<SpvCapability>(6025)},
-        {"AtomicFloat16MinMaxEXT", static_cast<SpvCapability>(5616)},
-        {"SubgroupShuffleINTEL", static_cast<SpvCapability>(5568)},
-        {"GroupNonUniformPartitionedNV", static_cast<SpvCapability>(5297)},
-        {"SampledRect", static_cast<SpvCapability>(37)},
-        {"GroupNonUniformClustered", static_cast<SpvCapability>(67)},
-        {"StorageImageReadWithoutFormat", static_cast<SpvCapability>(55)},
-        {"ImageBasic", static_cast<SpvCapability>(13)},
-        {"FPGARegINTEL", static_cast<SpvCapability>(5948)},
-        {"SparseResidency", static_cast<SpvCapability>(41)},
-        {"ImageGatherBiasLodAMD", static_cast<SpvCapability>(5009)},
-        {"OptNoneINTEL", static_cast<SpvCapability>(6094)},
-        {"ShaderLayer", static_cast<SpvCapability>(69)},
-        {"StorageImageWriteWithoutFormat", static_cast<SpvCapability>(56)},
-        {"Float16", static_cast<SpvCapability>(9)},
-        {"FragmentShaderShadingRateInterlockEXT", static_cast<SpvCapability>(5372)},
-        {"SubgroupImageBlockIOINTEL", static_cast<SpvCapability>(5570)},
-        {"ShaderInvocationReorderNV", static_cast<SpvCapability>(5383)},
-        {"PhysicalStorageBufferAddressesEXT", static_cast<SpvCapability>(5347)},
-        {"UniformBufferArrayNonUniformIndexingEXT", static_cast<SpvCapability>(5306)},
-        {"ShaderViewportMaskNV", static_cast<SpvCapability>(5255)},
-        {"DenormPreserve", static_cast<SpvCapability>(4464)},
-        {"FPGADSPControlINTEL", static_cast<SpvCapability>(5908)},
-        {"SampleRateShading", static_cast<SpvCapability>(35)},
-        {"RoundingModeRTZ", static_cast<SpvCapability>(4468)},
-        {"Kernel", static_cast<SpvCapability>(6)},
-        {"FunctionPointersINTEL", static_cast<SpvCapability>(5603)},
-        {"FloatingPointModeINTEL", static_cast<SpvCapability>(5583)},
-        {"StorageInputOutput16", static_cast<SpvCapability>(4436)},
-        {"AtomicFloat16AddEXT", static_cast<SpvCapability>(6095)},
-        {"ImageCubeArray", static_cast<SpvCapability>(34)},
-        {"DotProductInput4x8BitPacked", static_cast<SpvCapability>(6018)},
-        {"ClipDistance", static_cast<SpvCapability>(32)},
-        {"Int64Atomics", static_cast<SpvCapability>(12)},
-        {"MultiViewport", static_cast<SpvCapability>(57)},
-        {"RayQueryPositionFetchKHR", static_cast<SpvCapability>(5391)},
-        {"StencilExportEXT", static_cast<SpvCapability>(5013)},
-        {"RuntimeDescriptorArrayEXT", static_cast<SpvCapability>(5302)},
-        {"RoundToInfinityINTEL", static_cast<SpvCapability>(5582)},
-        {"StorageTexelBufferArrayDynamicIndexing", static_cast<SpvCapability>(5305)},
-        {"DotProductInput4x8Bit", static_cast<SpvCapability>(6017)},
-        {"UnstructuredLoopControlsINTEL", static_cast<SpvCapability>(5886)},
-        {"WorkgroupMemoryExplicitLayoutKHR", static_cast<SpvCapability>(4428)},
-        {"TransformFeedback", static_cast<SpvCapability>(53)},
-        {"Tessellation", static_cast<SpvCapability>(3)},
-        {"SubgroupBallotKHR", static_cast<SpvCapability>(4423)},
-        {"ImageMipmap", static_cast<SpvCapability>(15)},
-        {"DeviceGroup", static_cast<SpvCapability>(4437)},
-        {"Pipes", static_cast<SpvCapability>(17)},
-        {"FunctionFloatControlINTEL", static_cast<SpvCapability>(5821)},
-        {"RayCullMaskKHR", static_cast<SpvCapability>(6020)},
-        {"SampledImageArrayNonUniformIndexingEXT", static_cast<SpvCapability>(5307)},
-        {"DemoteToHelperInvocation", static_cast<SpvCapability>(5379)},
-        {"MeshShadingEXT", static_cast<SpvCapability>(5283)},
-        {"RayTraversalPrimitiveCullingKHR", static_cast<SpvCapability>(4478)},
-        {"GroupNonUniformQuad", static_cast<SpvCapability>(68)},
-        {"FPGAMemoryAttributesINTEL", static_cast<SpvCapability>(5824)},
-        {"GeometryPointSize", static_cast<SpvCapability>(24)},
-        {"FPGAMemoryAccessesINTEL", static_cast<SpvCapability>(5898)},
-        {"Int16", static_cast<SpvCapability>(22)},
-        {"GroupNonUniformBallot", static_cast<SpvCapability>(64)},
-        {"Int64ImageEXT", static_cast<SpvCapability>(5016)},
-        {"PerViewAttributesNV", static_cast<SpvCapability>(5260)},
-        {"ArbitraryPrecisionFloatingPointINTEL", static_cast<SpvCapability>(5845)},
-        {"KernelAttributesINTEL", static_cast<SpvCapability>(5892)},
-        {"AtomicFloat64AddEXT", static_cast<SpvCapability>(6034)},
-        {"FPGABufferLocationINTEL", static_cast<SpvCapability>(5920)},
-        {"StorageTexelBufferArrayNonUniformIndexing", static_cast<SpvCapability>(5312)},
-        {"ImageBuffer", static_cast<SpvCapability>(47)},
-        {"TileImageDepthReadAccessEXT", static_cast<SpvCapability>(4167)},
-        {"ImageMSArray", static_cast<SpvCapability>(48)},
-        {"StorageTexelBufferArrayNonUniformIndexingEXT", static_cast<SpvCapability>(5312)},
-        {"MultiView", static_cast<SpvCapability>(4439)},
-        {"InputAttachmentArrayNonUniformIndexingEXT", static_cast<SpvCapability>(5310)},
-        {"ExpectAssumeKHR", static_cast<SpvCapability>(5629)},
-        {"RayQueryKHR", static_cast<SpvCapability>(4472)},
-        {"BlockingPipesINTEL", static_cast<SpvCapability>(5945)},
-        {"StorageBufferArrayDynamicIndexing", static_cast<SpvCapability>(30)},
-        {"MemoryAccessAliasingINTEL", static_cast<SpvCapability>(5910)},
-        {"MeshShadingNV", static_cast<SpvCapability>(5266)},
-        {"RayTracingKHR", static_cast<SpvCapability>(4479)},
-        {"RayTracingNV", static_cast<SpvCapability>(5340)},
-        {"StorageUniform16", static_cast<SpvCapability>(4434)},
-        {"DotProductInput4x8BitKHR", static_cast<SpvCapability>(6017)},
         {"StoragePushConstant8", static_cast<SpvCapability>(4450)},
-        {"VariableLengthArrayINTEL", static_cast<SpvCapability>(5817)},
-        {"ShaderNonUniformEXT", static_cast<SpvCapability>(5301)},
+        {"UniformTexelBufferArrayNonUniformIndexing", static_cast<SpvCapability>(5311)},
+        {"ImageBasic", static_cast<SpvCapability>(13)},
+        {"DeviceGroup", static_cast<SpvCapability>(4437)},
+        {"DotProduct", static_cast<SpvCapability>(6019)},
+        {"AtomicStorageOps", static_cast<SpvCapability>(4445)},
+        {"ShaderSMBuiltinsNV", static_cast<SpvCapability>(5373)},
+        {"PhysicalStorageBufferAddresses", static_cast<SpvCapability>(5347)},
+        {"FragmentBarycentricKHR", static_cast<SpvCapability>(5284)},
+        {"RayTracingProvisionalKHR", static_cast<SpvCapability>(5353)},
+        {"UniformBufferArrayNonUniformIndexingEXT", static_cast<SpvCapability>(5306)},
+        {"FPGAKernelAttributesv2INTEL", static_cast<SpvCapability>(6161)},
+        {"FPGAArgumentInterfacesINTEL", static_cast<SpvCapability>(6174)},
+        {"SampledRect", static_cast<SpvCapability>(37)},
+        {"AtomicFloat64AddEXT", static_cast<SpvCapability>(6034)},
+        {"DeviceEnqueue", static_cast<SpvCapability>(19)},
+        {"ShadingRateNV", static_cast<SpvCapability>(5291)},
+        {"FragmentShadingRateKHR", static_cast<SpvCapability>(4422)},
+        {"RoundToInfinityINTEL", static_cast<SpvCapability>(5582)},
+        {"FPFastMathModeINTEL", static_cast<SpvCapability>(5837)},
+        {"AtomicFloat16AddEXT", static_cast<SpvCapability>(6095)},
+        {"StorageImageWriteWithoutFormat", static_cast<SpvCapability>(56)},
+        {"GroupNonUniformVote", static_cast<SpvCapability>(62)},
+        {"StorageImageArrayDynamicIndexing", static_cast<SpvCapability>(31)},
+        {"Int64Atomics", static_cast<SpvCapability>(12)},
+        {"DotProductInput4x8Bit", static_cast<SpvCapability>(6017)},
+        {"ArbitraryPrecisionFixedPointINTEL", static_cast<SpvCapability>(5922)},
+        {"FPGALoopControlsINTEL", static_cast<SpvCapability>(5888)},
+        {"IntegerFunctions2INTEL", static_cast<SpvCapability>(5584)},
+        {"AsmINTEL", static_cast<SpvCapability>(5606)},
+        {"ShaderViewportIndexLayerNV", static_cast<SpvCapability>(5254)},
+        {"GroupUniformArithmeticKHR", static_cast<SpvCapability>(6400)},
+        {"ComputeDerivativeGroupQuadsNV", static_cast<SpvCapability>(5288)},
+        {"Pipes", static_cast<SpvCapability>(17)},
+        {"Int8", static_cast<SpvCapability>(39)},
+        {"MultiViewport", static_cast<SpvCapability>(57)},
+        {"SampledImageArrayDynamicIndexing", static_cast<SpvCapability>(29)},
+        {"VulkanMemoryModelKHR", static_cast<SpvCapability>(5345)},
+        {"FragmentShaderSampleInterlockEXT", static_cast<SpvCapability>(5363)},
+        {"DotProductInput4x8BitKHR", static_cast<SpvCapability>(6017)},
+        {"CooperativeMatrixNV", static_cast<SpvCapability>(5357)},
+        {"RoundingModeRTE", static_cast<SpvCapability>(4467)},
+        {"DotProductInput4x8BitPackedKHR", static_cast<SpvCapability>(6018)},
+        {"TextureBlockMatchQCOM", static_cast<SpvCapability>(4486)},
+        {"ShaderViewportIndex", static_cast<SpvCapability>(70)},
+        {"DemoteToHelperInvocationEXT", static_cast<SpvCapability>(5379)},
+        {"GroupNonUniformShuffleRelative", static_cast<SpvCapability>(66)},
+        {"Shader", static_cast<SpvCapability>(1)},
+        {"FPGAClusterAttributesINTEL", static_cast<SpvCapability>(5904)},
+        {"UniformBufferArrayNonUniformIndexing", static_cast<SpvCapability>(5306)},
+        {"SampleRateShading", static_cast<SpvCapability>(35)},
+        {"MemoryAccessAliasingINTEL", static_cast<SpvCapability>(5910)},
+        {"Groups", static_cast<SpvCapability>(18)},
+        {"StorageTexelBufferArrayDynamicIndexingEXT", static_cast<SpvCapability>(5305)},
+        {"StorageUniform16", static_cast<SpvCapability>(4434)},
+        {"FragmentFullyCoveredEXT", static_cast<SpvCapability>(5265)},
+        {"PhysicalStorageBufferAddressesEXT", static_cast<SpvCapability>(5347)},
+        {"MeshShadingEXT", static_cast<SpvCapability>(5283)},
+        {"GroupNonUniformPartitionedNV", static_cast<SpvCapability>(5297)},
+        {"ImageMSArray", static_cast<SpvCapability>(48)},
+        {"StorageInputOutput16", static_cast<SpvCapability>(4436)},
+        {"VariablePointers", static_cast<SpvCapability>(4442)},
+        {"TileImageStencilReadAccessEXT", static_cast<SpvCapability>(4168)},
+        {"SampledImageArrayNonUniformIndexingEXT", static_cast<SpvCapability>(5307)},
+        {"ShaderClockKHR", static_cast<SpvCapability>(5055)},
+        {"SubgroupVoteKHR", static_cast<SpvCapability>(4431)},
+        {"StorageBufferArrayNonUniformIndexingEXT", static_cast<SpvCapability>(5308)},
+        {"UniformTexelBufferArrayDynamicIndexing", static_cast<SpvCapability>(5304)},
+        {"GroupNonUniformArithmetic", static_cast<SpvCapability>(63)},
+        {"RoundingModeRTZ", static_cast<SpvCapability>(4468)},
+        {"StorageTexelBufferArrayNonUniformIndexingEXT", static_cast<SpvCapability>(5312)},
+        {"FPGADSPControlINTEL", static_cast<SpvCapability>(5908)},
         {"SubgroupAvcMotionEstimationINTEL", static_cast<SpvCapability>(5696)},
-        {"StorageImageArrayNonUniformIndexingEXT", static_cast<SpvCapability>(5309)},
-        {"FragmentDensityEXT", static_cast<SpvCapability>(5291)},
+        {"LongConstantCompositeINTEL", static_cast<SpvCapability>(6089)},
+        {"UniformAndStorageBuffer16BitAccess", static_cast<SpvCapability>(4434)},
+        {"DotProductInputAll", static_cast<SpvCapability>(6016)},
+        {"VulkanMemoryModel", static_cast<SpvCapability>(5345)},
+        {"FPMaxErrorINTEL", static_cast<SpvCapability>(6169)},
+        {"VariablePointersStorageBuffer", static_cast<SpvCapability>(4441)},
+        {"ImageGatherExtended", static_cast<SpvCapability>(25)},
+        {"ShaderLayer", static_cast<SpvCapability>(69)},
+        {"FragmentShaderShadingRateInterlockEXT", static_cast<SpvCapability>(5372)},
+        {"FPGAInvocationPipeliningAttributesINTEL", static_cast<SpvCapability>(5916)},
+        {"GroupNonUniform", static_cast<SpvCapability>(61)},
+        {"AtomicFloat16MinMaxEXT", static_cast<SpvCapability>(5616)},
+        {"FragmentShaderPixelInterlockEXT", static_cast<SpvCapability>(5378)},
+        {"AtomicStorage", static_cast<SpvCapability>(21)},
+        {"RayQueryKHR", static_cast<SpvCapability>(4472)},
+        {"TextureBoxFilterQCOM", static_cast<SpvCapability>(4485)},
+        {"GroupNonUniformBallot", static_cast<SpvCapability>(64)},
+        {"ShaderViewportMaskNV", static_cast<SpvCapability>(5255)},
+        {"WorkgroupMemoryExplicitLayout16BitAccessKHR", static_cast<SpvCapability>(4430)},
+        {"AtomicFloat32AddEXT", static_cast<SpvCapability>(6033)},
         {"LoopFuseINTEL", static_cast<SpvCapability>(5906)},
+        {"DerivativeControl", static_cast<SpvCapability>(51)},
+        {"FunctionFloatControlINTEL", static_cast<SpvCapability>(5821)},
+        {"RayTracingMotionBlurNV", static_cast<SpvCapability>(5341)},
+        {"FragmentMaskAMD", static_cast<SpvCapability>(5010)},
+        {"Geometry", static_cast<SpvCapability>(2)},
+        {"SubgroupAvcMotionEstimationChromaINTEL", static_cast<SpvCapability>(5698)},
+        {"RayTraversalPrimitiveCullingKHR", static_cast<SpvCapability>(4478)},
+        {"TessellationPointSize", static_cast<SpvCapability>(23)},
+        {"Addresses", static_cast<SpvCapability>(4)},
+        {"SubgroupDispatch", static_cast<SpvCapability>(58)},
+        {"StorageBuffer16BitAccess", static_cast<SpvCapability>(4433)},
+        {"StorageUniformBufferBlock16", static_cast<SpvCapability>(4433)},
         {"ImageQuery", static_cast<SpvCapability>(50)},
+        {"InterpolationFunction", static_cast<SpvCapability>(52)},
+        {"UnstructuredLoopControlsINTEL", static_cast<SpvCapability>(5886)},
+        {"GeometryPointSize", static_cast<SpvCapability>(24)},
+        {"InputAttachmentArrayDynamicIndexingEXT", static_cast<SpvCapability>(5303)},
+        {"ShaderNonUniform", static_cast<SpvCapability>(5301)},
+        {"StorageImageReadWithoutFormat", static_cast<SpvCapability>(55)},
+        {"GroupNonUniformShuffle", static_cast<SpvCapability>(65)},
+        {"WorkgroupMemoryExplicitLayout8BitAccessKHR", static_cast<SpvCapability>(4429)},
+        {"GroupNonUniformQuad", static_cast<SpvCapability>(68)},
+        {"Float16", static_cast<SpvCapability>(9)},
+        {"ClipDistance", static_cast<SpvCapability>(32)},
+        {"SignedZeroInfNanPreserve", static_cast<SpvCapability>(4466)},
+        {"ImageReadWrite", static_cast<SpvCapability>(14)},
+        {"Kernel", static_cast<SpvCapability>(6)},
+        {"RayQueryPositionFetchKHR", static_cast<SpvCapability>(5391)},
+        {"BindlessTextureNV", static_cast<SpvCapability>(5390)},
+        {"ImageGatherBiasLodAMD", static_cast<SpvCapability>(5009)},
+        {"StorageImageExtendedFormats", static_cast<SpvCapability>(49)},
+        {"FPGARegINTEL", static_cast<SpvCapability>(5948)},
+        {"Matrix", static_cast<SpvCapability>(0)},
+        {"StorageImageMultisample", static_cast<SpvCapability>(27)},
+        {"Float16Buffer", static_cast<SpvCapability>(8)},
+        {"SampledCubeArray", static_cast<SpvCapability>(45)},
+        {"DebugInfoModuleINTEL", static_cast<SpvCapability>(6114)},
+        {"MinLod", static_cast<SpvCapability>(42)},
+        {"RayQueryProvisionalKHR", static_cast<SpvCapability>(4471)},
+        {"ExpectAssumeKHR", static_cast<SpvCapability>(5629)},
+        {"Vector16", static_cast<SpvCapability>(7)},
+        {"RuntimeDescriptorArrayEXT", static_cast<SpvCapability>(5302)},
+        {"SubgroupAvcMotionEstimationIntraINTEL", static_cast<SpvCapability>(5697)},
+        {"ImageReadWriteLodAMD", static_cast<SpvCapability>(5015)},
+        {"ShaderNonUniformEXT", static_cast<SpvCapability>(5301)},
+        {"SubgroupImageBlockIOINTEL", static_cast<SpvCapability>(5570)},
+        {"FPGALatencyControlINTEL", static_cast<SpvCapability>(6171)},
+        {"FPGAMemoryAttributesINTEL", static_cast<SpvCapability>(5824)},
+        {"SampleMaskPostDepthCoverage", static_cast<SpvCapability>(4447)},
+        {"InputAttachment", static_cast<SpvCapability>(40)},
+        {"SampledBuffer", static_cast<SpvCapability>(46)},
+        {"FPGAKernelAttributesINTEL", static_cast<SpvCapability>(5897)},
+        {"CoreBuiltinsARM", static_cast<SpvCapability>(4165)},
+        {"DotProductInput4x8BitPacked", static_cast<SpvCapability>(6018)},
+        {"FragmentDensityEXT", static_cast<SpvCapability>(5291)},
+        {"Int64ImageEXT", static_cast<SpvCapability>(5016)},
+        {"MeshShadingNV", static_cast<SpvCapability>(5266)},
+        {"StorageTexelBufferArrayNonUniformIndexing", static_cast<SpvCapability>(5312)},
+        {"FloatingPointModeINTEL", static_cast<SpvCapability>(5583)},
+        {"RayTracingNV", static_cast<SpvCapability>(5340)},
+        {"VectorComputeINTEL", static_cast<SpvCapability>(5617)},
+        {"CooperativeMatrixKHR", static_cast<SpvCapability>(6022)},
+        {"FPGAMemoryAccessesINTEL", static_cast<SpvCapability>(5898)},
+        {"RuntimeAlignedAttributeINTEL", static_cast<SpvCapability>(5939)},
+        {"StorageBufferArrayDynamicIndexing", static_cast<SpvCapability>(30)},
+        {"Int64", static_cast<SpvCapability>(11)},
+        {"UniformAndStorageBuffer8BitAccess", static_cast<SpvCapability>(4449)},
+        {"RuntimeDescriptorArray", static_cast<SpvCapability>(5302)},
+        {"TileImageColorReadAccessEXT", static_cast<SpvCapability>(4166)},
+        {"UniformTexelBufferArrayDynamicIndexingEXT", static_cast<SpvCapability>(5304)},
+        {"BlockingPipesINTEL", static_cast<SpvCapability>(5945)},
+        {"VariableLengthArrayINTEL", static_cast<SpvCapability>(5817)},
+        {"SubgroupImageMediaBlockIOINTEL", static_cast<SpvCapability>(5579)},
+        {"Tessellation", static_cast<SpvCapability>(3)},
+        {"SampleMaskOverrideCoverageNV", static_cast<SpvCapability>(5249)},
+        {"ImageBuffer", static_cast<SpvCapability>(47)},
+        {"Linkage", static_cast<SpvCapability>(5)},
+        {"USMStorageClassesINTEL", static_cast<SpvCapability>(5935)},
+        {"ComputeDerivativeGroupLinearNV", static_cast<SpvCapability>(5350)},
+        {"StorageImageArrayNonUniformIndexing", static_cast<SpvCapability>(5309)},
+        {"StorageImageArrayNonUniformIndexingEXT", static_cast<SpvCapability>(5309)},
+        {"ImageRect", static_cast<SpvCapability>(36)},
+        {"Float16ImageAMD", static_cast<SpvCapability>(5008)},
+        {"SparseResidency", static_cast<SpvCapability>(41)},
+        {"NamedBarrier", static_cast<SpvCapability>(59)},
+        {"GenericPointer", static_cast<SpvCapability>(38)},
+        {"SubgroupBufferBlockIOINTEL", static_cast<SpvCapability>(5569)},
+        {"InputAttachmentArrayNonUniformIndexing", static_cast<SpvCapability>(5310)},
+        {"TransformFeedback", static_cast<SpvCapability>(53)},
+        {"AtomicFloat32MinMaxEXT", static_cast<SpvCapability>(5612)},
+        {"StorageBufferArrayNonUniformIndexing", static_cast<SpvCapability>(5308)},
+        {"CullDistance", static_cast<SpvCapability>(33)},
+        {"OptNoneINTEL", static_cast<SpvCapability>(6094)},
+        {"SampledImageArrayNonUniformIndexing", static_cast<SpvCapability>(5307)},
+        {"SubgroupBallotKHR", static_cast<SpvCapability>(4423)},
+        {"DrawParameters", static_cast<SpvCapability>(4427)},
+        {"ShaderStereoViewNV", static_cast<SpvCapability>(5259)},
+        {"ImageFootprintNV", static_cast<SpvCapability>(5282)},
+        {"StorageBuffer8BitAccess", static_cast<SpvCapability>(4448)},
+        {"UniformDecoration", static_cast<SpvCapability>(71)},
+        {"ShaderViewportIndexLayerEXT", static_cast<SpvCapability>(5254)},
+        {"BitInstructions", static_cast<SpvCapability>(6025)},
+        {"GroupNonUniformRotateKHR", static_cast<SpvCapability>(6026)},
+        {"PerViewAttributesNV", static_cast<SpvCapability>(5260)},
+        {"Sampled1D", static_cast<SpvCapability>(43)},
+        {"ArbitraryPrecisionFloatingPointINTEL", static_cast<SpvCapability>(5845)},
+        {"VectorAnyINTEL", static_cast<SpvCapability>(5619)},
+        {"PipeStorage", static_cast<SpvCapability>(60)},
+        {"DemoteToHelperInvocation", static_cast<SpvCapability>(5379)},
+        {"DenormFlushToZero", static_cast<SpvCapability>(4465)},
+        {"Float64", static_cast<SpvCapability>(10)},
+        {"VulkanMemoryModelDeviceScope", static_cast<SpvCapability>(5346)},
+        {"IndirectReferencesINTEL", static_cast<SpvCapability>(5604)},
+        {"DotProductKHR", static_cast<SpvCapability>(6019)},
+        {"UniformBufferArrayDynamicIndexing", static_cast<SpvCapability>(28)},
+        {"InputAttachmentArrayNonUniformIndexingEXT", static_cast<SpvCapability>(5310)},
+        {"LiteralSampler", static_cast<SpvCapability>(20)},
+        {"SubgroupShuffleINTEL", static_cast<SpvCapability>(5568)},
+        {"InputAttachmentArrayDynamicIndexing", static_cast<SpvCapability>(5303)},
+        {"GeometryShaderPassthroughNV", static_cast<SpvCapability>(5251)},
+        {"Int16", static_cast<SpvCapability>(22)},
+        {"StoragePushConstant16", static_cast<SpvCapability>(4435)},
+        {"GeometryStreams", static_cast<SpvCapability>(54)},
+        {"VulkanMemoryModelDeviceScopeKHR", static_cast<SpvCapability>(5346)},
+        {"ShaderInvocationReorderNV", static_cast<SpvCapability>(5383)},
+        {"FPGABufferLocationINTEL", static_cast<SpvCapability>(5920)},
+        {"WorkgroupMemoryExplicitLayoutKHR", static_cast<SpvCapability>(4428)},
+        {"GroupNonUniformClustered", static_cast<SpvCapability>(67)},
+        {"FunctionPointersINTEL", static_cast<SpvCapability>(5603)},
+        {"Image1D", static_cast<SpvCapability>(44)},
+        {"DotProductInputAllKHR", static_cast<SpvCapability>(6016)},
+        {"BFloat16ConversionINTEL", static_cast<SpvCapability>(6115)},
+        {"ImageMipmap", static_cast<SpvCapability>(15)},
+        {"KernelAttributesINTEL", static_cast<SpvCapability>(5892)},
+        {"TextureSampleWeightedQCOM", static_cast<SpvCapability>(4484)},
+        {"IOPipesINTEL", static_cast<SpvCapability>(5943)},
+        {"MultiView", static_cast<SpvCapability>(4439)},
+        {"RayTracingPositionFetchKHR", static_cast<SpvCapability>(5336)},
+        {"StorageTexelBufferArrayDynamicIndexing", static_cast<SpvCapability>(5305)},
+        {"UniformTexelBufferArrayNonUniformIndexingEXT", static_cast<SpvCapability>(5311)},
+        {"AtomicFloat64MinMaxEXT", static_cast<SpvCapability>(5613)},
+        {"StencilExportEXT", static_cast<SpvCapability>(5013)},
+        {"RayTracingKHR", static_cast<SpvCapability>(4479)},
+        {"DenormPreserve", static_cast<SpvCapability>(4464)},
+        {"RayTracingOpacityMicromapEXT", static_cast<SpvCapability>(5381)},
+        {"ArbitraryPrecisionIntegersINTEL", static_cast<SpvCapability>(5844)},
+        {"TileImageDepthReadAccessEXT", static_cast<SpvCapability>(4167)},
+        {"SplitBarrierINTEL", static_cast<SpvCapability>(6141)},
+        {"RayCullMaskKHR", static_cast<SpvCapability>(6020)},
+        {"ImageCubeArray", static_cast<SpvCapability>(34)},
+        {"FragmentBarycentricNV", static_cast<SpvCapability>(5284)},
     };
 
     static const auto hash = [](const UnownedStringSlice& str, UInt32 salt){
-        return combineHash(getHashCode(str), getHashCode(salt)) % 245;
+        UInt32 h = salt;
+        for (const char c : str)
+            h = (h * 0x01000193) ^ c;
+        return h % 245;
     };
 
     const auto i = hash(str, tableSalt[hash(str, 0)]);
@@ -1086,1022 +1092,1025 @@ static bool lookupSpvCapability(const UnownedStringSlice& str, SpvCapability& va
     }
 }
 
-static bool lookupSpvWord(const UnownedStringSlice& str, SpvWord& value)
+static bool lookupEnumWithTypePrefix(const UnownedStringSlice& str, SpvWord& value)
 {
     static const unsigned tableSalt[944] = {
-        3, 4, 2, 0, 0, 1, 2, 1, 1, 1, 2, 3, 7, 1, 2, 1,
-        0, 0, 0, 0, 0, 0, 0, 3, 0, 3, 2, 1, 0, 0, 0, 1,
-        1, 1, 0, 9, 1, 0, 6, 3, 4, 4, 0, 1, 3, 3, 5, 3,
-        4, 4, 2, 1, 0, 2, 17, 7, 1, 1, 4, 1, 2, 1, 0, 1,
-        3, 6, 2, 1, 1, 0, 1, 1, 1, 0, 2, 3, 1, 1, 0, 1,
-        0, 2, 0, 3, 0, 9, 0, 3, 0, 2, 2, 3, 0, 2, 0, 1,
-        0, 0, 0, 0, 2, 1, 4, 1, 0, 1, 0, 0, 3, 0, 1, 4,
-        4, 1, 0, 0, 0, 0, 1, 0, 2, 1, 0, 1, 5, 0, 1, 0,
-        1, 0, 1, 6, 2, 1, 0, 6, 1, 0, 3, 0, 5, 2, 10, 0,
-        1, 5, 1, 0, 2, 1, 0, 0, 2, 1, 0, 1, 0, 1, 0, 2,
-        3, 0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 5, 2, 0, 1, 5,
-        0, 0, 6, 3, 2, 0, 1, 1, 5, 4, 0, 0, 0, 0, 0, 0,
-        0, 3, 5, 0, 1, 1, 3, 2, 0, 0, 3, 2, 0, 2, 0, 2,
-        0, 2, 0, 3, 0, 0, 0, 6, 0, 0, 1, 1, 6, 4, 2, 2,
-        0, 1, 1, 0, 1, 0, 3, 0, 2, 0, 1, 0, 0, 4, 1, 0,
-        1, 7, 0, 5, 9, 0, 0, 0, 1, 5, 4, 0, 2, 5, 0, 0,
-        7, 0, 6, 2, 2, 0, 5, 1, 5, 2, 1, 4, 4, 0, 2, 7,
-        0, 5, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 1, 0, 2, 1,
-        3, 0, 0, 0, 3, 0, 1, 8, 2, 0, 1, 2, 2, 2, 3, 0,
-        1, 0, 6, 2, 8, 3, 4, 3, 0, 1, 0, 0, 1, 0, 1, 2,
-        4, 0, 0, 0, 0, 0, 1, 0, 6, 0, 0, 4, 1, 0, 1, 0,
-        0, 4, 3, 2, 1, 0, 0, 1, 0, 3, 0, 6, 4, 0, 1, 1,
-        8, 1, 6, 5, 0, 0, 0, 3, 0, 0, 1, 2, 0, 1, 1, 0,
-        1, 0, 0, 1, 0, 2, 0, 3, 2, 0, 1, 4, 2, 21, 0, 6,
-        3, 2, 8, 0, 3, 2, 0, 1, 4, 0, 2, 3, 2, 2, 1, 2,
-        1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 4, 9, 4, 1, 2, 1,
-        0, 4, 1, 3, 0, 0, 1, 6, 1, 9, 4, 11, 15, 0, 0, 0,
-        1, 1, 0, 0, 1, 0, 2, 1, 0, 0, 5, 0, 1, 2, 3, 1,
-        3, 0, 0, 1, 3, 9, 0, 3, 1, 0, 0, 0, 0, 3, 0, 1,
-        0, 1, 0, 1, 0, 0, 2, 6, 9, 6, 3, 0, 3, 3, 5, 0,
-        0, 1, 0, 0, 2, 0, 1, 4, 3, 0, 5, 1, 0, 0, 1, 8,
-        1, 0, 0, 0, 2, 1, 0, 10, 1, 3, 16, 2, 1, 0, 0, 0,
-        0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 3, 3, 7, 1, 0, 0,
-        15, 1, 0, 2, 8, 3, 7, 0, 0, 0, 1, 3, 0, 4, 0, 1,
-        7, 4, 2, 3, 0, 6, 2, 2, 7, 0, 3, 4, 1, 0, 4, 0,
-        10, 6, 4, 19, 0, 10, 0, 2, 0, 0, 2, 1, 6, 2, 8, 0,
-        0, 2, 9, 26, 0, 2, 5, 0, 28, 0, 0, 0, 10, 1, 0, 0,
-        1, 1, 2, 0, 0, 1, 4, 2, 5, 2, 13, 12, 0, 0, 0, 8,
-        0, 6, 1, 11, 1, 1, 0, 4, 3, 2, 0, 0, 17, 13, 1, 0,
-        4, 2, 1, 10, 17, 9, 26, 2, 8, 1, 0, 25, 4, 5, 0, 0,
-        1, 1, 3, 1, 19, 1, 0, 0, 4, 0, 0, 0, 2, 5, 2, 0,
-        3, 0, 8, 0, 0, 5, 9, 4, 0, 0, 3, 0, 1, 10, 1, 0,
-        2, 0, 0, 5, 1, 4, 0, 3, 0, 17, 4, 0, 1, 3, 3, 2,
-        0, 3, 16, 0, 8, 3, 0, 0, 0, 1, 4, 2, 14, 1, 6, 0,
-        0, 0, 0, 12, 3, 0, 0, 35, 1, 15, 2, 0, 0, 15, 0, 0,
-        11, 5, 2, 0, 6, 20, 2, 0, 0, 2, 0, 2, 0, 17, 17, 0,
-        0, 27, 8, 0, 2, 4, 8, 1, 9, 2, 1, 13, 1, 47, 16, 2,
-        0, 1, 1, 0, 7, 8, 18, 5, 8, 6, 0, 3, 1, 6, 24, 0,
-        1, 7, 14, 0, 1, 19, 0, 3, 0, 33, 0, 10, 21, 8, 4, 8,
-        3, 9, 18, 2, 0, 3, 0, 0, 0, 2, 0, 5, 3, 8, 1, 0,
-        46, 14, 7, 10, 26, 33, 0, 26, 3, 1, 33, 0, 17, 8, 86, 11,
-        7, 16, 0, 38, 9, 10, 1, 0, 31, 10, 5, 16, 67, 8, 1, 17,
-        4, 9, 0, 0, 0, 29, 2, 13, 0, 0, 0, 1, 6, 54, 26, 0,
-        6, 0, 11, 3, 0, 9, 0, 0, 60, 18, 92, 4, 5, 2, 3, 5,
-        0, 12, 0, 80, 25, 0, 0, 3, 1, 1, 0, 1, 0, 9, 19, 8,
-        0, 8, 0, 46, 0, 1, 36, 32, 40, 1, 134, 0, 3, 68, 24, 0,
-        0, 0, 8, 116, 7, 50, 58, 0, 0, 254, 7, 0, 0, 96, 0, 0,
-        22, 0, 0, 45, 0, 35, 0, 0, 78, 0, 5, 3, 32, 120, 66, 5,
-        1, 0, 262, 0, 8, 0, 421, 0, 0, 0, 21, 0, 4, 682, 0, 571
+        0, 2, 0, 4, 3, 1, 1, 3, 0, 2, 1, 3, 1, 0, 0, 2,
+        0, 1, 1, 7, 0, 0, 1, 0, 2, 0, 0, 0, 3, 1, 1, 0,
+        12, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 2, 0, 2, 1,
+        0, 5, 0, 3, 5, 4, 1, 0, 0, 8, 3, 0, 1, 0, 1, 8,
+        0, 9, 0, 0, 11, 3, 2, 0, 6, 0, 2, 3, 0, 5, 0, 0,
+        0, 1, 1, 0, 1, 0, 0, 4, 1, 1, 0, 0, 0, 1, 0, 2,
+        6, 0, 0, 0, 1, 6, 2, 1, 1, 0, 0, 5, 0, 1, 3, 1,
+        0, 2, 0, 1, 1, 3, 1, 5, 0, 5, 1, 2, 1, 0, 2, 0,
+        0, 0, 0, 0, 0, 0, 6, 3, 1, 2, 3, 6, 4, 0, 2, 0,
+        1, 1, 2, 4, 4, 0, 1, 0, 1, 1, 1, 0, 0, 0, 4, 1,
+        1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 9, 0, 1,
+        2, 1, 0, 2, 3, 0, 0, 0, 1, 3, 1, 5, 0, 6, 3, 0,
+        7, 2, 0, 0, 1, 2, 0, 3, 1, 5, 2, 1, 1, 5, 1, 0,
+        1, 0, 4, 0, 3, 8, 0, 6, 0, 0, 0, 2, 3, 3, 7, 1,
+        1, 0, 1, 2, 0, 1, 0, 4, 0, 1, 4, 2, 0, 0, 2, 0,
+        0, 0, 14, 1, 0, 2, 1, 0, 1, 1, 3, 0, 0, 0, 1, 0,
+        3, 0, 4, 1, 0, 0, 1, 0, 0, 0, 4, 6, 1, 0, 0, 0,
+        1, 3, 5, 6, 2, 3, 0, 6, 6, 1, 1, 0, 0, 2, 0, 1,
+        0, 1, 1, 9, 2, 2, 4, 3, 2, 0, 2, 0, 5, 9, 1, 2,
+        1, 2, 2, 0, 1, 1, 0, 0, 3, 2, 0, 0, 1, 1, 0, 3,
+        3, 1, 10, 0, 0, 4, 0, 0, 2, 0, 0, 4, 2, 3, 2, 4,
+        1, 0, 3, 1, 0, 3, 1, 3, 1, 3, 0, 0, 2, 0, 1, 0,
+        0, 1, 0, 2, 2, 0, 0, 7, 1, 1, 8, 0, 1, 6, 0, 2,
+        2, 3, 2, 1, 1, 0, 0, 3, 1, 1, 0, 0, 0, 2, 2, 1,
+        0, 0, 3, 1, 1, 1, 3, 3, 0, 1, 2, 0, 1, 3, 5, 0,
+        0, 2, 2, 1, 8, 1, 12, 0, 2, 2, 17, 4, 0, 1, 1, 1,
+        11, 3, 1, 2, 4, 5, 1, 0, 4, 3, 3, 1, 1, 2, 1, 5,
+        3, 1, 3, 1, 5, 2, 2, 0, 5, 0, 1, 0, 1, 3, 1, 2,
+        2, 0, 0, 2, 5, 0, 0, 2, 8, 2, 8, 0, 3, 1, 0, 4,
+        0, 0, 1, 3, 1, 2, 0, 2, 2, 13, 0, 4, 0, 3, 3, 0,
+        2, 5, 1, 3, 5, 7, 2, 7, 1, 0, 13, 0, 3, 2, 1, 22,
+        0, 3, 2, 4, 0, 1, 2, 5, 0, 2, 0, 2, 0, 5, 0, 0,
+        0, 0, 1, 17, 0, 1, 11, 0, 5, 2, 0, 0, 4, 1, 17, 0,
+        0, 0, 1, 2, 5, 0, 0, 1, 1, 1, 26, 1, 5, 0, 1, 0,
+        1, 2, 0, 5, 5, 12, 1, 11, 17, 1, 2, 5, 0, 3, 11, 0,
+        5, 1, 5, 5, 3, 0, 0, 3, 1, 0, 4, 1, 8, 1, 8, 0,
+        0, 22, 1, 0, 3, 8, 1, 9, 4, 1, 0, 10, 0, 12, 1, 0,
+        11, 0, 0, 3, 42, 4, 0, 2, 0, 1, 4, 0, 11, 1, 4, 8,
+        14, 3, 0, 1, 6, 17, 1, 2, 15, 0, 10, 1, 0, 14, 2, 12,
+        0, 2, 0, 1, 6, 0, 13, 2, 1, 0, 7, 0, 6, 7, 0, 0,
+        14, 1, 7, 3, 2, 0, 1, 0, 7, 0, 1, 2, 0, 22, 0, 6,
+        0, 12, 3, 3, 4, 0, 10, 0, 0, 0, 2, 0, 4, 0, 0, 26,
+        1, 1, 0, 9, 0, 9, 10, 4, 3, 0, 4, 0, 20, 0, 0, 3,
+        10, 4, 14, 13, 10, 0, 15, 1, 0, 21, 1, 0, 22, 2, 3, 0,
+        0, 0, 10, 17, 0, 3, 1, 1, 0, 0, 1, 11, 4, 0, 2, 3,
+        0, 7, 23, 6, 0, 17, 0, 18, 0, 20, 2, 0, 0, 0, 4, 1,
+        0, 0, 1, 0, 0, 4, 5, 0, 4, 1, 7, 0, 3, 3, 1, 5,
+        3, 10, 11, 0, 16, 1, 0, 8, 6, 4, 0, 7, 0, 33, 1, 0,
+        1, 18, 0, 0, 16, 6, 14, 34, 10, 28, 0, 0, 1, 1, 0, 7,
+        4, 0, 2, 1, 1, 5, 0, 0, 2, 0, 31, 41, 0, 9, 10, 0,
+        0, 0, 9, 0, 0, 12, 9, 0, 0, 0, 19, 4, 0, 4, 0, 10,
+        0, 0, 21, 13, 0, 6, 1, 19, 0, 7, 6, 0, 0, 1, 4, 3,
+        0, 16, 0, 8, 32, 8, 0, 9, 0, 9, 10, 0, 2, 0, 10, 20,
+        45, 5, 2, 2, 0, 5, 2, 0, 31, 1, 1, 73, 30, 64, 19, 8,
+        2, 108, 7, 16, 5, 15, 4, 1, 20, 36, 1, 44, 0, 3, 3, 8,
+        0, 0, 0, 10, 32, 30, 0, 41, 0, 0, 29, 3, 0, 0, 15, 100,
+        0, 4, 1, 29, 11, 64, 105, 125, 0, 0, 0, 38, 115, 1, 1, 1,
+        0, 11, 21, 66, 1, 79, 4, 0, 0, 141, 1, 0, 0, 0, 0, 0,
+        530, 0, 8, 31, 3, 1, 0, 13, 0, 0, 6, 286, 14, 16, 134, 259
     };
 
     using KV = std::pair<const char*, SpvWord>;
 
     static const KV words[944] =
     {
-        {"ExecutionModeDepthReplacing", SpvWord{12}},
-        {"CapabilityImageMipmap", SpvWord{15}},
-        {"MemorySemanticsOutputMemory", SpvWord{4096}},
-        {"BuiltInWorldToObjectNV", SpvWord{5331}},
-        {"DecorationMediaBlockIOINTEL", SpvWord{6140}},
-        {"CapabilityStorageUniformBufferBlock16", SpvWord{4433}},
-        {"DecorationPerPrimitiveEXT", SpvWord{5271}},
-        {"StorageClassIncomingRayPayloadKHR", SpvWord{5342}},
-        {"QuantizationModesRND", SpvWord{2}},
-        {"ImageChannelOrderR", SpvWord{0}},
-        {"LoopControlMaxInterleavingINTEL", SpvWord{2097152}},
-        {"CapabilityStorageImageReadWithoutFormat", SpvWord{55}},
-        {"StorageClassRayPayloadKHR", SpvWord{5338}},
-        {"ImageChannelOrderBGRA", SpvWord{6}},
-        {"LoopControlMinIterations", SpvWord{16}},
-        {"CapabilityTileImageColorReadAccessEXT", SpvWord{4166}},
-        {"CapabilityStorageInputOutput16", SpvWord{4436}},
-        {"MemorySemanticsWorkgroupMemory", SpvWord{256}},
-        {"RayFlagsSkipClosestHitShaderKHR", SpvWord{8}},
-        {"CapabilityLiteralSampler", SpvWord{20}},
-        {"CapabilityUniformBufferArrayDynamicIndexing", SpvWord{28}},
-        {"BuiltInRayTminNV", SpvWord{5325}},
-        {"FPDenormModeFlushToZero", SpvWord{1}},
-        {"StorageClassTaskPayloadWorkgroupEXT", SpvWord{5402}},
-        {"ExecutionModeNonCoherentDepthAttachmentReadEXT", SpvWord{4170}},
-        {"BuiltInSubgroupGeMask", SpvWord{4417}},
-        {"ExecutionModeInputTrianglesAdjacency", SpvWord{23}},
-        {"CapabilityFloat64", SpvWord{10}},
-        {"ImageChannelDataTypeSnormInt16", SpvWord{1}},
-        {"BuiltInBaryCoordNoPerspKHR", SpvWord{5287}},
-        {"DecorationAliasedPointer", SpvWord{5356}},
-        {"ImageFormatRgba16f", SpvWord{2}},
-        {"BuiltInMeshViewCountNV", SpvWord{5280}},
-        {"RayFlagsCullNoOpaqueKHR", SpvWord{128}},
-        {"StorageClassRayPayloadNV", SpvWord{5338}},
-        {"SourceLanguageESSL", SpvWord{1}},
-        {"StorageClassHitAttributeNV", SpvWord{5339}},
-        {"ExecutionModelIntersectionNV", SpvWord{5314}},
-        {"DecorationArrayStride", SpvWord{6}},
-        {"CapabilityFPFastMathModeINTEL", SpvWord{5837}},
-        {"RayFlagsCullBackFacingTrianglesKHR", SpvWord{16}},
-        {"BuiltInViewIndex", SpvWord{4440}},
-        {"BuiltInPointSize", SpvWord{1}},
-        {"DecorationCPacked", SpvWord{10}},
-        {"OverflowModesWRAP", SpvWord{0}},
-        {"CapabilitySubgroupBallotKHR", SpvWord{4423}},
-        {"CapabilityVulkanMemoryModel", SpvWord{5345}},
-        {"RayFlagsNoOpaqueKHR", SpvWord{2}},
-        {"CapabilityGroupNonUniformShuffle", SpvWord{65}},
-        {"BuiltInLayer", SpvWord{9}},
-        {"ImageFormatRgba32ui", SpvWord{30}},
-        {"PackedVectorFormatPackedVectorFormat4x8Bit", SpvWord{0}},
-        {"StorageClassShaderRecordBufferKHR", SpvWord{5343}},
-        {"FunctionParameterAttributeNoReadWrite", SpvWord{7}},
-        {"ImageFormatR8", SpvWord{15}},
-        {"DecorationUserTypeGOOGLE", SpvWord{5636}},
-        {"BuiltInMeshViewIndicesNV", SpvWord{5281}},
-        {"FPOperationModeIEEE", SpvWord{0}},
-        {"CapabilityUniformAndStorageBuffer8BitAccess", SpvWord{4449}},
-        {"RayFlagsOpaqueKHR", SpvWord{1}},
-        {"CapabilityInt64", SpvWord{11}},
-        {"CapabilityFPGAKernelAttributesINTEL", SpvWord{5897}},
-        {"StorageClassOutput", SpvWord{3}},
-        {"BuiltInSubgroupLocalInvocationId", SpvWord{41}},
-        {"CapabilityUniformTexelBufferArrayNonUniformIndexingEXT", SpvWord{5311}},
-        {"BuiltInSampleMask", SpvWord{20}},
-        {"BuiltInObjectToWorldNV", SpvWord{5330}},
-        {"ImageFormatRgba16Snorm", SpvWord{16}},
-        {"BuiltInCullDistancePerViewNV", SpvWord{5278}},
-        {"ExecutionModelClosestHitKHR", SpvWord{5316}},
-        {"CapabilityImageReadWrite", SpvWord{14}},
-        {"CapabilityDenormPreserve", SpvWord{4464}},
-        {"CapabilitySampleMaskOverrideCoverageNV", SpvWord{5249}},
-        {"RayQueryCommittedIntersectionTypeRayQueryCommittedIntersectionGeneratedKHR", SpvWord{2}},
-        {"CapabilitySampledImageArrayDynamicIndexing", SpvWord{29}},
-        {"CapabilitySampledRect", SpvWord{37}},
-        {"FunctionParameterAttributeNoAlias", SpvWord{4}},
-        {"CapabilityAtomicFloat16MinMaxEXT", SpvWord{5616}},
-        {"SamplerAddressingModeRepeatMirrored", SpvWord{4}},
-        {"StorageClassUniformConstant", SpvWord{0}},
-        {"CapabilityLongConstantCompositeINTEL", SpvWord{6089}},
-        {"DecorationXfbBuffer", SpvWord{36}},
-        {"DecorationWeightTextureQCOM", SpvWord{4487}},
-        {"ImageFormatR16", SpvWord{14}},
-        {"AddressingModelPhysicalStorageBuffer64", SpvWord{5348}},
-        {"BuiltInCullPrimitiveEXT", SpvWord{5299}},
-        {"ImageFormatRg32i", SpvWord{25}},
-        {"DecorationNonWritable", SpvWord{24}},
-        {"DecorationRestrict", SpvWord{19}},
-        {"BuiltInWorldRayOriginKHR", SpvWord{5321}},
-        {"CapabilityGeometryShaderPassthroughNV", SpvWord{5251}},
-        {"DecorationIndex", SpvWord{32}},
-        {"CooperativeMatrixOperandsNoneKHR", SpvWord{0}},
-        {"ExecutionModeSubgroupsPerWorkgroup", SpvWord{36}},
-        {"ExecutionModeSubgroupsPerWorkgroupId", SpvWord{37}},
-        {"DecorationSideEffectsINTEL", SpvWord{5608}},
-        {"SourceLanguageOpenCL_C", SpvWord{3}},
-        {"BuiltInObjectToWorldKHR", SpvWord{5330}},
-        {"BuiltInInstanceCustomIndexNV", SpvWord{5327}},
-        {"ImageOperandsVolatileTexelKHR", SpvWord{2048}},
-        {"BuiltInGlobalOffset", SpvWord{33}},
-        {"ExecutionModeLocalSize", SpvWord{17}},
-        {"ImageChannelOrderRA", SpvWord{3}},
-        {"ExecutionModeSampleInterlockOrderedEXT", SpvWord{5368}},
-        {"BuiltInSubgroupLtMask", SpvWord{4420}},
-        {"CapabilityDotProductInput4x8Bit", SpvWord{6017}},
-        {"DecorationMMHostInterfaceAddressWidthINTEL", SpvWord{6177}},
-        {"CapabilityMultiView", SpvWord{4439}},
-        {"MemoryAccessMakePointerAvailable", SpvWord{8}},
-        {"ExecutionModePointMode", SpvWord{10}},
-        {"BuiltInWorldRayDirectionKHR", SpvWord{5322}},
-        {"ExecutionModeSpacingEqual", SpvWord{1}},
-        {"DecorationHlslCounterBufferGOOGLE", SpvWord{5634}},
-        {"DecorationNoUnsignedWrap", SpvWord{4470}},
-        {"SourceLanguageHERO_C", SpvWord{8}},
-        {"FragmentShadingRateHorizontal4Pixels", SpvWord{8}},
-        {"AddressingModelPhysicalStorageBuffer64EXT", SpvWord{5348}},
-        {"CapabilityImageMSArray", SpvWord{48}},
-        {"SourceLanguageHLSL", SpvWord{5}},
-        {"BuiltInLaunchSizeNV", SpvWord{5320}},
-        {"MemorySemanticsAcquire", SpvWord{2}},
-        {"MemoryAccessNonPrivatePointer", SpvWord{32}},
-        {"DecorationPerVertexNV", SpvWord{5285}},
-        {"CapabilityIndirectReferencesINTEL", SpvWord{5604}},
-        {"ImageOperandsNontemporal", SpvWord{16384}},
-        {"ExecutionModelKernel", SpvWord{6}},
-        {"QuantizationModesTRN", SpvWord{0}},
-        {"DecorationStallEnableINTEL", SpvWord{5905}},
-        {"MemoryModelOpenCL", SpvWord{2}},
-        {"ImageOperandsMakeTexelAvailableKHR", SpvWord{256}},
-        {"DecorationDoublepumpINTEL", SpvWord{5831}},
-        {"SourceLanguageSYCL", SpvWord{7}},
-        {"ImageChannelOrdersRGBA", SpvWord{17}},
-        {"CapabilityShader", SpvWord{1}},
-        {"ImageChannelOrderRGB", SpvWord{4}},
-        {"DecorationRegisterINTEL", SpvWord{5825}},
-        {"FPFastMathModeNotNaN", SpvWord{1}},
-        {"FPFastMathModeAllowContractFastINTEL", SpvWord{65536}},
-        {"FPRoundingModeRTE", SpvWord{0}},
-        {"CapabilityShaderClockKHR", SpvWord{5055}},
-        {"ImageOperandsMakeTexelAvailable", SpvWord{256}},
-        {"DecorationAliased", SpvWord{20}},
-        {"DecorationSimpleDualPortINTEL", SpvWord{5833}},
-        {"CapabilityAtomicFloat32AddEXT", SpvWord{6033}},
-        {"ExecutionModeLocalSizeHintId", SpvWord{39}},
-        {"CapabilityGroupUniformArithmeticKHR", SpvWord{6400}},
-        {"DecorationCounterBuffer", SpvWord{5634}},
-        {"ImageOperandsVolatileTexel", SpvWord{2048}},
-        {"CapabilityGroupNonUniformVote", SpvWord{62}},
-        {"BuiltInPatchVertices", SpvWord{14}},
-        {"CapabilityUniformBufferArrayNonUniformIndexingEXT", SpvWord{5306}},
-        {"MemorySemanticsAcquireRelease", SpvWord{8}},
-        {"CapabilityShaderViewportIndexLayerNV", SpvWord{5254}},
-        {"ImageChannelOrderRGBA", SpvWord{5}},
-        {"StorageClassDeviceOnlyINTEL", SpvWord{5936}},
-        {"CapabilityGroupNonUniform", SpvWord{61}},
-        {"BuiltInWorldToObjectKHR", SpvWord{5331}},
-        {"BuiltInRayTminKHR", SpvWord{5325}},
-        {"FPFastMathModeNotInf", SpvWord{2}},
-        {"BuiltInSubgroupLtMaskKHR", SpvWord{4420}},
-        {"ExecutionModeSpacingFractionalOdd", SpvWord{3}},
-        {"ImageOperandsOffsets", SpvWord{65536}},
-        {"DecorationHlslSemanticGOOGLE", SpvWord{5635}},
-        {"CapabilityTransformFeedback", SpvWord{53}},
-        {"CapabilityVariablePointers", SpvWord{4442}},
-        {"ImageChannelDataTypeSignedInt8", SpvWord{7}},
-        {"QuantizationModesRND_MIN_INF", SpvWord{5}},
-        {"CapabilityAtomicStorage", SpvWord{21}},
-        {"CapabilityStorageImageMultisample", SpvWord{27}},
-        {"BuiltInSampleId", SpvWord{18}},
-        {"CapabilitySubgroupAvcMotionEstimationChromaINTEL", SpvWord{5698}},
-        {"ImageChannelOrderRGBx", SpvWord{12}},
-        {"BuiltInCoreMaxIDARM", SpvWord{4162}},
-        {"SamplerAddressingModeClamp", SpvWord{2}},
-        {"DimSubpassData", SpvWord{6}},
-        {"FunctionControlOptNoneINTEL", SpvWord{65536}},
-        {"CapabilityImageGatherBiasLodAMD", SpvWord{5009}},
-        {"DecorationBlockMatchTextureQCOM", SpvWord{4488}},
-        {"BuiltInPrimitiveTriangleIndicesEXT", SpvWord{5296}},
-        {"DecorationNoAliasINTEL", SpvWord{5915}},
-        {"ExecutionModeRoundingModeRTNINTEL", SpvWord{5621}},
-        {"DecorationMathOpDSPModeINTEL", SpvWord{5909}},
-        {"StorageClassIncomingCallableDataNV", SpvWord{5329}},
-        {"CapabilitySplitBarrierINTEL", SpvWord{6141}},
-        {"DecorationComponent", SpvWord{31}},
-        {"KernelEnqueueFlagsNoWait", SpvWord{0}},
-        {"DecorationDescriptorSet", SpvWord{34}},
-        {"CapabilityFragmentShaderPixelInterlockEXT", SpvWord{5378}},
-        {"DecorationBuiltIn", SpvWord{11}},
-        {"ImageChannelDataTypeUnormInt24", SpvWord{15}},
-        {"ExecutionModeOutputLinesEXT", SpvWord{5269}},
-        {"CapabilityVariableLengthArrayINTEL", SpvWord{5817}},
-        {"ImageChannelDataTypeUnsignedIntRaw12EXT", SpvWord{20}},
-        {"CapabilitySubgroupDispatch", SpvWord{58}},
-        {"MemorySemanticsSequentiallyConsistent", SpvWord{16}},
-        {"DecorationExplicitInterpAMD", SpvWord{4999}},
-        {"DimCube", SpvWord{3}},
-        {"BuiltInObjectRayOriginKHR", SpvWord{5323}},
-        {"ImageFormatRg8Snorm", SpvWord{18}},
-        {"ExecutionModeMaxWorkDimINTEL", SpvWord{5894}},
-        {"DecorationPerViewNV", SpvWord{5272}},
-        {"CapabilityFloatingPointModeINTEL", SpvWord{5583}},
-        {"MemoryModelVulkanKHR", SpvWord{3}},
-        {"DecorationNonReadable", SpvWord{25}},
-        {"BuiltInSubgroupEqMask", SpvWord{4416}},
-        {"BuiltInHitTNV", SpvWord{5332}},
-        {"ExecutionModeInputLinesAdjacency", SpvWord{21}},
-        {"ImageFormatR32f", SpvWord{3}},
-        {"BuiltInTessLevelOuter", SpvWord{11}},
-        {"StorageClassHitAttributeKHR", SpvWord{5339}},
-        {"BuiltInPrimitiveId", SpvWord{7}},
-        {"DecorationPassthroughNV", SpvWord{5250}},
-        {"SelectionControlNone", SpvWord{0}},
-        {"DecorationColMajor", SpvWord{5}},
-        {"CapabilityImageBuffer", SpvWord{47}},
-        {"ImageFormatR32i", SpvWord{24}},
-        {"BuiltInRayGeometryIndexKHR", SpvWord{5352}},
-        {"MemorySemanticsVolatile", SpvWord{32768}},
-        {"CapabilityDotProductInput4x8BitKHR", SpvWord{6017}},
-        {"LoopControlNoFusionINTEL", SpvWord{8388608}},
-        {"CooperativeMatrixLayoutColumnMajorKHR", SpvWord{1}},
-        {"LinkageTypeLinkOnceODR", SpvWord{2}},
-        {"BuiltInPosition", SpvWord{0}},
-        {"LoopControlUnroll", SpvWord{1}},
-        {"CapabilityCooperativeMatrixNV", SpvWord{5357}},
-        {"ExecutionModeContractionOff", SpvWord{31}},
-        {"ExecutionModeInputLines", SpvWord{20}},
-        {"ExecutionModeOutputPoints", SpvWord{27}},
-        {"DecorationVectorComputeCallableFunctionINTEL", SpvWord{6087}},
-        {"CapabilitySampleRateShading", SpvWord{35}},
-        {"ImageOperandsSample", SpvWord{64}},
-        {"CapabilityInputAttachment", SpvWord{40}},
-        {"DecorationCoherent", SpvWord{23}},
-        {"DecorationFlat", SpvWord{14}},
-        {"DecorationVectorComputeFunctionINTEL", SpvWord{5626}},
-        {"CapabilityAtomicFloat32MinMaxEXT", SpvWord{5612}},
-        {"ImageOperandsOffset", SpvWord{16}},
-        {"CapabilityArbitraryPrecisionFixedPointINTEL", SpvWord{5922}},
-        {"BuiltInWorldRayOriginNV", SpvWord{5321}},
-        {"CapabilityGroups", SpvWord{18}},
-        {"CapabilityDotProduct", SpvWord{6019}},
-        {"ImageChannelOrderARGB", SpvWord{7}},
-        {"CapabilityCoreBuiltinsARM", SpvWord{4165}},
-        {"ExecutionModeEarlyAndLateFragmentTestsAMD", SpvWord{5017}},
-        {"MemoryAccessNontemporal", SpvWord{4}},
-        {"CapabilityFragmentShaderShadingRateInterlockEXT", SpvWord{5372}},
-        {"DecorationStream", SpvWord{29}},
-        {"CapabilityDebugInfoModuleINTEL", SpvWord{6114}},
-        {"CapabilityFragmentShadingRateKHR", SpvWord{4422}},
-        {"FunctionControlInline", SpvWord{1}},
-        {"ImageChannelOrderA", SpvWord{1}},
-        {"CapabilityFunctionFloatControlINTEL", SpvWord{5821}},
-        {"BuiltInSubgroupGtMaskKHR", SpvWord{4418}},
-        {"DecorationBankwidthINTEL", SpvWord{5828}},
-        {"DecorationGLSLShared", SpvWord{8}},
-        {"GroupOperationReduce", SpvWord{0}},
-        {"CapabilityClipDistance", SpvWord{32}},
-        {"ExecutionModeSchedulerTargetFmaxMhzINTEL", SpvWord{5903}},
-        {"DecorationMergeINTEL", SpvWord{5834}},
-        {"BuiltInFragStencilRefEXT", SpvWord{5014}},
-        {"RayFlagsSkipTrianglesKHR", SpvWord{256}},
-        {"DecorationVolatile", SpvWord{21}},
-        {"CapabilityWorkgroupMemoryExplicitLayoutKHR", SpvWord{4428}},
-        {"CapabilityAtomicFloat64AddEXT", SpvWord{6034}},
-        {"CapabilityStoragePushConstant16", SpvWord{4435}},
-        {"ExecutionModeStencilRefLessBackAMD", SpvWord{5084}},
-        {"BuiltInWarpsPerSMNV", SpvWord{5374}},
-        {"ExecutionModeOutputVertices", SpvWord{26}},
-        {"SourceLanguageGLSL", SpvWord{2}},
-        {"CapabilityDotProductInput4x8BitPacked", SpvWord{6018}},
-        {"DecorationAliasedPointerEXT", SpvWord{5356}},
-        {"CapabilityMatrix", SpvWord{0}},
-        {"DecorationFPRoundingMode", SpvWord{39}},
-        {"CapabilityMemoryAccessAliasingINTEL", SpvWord{5910}},
-        {"RayQueryCandidateIntersectionTypeRayQueryCandidateIntersectionTriangleKHR", SpvWord{0}},
-        {"CapabilityLinkage", SpvWord{5}},
-        {"ExecutionModeIsolines", SpvWord{25}},
-        {"ScopeInvocation", SpvWord{4}},
-        {"StorageClassHitObjectAttributeNV", SpvWord{5385}},
-        {"CapabilityRayTracingNV", SpvWord{5340}},
-        {"MemorySemanticsMakeVisible", SpvWord{16384}},
-        {"FunctionParameterAttributeNoWrite", SpvWord{6}},
-        {"ImageOperandsConstOffsets", SpvWord{32}},
-        {"FunctionControlDontInline", SpvWord{2}},
-        {"QuantizationModesRND_CONV", SpvWord{6}},
-        {"ExecutionModeRoundingModeRTZ", SpvWord{4463}},
-        {"ExecutionModeVertexOrderCcw", SpvWord{5}},
-        {"CapabilityFPGAMemoryAttributesINTEL", SpvWord{5824}},
-        {"CapabilityStorageTexelBufferArrayDynamicIndexingEXT", SpvWord{5305}},
-        {"ExecutionModelMissKHR", SpvWord{5317}},
-        {"CapabilityMeshShadingNV", SpvWord{5266}},
-        {"CapabilityVariablePointersStorageBuffer", SpvWord{4441}},
-        {"CapabilityRayTracingMotionBlurNV", SpvWord{5341}},
-        {"DecorationMaxByteOffset", SpvWord{45}},
-        {"StorageClassImage", SpvWord{11}},
-        {"DecorationMMHostInterfaceMaxBurstINTEL", SpvWord{6181}},
-        {"ImageChannelOrderABGR", SpvWord{19}},
-        {"CooperativeMatrixUseMatrixAKHR", SpvWord{0}},
-        {"ImageChannelDataTypeSignedInt16", SpvWord{8}},
-        {"StorageClassFunction", SpvWord{7}},
-        {"CapabilityRuntimeDescriptorArrayEXT", SpvWord{5302}},
-        {"RayQueryIntersectionRayQueryCommittedIntersectionKHR", SpvWord{1}},
-        {"DecorationUserSemantic", SpvWord{5635}},
-        {"ImageChannelDataTypeHalfFloat", SpvWord{13}},
-        {"DecorationMMHostInterfaceDataWidthINTEL", SpvWord{6178}},
-        {"ImageFormatR16i", SpvWord{28}},
-        {"ImageChannelOrderDepthStencil", SpvWord{14}},
-        {"DecorationRestrictPointer", SpvWord{5355}},
-        {"ImageFormatR64i", SpvWord{41}},
-        {"CooperativeMatrixOperandsMatrixCSignedComponentsKHR", SpvWord{4}},
-        {"CapabilityShaderInvocationReorderNV", SpvWord{5383}},
-        {"DecorationFunctionRoundingModeINTEL", SpvWord{5822}},
-        {"CapabilityTextureSampleWeightedQCOM", SpvWord{4484}},
-        {"ExecutionModeOutputTriangleStrip", SpvWord{29}},
-        {"BuiltInFragSizeEXT", SpvWord{5292}},
-        {"DecorationNonUniform", SpvWord{5300}},
-        {"DecorationClobberINTEL", SpvWord{5607}},
-        {"DecorationLatencyControlLabelINTEL", SpvWord{6172}},
-        {"CapabilityBFloat16ConversionINTEL", SpvWord{6115}},
-        {"MemoryAccessVolatile", SpvWord{1}},
-        {"DecorationBufferBlock", SpvWord{3}},
-        {"DecorationLocation", SpvWord{30}},
-        {"DecorationUniform", SpvWord{26}},
-        {"CapabilityUniformTexelBufferArrayDynamicIndexing", SpvWord{5304}},
-        {"CapabilityStorageBuffer16BitAccess", SpvWord{4433}},
-        {"ImageChannelDataTypeUnsignedInt8", SpvWord{10}},
-        {"DecorationNonUniformEXT", SpvWord{5300}},
-        {"ExecutionModeVertexOrderCw", SpvWord{4}},
-        {"SourceLanguageNZSL", SpvWord{9}},
-        {"ImageChannelDataTypeUnormShort565", SpvWord{4}},
-        {"CooperativeMatrixOperandsMatrixASignedComponentsKHR", SpvWord{1}},
-        {"BuiltInLayerPerViewNV", SpvWord{5279}},
-        {"BuiltInSMIDNV", SpvWord{5377}},
-        {"ImageChannelDataTypeUnormInt8", SpvWord{2}},
-        {"BuiltInFragInvocationCountEXT", SpvWord{5293}},
-        {"BuiltInHitTriangleVertexPositionsKHR", SpvWord{5335}},
-        {"ImageFormatRgba8Snorm", SpvWord{5}},
-        {"ImageOperandsZeroExtend", SpvWord{8192}},
-        {"DecorationPerPrimitiveNV", SpvWord{5271}},
-        {"DecorationFunctionDenormModeINTEL", SpvWord{5823}},
-        {"BuiltInInstanceId", SpvWord{6}},
-        {"BuiltInBaryCoordSmoothCentroidAMD", SpvWord{4996}},
-        {"ExecutionModeOriginLowerLeft", SpvWord{8}},
-        {"CapabilityMultiViewport", SpvWord{57}},
-        {"DecorationSIMTCallINTEL", SpvWord{5599}},
-        {"DecorationAlignmentId", SpvWord{46}},
-        {"CapabilityStorageBufferArrayDynamicIndexing", SpvWord{30}},
-        {"DecorationNoContraction", SpvWord{42}},
-        {"ExecutionModeInputPoints", SpvWord{19}},
-        {"CapabilityPerViewAttributesNV", SpvWord{5260}},
-        {"DecorationPrefetchINTEL", SpvWord{5902}},
-        {"CapabilityStorageImageWriteWithoutFormat", SpvWord{56}},
-        {"BuiltInBaryCoordNoPerspSampleAMD", SpvWord{4994}},
-        {"LoopControlLoopCoalesceINTEL", SpvWord{1048576}},
-        {"DecorationRegisterMapKernelArgumentINTEL", SpvWord{6176}},
-        {"CapabilityFragmentDensityEXT", SpvWord{5291}},
-        {"DecorationMMHostInterfaceLatencyINTEL", SpvWord{6179}},
-        {"CapabilityUniformBufferArrayNonUniformIndexing", SpvWord{5306}},
-        {"QuantizationModesTRN_ZERO", SpvWord{1}},
-        {"ImageChannelOrderDepth", SpvWord{13}},
-        {"CapabilityPhysicalStorageBufferAddresses", SpvWord{5347}},
-        {"DecorationSpecId", SpvWord{1}},
-        {"SourceLanguageUnknown", SpvWord{0}},
-        {"CapabilityRayQueryKHR", SpvWord{4472}},
-        {"CapabilityFragmentFullyCoveredEXT", SpvWord{5265}},
-        {"DecorationDontStaticallyCoalesceINTEL", SpvWord{5901}},
-        {"ImageFormatRgba16i", SpvWord{22}},
-        {"BuiltInLaunchSizeKHR", SpvWord{5320}},
-        {"BuiltInInvocationsPerPixelNV", SpvWord{5293}},
-        {"BuiltInViewportIndex", SpvWord{10}},
-        {"CapabilityVectorAnyINTEL", SpvWord{5619}},
-        {"Dim3D", SpvWord{2}},
-        {"DecorationHitObjectShaderRecordBufferNV", SpvWord{5386}},
-        {"CapabilityRoundingModeRTE", SpvWord{4467}},
-        {"DecorationFunctionFloatingPointModeINTEL", SpvWord{6080}},
-        {"CapabilityImageCubeArray", SpvWord{34}},
-        {"FPFastMathModeNone", SpvWord{0}},
-        {"BuiltInVertexIndex", SpvWord{42}},
-        {"CapabilityDotProductKHR", SpvWord{6019}},
-        {"ImageFormatRgba32i", SpvWord{21}},
-        {"CapabilityShaderViewportIndexLayerEXT", SpvWord{5254}},
-        {"MemorySemanticsNone", SpvWord{0}},
-        {"DecorationBinding", SpvWord{33}},
-        {"CapabilityFragmentMaskAMD", SpvWord{5010}},
-        {"ScopeDevice", SpvWord{1}},
-        {"CapabilityDemoteToHelperInvocationEXT", SpvWord{5379}},
-        {"MemoryAccessNoAliasINTELMask", SpvWord{131072}},
-        {"ExecutionModelRayGenerationKHR", SpvWord{5313}},
-        {"CooperativeMatrixOperandsMatrixBSignedComponentsKHR", SpvWord{2}},
-        {"CapabilityVulkanMemoryModelKHR", SpvWord{5345}},
-        {"ExecutionModeShadingRateInterlockUnorderedEXT", SpvWord{5371}},
-        {"ImageChannelDataTypeFloat", SpvWord{14}},
-        {"BuiltInShadingRateKHR", SpvWord{4444}},
-        {"ImageOperandsBias", SpvWord{1}},
-        {"FunctionControlNone", SpvWord{0}},
-        {"ExecutionModeNonCoherentColorAttachmentReadEXT", SpvWord{4169}},
-        {"ExecutionModeStencilRefGreaterBackAMD", SpvWord{5083}},
-        {"MemoryAccessNonPrivatePointerKHR", SpvWord{32}},
-        {"ImageChannelDataTypeUnsignedInt32", SpvWord{12}},
-        {"DecorationMaxConcurrencyINTEL", SpvWord{5918}},
-        {"LoopControlDependencyLength", SpvWord{8}},
-        {"BuiltInHelperInvocation", SpvWord{23}},
-        {"CapabilityFPGALoopControlsINTEL", SpvWord{5888}},
-        {"BuiltInSubgroupLeMask", SpvWord{4419}},
-        {"CapabilityStorageBufferArrayNonUniformIndexingEXT", SpvWord{5308}},
-        {"ImageFormatRg32ui", SpvWord{35}},
-        {"CapabilitySampledImageArrayNonUniformIndexingEXT", SpvWord{5307}},
-        {"BuiltInSubgroupId", SpvWord{40}},
-        {"ImageFormatR11fG11fB10f", SpvWord{8}},
-        {"LoopControlPeelCount", SpvWord{128}},
-        {"BuiltInSubgroupLeMaskKHR", SpvWord{4419}},
-        {"CapabilityNamedBarrier", SpvWord{59}},
-        {"DecorationSingleElementVectorINTEL", SpvWord{6085}},
-        {"DecorationForcePow2DepthINTEL", SpvWord{5836}},
-        {"DimTileImageDataEXT", SpvWord{4173}},
-        {"BuiltInBaseVertex", SpvWord{4424}},
-        {"DecorationUniformId", SpvWord{27}},
-        {"BuiltInBaryCoordPullModelAMD", SpvWord{4998}},
-        {"ExecutionModeDerivativeGroupQuadsNV", SpvWord{5289}},
-        {"AccessQualifierReadOnly", SpvWord{0}},
-        {"StorageClassPrivate", SpvWord{6}},
-        {"CapabilityArbitraryPrecisionIntegersINTEL", SpvWord{5844}},
-        {"CapabilityRayTracingProvisionalKHR", SpvWord{5353}},
-        {"MemorySemanticsMakeAvailable", SpvWord{8192}},
-        {"CapabilityShaderNonUniform", SpvWord{5301}},
-        {"CapabilitySampled1D", SpvWord{43}},
-        {"ImageFormatRgba8", SpvWord{4}},
-        {"CapabilityImageGatherExtended", SpvWord{25}},
-        {"CapabilitySubgroupBufferBlockIOINTEL", SpvWord{5569}},
-        {"CapabilityStorageUniform16", SpvWord{4434}},
-        {"BuiltInCullMaskKHR", SpvWord{6021}},
-        {"DecorationCentroid", SpvWord{16}},
-        {"CapabilityRayCullMaskKHR", SpvWord{6020}},
-        {"CapabilityTileImageStencilReadAccessEXT", SpvWord{4168}},
-        {"ImageFormatR8i", SpvWord{29}},
-        {"CapabilityShaderStereoViewNV", SpvWord{5259}},
-        {"Dim1D", SpvWord{0}},
-        {"CapabilityStorageImageArrayNonUniformIndexing", SpvWord{5309}},
-        {"ExecutionModeOutputPrimitivesNV", SpvWord{5270}},
-        {"DecorationAlignment", SpvWord{44}},
-        {"BuiltInVertexId", SpvWord{5}},
-        {"ImageFormatRg8ui", SpvWord{37}},
-        {"FunctionParameterAttributeZext", SpvWord{0}},
-        {"CapabilityRayTracingPositionFetchKHR", SpvWord{5336}},
-        {"CapabilityVulkanMemoryModelDeviceScope", SpvWord{5346}},
-        {"MemorySemanticsImageMemory", SpvWord{2048}},
-        {"StorageClassCrossWorkgroup", SpvWord{5}},
-        {"StorageClassInput", SpvWord{1}},
-        {"MemoryModelSimple", SpvWord{0}},
-        {"MemorySemanticsSubgroupMemory", SpvWord{128}},
-        {"StorageClassHostOnlyINTEL", SpvWord{5937}},
-        {"CapabilityImageQuery", SpvWord{50}},
-        {"ExecutionModeLocalSizeHint", SpvWord{18}},
-        {"ImageOperandsSignExtend", SpvWord{4096}},
-        {"ExecutionModelCallableKHR", SpvWord{5318}},
-        {"CapabilityIOPipesINTEL", SpvWord{5943}},
-        {"KernelEnqueueFlagsWaitKernel", SpvWord{1}},
-        {"CapabilityImageReadWriteLodAMD", SpvWord{5015}},
-        {"ImageFormatR8ui", SpvWord{39}},
-        {"ExecutionModeInvocations", SpvWord{0}},
-        {"ExecutionModeNoGlobalOffsetINTEL", SpvWord{5895}},
-        {"QuantizationModesRND_INF", SpvWord{4}},
-        {"RayFlagsTerminateOnFirstHitKHR", SpvWord{4}},
-        {"CapabilityAtomicStorageOps", SpvWord{4445}},
-        {"CapabilityFPGARegINTEL", SpvWord{5948}},
-        {"LoopControlMaxIterations", SpvWord{32}},
-        {"ExecutionModelIntersectionKHR", SpvWord{5314}},
-        {"BuiltInPrimitiveCountNV", SpvWord{5275}},
-        {"CapabilityFloat16ImageAMD", SpvWord{5008}},
-        {"ScopeShaderCallKHR", SpvWord{6}},
-        {"BuiltInHitKindNV", SpvWord{5333}},
-        {"ExecutionModeDepthUnchanged", SpvWord{16}},
-        {"BuiltInSubgroupMaxSize", SpvWord{37}},
-        {"CapabilityGroupNonUniformArithmetic", SpvWord{63}},
-        {"LoopControlPipelineEnableINTEL", SpvWord{524288}},
-        {"CapabilitySignedZeroInfNanPreserve", SpvWord{4466}},
-        {"MemorySemanticsMakeVisibleKHR", SpvWord{16384}},
-        {"ExecutionModeOutputTrianglesEXT", SpvWord{5298}},
-        {"BuiltInClipDistance", SpvWord{3}},
-        {"ExecutionModelMeshEXT", SpvWord{5365}},
-        {"ImageChannelOrderRx", SpvWord{10}},
-        {"DecorationConstant", SpvWord{22}},
-        {"ExecutionModeStencilRefUnchangedBackAMD", SpvWord{5082}},
-        {"DecorationSample", SpvWord{17}},
-        {"BuiltInEnqueuedWorkgroupSize", SpvWord{32}},
-        {"CapabilityFloat16", SpvWord{9}},
-        {"CapabilityBitInstructions", SpvWord{6025}},
-        {"CooperativeMatrixOperandsSaturatingAccumulationKHR", SpvWord{16}},
-        {"BuiltInCoreIDARM", SpvWord{4160}},
-        {"CapabilityFPMaxErrorINTEL", SpvWord{6169}},
-        {"CapabilityTextureBlockMatchQCOM", SpvWord{4486}},
-        {"CapabilityInt64ImageEXT", SpvWord{5016}},
-        {"BuiltInInstanceIndex", SpvWord{43}},
-        {"ExecutionModePostDepthCoverage", SpvWord{4446}},
-        {"ScopeSubgroup", SpvWord{3}},
-        {"CapabilityStencilExportEXT", SpvWord{5013}},
-        {"MemorySemanticsRelease", SpvWord{4}},
-        {"StorageClassCodeSectionINTEL", SpvWord{5605}},
-        {"MemoryAccessAliasScopeINTELMask", SpvWord{65536}},
-        {"FragmentShadingRateVertical4Pixels", SpvWord{2}},
-        {"FunctionControlPure", SpvWord{4}},
-        {"DecorationVectorComputeVariableINTEL", SpvWord{5624}},
-        {"StorageClassIncomingRayPayloadNV", SpvWord{5342}},
-        {"FunctionParameterAttributeNoCapture", SpvWord{5}},
-        {"CapabilityUniformAndStorageBuffer16BitAccess", SpvWord{4434}},
-        {"CapabilityCullDistance", SpvWord{33}},
-        {"DecorationBlock", SpvWord{2}},
-        {"ExecutionModelTaskEXT", SpvWord{5364}},
-        {"MemoryAccessMakePointerVisible", SpvWord{16}},
-        {"DecorationGLSLPacked", SpvWord{9}},
-        {"CapabilityShadingRateNV", SpvWord{5291}},
-        {"CapabilityUSMStorageClassesINTEL", SpvWord{5935}},
-        {"ExecutionModeSpacingFractionalEven", SpvWord{2}},
-        {"BuiltInNumWorkgroups", SpvWord{24}},
-        {"BuiltInCullDistance", SpvWord{4}},
-        {"ExecutionModeOutputPrimitivesEXT", SpvWord{5270}},
-        {"LoopControlDependencyArrayINTEL", SpvWord{262144}},
-        {"DecorationFPMaxErrorDecorationINTEL", SpvWord{6170}},
-        {"ImageChannelOrderIntensity", SpvWord{8}},
-        {"DecorationRestrictPointerEXT", SpvWord{5355}},
-        {"Dim2D", SpvWord{1}},
-        {"ImageOperandsMakeTexelVisible", SpvWord{512}},
-        {"CapabilityStorageTexelBufferArrayDynamicIndexing", SpvWord{5305}},
-        {"ImageFormatR16ui", SpvWord{38}},
-        {"CapabilityGroupNonUniformPartitionedNV", SpvWord{5297}},
-        {"FunctionParameterAttributeRuntimeAlignedINTEL", SpvWord{5940}},
-        {"BuiltInWarpMaxIDARM", SpvWord{4164}},
-        {"CapabilityGroupNonUniformRotateKHR", SpvWord{6026}},
-        {"CapabilityFPGAMemoryAccessesINTEL", SpvWord{5898}},
-        {"MemorySemanticsOutputMemoryKHR", SpvWord{4096}},
-        {"CapabilityKernelAttributesINTEL", SpvWord{5892}},
-        {"RayQueryCommittedIntersectionTypeRayQueryCommittedIntersectionNoneKHR", SpvWord{0}},
-        {"CapabilityShaderViewportMaskNV", SpvWord{5255}},
-        {"ImageFormatRgba16", SpvWord{10}},
-        {"CapabilityWorkgroupMemoryExplicitLayout8BitAccessKHR", SpvWord{4429}},
-        {"ExecutionModeEarlyFragmentTests", SpvWord{9}},
-        {"ImageFormatRg8i", SpvWord{27}},
-        {"CapabilityShaderViewportIndex", SpvWord{70}},
-        {"BuiltInFragDepth", SpvWord{22}},
-        {"MemoryAccessMakePointerAvailableKHR", SpvWord{8}},
-        {"ImageFormatRg16Snorm", SpvWord{17}},
-        {"MemorySemanticsAtomicCounterMemory", SpvWord{1024}},
-        {"CapabilityShaderSMBuiltinsNV", SpvWord{5373}},
-        {"LoopControlNone", SpvWord{0}},
-        {"ImageChannelOrderRGx", SpvWord{11}},
-        {"LoopControlMaxConcurrencyINTEL", SpvWord{131072}},
-        {"CapabilityCooperativeMatrixKHR", SpvWord{6022}},
-        {"CapabilityInt16", SpvWord{22}},
-        {"CapabilityInt64Atomics", SpvWord{12}},
-        {"DecorationLinkageAttributes", SpvWord{41}},
-        {"CapabilityFPGADSPControlINTEL", SpvWord{5908}},
-        {"CapabilityStorageImageArrayNonUniformIndexingEXT", SpvWord{5309}},
-        {"BuiltInWorkgroupId", SpvWord{26}},
-        {"CapabilityFPGALatencyControlINTEL", SpvWord{6171}},
-        {"BuiltInPrimitiveIndicesNV", SpvWord{5276}},
-        {"BuiltInRayTmaxKHR", SpvWord{5326}},
-        {"CapabilityDerivativeControl", SpvWord{51}},
-        {"DecorationBurstCoalesceINTEL", SpvWord{5899}},
-        {"ExecutionModelTessellationControl", SpvWord{1}},
-        {"CapabilityBindlessTextureNV", SpvWord{5390}},
-        {"BuiltInHitKindKHR", SpvWord{5333}},
-        {"CapabilityTessellationPointSize", SpvWord{23}},
-        {"CapabilityInputAttachmentArrayDynamicIndexingEXT", SpvWord{5303}},
-        {"RayFlagsForceOpacityMicromap2StateEXT", SpvWord{1024}},
-        {"ExecutionModeSubgroupUniformControlFlowKHR", SpvWord{4421}},
-        {"CapabilityDotProductInput4x8BitPackedKHR", SpvWord{6018}},
-        {"ExecutionModelMeshNV", SpvWord{5268}},
-        {"ImageChannelOrderRG", SpvWord{2}},
-        {"GroupOperationClusteredReduce", SpvWord{3}},
-        {"CapabilityRayQueryProvisionalKHR", SpvWord{4471}},
-        {"ExecutionModelFragment", SpvWord{4}},
-        {"BuiltInPrimitiveShadingRateKHR", SpvWord{4432}},
-        {"ExecutionModelAnyHitKHR", SpvWord{5315}},
-        {"DecorationBoundSamplerNV", SpvWord{5400}},
-        {"DecorationNoSignedWrap", SpvWord{4469}},
-        {"CapabilityInputAttachmentArrayNonUniformIndexingEXT", SpvWord{5310}},
-        {"ExecutionModeStreamingInterfaceINTEL", SpvWord{6154}},
-        {"StorageClassTileImageEXT", SpvWord{4172}},
-        {"FPFastMathModeAllowReassocINTEL", SpvWord{131072}},
-        {"CapabilityAtomicFloat64MinMaxEXT", SpvWord{5613}},
-        {"AddressingModelPhysical32", SpvWord{1}},
-        {"DecorationFuncParamAttr", SpvWord{38}},
-        {"BuiltInSubgroupSize", SpvWord{36}},
-        {"FPFastMathModeNSZ", SpvWord{4}},
-        {"CapabilityUniformDecoration", SpvWord{71}},
-        {"StorageClassGeneric", SpvWord{8}},
-        {"ExecutionModeOutputLineStrip", SpvWord{28}},
-        {"SamplerAddressingModeRepeat", SpvWord{3}},
-        {"ExecutionModelTessellationEvaluation", SpvWord{2}},
-        {"ExecutionModeSubgroupSize", SpvWord{35}},
-        {"LoopControlIterationMultiple", SpvWord{64}},
-        {"ExecutionModeDenormPreserve", SpvWord{4459}},
-        {"ExecutionModeStencilRefGreaterFrontAMD", SpvWord{5080}},
-        {"ExecutionModeOutputTrianglesNV", SpvWord{5298}},
-        {"BuiltInCoreCountARM", SpvWord{4161}},
-        {"DecorationPerVertexKHR", SpvWord{5285}},
-        {"ExecutionModeDepthGreater", SpvWord{14}},
-        {"AccessQualifierReadWrite", SpvWord{2}},
-        {"ExecutionModeNumSIMDWorkitemsINTEL", SpvWord{5896}},
-        {"BuiltInPrimitiveLineIndicesEXT", SpvWord{5295}},
-        {"CapabilityRayTracingKHR", SpvWord{4479}},
         {"MemoryAccessMakePointerVisibleKHR", SpvWord{16}},
-        {"DecorationMemoryINTEL", SpvWord{5826}},
-        {"CapabilityFragmentBarycentricNV", SpvWord{5284}},
-        {"FunctionParameterAttributeSret", SpvWord{3}},
-        {"CapabilityGeometryPointSize", SpvWord{24}},
-        {"BuiltInNumEnqueuedSubgroups", SpvWord{39}},
-        {"LoopControlDontUnroll", SpvWord{2}},
-        {"StorageClassWorkgroup", SpvWord{4}},
-        {"SamplerFilterModeNearest", SpvWord{0}},
-        {"DecorationStackCallINTEL", SpvWord{5627}},
-        {"RayQueryIntersectionRayQueryCandidateIntersectionKHR", SpvWord{0}},
-        {"BuiltInFragmentSizeNV", SpvWord{5292}},
-        {"BuiltInBaryCoordNV", SpvWord{5286}},
-        {"LoopControlInitiationIntervalINTEL", SpvWord{65536}},
-        {"CapabilityMeshShadingEXT", SpvWord{5283}},
-        {"SamplerAddressingModeNone", SpvWord{0}},
-        {"BuiltInFragCoord", SpvWord{15}},
-        {"ExecutionModelTaskNV", SpvWord{5267}},
-        {"ImageFormatRg16ui", SpvWord{36}},
-        {"CapabilityPipes", SpvWord{17}},
-        {"ImageFormatRgba32f", SpvWord{1}},
-        {"ExecutionModeDerivativeGroupLinearNV", SpvWord{5290}},
-        {"ImageOperandsConstOffset", SpvWord{8}},
-        {"CapabilityAddresses", SpvWord{4}},
-        {"CapabilityInputAttachmentArrayNonUniformIndexing", SpvWord{5310}},
-        {"FragmentShadingRateVertical2Pixels", SpvWord{1}},
-        {"FPFastMathModeAllowRecip", SpvWord{8}},
-        {"ImageFormatR64ui", SpvWord{40}},
-        {"CapabilitySubgroupImageMediaBlockIOINTEL", SpvWord{5579}},
-        {"DecorationMaxPrivateCopiesINTEL", SpvWord{5829}},
-        {"DecorationStableKernelArgumentINTEL", SpvWord{6183}},
-        {"BuiltInBaseInstance", SpvWord{4425}},
-        {"BuiltInWorkDim", SpvWord{30}},
-        {"CapabilityDeviceGroup", SpvWord{4437}},
-        {"CapabilityStorageTexelBufferArrayNonUniformIndexing", SpvWord{5312}},
-        {"BuiltInPositionPerViewNV", SpvWord{5261}},
-        {"CapabilityMinLod", SpvWord{42}},
-        {"CapabilityFragmentShaderSampleInterlockEXT", SpvWord{5363}},
-        {"BuiltInWorkgroupSize", SpvWord{25}},
-        {"StorageClassCallableDataNV", SpvWord{5328}},
-        {"ExecutionModelRayGenerationNV", SpvWord{5313}},
-        {"ExecutionModeDepthLess", SpvWord{15}},
-        {"SamplerFilterModeLinear", SpvWord{1}},
-        {"BuiltInObjectRayDirectionNV", SpvWord{5324}},
-        {"CapabilityFloat16Buffer", SpvWord{8}},
-        {"CapabilityIntegerFunctions2INTEL", SpvWord{5584}},
-        {"LoopControlSpeculatedIterationsINTEL", SpvWord{4194304}},
-        {"DecorationIOPipeStorageINTEL", SpvWord{5944}},
-        {"BuiltInDeviceIndex", SpvWord{4438}},
-        {"CapabilityVectorComputeINTEL", SpvWord{5617}},
-        {"CapabilityUnstructuredLoopControlsINTEL", SpvWord{5886}},
-        {"DecorationMatrixStride", SpvWord{7}},
-        {"DecorationPatch", SpvWord{15}},
-        {"BuiltInInstanceCustomIndexKHR", SpvWord{5327}},
-        {"CapabilityFPGAKernelAttributesv2INTEL", SpvWord{6161}},
-        {"BuiltInSecondaryPositionNV", SpvWord{5257}},
-        {"ImageFormatRgb10A2", SpvWord{11}},
-        {"CapabilitySubgroupShuffleINTEL", SpvWord{5568}},
-        {"CapabilityRayTraversalPrimitiveCullingKHR", SpvWord{4478}},
-        {"CapabilityAsmINTEL", SpvWord{5606}},
-        {"ExecutionModeQuads", SpvWord{24}},
-        {"DecorationRelaxedPrecision", SpvWord{0}},
-        {"StorageClassShaderRecordBufferNV", SpvWord{5343}},
-        {"ExecutionModeOriginUpperLeft", SpvWord{7}},
-        {"CapabilityInt8", SpvWord{39}},
-        {"CapabilityDotProductInputAll", SpvWord{6016}},
-        {"CapabilityInterpolationFunction", SpvWord{52}},
-        {"CapabilityGroupNonUniformBallot", SpvWord{64}},
-        {"ExecutionModeRoundingModeRTPINTEL", SpvWord{5620}},
-        {"CapabilityRoundToInfinityINTEL", SpvWord{5582}},
-        {"CapabilityOptNoneINTEL", SpvWord{6094}},
-        {"OverflowModesSAT_SYM", SpvWord{3}},
-        {"CapabilityExpectAssumeKHR", SpvWord{5629}},
-        {"DecorationSaturatedConversion", SpvWord{28}},
-        {"CapabilityRuntimeAlignedAttributeINTEL", SpvWord{5939}},
-        {"ImageFormatR32ui", SpvWord{33}},
-        {"BuiltInGlobalLinearId", SpvWord{34}},
-        {"ExecutionModeTriangles", SpvWord{22}},
-        {"ImageOperandsNonPrivateTexel", SpvWord{1024}},
-        {"SelectionControlDontFlatten", SpvWord{2}},
-        {"BuiltInIncomingRayFlagsNV", SpvWord{5351}},
-        {"BuiltInSMCountNV", SpvWord{5375}},
-        {"CapabilitySubgroupImageBlockIOINTEL", SpvWord{5570}},
-        {"DecorationSecondaryViewportRelativeNV", SpvWord{5256}},
-        {"MemoryAccessAligned", SpvWord{2}},
-        {"ExecutionModelCallableNV", SpvWord{5318}},
-        {"CapabilityDenormFlushToZero", SpvWord{4465}},
-        {"CapabilityComputeDerivativeGroupLinearNV", SpvWord{5350}},
-        {"StorageClassCallableDataKHR", SpvWord{5328}},
-        {"CapabilityFragmentBarycentricKHR", SpvWord{5284}},
-        {"SourceLanguageOpenCL_CPP", SpvWord{4}},
-        {"LinkageTypeExport", SpvWord{0}},
-        {"DimBuffer", SpvWord{5}},
-        {"DimRect", SpvWord{4}},
-        {"ImageChannelDataTypeUnsignedIntRaw10EXT", SpvWord{19}},
-        {"ExecutionModePixelInterlockOrderedEXT", SpvWord{5366}},
-        {"CapabilityRoundingModeRTZ", SpvWord{4468}},
-        {"ImageChannelDataTypeUnsignedInt16", SpvWord{11}},
-        {"ImageChannelDataTypeSnormInt8", SpvWord{0}},
-        {"CapabilityLoopFuseINTEL", SpvWord{5906}},
-        {"GroupOperationExclusiveScan", SpvWord{2}},
-        {"ImageChannelOrdersRGB", SpvWord{15}},
-        {"DecorationNoPerspective", SpvWord{13}},
-        {"BuiltInGlobalInvocationId", SpvWord{28}},
-        {"CapabilityComputeDerivativeGroupQuadsNV", SpvWord{5288}},
-        {"BuiltInPointCoord", SpvWord{16}},
-        {"CapabilityFPGAClusterAttributesINTEL", SpvWord{5904}},
-        {"ScopeQueueFamilyKHR", SpvWord{5}},
-        {"GroupOperationPartitionedExclusiveScanNV", SpvWord{8}},
-        {"BuiltInPrimitivePointIndicesEXT", SpvWord{5294}},
-        {"DecorationPerTaskNV", SpvWord{5273}},
-        {"CapabilityStoragePushConstant8", SpvWord{4450}},
-        {"ImageChannelDataTypeSignedInt32", SpvWord{9}},
-        {"ImageChannelOrderLuminance", SpvWord{9}},
-        {"FPDenormModePreserve", SpvWord{0}},
-        {"BuiltInLocalInvocationId", SpvWord{27}},
-        {"ExecutionModelMissNV", SpvWord{5317}},
-        {"CapabilityWorkgroupMemoryExplicitLayout16BitAccessKHR", SpvWord{4430}},
-        {"ImageChannelOrdersRGBx", SpvWord{16}},
-        {"BuiltInSubgroupGtMask", SpvWord{4418}},
-        {"FragmentShadingRateHorizontal2Pixels", SpvWord{4}},
-        {"CapabilityAtomicFloat16AddEXT", SpvWord{6095}},
-        {"ImageChannelOrdersBGRA", SpvWord{18}},
+        {"CapabilityStoragePushConstant16", SpvWord{4435}},
+        {"StorageClassTaskPayloadWorkgroupEXT", SpvWord{5402}},
         {"DecorationConduitKernelArgumentINTEL", SpvWord{6175}},
-        {"BuiltInTessLevelInner", SpvWord{12}},
-        {"DecorationMaxByteOffsetId", SpvWord{47}},
-        {"ExecutionModelAnyHitNV", SpvWord{5315}},
-        {"CapabilityGroupNonUniformQuad", SpvWord{68}},
-        {"CapabilityDotProductInputAllKHR", SpvWord{6016}},
-        {"SourceLanguageWGSL", SpvWord{10}},
-        {"ExecutionModeLocalSizeId", SpvWord{38}},
-        {"StorageClassAtomicCounter", SpvWord{10}},
-        {"CapabilityKernel", SpvWord{6}},
-        {"DecorationAliasScopeINTEL", SpvWord{5914}},
-        {"ImageOperandsMakeTexelVisibleKHR", SpvWord{512}},
-        {"CapabilityInputAttachmentArrayDynamicIndexing", SpvWord{5303}},
-        {"ExecutionModeInitializer", SpvWord{33}},
-        {"BuiltInTessCoord", SpvWord{13}},
-        {"RayFlagsSkipAABBsKHR", SpvWord{512}},
-        {"MemorySemanticsRelaxed", SpvWord{0}},
-        {"DecorationLatencyControlConstraintINTEL", SpvWord{6173}},
-        {"CapabilityTessellation", SpvWord{3}},
-        {"ExecutionModeSharedLocalMemorySizeINTEL", SpvWord{5618}},
-        {"CooperativeMatrixOperandsMatrixResultSignedComponentsKHR", SpvWord{8}},
-        {"BuiltInBaryCoordSmoothAMD", SpvWord{4995}},
-        {"BuiltInRayTmaxNV", SpvWord{5326}},
-        {"ExecutionModelGeometry", SpvWord{3}},
-        {"ImageFormatRgb10a2ui", SpvWord{34}},
-        {"ExecutionModelClosestHitNV", SpvWord{5316}},
-        {"RayFlagsCullOpaqueKHR", SpvWord{64}},
-        {"BuiltInCurrentRayTimeNV", SpvWord{5334}},
-        {"CooperativeMatrixUseMatrixAccumulatorKHR", SpvWord{2}},
-        {"BuiltInInvocationId", SpvWord{8}},
-        {"DecorationMMHostInterfaceReadWriteModeINTEL", SpvWord{6180}},
-        {"ExecutionModelGLCompute", SpvWord{5}},
-        {"CapabilityGroupNonUniformShuffleRelative", SpvWord{66}},
-        {"CapabilitySampledImageArrayNonUniformIndexing", SpvWord{5307}},
-        {"CapabilityStorageBuffer8BitAccess", SpvWord{4448}},
-        {"StorageClassPhysicalStorageBuffer", SpvWord{5349}},
-        {"DecorationRowMajor", SpvWord{4}},
-        {"CapabilitySubgroupVoteKHR", SpvWord{4431}},
-        {"ExecutionModeShadingRateInterlockOrderedEXT", SpvWord{5370}},
-        {"ImageChannelDataTypeUnormInt16", SpvWord{3}},
-        {"FunctionParameterAttributeSext", SpvWord{1}},
-        {"FPOperationModeALT", SpvWord{1}},
-        {"RayFlagsCullFrontFacingTrianglesKHR", SpvWord{32}},
-        {"RayQueryCommittedIntersectionTypeRayQueryCommittedIntersectionTriangleKHR", SpvWord{1}},
-        {"CapabilitySubgroupAvcMotionEstimationIntraINTEL", SpvWord{5697}},
-        {"CapabilityFunctionPointersINTEL", SpvWord{5603}},
-        {"ExecutionModeSampleInterlockUnorderedEXT", SpvWord{5369}},
-        {"CapabilityUniformTexelBufferArrayNonUniformIndexing", SpvWord{5311}},
-        {"BuiltInWarpIDARM", SpvWord{4163}},
-        {"CapabilityStorageImageExtendedFormats", SpvWord{49}},
-        {"CapabilityBlockingPipesINTEL", SpvWord{5945}},
-        {"ExecutionModeXfb", SpvWord{11}},
-        {"BuiltInSubgroupEqMaskKHR", SpvWord{4416}},
-        {"BuiltInDrawIndex", SpvWord{4426}},
-        {"ImageChannelDataTypeUnormInt101010_2", SpvWord{16}},
-        {"CapabilityVulkanMemoryModelDeviceScopeKHR", SpvWord{5346}},
-        {"ExecutionModeDenormFlushToZero", SpvWord{4460}},
-        {"CapabilityStorageTexelBufferArrayNonUniformIndexingEXT", SpvWord{5312}},
-        {"BuiltInGlobalSize", SpvWord{31}},
-        {"BuiltInWarpIDNV", SpvWord{5376}},
-        {"CapabilitySparseResidency", SpvWord{41}},
-        {"CapabilityImage1D", SpvWord{44}},
-        {"ImageFormatR16Snorm", SpvWord{19}},
-        {"ImageFormatR16f", SpvWord{9}},
-        {"DecorationNumbanksINTEL", SpvWord{5827}},
-        {"SamplerAddressingModeClampToEdge", SpvWord{1}},
-        {"DecorationBindlessImageNV", SpvWord{5399}},
-        {"DecorationGlobalVariableOffsetINTEL", SpvWord{5628}},
-        {"StorageClassPushConstant", SpvWord{9}},
-        {"BuiltInSamplePosition", SpvWord{19}},
-        {"BuiltInWorldRayDirectionNV", SpvWord{5322}},
-        {"ScopeWorkgroup", SpvWord{2}},
-        {"DecorationBufferLocationINTEL", SpvWord{5921}},
-        {"BuiltInIncomingRayFlagsKHR", SpvWord{5351}},
-        {"CapabilityGroupNonUniformClustered", SpvWord{67}},
-        {"DecorationOffset", SpvWord{35}},
-        {"StorageClassPhysicalStorageBufferEXT", SpvWord{5349}},
-        {"BuiltInViewportMaskNV", SpvWord{5253}},
-        {"MemoryModelGLSL450", SpvWord{1}},
-        {"BuiltInBaryCoordSmoothSampleAMD", SpvWord{4997}},
-        {"CapabilityGeometry", SpvWord{2}},
-        {"BuiltInViewportMaskPerViewNV", SpvWord{5262}},
-        {"ExecutionModeFloatingPointModeALTINTEL", SpvWord{5622}},
-        {"ExecutionModeFinalizer", SpvWord{34}},
-        {"CapabilityTileImageDepthReadAccessEXT", SpvWord{4167}},
-        {"BuiltInBaryCoordNoPerspCentroidAMD", SpvWord{4993}},
-        {"BuiltInBaryCoordKHR", SpvWord{5286}},
-        {"CapabilitySubgroupAvcMotionEstimationINTEL", SpvWord{5696}},
-        {"RayQueryCandidateIntersectionTypeRayQueryCandidateIntersectionAABBKHR", SpvWord{1}},
-        {"CapabilityTextureBoxFilterQCOM", SpvWord{4485}},
-        {"KernelProfilingInfoCmdExecTime", SpvWord{1}},
-        {"BuiltInFrontFacing", SpvWord{17}},
-        {"CapabilityDrawParameters", SpvWord{4427}},
-        {"ImageChannelDataTypeUnormShort555", SpvWord{5}},
-        {"KernelProfilingInfoNone", SpvWord{0}},
-        {"ImageFormatUnknown", SpvWord{0}},
-        {"GroupOperationPartitionedReduceNV", SpvWord{6}},
-        {"BuiltInLaunchIdKHR", SpvWord{5319}},
-        {"ImageFormatR8Snorm", SpvWord{20}},
-        {"CapabilityFPGABufferLocationINTEL", SpvWord{5920}},
-        {"BuiltInObjectRayDirectionKHR", SpvWord{5324}},
-        {"ExecutionModelVertex", SpvWord{0}},
-        {"BuiltInSecondaryViewportMaskNV", SpvWord{5258}},
-        {"DecorationInputAttachmentIndex", SpvWord{43}},
-        {"CapabilityRuntimeDescriptorArray", SpvWord{5302}},
-        {"LoopControlDependencyInfinite", SpvWord{4}},
-        {"GroupOperationPartitionedInclusiveScanNV", SpvWord{7}},
-        {"ImageFormatRgba8i", SpvWord{23}},
-        {"CapabilityShaderNonUniformEXT", SpvWord{5301}},
-        {"DecorationMaxReplicatesINTEL", SpvWord{5832}},
-        {"CapabilityRayTracingOpacityMicromapEXT", SpvWord{5381}},
-        {"ExecutionModeSignedZeroInfNanPreserve", SpvWord{4461}},
-        {"ImageOperandsLod", SpvWord{2}},
-        {"ExecutionModeMaxWorkgroupSizeINTEL", SpvWord{5893}},
-        {"LinkageTypeImport", SpvWord{1}},
-        {"RayFlagsNoneKHR", SpvWord{0}},
-        {"BuiltInLocalInvocationIndex", SpvWord{29}},
-        {"BuiltInBaryCoordNoPerspNV", SpvWord{5287}},
-        {"DecorationViewportRelativeNV", SpvWord{5252}},
-        {"ExecutionModeStencilRefUnchangedFrontAMD", SpvWord{5079}},
-        {"ScopeCrossDevice", SpvWord{0}},
-        {"CapabilityGenericPointer", SpvWord{38}},
-        {"FPRoundingModeRTP", SpvWord{2}},
-        {"KernelEnqueueFlagsWaitWorkGroup", SpvWord{2}},
-        {"DecorationPipelineEnableINTEL", SpvWord{5919}},
-        {"ImageFormatRgba16ui", SpvWord{31}},
-        {"FunctionParameterAttributeByVal", SpvWord{2}},
-        {"MemoryModelVulkan", SpvWord{3}},
-        {"ImageFormatRg8", SpvWord{13}},
-        {"QuantizationModesRND_ZERO", SpvWord{3}},
-        {"MemorySemanticsUniformMemory", SpvWord{64}},
-        {"CapabilityImageRect", SpvWord{36}},
-        {"ExecutionModeRegisterMapInterfaceINTEL", SpvWord{6160}},
-        {"BuiltInObjectRayOriginNV", SpvWord{5323}},
-        {"CapabilityPhysicalStorageBufferAddressesEXT", SpvWord{5347}},
-        {"StorageClassIncomingCallableDataKHR", SpvWord{5329}},
-        {"AddressingModelPhysical64", SpvWord{2}},
-        {"FPFastMathModeFast", SpvWord{16}},
-        {"ExecutionModeFloatingPointModeIEEEINTEL", SpvWord{5623}},
-        {"BuiltInClipDistancePerViewNV", SpvWord{5277}},
-        {"FPRoundingModeRTN", SpvWord{3}},
-        {"PackedVectorFormatPackedVectorFormat4x8BitKHR", SpvWord{0}},
-        {"DecorationOverrideCoverageNV", SpvWord{5248}},
-        {"FunctionControlConst", SpvWord{8}},
-        {"ImageFormatRg16", SpvWord{12}},
-        {"ExecutionModePixelInterlockUnorderedEXT", SpvWord{5367}},
-        {"CapabilityPipeStorage", SpvWord{60}},
-        {"SourceLanguageCPP_for_OpenCL", SpvWord{6}},
-        {"ImageFormatRg16i", SpvWord{26}},
-        {"ScopeQueueFamily", SpvWord{5}},
-        {"DecorationFPFastMathMode", SpvWord{40}},
-        {"CapabilityVector16", SpvWord{7}},
-        {"AddressingModelLogical", SpvWord{0}},
-        {"ImageFormatRg32f", SpvWord{6}},
-        {"ExecutionModeNonCoherentStencilAttachmentReadEXT", SpvWord{4171}},
-        {"ExecutionModeRoundingModeRTE", SpvWord{4462}},
-        {"ImageOperandsNonPrivateTexelKHR", SpvWord{1024}},
-        {"CapabilitySampledCubeArray", SpvWord{45}},
-        {"ImageOperandsNone", SpvWord{0}},
-        {"DecorationFuseLoopsInFunctionINTEL", SpvWord{5907}},
-        {"FPRoundingModeRTZ", SpvWord{1}},
-        {"CapabilityStorageBufferArrayNonUniformIndexing", SpvWord{5308}},
-        {"CapabilityShaderLayer", SpvWord{69}},
-        {"MemorySemanticsMakeAvailableKHR", SpvWord{8192}},
-        {"BuiltInNumSubgroups", SpvWord{38}},
-        {"ImageFormatRg16f", SpvWord{7}},
-        {"SelectionControlFlatten", SpvWord{1}},
-        {"DecorationReferencedIndirectlyINTEL", SpvWord{5602}},
-        {"DecorationBankBitsINTEL", SpvWord{5835}},
-        {"BuiltInFullyCoveredEXT", SpvWord{5264}},
-        {"CooperativeMatrixLayoutRowMajorKHR", SpvWord{0}},
-        {"DecorationBindlessSamplerNV", SpvWord{5398}},
-        {"ExecutionModeOutputLinesNV", SpvWord{5269}},
-        {"ImageOperandsMinLod", SpvWord{128}},
-        {"QuantizationModesRND_CONV_ODD", SpvWord{7}},
-        {"StorageClassUniform", SpvWord{2}},
-        {"ImageChannelDataTypeUnormInt101010", SpvWord{6}},
-        {"BuiltInSubgroupGeMaskKHR", SpvWord{4417}},
-        {"ExecutionModeStencilRefLessFrontAMD", SpvWord{5081}},
-        {"CooperativeMatrixUseMatrixBKHR", SpvWord{1}},
-        {"CapabilitySampledBuffer", SpvWord{46}},
-        {"MemorySemanticsCrossWorkgroupMemory", SpvWord{512}},
-        {"LoopControlPartialCount", SpvWord{256}},
-        {"CapabilityGeometryStreams", SpvWord{54}},
-        {"BuiltInTaskCountNV", SpvWord{5274}},
-        {"CapabilityDeviceEnqueue", SpvWord{19}},
-        {"ExecutionModeStencilRefReplacingEXT", SpvWord{5027}},
-        {"BuiltInBaryCoordNoPerspAMD", SpvWord{4992}},
-        {"CapabilityImageBasic", SpvWord{13}},
-        {"GroupOperationInclusiveScan", SpvWord{1}},
-        {"AccessQualifierWriteOnly", SpvWord{1}},
-        {"ExecutionModeVecTypeHint", SpvWord{30}},
-        {"DecorationInitiationIntervalINTEL", SpvWord{5917}},
-        {"ExecutionModePixelCenterInteger", SpvWord{6}},
-        {"CapabilityArbitraryPrecisionFloatingPointINTEL", SpvWord{5845}},
-        {"CapabilitySampleMaskPostDepthCoverage", SpvWord{4447}},
-        {"CapabilityFPGAInvocationPipeliningAttributesINTEL", SpvWord{5916}},
-        {"DecorationInvariant", SpvWord{18}},
-        {"DecorationCacheSizeINTEL", SpvWord{5900}},
-        {"DecorationBoundImageNV", SpvWord{5401}},
-        {"LoopControlMaxReinvocationDelayINTEL", SpvWord{33554432}},
-        {"CapabilityFPGAArgumentInterfacesINTEL", SpvWord{6174}},
-        {"ImageFormatRgba8ui", SpvWord{32}},
-        {"OverflowModesSAT_ZERO", SpvWord{2}},
-        {"CapabilityDemoteToHelperInvocation", SpvWord{5379}},
-        {"BuiltInLaunchIdNV", SpvWord{5319}},
-        {"OverflowModesSAT", SpvWord{1}},
-        {"LoopControlLoopCountINTEL", SpvWord{16777216}},
-        {"DecorationFuncParamIOKindINTEL", SpvWord{5625}},
-        {"CapabilityRayQueryPositionFetchKHR", SpvWord{5391}},
-        {"DecorationSinglepumpINTEL", SpvWord{5830}},
+        {"BuiltInRayTminNV", SpvWord{5325}},
+        {"MemoryAccessAligned", SpvWord{2}},
         {"ImageOperandsGrad", SpvWord{4}},
-        {"DecorationMMHostInterfaceWaitRequestINTEL", SpvWord{6182}},
-        {"CapabilityImageFootprintNV", SpvWord{5282}},
+        {"CapabilityAtomicFloat32AddEXT", SpvWord{6033}},
+        {"BuiltInWorldRayDirectionNV", SpvWord{5322}},
+        {"SourceLanguageSYCL", SpvWord{7}},
+        {"CapabilityFPGAInvocationPipeliningAttributesINTEL", SpvWord{5916}},
+        {"BuiltInFragStencilRefEXT", SpvWord{5014}},
+        {"FunctionControlNone", SpvWord{0}},
+        {"BuiltInBaryCoordNoPerspNV", SpvWord{5287}},
+        {"DecorationUniformId", SpvWord{27}},
+        {"BuiltInGlobalLinearId", SpvWord{34}},
+        {"DecorationLocation", SpvWord{30}},
+        {"ImageFormatR16Snorm", SpvWord{19}},
+        {"BuiltInSecondaryPositionNV", SpvWord{5257}},
+        {"MemorySemanticsMakeAvailableKHR", SpvWord{8192}},
+        {"ImageOperandsMinLod", SpvWord{128}},
+        {"Dim1D", SpvWord{0}},
+        {"SamplerAddressingModeRepeat", SpvWord{3}},
+        {"CapabilityCooperativeMatrixKHR", SpvWord{6022}},
+        {"ImageChannelDataTypeSignedInt8", SpvWord{7}},
+        {"ImageOperandsNontemporal", SpvWord{16384}},
+        {"BuiltInFragSizeEXT", SpvWord{5292}},
+        {"FPFastMathModeNSZ", SpvWord{4}},
+        {"ExecutionModeStencilRefGreaterFrontAMD", SpvWord{5080}},
+        {"DecorationBuiltIn", SpvWord{11}},
+        {"ExecutionModeOutputVertices", SpvWord{26}},
+        {"DecorationDoublepumpINTEL", SpvWord{5831}},
+        {"KernelEnqueueFlagsNoWait", SpvWord{0}},
+        {"BuiltInBaryCoordNoPerspCentroidAMD", SpvWord{4993}},
+        {"SourceLanguageUnknown", SpvWord{0}},
+        {"FragmentShadingRateHorizontal4Pixels", SpvWord{8}},
+        {"DecorationGLSLShared", SpvWord{8}},
+        {"BuiltInFragCoord", SpvWord{15}},
+        {"ImageChannelOrderRGB", SpvWord{4}},
+        {"ImageFormatRgb10A2", SpvWord{11}},
+        {"FPFastMathModeAllowContractFastINTEL", SpvWord{65536}},
+        {"BuiltInTessCoord", SpvWord{13}},
+        {"BuiltInLocalInvocationIndex", SpvWord{29}},
+        {"ExecutionModeFloatingPointModeIEEEINTEL", SpvWord{5623}},
+        {"ImageChannelOrderBGRA", SpvWord{6}},
+        {"CapabilityRayCullMaskKHR", SpvWord{6020}},
+        {"CapabilityVulkanMemoryModel", SpvWord{5345}},
+        {"BuiltInWarpIDARM", SpvWord{4163}},
+        {"BuiltInPrimitivePointIndicesEXT", SpvWord{5294}},
+        {"ExecutionModeInvocations", SpvWord{0}},
+        {"ImageOperandsConstOffset", SpvWord{8}},
+        {"ImageFormatRg32f", SpvWord{6}},
+        {"CapabilityInputAttachment", SpvWord{40}},
+        {"RayFlagsCullNoOpaqueKHR", SpvWord{128}},
+        {"CapabilityStorageImageArrayNonUniformIndexing", SpvWord{5309}},
+        {"CapabilityIOPipesINTEL", SpvWord{5943}},
+        {"ExecutionModeLocalSizeId", SpvWord{38}},
+        {"PackedVectorFormatPackedVectorFormat4x8Bit", SpvWord{0}},
+        {"AddressingModelPhysical32", SpvWord{1}},
         {"MemoryAccessNone", SpvWord{0}},
-        {"StorageClassStorageBuffer", SpvWord{12}},
-        {"ExecutionModeNamedBarrierCountINTEL", SpvWord{6417}},
-        {"DecorationXfbStride", SpvWord{37}},
-        {"CapabilityUniformTexelBufferArrayDynamicIndexingEXT", SpvWord{5304}},
+        {"ImageFormatRg32i", SpvWord{25}},
+        {"BuiltInObjectToWorldKHR", SpvWord{5330}},
+        {"DecorationCPacked", SpvWord{10}},
+        {"DecorationConstant", SpvWord{22}},
+        {"BuiltInVertexId", SpvWord{5}},
+        {"ExecutionModelMeshEXT", SpvWord{5365}},
+        {"DecorationFuseLoopsInFunctionINTEL", SpvWord{5907}},
+        {"CapabilityInt16", SpvWord{22}},
+        {"CapabilityFragmentDensityEXT", SpvWord{5291}},
+        {"CapabilityGroupNonUniformBallot", SpvWord{64}},
+        {"DecorationOffset", SpvWord{35}},
+        {"StorageClassHostOnlyINTEL", SpvWord{5937}},
+        {"DecorationMediaBlockIOINTEL", SpvWord{6140}},
+        {"PackedVectorFormatPackedVectorFormat4x8BitKHR", SpvWord{0}},
+        {"MemoryAccessNontemporal", SpvWord{4}},
+        {"ExecutionModelRayGenerationKHR", SpvWord{5313}},
+        {"DecorationUserSemantic", SpvWord{5635}},
+        {"BuiltInFrontFacing", SpvWord{17}},
+        {"RayFlagsNoneKHR", SpvWord{0}},
+        {"ImageFormatRgba16", SpvWord{10}},
+        {"BuiltInCurrentRayTimeNV", SpvWord{5334}},
+        {"ExecutionModelCallableNV", SpvWord{5318}},
+        {"MemoryModelVulkan", SpvWord{3}},
+        {"ExecutionModeInputLines", SpvWord{20}},
+        {"CapabilityShaderNonUniformEXT", SpvWord{5301}},
+        {"BuiltInFullyCoveredEXT", SpvWord{5264}},
+        {"DecorationFlat", SpvWord{14}},
+        {"CapabilityImage1D", SpvWord{44}},
+        {"StorageClassRayPayloadNV", SpvWord{5338}},
+        {"SourceLanguageHERO_C", SpvWord{8}},
+        {"CapabilityRuntimeDescriptorArrayEXT", SpvWord{5302}},
+        {"CapabilityRayTracingPositionFetchKHR", SpvWord{5336}},
+        {"BuiltInObjectRayOriginKHR", SpvWord{5323}},
+        {"BuiltInViewportMaskNV", SpvWord{5253}},
+        {"DecorationStallEnableINTEL", SpvWord{5905}},
+        {"FunctionParameterAttributeZext", SpvWord{0}},
+        {"ExecutionModeFloatingPointModeALTINTEL", SpvWord{5622}},
+        {"DecorationMaxPrivateCopiesINTEL", SpvWord{5829}},
+        {"BuiltInFragmentSizeNV", SpvWord{5292}},
+        {"RayQueryCommittedIntersectionTypeRayQueryCommittedIntersectionNoneKHR", SpvWord{0}},
+        {"DecorationNonUniform", SpvWord{5300}},
+        {"CapabilitySampledCubeArray", SpvWord{45}},
+        {"DimSubpassData", SpvWord{6}},
+        {"CapabilitySignedZeroInfNanPreserve", SpvWord{4466}},
+        {"BuiltInPrimitiveIndicesNV", SpvWord{5276}},
+        {"ExecutionModeOutputPrimitivesNV", SpvWord{5270}},
+        {"CapabilityTileImageStencilReadAccessEXT", SpvWord{4168}},
+        {"FPRoundingModeRTZ", SpvWord{1}},
+        {"ImageFormatRg8", SpvWord{13}},
         {"CapabilityStorageImageArrayDynamicIndexing", SpvWord{31}},
+        {"FPOperationModeALT", SpvWord{1}},
+        {"ExecutionModeOutputTrianglesEXT", SpvWord{5298}},
+        {"RayFlagsNoOpaqueKHR", SpvWord{2}},
+        {"ExecutionModelCallableKHR", SpvWord{5318}},
+        {"RayFlagsCullFrontFacingTrianglesKHR", SpvWord{32}},
+        {"CapabilityDenormPreserve", SpvWord{4464}},
+        {"GroupOperationPartitionedExclusiveScanNV", SpvWord{8}},
+        {"CapabilityFragmentBarycentricNV", SpvWord{5284}},
+        {"FragmentShadingRateVertical2Pixels", SpvWord{1}},
+        {"CapabilitySubgroupAvcMotionEstimationChromaINTEL", SpvWord{5698}},
+        {"CapabilityImageBasic", SpvWord{13}},
+        {"DecorationIOPipeStorageINTEL", SpvWord{5944}},
+        {"StorageClassIncomingRayPayloadKHR", SpvWord{5342}},
+        {"CapabilityPipeStorage", SpvWord{60}},
+        {"CapabilityStorageBufferArrayNonUniformIndexingEXT", SpvWord{5308}},
+        {"ExecutionModeOutputPoints", SpvWord{27}},
+        {"DecorationBlock", SpvWord{2}},
+        {"ExecutionModeSampleInterlockOrderedEXT", SpvWord{5368}},
+        {"DecorationRestrictPointerEXT", SpvWord{5355}},
+        {"MemorySemanticsSubgroupMemory", SpvWord{128}},
+        {"CapabilityShaderViewportIndexLayerEXT", SpvWord{5254}},
+        {"CapabilityMeshShadingNV", SpvWord{5266}},
+        {"ExecutionModeVertexOrderCw", SpvWord{4}},
+        {"ExecutionModeEarlyFragmentTests", SpvWord{9}},
+        {"BuiltInHitTriangleVertexPositionsKHR", SpvWord{5335}},
+        {"CapabilityBlockingPipesINTEL", SpvWord{5945}},
+        {"ImageChannelOrderR", SpvWord{0}},
+        {"ExecutionModeOutputTrianglesNV", SpvWord{5298}},
+        {"CapabilityClipDistance", SpvWord{32}},
+        {"MemorySemanticsNone", SpvWord{0}},
+        {"CapabilityUniformBufferArrayNonUniformIndexingEXT", SpvWord{5306}},
+        {"ExecutionModeInputLinesAdjacency", SpvWord{21}},
+        {"ExecutionModelMissNV", SpvWord{5317}},
+        {"BuiltInSubgroupEqMask", SpvWord{4416}},
+        {"FunctionParameterAttributeRuntimeAlignedINTEL", SpvWord{5940}},
+        {"CapabilityFPGAMemoryAttributesINTEL", SpvWord{5824}},
+        {"ImageChannelOrderRG", SpvWord{2}},
+        {"RayFlagsCullBackFacingTrianglesKHR", SpvWord{16}},
+        {"BuiltInObjectRayDirectionNV", SpvWord{5324}},
+        {"CapabilityCoreBuiltinsARM", SpvWord{4165}},
+        {"CapabilityFPGADSPControlINTEL", SpvWord{5908}},
+        {"BuiltInNumEnqueuedSubgroups", SpvWord{39}},
+        {"DecorationArrayStride", SpvWord{6}},
+        {"CapabilityInt64Atomics", SpvWord{12}},
+        {"MemoryModelSimple", SpvWord{0}},
+        {"ImageFormatRgba16i", SpvWord{22}},
+        {"CapabilityDotProductInput4x8BitPackedKHR", SpvWord{6018}},
+        {"ExecutionModeEarlyAndLateFragmentTestsAMD", SpvWord{5017}},
+        {"BuiltInLayer", SpvWord{9}},
+        {"BuiltInBaryCoordSmoothAMD", SpvWord{4995}},
+        {"ExecutionModeInitializer", SpvWord{33}},
+        {"ImageChannelDataTypeUnormShort555", SpvWord{5}},
+        {"FPOperationModeIEEE", SpvWord{0}},
+        {"MemoryAccessNonPrivatePointer", SpvWord{32}},
+        {"BuiltInLaunchIdNV", SpvWord{5319}},
+        {"CapabilityGroupNonUniformArithmetic", SpvWord{63}},
+        {"ExecutionModelTessellationControl", SpvWord{1}},
+        {"ImageFormatRg16Snorm", SpvWord{17}},
+        {"LoopControlMaxIterations", SpvWord{32}},
+        {"CapabilityTessellationPointSize", SpvWord{23}},
+        {"ExecutionModeNonCoherentDepthAttachmentReadEXT", SpvWord{4170}},
+        {"ImageChannelOrderDepthStencil", SpvWord{14}},
+        {"ImageOperandsNonPrivateTexelKHR", SpvWord{1024}},
+        {"DimRect", SpvWord{4}},
+        {"QuantizationModesTRN_ZERO", SpvWord{1}},
+        {"CapabilitySampleRateShading", SpvWord{35}},
+        {"GroupOperationExclusiveScan", SpvWord{2}},
+        {"DecorationCounterBuffer", SpvWord{5634}},
+        {"GroupOperationInclusiveScan", SpvWord{1}},
+        {"BuiltInLayerPerViewNV", SpvWord{5279}},
+        {"ExecutionModeSampleInterlockUnorderedEXT", SpvWord{5369}},
+        {"OverflowModesWRAP", SpvWord{0}},
+        {"ExecutionModeDerivativeGroupQuadsNV", SpvWord{5289}},
+        {"BuiltInHitKindNV", SpvWord{5333}},
+        {"BuiltInClipDistance", SpvWord{3}},
+        {"ExecutionModeDepthReplacing", SpvWord{12}},
+        {"CapabilityPerViewAttributesNV", SpvWord{5260}},
+        {"DecorationUserTypeGOOGLE", SpvWord{5636}},
+        {"ExecutionModePixelInterlockOrderedEXT", SpvWord{5366}},
+        {"CapabilitySampledBuffer", SpvWord{46}},
+        {"DecorationBinding", SpvWord{33}},
+        {"BuiltInHitTNV", SpvWord{5332}},
+        {"CapabilityUnstructuredLoopControlsINTEL", SpvWord{5886}},
+        {"ExecutionModeSpacingFractionalOdd", SpvWord{3}},
+        {"SourceLanguageCPP_for_OpenCL", SpvWord{6}},
+        {"ExecutionModeShadingRateInterlockUnorderedEXT", SpvWord{5371}},
+        {"RayFlagsSkipAABBsKHR", SpvWord{512}},
+        {"ImageChannelDataTypeSignedInt16", SpvWord{8}},
+        {"CapabilityOptNoneINTEL", SpvWord{6094}},
+        {"DecorationCoherent", SpvWord{23}},
+        {"ExecutionModelMissKHR", SpvWord{5317}},
+        {"BuiltInInstanceIndex", SpvWord{43}},
+        {"ImageFormatR8", SpvWord{15}},
+        {"SourceLanguageHLSL", SpvWord{5}},
+        {"CapabilityGroups", SpvWord{18}},
+        {"CapabilitySampledImageArrayNonUniformIndexingEXT", SpvWord{5307}},
+        {"CapabilityDemoteToHelperInvocationEXT", SpvWord{5379}},
+        {"CapabilityStorageTexelBufferArrayDynamicIndexingEXT", SpvWord{5305}},
+        {"ImageChannelDataTypeUnormInt8", SpvWord{2}},
+        {"CapabilityImageFootprintNV", SpvWord{5282}},
+        {"ExecutionModeNamedBarrierCountINTEL", SpvWord{6417}},
+        {"StorageClassCallableDataNV", SpvWord{5328}},
+        {"CapabilityImageCubeArray", SpvWord{34}},
+        {"BuiltInBaryCoordSmoothSampleAMD", SpvWord{4997}},
+        {"ImageOperandsMakeTexelVisibleKHR", SpvWord{512}},
+        {"DecorationPerViewNV", SpvWord{5272}},
+        {"OverflowModesSAT_SYM", SpvWord{3}},
+        {"CapabilityAddresses", SpvWord{4}},
+        {"CapabilityFPGABufferLocationINTEL", SpvWord{5920}},
+        {"CapabilityFunctionPointersINTEL", SpvWord{5603}},
+        {"CapabilityMatrix", SpvWord{0}},
+        {"CooperativeMatrixOperandsSaturatingAccumulationKHR", SpvWord{16}},
+        {"ImageChannelOrderRGx", SpvWord{11}},
+        {"BuiltInCullDistance", SpvWord{4}},
+        {"DecorationFPFastMathMode", SpvWord{40}},
+        {"MemorySemanticsOutputMemory", SpvWord{4096}},
+        {"CapabilitySampleMaskOverrideCoverageNV", SpvWord{5249}},
+        {"CapabilityUniformAndStorageBuffer16BitAccess", SpvWord{4434}},
+        {"MemoryAccessMakePointerAvailable", SpvWord{8}},
+        {"DecorationVectorComputeVariableINTEL", SpvWord{5624}},
+        {"BuiltInObjectRayDirectionKHR", SpvWord{5324}},
+        {"DecorationFunctionDenormModeINTEL", SpvWord{5823}},
+        {"DecorationAliased", SpvWord{20}},
+        {"CapabilityCullDistance", SpvWord{33}},
+        {"CapabilityIndirectReferencesINTEL", SpvWord{5604}},
+        {"DecorationBoundSamplerNV", SpvWord{5400}},
+        {"BuiltInNumWorkgroups", SpvWord{24}},
+        {"BuiltInFragDepth", SpvWord{22}},
+        {"CapabilityGroupNonUniform", SpvWord{61}},
+        {"BuiltInSubgroupLeMaskKHR", SpvWord{4419}},
+        {"BuiltInTessLevelOuter", SpvWord{11}},
+        {"ExecutionModeVecTypeHint", SpvWord{30}},
+        {"ExecutionModePixelCenterInteger", SpvWord{6}},
+        {"BuiltInLaunchIdKHR", SpvWord{5319}},
+        {"QuantizationModesRND_CONV", SpvWord{6}},
+        {"StorageClassStorageBuffer", SpvWord{12}},
+        {"CapabilityLongConstantCompositeINTEL", SpvWord{6089}},
+        {"MemorySemanticsSequentiallyConsistent", SpvWord{16}},
+        {"DecorationInvariant", SpvWord{18}},
+        {"ExecutionModeDepthGreater", SpvWord{14}},
+        {"ImageFormatRg16ui", SpvWord{36}},
+        {"ImageChannelOrdersRGB", SpvWord{15}},
+        {"BuiltInMeshViewCountNV", SpvWord{5280}},
+        {"MemoryAccessVolatile", SpvWord{1}},
+        {"CapabilityShaderViewportIndex", SpvWord{70}},
+        {"ExecutionModeInputTrianglesAdjacency", SpvWord{23}},
+        {"ImageFormatR11fG11fB10f", SpvWord{8}},
+        {"ImageOperandsSignExtend", SpvWord{4096}},
+        {"CapabilityDotProductInputAll", SpvWord{6016}},
+        {"CapabilityDeviceGroup", SpvWord{4437}},
+        {"MemorySemanticsMakeAvailable", SpvWord{8192}},
+        {"ExecutionModeSpacingEqual", SpvWord{1}},
+        {"ExecutionModeStencilRefGreaterBackAMD", SpvWord{5083}},
+        {"LoopControlMaxConcurrencyINTEL", SpvWord{131072}},
+        {"DecorationDontStaticallyCoalesceINTEL", SpvWord{5901}},
+        {"DecorationMaxReplicatesINTEL", SpvWord{5832}},
+        {"CapabilityUniformDecoration", SpvWord{71}},
+        {"LoopControlSpeculatedIterationsINTEL", SpvWord{4194304}},
+        {"CapabilityImageGatherExtended", SpvWord{25}},
+        {"ImageChannelOrderLuminance", SpvWord{9}},
+        {"DecorationMaxConcurrencyINTEL", SpvWord{5918}},
+        {"ExecutionModeOutputPrimitivesEXT", SpvWord{5270}},
+        {"ImageFormatR8Snorm", SpvWord{20}},
+        {"CapabilitySampleMaskPostDepthCoverage", SpvWord{4447}},
+        {"MemorySemanticsAtomicCounterMemory", SpvWord{1024}},
+        {"CapabilityExpectAssumeKHR", SpvWord{5629}},
+        {"BuiltInInvocationsPerPixelNV", SpvWord{5293}},
+        {"CapabilityAtomicStorageOps", SpvWord{4445}},
+        {"DecorationAlignmentId", SpvWord{46}},
+        {"ExecutionModelMeshNV", SpvWord{5268}},
+        {"BuiltInSubgroupGtMask", SpvWord{4418}},
+        {"DecorationSpecId", SpvWord{1}},
+        {"CapabilityBFloat16ConversionINTEL", SpvWord{6115}},
+        {"BuiltInWarpsPerSMNV", SpvWord{5374}},
+        {"StorageClassAtomicCounter", SpvWord{10}},
+        {"DecorationPipelineEnableINTEL", SpvWord{5919}},
+        {"RayFlagsOpaqueKHR", SpvWord{1}},
+        {"CapabilitySubgroupBufferBlockIOINTEL", SpvWord{5569}},
+        {"ExecutionModelGLCompute", SpvWord{5}},
+        {"DecorationFuncParamAttr", SpvWord{38}},
+        {"StorageClassIncomingRayPayloadNV", SpvWord{5342}},
+        {"ExecutionModeSubgroupSize", SpvWord{35}},
+        {"DecorationNoPerspective", SpvWord{13}},
+        {"DecorationBoundImageNV", SpvWord{5401}},
+        {"CapabilityStorageImageReadWithoutFormat", SpvWord{55}},
+        {"BuiltInRayGeometryIndexKHR", SpvWord{5352}},
+        {"BuiltInShadingRateKHR", SpvWord{4444}},
+        {"QuantizationModesTRN", SpvWord{0}},
+        {"CapabilityShaderViewportMaskNV", SpvWord{5255}},
+        {"BuiltInCullDistancePerViewNV", SpvWord{5278}},
+        {"ExecutionModelTessellationEvaluation", SpvWord{2}},
+        {"ImageOperandsVolatileTexelKHR", SpvWord{2048}},
+        {"CapabilityGroupNonUniformShuffleRelative", SpvWord{66}},
+        {"DecorationRestrict", SpvWord{19}},
+        {"ExecutionModelGeometry", SpvWord{3}},
+        {"CapabilitySubgroupVoteKHR", SpvWord{4431}},
+        {"CapabilityStencilExportEXT", SpvWord{5013}},
+        {"DecorationPerVertexKHR", SpvWord{5285}},
+        {"StorageClassHitAttributeNV", SpvWord{5339}},
+        {"CapabilityFragmentShaderShadingRateInterlockEXT", SpvWord{5372}},
+        {"Dim3D", SpvWord{2}},
+        {"CapabilitySampledImageArrayNonUniformIndexing", SpvWord{5307}},
+        {"StorageClassIncomingCallableDataKHR", SpvWord{5329}},
+        {"CapabilityTextureBoxFilterQCOM", SpvWord{4485}},
+        {"CooperativeMatrixOperandsMatrixBSignedComponentsKHR", SpvWord{2}},
+        {"CapabilityInputAttachmentArrayNonUniformIndexing", SpvWord{5310}},
+        {"ImageFormatR64i", SpvWord{41}},
+        {"CapabilityFPGAClusterAttributesINTEL", SpvWord{5904}},
+        {"KernelEnqueueFlagsWaitWorkGroup", SpvWord{2}},
+        {"DecorationHlslSemanticGOOGLE", SpvWord{5635}},
+        {"ExecutionModeTriangles", SpvWord{22}},
+        {"SamplerAddressingModeNone", SpvWord{0}},
+        {"LoopControlMaxInterleavingINTEL", SpvWord{2097152}},
+        {"CapabilityVectorComputeINTEL", SpvWord{5617}},
+        {"DecorationBufferLocationINTEL", SpvWord{5921}},
+        {"CapabilityShaderViewportIndexLayerNV", SpvWord{5254}},
+        {"RayQueryCandidateIntersectionTypeRayQueryCandidateIntersectionTriangleKHR", SpvWord{0}},
+        {"BuiltInLaunchSizeKHR", SpvWord{5320}},
+        {"BuiltInIncomingRayFlagsKHR", SpvWord{5351}},
+        {"CooperativeMatrixLayoutRowMajorKHR", SpvWord{0}},
+        {"StorageClassPhysicalStorageBuffer", SpvWord{5349}},
+        {"DecorationMatrixStride", SpvWord{7}},
+        {"ImageFormatRgba16Snorm", SpvWord{16}},
+        {"DecorationCacheSizeINTEL", SpvWord{5900}},
+        {"BuiltInWorldToObjectKHR", SpvWord{5331}},
+        {"AccessQualifierWriteOnly", SpvWord{1}},
+        {"DecorationNonReadable", SpvWord{25}},
+        {"CapabilityRoundToInfinityINTEL", SpvWord{5582}},
+        {"ImageFormatRgba32f", SpvWord{1}},
+        {"CapabilityFPMaxErrorINTEL", SpvWord{6169}},
+        {"ImageChannelOrderRGBx", SpvWord{12}},
+        {"CapabilitySparseResidency", SpvWord{41}},
+        {"DecorationMaxByteOffset", SpvWord{45}},
+        {"CapabilityStorageUniform16", SpvWord{4434}},
+        {"CapabilityStorageImageMultisample", SpvWord{27}},
+        {"DecorationBurstCoalesceINTEL", SpvWord{5899}},
+        {"BuiltInBaryCoordNoPerspAMD", SpvWord{4992}},
+        {"ImageOperandsOffsets", SpvWord{65536}},
+        {"LoopControlDependencyArrayINTEL", SpvWord{262144}},
+        {"CapabilityShadingRateNV", SpvWord{5291}},
+        {"LoopControlPipelineEnableINTEL", SpvWord{524288}},
+        {"CapabilityFragmentMaskAMD", SpvWord{5010}},
+        {"BuiltInCoreMaxIDARM", SpvWord{4162}},
+        {"CapabilityImageGatherBiasLodAMD", SpvWord{5009}},
+        {"CapabilityRuntimeAlignedAttributeINTEL", SpvWord{5939}},
+        {"AddressingModelLogical", SpvWord{0}},
+        {"BuiltInHelperInvocation", SpvWord{23}},
+        {"ScopeShaderCallKHR", SpvWord{6}},
+        {"CapabilityVariableLengthArrayINTEL", SpvWord{5817}},
+        {"ExecutionModeRegisterMapInterfaceINTEL", SpvWord{6160}},
+        {"DecorationRegisterINTEL", SpvWord{5825}},
+        {"CooperativeMatrixLayoutColumnMajorKHR", SpvWord{1}},
+        {"DecorationInitiationIntervalINTEL", SpvWord{5917}},
+        {"CapabilitySubgroupBallotKHR", SpvWord{4423}},
+        {"MemoryAccessMakePointerVisible", SpvWord{16}},
+        {"ImageChannelOrderA", SpvWord{1}},
+        {"CapabilityFPGAArgumentInterfacesINTEL", SpvWord{6174}},
+        {"DecorationBufferBlock", SpvWord{3}},
+        {"CapabilityDerivativeControl", SpvWord{51}},
+        {"FPFastMathModeFast", SpvWord{16}},
+        {"SamplerFilterModeNearest", SpvWord{0}},
+        {"CapabilityVulkanMemoryModelKHR", SpvWord{5345}},
+        {"ImageChannelDataTypeHalfFloat", SpvWord{13}},
+        {"BuiltInSampleMask", SpvWord{20}},
+        {"CapabilityTextureSampleWeightedQCOM", SpvWord{4484}},
+        {"DecorationReferencedIndirectlyINTEL", SpvWord{5602}},
+        {"ExecutionModeStencilRefLessFrontAMD", SpvWord{5081}},
+        {"DecorationBankwidthINTEL", SpvWord{5828}},
+        {"ImageChannelDataTypeSignedInt32", SpvWord{9}},
+        {"StorageClassShaderRecordBufferKHR", SpvWord{5343}},
+        {"ExecutionModeInputPoints", SpvWord{19}},
+        {"CapabilityImageMipmap", SpvWord{15}},
+        {"CapabilityVariablePointers", SpvWord{4442}},
+        {"CapabilityDotProductInputAllKHR", SpvWord{6016}},
+        {"DecorationSaturatedConversion", SpvWord{28}},
+        {"QuantizationModesRND_CONV_ODD", SpvWord{7}},
+        {"MemorySemanticsAcquireRelease", SpvWord{8}},
+        {"CapabilityMinLod", SpvWord{42}},
+        {"BuiltInGlobalInvocationId", SpvWord{28}},
+        {"DecorationFPRoundingMode", SpvWord{39}},
+        {"ScopeDevice", SpvWord{1}},
+        {"ImageFormatRg16i", SpvWord{26}},
+        {"MemorySemanticsImageMemory", SpvWord{2048}},
+        {"CapabilityAtomicFloat16MinMaxEXT", SpvWord{5616}},
+        {"ExecutionModeDenormFlushToZero", SpvWord{4460}},
+        {"BuiltInEnqueuedWorkgroupSize", SpvWord{32}},
+        {"BuiltInSubgroupGeMask", SpvWord{4417}},
+        {"ImageChannelOrderRGBA", SpvWord{5}},
+        {"ImageOperandsOffset", SpvWord{16}},
+        {"FunctionControlConst", SpvWord{8}},
+        {"MemorySemanticsWorkgroupMemory", SpvWord{256}},
+        {"ImageFormatRgba16ui", SpvWord{31}},
+        {"CapabilityDemoteToHelperInvocation", SpvWord{5379}},
+        {"BuiltInBaryCoordSmoothCentroidAMD", SpvWord{4996}},
+        {"CapabilityRayQueryProvisionalKHR", SpvWord{4471}},
+        {"CooperativeMatrixUseMatrixAccumulatorKHR", SpvWord{2}},
+        {"CapabilityDotProductKHR", SpvWord{6019}},
+        {"ImageChannelDataTypeUnsignedIntRaw12EXT", SpvWord{20}},
+        {"BuiltInSubgroupLeMask", SpvWord{4419}},
+        {"AddressingModelPhysical64", SpvWord{2}},
+        {"MemoryAccessAliasScopeINTELMask", SpvWord{65536}},
+        {"MemorySemanticsVolatile", SpvWord{32768}},
+        {"FragmentShadingRateVertical4Pixels", SpvWord{2}},
+        {"CapabilityDotProductInput4x8BitPacked", SpvWord{6018}},
+        {"CapabilityGroupNonUniformShuffle", SpvWord{65}},
+        {"CapabilitySubgroupAvcMotionEstimationIntraINTEL", SpvWord{5697}},
+        {"DecorationRelaxedPrecision", SpvWord{0}},
+        {"BuiltInBaryCoordPullModelAMD", SpvWord{4998}},
+        {"ExecutionModelAnyHitKHR", SpvWord{5315}},
+        {"CapabilityInputAttachmentArrayDynamicIndexingEXT", SpvWord{5303}},
+        {"LoopControlIterationMultiple", SpvWord{64}},
+        {"ScopeQueueFamilyKHR", SpvWord{5}},
+        {"RayFlagsSkipClosestHitShaderKHR", SpvWord{8}},
+        {"ExecutionModeLocalSizeHint", SpvWord{18}},
+        {"SourceLanguageGLSL", SpvWord{2}},
+        {"StorageClassWorkgroup", SpvWord{4}},
+        {"MemoryModelGLSL450", SpvWord{1}},
+        {"BuiltInCoreCountARM", SpvWord{4161}},
+        {"CapabilityIntegerFunctions2INTEL", SpvWord{5584}},
+        {"DecorationVolatile", SpvWord{21}},
+        {"MemorySemanticsRelease", SpvWord{4}},
+        {"RayQueryCommittedIntersectionTypeRayQueryCommittedIntersectionGeneratedKHR", SpvWord{2}},
+        {"LoopControlMinIterations", SpvWord{16}},
+        {"CapabilityUniformTexelBufferArrayNonUniformIndexing", SpvWord{5311}},
+        {"KernelEnqueueFlagsWaitKernel", SpvWord{1}},
+        {"ExecutionModeMaxWorkDimINTEL", SpvWord{5894}},
+        {"CapabilityFloatingPointModeINTEL", SpvWord{5583}},
+        {"BuiltInGlobalSize", SpvWord{31}},
+        {"CapabilityGeometryStreams", SpvWord{54}},
+        {"FunctionParameterAttributeSext", SpvWord{1}},
+        {"CapabilityFragmentBarycentricKHR", SpvWord{5284}},
+        {"StorageClassPhysicalStorageBufferEXT", SpvWord{5349}},
+        {"CapabilityComputeDerivativeGroupQuadsNV", SpvWord{5288}},
+        {"ExecutionModelFragment", SpvWord{4}},
+        {"CapabilityStorageBufferArrayDynamicIndexing", SpvWord{30}},
+        {"ScopeWorkgroup", SpvWord{2}},
+        {"DecorationSIMTCallINTEL", SpvWord{5599}},
+        {"MemoryAccessMakePointerAvailableKHR", SpvWord{8}},
+        {"DecorationRegisterMapKernelArgumentINTEL", SpvWord{6176}},
+        {"ImageChannelOrderDepth", SpvWord{13}},
+        {"CapabilityStorageImageArrayNonUniformIndexingEXT", SpvWord{5309}},
+        {"CapabilityPipes", SpvWord{17}},
+        {"ExecutionModeSharedLocalMemorySizeINTEL", SpvWord{5618}},
+        {"DecorationVectorComputeFunctionINTEL", SpvWord{5626}},
+        {"CapabilityLiteralSampler", SpvWord{20}},
+        {"CapabilityWorkgroupMemoryExplicitLayoutKHR", SpvWord{4428}},
+        {"DecorationRowMajor", SpvWord{4}},
+        {"ImageFormatRgba8i", SpvWord{23}},
+        {"ImageFormatRgba32ui", SpvWord{30}},
+        {"AccessQualifierReadOnly", SpvWord{0}},
+        {"BuiltInPrimitiveShadingRateKHR", SpvWord{4432}},
+        {"SamplerAddressingModeClamp", SpvWord{2}},
+        {"FunctionControlPure", SpvWord{4}},
+        {"GroupOperationPartitionedReduceNV", SpvWord{6}},
+        {"SelectionControlNone", SpvWord{0}},
+        {"ExecutionModePixelInterlockUnorderedEXT", SpvWord{5367}},
+        {"ExecutionModeLocalSizeHintId", SpvWord{39}},
+        {"MemoryModelOpenCL", SpvWord{2}},
+        {"FragmentShadingRateHorizontal2Pixels", SpvWord{4}},
+        {"CapabilityMultiViewport", SpvWord{57}},
+        {"CooperativeMatrixUseMatrixBKHR", SpvWord{1}},
+        {"DecorationAlignment", SpvWord{44}},
+        {"QuantizationModesRND_MIN_INF", SpvWord{5}},
+        {"BuiltInSMCountNV", SpvWord{5375}},
+        {"DecorationPerVertexNV", SpvWord{5285}},
+        {"CapabilityVariablePointersStorageBuffer", SpvWord{4441}},
+        {"BuiltInBaseInstance", SpvWord{4425}},
+        {"DecorationAliasedPointer", SpvWord{5356}},
+        {"CapabilitySubgroupShuffleINTEL", SpvWord{5568}},
+        {"CapabilityRayQueryPositionFetchKHR", SpvWord{5391}},
+        {"CapabilityTextureBlockMatchQCOM", SpvWord{4486}},
+        {"ExecutionModeSubgroupsPerWorkgroup", SpvWord{36}},
+        {"MemorySemanticsOutputMemoryKHR", SpvWord{4096}},
+        {"ExecutionModeQuads", SpvWord{24}},
+        {"ImageChannelDataTypeUnormInt101010", SpvWord{6}},
+        {"ImageFormatRgba8", SpvWord{4}},
+        {"BuiltInWorkgroupSize", SpvWord{25}},
+        {"ExecutionModeNoGlobalOffsetINTEL", SpvWord{5895}},
+        {"DecorationForcePow2DepthINTEL", SpvWord{5836}},
+        {"BuiltInGlobalOffset", SpvWord{33}},
+        {"BuiltInBaryCoordKHR", SpvWord{5286}},
+        {"LoopControlInitiationIntervalINTEL", SpvWord{65536}},
+        {"BuiltInWorldToObjectNV", SpvWord{5331}},
+        {"ExecutionModeSchedulerTargetFmaxMhzINTEL", SpvWord{5903}},
+        {"CapabilityStorageBuffer8BitAccess", SpvWord{4448}},
+        {"CapabilityLinkage", SpvWord{5}},
+        {"SourceLanguageOpenCL_C", SpvWord{3}},
+        {"DecorationBankBitsINTEL", SpvWord{5835}},
+        {"SamplerAddressingModeRepeatMirrored", SpvWord{4}},
+        {"ExecutionModeDenormPreserve", SpvWord{4459}},
+        {"ExecutionModeOutputTriangleStrip", SpvWord{29}},
+        {"ImageFormatR16f", SpvWord{9}},
+        {"DecorationFuncParamIOKindINTEL", SpvWord{5625}},
+        {"ExecutionModelIntersectionNV", SpvWord{5314}},
+        {"RayQueryIntersectionRayQueryCommittedIntersectionKHR", SpvWord{1}},
+        {"BuiltInPrimitiveTriangleIndicesEXT", SpvWord{5296}},
+        {"BuiltInPrimitiveId", SpvWord{7}},
+        {"ImageOperandsLod", SpvWord{2}},
+        {"AccessQualifierReadWrite", SpvWord{2}},
+        {"CapabilitySplitBarrierINTEL", SpvWord{6141}},
+        {"CapabilityGroupNonUniformQuad", SpvWord{68}},
+        {"DecorationCentroid", SpvWord{16}},
+        {"BuiltInSubgroupId", SpvWord{40}},
+        {"LoopControlPeelCount", SpvWord{128}},
+        {"LinkageTypeImport", SpvWord{1}},
+        {"ExecutionModeRoundingModeRTPINTEL", SpvWord{5620}},
+        {"ScopeQueueFamily", SpvWord{5}},
+        {"DecorationSecondaryViewportRelativeNV", SpvWord{5256}},
+        {"CapabilityStoragePushConstant8", SpvWord{4450}},
+        {"BuiltInInvocationId", SpvWord{8}},
+        {"MemoryModelVulkanKHR", SpvWord{3}},
+        {"ExecutionModelVertex", SpvWord{0}},
+        {"DecorationXfbBuffer", SpvWord{36}},
+        {"DecorationSingleElementVectorINTEL", SpvWord{6085}},
+        {"CapabilityInterpolationFunction", SpvWord{52}},
+        {"CapabilityFPGAKernelAttributesv2INTEL", SpvWord{6161}},
+        {"ImageFormatR32f", SpvWord{3}},
+        {"CapabilityFPGARegINTEL", SpvWord{5948}},
+        {"LoopControlNone", SpvWord{0}},
+        {"BuiltInSubgroupLtMask", SpvWord{4420}},
+        {"FunctionParameterAttributeByVal", SpvWord{2}},
+        {"DecorationNumbanksINTEL", SpvWord{5827}},
+        {"BuiltInInstanceId", SpvWord{6}},
+        {"ImageChannelDataTypeUnormInt24", SpvWord{15}},
+        {"ScopeSubgroup", SpvWord{3}},
+        {"ExecutionModeStencilRefUnchangedBackAMD", SpvWord{5082}},
+        {"LoopControlNoFusionINTEL", SpvWord{8388608}},
+        {"CapabilityMeshShadingEXT", SpvWord{5283}},
+        {"DecorationIndex", SpvWord{32}},
+        {"ImageOperandsBias", SpvWord{1}},
+        {"LinkageTypeExport", SpvWord{0}},
+        {"ExecutionModeOriginUpperLeft", SpvWord{7}},
+        {"BuiltInCoreIDARM", SpvWord{4160}},
+        {"BuiltInHitKindKHR", SpvWord{5333}},
+        {"BuiltInSubgroupGtMaskKHR", SpvWord{4418}},
+        {"CapabilityFPGALatencyControlINTEL", SpvWord{6171}},
+        {"SourceLanguageOpenCL_CPP", SpvWord{4}},
+        {"ImageFormatRg8Snorm", SpvWord{18}},
+        {"BuiltInRayTmaxNV", SpvWord{5326}},
+        {"CapabilityTransformFeedback", SpvWord{53}},
+        {"FPFastMathModeAllowRecip", SpvWord{8}},
+        {"SourceLanguageWGSL", SpvWord{10}},
+        {"CooperativeMatrixOperandsMatrixCSignedComponentsKHR", SpvWord{4}},
+        {"BuiltInBaryCoordNV", SpvWord{5286}},
+        {"ImageChannelDataTypeUnormShort565", SpvWord{4}},
+        {"DecorationRestrictPointer", SpvWord{5355}},
+        {"CapabilityRayQueryKHR", SpvWord{4472}},
+        {"ExecutionModelClosestHitKHR", SpvWord{5316}},
+        {"CapabilityArbitraryPrecisionFixedPointINTEL", SpvWord{5922}},
+        {"CapabilityRayTracingOpacityMicromapEXT", SpvWord{5381}},
+        {"DecorationPerPrimitiveNV", SpvWord{5271}},
+        {"DecorationMathOpDSPModeINTEL", SpvWord{5909}},
+        {"ImageOperandsVolatileTexel", SpvWord{2048}},
+        {"BuiltInTessLevelInner", SpvWord{12}},
+        {"ExecutionModePostDepthCoverage", SpvWord{4446}},
+        {"CapabilityLoopFuseINTEL", SpvWord{5906}},
+        {"CapabilityFunctionFloatControlINTEL", SpvWord{5821}},
+        {"CapabilityPhysicalStorageBufferAddresses", SpvWord{5347}},
+        {"ImageChannelOrderARGB", SpvWord{7}},
+        {"StorageClassIncomingCallableDataNV", SpvWord{5329}},
+        {"DecorationFunctionRoundingModeINTEL", SpvWord{5822}},
+        {"ExecutionModeDepthUnchanged", SpvWord{16}},
+        {"ImageChannelOrdersRGBx", SpvWord{16}},
+        {"DecorationMemoryINTEL", SpvWord{5826}},
+        {"CapabilityTileImageColorReadAccessEXT", SpvWord{4166}},
+        {"CooperativeMatrixOperandsMatrixASignedComponentsKHR", SpvWord{1}},
+        {"StorageClassFunction", SpvWord{7}},
+        {"CapabilityGenericPointer", SpvWord{38}},
+        {"CapabilityFPGAKernelAttributesINTEL", SpvWord{5897}},
+        {"CapabilitySubgroupImageMediaBlockIOINTEL", SpvWord{5579}},
+        {"CapabilityVector16", SpvWord{7}},
+        {"ExecutionModeSubgroupUniformControlFlowKHR", SpvWord{4421}},
+        {"CapabilityKernel", SpvWord{6}},
+        {"BuiltInWorkDim", SpvWord{30}},
+        {"CapabilityPhysicalStorageBufferAddressesEXT", SpvWord{5347}},
+        {"SamplerAddressingModeClampToEdge", SpvWord{1}},
+        {"DecorationMMHostInterfaceAddressWidthINTEL", SpvWord{6177}},
+        {"CapabilityGroupNonUniformVote", SpvWord{62}},
+        {"ImageFormatRgb10a2ui", SpvWord{34}},
+        {"DecorationNonUniformEXT", SpvWord{5300}},
+        {"CooperativeMatrixOperandsNoneKHR", SpvWord{0}},
+        {"CapabilityShaderClockKHR", SpvWord{5055}},
+        {"MemorySemanticsUniformMemory", SpvWord{64}},
+        {"DecorationSideEffectsINTEL", SpvWord{5608}},
+        {"StorageClassShaderRecordBufferNV", SpvWord{5343}},
+        {"CapabilityShaderSMBuiltinsNV", SpvWord{5373}},
+        {"CapabilityAtomicFloat64MinMaxEXT", SpvWord{5613}},
+        {"SourceLanguageESSL", SpvWord{1}},
+        {"DecorationMMHostInterfaceMaxBurstINTEL", SpvWord{6181}},
+        {"DecorationMaxByteOffsetId", SpvWord{47}},
+        {"ImageOperandsMakeTexelAvailable", SpvWord{256}},
+        {"CapabilityImageBuffer", SpvWord{47}},
+        {"CapabilityStorageTexelBufferArrayNonUniformIndexingEXT", SpvWord{5312}},
+        {"BuiltInInstanceCustomIndexNV", SpvWord{5327}},
+        {"ExecutionModeDepthLess", SpvWord{15}},
+        {"ImageFormatR8ui", SpvWord{39}},
+        {"GroupOperationReduce", SpvWord{0}},
+        {"CapabilityWorkgroupMemoryExplicitLayout16BitAccessKHR", SpvWord{4430}},
+        {"CapabilityInputAttachmentArrayDynamicIndexing", SpvWord{5303}},
+        {"LoopControlLoopCoalesceINTEL", SpvWord{1048576}},
+        {"FunctionParameterAttributeNoReadWrite", SpvWord{7}},
+        {"CapabilityAtomicStorage", SpvWord{21}},
+        {"DecorationSinglepumpINTEL", SpvWord{5830}},
+        {"ExecutionModeLocalSize", SpvWord{17}},
+        {"SamplerFilterModeLinear", SpvWord{1}},
+        {"DecorationGLSLPacked", SpvWord{9}},
+        {"SelectionControlDontFlatten", SpvWord{2}},
+        {"ExecutionModelClosestHitNV", SpvWord{5316}},
+        {"DecorationBlockMatchTextureQCOM", SpvWord{4488}},
+        {"FunctionParameterAttributeNoAlias", SpvWord{4}},
+        {"ImageFormatRg8ui", SpvWord{37}},
+        {"CapabilityArbitraryPrecisionIntegersINTEL", SpvWord{5844}},
+        {"LoopControlPartialCount", SpvWord{256}},
+        {"CapabilityImageQuery", SpvWord{50}},
+        {"StorageClassTileImageEXT", SpvWord{4172}},
+        {"ImageFormatRgba16f", SpvWord{2}},
+        {"KernelProfilingInfoCmdExecTime", SpvWord{1}},
+        {"DecorationNoUnsignedWrap", SpvWord{4470}},
+        {"ExecutionModeOutputLinesNV", SpvWord{5269}},
+        {"BuiltInWarpIDNV", SpvWord{5376}},
+        {"BuiltInSubgroupGeMaskKHR", SpvWord{4417}},
+        {"CapabilityNamedBarrier", SpvWord{59}},
+        {"CapabilityDotProductInput4x8BitKHR", SpvWord{6017}},
+        {"BuiltInNumSubgroups", SpvWord{38}},
+        {"CapabilityStorageBufferArrayNonUniformIndexing", SpvWord{5308}},
+        {"CapabilityRayTracingKHR", SpvWord{4479}},
+        {"ImageChannelDataTypeUnsignedIntRaw10EXT", SpvWord{19}},
+        {"QuantizationModesRND_INF", SpvWord{4}},
+        {"ExecutionModeSignedZeroInfNanPreserve", SpvWord{4461}},
+        {"CapabilityDotProduct", SpvWord{6019}},
+        {"CapabilityAtomicFloat32MinMaxEXT", SpvWord{5612}},
+        {"FPFastMathModeAllowReassocINTEL", SpvWord{131072}},
+        {"MemorySemanticsCrossWorkgroupMemory", SpvWord{512}},
+        {"OverflowModesSAT", SpvWord{1}},
+        {"CapabilityFPGALoopControlsINTEL", SpvWord{5888}},
+        {"DecorationStableKernelArgumentINTEL", SpvWord{6183}},
+        {"CapabilityBindlessTextureNV", SpvWord{5390}},
+        {"ImageFormatR32i", SpvWord{24}},
+        {"DecorationComponent", SpvWord{31}},
+        {"StorageClassHitObjectAttributeNV", SpvWord{5385}},
+        {"SelectionControlFlatten", SpvWord{1}},
+        {"DecorationStackCallINTEL", SpvWord{5627}},
+        {"CapabilityMemoryAccessAliasingINTEL", SpvWord{5910}},
+        {"ImageFormatR64ui", SpvWord{40}},
+        {"StorageClassDeviceOnlyINTEL", SpvWord{5936}},
+        {"DecorationVectorComputeCallableFunctionINTEL", SpvWord{6087}},
+        {"BuiltInViewportMaskPerViewNV", SpvWord{5262}},
+        {"BuiltInRayTmaxKHR", SpvWord{5326}},
+        {"DecorationPatch", SpvWord{15}},
+        {"CapabilityGeometry", SpvWord{2}},
+        {"ExecutionModeFinalizer", SpvWord{34}},
+        {"ImageChannelOrderABGR", SpvWord{19}},
+        {"ImageOperandsSample", SpvWord{64}},
+        {"ExecutionModeSpacingFractionalEven", SpvWord{2}},
+        {"ImageChannelDataTypeUnsignedInt8", SpvWord{10}},
+        {"DecorationOverrideCoverageNV", SpvWord{5248}},
+        {"FunctionParameterAttributeNoCapture", SpvWord{5}},
+        {"ImageFormatRgba8ui", SpvWord{32}},
+        {"CapabilityFragmentShaderPixelInterlockEXT", SpvWord{5378}},
+        {"FunctionControlDontInline", SpvWord{2}},
+        {"DecorationWeightTextureQCOM", SpvWord{4487}},
+        {"CapabilityShaderInvocationReorderNV", SpvWord{5383}},
+        {"DecorationExplicitInterpAMD", SpvWord{4999}},
+        {"CapabilityDeviceEnqueue", SpvWord{19}},
+        {"CapabilityFloat16", SpvWord{9}},
+        {"CapabilityRayTracingNV", SpvWord{5340}},
+        {"StorageClassCodeSectionINTEL", SpvWord{5605}},
+        {"BuiltInPatchVertices", SpvWord{14}},
+        {"DecorationBindlessSamplerNV", SpvWord{5398}},
+        {"RayFlagsCullOpaqueKHR", SpvWord{64}},
+        {"CapabilityStorageBuffer16BitAccess", SpvWord{4433}},
+        {"ExecutionModelTaskEXT", SpvWord{5364}},
+        {"ExecutionModeStreamingInterfaceINTEL", SpvWord{6154}},
+        {"BuiltInClipDistancePerViewNV", SpvWord{5277}},
+        {"CapabilitySampledRect", SpvWord{37}},
+        {"CapabilityGroupNonUniformPartitionedNV", SpvWord{5297}},
+        {"BuiltInWorldRayDirectionKHR", SpvWord{5322}},
+        {"ExecutionModelRayGenerationNV", SpvWord{5313}},
+        {"BuiltInWorldRayOriginKHR", SpvWord{5321}},
+        {"ImageChannelDataTypeSnormInt8", SpvWord{0}},
+        {"BuiltInSecondaryViewportMaskNV", SpvWord{5258}},
+        {"DecorationMergeINTEL", SpvWord{5834}},
+        {"FunctionParameterAttributeNoWrite", SpvWord{6}},
+        {"DecorationFPMaxErrorDecorationINTEL", SpvWord{6170}},
+        {"ExecutionModeOutputLinesEXT", SpvWord{5269}},
+        {"DecorationDescriptorSet", SpvWord{34}},
+        {"CapabilityVectorAnyINTEL", SpvWord{5619}},
+        {"QuantizationModesRND", SpvWord{2}},
+        {"DimCube", SpvWord{3}},
+        {"ExecutionModeOriginLowerLeft", SpvWord{8}},
+        {"ImageFormatRg32ui", SpvWord{35}},
+        {"CapabilityAtomicFloat16AddEXT", SpvWord{6095}},
+        {"FunctionParameterAttributeSret", SpvWord{3}},
+        {"ImageOperandsConstOffsets", SpvWord{32}},
+        {"DecorationAliasedPointerEXT", SpvWord{5356}},
+        {"BuiltInWarpMaxIDARM", SpvWord{4164}},
+        {"ImageFormatRg8i", SpvWord{27}},
+        {"ImageChannelOrdersRGBA", SpvWord{17}},
+        {"StorageClassPrivate", SpvWord{6}},
+        {"BuiltInPositionPerViewNV", SpvWord{5261}},
+        {"ExecutionModeIsolines", SpvWord{25}},
+        {"ScopeCrossDevice", SpvWord{0}},
+        {"BuiltInObjectToWorldNV", SpvWord{5330}},
+        {"CapabilityWorkgroupMemoryExplicitLayout8BitAccessKHR", SpvWord{4429}},
+        {"CapabilityUniformAndStorageBuffer8BitAccess", SpvWord{4449}},
+        {"ImageChannelDataTypeUnsignedInt32", SpvWord{12}},
+        {"FPRoundingModeRTP", SpvWord{2}},
+        {"ExecutionModeRoundingModeRTNINTEL", SpvWord{5621}},
+        {"DecorationLinkageAttributes", SpvWord{41}},
+        {"DecorationFunctionFloatingPointModeINTEL", SpvWord{6080}},
+        {"CapabilityRayTracingMotionBlurNV", SpvWord{5341}},
+        {"StorageClassCallableDataKHR", SpvWord{5328}},
+        {"CapabilityVulkanMemoryModelDeviceScope", SpvWord{5346}},
+        {"LoopControlUnroll", SpvWord{1}},
+        {"ImageChannelOrdersBGRA", SpvWord{18}},
+        {"MemorySemanticsAcquire", SpvWord{2}},
+        {"FPFastMathModeNotInf", SpvWord{2}},
+        {"DecorationClobberINTEL", SpvWord{5607}},
+        {"BuiltInCullPrimitiveEXT", SpvWord{5299}},
+        {"FPRoundingModeRTE", SpvWord{0}},
+        {"ExecutionModeSubgroupsPerWorkgroupId", SpvWord{37}},
+        {"GroupOperationPartitionedInclusiveScanNV", SpvWord{7}},
+        {"CapabilityInt64ImageEXT", SpvWord{5016}},
+        {"CapabilityStorageUniformBufferBlock16", SpvWord{4433}},
+        {"DecorationColMajor", SpvWord{5}},
+        {"FunctionControlInline", SpvWord{1}},
+        {"CapabilityShader", SpvWord{1}},
+        {"ExecutionModeOutputLineStrip", SpvWord{28}},
+        {"CapabilityFPFastMathModeINTEL", SpvWord{5837}},
+        {"CapabilityFPGAMemoryAccessesINTEL", SpvWord{5898}},
+        {"FPDenormModePreserve", SpvWord{0}},
+        {"ExecutionModeNonCoherentColorAttachmentReadEXT", SpvWord{4169}},
+        {"StorageClassHitAttributeKHR", SpvWord{5339}},
+        {"CapabilityShaderStereoViewNV", SpvWord{5259}},
+        {"ExecutionModeXfb", SpvWord{11}},
+        {"MemorySemanticsMakeVisibleKHR", SpvWord{16384}},
+        {"StorageClassUniform", SpvWord{2}},
+        {"BuiltInCullMaskKHR", SpvWord{6021}},
+        {"DecorationPerPrimitiveEXT", SpvWord{5271}},
+        {"BuiltInBaryCoordNoPerspKHR", SpvWord{5287}},
+        {"DecorationViewportRelativeNV", SpvWord{5252}},
+        {"ExecutionModeStencilRefLessBackAMD", SpvWord{5084}},
+        {"ImageFormatRgba32i", SpvWord{21}},
+        {"BuiltInDrawIndex", SpvWord{4426}},
+        {"ImageFormatRg16f", SpvWord{7}},
+        {"ExecutionModePointMode", SpvWord{10}},
+        {"BuiltInBaryCoordNoPerspSampleAMD", SpvWord{4994}},
+        {"BuiltInTaskCountNV", SpvWord{5274}},
+        {"DecorationBindlessImageNV", SpvWord{5399}},
+        {"CapabilityImageReadWrite", SpvWord{14}},
+        {"RayFlagsTerminateOnFirstHitKHR", SpvWord{4}},
+        {"ImageFormatRg16", SpvWord{12}},
+        {"KernelProfilingInfoNone", SpvWord{0}},
+        {"CapabilityBitInstructions", SpvWord{6025}},
+        {"ImageFormatR32ui", SpvWord{33}},
+        {"CapabilityGeometryShaderPassthroughNV", SpvWord{5251}},
+        {"BuiltInSubgroupSize", SpvWord{36}},
+        {"FunctionControlOptNoneINTEL", SpvWord{65536}},
+        {"ImageChannelDataTypeFloat", SpvWord{14}},
+        {"ImageChannelOrderRx", SpvWord{10}},
+        {"ImageFormatR16", SpvWord{14}},
+        {"BuiltInIncomingRayFlagsNV", SpvWord{5351}},
+        {"CapabilityFloat16Buffer", SpvWord{8}},
+        {"DecorationMMHostInterfaceDataWidthINTEL", SpvWord{6178}},
+        {"DecorationPassthroughNV", SpvWord{5250}},
+        {"StorageClassOutput", SpvWord{3}},
+        {"MemoryAccessNonPrivatePointerKHR", SpvWord{32}},
+        {"CapabilityRoundingModeRTE", SpvWord{4467}},
+        {"StorageClassRayPayloadKHR", SpvWord{5338}},
+        {"CooperativeMatrixUseMatrixAKHR", SpvWord{0}},
+        {"StorageClassCrossWorkgroup", SpvWord{5}},
+        {"BuiltInLaunchSizeNV", SpvWord{5320}},
+        {"QuantizationModesRND_ZERO", SpvWord{3}},
+        {"BuiltInSampleId", SpvWord{18}},
+        {"DecorationGlobalVariableOffsetINTEL", SpvWord{5628}},
+        {"ImageFormatR16i", SpvWord{28}},
+        {"ExecutionModeRoundingModeRTZ", SpvWord{4463}},
+        {"BuiltInViewIndex", SpvWord{4440}},
+        {"ImageFormatR8i", SpvWord{29}},
+        {"CapabilityRayTraversalPrimitiveCullingKHR", SpvWord{4478}},
+        {"CapabilityRoundingModeRTZ", SpvWord{4468}},
+        {"ExecutionModeContractionOff", SpvWord{31}},
+        {"AddressingModelPhysicalStorageBuffer64", SpvWord{5348}},
+        {"ImageFormatUnknown", SpvWord{0}},
+        {"BuiltInInstanceCustomIndexKHR", SpvWord{5327}},
+        {"DecorationXfbStride", SpvWord{37}},
+        {"CapabilityAtomicFloat64AddEXT", SpvWord{6034}},
+        {"RayQueryCandidateIntersectionTypeRayQueryCandidateIntersectionAABBKHR", SpvWord{1}},
+        {"FPFastMathModeNotNaN", SpvWord{1}},
+        {"DecorationMMHostInterfaceReadWriteModeINTEL", SpvWord{6180}},
+        {"DecorationLatencyControlConstraintINTEL", SpvWord{6173}},
+        {"LoopControlMaxReinvocationDelayINTEL", SpvWord{33554432}},
+        {"CapabilityStorageTexelBufferArrayNonUniformIndexing", SpvWord{5312}},
+        {"CapabilityUSMStorageClassesINTEL", SpvWord{5935}},
+        {"CapabilityImageRect", SpvWord{36}},
+        {"CapabilityFloat64", SpvWord{10}},
+        {"ImageOperandsMakeTexelVisible", SpvWord{512}},
+        {"LoopControlDontUnroll", SpvWord{2}},
+        {"StorageClassPushConstant", SpvWord{9}},
+        {"BuiltInWorkgroupId", SpvWord{26}},
+        {"ImageFormatR16ui", SpvWord{38}},
+        {"CapabilityInt64", SpvWord{11}},
+        {"BuiltInSubgroupEqMaskKHR", SpvWord{4416}},
+        {"MemorySemanticsMakeVisible", SpvWord{16384}},
+        {"DecorationNoSignedWrap", SpvWord{4469}},
+        {"ImageChannelDataTypeUnsignedInt16", SpvWord{11}},
+        {"OverflowModesSAT_ZERO", SpvWord{2}},
+        {"MemoryAccessNoAliasINTELMask", SpvWord{131072}},
+        {"CapabilityRuntimeDescriptorArray", SpvWord{5302}},
+        {"CapabilitySubgroupAvcMotionEstimationINTEL", SpvWord{5696}},
+        {"ExecutionModelIntersectionKHR", SpvWord{5314}},
+        {"StorageClassImage", SpvWord{11}},
+        {"BuiltInPrimitiveCountNV", SpvWord{5275}},
+        {"DecorationHlslCounterBufferGOOGLE", SpvWord{5634}},
+        {"CapabilityGroupNonUniformClustered", SpvWord{67}},
+        {"LoopControlLoopCountINTEL", SpvWord{16777216}},
+        {"RayFlagsSkipTrianglesKHR", SpvWord{256}},
+        {"ExecutionModeShadingRateInterlockOrderedEXT", SpvWord{5370}},
+        {"ExecutionModeMaxWorkgroupSizeINTEL", SpvWord{5893}},
+        {"BuiltInLocalInvocationId", SpvWord{27}},
+        {"CapabilityFragmentShadingRateKHR", SpvWord{4422}},
+        {"CapabilityShaderNonUniform", SpvWord{5301}},
+        {"ExecutionModeVertexOrderCcw", SpvWord{5}},
+        {"FPDenormModeFlushToZero", SpvWord{1}},
+        {"CooperativeMatrixOperandsMatrixResultSignedComponentsKHR", SpvWord{8}},
+        {"RayQueryIntersectionRayQueryCandidateIntersectionKHR", SpvWord{0}},
+        {"CapabilityAsmINTEL", SpvWord{5606}},
+        {"BuiltInPosition", SpvWord{0}},
+        {"BuiltInPrimitiveLineIndicesEXT", SpvWord{5295}},
+        {"DecorationAliasScopeINTEL", SpvWord{5914}},
+        {"CapabilityGroupUniformArithmeticKHR", SpvWord{6400}},
+        {"BuiltInMeshViewIndicesNV", SpvWord{5281}},
+        {"DimTileImageDataEXT", SpvWord{4173}},
+        {"DecorationMMHostInterfaceWaitRequestINTEL", SpvWord{6182}},
+        {"CapabilityArbitraryPrecisionFloatingPointINTEL", SpvWord{5845}},
+        {"SourceLanguageNZSL", SpvWord{9}},
+        {"CapabilityFragmentFullyCoveredEXT", SpvWord{5265}},
+        {"BuiltInPointCoord", SpvWord{16}},
+        {"CapabilitySubgroupDispatch", SpvWord{58}},
+        {"CapabilityImageReadWriteLodAMD", SpvWord{5015}},
+        {"CapabilityInputAttachmentArrayNonUniformIndexingEXT", SpvWord{5310}},
+        {"ScopeInvocation", SpvWord{4}},
+        {"ExecutionModelTaskNV", SpvWord{5267}},
+        {"CapabilityStorageTexelBufferArrayDynamicIndexing", SpvWord{5305}},
+        {"CapabilityTessellation", SpvWord{3}},
+        {"CapabilitySubgroupImageBlockIOINTEL", SpvWord{5570}},
+        {"ImageChannelOrderIntensity", SpvWord{8}},
+        {"CapabilityRayTracingProvisionalKHR", SpvWord{5353}},
+        {"CapabilityDotProductInput4x8Bit", SpvWord{6017}},
+        {"FPRoundingModeRTN", SpvWord{3}},
+        {"BuiltInVertexIndex", SpvWord{42}},
+        {"ExecutionModeStencilRefReplacingEXT", SpvWord{5027}},
+        {"MemorySemanticsRelaxed", SpvWord{0}},
+        {"CapabilityFragmentShaderSampleInterlockEXT", SpvWord{5363}},
+        {"ImageOperandsZeroExtend", SpvWord{8192}},
+        {"CapabilityVulkanMemoryModelDeviceScopeKHR", SpvWord{5346}},
+        {"RayQueryCommittedIntersectionTypeRayQueryCommittedIntersectionTriangleKHR", SpvWord{1}},
+        {"BuiltInBaseVertex", SpvWord{4424}},
+        {"ExecutionModeNumSIMDWorkitemsINTEL", SpvWord{5896}},
+        {"DecorationSample", SpvWord{17}},
+        {"BuiltInSubgroupLtMaskKHR", SpvWord{4420}},
+        {"ImageChannelDataTypeUnormInt16", SpvWord{3}},
+        {"ImageOperandsNone", SpvWord{0}},
+        {"CapabilityImageMSArray", SpvWord{48}},
+        {"ImageFormatRgba8Snorm", SpvWord{5}},
+        {"CapabilityUniformTexelBufferArrayNonUniformIndexingEXT", SpvWord{5311}},
+        {"DecorationNonWritable", SpvWord{24}},
+        {"BuiltInSubgroupMaxSize", SpvWord{37}},
+        {"CapabilityTileImageDepthReadAccessEXT", SpvWord{4167}},
+        {"Dim2D", SpvWord{1}},
+        {"DecorationStream", SpvWord{29}},
+        {"CapabilityUniformBufferArrayDynamicIndexing", SpvWord{28}},
+        {"CapabilityStorageImageExtendedFormats", SpvWord{49}},
+        {"CapabilityFloat16ImageAMD", SpvWord{5008}},
+        {"ExecutionModelAnyHitNV", SpvWord{5315}},
+        {"DecorationInputAttachmentIndex", SpvWord{43}},
+        {"BuiltInRayTminKHR", SpvWord{5325}},
+        {"BuiltInSubgroupLocalInvocationId", SpvWord{41}},
+        {"BuiltInViewportIndex", SpvWord{10}},
+        {"CapabilityMultiView", SpvWord{4439}},
+        {"AddressingModelPhysicalStorageBuffer64EXT", SpvWord{5348}},
+        {"DimBuffer", SpvWord{5}},
+        {"DecorationLatencyControlLabelINTEL", SpvWord{6172}},
+        {"DecorationSimpleDualPortINTEL", SpvWord{5833}},
+        {"BuiltInWorldRayOriginNV", SpvWord{5321}},
+        {"BuiltInObjectRayOriginNV", SpvWord{5323}},
+        {"RayFlagsForceOpacityMicromap2StateEXT", SpvWord{1024}},
+        {"CapabilityGeometryPointSize", SpvWord{24}},
+        {"LinkageTypeLinkOnceODR", SpvWord{2}},
+        {"ExecutionModeStencilRefUnchangedFrontAMD", SpvWord{5079}},
+        {"FPFastMathModeNone", SpvWord{0}},
+        {"DecorationNoAliasINTEL", SpvWord{5915}},
+        {"CapabilityShaderLayer", SpvWord{69}},
+        {"DecorationHitObjectShaderRecordBufferNV", SpvWord{5386}},
+        {"ImageChannelDataTypeUnormInt101010_2", SpvWord{16}},
+        {"BuiltInSamplePosition", SpvWord{19}},
+        {"CapabilityUniformTexelBufferArrayDynamicIndexingEXT", SpvWord{5304}},
+        {"DecorationUniform", SpvWord{26}},
+        {"ImageOperandsMakeTexelAvailableKHR", SpvWord{256}},
+        {"CapabilityUniformBufferArrayNonUniformIndexing", SpvWord{5306}},
+        {"DecorationPrefetchINTEL", SpvWord{5902}},
+        {"CapabilityDebugInfoModuleINTEL", SpvWord{6114}},
+        {"StorageClassGeneric", SpvWord{8}},
+        {"CapabilitySampled1D", SpvWord{43}},
+        {"ImageOperandsNonPrivateTexel", SpvWord{1024}},
+        {"LoopControlDependencyInfinite", SpvWord{4}},
+        {"StorageClassInput", SpvWord{1}},
+        {"LoopControlDependencyLength", SpvWord{8}},
+        {"GroupOperationClusteredReduce", SpvWord{3}},
+        {"CapabilityDrawParameters", SpvWord{4427}},
+        {"CapabilityUniformTexelBufferArrayDynamicIndexing", SpvWord{5304}},
+        {"ExecutionModeDerivativeGroupLinearNV", SpvWord{5290}},
+        {"DecorationMMHostInterfaceLatencyINTEL", SpvWord{6179}},
+        {"CapabilityInt8", SpvWord{39}},
+        {"ImageChannelDataTypeSnormInt16", SpvWord{1}},
+        {"CapabilityStorageInputOutput16", SpvWord{4436}},
+        {"CapabilitySampledImageArrayDynamicIndexing", SpvWord{29}},
+        {"ExecutionModeNonCoherentStencilAttachmentReadEXT", SpvWord{4171}},
+        {"BuiltInSMIDNV", SpvWord{5377}},
+        {"CapabilityKernelAttributesINTEL", SpvWord{5892}},
+        {"StorageClassUniformConstant", SpvWord{0}},
+        {"CapabilityCooperativeMatrixNV", SpvWord{5357}},
+        {"DecorationNoContraction", SpvWord{42}},
+        {"ExecutionModelKernel", SpvWord{6}},
+        {"DecorationPerTaskNV", SpvWord{5273}},
+        {"BuiltInFragInvocationCountEXT", SpvWord{5293}},
+        {"BuiltInDeviceIndex", SpvWord{4438}},
+        {"CapabilityStorageImageWriteWithoutFormat", SpvWord{56}},
+        {"CapabilityGroupNonUniformRotateKHR", SpvWord{6026}},
+        {"CapabilityDenormFlushToZero", SpvWord{4465}},
+        {"ExecutionModeRoundingModeRTE", SpvWord{4462}},
+        {"BuiltInPointSize", SpvWord{1}},
+        {"CapabilityComputeDerivativeGroupLinearNV", SpvWord{5350}},
+        {"ImageChannelOrderRA", SpvWord{3}},
     };
 
     static const auto hash = [](const UnownedStringSlice& str, UInt32 salt){
-        return combineHash(getHashCode(str), getHashCode(salt)) % 944;
+        UInt32 h = salt;
+        for (const char c : str)
+            h = (h * 0x01000193) ^ c;
+        return h % 944;
     };
 
     const auto i = hash(str, tableSalt[hash(str, 0)]);
@@ -9913,76 +9922,79 @@ static bool getOpName(const SpvOp& k, UnownedStringSlice& v)
 static bool lookupOperandKind(const UnownedStringSlice& str, OperandKind& value)
 {
     static const unsigned tableSalt[56] = {
-        1, 0, 1, 1, 0, 1, 1, 2, 8, 1, 0, 2, 0, 0, 1, 1,
-        3, 2, 2, 0, 0, 4, 0, 2, 0, 4, 2, 1, 1, 0, 0, 10,
-        0, 4, 2, 0, 4, 6, 0, 0, 0, 1, 0, 3, 5, 2, 0, 3,
-        1, 13, 0, 14, 0, 103, 16, 128
+        3, 1, 3, 1, 0, 3, 0, 0, 3, 0, 1, 1, 1, 3, 6, 2,
+        1, 2, 0, 0, 2, 1, 0, 1, 6, 1, 0, 0, 0, 2, 5, 6,
+        2, 0, 1, 0, 9, 2, 1, 5, 11, 7, 0, 0, 2, 0, 3, 0,
+        0, 2, 0, 20, 4, 7, 0, 9
     };
 
     using KV = std::pair<const char*, OperandKind>;
 
     static const KV words[56] =
     {
-        {"CooperativeMatrixLayout", OperandKind{41}},
-        {"StorageClass", OperandKind{15}},
-        {"LiteralExtInstInteger", OperandKind{51}},
-        {"PairIdRefLiteralInteger", OperandKind{54}},
-        {"SelectionControl", OperandKind{2}},
-        {"RayQueryCandidateIntersectionType", OperandKind{38}},
-        {"Capability", OperandKind{35}},
-        {"SamplerAddressingMode", OperandKind{17}},
-        {"FragmentShadingRate", OperandKind{9}},
-        {"IdRef", OperandKind{47}},
-        {"Dim", OperandKind{16}},
-        {"PairIdRefIdRef", OperandKind{55}},
-        {"PairLiteralIntegerIdRef", OperandKind{53}},
-        {"BuiltIn", OperandKind{31}},
-        {"ImageChannelDataType", OperandKind{21}},
-        {"CooperativeMatrixOperands", OperandKind{40}},
-        {"FPOperationMode", OperandKind{25}},
-        {"FunctionParameterAttribute", OperandKind{29}},
-        {"ExecutionMode", OperandKind{14}},
-        {"SourceLanguage", OperandKind{10}},
-        {"IdScope", OperandKind{46}},
         {"QuantizationModes", OperandKind{24}},
-        {"PackedVectorFormat", OperandKind{39}},
-        {"IdMemorySemantics", OperandKind{45}},
-        {"LinkageType", OperandKind{27}},
-        {"ImageOperands", OperandKind{0}},
-        {"OverflowModes", OperandKind{26}},
-        {"MemorySemantics", OperandKind{5}},
-        {"Scope", OperandKind{32}},
-        {"IdResultType", OperandKind{43}},
-        {"ImageFormat", OperandKind{19}},
-        {"FPRoundingMode", OperandKind{22}},
-        {"MemoryModel", OperandKind{13}},
+        {"PairIdRefIdRef", OperandKind{55}},
+        {"CooperativeMatrixOperands", OperandKind{40}},
         {"LiteralSpecConstantOpInteger", OperandKind{52}},
-        {"RayQueryCommittedIntersectionType", OperandKind{37}},
-        {"LiteralString", OperandKind{49}},
-        {"IdResult", OperandKind{44}},
+        {"SamplerFilterMode", OperandKind{18}},
         {"Decoration", OperandKind{30}},
+        {"ImageChannelDataType", OperandKind{21}},
+        {"LiteralInteger", OperandKind{48}},
+        {"IdMemorySemantics", OperandKind{45}},
+        {"AccessQualifier", OperandKind{28}},
+        {"LinkageType", OperandKind{27}},
+        {"BuiltIn", OperandKind{31}},
+        {"SamplerAddressingMode", OperandKind{17}},
+        {"IdRef", OperandKind{47}},
+        {"Scope", OperandKind{32}},
+        {"ImageChannelOrder", OperandKind{20}},
+        {"ExecutionModel", OperandKind{11}},
+        {"FragmentShadingRate", OperandKind{9}},
+        {"LiteralExtInstInteger", OperandKind{51}},
+        {"LiteralString", OperandKind{49}},
+        {"SourceLanguage", OperandKind{10}},
         {"LiteralContextDependentNumber", OperandKind{50}},
+        {"FPRoundingMode", OperandKind{22}},
+        {"FPOperationMode", OperandKind{25}},
+        {"RayQueryCommittedIntersectionType", OperandKind{37}},
+        {"CooperativeMatrixUse", OperandKind{42}},
+        {"MemoryAccess", OperandKind{6}},
+        {"PackedVectorFormat", OperandKind{39}},
+        {"FunctionControl", OperandKind{4}},
+        {"FunctionParameterAttribute", OperandKind{29}},
+        {"MemoryModel", OperandKind{13}},
+        {"StorageClass", OperandKind{15}},
+        {"ImageFormat", OperandKind{19}},
+        {"MemorySemantics", OperandKind{5}},
+        {"KernelEnqueueFlags", OperandKind{34}},
+        {"LoopControl", OperandKind{3}},
+        {"PairLiteralIntegerIdRef", OperandKind{53}},
+        {"IdResult", OperandKind{44}},
+        {"ImageOperands", OperandKind{0}},
+        {"Capability", OperandKind{35}},
+        {"FPDenormMode", OperandKind{23}},
+        {"Dim", OperandKind{16}},
+        {"RayQueryIntersection", OperandKind{36}},
+        {"IdScope", OperandKind{46}},
+        {"ExecutionMode", OperandKind{14}},
+        {"AddressingModel", OperandKind{12}},
+        {"CooperativeMatrixLayout", OperandKind{41}},
+        {"RayFlags", OperandKind{8}},
+        {"SelectionControl", OperandKind{2}},
+        {"OverflowModes", OperandKind{26}},
+        {"FPFastMathMode", OperandKind{1}},
+        {"RayQueryCandidateIntersectionType", OperandKind{38}},
+        {"PairIdRefLiteralInteger", OperandKind{54}},
+        {"IdResultType", OperandKind{43}},
         {"GroupOperation", OperandKind{33}},
         {"KernelProfilingInfo", OperandKind{7}},
-        {"AddressingModel", OperandKind{12}},
-        {"AccessQualifier", OperandKind{28}},
-        {"KernelEnqueueFlags", OperandKind{34}},
-        {"RayFlags", OperandKind{8}},
-        {"LoopControl", OperandKind{3}},
-        {"FunctionControl", OperandKind{4}},
-        {"RayQueryIntersection", OperandKind{36}},
-        {"SamplerFilterMode", OperandKind{18}},
-        {"FPFastMathMode", OperandKind{1}},
-        {"CooperativeMatrixUse", OperandKind{42}},
-        {"ExecutionModel", OperandKind{11}},
-        {"ImageChannelOrder", OperandKind{20}},
-        {"MemoryAccess", OperandKind{6}},
-        {"LiteralInteger", OperandKind{48}},
-        {"FPDenormMode", OperandKind{23}},
     };
 
     static const auto hash = [](const UnownedStringSlice& str, UInt32 salt){
-        return combineHash(getHashCode(str), getHashCode(salt)) % 56;
+        UInt32 h = salt;
+        for (const char c : str)
+            h = (h * 0x01000193) ^ c;
+        return h % 56;
     };
 
     const auto i = hash(str, tableSalt[hash(str, 0)]);
@@ -9997,16 +10009,2437 @@ static bool lookupOperandKind(const UnownedStringSlice& str, OperandKind& value)
     }
 }
 
+bool lookupEnumWithHexPrefix(const UnownedStringSlice& str, SpvWord& value)
+{
+    static const unsigned tableSalt[944] = {
+        1, 0, 0, 0, 2, 3, 2, 1, 3, 2, 0, 8, 0, 0, 0, 0,
+        0, 1, 0, 0, 0, 0, 0, 0, 4, 0, 2, 0, 0, 2, 3, 1,
+        2, 2, 5, 0, 3, 1, 4, 1, 0, 4, 3, 3, 0, 1, 0, 0,
+        1, 1, 1, 0, 1, 2, 3, 0, 0, 0, 1, 0, 1, 0, 0, 1,
+        0, 0, 0, 1, 0, 4, 0, 2, 0, 0, 5, 0, 0, 0, 0, 2,
+        0, 3, 0, 0, 0, 0, 0, 1, 0, 8, 1, 1, 11, 3, 2, 0,
+        1, 1, 21, 0, 0, 2, 4, 0, 2, 3, 6, 3, 0, 0, 0, 6,
+        0, 1, 17, 0, 2, 0, 10, 1, 0, 0, 1, 1, 0, 8, 0, 0,
+        2, 1, 2, 1, 0, 0, 1, 0, 0, 0, 2, 2, 0, 1, 0, 3,
+        3, 0, 2, 0, 4, 0, 0, 1, 1, 0, 0, 2, 1, 5, 0, 2,
+        0, 1, 1, 1, 0, 0, 0, 0, 3, 0, 0, 0, 6, 0, 4, 6,
+        1, 0, 1, 2, 10, 0, 1, 0, 0, 3, 2, 5, 1, 0, 2, 0,
+        2, 3, 0, 7, 1, 4, 2, 0, 1, 0, 1, 0, 0, 0, 0, 9,
+        7, 0, 1, 9, 1, 5, 0, 0, 0, 1, 0, 2, 0, 11, 2, 0,
+        3, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 0, 9, 8, 4, 1,
+        0, 5, 0, 0, 0, 7, 9, 6, 0, 3, 0, 1, 3, 0, 2, 5,
+        0, 1, 0, 2, 0, 1, 0, 0, 0, 1, 3, 2, 0, 0, 5, 0,
+        5, 0, 1, 18, 1, 0, 0, 0, 4, 0, 0, 1, 0, 0, 1, 2,
+        2, 3, 2, 9, 3, 0, 3, 3, 1, 0, 1, 2, 1, 2, 1, 0,
+        0, 2, 0, 3, 2, 2, 0, 0, 3, 2, 0, 0, 2, 0, 3, 0,
+        0, 0, 0, 5, 1, 0, 3, 2, 0, 0, 11, 3, 2, 0, 0, 7,
+        0, 0, 4, 6, 5, 0, 0, 2, 3, 2, 0, 0, 3, 14, 4, 6,
+        1, 6, 1, 0, 0, 2, 0, 1, 1, 11, 8, 0, 3, 1, 3, 4,
+        0, 0, 0, 0, 1, 1, 0, 1, 2, 7, 1, 0, 0, 0, 13, 0,
+        4, 0, 0, 0, 2, 1, 1, 7, 5, 4, 3, 1, 0, 3, 2, 2,
+        0, 0, 0, 6, 18, 0, 0, 0, 3, 3, 4, 5, 4, 0, 1, 5,
+        3, 0, 4, 5, 6, 9, 1, 3, 0, 0, 0, 1, 0, 1, 2, 7,
+        0, 3, 1, 0, 9, 2, 0, 0, 0, 6, 4, 1, 8, 1, 0, 1,
+        4, 2, 1, 0, 1, 4, 0, 5, 0, 4, 0, 3, 0, 1, 5, 6,
+        0, 1, 1, 4, 0, 2, 6, 5, 1, 5, 1, 2, 2, 1, 0, 2,
+        10, 0, 0, 4, 0, 1, 0, 1, 1, 8, 2, 2, 4, 1, 0, 0,
+        1, 3, 14, 8, 2, 15, 3, 1, 5, 11, 5, 0, 0, 1, 3, 0,
+        2, 0, 3, 0, 1, 3, 2, 5, 1, 4, 1, 6, 0, 0, 2, 1,
+        0, 2, 0, 0, 0, 1, 0, 2, 0, 3, 0, 0, 6, 2, 18, 3,
+        1, 7, 0, 4, 0, 4, 0, 0, 2, 3, 2, 2, 0, 8, 0, 0,
+        10, 0, 0, 9, 1, 4, 3, 6, 0, 1, 6, 3, 14, 0, 0, 0,
+        0, 0, 0, 11, 9, 5, 1, 0, 8, 0, 0, 0, 0, 0, 0, 0,
+        2, 1, 0, 0, 3, 0, 0, 0, 1, 1, 1, 0, 5, 9, 0, 0,
+        5, 11, 3, 4, 8, 0, 3, 5, 3, 0, 3, 1, 19, 0, 0, 1,
+        27, 7, 6, 2, 6, 4, 29, 1, 14, 5, 6, 0, 4, 1, 0, 0,
+        1, 4, 6, 0, 1, 0, 19, 18, 9, 1, 0, 12, 1, 1, 0, 0,
+        2, 0, 0, 12, 0, 0, 25, 0, 12, 11, 4, 2, 0, 2, 0, 34,
+        0, 0, 5, 2, 0, 4, 0, 0, 36, 4, 0, 6, 6, 3, 12, 0,
+        1, 1, 3, 0, 0, 0, 8, 4, 0, 14, 0, 0, 21, 7, 2, 0,
+        46, 6, 0, 4, 1, 0, 1, 3, 41, 23, 0, 2, 1, 0, 0, 14,
+        0, 9, 1, 2, 11, 0, 0, 66, 15, 26, 1, 26, 0, 0, 0, 0,
+        1, 0, 2, 1, 2, 14, 0, 0, 12, 1, 17, 1, 2, 4, 5, 3,
+        1, 3, 7, 4, 0, 5, 15, 29, 20, 0, 5, 0, 2, 12, 0, 3,
+        0, 0, 31, 0, 2, 4, 6, 3, 0, 1, 6, 21, 0, 8, 0, 0,
+        0, 4, 0, 1, 3, 1, 5, 6, 0, 1, 1, 0, 9, 9, 5, 14,
+        13, 57, 0, 0, 68, 0, 3, 29, 27, 0, 0, 29, 0, 1, 10, 0,
+        0, 3, 16, 1, 0, 0, 9, 17, 0, 0, 0, 5, 12, 43, 38, 1,
+        0, 1, 8, 47, 5, 0, 1, 0, 0, 1, 0, 0, 0, 0, 5, 0,
+        14, 6, 21, 9, 10, 0, 0, 16, 9, 2, 29, 80, 0, 30, 29, 76,
+        3, 2, 76, 0, 16, 6, 0, 28, 9, 44, 43, 0, 132, 1, 0, 1,
+        1, 1, 2, 0, 0, 0, 6, 120, 17, 169, 2, 3, 56, 0, 0, 0,
+        0, 0, 7, 49, 11, 0, 14, 30, 21, 0, 0, 8, 4, 15, 4, 0,
+        37, 7, 1, 12, 68, 3, 20, 0, 408, 339, 4, 67, 461, 10, 27, 0,
+        0, 0, 0, 0, 0, 0, 1, 0, 415, 2, 1, 0, 1, 0, 3, 172
+    };
+
+    using KV = std::pair<const char*, SpvWord>;
+
+    static const KV words[944] =
+    {
+        {"bpRayTmaxKHR", SpvWord{5326}},
+        {"bpBaseVertex", SpvWord{4424}},
+        {"bpObjectToWorldNV", SpvWord{5330}},
+        {"bpTessLevelOuter", SpvWord{11}},
+        {"boBufferBlock", SpvWord{3}},
+        {"bdR11fG11fB10f", SpvWord{8}},
+        {"cdRuntimeDescriptorArray", SpvWord{5302}},
+        {"boXfbStride", SpvWord{37}},
+        {"bdR16ui", SpvWord{38}},
+        {"bpLocalInvocationIndex", SpvWord{29}},
+        {"bnSret", SpvWord{3}},
+        {"cdFunctionFloatControlINTEL", SpvWord{5821}},
+        {"boFuseLoopsInFunctionINTEL", SpvWord{5907}},
+        {"anOpenCL", SpvWord{2}},
+        {"aiSkipClosestHitShaderKHR", SpvWord{8}},
+        {"cdInputAttachment", SpvWord{40}},
+        {"bpObjectRayOriginNV", SpvWord{5323}},
+        {"aoOriginUpperLeft", SpvWord{7}},
+        {"cdFloat64", SpvWord{10}},
+        {"bdR32f", SpvWord{3}},
+        {"akCPP_for_OpenCL", SpvWord{6}},
+        {"anSimple", SpvWord{0}},
+        {"boBankBitsINTEL", SpvWord{5835}},
+        {"bpNumWorkgroups", SpvWord{24}},
+        {"bpPatchVertices", SpvWord{14}},
+        {"boInputAttachmentIndex", SpvWord{43}},
+        {"aoNumSIMDWorkitemsINTEL", SpvWord{5896}},
+        {"boVectorComputeCallableFunctionINTEL", SpvWord{6087}},
+        {"boBindlessImageNV", SpvWord{5399}},
+        {"boUniform", SpvWord{26}},
+        {"cdStorageImageExtendedFormats", SpvWord{49}},
+        {"cdTextureBlockMatchQCOM", SpvWord{4486}},
+        {"aoMaxWorkgroupSizeINTEL", SpvWord{5893}},
+        {"baCube", SpvWord{3}},
+        {"aoSubgroupUniformControlFlowKHR", SpvWord{4421}},
+        {"apCallableDataKHR", SpvWord{5328}},
+        {"agNonPrivatePointer", SpvWord{32}},
+        {"aeNone", SpvWord{0}},
+        {"boMathOpDSPModeINTEL", SpvWord{5909}},
+        {"cdSampledImageArrayNonUniformIndexing", SpvWord{5307}},
+        {"beLuminance", SpvWord{9}},
+        {"aoPostDepthCoverage", SpvWord{4446}},
+        {"bdR16", SpvWord{14}},
+        {"bnByVal", SpvWord{2}},
+        {"afImageMemory", SpvWord{2048}},
+        {"bpBaryCoordNoPerspAMD", SpvWord{4992}},
+        {"cdDotProductInput4x8Bit", SpvWord{6017}},
+        {"bpPrimitiveShadingRateKHR", SpvWord{4432}},
+        {"abNotInf", SpvWord{2}},
+        {"bfUnormInt16", SpvWord{3}},
+        {"boMaxByteOffsetId", SpvWord{47}},
+        {"aoVertexOrderCw", SpvWord{4}},
+        {"bkWRAP", SpvWord{0}},
+        {"bnNoReadWrite", SpvWord{7}},
+        {"cdImageMSArray", SpvWord{48}},
+        {"bkSAT", SpvWord{1}},
+        {"bpCullMaskKHR", SpvWord{6021}},
+        {"boStableKernelArgumentINTEL", SpvWord{6183}},
+        {"bpBaryCoordKHR", SpvWord{5286}},
+        {"cdStorageUniformBufferBlock16", SpvWord{4433}},
+        {"bfUnormShort565", SpvWord{4}},
+        {"acFlatten", SpvWord{1}},
+        {"bfUnormInt101010_2", SpvWord{16}},
+        {"boPerVertexNV", SpvWord{5285}},
+        {"cdTileImageStencilReadAccessEXT", SpvWord{4168}},
+        {"akUnknown", SpvWord{0}},
+        {"bpBaryCoordSmoothCentroidAMD", SpvWord{4996}},
+        {"adMaxConcurrencyINTEL", SpvWord{131072}},
+        {"cdSubgroupAvcMotionEstimationChromaINTEL", SpvWord{5698}},
+        {"cdInputAttachmentArrayDynamicIndexingEXT", SpvWord{5303}},
+        {"boLocation", SpvWord{30}},
+        {"alMissKHR", SpvWord{5317}},
+        {"cbPartitionedInclusiveScanNV", SpvWord{7}},
+        {"boInvariant", SpvWord{18}},
+        {"alTaskEXT", SpvWord{5364}},
+        {"cdLoopFuseINTEL", SpvWord{5906}},
+        {"aiCullFrontFacingTrianglesKHR", SpvWord{32}},
+        {"bpSampleMask", SpvWord{20}},
+        {"cdDotProduct", SpvWord{6019}},
+        {"cdFragmentFullyCoveredEXT", SpvWord{5265}},
+        {"cdStencilExportEXT", SpvWord{5013}},
+        {"boNonUniform", SpvWord{5300}},
+        {"cdSampledImageArrayNonUniformIndexingEXT", SpvWord{5307}},
+        {"boCoherent", SpvWord{23}},
+        {"bpLayerPerViewNV", SpvWord{5279}},
+        {"bdRg8Snorm", SpvWord{18}},
+        {"bpSubgroupLocalInvocationId", SpvWord{41}},
+        {"cbReduce", SpvWord{0}},
+        {"boBoundSamplerNV", SpvWord{5400}},
+        {"akGLSL", SpvWord{2}},
+        {"boCentroid", SpvWord{16}},
+        {"apShaderRecordBufferKHR", SpvWord{5343}},
+        {"boCounterBuffer", SpvWord{5634}},
+        {"boVolatile", SpvWord{21}},
+        {"bpWorkgroupId", SpvWord{26}},
+        {"boVectorComputeFunctionINTEL", SpvWord{5626}},
+        {"ciMatrixASignedComponentsKHR", SpvWord{1}},
+        {"boFuncParamIOKindINTEL", SpvWord{5625}},
+        {"boFlat", SpvWord{14}},
+        {"cdDeviceGroup", SpvWord{4437}},
+        {"boPerPrimitiveNV", SpvWord{5271}},
+        {"aaSample", SpvWord{64}},
+        {"aoRoundingModeRTE", SpvWord{4462}},
+        {"bdR16Snorm", SpvWord{19}},
+        {"caShaderCallKHR", SpvWord{6}},
+        {"blExport", SpvWord{0}},
+        {"boIndex", SpvWord{32}},
+        {"cdComputeDerivativeGroupQuadsNV", SpvWord{5288}},
+        {"bpObjectRayDirectionNV", SpvWord{5324}},
+        {"cdInt64", SpvWord{11}},
+        {"chPackedVectorFormat4x8BitKHR", SpvWord{0}},
+        {"bpFragInvocationCountEXT", SpvWord{5293}},
+        {"alIntersectionNV", SpvWord{5314}},
+        {"ba1D", SpvWord{0}},
+        {"cgRayQueryCandidateIntersectionAABBKHR", SpvWord{1}},
+        {"aoInputLines", SpvWord{20}},
+        {"aeInline", SpvWord{1}},
+        {"cdIOPipesINTEL", SpvWord{5943}},
+        {"cdFPGALoopControlsINTEL", SpvWord{5888}},
+        {"cdFPGAKernelAttributesv2INTEL", SpvWord{6161}},
+        {"cdImageCubeArray", SpvWord{34}},
+        {"bpInstanceId", SpvWord{6}},
+        {"cdFPGARegINTEL", SpvWord{5948}},
+        {"cbClusteredReduce", SpvWord{3}},
+        {"aaConstOffsets", SpvWord{32}},
+        {"bpHelperInvocation", SpvWord{23}},
+        {"aoStencilRefLessBackAMD", SpvWord{5084}},
+        {"aeDontInline", SpvWord{2}},
+        {"cdUnstructuredLoopControlsINTEL", SpvWord{5886}},
+        {"besRGBx", SpvWord{16}},
+        {"cdAtomicFloat16MinMaxEXT", SpvWord{5616}},
+        {"cdDotProductKHR", SpvWord{6019}},
+        {"bpSecondaryPositionNV", SpvWord{5257}},
+        {"cdVulkanMemoryModel", SpvWord{5345}},
+        {"cdShaderNonUniformEXT", SpvWord{5301}},
+        {"alIntersectionKHR", SpvWord{5314}},
+        {"boGLSLShared", SpvWord{8}},
+        {"bpBaryCoordNoPerspCentroidAMD", SpvWord{4993}},
+        {"apPushConstant", SpvWord{9}},
+        {"biRND_CONV", SpvWord{6}},
+        {"bpFragmentSizeNV", SpvWord{5292}},
+        {"aoFinalizer", SpvWord{34}},
+        {"bdR8i", SpvWord{29}},
+        {"aoQuads", SpvWord{24}},
+        {"boHlslCounterBufferGOOGLE", SpvWord{5634}},
+        {"boSample", SpvWord{17}},
+        {"bdR8", SpvWord{15}},
+        {"boPerPrimitiveEXT", SpvWord{5271}},
+        {"biRND_ZERO", SpvWord{3}},
+        {"bdRgba32ui", SpvWord{30}},
+        {"aoDepthReplacing", SpvWord{12}},
+        {"cdGroupNonUniformShuffleRelative", SpvWord{66}},
+        {"bpSubgroupLtMask", SpvWord{4420}},
+        {"aoSchedulerTargetFmaxMhzINTEL", SpvWord{5903}},
+        {"cdSubgroupAvcMotionEstimationIntraINTEL", SpvWord{5697}},
+        {"cdShaderClockKHR", SpvWord{5055}},
+        {"cdUniformBufferArrayNonUniformIndexing", SpvWord{5306}},
+        {"boOverrideCoverageNV", SpvWord{5248}},
+        {"aoDenormFlushToZero", SpvWord{4460}},
+        {"boMMHostInterfaceDataWidthINTEL", SpvWord{6178}},
+        {"bfSignedInt16", SpvWord{8}},
+        {"bpSubgroupEqMaskKHR", SpvWord{4416}},
+        {"aoSubgroupSize", SpvWord{35}},
+        {"cdMinLod", SpvWord{42}},
+        {"agNoAliasINTELMask", SpvWord{131072}},
+        {"aaVolatileTexelKHR", SpvWord{2048}},
+        {"bpSMCountNV", SpvWord{5375}},
+        {"bpCullDistance", SpvWord{4}},
+        {"boAlignment", SpvWord{44}},
+        {"aoOutputPoints", SpvWord{27}},
+        {"bpWorkgroupSize", SpvWord{25}},
+        {"adLoopCoalesceINTEL", SpvWord{1048576}},
+        {"cdVariableLengthArrayINTEL", SpvWord{5817}},
+        {"bpWarpIDARM", SpvWord{4163}},
+        {"apPhysicalStorageBuffer", SpvWord{5349}},
+        {"bdRg16Snorm", SpvWord{17}},
+        {"boXfbBuffer", SpvWord{36}},
+        {"boComponent", SpvWord{31}},
+        {"afOutputMemory", SpvWord{4096}},
+        {"cdSubgroupAvcMotionEstimationINTEL", SpvWord{5696}},
+        {"cdRayTracingNV", SpvWord{5340}},
+        {"bpWorldToObjectNV", SpvWord{5331}},
+        {"ciMatrixBSignedComponentsKHR", SpvWord{2}},
+        {"cdVariablePointersStorageBuffer", SpvWord{4441}},
+        {"aoNonCoherentStencilAttachmentReadEXT", SpvWord{4171}},
+        {"boBufferLocationINTEL", SpvWord{5921}},
+        {"boBindlessSamplerNV", SpvWord{5398}},
+        {"cdRayTracingOpacityMicromapEXT", SpvWord{5381}},
+        {"cdStorageTexelBufferArrayDynamicIndexingEXT", SpvWord{5305}},
+        {"cdStorageImageArrayDynamicIndexing", SpvWord{31}},
+        {"cdFloat16", SpvWord{9}},
+        {"apStorageBuffer", SpvWord{12}},
+        {"bpSubgroupLtMaskKHR", SpvWord{4420}},
+        {"cdSparseResidency", SpvWord{41}},
+        {"bpWarpIDNV", SpvWord{5376}},
+        {"boRestrict", SpvWord{19}},
+        {"aoOutputPrimitivesNV", SpvWord{5270}},
+        {"boMatrixStride", SpvWord{7}},
+        {"cdUSMStorageClassesINTEL", SpvWord{5935}},
+        {"cdStorageBufferArrayNonUniformIndexing", SpvWord{5308}},
+        {"cdGroupNonUniformRotateKHR", SpvWord{6026}},
+        {"aoIsolines", SpvWord{25}},
+        {"biTRN", SpvWord{0}},
+        {"boFunctionFloatingPointModeINTEL", SpvWord{6080}},
+        {"bpPrimitiveId", SpvWord{7}},
+        {"boAliased", SpvWord{20}},
+        {"akWGSL", SpvWord{10}},
+        {"aoShadingRateInterlockOrderedEXT", SpvWord{5370}},
+        {"cdMeshShadingEXT", SpvWord{5283}},
+        {"ajHorizontal2Pixels", SpvWord{4}},
+        {"boUserTypeGOOGLE", SpvWord{5636}},
+        {"aoSampleInterlockOrderedEXT", SpvWord{5368}},
+        {"cdSubgroupBufferBlockIOINTEL", SpvWord{5569}},
+        {"bpObjectRayOriginKHR", SpvWord{5323}},
+        {"ajHorizontal4Pixels", SpvWord{8}},
+        {"cdVulkanMemoryModelDeviceScope", SpvWord{5346}},
+        {"bdRg32f", SpvWord{6}},
+        {"cdRayQueryKHR", SpvWord{4472}},
+        {"boRelaxedPrecision", SpvWord{0}},
+        {"bdRg16", SpvWord{12}},
+        {"boHitObjectShaderRecordBufferNV", SpvWord{5386}},
+        {"bdRg16ui", SpvWord{36}},
+        {"cdSignedZeroInfNanPreserve", SpvWord{4466}},
+        {"cdSubgroupBallotKHR", SpvWord{4423}},
+        {"agNontemporal", SpvWord{4}},
+        {"bpPosition", SpvWord{0}},
+        {"blImport", SpvWord{1}},
+        {"afMakeAvailable", SpvWord{8192}},
+        {"adInitiationIntervalINTEL", SpvWord{65536}},
+        {"boAlignmentId", SpvWord{46}},
+        {"aoSpacingFractionalOdd", SpvWord{3}},
+        {"adLoopCountINTEL", SpvWord{16777216}},
+        {"bcLinear", SpvWord{1}},
+        {"ckMatrixAKHR", SpvWord{0}},
+        {"boDoublepumpINTEL", SpvWord{5831}},
+        {"cdFloatingPointModeINTEL", SpvWord{5583}},
+        {"bpPositionPerViewNV", SpvWord{5261}},
+        {"apImage", SpvWord{11}},
+        {"bpInvocationId", SpvWord{8}},
+        {"caDevice", SpvWord{1}},
+        {"cdVectorAnyINTEL", SpvWord{5619}},
+        {"boViewportRelativeNV", SpvWord{5252}},
+        {"cdFragmentBarycentricKHR", SpvWord{5284}},
+        {"aaMakeTexelAvailableKHR", SpvWord{256}},
+        {"ccNoWait", SpvWord{0}},
+        {"bpRayTminNV", SpvWord{5325}},
+        {"abNotNaN", SpvWord{1}},
+        {"bdRgba16Snorm", SpvWord{16}},
+        {"aoOutputVertices", SpvWord{26}},
+        {"aoStencilRefGreaterFrontAMD", SpvWord{5080}},
+        {"boRestrictPointer", SpvWord{5355}},
+        {"bgRTN", SpvWord{3}},
+        {"cdSplitBarrierINTEL", SpvWord{6141}},
+        {"boNonWritable", SpvWord{24}},
+        {"bpPointSize", SpvWord{1}},
+        {"bfUnormInt8", SpvWord{2}},
+        {"aiOpaqueKHR", SpvWord{1}},
+        {"boSecondaryViewportRelativeNV", SpvWord{5256}},
+        {"cdFunctionPointersINTEL", SpvWord{5603}},
+        {"cdDemoteToHelperInvocationEXT", SpvWord{5379}},
+        {"cdStorageBufferArrayDynamicIndexing", SpvWord{30}},
+        {"boFPRoundingMode", SpvWord{39}},
+        {"bpFragSizeEXT", SpvWord{5292}},
+        {"cdShader", SpvWord{1}},
+        {"ba2D", SpvWord{1}},
+        {"boAliasedPointer", SpvWord{5356}},
+        {"bnNoAlias", SpvWord{4}},
+        {"aaSignExtend", SpvWord{4096}},
+        {"bdRgba32f", SpvWord{1}},
+        {"cdInt64ImageEXT", SpvWord{5016}},
+        {"aoSubgroupsPerWorkgroup", SpvWord{36}},
+        {"boRestrictPointerEXT", SpvWord{5355}},
+        {"cdVulkanMemoryModelDeviceScopeKHR", SpvWord{5346}},
+        {"bdRg32i", SpvWord{25}},
+        {"bpVertexIndex", SpvWord{42}},
+        {"alTessellationControl", SpvWord{1}},
+        {"aoOutputTrianglesNV", SpvWord{5298}},
+        {"aoOutputLineStrip", SpvWord{28}},
+        {"boFunctionRoundingModeINTEL", SpvWord{5822}},
+        {"cdGroupNonUniformShuffle", SpvWord{65}},
+        {"bpSubgroupGeMask", SpvWord{4417}},
+        {"cdArbitraryPrecisionFloatingPointINTEL", SpvWord{5845}},
+        {"afSubgroupMemory", SpvWord{128}},
+        {"bdR64ui", SpvWord{40}},
+        {"boMaxPrivateCopiesINTEL", SpvWord{5829}},
+        {"cdAtomicStorageOps", SpvWord{4445}},
+        {"cdStorageBuffer8BitAccess", SpvWord{4448}},
+        {"boBlock", SpvWord{2}},
+        {"cdSampledCubeArray", SpvWord{45}},
+        {"cdMemoryAccessAliasingINTEL", SpvWord{5910}},
+        {"adDependencyArrayINTEL", SpvWord{262144}},
+        {"cdRoundingModeRTZ", SpvWord{4468}},
+        {"afVolatile", SpvWord{32768}},
+        {"abFast", SpvWord{16}},
+        {"aoContractionOff", SpvWord{31}},
+        {"bpNumEnqueuedSubgroups", SpvWord{39}},
+        {"aoVecTypeHint", SpvWord{30}},
+        {"bdRgba32i", SpvWord{21}},
+        {"besRGBA", SpvWord{17}},
+        {"ba3D", SpvWord{2}},
+        {"apUniformConstant", SpvWord{0}},
+        {"afWorkgroupMemory", SpvWord{256}},
+        {"cdSubgroupImageBlockIOINTEL", SpvWord{5570}},
+        {"boSideEffectsINTEL", SpvWord{5608}},
+        {"anVulkan", SpvWord{3}},
+        {"cdRayTraversalPrimitiveCullingKHR", SpvWord{4478}},
+        {"cdGroupNonUniformArithmetic", SpvWord{63}},
+        {"bgRTP", SpvWord{2}},
+        {"cdMeshShadingNV", SpvWord{5266}},
+        {"bfUnormShort555", SpvWord{5}},
+        {"ciMatrixResultSignedComponentsKHR", SpvWord{8}},
+        {"bdUnknown", SpvWord{0}},
+        {"amPhysicalStorageBuffer64EXT", SpvWord{5348}},
+        {"boDontStaticallyCoalesceINTEL", SpvWord{5901}},
+        {"bpSubgroupLeMask", SpvWord{4419}},
+        {"cdAtomicFloat64AddEXT", SpvWord{6034}},
+        {"cdRoundingModeRTE", SpvWord{4467}},
+        {"aoDerivativeGroupQuadsNV", SpvWord{5289}},
+        {"boColMajor", SpvWord{5}},
+        {"apIncomingRayPayloadKHR", SpvWord{5342}},
+        {"afRelease", SpvWord{4}},
+        {"cjRowMajorKHR", SpvWord{0}},
+        {"afCrossWorkgroupMemory", SpvWord{512}},
+        {"cdStoragePushConstant16", SpvWord{4435}},
+        {"alFragment", SpvWord{4}},
+        {"boMMHostInterfaceReadWriteModeINTEL", SpvWord{6180}},
+        {"bbClampToEdge", SpvWord{1}},
+        {"bpGlobalOffset", SpvWord{33}},
+        {"aiNoOpaqueKHR", SpvWord{2}},
+        {"baSubpassData", SpvWord{6}},
+        {"cdImageMipmap", SpvWord{15}},
+        {"bpSubgroupGeMaskKHR", SpvWord{4417}},
+        {"cdImageFootprintNV", SpvWord{5282}},
+        {"cdGenericPointer", SpvWord{38}},
+        {"bdR32ui", SpvWord{33}},
+        {"bfUnormInt101010", SpvWord{6}},
+        {"bpPrimitiveCountNV", SpvWord{5275}},
+        {"boRowMajor", SpvWord{4}},
+        {"cdTileImageColorReadAccessEXT", SpvWord{4166}},
+        {"ckMatrixAccumulatorKHR", SpvWord{2}},
+        {"apIncomingCallableDataNV", SpvWord{5329}},
+        {"boMediaBlockIOINTEL", SpvWord{6140}},
+        {"agMakePointerAvailableKHR", SpvWord{8}},
+        {"adSpeculatedIterationsINTEL", SpvWord{4194304}},
+        {"bpRayGeometryIndexKHR", SpvWord{5352}},
+        {"apPhysicalStorageBufferEXT", SpvWord{5349}},
+        {"bpRayTmaxNV", SpvWord{5326}},
+        {"bdR32i", SpvWord{24}},
+        {"bdRgba8", SpvWord{4}},
+        {"bpWorldRayDirectionKHR", SpvWord{5322}},
+        {"adUnroll", SpvWord{1}},
+        {"bdRg16f", SpvWord{7}},
+        {"boPassthroughNV", SpvWord{5250}},
+        {"cdSampleMaskPostDepthCoverage", SpvWord{4447}},
+        {"bdR8ui", SpvWord{39}},
+        {"cdUniformAndStorageBuffer8BitAccess", SpvWord{4449}},
+        {"cdRuntimeAlignedAttributeINTEL", SpvWord{5939}},
+        {"cdUniformBufferArrayNonUniformIndexingEXT", SpvWord{5306}},
+        {"bpDeviceIndex", SpvWord{4438}},
+        {"bpSubgroupLeMaskKHR", SpvWord{4419}},
+        {"caInvocation", SpvWord{4}},
+        {"bpTessLevelInner", SpvWord{12}},
+        {"cdFloat16Buffer", SpvWord{8}},
+        {"bpCullPrimitiveEXT", SpvWord{5299}},
+        {"boPerVertexKHR", SpvWord{5285}},
+        {"boExplicitInterpAMD", SpvWord{4999}},
+        {"bpShadingRateKHR", SpvWord{4444}},
+        {"agAligned", SpvWord{2}},
+        {"boGLSLPacked", SpvWord{9}},
+        {"aiCullNoOpaqueKHR", SpvWord{128}},
+        {"boFunctionDenormModeINTEL", SpvWord{5823}},
+        {"bbClamp", SpvWord{2}},
+        {"bmReadWrite", SpvWord{2}},
+        {"aaNontemporal", SpvWord{16384}},
+        {"apOutput", SpvWord{3}},
+        {"bpSMIDNV", SpvWord{5377}},
+        {"cdShadingRateNV", SpvWord{5291}},
+        {"apFunction", SpvWord{7}},
+        {"baTileImageDataEXT", SpvWord{4173}},
+        {"boNoSignedWrap", SpvWord{4469}},
+        {"cdBlockingPipesINTEL", SpvWord{5945}},
+        {"cdImageQuery", SpvWord{50}},
+        {"aoVertexOrderCcw", SpvWord{5}},
+        {"boLatencyControlLabelINTEL", SpvWord{6172}},
+        {"agMakePointerVisibleKHR", SpvWord{16}},
+        {"cdStorageTexelBufferArrayDynamicIndexing", SpvWord{5305}},
+        {"beRx", SpvWord{10}},
+        {"bdRgba16", SpvWord{10}},
+        {"biRND", SpvWord{2}},
+        {"boArrayStride", SpvWord{6}},
+        {"cdFPGABufferLocationINTEL", SpvWord{5920}},
+        {"beRG", SpvWord{2}},
+        {"aoInputTrianglesAdjacency", SpvWord{23}},
+        {"bdRgba8ui", SpvWord{32}},
+        {"agAliasScopeINTELMask", SpvWord{65536}},
+        {"bpSubgroupSize", SpvWord{36}},
+        {"boStackCallINTEL", SpvWord{5627}},
+        {"cbPartitionedExclusiveScanNV", SpvWord{8}},
+        {"cdUniformAndStorageBuffer16BitAccess", SpvWord{4434}},
+        {"aoSharedLocalMemorySizeINTEL", SpvWord{5618}},
+        {"bfUnsignedInt32", SpvWord{12}},
+        {"cdStorageImageArrayNonUniformIndexingEXT", SpvWord{5309}},
+        {"alClosestHitNV", SpvWord{5316}},
+        {"cdStorageInputOutput16", SpvWord{4436}},
+        {"aoTriangles", SpvWord{22}},
+        {"akOpenCL_C", SpvWord{3}},
+        {"cdExpectAssumeKHR", SpvWord{5629}},
+        {"cdFPGAClusterAttributesINTEL", SpvWord{5904}},
+        {"aoDepthGreater", SpvWord{14}},
+        {"boMaxByteOffset", SpvWord{45}},
+        {"cdFragmentMaskAMD", SpvWord{5010}},
+        {"bpLayer", SpvWord{9}},
+        {"cdImage1D", SpvWord{44}},
+        {"bdRgb10a2ui", SpvWord{34}},
+        {"bdR16i", SpvWord{28}},
+        {"aaNonPrivateTexelKHR", SpvWord{1024}},
+        {"cjColumnMajorKHR", SpvWord{1}},
+        {"bpWorldRayOriginNV", SpvWord{5321}},
+        {"bpCullDistancePerViewNV", SpvWord{5278}},
+        {"cdInputAttachmentArrayNonUniformIndexing", SpvWord{5310}},
+        {"bfSnormInt8", SpvWord{0}},
+        {"cdSubgroupShuffleINTEL", SpvWord{5568}},
+        {"bhFlushToZero", SpvWord{1}},
+        {"abAllowRecip", SpvWord{8}},
+        {"cdSampleMaskOverrideCoverageNV", SpvWord{5249}},
+        {"adPeelCount", SpvWord{128}},
+        {"boPerTaskNV", SpvWord{5273}},
+        {"cdKernelAttributesINTEL", SpvWord{5892}},
+        {"bpFragCoord", SpvWord{15}},
+        {"boBurstCoalesceINTEL", SpvWord{5899}},
+        {"bpBaryCoordNV", SpvWord{5286}},
+        {"boPrefetchINTEL", SpvWord{5902}},
+        {"bpInvocationsPerPixelNV", SpvWord{5293}},
+        {"bpTaskCountNV", SpvWord{5274}},
+        {"cdLongConstantCompositeINTEL", SpvWord{6089}},
+        {"bpClipDistancePerViewNV", SpvWord{5277}},
+        {"bpEnqueuedWorkgroupSize", SpvWord{32}},
+        {"cdTileImageDepthReadAccessEXT", SpvWord{4167}},
+        {"bpSubgroupEqMask", SpvWord{4416}},
+        {"aoLocalSizeHint", SpvWord{18}},
+        {"cdVector16", SpvWord{7}},
+        {"bdRgba16i", SpvWord{22}},
+        {"apHostOnlyINTEL", SpvWord{5937}},
+        {"bpHitKindNV", SpvWord{5333}},
+        {"aoLocalSizeHintId", SpvWord{39}},
+        {"alCallableNV", SpvWord{5318}},
+        {"beRGBA", SpvWord{5}},
+        {"boOffset", SpvWord{35}},
+        {"agMakePointerVisible", SpvWord{16}},
+        {"cdSampled1D", SpvWord{43}},
+        {"bpWarpsPerSMNV", SpvWord{5374}},
+        {"beA", SpvWord{1}},
+        {"acDontFlatten", SpvWord{2}},
+        {"cgRayQueryCandidateIntersectionTriangleKHR", SpvWord{0}},
+        {"cdComputeDerivativeGroupLinearNV", SpvWord{5350}},
+        {"cbInclusiveScan", SpvWord{1}},
+        {"boNoUnsignedWrap", SpvWord{4470}},
+        {"aoStencilRefUnchangedBackAMD", SpvWord{5082}},
+        {"bnNoWrite", SpvWord{6}},
+        {"boUniformId", SpvWord{27}},
+        {"cdAtomicFloat32MinMaxEXT", SpvWord{5612}},
+        {"aoDenormPreserve", SpvWord{4459}},
+        {"aaOffset", SpvWord{16}},
+        {"aeConst", SpvWord{8}},
+        {"cdIntegerFunctions2INTEL", SpvWord{5584}},
+        {"cdRoundToInfinityINTEL", SpvWord{5582}},
+        {"aiNoneKHR", SpvWord{0}},
+        {"boReferencedIndirectlyINTEL", SpvWord{5602}},
+        {"alVertex", SpvWord{0}},
+        {"cdFragmentDensityEXT", SpvWord{5291}},
+        {"bpRayTminKHR", SpvWord{5325}},
+        {"aoStreamingInterfaceINTEL", SpvWord{6154}},
+        {"aoPixelInterlockUnorderedEXT", SpvWord{5367}},
+        {"cdRayTracingProvisionalKHR", SpvWord{5353}},
+        {"cdFPGAKernelAttributesINTEL", SpvWord{5897}},
+        {"bcNearest", SpvWord{0}},
+        {"alAnyHitKHR", SpvWord{5315}},
+        {"cdKernel", SpvWord{6}},
+        {"anVulkanKHR", SpvWord{3}},
+        {"akHLSL", SpvWord{5}},
+        {"aoSignedZeroInfNanPreserve", SpvWord{4461}},
+        {"aoEarlyFragmentTests", SpvWord{9}},
+        {"boCPacked", SpvWord{10}},
+        {"cdImageBasic", SpvWord{13}},
+        {"bjIEEE", SpvWord{0}},
+        {"apUniform", SpvWord{2}},
+        {"aoPixelCenterInteger", SpvWord{6}},
+        {"beBGRA", SpvWord{6}},
+        {"cdRayQueryProvisionalKHR", SpvWord{4471}},
+        {"boSIMTCallINTEL", SpvWord{5599}},
+        {"alTaskNV", SpvWord{5267}},
+        {"bdRgba16ui", SpvWord{31}},
+        {"ciNoneKHR", SpvWord{0}},
+        {"cdGroupNonUniformQuad", SpvWord{68}},
+        {"akSYCL", SpvWord{7}},
+        {"cdCullDistance", SpvWord{33}},
+        {"boConstant", SpvWord{22}},
+        {"adDependencyLength", SpvWord{8}},
+        {"adMaxReinvocationDelayINTEL", SpvWord{33554432}},
+        {"afAcquireRelease", SpvWord{8}},
+        {"cdLinkage", SpvWord{5}},
+        {"alRayGenerationKHR", SpvWord{5313}},
+        {"cdBitInstructions", SpvWord{6025}},
+        {"bfSignedInt32", SpvWord{9}},
+        {"cdClipDistance", SpvWord{32}},
+        {"aaZeroExtend", SpvWord{8192}},
+        {"bpPointCoord", SpvWord{16}},
+        {"cdStorageImageMultisample", SpvWord{27}},
+        {"apGeneric", SpvWord{8}},
+        {"bpPrimitiveIndicesNV", SpvWord{5276}},
+        {"boGlobalVariableOffsetINTEL", SpvWord{5628}},
+        {"aoEarlyAndLateFragmentTestsAMD", SpvWord{5017}},
+        {"bgRTZ", SpvWord{1}},
+        {"cdGeometry", SpvWord{2}},
+        {"bdRgba8i", SpvWord{23}},
+        {"bpCoreCountARM", SpvWord{4161}},
+        {"aaMakeTexelVisible", SpvWord{512}},
+        {"apRayPayloadNV", SpvWord{5338}},
+        {"aaVolatileTexel", SpvWord{2048}},
+        {"agNone", SpvWord{0}},
+        {"bpPrimitiveTriangleIndicesEXT", SpvWord{5296}},
+        {"amPhysical64", SpvWord{2}},
+        {"bpSampleId", SpvWord{18}},
+        {"acNone", SpvWord{0}},
+        {"beRA", SpvWord{3}},
+        {"afRelaxed", SpvWord{0}},
+        {"bfUnsignedIntRaw10EXT", SpvWord{19}},
+        {"boStallEnableINTEL", SpvWord{5905}},
+        {"aoRoundingModeRTPINTEL", SpvWord{5620}},
+        {"cdPerViewAttributesNV", SpvWord{5260}},
+        {"bpWorldRayOriginKHR", SpvWord{5321}},
+        {"cdShaderInvocationReorderNV", SpvWord{5383}},
+        {"cdShaderStereoViewNV", SpvWord{5259}},
+        {"cdSubgroupVoteKHR", SpvWord{4431}},
+        {"adPipelineEnableINTEL", SpvWord{524288}},
+        {"apAtomicCounter", SpvWord{10}},
+        {"aoSpacingFractionalEven", SpvWord{2}},
+        {"bkSAT_ZERO", SpvWord{2}},
+        {"apCallableDataNV", SpvWord{5328}},
+        {"cdBFloat16ConversionINTEL", SpvWord{6115}},
+        {"aoStencilRefUnchangedFrontAMD", SpvWord{5079}},
+        {"bpIncomingRayFlagsNV", SpvWord{5351}},
+        {"cdShaderViewportIndexLayerNV", SpvWord{5254}},
+        {"ccWaitKernel", SpvWord{1}},
+        {"cfRayQueryCommittedIntersectionGeneratedKHR", SpvWord{2}},
+        {"bpHitTriangleVertexPositionsKHR", SpvWord{5335}},
+        {"bjALT", SpvWord{1}},
+        {"cdFragmentShadingRateKHR", SpvWord{4422}},
+        {"cbPartitionedReduceNV", SpvWord{6}},
+        {"bpSamplePosition", SpvWord{19}},
+        {"alCallableKHR", SpvWord{5318}},
+        {"ckMatrixBKHR", SpvWord{1}},
+        {"cdGeometryPointSize", SpvWord{24}},
+        {"cdFragmentShaderShadingRateInterlockEXT", SpvWord{5372}},
+        {"boBlockMatchTextureQCOM", SpvWord{4488}},
+        {"boMemoryINTEL", SpvWord{5826}},
+        {"cdGroups", SpvWord{18}},
+        {"bpPrimitiveLineIndicesEXT", SpvWord{5295}},
+        {"bnZext", SpvWord{0}},
+        {"cdPipes", SpvWord{17}},
+        {"bpVertexId", SpvWord{5}},
+        {"cdAtomicFloat32AddEXT", SpvWord{6033}},
+        {"cdAtomicStorage", SpvWord{21}},
+        {"cdDeviceEnqueue", SpvWord{19}},
+        {"apHitObjectAttributeNV", SpvWord{5385}},
+        {"adNoFusionINTEL", SpvWord{8388608}},
+        {"cdShaderViewportIndexLayerEXT", SpvWord{5254}},
+        {"amPhysical32", SpvWord{1}},
+        {"aiCullBackFacingTrianglesKHR", SpvWord{16}},
+        {"bpCoreIDARM", SpvWord{4160}},
+        {"caQueueFamilyKHR", SpvWord{5}},
+        {"apDeviceOnlyINTEL", SpvWord{5936}},
+        {"cdImageReadWriteLodAMD", SpvWord{5015}},
+        {"boLatencyControlConstraintINTEL", SpvWord{6173}},
+        {"aoSubgroupsPerWorkgroupId", SpvWord{37}},
+        {"bpInstanceCustomIndexKHR", SpvWord{5327}},
+        {"aoNonCoherentDepthAttachmentReadEXT", SpvWord{4170}},
+        {"bfUnsignedInt8", SpvWord{10}},
+        {"bmWriteOnly", SpvWord{1}},
+        {"boNoPerspective", SpvWord{13}},
+        {"aoOutputLinesEXT", SpvWord{5269}},
+        {"boNoAliasINTEL", SpvWord{5915}},
+        {"cdDemoteToHelperInvocation", SpvWord{5379}},
+        {"adIterationMultiple", SpvWord{64}},
+        {"cdCooperativeMatrixKHR", SpvWord{6022}},
+        {"cdDotProductInput4x8BitPacked", SpvWord{6018}},
+        {"bpGlobalLinearId", SpvWord{34}},
+        {"apIncomingCallableDataKHR", SpvWord{5329}},
+        {"cdDebugInfoModuleINTEL", SpvWord{6114}},
+        {"aaBias", SpvWord{1}},
+        {"bfUnormInt24", SpvWord{15}},
+        {"aoInvocations", SpvWord{0}},
+        {"apIncomingRayPayloadNV", SpvWord{5342}},
+        {"aiForceOpacityMicromap2StateEXT", SpvWord{1024}},
+        {"ciMatrixCSignedComponentsKHR", SpvWord{4}},
+        {"cdBindlessTextureNV", SpvWord{5390}},
+        {"cdCoreBuiltinsARM", SpvWord{4165}},
+        {"cdFPGAArgumentInterfacesINTEL", SpvWord{6174}},
+        {"boInitiationIntervalINTEL", SpvWord{5917}},
+        {"akHERO_C", SpvWord{8}},
+        {"boAliasedPointerEXT", SpvWord{5356}},
+        {"afUniformMemory", SpvWord{64}},
+        {"apInput", SpvWord{1}},
+        {"bpObjectToWorldKHR", SpvWord{5330}},
+        {"bdRgba8Snorm", SpvWord{5}},
+        {"boRegisterMapKernelArgumentINTEL", SpvWord{6176}},
+        {"bpDrawIndex", SpvWord{4426}},
+        {"boMMHostInterfaceWaitRequestINTEL", SpvWord{6182}},
+        {"boPipelineEnableINTEL", SpvWord{5919}},
+        {"cdFragmentShaderPixelInterlockEXT", SpvWord{5378}},
+        {"bfSignedInt8", SpvWord{7}},
+        {"aaGrad", SpvWord{4}},
+        {"aoOutputPrimitivesEXT", SpvWord{5270}},
+        {"besBGRA", SpvWord{18}},
+        {"bpViewportIndex", SpvWord{10}},
+        {"afSequentiallyConsistent", SpvWord{16}},
+        {"alRayGenerationNV", SpvWord{5313}},
+        {"abNone", SpvWord{0}},
+        {"alMeshNV", SpvWord{5268}},
+        {"boConduitKernelArgumentINTEL", SpvWord{6175}},
+        {"bbRepeat", SpvWord{3}},
+        {"bbNone", SpvWord{0}},
+        {"adMaxInterleavingINTEL", SpvWord{2097152}},
+        {"cdInputAttachmentArrayDynamicIndexing", SpvWord{5303}},
+        {"cdSubgroupImageMediaBlockIOINTEL", SpvWord{5579}},
+        {"apShaderRecordBufferNV", SpvWord{5343}},
+        {"cdDenormFlushToZero", SpvWord{4465}},
+        {"ahCmdExecTime", SpvWord{1}},
+        {"cdStorageImageWriteWithoutFormat", SpvWord{56}},
+        {"cdPipeStorage", SpvWord{60}},
+        {"boSinglepumpINTEL", SpvWord{5830}},
+        {"cdUniformTexelBufferArrayNonUniformIndexingEXT", SpvWord{5311}},
+        {"beDepth", SpvWord{13}},
+        {"boSaturatedConversion", SpvWord{28}},
+        {"cdDerivativeControl", SpvWord{51}},
+        {"cdRayTracingMotionBlurNV", SpvWord{5341}},
+        {"apCrossWorkgroup", SpvWord{5}},
+        {"bpSubgroupGtMask", SpvWord{4418}},
+        {"bpBaryCoordSmoothAMD", SpvWord{4995}},
+        {"bpLaunchIdKHR", SpvWord{5319}},
+        {"cfRayQueryCommittedIntersectionNoneKHR", SpvWord{0}},
+        {"cbExclusiveScan", SpvWord{2}},
+        {"aaConstOffset", SpvWord{8}},
+        {"cdGeometryShaderPassthroughNV", SpvWord{5251}},
+        {"boForcePow2DepthINTEL", SpvWord{5836}},
+        {"bnSext", SpvWord{1}},
+        {"bpBaryCoordPullModelAMD", SpvWord{4998}},
+        {"agNonPrivatePointerKHR", SpvWord{32}},
+        {"biRND_CONV_ODD", SpvWord{7}},
+        {"cdStorageImageArrayNonUniformIndexing", SpvWord{5309}},
+        {"boIOPipeStorageINTEL", SpvWord{5944}},
+        {"apPrivate", SpvWord{6}},
+        {"cdFPGADSPControlINTEL", SpvWord{5908}},
+        {"bmReadOnly", SpvWord{0}},
+        {"cdVariablePointers", SpvWord{4442}},
+        {"bpTessCoord", SpvWord{13}},
+        {"ahNone", SpvWord{0}},
+        {"bpNumSubgroups", SpvWord{38}},
+        {"bkSAT_SYM", SpvWord{3}},
+        {"adDontUnroll", SpvWord{2}},
+        {"caCrossDevice", SpvWord{0}},
+        {"cdShaderViewportMaskNV", SpvWord{5255}},
+        {"cdGroupNonUniformVote", SpvWord{62}},
+        {"cdAddresses", SpvWord{4}},
+        {"afOutputMemoryKHR", SpvWord{4096}},
+        {"cdMatrix", SpvWord{0}},
+        {"akNZSL", SpvWord{9}},
+        {"cdRayQueryPositionFetchKHR", SpvWord{5391}},
+        {"biRND_INF", SpvWord{4}},
+        {"cdSampledImageArrayDynamicIndexing", SpvWord{29}},
+        {"adDependencyInfinite", SpvWord{4}},
+        {"aiCullOpaqueKHR", SpvWord{64}},
+        {"cdFPGAInvocationPipeliningAttributesINTEL", SpvWord{5916}},
+        {"abAllowReassocINTEL", SpvWord{131072}},
+        {"cdDrawParameters", SpvWord{4427}},
+        {"boPerViewNV", SpvWord{5272}},
+        {"aoRoundingModeRTZ", SpvWord{4463}},
+        {"afMakeAvailableKHR", SpvWord{8192}},
+        {"bpWorkDim", SpvWord{30}},
+        {"agMakePointerAvailable", SpvWord{8}},
+        {"bpSubgroupGtMaskKHR", SpvWord{4418}},
+        {"aiSkipAABBsKHR", SpvWord{512}},
+        {"bdRgba16f", SpvWord{2}},
+        {"boMMHostInterfaceAddressWidthINTEL", SpvWord{6177}},
+        {"afMakeVisibleKHR", SpvWord{16384}},
+        {"beABGR", SpvWord{19}},
+        {"cdInterpolationFunction", SpvWord{52}},
+        {"aoStencilRefReplacingEXT", SpvWord{5027}},
+        {"bfHalfFloat", SpvWord{13}},
+        {"cdRuntimeDescriptorArrayEXT", SpvWord{5302}},
+        {"apHitAttributeNV", SpvWord{5339}},
+        {"bpBaryCoordNoPerspNV", SpvWord{5287}},
+        {"cdUniformDecoration", SpvWord{71}},
+        {"afNone", SpvWord{0}},
+        {"bdR8Snorm", SpvWord{20}},
+        {"bpWorldRayDirectionNV", SpvWord{5322}},
+        {"cdDotProductInputAll", SpvWord{6016}},
+        {"bpLaunchSizeNV", SpvWord{5320}},
+        {"boSpecId", SpvWord{1}},
+        {"cdSampledRect", SpvWord{37}},
+        {"cdStorageBufferArrayNonUniformIndexingEXT", SpvWord{5308}},
+        {"cdFPGALatencyControlINTEL", SpvWord{6171}},
+        {"bgRTE", SpvWord{0}},
+        {"cdLiteralSampler", SpvWord{20}},
+        {"apRayPayloadKHR", SpvWord{5338}},
+        {"cdSampledBuffer", SpvWord{46}},
+        {"cdWorkgroupMemoryExplicitLayout16BitAccessKHR", SpvWord{4430}},
+        {"cdGroupNonUniformPartitionedNV", SpvWord{5297}},
+        {"boAliasScopeINTEL", SpvWord{5914}},
+        {"boHlslSemanticGOOGLE", SpvWord{5635}},
+        {"boMaxReplicatesINTEL", SpvWord{5832}},
+        {"bfUnsignedIntRaw12EXT", SpvWord{20}},
+        {"aoInputLinesAdjacency", SpvWord{21}},
+        {"aoPointMode", SpvWord{10}},
+        {"cdDotProductInput4x8BitPackedKHR", SpvWord{6018}},
+        {"cdGroupNonUniform", SpvWord{61}},
+        {"afAcquire", SpvWord{2}},
+        {"boBoundImageNV", SpvWord{5401}},
+        {"aoNonCoherentColorAttachmentReadEXT", SpvWord{4169}},
+        {"apCodeSectionINTEL", SpvWord{5605}},
+        {"apHitAttributeKHR", SpvWord{5339}},
+        {"boPatch", SpvWord{15}},
+        {"abAllowContractFastINTEL", SpvWord{65536}},
+        {"boFuncParamAttr", SpvWord{38}},
+        {"bdRg8i", SpvWord{27}},
+        {"boRegisterINTEL", SpvWord{5825}},
+        {"aoStencilRefLessFrontAMD", SpvWord{5081}},
+        {"boMergeINTEL", SpvWord{5834}},
+        {"boClobberINTEL", SpvWord{5607}},
+        {"bpCurrentRayTimeNV", SpvWord{5334}},
+        {"boNonUniformEXT", SpvWord{5300}},
+        {"adNone", SpvWord{0}},
+        {"boSingleElementVectorINTEL", SpvWord{6085}},
+        {"akOpenCL_CPP", SpvWord{4}},
+        {"cdFPMaxErrorINTEL", SpvWord{6169}},
+        {"bpLaunchSizeKHR", SpvWord{5320}},
+        {"cdStorageUniform16", SpvWord{4434}},
+        {"beIntensity", SpvWord{8}},
+        {"bpLaunchIdNV", SpvWord{5319}},
+        {"chPackedVectorFormat4x8Bit", SpvWord{0}},
+        {"cdSampleRateShading", SpvWord{35}},
+        {"cdStoragePushConstant8", SpvWord{4450}},
+        {"cdTextureBoxFilterQCOM", SpvWord{4485}},
+        {"bpViewportMaskPerViewNV", SpvWord{5262}},
+        {"cdGroupNonUniformBallot", SpvWord{64}},
+        {"ajVertical4Pixels", SpvWord{2}},
+        {"cdTextureSampleWeightedQCOM", SpvWord{4484}},
+        {"cdImageGatherExtended", SpvWord{25}},
+        {"cdAsmINTEL", SpvWord{5606}},
+        {"boNonReadable", SpvWord{25}},
+        {"boBuiltIn", SpvWord{11}},
+        {"bpHitKindKHR", SpvWord{5333}},
+        {"aoRoundingModeRTNINTEL", SpvWord{5621}},
+        {"cdWorkgroupMemoryExplicitLayoutKHR", SpvWord{4428}},
+        {"caQueueFamily", SpvWord{5}},
+        {"beDepthStencil", SpvWord{14}},
+        {"aoOriginLowerLeft", SpvWord{8}},
+        {"cdUniformTexelBufferArrayNonUniformIndexing", SpvWord{5311}},
+        {"alClosestHitKHR", SpvWord{5316}},
+        {"biTRN_ZERO", SpvWord{1}},
+        {"aaLod", SpvWord{2}},
+        {"cdUniformBufferArrayDynamicIndexing", SpvWord{28}},
+        {"boSimpleDualPortINTEL", SpvWord{5833}},
+        {"ceRayQueryCandidateIntersectionKHR", SpvWord{0}},
+        {"cdAtomicFloat16AddEXT", SpvWord{6095}},
+        {"beRGx", SpvWord{11}},
+        {"bpBaryCoordNoPerspSampleAMD", SpvWord{4994}},
+        {"afMakeVisible", SpvWord{16384}},
+        {"ciSaturatingAccumulationKHR", SpvWord{16}},
+        {"cdDotProductInput4x8BitKHR", SpvWord{6017}},
+        {"cdNamedBarrier", SpvWord{59}},
+        {"boLinkageAttributes", SpvWord{41}},
+        {"caWorkgroup", SpvWord{2}},
+        {"apTileImageEXT", SpvWord{4172}},
+        {"boCacheSizeINTEL", SpvWord{5900}},
+        {"beRGB", SpvWord{4}},
+        {"boMMHostInterfaceLatencyINTEL", SpvWord{6179}},
+        {"boNoContraction", SpvWord{42}},
+        {"aoRegisterMapInterfaceINTEL", SpvWord{6160}},
+        {"ceRayQueryCommittedIntersectionKHR", SpvWord{1}},
+        {"cdFPGAMemoryAttributesINTEL", SpvWord{5824}},
+        {"bfSnormInt16", SpvWord{1}},
+        {"bnRuntimeAlignedINTEL", SpvWord{5940}},
+        {"bpGlobalInvocationId", SpvWord{28}},
+        {"cdImageReadWrite", SpvWord{14}},
+        {"bpInstanceCustomIndexNV", SpvWord{5327}},
+        {"bpSubgroupMaxSize", SpvWord{37}},
+        {"cdVectorComputeINTEL", SpvWord{5617}},
+        {"beR", SpvWord{0}},
+        {"bhPreserve", SpvWord{0}},
+        {"cdSubgroupDispatch", SpvWord{58}},
+        {"apTaskPayloadWorkgroupEXT", SpvWord{5402}},
+        {"bdRg32ui", SpvWord{35}},
+        {"alMissNV", SpvWord{5317}},
+        {"aoPixelInterlockOrderedEXT", SpvWord{5366}},
+        {"cdDenormPreserve", SpvWord{4464}},
+        {"aeOptNoneINTEL", SpvWord{65536}},
+        {"cdPhysicalStorageBufferAddresses", SpvWord{5347}},
+        {"bdR64i", SpvWord{41}},
+        {"boNumbanksINTEL", SpvWord{5827}},
+        {"cdFragmentShaderSampleInterlockEXT", SpvWord{5363}},
+        {"cdOptNoneINTEL", SpvWord{6094}},
+        {"aiSkipTrianglesKHR", SpvWord{256}},
+        {"cdStorageTexelBufferArrayNonUniformIndexing", SpvWord{5312}},
+        {"beRGBx", SpvWord{12}},
+        {"bpIncomingRayFlagsKHR", SpvWord{5351}},
+        {"aoStencilRefGreaterBackAMD", SpvWord{5083}},
+        {"boMMHostInterfaceMaxBurstINTEL", SpvWord{6181}},
+        {"aoFloatingPointModeIEEEINTEL", SpvWord{5623}},
+        {"alMeshEXT", SpvWord{5365}},
+        {"cdShaderLayer", SpvWord{69}},
+        {"cdFPGAMemoryAccessesINTEL", SpvWord{5898}},
+        {"bpSecondaryViewportMaskNV", SpvWord{5258}},
+        {"cdArbitraryPrecisionIntegersINTEL", SpvWord{5844}},
+        {"ccWaitWorkGroup", SpvWord{2}},
+        {"aoOutputLinesNV", SpvWord{5269}},
+        {"aoOutputTriangleStrip", SpvWord{29}},
+        {"baRect", SpvWord{4}},
+        {"bpFragStencilRefEXT", SpvWord{5014}},
+        {"blLinkOnceODR", SpvWord{2}},
+        {"aoLocalSizeId", SpvWord{38}},
+        {"abNSZ", SpvWord{4}},
+        {"bdRg16i", SpvWord{26}},
+        {"boMaxConcurrencyINTEL", SpvWord{5918}},
+        {"akESSL", SpvWord{1}},
+        {"caSubgroup", SpvWord{3}},
+        {"bpFrontFacing", SpvWord{17}},
+        {"boWeightTextureQCOM", SpvWord{4487}},
+        {"aoNoGlobalOffsetINTEL", SpvWord{5895}},
+        {"bpViewportMaskNV", SpvWord{5253}},
+        {"bdRgb10A2", SpvWord{11}},
+        {"aaNonPrivateTexel", SpvWord{1024}},
+        {"cdUniformTexelBufferArrayDynamicIndexing", SpvWord{5304}},
+        {"bpViewIndex", SpvWord{4440}},
+        {"afAtomicCounterMemory", SpvWord{1024}},
+        {"bpGlobalSize", SpvWord{31}},
+        {"bpMeshViewCountNV", SpvWord{5280}},
+        {"cdImageBuffer", SpvWord{47}},
+        {"alGeometry", SpvWord{3}},
+        {"agVolatile", SpvWord{1}},
+        {"bdRg8", SpvWord{13}},
+        {"cdIndirectReferencesINTEL", SpvWord{5604}},
+        {"biRND_MIN_INF", SpvWord{5}},
+        {"bpBaryCoordSmoothSampleAMD", SpvWord{4997}},
+        {"cdVulkanMemoryModelKHR", SpvWord{5345}},
+        {"aoNamedBarrierCountINTEL", SpvWord{6417}},
+        {"cdShaderNonUniform", SpvWord{5301}},
+        {"adMaxIterations", SpvWord{32}},
+        {"aaMinLod", SpvWord{128}},
+        {"boFPFastMathMode", SpvWord{40}},
+        {"bpFullyCoveredEXT", SpvWord{5264}},
+        {"bpClipDistance", SpvWord{3}},
+        {"cdArbitraryPrecisionFixedPointINTEL", SpvWord{5922}},
+        {"bpBaseInstance", SpvWord{4425}},
+        {"cdMultiView", SpvWord{4439}},
+        {"bpInstanceIndex", SpvWord{43}},
+        {"bdRg8ui", SpvWord{37}},
+        {"aoMaxWorkDimINTEL", SpvWord{5894}},
+        {"cdInputAttachmentArrayNonUniformIndexingEXT", SpvWord{5310}},
+        {"amPhysicalStorageBuffer64", SpvWord{5348}},
+        {"aaMakeTexelVisibleKHR", SpvWord{512}},
+        {"cdUniformTexelBufferArrayDynamicIndexingEXT", SpvWord{5304}},
+        {"besRGB", SpvWord{15}},
+        {"aaNone", SpvWord{0}},
+        {"alGLCompute", SpvWord{5}},
+        {"bbRepeatMirrored", SpvWord{4}},
+        {"baBuffer", SpvWord{5}},
+        {"cdGeometryStreams", SpvWord{54}},
+        {"boDescriptorSet", SpvWord{34}},
+        {"aoLocalSize", SpvWord{17}},
+        {"cdShaderViewportIndex", SpvWord{70}},
+        {"cdStorageTexelBufferArrayNonUniformIndexingEXT", SpvWord{5312}},
+        {"boBankwidthINTEL", SpvWord{5828}},
+        {"bfFloat", SpvWord{14}},
+        {"beARGB", SpvWord{7}},
+        {"cdStorageImageReadWithoutFormat", SpvWord{55}},
+        {"bpCoreMaxIDARM", SpvWord{4162}},
+        {"cdRayCullMaskKHR", SpvWord{6020}},
+        {"cdShaderSMBuiltinsNV", SpvWord{5373}},
+        {"aiTerminateOnFirstHitKHR", SpvWord{4}},
+        {"cdWorkgroupMemoryExplicitLayout8BitAccessKHR", SpvWord{4429}},
+        {"bpWarpMaxIDARM", SpvWord{4164}},
+        {"aoDepthUnchanged", SpvWord{16}},
+        {"alTessellationEvaluation", SpvWord{2}},
+        {"cdStorageBuffer16BitAccess", SpvWord{4433}},
+        {"aoSampleInterlockUnorderedEXT", SpvWord{5369}},
+        {"bpHitTNV", SpvWord{5332}},
+        {"bdR16f", SpvWord{9}},
+        {"aaMakeTexelAvailable", SpvWord{256}},
+        {"aoDerivativeGroupLinearNV", SpvWord{5290}},
+        {"apWorkgroup", SpvWord{4}},
+        {"bnNoCapture", SpvWord{5}},
+        {"cdFloat16ImageAMD", SpvWord{5008}},
+        {"aoOutputTrianglesEXT", SpvWord{5298}},
+        {"bfUnsignedInt16", SpvWord{11}},
+        {"cdTessellation", SpvWord{3}},
+        {"cdImageGatherBiasLodAMD", SpvWord{5009}},
+        {"bpLocalInvocationId", SpvWord{27}},
+        {"anGLSL450", SpvWord{1}},
+        {"aoShadingRateInterlockUnorderedEXT", SpvWord{5371}},
+        {"boStream", SpvWord{29}},
+        {"boFPMaxErrorDecorationINTEL", SpvWord{6170}},
+        {"cdCooperativeMatrixNV", SpvWord{5357}},
+        {"cdInt64Atomics", SpvWord{12}},
+        {"amLogical", SpvWord{0}},
+        {"cdPhysicalStorageBufferAddressesEXT", SpvWord{5347}},
+        {"alKernel", SpvWord{6}},
+        {"cdTransformFeedback", SpvWord{53}},
+        {"aoXfb", SpvWord{11}},
+        {"aePure", SpvWord{4}},
+        {"bpFragDepth", SpvWord{22}},
+        {"ajVertical2Pixels", SpvWord{1}},
+        {"aoInitializer", SpvWord{33}},
+        {"bpBaryCoordNoPerspKHR", SpvWord{5287}},
+        {"adPartialCount", SpvWord{256}},
+        {"cdRayTracingPositionFetchKHR", SpvWord{5336}},
+        {"cdAtomicFloat64MinMaxEXT", SpvWord{5613}},
+        {"cfRayQueryCommittedIntersectionTriangleKHR", SpvWord{1}},
+        {"aoInputPoints", SpvWord{19}},
+        {"alAnyHitNV", SpvWord{5315}},
+        {"cdTessellationPointSize", SpvWord{23}},
+        {"aaOffsets", SpvWord{65536}},
+        {"cdInt16", SpvWord{22}},
+        {"cdRayTracingKHR", SpvWord{4479}},
+        {"cdImageRect", SpvWord{36}},
+        {"cdInt8", SpvWord{39}},
+        {"bpObjectRayDirectionKHR", SpvWord{5324}},
+        {"bpSubgroupId", SpvWord{40}},
+        {"cdFragmentBarycentricNV", SpvWord{5284}},
+        {"cdDotProductInputAllKHR", SpvWord{6016}},
+        {"aoFloatingPointModeALTINTEL", SpvWord{5622}},
+        {"cdMultiViewport", SpvWord{57}},
+        {"boVectorComputeVariableINTEL", SpvWord{5624}},
+        {"cdGroupUniformArithmeticKHR", SpvWord{6400}},
+        {"bpMeshViewIndicesNV", SpvWord{5281}},
+        {"cdFPFastMathModeINTEL", SpvWord{5837}},
+        {"aoSpacingEqual", SpvWord{1}},
+        {"bpPrimitivePointIndicesEXT", SpvWord{5294}},
+        {"bpWorldToObjectKHR", SpvWord{5331}},
+        {"boBinding", SpvWord{33}},
+        {"cdGroupNonUniformClustered", SpvWord{67}},
+        {"boUserSemantic", SpvWord{5635}},
+        {"aoDepthLess", SpvWord{15}},
+        {"adMinIterations", SpvWord{16}},
+    };
+
+    static const auto hash = [](const UnownedStringSlice& str, UInt32 salt){
+        UInt32 h = salt;
+        for (const char c : str)
+            h = (h * 0x01000193) ^ c;
+        return h % 944;
+    };
+
+    const auto i = hash(str, tableSalt[hash(str, 0)]);
+    if(str == words[i].first)
+    {
+        value = words[i].second;
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
+
+using QualifiedEnumName = SPIRVCoreGrammarInfo::QualifiedEnumName;
+static bool lookupQualifiedEnum(const QualifiedEnumName& k, SpvWord& v)
+{
+    static_assert(sizeof(k.kind.index) == 1);
+    if(k.name.getLength() > 46)
+        return false;
+    char name[48];
+    name[0] = char((k.kind.index >> 4) + 'a');
+    name[1] = char((k.kind.index & 0xf) + 'a');
+    memcpy(name+2, k.name.begin(), k.name.getLength());
+    return lookupEnumWithHexPrefix(UnownedStringSlice(name, k.name.getLength() + 2), v);
+}
+
+using QualifiedEnumValue = SPIRVCoreGrammarInfo::QualifiedEnumValue;
+static bool getQualifiedEnumName(const QualifiedEnumValue& k, UnownedStringSlice& v)
+{
+    const auto& [k1, k2] = k;
+    switch(k1.index)
+    {
+        case 0:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"None"}; return true;
+            case 1: v = UnownedStringSlice{"Bias"}; return true;
+            case 2: v = UnownedStringSlice{"Lod"}; return true;
+            case 4: v = UnownedStringSlice{"Grad"}; return true;
+            case 8: v = UnownedStringSlice{"ConstOffset"}; return true;
+            case 16: v = UnownedStringSlice{"Offset"}; return true;
+            case 32: v = UnownedStringSlice{"ConstOffsets"}; return true;
+            case 64: v = UnownedStringSlice{"Sample"}; return true;
+            case 128: v = UnownedStringSlice{"MinLod"}; return true;
+            case 256: v = UnownedStringSlice{"MakeTexelAvailable"}; return true;
+            case 512: v = UnownedStringSlice{"MakeTexelVisible"}; return true;
+            case 1024: v = UnownedStringSlice{"NonPrivateTexel"}; return true;
+            case 2048: v = UnownedStringSlice{"VolatileTexel"}; return true;
+            case 4096: v = UnownedStringSlice{"SignExtend"}; return true;
+            case 8192: v = UnownedStringSlice{"ZeroExtend"}; return true;
+            case 16384: v = UnownedStringSlice{"Nontemporal"}; return true;
+            case 65536: v = UnownedStringSlice{"Offsets"}; return true;
+            default: return false;
+        }
+        case 1:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"None"}; return true;
+            case 1: v = UnownedStringSlice{"NotNaN"}; return true;
+            case 2: v = UnownedStringSlice{"NotInf"}; return true;
+            case 4: v = UnownedStringSlice{"NSZ"}; return true;
+            case 8: v = UnownedStringSlice{"AllowRecip"}; return true;
+            case 16: v = UnownedStringSlice{"Fast"}; return true;
+            case 65536: v = UnownedStringSlice{"AllowContractFastINTEL"}; return true;
+            case 131072: v = UnownedStringSlice{"AllowReassocINTEL"}; return true;
+            default: return false;
+        }
+        case 2:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"None"}; return true;
+            case 1: v = UnownedStringSlice{"Flatten"}; return true;
+            case 2: v = UnownedStringSlice{"DontFlatten"}; return true;
+            default: return false;
+        }
+        case 3:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"None"}; return true;
+            case 1: v = UnownedStringSlice{"Unroll"}; return true;
+            case 2: v = UnownedStringSlice{"DontUnroll"}; return true;
+            case 4: v = UnownedStringSlice{"DependencyInfinite"}; return true;
+            case 8: v = UnownedStringSlice{"DependencyLength"}; return true;
+            case 16: v = UnownedStringSlice{"MinIterations"}; return true;
+            case 32: v = UnownedStringSlice{"MaxIterations"}; return true;
+            case 64: v = UnownedStringSlice{"IterationMultiple"}; return true;
+            case 128: v = UnownedStringSlice{"PeelCount"}; return true;
+            case 256: v = UnownedStringSlice{"PartialCount"}; return true;
+            case 65536: v = UnownedStringSlice{"InitiationIntervalINTEL"}; return true;
+            case 131072: v = UnownedStringSlice{"MaxConcurrencyINTEL"}; return true;
+            case 262144: v = UnownedStringSlice{"DependencyArrayINTEL"}; return true;
+            case 524288: v = UnownedStringSlice{"PipelineEnableINTEL"}; return true;
+            case 1048576: v = UnownedStringSlice{"LoopCoalesceINTEL"}; return true;
+            case 2097152: v = UnownedStringSlice{"MaxInterleavingINTEL"}; return true;
+            case 4194304: v = UnownedStringSlice{"SpeculatedIterationsINTEL"}; return true;
+            case 8388608: v = UnownedStringSlice{"NoFusionINTEL"}; return true;
+            case 16777216: v = UnownedStringSlice{"LoopCountINTEL"}; return true;
+            case 33554432: v = UnownedStringSlice{"MaxReinvocationDelayINTEL"}; return true;
+            default: return false;
+        }
+        case 4:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"None"}; return true;
+            case 1: v = UnownedStringSlice{"Inline"}; return true;
+            case 2: v = UnownedStringSlice{"DontInline"}; return true;
+            case 4: v = UnownedStringSlice{"Pure"}; return true;
+            case 8: v = UnownedStringSlice{"Const"}; return true;
+            case 65536: v = UnownedStringSlice{"OptNoneINTEL"}; return true;
+            default: return false;
+        }
+        case 5:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"Relaxed"}; return true;
+            case 2: v = UnownedStringSlice{"Acquire"}; return true;
+            case 4: v = UnownedStringSlice{"Release"}; return true;
+            case 8: v = UnownedStringSlice{"AcquireRelease"}; return true;
+            case 16: v = UnownedStringSlice{"SequentiallyConsistent"}; return true;
+            case 64: v = UnownedStringSlice{"UniformMemory"}; return true;
+            case 128: v = UnownedStringSlice{"SubgroupMemory"}; return true;
+            case 256: v = UnownedStringSlice{"WorkgroupMemory"}; return true;
+            case 512: v = UnownedStringSlice{"CrossWorkgroupMemory"}; return true;
+            case 1024: v = UnownedStringSlice{"AtomicCounterMemory"}; return true;
+            case 2048: v = UnownedStringSlice{"ImageMemory"}; return true;
+            case 4096: v = UnownedStringSlice{"OutputMemory"}; return true;
+            case 8192: v = UnownedStringSlice{"MakeAvailable"}; return true;
+            case 16384: v = UnownedStringSlice{"MakeVisible"}; return true;
+            case 32768: v = UnownedStringSlice{"Volatile"}; return true;
+            default: return false;
+        }
+        case 6:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"None"}; return true;
+            case 1: v = UnownedStringSlice{"Volatile"}; return true;
+            case 2: v = UnownedStringSlice{"Aligned"}; return true;
+            case 4: v = UnownedStringSlice{"Nontemporal"}; return true;
+            case 8: v = UnownedStringSlice{"MakePointerAvailable"}; return true;
+            case 16: v = UnownedStringSlice{"MakePointerVisible"}; return true;
+            case 32: v = UnownedStringSlice{"NonPrivatePointer"}; return true;
+            case 65536: v = UnownedStringSlice{"AliasScopeINTELMask"}; return true;
+            case 131072: v = UnownedStringSlice{"NoAliasINTELMask"}; return true;
+            default: return false;
+        }
+        case 7:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"None"}; return true;
+            case 1: v = UnownedStringSlice{"CmdExecTime"}; return true;
+            default: return false;
+        }
+        case 8:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"NoneKHR"}; return true;
+            case 1: v = UnownedStringSlice{"OpaqueKHR"}; return true;
+            case 2: v = UnownedStringSlice{"NoOpaqueKHR"}; return true;
+            case 4: v = UnownedStringSlice{"TerminateOnFirstHitKHR"}; return true;
+            case 8: v = UnownedStringSlice{"SkipClosestHitShaderKHR"}; return true;
+            case 16: v = UnownedStringSlice{"CullBackFacingTrianglesKHR"}; return true;
+            case 32: v = UnownedStringSlice{"CullFrontFacingTrianglesKHR"}; return true;
+            case 64: v = UnownedStringSlice{"CullOpaqueKHR"}; return true;
+            case 128: v = UnownedStringSlice{"CullNoOpaqueKHR"}; return true;
+            case 256: v = UnownedStringSlice{"SkipTrianglesKHR"}; return true;
+            case 512: v = UnownedStringSlice{"SkipAABBsKHR"}; return true;
+            case 1024: v = UnownedStringSlice{"ForceOpacityMicromap2StateEXT"}; return true;
+            default: return false;
+        }
+        case 9:
+        switch(k2)
+        {
+            case 1: v = UnownedStringSlice{"Vertical2Pixels"}; return true;
+            case 2: v = UnownedStringSlice{"Vertical4Pixels"}; return true;
+            case 4: v = UnownedStringSlice{"Horizontal2Pixels"}; return true;
+            case 8: v = UnownedStringSlice{"Horizontal4Pixels"}; return true;
+            default: return false;
+        }
+        case 10:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"Unknown"}; return true;
+            case 1: v = UnownedStringSlice{"ESSL"}; return true;
+            case 2: v = UnownedStringSlice{"GLSL"}; return true;
+            case 3: v = UnownedStringSlice{"OpenCL_C"}; return true;
+            case 4: v = UnownedStringSlice{"OpenCL_CPP"}; return true;
+            case 5: v = UnownedStringSlice{"HLSL"}; return true;
+            case 6: v = UnownedStringSlice{"CPP_for_OpenCL"}; return true;
+            case 7: v = UnownedStringSlice{"SYCL"}; return true;
+            case 8: v = UnownedStringSlice{"HERO_C"}; return true;
+            case 9: v = UnownedStringSlice{"NZSL"}; return true;
+            case 10: v = UnownedStringSlice{"WGSL"}; return true;
+            default: return false;
+        }
+        case 11:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"Vertex"}; return true;
+            case 1: v = UnownedStringSlice{"TessellationControl"}; return true;
+            case 2: v = UnownedStringSlice{"TessellationEvaluation"}; return true;
+            case 3: v = UnownedStringSlice{"Geometry"}; return true;
+            case 4: v = UnownedStringSlice{"Fragment"}; return true;
+            case 5: v = UnownedStringSlice{"GLCompute"}; return true;
+            case 6: v = UnownedStringSlice{"Kernel"}; return true;
+            case 5267: v = UnownedStringSlice{"TaskNV"}; return true;
+            case 5268: v = UnownedStringSlice{"MeshNV"}; return true;
+            case 5313: v = UnownedStringSlice{"RayGenerationNV"}; return true;
+            case 5314: v = UnownedStringSlice{"IntersectionNV"}; return true;
+            case 5315: v = UnownedStringSlice{"AnyHitNV"}; return true;
+            case 5316: v = UnownedStringSlice{"ClosestHitNV"}; return true;
+            case 5317: v = UnownedStringSlice{"MissNV"}; return true;
+            case 5318: v = UnownedStringSlice{"CallableNV"}; return true;
+            case 5364: v = UnownedStringSlice{"TaskEXT"}; return true;
+            case 5365: v = UnownedStringSlice{"MeshEXT"}; return true;
+            default: return false;
+        }
+        case 12:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"Logical"}; return true;
+            case 1: v = UnownedStringSlice{"Physical32"}; return true;
+            case 2: v = UnownedStringSlice{"Physical64"}; return true;
+            case 5348: v = UnownedStringSlice{"PhysicalStorageBuffer64"}; return true;
+            default: return false;
+        }
+        case 13:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"Simple"}; return true;
+            case 1: v = UnownedStringSlice{"GLSL450"}; return true;
+            case 2: v = UnownedStringSlice{"OpenCL"}; return true;
+            case 3: v = UnownedStringSlice{"Vulkan"}; return true;
+            default: return false;
+        }
+        case 14:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"Invocations"}; return true;
+            case 1: v = UnownedStringSlice{"SpacingEqual"}; return true;
+            case 2: v = UnownedStringSlice{"SpacingFractionalEven"}; return true;
+            case 3: v = UnownedStringSlice{"SpacingFractionalOdd"}; return true;
+            case 4: v = UnownedStringSlice{"VertexOrderCw"}; return true;
+            case 5: v = UnownedStringSlice{"VertexOrderCcw"}; return true;
+            case 6: v = UnownedStringSlice{"PixelCenterInteger"}; return true;
+            case 7: v = UnownedStringSlice{"OriginUpperLeft"}; return true;
+            case 8: v = UnownedStringSlice{"OriginLowerLeft"}; return true;
+            case 9: v = UnownedStringSlice{"EarlyFragmentTests"}; return true;
+            case 10: v = UnownedStringSlice{"PointMode"}; return true;
+            case 11: v = UnownedStringSlice{"Xfb"}; return true;
+            case 12: v = UnownedStringSlice{"DepthReplacing"}; return true;
+            case 14: v = UnownedStringSlice{"DepthGreater"}; return true;
+            case 15: v = UnownedStringSlice{"DepthLess"}; return true;
+            case 16: v = UnownedStringSlice{"DepthUnchanged"}; return true;
+            case 17: v = UnownedStringSlice{"LocalSize"}; return true;
+            case 18: v = UnownedStringSlice{"LocalSizeHint"}; return true;
+            case 19: v = UnownedStringSlice{"InputPoints"}; return true;
+            case 20: v = UnownedStringSlice{"InputLines"}; return true;
+            case 21: v = UnownedStringSlice{"InputLinesAdjacency"}; return true;
+            case 22: v = UnownedStringSlice{"Triangles"}; return true;
+            case 23: v = UnownedStringSlice{"InputTrianglesAdjacency"}; return true;
+            case 24: v = UnownedStringSlice{"Quads"}; return true;
+            case 25: v = UnownedStringSlice{"Isolines"}; return true;
+            case 26: v = UnownedStringSlice{"OutputVertices"}; return true;
+            case 27: v = UnownedStringSlice{"OutputPoints"}; return true;
+            case 28: v = UnownedStringSlice{"OutputLineStrip"}; return true;
+            case 29: v = UnownedStringSlice{"OutputTriangleStrip"}; return true;
+            case 30: v = UnownedStringSlice{"VecTypeHint"}; return true;
+            case 31: v = UnownedStringSlice{"ContractionOff"}; return true;
+            case 33: v = UnownedStringSlice{"Initializer"}; return true;
+            case 34: v = UnownedStringSlice{"Finalizer"}; return true;
+            case 35: v = UnownedStringSlice{"SubgroupSize"}; return true;
+            case 36: v = UnownedStringSlice{"SubgroupsPerWorkgroup"}; return true;
+            case 37: v = UnownedStringSlice{"SubgroupsPerWorkgroupId"}; return true;
+            case 38: v = UnownedStringSlice{"LocalSizeId"}; return true;
+            case 39: v = UnownedStringSlice{"LocalSizeHintId"}; return true;
+            case 4169: v = UnownedStringSlice{"NonCoherentColorAttachmentReadEXT"}; return true;
+            case 4170: v = UnownedStringSlice{"NonCoherentDepthAttachmentReadEXT"}; return true;
+            case 4171: v = UnownedStringSlice{"NonCoherentStencilAttachmentReadEXT"}; return true;
+            case 4421: v = UnownedStringSlice{"SubgroupUniformControlFlowKHR"}; return true;
+            case 4446: v = UnownedStringSlice{"PostDepthCoverage"}; return true;
+            case 4459: v = UnownedStringSlice{"DenormPreserve"}; return true;
+            case 4460: v = UnownedStringSlice{"DenormFlushToZero"}; return true;
+            case 4461: v = UnownedStringSlice{"SignedZeroInfNanPreserve"}; return true;
+            case 4462: v = UnownedStringSlice{"RoundingModeRTE"}; return true;
+            case 4463: v = UnownedStringSlice{"RoundingModeRTZ"}; return true;
+            case 5017: v = UnownedStringSlice{"EarlyAndLateFragmentTestsAMD"}; return true;
+            case 5027: v = UnownedStringSlice{"StencilRefReplacingEXT"}; return true;
+            case 5079: v = UnownedStringSlice{"StencilRefUnchangedFrontAMD"}; return true;
+            case 5080: v = UnownedStringSlice{"StencilRefGreaterFrontAMD"}; return true;
+            case 5081: v = UnownedStringSlice{"StencilRefLessFrontAMD"}; return true;
+            case 5082: v = UnownedStringSlice{"StencilRefUnchangedBackAMD"}; return true;
+            case 5083: v = UnownedStringSlice{"StencilRefGreaterBackAMD"}; return true;
+            case 5084: v = UnownedStringSlice{"StencilRefLessBackAMD"}; return true;
+            case 5269: v = UnownedStringSlice{"OutputLinesNV"}; return true;
+            case 5270: v = UnownedStringSlice{"OutputPrimitivesNV"}; return true;
+            case 5289: v = UnownedStringSlice{"DerivativeGroupQuadsNV"}; return true;
+            case 5290: v = UnownedStringSlice{"DerivativeGroupLinearNV"}; return true;
+            case 5298: v = UnownedStringSlice{"OutputTrianglesNV"}; return true;
+            case 5366: v = UnownedStringSlice{"PixelInterlockOrderedEXT"}; return true;
+            case 5367: v = UnownedStringSlice{"PixelInterlockUnorderedEXT"}; return true;
+            case 5368: v = UnownedStringSlice{"SampleInterlockOrderedEXT"}; return true;
+            case 5369: v = UnownedStringSlice{"SampleInterlockUnorderedEXT"}; return true;
+            case 5370: v = UnownedStringSlice{"ShadingRateInterlockOrderedEXT"}; return true;
+            case 5371: v = UnownedStringSlice{"ShadingRateInterlockUnorderedEXT"}; return true;
+            case 5618: v = UnownedStringSlice{"SharedLocalMemorySizeINTEL"}; return true;
+            case 5620: v = UnownedStringSlice{"RoundingModeRTPINTEL"}; return true;
+            case 5621: v = UnownedStringSlice{"RoundingModeRTNINTEL"}; return true;
+            case 5622: v = UnownedStringSlice{"FloatingPointModeALTINTEL"}; return true;
+            case 5623: v = UnownedStringSlice{"FloatingPointModeIEEEINTEL"}; return true;
+            case 5893: v = UnownedStringSlice{"MaxWorkgroupSizeINTEL"}; return true;
+            case 5894: v = UnownedStringSlice{"MaxWorkDimINTEL"}; return true;
+            case 5895: v = UnownedStringSlice{"NoGlobalOffsetINTEL"}; return true;
+            case 5896: v = UnownedStringSlice{"NumSIMDWorkitemsINTEL"}; return true;
+            case 5903: v = UnownedStringSlice{"SchedulerTargetFmaxMhzINTEL"}; return true;
+            case 6154: v = UnownedStringSlice{"StreamingInterfaceINTEL"}; return true;
+            case 6160: v = UnownedStringSlice{"RegisterMapInterfaceINTEL"}; return true;
+            case 6417: v = UnownedStringSlice{"NamedBarrierCountINTEL"}; return true;
+            default: return false;
+        }
+        case 15:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"UniformConstant"}; return true;
+            case 1: v = UnownedStringSlice{"Input"}; return true;
+            case 2: v = UnownedStringSlice{"Uniform"}; return true;
+            case 3: v = UnownedStringSlice{"Output"}; return true;
+            case 4: v = UnownedStringSlice{"Workgroup"}; return true;
+            case 5: v = UnownedStringSlice{"CrossWorkgroup"}; return true;
+            case 6: v = UnownedStringSlice{"Private"}; return true;
+            case 7: v = UnownedStringSlice{"Function"}; return true;
+            case 8: v = UnownedStringSlice{"Generic"}; return true;
+            case 9: v = UnownedStringSlice{"PushConstant"}; return true;
+            case 10: v = UnownedStringSlice{"AtomicCounter"}; return true;
+            case 11: v = UnownedStringSlice{"Image"}; return true;
+            case 12: v = UnownedStringSlice{"StorageBuffer"}; return true;
+            case 4172: v = UnownedStringSlice{"TileImageEXT"}; return true;
+            case 5328: v = UnownedStringSlice{"CallableDataNV"}; return true;
+            case 5329: v = UnownedStringSlice{"IncomingCallableDataNV"}; return true;
+            case 5338: v = UnownedStringSlice{"RayPayloadNV"}; return true;
+            case 5339: v = UnownedStringSlice{"HitAttributeNV"}; return true;
+            case 5342: v = UnownedStringSlice{"IncomingRayPayloadNV"}; return true;
+            case 5343: v = UnownedStringSlice{"ShaderRecordBufferNV"}; return true;
+            case 5349: v = UnownedStringSlice{"PhysicalStorageBuffer"}; return true;
+            case 5385: v = UnownedStringSlice{"HitObjectAttributeNV"}; return true;
+            case 5402: v = UnownedStringSlice{"TaskPayloadWorkgroupEXT"}; return true;
+            case 5605: v = UnownedStringSlice{"CodeSectionINTEL"}; return true;
+            case 5936: v = UnownedStringSlice{"DeviceOnlyINTEL"}; return true;
+            case 5937: v = UnownedStringSlice{"HostOnlyINTEL"}; return true;
+            default: return false;
+        }
+        case 16:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"1D"}; return true;
+            case 1: v = UnownedStringSlice{"2D"}; return true;
+            case 2: v = UnownedStringSlice{"3D"}; return true;
+            case 3: v = UnownedStringSlice{"Cube"}; return true;
+            case 4: v = UnownedStringSlice{"Rect"}; return true;
+            case 5: v = UnownedStringSlice{"Buffer"}; return true;
+            case 6: v = UnownedStringSlice{"SubpassData"}; return true;
+            case 4173: v = UnownedStringSlice{"TileImageDataEXT"}; return true;
+            default: return false;
+        }
+        case 17:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"None"}; return true;
+            case 1: v = UnownedStringSlice{"ClampToEdge"}; return true;
+            case 2: v = UnownedStringSlice{"Clamp"}; return true;
+            case 3: v = UnownedStringSlice{"Repeat"}; return true;
+            case 4: v = UnownedStringSlice{"RepeatMirrored"}; return true;
+            default: return false;
+        }
+        case 18:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"Nearest"}; return true;
+            case 1: v = UnownedStringSlice{"Linear"}; return true;
+            default: return false;
+        }
+        case 19:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"Unknown"}; return true;
+            case 1: v = UnownedStringSlice{"Rgba32f"}; return true;
+            case 2: v = UnownedStringSlice{"Rgba16f"}; return true;
+            case 3: v = UnownedStringSlice{"R32f"}; return true;
+            case 4: v = UnownedStringSlice{"Rgba8"}; return true;
+            case 5: v = UnownedStringSlice{"Rgba8Snorm"}; return true;
+            case 6: v = UnownedStringSlice{"Rg32f"}; return true;
+            case 7: v = UnownedStringSlice{"Rg16f"}; return true;
+            case 8: v = UnownedStringSlice{"R11fG11fB10f"}; return true;
+            case 9: v = UnownedStringSlice{"R16f"}; return true;
+            case 10: v = UnownedStringSlice{"Rgba16"}; return true;
+            case 11: v = UnownedStringSlice{"Rgb10A2"}; return true;
+            case 12: v = UnownedStringSlice{"Rg16"}; return true;
+            case 13: v = UnownedStringSlice{"Rg8"}; return true;
+            case 14: v = UnownedStringSlice{"R16"}; return true;
+            case 15: v = UnownedStringSlice{"R8"}; return true;
+            case 16: v = UnownedStringSlice{"Rgba16Snorm"}; return true;
+            case 17: v = UnownedStringSlice{"Rg16Snorm"}; return true;
+            case 18: v = UnownedStringSlice{"Rg8Snorm"}; return true;
+            case 19: v = UnownedStringSlice{"R16Snorm"}; return true;
+            case 20: v = UnownedStringSlice{"R8Snorm"}; return true;
+            case 21: v = UnownedStringSlice{"Rgba32i"}; return true;
+            case 22: v = UnownedStringSlice{"Rgba16i"}; return true;
+            case 23: v = UnownedStringSlice{"Rgba8i"}; return true;
+            case 24: v = UnownedStringSlice{"R32i"}; return true;
+            case 25: v = UnownedStringSlice{"Rg32i"}; return true;
+            case 26: v = UnownedStringSlice{"Rg16i"}; return true;
+            case 27: v = UnownedStringSlice{"Rg8i"}; return true;
+            case 28: v = UnownedStringSlice{"R16i"}; return true;
+            case 29: v = UnownedStringSlice{"R8i"}; return true;
+            case 30: v = UnownedStringSlice{"Rgba32ui"}; return true;
+            case 31: v = UnownedStringSlice{"Rgba16ui"}; return true;
+            case 32: v = UnownedStringSlice{"Rgba8ui"}; return true;
+            case 33: v = UnownedStringSlice{"R32ui"}; return true;
+            case 34: v = UnownedStringSlice{"Rgb10a2ui"}; return true;
+            case 35: v = UnownedStringSlice{"Rg32ui"}; return true;
+            case 36: v = UnownedStringSlice{"Rg16ui"}; return true;
+            case 37: v = UnownedStringSlice{"Rg8ui"}; return true;
+            case 38: v = UnownedStringSlice{"R16ui"}; return true;
+            case 39: v = UnownedStringSlice{"R8ui"}; return true;
+            case 40: v = UnownedStringSlice{"R64ui"}; return true;
+            case 41: v = UnownedStringSlice{"R64i"}; return true;
+            default: return false;
+        }
+        case 20:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"R"}; return true;
+            case 1: v = UnownedStringSlice{"A"}; return true;
+            case 2: v = UnownedStringSlice{"RG"}; return true;
+            case 3: v = UnownedStringSlice{"RA"}; return true;
+            case 4: v = UnownedStringSlice{"RGB"}; return true;
+            case 5: v = UnownedStringSlice{"RGBA"}; return true;
+            case 6: v = UnownedStringSlice{"BGRA"}; return true;
+            case 7: v = UnownedStringSlice{"ARGB"}; return true;
+            case 8: v = UnownedStringSlice{"Intensity"}; return true;
+            case 9: v = UnownedStringSlice{"Luminance"}; return true;
+            case 10: v = UnownedStringSlice{"Rx"}; return true;
+            case 11: v = UnownedStringSlice{"RGx"}; return true;
+            case 12: v = UnownedStringSlice{"RGBx"}; return true;
+            case 13: v = UnownedStringSlice{"Depth"}; return true;
+            case 14: v = UnownedStringSlice{"DepthStencil"}; return true;
+            case 15: v = UnownedStringSlice{"sRGB"}; return true;
+            case 16: v = UnownedStringSlice{"sRGBx"}; return true;
+            case 17: v = UnownedStringSlice{"sRGBA"}; return true;
+            case 18: v = UnownedStringSlice{"sBGRA"}; return true;
+            case 19: v = UnownedStringSlice{"ABGR"}; return true;
+            default: return false;
+        }
+        case 21:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"SnormInt8"}; return true;
+            case 1: v = UnownedStringSlice{"SnormInt16"}; return true;
+            case 2: v = UnownedStringSlice{"UnormInt8"}; return true;
+            case 3: v = UnownedStringSlice{"UnormInt16"}; return true;
+            case 4: v = UnownedStringSlice{"UnormShort565"}; return true;
+            case 5: v = UnownedStringSlice{"UnormShort555"}; return true;
+            case 6: v = UnownedStringSlice{"UnormInt101010"}; return true;
+            case 7: v = UnownedStringSlice{"SignedInt8"}; return true;
+            case 8: v = UnownedStringSlice{"SignedInt16"}; return true;
+            case 9: v = UnownedStringSlice{"SignedInt32"}; return true;
+            case 10: v = UnownedStringSlice{"UnsignedInt8"}; return true;
+            case 11: v = UnownedStringSlice{"UnsignedInt16"}; return true;
+            case 12: v = UnownedStringSlice{"UnsignedInt32"}; return true;
+            case 13: v = UnownedStringSlice{"HalfFloat"}; return true;
+            case 14: v = UnownedStringSlice{"Float"}; return true;
+            case 15: v = UnownedStringSlice{"UnormInt24"}; return true;
+            case 16: v = UnownedStringSlice{"UnormInt101010_2"}; return true;
+            case 19: v = UnownedStringSlice{"UnsignedIntRaw10EXT"}; return true;
+            case 20: v = UnownedStringSlice{"UnsignedIntRaw12EXT"}; return true;
+            default: return false;
+        }
+        case 22:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"RTE"}; return true;
+            case 1: v = UnownedStringSlice{"RTZ"}; return true;
+            case 2: v = UnownedStringSlice{"RTP"}; return true;
+            case 3: v = UnownedStringSlice{"RTN"}; return true;
+            default: return false;
+        }
+        case 23:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"Preserve"}; return true;
+            case 1: v = UnownedStringSlice{"FlushToZero"}; return true;
+            default: return false;
+        }
+        case 24:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"TRN"}; return true;
+            case 1: v = UnownedStringSlice{"TRN_ZERO"}; return true;
+            case 2: v = UnownedStringSlice{"RND"}; return true;
+            case 3: v = UnownedStringSlice{"RND_ZERO"}; return true;
+            case 4: v = UnownedStringSlice{"RND_INF"}; return true;
+            case 5: v = UnownedStringSlice{"RND_MIN_INF"}; return true;
+            case 6: v = UnownedStringSlice{"RND_CONV"}; return true;
+            case 7: v = UnownedStringSlice{"RND_CONV_ODD"}; return true;
+            default: return false;
+        }
+        case 25:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"IEEE"}; return true;
+            case 1: v = UnownedStringSlice{"ALT"}; return true;
+            default: return false;
+        }
+        case 26:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"WRAP"}; return true;
+            case 1: v = UnownedStringSlice{"SAT"}; return true;
+            case 2: v = UnownedStringSlice{"SAT_ZERO"}; return true;
+            case 3: v = UnownedStringSlice{"SAT_SYM"}; return true;
+            default: return false;
+        }
+        case 27:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"Export"}; return true;
+            case 1: v = UnownedStringSlice{"Import"}; return true;
+            case 2: v = UnownedStringSlice{"LinkOnceODR"}; return true;
+            default: return false;
+        }
+        case 28:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"ReadOnly"}; return true;
+            case 1: v = UnownedStringSlice{"WriteOnly"}; return true;
+            case 2: v = UnownedStringSlice{"ReadWrite"}; return true;
+            default: return false;
+        }
+        case 29:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"Zext"}; return true;
+            case 1: v = UnownedStringSlice{"Sext"}; return true;
+            case 2: v = UnownedStringSlice{"ByVal"}; return true;
+            case 3: v = UnownedStringSlice{"Sret"}; return true;
+            case 4: v = UnownedStringSlice{"NoAlias"}; return true;
+            case 5: v = UnownedStringSlice{"NoCapture"}; return true;
+            case 6: v = UnownedStringSlice{"NoWrite"}; return true;
+            case 7: v = UnownedStringSlice{"NoReadWrite"}; return true;
+            case 5940: v = UnownedStringSlice{"RuntimeAlignedINTEL"}; return true;
+            default: return false;
+        }
+        case 30:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"RelaxedPrecision"}; return true;
+            case 1: v = UnownedStringSlice{"SpecId"}; return true;
+            case 2: v = UnownedStringSlice{"Block"}; return true;
+            case 3: v = UnownedStringSlice{"BufferBlock"}; return true;
+            case 4: v = UnownedStringSlice{"RowMajor"}; return true;
+            case 5: v = UnownedStringSlice{"ColMajor"}; return true;
+            case 6: v = UnownedStringSlice{"ArrayStride"}; return true;
+            case 7: v = UnownedStringSlice{"MatrixStride"}; return true;
+            case 8: v = UnownedStringSlice{"GLSLShared"}; return true;
+            case 9: v = UnownedStringSlice{"GLSLPacked"}; return true;
+            case 10: v = UnownedStringSlice{"CPacked"}; return true;
+            case 11: v = UnownedStringSlice{"BuiltIn"}; return true;
+            case 13: v = UnownedStringSlice{"NoPerspective"}; return true;
+            case 14: v = UnownedStringSlice{"Flat"}; return true;
+            case 15: v = UnownedStringSlice{"Patch"}; return true;
+            case 16: v = UnownedStringSlice{"Centroid"}; return true;
+            case 17: v = UnownedStringSlice{"Sample"}; return true;
+            case 18: v = UnownedStringSlice{"Invariant"}; return true;
+            case 19: v = UnownedStringSlice{"Restrict"}; return true;
+            case 20: v = UnownedStringSlice{"Aliased"}; return true;
+            case 21: v = UnownedStringSlice{"Volatile"}; return true;
+            case 22: v = UnownedStringSlice{"Constant"}; return true;
+            case 23: v = UnownedStringSlice{"Coherent"}; return true;
+            case 24: v = UnownedStringSlice{"NonWritable"}; return true;
+            case 25: v = UnownedStringSlice{"NonReadable"}; return true;
+            case 26: v = UnownedStringSlice{"Uniform"}; return true;
+            case 27: v = UnownedStringSlice{"UniformId"}; return true;
+            case 28: v = UnownedStringSlice{"SaturatedConversion"}; return true;
+            case 29: v = UnownedStringSlice{"Stream"}; return true;
+            case 30: v = UnownedStringSlice{"Location"}; return true;
+            case 31: v = UnownedStringSlice{"Component"}; return true;
+            case 32: v = UnownedStringSlice{"Index"}; return true;
+            case 33: v = UnownedStringSlice{"Binding"}; return true;
+            case 34: v = UnownedStringSlice{"DescriptorSet"}; return true;
+            case 35: v = UnownedStringSlice{"Offset"}; return true;
+            case 36: v = UnownedStringSlice{"XfbBuffer"}; return true;
+            case 37: v = UnownedStringSlice{"XfbStride"}; return true;
+            case 38: v = UnownedStringSlice{"FuncParamAttr"}; return true;
+            case 39: v = UnownedStringSlice{"FPRoundingMode"}; return true;
+            case 40: v = UnownedStringSlice{"FPFastMathMode"}; return true;
+            case 41: v = UnownedStringSlice{"LinkageAttributes"}; return true;
+            case 42: v = UnownedStringSlice{"NoContraction"}; return true;
+            case 43: v = UnownedStringSlice{"InputAttachmentIndex"}; return true;
+            case 44: v = UnownedStringSlice{"Alignment"}; return true;
+            case 45: v = UnownedStringSlice{"MaxByteOffset"}; return true;
+            case 46: v = UnownedStringSlice{"AlignmentId"}; return true;
+            case 47: v = UnownedStringSlice{"MaxByteOffsetId"}; return true;
+            case 4469: v = UnownedStringSlice{"NoSignedWrap"}; return true;
+            case 4470: v = UnownedStringSlice{"NoUnsignedWrap"}; return true;
+            case 4487: v = UnownedStringSlice{"WeightTextureQCOM"}; return true;
+            case 4488: v = UnownedStringSlice{"BlockMatchTextureQCOM"}; return true;
+            case 4999: v = UnownedStringSlice{"ExplicitInterpAMD"}; return true;
+            case 5248: v = UnownedStringSlice{"OverrideCoverageNV"}; return true;
+            case 5250: v = UnownedStringSlice{"PassthroughNV"}; return true;
+            case 5252: v = UnownedStringSlice{"ViewportRelativeNV"}; return true;
+            case 5256: v = UnownedStringSlice{"SecondaryViewportRelativeNV"}; return true;
+            case 5271: v = UnownedStringSlice{"PerPrimitiveNV"}; return true;
+            case 5272: v = UnownedStringSlice{"PerViewNV"}; return true;
+            case 5273: v = UnownedStringSlice{"PerTaskNV"}; return true;
+            case 5285: v = UnownedStringSlice{"PerVertexKHR"}; return true;
+            case 5300: v = UnownedStringSlice{"NonUniform"}; return true;
+            case 5355: v = UnownedStringSlice{"RestrictPointer"}; return true;
+            case 5356: v = UnownedStringSlice{"AliasedPointer"}; return true;
+            case 5386: v = UnownedStringSlice{"HitObjectShaderRecordBufferNV"}; return true;
+            case 5398: v = UnownedStringSlice{"BindlessSamplerNV"}; return true;
+            case 5399: v = UnownedStringSlice{"BindlessImageNV"}; return true;
+            case 5400: v = UnownedStringSlice{"BoundSamplerNV"}; return true;
+            case 5401: v = UnownedStringSlice{"BoundImageNV"}; return true;
+            case 5599: v = UnownedStringSlice{"SIMTCallINTEL"}; return true;
+            case 5602: v = UnownedStringSlice{"ReferencedIndirectlyINTEL"}; return true;
+            case 5607: v = UnownedStringSlice{"ClobberINTEL"}; return true;
+            case 5608: v = UnownedStringSlice{"SideEffectsINTEL"}; return true;
+            case 5624: v = UnownedStringSlice{"VectorComputeVariableINTEL"}; return true;
+            case 5625: v = UnownedStringSlice{"FuncParamIOKindINTEL"}; return true;
+            case 5626: v = UnownedStringSlice{"VectorComputeFunctionINTEL"}; return true;
+            case 5627: v = UnownedStringSlice{"StackCallINTEL"}; return true;
+            case 5628: v = UnownedStringSlice{"GlobalVariableOffsetINTEL"}; return true;
+            case 5634: v = UnownedStringSlice{"CounterBuffer"}; return true;
+            case 5635: v = UnownedStringSlice{"UserSemantic"}; return true;
+            case 5636: v = UnownedStringSlice{"UserTypeGOOGLE"}; return true;
+            case 5822: v = UnownedStringSlice{"FunctionRoundingModeINTEL"}; return true;
+            case 5823: v = UnownedStringSlice{"FunctionDenormModeINTEL"}; return true;
+            case 5825: v = UnownedStringSlice{"RegisterINTEL"}; return true;
+            case 5826: v = UnownedStringSlice{"MemoryINTEL"}; return true;
+            case 5827: v = UnownedStringSlice{"NumbanksINTEL"}; return true;
+            case 5828: v = UnownedStringSlice{"BankwidthINTEL"}; return true;
+            case 5829: v = UnownedStringSlice{"MaxPrivateCopiesINTEL"}; return true;
+            case 5830: v = UnownedStringSlice{"SinglepumpINTEL"}; return true;
+            case 5831: v = UnownedStringSlice{"DoublepumpINTEL"}; return true;
+            case 5832: v = UnownedStringSlice{"MaxReplicatesINTEL"}; return true;
+            case 5833: v = UnownedStringSlice{"SimpleDualPortINTEL"}; return true;
+            case 5834: v = UnownedStringSlice{"MergeINTEL"}; return true;
+            case 5835: v = UnownedStringSlice{"BankBitsINTEL"}; return true;
+            case 5836: v = UnownedStringSlice{"ForcePow2DepthINTEL"}; return true;
+            case 5899: v = UnownedStringSlice{"BurstCoalesceINTEL"}; return true;
+            case 5900: v = UnownedStringSlice{"CacheSizeINTEL"}; return true;
+            case 5901: v = UnownedStringSlice{"DontStaticallyCoalesceINTEL"}; return true;
+            case 5902: v = UnownedStringSlice{"PrefetchINTEL"}; return true;
+            case 5905: v = UnownedStringSlice{"StallEnableINTEL"}; return true;
+            case 5907: v = UnownedStringSlice{"FuseLoopsInFunctionINTEL"}; return true;
+            case 5909: v = UnownedStringSlice{"MathOpDSPModeINTEL"}; return true;
+            case 5914: v = UnownedStringSlice{"AliasScopeINTEL"}; return true;
+            case 5915: v = UnownedStringSlice{"NoAliasINTEL"}; return true;
+            case 5917: v = UnownedStringSlice{"InitiationIntervalINTEL"}; return true;
+            case 5918: v = UnownedStringSlice{"MaxConcurrencyINTEL"}; return true;
+            case 5919: v = UnownedStringSlice{"PipelineEnableINTEL"}; return true;
+            case 5921: v = UnownedStringSlice{"BufferLocationINTEL"}; return true;
+            case 5944: v = UnownedStringSlice{"IOPipeStorageINTEL"}; return true;
+            case 6080: v = UnownedStringSlice{"FunctionFloatingPointModeINTEL"}; return true;
+            case 6085: v = UnownedStringSlice{"SingleElementVectorINTEL"}; return true;
+            case 6087: v = UnownedStringSlice{"VectorComputeCallableFunctionINTEL"}; return true;
+            case 6140: v = UnownedStringSlice{"MediaBlockIOINTEL"}; return true;
+            case 6170: v = UnownedStringSlice{"FPMaxErrorDecorationINTEL"}; return true;
+            case 6172: v = UnownedStringSlice{"LatencyControlLabelINTEL"}; return true;
+            case 6173: v = UnownedStringSlice{"LatencyControlConstraintINTEL"}; return true;
+            case 6175: v = UnownedStringSlice{"ConduitKernelArgumentINTEL"}; return true;
+            case 6176: v = UnownedStringSlice{"RegisterMapKernelArgumentINTEL"}; return true;
+            case 6177: v = UnownedStringSlice{"MMHostInterfaceAddressWidthINTEL"}; return true;
+            case 6178: v = UnownedStringSlice{"MMHostInterfaceDataWidthINTEL"}; return true;
+            case 6179: v = UnownedStringSlice{"MMHostInterfaceLatencyINTEL"}; return true;
+            case 6180: v = UnownedStringSlice{"MMHostInterfaceReadWriteModeINTEL"}; return true;
+            case 6181: v = UnownedStringSlice{"MMHostInterfaceMaxBurstINTEL"}; return true;
+            case 6182: v = UnownedStringSlice{"MMHostInterfaceWaitRequestINTEL"}; return true;
+            case 6183: v = UnownedStringSlice{"StableKernelArgumentINTEL"}; return true;
+            default: return false;
+        }
+        case 31:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"Position"}; return true;
+            case 1: v = UnownedStringSlice{"PointSize"}; return true;
+            case 3: v = UnownedStringSlice{"ClipDistance"}; return true;
+            case 4: v = UnownedStringSlice{"CullDistance"}; return true;
+            case 5: v = UnownedStringSlice{"VertexId"}; return true;
+            case 6: v = UnownedStringSlice{"InstanceId"}; return true;
+            case 7: v = UnownedStringSlice{"PrimitiveId"}; return true;
+            case 8: v = UnownedStringSlice{"InvocationId"}; return true;
+            case 9: v = UnownedStringSlice{"Layer"}; return true;
+            case 10: v = UnownedStringSlice{"ViewportIndex"}; return true;
+            case 11: v = UnownedStringSlice{"TessLevelOuter"}; return true;
+            case 12: v = UnownedStringSlice{"TessLevelInner"}; return true;
+            case 13: v = UnownedStringSlice{"TessCoord"}; return true;
+            case 14: v = UnownedStringSlice{"PatchVertices"}; return true;
+            case 15: v = UnownedStringSlice{"FragCoord"}; return true;
+            case 16: v = UnownedStringSlice{"PointCoord"}; return true;
+            case 17: v = UnownedStringSlice{"FrontFacing"}; return true;
+            case 18: v = UnownedStringSlice{"SampleId"}; return true;
+            case 19: v = UnownedStringSlice{"SamplePosition"}; return true;
+            case 20: v = UnownedStringSlice{"SampleMask"}; return true;
+            case 22: v = UnownedStringSlice{"FragDepth"}; return true;
+            case 23: v = UnownedStringSlice{"HelperInvocation"}; return true;
+            case 24: v = UnownedStringSlice{"NumWorkgroups"}; return true;
+            case 25: v = UnownedStringSlice{"WorkgroupSize"}; return true;
+            case 26: v = UnownedStringSlice{"WorkgroupId"}; return true;
+            case 27: v = UnownedStringSlice{"LocalInvocationId"}; return true;
+            case 28: v = UnownedStringSlice{"GlobalInvocationId"}; return true;
+            case 29: v = UnownedStringSlice{"LocalInvocationIndex"}; return true;
+            case 30: v = UnownedStringSlice{"WorkDim"}; return true;
+            case 31: v = UnownedStringSlice{"GlobalSize"}; return true;
+            case 32: v = UnownedStringSlice{"EnqueuedWorkgroupSize"}; return true;
+            case 33: v = UnownedStringSlice{"GlobalOffset"}; return true;
+            case 34: v = UnownedStringSlice{"GlobalLinearId"}; return true;
+            case 36: v = UnownedStringSlice{"SubgroupSize"}; return true;
+            case 37: v = UnownedStringSlice{"SubgroupMaxSize"}; return true;
+            case 38: v = UnownedStringSlice{"NumSubgroups"}; return true;
+            case 39: v = UnownedStringSlice{"NumEnqueuedSubgroups"}; return true;
+            case 40: v = UnownedStringSlice{"SubgroupId"}; return true;
+            case 41: v = UnownedStringSlice{"SubgroupLocalInvocationId"}; return true;
+            case 42: v = UnownedStringSlice{"VertexIndex"}; return true;
+            case 43: v = UnownedStringSlice{"InstanceIndex"}; return true;
+            case 4160: v = UnownedStringSlice{"CoreIDARM"}; return true;
+            case 4161: v = UnownedStringSlice{"CoreCountARM"}; return true;
+            case 4162: v = UnownedStringSlice{"CoreMaxIDARM"}; return true;
+            case 4163: v = UnownedStringSlice{"WarpIDARM"}; return true;
+            case 4164: v = UnownedStringSlice{"WarpMaxIDARM"}; return true;
+            case 4416: v = UnownedStringSlice{"SubgroupEqMask"}; return true;
+            case 4417: v = UnownedStringSlice{"SubgroupGeMask"}; return true;
+            case 4418: v = UnownedStringSlice{"SubgroupGtMask"}; return true;
+            case 4419: v = UnownedStringSlice{"SubgroupLeMask"}; return true;
+            case 4420: v = UnownedStringSlice{"SubgroupLtMask"}; return true;
+            case 4424: v = UnownedStringSlice{"BaseVertex"}; return true;
+            case 4425: v = UnownedStringSlice{"BaseInstance"}; return true;
+            case 4426: v = UnownedStringSlice{"DrawIndex"}; return true;
+            case 4432: v = UnownedStringSlice{"PrimitiveShadingRateKHR"}; return true;
+            case 4438: v = UnownedStringSlice{"DeviceIndex"}; return true;
+            case 4440: v = UnownedStringSlice{"ViewIndex"}; return true;
+            case 4444: v = UnownedStringSlice{"ShadingRateKHR"}; return true;
+            case 4992: v = UnownedStringSlice{"BaryCoordNoPerspAMD"}; return true;
+            case 4993: v = UnownedStringSlice{"BaryCoordNoPerspCentroidAMD"}; return true;
+            case 4994: v = UnownedStringSlice{"BaryCoordNoPerspSampleAMD"}; return true;
+            case 4995: v = UnownedStringSlice{"BaryCoordSmoothAMD"}; return true;
+            case 4996: v = UnownedStringSlice{"BaryCoordSmoothCentroidAMD"}; return true;
+            case 4997: v = UnownedStringSlice{"BaryCoordSmoothSampleAMD"}; return true;
+            case 4998: v = UnownedStringSlice{"BaryCoordPullModelAMD"}; return true;
+            case 5014: v = UnownedStringSlice{"FragStencilRefEXT"}; return true;
+            case 5253: v = UnownedStringSlice{"ViewportMaskNV"}; return true;
+            case 5257: v = UnownedStringSlice{"SecondaryPositionNV"}; return true;
+            case 5258: v = UnownedStringSlice{"SecondaryViewportMaskNV"}; return true;
+            case 5261: v = UnownedStringSlice{"PositionPerViewNV"}; return true;
+            case 5262: v = UnownedStringSlice{"ViewportMaskPerViewNV"}; return true;
+            case 5264: v = UnownedStringSlice{"FullyCoveredEXT"}; return true;
+            case 5274: v = UnownedStringSlice{"TaskCountNV"}; return true;
+            case 5275: v = UnownedStringSlice{"PrimitiveCountNV"}; return true;
+            case 5276: v = UnownedStringSlice{"PrimitiveIndicesNV"}; return true;
+            case 5277: v = UnownedStringSlice{"ClipDistancePerViewNV"}; return true;
+            case 5278: v = UnownedStringSlice{"CullDistancePerViewNV"}; return true;
+            case 5279: v = UnownedStringSlice{"LayerPerViewNV"}; return true;
+            case 5280: v = UnownedStringSlice{"MeshViewCountNV"}; return true;
+            case 5281: v = UnownedStringSlice{"MeshViewIndicesNV"}; return true;
+            case 5286: v = UnownedStringSlice{"BaryCoordKHR"}; return true;
+            case 5287: v = UnownedStringSlice{"BaryCoordNoPerspKHR"}; return true;
+            case 5292: v = UnownedStringSlice{"FragSizeEXT"}; return true;
+            case 5293: v = UnownedStringSlice{"FragInvocationCountEXT"}; return true;
+            case 5294: v = UnownedStringSlice{"PrimitivePointIndicesEXT"}; return true;
+            case 5295: v = UnownedStringSlice{"PrimitiveLineIndicesEXT"}; return true;
+            case 5296: v = UnownedStringSlice{"PrimitiveTriangleIndicesEXT"}; return true;
+            case 5299: v = UnownedStringSlice{"CullPrimitiveEXT"}; return true;
+            case 5319: v = UnownedStringSlice{"LaunchIdNV"}; return true;
+            case 5320: v = UnownedStringSlice{"LaunchSizeNV"}; return true;
+            case 5321: v = UnownedStringSlice{"WorldRayOriginNV"}; return true;
+            case 5322: v = UnownedStringSlice{"WorldRayDirectionNV"}; return true;
+            case 5323: v = UnownedStringSlice{"ObjectRayOriginNV"}; return true;
+            case 5324: v = UnownedStringSlice{"ObjectRayDirectionNV"}; return true;
+            case 5325: v = UnownedStringSlice{"RayTminNV"}; return true;
+            case 5326: v = UnownedStringSlice{"RayTmaxNV"}; return true;
+            case 5327: v = UnownedStringSlice{"InstanceCustomIndexNV"}; return true;
+            case 5330: v = UnownedStringSlice{"ObjectToWorldNV"}; return true;
+            case 5331: v = UnownedStringSlice{"WorldToObjectNV"}; return true;
+            case 5332: v = UnownedStringSlice{"HitTNV"}; return true;
+            case 5333: v = UnownedStringSlice{"HitKindNV"}; return true;
+            case 5334: v = UnownedStringSlice{"CurrentRayTimeNV"}; return true;
+            case 5335: v = UnownedStringSlice{"HitTriangleVertexPositionsKHR"}; return true;
+            case 5351: v = UnownedStringSlice{"IncomingRayFlagsNV"}; return true;
+            case 5352: v = UnownedStringSlice{"RayGeometryIndexKHR"}; return true;
+            case 5374: v = UnownedStringSlice{"WarpsPerSMNV"}; return true;
+            case 5375: v = UnownedStringSlice{"SMCountNV"}; return true;
+            case 5376: v = UnownedStringSlice{"WarpIDNV"}; return true;
+            case 5377: v = UnownedStringSlice{"SMIDNV"}; return true;
+            case 6021: v = UnownedStringSlice{"CullMaskKHR"}; return true;
+            default: return false;
+        }
+        case 32:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"CrossDevice"}; return true;
+            case 1: v = UnownedStringSlice{"Device"}; return true;
+            case 2: v = UnownedStringSlice{"Workgroup"}; return true;
+            case 3: v = UnownedStringSlice{"Subgroup"}; return true;
+            case 4: v = UnownedStringSlice{"Invocation"}; return true;
+            case 5: v = UnownedStringSlice{"QueueFamily"}; return true;
+            case 6: v = UnownedStringSlice{"ShaderCallKHR"}; return true;
+            default: return false;
+        }
+        case 33:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"Reduce"}; return true;
+            case 1: v = UnownedStringSlice{"InclusiveScan"}; return true;
+            case 2: v = UnownedStringSlice{"ExclusiveScan"}; return true;
+            case 3: v = UnownedStringSlice{"ClusteredReduce"}; return true;
+            case 6: v = UnownedStringSlice{"PartitionedReduceNV"}; return true;
+            case 7: v = UnownedStringSlice{"PartitionedInclusiveScanNV"}; return true;
+            case 8: v = UnownedStringSlice{"PartitionedExclusiveScanNV"}; return true;
+            default: return false;
+        }
+        case 34:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"NoWait"}; return true;
+            case 1: v = UnownedStringSlice{"WaitKernel"}; return true;
+            case 2: v = UnownedStringSlice{"WaitWorkGroup"}; return true;
+            default: return false;
+        }
+        case 35:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"Matrix"}; return true;
+            case 1: v = UnownedStringSlice{"Shader"}; return true;
+            case 2: v = UnownedStringSlice{"Geometry"}; return true;
+            case 3: v = UnownedStringSlice{"Tessellation"}; return true;
+            case 4: v = UnownedStringSlice{"Addresses"}; return true;
+            case 5: v = UnownedStringSlice{"Linkage"}; return true;
+            case 6: v = UnownedStringSlice{"Kernel"}; return true;
+            case 7: v = UnownedStringSlice{"Vector16"}; return true;
+            case 8: v = UnownedStringSlice{"Float16Buffer"}; return true;
+            case 9: v = UnownedStringSlice{"Float16"}; return true;
+            case 10: v = UnownedStringSlice{"Float64"}; return true;
+            case 11: v = UnownedStringSlice{"Int64"}; return true;
+            case 12: v = UnownedStringSlice{"Int64Atomics"}; return true;
+            case 13: v = UnownedStringSlice{"ImageBasic"}; return true;
+            case 14: v = UnownedStringSlice{"ImageReadWrite"}; return true;
+            case 15: v = UnownedStringSlice{"ImageMipmap"}; return true;
+            case 17: v = UnownedStringSlice{"Pipes"}; return true;
+            case 18: v = UnownedStringSlice{"Groups"}; return true;
+            case 19: v = UnownedStringSlice{"DeviceEnqueue"}; return true;
+            case 20: v = UnownedStringSlice{"LiteralSampler"}; return true;
+            case 21: v = UnownedStringSlice{"AtomicStorage"}; return true;
+            case 22: v = UnownedStringSlice{"Int16"}; return true;
+            case 23: v = UnownedStringSlice{"TessellationPointSize"}; return true;
+            case 24: v = UnownedStringSlice{"GeometryPointSize"}; return true;
+            case 25: v = UnownedStringSlice{"ImageGatherExtended"}; return true;
+            case 27: v = UnownedStringSlice{"StorageImageMultisample"}; return true;
+            case 28: v = UnownedStringSlice{"UniformBufferArrayDynamicIndexing"}; return true;
+            case 29: v = UnownedStringSlice{"SampledImageArrayDynamicIndexing"}; return true;
+            case 30: v = UnownedStringSlice{"StorageBufferArrayDynamicIndexing"}; return true;
+            case 31: v = UnownedStringSlice{"StorageImageArrayDynamicIndexing"}; return true;
+            case 32: v = UnownedStringSlice{"ClipDistance"}; return true;
+            case 33: v = UnownedStringSlice{"CullDistance"}; return true;
+            case 34: v = UnownedStringSlice{"ImageCubeArray"}; return true;
+            case 35: v = UnownedStringSlice{"SampleRateShading"}; return true;
+            case 36: v = UnownedStringSlice{"ImageRect"}; return true;
+            case 37: v = UnownedStringSlice{"SampledRect"}; return true;
+            case 38: v = UnownedStringSlice{"GenericPointer"}; return true;
+            case 39: v = UnownedStringSlice{"Int8"}; return true;
+            case 40: v = UnownedStringSlice{"InputAttachment"}; return true;
+            case 41: v = UnownedStringSlice{"SparseResidency"}; return true;
+            case 42: v = UnownedStringSlice{"MinLod"}; return true;
+            case 43: v = UnownedStringSlice{"Sampled1D"}; return true;
+            case 44: v = UnownedStringSlice{"Image1D"}; return true;
+            case 45: v = UnownedStringSlice{"SampledCubeArray"}; return true;
+            case 46: v = UnownedStringSlice{"SampledBuffer"}; return true;
+            case 47: v = UnownedStringSlice{"ImageBuffer"}; return true;
+            case 48: v = UnownedStringSlice{"ImageMSArray"}; return true;
+            case 49: v = UnownedStringSlice{"StorageImageExtendedFormats"}; return true;
+            case 50: v = UnownedStringSlice{"ImageQuery"}; return true;
+            case 51: v = UnownedStringSlice{"DerivativeControl"}; return true;
+            case 52: v = UnownedStringSlice{"InterpolationFunction"}; return true;
+            case 53: v = UnownedStringSlice{"TransformFeedback"}; return true;
+            case 54: v = UnownedStringSlice{"GeometryStreams"}; return true;
+            case 55: v = UnownedStringSlice{"StorageImageReadWithoutFormat"}; return true;
+            case 56: v = UnownedStringSlice{"StorageImageWriteWithoutFormat"}; return true;
+            case 57: v = UnownedStringSlice{"MultiViewport"}; return true;
+            case 58: v = UnownedStringSlice{"SubgroupDispatch"}; return true;
+            case 59: v = UnownedStringSlice{"NamedBarrier"}; return true;
+            case 60: v = UnownedStringSlice{"PipeStorage"}; return true;
+            case 61: v = UnownedStringSlice{"GroupNonUniform"}; return true;
+            case 62: v = UnownedStringSlice{"GroupNonUniformVote"}; return true;
+            case 63: v = UnownedStringSlice{"GroupNonUniformArithmetic"}; return true;
+            case 64: v = UnownedStringSlice{"GroupNonUniformBallot"}; return true;
+            case 65: v = UnownedStringSlice{"GroupNonUniformShuffle"}; return true;
+            case 66: v = UnownedStringSlice{"GroupNonUniformShuffleRelative"}; return true;
+            case 67: v = UnownedStringSlice{"GroupNonUniformClustered"}; return true;
+            case 68: v = UnownedStringSlice{"GroupNonUniformQuad"}; return true;
+            case 69: v = UnownedStringSlice{"ShaderLayer"}; return true;
+            case 70: v = UnownedStringSlice{"ShaderViewportIndex"}; return true;
+            case 71: v = UnownedStringSlice{"UniformDecoration"}; return true;
+            case 4165: v = UnownedStringSlice{"CoreBuiltinsARM"}; return true;
+            case 4166: v = UnownedStringSlice{"TileImageColorReadAccessEXT"}; return true;
+            case 4167: v = UnownedStringSlice{"TileImageDepthReadAccessEXT"}; return true;
+            case 4168: v = UnownedStringSlice{"TileImageStencilReadAccessEXT"}; return true;
+            case 4422: v = UnownedStringSlice{"FragmentShadingRateKHR"}; return true;
+            case 4423: v = UnownedStringSlice{"SubgroupBallotKHR"}; return true;
+            case 4427: v = UnownedStringSlice{"DrawParameters"}; return true;
+            case 4428: v = UnownedStringSlice{"WorkgroupMemoryExplicitLayoutKHR"}; return true;
+            case 4429: v = UnownedStringSlice{"WorkgroupMemoryExplicitLayout8BitAccessKHR"}; return true;
+            case 4430: v = UnownedStringSlice{"WorkgroupMemoryExplicitLayout16BitAccessKHR"}; return true;
+            case 4431: v = UnownedStringSlice{"SubgroupVoteKHR"}; return true;
+            case 4433: v = UnownedStringSlice{"StorageBuffer16BitAccess"}; return true;
+            case 4434: v = UnownedStringSlice{"UniformAndStorageBuffer16BitAccess"}; return true;
+            case 4435: v = UnownedStringSlice{"StoragePushConstant16"}; return true;
+            case 4436: v = UnownedStringSlice{"StorageInputOutput16"}; return true;
+            case 4437: v = UnownedStringSlice{"DeviceGroup"}; return true;
+            case 4439: v = UnownedStringSlice{"MultiView"}; return true;
+            case 4441: v = UnownedStringSlice{"VariablePointersStorageBuffer"}; return true;
+            case 4442: v = UnownedStringSlice{"VariablePointers"}; return true;
+            case 4445: v = UnownedStringSlice{"AtomicStorageOps"}; return true;
+            case 4447: v = UnownedStringSlice{"SampleMaskPostDepthCoverage"}; return true;
+            case 4448: v = UnownedStringSlice{"StorageBuffer8BitAccess"}; return true;
+            case 4449: v = UnownedStringSlice{"UniformAndStorageBuffer8BitAccess"}; return true;
+            case 4450: v = UnownedStringSlice{"StoragePushConstant8"}; return true;
+            case 4464: v = UnownedStringSlice{"DenormPreserve"}; return true;
+            case 4465: v = UnownedStringSlice{"DenormFlushToZero"}; return true;
+            case 4466: v = UnownedStringSlice{"SignedZeroInfNanPreserve"}; return true;
+            case 4467: v = UnownedStringSlice{"RoundingModeRTE"}; return true;
+            case 4468: v = UnownedStringSlice{"RoundingModeRTZ"}; return true;
+            case 4471: v = UnownedStringSlice{"RayQueryProvisionalKHR"}; return true;
+            case 4472: v = UnownedStringSlice{"RayQueryKHR"}; return true;
+            case 4478: v = UnownedStringSlice{"RayTraversalPrimitiveCullingKHR"}; return true;
+            case 4479: v = UnownedStringSlice{"RayTracingKHR"}; return true;
+            case 4484: v = UnownedStringSlice{"TextureSampleWeightedQCOM"}; return true;
+            case 4485: v = UnownedStringSlice{"TextureBoxFilterQCOM"}; return true;
+            case 4486: v = UnownedStringSlice{"TextureBlockMatchQCOM"}; return true;
+            case 5008: v = UnownedStringSlice{"Float16ImageAMD"}; return true;
+            case 5009: v = UnownedStringSlice{"ImageGatherBiasLodAMD"}; return true;
+            case 5010: v = UnownedStringSlice{"FragmentMaskAMD"}; return true;
+            case 5013: v = UnownedStringSlice{"StencilExportEXT"}; return true;
+            case 5015: v = UnownedStringSlice{"ImageReadWriteLodAMD"}; return true;
+            case 5016: v = UnownedStringSlice{"Int64ImageEXT"}; return true;
+            case 5055: v = UnownedStringSlice{"ShaderClockKHR"}; return true;
+            case 5249: v = UnownedStringSlice{"SampleMaskOverrideCoverageNV"}; return true;
+            case 5251: v = UnownedStringSlice{"GeometryShaderPassthroughNV"}; return true;
+            case 5254: v = UnownedStringSlice{"ShaderViewportIndexLayerEXT"}; return true;
+            case 5255: v = UnownedStringSlice{"ShaderViewportMaskNV"}; return true;
+            case 5259: v = UnownedStringSlice{"ShaderStereoViewNV"}; return true;
+            case 5260: v = UnownedStringSlice{"PerViewAttributesNV"}; return true;
+            case 5265: v = UnownedStringSlice{"FragmentFullyCoveredEXT"}; return true;
+            case 5266: v = UnownedStringSlice{"MeshShadingNV"}; return true;
+            case 5282: v = UnownedStringSlice{"ImageFootprintNV"}; return true;
+            case 5283: v = UnownedStringSlice{"MeshShadingEXT"}; return true;
+            case 5284: v = UnownedStringSlice{"FragmentBarycentricKHR"}; return true;
+            case 5288: v = UnownedStringSlice{"ComputeDerivativeGroupQuadsNV"}; return true;
+            case 5291: v = UnownedStringSlice{"FragmentDensityEXT"}; return true;
+            case 5297: v = UnownedStringSlice{"GroupNonUniformPartitionedNV"}; return true;
+            case 5301: v = UnownedStringSlice{"ShaderNonUniform"}; return true;
+            case 5302: v = UnownedStringSlice{"RuntimeDescriptorArray"}; return true;
+            case 5303: v = UnownedStringSlice{"InputAttachmentArrayDynamicIndexing"}; return true;
+            case 5304: v = UnownedStringSlice{"UniformTexelBufferArrayDynamicIndexing"}; return true;
+            case 5305: v = UnownedStringSlice{"StorageTexelBufferArrayDynamicIndexing"}; return true;
+            case 5306: v = UnownedStringSlice{"UniformBufferArrayNonUniformIndexing"}; return true;
+            case 5307: v = UnownedStringSlice{"SampledImageArrayNonUniformIndexing"}; return true;
+            case 5308: v = UnownedStringSlice{"StorageBufferArrayNonUniformIndexing"}; return true;
+            case 5309: v = UnownedStringSlice{"StorageImageArrayNonUniformIndexing"}; return true;
+            case 5310: v = UnownedStringSlice{"InputAttachmentArrayNonUniformIndexing"}; return true;
+            case 5311: v = UnownedStringSlice{"UniformTexelBufferArrayNonUniformIndexing"}; return true;
+            case 5312: v = UnownedStringSlice{"StorageTexelBufferArrayNonUniformIndexing"}; return true;
+            case 5336: v = UnownedStringSlice{"RayTracingPositionFetchKHR"}; return true;
+            case 5340: v = UnownedStringSlice{"RayTracingNV"}; return true;
+            case 5341: v = UnownedStringSlice{"RayTracingMotionBlurNV"}; return true;
+            case 5345: v = UnownedStringSlice{"VulkanMemoryModel"}; return true;
+            case 5346: v = UnownedStringSlice{"VulkanMemoryModelDeviceScope"}; return true;
+            case 5347: v = UnownedStringSlice{"PhysicalStorageBufferAddresses"}; return true;
+            case 5350: v = UnownedStringSlice{"ComputeDerivativeGroupLinearNV"}; return true;
+            case 5353: v = UnownedStringSlice{"RayTracingProvisionalKHR"}; return true;
+            case 5357: v = UnownedStringSlice{"CooperativeMatrixNV"}; return true;
+            case 5363: v = UnownedStringSlice{"FragmentShaderSampleInterlockEXT"}; return true;
+            case 5372: v = UnownedStringSlice{"FragmentShaderShadingRateInterlockEXT"}; return true;
+            case 5373: v = UnownedStringSlice{"ShaderSMBuiltinsNV"}; return true;
+            case 5378: v = UnownedStringSlice{"FragmentShaderPixelInterlockEXT"}; return true;
+            case 5379: v = UnownedStringSlice{"DemoteToHelperInvocation"}; return true;
+            case 5381: v = UnownedStringSlice{"RayTracingOpacityMicromapEXT"}; return true;
+            case 5383: v = UnownedStringSlice{"ShaderInvocationReorderNV"}; return true;
+            case 5390: v = UnownedStringSlice{"BindlessTextureNV"}; return true;
+            case 5391: v = UnownedStringSlice{"RayQueryPositionFetchKHR"}; return true;
+            case 5568: v = UnownedStringSlice{"SubgroupShuffleINTEL"}; return true;
+            case 5569: v = UnownedStringSlice{"SubgroupBufferBlockIOINTEL"}; return true;
+            case 5570: v = UnownedStringSlice{"SubgroupImageBlockIOINTEL"}; return true;
+            case 5579: v = UnownedStringSlice{"SubgroupImageMediaBlockIOINTEL"}; return true;
+            case 5582: v = UnownedStringSlice{"RoundToInfinityINTEL"}; return true;
+            case 5583: v = UnownedStringSlice{"FloatingPointModeINTEL"}; return true;
+            case 5584: v = UnownedStringSlice{"IntegerFunctions2INTEL"}; return true;
+            case 5603: v = UnownedStringSlice{"FunctionPointersINTEL"}; return true;
+            case 5604: v = UnownedStringSlice{"IndirectReferencesINTEL"}; return true;
+            case 5606: v = UnownedStringSlice{"AsmINTEL"}; return true;
+            case 5612: v = UnownedStringSlice{"AtomicFloat32MinMaxEXT"}; return true;
+            case 5613: v = UnownedStringSlice{"AtomicFloat64MinMaxEXT"}; return true;
+            case 5616: v = UnownedStringSlice{"AtomicFloat16MinMaxEXT"}; return true;
+            case 5617: v = UnownedStringSlice{"VectorComputeINTEL"}; return true;
+            case 5619: v = UnownedStringSlice{"VectorAnyINTEL"}; return true;
+            case 5629: v = UnownedStringSlice{"ExpectAssumeKHR"}; return true;
+            case 5696: v = UnownedStringSlice{"SubgroupAvcMotionEstimationINTEL"}; return true;
+            case 5697: v = UnownedStringSlice{"SubgroupAvcMotionEstimationIntraINTEL"}; return true;
+            case 5698: v = UnownedStringSlice{"SubgroupAvcMotionEstimationChromaINTEL"}; return true;
+            case 5817: v = UnownedStringSlice{"VariableLengthArrayINTEL"}; return true;
+            case 5821: v = UnownedStringSlice{"FunctionFloatControlINTEL"}; return true;
+            case 5824: v = UnownedStringSlice{"FPGAMemoryAttributesINTEL"}; return true;
+            case 5837: v = UnownedStringSlice{"FPFastMathModeINTEL"}; return true;
+            case 5844: v = UnownedStringSlice{"ArbitraryPrecisionIntegersINTEL"}; return true;
+            case 5845: v = UnownedStringSlice{"ArbitraryPrecisionFloatingPointINTEL"}; return true;
+            case 5886: v = UnownedStringSlice{"UnstructuredLoopControlsINTEL"}; return true;
+            case 5888: v = UnownedStringSlice{"FPGALoopControlsINTEL"}; return true;
+            case 5892: v = UnownedStringSlice{"KernelAttributesINTEL"}; return true;
+            case 5897: v = UnownedStringSlice{"FPGAKernelAttributesINTEL"}; return true;
+            case 5898: v = UnownedStringSlice{"FPGAMemoryAccessesINTEL"}; return true;
+            case 5904: v = UnownedStringSlice{"FPGAClusterAttributesINTEL"}; return true;
+            case 5906: v = UnownedStringSlice{"LoopFuseINTEL"}; return true;
+            case 5908: v = UnownedStringSlice{"FPGADSPControlINTEL"}; return true;
+            case 5910: v = UnownedStringSlice{"MemoryAccessAliasingINTEL"}; return true;
+            case 5916: v = UnownedStringSlice{"FPGAInvocationPipeliningAttributesINTEL"}; return true;
+            case 5920: v = UnownedStringSlice{"FPGABufferLocationINTEL"}; return true;
+            case 5922: v = UnownedStringSlice{"ArbitraryPrecisionFixedPointINTEL"}; return true;
+            case 5935: v = UnownedStringSlice{"USMStorageClassesINTEL"}; return true;
+            case 5939: v = UnownedStringSlice{"RuntimeAlignedAttributeINTEL"}; return true;
+            case 5943: v = UnownedStringSlice{"IOPipesINTEL"}; return true;
+            case 5945: v = UnownedStringSlice{"BlockingPipesINTEL"}; return true;
+            case 5948: v = UnownedStringSlice{"FPGARegINTEL"}; return true;
+            case 6016: v = UnownedStringSlice{"DotProductInputAll"}; return true;
+            case 6017: v = UnownedStringSlice{"DotProductInput4x8Bit"}; return true;
+            case 6018: v = UnownedStringSlice{"DotProductInput4x8BitPacked"}; return true;
+            case 6019: v = UnownedStringSlice{"DotProduct"}; return true;
+            case 6020: v = UnownedStringSlice{"RayCullMaskKHR"}; return true;
+            case 6022: v = UnownedStringSlice{"CooperativeMatrixKHR"}; return true;
+            case 6025: v = UnownedStringSlice{"BitInstructions"}; return true;
+            case 6026: v = UnownedStringSlice{"GroupNonUniformRotateKHR"}; return true;
+            case 6033: v = UnownedStringSlice{"AtomicFloat32AddEXT"}; return true;
+            case 6034: v = UnownedStringSlice{"AtomicFloat64AddEXT"}; return true;
+            case 6089: v = UnownedStringSlice{"LongConstantCompositeINTEL"}; return true;
+            case 6094: v = UnownedStringSlice{"OptNoneINTEL"}; return true;
+            case 6095: v = UnownedStringSlice{"AtomicFloat16AddEXT"}; return true;
+            case 6114: v = UnownedStringSlice{"DebugInfoModuleINTEL"}; return true;
+            case 6115: v = UnownedStringSlice{"BFloat16ConversionINTEL"}; return true;
+            case 6141: v = UnownedStringSlice{"SplitBarrierINTEL"}; return true;
+            case 6161: v = UnownedStringSlice{"FPGAKernelAttributesv2INTEL"}; return true;
+            case 6169: v = UnownedStringSlice{"FPMaxErrorINTEL"}; return true;
+            case 6171: v = UnownedStringSlice{"FPGALatencyControlINTEL"}; return true;
+            case 6174: v = UnownedStringSlice{"FPGAArgumentInterfacesINTEL"}; return true;
+            case 6400: v = UnownedStringSlice{"GroupUniformArithmeticKHR"}; return true;
+            default: return false;
+        }
+        case 36:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"RayQueryCandidateIntersectionKHR"}; return true;
+            case 1: v = UnownedStringSlice{"RayQueryCommittedIntersectionKHR"}; return true;
+            default: return false;
+        }
+        case 37:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"RayQueryCommittedIntersectionNoneKHR"}; return true;
+            case 1: v = UnownedStringSlice{"RayQueryCommittedIntersectionTriangleKHR"}; return true;
+            case 2: v = UnownedStringSlice{"RayQueryCommittedIntersectionGeneratedKHR"}; return true;
+            default: return false;
+        }
+        case 38:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"RayQueryCandidateIntersectionTriangleKHR"}; return true;
+            case 1: v = UnownedStringSlice{"RayQueryCandidateIntersectionAABBKHR"}; return true;
+            default: return false;
+        }
+        case 39:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"PackedVectorFormat4x8Bit"}; return true;
+            default: return false;
+        }
+        case 40:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"NoneKHR"}; return true;
+            case 1: v = UnownedStringSlice{"MatrixASignedComponentsKHR"}; return true;
+            case 2: v = UnownedStringSlice{"MatrixBSignedComponentsKHR"}; return true;
+            case 4: v = UnownedStringSlice{"MatrixCSignedComponentsKHR"}; return true;
+            case 8: v = UnownedStringSlice{"MatrixResultSignedComponentsKHR"}; return true;
+            case 16: v = UnownedStringSlice{"SaturatingAccumulationKHR"}; return true;
+            default: return false;
+        }
+        case 41:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"RowMajorKHR"}; return true;
+            case 1: v = UnownedStringSlice{"ColumnMajorKHR"}; return true;
+            default: return false;
+        }
+        case 42:
+        switch(k2)
+        {
+            case 0: v = UnownedStringSlice{"MatrixAKHR"}; return true;
+            case 1: v = UnownedStringSlice{"MatrixBKHR"}; return true;
+            case 2: v = UnownedStringSlice{"MatrixAccumulatorKHR"}; return true;
+            default: return false;
+        }
+        default: return false;
+    }
+}
+
+static bool getOperandKindName(const OperandKind& k, UnownedStringSlice& v)
+{
+    switch(k.index)
+    {
+        case 0:
+        {
+            v = UnownedStringSlice{"ImageOperands"};
+            return true;
+        }
+        case 1:
+        {
+            v = UnownedStringSlice{"FPFastMathMode"};
+            return true;
+        }
+        case 2:
+        {
+            v = UnownedStringSlice{"SelectionControl"};
+            return true;
+        }
+        case 3:
+        {
+            v = UnownedStringSlice{"LoopControl"};
+            return true;
+        }
+        case 4:
+        {
+            v = UnownedStringSlice{"FunctionControl"};
+            return true;
+        }
+        case 5:
+        {
+            v = UnownedStringSlice{"MemorySemantics"};
+            return true;
+        }
+        case 6:
+        {
+            v = UnownedStringSlice{"MemoryAccess"};
+            return true;
+        }
+        case 7:
+        {
+            v = UnownedStringSlice{"KernelProfilingInfo"};
+            return true;
+        }
+        case 8:
+        {
+            v = UnownedStringSlice{"RayFlags"};
+            return true;
+        }
+        case 9:
+        {
+            v = UnownedStringSlice{"FragmentShadingRate"};
+            return true;
+        }
+        case 10:
+        {
+            v = UnownedStringSlice{"SourceLanguage"};
+            return true;
+        }
+        case 11:
+        {
+            v = UnownedStringSlice{"ExecutionModel"};
+            return true;
+        }
+        case 12:
+        {
+            v = UnownedStringSlice{"AddressingModel"};
+            return true;
+        }
+        case 13:
+        {
+            v = UnownedStringSlice{"MemoryModel"};
+            return true;
+        }
+        case 14:
+        {
+            v = UnownedStringSlice{"ExecutionMode"};
+            return true;
+        }
+        case 15:
+        {
+            v = UnownedStringSlice{"StorageClass"};
+            return true;
+        }
+        case 16:
+        {
+            v = UnownedStringSlice{"Dim"};
+            return true;
+        }
+        case 17:
+        {
+            v = UnownedStringSlice{"SamplerAddressingMode"};
+            return true;
+        }
+        case 18:
+        {
+            v = UnownedStringSlice{"SamplerFilterMode"};
+            return true;
+        }
+        case 19:
+        {
+            v = UnownedStringSlice{"ImageFormat"};
+            return true;
+        }
+        case 20:
+        {
+            v = UnownedStringSlice{"ImageChannelOrder"};
+            return true;
+        }
+        case 21:
+        {
+            v = UnownedStringSlice{"ImageChannelDataType"};
+            return true;
+        }
+        case 22:
+        {
+            v = UnownedStringSlice{"FPRoundingMode"};
+            return true;
+        }
+        case 23:
+        {
+            v = UnownedStringSlice{"FPDenormMode"};
+            return true;
+        }
+        case 24:
+        {
+            v = UnownedStringSlice{"QuantizationModes"};
+            return true;
+        }
+        case 25:
+        {
+            v = UnownedStringSlice{"FPOperationMode"};
+            return true;
+        }
+        case 26:
+        {
+            v = UnownedStringSlice{"OverflowModes"};
+            return true;
+        }
+        case 27:
+        {
+            v = UnownedStringSlice{"LinkageType"};
+            return true;
+        }
+        case 28:
+        {
+            v = UnownedStringSlice{"AccessQualifier"};
+            return true;
+        }
+        case 29:
+        {
+            v = UnownedStringSlice{"FunctionParameterAttribute"};
+            return true;
+        }
+        case 30:
+        {
+            v = UnownedStringSlice{"Decoration"};
+            return true;
+        }
+        case 31:
+        {
+            v = UnownedStringSlice{"BuiltIn"};
+            return true;
+        }
+        case 32:
+        {
+            v = UnownedStringSlice{"Scope"};
+            return true;
+        }
+        case 33:
+        {
+            v = UnownedStringSlice{"GroupOperation"};
+            return true;
+        }
+        case 34:
+        {
+            v = UnownedStringSlice{"KernelEnqueueFlags"};
+            return true;
+        }
+        case 35:
+        {
+            v = UnownedStringSlice{"Capability"};
+            return true;
+        }
+        case 36:
+        {
+            v = UnownedStringSlice{"RayQueryIntersection"};
+            return true;
+        }
+        case 37:
+        {
+            v = UnownedStringSlice{"RayQueryCommittedIntersectionType"};
+            return true;
+        }
+        case 38:
+        {
+            v = UnownedStringSlice{"RayQueryCandidateIntersectionType"};
+            return true;
+        }
+        case 39:
+        {
+            v = UnownedStringSlice{"PackedVectorFormat"};
+            return true;
+        }
+        case 40:
+        {
+            v = UnownedStringSlice{"CooperativeMatrixOperands"};
+            return true;
+        }
+        case 41:
+        {
+            v = UnownedStringSlice{"CooperativeMatrixLayout"};
+            return true;
+        }
+        case 42:
+        {
+            v = UnownedStringSlice{"CooperativeMatrixUse"};
+            return true;
+        }
+        case 43:
+        {
+            v = UnownedStringSlice{"IdResultType"};
+            return true;
+        }
+        case 44:
+        {
+            v = UnownedStringSlice{"IdResult"};
+            return true;
+        }
+        case 45:
+        {
+            v = UnownedStringSlice{"IdMemorySemantics"};
+            return true;
+        }
+        case 46:
+        {
+            v = UnownedStringSlice{"IdScope"};
+            return true;
+        }
+        case 47:
+        {
+            v = UnownedStringSlice{"IdRef"};
+            return true;
+        }
+        case 48:
+        {
+            v = UnownedStringSlice{"LiteralInteger"};
+            return true;
+        }
+        case 49:
+        {
+            v = UnownedStringSlice{"LiteralString"};
+            return true;
+        }
+        case 50:
+        {
+            v = UnownedStringSlice{"LiteralContextDependentNumber"};
+            return true;
+        }
+        case 51:
+        {
+            v = UnownedStringSlice{"LiteralExtInstInteger"};
+            return true;
+        }
+        case 52:
+        {
+            v = UnownedStringSlice{"LiteralSpecConstantOpInteger"};
+            return true;
+        }
+        case 53:
+        {
+            v = UnownedStringSlice{"PairLiteralIntegerIdRef"};
+            return true;
+        }
+        case 54:
+        {
+            v = UnownedStringSlice{"PairIdRefLiteralInteger"};
+            return true;
+        }
+        case 55:
+        {
+            v = UnownedStringSlice{"PairIdRefIdRef"};
+            return true;
+        }
+        default: return false;
+    }
+}
+
 RefPtr<SPIRVCoreGrammarInfo> SPIRVCoreGrammarInfo::getEmbeddedVersion()
 {
     static SPIRVCoreGrammarInfo embedded = [](){
         SPIRVCoreGrammarInfo info;
         info.opcodes.embedded = &lookupSpvOp;
         info.capabilities.embedded = &lookupSpvCapability;
-        info.allEnums.embedded = &lookupSpvWord;
+        info.allEnumsWithTypePrefix.embedded = &lookupEnumWithTypePrefix;
+        info.allEnums.embedded = &lookupQualifiedEnum;
+        info.allEnumNames.embedded = &getQualifiedEnumName;
         info.opInfos.embedded = &getOpInfo;
         info.opNames.embedded = &getOpName;
         info.operandKinds.embedded = &lookupOperandKind;
+        info.operandKindNames.embedded = &getOperandKindName;
         info.addReference();
         return info;
     }();

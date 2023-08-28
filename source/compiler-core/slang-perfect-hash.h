@@ -24,6 +24,7 @@ HashFindResult minimalPerfectHash(const List<String>& ss, HashParams& hashParams
 String perfectHashToEmbeddableCpp(
     const HashParams& hashParams,
     const UnownedStringSlice& valueType,
+    const UnownedStringSlice& funcName,
     const List<String>& values);
 
 }

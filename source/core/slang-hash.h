@@ -147,6 +147,20 @@ namespace Slang
             return ::Slang::hashObjectBytes(*this); \
         }
 
+#   define SLANG_COMPONENTWISE_HASHABLE_1 \
+        auto getHashCode() const \
+        { \
+            const auto& [m1] = *this; \
+            return Slang::getHashCode(m1); \
+        }
+
+#   define SLANG_COMPONENTWISE_HASHABLE_2 \
+        auto getHashCode() const \
+        { \
+            const auto& [m1, m2] = *this; \
+            return combineHash(::Slang::getHashCode(m1), ::Slang::getHashCode(m2)); \
+        }
+
     inline HashCode64 combineHash(HashCode64 h)
     {
         return h;

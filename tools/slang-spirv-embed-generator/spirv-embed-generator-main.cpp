@@ -1,5 +1,6 @@
 #include <cstdio>
 
+#include "source/core/slang-dictionary.h"
 #include "source/core/slang-io.h"
 #include "source/compiler-core/slang-diagnostic-sink.h"
 #include "source/compiler-core/slang-perfect-hash.h"
@@ -9,10 +10,11 @@
 
 using namespace Slang;
 
-template<typename T, typename F>
+template<typename S, typename T, typename F>
 String dictToPerfectHash(
-    const Dictionary<UnownedStringSlice, T>& dict,
+    const Dictionary<S, T>& dict,
     const UnownedStringSlice& type,
+    const UnownedStringSlice& funcName,
     F valueToString)
 {
     HashParams hashParams;
@@ -27,7 +29,7 @@ String dictToPerfectHash(
     {
         values.add(valueToString(dict.getValue(v.getUnownedSlice())));
     }
-    return perfectHashToEmbeddableCpp(hashParams, type, values);
+    return perfectHashToEmbeddableCpp(hashParams, type, funcName, values);
 }
 
 template<typename K, typename V, typename F1, typename F2>
@@ -36,6 +38,7 @@ void dictToSwitch(
     const char* funName,
     const char* keyType,
     const char* valueType,
+    const char* unpackKey,
     const F1 keyToString,
     const F2 valueToAssignmentString,
     WriterHelper& w)
@@ -47,7 +50,7 @@ void dictToSwitch(
 
     w.print("static bool %s(const %s& k, %s& v)\n", funName, keyType, valueType);
     line("{");
-    line("    switch(k)");
+    w.print("    switch(%s)\n", unpackKey);
     line("    {");
     for(const auto& [k, v] : dict)
     {
@@ -62,6 +65,57 @@ void dictToSwitch(
             kStr.getBuffer(),
             vStr.getBuffer()
         );
+    }
+    line("        default: return false;");
+    line("    }");
+    line("}");
+    line("");
+}
+
+template<typename V, typename F>
+void qualifiedEnumValueNameSwitch(
+    const Dictionary<Slang::SPIRVCoreGrammarInfo::QualifiedEnumValue, V>& dict,
+    const char* funName,
+    const char* keyType,
+    const char* valueType,
+    const char* unpackKey1,
+    const F valueToAssignmentString,
+    WriterHelper& w)
+{
+    const auto line = [&](const auto& l){
+        w.put(l);
+        w.put("\n");
+    };
+
+    using K1 = Slang::SPIRVCoreGrammarInfo::OperandKind;
+    using K2 = SpvWord;
+    Dictionary<K1, Dictionary<K2, V>> stepDict;
+    for(const auto& [k, v] : dict)
+    {
+        const auto& [k1, k2] = k;
+        stepDict[k1][k2] = v;
+    }
+
+    w.print("static bool %s(const %s& k, %s& v)\n", funName, keyType, valueType);
+    line("{");
+    line("    const auto& [k1, k2] = k;");
+    w.print("    switch(%s)\n", unpackKey1);
+    line("    {");
+    for(const auto& [k1, inner] : stepDict)
+    {
+        const auto k1Str = String(k1.index);
+        w.print("        case %s:\n", k1Str.getBuffer());
+
+        line("        switch(k2)");
+        line("        {");
+        for(const auto& [k2, v] : inner)
+        {
+            const auto k2Str = String(k2);
+            const auto vStr = valueToAssignmentString(v);
+            w.print("            case %s: %s; return true;\n", k2Str.getBuffer(), vStr.getBuffer());
+        }
+        line("            default: return false;");
+        line("        }");
     }
     line("        default: return false;");
     line("    }");
@@ -99,6 +153,7 @@ void writeInfo(
     w.put(dictToPerfectHash(
         info.opcodes.dict,
         UnownedStringSlice("SpvOp"),
+        UnownedStringSlice("lookupSpvOp"),
         [](const auto n){
             const auto radix = 10;
             return "static_cast<SpvOp>(" + String(n, radix) + ")";
@@ -109,6 +164,7 @@ void writeInfo(
     w.put(dictToPerfectHash(
         info.capabilities.dict,
         UnownedStringSlice("SpvCapability"),
+        UnownedStringSlice("lookupSpvCapability"),
         [](const auto n){
             const auto radix = 10;
             return "static_cast<SpvCapability>(" + String(n, radix) + ")";
@@ -117,8 +173,9 @@ void writeInfo(
 
     w.put("static ");
     w.put(dictToPerfectHash(
-        info.allEnums.dict,
+        info.allEnumsWithTypePrefix.dict,
         UnownedStringSlice("SpvWord"),
+        UnownedStringSlice("lookupEnumWithTypePrefix"),
         [](const auto n){
             const auto radix = 10;
             return "SpvWord{" + String(n, radix) + "}";
@@ -131,6 +188,7 @@ void writeInfo(
         "getOpInfo",
         "SpvOp",
         "SPIRVCoreGrammarInfo::OpInfo",
+        "k",
         [&](SpvOp o){
             return "Spv" + String(info.opNames.dict.getValue(o));
         },
@@ -172,6 +230,7 @@ void writeInfo(
         "getOpName",
         "SpvOp",
         "UnownedStringSlice",
+        "k",
         [&](SpvOp o){
             return "Spv" + String(info.opNames.dict.getValue(o));
         },
@@ -185,11 +244,73 @@ void writeInfo(
     w.put(dictToPerfectHash(
         info.operandKinds.dict,
         UnownedStringSlice("OperandKind"),
+        UnownedStringSlice("lookupOperandKind"),
         [](const auto n){
             const auto radix = 10;
             return "OperandKind{" + String(n.index, radix) + "}";
         }
     ).getBuffer());
+
+    Dictionary<String, SpvWord> enumDict;
+    Index maxNameLength = 0;
+    for(const auto& [q, v] : info.allEnums.dict)
+    {
+        const auto i = q.kind.index;
+        String k;
+        k.appendChar(char((i >> 4) + 'a'));
+        k.appendChar(char((i & 0xf) + 'a'));
+        k.append(q.name);
+        enumDict.add(k, v);
+        maxNameLength = std::max(maxNameLength, k.getLength());
+    }
+    w.put(dictToPerfectHash(
+        enumDict,
+        UnownedStringSlice("SpvWord"),
+        UnownedStringSlice("lookupEnumWithHexPrefix"),
+        [&](const auto n){ return "SpvWord{" + String(n) + "}"; }
+    ).getBuffer());
+
+    line("using QualifiedEnumName = SPIRVCoreGrammarInfo::QualifiedEnumName;");
+    line("static bool lookupQualifiedEnum(const QualifiedEnumName& k, SpvWord& v)");
+    line("{");
+    line("    static_assert(sizeof(k.kind.index) == 1);");
+    w.print("    if(k.name.getLength() > %ld)\n", maxNameLength);
+    line("        return false;");
+    w.print("    char name[%ld];\n", maxNameLength + 2);
+    line("    name[0] = char((k.kind.index >> 4) + 'a');");
+    line("    name[1] = char((k.kind.index & 0xf) + 'a');");
+    line("    memcpy(name+2, k.name.begin(), k.name.getLength());");
+    line("    return lookupEnumWithHexPrefix(UnownedStringSlice(name, k.name.getLength() + 2), v);");
+    line("}");
+    line("");
+
+    line("using QualifiedEnumValue = SPIRVCoreGrammarInfo::QualifiedEnumValue;");
+    qualifiedEnumValueNameSwitch(
+        info.allEnumNames.dict,
+        "getQualifiedEnumName",
+        "QualifiedEnumValue",
+        "UnownedStringSlice",
+        "k1.index",
+        [](const UnownedStringSlice& i){
+            return "v = UnownedStringSlice{\"" + String(i) + "\"}";
+        },
+        w
+    );
+
+    dictToSwitch(
+        info.operandKindNames.dict,
+        "getOperandKindName",
+        "OperandKind",
+        "UnownedStringSlice",
+        "k.index",
+        [&](Slang::SPIRVCoreGrammarInfo::OperandKind o){
+            return String(o.index);
+        },
+        [](const UnownedStringSlice& i){
+            return "v = UnownedStringSlice{\"" + String(i) + "\"}";
+        },
+        w
+    );
 
     line("RefPtr<SPIRVCoreGrammarInfo> SPIRVCoreGrammarInfo::getEmbeddedVersion()");
     line("{");
@@ -197,10 +318,13 @@ void writeInfo(
     line("        SPIRVCoreGrammarInfo info;");
     line("        info.opcodes.embedded = &lookupSpvOp;");
     line("        info.capabilities.embedded = &lookupSpvCapability;");
-    line("        info.allEnums.embedded = &lookupSpvWord;");
+    line("        info.allEnumsWithTypePrefix.embedded = &lookupEnumWithTypePrefix;");
+    line("        info.allEnums.embedded = &lookupQualifiedEnum;");
+    line("        info.allEnumNames.embedded = &getQualifiedEnumName;");
     line("        info.opInfos.embedded = &getOpInfo;");
     line("        info.opNames.embedded = &getOpName;");
     line("        info.operandKinds.embedded = &lookupOperandKind;");
+    line("        info.operandKindNames.embedded = &getOperandKindName;");
 
     //
     line("        info.addReference();");

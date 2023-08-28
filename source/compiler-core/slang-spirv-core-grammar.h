@@ -34,17 +34,27 @@ namespace Slang
             Dictionary<K, T> dict;
         };
 
-        Lookup<UnownedStringSlice, SpvOp> opcodes;
-
-        Lookup<UnownedStringSlice, SpvCapability> capabilities;
-
-        // Returns std::nullopt on failure
-        // Looks up a qualified enum name, i.e. one with the type prefix.
-        Lookup<UnownedStringSlice, SpvWord> allEnums;
-
         struct OperandKind
         {
             uint8_t index;
+            SLANG_COMPONENTWISE_HASHABLE_1;
+            SLANG_COMPONENTWISE_EQUALITY_1(OperandKind);
+        };
+
+        struct QualifiedEnumName
+        {
+            OperandKind kind;
+            UnownedStringSlice name;
+            SLANG_COMPONENTWISE_HASHABLE_2;
+            SLANG_COMPONENTWISE_EQUALITY_2(QualifiedEnumName);
+        };
+
+        struct QualifiedEnumValue
+        {
+            OperandKind kind;
+            SpvWord value;
+            SLANG_COMPONENTWISE_HASHABLE_2;
+            SLANG_COMPONENTWISE_EQUALITY_2(QualifiedEnumValue);
         };
 
         struct OpInfo
@@ -73,10 +83,29 @@ namespace Slang
             uint16_t numOperandTypes; 
             const OperandKind* operandTypes;
         };
-        Lookup<SpvOp, OpInfo> opInfos;
-        Lookup<SpvOp, UnownedStringSlice> opNames;
 
+        //
+        // Our tables:
+        //
+
+        // Instruction name to opcode
+        Lookup<UnownedStringSlice, SpvOp> opcodes;
+        // Capability name to value
+        Lookup<UnownedStringSlice, SpvCapability> capabilities;
+        // String-qualified enum name (one with the type prefix) to value
+        Lookup<UnownedStringSlice, SpvWord> allEnumsWithTypePrefix;
+        // kind * enum name to value
+        Lookup<QualifiedEnumName, SpvWord> allEnums;
+        // kine * enum value to unqualified name
+        Lookup<QualifiedEnumValue, UnownedStringSlice> allEnumNames;
+        // Any other information on instructions
+        Lookup<SpvOp, OpInfo> opInfos;
+        // Opcode to instruction name
+        Lookup<SpvOp, UnownedStringSlice> opNames;
+        // Operand kind string to numeric id
         Lookup<UnownedStringSlice, OperandKind> operandKinds;
+        // Operand kind id to string
+        Lookup<OperandKind, UnownedStringSlice> operandKindNames;
 
     private:
 

@@ -100,6 +100,7 @@ void writeHashFile(
     w.put(perfectHashToEmbeddableCpp(
         hashParams,
         UnownedStringSlice(valueType),
+        (String("lookup") + valueType).getUnownedSlice(),
         values
     ).getBuffer());
 

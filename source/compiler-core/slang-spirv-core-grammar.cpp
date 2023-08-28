@@ -302,16 +302,22 @@ RefPtr<SPIRVCoreGrammarInfo> SPIRVCoreGrammarInfo::loadFromJSON(SourceView& sour
         });
         res->opNames.dict.addIfNotExists(SpvOp(i.opcode), i.opname);
     }
+
     for(const auto& k : spec.operand_kinds)
     {
+        const auto kindIndex = res->operandKinds.dict.getValue(k.kind);
         const auto d = operandKindToDict(container, sink, k);
         for(const auto& [n, v] : d)
         {
             // Add the string to this slice pool as we'll be taking ownership
             // of it shortly but don't want to invalidate it in the meantime.
             const auto s = container.getStringSlicePool().addAndGetSlice(String(k.kind) + n);
-            res->allEnums.dict.add(s, v);
+            res->allEnumsWithTypePrefix.dict.add(s, v);
+            res->allEnums.dict.add({kindIndex, n}, v);
+            res->allEnumNames.dict.addIfNotExists({kindIndex, v}, n);
         }
+
+        res->operandKindNames.dict.add(kindIndex, k.kind);
 
         if(k.kind == "Capability")
             for(const auto& [n, v] : d)
