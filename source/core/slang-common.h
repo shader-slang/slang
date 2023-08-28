@@ -100,6 +100,10 @@ namespace Slang
         const auto& [m1] = *this; \
         const auto& [o1] = other; \
         return m1 == o1; \
+    } \
+    bool operator!=(const type& other) const \
+    { \
+        return !(*this == other); \
     }
 
 #define SLANG_COMPONENTWISE_EQUALITY_2(type) \
@@ -108,6 +112,10 @@ namespace Slang
         const auto& [m1, m2] = *this; \
         const auto& [o1, o2] = other; \
         return m1 == o1 && m2 == o2; \
+    } \
+    bool operator!=(const type& other) const \
+    { \
+        return !(*this == other); \
     }
 
 #define SLANG_COMPONENTWISE_EQUALITY_3(type) \
@@ -116,6 +124,10 @@ namespace Slang
         const auto& [m1, m2, m3] = *this; \
         const auto& [o1, o2, o3] = other; \
         return m1 == o1 && m2 == o2 && m3 == o3; \
+    } \
+    bool operator!=(const type& other) const \
+    { \
+        return !(*this == other); \
     }
 #endif
 

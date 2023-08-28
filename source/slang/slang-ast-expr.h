@@ -663,6 +663,9 @@ public:
     // checking. If this is an opcode, then the parser will populate this too
     // (or set it to 0xffffffff);
     SpvWord namedValueWord = 0xffffffff;
+    // Although this might be a constant in the source we should actually pass
+    // it as an id created with OpConstant
+    bool wrapInId = false;
 
     // Once we've checked things, the SlangType flavour operands will have this
     // type populated.

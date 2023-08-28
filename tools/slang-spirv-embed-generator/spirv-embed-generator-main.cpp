@@ -397,6 +397,24 @@ void writeInfo(
         );
     }
 
+    {
+        memberAssignments.add("info.operandKindUnderneathIds.embedded = &getOperandKindUnderneathId;");
+        dictToSwitch(
+            info.operandKindUnderneathIds.dict,
+            "getOperandKindUnderneathId",
+            "OperandKind",
+            "OperandKind",
+            "k.index",
+            [](Slang::SPIRVCoreGrammarInfo::OperandKind o){
+                return String(o.index);
+            },
+            [](Slang::SPIRVCoreGrammarInfo::OperandKind i){
+                return "v = OperandKind{" + String(i.index) + "}";
+            },
+            w
+        );
+    }
+
     //
     // Now write out the function which holds onto the static embedded info table
     //

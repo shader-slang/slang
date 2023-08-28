@@ -3857,20 +3857,43 @@ struct SPIRVEmitContext
                         {
                             const auto v = as<IRConstant>(operand->getValue());
                             SLANG_ASSERT(v);
-                            switch(v->getOp())
+                            if(operand->getOperandCount() >= 2)
                             {
-                            case kIROp_StringLit:
-                                emitOperand(SpvLiteralBits::fromUnownedStringSlice(v->getStringSlice()));
-                                break;
-                            case kIROp_IntLit:
-                            {
-                                // TODO: range checking
-                                const auto i = cast<IRIntLit>(v)->getValue();
-                                emitOperand(SpvLiteralInteger::from32(uint32_t(i)));
-                                break;
+                                const auto constantType = cast<IRType>(operand->getOperand(1));
+                                SpvInst* constant;
+                                switch(v->getOp())
+                                {
+                                case kIROp_IntLit:
+                                {
+                                    // TODO: range checking
+                                    const auto i = cast<IRIntLit>(v)->getValue();
+                                    constant = emitIntConstant(i, constantType);
+                                    break;
+                                }
+                                case kIROp_StringLit:
+                                    SLANG_UNIMPLEMENTED_X("String constants in SPIR-V emit");
+                                default:
+                                    SLANG_UNREACHABLE("Unhandled case in emitSPIRVAsm");
+                                }
+                                emitOperand(constant);
                             }
-                            default:
-                                SLANG_UNREACHABLE("Unhandled case in emitSPIRVAsm");
+                            else
+                            {
+                                switch(v->getOp())
+                                {
+                                case kIROp_StringLit:
+                                    emitOperand(SpvLiteralBits::fromUnownedStringSlice(v->getStringSlice()));
+                                    break;
+                                case kIROp_IntLit:
+                                {
+                                    // TODO: range checking
+                                    const auto i = cast<IRIntLit>(v)->getValue();
+                                    emitOperand(SpvLiteralInteger::from32(uint32_t(i)));
+                                    break;
+                                }
+                                default:
+                                    SLANG_UNREACHABLE("Unhandled case in emitSPIRVAsm");
+                                }
                             }
                             break;
                         }
@@ -3878,6 +3901,7 @@ struct SPIRVEmitContext
                         {
                             const auto i = operand->getValue();
                             emitOperand(ensureInst(i));
+
                             break;
                         }
                         case kIROp_SPIRVAsmOperandResult:

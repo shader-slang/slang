@@ -322,6 +322,16 @@ RefPtr<SPIRVCoreGrammarInfo> SPIRVCoreGrammarInfo::loadFromJSON(SourceView& sour
         if(k.kind == "Capability")
             for(const auto& [n, v] : d)
                 res->capabilities.dict.add(n, SpvCapability(v));
+
+        // If this starts with Id, and the suffix is also an operand kind,
+        // assume that this is an Id wrapper
+        if(k.kind.startsWith("Id"))
+        {
+            const UnownedStringSlice underneathIdKind{k.kind.begin()+2, k.kind.end()};
+            OperandKind targetIndex;
+            if(res->operandKinds.dict.tryGetValue(underneathIdKind, targetIndex))
+                res->operandKindUnderneathIds.dict.add(kindIndex, targetIndex);
+        }
     }
     // Steal the strings from the JSON container before it dies
     res->strings.swapWith(container.getStringSlicePool());

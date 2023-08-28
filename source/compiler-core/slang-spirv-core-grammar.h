@@ -132,6 +132,8 @@ namespace Slang
         Lookup<UnownedStringSlice, OperandKind> operandKinds;
         // Operand kind id to string
         Lookup<OperandKind, UnownedStringSlice> operandKindNames;
+        // Operand kind to the "un-id" version of itself, for example IdMemorySemantics to MemorySemantics
+        Lookup<OperandKind, OperandKind> operandKindUnderneathIds;
 
     private:
 

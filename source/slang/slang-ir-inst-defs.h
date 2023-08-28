@@ -1064,9 +1064,9 @@ INST(SPIRVAsmInst, SPIRVAsmInst, 1, 0)
     INST(SPIRVAsmOperandLiteral, SPIRVAsmOperandLiteral, 1, 0)
     // A reference to a slang IRInst, either a value or a type
     INST(SPIRVAsmOperandInst, SPIRVAsmOperandInst, 1, 0)
-    // A named enumerator, the value of which is determined in the backend
-    // It can also have the value "result", indicating that the result-id of
-    // the asm block should be used
+    // A named enumerator, the value is stored as a constant operand
+    // It may have a second operand, which if present is a type with which to
+    // construct a constant id to pass, instead of a literal constant
     INST(SPIRVAsmOperandEnum, SPIRVAsmOperandEnum, 1, 0)
     // A string which is given a unique ID in the backend, used to refer to
     // results of other instrucions in the same asm block

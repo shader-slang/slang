@@ -12411,6 +12411,24 @@ static bool getOperandKindName(const OperandKind& k, UnownedStringSlice& v)
     }
 }
 
+static bool getOperandKindUnderneathId(const OperandKind& k, OperandKind& v)
+{
+    switch(k.index)
+    {
+        case 45:
+        {
+            v = OperandKind{5};
+            return true;
+        }
+        case 46:
+        {
+            v = OperandKind{32};
+            return true;
+        }
+        default: return false;
+    }
+}
+
 RefPtr<SPIRVCoreGrammarInfo> SPIRVCoreGrammarInfo::getEmbeddedVersion()
 {
     static SPIRVCoreGrammarInfo embedded = [](){
@@ -12424,6 +12442,7 @@ RefPtr<SPIRVCoreGrammarInfo> SPIRVCoreGrammarInfo::getEmbeddedVersion()
         info.allEnums.embedded = &lookupQualifiedEnum;
         info.allEnumNames.embedded = &getQualifiedEnumName;
         info.operandKindNames.embedded = &getOperandKindName;
+        info.operandKindUnderneathIds.embedded = &getOperandKindUnderneathId;
         info.addReference();
         return info;
     }();

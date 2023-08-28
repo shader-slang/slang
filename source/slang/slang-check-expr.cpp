@@ -3927,6 +3927,9 @@ namespace Slang
                 // Clamp to the end of the type info array, because the last one will be any variable operands
                 const auto operandType
                     = opInfo->operandTypes[std::min(operandIndex, Index(opInfo->numOperandTypes)-1)];
+                const auto baseOperandType
+                    = spirvInfo->operandKindUnderneathIds.lookup(operandType).value_or(operandType);
+                const auto needsIdWrapper = baseOperandType != operandType;
 
                 if(operand.flavor == SPIRVAsmOperand::SlangType)
                 {
@@ -3959,7 +3962,7 @@ namespace Slang
                 {
                     // First try and look it up with the knowledge of this operand's type
                     auto enumValue
-                        = spirvInfo->allEnums.lookup({operandType, operand.token.getContent()});
+                        = spirvInfo->allEnums.lookup({baseOperandType, operand.token.getContent()});
                     // Then fall back to with the type prefix
                     if(!enumValue)
                         enumValue = spirvInfo->allEnumsWithTypePrefix.lookup(operand.token.getContent());
@@ -3975,6 +3978,7 @@ namespace Slang
                     }
 
                     operand.namedValueWord = *enumValue;
+                    operand.wrapInId = needsIdWrapper;
                 }
             }
         }
