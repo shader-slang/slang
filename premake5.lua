@@ -958,6 +958,12 @@ tool "slang-cpp-extractor"
 
     links { "compiler-core", "core" }
 
+tool "slang-spirv-embed-generator"
+    uuid "8da787cc-0e04-450f-8e29-88eac5ebe9bb"
+    includedirs { "." }
+
+    links { "compiler-core", "core" }
+
 tool "slang-lookup-generator"
     uuid "3242baa7-fc4c-4f76-83bc-e4403099dc1d"
     includedirs { "." }
@@ -1397,6 +1403,39 @@ generatorProject("run-generators", nil)
 
     filter { }
 
+generatorProject("generate-spirv-embed")
+    tables = {
+        {
+            json = "external/spirv-headers/include/spirv/unified1/spirv.core.grammar.json",
+        },
+    }
+    for _, t in pairs(tables) do
+        files {t.json}
+    end
+
+    dependson { "slang-spirv-embed-generator" }
+
+    local builddir = getBuildDir()
+    if executeBinary then
+        for _, t in pairs(tables) do
+            filter("files:" .. t.json)
+
+            local inJson = "%{file.abspath}"
+            local cppFilename = "slang-spirv-core-grammar-embed.cpp"
+            local cppPath = "%{wks.location}/source/slang/" .. cppFilename
+            local buildcmd = '"' .. builddir .. '/slang-spirv-embed-generator" '
+                .. inJson .. " "
+                .. cppPath
+
+            buildmessage ("slang-spirv-embed-generator for " .. cppFilename)
+            buildcommands { buildcmd }
+            buildinputs { inJson, builddir .. "/slang-spirv-embed-generator" .. getExecutableSuffix() }
+            buildoutputs (cppPath)
+        end
+    end
+
+    filter { }
+
 generatorProject("generate-lookup-tables")
     tables = {
         {
@@ -1404,18 +1443,6 @@ generatorProject("generate-lookup-tables")
             header = "spirv/unified1/GLSL.std.450.h",
             prefix = "GLSLstd450",
             type = "GLSLstd450"
-        },
-        {
-            json = "external/spirv-headers/include/spirv/unified1/spirv.core.grammar.json",
-            header = "spirv/unified1/spirv.h",
-            prefix = "Spv",
-            type = "SpvOp"
-        },
-        {
-            json = "external/spirv/spirv-capabilities.txt",
-            header = "spirv/unified1/spirv.h",
-            prefix = "SpvCapability",
-            type = "SpvCapability"
         },
     }
     for _, t in pairs(tables) do
@@ -1606,9 +1633,7 @@ standardProject("slang", "source/slang")
 
     -- Similarly for any generated lookup tables
     files {
-        "source/slang/slang-lookup-spvop.cpp",
         "source/slang/slang-lookup-glslstd450.cpp",
-        "source/slang/slang-lookup-spvcapability.cpp",
     }
 
     --
@@ -1620,6 +1645,7 @@ standardProject("slang", "source/slang")
     if not skipSourceGeneration then
         dependson { "run-generators" }
         dependson { "generate-lookup-tables" }
+        dependson { "generate-spirv-embed" }
     end
 
     -- If we have slang-llvm copy it
