@@ -398,7 +398,7 @@ void writeInfo(
     }
 
     {
-        memberAssignments.add("info.operandKindUnderneathIds.embedded = &getOperandKindUnderneathId;");
+        memberAssignments.add("info->operandKindUnderneathIds.embedded = &getOperandKindUnderneathId;");
         dictToSwitch(
             info.operandKindUnderneathIds.dict,
             "getOperandKindUnderneathId",
@@ -420,16 +420,15 @@ void writeInfo(
     //
     line("RefPtr<SPIRVCoreGrammarInfo> SPIRVCoreGrammarInfo::getEmbeddedVersion()");
     line("{");
-    line("    static SPIRVCoreGrammarInfo embedded = [](){");
-    line("        SPIRVCoreGrammarInfo info;");
+    line("    static RefPtr<SPIRVCoreGrammarInfo> embedded = [](){");
+    line("        RefPtr<SPIRVCoreGrammarInfo> info = new SPIRVCoreGrammarInfo();");
     for(const auto& a : memberAssignments)
         line(("        " + a).getBuffer());
 
     //
-    line("        info.addReference();");
     line("        return info;");
     line("    }();");
-    line("    return &embedded;");
+    line("    return embedded;");
     line("}");
     line("}");
 
