@@ -2911,7 +2911,7 @@ struct IRSPIRVAsmInst : IRInst
         SLANG_ASSERT(o->getOp() != kIROp_SPIRVAsmOperandResult);
         const auto v = o->getValue();
         const auto i = cast<IRIntLit>(v);
-        return i->getValue();
+        return SpvWord(i->getValue());
     }
 
     IROperandList<IRSPIRVAsmOperand> getSPIRVOperands()
