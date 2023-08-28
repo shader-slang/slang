@@ -8,6 +8,9 @@
 #include "../compiler-core/slang-spirv-core-grammar.h"
 namespace Slang
 {
+using OperandKind = SPIRVCoreGrammarInfo::OperandKind;
+using QualifiedEnumName = SPIRVCoreGrammarInfo::QualifiedEnumName;
+using QualifiedEnumValue = SPIRVCoreGrammarInfo::QualifiedEnumValue;
 static bool lookupSpvOp(const UnownedStringSlice& str, SpvOp& value)
 {
     static const unsigned tableSalt[718] = {
@@ -2125,7 +2128,6 @@ static bool lookupEnumWithTypePrefix(const UnownedStringSlice& str, SpvWord& val
     }
 }
 
-using OperandKind = SPIRVCoreGrammarInfo::OperandKind;
 static bool getOpInfo(const SpvOp& k, SPIRVCoreGrammarInfo::OpInfo& v)
 {
     switch(k)
@@ -11042,7 +11044,6 @@ bool lookupEnumWithHexPrefix(const UnownedStringSlice& str, SpvWord& value)
     }
 }
 
-using QualifiedEnumName = SPIRVCoreGrammarInfo::QualifiedEnumName;
 static bool lookupQualifiedEnum(const QualifiedEnumName& k, SpvWord& v)
 {
     static_assert(sizeof(k.kind.index) == 1);
@@ -11055,7 +11056,6 @@ static bool lookupQualifiedEnum(const QualifiedEnumName& k, SpvWord& v)
     return lookupEnumWithHexPrefix(UnownedStringSlice(name, k.name.getLength() + 2), v);
 }
 
-using QualifiedEnumValue = SPIRVCoreGrammarInfo::QualifiedEnumValue;
 static bool getQualifiedEnumName(const QualifiedEnumValue& k, UnownedStringSlice& v)
 {
     const auto& [k1, k2] = k;
@@ -12434,11 +12434,11 @@ RefPtr<SPIRVCoreGrammarInfo> SPIRVCoreGrammarInfo::getEmbeddedVersion()
         info.opcodes.embedded = &lookupSpvOp;
         info.capabilities.embedded = &lookupSpvCapability;
         info.allEnumsWithTypePrefix.embedded = &lookupEnumWithTypePrefix;
-        info.allEnums.embedded = &lookupQualifiedEnum;
-        info.allEnumNames.embedded = &getQualifiedEnumName;
         info.opInfos.embedded = &getOpInfo;
         info.opNames.embedded = &getOpName;
         info.operandKinds.embedded = &lookupOperandKind;
+        info.allEnums.embedded = &lookupQualifiedEnum;
+        info.allEnumNames.embedded = &getQualifiedEnumName;
         info.operandKindNames.embedded = &getOperandKindName;
         info.addReference();
         return info;

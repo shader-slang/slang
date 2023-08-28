@@ -61,11 +61,35 @@ namespace Slang
         {
             enum Class
             {
-                // Adding to this? Don't forget to update the embedding generator
+                // Unrecognized instructions go in here
                 Other,
+
+                // Adding to this? Don't forget to update the embedding generator
+                Miscellaneous,
+                Debug,
+                Annotation,
+                Extension,
+                ModeSetting,
                 TypeDeclaration,
                 ConstantCreation,
-                Debug,
+                Memory,
+                Function,
+                Image,
+                Conversion,
+                Composite,
+                Arithmetic,
+                Bit,
+                Relational_and_Logical,
+                Derivative,
+                ControlFlow,
+                Atomic,
+                Primitive,
+                Barrier,
+                Group,
+                DeviceSideEnqueue,
+                Pipe,
+                NonUniform,
+                Reserved,
             };
             constexpr static int8_t kNoResultTypeId = -1;
             constexpr static int8_t kNoResultId = -1;
