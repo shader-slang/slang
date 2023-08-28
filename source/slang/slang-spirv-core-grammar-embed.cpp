@@ -6466,10 +6466,10 @@ RefPtr<SPIRVCoreGrammarInfo> SPIRVCoreGrammarInfo::getEmbeddedVersion()
 {
     static SPIRVCoreGrammarInfo embedded = [](){
         SPIRVCoreGrammarInfo info;
-        info.spvOps.embedded = &lookupSpvOp;
-        info.spvCapabilities.embedded = &lookupSpvCapability;
-        info.anyEnum.embedded = &lookupSpvWord;
-        info.opInfo.embedded = &getOpInfo;
+        info.opcodes.embedded = &lookupSpvOp;
+        info.capabilities.embedded = &lookupSpvCapability;
+        info.allEnums.embedded = &lookupSpvWord;
+        info.opInfos.embedded = &getOpInfo;
         info.opNames.embedded = &getOpName;
         info.enumCategories.embedded = &lookupEnumCategory;
         info.addReference();

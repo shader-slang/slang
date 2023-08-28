@@ -19,43 +19,28 @@ namespace Slang
         static RefPtr<SPIRVCoreGrammarInfo> getEmbeddedVersion();
 
         template<typename K, typename T>
-        struct LookupOpt
+        struct Lookup
         {
             std::optional<T> lookup(const K& name) const
             {
                 T ret;
-                const auto found = embedded ? embedded(name, ret) : dict.tryGetValue(name, ret);
-                return found ? ret : std::nullopt;
+                if(embedded ? embedded(name, ret) : dict.tryGetValue(name, ret))
+                    return ret;
+                else
+                    return std::nullopt;
             }
 
             bool (*embedded)(const K&, T&) = nullptr;
             Dictionary<K, T> dict;
         };
 
-        template<typename K, typename T, T onFailure>
-        struct Lookup
-        {
-            T lookup(const K& name) const
-            {
-                T ret;
-                const auto found = embedded ? embedded(name, ret) : dict.tryGetValue(name, ret);
-                return found ? ret : onFailure;
-            }
+        Lookup<UnownedStringSlice, SpvOp> opcodes;
 
-            bool (*embedded)(const K&, T&) = nullptr;
-            Dictionary<K, T> dict;
-        };
-
-        // Returns SpvOpMax (0x7fffffff) on failure, which couldn't possibly be
-        // a valid 16 bit opcode
-        Lookup<UnownedStringSlice, SpvOp, SpvOpMax> spvOps;
-
-        // Returns SpvCapabilityMax (0x7fffffff) on failure
-        Lookup<UnownedStringSlice, SpvCapability, SpvCapabilityMax> spvCapabilities;
+        Lookup<UnownedStringSlice, SpvCapability> capabilities;
 
         // Returns std::nullopt on failure
         // Looks up a qualified enum name, i.e. one with the type prefix.
-        LookupOpt<UnownedStringSlice, SpvWord> anyEnum;
+        Lookup<UnownedStringSlice, SpvWord> allEnums;
 
         struct OpInfo
         {
@@ -77,14 +62,14 @@ namespace Slang
             uint16_t minWordCount;
             uint16_t maxWordCount;
         };
-        LookupOpt<SpvOp, OpInfo> opInfo;
-        LookupOpt<SpvOp, UnownedStringSlice> opNames;
+        Lookup<SpvOp, OpInfo> opInfos;
+        Lookup<SpvOp, UnownedStringSlice> opNames;
 
         struct EnumCategory
         {
             int32_t index; 
         };
-        LookupOpt<UnownedStringSlice, EnumCategory> enumCategories;
+        Lookup<UnownedStringSlice, EnumCategory> enumCategories;
 
     private:
 

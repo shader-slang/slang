@@ -121,12 +121,13 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
             case Slang::Misc::TokenType::Identifier:
             {
                 auto opName = tokenReader.ReadWord();
-                opCode = spirvGrammar.spvOps.lookup(opName.getUnownedSlice());
-                if(opCode == SpvOpMax)
+                const auto opCodeMaybe = spirvGrammar.opcodes.lookup(opName.getUnownedSlice());
+                if(!opCodeMaybe)
                 {
                     throw Misc::TextFormatException(
                         "Text parsing error: Unrecognized SPIR-V opcode: " + opName);
                 }
+                opCode = *opCodeMaybe;
                 break;
             }
             default:

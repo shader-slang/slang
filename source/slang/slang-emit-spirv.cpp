@@ -3809,8 +3809,8 @@ struct SPIRVEmitContext
         {
             const bool isLast = spvInst == inst->getLastChild();
             const auto opcodeString = spvInst->getOpcodeString();
-            SpvOp opcode = m_grammarInfo->spvOps.lookup(opcodeString);
-            if(opcode == SpvOpMax)
+            const auto opcode = m_grammarInfo->opcodes.lookup(opcodeString);
+            if(!opcode)
             {
                 // TODO: https://github.com/shader-slang/slang/issues/3155
                 m_sink->diagnose(
@@ -3829,14 +3829,14 @@ struct SPIRVEmitContext
             };
 
             last = emitInstCustomOperandFunc(
-                parentForOpCode(opcode, parent),
+                parentForOpCode(*opcode, parent),
                 // We want the "result instruction" to refer to the top level
                 // block which assumes its value, the others are free to refer
                 // to whatever, so just use the internal spv inst rep
                 // TODO: This is not correct, because the instruction which is
                 // assigned to result is not necessarily the last instruction
                 isLast ? as<IRInst>(inst) : spvInst,
-                opcode,
+                *opcode,
                 [&](){
                     for(const auto operand : spvInst->getSPIRVOperands())
                     {

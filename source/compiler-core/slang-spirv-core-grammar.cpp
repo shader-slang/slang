@@ -198,10 +198,10 @@ RefPtr<SPIRVCoreGrammarInfo> SPIRVCoreGrammarInfo::loadFromJSON(SourceView& sour
         i++;
     }
 
-    res->spvOps.dict.reserve(spec.instructions.getCount());
+    res->opcodes.dict.reserve(spec.instructions.getCount());
     for(const auto& i : spec.instructions)
     {
-        res->spvOps.dict.add(i.opname, SpvOp(i.opcode));
+        res->opcodes.dict.add(i.opname, SpvOp(i.opcode));
 
         const auto class_ =
               i.class_ == "Type-Declaration" ? OpInfo::TypeDeclaration
@@ -258,7 +258,7 @@ RefPtr<SPIRVCoreGrammarInfo> SPIRVCoreGrammarInfo::loadFromJSON(SourceView& sour
         // There are duplicate opcodes in the json (for renamed instructions,
         // or the same instruction with different capabilities), for now just
         // keep the first one.
-        res->opInfo.dict.addIfNotExists(SpvOp(i.opcode), {
+        res->opInfos.dict.addIfNotExists(SpvOp(i.opcode), {
             class_,
             static_cast<int8_t>(resultTypeIndex),
             static_cast<int8_t>(resultIdIndex),
@@ -275,12 +275,12 @@ RefPtr<SPIRVCoreGrammarInfo> SPIRVCoreGrammarInfo::loadFromJSON(SourceView& sour
             // Add the string to this slice pool as we'll be taking ownership
             // of it shortly but don't want to invalidate it in the meantime.
             const auto s = container.getStringSlicePool().addAndGetSlice(String(k.kind) + n);
-            res->anyEnum.dict.add(s, v);
+            res->allEnums.dict.add(s, v);
         }
 
         if(k.kind == "Capability")
             for(const auto& [n, v] : d)
-                res->spvCapabilities.dict.add(n, SpvCapability(v));
+                res->capabilities.dict.add(n, SpvCapability(v));
     }
     // Steal the strings from the JSON container before it dies
     res->strings.swapWith(container.getStringSlicePool());

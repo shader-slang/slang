@@ -6657,10 +6657,13 @@ namespace Slang
         auto modifier = parser->astBuilder->create<RequiredSPIRVCapabilityModifier>();
         const SPIRVCoreGrammarInfo& spirvInfo =
             parser->astBuilder->getGlobalSession()->getSPIRVCoreGrammarInfo();
-        const SpvCapability cap = spirvInfo.spvCapabilities.lookup(token.getContent());
-        if (cap == SpvCapabilityMax)
+        const auto cap = spirvInfo.capabilities.lookup(token.getContent());
+        if (!cap)
+        {
             parser->sink->diagnose(token, Diagnostics::unknownSPIRVCapability, token);
-        modifier->capability = (int32_t)cap;
+            return nullptr;
+        }
+        modifier->capability = int32_t(*cap);
         return modifier;
     }
 

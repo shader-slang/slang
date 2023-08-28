@@ -95,7 +95,7 @@ void writeInfo(
 
     w.put("static ");
     w.put(dictToPerfectHash(
-        info.spvOps.dict,
+        info.opcodes.dict,
         UnownedStringSlice("SpvOp"),
         [](const auto n){
             const auto radix = 10;
@@ -105,7 +105,7 @@ void writeInfo(
 
     w.put("static ");
     w.put(dictToPerfectHash(
-        info.spvCapabilities.dict,
+        info.capabilities.dict,
         UnownedStringSlice("SpvCapability"),
         [](const auto n){
             const auto radix = 10;
@@ -115,7 +115,7 @@ void writeInfo(
 
     w.put("static ");
     w.put(dictToPerfectHash(
-        info.anyEnum.dict,
+        info.allEnums.dict,
         UnownedStringSlice("SpvWord"),
         [](const auto n){
             const auto radix = 10;
@@ -124,7 +124,7 @@ void writeInfo(
     ).getBuffer());
 
     dictToSwitch(
-        info.opInfo.dict,
+        info.opInfos.dict,
         "getOpInfo",
         "SpvOp",
         "SPIRVCoreGrammarInfo::OpInfo",
@@ -178,10 +178,10 @@ void writeInfo(
     line("{");
     line("    static SPIRVCoreGrammarInfo embedded = [](){");
     line("        SPIRVCoreGrammarInfo info;");
-    line("        info.spvOps.embedded = &lookupSpvOp;");
-    line("        info.spvCapabilities.embedded = &lookupSpvCapability;");
-    line("        info.anyEnum.embedded = &lookupSpvWord;");
-    line("        info.opInfo.embedded = &getOpInfo;");
+    line("        info.opcodes.embedded = &lookupSpvOp;");
+    line("        info.capabilities.embedded = &lookupSpvCapability;");
+    line("        info.allEnums.embedded = &lookupSpvWord;");
+    line("        info.opInfos.embedded = &getOpInfo;");
     line("        info.opNames.embedded = &getOpName;");
     line("        info.enumCategories.embedded = &lookupEnumCategory;");
 
