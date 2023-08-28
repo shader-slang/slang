@@ -6272,14 +6272,28 @@ namespace Slang
             return SPIRVAsmOperand{ flavor, tok, typeExpr };
         };
 
+        // The result marker
+        if(parser->LookAheadToken("result"))
+        {
+            return SPIRVAsmOperand{SPIRVAsmOperand::ResultMarker, parser->ReadToken()};
+        }
+
         // A regular identifier
-        if(parser->LookAheadToken(TokenType::Identifier))
+        else if(parser->LookAheadToken(TokenType::Identifier))
         {
             return SPIRVAsmOperand{SPIRVAsmOperand::NamedValue, parser->ReadToken()};
         }
-        // A literal integer or string
-        else if(parser->LookAheadToken(TokenType::IntegerLiteral)
-            || parser->LookAheadToken(TokenType::StringLiteral))
+        // A literal integer
+        else if(parser->LookAheadToken(TokenType::IntegerLiteral))
+        {
+            const auto tok = parser->ReadToken();
+            const auto v = getIntegerLiteralValue(tok);
+            if(v < 0 || v > 0xffffffff)
+                parser->diagnose(tok, Diagnostics::spirvOperandRange);
+            return SPIRVAsmOperand{SPIRVAsmOperand::Literal, tok, nullptr, {}, SpvWord(v)};
+        }
+        // A literal string
+        else if(parser->LookAheadToken(TokenType::StringLiteral))
         {
             return SPIRVAsmOperand{SPIRVAsmOperand::Literal, parser->ReadToken()};
         }
@@ -6314,37 +6328,120 @@ namespace Slang
 
     static std::optional<SPIRVAsmInst> parseSPIRVAsmInst(Parser* parser)
     {
+        const auto& spirvInfo = parser->astBuilder->getGlobalSession()->spirvCoreGrammarInfo;
+
         SPIRVAsmInst ret;
 
+        // We don't yet know if this is "OpFoo a b c" or "a = OpFoo b c"
         const auto resultOrOpcode = parseSPIRVAsmOperand(parser);
         if(!resultOrOpcode)
             return std::nullopt;
 
-        // We can enable this when we have a way of determining the index of
-        // the result id operand to each instruction, otherwise we don't know
-        // at which position in the operand list to insert this.
-#if 0
-        if(AdvanceIf(parser, TokenType::OpEql))
+        // If this is the latter, "assignment", syntax then we'll fill these in
+        std::optional<SPIRVAsmOperand> resultTypeOperand;
+        std::optional<SPIRVAsmOperand> resultOperand;
+
+        // If we see a colon, then this `%foo : %type = OpFoo`?
+        if(AdvanceIf(parser, TokenType::Colon))
+        {
+            resultTypeOperand = parseSPIRVAsmOperand(parser);
+            if(!resultTypeOperand)
+                return std::nullopt;
+            parser->ReadToken(TokenType::OpAssign);
+        }
+
+        // If we have seen a type, then insist on this syntax, otherwise allow
+        // skipping this if
+        if(resultTypeOperand || AdvanceIf(parser, TokenType::OpAssign))
         {
             const auto opcode = parseSPIRVAsmOperand(parser);
             if(!opcode)
                 return std::nullopt;
             ret.opcode = *opcode;
-            ret.operands.insert(???, *resultOrOpcode);
+            resultOperand = *resultOrOpcode;
         }
         else
-#endif
         {
             ret.opcode = *resultOrOpcode;
         }
 
-        // TODO: diagnose wrong opcode flavor here
+        const auto& opcodeWord = spirvInfo->opcodes.lookup(ret.opcode.token.getContent());
+        const auto& opInfo = opcodeWord
+            ? spirvInfo->opInfos.lookup(*opcodeWord)
+            : std::nullopt;
+        ret.opcode.knownValue = opcodeWord.value_or(SpvOp(0xffffffff));
 
+        // If we couldn't find any info, but used this assignment syntax, raise
+        // an error
+        if(!opInfo && resultOperand)
+        {
+            parser->diagnose(
+                resultOperand->token,
+                Diagnostics::unrecognizedSPIRVOpcode,
+                ret.opcode.token
+            );
+            return std::nullopt;
+        }
+
+        // If we have an explicit result operand (because this was a `x =
+        // OpFoo` instruction) then diagnose if we don't know where to put it
+        if(resultOperand && opInfo && opInfo->resultIdIndex == -1)
+        {
+            parser->diagnose(
+                resultOperand->token,
+                Diagnostics::spirvInstructionWithoutResultId,
+                ret.opcode.token
+            );
+            return std::nullopt;
+        }
+
+        // Likewise for the type
+        if(resultTypeOperand && opInfo && opInfo->resultTypeIndex == -1)
+        {
+            parser->diagnose(
+                resultTypeOperand->token,
+                Diagnostics::spirvInstructionWithoutResultTypeId,
+                ret.opcode.token
+            );
+            return std::nullopt;
+        }
+
+        //
+        // Now we've parsed the tricky preamble, grab the rest of the operands
+        // At this point we can also parse bitwise or expressions
+        //
         while(!(parser->LookAheadToken(TokenType::RBrace)
             || parser->LookAheadToken(TokenType::Semicolon)))
         {
-            if(const auto operand = parseSPIRVAsmOperand(parser))
+            if(ret.operands.getCount() == opInfo->maxOperandCount)
+            {
+                parser->diagnose(
+                    parser->tokenReader.peekLoc(),
+                    Diagnostics::spirvInstructionWithTooManyOperands,
+                    ret.opcode.token,
+                    opInfo->maxOperandCount
+                );
+            }
+
+            // Insert the LHS result-type operand
+            if(ret.operands.getCount() == opInfo->resultTypeIndex && resultTypeOperand)
+                ret.operands.add(*resultTypeOperand);
+
+            // Insert the LHS result operand
+            if(ret.operands.getCount() == opInfo->resultIdIndex && resultOperand)
+                ret.operands.add(*resultOperand);
+
+            if(auto operand = parseSPIRVAsmOperand(parser))
+            {
+                while(AdvanceIf(parser, TokenType::OpBitOr))
+                {
+                    if(const auto next = parseSPIRVAsmOperand(parser))
+                        operand->bitwiseOrWith.add(*next);
+                    else
+                        return std::nullopt;
+                }
                 ret.operands.add(*operand);
+            }
             else
                 return std::nullopt;
         }
@@ -6357,6 +6454,7 @@ namespace Slang
         SPIRVAsmExpr* asmExpr = parser->astBuilder->create<SPIRVAsmExpr>();
 
         parser->ReadToken(TokenType::LBrace);
+        bool failed = false;
         while(!parser->tokenReader.isAtEnd())
         {
             if(parser->LookAheadToken(TokenType::RBrace))
@@ -6364,14 +6462,21 @@ namespace Slang
             if(const auto inst = parseSPIRVAsmInst(parser))
                 asmExpr->insts.add(*inst);
             else
-                return nullptr;
+            {
+                failed = true;
+                // Recover to the semi or brace
+                while(!(parser->LookAheadToken(TokenType::Semicolon)
+                    || parser->LookAheadToken(TokenType::RBrace)
+                    || parser->LookAheadToken(TokenType::EndOfFile)))
+                    parser->ReadToken();
+            }
             if(parser->LookAheadToken(TokenType::RBrace))
                 break;
             parser->ReadToken(TokenType::Semicolon);
         }
-        parser->ReadToken(TokenType::RBrace);
+        parser->ReadMatchingToken(TokenType::RBrace);
 
-        return asmExpr;
+        return failed ? nullptr : asmExpr;
     }
 
     static Expr* parsePrefixExpr(Parser* parser)
@@ -6767,16 +6872,13 @@ namespace Slang
         parser->ReadToken(TokenType::LParent);
         Token token = parser->ReadToken(TokenType::Identifier);
         auto modifier = parser->astBuilder->create<RequiredSPIRVCapabilityModifier>();
-        SpvCapability cap;
-        if (!lookupSpvCapability(token.getContent(), cap))
-            parser->sink->diagnose(token, Diagnostics::unknownSPIRVCapability, token);
-        if (AdvanceIf(parser, TokenType::Comma))
+        const SPIRVCoreGrammarInfo& spirvInfo =
+            parser->astBuilder->getGlobalSession()->getSPIRVCoreGrammarInfo();
+        const auto cap = spirvInfo.capabilities.lookup(token.getContent());
+        if (!cap)
         {
-            auto extensionName = parser->ReadToken(TokenType::Identifier);
-            modifier->extensionName = extensionName.getContent();
-        }
+            parser->sink->diagnose(token, Diagnostics::unknownSPIRVCapability, token);
         modifier->capability = (int32_t)cap;
-        parser->ReadToken(TokenType::RParent);
         return modifier;
     }
 

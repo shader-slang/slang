@@ -2898,6 +2898,8 @@ struct IRSPIRVAsmOperand : IRInst
     IR_PARENT_ISA(SPIRVAsmOperand);
     IRInst* getValue()
     {
+        if(getOp() == kIROp_SPIRVAsmOperandResult)
+            return nullptr;
         return getOperand(0);
     }
 };
@@ -2906,20 +2908,20 @@ struct IRSPIRVAsmInst : IRInst
 {
     IR_LEAF_ISA(SPIRVAsmInst);
 
-    IRSPIRVAsmOperand* getOpcode()
+    IRSPIRVAsmOperand* getOpcodeOperand()
     {
-        // TODO: This only supports known opcodes at the moment, eventually we'll want
-        // another child of IRSPIRVAsm which just stores raw words
         const auto opcodeOperand = cast<IRSPIRVAsmOperand>(getOperand(0));
         SLANG_ASSERT(opcodeOperand->getOp() == kIROp_SPIRVAsmOperandEnum);
         return opcodeOperand;
     }
 
-    UnownedStringSlice getOpcodeString()
+    SpvWord getOpcodeOperandWord()
     {
-        const auto opcodeOperand = getOpcode();
-        const auto opcodeStringLit = cast<IRStringLit>(opcodeOperand->getValue());
-        return opcodeStringLit->getStringSlice();
+        const auto o = getOpcodeOperand();
+        SLANG_ASSERT(o->getOp() != kIROp_SPIRVAsmOperandResult);
+        const auto v = o->getValue();
+        const auto i = cast<IRIntLit>(v);
+        return SpvWord(i->getValue());
     }
 
     IROperandList<IRSPIRVAsmOperand> getSPIRVOperands()
@@ -3932,7 +3934,9 @@ public:
     IRSPIRVAsmOperand* emitSPIRVAsmOperandLiteral(IRInst* literal);
     IRSPIRVAsmOperand* emitSPIRVAsmOperandInst(IRInst* inst);
     IRSPIRVAsmOperand* emitSPIRVAsmOperandId(IRInst* inst);
+    IRSPIRVAsmOperand* emitSPIRVAsmOperandResult();
     IRSPIRVAsmOperand* emitSPIRVAsmOperandEnum(IRInst* inst);
+    IRSPIRVAsmOperand* emitSPIRVAsmOperandEnum(IRInst* inst, IRType* constantType);
     IRSPIRVAsmInst* emitSPIRVAsmInst(IRInst* opcode, List<IRInst*> operands);
     IRSPIRVAsm* emitSPIRVAsm(IRType* type);
     IRInst* emitGenericAsm(UnownedStringSlice asmText);

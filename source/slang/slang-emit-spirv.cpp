@@ -3808,25 +3808,34 @@ struct SPIRVEmitContext
         for(const auto spvInst : inst->getInsts())
         {
             const bool isLast = spvInst == inst->getLastChild();
-            const auto opcodeString = spvInst->getOpcodeString();
-            SpvOp opcode;
-            const bool foundOpCode = lookupSpvOp(opcodeString, opcode)
-                || lookupSpvOp((String("Op") + opcodeString).getUnownedSlice(), opcode);
-            if(!foundOpCode)
-            {
-                m_sink->diagnose(
-                    spvInst->getOpcode(),
-                    Diagnostics::unrecognizedSPIRVOpcode,
-                    opcodeString
-                );
-                return nullptr;
-            }
+            const SpvOp opcode = SpvOp(spvInst->getOpcodeOperandWord());
 
-            const auto parentForOpCode = [this](SpvOp opcode, SpvInstParent* defaultParent){
-                return
-                    opcode == SpvOpConstant ? getSection(SpvLogicalSectionID::ConstantsAndTypes)
-                    : opcode == SpvOpName ? getSection(SpvLogicalSectionID::DebugNames)
-                    : defaultParent;
+            const auto parentForOpCode = [this](SpvOp opcode, SpvInstParent* defaultParent) -> SpvInstParent*{
+                const auto info = m_grammarInfo->opInfos.lookup(opcode);
+                SLANG_ASSERT(info.has_value());
+                switch(info->class_)
+                {
+                    case SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration:
+                    case SPIRVCoreGrammarInfo::OpInfo::ConstantCreation:
+                        return getSection(SpvLogicalSectionID::ConstantsAndTypes);
+                    // Don't add this case, it's not correct as not all "Debug"
+                    // instructions belong in this block
+                    // case SPIRVCoreGrammarInfo::OpInfo::Debug:
+                    //     return getSection(SpvLogicalSectionID::DebugNames);
+                    default:
+                        switch(opcode)
+                        {
+                            case SpvOpName:
+                                return getSection(SpvLogicalSectionID::DebugNames);
+                            case SpvOpCapability:
+                                return getSection(SpvLogicalSectionID::Capabilities);
+                            case SpvOpExtension:
+                                return getSection(SpvLogicalSectionID::Extensions);
+                            default:
+                                return defaultParent;
+
+                        }
+                }
             };
 
             last = emitInstCustomOperandFunc(
@@ -3843,24 +3852,48 @@ struct SPIRVEmitContext
                     {
                         switch(operand->getOp())
                         {
+                        case kIROp_SPIRVAsmOperandEnum:
                         case kIROp_SPIRVAsmOperandLiteral:
                         {
                             const auto v = as<IRConstant>(operand->getValue());
                             SLANG_ASSERT(v);
-                            switch(v->getOp())
+                            if(operand->getOperandCount() >= 2)
                             {
-                            case kIROp_StringLit:
-                                emitOperand(SpvLiteralBits::fromUnownedStringSlice(v->getStringSlice()));
-                                break;
-                            case kIROp_IntLit:
-                            {
-                                // TODO: range checking
-                                const auto i = cast<IRIntLit>(v)->getValue();
-                                emitOperand(SpvLiteralInteger::from32(uint32_t(i)));
-                                break;
+                                const auto constantType = cast<IRType>(operand->getOperand(1));
+                                SpvInst* constant;
+                                switch(v->getOp())
+                                {
+                                case kIROp_IntLit:
+                                {
+                                    // TODO: range checking
+                                    const auto i = cast<IRIntLit>(v)->getValue();
+                                    constant = emitIntConstant(i, constantType);
+                                    break;
+                                }
+                                case kIROp_StringLit:
+                                    SLANG_UNIMPLEMENTED_X("String constants in SPIR-V emit");
+                                default:
+                                    SLANG_UNREACHABLE("Unhandled case in emitSPIRVAsm");
+                                }
+                                emitOperand(constant);
                             }
-                            default:
-                                SLANG_UNREACHABLE("Unhandled case in emitSPIRVAsm");
+                            else
+                            {
+                                switch(v->getOp())
+                                {
+                                case kIROp_StringLit:
+                                    emitOperand(SpvLiteralBits::fromUnownedStringSlice(v->getStringSlice()));
+                                    break;
+                                case kIROp_IntLit:
+                                {
+                                    // TODO: range checking
+                                    const auto i = cast<IRIntLit>(v)->getValue();
+                                    emitOperand(SpvLiteralInteger::from32(uint32_t(i)));
+                                    break;
+                                }
+                                default:
+                                    SLANG_UNREACHABLE("Unhandled case in emitSPIRVAsm");
+                                }
                             }
                             break;
                         }
@@ -3868,18 +3901,13 @@ struct SPIRVEmitContext
                         {
                             const auto i = operand->getValue();
                             emitOperand(ensureInst(i));
+
                             break;
                         }
-                        case kIROp_SPIRVAsmOperandEnum:
+                        case kIROp_SPIRVAsmOperandResult:
                         {
-                            const auto s = cast<IRStringLit>(operand->getValue())->getStringSlice();
-                            if(s == "result")
-                            {
-                                SLANG_ASSERT(isLast);
-                                emitOperand(kResultID);
-                            }
-                            else
-                                SLANG_UNIMPLEMENTED_X("lookup enum operands in spirv_asm");
+                            SLANG_ASSERT(isLast);
+                            emitOperand(kResultID);
                             break;
                         }
                         case kIROp_SPIRVAsmOperandId:
