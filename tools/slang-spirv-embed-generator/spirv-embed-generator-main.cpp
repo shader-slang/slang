@@ -209,7 +209,7 @@ void writeInfo(
 
 
     {
-        memberAssignments.add("info.opcodes.embedded = &lookupSpvOp;");
+        memberAssignments.add("info->opcodes.embedded = &lookupSpvOp;");
         w.put("static ");
         w.put(dictToPerfectHash(
             info.opcodes.dict,
@@ -223,7 +223,7 @@ void writeInfo(
     }
 
     {
-        memberAssignments.add("info.capabilities.embedded = &lookupSpvCapability;");
+        memberAssignments.add("info->capabilities.embedded = &lookupSpvCapability;");
         w.put("static ");
         w.put(dictToPerfectHash(
             info.capabilities.dict,
@@ -237,7 +237,7 @@ void writeInfo(
     }
 
     {
-        memberAssignments.add("info.allEnumsWithTypePrefix.embedded = &lookupEnumWithTypePrefix;");
+        memberAssignments.add("info->allEnumsWithTypePrefix.embedded = &lookupEnumWithTypePrefix;");
         w.put("static ");
         w.put(dictToPerfectHash(
             info.allEnumsWithTypePrefix.dict,
@@ -251,7 +251,7 @@ void writeInfo(
     }
 
     {
-        memberAssignments.add("info.opInfos.embedded = &getOpInfo;");
+        memberAssignments.add("info->opInfos.embedded = &getOpInfo;");
         dictToSwitch(
             info.opInfos.dict,
             "getOpInfo",
@@ -293,7 +293,7 @@ void writeInfo(
     }
 
     {
-        memberAssignments.add("info.opNames.embedded = &getOpName;");
+        memberAssignments.add("info->opNames.embedded = &getOpName;");
         dictToSwitch(
             info.opNames.dict,
             "getOpName",
@@ -311,7 +311,7 @@ void writeInfo(
     }
 
     {
-        memberAssignments.add("info.operandKinds.embedded = &lookupOperandKind;");
+        memberAssignments.add("info->operandKinds.embedded = &lookupOperandKind;");
         w.put("static ");
         w.put(dictToPerfectHash(
             info.operandKinds.dict,
@@ -325,7 +325,7 @@ void writeInfo(
     }
 
     {
-        memberAssignments.add("info.allEnums.embedded = &lookupQualifiedEnum;");
+        memberAssignments.add("info->allEnums.embedded = &lookupQualifiedEnum;");
 
         // First construct a helper function which will lookup an enum name
         // with a hex prefix representing the kind. This allows us to just
@@ -365,7 +365,7 @@ void writeInfo(
     }
 
     {
-        memberAssignments.add("info.allEnumNames.embedded = &getQualifiedEnumName;");
+        memberAssignments.add("info->allEnumNames.embedded = &getQualifiedEnumName;");
         qualifiedEnumValueNameSwitch(
             info.allEnumNames.dict,
             "getQualifiedEnumName",
@@ -380,7 +380,7 @@ void writeInfo(
     }
 
     {
-        memberAssignments.add("info.operandKindNames.embedded = &getOperandKindName;");
+        memberAssignments.add("info->operandKindNames.embedded = &getOperandKindName;");
         dictToSwitch(
             info.operandKindNames.dict,
             "getOperandKindName",
