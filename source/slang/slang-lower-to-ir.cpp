@@ -3263,11 +3263,10 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                 {
                     if(operand.token.type == TokenType::IntegerLiteral)
                     {
-                        const auto v = getIntegerLiteralValue(operand.token);
                         // TODO: we should sign-extend these where appropriate,
                         // difficult because it requires information on usage...
                         return builder->emitSPIRVAsmOperandLiteral(
-                            builder->getIntValue(builder->getUIntType(), v));
+                            builder->getIntValue(builder->getUIntType(), operand.knownValue));
                     }
                     else if(operand.token.type == TokenType::StringLiteral)
                     {
@@ -3289,7 +3288,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                 }
             case SPIRVAsmOperand::NamedValue:
                 {
-                    const auto v = operand.namedValueWord;
+                    const auto v = operand.knownValue;
                     const auto i = builder->getIntValue(builder->getIntType(), v);
                     if(operand.wrapInId)
                         return builder->emitSPIRVAsmOperandEnum(i, builder->getIntType());

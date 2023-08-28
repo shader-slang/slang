@@ -6170,9 +6170,17 @@ namespace Slang
         {
             return SPIRVAsmOperand{SPIRVAsmOperand::NamedValue, parser->ReadToken()};
         }
-        // A literal integer or string
-        else if(parser->LookAheadToken(TokenType::IntegerLiteral)
-            || parser->LookAheadToken(TokenType::StringLiteral))
+        // A literal integer
+        else if(parser->LookAheadToken(TokenType::IntegerLiteral))
+        {
+            const auto tok = parser->ReadToken();
+            const auto v = getIntegerLiteralValue(tok);
+            if(v < 0 || v > 0xffffffff)
+                parser->diagnose(tok, Diagnostics::spirvOperandRange);
+            return SPIRVAsmOperand{SPIRVAsmOperand::Literal, tok, nullptr, {}, SpvWord(v)};
+        }
+        // A literal string
+        else if(parser->LookAheadToken(TokenType::StringLiteral))
         {
             return SPIRVAsmOperand{SPIRVAsmOperand::Literal, parser->ReadToken()};
         }
@@ -6248,7 +6256,7 @@ namespace Slang
         const auto& opInfo = opcodeWord
             ? spirvInfo->opInfos.lookup(*opcodeWord)
             : std::nullopt;
-        ret.opcode.namedValueWord = opcodeWord.value_or(SpvOp(0xffffffff));
+        ret.opcode.knownValue = opcodeWord.value_or(SpvOp(0xffffffff));
 
         // If we couldn't find any info, but used this assignment syntax, raise
         // an error
@@ -6287,6 +6295,7 @@ namespace Slang
 
         //
         // Now we've parsed the tricky preamble, grab the rest of the operands
+        // At this point we can also parse bitwise or expressions
         //
         while(!(parser->LookAheadToken(TokenType::RBrace)
             || parser->LookAheadToken(TokenType::Semicolon)))
@@ -6309,8 +6318,17 @@ namespace Slang
             if(ret.operands.getCount() == opInfo->resultIdIndex && resultOperand)
                 ret.operands.add(*resultOperand);
 
-            if(const auto operand = parseSPIRVAsmOperand(parser))
+            if(auto operand = parseSPIRVAsmOperand(parser))
+            {
+                while(AdvanceIf(parser, TokenType::OpBitOr))
+                {
+                    if(const auto next = parseSPIRVAsmOperand(parser))
+                        operand->bitwiseOrWith.add(*next);
+                    else
+                        return std::nullopt;
+                }
                 ret.operands.add(*operand);
+            }
             else
                 return std::nullopt;
         }

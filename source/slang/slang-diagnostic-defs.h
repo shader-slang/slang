@@ -250,6 +250,8 @@ DIAGNOSTIC(29104, Error, spirvInstructionWithoutResultTypeId, "cannot use this '
 // This is a warning because we trust that people using the spirv_asm block know what they're doing
 DIAGNOSTIC(29104, Warning, spirvInstructionWithTooManyOperands, "too many operands for $0 (expected max $1), did you forget a semicolon?")
 DIAGNOSTIC(29104, Error, spirvUnableToResolveName, "unknown SPIR-V identifier $0, it's not a known enumerator or opcode")
+DIAGNOSTIC(29104, Error, spirvNonConstantBitwiseOr, "only integer literals and enum names can appear in a bitwise or expression")
+DIAGNOSTIC(29104, Error, spirvOperandRange, "Literal ints must be in the range 0 to 0xffffffff")
 
 
 //

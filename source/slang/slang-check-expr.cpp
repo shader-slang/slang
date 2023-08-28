@@ -3911,7 +3911,7 @@ namespace Slang
         {
             // It's not automatically a failure to not have info, we just won't
             // be able to deduce types for operands
-            const auto opInfo = spirvInfo->opInfos.lookup(SpvOp(inst.opcode.namedValueWord));
+            const auto opInfo = spirvInfo->opInfos.lookup(SpvOp(inst.opcode.knownValue));
 
             if(opInfo->numOperandTypes == 0 && inst.operands.getCount())
             {
@@ -3923,7 +3923,6 @@ namespace Slang
             const bool isLast = &inst == &expr->insts.getLast();
             for(Index operandIndex = 0; operandIndex < inst.operands.getCount(); ++operandIndex)
             {
-                auto& operand = inst.operands[operandIndex];
                 // Clamp to the end of the type info array, because the last one will be any variable operands
                 const auto operandType
                     = opInfo->operandTypes[std::min(operandIndex, Index(opInfo->numOperandTypes)-1)];
@@ -3931,55 +3930,76 @@ namespace Slang
                     = spirvInfo->operandKindUnderneathIds.lookup(operandType).value_or(operandType);
                 const auto needsIdWrapper = baseOperandType != operandType;
 
-                if(operand.flavor == SPIRVAsmOperand::SlangType)
-                {
-                    // This is a $$type operand, fill in the TypeExp member of the operand
-                    TypeExp& typeExpr = operand.type;
-                    typeExpr.exp = operand.expr;
-                    typeExpr = CheckProperType(typeExpr);
-                    operand.expr = typeExpr.exp;
-                }
-                else if(operand.flavor == SPIRVAsmOperand::SlangValue
-                    || operand.flavor == SPIRVAsmOperand::SlangValueAddr)
-                {
-                    // This is a $expr operand, check the expr
-                    operand.expr = dispatch(operand.expr);
-                }
-                else if(operand.flavor == SPIRVAsmOperand::ResultMarker)
-                {
-                    // This is the <result-id> marker, check that it only
-                    // appears in the last instruction.
-
-                    // TODO: We could consider relaxing this, because SPIR-V
-                    // does have forward references for decorations and such
-                    if (!isLast)
+                const auto check = [&](const auto& go, auto& operand) -> void {
+                    if(operand.flavor == SPIRVAsmOperand::SlangType)
                     {
-                        getSink()->diagnose(operand.token, Diagnostics::misplacedResultIdMarker);
-                        getSink()->diagnoseWithoutSourceView(expr, Diagnostics::considerOpCopyObject);
+                        // This is a $$type operand, fill in the TypeExp member of the operand
+                        TypeExp& typeExpr = operand.type;
+                        typeExpr.exp = operand.expr;
+                        typeExpr = CheckProperType(typeExpr);
+                        operand.expr = typeExpr.exp;
                     }
-                }
-                else if(operand.flavor == SPIRVAsmOperand::NamedValue)
-                {
-                    // First try and look it up with the knowledge of this operand's type
-                    auto enumValue
-                        = spirvInfo->allEnums.lookup({baseOperandType, operand.token.getContent()});
-                    // Then fall back to with the type prefix
-                    if(!enumValue)
-                        enumValue = spirvInfo->allEnumsWithTypePrefix.lookup(operand.token.getContent());
-                    // Then see if it's an opcode (for OpSpecialize)
-                    if(!enumValue)
-                        enumValue = spirvInfo->opcodes.lookup(operand.token.getContent());
+                    else if(operand.flavor == SPIRVAsmOperand::SlangValue
+                        || operand.flavor == SPIRVAsmOperand::SlangValueAddr)
+                    {
+                        // This is a $expr operand, check the expr
+                        operand.expr = dispatch(operand.expr);
+                    }
+                    else if(operand.flavor == SPIRVAsmOperand::ResultMarker)
+                    {
+                        // This is the <result-id> marker, check that it only
+                        // appears in the last instruction.
 
-                    if(!enumValue)
+                        // TODO: We could consider relaxing this, because SPIR-V
+                        // does have forward references for decorations and such
+                        if (!isLast)
+                        {
+                            getSink()->diagnose(operand.token, Diagnostics::misplacedResultIdMarker);
+                            getSink()->diagnoseWithoutSourceView(expr, Diagnostics::considerOpCopyObject);
+                        }
+                    }
+                    else if(operand.flavor == SPIRVAsmOperand::NamedValue)
+                    {
+                        // First try and look it up with the knowledge of this operand's type
+                        auto enumValue
+                            = spirvInfo->allEnums.lookup({baseOperandType, operand.token.getContent()});
+                        // Then fall back to with the type prefix
+                        if(!enumValue)
+                            enumValue = spirvInfo->allEnumsWithTypePrefix.lookup(operand.token.getContent());
+                        // Then see if it's an opcode (for OpSpecialize)
+                        if(!enumValue)
+                            enumValue = spirvInfo->opcodes.lookup(operand.token.getContent());
+
+                        if(!enumValue)
+                        {
+                            failed = true;
+                            getSink()->diagnose(operand.token, Diagnostics::spirvUnableToResolveName, operand.token.getContent());
+                            return;
+                        }
+
+                        operand.knownValue = *enumValue;
+                        operand.wrapInId = needsIdWrapper;
+                    }
+                    if(operand.bitwiseOrWith.getCount()
+                        && operand.flavor != SPIRVAsmOperand::Literal
+                        && operand.flavor != SPIRVAsmOperand::NamedValue)
                     {
                         failed = true;
-                        getSink()->diagnose(operand.token, Diagnostics::spirvUnableToResolveName, operand.token.getContent());
-                        continue;
+                        getSink()->diagnose(operand.token, Diagnostics::spirvNonConstantBitwiseOr);
                     }
+                    for(auto& o : operand.bitwiseOrWith)
+                    {
+                        if(o.flavor != SPIRVAsmOperand::Literal && o.flavor != SPIRVAsmOperand::NamedValue)
+                        {
+                            failed = true;
+                            getSink()->diagnose(operand.token, Diagnostics::spirvNonConstantBitwiseOr);
+                        }
+                        go(go, o);
+                        operand.knownValue |= o.knownValue;
+                    }
+                };
 
-                    operand.namedValueWord = *enumValue;
-                    operand.wrapInId = needsIdWrapper;
-                }
+                check(check, inst.operands[operandIndex]);
             }
         }
 

@@ -659,10 +659,15 @@ public:
     // parse single idents at the moment
     Expr* expr = nullptr;
 
+    // If this is part of a bitwise or expression, this will point to the
+    // remaining operands values in such an expression must be of flavour
+    // Literal or NamedValue
+    List<SPIRVAsmOperand> bitwiseOrWith = List<SPIRVAsmOperand>();
+
     // If this is a named value then we calculate the value here during
     // checking. If this is an opcode, then the parser will populate this too
     // (or set it to 0xffffffff);
-    SpvWord namedValueWord = 0xffffffff;
+    SpvWord knownValue = 0xffffffff;
     // Although this might be a constant in the source we should actually pass
     // it as an id created with OpConstant
     bool wrapInId = false;
