@@ -3823,10 +3823,18 @@ struct SPIRVEmitContext
                     // case SPIRVCoreGrammarInfo::OpInfo::Debug:
                     //     return getSection(SpvLogicalSectionID::DebugNames);
                     default:
-                        return
-                            opcode == SpvOpName
-                            ? getSection(SpvLogicalSectionID::DebugNames)
-                            : defaultParent;
+                        switch(opcode)
+                        {
+                            case SpvOpName:
+                                return getSection(SpvLogicalSectionID::DebugNames);
+                            case SpvOpCapability:
+                                return getSection(SpvLogicalSectionID::Capabilities);
+                            case SpvOpExtension:
+                                return getSection(SpvLogicalSectionID::Extensions);
+                            default:
+                                return defaultParent;
+
+                        }
                 }
             };
 
