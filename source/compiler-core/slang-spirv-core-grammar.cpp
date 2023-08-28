@@ -192,10 +192,10 @@ RefPtr<SPIRVCoreGrammarInfo> SPIRVCoreGrammarInfo::loadFromJSON(SourceView& sour
     RefPtr<SPIRVCoreGrammarInfo> res{new SPIRVCoreGrammarInfo};
 
     res->operandKinds.dict.reserve(spec.operand_kinds.getCount());
-    uint32_t i = 0;
+    uint32_t operandKindIndex = 0;
     for(const auto& c : spec.operand_kinds)
     {
-        if(i > std::numeric_limits<decltype(OperandKind::index)>::max())
+        if(operandKindIndex > std::numeric_limits<decltype(OperandKind::index)>::max())
         {
             sink.diagnoseWithoutSourceView(
                 SourceLoc{},
@@ -203,8 +203,8 @@ RefPtr<SPIRVCoreGrammarInfo> SPIRVCoreGrammarInfo::loadFromJSON(SourceView& sour
                 "Too many enum categories, expected fewer than 256"
             );
         }
-        res->operandKinds.dict.add(c.kind, {static_cast<decltype(OperandKind::index)>(i)});
-        i++;
+        res->operandKinds.dict.add(c.kind, {static_cast<decltype(OperandKind::index)>(operandKindIndex)});
+        operandKindIndex++;
     }
 
     // It's important we reserve the memory now, as we require the iterators to

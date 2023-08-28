@@ -27,7 +27,7 @@ HashFindResult minimalPerfectHash(const List<String>& ss, HashParams& hashParams
     List<List<String>> initialBuckets;
     initialBuckets.setCount(nBuckets);
 
-    const auto hash = [&](const String& s, const HashCode64 salt = 0) -> UInt32
+    const auto hash = [&](const String& s, const HashCode32 salt = 0) -> UInt32
     {
         //
         // The current getStableHashCode is susceptible to patterns of

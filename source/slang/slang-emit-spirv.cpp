@@ -3823,7 +3823,7 @@ struct SPIRVEmitContext
 
             const auto parentForOpCode = [this](SpvOp opcode, SpvInstParent* defaultParent) -> SpvInstParent*{
                 const auto info = m_grammarInfo->opInfos.lookup(opcode);
-                SLANG_ASSERT(info);
+                SLANG_ASSERT(info.has_value());
                 switch(info->class_)
                 {
                     case SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration:
