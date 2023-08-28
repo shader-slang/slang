@@ -6878,7 +6878,11 @@ namespace Slang
         if (!cap)
         {
             parser->sink->diagnose(token, Diagnostics::unknownSPIRVCapability, token);
-        modifier->capability = (int32_t)cap;
+        }
+        else
+        {
+            modifier->capability = (int32_t)cap.value();
+        }
         return modifier;
     }
 

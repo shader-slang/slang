@@ -12431,21 +12431,20 @@ static bool getOperandKindUnderneathId(const OperandKind& k, OperandKind& v)
 
 RefPtr<SPIRVCoreGrammarInfo> SPIRVCoreGrammarInfo::getEmbeddedVersion()
 {
-    static SPIRVCoreGrammarInfo embedded = [](){
-        SPIRVCoreGrammarInfo info;
-        info.opcodes.embedded = &lookupSpvOp;
-        info.capabilities.embedded = &lookupSpvCapability;
-        info.allEnumsWithTypePrefix.embedded = &lookupEnumWithTypePrefix;
-        info.opInfos.embedded = &getOpInfo;
-        info.opNames.embedded = &getOpName;
-        info.operandKinds.embedded = &lookupOperandKind;
-        info.allEnums.embedded = &lookupQualifiedEnum;
-        info.allEnumNames.embedded = &getQualifiedEnumName;
-        info.operandKindNames.embedded = &getOperandKindName;
-        info.operandKindUnderneathIds.embedded = &getOperandKindUnderneathId;
-        info.addReference();
+    static RefPtr<SPIRVCoreGrammarInfo> embedded = [](){
+        RefPtr<SPIRVCoreGrammarInfo> info = new SPIRVCoreGrammarInfo();
+        info->opcodes.embedded = &lookupSpvOp;
+        info->capabilities.embedded = &lookupSpvCapability;
+        info->allEnumsWithTypePrefix.embedded = &lookupEnumWithTypePrefix;
+        info->opInfos.embedded = &getOpInfo;
+        info->opNames.embedded = &getOpName;
+        info->operandKinds.embedded = &lookupOperandKind;
+        info->allEnums.embedded = &lookupQualifiedEnum;
+        info->allEnumNames.embedded = &getQualifiedEnumName;
+        info->operandKindNames.embedded = &getOperandKindName;
+        info->operandKindUnderneathIds.embedded = &getOperandKindUnderneathId;
         return info;
     }();
-    return &embedded;
+    return embedded;
 }
 }
