@@ -6202,35 +6202,83 @@ namespace Slang
 
     static std::optional<SPIRVAsmInst> parseSPIRVAsmInst(Parser* parser)
     {
+        const auto& spirvInfo = parser->astBuilder->getGlobalSession()->spirvCoreGrammarInfo;
+
         SPIRVAsmInst ret;
 
+        // We don't yet know if this is "OpFoo a b c" or "a = OpFoo b c"
         const auto resultOrOpcode = parseSPIRVAsmOperand(parser);
         if(!resultOrOpcode)
             return std::nullopt;
 
-        // We can enable this when we have a way of determining the index of
-        // the result id operand to each instruction, otherwise we don't know
-        // at which position in the operand list to insert this.
-#if 0
-        if(AdvanceIf(parser, TokenType::OpEql))
+        // If this is the latter, "assignment", syntax then we'll fill these in
+        std::optional<SPIRVAsmOperand> resultTypeOperand;
+        std::optional<SPIRVAsmOperand> resultOperand;
+
+        // If we see a colon, then this `%foo : %type = OpFoo`?
+        if(AdvanceIf(parser, TokenType::Colon))
+        {
+            resultTypeOperand = parseSPIRVAsmOperand(parser);
+            if(!resultTypeOperand)
+                return std::nullopt;
+            parser->ReadToken(TokenType::OpAssign);
+        }
+
+        // If we have seen a type, then insist on this syntax, otherwise allow
+        // skipping this if
+        if(resultTypeOperand || AdvanceIf(parser, TokenType::OpAssign))
         {
             const auto opcode = parseSPIRVAsmOperand(parser);
             if(!opcode)
                 return std::nullopt;
             ret.opcode = *opcode;
-            ret.operands.insert(???, *resultOrOpcode);
+            resultOperand = *resultOrOpcode;
         }
         else
-#endif
         {
             ret.opcode = *resultOrOpcode;
         }
 
-        // TODO: diagnose wrong opcode flavor here
+        const auto& opcodeWord = spirvInfo->opcodes.lookup(ret.opcode.token.getContent());
+        const auto& opInfo = opcodeWord
+            ? spirvInfo->opInfos.lookup(*opcodeWord)
+            : std::nullopt;
+
+        // If we have an explicit result operand (because this was a `x =
+        // OpFoo` instruction) then diagnose if we don't know where to put it
+        if(resultOperand && opInfo->resultIdIndex == -1)
+        {
+            parser->diagnose(
+                resultOperand->token,
+                Diagnostics::spirvInstructionWithoutResultId,
+                ret.opcode.token,
+                ret.opcode.token
+            );
+            return std::nullopt;
+        }
+
+        if(resultTypeOperand && opInfo->resultTypeIndex == -1)
+        {
+            parser->diagnose(
+                resultTypeOperand->token,
+                Diagnostics::spirvInstructionWithoutResultTypeId,
+                ret.opcode.token,
+                ret.opcode.token
+            );
+            return std::nullopt;
+        }
 
         while(!(parser->LookAheadToken(TokenType::RBrace)
             || parser->LookAheadToken(TokenType::Semicolon)))
         {
+            // Insert the LHS result-type operand
+            if(ret.operands.getCount() == opInfo->resultTypeIndex && resultTypeOperand)
+                ret.operands.add(*resultTypeOperand);
+
+            // Insert the LHS result operand
+            if(ret.operands.getCount() == opInfo->resultIdIndex && resultOperand)
+                ret.operands.add(*resultOperand);
+
             if(const auto operand = parseSPIRVAsmOperand(parser))
                 ret.operands.add(*operand);
             else
@@ -6245,6 +6293,7 @@ namespace Slang
         SPIRVAsmExpr* asmExpr = parser->astBuilder->create<SPIRVAsmExpr>();
 
         parser->ReadToken(TokenType::LBrace);
+        bool failed = false;
         while(!parser->tokenReader.isAtEnd())
         {
             if(parser->LookAheadToken(TokenType::RBrace))
@@ -6252,14 +6301,20 @@ namespace Slang
             if(const auto inst = parseSPIRVAsmInst(parser))
                 asmExpr->insts.add(*inst);
             else
-                return nullptr;
+            {
+                failed = true;
+                // Recover to the semi or brace
+                while(!(parser->LookAheadToken(TokenType::Semicolon)
+                    || parser->LookAheadToken(TokenType::RBrace)))
+                    parser->ReadToken();
+            }
             if(parser->LookAheadToken(TokenType::RBrace))
                 break;
             parser->ReadToken(TokenType::Semicolon);
         }
-        parser->ReadToken(TokenType::RBrace);
+        parser->ReadMatchingToken(TokenType::RBrace);
 
-        return asmExpr;
+        return failed ? nullptr : asmExpr;
     }
 
     static Expr* parsePrefixExpr(Parser* parser)
