@@ -4,6 +4,7 @@
 #include "../core/slang-string-util.h"
 #include "slang-json-native.h"
 #include "slang-core-diagnostics.h"
+#include <limits>
 
 namespace Slang
 {
@@ -190,13 +191,28 @@ RefPtr<SPIRVCoreGrammarInfo> SPIRVCoreGrammarInfo::loadFromJSON(SourceView& sour
     //
     RefPtr<SPIRVCoreGrammarInfo> res{new SPIRVCoreGrammarInfo};
 
-    res->enumCategories.dict.reserve(spec.operand_kinds.getCount());
-    int32_t i = 0;
+    res->operandKinds.dict.reserve(spec.operand_kinds.getCount());
+    uint32_t i = 0;
     for(const auto& c : spec.operand_kinds)
     {
-        res->enumCategories.dict.add(c.kind, EnumCategory{i});
+        if(i > std::numeric_limits<decltype(OperandKind::index)>::max())
+        {
+            sink.diagnoseWithoutSourceView(
+                SourceLoc{},
+                MiscDiagnostics::spirvCoreGrammarJSONParseFailure,
+                "Too many enum categories, expected fewer than 256"
+            );
+        }
+        res->operandKinds.dict.add(c.kind, {static_cast<decltype(OperandKind::index)>(i)});
         i++;
     }
+
+    // It's important we reserve the memory now, as we require the iterators to
+    // be stable, as references to them are maintained by the OpInfo structs.
+    Index totalNumOperands = 0;
+    for(const auto& i : spec.instructions)
+        totalNumOperands += i.operands.getCapacity();
+    res->operandTypesStorage.reserve(totalNumOperands);
 
     res->opcodes.dict.reserve(spec.instructions.getCount());
     for(const auto& i : spec.instructions)
@@ -218,6 +234,8 @@ RefPtr<SPIRVCoreGrammarInfo> SPIRVCoreGrammarInfo::loadFromJSON(SourceView& sour
         // Start with 1 because of the opcode itself
         uint16_t minWordCount = 1;
         uint16_t maxWordCount = 1;
+        uint16_t numOperandTypes = 0;
+        const OperandKind* operandTypes = res->operandTypesStorage.end();
         for(const auto& o : i.operands)
         {
             if(maxWordCount == 0xffff)
@@ -232,6 +250,21 @@ RefPtr<SPIRVCoreGrammarInfo> SPIRVCoreGrammarInfo::loadFromJSON(SourceView& sour
                     "\"*\"-qualified operand wasn't the last operand"
                 );
             }
+
+            const auto catIndex = res->operandKinds.lookup(o.kind);
+            if(!catIndex)
+            {
+                sink.diagnoseWithoutSourceView(
+                    SourceLoc{},
+                    MiscDiagnostics::spirvCoreGrammarJSONParseFailure,
+                    "Operand references a kind which doesn't exist"
+                );
+                continue;
+            }
+
+            numOperandTypes++;
+            res->operandTypesStorage.add(*catIndex);
+
             if(o.quantifier == "")
             {
                 // This catches the case where an "?" or "*" qualified operand
@@ -264,6 +297,8 @@ RefPtr<SPIRVCoreGrammarInfo> SPIRVCoreGrammarInfo::loadFromJSON(SourceView& sour
             static_cast<int8_t>(resultIdIndex),
             minWordCount,
             maxWordCount,
+            numOperandTypes,
+            operandTypes
         });
         res->opNames.dict.addIfNotExists(SpvOp(i.opcode), i.opname);
     }

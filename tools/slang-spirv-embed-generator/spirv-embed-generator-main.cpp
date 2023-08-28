@@ -37,7 +37,7 @@ void dictToSwitch(
     const char* keyType,
     const char* valueType,
     const F1 keyToString,
-    const F2 valueToString,
+    const F2 valueToAssignmentString,
     WriterHelper& w)
 {
     const auto line = [&](const auto& l){
@@ -52,11 +52,13 @@ void dictToSwitch(
     for(const auto& [k, v] : dict)
     {
         const auto kStr = keyToString(k);
-        const auto vStr = valueToString(v);
+        const auto vStr = valueToAssignmentString(v);
         w.print(
             "        case %s:\n"
-            "            v = %s;\n"
-            "            return true;\n",
+            "        {\n"
+            "            %s;\n"
+            "            return true;\n"
+            "        }\n",
             kStr.getBuffer(),
             vStr.getBuffer()
         );
@@ -123,6 +125,7 @@ void writeInfo(
         }
     ).getBuffer());
 
+    line("using OperandKind = SPIRVCoreGrammarInfo::OperandKind;");
     dictToSwitch(
         info.opInfos.dict,
         "getOpInfo",
@@ -139,12 +142,27 @@ void writeInfo(
                 case SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration: classStr = "TypeDeclaration"; break;
                 case SPIRVCoreGrammarInfo::OpInfo::ConstantCreation: classStr = "ConstantCreation"; break;
             }
-            return String("{SPIRVCoreGrammarInfo::OpInfo::")
+
+            String ret = String("const static OperandKind operandTypes[] = {");
+            String operandTypes;
+            for(Index o = 0; o < i.numOperandTypes; ++o)
+            {
+                if(o != 0)
+                    ret.append(", ");
+                ret.append("{" + String(i.operandTypes[o].index) + "}");
+            }
+            ret.append(
+                "};\n            "
+                + String("v = {SPIRVCoreGrammarInfo::OpInfo::")
                 + classStr + ", "
                 + String(i.resultTypeIndex) + ", "
                 + String(i.resultIdIndex) + ", "
                 + String(i.minWordCount) + ", "
-                + (i.maxWordCount == 0xffff ? String("0xffff") : String(i.maxWordCount)) + "}";
+                + (i.maxWordCount == 0xffff ? String("0xffff") : String(i.maxWordCount)) + ", "
+                + String(i.numOperandTypes) + ", "
+                + "operandTypes"
+                + "}");
+            return ret;
         },
         w
     );
@@ -158,19 +176,18 @@ void writeInfo(
             return "Spv" + String(info.opNames.dict.getValue(o));
         },
         [](const UnownedStringSlice& i){
-            return "UnownedStringSlice{\"" + String(i) + "\"}";
+            return "v = UnownedStringSlice{\"" + String(i) + "\"}";
         },
         w
     );
 
-    line("using EnumCategory = SPIRVCoreGrammarInfo::EnumCategory;");
     w.put("static ");
     w.put(dictToPerfectHash(
-        info.enumCategories.dict,
-        UnownedStringSlice("EnumCategory"),
+        info.operandKinds.dict,
+        UnownedStringSlice("OperandKind"),
         [](const auto n){
             const auto radix = 10;
-            return "EnumCategory{" + String(n.index, radix) + "}";
+            return "OperandKind{" + String(n.index, radix) + "}";
         }
     ).getBuffer());
 
@@ -183,7 +200,7 @@ void writeInfo(
     line("        info.allEnums.embedded = &lookupSpvWord;");
     line("        info.opInfos.embedded = &getOpInfo;");
     line("        info.opNames.embedded = &getOpName;");
-    line("        info.enumCategories.embedded = &lookupEnumCategory;");
+    line("        info.operandKinds.embedded = &lookupOperandKind;");
 
     //
     line("        info.addReference();");

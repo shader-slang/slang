@@ -42,6 +42,11 @@ namespace Slang
         // Looks up a qualified enum name, i.e. one with the type prefix.
         Lookup<UnownedStringSlice, SpvWord> allEnums;
 
+        struct OperandKind
+        {
+            uint8_t index;
+        };
+
         struct OpInfo
         {
             enum Class
@@ -59,22 +64,25 @@ namespace Slang
             // -1 or 0 or 1
             int8_t resultIdIndex = kNoResultId;
             // The range of valid WordCount for this instruction
+            // TODO: This is incorrect, for example when the last operand is a
+            // LiteralString, which has implicit variable length
             uint16_t minWordCount;
             uint16_t maxWordCount;
+            // when looking up an operand type, clamp to this number-1 to
+            // account for variable length operands at the end
+            uint16_t numOperandTypes; 
+            const OperandKind* operandTypes;
         };
         Lookup<SpvOp, OpInfo> opInfos;
         Lookup<SpvOp, UnownedStringSlice> opNames;
 
-        struct EnumCategory
-        {
-            int32_t index; 
-        };
-        Lookup<UnownedStringSlice, EnumCategory> enumCategories;
+        Lookup<UnownedStringSlice, OperandKind> operandKinds;
 
     private:
 
         // If this is loaded from JSON, we keep the strings around instead of
         // copying them as dictionary keys
         StringSlicePool strings = StringSlicePool(StringSlicePool::Style::Empty);
+        List<OperandKind> operandTypesStorage;
     };
 }
