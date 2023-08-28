@@ -8,7 +8,7 @@
 #include "../compiler-core/slang-spirv-core-grammar.h"
 namespace Slang
 {
-bool lookupSpvOp(const UnownedStringSlice& str, SpvOp& value)
+static bool lookupSpvOp(const UnownedStringSlice& str, SpvOp& value)
 {
     static const unsigned tableSalt[718] = {
         2, 1, 7, 1, 0, 0, 1, 1, 3, 0, 3, 1, 2, 1, 2, 2,
@@ -798,7 +798,7 @@ bool lookupSpvOp(const UnownedStringSlice& str, SpvOp& value)
     }
 }
 
-bool lookupSpvCapability(const UnownedStringSlice& str, SpvCapability& value)
+static bool lookupSpvCapability(const UnownedStringSlice& str, SpvCapability& value)
 {
     static const unsigned tableSalt[245] = {
         0, 4, 0, 0, 1, 0, 4, 0, 4, 7, 2, 0, 0, 0, 0, 1,
@@ -1086,7 +1086,7 @@ bool lookupSpvCapability(const UnownedStringSlice& str, SpvCapability& value)
     }
 }
 
-bool lookupSpvWord(const UnownedStringSlice& str, SpvWord& value)
+static bool lookupSpvWord(const UnownedStringSlice& str, SpvWord& value)
 {
     static const unsigned tableSalt[944] = {
         3, 4, 2, 0, 0, 1, 2, 1, 1, 1, 2, 3, 7, 1, 2, 1,
@@ -1154,950 +1154,950 @@ bool lookupSpvWord(const UnownedStringSlice& str, SpvWord& value)
 
     static const KV words[944] =
     {
-        {"ExecutionModeDepthReplacing", static_cast<SpvWord>(12)},
-        {"CapabilityImageMipmap", static_cast<SpvWord>(15)},
-        {"MemorySemanticsOutputMemory", static_cast<SpvWord>(4096)},
-        {"BuiltInWorldToObjectNV", static_cast<SpvWord>(5331)},
-        {"DecorationMediaBlockIOINTEL", static_cast<SpvWord>(6140)},
-        {"CapabilityStorageUniformBufferBlock16", static_cast<SpvWord>(4433)},
-        {"DecorationPerPrimitiveEXT", static_cast<SpvWord>(5271)},
-        {"StorageClassIncomingRayPayloadKHR", static_cast<SpvWord>(5342)},
-        {"QuantizationModesRND", static_cast<SpvWord>(2)},
-        {"ImageChannelOrderR", static_cast<SpvWord>(0)},
-        {"LoopControlMaxInterleavingINTEL", static_cast<SpvWord>(2097152)},
-        {"CapabilityStorageImageReadWithoutFormat", static_cast<SpvWord>(55)},
-        {"StorageClassRayPayloadKHR", static_cast<SpvWord>(5338)},
-        {"ImageChannelOrderBGRA", static_cast<SpvWord>(6)},
-        {"LoopControlMinIterations", static_cast<SpvWord>(16)},
-        {"CapabilityTileImageColorReadAccessEXT", static_cast<SpvWord>(4166)},
-        {"CapabilityStorageInputOutput16", static_cast<SpvWord>(4436)},
-        {"MemorySemanticsWorkgroupMemory", static_cast<SpvWord>(256)},
-        {"RayFlagsSkipClosestHitShaderKHR", static_cast<SpvWord>(8)},
-        {"CapabilityLiteralSampler", static_cast<SpvWord>(20)},
-        {"CapabilityUniformBufferArrayDynamicIndexing", static_cast<SpvWord>(28)},
-        {"BuiltInRayTminNV", static_cast<SpvWord>(5325)},
-        {"FPDenormModeFlushToZero", static_cast<SpvWord>(1)},
-        {"StorageClassTaskPayloadWorkgroupEXT", static_cast<SpvWord>(5402)},
-        {"ExecutionModeNonCoherentDepthAttachmentReadEXT", static_cast<SpvWord>(4170)},
-        {"BuiltInSubgroupGeMask", static_cast<SpvWord>(4417)},
-        {"ExecutionModeInputTrianglesAdjacency", static_cast<SpvWord>(23)},
-        {"CapabilityFloat64", static_cast<SpvWord>(10)},
-        {"ImageChannelDataTypeSnormInt16", static_cast<SpvWord>(1)},
-        {"BuiltInBaryCoordNoPerspKHR", static_cast<SpvWord>(5287)},
-        {"DecorationAliasedPointer", static_cast<SpvWord>(5356)},
-        {"ImageFormatRgba16f", static_cast<SpvWord>(2)},
-        {"BuiltInMeshViewCountNV", static_cast<SpvWord>(5280)},
-        {"RayFlagsCullNoOpaqueKHR", static_cast<SpvWord>(128)},
-        {"StorageClassRayPayloadNV", static_cast<SpvWord>(5338)},
-        {"SourceLanguageESSL", static_cast<SpvWord>(1)},
-        {"StorageClassHitAttributeNV", static_cast<SpvWord>(5339)},
-        {"ExecutionModelIntersectionNV", static_cast<SpvWord>(5314)},
-        {"DecorationArrayStride", static_cast<SpvWord>(6)},
-        {"CapabilityFPFastMathModeINTEL", static_cast<SpvWord>(5837)},
-        {"RayFlagsCullBackFacingTrianglesKHR", static_cast<SpvWord>(16)},
-        {"BuiltInViewIndex", static_cast<SpvWord>(4440)},
-        {"BuiltInPointSize", static_cast<SpvWord>(1)},
-        {"DecorationCPacked", static_cast<SpvWord>(10)},
-        {"OverflowModesWRAP", static_cast<SpvWord>(0)},
-        {"CapabilitySubgroupBallotKHR", static_cast<SpvWord>(4423)},
-        {"CapabilityVulkanMemoryModel", static_cast<SpvWord>(5345)},
-        {"RayFlagsNoOpaqueKHR", static_cast<SpvWord>(2)},
-        {"CapabilityGroupNonUniformShuffle", static_cast<SpvWord>(65)},
-        {"BuiltInLayer", static_cast<SpvWord>(9)},
-        {"ImageFormatRgba32ui", static_cast<SpvWord>(30)},
-        {"PackedVectorFormatPackedVectorFormat4x8Bit", static_cast<SpvWord>(0)},
-        {"StorageClassShaderRecordBufferKHR", static_cast<SpvWord>(5343)},
-        {"FunctionParameterAttributeNoReadWrite", static_cast<SpvWord>(7)},
-        {"ImageFormatR8", static_cast<SpvWord>(15)},
-        {"DecorationUserTypeGOOGLE", static_cast<SpvWord>(5636)},
-        {"BuiltInMeshViewIndicesNV", static_cast<SpvWord>(5281)},
-        {"FPOperationModeIEEE", static_cast<SpvWord>(0)},
-        {"CapabilityUniformAndStorageBuffer8BitAccess", static_cast<SpvWord>(4449)},
-        {"RayFlagsOpaqueKHR", static_cast<SpvWord>(1)},
-        {"CapabilityInt64", static_cast<SpvWord>(11)},
-        {"CapabilityFPGAKernelAttributesINTEL", static_cast<SpvWord>(5897)},
-        {"StorageClassOutput", static_cast<SpvWord>(3)},
-        {"BuiltInSubgroupLocalInvocationId", static_cast<SpvWord>(41)},
-        {"CapabilityUniformTexelBufferArrayNonUniformIndexingEXT", static_cast<SpvWord>(5311)},
-        {"BuiltInSampleMask", static_cast<SpvWord>(20)},
-        {"BuiltInObjectToWorldNV", static_cast<SpvWord>(5330)},
-        {"ImageFormatRgba16Snorm", static_cast<SpvWord>(16)},
-        {"BuiltInCullDistancePerViewNV", static_cast<SpvWord>(5278)},
-        {"ExecutionModelClosestHitKHR", static_cast<SpvWord>(5316)},
-        {"CapabilityImageReadWrite", static_cast<SpvWord>(14)},
-        {"CapabilityDenormPreserve", static_cast<SpvWord>(4464)},
-        {"CapabilitySampleMaskOverrideCoverageNV", static_cast<SpvWord>(5249)},
-        {"RayQueryCommittedIntersectionTypeRayQueryCommittedIntersectionGeneratedKHR", static_cast<SpvWord>(2)},
-        {"CapabilitySampledImageArrayDynamicIndexing", static_cast<SpvWord>(29)},
-        {"CapabilitySampledRect", static_cast<SpvWord>(37)},
-        {"FunctionParameterAttributeNoAlias", static_cast<SpvWord>(4)},
-        {"CapabilityAtomicFloat16MinMaxEXT", static_cast<SpvWord>(5616)},
-        {"SamplerAddressingModeRepeatMirrored", static_cast<SpvWord>(4)},
-        {"StorageClassUniformConstant", static_cast<SpvWord>(0)},
-        {"CapabilityLongConstantCompositeINTEL", static_cast<SpvWord>(6089)},
-        {"DecorationXfbBuffer", static_cast<SpvWord>(36)},
-        {"DecorationWeightTextureQCOM", static_cast<SpvWord>(4487)},
-        {"ImageFormatR16", static_cast<SpvWord>(14)},
-        {"AddressingModelPhysicalStorageBuffer64", static_cast<SpvWord>(5348)},
-        {"BuiltInCullPrimitiveEXT", static_cast<SpvWord>(5299)},
-        {"ImageFormatRg32i", static_cast<SpvWord>(25)},
-        {"DecorationNonWritable", static_cast<SpvWord>(24)},
-        {"DecorationRestrict", static_cast<SpvWord>(19)},
-        {"BuiltInWorldRayOriginKHR", static_cast<SpvWord>(5321)},
-        {"CapabilityGeometryShaderPassthroughNV", static_cast<SpvWord>(5251)},
-        {"DecorationIndex", static_cast<SpvWord>(32)},
-        {"CooperativeMatrixOperandsNoneKHR", static_cast<SpvWord>(0)},
-        {"ExecutionModeSubgroupsPerWorkgroup", static_cast<SpvWord>(36)},
-        {"ExecutionModeSubgroupsPerWorkgroupId", static_cast<SpvWord>(37)},
-        {"DecorationSideEffectsINTEL", static_cast<SpvWord>(5608)},
-        {"SourceLanguageOpenCL_C", static_cast<SpvWord>(3)},
-        {"BuiltInObjectToWorldKHR", static_cast<SpvWord>(5330)},
-        {"BuiltInInstanceCustomIndexNV", static_cast<SpvWord>(5327)},
-        {"ImageOperandsVolatileTexelKHR", static_cast<SpvWord>(2048)},
-        {"BuiltInGlobalOffset", static_cast<SpvWord>(33)},
-        {"ExecutionModeLocalSize", static_cast<SpvWord>(17)},
-        {"ImageChannelOrderRA", static_cast<SpvWord>(3)},
-        {"ExecutionModeSampleInterlockOrderedEXT", static_cast<SpvWord>(5368)},
-        {"BuiltInSubgroupLtMask", static_cast<SpvWord>(4420)},
-        {"CapabilityDotProductInput4x8Bit", static_cast<SpvWord>(6017)},
-        {"DecorationMMHostInterfaceAddressWidthINTEL", static_cast<SpvWord>(6177)},
-        {"CapabilityMultiView", static_cast<SpvWord>(4439)},
-        {"MemoryAccessMakePointerAvailable", static_cast<SpvWord>(8)},
-        {"ExecutionModePointMode", static_cast<SpvWord>(10)},
-        {"BuiltInWorldRayDirectionKHR", static_cast<SpvWord>(5322)},
-        {"ExecutionModeSpacingEqual", static_cast<SpvWord>(1)},
-        {"DecorationHlslCounterBufferGOOGLE", static_cast<SpvWord>(5634)},
-        {"DecorationNoUnsignedWrap", static_cast<SpvWord>(4470)},
-        {"SourceLanguageHERO_C", static_cast<SpvWord>(8)},
-        {"FragmentShadingRateHorizontal4Pixels", static_cast<SpvWord>(8)},
-        {"AddressingModelPhysicalStorageBuffer64EXT", static_cast<SpvWord>(5348)},
-        {"CapabilityImageMSArray", static_cast<SpvWord>(48)},
-        {"SourceLanguageHLSL", static_cast<SpvWord>(5)},
-        {"BuiltInLaunchSizeNV", static_cast<SpvWord>(5320)},
-        {"MemorySemanticsAcquire", static_cast<SpvWord>(2)},
-        {"MemoryAccessNonPrivatePointer", static_cast<SpvWord>(32)},
-        {"DecorationPerVertexNV", static_cast<SpvWord>(5285)},
-        {"CapabilityIndirectReferencesINTEL", static_cast<SpvWord>(5604)},
-        {"ImageOperandsNontemporal", static_cast<SpvWord>(16384)},
-        {"ExecutionModelKernel", static_cast<SpvWord>(6)},
-        {"QuantizationModesTRN", static_cast<SpvWord>(0)},
-        {"DecorationStallEnableINTEL", static_cast<SpvWord>(5905)},
-        {"MemoryModelOpenCL", static_cast<SpvWord>(2)},
-        {"ImageOperandsMakeTexelAvailableKHR", static_cast<SpvWord>(256)},
-        {"DecorationDoublepumpINTEL", static_cast<SpvWord>(5831)},
-        {"SourceLanguageSYCL", static_cast<SpvWord>(7)},
-        {"ImageChannelOrdersRGBA", static_cast<SpvWord>(17)},
-        {"CapabilityShader", static_cast<SpvWord>(1)},
-        {"ImageChannelOrderRGB", static_cast<SpvWord>(4)},
-        {"DecorationRegisterINTEL", static_cast<SpvWord>(5825)},
-        {"FPFastMathModeNotNaN", static_cast<SpvWord>(1)},
-        {"FPFastMathModeAllowContractFastINTEL", static_cast<SpvWord>(65536)},
-        {"FPRoundingModeRTE", static_cast<SpvWord>(0)},
-        {"CapabilityShaderClockKHR", static_cast<SpvWord>(5055)},
-        {"ImageOperandsMakeTexelAvailable", static_cast<SpvWord>(256)},
-        {"DecorationAliased", static_cast<SpvWord>(20)},
-        {"DecorationSimpleDualPortINTEL", static_cast<SpvWord>(5833)},
-        {"CapabilityAtomicFloat32AddEXT", static_cast<SpvWord>(6033)},
-        {"ExecutionModeLocalSizeHintId", static_cast<SpvWord>(39)},
-        {"CapabilityGroupUniformArithmeticKHR", static_cast<SpvWord>(6400)},
-        {"DecorationCounterBuffer", static_cast<SpvWord>(5634)},
-        {"ImageOperandsVolatileTexel", static_cast<SpvWord>(2048)},
-        {"CapabilityGroupNonUniformVote", static_cast<SpvWord>(62)},
-        {"BuiltInPatchVertices", static_cast<SpvWord>(14)},
-        {"CapabilityUniformBufferArrayNonUniformIndexingEXT", static_cast<SpvWord>(5306)},
-        {"MemorySemanticsAcquireRelease", static_cast<SpvWord>(8)},
-        {"CapabilityShaderViewportIndexLayerNV", static_cast<SpvWord>(5254)},
-        {"ImageChannelOrderRGBA", static_cast<SpvWord>(5)},
-        {"StorageClassDeviceOnlyINTEL", static_cast<SpvWord>(5936)},
-        {"CapabilityGroupNonUniform", static_cast<SpvWord>(61)},
-        {"BuiltInWorldToObjectKHR", static_cast<SpvWord>(5331)},
-        {"BuiltInRayTminKHR", static_cast<SpvWord>(5325)},
-        {"FPFastMathModeNotInf", static_cast<SpvWord>(2)},
-        {"BuiltInSubgroupLtMaskKHR", static_cast<SpvWord>(4420)},
-        {"ExecutionModeSpacingFractionalOdd", static_cast<SpvWord>(3)},
-        {"ImageOperandsOffsets", static_cast<SpvWord>(65536)},
-        {"DecorationHlslSemanticGOOGLE", static_cast<SpvWord>(5635)},
-        {"CapabilityTransformFeedback", static_cast<SpvWord>(53)},
-        {"CapabilityVariablePointers", static_cast<SpvWord>(4442)},
-        {"ImageChannelDataTypeSignedInt8", static_cast<SpvWord>(7)},
-        {"QuantizationModesRND_MIN_INF", static_cast<SpvWord>(5)},
-        {"CapabilityAtomicStorage", static_cast<SpvWord>(21)},
-        {"CapabilityStorageImageMultisample", static_cast<SpvWord>(27)},
-        {"BuiltInSampleId", static_cast<SpvWord>(18)},
-        {"CapabilitySubgroupAvcMotionEstimationChromaINTEL", static_cast<SpvWord>(5698)},
-        {"ImageChannelOrderRGBx", static_cast<SpvWord>(12)},
-        {"BuiltInCoreMaxIDARM", static_cast<SpvWord>(4162)},
-        {"SamplerAddressingModeClamp", static_cast<SpvWord>(2)},
-        {"DimSubpassData", static_cast<SpvWord>(6)},
-        {"FunctionControlOptNoneINTEL", static_cast<SpvWord>(65536)},
-        {"CapabilityImageGatherBiasLodAMD", static_cast<SpvWord>(5009)},
-        {"DecorationBlockMatchTextureQCOM", static_cast<SpvWord>(4488)},
-        {"BuiltInPrimitiveTriangleIndicesEXT", static_cast<SpvWord>(5296)},
-        {"DecorationNoAliasINTEL", static_cast<SpvWord>(5915)},
-        {"ExecutionModeRoundingModeRTNINTEL", static_cast<SpvWord>(5621)},
-        {"DecorationMathOpDSPModeINTEL", static_cast<SpvWord>(5909)},
-        {"StorageClassIncomingCallableDataNV", static_cast<SpvWord>(5329)},
-        {"CapabilitySplitBarrierINTEL", static_cast<SpvWord>(6141)},
-        {"DecorationComponent", static_cast<SpvWord>(31)},
-        {"KernelEnqueueFlagsNoWait", static_cast<SpvWord>(0)},
-        {"DecorationDescriptorSet", static_cast<SpvWord>(34)},
-        {"CapabilityFragmentShaderPixelInterlockEXT", static_cast<SpvWord>(5378)},
-        {"DecorationBuiltIn", static_cast<SpvWord>(11)},
-        {"ImageChannelDataTypeUnormInt24", static_cast<SpvWord>(15)},
-        {"ExecutionModeOutputLinesEXT", static_cast<SpvWord>(5269)},
-        {"CapabilityVariableLengthArrayINTEL", static_cast<SpvWord>(5817)},
-        {"ImageChannelDataTypeUnsignedIntRaw12EXT", static_cast<SpvWord>(20)},
-        {"CapabilitySubgroupDispatch", static_cast<SpvWord>(58)},
-        {"MemorySemanticsSequentiallyConsistent", static_cast<SpvWord>(16)},
-        {"DecorationExplicitInterpAMD", static_cast<SpvWord>(4999)},
-        {"DimCube", static_cast<SpvWord>(3)},
-        {"BuiltInObjectRayOriginKHR", static_cast<SpvWord>(5323)},
-        {"ImageFormatRg8Snorm", static_cast<SpvWord>(18)},
-        {"ExecutionModeMaxWorkDimINTEL", static_cast<SpvWord>(5894)},
-        {"DecorationPerViewNV", static_cast<SpvWord>(5272)},
-        {"CapabilityFloatingPointModeINTEL", static_cast<SpvWord>(5583)},
-        {"MemoryModelVulkanKHR", static_cast<SpvWord>(3)},
-        {"DecorationNonReadable", static_cast<SpvWord>(25)},
-        {"BuiltInSubgroupEqMask", static_cast<SpvWord>(4416)},
-        {"BuiltInHitTNV", static_cast<SpvWord>(5332)},
-        {"ExecutionModeInputLinesAdjacency", static_cast<SpvWord>(21)},
-        {"ImageFormatR32f", static_cast<SpvWord>(3)},
-        {"BuiltInTessLevelOuter", static_cast<SpvWord>(11)},
-        {"StorageClassHitAttributeKHR", static_cast<SpvWord>(5339)},
-        {"BuiltInPrimitiveId", static_cast<SpvWord>(7)},
-        {"DecorationPassthroughNV", static_cast<SpvWord>(5250)},
-        {"SelectionControlNone", static_cast<SpvWord>(0)},
-        {"DecorationColMajor", static_cast<SpvWord>(5)},
-        {"CapabilityImageBuffer", static_cast<SpvWord>(47)},
-        {"ImageFormatR32i", static_cast<SpvWord>(24)},
-        {"BuiltInRayGeometryIndexKHR", static_cast<SpvWord>(5352)},
-        {"MemorySemanticsVolatile", static_cast<SpvWord>(32768)},
-        {"CapabilityDotProductInput4x8BitKHR", static_cast<SpvWord>(6017)},
-        {"LoopControlNoFusionINTEL", static_cast<SpvWord>(8388608)},
-        {"CooperativeMatrixLayoutColumnMajorKHR", static_cast<SpvWord>(1)},
-        {"LinkageTypeLinkOnceODR", static_cast<SpvWord>(2)},
-        {"BuiltInPosition", static_cast<SpvWord>(0)},
-        {"LoopControlUnroll", static_cast<SpvWord>(1)},
-        {"CapabilityCooperativeMatrixNV", static_cast<SpvWord>(5357)},
-        {"ExecutionModeContractionOff", static_cast<SpvWord>(31)},
-        {"ExecutionModeInputLines", static_cast<SpvWord>(20)},
-        {"ExecutionModeOutputPoints", static_cast<SpvWord>(27)},
-        {"DecorationVectorComputeCallableFunctionINTEL", static_cast<SpvWord>(6087)},
-        {"CapabilitySampleRateShading", static_cast<SpvWord>(35)},
-        {"ImageOperandsSample", static_cast<SpvWord>(64)},
-        {"CapabilityInputAttachment", static_cast<SpvWord>(40)},
-        {"DecorationCoherent", static_cast<SpvWord>(23)},
-        {"DecorationFlat", static_cast<SpvWord>(14)},
-        {"DecorationVectorComputeFunctionINTEL", static_cast<SpvWord>(5626)},
-        {"CapabilityAtomicFloat32MinMaxEXT", static_cast<SpvWord>(5612)},
-        {"ImageOperandsOffset", static_cast<SpvWord>(16)},
-        {"CapabilityArbitraryPrecisionFixedPointINTEL", static_cast<SpvWord>(5922)},
-        {"BuiltInWorldRayOriginNV", static_cast<SpvWord>(5321)},
-        {"CapabilityGroups", static_cast<SpvWord>(18)},
-        {"CapabilityDotProduct", static_cast<SpvWord>(6019)},
-        {"ImageChannelOrderARGB", static_cast<SpvWord>(7)},
-        {"CapabilityCoreBuiltinsARM", static_cast<SpvWord>(4165)},
-        {"ExecutionModeEarlyAndLateFragmentTestsAMD", static_cast<SpvWord>(5017)},
-        {"MemoryAccessNontemporal", static_cast<SpvWord>(4)},
-        {"CapabilityFragmentShaderShadingRateInterlockEXT", static_cast<SpvWord>(5372)},
-        {"DecorationStream", static_cast<SpvWord>(29)},
-        {"CapabilityDebugInfoModuleINTEL", static_cast<SpvWord>(6114)},
-        {"CapabilityFragmentShadingRateKHR", static_cast<SpvWord>(4422)},
-        {"FunctionControlInline", static_cast<SpvWord>(1)},
-        {"ImageChannelOrderA", static_cast<SpvWord>(1)},
-        {"CapabilityFunctionFloatControlINTEL", static_cast<SpvWord>(5821)},
-        {"BuiltInSubgroupGtMaskKHR", static_cast<SpvWord>(4418)},
-        {"DecorationBankwidthINTEL", static_cast<SpvWord>(5828)},
-        {"DecorationGLSLShared", static_cast<SpvWord>(8)},
-        {"GroupOperationReduce", static_cast<SpvWord>(0)},
-        {"CapabilityClipDistance", static_cast<SpvWord>(32)},
-        {"ExecutionModeSchedulerTargetFmaxMhzINTEL", static_cast<SpvWord>(5903)},
-        {"DecorationMergeINTEL", static_cast<SpvWord>(5834)},
-        {"BuiltInFragStencilRefEXT", static_cast<SpvWord>(5014)},
-        {"RayFlagsSkipTrianglesKHR", static_cast<SpvWord>(256)},
-        {"DecorationVolatile", static_cast<SpvWord>(21)},
-        {"CapabilityWorkgroupMemoryExplicitLayoutKHR", static_cast<SpvWord>(4428)},
-        {"CapabilityAtomicFloat64AddEXT", static_cast<SpvWord>(6034)},
-        {"CapabilityStoragePushConstant16", static_cast<SpvWord>(4435)},
-        {"ExecutionModeStencilRefLessBackAMD", static_cast<SpvWord>(5084)},
-        {"BuiltInWarpsPerSMNV", static_cast<SpvWord>(5374)},
-        {"ExecutionModeOutputVertices", static_cast<SpvWord>(26)},
-        {"SourceLanguageGLSL", static_cast<SpvWord>(2)},
-        {"CapabilityDotProductInput4x8BitPacked", static_cast<SpvWord>(6018)},
-        {"DecorationAliasedPointerEXT", static_cast<SpvWord>(5356)},
-        {"CapabilityMatrix", static_cast<SpvWord>(0)},
-        {"DecorationFPRoundingMode", static_cast<SpvWord>(39)},
-        {"CapabilityMemoryAccessAliasingINTEL", static_cast<SpvWord>(5910)},
-        {"RayQueryCandidateIntersectionTypeRayQueryCandidateIntersectionTriangleKHR", static_cast<SpvWord>(0)},
-        {"CapabilityLinkage", static_cast<SpvWord>(5)},
-        {"ExecutionModeIsolines", static_cast<SpvWord>(25)},
-        {"ScopeInvocation", static_cast<SpvWord>(4)},
-        {"StorageClassHitObjectAttributeNV", static_cast<SpvWord>(5385)},
-        {"CapabilityRayTracingNV", static_cast<SpvWord>(5340)},
-        {"MemorySemanticsMakeVisible", static_cast<SpvWord>(16384)},
-        {"FunctionParameterAttributeNoWrite", static_cast<SpvWord>(6)},
-        {"ImageOperandsConstOffsets", static_cast<SpvWord>(32)},
-        {"FunctionControlDontInline", static_cast<SpvWord>(2)},
-        {"QuantizationModesRND_CONV", static_cast<SpvWord>(6)},
-        {"ExecutionModeRoundingModeRTZ", static_cast<SpvWord>(4463)},
-        {"ExecutionModeVertexOrderCcw", static_cast<SpvWord>(5)},
-        {"CapabilityFPGAMemoryAttributesINTEL", static_cast<SpvWord>(5824)},
-        {"CapabilityStorageTexelBufferArrayDynamicIndexingEXT", static_cast<SpvWord>(5305)},
-        {"ExecutionModelMissKHR", static_cast<SpvWord>(5317)},
-        {"CapabilityMeshShadingNV", static_cast<SpvWord>(5266)},
-        {"CapabilityVariablePointersStorageBuffer", static_cast<SpvWord>(4441)},
-        {"CapabilityRayTracingMotionBlurNV", static_cast<SpvWord>(5341)},
-        {"DecorationMaxByteOffset", static_cast<SpvWord>(45)},
-        {"StorageClassImage", static_cast<SpvWord>(11)},
-        {"DecorationMMHostInterfaceMaxBurstINTEL", static_cast<SpvWord>(6181)},
-        {"ImageChannelOrderABGR", static_cast<SpvWord>(19)},
-        {"CooperativeMatrixUseMatrixAKHR", static_cast<SpvWord>(0)},
-        {"ImageChannelDataTypeSignedInt16", static_cast<SpvWord>(8)},
-        {"StorageClassFunction", static_cast<SpvWord>(7)},
-        {"CapabilityRuntimeDescriptorArrayEXT", static_cast<SpvWord>(5302)},
-        {"RayQueryIntersectionRayQueryCommittedIntersectionKHR", static_cast<SpvWord>(1)},
-        {"DecorationUserSemantic", static_cast<SpvWord>(5635)},
-        {"ImageChannelDataTypeHalfFloat", static_cast<SpvWord>(13)},
-        {"DecorationMMHostInterfaceDataWidthINTEL", static_cast<SpvWord>(6178)},
-        {"ImageFormatR16i", static_cast<SpvWord>(28)},
-        {"ImageChannelOrderDepthStencil", static_cast<SpvWord>(14)},
-        {"DecorationRestrictPointer", static_cast<SpvWord>(5355)},
-        {"ImageFormatR64i", static_cast<SpvWord>(41)},
-        {"CooperativeMatrixOperandsMatrixCSignedComponentsKHR", static_cast<SpvWord>(4)},
-        {"CapabilityShaderInvocationReorderNV", static_cast<SpvWord>(5383)},
-        {"DecorationFunctionRoundingModeINTEL", static_cast<SpvWord>(5822)},
-        {"CapabilityTextureSampleWeightedQCOM", static_cast<SpvWord>(4484)},
-        {"ExecutionModeOutputTriangleStrip", static_cast<SpvWord>(29)},
-        {"BuiltInFragSizeEXT", static_cast<SpvWord>(5292)},
-        {"DecorationNonUniform", static_cast<SpvWord>(5300)},
-        {"DecorationClobberINTEL", static_cast<SpvWord>(5607)},
-        {"DecorationLatencyControlLabelINTEL", static_cast<SpvWord>(6172)},
-        {"CapabilityBFloat16ConversionINTEL", static_cast<SpvWord>(6115)},
-        {"MemoryAccessVolatile", static_cast<SpvWord>(1)},
-        {"DecorationBufferBlock", static_cast<SpvWord>(3)},
-        {"DecorationLocation", static_cast<SpvWord>(30)},
-        {"DecorationUniform", static_cast<SpvWord>(26)},
-        {"CapabilityUniformTexelBufferArrayDynamicIndexing", static_cast<SpvWord>(5304)},
-        {"CapabilityStorageBuffer16BitAccess", static_cast<SpvWord>(4433)},
-        {"ImageChannelDataTypeUnsignedInt8", static_cast<SpvWord>(10)},
-        {"DecorationNonUniformEXT", static_cast<SpvWord>(5300)},
-        {"ExecutionModeVertexOrderCw", static_cast<SpvWord>(4)},
-        {"SourceLanguageNZSL", static_cast<SpvWord>(9)},
-        {"ImageChannelDataTypeUnormShort565", static_cast<SpvWord>(4)},
-        {"CooperativeMatrixOperandsMatrixASignedComponentsKHR", static_cast<SpvWord>(1)},
-        {"BuiltInLayerPerViewNV", static_cast<SpvWord>(5279)},
-        {"BuiltInSMIDNV", static_cast<SpvWord>(5377)},
-        {"ImageChannelDataTypeUnormInt8", static_cast<SpvWord>(2)},
-        {"BuiltInFragInvocationCountEXT", static_cast<SpvWord>(5293)},
-        {"BuiltInHitTriangleVertexPositionsKHR", static_cast<SpvWord>(5335)},
-        {"ImageFormatRgba8Snorm", static_cast<SpvWord>(5)},
-        {"ImageOperandsZeroExtend", static_cast<SpvWord>(8192)},
-        {"DecorationPerPrimitiveNV", static_cast<SpvWord>(5271)},
-        {"DecorationFunctionDenormModeINTEL", static_cast<SpvWord>(5823)},
-        {"BuiltInInstanceId", static_cast<SpvWord>(6)},
-        {"BuiltInBaryCoordSmoothCentroidAMD", static_cast<SpvWord>(4996)},
-        {"ExecutionModeOriginLowerLeft", static_cast<SpvWord>(8)},
-        {"CapabilityMultiViewport", static_cast<SpvWord>(57)},
-        {"DecorationSIMTCallINTEL", static_cast<SpvWord>(5599)},
-        {"DecorationAlignmentId", static_cast<SpvWord>(46)},
-        {"CapabilityStorageBufferArrayDynamicIndexing", static_cast<SpvWord>(30)},
-        {"DecorationNoContraction", static_cast<SpvWord>(42)},
-        {"ExecutionModeInputPoints", static_cast<SpvWord>(19)},
-        {"CapabilityPerViewAttributesNV", static_cast<SpvWord>(5260)},
-        {"DecorationPrefetchINTEL", static_cast<SpvWord>(5902)},
-        {"CapabilityStorageImageWriteWithoutFormat", static_cast<SpvWord>(56)},
-        {"BuiltInBaryCoordNoPerspSampleAMD", static_cast<SpvWord>(4994)},
-        {"LoopControlLoopCoalesceINTEL", static_cast<SpvWord>(1048576)},
-        {"DecorationRegisterMapKernelArgumentINTEL", static_cast<SpvWord>(6176)},
-        {"CapabilityFragmentDensityEXT", static_cast<SpvWord>(5291)},
-        {"DecorationMMHostInterfaceLatencyINTEL", static_cast<SpvWord>(6179)},
-        {"CapabilityUniformBufferArrayNonUniformIndexing", static_cast<SpvWord>(5306)},
-        {"QuantizationModesTRN_ZERO", static_cast<SpvWord>(1)},
-        {"ImageChannelOrderDepth", static_cast<SpvWord>(13)},
-        {"CapabilityPhysicalStorageBufferAddresses", static_cast<SpvWord>(5347)},
-        {"DecorationSpecId", static_cast<SpvWord>(1)},
-        {"SourceLanguageUnknown", static_cast<SpvWord>(0)},
-        {"CapabilityRayQueryKHR", static_cast<SpvWord>(4472)},
-        {"CapabilityFragmentFullyCoveredEXT", static_cast<SpvWord>(5265)},
-        {"DecorationDontStaticallyCoalesceINTEL", static_cast<SpvWord>(5901)},
-        {"ImageFormatRgba16i", static_cast<SpvWord>(22)},
-        {"BuiltInLaunchSizeKHR", static_cast<SpvWord>(5320)},
-        {"BuiltInInvocationsPerPixelNV", static_cast<SpvWord>(5293)},
-        {"BuiltInViewportIndex", static_cast<SpvWord>(10)},
-        {"CapabilityVectorAnyINTEL", static_cast<SpvWord>(5619)},
-        {"Dim3D", static_cast<SpvWord>(2)},
-        {"DecorationHitObjectShaderRecordBufferNV", static_cast<SpvWord>(5386)},
-        {"CapabilityRoundingModeRTE", static_cast<SpvWord>(4467)},
-        {"DecorationFunctionFloatingPointModeINTEL", static_cast<SpvWord>(6080)},
-        {"CapabilityImageCubeArray", static_cast<SpvWord>(34)},
-        {"FPFastMathModeNone", static_cast<SpvWord>(0)},
-        {"BuiltInVertexIndex", static_cast<SpvWord>(42)},
-        {"CapabilityDotProductKHR", static_cast<SpvWord>(6019)},
-        {"ImageFormatRgba32i", static_cast<SpvWord>(21)},
-        {"CapabilityShaderViewportIndexLayerEXT", static_cast<SpvWord>(5254)},
-        {"MemorySemanticsNone", static_cast<SpvWord>(0)},
-        {"DecorationBinding", static_cast<SpvWord>(33)},
-        {"CapabilityFragmentMaskAMD", static_cast<SpvWord>(5010)},
-        {"ScopeDevice", static_cast<SpvWord>(1)},
-        {"CapabilityDemoteToHelperInvocationEXT", static_cast<SpvWord>(5379)},
-        {"MemoryAccessNoAliasINTELMask", static_cast<SpvWord>(131072)},
-        {"ExecutionModelRayGenerationKHR", static_cast<SpvWord>(5313)},
-        {"CooperativeMatrixOperandsMatrixBSignedComponentsKHR", static_cast<SpvWord>(2)},
-        {"CapabilityVulkanMemoryModelKHR", static_cast<SpvWord>(5345)},
-        {"ExecutionModeShadingRateInterlockUnorderedEXT", static_cast<SpvWord>(5371)},
-        {"ImageChannelDataTypeFloat", static_cast<SpvWord>(14)},
-        {"BuiltInShadingRateKHR", static_cast<SpvWord>(4444)},
-        {"ImageOperandsBias", static_cast<SpvWord>(1)},
-        {"FunctionControlNone", static_cast<SpvWord>(0)},
-        {"ExecutionModeNonCoherentColorAttachmentReadEXT", static_cast<SpvWord>(4169)},
-        {"ExecutionModeStencilRefGreaterBackAMD", static_cast<SpvWord>(5083)},
-        {"MemoryAccessNonPrivatePointerKHR", static_cast<SpvWord>(32)},
-        {"ImageChannelDataTypeUnsignedInt32", static_cast<SpvWord>(12)},
-        {"DecorationMaxConcurrencyINTEL", static_cast<SpvWord>(5918)},
-        {"LoopControlDependencyLength", static_cast<SpvWord>(8)},
-        {"BuiltInHelperInvocation", static_cast<SpvWord>(23)},
-        {"CapabilityFPGALoopControlsINTEL", static_cast<SpvWord>(5888)},
-        {"BuiltInSubgroupLeMask", static_cast<SpvWord>(4419)},
-        {"CapabilityStorageBufferArrayNonUniformIndexingEXT", static_cast<SpvWord>(5308)},
-        {"ImageFormatRg32ui", static_cast<SpvWord>(35)},
-        {"CapabilitySampledImageArrayNonUniformIndexingEXT", static_cast<SpvWord>(5307)},
-        {"BuiltInSubgroupId", static_cast<SpvWord>(40)},
-        {"ImageFormatR11fG11fB10f", static_cast<SpvWord>(8)},
-        {"LoopControlPeelCount", static_cast<SpvWord>(128)},
-        {"BuiltInSubgroupLeMaskKHR", static_cast<SpvWord>(4419)},
-        {"CapabilityNamedBarrier", static_cast<SpvWord>(59)},
-        {"DecorationSingleElementVectorINTEL", static_cast<SpvWord>(6085)},
-        {"DecorationForcePow2DepthINTEL", static_cast<SpvWord>(5836)},
-        {"DimTileImageDataEXT", static_cast<SpvWord>(4173)},
-        {"BuiltInBaseVertex", static_cast<SpvWord>(4424)},
-        {"DecorationUniformId", static_cast<SpvWord>(27)},
-        {"BuiltInBaryCoordPullModelAMD", static_cast<SpvWord>(4998)},
-        {"ExecutionModeDerivativeGroupQuadsNV", static_cast<SpvWord>(5289)},
-        {"AccessQualifierReadOnly", static_cast<SpvWord>(0)},
-        {"StorageClassPrivate", static_cast<SpvWord>(6)},
-        {"CapabilityArbitraryPrecisionIntegersINTEL", static_cast<SpvWord>(5844)},
-        {"CapabilityRayTracingProvisionalKHR", static_cast<SpvWord>(5353)},
-        {"MemorySemanticsMakeAvailable", static_cast<SpvWord>(8192)},
-        {"CapabilityShaderNonUniform", static_cast<SpvWord>(5301)},
-        {"CapabilitySampled1D", static_cast<SpvWord>(43)},
-        {"ImageFormatRgba8", static_cast<SpvWord>(4)},
-        {"CapabilityImageGatherExtended", static_cast<SpvWord>(25)},
-        {"CapabilitySubgroupBufferBlockIOINTEL", static_cast<SpvWord>(5569)},
-        {"CapabilityStorageUniform16", static_cast<SpvWord>(4434)},
-        {"BuiltInCullMaskKHR", static_cast<SpvWord>(6021)},
-        {"DecorationCentroid", static_cast<SpvWord>(16)},
-        {"CapabilityRayCullMaskKHR", static_cast<SpvWord>(6020)},
-        {"CapabilityTileImageStencilReadAccessEXT", static_cast<SpvWord>(4168)},
-        {"ImageFormatR8i", static_cast<SpvWord>(29)},
-        {"CapabilityShaderStereoViewNV", static_cast<SpvWord>(5259)},
-        {"Dim1D", static_cast<SpvWord>(0)},
-        {"CapabilityStorageImageArrayNonUniformIndexing", static_cast<SpvWord>(5309)},
-        {"ExecutionModeOutputPrimitivesNV", static_cast<SpvWord>(5270)},
-        {"DecorationAlignment", static_cast<SpvWord>(44)},
-        {"BuiltInVertexId", static_cast<SpvWord>(5)},
-        {"ImageFormatRg8ui", static_cast<SpvWord>(37)},
-        {"FunctionParameterAttributeZext", static_cast<SpvWord>(0)},
-        {"CapabilityRayTracingPositionFetchKHR", static_cast<SpvWord>(5336)},
-        {"CapabilityVulkanMemoryModelDeviceScope", static_cast<SpvWord>(5346)},
-        {"MemorySemanticsImageMemory", static_cast<SpvWord>(2048)},
-        {"StorageClassCrossWorkgroup", static_cast<SpvWord>(5)},
-        {"StorageClassInput", static_cast<SpvWord>(1)},
-        {"MemoryModelSimple", static_cast<SpvWord>(0)},
-        {"MemorySemanticsSubgroupMemory", static_cast<SpvWord>(128)},
-        {"StorageClassHostOnlyINTEL", static_cast<SpvWord>(5937)},
-        {"CapabilityImageQuery", static_cast<SpvWord>(50)},
-        {"ExecutionModeLocalSizeHint", static_cast<SpvWord>(18)},
-        {"ImageOperandsSignExtend", static_cast<SpvWord>(4096)},
-        {"ExecutionModelCallableKHR", static_cast<SpvWord>(5318)},
-        {"CapabilityIOPipesINTEL", static_cast<SpvWord>(5943)},
-        {"KernelEnqueueFlagsWaitKernel", static_cast<SpvWord>(1)},
-        {"CapabilityImageReadWriteLodAMD", static_cast<SpvWord>(5015)},
-        {"ImageFormatR8ui", static_cast<SpvWord>(39)},
-        {"ExecutionModeInvocations", static_cast<SpvWord>(0)},
-        {"ExecutionModeNoGlobalOffsetINTEL", static_cast<SpvWord>(5895)},
-        {"QuantizationModesRND_INF", static_cast<SpvWord>(4)},
-        {"RayFlagsTerminateOnFirstHitKHR", static_cast<SpvWord>(4)},
-        {"CapabilityAtomicStorageOps", static_cast<SpvWord>(4445)},
-        {"CapabilityFPGARegINTEL", static_cast<SpvWord>(5948)},
-        {"LoopControlMaxIterations", static_cast<SpvWord>(32)},
-        {"ExecutionModelIntersectionKHR", static_cast<SpvWord>(5314)},
-        {"BuiltInPrimitiveCountNV", static_cast<SpvWord>(5275)},
-        {"CapabilityFloat16ImageAMD", static_cast<SpvWord>(5008)},
-        {"ScopeShaderCallKHR", static_cast<SpvWord>(6)},
-        {"BuiltInHitKindNV", static_cast<SpvWord>(5333)},
-        {"ExecutionModeDepthUnchanged", static_cast<SpvWord>(16)},
-        {"BuiltInSubgroupMaxSize", static_cast<SpvWord>(37)},
-        {"CapabilityGroupNonUniformArithmetic", static_cast<SpvWord>(63)},
-        {"LoopControlPipelineEnableINTEL", static_cast<SpvWord>(524288)},
-        {"CapabilitySignedZeroInfNanPreserve", static_cast<SpvWord>(4466)},
-        {"MemorySemanticsMakeVisibleKHR", static_cast<SpvWord>(16384)},
-        {"ExecutionModeOutputTrianglesEXT", static_cast<SpvWord>(5298)},
-        {"BuiltInClipDistance", static_cast<SpvWord>(3)},
-        {"ExecutionModelMeshEXT", static_cast<SpvWord>(5365)},
-        {"ImageChannelOrderRx", static_cast<SpvWord>(10)},
-        {"DecorationConstant", static_cast<SpvWord>(22)},
-        {"ExecutionModeStencilRefUnchangedBackAMD", static_cast<SpvWord>(5082)},
-        {"DecorationSample", static_cast<SpvWord>(17)},
-        {"BuiltInEnqueuedWorkgroupSize", static_cast<SpvWord>(32)},
-        {"CapabilityFloat16", static_cast<SpvWord>(9)},
-        {"CapabilityBitInstructions", static_cast<SpvWord>(6025)},
-        {"CooperativeMatrixOperandsSaturatingAccumulationKHR", static_cast<SpvWord>(16)},
-        {"BuiltInCoreIDARM", static_cast<SpvWord>(4160)},
-        {"CapabilityFPMaxErrorINTEL", static_cast<SpvWord>(6169)},
-        {"CapabilityTextureBlockMatchQCOM", static_cast<SpvWord>(4486)},
-        {"CapabilityInt64ImageEXT", static_cast<SpvWord>(5016)},
-        {"BuiltInInstanceIndex", static_cast<SpvWord>(43)},
-        {"ExecutionModePostDepthCoverage", static_cast<SpvWord>(4446)},
-        {"ScopeSubgroup", static_cast<SpvWord>(3)},
-        {"CapabilityStencilExportEXT", static_cast<SpvWord>(5013)},
-        {"MemorySemanticsRelease", static_cast<SpvWord>(4)},
-        {"StorageClassCodeSectionINTEL", static_cast<SpvWord>(5605)},
-        {"MemoryAccessAliasScopeINTELMask", static_cast<SpvWord>(65536)},
-        {"FragmentShadingRateVertical4Pixels", static_cast<SpvWord>(2)},
-        {"FunctionControlPure", static_cast<SpvWord>(4)},
-        {"DecorationVectorComputeVariableINTEL", static_cast<SpvWord>(5624)},
-        {"StorageClassIncomingRayPayloadNV", static_cast<SpvWord>(5342)},
-        {"FunctionParameterAttributeNoCapture", static_cast<SpvWord>(5)},
-        {"CapabilityUniformAndStorageBuffer16BitAccess", static_cast<SpvWord>(4434)},
-        {"CapabilityCullDistance", static_cast<SpvWord>(33)},
-        {"DecorationBlock", static_cast<SpvWord>(2)},
-        {"ExecutionModelTaskEXT", static_cast<SpvWord>(5364)},
-        {"MemoryAccessMakePointerVisible", static_cast<SpvWord>(16)},
-        {"DecorationGLSLPacked", static_cast<SpvWord>(9)},
-        {"CapabilityShadingRateNV", static_cast<SpvWord>(5291)},
-        {"CapabilityUSMStorageClassesINTEL", static_cast<SpvWord>(5935)},
-        {"ExecutionModeSpacingFractionalEven", static_cast<SpvWord>(2)},
-        {"BuiltInNumWorkgroups", static_cast<SpvWord>(24)},
-        {"BuiltInCullDistance", static_cast<SpvWord>(4)},
-        {"ExecutionModeOutputPrimitivesEXT", static_cast<SpvWord>(5270)},
-        {"LoopControlDependencyArrayINTEL", static_cast<SpvWord>(262144)},
-        {"DecorationFPMaxErrorDecorationINTEL", static_cast<SpvWord>(6170)},
-        {"ImageChannelOrderIntensity", static_cast<SpvWord>(8)},
-        {"DecorationRestrictPointerEXT", static_cast<SpvWord>(5355)},
-        {"Dim2D", static_cast<SpvWord>(1)},
-        {"ImageOperandsMakeTexelVisible", static_cast<SpvWord>(512)},
-        {"CapabilityStorageTexelBufferArrayDynamicIndexing", static_cast<SpvWord>(5305)},
-        {"ImageFormatR16ui", static_cast<SpvWord>(38)},
-        {"CapabilityGroupNonUniformPartitionedNV", static_cast<SpvWord>(5297)},
-        {"FunctionParameterAttributeRuntimeAlignedINTEL", static_cast<SpvWord>(5940)},
-        {"BuiltInWarpMaxIDARM", static_cast<SpvWord>(4164)},
-        {"CapabilityGroupNonUniformRotateKHR", static_cast<SpvWord>(6026)},
-        {"CapabilityFPGAMemoryAccessesINTEL", static_cast<SpvWord>(5898)},
-        {"MemorySemanticsOutputMemoryKHR", static_cast<SpvWord>(4096)},
-        {"CapabilityKernelAttributesINTEL", static_cast<SpvWord>(5892)},
-        {"RayQueryCommittedIntersectionTypeRayQueryCommittedIntersectionNoneKHR", static_cast<SpvWord>(0)},
-        {"CapabilityShaderViewportMaskNV", static_cast<SpvWord>(5255)},
-        {"ImageFormatRgba16", static_cast<SpvWord>(10)},
-        {"CapabilityWorkgroupMemoryExplicitLayout8BitAccessKHR", static_cast<SpvWord>(4429)},
-        {"ExecutionModeEarlyFragmentTests", static_cast<SpvWord>(9)},
-        {"ImageFormatRg8i", static_cast<SpvWord>(27)},
-        {"CapabilityShaderViewportIndex", static_cast<SpvWord>(70)},
-        {"BuiltInFragDepth", static_cast<SpvWord>(22)},
-        {"MemoryAccessMakePointerAvailableKHR", static_cast<SpvWord>(8)},
-        {"ImageFormatRg16Snorm", static_cast<SpvWord>(17)},
-        {"MemorySemanticsAtomicCounterMemory", static_cast<SpvWord>(1024)},
-        {"CapabilityShaderSMBuiltinsNV", static_cast<SpvWord>(5373)},
-        {"LoopControlNone", static_cast<SpvWord>(0)},
-        {"ImageChannelOrderRGx", static_cast<SpvWord>(11)},
-        {"LoopControlMaxConcurrencyINTEL", static_cast<SpvWord>(131072)},
-        {"CapabilityCooperativeMatrixKHR", static_cast<SpvWord>(6022)},
-        {"CapabilityInt16", static_cast<SpvWord>(22)},
-        {"CapabilityInt64Atomics", static_cast<SpvWord>(12)},
-        {"DecorationLinkageAttributes", static_cast<SpvWord>(41)},
-        {"CapabilityFPGADSPControlINTEL", static_cast<SpvWord>(5908)},
-        {"CapabilityStorageImageArrayNonUniformIndexingEXT", static_cast<SpvWord>(5309)},
-        {"BuiltInWorkgroupId", static_cast<SpvWord>(26)},
-        {"CapabilityFPGALatencyControlINTEL", static_cast<SpvWord>(6171)},
-        {"BuiltInPrimitiveIndicesNV", static_cast<SpvWord>(5276)},
-        {"BuiltInRayTmaxKHR", static_cast<SpvWord>(5326)},
-        {"CapabilityDerivativeControl", static_cast<SpvWord>(51)},
-        {"DecorationBurstCoalesceINTEL", static_cast<SpvWord>(5899)},
-        {"ExecutionModelTessellationControl", static_cast<SpvWord>(1)},
-        {"CapabilityBindlessTextureNV", static_cast<SpvWord>(5390)},
-        {"BuiltInHitKindKHR", static_cast<SpvWord>(5333)},
-        {"CapabilityTessellationPointSize", static_cast<SpvWord>(23)},
-        {"CapabilityInputAttachmentArrayDynamicIndexingEXT", static_cast<SpvWord>(5303)},
-        {"RayFlagsForceOpacityMicromap2StateEXT", static_cast<SpvWord>(1024)},
-        {"ExecutionModeSubgroupUniformControlFlowKHR", static_cast<SpvWord>(4421)},
-        {"CapabilityDotProductInput4x8BitPackedKHR", static_cast<SpvWord>(6018)},
-        {"ExecutionModelMeshNV", static_cast<SpvWord>(5268)},
-        {"ImageChannelOrderRG", static_cast<SpvWord>(2)},
-        {"GroupOperationClusteredReduce", static_cast<SpvWord>(3)},
-        {"CapabilityRayQueryProvisionalKHR", static_cast<SpvWord>(4471)},
-        {"ExecutionModelFragment", static_cast<SpvWord>(4)},
-        {"BuiltInPrimitiveShadingRateKHR", static_cast<SpvWord>(4432)},
-        {"ExecutionModelAnyHitKHR", static_cast<SpvWord>(5315)},
-        {"DecorationBoundSamplerNV", static_cast<SpvWord>(5400)},
-        {"DecorationNoSignedWrap", static_cast<SpvWord>(4469)},
-        {"CapabilityInputAttachmentArrayNonUniformIndexingEXT", static_cast<SpvWord>(5310)},
-        {"ExecutionModeStreamingInterfaceINTEL", static_cast<SpvWord>(6154)},
-        {"StorageClassTileImageEXT", static_cast<SpvWord>(4172)},
-        {"FPFastMathModeAllowReassocINTEL", static_cast<SpvWord>(131072)},
-        {"CapabilityAtomicFloat64MinMaxEXT", static_cast<SpvWord>(5613)},
-        {"AddressingModelPhysical32", static_cast<SpvWord>(1)},
-        {"DecorationFuncParamAttr", static_cast<SpvWord>(38)},
-        {"BuiltInSubgroupSize", static_cast<SpvWord>(36)},
-        {"FPFastMathModeNSZ", static_cast<SpvWord>(4)},
-        {"CapabilityUniformDecoration", static_cast<SpvWord>(71)},
-        {"StorageClassGeneric", static_cast<SpvWord>(8)},
-        {"ExecutionModeOutputLineStrip", static_cast<SpvWord>(28)},
-        {"SamplerAddressingModeRepeat", static_cast<SpvWord>(3)},
-        {"ExecutionModelTessellationEvaluation", static_cast<SpvWord>(2)},
-        {"ExecutionModeSubgroupSize", static_cast<SpvWord>(35)},
-        {"LoopControlIterationMultiple", static_cast<SpvWord>(64)},
-        {"ExecutionModeDenormPreserve", static_cast<SpvWord>(4459)},
-        {"ExecutionModeStencilRefGreaterFrontAMD", static_cast<SpvWord>(5080)},
-        {"ExecutionModeOutputTrianglesNV", static_cast<SpvWord>(5298)},
-        {"BuiltInCoreCountARM", static_cast<SpvWord>(4161)},
-        {"DecorationPerVertexKHR", static_cast<SpvWord>(5285)},
-        {"ExecutionModeDepthGreater", static_cast<SpvWord>(14)},
-        {"AccessQualifierReadWrite", static_cast<SpvWord>(2)},
-        {"ExecutionModeNumSIMDWorkitemsINTEL", static_cast<SpvWord>(5896)},
-        {"BuiltInPrimitiveLineIndicesEXT", static_cast<SpvWord>(5295)},
-        {"CapabilityRayTracingKHR", static_cast<SpvWord>(4479)},
-        {"MemoryAccessMakePointerVisibleKHR", static_cast<SpvWord>(16)},
-        {"DecorationMemoryINTEL", static_cast<SpvWord>(5826)},
-        {"CapabilityFragmentBarycentricNV", static_cast<SpvWord>(5284)},
-        {"FunctionParameterAttributeSret", static_cast<SpvWord>(3)},
-        {"CapabilityGeometryPointSize", static_cast<SpvWord>(24)},
-        {"BuiltInNumEnqueuedSubgroups", static_cast<SpvWord>(39)},
-        {"LoopControlDontUnroll", static_cast<SpvWord>(2)},
-        {"StorageClassWorkgroup", static_cast<SpvWord>(4)},
-        {"SamplerFilterModeNearest", static_cast<SpvWord>(0)},
-        {"DecorationStackCallINTEL", static_cast<SpvWord>(5627)},
-        {"RayQueryIntersectionRayQueryCandidateIntersectionKHR", static_cast<SpvWord>(0)},
-        {"BuiltInFragmentSizeNV", static_cast<SpvWord>(5292)},
-        {"BuiltInBaryCoordNV", static_cast<SpvWord>(5286)},
-        {"LoopControlInitiationIntervalINTEL", static_cast<SpvWord>(65536)},
-        {"CapabilityMeshShadingEXT", static_cast<SpvWord>(5283)},
-        {"SamplerAddressingModeNone", static_cast<SpvWord>(0)},
-        {"BuiltInFragCoord", static_cast<SpvWord>(15)},
-        {"ExecutionModelTaskNV", static_cast<SpvWord>(5267)},
-        {"ImageFormatRg16ui", static_cast<SpvWord>(36)},
-        {"CapabilityPipes", static_cast<SpvWord>(17)},
-        {"ImageFormatRgba32f", static_cast<SpvWord>(1)},
-        {"ExecutionModeDerivativeGroupLinearNV", static_cast<SpvWord>(5290)},
-        {"ImageOperandsConstOffset", static_cast<SpvWord>(8)},
-        {"CapabilityAddresses", static_cast<SpvWord>(4)},
-        {"CapabilityInputAttachmentArrayNonUniformIndexing", static_cast<SpvWord>(5310)},
-        {"FragmentShadingRateVertical2Pixels", static_cast<SpvWord>(1)},
-        {"FPFastMathModeAllowRecip", static_cast<SpvWord>(8)},
-        {"ImageFormatR64ui", static_cast<SpvWord>(40)},
-        {"CapabilitySubgroupImageMediaBlockIOINTEL", static_cast<SpvWord>(5579)},
-        {"DecorationMaxPrivateCopiesINTEL", static_cast<SpvWord>(5829)},
-        {"DecorationStableKernelArgumentINTEL", static_cast<SpvWord>(6183)},
-        {"BuiltInBaseInstance", static_cast<SpvWord>(4425)},
-        {"BuiltInWorkDim", static_cast<SpvWord>(30)},
-        {"CapabilityDeviceGroup", static_cast<SpvWord>(4437)},
-        {"CapabilityStorageTexelBufferArrayNonUniformIndexing", static_cast<SpvWord>(5312)},
-        {"BuiltInPositionPerViewNV", static_cast<SpvWord>(5261)},
-        {"CapabilityMinLod", static_cast<SpvWord>(42)},
-        {"CapabilityFragmentShaderSampleInterlockEXT", static_cast<SpvWord>(5363)},
-        {"BuiltInWorkgroupSize", static_cast<SpvWord>(25)},
-        {"StorageClassCallableDataNV", static_cast<SpvWord>(5328)},
-        {"ExecutionModelRayGenerationNV", static_cast<SpvWord>(5313)},
-        {"ExecutionModeDepthLess", static_cast<SpvWord>(15)},
-        {"SamplerFilterModeLinear", static_cast<SpvWord>(1)},
-        {"BuiltInObjectRayDirectionNV", static_cast<SpvWord>(5324)},
-        {"CapabilityFloat16Buffer", static_cast<SpvWord>(8)},
-        {"CapabilityIntegerFunctions2INTEL", static_cast<SpvWord>(5584)},
-        {"LoopControlSpeculatedIterationsINTEL", static_cast<SpvWord>(4194304)},
-        {"DecorationIOPipeStorageINTEL", static_cast<SpvWord>(5944)},
-        {"BuiltInDeviceIndex", static_cast<SpvWord>(4438)},
-        {"CapabilityVectorComputeINTEL", static_cast<SpvWord>(5617)},
-        {"CapabilityUnstructuredLoopControlsINTEL", static_cast<SpvWord>(5886)},
-        {"DecorationMatrixStride", static_cast<SpvWord>(7)},
-        {"DecorationPatch", static_cast<SpvWord>(15)},
-        {"BuiltInInstanceCustomIndexKHR", static_cast<SpvWord>(5327)},
-        {"CapabilityFPGAKernelAttributesv2INTEL", static_cast<SpvWord>(6161)},
-        {"BuiltInSecondaryPositionNV", static_cast<SpvWord>(5257)},
-        {"ImageFormatRgb10A2", static_cast<SpvWord>(11)},
-        {"CapabilitySubgroupShuffleINTEL", static_cast<SpvWord>(5568)},
-        {"CapabilityRayTraversalPrimitiveCullingKHR", static_cast<SpvWord>(4478)},
-        {"CapabilityAsmINTEL", static_cast<SpvWord>(5606)},
-        {"ExecutionModeQuads", static_cast<SpvWord>(24)},
-        {"DecorationRelaxedPrecision", static_cast<SpvWord>(0)},
-        {"StorageClassShaderRecordBufferNV", static_cast<SpvWord>(5343)},
-        {"ExecutionModeOriginUpperLeft", static_cast<SpvWord>(7)},
-        {"CapabilityInt8", static_cast<SpvWord>(39)},
-        {"CapabilityDotProductInputAll", static_cast<SpvWord>(6016)},
-        {"CapabilityInterpolationFunction", static_cast<SpvWord>(52)},
-        {"CapabilityGroupNonUniformBallot", static_cast<SpvWord>(64)},
-        {"ExecutionModeRoundingModeRTPINTEL", static_cast<SpvWord>(5620)},
-        {"CapabilityRoundToInfinityINTEL", static_cast<SpvWord>(5582)},
-        {"CapabilityOptNoneINTEL", static_cast<SpvWord>(6094)},
-        {"OverflowModesSAT_SYM", static_cast<SpvWord>(3)},
-        {"CapabilityExpectAssumeKHR", static_cast<SpvWord>(5629)},
-        {"DecorationSaturatedConversion", static_cast<SpvWord>(28)},
-        {"CapabilityRuntimeAlignedAttributeINTEL", static_cast<SpvWord>(5939)},
-        {"ImageFormatR32ui", static_cast<SpvWord>(33)},
-        {"BuiltInGlobalLinearId", static_cast<SpvWord>(34)},
-        {"ExecutionModeTriangles", static_cast<SpvWord>(22)},
-        {"ImageOperandsNonPrivateTexel", static_cast<SpvWord>(1024)},
-        {"SelectionControlDontFlatten", static_cast<SpvWord>(2)},
-        {"BuiltInIncomingRayFlagsNV", static_cast<SpvWord>(5351)},
-        {"BuiltInSMCountNV", static_cast<SpvWord>(5375)},
-        {"CapabilitySubgroupImageBlockIOINTEL", static_cast<SpvWord>(5570)},
-        {"DecorationSecondaryViewportRelativeNV", static_cast<SpvWord>(5256)},
-        {"MemoryAccessAligned", static_cast<SpvWord>(2)},
-        {"ExecutionModelCallableNV", static_cast<SpvWord>(5318)},
-        {"CapabilityDenormFlushToZero", static_cast<SpvWord>(4465)},
-        {"CapabilityComputeDerivativeGroupLinearNV", static_cast<SpvWord>(5350)},
-        {"StorageClassCallableDataKHR", static_cast<SpvWord>(5328)},
-        {"CapabilityFragmentBarycentricKHR", static_cast<SpvWord>(5284)},
-        {"SourceLanguageOpenCL_CPP", static_cast<SpvWord>(4)},
-        {"LinkageTypeExport", static_cast<SpvWord>(0)},
-        {"DimBuffer", static_cast<SpvWord>(5)},
-        {"DimRect", static_cast<SpvWord>(4)},
-        {"ImageChannelDataTypeUnsignedIntRaw10EXT", static_cast<SpvWord>(19)},
-        {"ExecutionModePixelInterlockOrderedEXT", static_cast<SpvWord>(5366)},
-        {"CapabilityRoundingModeRTZ", static_cast<SpvWord>(4468)},
-        {"ImageChannelDataTypeUnsignedInt16", static_cast<SpvWord>(11)},
-        {"ImageChannelDataTypeSnormInt8", static_cast<SpvWord>(0)},
-        {"CapabilityLoopFuseINTEL", static_cast<SpvWord>(5906)},
-        {"GroupOperationExclusiveScan", static_cast<SpvWord>(2)},
-        {"ImageChannelOrdersRGB", static_cast<SpvWord>(15)},
-        {"DecorationNoPerspective", static_cast<SpvWord>(13)},
-        {"BuiltInGlobalInvocationId", static_cast<SpvWord>(28)},
-        {"CapabilityComputeDerivativeGroupQuadsNV", static_cast<SpvWord>(5288)},
-        {"BuiltInPointCoord", static_cast<SpvWord>(16)},
-        {"CapabilityFPGAClusterAttributesINTEL", static_cast<SpvWord>(5904)},
-        {"ScopeQueueFamilyKHR", static_cast<SpvWord>(5)},
-        {"GroupOperationPartitionedExclusiveScanNV", static_cast<SpvWord>(8)},
-        {"BuiltInPrimitivePointIndicesEXT", static_cast<SpvWord>(5294)},
-        {"DecorationPerTaskNV", static_cast<SpvWord>(5273)},
-        {"CapabilityStoragePushConstant8", static_cast<SpvWord>(4450)},
-        {"ImageChannelDataTypeSignedInt32", static_cast<SpvWord>(9)},
-        {"ImageChannelOrderLuminance", static_cast<SpvWord>(9)},
-        {"FPDenormModePreserve", static_cast<SpvWord>(0)},
-        {"BuiltInLocalInvocationId", static_cast<SpvWord>(27)},
-        {"ExecutionModelMissNV", static_cast<SpvWord>(5317)},
-        {"CapabilityWorkgroupMemoryExplicitLayout16BitAccessKHR", static_cast<SpvWord>(4430)},
-        {"ImageChannelOrdersRGBx", static_cast<SpvWord>(16)},
-        {"BuiltInSubgroupGtMask", static_cast<SpvWord>(4418)},
-        {"FragmentShadingRateHorizontal2Pixels", static_cast<SpvWord>(4)},
-        {"CapabilityAtomicFloat16AddEXT", static_cast<SpvWord>(6095)},
-        {"ImageChannelOrdersBGRA", static_cast<SpvWord>(18)},
-        {"DecorationConduitKernelArgumentINTEL", static_cast<SpvWord>(6175)},
-        {"BuiltInTessLevelInner", static_cast<SpvWord>(12)},
-        {"DecorationMaxByteOffsetId", static_cast<SpvWord>(47)},
-        {"ExecutionModelAnyHitNV", static_cast<SpvWord>(5315)},
-        {"CapabilityGroupNonUniformQuad", static_cast<SpvWord>(68)},
-        {"CapabilityDotProductInputAllKHR", static_cast<SpvWord>(6016)},
-        {"SourceLanguageWGSL", static_cast<SpvWord>(10)},
-        {"ExecutionModeLocalSizeId", static_cast<SpvWord>(38)},
-        {"StorageClassAtomicCounter", static_cast<SpvWord>(10)},
-        {"CapabilityKernel", static_cast<SpvWord>(6)},
-        {"DecorationAliasScopeINTEL", static_cast<SpvWord>(5914)},
-        {"ImageOperandsMakeTexelVisibleKHR", static_cast<SpvWord>(512)},
-        {"CapabilityInputAttachmentArrayDynamicIndexing", static_cast<SpvWord>(5303)},
-        {"ExecutionModeInitializer", static_cast<SpvWord>(33)},
-        {"BuiltInTessCoord", static_cast<SpvWord>(13)},
-        {"RayFlagsSkipAABBsKHR", static_cast<SpvWord>(512)},
-        {"MemorySemanticsRelaxed", static_cast<SpvWord>(0)},
-        {"DecorationLatencyControlConstraintINTEL", static_cast<SpvWord>(6173)},
-        {"CapabilityTessellation", static_cast<SpvWord>(3)},
-        {"ExecutionModeSharedLocalMemorySizeINTEL", static_cast<SpvWord>(5618)},
-        {"CooperativeMatrixOperandsMatrixResultSignedComponentsKHR", static_cast<SpvWord>(8)},
-        {"BuiltInBaryCoordSmoothAMD", static_cast<SpvWord>(4995)},
-        {"BuiltInRayTmaxNV", static_cast<SpvWord>(5326)},
-        {"ExecutionModelGeometry", static_cast<SpvWord>(3)},
-        {"ImageFormatRgb10a2ui", static_cast<SpvWord>(34)},
-        {"ExecutionModelClosestHitNV", static_cast<SpvWord>(5316)},
-        {"RayFlagsCullOpaqueKHR", static_cast<SpvWord>(64)},
-        {"BuiltInCurrentRayTimeNV", static_cast<SpvWord>(5334)},
-        {"CooperativeMatrixUseMatrixAccumulatorKHR", static_cast<SpvWord>(2)},
-        {"BuiltInInvocationId", static_cast<SpvWord>(8)},
-        {"DecorationMMHostInterfaceReadWriteModeINTEL", static_cast<SpvWord>(6180)},
-        {"ExecutionModelGLCompute", static_cast<SpvWord>(5)},
-        {"CapabilityGroupNonUniformShuffleRelative", static_cast<SpvWord>(66)},
-        {"CapabilitySampledImageArrayNonUniformIndexing", static_cast<SpvWord>(5307)},
-        {"CapabilityStorageBuffer8BitAccess", static_cast<SpvWord>(4448)},
-        {"StorageClassPhysicalStorageBuffer", static_cast<SpvWord>(5349)},
-        {"DecorationRowMajor", static_cast<SpvWord>(4)},
-        {"CapabilitySubgroupVoteKHR", static_cast<SpvWord>(4431)},
-        {"ExecutionModeShadingRateInterlockOrderedEXT", static_cast<SpvWord>(5370)},
-        {"ImageChannelDataTypeUnormInt16", static_cast<SpvWord>(3)},
-        {"FunctionParameterAttributeSext", static_cast<SpvWord>(1)},
-        {"FPOperationModeALT", static_cast<SpvWord>(1)},
-        {"RayFlagsCullFrontFacingTrianglesKHR", static_cast<SpvWord>(32)},
-        {"RayQueryCommittedIntersectionTypeRayQueryCommittedIntersectionTriangleKHR", static_cast<SpvWord>(1)},
-        {"CapabilitySubgroupAvcMotionEstimationIntraINTEL", static_cast<SpvWord>(5697)},
-        {"CapabilityFunctionPointersINTEL", static_cast<SpvWord>(5603)},
-        {"ExecutionModeSampleInterlockUnorderedEXT", static_cast<SpvWord>(5369)},
-        {"CapabilityUniformTexelBufferArrayNonUniformIndexing", static_cast<SpvWord>(5311)},
-        {"BuiltInWarpIDARM", static_cast<SpvWord>(4163)},
-        {"CapabilityStorageImageExtendedFormats", static_cast<SpvWord>(49)},
-        {"CapabilityBlockingPipesINTEL", static_cast<SpvWord>(5945)},
-        {"ExecutionModeXfb", static_cast<SpvWord>(11)},
-        {"BuiltInSubgroupEqMaskKHR", static_cast<SpvWord>(4416)},
-        {"BuiltInDrawIndex", static_cast<SpvWord>(4426)},
-        {"ImageChannelDataTypeUnormInt101010_2", static_cast<SpvWord>(16)},
-        {"CapabilityVulkanMemoryModelDeviceScopeKHR", static_cast<SpvWord>(5346)},
-        {"ExecutionModeDenormFlushToZero", static_cast<SpvWord>(4460)},
-        {"CapabilityStorageTexelBufferArrayNonUniformIndexingEXT", static_cast<SpvWord>(5312)},
-        {"BuiltInGlobalSize", static_cast<SpvWord>(31)},
-        {"BuiltInWarpIDNV", static_cast<SpvWord>(5376)},
-        {"CapabilitySparseResidency", static_cast<SpvWord>(41)},
-        {"CapabilityImage1D", static_cast<SpvWord>(44)},
-        {"ImageFormatR16Snorm", static_cast<SpvWord>(19)},
-        {"ImageFormatR16f", static_cast<SpvWord>(9)},
-        {"DecorationNumbanksINTEL", static_cast<SpvWord>(5827)},
-        {"SamplerAddressingModeClampToEdge", static_cast<SpvWord>(1)},
-        {"DecorationBindlessImageNV", static_cast<SpvWord>(5399)},
-        {"DecorationGlobalVariableOffsetINTEL", static_cast<SpvWord>(5628)},
-        {"StorageClassPushConstant", static_cast<SpvWord>(9)},
-        {"BuiltInSamplePosition", static_cast<SpvWord>(19)},
-        {"BuiltInWorldRayDirectionNV", static_cast<SpvWord>(5322)},
-        {"ScopeWorkgroup", static_cast<SpvWord>(2)},
-        {"DecorationBufferLocationINTEL", static_cast<SpvWord>(5921)},
-        {"BuiltInIncomingRayFlagsKHR", static_cast<SpvWord>(5351)},
-        {"CapabilityGroupNonUniformClustered", static_cast<SpvWord>(67)},
-        {"DecorationOffset", static_cast<SpvWord>(35)},
-        {"StorageClassPhysicalStorageBufferEXT", static_cast<SpvWord>(5349)},
-        {"BuiltInViewportMaskNV", static_cast<SpvWord>(5253)},
-        {"MemoryModelGLSL450", static_cast<SpvWord>(1)},
-        {"BuiltInBaryCoordSmoothSampleAMD", static_cast<SpvWord>(4997)},
-        {"CapabilityGeometry", static_cast<SpvWord>(2)},
-        {"BuiltInViewportMaskPerViewNV", static_cast<SpvWord>(5262)},
-        {"ExecutionModeFloatingPointModeALTINTEL", static_cast<SpvWord>(5622)},
-        {"ExecutionModeFinalizer", static_cast<SpvWord>(34)},
-        {"CapabilityTileImageDepthReadAccessEXT", static_cast<SpvWord>(4167)},
-        {"BuiltInBaryCoordNoPerspCentroidAMD", static_cast<SpvWord>(4993)},
-        {"BuiltInBaryCoordKHR", static_cast<SpvWord>(5286)},
-        {"CapabilitySubgroupAvcMotionEstimationINTEL", static_cast<SpvWord>(5696)},
-        {"RayQueryCandidateIntersectionTypeRayQueryCandidateIntersectionAABBKHR", static_cast<SpvWord>(1)},
-        {"CapabilityTextureBoxFilterQCOM", static_cast<SpvWord>(4485)},
-        {"KernelProfilingInfoCmdExecTime", static_cast<SpvWord>(1)},
-        {"BuiltInFrontFacing", static_cast<SpvWord>(17)},
-        {"CapabilityDrawParameters", static_cast<SpvWord>(4427)},
-        {"ImageChannelDataTypeUnormShort555", static_cast<SpvWord>(5)},
-        {"KernelProfilingInfoNone", static_cast<SpvWord>(0)},
-        {"ImageFormatUnknown", static_cast<SpvWord>(0)},
-        {"GroupOperationPartitionedReduceNV", static_cast<SpvWord>(6)},
-        {"BuiltInLaunchIdKHR", static_cast<SpvWord>(5319)},
-        {"ImageFormatR8Snorm", static_cast<SpvWord>(20)},
-        {"CapabilityFPGABufferLocationINTEL", static_cast<SpvWord>(5920)},
-        {"BuiltInObjectRayDirectionKHR", static_cast<SpvWord>(5324)},
-        {"ExecutionModelVertex", static_cast<SpvWord>(0)},
-        {"BuiltInSecondaryViewportMaskNV", static_cast<SpvWord>(5258)},
-        {"DecorationInputAttachmentIndex", static_cast<SpvWord>(43)},
-        {"CapabilityRuntimeDescriptorArray", static_cast<SpvWord>(5302)},
-        {"LoopControlDependencyInfinite", static_cast<SpvWord>(4)},
-        {"GroupOperationPartitionedInclusiveScanNV", static_cast<SpvWord>(7)},
-        {"ImageFormatRgba8i", static_cast<SpvWord>(23)},
-        {"CapabilityShaderNonUniformEXT", static_cast<SpvWord>(5301)},
-        {"DecorationMaxReplicatesINTEL", static_cast<SpvWord>(5832)},
-        {"CapabilityRayTracingOpacityMicromapEXT", static_cast<SpvWord>(5381)},
-        {"ExecutionModeSignedZeroInfNanPreserve", static_cast<SpvWord>(4461)},
-        {"ImageOperandsLod", static_cast<SpvWord>(2)},
-        {"ExecutionModeMaxWorkgroupSizeINTEL", static_cast<SpvWord>(5893)},
-        {"LinkageTypeImport", static_cast<SpvWord>(1)},
-        {"RayFlagsNoneKHR", static_cast<SpvWord>(0)},
-        {"BuiltInLocalInvocationIndex", static_cast<SpvWord>(29)},
-        {"BuiltInBaryCoordNoPerspNV", static_cast<SpvWord>(5287)},
-        {"DecorationViewportRelativeNV", static_cast<SpvWord>(5252)},
-        {"ExecutionModeStencilRefUnchangedFrontAMD", static_cast<SpvWord>(5079)},
-        {"ScopeCrossDevice", static_cast<SpvWord>(0)},
-        {"CapabilityGenericPointer", static_cast<SpvWord>(38)},
-        {"FPRoundingModeRTP", static_cast<SpvWord>(2)},
-        {"KernelEnqueueFlagsWaitWorkGroup", static_cast<SpvWord>(2)},
-        {"DecorationPipelineEnableINTEL", static_cast<SpvWord>(5919)},
-        {"ImageFormatRgba16ui", static_cast<SpvWord>(31)},
-        {"FunctionParameterAttributeByVal", static_cast<SpvWord>(2)},
-        {"MemoryModelVulkan", static_cast<SpvWord>(3)},
-        {"ImageFormatRg8", static_cast<SpvWord>(13)},
-        {"QuantizationModesRND_ZERO", static_cast<SpvWord>(3)},
-        {"MemorySemanticsUniformMemory", static_cast<SpvWord>(64)},
-        {"CapabilityImageRect", static_cast<SpvWord>(36)},
-        {"ExecutionModeRegisterMapInterfaceINTEL", static_cast<SpvWord>(6160)},
-        {"BuiltInObjectRayOriginNV", static_cast<SpvWord>(5323)},
-        {"CapabilityPhysicalStorageBufferAddressesEXT", static_cast<SpvWord>(5347)},
-        {"StorageClassIncomingCallableDataKHR", static_cast<SpvWord>(5329)},
-        {"AddressingModelPhysical64", static_cast<SpvWord>(2)},
-        {"FPFastMathModeFast", static_cast<SpvWord>(16)},
-        {"ExecutionModeFloatingPointModeIEEEINTEL", static_cast<SpvWord>(5623)},
-        {"BuiltInClipDistancePerViewNV", static_cast<SpvWord>(5277)},
-        {"FPRoundingModeRTN", static_cast<SpvWord>(3)},
-        {"PackedVectorFormatPackedVectorFormat4x8BitKHR", static_cast<SpvWord>(0)},
-        {"DecorationOverrideCoverageNV", static_cast<SpvWord>(5248)},
-        {"FunctionControlConst", static_cast<SpvWord>(8)},
-        {"ImageFormatRg16", static_cast<SpvWord>(12)},
-        {"ExecutionModePixelInterlockUnorderedEXT", static_cast<SpvWord>(5367)},
-        {"CapabilityPipeStorage", static_cast<SpvWord>(60)},
-        {"SourceLanguageCPP_for_OpenCL", static_cast<SpvWord>(6)},
-        {"ImageFormatRg16i", static_cast<SpvWord>(26)},
-        {"ScopeQueueFamily", static_cast<SpvWord>(5)},
-        {"DecorationFPFastMathMode", static_cast<SpvWord>(40)},
-        {"CapabilityVector16", static_cast<SpvWord>(7)},
-        {"AddressingModelLogical", static_cast<SpvWord>(0)},
-        {"ImageFormatRg32f", static_cast<SpvWord>(6)},
-        {"ExecutionModeNonCoherentStencilAttachmentReadEXT", static_cast<SpvWord>(4171)},
-        {"ExecutionModeRoundingModeRTE", static_cast<SpvWord>(4462)},
-        {"ImageOperandsNonPrivateTexelKHR", static_cast<SpvWord>(1024)},
-        {"CapabilitySampledCubeArray", static_cast<SpvWord>(45)},
-        {"ImageOperandsNone", static_cast<SpvWord>(0)},
-        {"DecorationFuseLoopsInFunctionINTEL", static_cast<SpvWord>(5907)},
-        {"FPRoundingModeRTZ", static_cast<SpvWord>(1)},
-        {"CapabilityStorageBufferArrayNonUniformIndexing", static_cast<SpvWord>(5308)},
-        {"CapabilityShaderLayer", static_cast<SpvWord>(69)},
-        {"MemorySemanticsMakeAvailableKHR", static_cast<SpvWord>(8192)},
-        {"BuiltInNumSubgroups", static_cast<SpvWord>(38)},
-        {"ImageFormatRg16f", static_cast<SpvWord>(7)},
-        {"SelectionControlFlatten", static_cast<SpvWord>(1)},
-        {"DecorationReferencedIndirectlyINTEL", static_cast<SpvWord>(5602)},
-        {"DecorationBankBitsINTEL", static_cast<SpvWord>(5835)},
-        {"BuiltInFullyCoveredEXT", static_cast<SpvWord>(5264)},
-        {"CooperativeMatrixLayoutRowMajorKHR", static_cast<SpvWord>(0)},
-        {"DecorationBindlessSamplerNV", static_cast<SpvWord>(5398)},
-        {"ExecutionModeOutputLinesNV", static_cast<SpvWord>(5269)},
-        {"ImageOperandsMinLod", static_cast<SpvWord>(128)},
-        {"QuantizationModesRND_CONV_ODD", static_cast<SpvWord>(7)},
-        {"StorageClassUniform", static_cast<SpvWord>(2)},
-        {"ImageChannelDataTypeUnormInt101010", static_cast<SpvWord>(6)},
-        {"BuiltInSubgroupGeMaskKHR", static_cast<SpvWord>(4417)},
-        {"ExecutionModeStencilRefLessFrontAMD", static_cast<SpvWord>(5081)},
-        {"CooperativeMatrixUseMatrixBKHR", static_cast<SpvWord>(1)},
-        {"CapabilitySampledBuffer", static_cast<SpvWord>(46)},
-        {"MemorySemanticsCrossWorkgroupMemory", static_cast<SpvWord>(512)},
-        {"LoopControlPartialCount", static_cast<SpvWord>(256)},
-        {"CapabilityGeometryStreams", static_cast<SpvWord>(54)},
-        {"BuiltInTaskCountNV", static_cast<SpvWord>(5274)},
-        {"CapabilityDeviceEnqueue", static_cast<SpvWord>(19)},
-        {"ExecutionModeStencilRefReplacingEXT", static_cast<SpvWord>(5027)},
-        {"BuiltInBaryCoordNoPerspAMD", static_cast<SpvWord>(4992)},
-        {"CapabilityImageBasic", static_cast<SpvWord>(13)},
-        {"GroupOperationInclusiveScan", static_cast<SpvWord>(1)},
-        {"AccessQualifierWriteOnly", static_cast<SpvWord>(1)},
-        {"ExecutionModeVecTypeHint", static_cast<SpvWord>(30)},
-        {"DecorationInitiationIntervalINTEL", static_cast<SpvWord>(5917)},
-        {"ExecutionModePixelCenterInteger", static_cast<SpvWord>(6)},
-        {"CapabilityArbitraryPrecisionFloatingPointINTEL", static_cast<SpvWord>(5845)},
-        {"CapabilitySampleMaskPostDepthCoverage", static_cast<SpvWord>(4447)},
-        {"CapabilityFPGAInvocationPipeliningAttributesINTEL", static_cast<SpvWord>(5916)},
-        {"DecorationInvariant", static_cast<SpvWord>(18)},
-        {"DecorationCacheSizeINTEL", static_cast<SpvWord>(5900)},
-        {"DecorationBoundImageNV", static_cast<SpvWord>(5401)},
-        {"LoopControlMaxReinvocationDelayINTEL", static_cast<SpvWord>(33554432)},
-        {"CapabilityFPGAArgumentInterfacesINTEL", static_cast<SpvWord>(6174)},
-        {"ImageFormatRgba8ui", static_cast<SpvWord>(32)},
-        {"OverflowModesSAT_ZERO", static_cast<SpvWord>(2)},
-        {"CapabilityDemoteToHelperInvocation", static_cast<SpvWord>(5379)},
-        {"BuiltInLaunchIdNV", static_cast<SpvWord>(5319)},
-        {"OverflowModesSAT", static_cast<SpvWord>(1)},
-        {"LoopControlLoopCountINTEL", static_cast<SpvWord>(16777216)},
-        {"DecorationFuncParamIOKindINTEL", static_cast<SpvWord>(5625)},
-        {"CapabilityRayQueryPositionFetchKHR", static_cast<SpvWord>(5391)},
-        {"DecorationSinglepumpINTEL", static_cast<SpvWord>(5830)},
-        {"ImageOperandsGrad", static_cast<SpvWord>(4)},
-        {"DecorationMMHostInterfaceWaitRequestINTEL", static_cast<SpvWord>(6182)},
-        {"CapabilityImageFootprintNV", static_cast<SpvWord>(5282)},
-        {"MemoryAccessNone", static_cast<SpvWord>(0)},
-        {"StorageClassStorageBuffer", static_cast<SpvWord>(12)},
-        {"ExecutionModeNamedBarrierCountINTEL", static_cast<SpvWord>(6417)},
-        {"DecorationXfbStride", static_cast<SpvWord>(37)},
-        {"CapabilityUniformTexelBufferArrayDynamicIndexingEXT", static_cast<SpvWord>(5304)},
-        {"CapabilityStorageImageArrayDynamicIndexing", static_cast<SpvWord>(31)},
+        {"ExecutionModeDepthReplacing", SpvWord{12}},
+        {"CapabilityImageMipmap", SpvWord{15}},
+        {"MemorySemanticsOutputMemory", SpvWord{4096}},
+        {"BuiltInWorldToObjectNV", SpvWord{5331}},
+        {"DecorationMediaBlockIOINTEL", SpvWord{6140}},
+        {"CapabilityStorageUniformBufferBlock16", SpvWord{4433}},
+        {"DecorationPerPrimitiveEXT", SpvWord{5271}},
+        {"StorageClassIncomingRayPayloadKHR", SpvWord{5342}},
+        {"QuantizationModesRND", SpvWord{2}},
+        {"ImageChannelOrderR", SpvWord{0}},
+        {"LoopControlMaxInterleavingINTEL", SpvWord{2097152}},
+        {"CapabilityStorageImageReadWithoutFormat", SpvWord{55}},
+        {"StorageClassRayPayloadKHR", SpvWord{5338}},
+        {"ImageChannelOrderBGRA", SpvWord{6}},
+        {"LoopControlMinIterations", SpvWord{16}},
+        {"CapabilityTileImageColorReadAccessEXT", SpvWord{4166}},
+        {"CapabilityStorageInputOutput16", SpvWord{4436}},
+        {"MemorySemanticsWorkgroupMemory", SpvWord{256}},
+        {"RayFlagsSkipClosestHitShaderKHR", SpvWord{8}},
+        {"CapabilityLiteralSampler", SpvWord{20}},
+        {"CapabilityUniformBufferArrayDynamicIndexing", SpvWord{28}},
+        {"BuiltInRayTminNV", SpvWord{5325}},
+        {"FPDenormModeFlushToZero", SpvWord{1}},
+        {"StorageClassTaskPayloadWorkgroupEXT", SpvWord{5402}},
+        {"ExecutionModeNonCoherentDepthAttachmentReadEXT", SpvWord{4170}},
+        {"BuiltInSubgroupGeMask", SpvWord{4417}},
+        {"ExecutionModeInputTrianglesAdjacency", SpvWord{23}},
+        {"CapabilityFloat64", SpvWord{10}},
+        {"ImageChannelDataTypeSnormInt16", SpvWord{1}},
+        {"BuiltInBaryCoordNoPerspKHR", SpvWord{5287}},
+        {"DecorationAliasedPointer", SpvWord{5356}},
+        {"ImageFormatRgba16f", SpvWord{2}},
+        {"BuiltInMeshViewCountNV", SpvWord{5280}},
+        {"RayFlagsCullNoOpaqueKHR", SpvWord{128}},
+        {"StorageClassRayPayloadNV", SpvWord{5338}},
+        {"SourceLanguageESSL", SpvWord{1}},
+        {"StorageClassHitAttributeNV", SpvWord{5339}},
+        {"ExecutionModelIntersectionNV", SpvWord{5314}},
+        {"DecorationArrayStride", SpvWord{6}},
+        {"CapabilityFPFastMathModeINTEL", SpvWord{5837}},
+        {"RayFlagsCullBackFacingTrianglesKHR", SpvWord{16}},
+        {"BuiltInViewIndex", SpvWord{4440}},
+        {"BuiltInPointSize", SpvWord{1}},
+        {"DecorationCPacked", SpvWord{10}},
+        {"OverflowModesWRAP", SpvWord{0}},
+        {"CapabilitySubgroupBallotKHR", SpvWord{4423}},
+        {"CapabilityVulkanMemoryModel", SpvWord{5345}},
+        {"RayFlagsNoOpaqueKHR", SpvWord{2}},
+        {"CapabilityGroupNonUniformShuffle", SpvWord{65}},
+        {"BuiltInLayer", SpvWord{9}},
+        {"ImageFormatRgba32ui", SpvWord{30}},
+        {"PackedVectorFormatPackedVectorFormat4x8Bit", SpvWord{0}},
+        {"StorageClassShaderRecordBufferKHR", SpvWord{5343}},
+        {"FunctionParameterAttributeNoReadWrite", SpvWord{7}},
+        {"ImageFormatR8", SpvWord{15}},
+        {"DecorationUserTypeGOOGLE", SpvWord{5636}},
+        {"BuiltInMeshViewIndicesNV", SpvWord{5281}},
+        {"FPOperationModeIEEE", SpvWord{0}},
+        {"CapabilityUniformAndStorageBuffer8BitAccess", SpvWord{4449}},
+        {"RayFlagsOpaqueKHR", SpvWord{1}},
+        {"CapabilityInt64", SpvWord{11}},
+        {"CapabilityFPGAKernelAttributesINTEL", SpvWord{5897}},
+        {"StorageClassOutput", SpvWord{3}},
+        {"BuiltInSubgroupLocalInvocationId", SpvWord{41}},
+        {"CapabilityUniformTexelBufferArrayNonUniformIndexingEXT", SpvWord{5311}},
+        {"BuiltInSampleMask", SpvWord{20}},
+        {"BuiltInObjectToWorldNV", SpvWord{5330}},
+        {"ImageFormatRgba16Snorm", SpvWord{16}},
+        {"BuiltInCullDistancePerViewNV", SpvWord{5278}},
+        {"ExecutionModelClosestHitKHR", SpvWord{5316}},
+        {"CapabilityImageReadWrite", SpvWord{14}},
+        {"CapabilityDenormPreserve", SpvWord{4464}},
+        {"CapabilitySampleMaskOverrideCoverageNV", SpvWord{5249}},
+        {"RayQueryCommittedIntersectionTypeRayQueryCommittedIntersectionGeneratedKHR", SpvWord{2}},
+        {"CapabilitySampledImageArrayDynamicIndexing", SpvWord{29}},
+        {"CapabilitySampledRect", SpvWord{37}},
+        {"FunctionParameterAttributeNoAlias", SpvWord{4}},
+        {"CapabilityAtomicFloat16MinMaxEXT", SpvWord{5616}},
+        {"SamplerAddressingModeRepeatMirrored", SpvWord{4}},
+        {"StorageClassUniformConstant", SpvWord{0}},
+        {"CapabilityLongConstantCompositeINTEL", SpvWord{6089}},
+        {"DecorationXfbBuffer", SpvWord{36}},
+        {"DecorationWeightTextureQCOM", SpvWord{4487}},
+        {"ImageFormatR16", SpvWord{14}},
+        {"AddressingModelPhysicalStorageBuffer64", SpvWord{5348}},
+        {"BuiltInCullPrimitiveEXT", SpvWord{5299}},
+        {"ImageFormatRg32i", SpvWord{25}},
+        {"DecorationNonWritable", SpvWord{24}},
+        {"DecorationRestrict", SpvWord{19}},
+        {"BuiltInWorldRayOriginKHR", SpvWord{5321}},
+        {"CapabilityGeometryShaderPassthroughNV", SpvWord{5251}},
+        {"DecorationIndex", SpvWord{32}},
+        {"CooperativeMatrixOperandsNoneKHR", SpvWord{0}},
+        {"ExecutionModeSubgroupsPerWorkgroup", SpvWord{36}},
+        {"ExecutionModeSubgroupsPerWorkgroupId", SpvWord{37}},
+        {"DecorationSideEffectsINTEL", SpvWord{5608}},
+        {"SourceLanguageOpenCL_C", SpvWord{3}},
+        {"BuiltInObjectToWorldKHR", SpvWord{5330}},
+        {"BuiltInInstanceCustomIndexNV", SpvWord{5327}},
+        {"ImageOperandsVolatileTexelKHR", SpvWord{2048}},
+        {"BuiltInGlobalOffset", SpvWord{33}},
+        {"ExecutionModeLocalSize", SpvWord{17}},
+        {"ImageChannelOrderRA", SpvWord{3}},
+        {"ExecutionModeSampleInterlockOrderedEXT", SpvWord{5368}},
+        {"BuiltInSubgroupLtMask", SpvWord{4420}},
+        {"CapabilityDotProductInput4x8Bit", SpvWord{6017}},
+        {"DecorationMMHostInterfaceAddressWidthINTEL", SpvWord{6177}},
+        {"CapabilityMultiView", SpvWord{4439}},
+        {"MemoryAccessMakePointerAvailable", SpvWord{8}},
+        {"ExecutionModePointMode", SpvWord{10}},
+        {"BuiltInWorldRayDirectionKHR", SpvWord{5322}},
+        {"ExecutionModeSpacingEqual", SpvWord{1}},
+        {"DecorationHlslCounterBufferGOOGLE", SpvWord{5634}},
+        {"DecorationNoUnsignedWrap", SpvWord{4470}},
+        {"SourceLanguageHERO_C", SpvWord{8}},
+        {"FragmentShadingRateHorizontal4Pixels", SpvWord{8}},
+        {"AddressingModelPhysicalStorageBuffer64EXT", SpvWord{5348}},
+        {"CapabilityImageMSArray", SpvWord{48}},
+        {"SourceLanguageHLSL", SpvWord{5}},
+        {"BuiltInLaunchSizeNV", SpvWord{5320}},
+        {"MemorySemanticsAcquire", SpvWord{2}},
+        {"MemoryAccessNonPrivatePointer", SpvWord{32}},
+        {"DecorationPerVertexNV", SpvWord{5285}},
+        {"CapabilityIndirectReferencesINTEL", SpvWord{5604}},
+        {"ImageOperandsNontemporal", SpvWord{16384}},
+        {"ExecutionModelKernel", SpvWord{6}},
+        {"QuantizationModesTRN", SpvWord{0}},
+        {"DecorationStallEnableINTEL", SpvWord{5905}},
+        {"MemoryModelOpenCL", SpvWord{2}},
+        {"ImageOperandsMakeTexelAvailableKHR", SpvWord{256}},
+        {"DecorationDoublepumpINTEL", SpvWord{5831}},
+        {"SourceLanguageSYCL", SpvWord{7}},
+        {"ImageChannelOrdersRGBA", SpvWord{17}},
+        {"CapabilityShader", SpvWord{1}},
+        {"ImageChannelOrderRGB", SpvWord{4}},
+        {"DecorationRegisterINTEL", SpvWord{5825}},
+        {"FPFastMathModeNotNaN", SpvWord{1}},
+        {"FPFastMathModeAllowContractFastINTEL", SpvWord{65536}},
+        {"FPRoundingModeRTE", SpvWord{0}},
+        {"CapabilityShaderClockKHR", SpvWord{5055}},
+        {"ImageOperandsMakeTexelAvailable", SpvWord{256}},
+        {"DecorationAliased", SpvWord{20}},
+        {"DecorationSimpleDualPortINTEL", SpvWord{5833}},
+        {"CapabilityAtomicFloat32AddEXT", SpvWord{6033}},
+        {"ExecutionModeLocalSizeHintId", SpvWord{39}},
+        {"CapabilityGroupUniformArithmeticKHR", SpvWord{6400}},
+        {"DecorationCounterBuffer", SpvWord{5634}},
+        {"ImageOperandsVolatileTexel", SpvWord{2048}},
+        {"CapabilityGroupNonUniformVote", SpvWord{62}},
+        {"BuiltInPatchVertices", SpvWord{14}},
+        {"CapabilityUniformBufferArrayNonUniformIndexingEXT", SpvWord{5306}},
+        {"MemorySemanticsAcquireRelease", SpvWord{8}},
+        {"CapabilityShaderViewportIndexLayerNV", SpvWord{5254}},
+        {"ImageChannelOrderRGBA", SpvWord{5}},
+        {"StorageClassDeviceOnlyINTEL", SpvWord{5936}},
+        {"CapabilityGroupNonUniform", SpvWord{61}},
+        {"BuiltInWorldToObjectKHR", SpvWord{5331}},
+        {"BuiltInRayTminKHR", SpvWord{5325}},
+        {"FPFastMathModeNotInf", SpvWord{2}},
+        {"BuiltInSubgroupLtMaskKHR", SpvWord{4420}},
+        {"ExecutionModeSpacingFractionalOdd", SpvWord{3}},
+        {"ImageOperandsOffsets", SpvWord{65536}},
+        {"DecorationHlslSemanticGOOGLE", SpvWord{5635}},
+        {"CapabilityTransformFeedback", SpvWord{53}},
+        {"CapabilityVariablePointers", SpvWord{4442}},
+        {"ImageChannelDataTypeSignedInt8", SpvWord{7}},
+        {"QuantizationModesRND_MIN_INF", SpvWord{5}},
+        {"CapabilityAtomicStorage", SpvWord{21}},
+        {"CapabilityStorageImageMultisample", SpvWord{27}},
+        {"BuiltInSampleId", SpvWord{18}},
+        {"CapabilitySubgroupAvcMotionEstimationChromaINTEL", SpvWord{5698}},
+        {"ImageChannelOrderRGBx", SpvWord{12}},
+        {"BuiltInCoreMaxIDARM", SpvWord{4162}},
+        {"SamplerAddressingModeClamp", SpvWord{2}},
+        {"DimSubpassData", SpvWord{6}},
+        {"FunctionControlOptNoneINTEL", SpvWord{65536}},
+        {"CapabilityImageGatherBiasLodAMD", SpvWord{5009}},
+        {"DecorationBlockMatchTextureQCOM", SpvWord{4488}},
+        {"BuiltInPrimitiveTriangleIndicesEXT", SpvWord{5296}},
+        {"DecorationNoAliasINTEL", SpvWord{5915}},
+        {"ExecutionModeRoundingModeRTNINTEL", SpvWord{5621}},
+        {"DecorationMathOpDSPModeINTEL", SpvWord{5909}},
+        {"StorageClassIncomingCallableDataNV", SpvWord{5329}},
+        {"CapabilitySplitBarrierINTEL", SpvWord{6141}},
+        {"DecorationComponent", SpvWord{31}},
+        {"KernelEnqueueFlagsNoWait", SpvWord{0}},
+        {"DecorationDescriptorSet", SpvWord{34}},
+        {"CapabilityFragmentShaderPixelInterlockEXT", SpvWord{5378}},
+        {"DecorationBuiltIn", SpvWord{11}},
+        {"ImageChannelDataTypeUnormInt24", SpvWord{15}},
+        {"ExecutionModeOutputLinesEXT", SpvWord{5269}},
+        {"CapabilityVariableLengthArrayINTEL", SpvWord{5817}},
+        {"ImageChannelDataTypeUnsignedIntRaw12EXT", SpvWord{20}},
+        {"CapabilitySubgroupDispatch", SpvWord{58}},
+        {"MemorySemanticsSequentiallyConsistent", SpvWord{16}},
+        {"DecorationExplicitInterpAMD", SpvWord{4999}},
+        {"DimCube", SpvWord{3}},
+        {"BuiltInObjectRayOriginKHR", SpvWord{5323}},
+        {"ImageFormatRg8Snorm", SpvWord{18}},
+        {"ExecutionModeMaxWorkDimINTEL", SpvWord{5894}},
+        {"DecorationPerViewNV", SpvWord{5272}},
+        {"CapabilityFloatingPointModeINTEL", SpvWord{5583}},
+        {"MemoryModelVulkanKHR", SpvWord{3}},
+        {"DecorationNonReadable", SpvWord{25}},
+        {"BuiltInSubgroupEqMask", SpvWord{4416}},
+        {"BuiltInHitTNV", SpvWord{5332}},
+        {"ExecutionModeInputLinesAdjacency", SpvWord{21}},
+        {"ImageFormatR32f", SpvWord{3}},
+        {"BuiltInTessLevelOuter", SpvWord{11}},
+        {"StorageClassHitAttributeKHR", SpvWord{5339}},
+        {"BuiltInPrimitiveId", SpvWord{7}},
+        {"DecorationPassthroughNV", SpvWord{5250}},
+        {"SelectionControlNone", SpvWord{0}},
+        {"DecorationColMajor", SpvWord{5}},
+        {"CapabilityImageBuffer", SpvWord{47}},
+        {"ImageFormatR32i", SpvWord{24}},
+        {"BuiltInRayGeometryIndexKHR", SpvWord{5352}},
+        {"MemorySemanticsVolatile", SpvWord{32768}},
+        {"CapabilityDotProductInput4x8BitKHR", SpvWord{6017}},
+        {"LoopControlNoFusionINTEL", SpvWord{8388608}},
+        {"CooperativeMatrixLayoutColumnMajorKHR", SpvWord{1}},
+        {"LinkageTypeLinkOnceODR", SpvWord{2}},
+        {"BuiltInPosition", SpvWord{0}},
+        {"LoopControlUnroll", SpvWord{1}},
+        {"CapabilityCooperativeMatrixNV", SpvWord{5357}},
+        {"ExecutionModeContractionOff", SpvWord{31}},
+        {"ExecutionModeInputLines", SpvWord{20}},
+        {"ExecutionModeOutputPoints", SpvWord{27}},
+        {"DecorationVectorComputeCallableFunctionINTEL", SpvWord{6087}},
+        {"CapabilitySampleRateShading", SpvWord{35}},
+        {"ImageOperandsSample", SpvWord{64}},
+        {"CapabilityInputAttachment", SpvWord{40}},
+        {"DecorationCoherent", SpvWord{23}},
+        {"DecorationFlat", SpvWord{14}},
+        {"DecorationVectorComputeFunctionINTEL", SpvWord{5626}},
+        {"CapabilityAtomicFloat32MinMaxEXT", SpvWord{5612}},
+        {"ImageOperandsOffset", SpvWord{16}},
+        {"CapabilityArbitraryPrecisionFixedPointINTEL", SpvWord{5922}},
+        {"BuiltInWorldRayOriginNV", SpvWord{5321}},
+        {"CapabilityGroups", SpvWord{18}},
+        {"CapabilityDotProduct", SpvWord{6019}},
+        {"ImageChannelOrderARGB", SpvWord{7}},
+        {"CapabilityCoreBuiltinsARM", SpvWord{4165}},
+        {"ExecutionModeEarlyAndLateFragmentTestsAMD", SpvWord{5017}},
+        {"MemoryAccessNontemporal", SpvWord{4}},
+        {"CapabilityFragmentShaderShadingRateInterlockEXT", SpvWord{5372}},
+        {"DecorationStream", SpvWord{29}},
+        {"CapabilityDebugInfoModuleINTEL", SpvWord{6114}},
+        {"CapabilityFragmentShadingRateKHR", SpvWord{4422}},
+        {"FunctionControlInline", SpvWord{1}},
+        {"ImageChannelOrderA", SpvWord{1}},
+        {"CapabilityFunctionFloatControlINTEL", SpvWord{5821}},
+        {"BuiltInSubgroupGtMaskKHR", SpvWord{4418}},
+        {"DecorationBankwidthINTEL", SpvWord{5828}},
+        {"DecorationGLSLShared", SpvWord{8}},
+        {"GroupOperationReduce", SpvWord{0}},
+        {"CapabilityClipDistance", SpvWord{32}},
+        {"ExecutionModeSchedulerTargetFmaxMhzINTEL", SpvWord{5903}},
+        {"DecorationMergeINTEL", SpvWord{5834}},
+        {"BuiltInFragStencilRefEXT", SpvWord{5014}},
+        {"RayFlagsSkipTrianglesKHR", SpvWord{256}},
+        {"DecorationVolatile", SpvWord{21}},
+        {"CapabilityWorkgroupMemoryExplicitLayoutKHR", SpvWord{4428}},
+        {"CapabilityAtomicFloat64AddEXT", SpvWord{6034}},
+        {"CapabilityStoragePushConstant16", SpvWord{4435}},
+        {"ExecutionModeStencilRefLessBackAMD", SpvWord{5084}},
+        {"BuiltInWarpsPerSMNV", SpvWord{5374}},
+        {"ExecutionModeOutputVertices", SpvWord{26}},
+        {"SourceLanguageGLSL", SpvWord{2}},
+        {"CapabilityDotProductInput4x8BitPacked", SpvWord{6018}},
+        {"DecorationAliasedPointerEXT", SpvWord{5356}},
+        {"CapabilityMatrix", SpvWord{0}},
+        {"DecorationFPRoundingMode", SpvWord{39}},
+        {"CapabilityMemoryAccessAliasingINTEL", SpvWord{5910}},
+        {"RayQueryCandidateIntersectionTypeRayQueryCandidateIntersectionTriangleKHR", SpvWord{0}},
+        {"CapabilityLinkage", SpvWord{5}},
+        {"ExecutionModeIsolines", SpvWord{25}},
+        {"ScopeInvocation", SpvWord{4}},
+        {"StorageClassHitObjectAttributeNV", SpvWord{5385}},
+        {"CapabilityRayTracingNV", SpvWord{5340}},
+        {"MemorySemanticsMakeVisible", SpvWord{16384}},
+        {"FunctionParameterAttributeNoWrite", SpvWord{6}},
+        {"ImageOperandsConstOffsets", SpvWord{32}},
+        {"FunctionControlDontInline", SpvWord{2}},
+        {"QuantizationModesRND_CONV", SpvWord{6}},
+        {"ExecutionModeRoundingModeRTZ", SpvWord{4463}},
+        {"ExecutionModeVertexOrderCcw", SpvWord{5}},
+        {"CapabilityFPGAMemoryAttributesINTEL", SpvWord{5824}},
+        {"CapabilityStorageTexelBufferArrayDynamicIndexingEXT", SpvWord{5305}},
+        {"ExecutionModelMissKHR", SpvWord{5317}},
+        {"CapabilityMeshShadingNV", SpvWord{5266}},
+        {"CapabilityVariablePointersStorageBuffer", SpvWord{4441}},
+        {"CapabilityRayTracingMotionBlurNV", SpvWord{5341}},
+        {"DecorationMaxByteOffset", SpvWord{45}},
+        {"StorageClassImage", SpvWord{11}},
+        {"DecorationMMHostInterfaceMaxBurstINTEL", SpvWord{6181}},
+        {"ImageChannelOrderABGR", SpvWord{19}},
+        {"CooperativeMatrixUseMatrixAKHR", SpvWord{0}},
+        {"ImageChannelDataTypeSignedInt16", SpvWord{8}},
+        {"StorageClassFunction", SpvWord{7}},
+        {"CapabilityRuntimeDescriptorArrayEXT", SpvWord{5302}},
+        {"RayQueryIntersectionRayQueryCommittedIntersectionKHR", SpvWord{1}},
+        {"DecorationUserSemantic", SpvWord{5635}},
+        {"ImageChannelDataTypeHalfFloat", SpvWord{13}},
+        {"DecorationMMHostInterfaceDataWidthINTEL", SpvWord{6178}},
+        {"ImageFormatR16i", SpvWord{28}},
+        {"ImageChannelOrderDepthStencil", SpvWord{14}},
+        {"DecorationRestrictPointer", SpvWord{5355}},
+        {"ImageFormatR64i", SpvWord{41}},
+        {"CooperativeMatrixOperandsMatrixCSignedComponentsKHR", SpvWord{4}},
+        {"CapabilityShaderInvocationReorderNV", SpvWord{5383}},
+        {"DecorationFunctionRoundingModeINTEL", SpvWord{5822}},
+        {"CapabilityTextureSampleWeightedQCOM", SpvWord{4484}},
+        {"ExecutionModeOutputTriangleStrip", SpvWord{29}},
+        {"BuiltInFragSizeEXT", SpvWord{5292}},
+        {"DecorationNonUniform", SpvWord{5300}},
+        {"DecorationClobberINTEL", SpvWord{5607}},
+        {"DecorationLatencyControlLabelINTEL", SpvWord{6172}},
+        {"CapabilityBFloat16ConversionINTEL", SpvWord{6115}},
+        {"MemoryAccessVolatile", SpvWord{1}},
+        {"DecorationBufferBlock", SpvWord{3}},
+        {"DecorationLocation", SpvWord{30}},
+        {"DecorationUniform", SpvWord{26}},
+        {"CapabilityUniformTexelBufferArrayDynamicIndexing", SpvWord{5304}},
+        {"CapabilityStorageBuffer16BitAccess", SpvWord{4433}},
+        {"ImageChannelDataTypeUnsignedInt8", SpvWord{10}},
+        {"DecorationNonUniformEXT", SpvWord{5300}},
+        {"ExecutionModeVertexOrderCw", SpvWord{4}},
+        {"SourceLanguageNZSL", SpvWord{9}},
+        {"ImageChannelDataTypeUnormShort565", SpvWord{4}},
+        {"CooperativeMatrixOperandsMatrixASignedComponentsKHR", SpvWord{1}},
+        {"BuiltInLayerPerViewNV", SpvWord{5279}},
+        {"BuiltInSMIDNV", SpvWord{5377}},
+        {"ImageChannelDataTypeUnormInt8", SpvWord{2}},
+        {"BuiltInFragInvocationCountEXT", SpvWord{5293}},
+        {"BuiltInHitTriangleVertexPositionsKHR", SpvWord{5335}},
+        {"ImageFormatRgba8Snorm", SpvWord{5}},
+        {"ImageOperandsZeroExtend", SpvWord{8192}},
+        {"DecorationPerPrimitiveNV", SpvWord{5271}},
+        {"DecorationFunctionDenormModeINTEL", SpvWord{5823}},
+        {"BuiltInInstanceId", SpvWord{6}},
+        {"BuiltInBaryCoordSmoothCentroidAMD", SpvWord{4996}},
+        {"ExecutionModeOriginLowerLeft", SpvWord{8}},
+        {"CapabilityMultiViewport", SpvWord{57}},
+        {"DecorationSIMTCallINTEL", SpvWord{5599}},
+        {"DecorationAlignmentId", SpvWord{46}},
+        {"CapabilityStorageBufferArrayDynamicIndexing", SpvWord{30}},
+        {"DecorationNoContraction", SpvWord{42}},
+        {"ExecutionModeInputPoints", SpvWord{19}},
+        {"CapabilityPerViewAttributesNV", SpvWord{5260}},
+        {"DecorationPrefetchINTEL", SpvWord{5902}},
+        {"CapabilityStorageImageWriteWithoutFormat", SpvWord{56}},
+        {"BuiltInBaryCoordNoPerspSampleAMD", SpvWord{4994}},
+        {"LoopControlLoopCoalesceINTEL", SpvWord{1048576}},
+        {"DecorationRegisterMapKernelArgumentINTEL", SpvWord{6176}},
+        {"CapabilityFragmentDensityEXT", SpvWord{5291}},
+        {"DecorationMMHostInterfaceLatencyINTEL", SpvWord{6179}},
+        {"CapabilityUniformBufferArrayNonUniformIndexing", SpvWord{5306}},
+        {"QuantizationModesTRN_ZERO", SpvWord{1}},
+        {"ImageChannelOrderDepth", SpvWord{13}},
+        {"CapabilityPhysicalStorageBufferAddresses", SpvWord{5347}},
+        {"DecorationSpecId", SpvWord{1}},
+        {"SourceLanguageUnknown", SpvWord{0}},
+        {"CapabilityRayQueryKHR", SpvWord{4472}},
+        {"CapabilityFragmentFullyCoveredEXT", SpvWord{5265}},
+        {"DecorationDontStaticallyCoalesceINTEL", SpvWord{5901}},
+        {"ImageFormatRgba16i", SpvWord{22}},
+        {"BuiltInLaunchSizeKHR", SpvWord{5320}},
+        {"BuiltInInvocationsPerPixelNV", SpvWord{5293}},
+        {"BuiltInViewportIndex", SpvWord{10}},
+        {"CapabilityVectorAnyINTEL", SpvWord{5619}},
+        {"Dim3D", SpvWord{2}},
+        {"DecorationHitObjectShaderRecordBufferNV", SpvWord{5386}},
+        {"CapabilityRoundingModeRTE", SpvWord{4467}},
+        {"DecorationFunctionFloatingPointModeINTEL", SpvWord{6080}},
+        {"CapabilityImageCubeArray", SpvWord{34}},
+        {"FPFastMathModeNone", SpvWord{0}},
+        {"BuiltInVertexIndex", SpvWord{42}},
+        {"CapabilityDotProductKHR", SpvWord{6019}},
+        {"ImageFormatRgba32i", SpvWord{21}},
+        {"CapabilityShaderViewportIndexLayerEXT", SpvWord{5254}},
+        {"MemorySemanticsNone", SpvWord{0}},
+        {"DecorationBinding", SpvWord{33}},
+        {"CapabilityFragmentMaskAMD", SpvWord{5010}},
+        {"ScopeDevice", SpvWord{1}},
+        {"CapabilityDemoteToHelperInvocationEXT", SpvWord{5379}},
+        {"MemoryAccessNoAliasINTELMask", SpvWord{131072}},
+        {"ExecutionModelRayGenerationKHR", SpvWord{5313}},
+        {"CooperativeMatrixOperandsMatrixBSignedComponentsKHR", SpvWord{2}},
+        {"CapabilityVulkanMemoryModelKHR", SpvWord{5345}},
+        {"ExecutionModeShadingRateInterlockUnorderedEXT", SpvWord{5371}},
+        {"ImageChannelDataTypeFloat", SpvWord{14}},
+        {"BuiltInShadingRateKHR", SpvWord{4444}},
+        {"ImageOperandsBias", SpvWord{1}},
+        {"FunctionControlNone", SpvWord{0}},
+        {"ExecutionModeNonCoherentColorAttachmentReadEXT", SpvWord{4169}},
+        {"ExecutionModeStencilRefGreaterBackAMD", SpvWord{5083}},
+        {"MemoryAccessNonPrivatePointerKHR", SpvWord{32}},
+        {"ImageChannelDataTypeUnsignedInt32", SpvWord{12}},
+        {"DecorationMaxConcurrencyINTEL", SpvWord{5918}},
+        {"LoopControlDependencyLength", SpvWord{8}},
+        {"BuiltInHelperInvocation", SpvWord{23}},
+        {"CapabilityFPGALoopControlsINTEL", SpvWord{5888}},
+        {"BuiltInSubgroupLeMask", SpvWord{4419}},
+        {"CapabilityStorageBufferArrayNonUniformIndexingEXT", SpvWord{5308}},
+        {"ImageFormatRg32ui", SpvWord{35}},
+        {"CapabilitySampledImageArrayNonUniformIndexingEXT", SpvWord{5307}},
+        {"BuiltInSubgroupId", SpvWord{40}},
+        {"ImageFormatR11fG11fB10f", SpvWord{8}},
+        {"LoopControlPeelCount", SpvWord{128}},
+        {"BuiltInSubgroupLeMaskKHR", SpvWord{4419}},
+        {"CapabilityNamedBarrier", SpvWord{59}},
+        {"DecorationSingleElementVectorINTEL", SpvWord{6085}},
+        {"DecorationForcePow2DepthINTEL", SpvWord{5836}},
+        {"DimTileImageDataEXT", SpvWord{4173}},
+        {"BuiltInBaseVertex", SpvWord{4424}},
+        {"DecorationUniformId", SpvWord{27}},
+        {"BuiltInBaryCoordPullModelAMD", SpvWord{4998}},
+        {"ExecutionModeDerivativeGroupQuadsNV", SpvWord{5289}},
+        {"AccessQualifierReadOnly", SpvWord{0}},
+        {"StorageClassPrivate", SpvWord{6}},
+        {"CapabilityArbitraryPrecisionIntegersINTEL", SpvWord{5844}},
+        {"CapabilityRayTracingProvisionalKHR", SpvWord{5353}},
+        {"MemorySemanticsMakeAvailable", SpvWord{8192}},
+        {"CapabilityShaderNonUniform", SpvWord{5301}},
+        {"CapabilitySampled1D", SpvWord{43}},
+        {"ImageFormatRgba8", SpvWord{4}},
+        {"CapabilityImageGatherExtended", SpvWord{25}},
+        {"CapabilitySubgroupBufferBlockIOINTEL", SpvWord{5569}},
+        {"CapabilityStorageUniform16", SpvWord{4434}},
+        {"BuiltInCullMaskKHR", SpvWord{6021}},
+        {"DecorationCentroid", SpvWord{16}},
+        {"CapabilityRayCullMaskKHR", SpvWord{6020}},
+        {"CapabilityTileImageStencilReadAccessEXT", SpvWord{4168}},
+        {"ImageFormatR8i", SpvWord{29}},
+        {"CapabilityShaderStereoViewNV", SpvWord{5259}},
+        {"Dim1D", SpvWord{0}},
+        {"CapabilityStorageImageArrayNonUniformIndexing", SpvWord{5309}},
+        {"ExecutionModeOutputPrimitivesNV", SpvWord{5270}},
+        {"DecorationAlignment", SpvWord{44}},
+        {"BuiltInVertexId", SpvWord{5}},
+        {"ImageFormatRg8ui", SpvWord{37}},
+        {"FunctionParameterAttributeZext", SpvWord{0}},
+        {"CapabilityRayTracingPositionFetchKHR", SpvWord{5336}},
+        {"CapabilityVulkanMemoryModelDeviceScope", SpvWord{5346}},
+        {"MemorySemanticsImageMemory", SpvWord{2048}},
+        {"StorageClassCrossWorkgroup", SpvWord{5}},
+        {"StorageClassInput", SpvWord{1}},
+        {"MemoryModelSimple", SpvWord{0}},
+        {"MemorySemanticsSubgroupMemory", SpvWord{128}},
+        {"StorageClassHostOnlyINTEL", SpvWord{5937}},
+        {"CapabilityImageQuery", SpvWord{50}},
+        {"ExecutionModeLocalSizeHint", SpvWord{18}},
+        {"ImageOperandsSignExtend", SpvWord{4096}},
+        {"ExecutionModelCallableKHR", SpvWord{5318}},
+        {"CapabilityIOPipesINTEL", SpvWord{5943}},
+        {"KernelEnqueueFlagsWaitKernel", SpvWord{1}},
+        {"CapabilityImageReadWriteLodAMD", SpvWord{5015}},
+        {"ImageFormatR8ui", SpvWord{39}},
+        {"ExecutionModeInvocations", SpvWord{0}},
+        {"ExecutionModeNoGlobalOffsetINTEL", SpvWord{5895}},
+        {"QuantizationModesRND_INF", SpvWord{4}},
+        {"RayFlagsTerminateOnFirstHitKHR", SpvWord{4}},
+        {"CapabilityAtomicStorageOps", SpvWord{4445}},
+        {"CapabilityFPGARegINTEL", SpvWord{5948}},
+        {"LoopControlMaxIterations", SpvWord{32}},
+        {"ExecutionModelIntersectionKHR", SpvWord{5314}},
+        {"BuiltInPrimitiveCountNV", SpvWord{5275}},
+        {"CapabilityFloat16ImageAMD", SpvWord{5008}},
+        {"ScopeShaderCallKHR", SpvWord{6}},
+        {"BuiltInHitKindNV", SpvWord{5333}},
+        {"ExecutionModeDepthUnchanged", SpvWord{16}},
+        {"BuiltInSubgroupMaxSize", SpvWord{37}},
+        {"CapabilityGroupNonUniformArithmetic", SpvWord{63}},
+        {"LoopControlPipelineEnableINTEL", SpvWord{524288}},
+        {"CapabilitySignedZeroInfNanPreserve", SpvWord{4466}},
+        {"MemorySemanticsMakeVisibleKHR", SpvWord{16384}},
+        {"ExecutionModeOutputTrianglesEXT", SpvWord{5298}},
+        {"BuiltInClipDistance", SpvWord{3}},
+        {"ExecutionModelMeshEXT", SpvWord{5365}},
+        {"ImageChannelOrderRx", SpvWord{10}},
+        {"DecorationConstant", SpvWord{22}},
+        {"ExecutionModeStencilRefUnchangedBackAMD", SpvWord{5082}},
+        {"DecorationSample", SpvWord{17}},
+        {"BuiltInEnqueuedWorkgroupSize", SpvWord{32}},
+        {"CapabilityFloat16", SpvWord{9}},
+        {"CapabilityBitInstructions", SpvWord{6025}},
+        {"CooperativeMatrixOperandsSaturatingAccumulationKHR", SpvWord{16}},
+        {"BuiltInCoreIDARM", SpvWord{4160}},
+        {"CapabilityFPMaxErrorINTEL", SpvWord{6169}},
+        {"CapabilityTextureBlockMatchQCOM", SpvWord{4486}},
+        {"CapabilityInt64ImageEXT", SpvWord{5016}},
+        {"BuiltInInstanceIndex", SpvWord{43}},
+        {"ExecutionModePostDepthCoverage", SpvWord{4446}},
+        {"ScopeSubgroup", SpvWord{3}},
+        {"CapabilityStencilExportEXT", SpvWord{5013}},
+        {"MemorySemanticsRelease", SpvWord{4}},
+        {"StorageClassCodeSectionINTEL", SpvWord{5605}},
+        {"MemoryAccessAliasScopeINTELMask", SpvWord{65536}},
+        {"FragmentShadingRateVertical4Pixels", SpvWord{2}},
+        {"FunctionControlPure", SpvWord{4}},
+        {"DecorationVectorComputeVariableINTEL", SpvWord{5624}},
+        {"StorageClassIncomingRayPayloadNV", SpvWord{5342}},
+        {"FunctionParameterAttributeNoCapture", SpvWord{5}},
+        {"CapabilityUniformAndStorageBuffer16BitAccess", SpvWord{4434}},
+        {"CapabilityCullDistance", SpvWord{33}},
+        {"DecorationBlock", SpvWord{2}},
+        {"ExecutionModelTaskEXT", SpvWord{5364}},
+        {"MemoryAccessMakePointerVisible", SpvWord{16}},
+        {"DecorationGLSLPacked", SpvWord{9}},
+        {"CapabilityShadingRateNV", SpvWord{5291}},
+        {"CapabilityUSMStorageClassesINTEL", SpvWord{5935}},
+        {"ExecutionModeSpacingFractionalEven", SpvWord{2}},
+        {"BuiltInNumWorkgroups", SpvWord{24}},
+        {"BuiltInCullDistance", SpvWord{4}},
+        {"ExecutionModeOutputPrimitivesEXT", SpvWord{5270}},
+        {"LoopControlDependencyArrayINTEL", SpvWord{262144}},
+        {"DecorationFPMaxErrorDecorationINTEL", SpvWord{6170}},
+        {"ImageChannelOrderIntensity", SpvWord{8}},
+        {"DecorationRestrictPointerEXT", SpvWord{5355}},
+        {"Dim2D", SpvWord{1}},
+        {"ImageOperandsMakeTexelVisible", SpvWord{512}},
+        {"CapabilityStorageTexelBufferArrayDynamicIndexing", SpvWord{5305}},
+        {"ImageFormatR16ui", SpvWord{38}},
+        {"CapabilityGroupNonUniformPartitionedNV", SpvWord{5297}},
+        {"FunctionParameterAttributeRuntimeAlignedINTEL", SpvWord{5940}},
+        {"BuiltInWarpMaxIDARM", SpvWord{4164}},
+        {"CapabilityGroupNonUniformRotateKHR", SpvWord{6026}},
+        {"CapabilityFPGAMemoryAccessesINTEL", SpvWord{5898}},
+        {"MemorySemanticsOutputMemoryKHR", SpvWord{4096}},
+        {"CapabilityKernelAttributesINTEL", SpvWord{5892}},
+        {"RayQueryCommittedIntersectionTypeRayQueryCommittedIntersectionNoneKHR", SpvWord{0}},
+        {"CapabilityShaderViewportMaskNV", SpvWord{5255}},
+        {"ImageFormatRgba16", SpvWord{10}},
+        {"CapabilityWorkgroupMemoryExplicitLayout8BitAccessKHR", SpvWord{4429}},
+        {"ExecutionModeEarlyFragmentTests", SpvWord{9}},
+        {"ImageFormatRg8i", SpvWord{27}},
+        {"CapabilityShaderViewportIndex", SpvWord{70}},
+        {"BuiltInFragDepth", SpvWord{22}},
+        {"MemoryAccessMakePointerAvailableKHR", SpvWord{8}},
+        {"ImageFormatRg16Snorm", SpvWord{17}},
+        {"MemorySemanticsAtomicCounterMemory", SpvWord{1024}},
+        {"CapabilityShaderSMBuiltinsNV", SpvWord{5373}},
+        {"LoopControlNone", SpvWord{0}},
+        {"ImageChannelOrderRGx", SpvWord{11}},
+        {"LoopControlMaxConcurrencyINTEL", SpvWord{131072}},
+        {"CapabilityCooperativeMatrixKHR", SpvWord{6022}},
+        {"CapabilityInt16", SpvWord{22}},
+        {"CapabilityInt64Atomics", SpvWord{12}},
+        {"DecorationLinkageAttributes", SpvWord{41}},
+        {"CapabilityFPGADSPControlINTEL", SpvWord{5908}},
+        {"CapabilityStorageImageArrayNonUniformIndexingEXT", SpvWord{5309}},
+        {"BuiltInWorkgroupId", SpvWord{26}},
+        {"CapabilityFPGALatencyControlINTEL", SpvWord{6171}},
+        {"BuiltInPrimitiveIndicesNV", SpvWord{5276}},
+        {"BuiltInRayTmaxKHR", SpvWord{5326}},
+        {"CapabilityDerivativeControl", SpvWord{51}},
+        {"DecorationBurstCoalesceINTEL", SpvWord{5899}},
+        {"ExecutionModelTessellationControl", SpvWord{1}},
+        {"CapabilityBindlessTextureNV", SpvWord{5390}},
+        {"BuiltInHitKindKHR", SpvWord{5333}},
+        {"CapabilityTessellationPointSize", SpvWord{23}},
+        {"CapabilityInputAttachmentArrayDynamicIndexingEXT", SpvWord{5303}},
+        {"RayFlagsForceOpacityMicromap2StateEXT", SpvWord{1024}},
+        {"ExecutionModeSubgroupUniformControlFlowKHR", SpvWord{4421}},
+        {"CapabilityDotProductInput4x8BitPackedKHR", SpvWord{6018}},
+        {"ExecutionModelMeshNV", SpvWord{5268}},
+        {"ImageChannelOrderRG", SpvWord{2}},
+        {"GroupOperationClusteredReduce", SpvWord{3}},
+        {"CapabilityRayQueryProvisionalKHR", SpvWord{4471}},
+        {"ExecutionModelFragment", SpvWord{4}},
+        {"BuiltInPrimitiveShadingRateKHR", SpvWord{4432}},
+        {"ExecutionModelAnyHitKHR", SpvWord{5315}},
+        {"DecorationBoundSamplerNV", SpvWord{5400}},
+        {"DecorationNoSignedWrap", SpvWord{4469}},
+        {"CapabilityInputAttachmentArrayNonUniformIndexingEXT", SpvWord{5310}},
+        {"ExecutionModeStreamingInterfaceINTEL", SpvWord{6154}},
+        {"StorageClassTileImageEXT", SpvWord{4172}},
+        {"FPFastMathModeAllowReassocINTEL", SpvWord{131072}},
+        {"CapabilityAtomicFloat64MinMaxEXT", SpvWord{5613}},
+        {"AddressingModelPhysical32", SpvWord{1}},
+        {"DecorationFuncParamAttr", SpvWord{38}},
+        {"BuiltInSubgroupSize", SpvWord{36}},
+        {"FPFastMathModeNSZ", SpvWord{4}},
+        {"CapabilityUniformDecoration", SpvWord{71}},
+        {"StorageClassGeneric", SpvWord{8}},
+        {"ExecutionModeOutputLineStrip", SpvWord{28}},
+        {"SamplerAddressingModeRepeat", SpvWord{3}},
+        {"ExecutionModelTessellationEvaluation", SpvWord{2}},
+        {"ExecutionModeSubgroupSize", SpvWord{35}},
+        {"LoopControlIterationMultiple", SpvWord{64}},
+        {"ExecutionModeDenormPreserve", SpvWord{4459}},
+        {"ExecutionModeStencilRefGreaterFrontAMD", SpvWord{5080}},
+        {"ExecutionModeOutputTrianglesNV", SpvWord{5298}},
+        {"BuiltInCoreCountARM", SpvWord{4161}},
+        {"DecorationPerVertexKHR", SpvWord{5285}},
+        {"ExecutionModeDepthGreater", SpvWord{14}},
+        {"AccessQualifierReadWrite", SpvWord{2}},
+        {"ExecutionModeNumSIMDWorkitemsINTEL", SpvWord{5896}},
+        {"BuiltInPrimitiveLineIndicesEXT", SpvWord{5295}},
+        {"CapabilityRayTracingKHR", SpvWord{4479}},
+        {"MemoryAccessMakePointerVisibleKHR", SpvWord{16}},
+        {"DecorationMemoryINTEL", SpvWord{5826}},
+        {"CapabilityFragmentBarycentricNV", SpvWord{5284}},
+        {"FunctionParameterAttributeSret", SpvWord{3}},
+        {"CapabilityGeometryPointSize", SpvWord{24}},
+        {"BuiltInNumEnqueuedSubgroups", SpvWord{39}},
+        {"LoopControlDontUnroll", SpvWord{2}},
+        {"StorageClassWorkgroup", SpvWord{4}},
+        {"SamplerFilterModeNearest", SpvWord{0}},
+        {"DecorationStackCallINTEL", SpvWord{5627}},
+        {"RayQueryIntersectionRayQueryCandidateIntersectionKHR", SpvWord{0}},
+        {"BuiltInFragmentSizeNV", SpvWord{5292}},
+        {"BuiltInBaryCoordNV", SpvWord{5286}},
+        {"LoopControlInitiationIntervalINTEL", SpvWord{65536}},
+        {"CapabilityMeshShadingEXT", SpvWord{5283}},
+        {"SamplerAddressingModeNone", SpvWord{0}},
+        {"BuiltInFragCoord", SpvWord{15}},
+        {"ExecutionModelTaskNV", SpvWord{5267}},
+        {"ImageFormatRg16ui", SpvWord{36}},
+        {"CapabilityPipes", SpvWord{17}},
+        {"ImageFormatRgba32f", SpvWord{1}},
+        {"ExecutionModeDerivativeGroupLinearNV", SpvWord{5290}},
+        {"ImageOperandsConstOffset", SpvWord{8}},
+        {"CapabilityAddresses", SpvWord{4}},
+        {"CapabilityInputAttachmentArrayNonUniformIndexing", SpvWord{5310}},
+        {"FragmentShadingRateVertical2Pixels", SpvWord{1}},
+        {"FPFastMathModeAllowRecip", SpvWord{8}},
+        {"ImageFormatR64ui", SpvWord{40}},
+        {"CapabilitySubgroupImageMediaBlockIOINTEL", SpvWord{5579}},
+        {"DecorationMaxPrivateCopiesINTEL", SpvWord{5829}},
+        {"DecorationStableKernelArgumentINTEL", SpvWord{6183}},
+        {"BuiltInBaseInstance", SpvWord{4425}},
+        {"BuiltInWorkDim", SpvWord{30}},
+        {"CapabilityDeviceGroup", SpvWord{4437}},
+        {"CapabilityStorageTexelBufferArrayNonUniformIndexing", SpvWord{5312}},
+        {"BuiltInPositionPerViewNV", SpvWord{5261}},
+        {"CapabilityMinLod", SpvWord{42}},
+        {"CapabilityFragmentShaderSampleInterlockEXT", SpvWord{5363}},
+        {"BuiltInWorkgroupSize", SpvWord{25}},
+        {"StorageClassCallableDataNV", SpvWord{5328}},
+        {"ExecutionModelRayGenerationNV", SpvWord{5313}},
+        {"ExecutionModeDepthLess", SpvWord{15}},
+        {"SamplerFilterModeLinear", SpvWord{1}},
+        {"BuiltInObjectRayDirectionNV", SpvWord{5324}},
+        {"CapabilityFloat16Buffer", SpvWord{8}},
+        {"CapabilityIntegerFunctions2INTEL", SpvWord{5584}},
+        {"LoopControlSpeculatedIterationsINTEL", SpvWord{4194304}},
+        {"DecorationIOPipeStorageINTEL", SpvWord{5944}},
+        {"BuiltInDeviceIndex", SpvWord{4438}},
+        {"CapabilityVectorComputeINTEL", SpvWord{5617}},
+        {"CapabilityUnstructuredLoopControlsINTEL", SpvWord{5886}},
+        {"DecorationMatrixStride", SpvWord{7}},
+        {"DecorationPatch", SpvWord{15}},
+        {"BuiltInInstanceCustomIndexKHR", SpvWord{5327}},
+        {"CapabilityFPGAKernelAttributesv2INTEL", SpvWord{6161}},
+        {"BuiltInSecondaryPositionNV", SpvWord{5257}},
+        {"ImageFormatRgb10A2", SpvWord{11}},
+        {"CapabilitySubgroupShuffleINTEL", SpvWord{5568}},
+        {"CapabilityRayTraversalPrimitiveCullingKHR", SpvWord{4478}},
+        {"CapabilityAsmINTEL", SpvWord{5606}},
+        {"ExecutionModeQuads", SpvWord{24}},
+        {"DecorationRelaxedPrecision", SpvWord{0}},
+        {"StorageClassShaderRecordBufferNV", SpvWord{5343}},
+        {"ExecutionModeOriginUpperLeft", SpvWord{7}},
+        {"CapabilityInt8", SpvWord{39}},
+        {"CapabilityDotProductInputAll", SpvWord{6016}},
+        {"CapabilityInterpolationFunction", SpvWord{52}},
+        {"CapabilityGroupNonUniformBallot", SpvWord{64}},
+        {"ExecutionModeRoundingModeRTPINTEL", SpvWord{5620}},
+        {"CapabilityRoundToInfinityINTEL", SpvWord{5582}},
+        {"CapabilityOptNoneINTEL", SpvWord{6094}},
+        {"OverflowModesSAT_SYM", SpvWord{3}},
+        {"CapabilityExpectAssumeKHR", SpvWord{5629}},
+        {"DecorationSaturatedConversion", SpvWord{28}},
+        {"CapabilityRuntimeAlignedAttributeINTEL", SpvWord{5939}},
+        {"ImageFormatR32ui", SpvWord{33}},
+        {"BuiltInGlobalLinearId", SpvWord{34}},
+        {"ExecutionModeTriangles", SpvWord{22}},
+        {"ImageOperandsNonPrivateTexel", SpvWord{1024}},
+        {"SelectionControlDontFlatten", SpvWord{2}},
+        {"BuiltInIncomingRayFlagsNV", SpvWord{5351}},
+        {"BuiltInSMCountNV", SpvWord{5375}},
+        {"CapabilitySubgroupImageBlockIOINTEL", SpvWord{5570}},
+        {"DecorationSecondaryViewportRelativeNV", SpvWord{5256}},
+        {"MemoryAccessAligned", SpvWord{2}},
+        {"ExecutionModelCallableNV", SpvWord{5318}},
+        {"CapabilityDenormFlushToZero", SpvWord{4465}},
+        {"CapabilityComputeDerivativeGroupLinearNV", SpvWord{5350}},
+        {"StorageClassCallableDataKHR", SpvWord{5328}},
+        {"CapabilityFragmentBarycentricKHR", SpvWord{5284}},
+        {"SourceLanguageOpenCL_CPP", SpvWord{4}},
+        {"LinkageTypeExport", SpvWord{0}},
+        {"DimBuffer", SpvWord{5}},
+        {"DimRect", SpvWord{4}},
+        {"ImageChannelDataTypeUnsignedIntRaw10EXT", SpvWord{19}},
+        {"ExecutionModePixelInterlockOrderedEXT", SpvWord{5366}},
+        {"CapabilityRoundingModeRTZ", SpvWord{4468}},
+        {"ImageChannelDataTypeUnsignedInt16", SpvWord{11}},
+        {"ImageChannelDataTypeSnormInt8", SpvWord{0}},
+        {"CapabilityLoopFuseINTEL", SpvWord{5906}},
+        {"GroupOperationExclusiveScan", SpvWord{2}},
+        {"ImageChannelOrdersRGB", SpvWord{15}},
+        {"DecorationNoPerspective", SpvWord{13}},
+        {"BuiltInGlobalInvocationId", SpvWord{28}},
+        {"CapabilityComputeDerivativeGroupQuadsNV", SpvWord{5288}},
+        {"BuiltInPointCoord", SpvWord{16}},
+        {"CapabilityFPGAClusterAttributesINTEL", SpvWord{5904}},
+        {"ScopeQueueFamilyKHR", SpvWord{5}},
+        {"GroupOperationPartitionedExclusiveScanNV", SpvWord{8}},
+        {"BuiltInPrimitivePointIndicesEXT", SpvWord{5294}},
+        {"DecorationPerTaskNV", SpvWord{5273}},
+        {"CapabilityStoragePushConstant8", SpvWord{4450}},
+        {"ImageChannelDataTypeSignedInt32", SpvWord{9}},
+        {"ImageChannelOrderLuminance", SpvWord{9}},
+        {"FPDenormModePreserve", SpvWord{0}},
+        {"BuiltInLocalInvocationId", SpvWord{27}},
+        {"ExecutionModelMissNV", SpvWord{5317}},
+        {"CapabilityWorkgroupMemoryExplicitLayout16BitAccessKHR", SpvWord{4430}},
+        {"ImageChannelOrdersRGBx", SpvWord{16}},
+        {"BuiltInSubgroupGtMask", SpvWord{4418}},
+        {"FragmentShadingRateHorizontal2Pixels", SpvWord{4}},
+        {"CapabilityAtomicFloat16AddEXT", SpvWord{6095}},
+        {"ImageChannelOrdersBGRA", SpvWord{18}},
+        {"DecorationConduitKernelArgumentINTEL", SpvWord{6175}},
+        {"BuiltInTessLevelInner", SpvWord{12}},
+        {"DecorationMaxByteOffsetId", SpvWord{47}},
+        {"ExecutionModelAnyHitNV", SpvWord{5315}},
+        {"CapabilityGroupNonUniformQuad", SpvWord{68}},
+        {"CapabilityDotProductInputAllKHR", SpvWord{6016}},
+        {"SourceLanguageWGSL", SpvWord{10}},
+        {"ExecutionModeLocalSizeId", SpvWord{38}},
+        {"StorageClassAtomicCounter", SpvWord{10}},
+        {"CapabilityKernel", SpvWord{6}},
+        {"DecorationAliasScopeINTEL", SpvWord{5914}},
+        {"ImageOperandsMakeTexelVisibleKHR", SpvWord{512}},
+        {"CapabilityInputAttachmentArrayDynamicIndexing", SpvWord{5303}},
+        {"ExecutionModeInitializer", SpvWord{33}},
+        {"BuiltInTessCoord", SpvWord{13}},
+        {"RayFlagsSkipAABBsKHR", SpvWord{512}},
+        {"MemorySemanticsRelaxed", SpvWord{0}},
+        {"DecorationLatencyControlConstraintINTEL", SpvWord{6173}},
+        {"CapabilityTessellation", SpvWord{3}},
+        {"ExecutionModeSharedLocalMemorySizeINTEL", SpvWord{5618}},
+        {"CooperativeMatrixOperandsMatrixResultSignedComponentsKHR", SpvWord{8}},
+        {"BuiltInBaryCoordSmoothAMD", SpvWord{4995}},
+        {"BuiltInRayTmaxNV", SpvWord{5326}},
+        {"ExecutionModelGeometry", SpvWord{3}},
+        {"ImageFormatRgb10a2ui", SpvWord{34}},
+        {"ExecutionModelClosestHitNV", SpvWord{5316}},
+        {"RayFlagsCullOpaqueKHR", SpvWord{64}},
+        {"BuiltInCurrentRayTimeNV", SpvWord{5334}},
+        {"CooperativeMatrixUseMatrixAccumulatorKHR", SpvWord{2}},
+        {"BuiltInInvocationId", SpvWord{8}},
+        {"DecorationMMHostInterfaceReadWriteModeINTEL", SpvWord{6180}},
+        {"ExecutionModelGLCompute", SpvWord{5}},
+        {"CapabilityGroupNonUniformShuffleRelative", SpvWord{66}},
+        {"CapabilitySampledImageArrayNonUniformIndexing", SpvWord{5307}},
+        {"CapabilityStorageBuffer8BitAccess", SpvWord{4448}},
+        {"StorageClassPhysicalStorageBuffer", SpvWord{5349}},
+        {"DecorationRowMajor", SpvWord{4}},
+        {"CapabilitySubgroupVoteKHR", SpvWord{4431}},
+        {"ExecutionModeShadingRateInterlockOrderedEXT", SpvWord{5370}},
+        {"ImageChannelDataTypeUnormInt16", SpvWord{3}},
+        {"FunctionParameterAttributeSext", SpvWord{1}},
+        {"FPOperationModeALT", SpvWord{1}},
+        {"RayFlagsCullFrontFacingTrianglesKHR", SpvWord{32}},
+        {"RayQueryCommittedIntersectionTypeRayQueryCommittedIntersectionTriangleKHR", SpvWord{1}},
+        {"CapabilitySubgroupAvcMotionEstimationIntraINTEL", SpvWord{5697}},
+        {"CapabilityFunctionPointersINTEL", SpvWord{5603}},
+        {"ExecutionModeSampleInterlockUnorderedEXT", SpvWord{5369}},
+        {"CapabilityUniformTexelBufferArrayNonUniformIndexing", SpvWord{5311}},
+        {"BuiltInWarpIDARM", SpvWord{4163}},
+        {"CapabilityStorageImageExtendedFormats", SpvWord{49}},
+        {"CapabilityBlockingPipesINTEL", SpvWord{5945}},
+        {"ExecutionModeXfb", SpvWord{11}},
+        {"BuiltInSubgroupEqMaskKHR", SpvWord{4416}},
+        {"BuiltInDrawIndex", SpvWord{4426}},
+        {"ImageChannelDataTypeUnormInt101010_2", SpvWord{16}},
+        {"CapabilityVulkanMemoryModelDeviceScopeKHR", SpvWord{5346}},
+        {"ExecutionModeDenormFlushToZero", SpvWord{4460}},
+        {"CapabilityStorageTexelBufferArrayNonUniformIndexingEXT", SpvWord{5312}},
+        {"BuiltInGlobalSize", SpvWord{31}},
+        {"BuiltInWarpIDNV", SpvWord{5376}},
+        {"CapabilitySparseResidency", SpvWord{41}},
+        {"CapabilityImage1D", SpvWord{44}},
+        {"ImageFormatR16Snorm", SpvWord{19}},
+        {"ImageFormatR16f", SpvWord{9}},
+        {"DecorationNumbanksINTEL", SpvWord{5827}},
+        {"SamplerAddressingModeClampToEdge", SpvWord{1}},
+        {"DecorationBindlessImageNV", SpvWord{5399}},
+        {"DecorationGlobalVariableOffsetINTEL", SpvWord{5628}},
+        {"StorageClassPushConstant", SpvWord{9}},
+        {"BuiltInSamplePosition", SpvWord{19}},
+        {"BuiltInWorldRayDirectionNV", SpvWord{5322}},
+        {"ScopeWorkgroup", SpvWord{2}},
+        {"DecorationBufferLocationINTEL", SpvWord{5921}},
+        {"BuiltInIncomingRayFlagsKHR", SpvWord{5351}},
+        {"CapabilityGroupNonUniformClustered", SpvWord{67}},
+        {"DecorationOffset", SpvWord{35}},
+        {"StorageClassPhysicalStorageBufferEXT", SpvWord{5349}},
+        {"BuiltInViewportMaskNV", SpvWord{5253}},
+        {"MemoryModelGLSL450", SpvWord{1}},
+        {"BuiltInBaryCoordSmoothSampleAMD", SpvWord{4997}},
+        {"CapabilityGeometry", SpvWord{2}},
+        {"BuiltInViewportMaskPerViewNV", SpvWord{5262}},
+        {"ExecutionModeFloatingPointModeALTINTEL", SpvWord{5622}},
+        {"ExecutionModeFinalizer", SpvWord{34}},
+        {"CapabilityTileImageDepthReadAccessEXT", SpvWord{4167}},
+        {"BuiltInBaryCoordNoPerspCentroidAMD", SpvWord{4993}},
+        {"BuiltInBaryCoordKHR", SpvWord{5286}},
+        {"CapabilitySubgroupAvcMotionEstimationINTEL", SpvWord{5696}},
+        {"RayQueryCandidateIntersectionTypeRayQueryCandidateIntersectionAABBKHR", SpvWord{1}},
+        {"CapabilityTextureBoxFilterQCOM", SpvWord{4485}},
+        {"KernelProfilingInfoCmdExecTime", SpvWord{1}},
+        {"BuiltInFrontFacing", SpvWord{17}},
+        {"CapabilityDrawParameters", SpvWord{4427}},
+        {"ImageChannelDataTypeUnormShort555", SpvWord{5}},
+        {"KernelProfilingInfoNone", SpvWord{0}},
+        {"ImageFormatUnknown", SpvWord{0}},
+        {"GroupOperationPartitionedReduceNV", SpvWord{6}},
+        {"BuiltInLaunchIdKHR", SpvWord{5319}},
+        {"ImageFormatR8Snorm", SpvWord{20}},
+        {"CapabilityFPGABufferLocationINTEL", SpvWord{5920}},
+        {"BuiltInObjectRayDirectionKHR", SpvWord{5324}},
+        {"ExecutionModelVertex", SpvWord{0}},
+        {"BuiltInSecondaryViewportMaskNV", SpvWord{5258}},
+        {"DecorationInputAttachmentIndex", SpvWord{43}},
+        {"CapabilityRuntimeDescriptorArray", SpvWord{5302}},
+        {"LoopControlDependencyInfinite", SpvWord{4}},
+        {"GroupOperationPartitionedInclusiveScanNV", SpvWord{7}},
+        {"ImageFormatRgba8i", SpvWord{23}},
+        {"CapabilityShaderNonUniformEXT", SpvWord{5301}},
+        {"DecorationMaxReplicatesINTEL", SpvWord{5832}},
+        {"CapabilityRayTracingOpacityMicromapEXT", SpvWord{5381}},
+        {"ExecutionModeSignedZeroInfNanPreserve", SpvWord{4461}},
+        {"ImageOperandsLod", SpvWord{2}},
+        {"ExecutionModeMaxWorkgroupSizeINTEL", SpvWord{5893}},
+        {"LinkageTypeImport", SpvWord{1}},
+        {"RayFlagsNoneKHR", SpvWord{0}},
+        {"BuiltInLocalInvocationIndex", SpvWord{29}},
+        {"BuiltInBaryCoordNoPerspNV", SpvWord{5287}},
+        {"DecorationViewportRelativeNV", SpvWord{5252}},
+        {"ExecutionModeStencilRefUnchangedFrontAMD", SpvWord{5079}},
+        {"ScopeCrossDevice", SpvWord{0}},
+        {"CapabilityGenericPointer", SpvWord{38}},
+        {"FPRoundingModeRTP", SpvWord{2}},
+        {"KernelEnqueueFlagsWaitWorkGroup", SpvWord{2}},
+        {"DecorationPipelineEnableINTEL", SpvWord{5919}},
+        {"ImageFormatRgba16ui", SpvWord{31}},
+        {"FunctionParameterAttributeByVal", SpvWord{2}},
+        {"MemoryModelVulkan", SpvWord{3}},
+        {"ImageFormatRg8", SpvWord{13}},
+        {"QuantizationModesRND_ZERO", SpvWord{3}},
+        {"MemorySemanticsUniformMemory", SpvWord{64}},
+        {"CapabilityImageRect", SpvWord{36}},
+        {"ExecutionModeRegisterMapInterfaceINTEL", SpvWord{6160}},
+        {"BuiltInObjectRayOriginNV", SpvWord{5323}},
+        {"CapabilityPhysicalStorageBufferAddressesEXT", SpvWord{5347}},
+        {"StorageClassIncomingCallableDataKHR", SpvWord{5329}},
+        {"AddressingModelPhysical64", SpvWord{2}},
+        {"FPFastMathModeFast", SpvWord{16}},
+        {"ExecutionModeFloatingPointModeIEEEINTEL", SpvWord{5623}},
+        {"BuiltInClipDistancePerViewNV", SpvWord{5277}},
+        {"FPRoundingModeRTN", SpvWord{3}},
+        {"PackedVectorFormatPackedVectorFormat4x8BitKHR", SpvWord{0}},
+        {"DecorationOverrideCoverageNV", SpvWord{5248}},
+        {"FunctionControlConst", SpvWord{8}},
+        {"ImageFormatRg16", SpvWord{12}},
+        {"ExecutionModePixelInterlockUnorderedEXT", SpvWord{5367}},
+        {"CapabilityPipeStorage", SpvWord{60}},
+        {"SourceLanguageCPP_for_OpenCL", SpvWord{6}},
+        {"ImageFormatRg16i", SpvWord{26}},
+        {"ScopeQueueFamily", SpvWord{5}},
+        {"DecorationFPFastMathMode", SpvWord{40}},
+        {"CapabilityVector16", SpvWord{7}},
+        {"AddressingModelLogical", SpvWord{0}},
+        {"ImageFormatRg32f", SpvWord{6}},
+        {"ExecutionModeNonCoherentStencilAttachmentReadEXT", SpvWord{4171}},
+        {"ExecutionModeRoundingModeRTE", SpvWord{4462}},
+        {"ImageOperandsNonPrivateTexelKHR", SpvWord{1024}},
+        {"CapabilitySampledCubeArray", SpvWord{45}},
+        {"ImageOperandsNone", SpvWord{0}},
+        {"DecorationFuseLoopsInFunctionINTEL", SpvWord{5907}},
+        {"FPRoundingModeRTZ", SpvWord{1}},
+        {"CapabilityStorageBufferArrayNonUniformIndexing", SpvWord{5308}},
+        {"CapabilityShaderLayer", SpvWord{69}},
+        {"MemorySemanticsMakeAvailableKHR", SpvWord{8192}},
+        {"BuiltInNumSubgroups", SpvWord{38}},
+        {"ImageFormatRg16f", SpvWord{7}},
+        {"SelectionControlFlatten", SpvWord{1}},
+        {"DecorationReferencedIndirectlyINTEL", SpvWord{5602}},
+        {"DecorationBankBitsINTEL", SpvWord{5835}},
+        {"BuiltInFullyCoveredEXT", SpvWord{5264}},
+        {"CooperativeMatrixLayoutRowMajorKHR", SpvWord{0}},
+        {"DecorationBindlessSamplerNV", SpvWord{5398}},
+        {"ExecutionModeOutputLinesNV", SpvWord{5269}},
+        {"ImageOperandsMinLod", SpvWord{128}},
+        {"QuantizationModesRND_CONV_ODD", SpvWord{7}},
+        {"StorageClassUniform", SpvWord{2}},
+        {"ImageChannelDataTypeUnormInt101010", SpvWord{6}},
+        {"BuiltInSubgroupGeMaskKHR", SpvWord{4417}},
+        {"ExecutionModeStencilRefLessFrontAMD", SpvWord{5081}},
+        {"CooperativeMatrixUseMatrixBKHR", SpvWord{1}},
+        {"CapabilitySampledBuffer", SpvWord{46}},
+        {"MemorySemanticsCrossWorkgroupMemory", SpvWord{512}},
+        {"LoopControlPartialCount", SpvWord{256}},
+        {"CapabilityGeometryStreams", SpvWord{54}},
+        {"BuiltInTaskCountNV", SpvWord{5274}},
+        {"CapabilityDeviceEnqueue", SpvWord{19}},
+        {"ExecutionModeStencilRefReplacingEXT", SpvWord{5027}},
+        {"BuiltInBaryCoordNoPerspAMD", SpvWord{4992}},
+        {"CapabilityImageBasic", SpvWord{13}},
+        {"GroupOperationInclusiveScan", SpvWord{1}},
+        {"AccessQualifierWriteOnly", SpvWord{1}},
+        {"ExecutionModeVecTypeHint", SpvWord{30}},
+        {"DecorationInitiationIntervalINTEL", SpvWord{5917}},
+        {"ExecutionModePixelCenterInteger", SpvWord{6}},
+        {"CapabilityArbitraryPrecisionFloatingPointINTEL", SpvWord{5845}},
+        {"CapabilitySampleMaskPostDepthCoverage", SpvWord{4447}},
+        {"CapabilityFPGAInvocationPipeliningAttributesINTEL", SpvWord{5916}},
+        {"DecorationInvariant", SpvWord{18}},
+        {"DecorationCacheSizeINTEL", SpvWord{5900}},
+        {"DecorationBoundImageNV", SpvWord{5401}},
+        {"LoopControlMaxReinvocationDelayINTEL", SpvWord{33554432}},
+        {"CapabilityFPGAArgumentInterfacesINTEL", SpvWord{6174}},
+        {"ImageFormatRgba8ui", SpvWord{32}},
+        {"OverflowModesSAT_ZERO", SpvWord{2}},
+        {"CapabilityDemoteToHelperInvocation", SpvWord{5379}},
+        {"BuiltInLaunchIdNV", SpvWord{5319}},
+        {"OverflowModesSAT", SpvWord{1}},
+        {"LoopControlLoopCountINTEL", SpvWord{16777216}},
+        {"DecorationFuncParamIOKindINTEL", SpvWord{5625}},
+        {"CapabilityRayQueryPositionFetchKHR", SpvWord{5391}},
+        {"DecorationSinglepumpINTEL", SpvWord{5830}},
+        {"ImageOperandsGrad", SpvWord{4}},
+        {"DecorationMMHostInterfaceWaitRequestINTEL", SpvWord{6182}},
+        {"CapabilityImageFootprintNV", SpvWord{5282}},
+        {"MemoryAccessNone", SpvWord{0}},
+        {"StorageClassStorageBuffer", SpvWord{12}},
+        {"ExecutionModeNamedBarrierCountINTEL", SpvWord{6417}},
+        {"DecorationXfbStride", SpvWord{37}},
+        {"CapabilityUniformTexelBufferArrayDynamicIndexingEXT", SpvWord{5304}},
+        {"CapabilityStorageImageArrayDynamicIndexing", SpvWord{31}},
     };
 
     static const auto hash = [](const UnownedStringSlice& str, UInt32 salt){
@@ -2121,2125 +2121,2125 @@ static bool getOpInfo(const SpvOp& k, SPIRVCoreGrammarInfo::OpInfo& v)
     switch(k)
     {
         case SpvOpNop:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1};
             return true;
         case SpvOpUndef:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3};
             return true;
         case SpvOpSourceContinued:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2};
             return true;
         case SpvOpSource:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 5};
             return true;
         case SpvOpSourceExtension:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2};
             return true;
         case SpvOpName:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3};
             return true;
         case SpvOpMemberName:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 4};
             return true;
         case SpvOpString:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 3, 3};
             return true;
         case SpvOpLine:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 4};
             return true;
         case SpvOpExtension:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2};
             return true;
         case SpvOpExtInstImport:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 3, 3};
             return true;
         case SpvOpExtInst:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 0xffff};
             return true;
         case SpvOpMemoryModel:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3};
             return true;
         case SpvOpEntryPoint:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 0xffff};
             return true;
         case SpvOpExecutionMode:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3};
             return true;
         case SpvOpCapability:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2};
             return true;
         case SpvOpTypeVoid:
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 2, 2};
             return true;
         case SpvOpTypeBool:
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 2, 2};
             return true;
         case SpvOpTypeInt:
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 4, 4};
             return true;
         case SpvOpTypeFloat:
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 3, 3};
             return true;
         case SpvOpTypeVector:
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 4, 4};
             return true;
         case SpvOpTypeMatrix:
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 4, 4};
             return true;
         case SpvOpTypeImage:
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 9, 10};
             return true;
         case SpvOpTypeSampler:
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 2, 2};
             return true;
         case SpvOpTypeSampledImage:
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 3, 3};
             return true;
         case SpvOpTypeArray:
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 4, 4};
             return true;
         case SpvOpTypeRuntimeArray:
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 3, 3};
             return true;
         case SpvOpTypeStruct:
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 2, 0xffff};
             return true;
         case SpvOpTypeOpaque:
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 3, 3};
             return true;
         case SpvOpTypePointer:
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 4, 4};
             return true;
         case SpvOpTypeFunction:
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 3, 0xffff};
             return true;
         case SpvOpTypeEvent:
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 2, 2};
             return true;
         case SpvOpTypeDeviceEvent:
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 2, 2};
             return true;
         case SpvOpTypeReserveId:
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 2, 2};
             return true;
         case SpvOpTypeQueue:
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 2, 2};
             return true;
         case SpvOpTypePipe:
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 3, 3};
             return true;
         case SpvOpTypeForwardPointer:
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, -1, 3, 3};
             return true;
         case SpvOpConstantTrue:
-            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 3, 3};
             return true;
         case SpvOpConstantFalse:
-            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 3, 3};
             return true;
         case SpvOpConstant:
-            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 4, 4};
             return true;
         case SpvOpConstantComposite:
-            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 3, 0xffff};
             return true;
         case SpvOpConstantSampler:
-            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 6, 6};
             return true;
         case SpvOpConstantNull:
-            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 3, 3};
             return true;
         case SpvOpSpecConstantTrue:
-            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 3, 3};
             return true;
         case SpvOpSpecConstantFalse:
-            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 3, 3};
             return true;
         case SpvOpSpecConstant:
-            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 4, 4};
             return true;
         case SpvOpSpecConstantComposite:
-            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 3, 0xffff};
             return true;
         case SpvOpSpecConstantOp:
-            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 4, 4};
             return true;
         case SpvOpFunction:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpFunctionParameter:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3};
             return true;
         case SpvOpFunctionEnd:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1};
             return true;
         case SpvOpFunctionCall:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff};
             return true;
         case SpvOpVariable:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 5};
             return true;
         case SpvOpImageTexelPointer:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpLoad:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 5};
             return true;
         case SpvOpStore:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 4};
             return true;
         case SpvOpCopyMemory:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 5};
             return true;
         case SpvOpCopyMemorySized:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 6};
             return true;
         case SpvOpAccessChain:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff};
             return true;
         case SpvOpInBoundsAccessChain:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff};
             return true;
         case SpvOpPtrAccessChain:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 0xffff};
             return true;
         case SpvOpArrayLength:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpGenericPtrMemSemantics:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpInBoundsPtrAccessChain:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 0xffff};
             return true;
         case SpvOpDecorate:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3};
             return true;
         case SpvOpMemberDecorate:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 4};
             return true;
         case SpvOpDecorationGroup:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 2};
             return true;
         case SpvOpGroupDecorate:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 0xffff};
             return true;
         case SpvOpGroupMemberDecorate:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 0xffff};
             return true;
         case SpvOpVectorExtractDynamic:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpVectorInsertDynamic:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpVectorShuffle:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 0xffff};
             return true;
         case SpvOpCompositeConstruct:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 0xffff};
             return true;
         case SpvOpCompositeExtract:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff};
             return true;
         case SpvOpCompositeInsert:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 0xffff};
             return true;
         case SpvOpCopyObject:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpTranspose:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSampledImage:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpImageSampleImplicitLod:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6};
             return true;
         case SpvOpImageSampleExplicitLod:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpImageSampleDrefImplicitLod:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7};
             return true;
         case SpvOpImageSampleDrefExplicitLod:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpImageSampleProjImplicitLod:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6};
             return true;
         case SpvOpImageSampleProjExplicitLod:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpImageSampleProjDrefImplicitLod:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7};
             return true;
         case SpvOpImageSampleProjDrefExplicitLod:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpImageFetch:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6};
             return true;
         case SpvOpImageGather:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7};
             return true;
         case SpvOpImageDrefGather:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7};
             return true;
         case SpvOpImageRead:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6};
             return true;
         case SpvOpImageWrite:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 5};
             return true;
         case SpvOpImage:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpImageQueryFormat:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpImageQueryOrder:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpImageQuerySizeLod:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpImageQuerySize:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpImageQueryLod:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpImageQueryLevels:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpImageQuerySamples:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpConvertFToU:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpConvertFToS:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpConvertSToF:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpConvertUToF:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpUConvert:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSConvert:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpFConvert:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpQuantizeToF16:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpConvertPtrToU:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSatConvertSToU:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSatConvertUToS:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpConvertUToPtr:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpPtrCastToGeneric:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpGenericCastToPtr:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpGenericCastToPtrExplicit:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpBitcast:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSNegate:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpFNegate:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpIAdd:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpFAdd:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpISub:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpFSub:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpIMul:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpFMul:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpUDiv:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpSDiv:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpFDiv:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpUMod:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpSRem:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpSMod:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpFRem:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpFMod:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpVectorTimesScalar:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpMatrixTimesScalar:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpVectorTimesMatrix:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpMatrixTimesVector:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpMatrixTimesMatrix:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpOuterProduct:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpDot:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpIAddCarry:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpISubBorrow:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpUMulExtended:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpSMulExtended:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpAny:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpAll:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpIsNan:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpIsInf:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpIsFinite:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpIsNormal:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSignBitSet:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpLessOrGreater:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpOrdered:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpUnordered:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpLogicalEqual:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpLogicalNotEqual:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpLogicalOr:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpLogicalAnd:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpLogicalNot:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSelect:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpIEqual:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpINotEqual:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpUGreaterThan:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpSGreaterThan:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpUGreaterThanEqual:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpSGreaterThanEqual:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpULessThan:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpSLessThan:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpULessThanEqual:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpSLessThanEqual:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpFOrdEqual:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpFUnordEqual:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpFOrdNotEqual:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpFUnordNotEqual:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpFOrdLessThan:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpFUnordLessThan:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpFOrdGreaterThan:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpFUnordGreaterThan:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpFOrdLessThanEqual:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpFUnordLessThanEqual:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpFOrdGreaterThanEqual:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpFUnordGreaterThanEqual:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpShiftRightLogical:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpShiftRightArithmetic:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpShiftLeftLogical:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpBitwiseOr:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpBitwiseXor:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpBitwiseAnd:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpNot:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpBitFieldInsert:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpBitFieldSExtract:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpBitFieldUExtract:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpBitReverse:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpBitCount:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpDPdx:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpDPdy:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpFwidth:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpDPdxFine:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpDPdyFine:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpFwidthFine:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpDPdxCoarse:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpDPdyCoarse:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpFwidthCoarse:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpEmitVertex:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1};
             return true;
         case SpvOpEndPrimitive:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1};
             return true;
         case SpvOpEmitStreamVertex:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2};
             return true;
         case SpvOpEndStreamPrimitive:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2};
             return true;
         case SpvOpControlBarrier:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 4};
             return true;
         case SpvOpMemoryBarrier:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3};
             return true;
         case SpvOpAtomicLoad:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpAtomicStore:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 5, 5};
             return true;
         case SpvOpAtomicExchange:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpAtomicCompareExchange:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9};
             return true;
         case SpvOpAtomicCompareExchangeWeak:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9};
             return true;
         case SpvOpAtomicIIncrement:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpAtomicIDecrement:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpAtomicIAdd:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpAtomicISub:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpAtomicSMin:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpAtomicUMin:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpAtomicSMax:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpAtomicUMax:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpAtomicAnd:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpAtomicOr:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpAtomicXor:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpPhi:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 0xffff};
             return true;
         case SpvOpLoopMerge:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 4};
             return true;
         case SpvOpSelectionMerge:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3};
             return true;
         case SpvOpLabel:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 2};
             return true;
         case SpvOpBranch:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2};
             return true;
         case SpvOpBranchConditional:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 0xffff};
             return true;
         case SpvOpSwitch:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 0xffff};
             return true;
         case SpvOpKill:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1};
             return true;
         case SpvOpReturn:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1};
             return true;
         case SpvOpReturnValue:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2};
             return true;
         case SpvOpUnreachable:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1};
             return true;
         case SpvOpLifetimeStart:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3};
             return true;
         case SpvOpLifetimeStop:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3};
             return true;
         case SpvOpGroupAsyncCopy:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9};
             return true;
         case SpvOpGroupWaitEvents:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 4};
             return true;
         case SpvOpGroupAll:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpGroupAny:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpGroupBroadcast:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpGroupIAdd:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpGroupFAdd:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpGroupFMin:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpGroupUMin:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpGroupSMin:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpGroupFMax:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpGroupUMax:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpGroupSMax:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpReadPipe:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpWritePipe:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpReservedReadPipe:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9};
             return true;
         case SpvOpReservedWritePipe:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9};
             return true;
         case SpvOpReserveReadPipePackets:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpReserveWritePipePackets:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpCommitReadPipe:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 5, 5};
             return true;
         case SpvOpCommitWritePipe:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 5, 5};
             return true;
         case SpvOpIsValidReserveId:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpGetNumPipePackets:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpGetMaxPipePackets:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpGroupReserveReadPipePackets:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8};
             return true;
         case SpvOpGroupReserveWritePipePackets:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8};
             return true;
         case SpvOpGroupCommitReadPipe:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 6, 6};
             return true;
         case SpvOpGroupCommitWritePipe:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 6, 6};
             return true;
         case SpvOpEnqueueMarker:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpEnqueueKernel:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 13, 0xffff};
             return true;
         case SpvOpGetKernelNDrangeSubGroupCount:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8};
             return true;
         case SpvOpGetKernelNDrangeMaxSubGroupSize:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8};
             return true;
         case SpvOpGetKernelWorkGroupSize:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpGetKernelPreferredWorkGroupSizeMultiple:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpRetainEvent:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2};
             return true;
         case SpvOpReleaseEvent:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2};
             return true;
         case SpvOpCreateUserEvent:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3};
             return true;
         case SpvOpIsValidEvent:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSetUserEventStatus:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3};
             return true;
         case SpvOpCaptureEventProfilingInfo:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 4};
             return true;
         case SpvOpGetDefaultQueue:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3};
             return true;
         case SpvOpBuildNDRange:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpImageSparseSampleImplicitLod:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6};
             return true;
         case SpvOpImageSparseSampleExplicitLod:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpImageSparseSampleDrefImplicitLod:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7};
             return true;
         case SpvOpImageSparseSampleDrefExplicitLod:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpImageSparseSampleProjImplicitLod:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6};
             return true;
         case SpvOpImageSparseSampleProjExplicitLod:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpImageSparseSampleProjDrefImplicitLod:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7};
             return true;
         case SpvOpImageSparseSampleProjDrefExplicitLod:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpImageSparseFetch:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6};
             return true;
         case SpvOpImageSparseGather:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7};
             return true;
         case SpvOpImageSparseDrefGather:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7};
             return true;
         case SpvOpImageSparseTexelsResident:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpNoLine:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1};
             return true;
         case SpvOpAtomicFlagTestAndSet:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpAtomicFlagClear:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 4};
             return true;
         case SpvOpImageSparseRead:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6};
             return true;
         case SpvOpSizeOf:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpTypePipeStorage:
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 2, 2};
             return true;
         case SpvOpConstantPipeStorage:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpCreatePipeFromPipeStorage:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpGetKernelLocalSizeForSubgroupCount:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8};
             return true;
         case SpvOpGetKernelMaxNumSubgroups:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpTypeNamedBarrier:
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 2, 2};
             return true;
         case SpvOpNamedBarrierInitialize:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpMemoryNamedBarrier:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 4};
             return true;
         case SpvOpModuleProcessed:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2};
             return true;
         case SpvOpExecutionModeId:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3};
             return true;
         case SpvOpDecorateId:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3};
             return true;
         case SpvOpGroupNonUniformElect:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpGroupNonUniformAll:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpGroupNonUniformAny:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpGroupNonUniformAllEqual:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpGroupNonUniformBroadcast:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpGroupNonUniformBroadcastFirst:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpGroupNonUniformBallot:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpGroupNonUniformInverseBallot:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpGroupNonUniformBallotBitExtract:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpGroupNonUniformBallotBitCount:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpGroupNonUniformBallotFindLSB:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpGroupNonUniformBallotFindMSB:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpGroupNonUniformShuffle:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpGroupNonUniformShuffleXor:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpGroupNonUniformShuffleUp:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpGroupNonUniformShuffleDown:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpGroupNonUniformIAdd:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7};
             return true;
         case SpvOpGroupNonUniformFAdd:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7};
             return true;
         case SpvOpGroupNonUniformIMul:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7};
             return true;
         case SpvOpGroupNonUniformFMul:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7};
             return true;
         case SpvOpGroupNonUniformSMin:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7};
             return true;
         case SpvOpGroupNonUniformUMin:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7};
             return true;
         case SpvOpGroupNonUniformFMin:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7};
             return true;
         case SpvOpGroupNonUniformSMax:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7};
             return true;
         case SpvOpGroupNonUniformUMax:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7};
             return true;
         case SpvOpGroupNonUniformFMax:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7};
             return true;
         case SpvOpGroupNonUniformBitwiseAnd:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7};
             return true;
         case SpvOpGroupNonUniformBitwiseOr:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7};
             return true;
         case SpvOpGroupNonUniformBitwiseXor:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7};
             return true;
         case SpvOpGroupNonUniformLogicalAnd:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7};
             return true;
         case SpvOpGroupNonUniformLogicalOr:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7};
             return true;
         case SpvOpGroupNonUniformLogicalXor:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7};
             return true;
         case SpvOpGroupNonUniformQuadBroadcast:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpGroupNonUniformQuadSwap:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpCopyLogical:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpPtrEqual:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpPtrNotEqual:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpPtrDiff:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpColorAttachmentReadEXT:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 5};
             return true;
         case SpvOpDepthAttachmentReadEXT:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 4};
             return true;
         case SpvOpStencilAttachmentReadEXT:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 4};
             return true;
         case SpvOpTerminateInvocation:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1};
             return true;
         case SpvOpSubgroupBallotKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupFirstInvocationKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAllKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAnyKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAllEqualKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpGroupNonUniformRotateKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7};
             return true;
         case SpvOpSubgroupReadInvocationKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpTraceRayKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 12, 12};
             return true;
         case SpvOpExecuteCallableKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3};
             return true;
         case SpvOpConvertUToAccelerationStructureKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpIgnoreIntersectionKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1};
             return true;
         case SpvOpTerminateRayKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1};
             return true;
         case SpvOpSDot:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6};
             return true;
         case SpvOpUDot:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6};
             return true;
         case SpvOpSUDot:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6};
             return true;
         case SpvOpSDotAccSat:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7};
             return true;
         case SpvOpUDotAccSat:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7};
             return true;
         case SpvOpSUDotAccSat:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7};
             return true;
         case SpvOpTypeCooperativeMatrixKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 7, 7};
             return true;
         case SpvOpCooperativeMatrixLoadKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 7};
             return true;
         case SpvOpCooperativeMatrixStoreKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 6};
             return true;
         case SpvOpCooperativeMatrixMulAddKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7};
             return true;
         case SpvOpCooperativeMatrixLengthKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpTypeRayQueryKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 2};
             return true;
         case SpvOpRayQueryInitializeKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 9, 9};
             return true;
         case SpvOpRayQueryTerminateKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2};
             return true;
         case SpvOpRayQueryGenerateIntersectionKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3};
             return true;
         case SpvOpRayQueryConfirmIntersectionKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2};
             return true;
         case SpvOpRayQueryProceedKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpRayQueryGetIntersectionTypeKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpImageSampleWeightedQCOM:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpImageBoxFilterQCOM:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpImageBlockMatchSSDQCOM:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8};
             return true;
         case SpvOpImageBlockMatchSADQCOM:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8};
             return true;
         case SpvOpGroupIAddNonUniformAMD:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpGroupFAddNonUniformAMD:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpGroupFMinNonUniformAMD:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpGroupUMinNonUniformAMD:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpGroupSMinNonUniformAMD:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpGroupFMaxNonUniformAMD:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpGroupUMaxNonUniformAMD:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpGroupSMaxNonUniformAMD:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpFragmentMaskFetchAMD:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpFragmentFetchAMD:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpReadClockKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpHitObjectRecordHitMotionNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 15, 15};
             return true;
         case SpvOpHitObjectRecordHitWithIndexMotionNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 14, 14};
             return true;
         case SpvOpHitObjectRecordMissMotionNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 8, 8};
             return true;
         case SpvOpHitObjectGetWorldToObjectNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpHitObjectGetObjectToWorldNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpHitObjectGetObjectRayDirectionNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpHitObjectGetObjectRayOriginNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpHitObjectTraceRayMotionNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 14, 14};
             return true;
         case SpvOpHitObjectGetShaderRecordBufferHandleNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpHitObjectGetShaderBindingTableRecordIndexNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpHitObjectRecordEmptyNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2};
             return true;
         case SpvOpHitObjectTraceRayNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 13, 13};
             return true;
         case SpvOpHitObjectRecordHitNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 14, 14};
             return true;
         case SpvOpHitObjectRecordHitWithIndexNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 13, 13};
             return true;
         case SpvOpHitObjectRecordMissNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 7, 7};
             return true;
         case SpvOpHitObjectExecuteShaderNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3};
             return true;
         case SpvOpHitObjectGetCurrentTimeNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpHitObjectGetAttributesNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3};
             return true;
         case SpvOpHitObjectGetHitKindNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpHitObjectGetPrimitiveIndexNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpHitObjectGetGeometryIndexNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpHitObjectGetInstanceIdNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpHitObjectGetInstanceCustomIndexNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpHitObjectGetWorldRayDirectionNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpHitObjectGetWorldRayOriginNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpHitObjectGetRayTMaxNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpHitObjectGetRayTMinNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpHitObjectIsEmptyNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpHitObjectIsHitNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpHitObjectIsMissNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpReorderThreadWithHitObjectNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 4};
             return true;
         case SpvOpReorderThreadWithHintNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3};
             return true;
         case SpvOpTypeHitObjectNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 2};
             return true;
         case SpvOpImageSampleFootprintNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 8};
             return true;
         case SpvOpEmitMeshTasksEXT:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 5};
             return true;
         case SpvOpSetMeshOutputsEXT:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3};
             return true;
         case SpvOpGroupNonUniformPartitionNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpWritePackedPrimitiveIndices4x8NV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3};
             return true;
         case SpvOpReportIntersectionNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpIgnoreIntersectionNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1};
             return true;
         case SpvOpTerminateRayNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1};
             return true;
         case SpvOpTraceNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 12, 12};
             return true;
         case SpvOpTraceMotionNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 13, 13};
             return true;
         case SpvOpTraceRayMotionNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 13, 13};
             return true;
         case SpvOpRayQueryGetIntersectionTriangleVertexPositionsKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpTypeAccelerationStructureNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 2};
             return true;
         case SpvOpExecuteCallableNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3};
             return true;
         case SpvOpTypeCooperativeMatrixNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 6, 6};
             return true;
         case SpvOpCooperativeMatrixLoadNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7};
             return true;
         case SpvOpCooperativeMatrixStoreNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 5, 6};
             return true;
         case SpvOpCooperativeMatrixMulAddNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpCooperativeMatrixLengthNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpBeginInvocationInterlockEXT:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1};
             return true;
         case SpvOpEndInvocationInterlockEXT:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1};
             return true;
         case SpvOpDemoteToHelperInvocation:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1};
             return true;
         case SpvOpIsHelperInvocationEXT:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3};
             return true;
         case SpvOpConvertUToImageNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpConvertUToSamplerNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpConvertImageToUNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpConvertSamplerToUNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpConvertUToSampledImageNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpConvertSampledImageToUNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSamplerImageAddressingModeNV:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2};
             return true;
         case SpvOpSubgroupShuffleINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpSubgroupShuffleDownINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpSubgroupShuffleUpINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpSubgroupShuffleXorINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpSubgroupBlockReadINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupBlockWriteINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3};
             return true;
         case SpvOpSubgroupImageBlockReadINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpSubgroupImageBlockWriteINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 4};
             return true;
         case SpvOpSubgroupImageMediaBlockReadINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpSubgroupImageMediaBlockWriteINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 6, 6};
             return true;
         case SpvOpUCountLeadingZerosINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpUCountTrailingZerosINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpAbsISubINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpAbsUSubINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpIAddSatINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpUAddSatINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpIAverageINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpUAverageINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpIAverageRoundedINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpUAverageRoundedINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpISubSatINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpUSubSatINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpIMul32x16INTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpUMul32x16INTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpConstantFunctionPointerINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpFunctionPointerCallINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 0xffff};
             return true;
         case SpvOpAsmTargetINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpAsmINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpAsmCallINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff};
             return true;
         case SpvOpAtomicFMinEXT:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpAtomicFMaxEXT:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpAssumeTrueKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2};
             return true;
         case SpvOpExpectKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpDecorateString:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3};
             return true;
         case SpvOpMemberDecorateString:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 4};
             return true;
         case SpvOpVmeImageINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpTypeVmeImageINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 3, 3};
             return true;
         case SpvOpTypeAvcImePayloadINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 2};
             return true;
         case SpvOpTypeAvcRefPayloadINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 2};
             return true;
         case SpvOpTypeAvcSicPayloadINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 2};
             return true;
         case SpvOpTypeAvcMcePayloadINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 2};
             return true;
         case SpvOpTypeAvcMceResultINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 2};
             return true;
         case SpvOpTypeAvcImeResultINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 2};
             return true;
         case SpvOpTypeAvcImeResultSingleReferenceStreamoutINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 2};
             return true;
         case SpvOpTypeAvcImeResultDualReferenceStreamoutINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 2};
             return true;
         case SpvOpTypeAvcImeSingleReferenceStreaminINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 2};
             return true;
         case SpvOpTypeAvcImeDualReferenceStreaminINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 2};
             return true;
         case SpvOpTypeAvcRefResultINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 2};
             return true;
         case SpvOpTypeAvcSicResultINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 2};
             return true;
         case SpvOpSubgroupAvcMceGetDefaultInterBaseMultiReferencePenaltyINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpSubgroupAvcMceSetInterBaseMultiReferencePenaltyINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpSubgroupAvcMceGetDefaultInterShapePenaltyINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpSubgroupAvcMceSetInterShapePenaltyINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpSubgroupAvcMceGetDefaultInterDirectionPenaltyINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpSubgroupAvcMceSetInterDirectionPenaltyINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpSubgroupAvcMceGetDefaultIntraLumaShapePenaltyINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpSubgroupAvcMceGetDefaultInterMotionVectorCostTableINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpSubgroupAvcMceGetDefaultHighPenaltyCostTableINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3};
             return true;
         case SpvOpSubgroupAvcMceGetDefaultMediumPenaltyCostTableINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3};
             return true;
         case SpvOpSubgroupAvcMceGetDefaultLowPenaltyCostTableINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3};
             return true;
         case SpvOpSubgroupAvcMceSetMotionVectorCostFunctionINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpSubgroupAvcMceGetDefaultIntraLumaModePenaltyINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpSubgroupAvcMceGetDefaultNonDcLumaIntraPenaltyINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3};
             return true;
         case SpvOpSubgroupAvcMceGetDefaultIntraChromaModeBasePenaltyINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3};
             return true;
         case SpvOpSubgroupAvcMceSetAcOnlyHaarINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAvcMceSetSourceInterlacedFieldPolarityINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpSubgroupAvcMceSetSingleReferenceInterlacedFieldPolarityINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpSubgroupAvcMceSetDualReferenceInterlacedFieldPolaritiesINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpSubgroupAvcMceConvertToImePayloadINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAvcMceConvertToImeResultINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAvcMceConvertToRefPayloadINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAvcMceConvertToRefResultINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAvcMceConvertToSicPayloadINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAvcMceConvertToSicResultINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAvcMceGetMotionVectorsINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAvcMceGetInterDistortionsINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAvcMceGetBestInterDistortionsINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAvcMceGetInterMajorShapeINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAvcMceGetInterMinorShapeINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAvcMceGetInterDirectionsINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAvcMceGetInterMotionVectorCountINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAvcMceGetInterReferenceIdsINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAvcMceGetInterReferenceInterlacedFieldPolaritiesINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpSubgroupAvcImeInitializeINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpSubgroupAvcImeSetSingleReferenceINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpSubgroupAvcImeSetDualReferenceINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpSubgroupAvcImeRefWindowSizeINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpSubgroupAvcImeAdjustRefOffsetINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpSubgroupAvcImeConvertToMcePayloadINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAvcImeSetMaxMotionVectorCountINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpSubgroupAvcImeSetUnidirectionalMixDisableINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAvcImeSetEarlySearchTerminationThresholdINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpSubgroupAvcImeSetWeightedSadINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpSubgroupAvcImeEvaluateWithSingleReferenceINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpSubgroupAvcImeEvaluateWithDualReferenceINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpSubgroupAvcImeEvaluateWithSingleReferenceStreaminINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpSubgroupAvcImeEvaluateWithDualReferenceStreaminINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8};
             return true;
         case SpvOpSubgroupAvcImeEvaluateWithSingleReferenceStreamoutINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpSubgroupAvcImeEvaluateWithDualReferenceStreamoutINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpSubgroupAvcImeEvaluateWithSingleReferenceStreaminoutINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpSubgroupAvcImeEvaluateWithDualReferenceStreaminoutINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8};
             return true;
         case SpvOpSubgroupAvcImeConvertToMceResultINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAvcImeGetSingleReferenceStreaminINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAvcImeGetDualReferenceStreaminINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAvcImeStripSingleReferenceStreamoutINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAvcImeStripDualReferenceStreamoutINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAvcImeGetStreamoutSingleReferenceMajorShapeMotionVectorsINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpSubgroupAvcImeGetStreamoutSingleReferenceMajorShapeDistortionsINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpSubgroupAvcImeGetStreamoutSingleReferenceMajorShapeReferenceIdsINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpSubgroupAvcImeGetStreamoutDualReferenceMajorShapeMotionVectorsINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpSubgroupAvcImeGetStreamoutDualReferenceMajorShapeDistortionsINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpSubgroupAvcImeGetStreamoutDualReferenceMajorShapeReferenceIdsINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpSubgroupAvcImeGetBorderReachedINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpSubgroupAvcImeGetTruncatedSearchIndicationINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAvcImeGetUnidirectionalEarlySearchTerminationINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAvcImeGetWeightingPatternMinimumMotionVectorINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAvcImeGetWeightingPatternMinimumDistortionINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAvcFmeInitializeINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10};
             return true;
         case SpvOpSubgroupAvcBmeInitializeINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 11, 11};
             return true;
         case SpvOpSubgroupAvcRefConvertToMcePayloadINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAvcRefSetBidirectionalMixDisableINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAvcRefSetBilinearFilterEnableINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAvcRefEvaluateWithSingleReferenceINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpSubgroupAvcRefEvaluateWithDualReferenceINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpSubgroupAvcRefEvaluateWithMultiReferenceINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpSubgroupAvcRefEvaluateWithMultiReferenceInterlacedINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpSubgroupAvcRefConvertToMceResultINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAvcSicInitializeINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAvcSicConfigureSkcINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9};
             return true;
         case SpvOpSubgroupAvcSicConfigureIpeLumaINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 11, 11};
             return true;
         case SpvOpSubgroupAvcSicConfigureIpeLumaChromaINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 14, 14};
             return true;
         case SpvOpSubgroupAvcSicGetMotionVectorMaskINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpSubgroupAvcSicConvertToMcePayloadINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAvcSicSetIntraLumaShapePenaltyINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpSubgroupAvcSicSetIntraLumaModeCostFunctionINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpSubgroupAvcSicSetIntraChromaModeCostFunctionINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpSubgroupAvcSicSetBilinearFilterEnableINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAvcSicSetSkcForwardTransformEnableINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpSubgroupAvcSicSetBlockBasedRawSkipSadINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpSubgroupAvcSicEvaluateIpeINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpSubgroupAvcSicEvaluateWithSingleReferenceINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpSubgroupAvcSicEvaluateWithDualReferenceINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpSubgroupAvcSicEvaluateWithMultiReferenceINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpSubgroupAvcSicEvaluateWithMultiReferenceInterlacedINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpSubgroupAvcSicConvertToMceResultINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAvcSicGetIpeLumaShapeINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAvcSicGetBestIpeLumaDistortionINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAvcSicGetBestIpeChromaDistortionINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAvcSicGetPackedIpeLumaModesINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAvcSicGetIpeChromaModeINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAvcSicGetPackedSkcLumaCountThresholdINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAvcSicGetPackedSkcLumaSumThresholdINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSubgroupAvcSicGetInterRawSadsINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpVariableLengthArrayINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpSaveMemoryINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3};
             return true;
         case SpvOpRestoreMemoryINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2};
             return true;
         case SpvOpArbitraryFloatSinCosPiINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10};
             return true;
         case SpvOpArbitraryFloatCastINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9};
             return true;
         case SpvOpArbitraryFloatCastFromIntINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9};
             return true;
         case SpvOpArbitraryFloatCastToIntINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8};
             return true;
         case SpvOpArbitraryFloatAddINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 11, 11};
             return true;
         case SpvOpArbitraryFloatSubINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 11, 11};
             return true;
         case SpvOpArbitraryFloatMulINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 11, 11};
             return true;
         case SpvOpArbitraryFloatDivINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 11, 11};
             return true;
         case SpvOpArbitraryFloatGTINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpArbitraryFloatGEINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpArbitraryFloatLTINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpArbitraryFloatLEINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpArbitraryFloatEQINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpArbitraryFloatRecipINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9};
             return true;
         case SpvOpArbitraryFloatRSqrtINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9};
             return true;
         case SpvOpArbitraryFloatCbrtINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9};
             return true;
         case SpvOpArbitraryFloatHypotINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 11, 11};
             return true;
         case SpvOpArbitraryFloatSqrtINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9};
             return true;
         case SpvOpArbitraryFloatLogINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9};
             return true;
         case SpvOpArbitraryFloatLog2INTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9};
             return true;
         case SpvOpArbitraryFloatLog10INTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9};
             return true;
         case SpvOpArbitraryFloatLog1pINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9};
             return true;
         case SpvOpArbitraryFloatExpINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9};
             return true;
         case SpvOpArbitraryFloatExp2INTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9};
             return true;
         case SpvOpArbitraryFloatExp10INTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9};
             return true;
         case SpvOpArbitraryFloatExpm1INTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9};
             return true;
         case SpvOpArbitraryFloatSinINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9};
             return true;
         case SpvOpArbitraryFloatCosINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9};
             return true;
         case SpvOpArbitraryFloatSinCosINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9};
             return true;
         case SpvOpArbitraryFloatSinPiINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9};
             return true;
         case SpvOpArbitraryFloatCosPiINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9};
             return true;
         case SpvOpArbitraryFloatASinINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9};
             return true;
         case SpvOpArbitraryFloatASinPiINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9};
             return true;
         case SpvOpArbitraryFloatACosINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9};
             return true;
         case SpvOpArbitraryFloatACosPiINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9};
             return true;
         case SpvOpArbitraryFloatATanINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9};
             return true;
         case SpvOpArbitraryFloatATanPiINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9};
             return true;
         case SpvOpArbitraryFloatATan2INTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 11, 11};
             return true;
         case SpvOpArbitraryFloatPowINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 11, 11};
             return true;
         case SpvOpArbitraryFloatPowRINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 11, 11};
             return true;
         case SpvOpArbitraryFloatPowNINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10};
             return true;
         case SpvOpLoopControlINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 0xffff};
             return true;
         case SpvOpAliasDomainDeclINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 3};
             return true;
         case SpvOpAliasScopeDeclINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 3, 4};
             return true;
         case SpvOpAliasScopeListDeclINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 0xffff};
             return true;
         case SpvOpFixedSqrtINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10};
             return true;
         case SpvOpFixedRecipINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10};
             return true;
         case SpvOpFixedRsqrtINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10};
             return true;
         case SpvOpFixedSinINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10};
             return true;
         case SpvOpFixedCosINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10};
             return true;
         case SpvOpFixedSinCosINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10};
             return true;
         case SpvOpFixedSinPiINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10};
             return true;
         case SpvOpFixedCosPiINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10};
             return true;
         case SpvOpFixedSinCosPiINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10};
             return true;
         case SpvOpFixedLogINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10};
             return true;
         case SpvOpFixedExpINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10};
             return true;
         case SpvOpPtrCastToCrossWorkgroupINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpCrossWorkgroupCastToPtrINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpReadPipeBlockingINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpWritePipeBlockingINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpFPGARegINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpRayQueryGetRayTMinKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpRayQueryGetRayFlagsKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpRayQueryGetIntersectionTKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpRayQueryGetIntersectionInstanceCustomIndexKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpRayQueryGetIntersectionInstanceIdKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpRayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpRayQueryGetIntersectionGeometryIndexKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpRayQueryGetIntersectionPrimitiveIndexKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpRayQueryGetIntersectionBarycentricsKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpRayQueryGetIntersectionFrontFaceKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpRayQueryGetIntersectionCandidateAABBOpaqueKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpRayQueryGetIntersectionObjectRayDirectionKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpRayQueryGetIntersectionObjectRayOriginKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpRayQueryGetWorldRayDirectionKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpRayQueryGetWorldRayOriginKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpRayQueryGetIntersectionObjectToWorldKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpRayQueryGetIntersectionWorldToObjectKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5};
             return true;
         case SpvOpAtomicFAddEXT:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7};
             return true;
         case SpvOpTypeBufferSurfaceINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 3, 3};
             return true;
         case SpvOpTypeStructContinuedINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, -1, 1, 0xffff};
             return true;
         case SpvOpConstantCompositeContinuedINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, -1, -1, 1, 0xffff};
             return true;
         case SpvOpSpecConstantCompositeContinuedINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, -1, -1, 1, 0xffff};
             return true;
         case SpvOpConvertFToBF16INTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpConvertBF16ToFINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4};
             return true;
         case SpvOpControlBarrierArriveINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 4};
             return true;
         case SpvOpControlBarrierWaitINTEL:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 4};
             return true;
         case SpvOpGroupIMulKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpGroupFMulKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpGroupBitwiseAndKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpGroupBitwiseOrKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpGroupBitwiseXorKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpGroupLogicalAndKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpGroupLogicalOrKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         case SpvOpGroupLogicalXorKHR:
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6};
             return true;
         default: return false;
     }
@@ -6374,6 +6374,94 @@ static bool getOpName(const SpvOp& k, UnownedStringSlice& v)
     }
 }
 
+using EnumCategory = SPIRVCoreGrammarInfo::EnumCategory;
+static bool lookupEnumCategory(const UnownedStringSlice& str, EnumCategory& value)
+{
+    static const unsigned tableSalt[56] = {
+        1, 0, 1, 1, 0, 1, 1, 2, 8, 1, 0, 2, 0, 0, 1, 1,
+        3, 2, 2, 0, 0, 4, 0, 2, 0, 4, 2, 1, 1, 0, 0, 10,
+        0, 4, 2, 0, 4, 6, 0, 0, 0, 1, 0, 3, 5, 2, 0, 3,
+        1, 13, 0, 14, 0, 103, 16, 128
+    };
+
+    using KV = std::pair<const char*, EnumCategory>;
+
+    static const KV words[56] =
+    {
+        {"CooperativeMatrixLayout", EnumCategory{41}},
+        {"StorageClass", EnumCategory{15}},
+        {"LiteralExtInstInteger", EnumCategory{51}},
+        {"PairIdRefLiteralInteger", EnumCategory{54}},
+        {"SelectionControl", EnumCategory{2}},
+        {"RayQueryCandidateIntersectionType", EnumCategory{38}},
+        {"Capability", EnumCategory{35}},
+        {"SamplerAddressingMode", EnumCategory{17}},
+        {"FragmentShadingRate", EnumCategory{9}},
+        {"IdRef", EnumCategory{47}},
+        {"Dim", EnumCategory{16}},
+        {"PairIdRefIdRef", EnumCategory{55}},
+        {"PairLiteralIntegerIdRef", EnumCategory{53}},
+        {"BuiltIn", EnumCategory{31}},
+        {"ImageChannelDataType", EnumCategory{21}},
+        {"CooperativeMatrixOperands", EnumCategory{40}},
+        {"FPOperationMode", EnumCategory{25}},
+        {"FunctionParameterAttribute", EnumCategory{29}},
+        {"ExecutionMode", EnumCategory{14}},
+        {"SourceLanguage", EnumCategory{10}},
+        {"IdScope", EnumCategory{46}},
+        {"QuantizationModes", EnumCategory{24}},
+        {"PackedVectorFormat", EnumCategory{39}},
+        {"IdMemorySemantics", EnumCategory{45}},
+        {"LinkageType", EnumCategory{27}},
+        {"ImageOperands", EnumCategory{0}},
+        {"OverflowModes", EnumCategory{26}},
+        {"MemorySemantics", EnumCategory{5}},
+        {"Scope", EnumCategory{32}},
+        {"IdResultType", EnumCategory{43}},
+        {"ImageFormat", EnumCategory{19}},
+        {"FPRoundingMode", EnumCategory{22}},
+        {"MemoryModel", EnumCategory{13}},
+        {"LiteralSpecConstantOpInteger", EnumCategory{52}},
+        {"RayQueryCommittedIntersectionType", EnumCategory{37}},
+        {"LiteralString", EnumCategory{49}},
+        {"IdResult", EnumCategory{44}},
+        {"Decoration", EnumCategory{30}},
+        {"LiteralContextDependentNumber", EnumCategory{50}},
+        {"GroupOperation", EnumCategory{33}},
+        {"KernelProfilingInfo", EnumCategory{7}},
+        {"AddressingModel", EnumCategory{12}},
+        {"AccessQualifier", EnumCategory{28}},
+        {"KernelEnqueueFlags", EnumCategory{34}},
+        {"RayFlags", EnumCategory{8}},
+        {"LoopControl", EnumCategory{3}},
+        {"FunctionControl", EnumCategory{4}},
+        {"RayQueryIntersection", EnumCategory{36}},
+        {"SamplerFilterMode", EnumCategory{18}},
+        {"FPFastMathMode", EnumCategory{1}},
+        {"CooperativeMatrixUse", EnumCategory{42}},
+        {"ExecutionModel", EnumCategory{11}},
+        {"ImageChannelOrder", EnumCategory{20}},
+        {"MemoryAccess", EnumCategory{6}},
+        {"LiteralInteger", EnumCategory{48}},
+        {"FPDenormMode", EnumCategory{23}},
+    };
+
+    static const auto hash = [](const UnownedStringSlice& str, UInt32 salt){
+        return combineHash(getHashCode(str), getHashCode(salt)) % 56;
+    };
+
+    const auto i = hash(str, tableSalt[hash(str, 0)]);
+    if(str == words[i].first)
+    {
+        value = words[i].second;
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
+
 RefPtr<SPIRVCoreGrammarInfo> SPIRVCoreGrammarInfo::getEmbeddedVersion()
 {
     static SPIRVCoreGrammarInfo embedded = [](){
@@ -6383,6 +6471,7 @@ RefPtr<SPIRVCoreGrammarInfo> SPIRVCoreGrammarInfo::getEmbeddedVersion()
         info.anyEnum.embedded = &lookupSpvWord;
         info.opInfo.embedded = &getOpInfo;
         info.opNames.embedded = &getOpName;
+        info.enumCategories.embedded = &lookupEnumCategory;
         info.addReference();
         return info;
     }();

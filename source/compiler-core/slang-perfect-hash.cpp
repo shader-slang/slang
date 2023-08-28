@@ -8,7 +8,7 @@ namespace Slang
 
 // Implemented according to "Hash, displace, and compress"
 // https://cmph.sourceforge.net/papers/esa09.pdf
-HashFindResult minimalPerfectHash(const List<String>& ss, HashParams<String>& hashParams)
+HashFindResult minimalPerfectHash(const List<String>& ss, HashParams& hashParams)
 {
     // Check for uniqueness
     for (Index i = 0; i < ss.getCount(); ++i)
@@ -113,10 +113,13 @@ HashFindResult minimalPerfectHash(const List<String>& ss, HashParams<String>& ha
     return HashFindResult::Success;
 }
 
-String perfectHashToEmbeddableCpp( const HashParams<String>& hashParams, const UnownedStringSlice& valueType)
+String perfectHashToEmbeddableCpp(
+    const HashParams& hashParams,
+    const UnownedStringSlice& valueType,
+    const List<String>& values)
 {
-    SLANG_ASSERT(hashParams.valueTable.getCount() == hashParams.destTable.getCount());
     SLANG_ASSERT(hashParams.saltTable.getCount() == hashParams.destTable.getCount());
+    SLANG_ASSERT(hashParams.saltTable.getCount() == values.getCount());
 
     StringBuilder sb;
     StringWriter writer(&sb, WriterFlags(0));
@@ -157,8 +160,8 @@ String perfectHashToEmbeddableCpp( const HashParams<String>& hashParams, const U
     line("    {");
     for (Index i = 0; i < hashParams.destTable.getCount(); ++i)
     {
-        const auto s = hashParams.destTable[i];
-        const auto v = hashParams.valueTable[i];
+        const auto& s = hashParams.destTable[i];
+        const auto& v = values[i];
         w.print(
             "        {\"%s\", %s},\n",
             s.getBuffer(),

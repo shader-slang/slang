@@ -74,7 +74,8 @@ void writeHashFile(
     const char*        valueType,
     const char*        valuePrefix,
     const List<String> includes,
-    const HashParams<String>& hashParams)
+    const HashParams& hashParams,
+    const List<String> values)
 {
     StringBuilder sb;
     StringWriter writer(&sb, WriterFlags(0));
@@ -98,7 +99,8 @@ void writeHashFile(
 
     w.put(perfectHashToEmbeddableCpp(
         hashParams,
-        UnownedStringSlice(valueType)
+        UnownedStringSlice(valueType),
+        values
     ).getBuffer());
 
     w.print("}\n");
@@ -163,7 +165,7 @@ int main(int argc, const char* const* argv)
             opnames.add(w);
     }
 
-    HashParams<String> hashParams;
+    HashParams hashParams;
     auto r = minimalPerfectHash(opnames, hashParams);
     switch (r)
     {
@@ -184,15 +186,17 @@ int main(int argc, const char* const* argv)
     case HashFindResult::Success:;
     }
 
-    hashParams.valueTable.reserve(hashParams.destTable.getCount());
+    List<String> values;
+    values.reserve (hashParams.destTable.getCount());
     for(const auto& v : hashParams.destTable)
-        hashParams.valueTable.add(enumerantPrefix + v);
+        values.add(enumerantPrefix + v);
     writeHashFile(
         outCppPath,
         enumName,
         enumerantPrefix,
         { "../core/slang-common.h", "../core/slang-string.h", enumHeader },
-        hashParams);
+        hashParams,
+        values);
 
     return 0;
 }

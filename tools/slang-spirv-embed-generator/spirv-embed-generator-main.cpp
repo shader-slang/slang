@@ -9,27 +9,25 @@
 
 using namespace Slang;
 
-template<typename T>
+template<typename T, typename F>
 String dictToPerfectHash(
     const Dictionary<UnownedStringSlice, T>& dict,
     const UnownedStringSlice& type,
-    const bool isMask)
+    F valueToString)
 {
-    HashParams<String> hashParams;
+    HashParams hashParams;
     List<String> names;
     for(const auto& [name, val] : dict)
         names.add(name);
     auto r = minimalPerfectHash(names, hashParams);
     SLANG_ASSERT(r == HashFindResult::Success);
-    hashParams.valueTable.reserve(hashParams.destTable.getCount());
-    const auto radix = isMask ? 16 : 10;
-    const auto prefix = isMask ? "0x" : "";
+    List<String> values;
+    values.reserve(hashParams.destTable.getCount());
     for(const auto& v : hashParams.destTable)
     {
-        const auto s = prefix + String(dict.getValue(v.getUnownedSlice()), radix);
-        hashParams.valueTable.add("static_cast<" + String(type) + ">(" + s + ")");
+        values.add(valueToString(dict.getValue(v.getUnownedSlice())));
     }
-    return perfectHashToEmbeddableCpp(hashParams, type);
+    return perfectHashToEmbeddableCpp(hashParams, type, values);
 }
 
 template<typename K, typename V, typename F1, typename F2>
@@ -95,22 +93,34 @@ void writeInfo(
     line("namespace Slang");
     line("{");
 
+    w.put("static ");
     w.put(dictToPerfectHash(
         info.spvOps.dict,
         UnownedStringSlice("SpvOp"),
-        false
+        [](const auto n){
+            const auto radix = 10;
+            return "static_cast<SpvOp>(" + String(n, radix) + ")";
+        }
     ).getBuffer());
 
+    w.put("static ");
     w.put(dictToPerfectHash(
         info.spvCapabilities.dict,
         UnownedStringSlice("SpvCapability"),
-        false
+        [](const auto n){
+            const auto radix = 10;
+            return "static_cast<SpvCapability>(" + String(n, radix) + ")";
+        }
     ).getBuffer());
 
+    w.put("static ");
     w.put(dictToPerfectHash(
         info.anyEnum.dict,
         UnownedStringSlice("SpvWord"),
-        false
+        [](const auto n){
+            const auto radix = 10;
+            return "SpvWord{" + String(n, radix) + "}";
+        }
     ).getBuffer());
 
     dictToSwitch(
@@ -130,12 +140,11 @@ void writeInfo(
                 case SPIRVCoreGrammarInfo::OpInfo::ConstantCreation: classStr = "ConstantCreation"; break;
             }
             return String("{SPIRVCoreGrammarInfo::OpInfo::")
-                + classStr
-                + ", "
-                + String(i.resultTypeIndex)
-                + ", "
-                + String(i.resultIdIndex)
-                + "}";
+                + classStr + ", "
+                + String(i.resultTypeIndex) + ", "
+                + String(i.resultIdIndex) + ", "
+                + String(i.minWordCount) + ", "
+                + (i.maxWordCount == 0xffff ? String("0xffff") : String(i.maxWordCount)) + "}";
         },
         w
     );
@@ -154,6 +163,17 @@ void writeInfo(
         w
     );
 
+    line("using EnumCategory = SPIRVCoreGrammarInfo::EnumCategory;");
+    w.put("static ");
+    w.put(dictToPerfectHash(
+        info.enumCategories.dict,
+        UnownedStringSlice("EnumCategory"),
+        [](const auto n){
+            const auto radix = 10;
+            return "EnumCategory{" + String(n.index, radix) + "}";
+        }
+    ).getBuffer());
+
     line("RefPtr<SPIRVCoreGrammarInfo> SPIRVCoreGrammarInfo::getEmbeddedVersion()");
     line("{");
     line("    static SPIRVCoreGrammarInfo embedded = [](){");
@@ -163,6 +183,7 @@ void writeInfo(
     line("        info.anyEnum.embedded = &lookupSpvWord;");
     line("        info.opInfo.embedded = &getOpInfo;");
     line("        info.opNames.embedded = &getOpName;");
+    line("        info.enumCategories.embedded = &lookupEnumCategory;");
 
     //
     line("        info.addReference();");

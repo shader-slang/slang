@@ -134,13 +134,21 @@ static Dictionary<UnownedStringSlice, SpvWord> operandKindToDict(
                 Int i = 0;
                 const auto str = container.getString(e.value);
                 if(SLANG_FAILED(StringUtil::parseInt(str, i)))
-                    sink.diagnose(e.value.loc, MiscDiagnostics::spirvCoreGrammarJSONParseFailure);
+                    sink.diagnose(
+                        e.value.loc,
+                        MiscDiagnostics::spirvCoreGrammarJSONParseFailure,
+                        "Expected an integer value"
+                    );
                 // TODO: Range check here?
                 valueInt = SpvWord(i);
                 break;
              }
              default:
-                sink.diagnose(e.value.loc, MiscDiagnostics::spirvCoreGrammarJSONParseFailure);
+                sink.diagnose(
+                    e.value.loc,
+                    MiscDiagnostics::spirvCoreGrammarJSONParseFailure,
+                    "Expected an integer value (or a string with an integer inside)"
+                );
         }
         dict.add(e.enumerant, valueInt);
     }
@@ -169,7 +177,11 @@ RefPtr<SPIRVCoreGrammarInfo> SPIRVCoreGrammarInfo::loadFromJSON(SourceView& sour
     if(SLANG_FAILED(converter.convert(builder.getRootValue(), &spec)))
     {
         // TODO: not having a source loc here is not great...
-        sink.diagnoseWithoutSourceView(SourceLoc{}, MiscDiagnostics::spirvCoreGrammarJSONParseFailure);
+        sink.diagnoseWithoutSourceView(
+            SourceLoc{},
+            MiscDiagnostics::spirvCoreGrammarJSONParseFailure,
+            "Failed to match SPIR-V grammar JSON to the expected schema"
+        );
         return nullptr;
     }
 
@@ -177,27 +189,81 @@ RefPtr<SPIRVCoreGrammarInfo> SPIRVCoreGrammarInfo::loadFromJSON(SourceView& sour
     // Convert to the internal representation
     //
     RefPtr<SPIRVCoreGrammarInfo> res{new SPIRVCoreGrammarInfo};
+
+    res->enumCategories.dict.reserve(spec.operand_kinds.getCount());
+    int32_t i = 0;
+    for(const auto& c : spec.operand_kinds)
+    {
+        res->enumCategories.dict.add(c.kind, EnumCategory{i});
+        i++;
+    }
+
     res->spvOps.dict.reserve(spec.instructions.getCount());
     for(const auto& i : spec.instructions)
     {
         res->spvOps.dict.add(i.opname, SpvOp(i.opcode));
+
         const auto class_ =
               i.class_ == "Type-Declaration" ? OpInfo::TypeDeclaration
             : i.class_ == "Constant-Creation" ? OpInfo::ConstantCreation
             : OpInfo::Other;
+
         const auto resultTypeIndex
             = i.operands.findFirstIndex([](const auto& o){return o.kind == "IdResultType";});
         const auto resultIdIndex
             = i.operands.findFirstIndex([](const auto& o){return o.kind == "IdResult";});
+        SLANG_ASSERT(resultTypeIndex >= -1 || resultTypeIndex <= 0);
+        SLANG_ASSERT(resultIdIndex >= -1 || resultTypeIndex <= 1);
+
+        // Start with 1 because of the opcode itself
+        uint16_t minWordCount = 1;
+        uint16_t maxWordCount = 1;
+        for(const auto& o : i.operands)
+        {
+            if(maxWordCount == 0xffff)
+            {
+                // We are about to overflow maxWordCount, either someone has
+                // put 2^16-1 operands in the json, or we have a "*" quantified
+                // operand not in the last position and should implement
+                // support for that
+                sink.diagnoseWithoutSourceView(
+                    SourceLoc{},
+                    MiscDiagnostics::spirvCoreGrammarJSONParseFailure,
+                    "\"*\"-qualified operand wasn't the last operand"
+                );
+            }
+            if(o.quantifier == "")
+            {
+                // This catches the case where an "?" or "*" qualified operand
+                // appears before any unqualified operands
+                if(minWordCount != maxWordCount)
+                    sink.diagnoseWithoutSourceView(
+                        SourceLoc{},
+                        MiscDiagnostics::spirvCoreGrammarJSONParseFailure,
+                        "\"*\" or \"?\" operand appeared before an unqualified operand"
+                    );
+                minWordCount++;
+                maxWordCount++;
+            }
+            else if(o.quantifier == "?")
+            {
+                maxWordCount++;
+            }
+            else if(o.quantifier == "*")
+            {
+                maxWordCount = 0xffff;
+            }
+        }
+
         // There are duplicate opcodes in the json (for renamed instructions,
         // or the same instruction with different capabilities), for now just
         // keep the first one.
-        SLANG_ASSERT(resultTypeIndex >= -1 || resultTypeIndex <= 0);
-        SLANG_ASSERT(resultIdIndex >= -1 || resultTypeIndex <= 1);
         res->opInfo.dict.addIfNotExists(SpvOp(i.opcode), {
             class_,
             static_cast<int8_t>(resultTypeIndex),
             static_cast<int8_t>(resultIdIndex),
+            minWordCount,
+            maxWordCount,
         });
         res->opNames.dict.addIfNotExists(SpvOp(i.opcode), i.opname);
     }

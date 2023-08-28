@@ -65,14 +65,26 @@ namespace Slang
                 TypeDeclaration,
                 ConstantCreation
             };
+            constexpr static int8_t kNoResultTypeId = -1;
+            constexpr static int8_t kNoResultId = -1;
+
             Class class_;
             // -1 or 0
-            int8_t resultTypeIndex = -1;
+            int8_t resultTypeIndex = kNoResultTypeId;
             // -1 or 0 or 1
-            int8_t resultIdIndex = -1;
+            int8_t resultIdIndex = kNoResultId;
+            // The range of valid WordCount for this instruction
+            uint16_t minWordCount;
+            uint16_t maxWordCount;
         };
         LookupOpt<SpvOp, OpInfo> opInfo;
         LookupOpt<SpvOp, UnownedStringSlice> opNames;
+
+        struct EnumCategory
+        {
+            int32_t index; 
+        };
+        LookupOpt<UnownedStringSlice, EnumCategory> enumCategories;
 
     private:
 
