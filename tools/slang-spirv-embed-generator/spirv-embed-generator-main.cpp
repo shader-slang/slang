@@ -199,6 +199,7 @@ void writeInfo(
                 case SPIRVCoreGrammarInfo::OpInfo::Other: classStr = "Other"; break;
                 case SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration: classStr = "TypeDeclaration"; break;
                 case SPIRVCoreGrammarInfo::OpInfo::ConstantCreation: classStr = "ConstantCreation"; break;
+                case SPIRVCoreGrammarInfo::OpInfo::Debug: classStr = "Debug"; break;
             }
 
             String ret = String("const static OperandKind operandTypes[] = {");

@@ -3821,11 +3821,24 @@ struct SPIRVEmitContext
                 return nullptr;
             }
 
-            const auto parentForOpCode = [this](SpvOp opcode, SpvInstParent* defaultParent){
-                return
-                    opcode == SpvOpConstant ? getSection(SpvLogicalSectionID::ConstantsAndTypes)
-                    : opcode == SpvOpName ? getSection(SpvLogicalSectionID::DebugNames)
-                    : defaultParent;
+            const auto parentForOpCode = [this](SpvOp opcode, SpvInstParent* defaultParent) -> SpvInstParent*{
+                const auto info = m_grammarInfo->opInfos.lookup(opcode);
+                SLANG_ASSERT(info);
+                switch(info->class_)
+                {
+                    case SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration:
+                    case SPIRVCoreGrammarInfo::OpInfo::ConstantCreation:
+                        return getSection(SpvLogicalSectionID::ConstantsAndTypes);
+                    // Don't add this case, it's not correct as not all "Debug"
+                    // instructions belong in this block
+                    // case SPIRVCoreGrammarInfo::OpInfo::Debug:
+                    //     return getSection(SpvLogicalSectionID::DebugNames);
+                    default:
+                        return
+                            opcode == SpvOpName
+                            ? getSection(SpvLogicalSectionID::DebugNames)
+                            : defaultParent;
+                }
             };
 
             last = emitInstCustomOperandFunc(

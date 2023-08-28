@@ -2145,43 +2145,43 @@ static bool getOpInfo(const SpvOp& k, SPIRVCoreGrammarInfo::OpInfo& v)
         case SpvOpSourceContinued:
         {
             const static OperandKind operandTypes[] = {{49}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Debug, -1, -1, 2, 2, 1, operandTypes};
             return true;
         }
         case SpvOpSource:
         {
             const static OperandKind operandTypes[] = {{10}, {48}, {47}, {49}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Debug, -1, -1, 3, 5, 4, operandTypes};
             return true;
         }
         case SpvOpSourceExtension:
         {
             const static OperandKind operandTypes[] = {{49}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Debug, -1, -1, 2, 2, 1, operandTypes};
             return true;
         }
         case SpvOpName:
         {
             const static OperandKind operandTypes[] = {{47}, {49}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Debug, -1, -1, 3, 3, 2, operandTypes};
             return true;
         }
         case SpvOpMemberName:
         {
             const static OperandKind operandTypes[] = {{47}, {48}, {49}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Debug, -1, -1, 4, 4, 3, operandTypes};
             return true;
         }
         case SpvOpString:
         {
             const static OperandKind operandTypes[] = {{44}, {49}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Debug, -1, 0, 3, 3, 2, operandTypes};
             return true;
         }
         case SpvOpLine:
         {
             const static OperandKind operandTypes[] = {{47}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Debug, -1, -1, 4, 4, 3, operandTypes};
             return true;
         }
         case SpvOpExtension:
@@ -3873,7 +3873,7 @@ static bool getOpInfo(const SpvOp& k, SPIRVCoreGrammarInfo::OpInfo& v)
         case SpvOpNoLine:
         {
             const static OperandKind operandTypes[] = {};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Debug, -1, -1, 1, 1, 0, operandTypes};
             return true;
         }
         case SpvOpAtomicFlagTestAndSet:
@@ -3951,7 +3951,7 @@ static bool getOpInfo(const SpvOp& k, SPIRVCoreGrammarInfo::OpInfo& v)
         case SpvOpModuleProcessed:
         {
             const static OperandKind operandTypes[] = {{49}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Debug, -1, -1, 2, 2, 1, operandTypes};
             return true;
         }
         case SpvOpExecutionModeId:

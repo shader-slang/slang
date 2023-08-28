@@ -61,9 +61,11 @@ namespace Slang
         {
             enum Class
             {
+                // Adding to this? Don't forget to update the embedding generator
                 Other,
                 TypeDeclaration,
-                ConstantCreation
+                ConstantCreation,
+                Debug,
             };
             constexpr static int8_t kNoResultTypeId = -1;
             constexpr static int8_t kNoResultId = -1;

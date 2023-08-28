@@ -222,6 +222,7 @@ RefPtr<SPIRVCoreGrammarInfo> SPIRVCoreGrammarInfo::loadFromJSON(SourceView& sour
         const auto class_ =
               i.class_ == "Type-Declaration" ? OpInfo::TypeDeclaration
             : i.class_ == "Constant-Creation" ? OpInfo::ConstantCreation
+            : i.class_ == "Debug" ? OpInfo::Debug
             : OpInfo::Other;
 
         const auto resultTypeIndex
