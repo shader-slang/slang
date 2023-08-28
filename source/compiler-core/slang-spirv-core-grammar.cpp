@@ -241,7 +241,7 @@ RefPtr<SPIRVCoreGrammarInfo> SPIRVCoreGrammarInfo::loadFromJSON(SourceView& sour
             if(maxOperandCount == 0xffff)
             {
                 // We are about to overflow maxWordCount, either someone has
-                // put 2^16-1 operands in the json, or we have a "*" quantified
+                // put 2^16 operands in the json, or we have a "*" quantified
                 // operand not in the last position and should implement
                 // support for that
                 sink.diagnoseWithoutSourceView(

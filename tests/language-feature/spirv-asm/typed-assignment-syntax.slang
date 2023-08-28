@@ -9,7 +9,7 @@ RWStructuredBuffer<int> outputBuffer;
 // CHECK-NEXT: 8
 
 //
-// This test tests a basic application of the spirv_asm block
+// This test tests a basic application of the spirv_asm block's typed assignment syntax
 //
 [numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
