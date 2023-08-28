@@ -4935,10 +4935,7 @@ bool WaveMaskAllEqual(WaveMask mask, T value)
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
-__target_intrinsic(glsl, "subgroupAllEqual($1)")
 __cuda_sm_version(7.0)
-__target_intrinsic(cuda, "_waveAllEqualMultiple($0, $1)")
-__target_intrinsic(hlsl, "WaveActiveAllEqual($1)")
 bool WaveMaskAllEqual(WaveMask mask, vector<T,N> value)
 {
     __target_switch
