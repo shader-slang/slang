@@ -24,9 +24,12 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         // their Scope and MemorySemantics prefixes, and correctly wrap them in
         // OpConstant.
         OpMemoryBarrier Invocation
+            // Test that an unqualified enum works
               AcquireRelease
-            | UniformMemory
-            | ImageMemory
+            // Test that a decimal integer literal works
+            | 64
+            // Test that a hex integer literal works
+            | 0x800
             // Test that an explicit scope works
             | MemorySemanticsAtomicCounterMemory;
         OpIMul $$int result $n %two
