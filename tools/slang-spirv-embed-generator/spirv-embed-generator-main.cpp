@@ -263,24 +263,28 @@ void writeInfo(
             },
             [](const Slang::SPIRVCoreGrammarInfo::OpInfo& i){
                 const char* classStr = opClassToString(i.class_);
-                String ret = String("const static OperandKind operandTypes[] = {");
-                String operandTypes;
-                for(Index o = 0; o < i.numOperandTypes; ++o)
+                String ret;
+                if(i.numOperandTypes)
                 {
-                    if(o != 0)
-                        ret.append(", ");
-                    ret.append("{" + String(i.operandTypes[o].index) + "}");
+                    ret.append("const static OperandKind operandTypes[] = {");
+                    String operandTypes;
+                    for(Index o = 0; o < i.numOperandTypes; ++o)
+                    {
+                        if(o != 0)
+                            ret.append(", ");
+                        ret.append("{" + String(i.operandTypes[o].index) + "}");
+                    }
+                    ret.append("};\n            ");
                 }
                 ret.append(
-                    "};\n            "
-                    + String("v = {SPIRVCoreGrammarInfo::OpInfo::")
+                      String("v = {SPIRVCoreGrammarInfo::OpInfo::")
                     + classStr + ", "
                     + String(i.resultTypeIndex) + ", "
                     + String(i.resultIdIndex) + ", "
                     + String(i.minWordCount) + ", "
                     + (i.maxWordCount == 0xffff ? String("0xffff") : String(i.maxWordCount)) + ", "
                     + String(i.numOperandTypes) + ", "
-                    + "operandTypes"
+                    + (i.numOperandTypes ? "operandTypes" : "nullptr")
                     + "}");
                 return ret;
             },

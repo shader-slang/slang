@@ -2134,8 +2134,7 @@ static bool getOpInfo(const SpvOp& k, SPIRVCoreGrammarInfo::OpInfo& v)
     {
         case SpvOpNop:
         {
-            const static OperandKind operandTypes[] = {};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, nullptr};
             return true;
         }
         case SpvOpUndef:
@@ -2434,8 +2433,7 @@ static bool getOpInfo(const SpvOp& k, SPIRVCoreGrammarInfo::OpInfo& v)
         }
         case SpvOpFunctionEnd:
         {
-            const static OperandKind operandTypes[] = {};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, nullptr};
             return true;
         }
         case SpvOpFunctionCall:
@@ -3340,14 +3338,12 @@ static bool getOpInfo(const SpvOp& k, SPIRVCoreGrammarInfo::OpInfo& v)
         }
         case SpvOpEmitVertex:
         {
-            const static OperandKind operandTypes[] = {};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, nullptr};
             return true;
         }
         case SpvOpEndPrimitive:
         {
-            const static OperandKind operandTypes[] = {};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, nullptr};
             return true;
         }
         case SpvOpEmitStreamVertex:
@@ -3514,14 +3510,12 @@ static bool getOpInfo(const SpvOp& k, SPIRVCoreGrammarInfo::OpInfo& v)
         }
         case SpvOpKill:
         {
-            const static OperandKind operandTypes[] = {};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, nullptr};
             return true;
         }
         case SpvOpReturn:
         {
-            const static OperandKind operandTypes[] = {};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, nullptr};
             return true;
         }
         case SpvOpReturnValue:
@@ -3532,8 +3526,7 @@ static bool getOpInfo(const SpvOp& k, SPIRVCoreGrammarInfo::OpInfo& v)
         }
         case SpvOpUnreachable:
         {
-            const static OperandKind operandTypes[] = {};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, nullptr};
             return true;
         }
         case SpvOpLifetimeStart:
@@ -3874,8 +3867,7 @@ static bool getOpInfo(const SpvOp& k, SPIRVCoreGrammarInfo::OpInfo& v)
         }
         case SpvOpNoLine:
         {
-            const static OperandKind operandTypes[] = {};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Debug, -1, -1, 1, 1, 0, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Debug, -1, -1, 1, 1, 0, nullptr};
             return true;
         }
         case SpvOpAtomicFlagTestAndSet:
@@ -4216,8 +4208,7 @@ static bool getOpInfo(const SpvOp& k, SPIRVCoreGrammarInfo::OpInfo& v)
         }
         case SpvOpTerminateInvocation:
         {
-            const static OperandKind operandTypes[] = {};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, nullptr};
             return true;
         }
         case SpvOpSubgroupBallotKHR:
@@ -4282,14 +4273,12 @@ static bool getOpInfo(const SpvOp& k, SPIRVCoreGrammarInfo::OpInfo& v)
         }
         case SpvOpIgnoreIntersectionKHR:
         {
-            const static OperandKind operandTypes[] = {};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, nullptr};
             return true;
         }
         case SpvOpTerminateRayKHR:
         {
-            const static OperandKind operandTypes[] = {};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, nullptr};
             return true;
         }
         case SpvOpSDot:
@@ -4726,14 +4715,12 @@ static bool getOpInfo(const SpvOp& k, SPIRVCoreGrammarInfo::OpInfo& v)
         }
         case SpvOpIgnoreIntersectionNV:
         {
-            const static OperandKind operandTypes[] = {};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, nullptr};
             return true;
         }
         case SpvOpTerminateRayNV:
         {
-            const static OperandKind operandTypes[] = {};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, nullptr};
             return true;
         }
         case SpvOpTraceNV:
@@ -4804,20 +4791,17 @@ static bool getOpInfo(const SpvOp& k, SPIRVCoreGrammarInfo::OpInfo& v)
         }
         case SpvOpBeginInvocationInterlockEXT:
         {
-            const static OperandKind operandTypes[] = {};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, nullptr};
             return true;
         }
         case SpvOpEndInvocationInterlockEXT:
         {
-            const static OperandKind operandTypes[] = {};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, nullptr};
             return true;
         }
         case SpvOpDemoteToHelperInvocation:
         {
-            const static OperandKind operandTypes[] = {};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, nullptr};
             return true;
         }
         case SpvOpIsHelperInvocationEXT:
