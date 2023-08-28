@@ -2116,717 +2116,4260 @@ bool lookupSpvWord(const UnownedStringSlice& str, SpvWord& value)
     }
 }
 
-static bool getOpInfo(const SpvOp& op, SPIRVCoreGrammarInfo::OpInfo& info)
+static bool getOpInfo(const SpvOp& k, SPIRVCoreGrammarInfo::OpInfo& v)
 {
-    switch(op)
+    switch(k)
     {
-        case 0: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 1: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 2: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 3: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 4: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 5: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 6: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 7: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0}; return true;
-        case 8: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 10: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 11: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0}; return true;
-        case 12: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 14: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 15: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 16: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 17: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 19: info = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0}; return true;
-        case 20: info = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0}; return true;
-        case 21: info = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0}; return true;
-        case 22: info = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0}; return true;
-        case 23: info = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0}; return true;
-        case 24: info = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0}; return true;
-        case 25: info = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0}; return true;
-        case 26: info = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0}; return true;
-        case 27: info = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0}; return true;
-        case 28: info = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0}; return true;
-        case 29: info = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0}; return true;
-        case 30: info = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0}; return true;
-        case 31: info = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0}; return true;
-        case 32: info = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0}; return true;
-        case 33: info = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0}; return true;
-        case 34: info = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0}; return true;
-        case 35: info = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0}; return true;
-        case 36: info = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0}; return true;
-        case 37: info = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0}; return true;
-        case 38: info = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0}; return true;
-        case 39: info = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, -1}; return true;
-        case 41: info = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1}; return true;
-        case 42: info = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1}; return true;
-        case 43: info = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1}; return true;
-        case 44: info = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1}; return true;
-        case 45: info = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1}; return true;
-        case 46: info = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1}; return true;
-        case 48: info = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1}; return true;
-        case 49: info = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1}; return true;
-        case 50: info = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1}; return true;
-        case 51: info = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1}; return true;
-        case 52: info = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1}; return true;
-        case 54: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 55: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 56: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 57: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 59: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 60: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 61: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 62: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 63: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 64: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 65: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 66: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 67: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 68: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 69: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 70: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 71: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 72: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 73: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0}; return true;
-        case 74: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 75: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 77: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 78: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 79: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 80: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 81: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 82: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 83: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 84: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 86: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 87: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 88: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 89: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 90: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 91: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 92: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 93: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 94: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 95: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 96: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 97: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 98: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 99: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 100: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 101: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 102: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 103: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 104: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 105: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 106: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 107: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 109: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 110: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 111: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 112: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 113: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 114: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 115: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 116: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 117: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 118: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 119: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 120: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 121: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 122: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 123: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 124: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 126: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 127: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 128: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 129: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 130: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 131: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 132: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 133: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 134: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 135: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 136: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 137: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 138: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 139: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 140: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 141: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 142: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 143: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 144: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 145: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 146: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 147: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 148: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 149: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 150: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 151: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 152: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 154: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 155: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 156: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 157: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 158: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 159: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 160: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 161: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 162: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 163: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 164: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 165: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 166: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 167: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 168: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 169: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 170: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 171: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 172: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 173: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 174: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 175: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 176: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 177: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 178: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 179: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 180: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 181: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 182: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 183: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 184: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 185: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 186: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 187: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 188: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 189: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 190: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 191: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 194: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 195: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 196: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 197: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 198: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 199: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 200: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 201: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 202: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 203: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 204: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 205: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 207: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 208: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 209: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 210: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 211: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 212: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 213: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 214: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 215: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 218: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 219: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 220: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 221: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 224: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 225: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 227: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 228: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 229: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 230: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 231: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 232: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 233: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 234: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 235: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 236: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 237: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 238: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 239: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 240: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 241: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 242: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 245: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 246: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 247: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 248: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0}; return true;
-        case 249: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 250: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 251: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 252: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 253: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 254: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 255: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 256: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 257: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 259: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 260: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 261: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 262: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 263: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 264: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 265: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 266: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 267: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 268: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 269: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 270: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 271: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 274: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 275: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 276: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 277: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 278: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 279: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 280: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 281: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 282: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 283: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 284: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 285: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 286: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 287: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 288: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 291: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 292: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 293: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 294: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 295: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 296: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 297: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 298: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 299: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 300: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 301: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 302: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 303: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 304: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 305: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 306: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 307: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 308: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 309: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 310: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 311: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 312: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 313: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 314: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 315: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 316: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 317: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 318: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 319: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 320: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 321: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 322: info = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0}; return true;
-        case 323: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 324: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 325: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 326: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 327: info = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0}; return true;
-        case 328: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 329: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 330: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 331: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 332: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 333: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 334: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 335: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 336: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 337: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 338: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 339: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 340: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 341: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 342: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 343: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 344: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 345: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 346: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 347: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 348: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 349: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 350: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 351: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 352: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 353: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 354: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 355: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 356: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 357: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 358: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 359: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 360: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 361: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 362: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 363: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 364: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 365: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 366: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 400: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 401: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 402: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 403: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 4160: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 4161: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 4162: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 4416: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 4421: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 4422: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 4428: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 4429: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 4430: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 4431: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 4432: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 4445: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 4446: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 4447: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 4448: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 4449: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 4450: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 4451: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 4452: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 4453: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 4454: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 4455: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 4456: info = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0}; return true;
-        case 4457: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 4458: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 4459: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 4460: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 4472: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0}; return true;
-        case 4473: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 4474: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 4475: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 4476: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 4477: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 4479: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 4480: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 4481: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 4482: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 4483: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5000: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5001: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5002: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5003: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5004: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5005: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5006: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5007: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5011: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5012: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5056: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5249: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 5250: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 5251: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 5252: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5253: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5254: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5255: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5256: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 5257: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5258: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5259: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 5260: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 5261: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 5262: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 5263: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 5264: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 5265: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5266: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 5267: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5268: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5269: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5270: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5271: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5272: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5273: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5274: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5275: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5276: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5277: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5278: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5279: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 5280: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 5281: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0}; return true;
-        case 5283: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5294: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 5295: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 5296: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5299: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 5334: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5335: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 5336: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 5337: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 5338: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 5339: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 5340: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5341: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0}; return true;
-        case 5344: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 5358: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0}; return true;
-        case 5359: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5360: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 5361: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5362: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5364: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 5365: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 5380: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 5381: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5391: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5392: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5393: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5394: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5395: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5396: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5397: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 5571: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5572: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5573: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5574: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5575: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5576: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 5577: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5578: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 5580: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5581: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 5585: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5586: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5587: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5588: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5589: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5590: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5591: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5592: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5593: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5594: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5595: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5596: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5597: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5598: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5600: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5601: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5609: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5610: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5611: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5614: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5615: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5630: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 5631: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5632: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 5633: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 5699: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5700: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0}; return true;
-        case 5701: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0}; return true;
-        case 5702: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0}; return true;
-        case 5703: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0}; return true;
-        case 5704: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0}; return true;
-        case 5705: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0}; return true;
-        case 5706: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0}; return true;
-        case 5707: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0}; return true;
-        case 5708: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0}; return true;
-        case 5709: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0}; return true;
-        case 5710: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0}; return true;
-        case 5711: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0}; return true;
-        case 5712: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0}; return true;
-        case 5713: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5714: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5715: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5716: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5717: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5718: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5719: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5720: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5721: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5722: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5723: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5724: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5725: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5726: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5727: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5728: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5729: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5730: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5731: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5732: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5733: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5734: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5735: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5736: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5737: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5738: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5739: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5740: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5741: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5742: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5743: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5744: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5745: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5746: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5747: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5748: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5749: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5750: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5751: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5752: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5753: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5754: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5755: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5756: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5757: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5758: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5759: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5760: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5761: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5762: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5763: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5764: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5765: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5766: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5767: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5768: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5769: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5770: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5771: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5772: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5773: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5774: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5775: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5776: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5777: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5778: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5779: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5780: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5781: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5782: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5783: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5784: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5785: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5786: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5787: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5788: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5789: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5790: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5791: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5792: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5793: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5794: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5795: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5796: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5797: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5798: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5799: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5800: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5801: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5802: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5803: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5804: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5805: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5806: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5807: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5808: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5809: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5810: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5811: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5812: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5813: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5814: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5815: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5816: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5818: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5819: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5820: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 5840: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5841: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5842: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5843: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5846: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5847: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5848: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5849: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5850: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5851: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5852: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5853: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5854: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5855: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5856: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5857: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5858: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5859: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5860: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5861: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5862: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5863: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5864: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5865: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5866: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5867: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5868: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5869: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5870: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5871: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5872: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5873: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5874: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5875: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5876: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5877: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5878: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5879: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5880: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5881: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5882: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5887: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 5911: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0}; return true;
-        case 5912: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0}; return true;
-        case 5913: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0}; return true;
-        case 5923: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5924: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5925: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5926: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5927: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5928: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5929: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5930: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5931: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5932: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5933: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5934: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5938: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5946: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5947: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 5949: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 6016: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 6017: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 6018: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 6019: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 6020: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 6021: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 6022: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 6023: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 6024: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 6025: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 6026: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 6027: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 6028: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 6029: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 6030: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 6031: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 6032: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 6035: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 6086: info = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0}; return true;
-        case 6090: info = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, -1}; return true;
-        case 6091: info = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, -1, -1}; return true;
-        case 6092: info = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, -1, -1}; return true;
-        case 6116: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 6117: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 6142: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 6143: info = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1}; return true;
-        case 6401: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 6402: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 6403: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 6404: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 6405: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 6406: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 6407: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
-        case 6408: info = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1}; return true;
+        case SpvOpNop:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpUndef:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSourceContinued:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpSource:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpSourceExtension:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpName:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpMemberName:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpString:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            return true;
+        case SpvOpLine:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpExtension:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpExtInstImport:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            return true;
+        case SpvOpExtInst:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpMemoryModel:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpEntryPoint:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpExecutionMode:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpCapability:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpTypeVoid:
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            return true;
+        case SpvOpTypeBool:
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            return true;
+        case SpvOpTypeInt:
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            return true;
+        case SpvOpTypeFloat:
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            return true;
+        case SpvOpTypeVector:
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            return true;
+        case SpvOpTypeMatrix:
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            return true;
+        case SpvOpTypeImage:
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            return true;
+        case SpvOpTypeSampler:
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            return true;
+        case SpvOpTypeSampledImage:
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            return true;
+        case SpvOpTypeArray:
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            return true;
+        case SpvOpTypeRuntimeArray:
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            return true;
+        case SpvOpTypeStruct:
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            return true;
+        case SpvOpTypeOpaque:
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            return true;
+        case SpvOpTypePointer:
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            return true;
+        case SpvOpTypeFunction:
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            return true;
+        case SpvOpTypeEvent:
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            return true;
+        case SpvOpTypeDeviceEvent:
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            return true;
+        case SpvOpTypeReserveId:
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            return true;
+        case SpvOpTypeQueue:
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            return true;
+        case SpvOpTypePipe:
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            return true;
+        case SpvOpTypeForwardPointer:
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, -1};
+            return true;
+        case SpvOpConstantTrue:
+            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1};
+            return true;
+        case SpvOpConstantFalse:
+            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1};
+            return true;
+        case SpvOpConstant:
+            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1};
+            return true;
+        case SpvOpConstantComposite:
+            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1};
+            return true;
+        case SpvOpConstantSampler:
+            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1};
+            return true;
+        case SpvOpConstantNull:
+            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1};
+            return true;
+        case SpvOpSpecConstantTrue:
+            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1};
+            return true;
+        case SpvOpSpecConstantFalse:
+            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1};
+            return true;
+        case SpvOpSpecConstant:
+            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1};
+            return true;
+        case SpvOpSpecConstantComposite:
+            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1};
+            return true;
+        case SpvOpSpecConstantOp:
+            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1};
+            return true;
+        case SpvOpFunction:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpFunctionParameter:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpFunctionEnd:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpFunctionCall:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpVariable:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpImageTexelPointer:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpLoad:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpStore:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpCopyMemory:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpCopyMemorySized:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpAccessChain:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpInBoundsAccessChain:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpPtrAccessChain:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpArrayLength:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGenericPtrMemSemantics:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpInBoundsPtrAccessChain:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpDecorate:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpMemberDecorate:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpDecorationGroup:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            return true;
+        case SpvOpGroupDecorate:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpGroupMemberDecorate:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpVectorExtractDynamic:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpVectorInsertDynamic:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpVectorShuffle:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpCompositeConstruct:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpCompositeExtract:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpCompositeInsert:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpCopyObject:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpTranspose:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSampledImage:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpImageSampleImplicitLod:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpImageSampleExplicitLod:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpImageSampleDrefImplicitLod:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpImageSampleDrefExplicitLod:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpImageSampleProjImplicitLod:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpImageSampleProjExplicitLod:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpImageSampleProjDrefImplicitLod:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpImageSampleProjDrefExplicitLod:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpImageFetch:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpImageGather:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpImageDrefGather:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpImageRead:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpImageWrite:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpImage:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpImageQueryFormat:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpImageQueryOrder:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpImageQuerySizeLod:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpImageQuerySize:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpImageQueryLod:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpImageQueryLevels:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpImageQuerySamples:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpConvertFToU:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpConvertFToS:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpConvertSToF:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpConvertUToF:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpUConvert:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSConvert:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpFConvert:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpQuantizeToF16:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpConvertPtrToU:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSatConvertSToU:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSatConvertUToS:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpConvertUToPtr:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpPtrCastToGeneric:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGenericCastToPtr:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGenericCastToPtrExplicit:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpBitcast:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSNegate:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpFNegate:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpIAdd:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpFAdd:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpISub:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpFSub:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpIMul:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpFMul:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpUDiv:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSDiv:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpFDiv:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpUMod:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSRem:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSMod:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpFRem:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpFMod:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpVectorTimesScalar:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpMatrixTimesScalar:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpVectorTimesMatrix:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpMatrixTimesVector:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpMatrixTimesMatrix:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpOuterProduct:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpDot:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpIAddCarry:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpISubBorrow:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpUMulExtended:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSMulExtended:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpAny:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpAll:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpIsNan:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpIsInf:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpIsFinite:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpIsNormal:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSignBitSet:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpLessOrGreater:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpOrdered:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpUnordered:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpLogicalEqual:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpLogicalNotEqual:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpLogicalOr:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpLogicalAnd:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpLogicalNot:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSelect:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpIEqual:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpINotEqual:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpUGreaterThan:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSGreaterThan:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpUGreaterThanEqual:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSGreaterThanEqual:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpULessThan:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSLessThan:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpULessThanEqual:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSLessThanEqual:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpFOrdEqual:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpFUnordEqual:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpFOrdNotEqual:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpFUnordNotEqual:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpFOrdLessThan:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpFUnordLessThan:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpFOrdGreaterThan:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpFUnordGreaterThan:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpFOrdLessThanEqual:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpFUnordLessThanEqual:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpFOrdGreaterThanEqual:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpFUnordGreaterThanEqual:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpShiftRightLogical:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpShiftRightArithmetic:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpShiftLeftLogical:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpBitwiseOr:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpBitwiseXor:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpBitwiseAnd:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpNot:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpBitFieldInsert:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpBitFieldSExtract:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpBitFieldUExtract:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpBitReverse:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpBitCount:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpDPdx:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpDPdy:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpFwidth:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpDPdxFine:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpDPdyFine:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpFwidthFine:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpDPdxCoarse:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpDPdyCoarse:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpFwidthCoarse:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpEmitVertex:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpEndPrimitive:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpEmitStreamVertex:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpEndStreamPrimitive:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpControlBarrier:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpMemoryBarrier:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpAtomicLoad:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpAtomicStore:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpAtomicExchange:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpAtomicCompareExchange:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpAtomicCompareExchangeWeak:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpAtomicIIncrement:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpAtomicIDecrement:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpAtomicIAdd:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpAtomicISub:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpAtomicSMin:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpAtomicUMin:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpAtomicSMax:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpAtomicUMax:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpAtomicAnd:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpAtomicOr:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpAtomicXor:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpPhi:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpLoopMerge:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpSelectionMerge:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpLabel:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            return true;
+        case SpvOpBranch:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpBranchConditional:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpSwitch:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpKill:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpReturn:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpReturnValue:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpUnreachable:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpLifetimeStart:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpLifetimeStop:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpGroupAsyncCopy:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupWaitEvents:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpGroupAll:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupAny:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupBroadcast:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupIAdd:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupFAdd:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupFMin:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupUMin:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupSMin:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupFMax:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupUMax:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupSMax:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpReadPipe:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpWritePipe:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpReservedReadPipe:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpReservedWritePipe:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpReserveReadPipePackets:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpReserveWritePipePackets:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpCommitReadPipe:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpCommitWritePipe:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpIsValidReserveId:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGetNumPipePackets:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGetMaxPipePackets:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupReserveReadPipePackets:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupReserveWritePipePackets:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupCommitReadPipe:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpGroupCommitWritePipe:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpEnqueueMarker:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpEnqueueKernel:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGetKernelNDrangeSubGroupCount:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGetKernelNDrangeMaxSubGroupSize:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGetKernelWorkGroupSize:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGetKernelPreferredWorkGroupSizeMultiple:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpRetainEvent:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpReleaseEvent:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpCreateUserEvent:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpIsValidEvent:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSetUserEventStatus:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpCaptureEventProfilingInfo:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpGetDefaultQueue:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpBuildNDRange:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpImageSparseSampleImplicitLod:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpImageSparseSampleExplicitLod:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpImageSparseSampleDrefImplicitLod:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpImageSparseSampleDrefExplicitLod:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpImageSparseSampleProjImplicitLod:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpImageSparseSampleProjExplicitLod:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpImageSparseSampleProjDrefImplicitLod:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpImageSparseSampleProjDrefExplicitLod:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpImageSparseFetch:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpImageSparseGather:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpImageSparseDrefGather:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpImageSparseTexelsResident:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpNoLine:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpAtomicFlagTestAndSet:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpAtomicFlagClear:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpImageSparseRead:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSizeOf:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpTypePipeStorage:
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            return true;
+        case SpvOpConstantPipeStorage:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpCreatePipeFromPipeStorage:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGetKernelLocalSizeForSubgroupCount:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGetKernelMaxNumSubgroups:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpTypeNamedBarrier:
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            return true;
+        case SpvOpNamedBarrierInitialize:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpMemoryNamedBarrier:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpModuleProcessed:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpExecutionModeId:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpDecorateId:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpGroupNonUniformElect:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupNonUniformAll:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupNonUniformAny:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupNonUniformAllEqual:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupNonUniformBroadcast:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupNonUniformBroadcastFirst:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupNonUniformBallot:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupNonUniformInverseBallot:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupNonUniformBallotBitExtract:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupNonUniformBallotBitCount:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupNonUniformBallotFindLSB:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupNonUniformBallotFindMSB:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupNonUniformShuffle:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupNonUniformShuffleXor:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupNonUniformShuffleUp:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupNonUniformShuffleDown:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupNonUniformIAdd:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupNonUniformFAdd:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupNonUniformIMul:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupNonUniformFMul:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupNonUniformSMin:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupNonUniformUMin:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupNonUniformFMin:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupNonUniformSMax:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupNonUniformUMax:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupNonUniformFMax:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupNonUniformBitwiseAnd:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupNonUniformBitwiseOr:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupNonUniformBitwiseXor:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupNonUniformLogicalAnd:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupNonUniformLogicalOr:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupNonUniformLogicalXor:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupNonUniformQuadBroadcast:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupNonUniformQuadSwap:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpCopyLogical:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpPtrEqual:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpPtrNotEqual:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpPtrDiff:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpColorAttachmentReadEXT:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpDepthAttachmentReadEXT:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpStencilAttachmentReadEXT:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpTerminateInvocation:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpSubgroupBallotKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupFirstInvocationKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAllKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAnyKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAllEqualKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupNonUniformRotateKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupReadInvocationKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpTraceRayKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpExecuteCallableKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpConvertUToAccelerationStructureKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpIgnoreIntersectionKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpTerminateRayKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpSDot:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpUDot:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSUDot:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSDotAccSat:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpUDotAccSat:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSUDotAccSat:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpTypeCooperativeMatrixKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            return true;
+        case SpvOpCooperativeMatrixLoadKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpCooperativeMatrixStoreKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpCooperativeMatrixMulAddKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpCooperativeMatrixLengthKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpTypeRayQueryKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            return true;
+        case SpvOpRayQueryInitializeKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpRayQueryTerminateKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpRayQueryGenerateIntersectionKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpRayQueryConfirmIntersectionKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpRayQueryProceedKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpRayQueryGetIntersectionTypeKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpImageSampleWeightedQCOM:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpImageBoxFilterQCOM:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpImageBlockMatchSSDQCOM:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpImageBlockMatchSADQCOM:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupIAddNonUniformAMD:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupFAddNonUniformAMD:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupFMinNonUniformAMD:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupUMinNonUniformAMD:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupSMinNonUniformAMD:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupFMaxNonUniformAMD:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupUMaxNonUniformAMD:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupSMaxNonUniformAMD:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpFragmentMaskFetchAMD:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpFragmentFetchAMD:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpReadClockKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpHitObjectRecordHitMotionNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpHitObjectRecordHitWithIndexMotionNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpHitObjectRecordMissMotionNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpHitObjectGetWorldToObjectNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpHitObjectGetObjectToWorldNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpHitObjectGetObjectRayDirectionNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpHitObjectGetObjectRayOriginNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpHitObjectTraceRayMotionNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpHitObjectGetShaderRecordBufferHandleNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpHitObjectGetShaderBindingTableRecordIndexNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpHitObjectRecordEmptyNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpHitObjectTraceRayNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpHitObjectRecordHitNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpHitObjectRecordHitWithIndexNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpHitObjectRecordMissNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpHitObjectExecuteShaderNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpHitObjectGetCurrentTimeNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpHitObjectGetAttributesNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpHitObjectGetHitKindNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpHitObjectGetPrimitiveIndexNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpHitObjectGetGeometryIndexNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpHitObjectGetInstanceIdNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpHitObjectGetInstanceCustomIndexNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpHitObjectGetWorldRayDirectionNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpHitObjectGetWorldRayOriginNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpHitObjectGetRayTMaxNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpHitObjectGetRayTMinNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpHitObjectIsEmptyNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpHitObjectIsHitNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpHitObjectIsMissNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpReorderThreadWithHitObjectNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpReorderThreadWithHintNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpTypeHitObjectNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            return true;
+        case SpvOpImageSampleFootprintNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpEmitMeshTasksEXT:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpSetMeshOutputsEXT:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpGroupNonUniformPartitionNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpWritePackedPrimitiveIndices4x8NV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpReportIntersectionNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpIgnoreIntersectionNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpTerminateRayNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpTraceNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpTraceMotionNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpTraceRayMotionNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpRayQueryGetIntersectionTriangleVertexPositionsKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpTypeAccelerationStructureNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            return true;
+        case SpvOpExecuteCallableNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpTypeCooperativeMatrixNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            return true;
+        case SpvOpCooperativeMatrixLoadNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpCooperativeMatrixStoreNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpCooperativeMatrixMulAddNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpCooperativeMatrixLengthNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpBeginInvocationInterlockEXT:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpEndInvocationInterlockEXT:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpDemoteToHelperInvocation:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpIsHelperInvocationEXT:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpConvertUToImageNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpConvertUToSamplerNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpConvertImageToUNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpConvertSamplerToUNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpConvertUToSampledImageNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpConvertSampledImageToUNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSamplerImageAddressingModeNV:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpSubgroupShuffleINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupShuffleDownINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupShuffleUpINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupShuffleXorINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupBlockReadINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupBlockWriteINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpSubgroupImageBlockReadINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupImageBlockWriteINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpSubgroupImageMediaBlockReadINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupImageMediaBlockWriteINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpUCountLeadingZerosINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpUCountTrailingZerosINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpAbsISubINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpAbsUSubINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpIAddSatINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpUAddSatINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpIAverageINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpUAverageINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpIAverageRoundedINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpUAverageRoundedINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpISubSatINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpUSubSatINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpIMul32x16INTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpUMul32x16INTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpConstantFunctionPointerINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpFunctionPointerCallINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpAsmTargetINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpAsmINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpAsmCallINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpAtomicFMinEXT:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpAtomicFMaxEXT:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpAssumeTrueKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpExpectKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpDecorateString:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpMemberDecorateString:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpVmeImageINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpTypeVmeImageINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            return true;
+        case SpvOpTypeAvcImePayloadINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            return true;
+        case SpvOpTypeAvcRefPayloadINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            return true;
+        case SpvOpTypeAvcSicPayloadINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            return true;
+        case SpvOpTypeAvcMcePayloadINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            return true;
+        case SpvOpTypeAvcMceResultINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            return true;
+        case SpvOpTypeAvcImeResultINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            return true;
+        case SpvOpTypeAvcImeResultSingleReferenceStreamoutINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            return true;
+        case SpvOpTypeAvcImeResultDualReferenceStreamoutINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            return true;
+        case SpvOpTypeAvcImeSingleReferenceStreaminINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            return true;
+        case SpvOpTypeAvcImeDualReferenceStreaminINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            return true;
+        case SpvOpTypeAvcRefResultINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            return true;
+        case SpvOpTypeAvcSicResultINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            return true;
+        case SpvOpSubgroupAvcMceGetDefaultInterBaseMultiReferencePenaltyINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcMceSetInterBaseMultiReferencePenaltyINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcMceGetDefaultInterShapePenaltyINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcMceSetInterShapePenaltyINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcMceGetDefaultInterDirectionPenaltyINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcMceSetInterDirectionPenaltyINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcMceGetDefaultIntraLumaShapePenaltyINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcMceGetDefaultInterMotionVectorCostTableINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcMceGetDefaultHighPenaltyCostTableINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcMceGetDefaultMediumPenaltyCostTableINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcMceGetDefaultLowPenaltyCostTableINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcMceSetMotionVectorCostFunctionINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcMceGetDefaultIntraLumaModePenaltyINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcMceGetDefaultNonDcLumaIntraPenaltyINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcMceGetDefaultIntraChromaModeBasePenaltyINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcMceSetAcOnlyHaarINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcMceSetSourceInterlacedFieldPolarityINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcMceSetSingleReferenceInterlacedFieldPolarityINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcMceSetDualReferenceInterlacedFieldPolaritiesINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcMceConvertToImePayloadINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcMceConvertToImeResultINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcMceConvertToRefPayloadINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcMceConvertToRefResultINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcMceConvertToSicPayloadINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcMceConvertToSicResultINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcMceGetMotionVectorsINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcMceGetInterDistortionsINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcMceGetBestInterDistortionsINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcMceGetInterMajorShapeINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcMceGetInterMinorShapeINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcMceGetInterDirectionsINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcMceGetInterMotionVectorCountINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcMceGetInterReferenceIdsINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcMceGetInterReferenceInterlacedFieldPolaritiesINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcImeInitializeINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcImeSetSingleReferenceINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcImeSetDualReferenceINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcImeRefWindowSizeINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcImeAdjustRefOffsetINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcImeConvertToMcePayloadINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcImeSetMaxMotionVectorCountINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcImeSetUnidirectionalMixDisableINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcImeSetEarlySearchTerminationThresholdINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcImeSetWeightedSadINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcImeEvaluateWithSingleReferenceINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcImeEvaluateWithDualReferenceINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcImeEvaluateWithSingleReferenceStreaminINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcImeEvaluateWithDualReferenceStreaminINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcImeEvaluateWithSingleReferenceStreamoutINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcImeEvaluateWithDualReferenceStreamoutINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcImeEvaluateWithSingleReferenceStreaminoutINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcImeEvaluateWithDualReferenceStreaminoutINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcImeConvertToMceResultINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcImeGetSingleReferenceStreaminINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcImeGetDualReferenceStreaminINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcImeStripSingleReferenceStreamoutINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcImeStripDualReferenceStreamoutINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcImeGetStreamoutSingleReferenceMajorShapeMotionVectorsINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcImeGetStreamoutSingleReferenceMajorShapeDistortionsINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcImeGetStreamoutSingleReferenceMajorShapeReferenceIdsINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcImeGetStreamoutDualReferenceMajorShapeMotionVectorsINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcImeGetStreamoutDualReferenceMajorShapeDistortionsINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcImeGetStreamoutDualReferenceMajorShapeReferenceIdsINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcImeGetBorderReachedINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcImeGetTruncatedSearchIndicationINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcImeGetUnidirectionalEarlySearchTerminationINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcImeGetWeightingPatternMinimumMotionVectorINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcImeGetWeightingPatternMinimumDistortionINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcFmeInitializeINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcBmeInitializeINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcRefConvertToMcePayloadINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcRefSetBidirectionalMixDisableINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcRefSetBilinearFilterEnableINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcRefEvaluateWithSingleReferenceINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcRefEvaluateWithDualReferenceINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcRefEvaluateWithMultiReferenceINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcRefEvaluateWithMultiReferenceInterlacedINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcRefConvertToMceResultINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcSicInitializeINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcSicConfigureSkcINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcSicConfigureIpeLumaINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcSicConfigureIpeLumaChromaINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcSicGetMotionVectorMaskINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcSicConvertToMcePayloadINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcSicSetIntraLumaShapePenaltyINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcSicSetIntraLumaModeCostFunctionINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcSicSetIntraChromaModeCostFunctionINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcSicSetBilinearFilterEnableINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcSicSetSkcForwardTransformEnableINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcSicSetBlockBasedRawSkipSadINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcSicEvaluateIpeINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcSicEvaluateWithSingleReferenceINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcSicEvaluateWithDualReferenceINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcSicEvaluateWithMultiReferenceINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcSicEvaluateWithMultiReferenceInterlacedINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcSicConvertToMceResultINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcSicGetIpeLumaShapeINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcSicGetBestIpeLumaDistortionINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcSicGetBestIpeChromaDistortionINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcSicGetPackedIpeLumaModesINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcSicGetIpeChromaModeINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcSicGetPackedSkcLumaCountThresholdINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcSicGetPackedSkcLumaSumThresholdINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSubgroupAvcSicGetInterRawSadsINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpVariableLengthArrayINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpSaveMemoryINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpRestoreMemoryINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpArbitraryFloatSinCosPiINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpArbitraryFloatCastINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpArbitraryFloatCastFromIntINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpArbitraryFloatCastToIntINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpArbitraryFloatAddINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpArbitraryFloatSubINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpArbitraryFloatMulINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpArbitraryFloatDivINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpArbitraryFloatGTINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpArbitraryFloatGEINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpArbitraryFloatLTINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpArbitraryFloatLEINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpArbitraryFloatEQINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpArbitraryFloatRecipINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpArbitraryFloatRSqrtINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpArbitraryFloatCbrtINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpArbitraryFloatHypotINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpArbitraryFloatSqrtINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpArbitraryFloatLogINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpArbitraryFloatLog2INTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpArbitraryFloatLog10INTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpArbitraryFloatLog1pINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpArbitraryFloatExpINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpArbitraryFloatExp2INTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpArbitraryFloatExp10INTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpArbitraryFloatExpm1INTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpArbitraryFloatSinINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpArbitraryFloatCosINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpArbitraryFloatSinCosINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpArbitraryFloatSinPiINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpArbitraryFloatCosPiINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpArbitraryFloatASinINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpArbitraryFloatASinPiINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpArbitraryFloatACosINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpArbitraryFloatACosPiINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpArbitraryFloatATanINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpArbitraryFloatATanPiINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpArbitraryFloatATan2INTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpArbitraryFloatPowINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpArbitraryFloatPowRINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpArbitraryFloatPowNINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpLoopControlINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpAliasDomainDeclINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            return true;
+        case SpvOpAliasScopeDeclINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            return true;
+        case SpvOpAliasScopeListDeclINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0};
+            return true;
+        case SpvOpFixedSqrtINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpFixedRecipINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpFixedRsqrtINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpFixedSinINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpFixedCosINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpFixedSinCosINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpFixedSinPiINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpFixedCosPiINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpFixedSinCosPiINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpFixedLogINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpFixedExpINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpPtrCastToCrossWorkgroupINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpCrossWorkgroupCastToPtrINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpReadPipeBlockingINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpWritePipeBlockingINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpFPGARegINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpRayQueryGetRayTMinKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpRayQueryGetRayFlagsKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpRayQueryGetIntersectionTKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpRayQueryGetIntersectionInstanceCustomIndexKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpRayQueryGetIntersectionInstanceIdKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpRayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpRayQueryGetIntersectionGeometryIndexKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpRayQueryGetIntersectionPrimitiveIndexKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpRayQueryGetIntersectionBarycentricsKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpRayQueryGetIntersectionFrontFaceKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpRayQueryGetIntersectionCandidateAABBOpaqueKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpRayQueryGetIntersectionObjectRayDirectionKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpRayQueryGetIntersectionObjectRayOriginKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpRayQueryGetWorldRayDirectionKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpRayQueryGetWorldRayOriginKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpRayQueryGetIntersectionObjectToWorldKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpRayQueryGetIntersectionWorldToObjectKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpAtomicFAddEXT:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpTypeBufferSurfaceINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0};
+            return true;
+        case SpvOpTypeStructContinuedINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, -1};
+            return true;
+        case SpvOpConstantCompositeContinuedINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, -1, -1};
+            return true;
+        case SpvOpSpecConstantCompositeContinuedINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, -1, -1};
+            return true;
+        case SpvOpConvertFToBF16INTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpConvertBF16ToFINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpControlBarrierArriveINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpControlBarrierWaitINTEL:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1};
+            return true;
+        case SpvOpGroupIMulKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupFMulKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupBitwiseAndKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupBitwiseOrKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupBitwiseXorKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupLogicalAndKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupLogicalOrKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        case SpvOpGroupLogicalXorKHR:
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1};
+            return true;
+        default: return false;
+    }
+}
+
+static bool getOpName(const SpvOp& k, UnownedStringSlice& v)
+{
+    switch(k)
+    {
+        case SpvOpNop:
+            v = UnownedStringSlice{"OpNop"};
+            return true;
+        case SpvOpUndef:
+            v = UnownedStringSlice{"OpUndef"};
+            return true;
+        case SpvOpSourceContinued:
+            v = UnownedStringSlice{"OpSourceContinued"};
+            return true;
+        case SpvOpSource:
+            v = UnownedStringSlice{"OpSource"};
+            return true;
+        case SpvOpSourceExtension:
+            v = UnownedStringSlice{"OpSourceExtension"};
+            return true;
+        case SpvOpName:
+            v = UnownedStringSlice{"OpName"};
+            return true;
+        case SpvOpMemberName:
+            v = UnownedStringSlice{"OpMemberName"};
+            return true;
+        case SpvOpString:
+            v = UnownedStringSlice{"OpString"};
+            return true;
+        case SpvOpLine:
+            v = UnownedStringSlice{"OpLine"};
+            return true;
+        case SpvOpExtension:
+            v = UnownedStringSlice{"OpExtension"};
+            return true;
+        case SpvOpExtInstImport:
+            v = UnownedStringSlice{"OpExtInstImport"};
+            return true;
+        case SpvOpExtInst:
+            v = UnownedStringSlice{"OpExtInst"};
+            return true;
+        case SpvOpMemoryModel:
+            v = UnownedStringSlice{"OpMemoryModel"};
+            return true;
+        case SpvOpEntryPoint:
+            v = UnownedStringSlice{"OpEntryPoint"};
+            return true;
+        case SpvOpExecutionMode:
+            v = UnownedStringSlice{"OpExecutionMode"};
+            return true;
+        case SpvOpCapability:
+            v = UnownedStringSlice{"OpCapability"};
+            return true;
+        case SpvOpTypeVoid:
+            v = UnownedStringSlice{"OpTypeVoid"};
+            return true;
+        case SpvOpTypeBool:
+            v = UnownedStringSlice{"OpTypeBool"};
+            return true;
+        case SpvOpTypeInt:
+            v = UnownedStringSlice{"OpTypeInt"};
+            return true;
+        case SpvOpTypeFloat:
+            v = UnownedStringSlice{"OpTypeFloat"};
+            return true;
+        case SpvOpTypeVector:
+            v = UnownedStringSlice{"OpTypeVector"};
+            return true;
+        case SpvOpTypeMatrix:
+            v = UnownedStringSlice{"OpTypeMatrix"};
+            return true;
+        case SpvOpTypeImage:
+            v = UnownedStringSlice{"OpTypeImage"};
+            return true;
+        case SpvOpTypeSampler:
+            v = UnownedStringSlice{"OpTypeSampler"};
+            return true;
+        case SpvOpTypeSampledImage:
+            v = UnownedStringSlice{"OpTypeSampledImage"};
+            return true;
+        case SpvOpTypeArray:
+            v = UnownedStringSlice{"OpTypeArray"};
+            return true;
+        case SpvOpTypeRuntimeArray:
+            v = UnownedStringSlice{"OpTypeRuntimeArray"};
+            return true;
+        case SpvOpTypeStruct:
+            v = UnownedStringSlice{"OpTypeStruct"};
+            return true;
+        case SpvOpTypeOpaque:
+            v = UnownedStringSlice{"OpTypeOpaque"};
+            return true;
+        case SpvOpTypePointer:
+            v = UnownedStringSlice{"OpTypePointer"};
+            return true;
+        case SpvOpTypeFunction:
+            v = UnownedStringSlice{"OpTypeFunction"};
+            return true;
+        case SpvOpTypeEvent:
+            v = UnownedStringSlice{"OpTypeEvent"};
+            return true;
+        case SpvOpTypeDeviceEvent:
+            v = UnownedStringSlice{"OpTypeDeviceEvent"};
+            return true;
+        case SpvOpTypeReserveId:
+            v = UnownedStringSlice{"OpTypeReserveId"};
+            return true;
+        case SpvOpTypeQueue:
+            v = UnownedStringSlice{"OpTypeQueue"};
+            return true;
+        case SpvOpTypePipe:
+            v = UnownedStringSlice{"OpTypePipe"};
+            return true;
+        case SpvOpTypeForwardPointer:
+            v = UnownedStringSlice{"OpTypeForwardPointer"};
+            return true;
+        case SpvOpConstantTrue:
+            v = UnownedStringSlice{"OpConstantTrue"};
+            return true;
+        case SpvOpConstantFalse:
+            v = UnownedStringSlice{"OpConstantFalse"};
+            return true;
+        case SpvOpConstant:
+            v = UnownedStringSlice{"OpConstant"};
+            return true;
+        case SpvOpConstantComposite:
+            v = UnownedStringSlice{"OpConstantComposite"};
+            return true;
+        case SpvOpConstantSampler:
+            v = UnownedStringSlice{"OpConstantSampler"};
+            return true;
+        case SpvOpConstantNull:
+            v = UnownedStringSlice{"OpConstantNull"};
+            return true;
+        case SpvOpSpecConstantTrue:
+            v = UnownedStringSlice{"OpSpecConstantTrue"};
+            return true;
+        case SpvOpSpecConstantFalse:
+            v = UnownedStringSlice{"OpSpecConstantFalse"};
+            return true;
+        case SpvOpSpecConstant:
+            v = UnownedStringSlice{"OpSpecConstant"};
+            return true;
+        case SpvOpSpecConstantComposite:
+            v = UnownedStringSlice{"OpSpecConstantComposite"};
+            return true;
+        case SpvOpSpecConstantOp:
+            v = UnownedStringSlice{"OpSpecConstantOp"};
+            return true;
+        case SpvOpFunction:
+            v = UnownedStringSlice{"OpFunction"};
+            return true;
+        case SpvOpFunctionParameter:
+            v = UnownedStringSlice{"OpFunctionParameter"};
+            return true;
+        case SpvOpFunctionEnd:
+            v = UnownedStringSlice{"OpFunctionEnd"};
+            return true;
+        case SpvOpFunctionCall:
+            v = UnownedStringSlice{"OpFunctionCall"};
+            return true;
+        case SpvOpVariable:
+            v = UnownedStringSlice{"OpVariable"};
+            return true;
+        case SpvOpImageTexelPointer:
+            v = UnownedStringSlice{"OpImageTexelPointer"};
+            return true;
+        case SpvOpLoad:
+            v = UnownedStringSlice{"OpLoad"};
+            return true;
+        case SpvOpStore:
+            v = UnownedStringSlice{"OpStore"};
+            return true;
+        case SpvOpCopyMemory:
+            v = UnownedStringSlice{"OpCopyMemory"};
+            return true;
+        case SpvOpCopyMemorySized:
+            v = UnownedStringSlice{"OpCopyMemorySized"};
+            return true;
+        case SpvOpAccessChain:
+            v = UnownedStringSlice{"OpAccessChain"};
+            return true;
+        case SpvOpInBoundsAccessChain:
+            v = UnownedStringSlice{"OpInBoundsAccessChain"};
+            return true;
+        case SpvOpPtrAccessChain:
+            v = UnownedStringSlice{"OpPtrAccessChain"};
+            return true;
+        case SpvOpArrayLength:
+            v = UnownedStringSlice{"OpArrayLength"};
+            return true;
+        case SpvOpGenericPtrMemSemantics:
+            v = UnownedStringSlice{"OpGenericPtrMemSemantics"};
+            return true;
+        case SpvOpInBoundsPtrAccessChain:
+            v = UnownedStringSlice{"OpInBoundsPtrAccessChain"};
+            return true;
+        case SpvOpDecorate:
+            v = UnownedStringSlice{"OpDecorate"};
+            return true;
+        case SpvOpMemberDecorate:
+            v = UnownedStringSlice{"OpMemberDecorate"};
+            return true;
+        case SpvOpDecorationGroup:
+            v = UnownedStringSlice{"OpDecorationGroup"};
+            return true;
+        case SpvOpGroupDecorate:
+            v = UnownedStringSlice{"OpGroupDecorate"};
+            return true;
+        case SpvOpGroupMemberDecorate:
+            v = UnownedStringSlice{"OpGroupMemberDecorate"};
+            return true;
+        case SpvOpVectorExtractDynamic:
+            v = UnownedStringSlice{"OpVectorExtractDynamic"};
+            return true;
+        case SpvOpVectorInsertDynamic:
+            v = UnownedStringSlice{"OpVectorInsertDynamic"};
+            return true;
+        case SpvOpVectorShuffle:
+            v = UnownedStringSlice{"OpVectorShuffle"};
+            return true;
+        case SpvOpCompositeConstruct:
+            v = UnownedStringSlice{"OpCompositeConstruct"};
+            return true;
+        case SpvOpCompositeExtract:
+            v = UnownedStringSlice{"OpCompositeExtract"};
+            return true;
+        case SpvOpCompositeInsert:
+            v = UnownedStringSlice{"OpCompositeInsert"};
+            return true;
+        case SpvOpCopyObject:
+            v = UnownedStringSlice{"OpCopyObject"};
+            return true;
+        case SpvOpTranspose:
+            v = UnownedStringSlice{"OpTranspose"};
+            return true;
+        case SpvOpSampledImage:
+            v = UnownedStringSlice{"OpSampledImage"};
+            return true;
+        case SpvOpImageSampleImplicitLod:
+            v = UnownedStringSlice{"OpImageSampleImplicitLod"};
+            return true;
+        case SpvOpImageSampleExplicitLod:
+            v = UnownedStringSlice{"OpImageSampleExplicitLod"};
+            return true;
+        case SpvOpImageSampleDrefImplicitLod:
+            v = UnownedStringSlice{"OpImageSampleDrefImplicitLod"};
+            return true;
+        case SpvOpImageSampleDrefExplicitLod:
+            v = UnownedStringSlice{"OpImageSampleDrefExplicitLod"};
+            return true;
+        case SpvOpImageSampleProjImplicitLod:
+            v = UnownedStringSlice{"OpImageSampleProjImplicitLod"};
+            return true;
+        case SpvOpImageSampleProjExplicitLod:
+            v = UnownedStringSlice{"OpImageSampleProjExplicitLod"};
+            return true;
+        case SpvOpImageSampleProjDrefImplicitLod:
+            v = UnownedStringSlice{"OpImageSampleProjDrefImplicitLod"};
+            return true;
+        case SpvOpImageSampleProjDrefExplicitLod:
+            v = UnownedStringSlice{"OpImageSampleProjDrefExplicitLod"};
+            return true;
+        case SpvOpImageFetch:
+            v = UnownedStringSlice{"OpImageFetch"};
+            return true;
+        case SpvOpImageGather:
+            v = UnownedStringSlice{"OpImageGather"};
+            return true;
+        case SpvOpImageDrefGather:
+            v = UnownedStringSlice{"OpImageDrefGather"};
+            return true;
+        case SpvOpImageRead:
+            v = UnownedStringSlice{"OpImageRead"};
+            return true;
+        case SpvOpImageWrite:
+            v = UnownedStringSlice{"OpImageWrite"};
+            return true;
+        case SpvOpImage:
+            v = UnownedStringSlice{"OpImage"};
+            return true;
+        case SpvOpImageQueryFormat:
+            v = UnownedStringSlice{"OpImageQueryFormat"};
+            return true;
+        case SpvOpImageQueryOrder:
+            v = UnownedStringSlice{"OpImageQueryOrder"};
+            return true;
+        case SpvOpImageQuerySizeLod:
+            v = UnownedStringSlice{"OpImageQuerySizeLod"};
+            return true;
+        case SpvOpImageQuerySize:
+            v = UnownedStringSlice{"OpImageQuerySize"};
+            return true;
+        case SpvOpImageQueryLod:
+            v = UnownedStringSlice{"OpImageQueryLod"};
+            return true;
+        case SpvOpImageQueryLevels:
+            v = UnownedStringSlice{"OpImageQueryLevels"};
+            return true;
+        case SpvOpImageQuerySamples:
+            v = UnownedStringSlice{"OpImageQuerySamples"};
+            return true;
+        case SpvOpConvertFToU:
+            v = UnownedStringSlice{"OpConvertFToU"};
+            return true;
+        case SpvOpConvertFToS:
+            v = UnownedStringSlice{"OpConvertFToS"};
+            return true;
+        case SpvOpConvertSToF:
+            v = UnownedStringSlice{"OpConvertSToF"};
+            return true;
+        case SpvOpConvertUToF:
+            v = UnownedStringSlice{"OpConvertUToF"};
+            return true;
+        case SpvOpUConvert:
+            v = UnownedStringSlice{"OpUConvert"};
+            return true;
+        case SpvOpSConvert:
+            v = UnownedStringSlice{"OpSConvert"};
+            return true;
+        case SpvOpFConvert:
+            v = UnownedStringSlice{"OpFConvert"};
+            return true;
+        case SpvOpQuantizeToF16:
+            v = UnownedStringSlice{"OpQuantizeToF16"};
+            return true;
+        case SpvOpConvertPtrToU:
+            v = UnownedStringSlice{"OpConvertPtrToU"};
+            return true;
+        case SpvOpSatConvertSToU:
+            v = UnownedStringSlice{"OpSatConvertSToU"};
+            return true;
+        case SpvOpSatConvertUToS:
+            v = UnownedStringSlice{"OpSatConvertUToS"};
+            return true;
+        case SpvOpConvertUToPtr:
+            v = UnownedStringSlice{"OpConvertUToPtr"};
+            return true;
+        case SpvOpPtrCastToGeneric:
+            v = UnownedStringSlice{"OpPtrCastToGeneric"};
+            return true;
+        case SpvOpGenericCastToPtr:
+            v = UnownedStringSlice{"OpGenericCastToPtr"};
+            return true;
+        case SpvOpGenericCastToPtrExplicit:
+            v = UnownedStringSlice{"OpGenericCastToPtrExplicit"};
+            return true;
+        case SpvOpBitcast:
+            v = UnownedStringSlice{"OpBitcast"};
+            return true;
+        case SpvOpSNegate:
+            v = UnownedStringSlice{"OpSNegate"};
+            return true;
+        case SpvOpFNegate:
+            v = UnownedStringSlice{"OpFNegate"};
+            return true;
+        case SpvOpIAdd:
+            v = UnownedStringSlice{"OpIAdd"};
+            return true;
+        case SpvOpFAdd:
+            v = UnownedStringSlice{"OpFAdd"};
+            return true;
+        case SpvOpISub:
+            v = UnownedStringSlice{"OpISub"};
+            return true;
+        case SpvOpFSub:
+            v = UnownedStringSlice{"OpFSub"};
+            return true;
+        case SpvOpIMul:
+            v = UnownedStringSlice{"OpIMul"};
+            return true;
+        case SpvOpFMul:
+            v = UnownedStringSlice{"OpFMul"};
+            return true;
+        case SpvOpUDiv:
+            v = UnownedStringSlice{"OpUDiv"};
+            return true;
+        case SpvOpSDiv:
+            v = UnownedStringSlice{"OpSDiv"};
+            return true;
+        case SpvOpFDiv:
+            v = UnownedStringSlice{"OpFDiv"};
+            return true;
+        case SpvOpUMod:
+            v = UnownedStringSlice{"OpUMod"};
+            return true;
+        case SpvOpSRem:
+            v = UnownedStringSlice{"OpSRem"};
+            return true;
+        case SpvOpSMod:
+            v = UnownedStringSlice{"OpSMod"};
+            return true;
+        case SpvOpFRem:
+            v = UnownedStringSlice{"OpFRem"};
+            return true;
+        case SpvOpFMod:
+            v = UnownedStringSlice{"OpFMod"};
+            return true;
+        case SpvOpVectorTimesScalar:
+            v = UnownedStringSlice{"OpVectorTimesScalar"};
+            return true;
+        case SpvOpMatrixTimesScalar:
+            v = UnownedStringSlice{"OpMatrixTimesScalar"};
+            return true;
+        case SpvOpVectorTimesMatrix:
+            v = UnownedStringSlice{"OpVectorTimesMatrix"};
+            return true;
+        case SpvOpMatrixTimesVector:
+            v = UnownedStringSlice{"OpMatrixTimesVector"};
+            return true;
+        case SpvOpMatrixTimesMatrix:
+            v = UnownedStringSlice{"OpMatrixTimesMatrix"};
+            return true;
+        case SpvOpOuterProduct:
+            v = UnownedStringSlice{"OpOuterProduct"};
+            return true;
+        case SpvOpDot:
+            v = UnownedStringSlice{"OpDot"};
+            return true;
+        case SpvOpIAddCarry:
+            v = UnownedStringSlice{"OpIAddCarry"};
+            return true;
+        case SpvOpISubBorrow:
+            v = UnownedStringSlice{"OpISubBorrow"};
+            return true;
+        case SpvOpUMulExtended:
+            v = UnownedStringSlice{"OpUMulExtended"};
+            return true;
+        case SpvOpSMulExtended:
+            v = UnownedStringSlice{"OpSMulExtended"};
+            return true;
+        case SpvOpAny:
+            v = UnownedStringSlice{"OpAny"};
+            return true;
+        case SpvOpAll:
+            v = UnownedStringSlice{"OpAll"};
+            return true;
+        case SpvOpIsNan:
+            v = UnownedStringSlice{"OpIsNan"};
+            return true;
+        case SpvOpIsInf:
+            v = UnownedStringSlice{"OpIsInf"};
+            return true;
+        case SpvOpIsFinite:
+            v = UnownedStringSlice{"OpIsFinite"};
+            return true;
+        case SpvOpIsNormal:
+            v = UnownedStringSlice{"OpIsNormal"};
+            return true;
+        case SpvOpSignBitSet:
+            v = UnownedStringSlice{"OpSignBitSet"};
+            return true;
+        case SpvOpLessOrGreater:
+            v = UnownedStringSlice{"OpLessOrGreater"};
+            return true;
+        case SpvOpOrdered:
+            v = UnownedStringSlice{"OpOrdered"};
+            return true;
+        case SpvOpUnordered:
+            v = UnownedStringSlice{"OpUnordered"};
+            return true;
+        case SpvOpLogicalEqual:
+            v = UnownedStringSlice{"OpLogicalEqual"};
+            return true;
+        case SpvOpLogicalNotEqual:
+            v = UnownedStringSlice{"OpLogicalNotEqual"};
+            return true;
+        case SpvOpLogicalOr:
+            v = UnownedStringSlice{"OpLogicalOr"};
+            return true;
+        case SpvOpLogicalAnd:
+            v = UnownedStringSlice{"OpLogicalAnd"};
+            return true;
+        case SpvOpLogicalNot:
+            v = UnownedStringSlice{"OpLogicalNot"};
+            return true;
+        case SpvOpSelect:
+            v = UnownedStringSlice{"OpSelect"};
+            return true;
+        case SpvOpIEqual:
+            v = UnownedStringSlice{"OpIEqual"};
+            return true;
+        case SpvOpINotEqual:
+            v = UnownedStringSlice{"OpINotEqual"};
+            return true;
+        case SpvOpUGreaterThan:
+            v = UnownedStringSlice{"OpUGreaterThan"};
+            return true;
+        case SpvOpSGreaterThan:
+            v = UnownedStringSlice{"OpSGreaterThan"};
+            return true;
+        case SpvOpUGreaterThanEqual:
+            v = UnownedStringSlice{"OpUGreaterThanEqual"};
+            return true;
+        case SpvOpSGreaterThanEqual:
+            v = UnownedStringSlice{"OpSGreaterThanEqual"};
+            return true;
+        case SpvOpULessThan:
+            v = UnownedStringSlice{"OpULessThan"};
+            return true;
+        case SpvOpSLessThan:
+            v = UnownedStringSlice{"OpSLessThan"};
+            return true;
+        case SpvOpULessThanEqual:
+            v = UnownedStringSlice{"OpULessThanEqual"};
+            return true;
+        case SpvOpSLessThanEqual:
+            v = UnownedStringSlice{"OpSLessThanEqual"};
+            return true;
+        case SpvOpFOrdEqual:
+            v = UnownedStringSlice{"OpFOrdEqual"};
+            return true;
+        case SpvOpFUnordEqual:
+            v = UnownedStringSlice{"OpFUnordEqual"};
+            return true;
+        case SpvOpFOrdNotEqual:
+            v = UnownedStringSlice{"OpFOrdNotEqual"};
+            return true;
+        case SpvOpFUnordNotEqual:
+            v = UnownedStringSlice{"OpFUnordNotEqual"};
+            return true;
+        case SpvOpFOrdLessThan:
+            v = UnownedStringSlice{"OpFOrdLessThan"};
+            return true;
+        case SpvOpFUnordLessThan:
+            v = UnownedStringSlice{"OpFUnordLessThan"};
+            return true;
+        case SpvOpFOrdGreaterThan:
+            v = UnownedStringSlice{"OpFOrdGreaterThan"};
+            return true;
+        case SpvOpFUnordGreaterThan:
+            v = UnownedStringSlice{"OpFUnordGreaterThan"};
+            return true;
+        case SpvOpFOrdLessThanEqual:
+            v = UnownedStringSlice{"OpFOrdLessThanEqual"};
+            return true;
+        case SpvOpFUnordLessThanEqual:
+            v = UnownedStringSlice{"OpFUnordLessThanEqual"};
+            return true;
+        case SpvOpFOrdGreaterThanEqual:
+            v = UnownedStringSlice{"OpFOrdGreaterThanEqual"};
+            return true;
+        case SpvOpFUnordGreaterThanEqual:
+            v = UnownedStringSlice{"OpFUnordGreaterThanEqual"};
+            return true;
+        case SpvOpShiftRightLogical:
+            v = UnownedStringSlice{"OpShiftRightLogical"};
+            return true;
+        case SpvOpShiftRightArithmetic:
+            v = UnownedStringSlice{"OpShiftRightArithmetic"};
+            return true;
+        case SpvOpShiftLeftLogical:
+            v = UnownedStringSlice{"OpShiftLeftLogical"};
+            return true;
+        case SpvOpBitwiseOr:
+            v = UnownedStringSlice{"OpBitwiseOr"};
+            return true;
+        case SpvOpBitwiseXor:
+            v = UnownedStringSlice{"OpBitwiseXor"};
+            return true;
+        case SpvOpBitwiseAnd:
+            v = UnownedStringSlice{"OpBitwiseAnd"};
+            return true;
+        case SpvOpNot:
+            v = UnownedStringSlice{"OpNot"};
+            return true;
+        case SpvOpBitFieldInsert:
+            v = UnownedStringSlice{"OpBitFieldInsert"};
+            return true;
+        case SpvOpBitFieldSExtract:
+            v = UnownedStringSlice{"OpBitFieldSExtract"};
+            return true;
+        case SpvOpBitFieldUExtract:
+            v = UnownedStringSlice{"OpBitFieldUExtract"};
+            return true;
+        case SpvOpBitReverse:
+            v = UnownedStringSlice{"OpBitReverse"};
+            return true;
+        case SpvOpBitCount:
+            v = UnownedStringSlice{"OpBitCount"};
+            return true;
+        case SpvOpDPdx:
+            v = UnownedStringSlice{"OpDPdx"};
+            return true;
+        case SpvOpDPdy:
+            v = UnownedStringSlice{"OpDPdy"};
+            return true;
+        case SpvOpFwidth:
+            v = UnownedStringSlice{"OpFwidth"};
+            return true;
+        case SpvOpDPdxFine:
+            v = UnownedStringSlice{"OpDPdxFine"};
+            return true;
+        case SpvOpDPdyFine:
+            v = UnownedStringSlice{"OpDPdyFine"};
+            return true;
+        case SpvOpFwidthFine:
+            v = UnownedStringSlice{"OpFwidthFine"};
+            return true;
+        case SpvOpDPdxCoarse:
+            v = UnownedStringSlice{"OpDPdxCoarse"};
+            return true;
+        case SpvOpDPdyCoarse:
+            v = UnownedStringSlice{"OpDPdyCoarse"};
+            return true;
+        case SpvOpFwidthCoarse:
+            v = UnownedStringSlice{"OpFwidthCoarse"};
+            return true;
+        case SpvOpEmitVertex:
+            v = UnownedStringSlice{"OpEmitVertex"};
+            return true;
+        case SpvOpEndPrimitive:
+            v = UnownedStringSlice{"OpEndPrimitive"};
+            return true;
+        case SpvOpEmitStreamVertex:
+            v = UnownedStringSlice{"OpEmitStreamVertex"};
+            return true;
+        case SpvOpEndStreamPrimitive:
+            v = UnownedStringSlice{"OpEndStreamPrimitive"};
+            return true;
+        case SpvOpControlBarrier:
+            v = UnownedStringSlice{"OpControlBarrier"};
+            return true;
+        case SpvOpMemoryBarrier:
+            v = UnownedStringSlice{"OpMemoryBarrier"};
+            return true;
+        case SpvOpAtomicLoad:
+            v = UnownedStringSlice{"OpAtomicLoad"};
+            return true;
+        case SpvOpAtomicStore:
+            v = UnownedStringSlice{"OpAtomicStore"};
+            return true;
+        case SpvOpAtomicExchange:
+            v = UnownedStringSlice{"OpAtomicExchange"};
+            return true;
+        case SpvOpAtomicCompareExchange:
+            v = UnownedStringSlice{"OpAtomicCompareExchange"};
+            return true;
+        case SpvOpAtomicCompareExchangeWeak:
+            v = UnownedStringSlice{"OpAtomicCompareExchangeWeak"};
+            return true;
+        case SpvOpAtomicIIncrement:
+            v = UnownedStringSlice{"OpAtomicIIncrement"};
+            return true;
+        case SpvOpAtomicIDecrement:
+            v = UnownedStringSlice{"OpAtomicIDecrement"};
+            return true;
+        case SpvOpAtomicIAdd:
+            v = UnownedStringSlice{"OpAtomicIAdd"};
+            return true;
+        case SpvOpAtomicISub:
+            v = UnownedStringSlice{"OpAtomicISub"};
+            return true;
+        case SpvOpAtomicSMin:
+            v = UnownedStringSlice{"OpAtomicSMin"};
+            return true;
+        case SpvOpAtomicUMin:
+            v = UnownedStringSlice{"OpAtomicUMin"};
+            return true;
+        case SpvOpAtomicSMax:
+            v = UnownedStringSlice{"OpAtomicSMax"};
+            return true;
+        case SpvOpAtomicUMax:
+            v = UnownedStringSlice{"OpAtomicUMax"};
+            return true;
+        case SpvOpAtomicAnd:
+            v = UnownedStringSlice{"OpAtomicAnd"};
+            return true;
+        case SpvOpAtomicOr:
+            v = UnownedStringSlice{"OpAtomicOr"};
+            return true;
+        case SpvOpAtomicXor:
+            v = UnownedStringSlice{"OpAtomicXor"};
+            return true;
+        case SpvOpPhi:
+            v = UnownedStringSlice{"OpPhi"};
+            return true;
+        case SpvOpLoopMerge:
+            v = UnownedStringSlice{"OpLoopMerge"};
+            return true;
+        case SpvOpSelectionMerge:
+            v = UnownedStringSlice{"OpSelectionMerge"};
+            return true;
+        case SpvOpLabel:
+            v = UnownedStringSlice{"OpLabel"};
+            return true;
+        case SpvOpBranch:
+            v = UnownedStringSlice{"OpBranch"};
+            return true;
+        case SpvOpBranchConditional:
+            v = UnownedStringSlice{"OpBranchConditional"};
+            return true;
+        case SpvOpSwitch:
+            v = UnownedStringSlice{"OpSwitch"};
+            return true;
+        case SpvOpKill:
+            v = UnownedStringSlice{"OpKill"};
+            return true;
+        case SpvOpReturn:
+            v = UnownedStringSlice{"OpReturn"};
+            return true;
+        case SpvOpReturnValue:
+            v = UnownedStringSlice{"OpReturnValue"};
+            return true;
+        case SpvOpUnreachable:
+            v = UnownedStringSlice{"OpUnreachable"};
+            return true;
+        case SpvOpLifetimeStart:
+            v = UnownedStringSlice{"OpLifetimeStart"};
+            return true;
+        case SpvOpLifetimeStop:
+            v = UnownedStringSlice{"OpLifetimeStop"};
+            return true;
+        case SpvOpGroupAsyncCopy:
+            v = UnownedStringSlice{"OpGroupAsyncCopy"};
+            return true;
+        case SpvOpGroupWaitEvents:
+            v = UnownedStringSlice{"OpGroupWaitEvents"};
+            return true;
+        case SpvOpGroupAll:
+            v = UnownedStringSlice{"OpGroupAll"};
+            return true;
+        case SpvOpGroupAny:
+            v = UnownedStringSlice{"OpGroupAny"};
+            return true;
+        case SpvOpGroupBroadcast:
+            v = UnownedStringSlice{"OpGroupBroadcast"};
+            return true;
+        case SpvOpGroupIAdd:
+            v = UnownedStringSlice{"OpGroupIAdd"};
+            return true;
+        case SpvOpGroupFAdd:
+            v = UnownedStringSlice{"OpGroupFAdd"};
+            return true;
+        case SpvOpGroupFMin:
+            v = UnownedStringSlice{"OpGroupFMin"};
+            return true;
+        case SpvOpGroupUMin:
+            v = UnownedStringSlice{"OpGroupUMin"};
+            return true;
+        case SpvOpGroupSMin:
+            v = UnownedStringSlice{"OpGroupSMin"};
+            return true;
+        case SpvOpGroupFMax:
+            v = UnownedStringSlice{"OpGroupFMax"};
+            return true;
+        case SpvOpGroupUMax:
+            v = UnownedStringSlice{"OpGroupUMax"};
+            return true;
+        case SpvOpGroupSMax:
+            v = UnownedStringSlice{"OpGroupSMax"};
+            return true;
+        case SpvOpReadPipe:
+            v = UnownedStringSlice{"OpReadPipe"};
+            return true;
+        case SpvOpWritePipe:
+            v = UnownedStringSlice{"OpWritePipe"};
+            return true;
+        case SpvOpReservedReadPipe:
+            v = UnownedStringSlice{"OpReservedReadPipe"};
+            return true;
+        case SpvOpReservedWritePipe:
+            v = UnownedStringSlice{"OpReservedWritePipe"};
+            return true;
+        case SpvOpReserveReadPipePackets:
+            v = UnownedStringSlice{"OpReserveReadPipePackets"};
+            return true;
+        case SpvOpReserveWritePipePackets:
+            v = UnownedStringSlice{"OpReserveWritePipePackets"};
+            return true;
+        case SpvOpCommitReadPipe:
+            v = UnownedStringSlice{"OpCommitReadPipe"};
+            return true;
+        case SpvOpCommitWritePipe:
+            v = UnownedStringSlice{"OpCommitWritePipe"};
+            return true;
+        case SpvOpIsValidReserveId:
+            v = UnownedStringSlice{"OpIsValidReserveId"};
+            return true;
+        case SpvOpGetNumPipePackets:
+            v = UnownedStringSlice{"OpGetNumPipePackets"};
+            return true;
+        case SpvOpGetMaxPipePackets:
+            v = UnownedStringSlice{"OpGetMaxPipePackets"};
+            return true;
+        case SpvOpGroupReserveReadPipePackets:
+            v = UnownedStringSlice{"OpGroupReserveReadPipePackets"};
+            return true;
+        case SpvOpGroupReserveWritePipePackets:
+            v = UnownedStringSlice{"OpGroupReserveWritePipePackets"};
+            return true;
+        case SpvOpGroupCommitReadPipe:
+            v = UnownedStringSlice{"OpGroupCommitReadPipe"};
+            return true;
+        case SpvOpGroupCommitWritePipe:
+            v = UnownedStringSlice{"OpGroupCommitWritePipe"};
+            return true;
+        case SpvOpEnqueueMarker:
+            v = UnownedStringSlice{"OpEnqueueMarker"};
+            return true;
+        case SpvOpEnqueueKernel:
+            v = UnownedStringSlice{"OpEnqueueKernel"};
+            return true;
+        case SpvOpGetKernelNDrangeSubGroupCount:
+            v = UnownedStringSlice{"OpGetKernelNDrangeSubGroupCount"};
+            return true;
+        case SpvOpGetKernelNDrangeMaxSubGroupSize:
+            v = UnownedStringSlice{"OpGetKernelNDrangeMaxSubGroupSize"};
+            return true;
+        case SpvOpGetKernelWorkGroupSize:
+            v = UnownedStringSlice{"OpGetKernelWorkGroupSize"};
+            return true;
+        case SpvOpGetKernelPreferredWorkGroupSizeMultiple:
+            v = UnownedStringSlice{"OpGetKernelPreferredWorkGroupSizeMultiple"};
+            return true;
+        case SpvOpRetainEvent:
+            v = UnownedStringSlice{"OpRetainEvent"};
+            return true;
+        case SpvOpReleaseEvent:
+            v = UnownedStringSlice{"OpReleaseEvent"};
+            return true;
+        case SpvOpCreateUserEvent:
+            v = UnownedStringSlice{"OpCreateUserEvent"};
+            return true;
+        case SpvOpIsValidEvent:
+            v = UnownedStringSlice{"OpIsValidEvent"};
+            return true;
+        case SpvOpSetUserEventStatus:
+            v = UnownedStringSlice{"OpSetUserEventStatus"};
+            return true;
+        case SpvOpCaptureEventProfilingInfo:
+            v = UnownedStringSlice{"OpCaptureEventProfilingInfo"};
+            return true;
+        case SpvOpGetDefaultQueue:
+            v = UnownedStringSlice{"OpGetDefaultQueue"};
+            return true;
+        case SpvOpBuildNDRange:
+            v = UnownedStringSlice{"OpBuildNDRange"};
+            return true;
+        case SpvOpImageSparseSampleImplicitLod:
+            v = UnownedStringSlice{"OpImageSparseSampleImplicitLod"};
+            return true;
+        case SpvOpImageSparseSampleExplicitLod:
+            v = UnownedStringSlice{"OpImageSparseSampleExplicitLod"};
+            return true;
+        case SpvOpImageSparseSampleDrefImplicitLod:
+            v = UnownedStringSlice{"OpImageSparseSampleDrefImplicitLod"};
+            return true;
+        case SpvOpImageSparseSampleDrefExplicitLod:
+            v = UnownedStringSlice{"OpImageSparseSampleDrefExplicitLod"};
+            return true;
+        case SpvOpImageSparseSampleProjImplicitLod:
+            v = UnownedStringSlice{"OpImageSparseSampleProjImplicitLod"};
+            return true;
+        case SpvOpImageSparseSampleProjExplicitLod:
+            v = UnownedStringSlice{"OpImageSparseSampleProjExplicitLod"};
+            return true;
+        case SpvOpImageSparseSampleProjDrefImplicitLod:
+            v = UnownedStringSlice{"OpImageSparseSampleProjDrefImplicitLod"};
+            return true;
+        case SpvOpImageSparseSampleProjDrefExplicitLod:
+            v = UnownedStringSlice{"OpImageSparseSampleProjDrefExplicitLod"};
+            return true;
+        case SpvOpImageSparseFetch:
+            v = UnownedStringSlice{"OpImageSparseFetch"};
+            return true;
+        case SpvOpImageSparseGather:
+            v = UnownedStringSlice{"OpImageSparseGather"};
+            return true;
+        case SpvOpImageSparseDrefGather:
+            v = UnownedStringSlice{"OpImageSparseDrefGather"};
+            return true;
+        case SpvOpImageSparseTexelsResident:
+            v = UnownedStringSlice{"OpImageSparseTexelsResident"};
+            return true;
+        case SpvOpNoLine:
+            v = UnownedStringSlice{"OpNoLine"};
+            return true;
+        case SpvOpAtomicFlagTestAndSet:
+            v = UnownedStringSlice{"OpAtomicFlagTestAndSet"};
+            return true;
+        case SpvOpAtomicFlagClear:
+            v = UnownedStringSlice{"OpAtomicFlagClear"};
+            return true;
+        case SpvOpImageSparseRead:
+            v = UnownedStringSlice{"OpImageSparseRead"};
+            return true;
+        case SpvOpSizeOf:
+            v = UnownedStringSlice{"OpSizeOf"};
+            return true;
+        case SpvOpTypePipeStorage:
+            v = UnownedStringSlice{"OpTypePipeStorage"};
+            return true;
+        case SpvOpConstantPipeStorage:
+            v = UnownedStringSlice{"OpConstantPipeStorage"};
+            return true;
+        case SpvOpCreatePipeFromPipeStorage:
+            v = UnownedStringSlice{"OpCreatePipeFromPipeStorage"};
+            return true;
+        case SpvOpGetKernelLocalSizeForSubgroupCount:
+            v = UnownedStringSlice{"OpGetKernelLocalSizeForSubgroupCount"};
+            return true;
+        case SpvOpGetKernelMaxNumSubgroups:
+            v = UnownedStringSlice{"OpGetKernelMaxNumSubgroups"};
+            return true;
+        case SpvOpTypeNamedBarrier:
+            v = UnownedStringSlice{"OpTypeNamedBarrier"};
+            return true;
+        case SpvOpNamedBarrierInitialize:
+            v = UnownedStringSlice{"OpNamedBarrierInitialize"};
+            return true;
+        case SpvOpMemoryNamedBarrier:
+            v = UnownedStringSlice{"OpMemoryNamedBarrier"};
+            return true;
+        case SpvOpModuleProcessed:
+            v = UnownedStringSlice{"OpModuleProcessed"};
+            return true;
+        case SpvOpExecutionModeId:
+            v = UnownedStringSlice{"OpExecutionModeId"};
+            return true;
+        case SpvOpDecorateId:
+            v = UnownedStringSlice{"OpDecorateId"};
+            return true;
+        case SpvOpGroupNonUniformElect:
+            v = UnownedStringSlice{"OpGroupNonUniformElect"};
+            return true;
+        case SpvOpGroupNonUniformAll:
+            v = UnownedStringSlice{"OpGroupNonUniformAll"};
+            return true;
+        case SpvOpGroupNonUniformAny:
+            v = UnownedStringSlice{"OpGroupNonUniformAny"};
+            return true;
+        case SpvOpGroupNonUniformAllEqual:
+            v = UnownedStringSlice{"OpGroupNonUniformAllEqual"};
+            return true;
+        case SpvOpGroupNonUniformBroadcast:
+            v = UnownedStringSlice{"OpGroupNonUniformBroadcast"};
+            return true;
+        case SpvOpGroupNonUniformBroadcastFirst:
+            v = UnownedStringSlice{"OpGroupNonUniformBroadcastFirst"};
+            return true;
+        case SpvOpGroupNonUniformBallot:
+            v = UnownedStringSlice{"OpGroupNonUniformBallot"};
+            return true;
+        case SpvOpGroupNonUniformInverseBallot:
+            v = UnownedStringSlice{"OpGroupNonUniformInverseBallot"};
+            return true;
+        case SpvOpGroupNonUniformBallotBitExtract:
+            v = UnownedStringSlice{"OpGroupNonUniformBallotBitExtract"};
+            return true;
+        case SpvOpGroupNonUniformBallotBitCount:
+            v = UnownedStringSlice{"OpGroupNonUniformBallotBitCount"};
+            return true;
+        case SpvOpGroupNonUniformBallotFindLSB:
+            v = UnownedStringSlice{"OpGroupNonUniformBallotFindLSB"};
+            return true;
+        case SpvOpGroupNonUniformBallotFindMSB:
+            v = UnownedStringSlice{"OpGroupNonUniformBallotFindMSB"};
+            return true;
+        case SpvOpGroupNonUniformShuffle:
+            v = UnownedStringSlice{"OpGroupNonUniformShuffle"};
+            return true;
+        case SpvOpGroupNonUniformShuffleXor:
+            v = UnownedStringSlice{"OpGroupNonUniformShuffleXor"};
+            return true;
+        case SpvOpGroupNonUniformShuffleUp:
+            v = UnownedStringSlice{"OpGroupNonUniformShuffleUp"};
+            return true;
+        case SpvOpGroupNonUniformShuffleDown:
+            v = UnownedStringSlice{"OpGroupNonUniformShuffleDown"};
+            return true;
+        case SpvOpGroupNonUniformIAdd:
+            v = UnownedStringSlice{"OpGroupNonUniformIAdd"};
+            return true;
+        case SpvOpGroupNonUniformFAdd:
+            v = UnownedStringSlice{"OpGroupNonUniformFAdd"};
+            return true;
+        case SpvOpGroupNonUniformIMul:
+            v = UnownedStringSlice{"OpGroupNonUniformIMul"};
+            return true;
+        case SpvOpGroupNonUniformFMul:
+            v = UnownedStringSlice{"OpGroupNonUniformFMul"};
+            return true;
+        case SpvOpGroupNonUniformSMin:
+            v = UnownedStringSlice{"OpGroupNonUniformSMin"};
+            return true;
+        case SpvOpGroupNonUniformUMin:
+            v = UnownedStringSlice{"OpGroupNonUniformUMin"};
+            return true;
+        case SpvOpGroupNonUniformFMin:
+            v = UnownedStringSlice{"OpGroupNonUniformFMin"};
+            return true;
+        case SpvOpGroupNonUniformSMax:
+            v = UnownedStringSlice{"OpGroupNonUniformSMax"};
+            return true;
+        case SpvOpGroupNonUniformUMax:
+            v = UnownedStringSlice{"OpGroupNonUniformUMax"};
+            return true;
+        case SpvOpGroupNonUniformFMax:
+            v = UnownedStringSlice{"OpGroupNonUniformFMax"};
+            return true;
+        case SpvOpGroupNonUniformBitwiseAnd:
+            v = UnownedStringSlice{"OpGroupNonUniformBitwiseAnd"};
+            return true;
+        case SpvOpGroupNonUniformBitwiseOr:
+            v = UnownedStringSlice{"OpGroupNonUniformBitwiseOr"};
+            return true;
+        case SpvOpGroupNonUniformBitwiseXor:
+            v = UnownedStringSlice{"OpGroupNonUniformBitwiseXor"};
+            return true;
+        case SpvOpGroupNonUniformLogicalAnd:
+            v = UnownedStringSlice{"OpGroupNonUniformLogicalAnd"};
+            return true;
+        case SpvOpGroupNonUniformLogicalOr:
+            v = UnownedStringSlice{"OpGroupNonUniformLogicalOr"};
+            return true;
+        case SpvOpGroupNonUniformLogicalXor:
+            v = UnownedStringSlice{"OpGroupNonUniformLogicalXor"};
+            return true;
+        case SpvOpGroupNonUniformQuadBroadcast:
+            v = UnownedStringSlice{"OpGroupNonUniformQuadBroadcast"};
+            return true;
+        case SpvOpGroupNonUniformQuadSwap:
+            v = UnownedStringSlice{"OpGroupNonUniformQuadSwap"};
+            return true;
+        case SpvOpCopyLogical:
+            v = UnownedStringSlice{"OpCopyLogical"};
+            return true;
+        case SpvOpPtrEqual:
+            v = UnownedStringSlice{"OpPtrEqual"};
+            return true;
+        case SpvOpPtrNotEqual:
+            v = UnownedStringSlice{"OpPtrNotEqual"};
+            return true;
+        case SpvOpPtrDiff:
+            v = UnownedStringSlice{"OpPtrDiff"};
+            return true;
+        case SpvOpColorAttachmentReadEXT:
+            v = UnownedStringSlice{"OpColorAttachmentReadEXT"};
+            return true;
+        case SpvOpDepthAttachmentReadEXT:
+            v = UnownedStringSlice{"OpDepthAttachmentReadEXT"};
+            return true;
+        case SpvOpStencilAttachmentReadEXT:
+            v = UnownedStringSlice{"OpStencilAttachmentReadEXT"};
+            return true;
+        case SpvOpTerminateInvocation:
+            v = UnownedStringSlice{"OpTerminateInvocation"};
+            return true;
+        case SpvOpSubgroupBallotKHR:
+            v = UnownedStringSlice{"OpSubgroupBallotKHR"};
+            return true;
+        case SpvOpSubgroupFirstInvocationKHR:
+            v = UnownedStringSlice{"OpSubgroupFirstInvocationKHR"};
+            return true;
+        case SpvOpSubgroupAllKHR:
+            v = UnownedStringSlice{"OpSubgroupAllKHR"};
+            return true;
+        case SpvOpSubgroupAnyKHR:
+            v = UnownedStringSlice{"OpSubgroupAnyKHR"};
+            return true;
+        case SpvOpSubgroupAllEqualKHR:
+            v = UnownedStringSlice{"OpSubgroupAllEqualKHR"};
+            return true;
+        case SpvOpGroupNonUniformRotateKHR:
+            v = UnownedStringSlice{"OpGroupNonUniformRotateKHR"};
+            return true;
+        case SpvOpSubgroupReadInvocationKHR:
+            v = UnownedStringSlice{"OpSubgroupReadInvocationKHR"};
+            return true;
+        case SpvOpTraceRayKHR:
+            v = UnownedStringSlice{"OpTraceRayKHR"};
+            return true;
+        case SpvOpExecuteCallableKHR:
+            v = UnownedStringSlice{"OpExecuteCallableKHR"};
+            return true;
+        case SpvOpConvertUToAccelerationStructureKHR:
+            v = UnownedStringSlice{"OpConvertUToAccelerationStructureKHR"};
+            return true;
+        case SpvOpIgnoreIntersectionKHR:
+            v = UnownedStringSlice{"OpIgnoreIntersectionKHR"};
+            return true;
+        case SpvOpTerminateRayKHR:
+            v = UnownedStringSlice{"OpTerminateRayKHR"};
+            return true;
+        case SpvOpSDot:
+            v = UnownedStringSlice{"OpSDot"};
+            return true;
+        case SpvOpUDot:
+            v = UnownedStringSlice{"OpUDot"};
+            return true;
+        case SpvOpSUDot:
+            v = UnownedStringSlice{"OpSUDot"};
+            return true;
+        case SpvOpSDotAccSat:
+            v = UnownedStringSlice{"OpSDotAccSat"};
+            return true;
+        case SpvOpUDotAccSat:
+            v = UnownedStringSlice{"OpUDotAccSat"};
+            return true;
+        case SpvOpSUDotAccSat:
+            v = UnownedStringSlice{"OpSUDotAccSat"};
+            return true;
+        case SpvOpTypeCooperativeMatrixKHR:
+            v = UnownedStringSlice{"OpTypeCooperativeMatrixKHR"};
+            return true;
+        case SpvOpCooperativeMatrixLoadKHR:
+            v = UnownedStringSlice{"OpCooperativeMatrixLoadKHR"};
+            return true;
+        case SpvOpCooperativeMatrixStoreKHR:
+            v = UnownedStringSlice{"OpCooperativeMatrixStoreKHR"};
+            return true;
+        case SpvOpCooperativeMatrixMulAddKHR:
+            v = UnownedStringSlice{"OpCooperativeMatrixMulAddKHR"};
+            return true;
+        case SpvOpCooperativeMatrixLengthKHR:
+            v = UnownedStringSlice{"OpCooperativeMatrixLengthKHR"};
+            return true;
+        case SpvOpTypeRayQueryKHR:
+            v = UnownedStringSlice{"OpTypeRayQueryKHR"};
+            return true;
+        case SpvOpRayQueryInitializeKHR:
+            v = UnownedStringSlice{"OpRayQueryInitializeKHR"};
+            return true;
+        case SpvOpRayQueryTerminateKHR:
+            v = UnownedStringSlice{"OpRayQueryTerminateKHR"};
+            return true;
+        case SpvOpRayQueryGenerateIntersectionKHR:
+            v = UnownedStringSlice{"OpRayQueryGenerateIntersectionKHR"};
+            return true;
+        case SpvOpRayQueryConfirmIntersectionKHR:
+            v = UnownedStringSlice{"OpRayQueryConfirmIntersectionKHR"};
+            return true;
+        case SpvOpRayQueryProceedKHR:
+            v = UnownedStringSlice{"OpRayQueryProceedKHR"};
+            return true;
+        case SpvOpRayQueryGetIntersectionTypeKHR:
+            v = UnownedStringSlice{"OpRayQueryGetIntersectionTypeKHR"};
+            return true;
+        case SpvOpImageSampleWeightedQCOM:
+            v = UnownedStringSlice{"OpImageSampleWeightedQCOM"};
+            return true;
+        case SpvOpImageBoxFilterQCOM:
+            v = UnownedStringSlice{"OpImageBoxFilterQCOM"};
+            return true;
+        case SpvOpImageBlockMatchSSDQCOM:
+            v = UnownedStringSlice{"OpImageBlockMatchSSDQCOM"};
+            return true;
+        case SpvOpImageBlockMatchSADQCOM:
+            v = UnownedStringSlice{"OpImageBlockMatchSADQCOM"};
+            return true;
+        case SpvOpGroupIAddNonUniformAMD:
+            v = UnownedStringSlice{"OpGroupIAddNonUniformAMD"};
+            return true;
+        case SpvOpGroupFAddNonUniformAMD:
+            v = UnownedStringSlice{"OpGroupFAddNonUniformAMD"};
+            return true;
+        case SpvOpGroupFMinNonUniformAMD:
+            v = UnownedStringSlice{"OpGroupFMinNonUniformAMD"};
+            return true;
+        case SpvOpGroupUMinNonUniformAMD:
+            v = UnownedStringSlice{"OpGroupUMinNonUniformAMD"};
+            return true;
+        case SpvOpGroupSMinNonUniformAMD:
+            v = UnownedStringSlice{"OpGroupSMinNonUniformAMD"};
+            return true;
+        case SpvOpGroupFMaxNonUniformAMD:
+            v = UnownedStringSlice{"OpGroupFMaxNonUniformAMD"};
+            return true;
+        case SpvOpGroupUMaxNonUniformAMD:
+            v = UnownedStringSlice{"OpGroupUMaxNonUniformAMD"};
+            return true;
+        case SpvOpGroupSMaxNonUniformAMD:
+            v = UnownedStringSlice{"OpGroupSMaxNonUniformAMD"};
+            return true;
+        case SpvOpFragmentMaskFetchAMD:
+            v = UnownedStringSlice{"OpFragmentMaskFetchAMD"};
+            return true;
+        case SpvOpFragmentFetchAMD:
+            v = UnownedStringSlice{"OpFragmentFetchAMD"};
+            return true;
+        case SpvOpReadClockKHR:
+            v = UnownedStringSlice{"OpReadClockKHR"};
+            return true;
+        case SpvOpHitObjectRecordHitMotionNV:
+            v = UnownedStringSlice{"OpHitObjectRecordHitMotionNV"};
+            return true;
+        case SpvOpHitObjectRecordHitWithIndexMotionNV:
+            v = UnownedStringSlice{"OpHitObjectRecordHitWithIndexMotionNV"};
+            return true;
+        case SpvOpHitObjectRecordMissMotionNV:
+            v = UnownedStringSlice{"OpHitObjectRecordMissMotionNV"};
+            return true;
+        case SpvOpHitObjectGetWorldToObjectNV:
+            v = UnownedStringSlice{"OpHitObjectGetWorldToObjectNV"};
+            return true;
+        case SpvOpHitObjectGetObjectToWorldNV:
+            v = UnownedStringSlice{"OpHitObjectGetObjectToWorldNV"};
+            return true;
+        case SpvOpHitObjectGetObjectRayDirectionNV:
+            v = UnownedStringSlice{"OpHitObjectGetObjectRayDirectionNV"};
+            return true;
+        case SpvOpHitObjectGetObjectRayOriginNV:
+            v = UnownedStringSlice{"OpHitObjectGetObjectRayOriginNV"};
+            return true;
+        case SpvOpHitObjectTraceRayMotionNV:
+            v = UnownedStringSlice{"OpHitObjectTraceRayMotionNV"};
+            return true;
+        case SpvOpHitObjectGetShaderRecordBufferHandleNV:
+            v = UnownedStringSlice{"OpHitObjectGetShaderRecordBufferHandleNV"};
+            return true;
+        case SpvOpHitObjectGetShaderBindingTableRecordIndexNV:
+            v = UnownedStringSlice{"OpHitObjectGetShaderBindingTableRecordIndexNV"};
+            return true;
+        case SpvOpHitObjectRecordEmptyNV:
+            v = UnownedStringSlice{"OpHitObjectRecordEmptyNV"};
+            return true;
+        case SpvOpHitObjectTraceRayNV:
+            v = UnownedStringSlice{"OpHitObjectTraceRayNV"};
+            return true;
+        case SpvOpHitObjectRecordHitNV:
+            v = UnownedStringSlice{"OpHitObjectRecordHitNV"};
+            return true;
+        case SpvOpHitObjectRecordHitWithIndexNV:
+            v = UnownedStringSlice{"OpHitObjectRecordHitWithIndexNV"};
+            return true;
+        case SpvOpHitObjectRecordMissNV:
+            v = UnownedStringSlice{"OpHitObjectRecordMissNV"};
+            return true;
+        case SpvOpHitObjectExecuteShaderNV:
+            v = UnownedStringSlice{"OpHitObjectExecuteShaderNV"};
+            return true;
+        case SpvOpHitObjectGetCurrentTimeNV:
+            v = UnownedStringSlice{"OpHitObjectGetCurrentTimeNV"};
+            return true;
+        case SpvOpHitObjectGetAttributesNV:
+            v = UnownedStringSlice{"OpHitObjectGetAttributesNV"};
+            return true;
+        case SpvOpHitObjectGetHitKindNV:
+            v = UnownedStringSlice{"OpHitObjectGetHitKindNV"};
+            return true;
+        case SpvOpHitObjectGetPrimitiveIndexNV:
+            v = UnownedStringSlice{"OpHitObjectGetPrimitiveIndexNV"};
+            return true;
+        case SpvOpHitObjectGetGeometryIndexNV:
+            v = UnownedStringSlice{"OpHitObjectGetGeometryIndexNV"};
+            return true;
+        case SpvOpHitObjectGetInstanceIdNV:
+            v = UnownedStringSlice{"OpHitObjectGetInstanceIdNV"};
+            return true;
+        case SpvOpHitObjectGetInstanceCustomIndexNV:
+            v = UnownedStringSlice{"OpHitObjectGetInstanceCustomIndexNV"};
+            return true;
+        case SpvOpHitObjectGetWorldRayDirectionNV:
+            v = UnownedStringSlice{"OpHitObjectGetWorldRayDirectionNV"};
+            return true;
+        case SpvOpHitObjectGetWorldRayOriginNV:
+            v = UnownedStringSlice{"OpHitObjectGetWorldRayOriginNV"};
+            return true;
+        case SpvOpHitObjectGetRayTMaxNV:
+            v = UnownedStringSlice{"OpHitObjectGetRayTMaxNV"};
+            return true;
+        case SpvOpHitObjectGetRayTMinNV:
+            v = UnownedStringSlice{"OpHitObjectGetRayTMinNV"};
+            return true;
+        case SpvOpHitObjectIsEmptyNV:
+            v = UnownedStringSlice{"OpHitObjectIsEmptyNV"};
+            return true;
+        case SpvOpHitObjectIsHitNV:
+            v = UnownedStringSlice{"OpHitObjectIsHitNV"};
+            return true;
+        case SpvOpHitObjectIsMissNV:
+            v = UnownedStringSlice{"OpHitObjectIsMissNV"};
+            return true;
+        case SpvOpReorderThreadWithHitObjectNV:
+            v = UnownedStringSlice{"OpReorderThreadWithHitObjectNV"};
+            return true;
+        case SpvOpReorderThreadWithHintNV:
+            v = UnownedStringSlice{"OpReorderThreadWithHintNV"};
+            return true;
+        case SpvOpTypeHitObjectNV:
+            v = UnownedStringSlice{"OpTypeHitObjectNV"};
+            return true;
+        case SpvOpImageSampleFootprintNV:
+            v = UnownedStringSlice{"OpImageSampleFootprintNV"};
+            return true;
+        case SpvOpEmitMeshTasksEXT:
+            v = UnownedStringSlice{"OpEmitMeshTasksEXT"};
+            return true;
+        case SpvOpSetMeshOutputsEXT:
+            v = UnownedStringSlice{"OpSetMeshOutputsEXT"};
+            return true;
+        case SpvOpGroupNonUniformPartitionNV:
+            v = UnownedStringSlice{"OpGroupNonUniformPartitionNV"};
+            return true;
+        case SpvOpWritePackedPrimitiveIndices4x8NV:
+            v = UnownedStringSlice{"OpWritePackedPrimitiveIndices4x8NV"};
+            return true;
+        case SpvOpReportIntersectionNV:
+            v = UnownedStringSlice{"OpReportIntersectionNV"};
+            return true;
+        case SpvOpIgnoreIntersectionNV:
+            v = UnownedStringSlice{"OpIgnoreIntersectionNV"};
+            return true;
+        case SpvOpTerminateRayNV:
+            v = UnownedStringSlice{"OpTerminateRayNV"};
+            return true;
+        case SpvOpTraceNV:
+            v = UnownedStringSlice{"OpTraceNV"};
+            return true;
+        case SpvOpTraceMotionNV:
+            v = UnownedStringSlice{"OpTraceMotionNV"};
+            return true;
+        case SpvOpTraceRayMotionNV:
+            v = UnownedStringSlice{"OpTraceRayMotionNV"};
+            return true;
+        case SpvOpRayQueryGetIntersectionTriangleVertexPositionsKHR:
+            v = UnownedStringSlice{"OpRayQueryGetIntersectionTriangleVertexPositionsKHR"};
+            return true;
+        case SpvOpTypeAccelerationStructureNV:
+            v = UnownedStringSlice{"OpTypeAccelerationStructureNV"};
+            return true;
+        case SpvOpExecuteCallableNV:
+            v = UnownedStringSlice{"OpExecuteCallableNV"};
+            return true;
+        case SpvOpTypeCooperativeMatrixNV:
+            v = UnownedStringSlice{"OpTypeCooperativeMatrixNV"};
+            return true;
+        case SpvOpCooperativeMatrixLoadNV:
+            v = UnownedStringSlice{"OpCooperativeMatrixLoadNV"};
+            return true;
+        case SpvOpCooperativeMatrixStoreNV:
+            v = UnownedStringSlice{"OpCooperativeMatrixStoreNV"};
+            return true;
+        case SpvOpCooperativeMatrixMulAddNV:
+            v = UnownedStringSlice{"OpCooperativeMatrixMulAddNV"};
+            return true;
+        case SpvOpCooperativeMatrixLengthNV:
+            v = UnownedStringSlice{"OpCooperativeMatrixLengthNV"};
+            return true;
+        case SpvOpBeginInvocationInterlockEXT:
+            v = UnownedStringSlice{"OpBeginInvocationInterlockEXT"};
+            return true;
+        case SpvOpEndInvocationInterlockEXT:
+            v = UnownedStringSlice{"OpEndInvocationInterlockEXT"};
+            return true;
+        case SpvOpDemoteToHelperInvocation:
+            v = UnownedStringSlice{"OpDemoteToHelperInvocation"};
+            return true;
+        case SpvOpIsHelperInvocationEXT:
+            v = UnownedStringSlice{"OpIsHelperInvocationEXT"};
+            return true;
+        case SpvOpConvertUToImageNV:
+            v = UnownedStringSlice{"OpConvertUToImageNV"};
+            return true;
+        case SpvOpConvertUToSamplerNV:
+            v = UnownedStringSlice{"OpConvertUToSamplerNV"};
+            return true;
+        case SpvOpConvertImageToUNV:
+            v = UnownedStringSlice{"OpConvertImageToUNV"};
+            return true;
+        case SpvOpConvertSamplerToUNV:
+            v = UnownedStringSlice{"OpConvertSamplerToUNV"};
+            return true;
+        case SpvOpConvertUToSampledImageNV:
+            v = UnownedStringSlice{"OpConvertUToSampledImageNV"};
+            return true;
+        case SpvOpConvertSampledImageToUNV:
+            v = UnownedStringSlice{"OpConvertSampledImageToUNV"};
+            return true;
+        case SpvOpSamplerImageAddressingModeNV:
+            v = UnownedStringSlice{"OpSamplerImageAddressingModeNV"};
+            return true;
+        case SpvOpSubgroupShuffleINTEL:
+            v = UnownedStringSlice{"OpSubgroupShuffleINTEL"};
+            return true;
+        case SpvOpSubgroupShuffleDownINTEL:
+            v = UnownedStringSlice{"OpSubgroupShuffleDownINTEL"};
+            return true;
+        case SpvOpSubgroupShuffleUpINTEL:
+            v = UnownedStringSlice{"OpSubgroupShuffleUpINTEL"};
+            return true;
+        case SpvOpSubgroupShuffleXorINTEL:
+            v = UnownedStringSlice{"OpSubgroupShuffleXorINTEL"};
+            return true;
+        case SpvOpSubgroupBlockReadINTEL:
+            v = UnownedStringSlice{"OpSubgroupBlockReadINTEL"};
+            return true;
+        case SpvOpSubgroupBlockWriteINTEL:
+            v = UnownedStringSlice{"OpSubgroupBlockWriteINTEL"};
+            return true;
+        case SpvOpSubgroupImageBlockReadINTEL:
+            v = UnownedStringSlice{"OpSubgroupImageBlockReadINTEL"};
+            return true;
+        case SpvOpSubgroupImageBlockWriteINTEL:
+            v = UnownedStringSlice{"OpSubgroupImageBlockWriteINTEL"};
+            return true;
+        case SpvOpSubgroupImageMediaBlockReadINTEL:
+            v = UnownedStringSlice{"OpSubgroupImageMediaBlockReadINTEL"};
+            return true;
+        case SpvOpSubgroupImageMediaBlockWriteINTEL:
+            v = UnownedStringSlice{"OpSubgroupImageMediaBlockWriteINTEL"};
+            return true;
+        case SpvOpUCountLeadingZerosINTEL:
+            v = UnownedStringSlice{"OpUCountLeadingZerosINTEL"};
+            return true;
+        case SpvOpUCountTrailingZerosINTEL:
+            v = UnownedStringSlice{"OpUCountTrailingZerosINTEL"};
+            return true;
+        case SpvOpAbsISubINTEL:
+            v = UnownedStringSlice{"OpAbsISubINTEL"};
+            return true;
+        case SpvOpAbsUSubINTEL:
+            v = UnownedStringSlice{"OpAbsUSubINTEL"};
+            return true;
+        case SpvOpIAddSatINTEL:
+            v = UnownedStringSlice{"OpIAddSatINTEL"};
+            return true;
+        case SpvOpUAddSatINTEL:
+            v = UnownedStringSlice{"OpUAddSatINTEL"};
+            return true;
+        case SpvOpIAverageINTEL:
+            v = UnownedStringSlice{"OpIAverageINTEL"};
+            return true;
+        case SpvOpUAverageINTEL:
+            v = UnownedStringSlice{"OpUAverageINTEL"};
+            return true;
+        case SpvOpIAverageRoundedINTEL:
+            v = UnownedStringSlice{"OpIAverageRoundedINTEL"};
+            return true;
+        case SpvOpUAverageRoundedINTEL:
+            v = UnownedStringSlice{"OpUAverageRoundedINTEL"};
+            return true;
+        case SpvOpISubSatINTEL:
+            v = UnownedStringSlice{"OpISubSatINTEL"};
+            return true;
+        case SpvOpUSubSatINTEL:
+            v = UnownedStringSlice{"OpUSubSatINTEL"};
+            return true;
+        case SpvOpIMul32x16INTEL:
+            v = UnownedStringSlice{"OpIMul32x16INTEL"};
+            return true;
+        case SpvOpUMul32x16INTEL:
+            v = UnownedStringSlice{"OpUMul32x16INTEL"};
+            return true;
+        case SpvOpConstantFunctionPointerINTEL:
+            v = UnownedStringSlice{"OpConstantFunctionPointerINTEL"};
+            return true;
+        case SpvOpFunctionPointerCallINTEL:
+            v = UnownedStringSlice{"OpFunctionPointerCallINTEL"};
+            return true;
+        case SpvOpAsmTargetINTEL:
+            v = UnownedStringSlice{"OpAsmTargetINTEL"};
+            return true;
+        case SpvOpAsmINTEL:
+            v = UnownedStringSlice{"OpAsmINTEL"};
+            return true;
+        case SpvOpAsmCallINTEL:
+            v = UnownedStringSlice{"OpAsmCallINTEL"};
+            return true;
+        case SpvOpAtomicFMinEXT:
+            v = UnownedStringSlice{"OpAtomicFMinEXT"};
+            return true;
+        case SpvOpAtomicFMaxEXT:
+            v = UnownedStringSlice{"OpAtomicFMaxEXT"};
+            return true;
+        case SpvOpAssumeTrueKHR:
+            v = UnownedStringSlice{"OpAssumeTrueKHR"};
+            return true;
+        case SpvOpExpectKHR:
+            v = UnownedStringSlice{"OpExpectKHR"};
+            return true;
+        case SpvOpDecorateString:
+            v = UnownedStringSlice{"OpDecorateString"};
+            return true;
+        case SpvOpMemberDecorateString:
+            v = UnownedStringSlice{"OpMemberDecorateString"};
+            return true;
+        case SpvOpVmeImageINTEL:
+            v = UnownedStringSlice{"OpVmeImageINTEL"};
+            return true;
+        case SpvOpTypeVmeImageINTEL:
+            v = UnownedStringSlice{"OpTypeVmeImageINTEL"};
+            return true;
+        case SpvOpTypeAvcImePayloadINTEL:
+            v = UnownedStringSlice{"OpTypeAvcImePayloadINTEL"};
+            return true;
+        case SpvOpTypeAvcRefPayloadINTEL:
+            v = UnownedStringSlice{"OpTypeAvcRefPayloadINTEL"};
+            return true;
+        case SpvOpTypeAvcSicPayloadINTEL:
+            v = UnownedStringSlice{"OpTypeAvcSicPayloadINTEL"};
+            return true;
+        case SpvOpTypeAvcMcePayloadINTEL:
+            v = UnownedStringSlice{"OpTypeAvcMcePayloadINTEL"};
+            return true;
+        case SpvOpTypeAvcMceResultINTEL:
+            v = UnownedStringSlice{"OpTypeAvcMceResultINTEL"};
+            return true;
+        case SpvOpTypeAvcImeResultINTEL:
+            v = UnownedStringSlice{"OpTypeAvcImeResultINTEL"};
+            return true;
+        case SpvOpTypeAvcImeResultSingleReferenceStreamoutINTEL:
+            v = UnownedStringSlice{"OpTypeAvcImeResultSingleReferenceStreamoutINTEL"};
+            return true;
+        case SpvOpTypeAvcImeResultDualReferenceStreamoutINTEL:
+            v = UnownedStringSlice{"OpTypeAvcImeResultDualReferenceStreamoutINTEL"};
+            return true;
+        case SpvOpTypeAvcImeSingleReferenceStreaminINTEL:
+            v = UnownedStringSlice{"OpTypeAvcImeSingleReferenceStreaminINTEL"};
+            return true;
+        case SpvOpTypeAvcImeDualReferenceStreaminINTEL:
+            v = UnownedStringSlice{"OpTypeAvcImeDualReferenceStreaminINTEL"};
+            return true;
+        case SpvOpTypeAvcRefResultINTEL:
+            v = UnownedStringSlice{"OpTypeAvcRefResultINTEL"};
+            return true;
+        case SpvOpTypeAvcSicResultINTEL:
+            v = UnownedStringSlice{"OpTypeAvcSicResultINTEL"};
+            return true;
+        case SpvOpSubgroupAvcMceGetDefaultInterBaseMultiReferencePenaltyINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcMceGetDefaultInterBaseMultiReferencePenaltyINTEL"};
+            return true;
+        case SpvOpSubgroupAvcMceSetInterBaseMultiReferencePenaltyINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcMceSetInterBaseMultiReferencePenaltyINTEL"};
+            return true;
+        case SpvOpSubgroupAvcMceGetDefaultInterShapePenaltyINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcMceGetDefaultInterShapePenaltyINTEL"};
+            return true;
+        case SpvOpSubgroupAvcMceSetInterShapePenaltyINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcMceSetInterShapePenaltyINTEL"};
+            return true;
+        case SpvOpSubgroupAvcMceGetDefaultInterDirectionPenaltyINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcMceGetDefaultInterDirectionPenaltyINTEL"};
+            return true;
+        case SpvOpSubgroupAvcMceSetInterDirectionPenaltyINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcMceSetInterDirectionPenaltyINTEL"};
+            return true;
+        case SpvOpSubgroupAvcMceGetDefaultIntraLumaShapePenaltyINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcMceGetDefaultIntraLumaShapePenaltyINTEL"};
+            return true;
+        case SpvOpSubgroupAvcMceGetDefaultInterMotionVectorCostTableINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcMceGetDefaultInterMotionVectorCostTableINTEL"};
+            return true;
+        case SpvOpSubgroupAvcMceGetDefaultHighPenaltyCostTableINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcMceGetDefaultHighPenaltyCostTableINTEL"};
+            return true;
+        case SpvOpSubgroupAvcMceGetDefaultMediumPenaltyCostTableINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcMceGetDefaultMediumPenaltyCostTableINTEL"};
+            return true;
+        case SpvOpSubgroupAvcMceGetDefaultLowPenaltyCostTableINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcMceGetDefaultLowPenaltyCostTableINTEL"};
+            return true;
+        case SpvOpSubgroupAvcMceSetMotionVectorCostFunctionINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcMceSetMotionVectorCostFunctionINTEL"};
+            return true;
+        case SpvOpSubgroupAvcMceGetDefaultIntraLumaModePenaltyINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcMceGetDefaultIntraLumaModePenaltyINTEL"};
+            return true;
+        case SpvOpSubgroupAvcMceGetDefaultNonDcLumaIntraPenaltyINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcMceGetDefaultNonDcLumaIntraPenaltyINTEL"};
+            return true;
+        case SpvOpSubgroupAvcMceGetDefaultIntraChromaModeBasePenaltyINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcMceGetDefaultIntraChromaModeBasePenaltyINTEL"};
+            return true;
+        case SpvOpSubgroupAvcMceSetAcOnlyHaarINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcMceSetAcOnlyHaarINTEL"};
+            return true;
+        case SpvOpSubgroupAvcMceSetSourceInterlacedFieldPolarityINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcMceSetSourceInterlacedFieldPolarityINTEL"};
+            return true;
+        case SpvOpSubgroupAvcMceSetSingleReferenceInterlacedFieldPolarityINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcMceSetSingleReferenceInterlacedFieldPolarityINTEL"};
+            return true;
+        case SpvOpSubgroupAvcMceSetDualReferenceInterlacedFieldPolaritiesINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcMceSetDualReferenceInterlacedFieldPolaritiesINTEL"};
+            return true;
+        case SpvOpSubgroupAvcMceConvertToImePayloadINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcMceConvertToImePayloadINTEL"};
+            return true;
+        case SpvOpSubgroupAvcMceConvertToImeResultINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcMceConvertToImeResultINTEL"};
+            return true;
+        case SpvOpSubgroupAvcMceConvertToRefPayloadINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcMceConvertToRefPayloadINTEL"};
+            return true;
+        case SpvOpSubgroupAvcMceConvertToRefResultINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcMceConvertToRefResultINTEL"};
+            return true;
+        case SpvOpSubgroupAvcMceConvertToSicPayloadINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcMceConvertToSicPayloadINTEL"};
+            return true;
+        case SpvOpSubgroupAvcMceConvertToSicResultINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcMceConvertToSicResultINTEL"};
+            return true;
+        case SpvOpSubgroupAvcMceGetMotionVectorsINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcMceGetMotionVectorsINTEL"};
+            return true;
+        case SpvOpSubgroupAvcMceGetInterDistortionsINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcMceGetInterDistortionsINTEL"};
+            return true;
+        case SpvOpSubgroupAvcMceGetBestInterDistortionsINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcMceGetBestInterDistortionsINTEL"};
+            return true;
+        case SpvOpSubgroupAvcMceGetInterMajorShapeINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcMceGetInterMajorShapeINTEL"};
+            return true;
+        case SpvOpSubgroupAvcMceGetInterMinorShapeINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcMceGetInterMinorShapeINTEL"};
+            return true;
+        case SpvOpSubgroupAvcMceGetInterDirectionsINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcMceGetInterDirectionsINTEL"};
+            return true;
+        case SpvOpSubgroupAvcMceGetInterMotionVectorCountINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcMceGetInterMotionVectorCountINTEL"};
+            return true;
+        case SpvOpSubgroupAvcMceGetInterReferenceIdsINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcMceGetInterReferenceIdsINTEL"};
+            return true;
+        case SpvOpSubgroupAvcMceGetInterReferenceInterlacedFieldPolaritiesINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcMceGetInterReferenceInterlacedFieldPolaritiesINTEL"};
+            return true;
+        case SpvOpSubgroupAvcImeInitializeINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcImeInitializeINTEL"};
+            return true;
+        case SpvOpSubgroupAvcImeSetSingleReferenceINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcImeSetSingleReferenceINTEL"};
+            return true;
+        case SpvOpSubgroupAvcImeSetDualReferenceINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcImeSetDualReferenceINTEL"};
+            return true;
+        case SpvOpSubgroupAvcImeRefWindowSizeINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcImeRefWindowSizeINTEL"};
+            return true;
+        case SpvOpSubgroupAvcImeAdjustRefOffsetINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcImeAdjustRefOffsetINTEL"};
+            return true;
+        case SpvOpSubgroupAvcImeConvertToMcePayloadINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcImeConvertToMcePayloadINTEL"};
+            return true;
+        case SpvOpSubgroupAvcImeSetMaxMotionVectorCountINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcImeSetMaxMotionVectorCountINTEL"};
+            return true;
+        case SpvOpSubgroupAvcImeSetUnidirectionalMixDisableINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcImeSetUnidirectionalMixDisableINTEL"};
+            return true;
+        case SpvOpSubgroupAvcImeSetEarlySearchTerminationThresholdINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcImeSetEarlySearchTerminationThresholdINTEL"};
+            return true;
+        case SpvOpSubgroupAvcImeSetWeightedSadINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcImeSetWeightedSadINTEL"};
+            return true;
+        case SpvOpSubgroupAvcImeEvaluateWithSingleReferenceINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcImeEvaluateWithSingleReferenceINTEL"};
+            return true;
+        case SpvOpSubgroupAvcImeEvaluateWithDualReferenceINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcImeEvaluateWithDualReferenceINTEL"};
+            return true;
+        case SpvOpSubgroupAvcImeEvaluateWithSingleReferenceStreaminINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcImeEvaluateWithSingleReferenceStreaminINTEL"};
+            return true;
+        case SpvOpSubgroupAvcImeEvaluateWithDualReferenceStreaminINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcImeEvaluateWithDualReferenceStreaminINTEL"};
+            return true;
+        case SpvOpSubgroupAvcImeEvaluateWithSingleReferenceStreamoutINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcImeEvaluateWithSingleReferenceStreamoutINTEL"};
+            return true;
+        case SpvOpSubgroupAvcImeEvaluateWithDualReferenceStreamoutINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcImeEvaluateWithDualReferenceStreamoutINTEL"};
+            return true;
+        case SpvOpSubgroupAvcImeEvaluateWithSingleReferenceStreaminoutINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcImeEvaluateWithSingleReferenceStreaminoutINTEL"};
+            return true;
+        case SpvOpSubgroupAvcImeEvaluateWithDualReferenceStreaminoutINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcImeEvaluateWithDualReferenceStreaminoutINTEL"};
+            return true;
+        case SpvOpSubgroupAvcImeConvertToMceResultINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcImeConvertToMceResultINTEL"};
+            return true;
+        case SpvOpSubgroupAvcImeGetSingleReferenceStreaminINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcImeGetSingleReferenceStreaminINTEL"};
+            return true;
+        case SpvOpSubgroupAvcImeGetDualReferenceStreaminINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcImeGetDualReferenceStreaminINTEL"};
+            return true;
+        case SpvOpSubgroupAvcImeStripSingleReferenceStreamoutINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcImeStripSingleReferenceStreamoutINTEL"};
+            return true;
+        case SpvOpSubgroupAvcImeStripDualReferenceStreamoutINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcImeStripDualReferenceStreamoutINTEL"};
+            return true;
+        case SpvOpSubgroupAvcImeGetStreamoutSingleReferenceMajorShapeMotionVectorsINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcImeGetStreamoutSingleReferenceMajorShapeMotionVectorsINTEL"};
+            return true;
+        case SpvOpSubgroupAvcImeGetStreamoutSingleReferenceMajorShapeDistortionsINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcImeGetStreamoutSingleReferenceMajorShapeDistortionsINTEL"};
+            return true;
+        case SpvOpSubgroupAvcImeGetStreamoutSingleReferenceMajorShapeReferenceIdsINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcImeGetStreamoutSingleReferenceMajorShapeReferenceIdsINTEL"};
+            return true;
+        case SpvOpSubgroupAvcImeGetStreamoutDualReferenceMajorShapeMotionVectorsINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcImeGetStreamoutDualReferenceMajorShapeMotionVectorsINTEL"};
+            return true;
+        case SpvOpSubgroupAvcImeGetStreamoutDualReferenceMajorShapeDistortionsINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcImeGetStreamoutDualReferenceMajorShapeDistortionsINTEL"};
+            return true;
+        case SpvOpSubgroupAvcImeGetStreamoutDualReferenceMajorShapeReferenceIdsINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcImeGetStreamoutDualReferenceMajorShapeReferenceIdsINTEL"};
+            return true;
+        case SpvOpSubgroupAvcImeGetBorderReachedINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcImeGetBorderReachedINTEL"};
+            return true;
+        case SpvOpSubgroupAvcImeGetTruncatedSearchIndicationINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcImeGetTruncatedSearchIndicationINTEL"};
+            return true;
+        case SpvOpSubgroupAvcImeGetUnidirectionalEarlySearchTerminationINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcImeGetUnidirectionalEarlySearchTerminationINTEL"};
+            return true;
+        case SpvOpSubgroupAvcImeGetWeightingPatternMinimumMotionVectorINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcImeGetWeightingPatternMinimumMotionVectorINTEL"};
+            return true;
+        case SpvOpSubgroupAvcImeGetWeightingPatternMinimumDistortionINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcImeGetWeightingPatternMinimumDistortionINTEL"};
+            return true;
+        case SpvOpSubgroupAvcFmeInitializeINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcFmeInitializeINTEL"};
+            return true;
+        case SpvOpSubgroupAvcBmeInitializeINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcBmeInitializeINTEL"};
+            return true;
+        case SpvOpSubgroupAvcRefConvertToMcePayloadINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcRefConvertToMcePayloadINTEL"};
+            return true;
+        case SpvOpSubgroupAvcRefSetBidirectionalMixDisableINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcRefSetBidirectionalMixDisableINTEL"};
+            return true;
+        case SpvOpSubgroupAvcRefSetBilinearFilterEnableINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcRefSetBilinearFilterEnableINTEL"};
+            return true;
+        case SpvOpSubgroupAvcRefEvaluateWithSingleReferenceINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcRefEvaluateWithSingleReferenceINTEL"};
+            return true;
+        case SpvOpSubgroupAvcRefEvaluateWithDualReferenceINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcRefEvaluateWithDualReferenceINTEL"};
+            return true;
+        case SpvOpSubgroupAvcRefEvaluateWithMultiReferenceINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcRefEvaluateWithMultiReferenceINTEL"};
+            return true;
+        case SpvOpSubgroupAvcRefEvaluateWithMultiReferenceInterlacedINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcRefEvaluateWithMultiReferenceInterlacedINTEL"};
+            return true;
+        case SpvOpSubgroupAvcRefConvertToMceResultINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcRefConvertToMceResultINTEL"};
+            return true;
+        case SpvOpSubgroupAvcSicInitializeINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcSicInitializeINTEL"};
+            return true;
+        case SpvOpSubgroupAvcSicConfigureSkcINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcSicConfigureSkcINTEL"};
+            return true;
+        case SpvOpSubgroupAvcSicConfigureIpeLumaINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcSicConfigureIpeLumaINTEL"};
+            return true;
+        case SpvOpSubgroupAvcSicConfigureIpeLumaChromaINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcSicConfigureIpeLumaChromaINTEL"};
+            return true;
+        case SpvOpSubgroupAvcSicGetMotionVectorMaskINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcSicGetMotionVectorMaskINTEL"};
+            return true;
+        case SpvOpSubgroupAvcSicConvertToMcePayloadINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcSicConvertToMcePayloadINTEL"};
+            return true;
+        case SpvOpSubgroupAvcSicSetIntraLumaShapePenaltyINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcSicSetIntraLumaShapePenaltyINTEL"};
+            return true;
+        case SpvOpSubgroupAvcSicSetIntraLumaModeCostFunctionINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcSicSetIntraLumaModeCostFunctionINTEL"};
+            return true;
+        case SpvOpSubgroupAvcSicSetIntraChromaModeCostFunctionINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcSicSetIntraChromaModeCostFunctionINTEL"};
+            return true;
+        case SpvOpSubgroupAvcSicSetBilinearFilterEnableINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcSicSetBilinearFilterEnableINTEL"};
+            return true;
+        case SpvOpSubgroupAvcSicSetSkcForwardTransformEnableINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcSicSetSkcForwardTransformEnableINTEL"};
+            return true;
+        case SpvOpSubgroupAvcSicSetBlockBasedRawSkipSadINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcSicSetBlockBasedRawSkipSadINTEL"};
+            return true;
+        case SpvOpSubgroupAvcSicEvaluateIpeINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcSicEvaluateIpeINTEL"};
+            return true;
+        case SpvOpSubgroupAvcSicEvaluateWithSingleReferenceINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcSicEvaluateWithSingleReferenceINTEL"};
+            return true;
+        case SpvOpSubgroupAvcSicEvaluateWithDualReferenceINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcSicEvaluateWithDualReferenceINTEL"};
+            return true;
+        case SpvOpSubgroupAvcSicEvaluateWithMultiReferenceINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcSicEvaluateWithMultiReferenceINTEL"};
+            return true;
+        case SpvOpSubgroupAvcSicEvaluateWithMultiReferenceInterlacedINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcSicEvaluateWithMultiReferenceInterlacedINTEL"};
+            return true;
+        case SpvOpSubgroupAvcSicConvertToMceResultINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcSicConvertToMceResultINTEL"};
+            return true;
+        case SpvOpSubgroupAvcSicGetIpeLumaShapeINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcSicGetIpeLumaShapeINTEL"};
+            return true;
+        case SpvOpSubgroupAvcSicGetBestIpeLumaDistortionINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcSicGetBestIpeLumaDistortionINTEL"};
+            return true;
+        case SpvOpSubgroupAvcSicGetBestIpeChromaDistortionINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcSicGetBestIpeChromaDistortionINTEL"};
+            return true;
+        case SpvOpSubgroupAvcSicGetPackedIpeLumaModesINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcSicGetPackedIpeLumaModesINTEL"};
+            return true;
+        case SpvOpSubgroupAvcSicGetIpeChromaModeINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcSicGetIpeChromaModeINTEL"};
+            return true;
+        case SpvOpSubgroupAvcSicGetPackedSkcLumaCountThresholdINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcSicGetPackedSkcLumaCountThresholdINTEL"};
+            return true;
+        case SpvOpSubgroupAvcSicGetPackedSkcLumaSumThresholdINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcSicGetPackedSkcLumaSumThresholdINTEL"};
+            return true;
+        case SpvOpSubgroupAvcSicGetInterRawSadsINTEL:
+            v = UnownedStringSlice{"OpSubgroupAvcSicGetInterRawSadsINTEL"};
+            return true;
+        case SpvOpVariableLengthArrayINTEL:
+            v = UnownedStringSlice{"OpVariableLengthArrayINTEL"};
+            return true;
+        case SpvOpSaveMemoryINTEL:
+            v = UnownedStringSlice{"OpSaveMemoryINTEL"};
+            return true;
+        case SpvOpRestoreMemoryINTEL:
+            v = UnownedStringSlice{"OpRestoreMemoryINTEL"};
+            return true;
+        case SpvOpArbitraryFloatSinCosPiINTEL:
+            v = UnownedStringSlice{"OpArbitraryFloatSinCosPiINTEL"};
+            return true;
+        case SpvOpArbitraryFloatCastINTEL:
+            v = UnownedStringSlice{"OpArbitraryFloatCastINTEL"};
+            return true;
+        case SpvOpArbitraryFloatCastFromIntINTEL:
+            v = UnownedStringSlice{"OpArbitraryFloatCastFromIntINTEL"};
+            return true;
+        case SpvOpArbitraryFloatCastToIntINTEL:
+            v = UnownedStringSlice{"OpArbitraryFloatCastToIntINTEL"};
+            return true;
+        case SpvOpArbitraryFloatAddINTEL:
+            v = UnownedStringSlice{"OpArbitraryFloatAddINTEL"};
+            return true;
+        case SpvOpArbitraryFloatSubINTEL:
+            v = UnownedStringSlice{"OpArbitraryFloatSubINTEL"};
+            return true;
+        case SpvOpArbitraryFloatMulINTEL:
+            v = UnownedStringSlice{"OpArbitraryFloatMulINTEL"};
+            return true;
+        case SpvOpArbitraryFloatDivINTEL:
+            v = UnownedStringSlice{"OpArbitraryFloatDivINTEL"};
+            return true;
+        case SpvOpArbitraryFloatGTINTEL:
+            v = UnownedStringSlice{"OpArbitraryFloatGTINTEL"};
+            return true;
+        case SpvOpArbitraryFloatGEINTEL:
+            v = UnownedStringSlice{"OpArbitraryFloatGEINTEL"};
+            return true;
+        case SpvOpArbitraryFloatLTINTEL:
+            v = UnownedStringSlice{"OpArbitraryFloatLTINTEL"};
+            return true;
+        case SpvOpArbitraryFloatLEINTEL:
+            v = UnownedStringSlice{"OpArbitraryFloatLEINTEL"};
+            return true;
+        case SpvOpArbitraryFloatEQINTEL:
+            v = UnownedStringSlice{"OpArbitraryFloatEQINTEL"};
+            return true;
+        case SpvOpArbitraryFloatRecipINTEL:
+            v = UnownedStringSlice{"OpArbitraryFloatRecipINTEL"};
+            return true;
+        case SpvOpArbitraryFloatRSqrtINTEL:
+            v = UnownedStringSlice{"OpArbitraryFloatRSqrtINTEL"};
+            return true;
+        case SpvOpArbitraryFloatCbrtINTEL:
+            v = UnownedStringSlice{"OpArbitraryFloatCbrtINTEL"};
+            return true;
+        case SpvOpArbitraryFloatHypotINTEL:
+            v = UnownedStringSlice{"OpArbitraryFloatHypotINTEL"};
+            return true;
+        case SpvOpArbitraryFloatSqrtINTEL:
+            v = UnownedStringSlice{"OpArbitraryFloatSqrtINTEL"};
+            return true;
+        case SpvOpArbitraryFloatLogINTEL:
+            v = UnownedStringSlice{"OpArbitraryFloatLogINTEL"};
+            return true;
+        case SpvOpArbitraryFloatLog2INTEL:
+            v = UnownedStringSlice{"OpArbitraryFloatLog2INTEL"};
+            return true;
+        case SpvOpArbitraryFloatLog10INTEL:
+            v = UnownedStringSlice{"OpArbitraryFloatLog10INTEL"};
+            return true;
+        case SpvOpArbitraryFloatLog1pINTEL:
+            v = UnownedStringSlice{"OpArbitraryFloatLog1pINTEL"};
+            return true;
+        case SpvOpArbitraryFloatExpINTEL:
+            v = UnownedStringSlice{"OpArbitraryFloatExpINTEL"};
+            return true;
+        case SpvOpArbitraryFloatExp2INTEL:
+            v = UnownedStringSlice{"OpArbitraryFloatExp2INTEL"};
+            return true;
+        case SpvOpArbitraryFloatExp10INTEL:
+            v = UnownedStringSlice{"OpArbitraryFloatExp10INTEL"};
+            return true;
+        case SpvOpArbitraryFloatExpm1INTEL:
+            v = UnownedStringSlice{"OpArbitraryFloatExpm1INTEL"};
+            return true;
+        case SpvOpArbitraryFloatSinINTEL:
+            v = UnownedStringSlice{"OpArbitraryFloatSinINTEL"};
+            return true;
+        case SpvOpArbitraryFloatCosINTEL:
+            v = UnownedStringSlice{"OpArbitraryFloatCosINTEL"};
+            return true;
+        case SpvOpArbitraryFloatSinCosINTEL:
+            v = UnownedStringSlice{"OpArbitraryFloatSinCosINTEL"};
+            return true;
+        case SpvOpArbitraryFloatSinPiINTEL:
+            v = UnownedStringSlice{"OpArbitraryFloatSinPiINTEL"};
+            return true;
+        case SpvOpArbitraryFloatCosPiINTEL:
+            v = UnownedStringSlice{"OpArbitraryFloatCosPiINTEL"};
+            return true;
+        case SpvOpArbitraryFloatASinINTEL:
+            v = UnownedStringSlice{"OpArbitraryFloatASinINTEL"};
+            return true;
+        case SpvOpArbitraryFloatASinPiINTEL:
+            v = UnownedStringSlice{"OpArbitraryFloatASinPiINTEL"};
+            return true;
+        case SpvOpArbitraryFloatACosINTEL:
+            v = UnownedStringSlice{"OpArbitraryFloatACosINTEL"};
+            return true;
+        case SpvOpArbitraryFloatACosPiINTEL:
+            v = UnownedStringSlice{"OpArbitraryFloatACosPiINTEL"};
+            return true;
+        case SpvOpArbitraryFloatATanINTEL:
+            v = UnownedStringSlice{"OpArbitraryFloatATanINTEL"};
+            return true;
+        case SpvOpArbitraryFloatATanPiINTEL:
+            v = UnownedStringSlice{"OpArbitraryFloatATanPiINTEL"};
+            return true;
+        case SpvOpArbitraryFloatATan2INTEL:
+            v = UnownedStringSlice{"OpArbitraryFloatATan2INTEL"};
+            return true;
+        case SpvOpArbitraryFloatPowINTEL:
+            v = UnownedStringSlice{"OpArbitraryFloatPowINTEL"};
+            return true;
+        case SpvOpArbitraryFloatPowRINTEL:
+            v = UnownedStringSlice{"OpArbitraryFloatPowRINTEL"};
+            return true;
+        case SpvOpArbitraryFloatPowNINTEL:
+            v = UnownedStringSlice{"OpArbitraryFloatPowNINTEL"};
+            return true;
+        case SpvOpLoopControlINTEL:
+            v = UnownedStringSlice{"OpLoopControlINTEL"};
+            return true;
+        case SpvOpAliasDomainDeclINTEL:
+            v = UnownedStringSlice{"OpAliasDomainDeclINTEL"};
+            return true;
+        case SpvOpAliasScopeDeclINTEL:
+            v = UnownedStringSlice{"OpAliasScopeDeclINTEL"};
+            return true;
+        case SpvOpAliasScopeListDeclINTEL:
+            v = UnownedStringSlice{"OpAliasScopeListDeclINTEL"};
+            return true;
+        case SpvOpFixedSqrtINTEL:
+            v = UnownedStringSlice{"OpFixedSqrtINTEL"};
+            return true;
+        case SpvOpFixedRecipINTEL:
+            v = UnownedStringSlice{"OpFixedRecipINTEL"};
+            return true;
+        case SpvOpFixedRsqrtINTEL:
+            v = UnownedStringSlice{"OpFixedRsqrtINTEL"};
+            return true;
+        case SpvOpFixedSinINTEL:
+            v = UnownedStringSlice{"OpFixedSinINTEL"};
+            return true;
+        case SpvOpFixedCosINTEL:
+            v = UnownedStringSlice{"OpFixedCosINTEL"};
+            return true;
+        case SpvOpFixedSinCosINTEL:
+            v = UnownedStringSlice{"OpFixedSinCosINTEL"};
+            return true;
+        case SpvOpFixedSinPiINTEL:
+            v = UnownedStringSlice{"OpFixedSinPiINTEL"};
+            return true;
+        case SpvOpFixedCosPiINTEL:
+            v = UnownedStringSlice{"OpFixedCosPiINTEL"};
+            return true;
+        case SpvOpFixedSinCosPiINTEL:
+            v = UnownedStringSlice{"OpFixedSinCosPiINTEL"};
+            return true;
+        case SpvOpFixedLogINTEL:
+            v = UnownedStringSlice{"OpFixedLogINTEL"};
+            return true;
+        case SpvOpFixedExpINTEL:
+            v = UnownedStringSlice{"OpFixedExpINTEL"};
+            return true;
+        case SpvOpPtrCastToCrossWorkgroupINTEL:
+            v = UnownedStringSlice{"OpPtrCastToCrossWorkgroupINTEL"};
+            return true;
+        case SpvOpCrossWorkgroupCastToPtrINTEL:
+            v = UnownedStringSlice{"OpCrossWorkgroupCastToPtrINTEL"};
+            return true;
+        case SpvOpReadPipeBlockingINTEL:
+            v = UnownedStringSlice{"OpReadPipeBlockingINTEL"};
+            return true;
+        case SpvOpWritePipeBlockingINTEL:
+            v = UnownedStringSlice{"OpWritePipeBlockingINTEL"};
+            return true;
+        case SpvOpFPGARegINTEL:
+            v = UnownedStringSlice{"OpFPGARegINTEL"};
+            return true;
+        case SpvOpRayQueryGetRayTMinKHR:
+            v = UnownedStringSlice{"OpRayQueryGetRayTMinKHR"};
+            return true;
+        case SpvOpRayQueryGetRayFlagsKHR:
+            v = UnownedStringSlice{"OpRayQueryGetRayFlagsKHR"};
+            return true;
+        case SpvOpRayQueryGetIntersectionTKHR:
+            v = UnownedStringSlice{"OpRayQueryGetIntersectionTKHR"};
+            return true;
+        case SpvOpRayQueryGetIntersectionInstanceCustomIndexKHR:
+            v = UnownedStringSlice{"OpRayQueryGetIntersectionInstanceCustomIndexKHR"};
+            return true;
+        case SpvOpRayQueryGetIntersectionInstanceIdKHR:
+            v = UnownedStringSlice{"OpRayQueryGetIntersectionInstanceIdKHR"};
+            return true;
+        case SpvOpRayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetKHR:
+            v = UnownedStringSlice{"OpRayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetKHR"};
+            return true;
+        case SpvOpRayQueryGetIntersectionGeometryIndexKHR:
+            v = UnownedStringSlice{"OpRayQueryGetIntersectionGeometryIndexKHR"};
+            return true;
+        case SpvOpRayQueryGetIntersectionPrimitiveIndexKHR:
+            v = UnownedStringSlice{"OpRayQueryGetIntersectionPrimitiveIndexKHR"};
+            return true;
+        case SpvOpRayQueryGetIntersectionBarycentricsKHR:
+            v = UnownedStringSlice{"OpRayQueryGetIntersectionBarycentricsKHR"};
+            return true;
+        case SpvOpRayQueryGetIntersectionFrontFaceKHR:
+            v = UnownedStringSlice{"OpRayQueryGetIntersectionFrontFaceKHR"};
+            return true;
+        case SpvOpRayQueryGetIntersectionCandidateAABBOpaqueKHR:
+            v = UnownedStringSlice{"OpRayQueryGetIntersectionCandidateAABBOpaqueKHR"};
+            return true;
+        case SpvOpRayQueryGetIntersectionObjectRayDirectionKHR:
+            v = UnownedStringSlice{"OpRayQueryGetIntersectionObjectRayDirectionKHR"};
+            return true;
+        case SpvOpRayQueryGetIntersectionObjectRayOriginKHR:
+            v = UnownedStringSlice{"OpRayQueryGetIntersectionObjectRayOriginKHR"};
+            return true;
+        case SpvOpRayQueryGetWorldRayDirectionKHR:
+            v = UnownedStringSlice{"OpRayQueryGetWorldRayDirectionKHR"};
+            return true;
+        case SpvOpRayQueryGetWorldRayOriginKHR:
+            v = UnownedStringSlice{"OpRayQueryGetWorldRayOriginKHR"};
+            return true;
+        case SpvOpRayQueryGetIntersectionObjectToWorldKHR:
+            v = UnownedStringSlice{"OpRayQueryGetIntersectionObjectToWorldKHR"};
+            return true;
+        case SpvOpRayQueryGetIntersectionWorldToObjectKHR:
+            v = UnownedStringSlice{"OpRayQueryGetIntersectionWorldToObjectKHR"};
+            return true;
+        case SpvOpAtomicFAddEXT:
+            v = UnownedStringSlice{"OpAtomicFAddEXT"};
+            return true;
+        case SpvOpTypeBufferSurfaceINTEL:
+            v = UnownedStringSlice{"OpTypeBufferSurfaceINTEL"};
+            return true;
+        case SpvOpTypeStructContinuedINTEL:
+            v = UnownedStringSlice{"OpTypeStructContinuedINTEL"};
+            return true;
+        case SpvOpConstantCompositeContinuedINTEL:
+            v = UnownedStringSlice{"OpConstantCompositeContinuedINTEL"};
+            return true;
+        case SpvOpSpecConstantCompositeContinuedINTEL:
+            v = UnownedStringSlice{"OpSpecConstantCompositeContinuedINTEL"};
+            return true;
+        case SpvOpConvertFToBF16INTEL:
+            v = UnownedStringSlice{"OpConvertFToBF16INTEL"};
+            return true;
+        case SpvOpConvertBF16ToFINTEL:
+            v = UnownedStringSlice{"OpConvertBF16ToFINTEL"};
+            return true;
+        case SpvOpControlBarrierArriveINTEL:
+            v = UnownedStringSlice{"OpControlBarrierArriveINTEL"};
+            return true;
+        case SpvOpControlBarrierWaitINTEL:
+            v = UnownedStringSlice{"OpControlBarrierWaitINTEL"};
+            return true;
+        case SpvOpGroupIMulKHR:
+            v = UnownedStringSlice{"OpGroupIMulKHR"};
+            return true;
+        case SpvOpGroupFMulKHR:
+            v = UnownedStringSlice{"OpGroupFMulKHR"};
+            return true;
+        case SpvOpGroupBitwiseAndKHR:
+            v = UnownedStringSlice{"OpGroupBitwiseAndKHR"};
+            return true;
+        case SpvOpGroupBitwiseOrKHR:
+            v = UnownedStringSlice{"OpGroupBitwiseOrKHR"};
+            return true;
+        case SpvOpGroupBitwiseXorKHR:
+            v = UnownedStringSlice{"OpGroupBitwiseXorKHR"};
+            return true;
+        case SpvOpGroupLogicalAndKHR:
+            v = UnownedStringSlice{"OpGroupLogicalAndKHR"};
+            return true;
+        case SpvOpGroupLogicalOrKHR:
+            v = UnownedStringSlice{"OpGroupLogicalOrKHR"};
+            return true;
+        case SpvOpGroupLogicalXorKHR:
+            v = UnownedStringSlice{"OpGroupLogicalXorKHR"};
+            return true;
         default: return false;
     }
 }
@@ -2839,6 +6382,7 @@ RefPtr<SPIRVCoreGrammarInfo> SPIRVCoreGrammarInfo::getEmbeddedVersion()
         info.spvCapabilities.embedded = &lookupSpvCapability;
         info.anyEnum.embedded = &lookupSpvWord;
         info.opInfo.embedded = &getOpInfo;
+        info.opNames.embedded = &getOpName;
         info.addReference();
         return info;
     }();

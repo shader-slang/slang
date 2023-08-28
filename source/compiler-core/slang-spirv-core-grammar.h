@@ -18,7 +18,7 @@ namespace Slang
         static RefPtr<SPIRVCoreGrammarInfo> loadFromJSON(SourceView& source, DiagnosticSink& sink);
         static RefPtr<SPIRVCoreGrammarInfo> getEmbeddedVersion();
 
-        template<typename T, typename K = UnownedStringSlice>
+        template<typename K, typename T>
         struct LookupOpt
         {
             std::optional<T> lookup(const K& name) const
@@ -32,7 +32,7 @@ namespace Slang
             Dictionary<K, T> dict;
         };
 
-        template<typename T, T onFailure, typename K = UnownedStringSlice>
+        template<typename K, typename T, T onFailure>
         struct Lookup
         {
             T lookup(const K& name) const
@@ -48,13 +48,14 @@ namespace Slang
 
         // Returns SpvOpMax (0x7fffffff) on failure, which couldn't possibly be
         // a valid 16 bit opcode
-        Lookup<SpvOp, SpvOpMax> spvOps;
+        Lookup<UnownedStringSlice, SpvOp, SpvOpMax> spvOps;
 
         // Returns SpvCapabilityMax (0x7fffffff) on failure
-        Lookup<SpvCapability, SpvCapabilityMax> spvCapabilities;
+        Lookup<UnownedStringSlice, SpvCapability, SpvCapabilityMax> spvCapabilities;
 
         // Returns std::nullopt on failure
-        LookupOpt<SpvWord> anyEnum;
+        // Looks up a qualified enum name, i.e. one with the type prefix.
+        LookupOpt<UnownedStringSlice, SpvWord> anyEnum;
 
         struct OpInfo
         {
@@ -65,10 +66,13 @@ namespace Slang
                 ConstantCreation
             };
             Class class_;
-            int resultTypeIndex = -1;
-            int resultIdIndex = -1;
+            // -1 or 0
+            int8_t resultTypeIndex = -1;
+            // -1 or 0 or 1
+            int8_t resultIdIndex = -1;
         };
-        LookupOpt<OpInfo, SpvOp> opInfo;
+        LookupOpt<SpvOp, OpInfo> opInfo;
+        LookupOpt<SpvOp, UnownedStringSlice> opNames;
 
     private:
 

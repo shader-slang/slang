@@ -192,11 +192,14 @@ RefPtr<SPIRVCoreGrammarInfo> SPIRVCoreGrammarInfo::loadFromJSON(SourceView& sour
         // There are duplicate opcodes in the json (for renamed instructions,
         // or the same instruction with different capabilities), for now just
         // keep the first one.
+        SLANG_ASSERT(resultTypeIndex >= -1 || resultTypeIndex <= 0);
+        SLANG_ASSERT(resultIdIndex >= -1 || resultTypeIndex <= 1);
         res->opInfo.dict.addIfNotExists(SpvOp(i.opcode), {
             class_,
-            static_cast<int>(resultTypeIndex),
-            static_cast<int>(resultIdIndex),
+            static_cast<int8_t>(resultTypeIndex),
+            static_cast<int8_t>(resultIdIndex),
         });
+        res->opNames.dict.addIfNotExists(SpvOp(i.opcode), i.opname);
     }
     for(const auto& k : spec.operand_kinds)
     {

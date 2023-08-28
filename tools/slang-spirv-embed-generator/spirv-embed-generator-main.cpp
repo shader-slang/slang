@@ -32,6 +32,43 @@ String dictToPerfectHash(
     return perfectHashToEmbeddableCpp(hashParams, type);
 }
 
+template<typename K, typename V, typename F1, typename F2>
+void dictToSwitch(
+    const Dictionary<K, V>& dict,
+    const char* funName,
+    const char* keyType,
+    const char* valueType,
+    const F1 keyToString,
+    const F2 valueToString,
+    WriterHelper& w)
+{
+    const auto line = [&](const auto& l){
+        w.put(l);
+        w.put("\n");
+    };
+
+    w.print("static bool %s(const %s& k, %s& v)\n", funName, keyType, valueType);
+    line("{");
+    line("    switch(k)");
+    line("    {");
+    for(const auto& [k, v] : dict)
+    {
+        const auto kStr = keyToString(k);
+        const auto vStr = valueToString(v);
+        w.print(
+            "        case %s:\n"
+            "            v = %s;\n"
+            "            return true;\n",
+            kStr.getBuffer(),
+            vStr.getBuffer()
+        );
+    }
+    line("        default: return false;");
+    line("    }");
+    line("}");
+    line("");
+}
+
 void writeInfo(
     const char* const outCppPath,
     const SPIRVCoreGrammarInfo& info)
@@ -76,31 +113,46 @@ void writeInfo(
         false
     ).getBuffer());
 
-    line("static bool getOpInfo(const SpvOp& op, SPIRVCoreGrammarInfo::OpInfo& info)");
-    line("{");
-    line("    switch(op)");
-    line("    {");
-    for(const auto [o, i] : info.opInfo.dict)
-    {
-        const char* classStr;
-        switch(i.class_)
-        {
-            case SPIRVCoreGrammarInfo::OpInfo::Other: classStr = "Other"; break;
-            case SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration: classStr = "TypeDeclaration"; break;
-            case SPIRVCoreGrammarInfo::OpInfo::ConstantCreation: classStr = "ConstantCreation"; break;
-        }
-        w.print(
-            "        case %d: info = {SPIRVCoreGrammarInfo::OpInfo::%s, %d, %d}; return true;\n",
-            o,
-            classStr,
-            i.resultTypeIndex,
-            i.resultIdIndex
-        );
-    }
-    line("        default: return false;");
-    line("    }");
-    line("}");
-    line("");
+    dictToSwitch(
+        info.opInfo.dict,
+        "getOpInfo",
+        "SpvOp",
+        "SPIRVCoreGrammarInfo::OpInfo",
+        [&](SpvOp o){
+            return "Spv" + String(info.opNames.dict.getValue(o));
+        },
+        [](const Slang::SPIRVCoreGrammarInfo::OpInfo& i){
+            const char* classStr;
+            switch(i.class_)
+            {
+                case SPIRVCoreGrammarInfo::OpInfo::Other: classStr = "Other"; break;
+                case SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration: classStr = "TypeDeclaration"; break;
+                case SPIRVCoreGrammarInfo::OpInfo::ConstantCreation: classStr = "ConstantCreation"; break;
+            }
+            return String("{SPIRVCoreGrammarInfo::OpInfo::")
+                + classStr
+                + ", "
+                + String(i.resultTypeIndex)
+                + ", "
+                + String(i.resultIdIndex)
+                + "}";
+        },
+        w
+    );
+
+    dictToSwitch(
+        info.opNames.dict,
+        "getOpName",
+        "SpvOp",
+        "UnownedStringSlice",
+        [&](SpvOp o){
+            return "Spv" + String(info.opNames.dict.getValue(o));
+        },
+        [](const UnownedStringSlice& i){
+            return "UnownedStringSlice{\"" + String(i) + "\"}";
+        },
+        w
+    );
 
     line("RefPtr<SPIRVCoreGrammarInfo> SPIRVCoreGrammarInfo::getEmbeddedVersion()");
     line("{");
@@ -110,6 +162,7 @@ void writeInfo(
     line("        info.spvCapabilities.embedded = &lookupSpvCapability;");
     line("        info.anyEnum.embedded = &lookupSpvWord;");
     line("        info.opInfo.embedded = &getOpInfo;");
+    line("        info.opNames.embedded = &getOpName;");
 
     //
     line("        info.addReference();");
