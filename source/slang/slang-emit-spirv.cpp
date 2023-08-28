@@ -3808,18 +3808,7 @@ struct SPIRVEmitContext
         for(const auto spvInst : inst->getInsts())
         {
             const bool isLast = spvInst == inst->getLastChild();
-            const auto opcodeString = spvInst->getOpcodeString();
-            const auto opcode = m_grammarInfo->opcodes.lookup(opcodeString);
-            if(!opcode)
-            {
-                // TODO: https://github.com/shader-slang/slang/issues/3155
-                m_sink->diagnose(
-                    spvInst->getOpcode(),
-                    Diagnostics::unrecognizedSPIRVOpcode,
-                    opcodeString
-                );
-                return nullptr;
-            }
+            const SpvOp opcode = SpvOp(spvInst->getOpcodeOperandWord());
 
             const auto parentForOpCode = [this](SpvOp opcode, SpvInstParent* defaultParent) -> SpvInstParent*{
                 const auto info = m_grammarInfo->opInfos.lookup(opcode);
@@ -3842,19 +3831,20 @@ struct SPIRVEmitContext
             };
 
             last = emitInstCustomOperandFunc(
-                parentForOpCode(*opcode, parent),
+                parentForOpCode(opcode, parent),
                 // We want the "result instruction" to refer to the top level
                 // block which assumes its value, the others are free to refer
                 // to whatever, so just use the internal spv inst rep
                 // TODO: This is not correct, because the instruction which is
                 // assigned to result is not necessarily the last instruction
                 isLast ? as<IRInst>(inst) : spvInst,
-                *opcode,
+                opcode,
                 [&](){
                     for(const auto operand : spvInst->getSPIRVOperands())
                     {
                         switch(operand->getOp())
                         {
+                        case kIROp_SPIRVAsmOperandEnum:
                         case kIROp_SPIRVAsmOperandLiteral:
                         {
                             const auto v = as<IRConstant>(operand->getValue());
@@ -3882,16 +3872,10 @@ struct SPIRVEmitContext
                             emitOperand(ensureInst(i));
                             break;
                         }
-                        case kIROp_SPIRVAsmOperandEnum:
+                        case kIROp_SPIRVAsmOperandResult:
                         {
-                            const auto s = cast<IRStringLit>(operand->getValue())->getStringSlice();
-                            if(s == "result")
-                            {
-                                SLANG_ASSERT(isLast);
-                                emitOperand(kResultID);
-                            }
-                            else
-                                SLANG_UNIMPLEMENTED_X("lookup enum operands in spirv_asm");
+                            SLANG_ASSERT(isLast);
+                            emitOperand(kResultID);
                             break;
                         }
                         case kIROp_SPIRVAsmOperandId:

@@ -6160,8 +6160,13 @@ namespace Slang
             return SPIRVAsmOperand{flavor, tok, varExpr};
         };
 
+        // The result marker
+        if(parser->LookAheadToken("result"))
+        {
+            return SPIRVAsmOperand{SPIRVAsmOperand::ResultMarker, parser->ReadToken()};
+        }
         // A regular identifier
-        if(parser->LookAheadToken(TokenType::Identifier))
+        else if(parser->LookAheadToken(TokenType::Identifier))
         {
             return SPIRVAsmOperand{SPIRVAsmOperand::NamedValue, parser->ReadToken()};
         }
@@ -6243,10 +6248,23 @@ namespace Slang
         const auto& opInfo = opcodeWord
             ? spirvInfo->opInfos.lookup(*opcodeWord)
             : std::nullopt;
+        ret.opcode.namedValueWord = opcodeWord.value_or(SpvOp(0xffffffff));
+
+        // If we couldn't find any info, but used this assignment syntax, raise
+        // an error
+        if(!opInfo && resultOperand)
+        {
+            parser->diagnose(
+                resultOperand->token,
+                Diagnostics::unrecognizedSPIRVOpcode,
+                ret.opcode.token
+            );
+            return std::nullopt;
+        }
 
         // If we have an explicit result operand (because this was a `x =
         // OpFoo` instruction) then diagnose if we don't know where to put it
-        if(resultOperand && opInfo->resultIdIndex == -1)
+        if(resultOperand && opInfo && opInfo->resultIdIndex == -1)
         {
             parser->diagnose(
                 resultOperand->token,
@@ -6257,7 +6275,7 @@ namespace Slang
         }
 
         // Likewise for the type
-        if(resultTypeOperand && opInfo->resultTypeIndex == -1)
+        if(resultTypeOperand && opInfo && opInfo->resultTypeIndex == -1)
         {
             parser->diagnose(
                 resultTypeOperand->token,
@@ -6317,7 +6335,8 @@ namespace Slang
                 failed = true;
                 // Recover to the semi or brace
                 while(!(parser->LookAheadToken(TokenType::Semicolon)
-                    || parser->LookAheadToken(TokenType::RBrace)))
+                    || parser->LookAheadToken(TokenType::RBrace)
+                    || parser->LookAheadToken(TokenType::EndOfFile)))
                     parser->ReadToken();
             }
             if(parser->LookAheadToken(TokenType::RBrace))

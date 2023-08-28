@@ -248,7 +248,8 @@ DIAGNOSTIC(29103, Note,  noSuchAddress, "unable to take the address of this addr
 DIAGNOSTIC(29104, Error, spirvInstructionWithoutResultId, "cannot use this 'x = $0...' syntax because $0 does not have a <result-id> operand")
 DIAGNOSTIC(29104, Error, spirvInstructionWithoutResultTypeId, "cannot use this 'x : <type> = $0...' syntax because $0 does not have a <result-type-id> operand")
 // This is a warning because we trust that people using the spirv_asm block know what they're doing
-DIAGNOSTIC(29104, Warning, spirvInstructionWithTooManyOperands, "Too many operands for $0 (expected max $1), did you forget a semicolon?")
+DIAGNOSTIC(29104, Warning, spirvInstructionWithTooManyOperands, "too many operands for $0 (expected max $1), did you forget a semicolon?")
+DIAGNOSTIC(29104, Error, spirvUnableToResolveName, "unknown SPIR-V identifier $0, it's not a known enumerator or opcode")
 
 
 //

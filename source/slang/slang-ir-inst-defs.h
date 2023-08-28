@@ -1071,7 +1071,10 @@ INST(SPIRVAsmInst, SPIRVAsmInst, 1, 0)
     // A string which is given a unique ID in the backend, used to refer to
     // results of other instrucions in the same asm block
     INST(SPIRVAsmOperandId, SPIRVAsmOperandId, 1, 0)
-INST_RANGE(SPIRVAsmOperand, SPIRVAsmOperandLiteral, SPIRVAsmOperandId)
+    // A special instruction which marks the place to insert the generated
+    // result operand
+    INST(SPIRVAsmOperandResult, SPIRVAsmOperandResult, 0, 0)
+INST_RANGE(SPIRVAsmOperand, SPIRVAsmOperandLiteral, SPIRVAsmOperandResult)
 
 #undef PARENT
 #undef USE_OTHER

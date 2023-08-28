@@ -3283,11 +3283,15 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                     return builder->emitSPIRVAsmOperandId(
                         builder->getStringValue(id));
                 }
+            case SPIRVAsmOperand::ResultMarker:
+                {
+                    return builder->emitSPIRVAsmOperandResult();
+                }
             case SPIRVAsmOperand::NamedValue:
                 {
-                    const auto id = operand.token.getContent();
+                    const auto v = operand.namedValueWord;
                     return builder->emitSPIRVAsmOperandEnum(
-                        builder->getStringValue(id));
+                        builder->getIntValue(builder->getIntType(), v));
                 }
             case SPIRVAsmOperand::SlangValue:
                 {

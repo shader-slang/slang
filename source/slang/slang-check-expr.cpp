@@ -3898,13 +3898,36 @@ namespace Slang
 
     Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
     {
+        //
+        // Firstly, get the info for this op, the opcode has already been
+        // discovered by the parser
+        //
+        const auto& spirvInfo = getSession()->spirvCoreGrammarInfo;
+
         // We will iterate over all the operands in all the insts and check
         // them
+        bool failed = false;
         for(auto& inst : expr->insts)
         {
-            const bool isLast = &inst == &expr->insts.getLast();
-            for(auto& operand : inst.operands)
+            // It's not automatically a failure to not have info, we just won't
+            // be able to deduce types for operands
+            const auto opInfo = spirvInfo->opInfos.lookup(SpvOp(inst.opcode.namedValueWord));
+
+            if(opInfo->numOperandTypes == 0 && inst.operands.getCount())
             {
+                failed = true;
+                getSink()->diagnose(inst.opcode.token, Diagnostics::spirvInstructionWithTooManyOperands, inst.opcode.token, 0);
+                continue;
+            }
+
+            const bool isLast = &inst == &expr->insts.getLast();
+            for(Index operandIndex = 0; operandIndex < inst.operands.getCount(); ++operandIndex)
+            {
+                auto& operand = inst.operands[operandIndex];
+                // Clamp to the end of the type info array, because the last one will be any variable operands
+                const auto operandType
+                    = opInfo->operandTypes[std::min(operandIndex, Index(opInfo->numOperandTypes)-1)];
+
                 if(operand.flavor == SPIRVAsmOperand::SlangType)
                 {
                     // This is a $$type operand, fill in the TypeExp member of the operand
@@ -3919,8 +3942,7 @@ namespace Slang
                     // This is a $expr operand, check the expr
                     operand.expr = dispatch(operand.expr);
                 }
-                else if(operand.flavor == SPIRVAsmOperand::NamedValue
-                    && operand.token.getContent() == "result")
+                else if(operand.flavor == SPIRVAsmOperand::ResultMarker)
                 {
                     // This is the <result-id> marker, check that it only
                     // appears in the last instruction.
@@ -3933,8 +3955,32 @@ namespace Slang
                         getSink()->diagnoseWithoutSourceView(expr, Diagnostics::considerOpCopyObject);
                     }
                 }
+                else if(operand.flavor == SPIRVAsmOperand::NamedValue)
+                {
+                    // First try and look it up with the knowledge of this operand's type
+                    auto enumValue
+                        = spirvInfo->allEnums.lookup({operandType, operand.token.getContent()});
+                    // Then fall back to with the type prefix
+                    if(!enumValue)
+                        enumValue = spirvInfo->allEnumsWithTypePrefix.lookup(operand.token.getContent());
+                    // Then see if it's an opcode (for OpSpecialize)
+                    if(!enumValue)
+                        enumValue = spirvInfo->opcodes.lookup(operand.token.getContent());
+
+                    if(!enumValue)
+                    {
+                        failed = true;
+                        getSink()->diagnose(operand.token, Diagnostics::spirvUnableToResolveName, operand.token.getContent());
+                        continue;
+                    }
+
+                    operand.namedValueWord = *enumValue;
+                }
             }
         }
+
+        if(failed)
+            return CreateErrorExpr(expr);
 
         // Assign the type of this expression from the type of the last
         // instruction, otherwise void
@@ -3944,8 +3990,7 @@ namespace Slang
             const auto lastOperands = expr->insts.getLast().operands;
             if(lastOperands.getCount() >= 2
                 && lastOperands[0].flavor == SPIRVAsmOperand::SlangType
-                && lastOperands[1].flavor == SPIRVAsmOperand::NamedValue
-                && lastOperands[1].token.getContent() == "result")
+                && lastOperands[1].flavor == SPIRVAsmOperand::ResultMarker)
             {
                 expr->type = lastOperands[0].type.type;
             }
