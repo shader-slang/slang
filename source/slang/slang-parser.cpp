@@ -6257,6 +6257,7 @@ namespace Slang
             return std::nullopt;
         }
 
+        // Likewise for the type
         if(resultTypeOperand && opInfo->resultTypeIndex == -1)
         {
             parser->diagnose(
@@ -6268,6 +6269,9 @@ namespace Slang
             return std::nullopt;
         }
 
+        //
+        // Now we've parsed the tricky preamble, grab the rest of the operands
+        //
         while(!(parser->LookAheadToken(TokenType::RBrace)
             || parser->LookAheadToken(TokenType::Semicolon)))
         {
