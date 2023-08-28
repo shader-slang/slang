@@ -6251,7 +6251,6 @@ namespace Slang
             parser->diagnose(
                 resultOperand->token,
                 Diagnostics::spirvInstructionWithoutResultId,
-                ret.opcode.token,
                 ret.opcode.token
             );
             return std::nullopt;
@@ -6263,7 +6262,6 @@ namespace Slang
             parser->diagnose(
                 resultTypeOperand->token,
                 Diagnostics::spirvInstructionWithoutResultTypeId,
-                ret.opcode.token,
                 ret.opcode.token
             );
             return std::nullopt;
@@ -6275,6 +6273,16 @@ namespace Slang
         while(!(parser->LookAheadToken(TokenType::RBrace)
             || parser->LookAheadToken(TokenType::Semicolon)))
         {
+            if(ret.operands.getCount() == opInfo->maxOperandCount)
+            {
+                parser->diagnose(
+                    parser->tokenReader.peekLoc(),
+                    Diagnostics::spirvInstructionWithTooManyOperands,
+                    ret.opcode.token,
+                    opInfo->maxOperandCount
+                );
+            }
+
             // Insert the LHS result-type operand
             if(ret.operands.getCount() == opInfo->resultTypeIndex && resultTypeOperand)
                 ret.operands.add(*resultTypeOperand);

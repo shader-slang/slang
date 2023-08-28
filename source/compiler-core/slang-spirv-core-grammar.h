@@ -99,11 +99,11 @@ namespace Slang
             int8_t resultTypeIndex = kNoResultTypeId;
             // -1 or 0 or 1
             int8_t resultIdIndex = kNoResultId;
-            // The range of valid WordCount for this instruction
-            // TODO: This is incorrect, for example when the last operand is a
-            // LiteralString, which has implicit variable length
-            uint16_t minWordCount;
-            uint16_t maxWordCount;
+            // The range of valid operand counts for this instruction,
+            // including any result type and id. Multi-word operands count as a
+            // single operand.
+            uint16_t minOperandCount;
+            uint16_t maxOperandCount;
             // when looking up an operand type, clamp to this number-1 to
             // account for variable length operands at the end
             uint16_t numOperandTypes; 

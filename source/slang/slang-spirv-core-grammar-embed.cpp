@@ -2134,4228 +2134,4228 @@ static bool getOpInfo(const SpvOp& k, SPIRVCoreGrammarInfo::OpInfo& v)
     {
         case SpvOpNop:
         {
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, nullptr};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 0, 0, 0, nullptr};
             return true;
         }
         case SpvOpUndef:
         {
             const static OperandKind operandTypes[] = {{43}, {44}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpSourceContinued:
         {
             const static OperandKind operandTypes[] = {{49}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Debug, -1, -1, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Debug, -1, -1, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpSource:
         {
             const static OperandKind operandTypes[] = {{10}, {48}, {47}, {49}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Debug, -1, -1, 3, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Debug, -1, -1, 2, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSourceExtension:
         {
             const static OperandKind operandTypes[] = {{49}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Debug, -1, -1, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Debug, -1, -1, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpName:
         {
             const static OperandKind operandTypes[] = {{47}, {49}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Debug, -1, -1, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Debug, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpMemberName:
         {
             const static OperandKind operandTypes[] = {{47}, {48}, {49}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Debug, -1, -1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Debug, -1, -1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpString:
         {
             const static OperandKind operandTypes[] = {{44}, {49}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Debug, -1, 0, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Debug, -1, 0, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpLine:
         {
             const static OperandKind operandTypes[] = {{47}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Debug, -1, -1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Debug, -1, -1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpExtension:
         {
             const static OperandKind operandTypes[] = {{49}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpExtInstImport:
         {
             const static OperandKind operandTypes[] = {{44}, {49}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpExtInst:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {51}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 0xffff, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff, 5, operandTypes};
             return true;
         }
         case SpvOpMemoryModel:
         {
             const static OperandKind operandTypes[] = {{12}, {13}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpEntryPoint:
         {
             const static OperandKind operandTypes[] = {{11}, {47}, {49}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 0xffff, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 0xffff, 4, operandTypes};
             return true;
         }
         case SpvOpExecutionMode:
         {
             const static OperandKind operandTypes[] = {{47}, {14}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpCapability:
         {
             const static OperandKind operandTypes[] = {{35}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpTypeVoid:
         {
             const static OperandKind operandTypes[] = {{44}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpTypeBool:
         {
             const static OperandKind operandTypes[] = {{44}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpTypeInt:
         {
             const static OperandKind operandTypes[] = {{44}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpTypeFloat:
         {
             const static OperandKind operandTypes[] = {{44}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpTypeVector:
         {
             const static OperandKind operandTypes[] = {{44}, {47}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpTypeMatrix:
         {
             const static OperandKind operandTypes[] = {{44}, {47}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpTypeImage:
         {
             const static OperandKind operandTypes[] = {{44}, {47}, {16}, {48}, {48}, {48}, {48}, {19}, {28}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 9, 10, 9, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 8, 9, 9, operandTypes};
             return true;
         }
         case SpvOpTypeSampler:
         {
             const static OperandKind operandTypes[] = {{44}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpTypeSampledImage:
         {
             const static OperandKind operandTypes[] = {{44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpTypeArray:
         {
             const static OperandKind operandTypes[] = {{44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpTypeRuntimeArray:
         {
             const static OperandKind operandTypes[] = {{44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpTypeStruct:
         {
             const static OperandKind operandTypes[] = {{44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 2, 0xffff, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 1, 0xffff, 2, operandTypes};
             return true;
         }
         case SpvOpTypeOpaque:
         {
             const static OperandKind operandTypes[] = {{44}, {49}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpTypePointer:
         {
             const static OperandKind operandTypes[] = {{44}, {15}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpTypeFunction:
         {
             const static OperandKind operandTypes[] = {{44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 3, 0xffff, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 2, 0xffff, 3, operandTypes};
             return true;
         }
         case SpvOpTypeEvent:
         {
             const static OperandKind operandTypes[] = {{44}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpTypeDeviceEvent:
         {
             const static OperandKind operandTypes[] = {{44}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpTypeReserveId:
         {
             const static OperandKind operandTypes[] = {{44}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpTypeQueue:
         {
             const static OperandKind operandTypes[] = {{44}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpTypePipe:
         {
             const static OperandKind operandTypes[] = {{44}, {28}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpTypeForwardPointer:
         {
             const static OperandKind operandTypes[] = {{47}, {15}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, -1, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpConstantTrue:
         {
             const static OperandKind operandTypes[] = {{43}, {44}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpConstantFalse:
         {
             const static OperandKind operandTypes[] = {{43}, {44}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpConstant:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {50}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpConstantComposite:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 3, 0xffff, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 2, 0xffff, 3, operandTypes};
             return true;
         }
         case SpvOpConstantSampler:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {17}, {48}, {18}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpConstantNull:
         {
             const static OperandKind operandTypes[] = {{43}, {44}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpSpecConstantTrue:
         {
             const static OperandKind operandTypes[] = {{43}, {44}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpSpecConstantFalse:
         {
             const static OperandKind operandTypes[] = {{43}, {44}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpSpecConstant:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {50}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSpecConstantComposite:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 3, 0xffff, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 2, 0xffff, 3, operandTypes};
             return true;
         }
         case SpvOpSpecConstantOp:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {52}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpFunction:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {4}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpFunctionParameter:
         {
             const static OperandKind operandTypes[] = {{43}, {44}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpFunctionEnd:
         {
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, nullptr};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 0, 0, 0, nullptr};
             return true;
         }
         case SpvOpFunctionCall:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 0xffff, 4, operandTypes};
             return true;
         }
         case SpvOpVariable:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {15}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 4, 4, operandTypes};
             return true;
         }
         case SpvOpImageTexelPointer:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpLoad:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {6}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 4, 4, operandTypes};
             return true;
         }
         case SpvOpStore:
         {
             const static OperandKind operandTypes[] = {{47}, {47}, {6}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 3, 3, operandTypes};
             return true;
         }
         case SpvOpCopyMemory:
         {
             const static OperandKind operandTypes[] = {{47}, {47}, {6}, {6}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 4, 4, operandTypes};
             return true;
         }
         case SpvOpCopyMemorySized:
         {
             const static OperandKind operandTypes[] = {{47}, {47}, {47}, {6}, {6}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 5, 5, operandTypes};
             return true;
         }
         case SpvOpAccessChain:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 0xffff, 4, operandTypes};
             return true;
         }
         case SpvOpInBoundsAccessChain:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 0xffff, 4, operandTypes};
             return true;
         }
         case SpvOpPtrAccessChain:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 0xffff, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff, 5, operandTypes};
             return true;
         }
         case SpvOpArrayLength:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpGenericPtrMemSemantics:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpInBoundsPtrAccessChain:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 0xffff, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff, 5, operandTypes};
             return true;
         }
         case SpvOpDecorate:
         {
             const static OperandKind operandTypes[] = {{47}, {30}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpMemberDecorate:
         {
             const static OperandKind operandTypes[] = {{47}, {48}, {30}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpDecorationGroup:
         {
             const static OperandKind operandTypes[] = {{44}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpGroupDecorate:
         {
             const static OperandKind operandTypes[] = {{47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 0xffff, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 0xffff, 2, operandTypes};
             return true;
         }
         case SpvOpGroupMemberDecorate:
         {
             const static OperandKind operandTypes[] = {{47}, {54}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 0xffff, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 0xffff, 2, operandTypes};
             return true;
         }
         case SpvOpVectorExtractDynamic:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpVectorInsertDynamic:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpVectorShuffle:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 0xffff, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff, 5, operandTypes};
             return true;
         }
         case SpvOpCompositeConstruct:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 0xffff, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 2, 0xffff, 3, operandTypes};
             return true;
         }
         case SpvOpCompositeExtract:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 0xffff, 4, operandTypes};
             return true;
         }
         case SpvOpCompositeInsert:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 0xffff, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff, 5, operandTypes};
             return true;
         }
         case SpvOpCopyObject:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpTranspose:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSampledImage:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpImageSampleImplicitLod:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 5, 5, operandTypes};
             return true;
         }
         case SpvOpImageSampleExplicitLod:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpImageSampleDrefImplicitLod:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpImageSampleDrefExplicitLod:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpImageSampleProjImplicitLod:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 5, 5, operandTypes};
             return true;
         }
         case SpvOpImageSampleProjExplicitLod:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpImageSampleProjDrefImplicitLod:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpImageSampleProjDrefExplicitLod:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpImageFetch:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 5, 5, operandTypes};
             return true;
         }
         case SpvOpImageGather:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpImageDrefGather:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpImageRead:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 5, 5, operandTypes};
             return true;
         }
         case SpvOpImageWrite:
         {
             const static OperandKind operandTypes[] = {{47}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 4, 4, operandTypes};
             return true;
         }
         case SpvOpImage:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpImageQueryFormat:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpImageQueryOrder:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpImageQuerySizeLod:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpImageQuerySize:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpImageQueryLod:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpImageQueryLevels:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpImageQuerySamples:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpConvertFToU:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpConvertFToS:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpConvertSToF:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpConvertUToF:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpUConvert:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSConvert:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpFConvert:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpQuantizeToF16:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpConvertPtrToU:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSatConvertSToU:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSatConvertUToS:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpConvertUToPtr:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpPtrCastToGeneric:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpGenericCastToPtr:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpGenericCastToPtrExplicit:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {15}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpBitcast:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSNegate:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpFNegate:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpIAdd:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpFAdd:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpISub:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpFSub:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpIMul:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpFMul:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpUDiv:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSDiv:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpFDiv:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpUMod:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSRem:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSMod:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpFRem:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpFMod:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpVectorTimesScalar:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpMatrixTimesScalar:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpVectorTimesMatrix:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpMatrixTimesVector:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpMatrixTimesMatrix:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpOuterProduct:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpDot:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpIAddCarry:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpISubBorrow:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpUMulExtended:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSMulExtended:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpAny:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpAll:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpIsNan:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpIsInf:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpIsFinite:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpIsNormal:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSignBitSet:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpLessOrGreater:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpOrdered:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpUnordered:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpLogicalEqual:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpLogicalNotEqual:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpLogicalOr:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpLogicalAnd:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpLogicalNot:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSelect:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpIEqual:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpINotEqual:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpUGreaterThan:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSGreaterThan:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpUGreaterThanEqual:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSGreaterThanEqual:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpULessThan:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSLessThan:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpULessThanEqual:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSLessThanEqual:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpFOrdEqual:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpFUnordEqual:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpFOrdNotEqual:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpFUnordNotEqual:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpFOrdLessThan:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpFUnordLessThan:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpFOrdGreaterThan:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpFUnordGreaterThan:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpFOrdLessThanEqual:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpFUnordLessThanEqual:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpFOrdGreaterThanEqual:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpFUnordGreaterThanEqual:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpShiftRightLogical:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpShiftRightArithmetic:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpShiftLeftLogical:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpBitwiseOr:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpBitwiseXor:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpBitwiseAnd:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpNot:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpBitFieldInsert:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpBitFieldSExtract:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpBitFieldUExtract:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpBitReverse:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpBitCount:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpDPdx:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpDPdy:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpFwidth:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpDPdxFine:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpDPdyFine:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpFwidthFine:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpDPdxCoarse:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpDPdyCoarse:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpFwidthCoarse:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpEmitVertex:
         {
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, nullptr};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 0, 0, 0, nullptr};
             return true;
         }
         case SpvOpEndPrimitive:
         {
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, nullptr};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 0, 0, 0, nullptr};
             return true;
         }
         case SpvOpEmitStreamVertex:
         {
             const static OperandKind operandTypes[] = {{47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpEndStreamPrimitive:
         {
             const static OperandKind operandTypes[] = {{47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpControlBarrier:
         {
             const static OperandKind operandTypes[] = {{46}, {46}, {45}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpMemoryBarrier:
         {
             const static OperandKind operandTypes[] = {{46}, {45}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpAtomicLoad:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {46}, {45}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpAtomicStore:
         {
             const static OperandKind operandTypes[] = {{47}, {46}, {45}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpAtomicExchange:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {46}, {45}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpAtomicCompareExchange:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {46}, {45}, {45}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 8, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpAtomicCompareExchangeWeak:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {46}, {45}, {45}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 8, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpAtomicIIncrement:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {46}, {45}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpAtomicIDecrement:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {46}, {45}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpAtomicIAdd:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {46}, {45}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpAtomicISub:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {46}, {45}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpAtomicSMin:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {46}, {45}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpAtomicUMin:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {46}, {45}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpAtomicSMax:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {46}, {45}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpAtomicUMax:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {46}, {45}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpAtomicAnd:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {46}, {45}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpAtomicOr:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {46}, {45}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpAtomicXor:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {46}, {45}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpPhi:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {55}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 0xffff, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 2, 0xffff, 3, operandTypes};
             return true;
         }
         case SpvOpLoopMerge:
         {
             const static OperandKind operandTypes[] = {{47}, {47}, {3}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSelectionMerge:
         {
             const static OperandKind operandTypes[] = {{47}, {2}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpLabel:
         {
             const static OperandKind operandTypes[] = {{44}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpBranch:
         {
             const static OperandKind operandTypes[] = {{47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpBranchConditional:
         {
             const static OperandKind operandTypes[] = {{47}, {47}, {47}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 0xffff, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 0xffff, 4, operandTypes};
             return true;
         }
         case SpvOpSwitch:
         {
             const static OperandKind operandTypes[] = {{47}, {47}, {53}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 0xffff, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 0xffff, 3, operandTypes};
             return true;
         }
         case SpvOpKill:
         {
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, nullptr};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 0, 0, 0, nullptr};
             return true;
         }
         case SpvOpReturn:
         {
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, nullptr};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 0, 0, 0, nullptr};
             return true;
         }
         case SpvOpReturnValue:
         {
             const static OperandKind operandTypes[] = {{47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpUnreachable:
         {
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, nullptr};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 0, 0, 0, nullptr};
             return true;
         }
         case SpvOpLifetimeStart:
         {
             const static OperandKind operandTypes[] = {{47}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpLifetimeStop:
         {
             const static OperandKind operandTypes[] = {{47}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpGroupAsyncCopy:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {47}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 8, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpGroupWaitEvents:
         {
             const static OperandKind operandTypes[] = {{46}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpGroupAll:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpGroupAny:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpGroupBroadcast:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupIAdd:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {33}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupFAdd:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {33}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupFMin:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {33}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupUMin:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {33}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupSMin:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {33}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupFMax:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {33}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupUMax:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {33}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupSMax:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {33}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpReadPipe:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpWritePipe:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpReservedReadPipe:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 8, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpReservedWritePipe:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 8, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpReserveReadPipePackets:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpReserveWritePipePackets:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpCommitReadPipe:
         {
             const static OperandKind operandTypes[] = {{47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpCommitWritePipe:
         {
             const static OperandKind operandTypes[] = {{47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpIsValidReserveId:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpGetNumPipePackets:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGetMaxPipePackets:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupReserveReadPipePackets:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 7, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 7, operandTypes};
             return true;
         }
         case SpvOpGroupReserveWritePipePackets:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 7, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 7, operandTypes};
             return true;
         }
         case SpvOpGroupCommitReadPipe:
         {
             const static OperandKind operandTypes[] = {{46}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupCommitWritePipe:
         {
             const static OperandKind operandTypes[] = {{46}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpEnqueueMarker:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpEnqueueKernel:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 13, 0xffff, 13, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 12, 0xffff, 13, operandTypes};
             return true;
         }
         case SpvOpGetKernelNDrangeSubGroupCount:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 7, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 7, operandTypes};
             return true;
         }
         case SpvOpGetKernelNDrangeMaxSubGroupSize:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 7, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 7, operandTypes};
             return true;
         }
         case SpvOpGetKernelWorkGroupSize:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpGetKernelPreferredWorkGroupSizeMultiple:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpRetainEvent:
         {
             const static OperandKind operandTypes[] = {{47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpReleaseEvent:
         {
             const static OperandKind operandTypes[] = {{47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpCreateUserEvent:
         {
             const static OperandKind operandTypes[] = {{43}, {44}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpIsValidEvent:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSetUserEventStatus:
         {
             const static OperandKind operandTypes[] = {{47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpCaptureEventProfilingInfo:
         {
             const static OperandKind operandTypes[] = {{47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpGetDefaultQueue:
         {
             const static OperandKind operandTypes[] = {{43}, {44}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpBuildNDRange:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpImageSparseSampleImplicitLod:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 5, 5, operandTypes};
             return true;
         }
         case SpvOpImageSparseSampleExplicitLod:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpImageSparseSampleDrefImplicitLod:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpImageSparseSampleDrefExplicitLod:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpImageSparseSampleProjImplicitLod:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 5, 5, operandTypes};
             return true;
         }
         case SpvOpImageSparseSampleProjExplicitLod:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpImageSparseSampleProjDrefImplicitLod:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpImageSparseSampleProjDrefExplicitLod:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpImageSparseFetch:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 5, 5, operandTypes};
             return true;
         }
         case SpvOpImageSparseGather:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpImageSparseDrefGather:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpImageSparseTexelsResident:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpNoLine:
         {
-            v = {SPIRVCoreGrammarInfo::OpInfo::Debug, -1, -1, 1, 1, 0, nullptr};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Debug, -1, -1, 0, 0, 0, nullptr};
             return true;
         }
         case SpvOpAtomicFlagTestAndSet:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {46}, {45}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpAtomicFlagClear:
         {
             const static OperandKind operandTypes[] = {{47}, {46}, {45}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpImageSparseRead:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 5, 5, operandTypes};
             return true;
         }
         case SpvOpSizeOf:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpTypePipeStorage:
         {
             const static OperandKind operandTypes[] = {{44}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpConstantPipeStorage:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpCreatePipeFromPipeStorage:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpGetKernelLocalSizeForSubgroupCount:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 7, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 7, operandTypes};
             return true;
         }
         case SpvOpGetKernelMaxNumSubgroups:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpTypeNamedBarrier:
         {
             const static OperandKind operandTypes[] = {{44}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpNamedBarrierInitialize:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpMemoryNamedBarrier:
         {
             const static OperandKind operandTypes[] = {{47}, {46}, {45}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpModuleProcessed:
         {
             const static OperandKind operandTypes[] = {{49}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Debug, -1, -1, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Debug, -1, -1, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpExecutionModeId:
         {
             const static OperandKind operandTypes[] = {{47}, {14}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpDecorateId:
         {
             const static OperandKind operandTypes[] = {{47}, {30}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformElect:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformAll:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformAny:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformAllEqual:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformBroadcast:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformBroadcastFirst:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformBallot:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformInverseBallot:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformBallotBitExtract:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformBallotBitCount:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {33}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformBallotFindLSB:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformBallotFindMSB:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformShuffle:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformShuffleXor:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformShuffleUp:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformShuffleDown:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformIAdd:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {33}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformFAdd:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {33}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformIMul:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {33}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformFMul:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {33}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformSMin:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {33}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformUMin:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {33}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformFMin:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {33}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformSMax:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {33}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformUMax:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {33}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformFMax:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {33}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformBitwiseAnd:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {33}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformBitwiseOr:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {33}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformBitwiseXor:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {33}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformLogicalAnd:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {33}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformLogicalOr:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {33}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformLogicalXor:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {33}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformQuadBroadcast:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformQuadSwap:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpCopyLogical:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpPtrEqual:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpPtrNotEqual:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpPtrDiff:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpColorAttachmentReadEXT:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 4, 4, operandTypes};
             return true;
         }
         case SpvOpDepthAttachmentReadEXT:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 2, 3, 3, operandTypes};
             return true;
         }
         case SpvOpStencilAttachmentReadEXT:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 2, 3, 3, operandTypes};
             return true;
         }
         case SpvOpTerminateInvocation:
         {
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, nullptr};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 0, 0, 0, nullptr};
             return true;
         }
         case SpvOpSubgroupBallotKHR:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupFirstInvocationKHR:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAllKHR:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAnyKHR:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAllEqualKHR:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformRotateKHR:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpSubgroupReadInvocationKHR:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpTraceRayKHR:
         {
             const static OperandKind operandTypes[] = {{47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 12, 12, 11, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 11, 11, 11, operandTypes};
             return true;
         }
         case SpvOpExecuteCallableKHR:
         {
             const static OperandKind operandTypes[] = {{47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpConvertUToAccelerationStructureKHR:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpIgnoreIntersectionKHR:
         {
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, nullptr};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 0, 0, 0, nullptr};
             return true;
         }
         case SpvOpTerminateRayKHR:
         {
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, nullptr};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 0, 0, 0, nullptr};
             return true;
         }
         case SpvOpSDot:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {39}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 5, 5, operandTypes};
             return true;
         }
         case SpvOpUDot:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {39}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 5, 5, operandTypes};
             return true;
         }
         case SpvOpSUDot:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {39}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 5, 5, operandTypes};
             return true;
         }
         case SpvOpSDotAccSat:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {39}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpUDotAccSat:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {39}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpSUDotAccSat:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {39}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpTypeCooperativeMatrixKHR:
         {
             const static OperandKind operandTypes[] = {{44}, {47}, {46}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpCooperativeMatrixLoadKHR:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {6}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 6, 6, operandTypes};
             return true;
         }
         case SpvOpCooperativeMatrixStoreKHR:
         {
             const static OperandKind operandTypes[] = {{47}, {47}, {47}, {47}, {6}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 5, 5, operandTypes};
             return true;
         }
         case SpvOpCooperativeMatrixMulAddKHR:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {40}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpCooperativeMatrixLengthKHR:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpTypeRayQueryKHR:
         {
             const static OperandKind operandTypes[] = {{44}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpRayQueryInitializeKHR:
         {
             const static OperandKind operandTypes[] = {{47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 9, 9, 8, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpRayQueryTerminateKHR:
         {
             const static OperandKind operandTypes[] = {{47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpRayQueryGenerateIntersectionKHR:
         {
             const static OperandKind operandTypes[] = {{47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpRayQueryConfirmIntersectionKHR:
         {
             const static OperandKind operandTypes[] = {{47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpRayQueryProceedKHR:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpRayQueryGetIntersectionTypeKHR:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpImageSampleWeightedQCOM:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpImageBoxFilterQCOM:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpImageBlockMatchSSDQCOM:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 7, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 7, operandTypes};
             return true;
         }
         case SpvOpImageBlockMatchSADQCOM:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 7, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 7, operandTypes};
             return true;
         }
         case SpvOpGroupIAddNonUniformAMD:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {33}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupFAddNonUniformAMD:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {33}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupFMinNonUniformAMD:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {33}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupUMinNonUniformAMD:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {33}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupSMinNonUniformAMD:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {33}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupFMaxNonUniformAMD:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {33}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupUMaxNonUniformAMD:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {33}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupSMaxNonUniformAMD:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {33}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpFragmentMaskFetchAMD:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpFragmentFetchAMD:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpReadClockKHR:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpHitObjectRecordHitMotionNV:
         {
             const static OperandKind operandTypes[] = {{47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 15, 15, 14, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 14, 14, 14, operandTypes};
             return true;
         }
         case SpvOpHitObjectRecordHitWithIndexMotionNV:
         {
             const static OperandKind operandTypes[] = {{47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 14, 14, 13, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 13, 13, 13, operandTypes};
             return true;
         }
         case SpvOpHitObjectRecordMissMotionNV:
         {
             const static OperandKind operandTypes[] = {{47}, {47}, {47}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 8, 8, 7, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 7, 7, 7, operandTypes};
             return true;
         }
         case SpvOpHitObjectGetWorldToObjectNV:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpHitObjectGetObjectToWorldNV:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpHitObjectGetObjectRayDirectionNV:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpHitObjectGetObjectRayOriginNV:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpHitObjectTraceRayMotionNV:
         {
             const static OperandKind operandTypes[] = {{47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 14, 14, 13, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 13, 13, 13, operandTypes};
             return true;
         }
         case SpvOpHitObjectGetShaderRecordBufferHandleNV:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpHitObjectGetShaderBindingTableRecordIndexNV:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpHitObjectRecordEmptyNV:
         {
             const static OperandKind operandTypes[] = {{47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpHitObjectTraceRayNV:
         {
             const static OperandKind operandTypes[] = {{47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 13, 13, 12, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 12, 12, 12, operandTypes};
             return true;
         }
         case SpvOpHitObjectRecordHitNV:
         {
             const static OperandKind operandTypes[] = {{47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 14, 14, 13, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 13, 13, 13, operandTypes};
             return true;
         }
         case SpvOpHitObjectRecordHitWithIndexNV:
         {
             const static OperandKind operandTypes[] = {{47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 13, 13, 12, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 12, 12, 12, operandTypes};
             return true;
         }
         case SpvOpHitObjectRecordMissNV:
         {
             const static OperandKind operandTypes[] = {{47}, {47}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpHitObjectExecuteShaderNV:
         {
             const static OperandKind operandTypes[] = {{47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpHitObjectGetCurrentTimeNV:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpHitObjectGetAttributesNV:
         {
             const static OperandKind operandTypes[] = {{47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpHitObjectGetHitKindNV:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpHitObjectGetPrimitiveIndexNV:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpHitObjectGetGeometryIndexNV:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpHitObjectGetInstanceIdNV:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpHitObjectGetInstanceCustomIndexNV:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpHitObjectGetWorldRayDirectionNV:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpHitObjectGetWorldRayOriginNV:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpHitObjectGetRayTMaxNV:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpHitObjectGetRayTMinNV:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpHitObjectIsEmptyNV:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpHitObjectIsHitNV:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpHitObjectIsMissNV:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpReorderThreadWithHitObjectNV:
         {
             const static OperandKind operandTypes[] = {{47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 3, 3, operandTypes};
             return true;
         }
         case SpvOpReorderThreadWithHintNV:
         {
             const static OperandKind operandTypes[] = {{47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpTypeHitObjectNV:
         {
             const static OperandKind operandTypes[] = {{44}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpImageSampleFootprintNV:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 8, 7, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7, 7, operandTypes};
             return true;
         }
         case SpvOpEmitMeshTasksEXT:
         {
             const static OperandKind operandTypes[] = {{47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSetMeshOutputsEXT:
         {
             const static OperandKind operandTypes[] = {{47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpGroupNonUniformPartitionNV:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpWritePackedPrimitiveIndices4x8NV:
         {
             const static OperandKind operandTypes[] = {{47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpReportIntersectionNV:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpIgnoreIntersectionNV:
         {
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, nullptr};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 0, 0, 0, nullptr};
             return true;
         }
         case SpvOpTerminateRayNV:
         {
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, nullptr};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 0, 0, 0, nullptr};
             return true;
         }
         case SpvOpTraceNV:
         {
             const static OperandKind operandTypes[] = {{47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 12, 12, 11, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 11, 11, 11, operandTypes};
             return true;
         }
         case SpvOpTraceMotionNV:
         {
             const static OperandKind operandTypes[] = {{47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 13, 13, 12, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 12, 12, 12, operandTypes};
             return true;
         }
         case SpvOpTraceRayMotionNV:
         {
             const static OperandKind operandTypes[] = {{47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 13, 13, 12, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 12, 12, 12, operandTypes};
             return true;
         }
         case SpvOpRayQueryGetIntersectionTriangleVertexPositionsKHR:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpTypeAccelerationStructureNV:
         {
             const static OperandKind operandTypes[] = {{44}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpExecuteCallableNV:
         {
             const static OperandKind operandTypes[] = {{47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpTypeCooperativeMatrixNV:
         {
             const static OperandKind operandTypes[] = {{44}, {47}, {46}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpCooperativeMatrixLoadNV:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {6}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
             return true;
         }
         case SpvOpCooperativeMatrixStoreNV:
         {
             const static OperandKind operandTypes[] = {{47}, {47}, {47}, {47}, {6}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 5, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 5, 5, operandTypes};
             return true;
         }
         case SpvOpCooperativeMatrixMulAddNV:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpCooperativeMatrixLengthNV:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpBeginInvocationInterlockEXT:
         {
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, nullptr};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 0, 0, 0, nullptr};
             return true;
         }
         case SpvOpEndInvocationInterlockEXT:
         {
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, nullptr};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 0, 0, 0, nullptr};
             return true;
         }
         case SpvOpDemoteToHelperInvocation:
         {
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 0, nullptr};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 0, 0, 0, nullptr};
             return true;
         }
         case SpvOpIsHelperInvocationEXT:
         {
             const static OperandKind operandTypes[] = {{43}, {44}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpConvertUToImageNV:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpConvertUToSamplerNV:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpConvertImageToUNV:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpConvertSamplerToUNV:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpConvertUToSampledImageNV:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpConvertSampledImageToUNV:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSamplerImageAddressingModeNV:
         {
             const static OperandKind operandTypes[] = {{48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpSubgroupShuffleINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupShuffleDownINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpSubgroupShuffleUpINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpSubgroupShuffleXorINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupBlockReadINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupBlockWriteINTEL:
         {
             const static OperandKind operandTypes[] = {{47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpSubgroupImageBlockReadINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupImageBlockWriteINTEL:
         {
             const static OperandKind operandTypes[] = {{47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupImageMediaBlockReadINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpSubgroupImageMediaBlockWriteINTEL:
         {
             const static OperandKind operandTypes[] = {{47}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpUCountLeadingZerosINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpUCountTrailingZerosINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpAbsISubINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpAbsUSubINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpIAddSatINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpUAddSatINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpIAverageINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpUAverageINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpIAverageRoundedINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpUAverageRoundedINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpISubSatINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpUSubSatINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpIMul32x16INTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpUMul32x16INTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpConstantFunctionPointerINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpFunctionPointerCallINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 0xffff, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 2, 0xffff, 3, operandTypes};
             return true;
         }
         case SpvOpAsmTargetINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {49}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpAsmINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {49}, {49}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpAsmCallINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 0xffff, 4, operandTypes};
             return true;
         }
         case SpvOpAtomicFMinEXT:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {46}, {45}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpAtomicFMaxEXT:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {46}, {45}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpAssumeTrueKHR:
         {
             const static OperandKind operandTypes[] = {{47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpExpectKHR:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpDecorateString:
         {
             const static OperandKind operandTypes[] = {{47}, {30}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpMemberDecorateString:
         {
             const static OperandKind operandTypes[] = {{47}, {48}, {30}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpVmeImageINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpTypeVmeImageINTEL:
         {
             const static OperandKind operandTypes[] = {{44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpTypeAvcImePayloadINTEL:
         {
             const static OperandKind operandTypes[] = {{44}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpTypeAvcRefPayloadINTEL:
         {
             const static OperandKind operandTypes[] = {{44}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpTypeAvcSicPayloadINTEL:
         {
             const static OperandKind operandTypes[] = {{44}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpTypeAvcMcePayloadINTEL:
         {
             const static OperandKind operandTypes[] = {{44}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpTypeAvcMceResultINTEL:
         {
             const static OperandKind operandTypes[] = {{44}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpTypeAvcImeResultINTEL:
         {
             const static OperandKind operandTypes[] = {{44}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpTypeAvcImeResultSingleReferenceStreamoutINTEL:
         {
             const static OperandKind operandTypes[] = {{44}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpTypeAvcImeResultDualReferenceStreamoutINTEL:
         {
             const static OperandKind operandTypes[] = {{44}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpTypeAvcImeSingleReferenceStreaminINTEL:
         {
             const static OperandKind operandTypes[] = {{44}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpTypeAvcImeDualReferenceStreaminINTEL:
         {
             const static OperandKind operandTypes[] = {{44}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpTypeAvcRefResultINTEL:
         {
             const static OperandKind operandTypes[] = {{44}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpTypeAvcSicResultINTEL:
         {
             const static OperandKind operandTypes[] = {{44}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceGetDefaultInterBaseMultiReferencePenaltyINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceSetInterBaseMultiReferencePenaltyINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceGetDefaultInterShapePenaltyINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceSetInterShapePenaltyINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceGetDefaultInterDirectionPenaltyINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceSetInterDirectionPenaltyINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceGetDefaultIntraLumaShapePenaltyINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceGetDefaultInterMotionVectorCostTableINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceGetDefaultHighPenaltyCostTableINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceGetDefaultMediumPenaltyCostTableINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceGetDefaultLowPenaltyCostTableINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceSetMotionVectorCostFunctionINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceGetDefaultIntraLumaModePenaltyINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceGetDefaultNonDcLumaIntraPenaltyINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceGetDefaultIntraChromaModeBasePenaltyINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceSetAcOnlyHaarINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceSetSourceInterlacedFieldPolarityINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceSetSingleReferenceInterlacedFieldPolarityINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceSetDualReferenceInterlacedFieldPolaritiesINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceConvertToImePayloadINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceConvertToImeResultINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceConvertToRefPayloadINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceConvertToRefResultINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceConvertToSicPayloadINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceConvertToSicResultINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceGetMotionVectorsINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceGetInterDistortionsINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceGetBestInterDistortionsINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceGetInterMajorShapeINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceGetInterMinorShapeINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceGetInterDirectionsINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceGetInterMotionVectorCountINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceGetInterReferenceIdsINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcMceGetInterReferenceInterlacedFieldPolaritiesINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeInitializeINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeSetSingleReferenceINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeSetDualReferenceINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeRefWindowSizeINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeAdjustRefOffsetINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeConvertToMcePayloadINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeSetMaxMotionVectorCountINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeSetUnidirectionalMixDisableINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeSetEarlySearchTerminationThresholdINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeSetWeightedSadINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeEvaluateWithSingleReferenceINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeEvaluateWithDualReferenceINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeEvaluateWithSingleReferenceStreaminINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeEvaluateWithDualReferenceStreaminINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 7, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 7, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeEvaluateWithSingleReferenceStreamoutINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeEvaluateWithDualReferenceStreamoutINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeEvaluateWithSingleReferenceStreaminoutINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeEvaluateWithDualReferenceStreaminoutINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 7, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 7, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeConvertToMceResultINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeGetSingleReferenceStreaminINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeGetDualReferenceStreaminINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeStripSingleReferenceStreamoutINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeStripDualReferenceStreamoutINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeGetStreamoutSingleReferenceMajorShapeMotionVectorsINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeGetStreamoutSingleReferenceMajorShapeDistortionsINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeGetStreamoutSingleReferenceMajorShapeReferenceIdsINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeGetStreamoutDualReferenceMajorShapeMotionVectorsINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeGetStreamoutDualReferenceMajorShapeDistortionsINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeGetStreamoutDualReferenceMajorShapeReferenceIdsINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeGetBorderReachedINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeGetTruncatedSearchIndicationINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeGetUnidirectionalEarlySearchTerminationINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeGetWeightingPatternMinimumMotionVectorINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcImeGetWeightingPatternMinimumDistortionINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcFmeInitializeINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10, 9, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 9, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcBmeInitializeINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 11, 11, 10, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10, 10, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcRefConvertToMcePayloadINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcRefSetBidirectionalMixDisableINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcRefSetBilinearFilterEnableINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcRefEvaluateWithSingleReferenceINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcRefEvaluateWithDualReferenceINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcRefEvaluateWithMultiReferenceINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcRefEvaluateWithMultiReferenceInterlacedINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcRefConvertToMceResultINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicInitializeINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicConfigureSkcINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 8, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicConfigureIpeLumaINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 11, 11, 10, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10, 10, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicConfigureIpeLumaChromaINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 14, 14, 13, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 13, 13, 13, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicGetMotionVectorMaskINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicConvertToMcePayloadINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicSetIntraLumaShapePenaltyINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicSetIntraLumaModeCostFunctionINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicSetIntraChromaModeCostFunctionINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicSetBilinearFilterEnableINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicSetSkcForwardTransformEnableINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicSetBlockBasedRawSkipSadINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicEvaluateIpeINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicEvaluateWithSingleReferenceINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicEvaluateWithDualReferenceINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicEvaluateWithMultiReferenceINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicEvaluateWithMultiReferenceInterlacedINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicConvertToMceResultINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicGetIpeLumaShapeINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicGetBestIpeLumaDistortionINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicGetBestIpeChromaDistortionINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicGetPackedIpeLumaModesINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicGetIpeChromaModeINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicGetPackedSkcLumaCountThresholdINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicGetPackedSkcLumaSumThresholdINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSubgroupAvcSicGetInterRawSadsINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpVariableLengthArrayINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpSaveMemoryINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpRestoreMemoryINTEL:
         {
             const static OperandKind operandTypes[] = {{47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 2, 2, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 1, 1, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatSinCosPiINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10, 9, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 9, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatCastINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 8, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatCastFromIntINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 8, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatCastToIntINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 7, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 7, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatAddINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 11, 11, 10, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10, 10, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatSubINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 11, 11, 10, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10, 10, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatMulINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 11, 11, 10, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10, 10, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatDivINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 11, 11, 10, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10, 10, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatGTINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}, {47}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatGEINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}, {47}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatLTINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}, {47}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatLEINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}, {47}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatEQINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}, {47}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatRecipINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 8, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatRSqrtINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 8, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatCbrtINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 8, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatHypotINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 11, 11, 10, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10, 10, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatSqrtINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 8, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatLogINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 8, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatLog2INTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 8, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatLog10INTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 8, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatLog1pINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 8, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatExpINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 8, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatExp2INTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 8, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatExp10INTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 8, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatExpm1INTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 8, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatSinINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 8, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatCosINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 8, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatSinCosINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 8, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatSinPiINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 8, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatCosPiINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 8, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatASinINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 8, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatASinPiINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 8, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatACosINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 8, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatACosPiINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 8, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatATanINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 8, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatATanPiINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 8, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 8, 8, 8, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatATan2INTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 11, 11, 10, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10, 10, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatPowINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 11, 11, 10, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10, 10, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatPowRINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 11, 11, 10, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10, 10, operandTypes};
             return true;
         }
         case SpvOpArbitraryFloatPowNINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {48}, {47}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10, 9, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 9, operandTypes};
             return true;
         }
         case SpvOpLoopControlINTEL:
         {
             const static OperandKind operandTypes[] = {{48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 1, 0xffff, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 0, 0xffff, 1, operandTypes};
             return true;
         }
         case SpvOpAliasDomainDeclINTEL:
         {
             const static OperandKind operandTypes[] = {{44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 1, 2, 2, operandTypes};
             return true;
         }
         case SpvOpAliasScopeDeclINTEL:
         {
             const static OperandKind operandTypes[] = {{44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 3, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 3, 3, operandTypes};
             return true;
         }
         case SpvOpAliasScopeListDeclINTEL:
         {
             const static OperandKind operandTypes[] = {{44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 2, 0xffff, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, 0, 1, 0xffff, 2, operandTypes};
             return true;
         }
         case SpvOpFixedSqrtINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10, 9, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 9, operandTypes};
             return true;
         }
         case SpvOpFixedRecipINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10, 9, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 9, operandTypes};
             return true;
         }
         case SpvOpFixedRsqrtINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10, 9, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 9, operandTypes};
             return true;
         }
         case SpvOpFixedSinINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10, 9, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 9, operandTypes};
             return true;
         }
         case SpvOpFixedCosINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10, 9, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 9, operandTypes};
             return true;
         }
         case SpvOpFixedSinCosINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10, 9, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 9, operandTypes};
             return true;
         }
         case SpvOpFixedSinPiINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10, 9, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 9, operandTypes};
             return true;
         }
         case SpvOpFixedCosPiINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10, 9, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 9, operandTypes};
             return true;
         }
         case SpvOpFixedSinCosPiINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10, 9, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 9, operandTypes};
             return true;
         }
         case SpvOpFixedLogINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10, 9, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 9, operandTypes};
             return true;
         }
         case SpvOpFixedExpINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {48}, {48}, {48}, {48}, {48}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 10, 10, 9, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 9, 9, 9, operandTypes};
             return true;
         }
         case SpvOpPtrCastToCrossWorkgroupINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpCrossWorkgroupCastToPtrINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpReadPipeBlockingINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpWritePipeBlockingINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpFPGARegINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpRayQueryGetRayTMinKHR:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpRayQueryGetRayFlagsKHR:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpRayQueryGetIntersectionTKHR:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpRayQueryGetIntersectionInstanceCustomIndexKHR:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpRayQueryGetIntersectionInstanceIdKHR:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpRayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetKHR:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpRayQueryGetIntersectionGeometryIndexKHR:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpRayQueryGetIntersectionPrimitiveIndexKHR:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpRayQueryGetIntersectionBarycentricsKHR:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpRayQueryGetIntersectionFrontFaceKHR:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpRayQueryGetIntersectionCandidateAABBOpaqueKHR:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpRayQueryGetIntersectionObjectRayDirectionKHR:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpRayQueryGetIntersectionObjectRayOriginKHR:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpRayQueryGetWorldRayDirectionKHR:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpRayQueryGetWorldRayOriginKHR:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpRayQueryGetIntersectionObjectToWorldKHR:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpRayQueryGetIntersectionWorldToObjectKHR:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 4, operandTypes};
             return true;
         }
         case SpvOpAtomicFAddEXT:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {46}, {45}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 7, 7, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
             return true;
         }
         case SpvOpTypeBufferSurfaceINTEL:
         {
             const static OperandKind operandTypes[] = {{44}, {28}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 3, 3, 2, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, 0, 2, 2, 2, operandTypes};
             return true;
         }
         case SpvOpTypeStructContinuedINTEL:
         {
             const static OperandKind operandTypes[] = {{47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, -1, 1, 0xffff, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration, -1, -1, 0, 0xffff, 1, operandTypes};
             return true;
         }
         case SpvOpConstantCompositeContinuedINTEL:
         {
             const static OperandKind operandTypes[] = {{47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, -1, -1, 1, 0xffff, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, -1, -1, 0, 0xffff, 1, operandTypes};
             return true;
         }
         case SpvOpSpecConstantCompositeContinuedINTEL:
         {
             const static OperandKind operandTypes[] = {{47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, -1, -1, 1, 0xffff, 1, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::ConstantCreation, -1, -1, 0, 0xffff, 1, operandTypes};
             return true;
         }
         case SpvOpConvertFToBF16INTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpConvertBF16ToFINTEL:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpControlBarrierArriveINTEL:
         {
             const static OperandKind operandTypes[] = {{46}, {46}, {45}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpControlBarrierWaitINTEL:
         {
             const static OperandKind operandTypes[] = {{46}, {46}, {45}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 4, 4, 3, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 3, 3, operandTypes};
             return true;
         }
         case SpvOpGroupIMulKHR:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {33}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupFMulKHR:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {33}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupBitwiseAndKHR:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {33}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupBitwiseOrKHR:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {33}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupBitwiseXorKHR:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {33}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupLogicalAndKHR:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {33}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupLogicalOrKHR:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {33}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         case SpvOpGroupLogicalXorKHR:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {46}, {33}, {47}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
             return true;
         }
         default: return false;

@@ -232,14 +232,13 @@ RefPtr<SPIRVCoreGrammarInfo> SPIRVCoreGrammarInfo::loadFromJSON(SourceView& sour
         SLANG_ASSERT(resultTypeIndex >= -1 || resultTypeIndex <= 0);
         SLANG_ASSERT(resultIdIndex >= -1 || resultTypeIndex <= 1);
 
-        // Start with 1 because of the opcode itself
-        uint16_t minWordCount = 1;
-        uint16_t maxWordCount = 1;
+        uint16_t minOperandCount = 0;
+        uint16_t maxOperandCount = 0;
         uint16_t numOperandTypes = 0;
         const OperandKind* operandTypes = res->operandTypesStorage.end();
         for(const auto& o : i.operands)
         {
-            if(maxWordCount == 0xffff)
+            if(maxOperandCount == 0xffff)
             {
                 // We are about to overflow maxWordCount, either someone has
                 // put 2^16-1 operands in the json, or we have a "*" quantified
@@ -270,22 +269,22 @@ RefPtr<SPIRVCoreGrammarInfo> SPIRVCoreGrammarInfo::loadFromJSON(SourceView& sour
             {
                 // This catches the case where an "?" or "*" qualified operand
                 // appears before any unqualified operands
-                if(minWordCount != maxWordCount)
+                if(minOperandCount != maxOperandCount)
                     sink.diagnoseWithoutSourceView(
                         SourceLoc{},
                         MiscDiagnostics::spirvCoreGrammarJSONParseFailure,
                         "\"*\" or \"?\" operand appeared before an unqualified operand"
                     );
-                minWordCount++;
-                maxWordCount++;
+                minOperandCount++;
+                maxOperandCount++;
             }
             else if(o.quantifier == "?")
             {
-                maxWordCount++;
+                maxOperandCount++;
             }
             else if(o.quantifier == "*")
             {
-                maxWordCount = 0xffff;
+                maxOperandCount = 0xffff;
             }
         }
 
@@ -296,8 +295,8 @@ RefPtr<SPIRVCoreGrammarInfo> SPIRVCoreGrammarInfo::loadFromJSON(SourceView& sour
             class_,
             static_cast<int8_t>(resultTypeIndex),
             static_cast<int8_t>(resultIdIndex),
-            minWordCount,
-            maxWordCount,
+            minOperandCount,
+            maxOperandCount,
             numOperandTypes,
             operandTypes
         });

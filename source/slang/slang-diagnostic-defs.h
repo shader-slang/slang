@@ -247,6 +247,8 @@ DIAGNOSTIC(29102, Note,  considerOpCopyObject, "consider adding an OpCopyObject 
 DIAGNOSTIC(29103, Note,  noSuchAddress, "unable to take the address of this address-of asm operand")
 DIAGNOSTIC(29104, Error, spirvInstructionWithoutResultId, "cannot use this 'x = $0...' syntax because $0 does not have a <result-id> operand")
 DIAGNOSTIC(29104, Error, spirvInstructionWithoutResultTypeId, "cannot use this 'x : <type> = $0...' syntax because $0 does not have a <result-type-id> operand")
+// This is a warning because we trust that people using the spirv_asm block know what they're doing
+DIAGNOSTIC(29104, Warning, spirvInstructionWithTooManyOperands, "Too many operands for $0 (expected max $1), did you forget a semicolon?")
 
 
 //

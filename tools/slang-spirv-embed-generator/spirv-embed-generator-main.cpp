@@ -281,8 +281,8 @@ void writeInfo(
                     + classStr + ", "
                     + String(i.resultTypeIndex) + ", "
                     + String(i.resultIdIndex) + ", "
-                    + String(i.minWordCount) + ", "
-                    + (i.maxWordCount == 0xffff ? String("0xffff") : String(i.maxWordCount)) + ", "
+                    + String(i.minOperandCount) + ", "
+                    + (i.maxOperandCount == 0xffff ? String("0xffff") : String(i.maxOperandCount)) + ", "
                     + String(i.numOperandTypes) + ", "
                     + (i.numOperandTypes ? "operandTypes" : "nullptr")
                     + "}");
