@@ -2076,65 +2076,96 @@ struct TextureTypeInfo
 
             // `SampleLevel`
 
-            sb << "__target_intrinsic(glsl, \"$ctextureLod($p, $2, $3)$z\")\n";
+            StringBuilder cppBuilder;
+            {
+                cppBuilder << "__intrinsic_asm \".SampleLevel\"";
+            }
+
+            StringBuilder hlslBuilder;
+            {
+                hlslBuilder << "__intrinsic_asm \".SampleLevel\"";
+            }
+
+            StringBuilder glslBuilder;
+            {
+                glslBuilder << "__intrinsic_asm \"$ctextureLod($p, $2, $3)$z\"";
+            }
 
             // SPIR-V
+            StringBuilder spirvBuilder;
             {
-                // TODO:
-                // Need to:
-                // - Construct sampled image type OpTypeSampledImage of image type
-                // - Construct OpSampledImage from image and sampler
-                // - Call OpImageSampleExplicitLod
-                // test ./tests/compute/texture-simpler.slang
+                const String i = "            ";
+                spirvBuilder << "\n        ";
+                spirvBuilder << "return spirv_asm";
+                spirvBuilder << "\n        ";
+                spirvBuilder << "{\n";
+                spirvBuilder << i << "%sampledImageType = OpTypeSampledImage $$This;\n";
+                spirvBuilder << i << "%sampledImage : %sampledImageType = OpSampledImage $this $s;\n";
+                spirvBuilder << i << "%sampled : __sampledType(T) = OpImageSampleExplicitLod %sampledImage $location Lod $level;\n";
+                spirvBuilder << i << "__truncate $$T result __sampledType(T) %sampled;\n";
+                spirvBuilder << "        }";
             }
 
             // CUDA
+            StringBuilder cudaBuilder;
             {
                 const int coordCount = base.coordCount;
                 const int vecCount = coordCount + int(isArray);
 
                 if( baseShape != TextureFlavor::Shape::ShapeCube )
                 {
-                    sb << "__target_intrinsic(cuda, \"tex" << coordCount << "D";
+                    cudaBuilder << "__intrinsic_asm \"tex" << coordCount << "D";
                     if (isArray)
                     {
-                        sb << "Layered";
+                        cudaBuilder << "Layered";
                     }
-                    sb << "Lod<$T0>($0";
+                    cudaBuilder << "Lod<$T0>($0";
                     for (int i = 0; i < coordCount; ++i)
                     {
-                        sb << ", ($2)";
+                        cudaBuilder << ", ($2)";
                         if (vecCount > 1)
                         {
-                            sb << '.' << char(i + 'x');
+                            cudaBuilder << '.' << char(i + 'x');
                         }
                     }
                     if (isArray)
                     {
-                        sb << ", int(($2)." << char(coordCount + 'x') << ")";
+                        cudaBuilder << ", int(($2)." << char(coordCount + 'x') << ")";
                     }
-                    sb << ", $3)\")\n";
+                    cudaBuilder << ", $3)\"";
                 }
                 else
                 {
-                    sb << "__target_intrinsic(cuda, \"texCubemap";
+                    cudaBuilder << "__intrinsic_asm \"texCubemap";
                     if (isArray)
                     {
-                        sb << "Layered";
+                        cudaBuilder << "Layered";
                     }
-                    sb << "Lod<$T0>($0, ($2).x, ($2).y, ($2).z";
+                    cudaBuilder << "Lod<$T0>($0, ($2).x, ($2).y, ($2).z";
                     if (isArray)
                     {
-                        sb << ", int(($2).w)"; 
+                        cudaBuilder << ", int(($2).w)";
                     }
-                    sb << ", $3)\")\n";
+                    cudaBuilder << ", $3)\"";
                 }
             }
+
             if (isReadOnly)
                 sb << "[__readNone]\n";
             sb << "T SampleLevel(" << samplerStateParam;
             sb << "float" << base.coordCount + isArray << " location, ";
-            sb << "float level);\n";
+            sb << "float level)\n";
+            sb << "{\n";
+            sb << "    __target_switch\n";
+            sb << "    {\n";
+            sb << "    case cpp: " << cppBuilder << ";\n";
+            sb << "    case hlsl: " << hlslBuilder << ";\n";
+            sb << "    case glsl: " << glslBuilder << ";\n";
+            sb << "    case cuda: " << cudaBuilder << ";\n";
+            if(!prefixInfo.combined)
+                sb << "    case spirv: " << spirvBuilder << ";\n";
+            sb << "    }\n";
+            sb << "}\n";
 
             if( baseShape != TextureFlavor::Shape::ShapeCube )
             {

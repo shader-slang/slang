@@ -6277,7 +6277,19 @@ namespace Slang
         {
             return SPIRVAsmOperand{SPIRVAsmOperand::ResultMarker, parser->ReadToken()};
         }
-
+        // The handy __sampledType function
+        if(AdvanceIf(parser, "__sampledType"))
+        {
+            parser->ReadToken(TokenType::LParent);
+            const auto typeExpr = parser->ParseType();
+            parser->ReadMatchingToken(TokenType::RParent);
+            return SPIRVAsmOperand{SPIRVAsmOperand::SampledType, Token{}, typeExpr};
+        }
+        // The pseudo-operand for component truncation
+        if(parser->LookAheadToken("__truncate"))
+        {
+            return SPIRVAsmOperand{SPIRVAsmOperand::TruncateMarker, parser->ReadToken()};
+        }
         // A regular identifier
         else if(parser->LookAheadToken(TokenType::Identifier))
         {
@@ -6314,7 +6326,8 @@ namespace Slang
         // A $foo variable
         else if(AdvanceIf(parser, TokenType::Dollar))
         {
-            return slangIdentOperand(SPIRVAsmOperand::SlangValue);
+            Expr* expr = parseAtomicExpr(parser);
+            return SPIRVAsmOperand{SPIRVAsmOperand::SlangValue, Token{}, expr};
         }
         // A $$foo type
         else if(AdvanceIf(parser, TokenType::DollarDollar))
@@ -6417,7 +6430,7 @@ namespace Slang
             || resultOperand)
         {
             // Insert the LHS result-type operand
-            if(ret.operands.getCount() == opInfo->resultTypeIndex && resultTypeOperand)
+            if(opInfo && ret.operands.getCount() == opInfo->resultTypeIndex && resultTypeOperand)
             {
                 ret.operands.add(*resultTypeOperand);
                 resultTypeOperand.reset();
@@ -6425,14 +6438,14 @@ namespace Slang
             }
 
             // Insert the LHS result operand
-            if(ret.operands.getCount() == opInfo->resultIdIndex && resultOperand)
+            if(opInfo && ret.operands.getCount() == opInfo->resultIdIndex && resultOperand)
             {
                 ret.operands.add(*resultOperand);
                 resultOperand.reset();
                 continue;
             }
 
-            if(ret.operands.getCount() == opInfo->maxOperandCount)
+            if(opInfo && ret.operands.getCount() == opInfo->maxOperandCount)
             {
                 parser->diagnose(
                     parser->tokenReader.peekLoc(),

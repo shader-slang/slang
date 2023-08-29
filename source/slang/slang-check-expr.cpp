@@ -3913,7 +3913,7 @@ namespace Slang
             // be able to deduce types for operands
             const auto opInfo = spirvInfo->opInfos.lookup(SpvOp(inst.opcode.knownValue));
 
-            if(opInfo->numOperandTypes == 0 && inst.operands.getCount())
+            if(opInfo && opInfo->numOperandTypes == 0 && inst.operands.getCount())
             {
                 failed = true;
                 getSink()->diagnose(inst.opcode.token, Diagnostics::spirvInstructionWithTooManyOperands, inst.opcode.token, 0);
@@ -3925,13 +3925,16 @@ namespace Slang
             {
                 // Clamp to the end of the type info array, because the last one will be any variable operands
                 const auto operandType
-                    = opInfo->operandTypes[std::min(operandIndex, Index(opInfo->numOperandTypes)-1)];
+                    = opInfo.has_value()
+                    ? opInfo->operandTypes[std::min(operandIndex, Index(opInfo->numOperandTypes)-1)]
+                    : SPIRVCoreGrammarInfo::OperandKind{0xff};
                 const auto baseOperandType
                     = spirvInfo->operandKindUnderneathIds.lookup(operandType).value_or(operandType);
                 const auto needsIdWrapper = baseOperandType != operandType;
 
                 const auto check = [&](const auto& go, auto& operand) -> void {
-                    if(operand.flavor == SPIRVAsmOperand::SlangType)
+                    if(operand.flavor == SPIRVAsmOperand::SlangType
+                        || operand.flavor == SPIRVAsmOperand::SampledType)
                     {
                         // This is a $$type operand, fill in the TypeExp member of the operand
                         TypeExp& typeExpr = operand.type;

@@ -3336,6 +3336,20 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                     }
                     return builder->emitSPIRVAsmOperandInst(i);
                 }
+            case SPIRVAsmOperand::SampledType:
+                {
+                    IRType* i;
+                    {
+                        IRBuilderInsertLocScope insertScope(builder);
+                        builder->setInsertBefore(spirvAsmInst);
+                        i = lowerType(context, operand.type.type);
+                    }
+                    return builder->emitSPIRVAsmOperandSampledType(i);
+                }
+            case SPIRVAsmOperand::TruncateMarker:
+                {
+                    return builder->emitSPIRVAsmOperandTruncate();
+                }
             }
             SLANG_UNREACHABLE("Unhandled case in visitSPIRVAsmExpr");
         };

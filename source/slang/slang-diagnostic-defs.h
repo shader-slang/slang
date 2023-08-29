@@ -255,6 +255,8 @@ DIAGNOSTIC(29109, Error, spirvOperandRange, "Literal ints must be in the range 0
 
 DIAGNOSTIC(29110, Error, unknownTargetName, "unknown target name '$0'")
 
+DIAGNOSTIC(29111, Error, spirvInvalidTruncate, "__truncate has been given a source smaller than its target")
+
 //
 // 3xxxx - Semantic analysis
 //

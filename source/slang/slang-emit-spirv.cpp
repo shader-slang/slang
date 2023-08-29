@@ -1323,12 +1323,13 @@ struct SPIRVEmitContext
                 SpvWord depth = 2; // No knowledge of if this is a depth image
                 bool ms = texTypeInst->isMultisample();
                 // TODO: can we do better here?
-                SpvWord sampled = 0; // Only known at run time
+                // TODO: This is wrong
+                SpvWord sampled = 1;
                 // TODO: can we do better?
                 SpvImageFormat format = SpvImageFormatUnknown;
                 return emitOpTypeImage(
                     inst,
-                    sampledType,
+                    dropVector(sampledType),
                     dim,
                     SpvLiteralInteger::from32(depth),
                     SpvLiteralInteger::from32(arrayed),
@@ -3808,7 +3809,6 @@ struct SPIRVEmitContext
         for(const auto spvInst : inst->getInsts())
         {
             const bool isLast = spvInst == inst->getLastChild();
-            const SpvOp opcode = SpvOp(spvInst->getOpcodeOperandWord());
 
             const auto parentForOpCode = [this](SpvOp opcode, SpvInstParent* defaultParent) -> SpvInstParent*{
                 const auto info = m_grammarInfo->opInfos.lookup(opcode);
@@ -3838,96 +3838,215 @@ struct SPIRVEmitContext
                 }
             };
 
-            last = emitInstCustomOperandFunc(
-                parentForOpCode(opcode, parent),
-                // We want the "result instruction" to refer to the top level
-                // block which assumes its value, the others are free to refer
-                // to whatever, so just use the internal spv inst rep
-                // TODO: This is not correct, because the instruction which is
-                // assigned to result is not necessarily the last instruction
-                isLast ? as<IRInst>(inst) : spvInst,
-                opcode,
-                [&](){
-                    for(const auto operand : spvInst->getSPIRVOperands())
+            const auto emitSpvAsmOperand = [&](IRSPIRVAsmOperand* operand){
+                switch(operand->getOp())
+                {
+                case kIROp_SPIRVAsmOperandEnum:
+                case kIROp_SPIRVAsmOperandLiteral:
+                {
+                    const auto v = as<IRConstant>(operand->getValue());
+                    SLANG_ASSERT(v);
+                    if(operand->getOperandCount() >= 2)
                     {
-                        switch(operand->getOp())
+                        const auto constantType = cast<IRType>(operand->getOperand(1));
+                        SpvInst* constant;
+                        switch(v->getOp())
                         {
-                        case kIROp_SPIRVAsmOperandEnum:
-                        case kIROp_SPIRVAsmOperandLiteral:
+                        case kIROp_IntLit:
                         {
-                            const auto v = as<IRConstant>(operand->getValue());
-                            SLANG_ASSERT(v);
-                            if(operand->getOperandCount() >= 2)
-                            {
-                                const auto constantType = cast<IRType>(operand->getOperand(1));
-                                SpvInst* constant;
-                                switch(v->getOp())
-                                {
-                                case kIROp_IntLit:
-                                {
-                                    // TODO: range checking
-                                    const auto i = cast<IRIntLit>(v)->getValue();
-                                    constant = emitIntConstant(i, constantType);
-                                    break;
-                                }
-                                case kIROp_StringLit:
-                                    SLANG_UNIMPLEMENTED_X("String constants in SPIR-V emit");
-                                default:
-                                    SLANG_UNREACHABLE("Unhandled case in emitSPIRVAsm");
-                                }
-                                emitOperand(constant);
-                            }
-                            else
-                            {
-                                switch(v->getOp())
-                                {
-                                case kIROp_StringLit:
-                                    emitOperand(SpvLiteralBits::fromUnownedStringSlice(v->getStringSlice()));
-                                    break;
-                                case kIROp_IntLit:
-                                {
-                                    // TODO: range checking
-                                    const auto i = cast<IRIntLit>(v)->getValue();
-                                    emitOperand(SpvLiteralInteger::from32(uint32_t(i)));
-                                    break;
-                                }
-                                default:
-                                    SLANG_UNREACHABLE("Unhandled case in emitSPIRVAsm");
-                                }
-                            }
+                            // TODO: range checking
+                            const auto i = cast<IRIntLit>(v)->getValue();
+                            constant = emitIntConstant(i, constantType);
                             break;
                         }
-                        case kIROp_SPIRVAsmOperandInst:
-                        {
-                            const auto i = operand->getValue();
-                            emitOperand(ensureInst(i));
-
-                            break;
+                        case kIROp_StringLit:
+                            SLANG_UNIMPLEMENTED_X("String constants in SPIR-V emit");
+                        default:
+                            SLANG_UNREACHABLE("Unhandled case in emitSPIRVAsm");
                         }
-                        case kIROp_SPIRVAsmOperandResult:
+                        emitOperand(constant);
+                    }
+                    else
+                    {
+                        switch(v->getOp())
                         {
-                            SLANG_ASSERT(isLast);
-                            emitOperand(kResultID);
+                        case kIROp_StringLit:
+                            emitOperand(SpvLiteralBits::fromUnownedStringSlice(v->getStringSlice()));
                             break;
-                        }
-                        case kIROp_SPIRVAsmOperandId:
+                        case kIROp_IntLit:
                         {
-                            const auto idName = cast<IRStringLit>(operand->getValue())->getStringSlice();
-                            SpvWord id;
-                            if(!idMap.tryGetValue(idName, id))
-                            {
-                                id = freshID();
-                                idMap.set(idName, id);
-                            }
-                            emitOperand(id);
+                            // TODO: range checking
+                            const auto i = cast<IRIntLit>(v)->getValue();
+                            emitOperand(SpvLiteralInteger::from32(uint32_t(i)));
                             break;
                         }
                         default:
                             SLANG_UNREACHABLE("Unhandled case in emitSPIRVAsm");
                         }
                     }
+                    break;
                 }
-            );
+                case kIROp_SPIRVAsmOperandInst:
+                {
+                    const auto i = operand->getValue();
+                    emitOperand(ensureInst(i));
+
+                    break;
+                }
+                case kIROp_SPIRVAsmOperandResult:
+                {
+                    SLANG_ASSERT(isLast);
+                    emitOperand(kResultID);
+                    break;
+                }
+                case kIROp_SPIRVAsmOperandId:
+                {
+                    const auto idName = cast<IRStringLit>(operand->getValue())->getStringSlice();
+                    SpvWord id;
+                    if(!idMap.tryGetValue(idName, id))
+                    {
+                        id = freshID();
+                        idMap.set(idName, id);
+                    }
+                    emitOperand(id);
+                    break;
+                }
+                case kIROp_SPIRVAsmOperandSampledType:
+                {
+                    // Make a 4 vector of the component type
+                    IRBuilder builder(m_irModule);
+                    const auto elementType = cast<IRType>(operand->getValue());
+                    const auto sampledType = builder.getVectorType(dropVector(elementType), 4);
+                    emitOperand(ensureInst(sampledType));
+                    break;
+                }
+                default:
+                    SLANG_UNREACHABLE("Unhandled case in emitSPIRVAsm");
+                }
+            };
+
+            if(spvInst->getOpcodeOperand()->getOp() == kIROp_SPIRVAsmOperandTruncate)
+            {
+                const auto getSlangType = [&](IRSPIRVAsmOperand* operand) -> IRType*{
+                    switch(operand->getOp())
+                    {
+                    case kIROp_SPIRVAsmOperandInst:
+                        return cast<IRType>(operand->getValue());
+                    case kIROp_SPIRVAsmOperandSampledType:
+                        {
+                            // Make a 4 vector of the component type
+                            IRBuilder builder(m_irModule);
+                            const auto elementType = cast<IRType>(operand->getValue());
+                            return builder.getVectorType(dropVector(elementType), 4);
+                        }
+                    case kIROp_SPIRVAsmOperandEnum:
+                    case kIROp_SPIRVAsmOperandLiteral:
+                    case kIROp_SPIRVAsmOperandResult:
+                    case kIROp_SPIRVAsmOperandId:
+                        SLANG_UNEXPECTED("truncate should have been given slang types");
+                    default:
+                        SLANG_UNREACHABLE("Unhandled case in emitSPIRVAsm");
+                    }
+                };
+
+                SLANG_ASSERT(spvInst->getSPIRVOperands().getCount() == 4);
+                const auto toType = getSlangType(spvInst->getSPIRVOperands()[0]);
+                const auto toIdOperand = spvInst->getSPIRVOperands()[1];
+                const auto fromType = getSlangType(spvInst->getSPIRVOperands()[2]);
+                const auto fromIdOperand = spvInst->getSPIRVOperands()[3];
+
+                // The component types must be the same
+                SLANG_ASSERT(isTypeEqual(dropVector(toType), dropVector(fromType)));
+
+                // If we don't need truncation, but a different result ID is
+                // expected, then just unify them in the idMap
+                if(isTypeEqual(toType, fromType))
+                {
+                    // TODO: if this is the last inst, we should just remove it
+                    // and rewrite the penultimate one
+                    last = emitInstCustomOperandFunc(
+                        parent,
+                        isLast ? as<IRInst>(inst) : spvInst,
+                        SpvOpCopyObject,
+                        [&](){
+                            emitOperand(toType);
+                            emitSpvAsmOperand(toIdOperand);
+                            emitSpvAsmOperand(fromIdOperand);
+                        }
+                    );
+                }
+                // Otherwise, if we are truncating to a scalar, extract the first element
+                else if(!as<IRVectorType>(toType))
+                {
+                    last = emitInstCustomOperandFunc(
+                        parent,
+                        isLast ? as<IRInst>(inst) : spvInst,
+                        SpvOpCompositeExtract,
+                        [&](){
+                            emitOperand(toType);
+                            emitSpvAsmOperand(toIdOperand);
+                            emitSpvAsmOperand(fromIdOperand);
+                            emitOperand(SpvLiteralInteger::from32(0));
+                        }
+                    );
+                }
+                // Otherwise, if we are truncating to a 1-vector from a scalar
+                else if(as<IRVectorType>(toType) && !as<IRVectorType>(fromType))
+                {
+                    last = emitInstCustomOperandFunc(
+                        parent,
+                        isLast ? as<IRInst>(inst) : spvInst,
+                        SpvOpCompositeConstruct,
+                        [&](){
+                            emitOperand(toType);
+                            emitSpvAsmOperand(toIdOperand);
+                            emitSpvAsmOperand(fromIdOperand);
+                        }
+                    );
+                }
+                // Otherwise, we are truncating a vector to a smaller vector
+                else
+                {
+                    const auto toVector = cast<IRVectorType>(toType);
+                    const auto toVectorSize = getIntVal(toVector->getElementCount());
+                    const auto fromVector = cast<IRVectorType>(fromType);
+                    [[maybe_unused]]
+                    const auto fromVectorSize = getIntVal(fromVector->getElementCount());
+                    if(toVectorSize > fromVectorSize)
+                        m_sink->diagnose(inst, Diagnostics::spirvInvalidTruncate);
+                    last = emitInstCustomOperandFunc(
+                        parent,
+                        isLast ? as<IRInst>(inst) : spvInst,
+                        SpvOpVectorShuffle,
+                        [&](){
+                            emitOperand(toType);
+                            emitSpvAsmOperand(toIdOperand);
+                            emitSpvAsmOperand(fromIdOperand);
+                            emitOperand(emitOpUndef(parent, nullptr, fromVector));
+                            for(Int32 i = 0; i < toVectorSize; ++i)
+                                emitOperand(SpvLiteralInteger::from32(i));
+                        }
+                    );
+                }
+            }
+            else
+            {
+                const SpvOp opcode = SpvOp(spvInst->getOpcodeOperandWord());
+                last = emitInstCustomOperandFunc(
+                    parentForOpCode(opcode, parent),
+                    // We want the "result instruction" to refer to the top level
+                    // block which assumes its value, the others are free to refer
+                    // to whatever, so just use the internal spv inst rep
+                    // TODO: This is not correct, because the instruction which is
+                    // assigned to result is not necessarily the last instruction
+                    isLast ? as<IRInst>(inst) : spvInst,
+                    opcode,
+                    [&](){
+                        for(const auto operand : spvInst->getSPIRVOperands())
+                            emitSpvAsmOperand(operand);
+                    }
+                );
+            }
         }
 
         for(const auto& [name, id] : idMap)

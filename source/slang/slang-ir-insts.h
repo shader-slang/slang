@@ -2911,7 +2911,8 @@ struct IRSPIRVAsmInst : IRInst
     IRSPIRVAsmOperand* getOpcodeOperand()
     {
         const auto opcodeOperand = cast<IRSPIRVAsmOperand>(getOperand(0));
-        SLANG_ASSERT(opcodeOperand->getOp() == kIROp_SPIRVAsmOperandEnum);
+        SLANG_ASSERT(opcodeOperand->getOp() == kIROp_SPIRVAsmOperandEnum
+            || opcodeOperand->getOp() == kIROp_SPIRVAsmOperandTruncate);
         return opcodeOperand;
     }
 
@@ -3937,6 +3938,8 @@ public:
     IRSPIRVAsmOperand* emitSPIRVAsmOperandResult();
     IRSPIRVAsmOperand* emitSPIRVAsmOperandEnum(IRInst* inst);
     IRSPIRVAsmOperand* emitSPIRVAsmOperandEnum(IRInst* inst, IRType* constantType);
+    IRSPIRVAsmOperand* emitSPIRVAsmOperandSampledType(IRType* elementType);
+    IRSPIRVAsmOperand* emitSPIRVAsmOperandTruncate();
     IRSPIRVAsmInst* emitSPIRVAsmInst(IRInst* opcode, List<IRInst*> operands);
     IRSPIRVAsm* emitSPIRVAsm(IRType* type);
     IRInst* emitGenericAsm(UnownedStringSlice asmText);

@@ -1087,7 +1087,13 @@ INST(SPIRVAsmInst, SPIRVAsmInst, 1, 0)
     // A special instruction which marks the place to insert the generated
     // result operand
     INST(SPIRVAsmOperandResult, SPIRVAsmOperandResult, 0, 0)
-INST_RANGE(SPIRVAsmOperand, SPIRVAsmOperandLiteral, SPIRVAsmOperandResult)
+    // A special instruction which represents a type directed truncation
+    // operation where extra components are dropped
+    INST(SPIRVAsmOperandTruncate, __truncate, 0, 0)
+    // A type function which returns the result type of sampling an image of
+    // this component type
+    INST(SPIRVAsmOperandSampledType, __sampledType, 1, 0)
+INST_RANGE(SPIRVAsmOperand, SPIRVAsmOperandLiteral, SPIRVAsmOperandSampledType)
 
 
 #undef PARENT

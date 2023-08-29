@@ -109,6 +109,15 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 }
             }
 
+            // Textures and Samplers can't be in Uniform for Vulkan, if they are
+            // placed here then put them in UniformConstant instead
+            if (storageClass == SpvStorageClassUniform
+                && (as<IRTextureTypeBase>(inst->getDataType())
+                    || as<IRSamplerStateTypeBase>(inst->getDataType())))
+            {
+                storageClass = SpvStorageClassUniformConstant;
+            }
+
             // Strip any HLSL wrappers
             IRBuilder builder(m_sharedContext->m_irModule);
             bool needLoad = true;
