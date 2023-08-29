@@ -51,10 +51,10 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{5FFA0764-4BF4-30B6-3461-C7C620FA9622}</ProjectGuid>
+    <ProjectGuid>{FB5DA174-E7EC-2A3E-900B-3F397C793BE4}</ProjectGuid>
     <IgnoreWarnCompileDuplicatedFilename>true</IgnoreWarnCompileDuplicatedFilename>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>generate-lookup-tables</RootNamespace>
+    <RootNamespace>generate-spirv-embed</RootNamespace>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -105,27 +105,27 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <OutDir>..\..\..\bin\windows-x86\debug\</OutDir>
-    <IntDir>..\..\..\intermediate\windows-x86\debug\generate-lookup-tables\</IntDir>
+    <IntDir>..\..\..\intermediate\windows-x86\debug\generate-spirv-embed\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <OutDir>..\..\..\bin\windows-x64\debug\</OutDir>
-    <IntDir>..\..\..\intermediate\windows-x64\debug\generate-lookup-tables\</IntDir>
+    <IntDir>..\..\..\intermediate\windows-x64\debug\generate-spirv-embed\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug aarch64|ARM64'">
     <OutDir>..\..\..\bin\windows-aarch64\debug\</OutDir>
-    <IntDir>..\..\..\intermediate\windows-aarch64\debug\generate-lookup-tables\</IntDir>
+    <IntDir>..\..\..\intermediate\windows-aarch64\debug\generate-spirv-embed\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <OutDir>..\..\..\bin\windows-x86\release\</OutDir>
-    <IntDir>..\..\..\intermediate\windows-x86\release\generate-lookup-tables\</IntDir>
+    <IntDir>..\..\..\intermediate\windows-x86\release\generate-spirv-embed\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>..\..\..\bin\windows-x64\release\</OutDir>
-    <IntDir>..\..\..\intermediate\windows-x64\release\generate-lookup-tables\</IntDir>
+    <IntDir>..\..\..\intermediate\windows-x64\release\generate-spirv-embed\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release aarch64|ARM64'">
     <OutDir>..\..\..\bin\windows-aarch64\release\</OutDir>
-    <IntDir>..\..\..\intermediate\windows-aarch64\release\generate-lookup-tables\</IntDir>
+    <IntDir>..\..\..\intermediate\windows-aarch64\release\generate-spirv-embed\</IntDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
   </ItemDefinitionGroup>
@@ -140,22 +140,22 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release aarch64|ARM64'">
   </ItemDefinitionGroup>
   <ItemGroup>
-    <CustomBuild Include="..\..\..\external\spirv-headers\include\spirv\unified1\extinst.glsl.std.450.grammar.json">
+    <CustomBuild Include="..\..\..\external\spirv-headers\include\spirv\unified1\spirv.core.grammar.json">
       <FileType>Document</FileType>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">"../../../bin/windows-x86/debug/slang-lookup-generator" %(FullPath) $(SolutionDir)/source/slang/slang-lookup-glslstd450.cpp GLSLstd450 GLSLstd450 spirv/unified1/GLSL.std.450.h</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">"../../../bin/windows-x64/debug/slang-lookup-generator" %(FullPath) $(SolutionDir)/source/slang/slang-lookup-glslstd450.cpp GLSLstd450 GLSLstd450 spirv/unified1/GLSL.std.450.h</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug aarch64|ARM64'">"../../../bin/windows-aarch64/debug/slang-lookup-generator" %(FullPath) $(SolutionDir)/source/slang/slang-lookup-glslstd450.cpp GLSLstd450 GLSLstd450 spirv/unified1/GLSL.std.450.h</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"../../../bin/windows-x86/release/slang-lookup-generator" %(FullPath) $(SolutionDir)/source/slang/slang-lookup-glslstd450.cpp GLSLstd450 GLSLstd450 spirv/unified1/GLSL.std.450.h</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">"../../../bin/windows-x64/release/slang-lookup-generator" %(FullPath) $(SolutionDir)/source/slang/slang-lookup-glslstd450.cpp GLSLstd450 GLSLstd450 spirv/unified1/GLSL.std.450.h</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release aarch64|ARM64'">"../../../bin/windows-aarch64/release/slang-lookup-generator" %(FullPath) $(SolutionDir)/source/slang/slang-lookup-glslstd450.cpp GLSLstd450 GLSLstd450 spirv/unified1/GLSL.std.450.h</Command>
-      <Outputs>../../../source/slang/slang-lookup-glslstd450.cpp</Outputs>
-      <Message>slang-lookup-generator for slang-lookup-glslstd450.cpp</Message>
-      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">../../../external/spirv-headers/include/spirv/unified1/extinst.glsl.std.450.grammar.json;../../../bin/windows-x86/debug/slang-lookup-generator.exe</AdditionalInputs>
-      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">../../../external/spirv-headers/include/spirv/unified1/extinst.glsl.std.450.grammar.json;../../../bin/windows-x64/debug/slang-lookup-generator.exe</AdditionalInputs>
-      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug aarch64|ARM64'">../../../external/spirv-headers/include/spirv/unified1/extinst.glsl.std.450.grammar.json;../../../bin/windows-aarch64/debug/slang-lookup-generator.exe</AdditionalInputs>
-      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">../../../external/spirv-headers/include/spirv/unified1/extinst.glsl.std.450.grammar.json;../../../bin/windows-x86/release/slang-lookup-generator.exe</AdditionalInputs>
-      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">../../../external/spirv-headers/include/spirv/unified1/extinst.glsl.std.450.grammar.json;../../../bin/windows-x64/release/slang-lookup-generator.exe</AdditionalInputs>
-      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release aarch64|ARM64'">../../../external/spirv-headers/include/spirv/unified1/extinst.glsl.std.450.grammar.json;../../../bin/windows-aarch64/release/slang-lookup-generator.exe</AdditionalInputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">"../../../bin/windows-x86/debug/slang-spirv-embed-generator" %(FullPath) $(SolutionDir)/source/slang/slang-spirv-core-grammar-embed.cpp</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">"../../../bin/windows-x64/debug/slang-spirv-embed-generator" %(FullPath) $(SolutionDir)/source/slang/slang-spirv-core-grammar-embed.cpp</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug aarch64|ARM64'">"../../../bin/windows-aarch64/debug/slang-spirv-embed-generator" %(FullPath) $(SolutionDir)/source/slang/slang-spirv-core-grammar-embed.cpp</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"../../../bin/windows-x86/release/slang-spirv-embed-generator" %(FullPath) $(SolutionDir)/source/slang/slang-spirv-core-grammar-embed.cpp</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">"../../../bin/windows-x64/release/slang-spirv-embed-generator" %(FullPath) $(SolutionDir)/source/slang/slang-spirv-core-grammar-embed.cpp</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release aarch64|ARM64'">"../../../bin/windows-aarch64/release/slang-spirv-embed-generator" %(FullPath) $(SolutionDir)/source/slang/slang-spirv-core-grammar-embed.cpp</Command>
+      <Outputs>../../../source/slang/slang-spirv-core-grammar-embed.cpp</Outputs>
+      <Message>slang-spirv-embed-generator for slang-spirv-core-grammar-embed.cpp</Message>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">../../../external/spirv-headers/include/spirv/unified1/spirv.core.grammar.json;../../../bin/windows-x86/debug/slang-spirv-embed-generator.exe</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">../../../external/spirv-headers/include/spirv/unified1/spirv.core.grammar.json;../../../bin/windows-x64/debug/slang-spirv-embed-generator.exe</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug aarch64|ARM64'">../../../external/spirv-headers/include/spirv/unified1/spirv.core.grammar.json;../../../bin/windows-aarch64/debug/slang-spirv-embed-generator.exe</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">../../../external/spirv-headers/include/spirv/unified1/spirv.core.grammar.json;../../../bin/windows-x86/release/slang-spirv-embed-generator.exe</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">../../../external/spirv-headers/include/spirv/unified1/spirv.core.grammar.json;../../../bin/windows-x64/release/slang-spirv-embed-generator.exe</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release aarch64|ARM64'">../../../external/spirv-headers/include/spirv/unified1/spirv.core.grammar.json;../../../bin/windows-aarch64/release/slang-spirv-embed-generator.exe</AdditionalInputs>
     </CustomBuild>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

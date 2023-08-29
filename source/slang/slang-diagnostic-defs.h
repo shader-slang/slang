@@ -245,6 +245,13 @@ DIAGNOSTIC(29100, Error, unrecognizedSPIRVOpcode, "unrecognized spirv opcode: $0
 DIAGNOSTIC(29101, Error, misplacedResultIdMarker, "the result-id marker must only be used in the last instruction of a spriv_asm expression")
 DIAGNOSTIC(29102, Note,  considerOpCopyObject, "consider adding an OpCopyObject instruction to the end of the spirv_asm expression")
 DIAGNOSTIC(29103, Note,  noSuchAddress, "unable to take the address of this address-of asm operand")
+DIAGNOSTIC(29104, Error, spirvInstructionWithoutResultId, "cannot use this 'x = $0...' syntax because $0 does not have a <result-id> operand")
+DIAGNOSTIC(29104, Error, spirvInstructionWithoutResultTypeId, "cannot use this 'x : <type> = $0...' syntax because $0 does not have a <result-type-id> operand")
+// This is a warning because we trust that people using the spirv_asm block know what they're doing
+DIAGNOSTIC(29104, Warning, spirvInstructionWithTooManyOperands, "too many operands for $0 (expected max $1), did you forget a semicolon?")
+DIAGNOSTIC(29104, Error, spirvUnableToResolveName, "unknown SPIR-V identifier $0, it's not a known enumerator or opcode")
+DIAGNOSTIC(29104, Error, spirvNonConstantBitwiseOr, "only integer literals and enum names can appear in a bitwise or expression")
+DIAGNOSTIC(29104, Error, spirvOperandRange, "Literal ints must be in the range 0 to 0xffffffff")
 
 
 //

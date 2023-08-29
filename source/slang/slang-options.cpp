@@ -102,6 +102,7 @@ enum class OptionKind
 
     EmitSpirvViaGLSL,
     EmitSpirvDirectly,
+    SPIRVCoreGrammarJSON,
     
     // Downstream
 
@@ -518,6 +519,8 @@ void initCommandOptions(CommandOptions& options)
         "Generate SPIR-V output by compiling generated GLSL with glslang (default)" },
         { OptionKind::EmitSpirvDirectly, "-emit-spirv-directly", nullptr,
         "Generate SPIR-V output direclty rather than by compiling generated GLSL with glslang" },
+        { OptionKind::SPIRVCoreGrammarJSON, "-spirv-core-grammar", nullptr,
+        "A path to a specific spirv.core.grammar.json to use when generating SPIR-V output" },
 #endif
     };
 
@@ -888,6 +891,8 @@ struct OptionsParser
     bool m_compileStdLib = false;
     slang::CompileStdLibFlags m_compileStdLibFlags = 0;
     bool m_hasLoadedRepro = false;
+
+    String m_spirvCoreGrammarJSONPath;
 
     CommandLineReader m_reader;
 
@@ -2300,6 +2305,13 @@ SlangResult OptionsParser::_parse(
                 getCurrentTarget()->targetFlags |= SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY;
             }
             break;
+            case OptionKind::SPIRVCoreGrammarJSON:
+            {
+                CommandLineArg path;
+                SLANG_RETURN_ON_FAIL(m_reader.expectArg(path));
+                m_spirvCoreGrammarJSONPath = path.value;
+            }
+            break;
 
             case OptionKind::DefaultDownstreamCompiler:
             {
@@ -2841,6 +2853,11 @@ SlangResult OptionsParser::_parse(
     if (m_defaultMatrixLayoutMode != SLANG_MATRIX_LAYOUT_MODE_UNKNOWN)
     {
         m_compileRequest->setMatrixLayoutMode(m_defaultMatrixLayoutMode);
+    }
+
+    if(m_spirvCoreGrammarJSONPath.getLength())
+    {
+        m_session->setSPIRVCoreGrammar(m_spirvCoreGrammarJSONPath.getBuffer());
     }
 
     // Next we need to sort out the output files specified with `-o`, and
