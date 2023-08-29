@@ -436,17 +436,17 @@ void CUDASourceEmitter::_emitInitializerList(IRType* elementType, IRUse* operand
     m_writer->emit("\n}");
 }
 
-void CUDASourceEmitter::emitIntrinsicCallExprImpl(IRCall* inst, IRTargetIntrinsicDecoration* targetIntrinsic, EmitOpInfo const& inOuterPrec)
+void CUDASourceEmitter::emitIntrinsicCallExprImpl(IRCall* inst, UnownedStringSlice intrinsicDefinition, EmitOpInfo const& inOuterPrec)
 {
     // This works around the problem, where some intrinsics that require the "half" type enabled don't use the half/float16_t type.
     // For example `f16tof32` can operate on float16_t *and* uint. If the input is uint, although we are 
     // using the half feature (as far as CUDA is concerned), the half/float16_t type is not visible/directly used.
-    if (targetIntrinsic->getDefinition().startsWith(toSlice("__half")))
+    if (intrinsicDefinition.startsWith(toSlice("__half")))
     {
         m_extensionTracker->requireBaseType(BaseType::Half);
     }
 
-    Super::emitIntrinsicCallExprImpl(inst, targetIntrinsic, inOuterPrec);
+    Super::emitIntrinsicCallExprImpl(inst, intrinsicDefinition, inOuterPrec);
 }
 
 bool CUDASourceEmitter::tryEmitInstStmtImpl(IRInst* inst)

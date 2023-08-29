@@ -450,6 +450,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ir-specialize-function-call.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-specialize-matrix-layout.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-specialize-resources.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-specialize-target-switch.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-specialize.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-spirv-legalize.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-spirv-snippet.h" />
@@ -661,6 +662,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ir-specialize-function-call.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-specialize-matrix-layout.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-specialize-resources.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-specialize-target-switch.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-specialize.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-spirv-legalize.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-spirv-snippet.cpp" />

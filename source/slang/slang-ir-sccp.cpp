@@ -1192,7 +1192,13 @@ struct SCCPContext
                 }
                 cfgWorkList.add(switchInst->getDefaultLabel());
             }
-
+            else if (auto targetSwitch = as<IRTargetSwitch>(inst))
+            {
+                for (UInt cc = 0; cc < targetSwitch->getCaseCount(); ++cc)
+                {
+                    cfgWorkList.add(targetSwitch->getCaseBlock(cc));
+                }
+            }
             // There are other cases of terminator instructions not handled
             // above (e.g., `return` instructions), but these can't cause
             // additional basic blocks in the CFG to execute, so we don't
@@ -1555,7 +1561,6 @@ struct SCCPContext
                     terminator->removeAndDeallocate();
                     changed = true;
                 }
-            
             }
         }
 
