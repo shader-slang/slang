@@ -14,6 +14,8 @@
 
 #include "../compiler-core/slang-source-embed-util.h"
 
+#include "../compiler-core/slang-spirv-core-grammar.h"
+
 #include "../core/slang-std-writers.h"
 #include "../core/slang-command-options.h"
 
@@ -2995,7 +2997,9 @@ namespace Slang
             *outDownstreamTime = m_downstreamCompileTime;
             *outTotalTime = m_totalCompileTime;
         }
-        
+
+        SLANG_NO_THROW SlangResult SLANG_MCALL setSPIRVCoreGrammar(char const* jsonPath) override;
+
             /// Get the downstream compiler for a transition
         IDownstreamCompiler* getDownstreamCompiler(CodeGenTarget source, CodeGenTarget target);
         
@@ -3047,6 +3051,14 @@ namespace Slang
 
         RefPtr<SharedASTBuilder> m_sharedASTBuilder;
 
+        SPIRVCoreGrammarInfo& getSPIRVCoreGrammarInfo()
+        {
+            if(!spirvCoreGrammarInfo)
+                setSPIRVCoreGrammar(nullptr);
+            SLANG_ASSERT(spirvCoreGrammarInfo);
+            return *spirvCoreGrammarInfo;
+        }
+        RefPtr<SPIRVCoreGrammarInfo> spirvCoreGrammarInfo;
 
         //
 

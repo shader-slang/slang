@@ -902,10 +902,69 @@ struct PeepholeContext : InstPassBase
                 }
                 break;
             }
-
+        case kIROp_TypeEquals:
+            {
+                auto left = inst->getOperand(0)->getDataType();
+                auto right = inst->getOperand(1)->getDataType();
+                if (isConcreteType(left) && isConcreteType(right))
+                {
+                    IRBuilder builder(module);
+                    builder.setInsertBefore(inst);
+                    bool result = left == right;
+                    inst->replaceUsesWith(builder.getBoolValue(result));
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
+                break;
+            }
+        case kIROp_IsInt:
+        case kIROp_IsFloat:
+        case kIROp_IsUnsignedInt:
+        case kIROp_IsSignedInt:
+        case kIROp_IsBool:
+            {
+                auto type = inst->getOperand(0)->getDataType();
+                if (auto vectorType = as<IRVectorType>(type))
+                    type = vectorType->getElementType();
+                if (auto matType = as<IRMatrixType>(type))
+                    type = matType->getElementType();
+                if (isConcreteType(type))
+                {
+                    IRBuilder builder(module);
+                    builder.setInsertBefore(inst);
+                    bool result = false;
+                    switch (inst->getOp())
+                    {
+                    case kIROp_IsInt:
+                        result = isIntegralType(type);
+                        break;
+                    case kIROp_IsBool:
+                        result = type->getOp() == kIROp_BoolType;
+                        break;
+                    case kIROp_IsFloat:
+                        result = isFloatingType(type);
+                        break;
+                    case kIROp_IsUnsignedInt:
+                        result = isIntegralType(type) && !getIntTypeInfo(type).isSigned;
+                        break;
+                    case kIROp_IsSignedInt:
+                        result = isIntegralType(type) && getIntTypeInfo(type).isSigned;
+                        break;
+                    }
+                    inst->replaceUsesWith(builder.getBoolValue(result));
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
+                break;
+            }
         default:
             break;
         }
+    }
+
+    bool isConcreteType(IRType* type)
+    {
+        return type->parent->getOp() == kIROp_Module && !as<IRGlobalGenericParam>(type);
     }
 
     bool processFunc(IRInst* func)

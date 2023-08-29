@@ -1100,7 +1100,7 @@ extern "C"
     typedef void(*SlangFuncPtr)(void);
 
     /** 
-    (DEPRECIATED) ISlangSharedLibrary
+    (DEPRECATED) ISlangSharedLibrary
     */
     struct ISlangSharedLibrary_Dep1: public ISlangUnknown
     {
@@ -3365,7 +3365,7 @@ namespace slang
             SlangPassThrough passThrough,
             char const* path) = 0;
 
-            /** DEPRECIATED: Use setLanguagePrelude
+            /** DEPRECATED: Use setLanguagePrelude
 
             Set the 'prelude' for generated code for a 'downstream compiler'.
             @param passThrough The downstream compiler for generated code that will have the prelude applied to it. 
@@ -3377,7 +3377,7 @@ namespace slang
             SlangPassThrough passThrough,
             const char* preludeText) = 0;
 
-            /** DEPRECIATED: Use getLanguagePrelude
+            /** DEPRECATED: Use getLanguagePrelude
 
             Get the 'prelude' for generated code for a 'downstream compiler'.
             @param passThrough The downstream compiler for generated code that will have the prelude applied to it. 
@@ -3526,6 +3526,12 @@ namespace slang
             /** Get the time in seconds spent in the slang and downstream compiler.
             */
         virtual SLANG_NO_THROW void SLANG_MCALL getCompilerElapsedTime(double* outTotalTime, double* outDownstreamTime) = 0;
+
+            /** Specify a spirv.core.grammar.json file to load and use when
+             * parsing and checking any SPIR-V code
+             */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL setSPIRVCoreGrammar(
+            char const* jsonPath) = 0;
     };
 
     #define SLANG_UUID_IGlobalSession IGlobalSession::getTypeGuid()

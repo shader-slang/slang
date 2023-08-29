@@ -12,120 +12,115 @@
 namespace Slang
 {
 
-static const unsigned tableSalt[81] ={
-    1, 1, 1, 1, 4, 0, 1, 0, 10, 0, 3, 0, 0, 13, 4, 1,
-    5, 1, 5, 4, 0, 0, 0, 1, 0, 9, 1, 0, 0, 1, 1, 8,
-    2, 0, 0, 2, 0, 1, 0, 0, 2, 1, 1, 0, 0, 0, 0, 1,
-    4, 3, 9, 0, 26, 0, 0, 2, 0, 2, 8, 0, 0, 17, 20, 5,
-    0, 0, 0, 5, 4, 9, 4, 23, 0, 1, 7, 0, 24, 43, 10, 41,
-    6
-};
-
-struct KV
-{
-    const char* name;
-    GLSLstd450 value;
-};
-
-static const KV words[81] =
-{
-    {"FindSMsb", GLSLstd450FindSMsb},
-    {"SClamp", GLSLstd450SClamp},
-    {"UnpackHalf2x16", GLSLstd450UnpackHalf2x16},
-    {"Normalize", GLSLstd450Normalize},
-    {"Pow", GLSLstd450Pow},
-    {"Ceil", GLSLstd450Ceil},
-    {"PackUnorm4x8", GLSLstd450PackUnorm4x8},
-    {"Cosh", GLSLstd450Cosh},
-    {"Frexp", GLSLstd450Frexp},
-    {"PackUnorm2x16", GLSLstd450PackUnorm2x16},
-    {"Atan2", GLSLstd450Atan2},
-    {"Exp", GLSLstd450Exp},
-    {"Ldexp", GLSLstd450Ldexp},
-    {"NClamp", GLSLstd450NClamp},
-    {"PackHalf2x16", GLSLstd450PackHalf2x16},
-    {"Trunc", GLSLstd450Trunc},
-    {"UMin", GLSLstd450UMin},
-    {"FClamp", GLSLstd450FClamp},
-    {"SMin", GLSLstd450SMin},
-    {"IMix", GLSLstd450IMix},
-    {"FindUMsb", GLSLstd450FindUMsb},
-    {"Cos", GLSLstd450Cos},
-    {"UnpackUnorm4x8", GLSLstd450UnpackUnorm4x8},
-    {"Fma", GLSLstd450Fma},
-    {"RoundEven", GLSLstd450RoundEven},
-    {"Log", GLSLstd450Log},
-    {"Refract", GLSLstd450Refract},
-    {"Distance", GLSLstd450Distance},
-    {"UMax", GLSLstd450UMax},
-    {"ModfStruct", GLSLstd450ModfStruct},
-    {"PackSnorm4x8", GLSLstd450PackSnorm4x8},
-    {"Determinant", GLSLstd450Determinant},
-    {"SmoothStep", GLSLstd450SmoothStep},
-    {"Reflect", GLSLstd450Reflect},
-    {"Fract", GLSLstd450Fract},
-    {"Asin", GLSLstd450Asin},
-    {"Tanh", GLSLstd450Tanh},
-    {"Degrees", GLSLstd450Degrees},
-    {"Sqrt", GLSLstd450Sqrt},
-    {"MatrixInverse", GLSLstd450MatrixInverse},
-    {"Exp2", GLSLstd450Exp2},
-    {"Cross", GLSLstd450Cross},
-    {"FindILsb", GLSLstd450FindILsb},
-    {"FMax", GLSLstd450FMax},
-    {"NMin", GLSLstd450NMin},
-    {"SMax", GLSLstd450SMax},
-    {"InverseSqrt", GLSLstd450InverseSqrt},
-    {"Length", GLSLstd450Length},
-    {"SAbs", GLSLstd450SAbs},
-    {"UClamp", GLSLstd450UClamp},
-    {"FMix", GLSLstd450FMix},
-    {"FaceForward", GLSLstd450FaceForward},
-    {"Tan", GLSLstd450Tan},
-    {"Modf", GLSLstd450Modf},
-    {"PackSnorm2x16", GLSLstd450PackSnorm2x16},
-    {"Round", GLSLstd450Round},
-    {"UnpackUnorm2x16", GLSLstd450UnpackUnorm2x16},
-    {"Atan", GLSLstd450Atan},
-    {"FSign", GLSLstd450FSign},
-    {"Sin", GLSLstd450Sin},
-    {"UnpackSnorm2x16", GLSLstd450UnpackSnorm2x16},
-    {"Radians", GLSLstd450Radians},
-    {"PackDouble2x32", GLSLstd450PackDouble2x32},
-    {"Sinh", GLSLstd450Sinh},
-    {"UnpackSnorm4x8", GLSLstd450UnpackSnorm4x8},
-    {"InterpolateAtCentroid", GLSLstd450InterpolateAtCentroid},
-    {"NMax", GLSLstd450NMax},
-    {"Acosh", GLSLstd450Acosh},
-    {"Acos", GLSLstd450Acos},
-    {"UnpackDouble2x32", GLSLstd450UnpackDouble2x32},
-    {"FrexpStruct", GLSLstd450FrexpStruct},
-    {"Atanh", GLSLstd450Atanh},
-    {"Floor", GLSLstd450Floor},
-    {"Asinh", GLSLstd450Asinh},
-    {"InterpolateAtOffset", GLSLstd450InterpolateAtOffset},
-    {"Step", GLSLstd450Step},
-    {"FAbs", GLSLstd450FAbs},
-    {"InterpolateAtSample", GLSLstd450InterpolateAtSample},
-    {"Log2", GLSLstd450Log2},
-    {"SSign", GLSLstd450SSign},
-    {"FMin", GLSLstd450FMin},
-};
-
-static UInt32 hash(const UnownedStringSlice& str, UInt32 salt)
-{
-    UInt64 h = salt;
-    for(const char c : str)
-        h = ((h * 0x00000100000001B3) ^ c);
-    return h % (sizeof(tableSalt)/sizeof(tableSalt[0]));
-}
-
 bool lookupGLSLstd450(const UnownedStringSlice& str, GLSLstd450& value)
 {
-    const auto i = hash(str, tableSalt[hash(str, 0)]);
-    if(str == words[i].name)
+    static const unsigned tableSalt[81] = {
+        1, 3, 0, 0, 6, 1, 2, 3, 0, 0, 0, 1, 4, 0, 1, 0,
+        0, 0, 1, 3, 0, 0, 5, 0, 2, 0, 0, 0, 0, 0, 1, 0,
+        2, 1, 1, 1, 8, 3, 1, 3, 0, 0, 3, 0, 3, 0, 9, 0,
+        16, 0, 1, 0, 2, 0, 1, 1, 0, 0, 0, 2, 16, 15, 6, 1,
+        1, 2, 2, 7, 7, 2, 24, 0, 16, 27, 1, 1, 176, 0, 11, 0,
+        6
+    };
+
+    using KV = std::pair<const char*, GLSLstd450>;
+
+    static const KV words[81] =
     {
-        value = words[i].value;
+        {"InterpolateAtOffset", GLSLstd450InterpolateAtOffset},
+        {"Floor", GLSLstd450Floor},
+        {"UnpackDouble2x32", GLSLstd450UnpackDouble2x32},
+        {"Acosh", GLSLstd450Acosh},
+        {"FindUMsb", GLSLstd450FindUMsb},
+        {"Sinh", GLSLstd450Sinh},
+        {"NMin", GLSLstd450NMin},
+        {"Cos", GLSLstd450Cos},
+        {"UMax", GLSLstd450UMax},
+        {"Sqrt", GLSLstd450Sqrt},
+        {"Frexp", GLSLstd450Frexp},
+        {"Determinant", GLSLstd450Determinant},
+        {"ModfStruct", GLSLstd450ModfStruct},
+        {"PackSnorm4x8", GLSLstd450PackSnorm4x8},
+        {"FrexpStruct", GLSLstd450FrexpStruct},
+        {"Cross", GLSLstd450Cross},
+        {"FClamp", GLSLstd450FClamp},
+        {"Fract", GLSLstd450Fract},
+        {"FaceForward", GLSLstd450FaceForward},
+        {"MatrixInverse", GLSLstd450MatrixInverse},
+        {"PackUnorm4x8", GLSLstd450PackUnorm4x8},
+        {"Log2", GLSLstd450Log2},
+        {"Reflect", GLSLstd450Reflect},
+        {"Radians", GLSLstd450Radians},
+        {"Round", GLSLstd450Round},
+        {"InverseSqrt", GLSLstd450InverseSqrt},
+        {"Exp", GLSLstd450Exp},
+        {"Normalize", GLSLstd450Normalize},
+        {"UnpackSnorm2x16", GLSLstd450UnpackSnorm2x16},
+        {"InterpolateAtCentroid", GLSLstd450InterpolateAtCentroid},
+        {"Refract", GLSLstd450Refract},
+        {"Fma", GLSLstd450Fma},
+        {"UClamp", GLSLstd450UClamp},
+        {"FAbs", GLSLstd450FAbs},
+        {"RoundEven", GLSLstd450RoundEven},
+        {"FSign", GLSLstd450FSign},
+        {"SSign", GLSLstd450SSign},
+        {"Asinh", GLSLstd450Asinh},
+        {"PackHalf2x16", GLSLstd450PackHalf2x16},
+        {"Tan", GLSLstd450Tan},
+        {"SMin", GLSLstd450SMin},
+        {"Degrees", GLSLstd450Degrees},
+        {"PackSnorm2x16", GLSLstd450PackSnorm2x16},
+        {"FMix", GLSLstd450FMix},
+        {"Atan2", GLSLstd450Atan2},
+        {"PackUnorm2x16", GLSLstd450PackUnorm2x16},
+        {"NMax", GLSLstd450NMax},
+        {"NClamp", GLSLstd450NClamp},
+        {"FindSMsb", GLSLstd450FindSMsb},
+        {"Atanh", GLSLstd450Atanh},
+        {"Atan", GLSLstd450Atan},
+        {"Modf", GLSLstd450Modf},
+        {"Cosh", GLSLstd450Cosh},
+        {"Exp2", GLSLstd450Exp2},
+        {"Tanh", GLSLstd450Tanh},
+        {"UMin", GLSLstd450UMin},
+        {"FMin", GLSLstd450FMin},
+        {"Log", GLSLstd450Log},
+        {"SAbs", GLSLstd450SAbs},
+        {"IMix", GLSLstd450IMix},
+        {"Step", GLSLstd450Step},
+        {"InterpolateAtSample", GLSLstd450InterpolateAtSample},
+        {"UnpackHalf2x16", GLSLstd450UnpackHalf2x16},
+        {"PackDouble2x32", GLSLstd450PackDouble2x32},
+        {"FMax", GLSLstd450FMax},
+        {"Length", GLSLstd450Length},
+        {"Distance", GLSLstd450Distance},
+        {"SmoothStep", GLSLstd450SmoothStep},
+        {"UnpackUnorm2x16", GLSLstd450UnpackUnorm2x16},
+        {"SMax", GLSLstd450SMax},
+        {"UnpackSnorm4x8", GLSLstd450UnpackSnorm4x8},
+        {"Asin", GLSLstd450Asin},
+        {"UnpackUnorm4x8", GLSLstd450UnpackUnorm4x8},
+        {"Ldexp", GLSLstd450Ldexp},
+        {"Ceil", GLSLstd450Ceil},
+        {"SClamp", GLSLstd450SClamp},
+        {"Trunc", GLSLstd450Trunc},
+        {"Sin", GLSLstd450Sin},
+        {"Pow", GLSLstd450Pow},
+        {"FindILsb", GLSLstd450FindILsb},
+        {"Acos", GLSLstd450Acos},
+    };
+
+    static const auto hash = [](const UnownedStringSlice& str, UInt32 salt){
+        UInt32 h = salt;
+        for (const char c : str)
+            h = (h * 0x01000193) ^ c;
+        return h % 81;
+    };
+
+    const auto i = hash(str, tableSalt[hash(str, 0)]);
+    if(str == words[i].first)
+    {
+        value = words[i].second;
         return true;
     }
     else

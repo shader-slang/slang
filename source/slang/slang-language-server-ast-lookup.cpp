@@ -540,6 +540,21 @@ struct ASTLookupStmtVisitor : public StmtVisitor<ASTLookupStmtVisitor, bool>
 
     bool visitCaseStmt(CaseStmt* stmt) { return checkExpr(stmt->expr); }
 
+    bool visitTargetSwitchStmt(TargetSwitchStmt* stmt)
+    {
+        for (auto targetCase : stmt->targetCases)
+            if (dispatchIfNotNull(targetCase))
+                return true;
+        return false;
+    }
+
+    bool visitTargetCaseStmt(TargetCaseStmt* stmt)
+    {
+        return dispatchIfNotNull(stmt->body);
+    }
+
+    bool visitIntrinsicAsmStmt(IntrinsicAsmStmt*) { return false; }
+
     bool visitDefaultStmt(DefaultStmt*) { return false; }
 
     bool visitIfStmt(IfStmt* stmt)

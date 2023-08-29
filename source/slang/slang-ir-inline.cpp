@@ -173,6 +173,19 @@ struct InliningPassBase
         return false;
     }
 
+    static bool hasGenericAsmInst(IRInst* func)
+    {
+        auto f = as<IRFunc>(getResolvedInstForDecorations(func));
+        if (!f)
+            return false;
+        for (auto b : f->getBlocks())
+        {
+            if (as<IRGenericAsm>(b->getTerminator()))
+                return true;
+        }
+        return false;
+    }
+
         /// Determine whether `call` can be inlined, and if so write information about it to `outCallSite`
     bool canInline(IRCall* call, CallSiteInfo& outCallSite)
     {
@@ -235,6 +248,24 @@ struct InliningPassBase
 
         if (callee->findDecoration<IRIntrinsicOpDecoration>())
             return true;
+
+        // We cannot inline a function that is defined by a generic asm inst.
+        if (hasGenericAsmInst(callee))
+            return false;
+
+        for (auto decor : callee->getDecorations())
+        {
+            switch (decor->getOp())
+            {
+            case kIROp_IntrinsicOpDecoration:
+                return true;
+            case kIROp_RequireSPIRVCapabilityDecoration:
+            case kIROp_RequireSPIRVVersionDecoration:
+            case kIROp_RequireGLSLExtensionDecoration:
+            case kIROp_RequireGLSLVersionDecoration:
+                return false;
+            }
+        }
 
         // At this point the `CallSiteInfo` is complete and
         // could be used for inlining, but we have additional
@@ -665,9 +696,10 @@ struct MandatoryEarlyInliningPass : InliningPassBase
 
     bool shouldInline(CallSiteInfo const& info)
     {
-        if(info.callee->findDecoration<IRUnsafeForceInlineEarlyDecoration>())
-            return true;
         if (info.callee->findDecoration<IRIntrinsicOpDecoration>())
+            return true;
+
+        if(info.callee->findDecoration<IRUnsafeForceInlineEarlyDecoration>())
             return true;
         return false;
     }

@@ -311,6 +311,11 @@ public:
         /// Returns true if all the keys are unique
     static bool areKeysUnique(const JSONKeyValue* keyValues, Index keyValueCount);
 
+        /// Access the internal set of strings, removing anything from this
+        /// will invalidate the container, so only do it immediately prior to
+        /// destruction.
+    StringSlicePool& getStringSlicePool() {return m_slicePool;};
+
 protected:
     struct Range
     {
