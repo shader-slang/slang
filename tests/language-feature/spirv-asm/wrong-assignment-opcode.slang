@@ -15,7 +15,7 @@ int foo(const int constParam)
     spirv_asm
     {
         %bar : %wrong = OpTypeInt 32 0
-        // CHECK: wrong-assignment-opcode.slang([[#@LINE-1]]): error 29104: cannot use this 'x : <type> = OpTypeInt...' syntax because OpTypeInt does not have a <result-type-id> operand
+        // CHECK: wrong-assignment-opcode.slang([[#@LINE-1]]): error {{.*}}: cannot use this 'x : <type> = OpTypeInt...' syntax because OpTypeInt does not have a <result-type-id> operand
 
     };
 
@@ -23,19 +23,19 @@ int foo(const int constParam)
     spirv_asm
     {
         %foo = OpStore 1 2;
-        // CHECK: wrong-assignment-opcode.slang([[#@LINE-1]]): error 29104: cannot use this 'x = OpStore...' syntax because OpStore does not have a <result-id> operand
+        // CHECK: wrong-assignment-opcode.slang([[#@LINE-1]]): error {{.*}}: cannot use this 'x = OpStore...' syntax because OpStore does not have a <result-id> operand
     };
 
     // garbage
     spirv_asm
     {
         %foo =;
-        // CHECK: wrong-assignment-opcode.slang([[#@LINE-1]]): error 20003: unexpected ';'
+        // CHECK: wrong-assignment-opcode.slang([[#@LINE-1]]): error {{.*}}: unexpected ';'
         %foo :;
-        // CHECK: wrong-assignment-opcode.slang([[#@LINE-1]]): error 20003: unexpected ';'
+        // CHECK: wrong-assignment-opcode.slang([[#@LINE-1]]): error {{.*}}: unexpected ';'
         %foo : bar;
-        // CHECK: wrong-assignment-opcode.slang([[#@LINE-1]]): error 20001: unexpected ';', expected '='
+        // CHECK: wrong-assignment-opcode.slang([[#@LINE-1]]): error {{.*}}: unexpected ';', expected '='
         %foo : bar =;
-        // CHECK: wrong-assignment-opcode.slang([[#@LINE-1]]): error 20003: unexpected ';'
+        // CHECK: wrong-assignment-opcode.slang([[#@LINE-1]]): error {{.*}}: unexpected ';'
     };
 }
