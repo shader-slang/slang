@@ -1880,23 +1880,7 @@ void CLikeSourceEmitter::emitComInterfaceCallExpr(IRCall* inst, EmitOpInfo const
 
 bool CLikeSourceEmitter::findTargetIntrinsicDefinition(IRInst* callee, UnownedStringSlice& outDefinition)
 {
-    if (auto decor = _findBestTargetIntrinsicDecoration(callee))
-    {
-        outDefinition = decor->getDefinition();
-        return true;
-    }
-    auto func = as<IRGlobalValueWithCode>(callee);
-    if (!func)
-        return false;
-    auto block = func->getFirstBlock();
-    if (!block)
-        return false;
-    if (auto genAsm = as<IRGenericAsm>(block->getTerminator()))
-    {
-        outDefinition = genAsm->getAsm();
-        return true;
-    }
-    return false;
+    return Slang::findTargetIntrinsicDefinition(callee, getTargetCaps(), outDefinition);
 }
 
 void CLikeSourceEmitter::emitCallExpr(IRCall* inst, EmitOpInfo outerPrec)

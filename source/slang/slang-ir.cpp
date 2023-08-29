@@ -7754,6 +7754,26 @@ namespace Slang
         return findBestTargetDecoration(val, CapabilitySet(targetCapabilityAtom));
     }
 
+    bool findTargetIntrinsicDefinition(IRInst* callee, CapabilitySet const& targetCaps, UnownedStringSlice& outDefinition)
+    {
+        if (auto decor = findBestTargetIntrinsicDecoration(callee, targetCaps))
+        {
+            outDefinition = decor->getDefinition();
+            return true;
+        }
+        auto func = as<IRGlobalValueWithCode>(callee);
+        if (!func)
+            return false;
+        auto block = func->getFirstBlock();
+        if (!block)
+            return false;
+        if (auto genAsm = as<IRGenericAsm>(block->getTerminator()))
+        {
+            outDefinition = genAsm->getAsm();
+            return true;
+        }
+        return false;
+    }
 
 #if 0
     IRFunc* cloneSimpleFuncWithoutRegistering(IRSpecContextBase* context, IRFunc* originalFunc)

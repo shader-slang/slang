@@ -6883,6 +6883,7 @@ namespace Slang
         {
             modifier->capability = (int32_t)cap.value();
         }
+        parser->ReadToken(TokenType::RParent);
         return modifier;
     }
 

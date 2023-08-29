@@ -4529,6 +4529,8 @@ IRTargetSpecificDecoration* findBestTargetDecoration(
         IRInst*         val,
         CapabilityAtom  targetCapabilityAtom);
 
+bool findTargetIntrinsicDefinition(IRInst* callee, CapabilitySet const& targetCaps, UnownedStringSlice& outDefinition);
+
 inline IRTargetIntrinsicDecoration* findBestTargetIntrinsicDecoration(
     IRInst* inInst,
     CapabilitySet const& targetCaps)

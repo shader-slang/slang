@@ -665,9 +665,15 @@ struct MandatoryEarlyInliningPass : InliningPassBase
 
     bool shouldInline(CallSiteInfo const& info)
     {
-        if(info.callee->findDecoration<IRUnsafeForceInlineEarlyDecoration>())
-            return true;
         if (info.callee->findDecoration<IRIntrinsicOpDecoration>())
+            return true;
+
+        // Never inline a callee that has target intrinsic definition.
+        UnownedStringSlice definition;
+        if (findTargetIntrinsicDefinition(info.callee, CapabilitySet::makeEmpty(), definition))
+            return false;
+
+        if(info.callee->findDecoration<IRUnsafeForceInlineEarlyDecoration>())
             return true;
         return false;
     }
@@ -782,6 +788,11 @@ struct ForceInliningPass : InliningPassBase
 
     bool shouldInline(CallSiteInfo const& info)
     {
+        // Never inline a callee that has target intrinsic definition.
+        UnownedStringSlice definition;
+        if (findTargetIntrinsicDefinition(info.callee, CapabilitySet::makeEmpty(), definition))
+            return false;
+
         if (info.callee->findDecoration<IRForceInlineDecoration>() ||
             info.callee->findDecoration<IRUnsafeForceInlineEarlyDecoration>()||
             info.callee->findDecoration<IRIntrinsicOpDecoration>())
