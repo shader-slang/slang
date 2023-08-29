@@ -18,7 +18,7 @@ slangc -help-style markdown -h
 * [Debugging](#Debugging)
 * [Experimental](#Experimental)
 * [Internal](#Internal)
-* [Depreciated](#Depreciated)
+* [Deprecated](#Deprecated)
 * [compiler](#compiler)
 * [language](#language)
 * [archive-type](#archive-type)
@@ -647,8 +647,8 @@ Enable liveness tracking. Places SLANG_LIVE_START, and SLANG_LIVE_END in output 
 
 
 
-<a id="Depreciated"></a>
-# Depreciated
+<a id="Deprecated"></a>
+# Deprecated
 
 Deprecated options (allowed but ignored; may be removed in future) 
 
