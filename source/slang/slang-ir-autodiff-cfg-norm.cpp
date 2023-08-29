@@ -183,7 +183,7 @@ struct CFGNormalizationPass
         }
     }
 
-    RegionEndpoint getNormalizedRegionEndpoint( 
+    RegionEndpoint getNormalizedRegionEndpoint(
         BreakableRegionInfo* parentRegion, IRBlock* entryBlock, List<IRBlock*> afterBlocks)
     {
         IRBlock* currentBlock = entryBlock;
@@ -798,7 +798,7 @@ void normalizeCFG(
         }
         else
         {
-            for (auto successor : block->getSuccessors()) 
+            for (auto successor : block->getSuccessors())
                 workList.add(successor);
         }
     }
