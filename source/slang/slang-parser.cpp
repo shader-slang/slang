@@ -6411,8 +6411,26 @@ namespace Slang
         // At this point we can also parse bitwise or expressions
         //
         while(!(parser->LookAheadToken(TokenType::RBrace)
-            || parser->LookAheadToken(TokenType::Semicolon)))
+            || parser->LookAheadToken(TokenType::Semicolon))
+            || resultTypeOperand
+            || resultOperand)
         {
+            // Insert the LHS result-type operand
+            if(ret.operands.getCount() == opInfo->resultTypeIndex && resultTypeOperand)
+            {
+                ret.operands.add(*resultTypeOperand);
+                resultTypeOperand.reset();
+                continue;
+            }
+
+            // Insert the LHS result operand
+            if(ret.operands.getCount() == opInfo->resultIdIndex && resultOperand)
+            {
+                ret.operands.add(*resultOperand);
+                resultOperand.reset();
+                continue;
+            }
+
             if(ret.operands.getCount() == opInfo->maxOperandCount)
             {
                 parser->diagnose(
@@ -6422,14 +6440,6 @@ namespace Slang
                     opInfo->maxOperandCount
                 );
             }
-
-            // Insert the LHS result-type operand
-            if(ret.operands.getCount() == opInfo->resultTypeIndex && resultTypeOperand)
-                ret.operands.add(*resultTypeOperand);
-
-            // Insert the LHS result operand
-            if(ret.operands.getCount() == opInfo->resultIdIndex && resultOperand)
-                ret.operands.add(*resultOperand);
 
             if(auto operand = parseSPIRVAsmOperand(parser))
             {
