@@ -84,6 +84,53 @@ namespace Slang
     }
 }
 
+//
+// Some macros for avoiding boilerplate
+// TODO: could probably deduce the size with templates, and move the whole
+// thing into a template
+//
+#if __cplusplus >= 202002L
+#define SLANG_COMPONENTWISE_EQUALITY_1(type) bool operator==(const type& other) const = default;
+#define SLANG_COMPONENTWISE_EQUALITY_2(type) bool operator==(const type& other) const = default;
+#define SLANG_COMPONENTWISE_EQUALITY_3(type) bool operator==(const type& other) const = default;
+#else
+#define SLANG_COMPONENTWISE_EQUALITY_1(type) \
+    bool operator==(const type& other) const \
+    { \
+        const auto& [m1] = *this; \
+        const auto& [o1] = other; \
+        return m1 == o1; \
+    } \
+    bool operator!=(const type& other) const \
+    { \
+        return !(*this == other); \
+    }
+
+#define SLANG_COMPONENTWISE_EQUALITY_2(type) \
+    bool operator==(const type& other) const \
+    { \
+        const auto& [m1, m2] = *this; \
+        const auto& [o1, o2] = other; \
+        return m1 == o1 && m2 == o2; \
+    } \
+    bool operator!=(const type& other) const \
+    { \
+        return !(*this == other); \
+    }
+
+#define SLANG_COMPONENTWISE_EQUALITY_3(type) \
+    bool operator==(const type& other) const \
+    { \
+        const auto& [m1, m2, m3] = *this; \
+        const auto& [o1, o2, o3] = other; \
+        return m1 == o1 && m2 == o2 && m3 == o3; \
+    } \
+    bool operator!=(const type& other) const \
+    { \
+        return !(*this == other); \
+    }
+#endif
+
 // TODO: Shouldn't these be SLANG_ prefixed?
 #ifdef _MSC_VER
 #define UNREACHABLE_RETURN(x)

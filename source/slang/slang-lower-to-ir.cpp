@@ -3263,11 +3263,10 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                 {
                     if(operand.token.type == TokenType::IntegerLiteral)
                     {
-                        const auto v = getIntegerLiteralValue(operand.token);
                         // TODO: we should sign-extend these where appropriate,
                         // difficult because it requires information on usage...
                         return builder->emitSPIRVAsmOperandLiteral(
-                            builder->getIntValue(builder->getUIntType(), v));
+                            builder->getIntValue(builder->getUIntType(), operand.knownValue));
                     }
                     else if(operand.token.type == TokenType::StringLiteral)
                     {
@@ -3283,11 +3282,18 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                     return builder->emitSPIRVAsmOperandId(
                         builder->getStringValue(id));
                 }
+            case SPIRVAsmOperand::ResultMarker:
+                {
+                    return builder->emitSPIRVAsmOperandResult();
+                }
             case SPIRVAsmOperand::NamedValue:
                 {
-                    const auto id = operand.token.getContent();
-                    return builder->emitSPIRVAsmOperandEnum(
-                        builder->getStringValue(id));
+                    const auto v = operand.knownValue;
+                    const auto i = builder->getIntValue(builder->getIntType(), v);
+                    if(operand.wrapInId)
+                        return builder->emitSPIRVAsmOperandEnum(i, builder->getIntType());
+                    else
+                        return builder->emitSPIRVAsmOperandEnum(i);
                 }
             case SPIRVAsmOperand::SlangValue:
                 {
@@ -5715,6 +5721,49 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
                 info->anythingEmittedToCurrentCaseBlock = true;
             }
         }
+    }
+
+    void visitTargetSwitchStmt(TargetSwitchStmt* stmt)
+    {
+        auto builder = getBuilder();
+        startBlockIfNeeded(stmt);
+        auto initialBlock = builder->getBlock();
+        auto breakLabel = builder->createBlock();
+        context->shared->breakLabels.add(stmt, breakLabel);
+        builder->setInsertInto(initialBlock->getParent());
+        List<IRInst*> args;
+        args.add(breakLabel);
+        Dictionary<Stmt*, IRBlock*> mapCaseStmtToBlock;
+        for (auto targetCase : stmt->targetCases)
+        {
+            IRBlock* caseBlock = nullptr;
+            if (!mapCaseStmtToBlock.tryGetValue(targetCase->body, caseBlock))
+            {
+                caseBlock = builder->emitBlock();
+                lowerStmt(context, targetCase->body);
+                mapCaseStmtToBlock.add(targetCase->body, caseBlock);
+                if (!builder->getBlock()->getTerminator())
+                    builder->emitBranch(breakLabel);
+            }
+            args.add(builder->getIntValue(builder->getIntType(), targetCase->capability));
+            args.add(caseBlock);
+        }
+        context->shared->breakLabels.remove(stmt);
+        builder->setInsertInto(initialBlock);
+        builder->emitIntrinsicInst(nullptr, kIROp_TargetSwitch, (UInt)args.getCount(), args.getBuffer());
+        insertBlock(breakLabel);
+    }
+
+    void visitTargetCaseStmt(TargetCaseStmt*)
+    {
+        SLANG_UNREACHABLE("lowering target case");
+    }
+
+    void visitIntrinsicAsmStmt(IntrinsicAsmStmt* stmt)
+    {
+        auto builder = getBuilder();
+        IRInst* arg = builder->getStringValue(stmt->asmText.getUnownedSlice());
+        builder->emitIntrinsicInst(nullptr, kIROp_GenericAsm, 1, &arg);
     }
 
     void visitSwitchStmt(SwitchStmt* stmt)
@@ -9050,7 +9099,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             else if (auto spvVersion = as<RequiredSPIRVVersionModifier>(modifier))
                 getBuilder()->addRequireSPIRVVersionDecoration(irFunc, spvVersion->version);
             else if (auto capMod = as<RequiredSPIRVCapabilityModifier>(modifier))
-                getBuilder()->addRequireSPIRVCapabilityDecoration(irFunc, capMod->capability);
+                getBuilder()->addRequireSPIRVCapabilityDecoration(irFunc, capMod->capability, capMod->extensionName.getUnownedSlice());
             else if (auto cudasmVersion = as<RequiredCUDASMVersionModifier>(modifier))
                 getBuilder()->addRequireCUDASMVersionDecoration(irFunc, cudasmVersion->version);
         }

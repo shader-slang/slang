@@ -56,8 +56,8 @@ struct LValueCastLoweringContext
         /// Only some targets can allow such conversions
     bool _canReinterpretCast(IRType* a, IRType* b)
     {
-        auto ptrA = as<IRPtrType>(a);
-        auto ptrB = as<IRPtrType>(b);
+        auto ptrA = as<IRPtrTypeBase>(a);
+        auto ptrB = as<IRPtrTypeBase>(b);
 
         // They must both be pointers...
         SLANG_ASSERT(ptrA && ptrB);

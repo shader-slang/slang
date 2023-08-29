@@ -5,6 +5,9 @@
 
 namespace Slang
 {
+
+struct SPIRVCoreGrammarInfo;
+
 //
 // [2.2: Terms]
 //
@@ -137,7 +140,7 @@ struct SpvSnippet : public RefObject
     List<ASMConstant> constants;
     SpvStorageClass resultStorageClass = SpvStorageClassMax;
 
-    static RefPtr<SpvSnippet> parse(UnownedStringSlice definition);
+    static RefPtr<SpvSnippet> parse(const SPIRVCoreGrammarInfo& spirvGrammar, UnownedStringSlice definition);
 };
 
 

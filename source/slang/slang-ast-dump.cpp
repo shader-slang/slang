@@ -651,6 +651,9 @@ struct ASTDumpContext
         case SPIRVAsmOperand::Id:
             m_writer->emit("%");
             break;
+        case SPIRVAsmOperand::ResultMarker:
+            m_writer->emit("result");
+            break;
         case SPIRVAsmOperand::Literal:
         case SPIRVAsmOperand::NamedValue:
             break;

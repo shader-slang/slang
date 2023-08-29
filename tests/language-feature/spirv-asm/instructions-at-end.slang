@@ -16,7 +16,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     {
         OpConstant $$int %two 2;
         OpIMul $$int result $n %two;
-        // CHECK: instructions-at-end.slang([[#@LINE-1]]): error 29101: the result-id marker must only be used in the last instruction of a spriv_asm expression
+        // CHECK: instructions-at-end.slang([[#@LINE-1]]): error {{.*}}: the result-id marker must only be used in the last instruction of a spriv_asm expression
         // CHECK: note 29102: consider adding an OpCopyObject instruction to the end of the spirv_asm expression
 
         OpIAdd $$uint %something %two %two;

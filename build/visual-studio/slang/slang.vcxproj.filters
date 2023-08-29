@@ -438,6 +438,9 @@
     <ClInclude Include="..\..\..\source\slang\slang-ir-specialize-resources.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-ir-specialize-target-switch.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ir-specialize.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -1067,6 +1070,9 @@
     <ClCompile Include="..\..\..\source\slang\slang-ir-specialize-resources.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-ir-specialize-target-switch.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-specialize.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -1148,12 +1154,6 @@
     <ClCompile Include="..\..\..\source\slang\slang-lookup-glslstd450.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\source\slang\slang-lookup-spvcapability.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\source\slang\slang-lookup-spvop.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-lookup.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -1218,6 +1218,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-serialize.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-spirv-core-grammar-embed.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-spirv-val.cpp">

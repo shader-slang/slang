@@ -74,7 +74,7 @@ static_assert(std::is_trivially_copyable_v<TerminatedCharSlice>);
 If some aspect can apply to multiple items identically we move that to a separate enum. 
 
 NOTE!
-New Kinds must be added at the end. Values can be depreciated, or disabled
+New Kinds must be added at the end. Values can be deprecated, or disabled
 but never removed, without breaking binary compatability.
 
 Any change requires a change to SLANG_ARTIFACT_KIND
@@ -121,7 +121,7 @@ enum class ArtifactKind : uint8_t
 SlangIR and LLVMIR can be GPU or CPU orientated, so put in own category.
 
 NOTE!
-New Payloads must be added at the end. Values can be depreciated, or disabled
+New Payloads must be added at the end. Values can be deprecated, or disabled
 but never removed, without breaking binary compatability.
 
 Any change requires a change to SLANG_ARTIFACT_PAYLOAD
@@ -196,7 +196,7 @@ enum class ArtifactPayload : uint8_t
 /* Style.
 
 NOTE!
-New Styles must be added at the end. Values can be depreciated, or disabled
+New Styles must be added at the end. Values can be deprecated, or disabled
 but never removed, without breaking binary compatability.
 
 Any change requires a change to SLANG_ARTIFACT_STYLE

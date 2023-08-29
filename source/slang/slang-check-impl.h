@@ -2470,6 +2470,12 @@ namespace Slang
 
         void visitCaseStmt(CaseStmt* stmt);
 
+        void visitTargetSwitchStmt(TargetSwitchStmt* stmt);
+
+        void visitTargetCaseStmt(TargetCaseStmt* stmt);
+
+        void visitIntrinsicAsmStmt(IntrinsicAsmStmt*) {}
+
         void visitDefaultStmt(DefaultStmt* stmt);
 
         void visitIfStmt(IfStmt *stmt);

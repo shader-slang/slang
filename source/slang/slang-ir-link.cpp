@@ -7,6 +7,7 @@
 #include "slang-mangle.h"
 #include "slang-ir-string-hash.h"
 #include "slang-ir-autodiff.h"
+#include "slang-ir-specialize-target-switch.h"
 #include "slang-module-library.h"
 
 #include "../core/slang-performance-profiler.h"
@@ -1629,6 +1630,8 @@ LinkedIR linkIR(
         }
     }
 
+    // Specialize target_switch branches to use the best branch for the target.
+    specializeTargetSwitch(targetReq, state->irModule);
 
     // TODO: *technically* we should consider the case where
     // we have global variables with initializers, since
