@@ -6,6 +6,8 @@
 
 namespace Slang {
 
+using SpvWord = uint32_t;
+
 // Syntax class definitions for expressions.
 // 
     // A placeholder for where an Expr is expected but is missing from source.
@@ -640,14 +642,38 @@ public:
     {
         Literal, // No prefix
         Id, // Prefixed with %
-        NamedValue, // An identifier
+        ResultMarker, // "result" (without quotes)
+        NamedValue, // Any other identifier
         SlangValue,
         SlangValueAddr,
         SlangType,
     };
+
+    // The flavour and token describes how this was parsed
     Flavor flavor;
+    // The single token this came from
     Token token;
+
+    // If this was a SlangValue or SlangValueAddr or SlangType, then we also
+    // store the expression, which should be a single VarExpr because we only
+    // parse single idents at the moment
     Expr* expr = nullptr;
+
+    // If this is part of a bitwise or expression, this will point to the
+    // remaining operands values in such an expression must be of flavour
+    // Literal or NamedValue
+    List<SPIRVAsmOperand> bitwiseOrWith = List<SPIRVAsmOperand>();
+
+    // If this is a named value then we calculate the value here during
+    // checking. If this is an opcode, then the parser will populate this too
+    // (or set it to 0xffffffff);
+    SpvWord knownValue = 0xffffffff;
+    // Although this might be a constant in the source we should actually pass
+    // it as an id created with OpConstant
+    bool wrapInId = false;
+
+    // Once we've checked things, the SlangType flavour operands will have this
+    // type populated.
     TypeExp type = TypeExp();
 };
 

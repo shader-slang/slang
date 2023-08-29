@@ -102,6 +102,7 @@ enum class OptionKind
 
     EmitSpirvViaGLSL,
     EmitSpirvDirectly,
+    SPIRVCoreGrammarJSON,
     
     // Downstream
 
@@ -150,7 +151,7 @@ enum class OptionKind
     SaveStdLibBinSource,
     TrackLiveness,
 
-    // Depreciated
+    // Deprecated
     ParameterBlocksUseRegisterSpaces,
 
     CountOf,
@@ -224,7 +225,7 @@ void initCommandOptions(CommandOptions& options)
     options.addCategory(CategoryKind::Option, "Debugging", "Compiler debugging/instrumentation options");
     options.addCategory(CategoryKind::Option, "Experimental", "Experimental options (use at your own risk)");
     options.addCategory(CategoryKind::Option, "Internal", "Internal-use options (use at your own risk)");
-    options.addCategory(CategoryKind::Option, "Depreciated", "Deprecated options (allowed but ignored; may be removed in future)");
+    options.addCategory(CategoryKind::Option, "Deprecated", "Deprecated options (allowed but ignored; may be removed in future)");
 
     // Do the easy ones
     {
@@ -518,6 +519,8 @@ void initCommandOptions(CommandOptions& options)
         "Generate SPIR-V output by compiling generated GLSL with glslang (default)" },
         { OptionKind::EmitSpirvDirectly, "-emit-spirv-directly", nullptr,
         "Generate SPIR-V output direclty rather than by compiling generated GLSL with glslang" },
+        { OptionKind::SPIRVCoreGrammarJSON, "-spirv-core-grammar", nullptr,
+        "A path to a specific spirv.core.grammar.json to use when generating SPIR-V output" },
 #endif
     };
 
@@ -626,15 +629,15 @@ void initCommandOptions(CommandOptions& options)
     };
     _addOptions(makeConstArrayView(internalOpts), options);
 
-    /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Depreciated !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+    /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Deprecated !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-    options.setCategory("Depreciated");
+    options.setCategory("Deprecated");
 
-    const Option depreciatedOpts[] = 
+    const Option deprecatedOpts[] =
     {
         { OptionKind::ParameterBlocksUseRegisterSpaces, "-parameter-blocks-use-register-spaces", nullptr, "Parameter blocks will use register spaces" },
     };
-    _addOptions(makeConstArrayView(depreciatedOpts), options);
+    _addOptions(makeConstArrayView(deprecatedOpts), options);
 
     // We can now check that the whole range is available. If this fails it means there 
     // is an enum in the list that hasn't been setup as an option!
@@ -888,6 +891,8 @@ struct OptionsParser
     bool m_compileStdLib = false;
     slang::CompileStdLibFlags m_compileStdLibFlags = 0;
     bool m_hasLoadedRepro = false;
+
+    String m_spirvCoreGrammarJSONPath;
 
     CommandLineReader m_reader;
 
@@ -2300,6 +2305,13 @@ SlangResult OptionsParser::_parse(
                 getCurrentTarget()->targetFlags |= SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY;
             }
             break;
+            case OptionKind::SPIRVCoreGrammarJSON:
+            {
+                CommandLineArg path;
+                SLANG_RETURN_ON_FAIL(m_reader.expectArg(path));
+                m_spirvCoreGrammarJSONPath = path.value;
+            }
+            break;
 
             case OptionKind::DefaultDownstreamCompiler:
             {
@@ -2841,6 +2853,11 @@ SlangResult OptionsParser::_parse(
     if (m_defaultMatrixLayoutMode != SLANG_MATRIX_LAYOUT_MODE_UNKNOWN)
     {
         m_compileRequest->setMatrixLayoutMode(m_defaultMatrixLayoutMode);
+    }
+
+    if(m_spirvCoreGrammarJSONPath.getLength())
+    {
+        m_session->setSPIRVCoreGrammar(m_spirvCoreGrammarJSONPath.getBuffer());
     }
 
     // Next we need to sort out the output files specified with `-o`, and

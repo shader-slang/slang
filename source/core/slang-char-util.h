@@ -50,6 +50,10 @@ struct CharUtil
         /// Given a value between 0-15 inclusive returns the hex digit. Uses lower case hex.
     SLANG_FORCE_INLINE static char getHexChar(Index i) { SLANG_ASSERT((i & ~Index(0xf)) == 0); return char(i >= 10 ? (i - 10 + 'a') : (i + '0')); }
 
+        /// Returns the value if c interpretted as a decimal digit
+        /// If c is not a valid digit returns -1
+    inline static int getDecimalDigitValue(char c) { return isDigit(c) ? (c - '0') : -1; }
+
         /// Returns the value if c interpretted as a hex digit
         /// If c is not a valid hex returns -1
     inline static int getHexDigitValue(char c);
