@@ -7757,26 +7757,46 @@ void debugBreak();
 // https://github.com/KhronosGroup/GLSL/blob/master/extensions/ext/GL_EXT_shader_realtime_clock.txt
 
 [__requiresNVAPI]
-__target_intrinsic(hlsl, "NvGetSpecial( NV_SPECIALOP_GLOBAL_TIMER_LO)")
 __glsl_extension(GL_EXT_shader_realtime_clock)
-__target_intrinsic(glsl, "clockRealtime2x32EXT().x")
-__target_intrinsic(cuda, "clock")
-uint getRealtimeClockLow();
+uint getRealtimeClockLow()
+{
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "NvGetSpecial( NV_SPECIALOP_GLOBAL_TIMER_LO)";
+    case glsl:
+        return getRealtimeClock().x;
+    case cuda:
+        __intrinsic_asm "clock";
+    case spirv:
+        return getRealtimeClock().x;
+    }
+}
 
 __target_intrinsic(cuda, "clock64")
 int64_t __cudaGetRealtimeClock();
 
 [__requiresNVAPI]
-__target_intrinsic(hlsl, "uint2(NvGetSpecial( NV_SPECIALOP_GLOBAL_TIMER_LO), NvGetSpecial( NV_SPECIALOP_GLOBAL_TIMER_HI)) ")
 __glsl_extension(GL_EXT_shader_realtime_clock)
-__target_intrinsic(glsl, "clockRealtime2x32EXT()")
-uint2 getRealtimeClock();
-
-__specialized_for_target(cuda)
 uint2 getRealtimeClock()
 {
-    int64_t ticks = __cudaGetRealtimeClock();
-    return uint2(uint(ticks), uint(uint64_t(ticks) >> 32)); 
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "uint2(NvGetSpecial(NV_SPECIALOP_GLOBAL_TIMER_LO), NvGetSpecial( NV_SPECIALOP_GLOBAL_TIMER_HI))";
+    case glsl:
+        __intrinsic_asm "clockRealtime2x32EXT()";
+    case cuda:
+        int64_t ticks = __cudaGetRealtimeClock();
+        return uint2(uint(ticks), uint(uint64_t(ticks) >> 32));
+    case spirv:
+        return spirv_asm
+        {
+            OpCapability ShaderClockKHR;
+            OpExtension "SPV_KHR_shader_clock";
+            result : $$uint2 = OpReadClockKHR Device
+        };
+    }
 }
 
 // 
