@@ -3980,6 +3980,19 @@ namespace Slang
                         operand.knownValue = *enumValue;
                         operand.wrapInId = needsIdWrapper;
                     }
+                    else if (operand.flavor == SPIRVAsmOperand::BuiltinVar)
+                    {
+                        operand.type = CheckProperType(operand.type);
+                        auto builtinVarKind = spirvInfo->allEnums.lookup(
+                            SPIRVCoreGrammarInfo::QualifiedEnumName{spirvInfo->operandKinds.lookup(UnownedStringSlice("BuiltIn")).value(), operand.token.getContent()});
+                        if (!builtinVarKind)
+                        {
+                            failed = true;
+                            getSink()->diagnose(operand.token, Diagnostics::spirvUnableToResolveName, operand.token.getContent());
+                            return;
+                        }
+                        operand.knownValue = builtinVarKind.value();
+                    }
                     if(operand.bitwiseOrWith.getCount()
                         && operand.flavor != SPIRVAsmOperand::Literal
                         && operand.flavor != SPIRVAsmOperand::NamedValue)

@@ -6277,6 +6277,17 @@ namespace Slang
         {
             return SPIRVAsmOperand{SPIRVAsmOperand::ResultMarker, parser->ReadToken()};
         }
+        else if (AdvanceIf(parser, "builtin"))
+        {
+            // reference to a builtin var.
+            parser->ReadToken(TokenType::LParent);
+            auto operand = SPIRVAsmOperand{ SPIRVAsmOperand::BuiltinVar, parser->ReadToken() };
+            parser->ReadToken(TokenType::Colon);
+            AdvanceIf(parser, TokenType::DollarDollar);
+            operand.type = parser->ParseTypeExp();
+            parser->ReadToken(TokenType::RParent);
+            return operand;
+        }
 
         // A regular identifier
         else if(parser->LookAheadToken(TokenType::Identifier))

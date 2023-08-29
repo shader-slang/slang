@@ -647,6 +647,7 @@ public:
         SlangValue,
         SlangValueAddr,
         SlangType,
+        BuiltinVar,
     };
 
     // The flavour and token describes how this was parsed
@@ -672,8 +673,8 @@ public:
     // it as an id created with OpConstant
     bool wrapInId = false;
 
-    // Once we've checked things, the SlangType flavour operands will have this
-    // type populated.
+    // Once we've checked things, the SlangType and BuiltinVar flavour operands
+    // will have this type populated.
     TypeExp type = TypeExp();
 };
 

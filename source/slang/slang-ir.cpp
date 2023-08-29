@@ -5747,6 +5747,19 @@ namespace Slang
         return i;
     }
 
+    IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandBuiltinVar(IRInst* type, IRInst* builtinKind)
+    {
+        SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
+        const auto i = createInst<IRSPIRVAsmOperand>(
+            this,
+            kIROp_SPIRVAsmOperandBuiltinVar,
+            (IRType*)type,
+            builtinKind
+        );
+        addInst(i);
+        return i;
+    }
+
     IRSPIRVAsmInst* IRBuilder::emitSPIRVAsmInst(IRInst* opcode, List<IRInst*> operands)
     {
         SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
@@ -7480,6 +7493,9 @@ namespace Slang
             return false;
 
         if(as<IRAttr>(this))
+            return false;
+
+        if (as<IRSPIRVAsmOperand>(this))
             return false;
 
         switch(getOp())

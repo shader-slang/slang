@@ -3295,6 +3295,13 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                     else
                         return builder->emitSPIRVAsmOperandEnum(i);
                 }
+            case SPIRVAsmOperand::BuiltinVar:
+                {
+                    const auto kind = operand.knownValue;
+                    auto kindInst = builder->getIntValue(builder->getIntType(), kind);
+                    const auto type = lowerType(context, operand.type.type);
+                    return builder->emitSPIRVAsmOperandBuiltinVar(type, kindInst);
+                }
             case SPIRVAsmOperand::SlangValue:
                 {
                     IRInst* i;

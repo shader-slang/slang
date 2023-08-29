@@ -4212,10 +4212,9 @@ WaveMask WaveGetConvergedMask()
         __intrinsic_asm "__activemask()";
     case spirv:
         let _true = true;
-        let _scope = 3; // subgroup
         return (spirv_asm
         {
-            OpGroupNonUniformBallot $$uint4 result $_scope $_true
+            OpGroupNonUniformBallot $$uint4 result Subgroup $_true
         }).x;
     }
 }
@@ -4563,8 +4562,11 @@ uint WaveMaskPrefixCountBits(WaveMask mask, bool value)
     case cuda: __intrinsic_asm "__popc(__ballot_sync($0, $1)  & _getLaneLtMask())";
     case hlsl: __intrinsic_asm "WavePrefixCountBits($1)";
     case spirv:
-        let _scope = 3u; // subgroup
-        return spirv_asm {OpGroupNonUniformBallotBitCount $$uint result $_scope 2 $value};
+        return spirv_asm
+        {
+            %mask:$$uint4 = OpGroupNonUniformBallot Subgroup $value;
+            OpGroupNonUniformBallotBitCount $$uint result Subgroup 2 %mask
+        };
     }
 }
 
@@ -5012,9 +5014,9 @@ vector<T,N> WaveMaskPrefixProduct(WaveMask mask, vector<T,N> expr)
             return spirv_asm
             {
                 // TODO: use the correct integer width
-                OpBitcast $$uint %uvalue $expr;
+                OpBitcast $$vector<uint,N> %uvalue $expr;
                 OpGroupNonUniformIMul $$vector<uint,N> %mulResult Subgroup ExclusiveScan %uvalue;
-                OpBitcast $$T result %mulResult
+                OpBitcast $$vector<T,N> result %mulResult
             };
         }
         else if (__isUnsignedInt<T>())
@@ -5074,9 +5076,9 @@ vector<T,N> WaveMaskPrefixSum(WaveMask mask, vector<T,N> expr)
             return spirv_asm
             {
                 // TODO: use the correct integer width
-                %uvalue: $$uint = OpBitcast $expr;
+                %uvalue: $$vector<uint,N> = OpBitcast $expr;
                 %mulResult: $$vector<uint,N> = OpGroupNonUniformIAdd Subgroup ExclusiveScan %uvalue;
-                result: $$T = OpBitcast  %mulResult
+                result: $$vector<T,N> = OpBitcast  %mulResult
             };
         }
         else if (__isUnsignedInt<T>())
@@ -5428,21 +5430,45 @@ matrix<T, N, M> WaveActiveBitXor(matrix<T, N, M> expr)
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
-__target_intrinsic(glsl, "subgroupMax($0)")
-__target_intrinsic(hlsl)
+__spirv_capability(GroupNonUniformArithmetic)
 T WaveActiveMax(T expr)
 {
-    return WaveMaskMax(WaveGetActiveMask(), expr);
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "subgroupMax($0)";
+    case hlsl: __intrinsic_asm "WaveActiveMax";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm {OpGroupNonUniformFMax $$T result Subgroup Reduce $expr};
+        else if (__isUnsignedInt<T>())
+            return spirv_asm {OpGroupNonUniformUMax $$T result Subgroup Reduce $expr};
+        else
+            return spirv_asm {OpGroupNonUniformSMax $$T result Subgroup Reduce $expr};
+    default:
+        return WaveMaskMax(WaveGetActiveMask(), expr);
+    }
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
-__target_intrinsic(glsl, "subgroupMax($0)")
-__target_intrinsic(hlsl)
+__spirv_capability(GroupNonUniformArithmetic)
 vector<T, N> WaveActiveMax(vector<T, N> expr)
 {
-    return WaveMaskMax(WaveGetActiveMask(), expr);
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "subgroupMax($0)";
+    case hlsl: __intrinsic_asm "WaveActiveMax";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm {OpGroupNonUniformFMax $$vector<T, N> result Subgroup Reduce $expr};
+        else if (__isUnsignedInt<T>())
+            return spirv_asm {OpGroupNonUniformUMax $$vector<T, N> result Subgroup Reduce $expr};
+        else
+            return spirv_asm {OpGroupNonUniformSMax $$vector<T, N> result Subgroup Reduce $expr};
+    default:
+        return WaveMaskMax(WaveGetActiveMask(), expr);
+    }
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
@@ -5455,21 +5481,45 @@ matrix<T, N, M> WaveActiveMax(matrix<T, N, M> expr)
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
-__target_intrinsic(glsl, "subgroupMin($0)")
-__target_intrinsic(hlsl)
+__spirv_capability(GroupNonUniformArithmetic)
 T WaveActiveMin(T expr)
 {
-    return WaveMaskMin(WaveGetActiveMask(), expr);
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "subgroupMin($0)";
+    case hlsl: __intrinsic_asm "WaveActiveMin";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm {OpGroupNonUniformFMin $$T result Subgroup Reduce $expr};
+        else if (__isUnsignedInt<T>())
+            return spirv_asm {OpGroupNonUniformUMin $$T result Subgroup Reduce $expr};
+        else
+            return spirv_asm {OpGroupNonUniformSMin $$T result Subgroup Reduce $expr};
+    default:
+        return WaveMaskMin(WaveGetActiveMask(), expr);
+    }
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
-__target_intrinsic(glsl, "subgroupMin($0)")
-__target_intrinsic(hlsl)
+__spirv_capability(GroupNonUniformArithmetic)
 vector<T, N> WaveActiveMin(vector<T, N> expr)
 {
-    return WaveMaskMin(WaveGetActiveMask(), expr);
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "subgroupMin($0)";
+    case hlsl: __intrinsic_asm "WaveActiveMinWaveActiveMin";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm {OpGroupNonUniformFMin $$vector<T, N> result Subgroup Reduce $expr};
+        else if (__isUnsignedInt<T>())
+            return spirv_asm {OpGroupNonUniformUMin $$vector<T, N> result Subgroup Reduce $expr};
+        else
+            return spirv_asm {OpGroupNonUniformSMin $$vector<T, N> result Subgroup Reduce $expr};
+    default:
+        return WaveMaskMin(WaveGetActiveMask(), expr);
+    }
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
@@ -5546,10 +5596,9 @@ bool WaveActiveAllEqual(T value)
     case hlsl:
         __intrinsic_asm "WaveActiveAllEqual";
     case spirv:
-        let _scope = 3u; // subgroup
         return spirv_asm
         {
-            OpGroupNonUniformAllEqual $$bool result $_scope $value
+            OpGroupNonUniformAllEqual $$bool result Subgroup $value
         };
     default:
         return WaveMaskAllEqual(WaveGetActiveMask(), value);
@@ -5569,10 +5618,9 @@ bool WaveActiveAllEqual(vector<T,N> value)
     case hlsl:
         __intrinsic_asm "WaveActiveAllEqual";
     case spirv:
-        let _scope = 3u; // subgroup
         return spirv_asm
         {
-            OpGroupNonUniformAllEqual $$bool result $_scope $value
+            OpGroupNonUniformAllEqual $$bool result Subgroup $value
         };
     default:
         return WaveMaskAllEqual(WaveGetActiveMask(), value);
@@ -5598,10 +5646,9 @@ bool WaveActiveAllTrue(bool condition)
     case hlsl:
         __intrinsic_asm "WaveActiveAllTrue($0)";
     case spirv:
-        let _scope = 3u; // subgroup
         return spirv_asm
         {
-            OpGroupNonUniformAll $$bool result $_scope $condition
+            OpGroupNonUniformAll $$bool result Subgroup $condition
         };
     default:
         return WaveMaskAllTrue(WaveGetActiveMask(), condition);
@@ -5611,8 +5658,6 @@ bool WaveActiveAllTrue(bool condition)
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
 __spirv_capability(GroupNonUniformVote)
-__target_intrinsic(glsl, "subgroupAny($0)")
-__target_intrinsic(hlsl)
 bool WaveActiveAnyTrue(bool condition)
 {
     __target_switch
@@ -5622,10 +5667,9 @@ bool WaveActiveAnyTrue(bool condition)
     case hlsl:
         __intrinsic_asm "WaveActiveAnyTrue($0)";
     case spirv:
-        let _scope = 3u; // subgroup
         return spirv_asm
         {
-            OpGroupNonUniformAny $$bool result $_scope $condition
+            OpGroupNonUniformAny $$bool result Subgroup $condition
         };
     default:
         return WaveMaskAnyTrue(WaveGetActiveMask(), condition);
@@ -5662,14 +5706,25 @@ uint WaveActiveCountBits(bool value)
 
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
-__target_intrinsic(glsl, "(gl_SubgroupSize)")
-__target_intrinsic(cuda, "(warpSize)")
-uint WaveGetLaneCount();
+__spirv_capability(GroupNonUniform)
+uint WaveGetLaneCount()
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm  "(gl_SubgroupSize)";
+    case cuda: __intrinsic_asm  "(warpSize)";
+    case hlsl: __intrinsic_asm  "WaveGetLaneCount()";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$uint = OpLoad builtin(SubgroupSize:uint)
+        };
+    }
+}
 
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
-__target_intrinsic(glsl, "(gl_SubgroupInvocationID)")
-__target_intrinsic(cuda, "_getLaneId()")
+__spirv_capability(GroupNonUniform)
 uint WaveGetLaneIndex()
 {
     __target_switch
@@ -5677,14 +5732,11 @@ uint WaveGetLaneIndex()
     case glsl: __intrinsic_asm  "(gl_SubgroupInvocationID)";
     case cuda: __intrinsic_asm  "_getLaneId()";
     case hlsl: __intrinsic_asm  "WaveGetLaneIndex()";
-    /*
     case spirv:
-        let _scope = 3u; // subgroup
         return spirv_asm
         {
-            OpSubgroupLocalInvocationId $$uint result $_scope
+            result:$$uint = OpLoad builtin(SubgroupLocalInvocationId:uint)
         };
-    */
     }
 }
 
@@ -5700,10 +5752,9 @@ bool WaveIsFirstLane()
     case hlsl:
         __intrinsic_asm "WaveIsFirstLane()";
     case spirv:
-        let _scope = 3u; // subgroup
         return spirv_asm
         {
-            OpGroupNonUniformElect $$bool result $_scope
+            OpGroupNonUniformElect $$bool result Subgroup
         };
     default:
         return WaveMaskIsFirstLane(WaveGetActiveMask());
@@ -5718,10 +5769,9 @@ uint _WaveCountBits(uint4 value)
     __target_switch
     {
     case spirv:
-        let _scope = 3u; // Subgroup
         return spirv_asm
         {
-            OpGroupNonUniformBallotBitCount $$uint result $_scope 0 $value
+            OpGroupNonUniformBallotBitCount $$uint result Subgroup Reduce $value
         };
     default:
         // Assume since WaveGetLaneCount should be known at compile time, the branches will hopefully boil away
@@ -5743,22 +5793,62 @@ uint _WaveCountBits(uint4 value)
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
-__target_intrinsic(glsl, "subgroupExclusiveMul($0)")
-__target_intrinsic(hlsl)
+__spirv_capability(GroupNonUniformArithmetic)
 T WavePrefixProduct(T expr)
 {
-    return WaveMaskPrefixProduct(WaveGetActiveMask(), expr);
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "subgroupExclusiveMul($0)";
+    case hlsl: __intrinsic_asm "WavePrefixProduct";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm {OpGroupNonUniformFMul $$T result Subgroup ExclusiveScan $expr};
+        else if (__isSignedInt<T>())
+        {
+            return spirv_asm
+            {
+                // TODO: use the correct integer width
+                OpBitcast $$uint %uvalue $expr;
+                OpGroupNonUniformIMul $$uint %mulResult Subgroup ExclusiveScan %uvalue;
+                OpBitcast $$T result %mulResult
+            };
+        }
+        else if (__isUnsignedInt<T>())
+            return spirv_asm {OpGroupNonUniformIMul $$T result Subgroup ExclusiveScan $expr};
+    default:
+        return WaveMaskPrefixProduct(WaveGetActiveMask(), expr);
+    }
 }
 
 
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
-__target_intrinsic(glsl, "subgroupExclusiveMul($0)")
-__target_intrinsic(hlsl)
+__spirv_capability(GroupNonUniformArithmetic)
 vector<T,N> WavePrefixProduct(vector<T,N> expr)
 {
-    return WaveMaskPrefixProduct(WaveGetActiveMask(), expr);
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "subgroupExclusiveMul($0)";
+    case hlsl: __intrinsic_asm "WavePrefixProduct";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm {OpGroupNonUniformFMul $$vector<T,N> result Subgroup ExclusiveScan $expr};
+        else if (__isSignedInt<T>())
+        {
+            return spirv_asm
+            {
+                // TODO: use the correct integer width
+                OpBitcast $$vector<uint,N> %uvalue $expr;
+                OpGroupNonUniformIMul $$vector<uint,N> %mulResult Subgroup ExclusiveScan %uvalue;
+                OpBitcast $$vector<T,N> result %mulResult
+            };
+        }
+        else if (__isUnsignedInt<T>())
+            return spirv_asm {OpGroupNonUniformIMul $$vector<T,N> result Subgroup ExclusiveScan $expr};
+    default:
+        return WaveMaskPrefixProduct(WaveGetActiveMask(), expr);
+    }
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
@@ -5771,21 +5861,61 @@ matrix<T, N, M> WavePrefixProduct(matrix<T, N, M> expr)
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
-__target_intrinsic(glsl, "subgroupExclusiveAdd($0)")
-__target_intrinsic(hlsl)
+__spirv_capability(GroupNonUniformArithmetic)
 T WavePrefixSum(T expr)
 {
-    return WaveMaskPrefixSum(WaveGetActiveMask(), expr);
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "subgroupExclusiveAdd($0)";
+    case hlsl: __intrinsic_asm "WavePrefixSum";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm {OpGroupNonUniformFAdd $$T result Subgroup ExclusiveScan $expr};
+        else if (__isSignedInt<T>())
+        {
+            return spirv_asm
+            {
+                // TODO: use the correct integer width
+                %uvalue:$$uint = OpBitcast $expr;
+                %mulResult:$$uint = OpGroupNonUniformIAdd Subgroup ExclusiveScan %uvalue;
+                result:$$T = OpBitcast %mulResult
+            };
+        }
+        else if (__isUnsignedInt<T>())
+            return spirv_asm {OpGroupNonUniformIAdd $$T result Subgroup ExclusiveScan $expr};
+    default:
+        return WaveMaskPrefixSum(WaveGetActiveMask(), expr);
+    }
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
-__target_intrinsic(glsl, "subgroupExclusiveAdd($0)")
-__target_intrinsic(hlsl)
+__spirv_capability(GroupNonUniformArithmetic)
 vector<T,N> WavePrefixSum(vector<T,N> expr)
 {
-    return WaveMaskPrefixSum(WaveGetActiveMask(), expr);
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "subgroupExclusiveAdd($0)";
+    case hlsl: __intrinsic_asm "WavePrefixSum";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm {OpGroupNonUniformFAdd $$vector<T,N> result Subgroup ExclusiveScan $expr};
+        else if (__isSignedInt<T>())
+        {
+            return spirv_asm
+            {
+                // TODO: use the correct integer width
+                %uvalue:$$vector<uint,N> = OpBitcast $expr;
+                %mulResult:$$vector<uint,N> = OpGroupNonUniformIAdd Subgroup ExclusiveScan %uvalue;
+                result:$$vector<T,N> = OpBitcast %mulResult
+            };
+        }
+        else if (__isUnsignedInt<T>())
+            return spirv_asm {OpGroupNonUniformIAdd $$vector<T,N> result Subgroup ExclusiveScan $expr};
+    default:
+        return WaveMaskPrefixSum(WaveGetActiveMask(), expr);
+    }
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
@@ -5798,21 +5928,35 @@ matrix<T,N,M> WavePrefixSum(matrix<T,N,M> expr)
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
-__target_intrinsic(glsl, "subgroupBroadcastFirst($0)")
-__target_intrinsic(hlsl)
+__spirv_capability(GroupNonUniformBallot)
 T WaveReadLaneFirst(T expr)
 {
-    return WaveMaskReadLaneFirst(WaveGetActiveMask(), expr);
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "subgroupBroadcastFirst($0)";
+    case hlsl: __intrinsic_asm "WaveReadLaneFirst";
+    case spirv:
+        return spirv_asm {OpGroupNonUniformBroadcastFirst $$T result Subgroup $expr};
+    default:
+        return WaveMaskReadLaneFirst(WaveGetActiveMask(), expr);
+    }
 }
 
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
-__target_intrinsic(glsl, "subgroupBroadcastFirst($0)")
-__target_intrinsic(hlsl)
+__spirv_capability(GroupNonUniformBallot)
 vector<T,N> WaveReadLaneFirst(vector<T,N> expr)
 {
-    return WaveMaskReadLaneFirst(WaveGetActiveMask(), expr);
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "subgroupBroadcastFirst($0)";
+    case hlsl: __intrinsic_asm "WaveReadLaneFirst";
+    case spirv:
+        return spirv_asm {OpGroupNonUniformBroadcastFirst $$vector<T,N> result Subgroup $expr};
+    default:
+        return WaveMaskReadLaneFirst(WaveGetActiveMask(), expr);
+    }
 }
 
 __generic<T : __BuiltinType, let N : int, let M : int>
@@ -5831,21 +5975,35 @@ matrix<T,N,M> WaveReadLaneFirst(matrix<T,N,M> expr)
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
-__target_intrinsic(glsl, "subgroupBroadcast($0, $1)")
-__target_intrinsic(hlsl, "WaveReadLaneAt")
+__spirv_capability(GroupNonUniformBallot)
 T WaveBroadcastLaneAt(T value, constexpr int lane)
 {
-    return WaveMaskBroadcastLaneAt(WaveGetActiveMask(), value, lane);
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "subgroupBroadcast($0, $1)";
+    case hlsl: __intrinsic_asm "WaveReadLaneAt";
+    case spirv:
+        return spirv_asm {OpGroupNonUniformBroadcast $$T result Subgroup $value $lane};
+    default:
+        return WaveMaskBroadcastLaneAt(WaveGetActiveMask(), value, lane);
+    }
 }
 
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
-__target_intrinsic(glsl, "subgroupBroadcast($0, $1)")
-__target_intrinsic(hlsl, "WaveReadLaneAt")
+__spirv_capability(GroupNonUniformBallot)
 vector<T,N> WaveBroadcastLaneAt(vector<T,N> value, constexpr int lane)
 {
-    return WaveMaskBroadcastLaneAt(WaveGetActiveMask(), value, lane);
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "subgroupBroadcast($0, $1)";
+    case hlsl: __intrinsic_asm "WaveReadLaneAt";
+    case spirv:
+        return spirv_asm {OpGroupNonUniformBroadcast $$vector<T,N> result Subgroup $value $lane};
+    default:
+        return WaveMaskBroadcastLaneAt(WaveGetActiveMask(), value, lane);
+    }
 }
 
 __generic<T : __BuiltinType, let N : int, let M : int>
@@ -5861,21 +6019,35 @@ matrix<T, N, M> WaveBroadcastLaneAt(matrix<T, N, M> value, constexpr int lane)
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_shuffle)
 __spirv_version(1.3)
-__target_intrinsic(glsl, "subgroupShuffle($0, $1)")
-__target_intrinsic(hlsl)
+__spirv_capability(GroupNonUniformShuffle)
 T WaveReadLaneAt(T value, int lane)
 {
-    return WaveMaskReadLaneAt(WaveGetActiveMask(), value, lane);
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "subgroupShuffle($0, $1)";
+    case hlsl: __intrinsic_asm "WaveReadLaneAt";
+    case spirv:
+        return spirv_asm {OpGroupNonUniformShuffle $$T result Subgroup $value $lane};
+    default:
+        return WaveMaskReadLaneAt(WaveGetActiveMask(), value, lane);
+    }
 }
 
 __generic<T : __BuiltinType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_shuffle)
-__target_intrinsic(glsl, "subgroupShuffle($0, $1)")
-__target_intrinsic(hlsl)
+__spirv_capability(GroupNonUniformShuffle)
 vector<T,N> WaveReadLaneAt(vector<T,N> value, int lane)
 {
-    return WaveMaskReadLaneAt(WaveGetActiveMask(), value, lane);
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "subgroupShuffle($0, $1)";
+    case hlsl: __intrinsic_asm "WaveReadLaneAt";
+    case spirv:
+        return spirv_asm {OpGroupNonUniformShuffle $$vector<T,N> result Subgroup $value $lane};
+    default:
+        return WaveMaskReadLaneAt(WaveGetActiveMask(), value, lane);
+    }
 }
 
 __generic<T : __BuiltinType, let N : int, let M : int>
@@ -5892,21 +6064,35 @@ matrix<T, N, M> WaveReadLaneAt(matrix<T, N, M> value, int lane)
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_shuffle)
 __spirv_version(1.3)
-__target_intrinsic(glsl, "subgroupShuffle($0, $1)")
-__target_intrinsic(hlsl, "WaveReadLaneAt")
+__spirv_capability(GroupNonUniformShuffle)
 T WaveShuffle(T value, int lane)
 {
-    return WaveMaskShuffle(WaveGetActiveMask(), value, lane);
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "subgroupShuffle($0, $1)";
+    case hlsl: __intrinsic_asm "WaveReadLaneAt";
+    case spirv:
+        return spirv_asm {OpGroupNonUniformShuffle $$T result Subgroup $value $lane};
+    default:
+        return WaveMaskShuffle(WaveGetActiveMask(), value, lane);
+    }
 }
 
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_shuffle)
 __spirv_version(1.3)
-__target_intrinsic(glsl, "subgroupShuffle($0, $1)")
-__target_intrinsic(hlsl, "WaveReadLaneAt")
+__spirv_capability(GroupNonUniformShuffle)
 vector<T,N> WaveShuffle(vector<T,N> value, int lane)
 {
-    return WaveMaskShuffle(WaveGetActiveMask(), value, lane);
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "subgroupShuffle($0, $1)";
+    case hlsl: __intrinsic_asm "WaveReadLaneAt";
+    case spirv:
+        return spirv_asm {OpGroupNonUniformShuffle $$vector<T,N> result Subgroup $value $lane};
+    default:
+        return WaveMaskShuffle(WaveGetActiveMask(), value, lane);
+    }
 }
 
 __generic<T : __BuiltinType, let N : int, let M : int>
@@ -5918,25 +6104,48 @@ matrix<T, N, M> WaveShuffle(matrix<T, N, M> value, int lane)
 
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
-__target_intrinsic(glsl, "subgroupBallotExclusiveBitCount(subgroupBallot($0))")
-__target_intrinsic(hlsl)
+__spirv_capability(GroupNonUniformBallot)
 uint WavePrefixCountBits(bool value)
 {
-    return WaveMaskPrefixCountBits(WaveGetActiveMask(), value);
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "subgroupBallotExclusiveBitCount(subgroupBallot($0))";
+    case hlsl: __intrinsic_asm "WavePrefixCountBits($0)";
+    case spirv:
+        return spirv_asm
+        {
+            %mask:$$uint4 = OpGroupNonUniformBallot Subgroup $value;
+            OpGroupNonUniformBallotBitCount $$uint result Subgroup 2 %mask
+        };
+    default:
+        return WaveMaskPrefixCountBits(WaveGetActiveMask(), value);
+    }
 }
 
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
-__target_intrinsic(glsl, "subgroupBallot(true)")
-__target_intrinsic(cuda, "make_uint4(__activemask(), 0, 0, 0)")
-__target_intrinsic(hlsl, "WaveActiveBallot(true)")
-uint4 WaveGetConvergedMulti();
+__spirv_capability(GroupNonUniformBallot)
+uint4 WaveGetConvergedMulti()
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "subgroupBallot(true)";
+    case hlsl: __intrinsic_asm "WaveActiveBallot(true)";
+    case cuda: __intrinsic_asm "make_uint4(__activemask(), 0, 0, 0)";
+    case spirv:
+        let _true = true;
+        return spirv_asm
+        {
+            OpGroupNonUniformBallot $$uint4 result Subgroup $_true
+        };
+    }
+}
 
-__glsl_extension(GL_KHR_shader_subgroup_ballot)
-__spirv_version(1.3)
-__target_intrinsic(glsl, "subgroupBallot(true)")
-__target_intrinsic(hlsl, "WaveActiveBallot(true)")
-uint4 WaveGetActiveMulti();
+[ForceInline]
+uint4 WaveGetActiveMulti()
+{
+    return WaveGetConvergedMulti();
+}
 
 // Shader model 6.5 stuff
 // https://github.com/microsoft/DirectX-Specs/blob/master/d3d/HLSL_ShaderModel6_5.md

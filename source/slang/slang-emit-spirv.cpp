@@ -1454,6 +1454,8 @@ struct SPIRVEmitContext
             return emitGetStringHash(inst);
         default:
             {
+                if (as<IRSPIRVAsmOperand>(inst))
+                    return nullptr;
                 String e = "Unhandled global inst in spirv-emit:\n"
                     + dumpIRToString(inst, {IRDumpOptions::Mode::Detailed, 0});
                 SLANG_UNIMPLEMENTED_X(e.begin());
@@ -1854,6 +1856,8 @@ struct SPIRVEmitContext
         {
         default:
             {
+                if (as<IRSPIRVAsmOperand>(inst))
+                    return nullptr;
                 String e = "Unhandled local inst in spirv-emit:\n"
                     + dumpIRToString(inst, {IRDumpOptions::Mode::Detailed, 0});
                 SLANG_UNIMPLEMENTED_X(e.getBuffer());
@@ -2175,7 +2179,8 @@ struct SPIRVEmitContext
                 auto entryPointDecor = cast<IREntryPointDecoration>(decoration);
                 auto spvStage = mapStageToExecutionModel(entryPointDecor->getProfile().getStage());
                 auto name = entryPointDecor->getName()->getStringSlice();
-                List<IRInst*> params;
+                List<SpvInst*> params;
+                HashSet<SpvInst*> paramsSet;
                 // `interface` part: reference all global variables that are used by this entrypoint.
                 // TODO: we may want to perform more accurate tracking.
                 for (auto globalInst : m_irModule->getModuleInst()->getChildren())
@@ -2184,9 +2189,26 @@ struct SPIRVEmitContext
                     {
                     case kIROp_GlobalVar:
                     case kIROp_GlobalParam:
-                        params.add(globalInst);
+                    {
+                        SpvInst* spvGlobalInst;
+                        if (m_mapIRInstToSpvInst.tryGetValue(globalInst, spvGlobalInst))
+                        {
+                            paramsSet.add(spvGlobalInst);
+                            params.add(spvGlobalInst);
+                        }
                         break;
                     }
+                    default:
+                        break;
+                    }
+                }
+
+                // Add remaining builtin variables that does not have a corresponding IR global var/param.
+                // These variables could be added from SPIRV ASM blocks.
+                for (auto builtinVar : m_builtinGlobalVars)
+                {
+                    if (paramsSet.add(builtinVar.second))
+                        params.add(builtinVar.second);
                 }
                 emitOpEntryPoint(
                     section,
@@ -3838,6 +3860,18 @@ struct SPIRVEmitContext
                 }
             };
 
+            switch (opcode)
+            {
+            case SpvOpCapability:
+                requireSPIRVCapability((SpvCapability)getIntVal(spvInst->getOperand(1)));
+                return nullptr;
+            case SpvOpExtension:
+                ensureExtensionDeclaration(as<IRStringLit>(spvInst->getOperand(1))->getStringSlice());
+                return nullptr;
+            default:
+                break;
+            }
+
             last = emitInstCustomOperandFunc(
                 parentForOpCode(opcode, parent),
                 // We want the "result instruction" to refer to the top level
@@ -3920,6 +3954,15 @@ struct SPIRVEmitContext
                                 idMap.set(idName, id);
                             }
                             emitOperand(id);
+                            break;
+                        }
+                        case kIROp_SPIRVAsmOperandBuiltinVar:
+                        {
+                            const auto kind = (SpvBuiltIn)(getIntVal(operand->getOperand(0)));
+                            IRBuilder builder(operand);
+                            builder.setInsertBefore(operand);
+                            auto varInst = getBuiltinGlobalVar(builder.getPtrType(kIROp_PtrType, operand->getDataType(), SpvStorageClassInput), kind);
+                            emitOperand(varInst);
                             break;
                         }
                         default:
