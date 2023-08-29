@@ -543,6 +543,11 @@ INST(Throw, throw, 1, 0)
 INST(TryCall, tryCall, 3, 0)
 // switch <val> <break> <default> <caseVal1> <caseBlock1> ...
 INST(Switch, switch, 3, 0)
+// target_switch <break> <targetName1> <block1> ...
+INST(TargetSwitch, targetSwitch, 1, 0)
+
+// A generic asm inst has an return semantics that terminates the control flow.
+INST(GenericAsm, GenericAsm, 1, 0)
 
 INST(discard, discard, 0, 0)
 
@@ -972,6 +977,13 @@ INST(SizeOf,                            sizeOf,                     1, 0)
 INST(AlignOf,                           alignOf,                    1, 0)
 
 INST(IsType, IsType, 3, 0)
+INST(TypeEquals, TypeEquals, 2, 0)
+INST(IsInt, IsInt, 1, 0)
+INST(IsBool, IsBool, 1, 0)
+INST(IsFloat, IsFloat, 1, 0)
+INST(IsUnsignedInt, IsUnsignedInt, 1, 0)
+INST(IsSignedInt, IsSignedInt, 1, 0)
+
 INST(ForwardDifferentiate,                   ForwardDifferentiate,            1, 0)
 
 // Produces the primal computation of backward derivatives, will return an intermediate context for
@@ -1054,6 +1066,7 @@ INST(DebugSource, DebugSource, 2, HOISTABLE)
 INST(DebugLine, DebugLine, 5, 0)
 
 /* Inline assembly */
+
 INST(SPIRVAsm, SPIRVAsm, 0, PARENT)
 INST(SPIRVAsmInst, SPIRVAsmInst, 1, 0)
     // These instruction serve to inform the backend precisely how to emit each
@@ -1075,6 +1088,7 @@ INST(SPIRVAsmInst, SPIRVAsmInst, 1, 0)
     // result operand
     INST(SPIRVAsmOperandResult, SPIRVAsmOperandResult, 0, 0)
 INST_RANGE(SPIRVAsmOperand, SPIRVAsmOperandLiteral, SPIRVAsmOperandResult)
+
 
 #undef PARENT
 #undef USE_OTHER

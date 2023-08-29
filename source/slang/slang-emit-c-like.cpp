@@ -970,9 +970,10 @@ String CLikeSourceEmitter::generateName(IRInst* inst)
     // If the instruction names something
     // that should be emitted as a target intrinsic,
     // then use that name instead.
-    if(auto intrinsicDecoration = findBestTargetIntrinsicDecoration(inst))
+    UnownedStringSlice intrinsicDef;
+    if(findTargetIntrinsicDefinition(inst, intrinsicDef))
     {
-        return String(intrinsicDecoration->getDefinition());
+        return String(intrinsicDef);
     }
 
     // If the instruction reprsents one of the "magic" declarations
@@ -1434,7 +1435,8 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
         // This is significant, because we can within a target intrinsics definition multiple accesses to the same
         // parameter. This is not indicated into the call, and can lead to output code computes something multiple
         // times as it is folding into the expression of the the target intrinsic, which we don't want.
-        if (auto targetIntrinsicDecoration = findBestTargetIntrinsicDecoration(funcValue))
+        UnownedStringSlice intrinsicDef;
+        if (findTargetIntrinsicDefinition(funcValue, intrinsicDef))
         {         
             // Find the index of the original instruction, to see if it's multiply used.
             IRUse* args = callInst->getArgs();
@@ -1443,7 +1445,7 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
 
             // Look through the slice to seeing how many times this parameters is used (signified via the $0...$9)
             {
-                UnownedStringSlice slice = targetIntrinsicDecoration->getDefinition();
+                UnownedStringSlice slice = intrinsicDef;
                 
                 const char* cur = slice.begin();
                 const char* end = slice.end();
@@ -1705,7 +1707,7 @@ IRTargetSpecificDecoration* CLikeSourceEmitter::findBestTargetDecoration(IRInst*
     return Slang::findBestTargetDecoration(inInst, getTargetCaps());
 }
 
-IRTargetIntrinsicDecoration* CLikeSourceEmitter::findBestTargetIntrinsicDecoration(IRInst* inInst)
+IRTargetIntrinsicDecoration* CLikeSourceEmitter::_findBestTargetIntrinsicDecoration(IRInst* inInst)
 {
     return as<IRTargetIntrinsicDecoration>(findBestTargetDecoration(inInst));
 }
@@ -1745,14 +1747,14 @@ IRTargetIntrinsicDecoration* CLikeSourceEmitter::findBestTargetIntrinsicDecorati
 }
 
 
-void CLikeSourceEmitter::emitIntrinsicCallExpr(IRCall* inst, IRTargetIntrinsicDecoration* targetIntrinsic, EmitOpInfo const& inOuterPrec)
+void CLikeSourceEmitter::emitIntrinsicCallExpr(IRCall* inst, UnownedStringSlice intrinsicDefinition, EmitOpInfo const& inOuterPrec)
 {
-    emitIntrinsicCallExprImpl(inst, targetIntrinsic, inOuterPrec);
+    emitIntrinsicCallExprImpl(inst, intrinsicDefinition, inOuterPrec);
 }
 
 void CLikeSourceEmitter::emitIntrinsicCallExprImpl(
     IRCall*                         inst,
-    IRTargetIntrinsicDecoration*    targetIntrinsic,
+    UnownedStringSlice              intrinsicDefinition,
     EmitOpInfo const&               inOuterPrec)
 {
     auto outerPrec = inOuterPrec;
@@ -1764,7 +1766,7 @@ void CLikeSourceEmitter::emitIntrinsicCallExprImpl(
     args++;
     argCount--;
 
-    auto name = targetIntrinsic->getDefinition();
+    auto name = intrinsicDefinition;
 
     if(isOrdinaryName(name))
     {
@@ -1876,6 +1878,11 @@ void CLikeSourceEmitter::emitComInterfaceCallExpr(IRCall* inst, EmitOpInfo const
     maybeCloseParens(needClose);
 }
 
+bool CLikeSourceEmitter::findTargetIntrinsicDefinition(IRInst* callee, UnownedStringSlice& outDefinition)
+{
+    return Slang::findTargetIntrinsicDefinition(callee, getTargetCaps(), outDefinition);
+}
+
 void CLikeSourceEmitter::emitCallExpr(IRCall* inst, EmitOpInfo outerPrec)
 {
     auto funcValue = inst->getOperand(0);
@@ -1909,9 +1916,10 @@ void CLikeSourceEmitter::emitCallExpr(IRCall* inst, EmitOpInfo outerPrec)
 
     // We want to detect any call to an intrinsic operation,
     // that we can emit it directly without mangling, etc.
-    if(auto targetIntrinsic = findBestTargetIntrinsicDecoration(funcValue))
+    UnownedStringSlice intrinsicDefinition;
+    if (findTargetIntrinsicDefinition(funcValue, intrinsicDefinition))
     {
-        emitIntrinsicCallExpr(inst, targetIntrinsic, outerPrec);
+        emitIntrinsicCallExpr(inst, intrinsicDefinition, outerPrec);
     }
     else
     {
@@ -3325,13 +3333,14 @@ IREntryPointLayout* CLikeSourceEmitter::asEntryPoint(IRFunc* func)
     return nullptr;
 }
 
-bool CLikeSourceEmitter::isTargetIntrinsic(IRFunc* func)
+bool CLikeSourceEmitter::isTargetIntrinsic(IRInst* inst)
 {
     // A function is a target intrinsic if and only if
     // it has a suitable decoration marking it as a
     // target intrinsic for the current compilation target.
     //
-    return findBestTargetIntrinsicDecoration(func) != nullptr;
+    UnownedStringSlice intrinsicDef;
+    return findTargetIntrinsicDefinition(inst, intrinsicDef);
 }
 
 void CLikeSourceEmitter::emitFunc(IRFunc* func)
@@ -3373,7 +3382,7 @@ void CLikeSourceEmitter::emitStruct(IRStructType* structType)
 {
     // If the selected `struct` type is actually an intrinsic
     // on our target, then we don't want to emit anything at all.
-    if(const auto intrinsicDecoration = findBestTargetIntrinsicDecoration(structType))
+    if(isTargetIntrinsic(structType))
     {
         return;
     }
@@ -3429,7 +3438,7 @@ void CLikeSourceEmitter::emitClass(IRClassType* classType)
 {
     // If the selected `class` type is actually an intrinsic
     // on our target, then we don't want to emit anything at all.
-    if (const auto intrinsicDecoration = findBestTargetIntrinsicDecoration(classType))
+    if (isTargetIntrinsic(classType))
     {
         return;
     }
