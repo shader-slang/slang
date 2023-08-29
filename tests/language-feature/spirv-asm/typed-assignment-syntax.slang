@@ -18,6 +18,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     int n = outputBuffer[i];
     int r = spirv_asm
     {
+        // Check that this still works even with no operands on the RHS
+        %unused : $$uint = OpUndef;
+        // More normal usage
         %two   : $$int = OpConstant 2;
         result : $$int = OpIMul $n %two;
     };
