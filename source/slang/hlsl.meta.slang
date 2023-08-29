@@ -1353,13 +1353,27 @@ matrix<int,N,M> asint(matrix<int,N,M> x)
 
 // Reinterpret bits of double as a uint (HLSL SM 5.0)
 
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl, "{ uvec2 v = unpackDouble2x32($0); $1 = v.x; $2 = v.y; }")
 __glsl_extension(GL_ARB_gpu_shader5)
-__target_intrinsic(cpp, "$P_asuint($0, $1, $2)")
-__target_intrinsic(cuda, "$P_asuint($0, $1, $2)")
 [__readNone]
-void asuint(double value, out uint lowbits, out uint highbits);
+void asuint(double value, out uint lowbits, out uint highbits)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "asuint";
+    case glsl: __intrinsic_asm "{ uvec2 v = unpackDouble2x32($0); $1 = v.x; $2 = v.y; }";
+    case cpp:
+    case cuda:
+        __intrinsic_asm "$P_asuint($0, $1, $2)";
+    case spirv:
+        let uv = spirv_asm
+        {
+            result : $$uint2 = OpBitcast $value;
+        };
+        lowbits = uv.x;
+        highbits = uv.y;
+        return;
+    }
+}
 
 // Reinterpret bits as a uint (HLSL SM 4.0)
 
@@ -2752,20 +2766,30 @@ void InterlockedXor(__ref uint dest, uint value, out uint original_value);
 
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
-__target_intrinsic(cuda, "$P_isfinite($0)")
-__target_intrinsic(cpp, "$P_isfinite($0)")
 [__readNone]
 bool isfinite(T x)
 {
-    return !(isinf(x) || isnan(x));
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "isfinite";
+    case cuda:
+    case cpp:
+        __intrinsic_asm "$P_isfinite($0)";
+    default:
+        return !(isinf(x) || isnan(x));
+    }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
-__target_intrinsic(hlsl)
 [__readNone]
 vector<bool, N> isfinite(vector<T, N> x)
 {
-    VECTOR_MAP_UNARY(bool, N, isfinite, x);
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "isfinite";
+    default:
+        VECTOR_MAP_UNARY(bool, N, isfinite, x);
+    }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
@@ -2778,20 +2802,36 @@ matrix<bool, N, M> isfinite(matrix<T, N, M> x)
 
 // Is floating-point value infinite?
 __generic<T : __BuiltinFloatingPointType>
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl)
-__target_intrinsic(cuda, "$P_isinf($0)")
-__target_intrinsic(cpp, "$P_isinf($0)")
 [__readNone]
-bool isinf(T x);
+bool isinf(T x)
+{
+    __target_switch
+    {
+    case hlsl:
+    case glsl:
+        __intrinsic_asm "isinf";
+    case cuda:
+    case cpp:
+        __intrinsic_asm "$P_isinf($0)";
+    case spirv:
+        return spirv_asm { result:$$bool = OpIsInf $x};
+    }
+}
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl)
 [__readNone]
 vector<bool, N> isinf(vector<T, N> x)
 {
-    VECTOR_MAP_UNARY(bool, N, isinf, x);
+    __target_switch
+    {
+    case hlsl:
+    case glsl:
+        __intrinsic_asm "isinf";
+    case spirv:
+        return spirv_asm { result:$$vector<bool,N> = OpIsInf $x};
+    default:
+        VECTOR_MAP_UNARY(bool, N, isinf, x);
+    }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
@@ -2804,20 +2844,36 @@ matrix<bool, N, M> isinf(matrix<T, N, M> x)
 
 // Is floating-point value not-a-number?
 __generic<T : __BuiltinFloatingPointType>
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl)
-__target_intrinsic(cuda, "$P_isnan($0)")
-__target_intrinsic(cpp, "$P_isnan($0)")
 [__readNone]
-bool isnan(T x);
+bool isnan(T x)
+{
+    __target_switch
+    {
+    case hlsl:
+    case glsl:
+        __intrinsic_asm "isnan";
+    case cuda:
+    case cpp:
+        __intrinsic_asm "$P_isnan($0)";
+    case spirv:
+        return spirv_asm { result:$$bool = OpIsNan $x};
+    }
+}
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl)
 [__readNone]
 vector<bool, N> isnan(vector<T, N> x)
 {
-    VECTOR_MAP_UNARY(bool, N, isnan, x);
+    __target_switch
+    {
+    case hlsl:
+    case glsl:
+        __intrinsic_asm "isnan";
+    case spirv:
+        return spirv_asm { result:$$vector<bool, N> = OpIsNan $x};
+    default:
+        VECTOR_MAP_UNARY(bool, N, isnan, x);
+    }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
@@ -2832,7 +2888,6 @@ matrix<bool, N, M> isnan(matrix<T, N, M> x)
 
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
-__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Ldexp _0 _1")
 [__readNone]
 T ldexp(T x, T exp)
 {
@@ -2841,7 +2896,6 @@ T ldexp(T x, T exp)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
-__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Ldexp _0 _1")
 [__readNone]
 vector<T, N> ldexp(vector<T, N> x, vector<T, N> exp)
 {
@@ -2948,14 +3002,14 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "(log( $0 ) * $S0( 0.43429448190325182765112891891661) )" )
 __target_intrinsic(cuda, "$P_log10($0)")
 __target_intrinsic(cpp, "$P_log10($0)")
-__target_intrinsic(spirv, "%baseElog = OpExtInst resultType resultId glsl450 Log _0; OpFMul resultType resultId _0 %baseElog const(_p,0.43429448190325182765112891891661)")
+__target_intrinsic(spirv, "%baseElog = OpExtInst resultType resultId glsl450 Log _0; OpFMul resultType resultId %baseElog const(_p,0.43429448190325182765112891891661)")
 [__readNone]
 T log10(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "(log( $0 ) * $S0(0.43429448190325182765112891891661) )" )
-__target_intrinsic(spirv, "%baseElog = OpExtInst resultType resultId glsl450 Log _0; OpVectorTimesScalar resultType resultId _0 %baseElog const(_p,0.43429448190325182765112891891661)")
+__target_intrinsic(spirv, "%baseElog = OpExtInst resultType resultId glsl450 Log _0; OpVectorTimesScalar resultType resultId %baseElog const(_p,0.43429448190325182765112891891661)")
 [__readNone]
 vector<T,N> log10(vector<T,N> x)
 {
@@ -3866,24 +3920,58 @@ matrix<T,N,M> saturate(matrix<T,N,M> x)
     MATRIX_MAP_UNARY(T, N, M, saturate, x);
 }
 
+__generic<T:__BuiltinArithmeticType, U:__BuiltinArithmeticType>
+__intrinsic_op($(kIROp_IntCast))
+T __int_cast(U val);
+
+__generic<T:__BuiltinArithmeticType, U:__BuiltinArithmeticType, let N : int>
+__intrinsic_op($(kIROp_IntCast))
+vector<T,N> __int_cast(vector<U,N> val);
+
 // Extract sign of value
 __generic<T : __BuiltinSignedArithmeticType>
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl, "int(sign($0))")
-__target_intrinsic(cuda, "$P_sign($0)")
-__target_intrinsic(cpp, "$P_sign($0)")
-__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fi(FSign, SSign) _0")
 [__readNone]
-int sign(T x);
+int sign(T x)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "sign";
+    case glsl: __intrinsic_asm "int(sign($0))";
+    case cuda:
+    case cpp:
+        __intrinsic_asm "$P_sign($0)";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm
+            {
+                %fsign:$$T = OpExtInst glsl450 FSign $x;
+                result:$$int = OpConvertFToS %fsign
+            };
+        else
+            return __int_cast<int>(spirv_asm {OpExtInst $$T result glsl450 SSign $x});
+    }
+}
 
 __generic<T : __BuiltinSignedArithmeticType, let N : int>
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl, "ivec$N0(sign($0))")
-__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 fi(FSign, SSign) _0")
 [__readNone]
 vector<int, N> sign(vector<T, N> x)
 {
-    VECTOR_MAP_UNARY(int, N, sign, x);
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "sign";
+    case glsl: __intrinsic_asm "ivec$N0(sign($0))";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm
+            {
+                %fsign:$$vector<T, N> = OpExtInst glsl450 FSign $x;
+                result:$$vector<int, N> = OpConvertFToS %fsign
+            };
+        else
+            return __int_cast<int>(spirv_asm {OpExtInst $$vector<T,N> result glsl450 SSign $x});
+    default:
+        VECTOR_MAP_UNARY(int, N, sign, x);
+    }
 }
 
 __generic<T : __BuiltinSignedArithmeticType, let N : int, let M : int>

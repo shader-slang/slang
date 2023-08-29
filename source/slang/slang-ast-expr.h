@@ -648,6 +648,7 @@ public:
         SlangValueAddr,
         SlangType,
         BuiltinVar,
+        GLSL450Set,
     };
 
     // The flavour and token describes how this was parsed

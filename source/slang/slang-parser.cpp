@@ -6288,6 +6288,10 @@ namespace Slang
             parser->ReadToken(TokenType::RParent);
             return operand;
         }
+        else if (parser->LookAheadToken("glsl450"))
+        {
+            return SPIRVAsmOperand{ SPIRVAsmOperand::GLSL450Set, parser->ReadToken() };
+        }
 
         // A regular identifier
         else if(parser->LookAheadToken(TokenType::Identifier))

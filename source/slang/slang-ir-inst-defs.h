@@ -1083,6 +1083,8 @@ INST(SPIRVAsmInst, SPIRVAsmInst, 1, 0)
     INST(SPIRVAsmOperandEnum, SPIRVAsmOperandEnum, 1, HOISTABLE)
     // A reference to a builtin variable.
     INST(SPIRVAsmOperandBuiltinVar, SPIRVAsmOperandBuiltinVar, 1, HOISTABLE)
+    // A reference to the glsl450 instruction set.
+    INST(SPIRVAsmOperandGLSL450Set, SPIRVAsmOperandGLSL450Set, 0, HOISTABLE)
     // A string which is given a unique ID in the backend, used to refer to
     // results of other instrucions in the same asm block
     INST(SPIRVAsmOperandId, SPIRVAsmOperandId, 1, HOISTABLE)

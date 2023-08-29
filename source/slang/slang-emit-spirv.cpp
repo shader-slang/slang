@@ -3863,11 +3863,11 @@ struct SPIRVEmitContext
             switch (opcode)
             {
             case SpvOpCapability:
-                requireSPIRVCapability((SpvCapability)getIntVal(spvInst->getOperand(1)));
-                return nullptr;
+                requireSPIRVCapability((SpvCapability)getIntVal(spvInst->getOperand(1)->getOperand(0)));
+                continue;
             case SpvOpExtension:
-                ensureExtensionDeclaration(as<IRStringLit>(spvInst->getOperand(1))->getStringSlice());
-                return nullptr;
+                ensureExtensionDeclaration(as<IRStringLit>(spvInst->getOperand(1)->getOperand(0))->getStringSlice());
+                continue;
             default:
                 break;
             }
@@ -3963,6 +3963,11 @@ struct SPIRVEmitContext
                             builder.setInsertBefore(operand);
                             auto varInst = getBuiltinGlobalVar(builder.getPtrType(kIROp_PtrType, operand->getDataType(), SpvStorageClassInput), kind);
                             emitOperand(varInst);
+                            break;
+                        }
+                        case kIROp_SPIRVAsmOperandGLSL450Set:
+                        {
+                            emitOperand(getGLSL450ExtInst());
                             break;
                         }
                         default:

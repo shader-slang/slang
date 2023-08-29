@@ -3302,6 +3302,10 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                     const auto type = lowerType(context, operand.type.type);
                     return builder->emitSPIRVAsmOperandBuiltinVar(type, kindInst);
                 }
+            case SPIRVAsmOperand::GLSL450Set:
+                {
+                    return builder->emitSPIRVAsmOperandGLSL450Set();
+                }
             case SPIRVAsmOperand::SlangValue:
                 {
                     IRInst* i;

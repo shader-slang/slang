@@ -5760,6 +5760,18 @@ namespace Slang
         return i;
     }
 
+    IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandGLSL450Set()
+    {
+        SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
+        const auto i = createInst<IRSPIRVAsmOperand>(
+            this,
+            kIROp_SPIRVAsmOperandGLSL450Set,
+            getVoidType()
+        );
+        addInst(i);
+        return i;
+    }
+
     IRSPIRVAsmInst* IRBuilder::emitSPIRVAsmInst(IRInst* opcode, List<IRInst*> operands)
     {
         SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
