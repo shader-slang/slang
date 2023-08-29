@@ -1322,8 +1322,7 @@ struct SPIRVEmitContext
                 bool arrayed = texTypeInst->isArray();
                 SpvWord depth = 2; // No knowledge of if this is a depth image
                 bool ms = texTypeInst->isMultisample();
-                // TODO: can we do better here?
-                // TODO: This is wrong
+                // TODO: This is wrong, it should be 1 if it's a sampled image and 2 if it's a RW image
                 SpvWord sampled = 1;
                 // TODO: can we do better?
                 SpvImageFormat format = SpvImageFormatUnknown;
