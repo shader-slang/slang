@@ -4479,7 +4479,7 @@ vector<T,N> WaveMaskBroadcastLaneAt(WaveMask mask, vector<T,N> value, constexpr 
     __target_switch
     {
     case glsl: __intrinsic_asm "subgroupBroadcast($1, $2)";
-    case cuda: __intrinsic_asm "__shfl_sync($0, $1, $2)";
+    case cuda: __intrinsic_asm "_waveShuffleMultiple($0, $1, $2)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt($1, $2)";
     case spirv:
         let _scope = 3u; // subgroup
@@ -4518,7 +4518,7 @@ vector<T,N> WaveMaskReadLaneAt(WaveMask mask, vector<T,N> value, int lane)
     __target_switch
     {
     case glsl: __intrinsic_asm "subgroupShuffle($1, $2)";
-    case cuda: __intrinsic_asm "__shfl_sync($0, $1, $2)";
+    case cuda: __intrinsic_asm "_waveShuffleMultiple($0, $1, $2)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt($1, $2)";
     case spirv:
         let _scope = 3u; // subgroup
@@ -4596,7 +4596,7 @@ vector<T,N> WaveMaskBitAnd(WaveMask mask, vector<T,N> expr)
     __target_switch
     {
     case glsl: __intrinsic_asm "subgroupAnd($1)";
-    case cuda: __intrinsic_asm "_waveAnd($0, $1)";
+    case cuda: __intrinsic_asm "_waveAndMultiple($0, $1)";
     case hlsl: __intrinsic_asm "WaveActiveBitAnd($1)";
     case spirv:
         let _scope = 3u; // subgroup
@@ -4633,7 +4633,7 @@ vector<T,N> WaveMaskBitOr(WaveMask mask, vector<T,N> expr)
     __target_switch
     {
     case glsl: __intrinsic_asm "subgroupOr($1)";
-    case cuda: __intrinsic_asm "_waveOr($0, $1)";
+    case cuda: __intrinsic_asm "_waveOrMultiple($0, $1)";
     case hlsl: __intrinsic_asm "WaveActiveBitOr($1)";
     case spirv:
         let _scope = 3u; // subgroup
@@ -4670,7 +4670,7 @@ vector<T,N> WaveMaskBitXor(WaveMask mask, vector<T,N> expr)
     __target_switch
     {
     case glsl: __intrinsic_asm "subgroupXor($1)";
-    case cuda: __intrinsic_asm "_waveXor($0, $1)";
+    case cuda: __intrinsic_asm "_waveXorMultiple($0, $1)";
     case hlsl: __intrinsic_asm "WaveActiveBitXor($1)";
     case spirv:
         let _scope = 3u; // subgroup
@@ -4712,7 +4712,7 @@ vector<T,N> WaveMaskMax(WaveMask mask, vector<T,N> expr)
     __target_switch
     {
     case glsl: __intrinsic_asm "subgroupMax($1)";
-    case cuda: __intrinsic_asm "_waveMax($0, $1)";
+    case cuda: __intrinsic_asm "_waveMaxMultiple($0, $1)";
     case hlsl: __intrinsic_asm "WaveActiveMax($1)";
     case spirv:
         let _scope = 3u; // subgroup
@@ -4761,7 +4761,7 @@ vector<T,N> WaveMaskMin(WaveMask mask, vector<T,N> expr)
     __target_switch
     {
     case glsl: __intrinsic_asm "subgroupMin($1)";
-    case cuda: __intrinsic_asm "_waveMin($0, $1)";
+    case cuda: __intrinsic_asm "_waveMinMultiple($0, $1)";
     case hlsl: __intrinsic_asm "WaveActiveMin($1)";
     case spirv:
         let _scope = 3u; // subgroup
@@ -4818,7 +4818,7 @@ vector<T,N> WaveMaskProduct(WaveMask mask, vector<T,N> expr)
     __target_switch
     {
     case glsl: __intrinsic_asm "subgroupMul($1)";
-    case cuda: __intrinsic_asm "_waveProduct($0, $1)";
+    case cuda: __intrinsic_asm "_waveProductMultiple($0, $1)";
     case hlsl: __intrinsic_asm "WaveActiveProduct($1)";
     case spirv:
         let _scope = 3u; // subgroup
