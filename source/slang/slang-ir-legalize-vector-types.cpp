@@ -87,6 +87,7 @@ namespace Slang
                 }
             });
 
+            IRBuilder builder(module);
             //
             // Now we handle the uses of all vec1 typed things
             //
@@ -101,10 +102,27 @@ namespace Slang
                 // TODO: handle things here such as getElement, swizzle etc...
                 case kIROp_GetElementPtr:
                 case kIROp_GetElement:
-                case kIROp_swizzle:
                 case kIROp_SwizzledStore:
                     SLANG_UNIMPLEMENTED_X("Vector user in 1-vector legalization");
 
+                case kIROp_swizzle:
+                {
+                    const auto swizzle = as<IRSwizzle>(vec1Consumer);
+                    const auto swizzleLength = swizzle->getElementCount();
+                    if(swizzleLength == 1)
+                    {
+                        swizzle->replaceUsesWith(swizzle->getBase());
+                    }
+                    else
+                    {
+                        builder.setInsertBefore(swizzle);
+                        // TODO: This isn't type-correct at this stage...
+                        const auto v = builder.emitMakeVectorFromScalar(scalarType, swizzle->getBase());
+                        swizzle->replaceUsesWith(v);
+                    }
+                    swizzle->removeAndDeallocate();
+                }
+                break;
 
                 // Turn this on to easily find more cases to add
 #               if 0
