@@ -42,6 +42,7 @@
 #include "slang-ir-lower-size-of.h"
 #include "slang-ir-lower-reinterpret.h"
 #include "slang-ir-loop-unroll.h"
+#include "slang-ir-legalize-vector-types.h"
 #include "slang-ir-metadata.h"
 #include "slang-ir-optix-entry-point-uniforms.h"
 #include "slang-ir-restructure.h"
@@ -568,6 +569,12 @@ Result linkAndOptimizeIR(
         legalizeEmptyTypes(
             irModule,
             sink);
+    }
+
+    if(targetRequest->getTarget() == CodeGenTarget::SPIRV)
+    {
+        // SPIR-V doesn't support 1-vectors
+        legalizeVectorTypes(irModule, sink);
     }
 
     // Once specialization and type legalization have been performed,
