@@ -1100,7 +1100,7 @@ extern "C"
     typedef void(*SlangFuncPtr)(void);
 
     /** 
-    (DEPRECIATED) ISlangSharedLibrary
+    (DEPRECATED) ISlangSharedLibrary
     */
     struct ISlangSharedLibrary_Dep1: public ISlangUnknown
     {
@@ -3365,7 +3365,7 @@ namespace slang
             SlangPassThrough passThrough,
             char const* path) = 0;
 
-            /** DEPRECIATED: Use setLanguagePrelude
+            /** DEPRECATED: Use setLanguagePrelude
 
             Set the 'prelude' for generated code for a 'downstream compiler'.
             @param passThrough The downstream compiler for generated code that will have the prelude applied to it. 
@@ -3377,7 +3377,7 @@ namespace slang
             SlangPassThrough passThrough,
             const char* preludeText) = 0;
 
-            /** DEPRECIATED: Use getLanguagePrelude
+            /** DEPRECATED: Use getLanguagePrelude
 
             Get the 'prelude' for generated code for a 'downstream compiler'.
             @param passThrough The downstream compiler for generated code that will have the prelude applied to it. 

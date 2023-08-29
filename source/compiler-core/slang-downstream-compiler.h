@@ -260,8 +260,8 @@ struct DownstreamCompileOptions
 };
 static_assert(std::is_trivially_copyable_v<DownstreamCompileOptions>);
 
-#define SLANG_ALIAS_DEPRECIATED_VERSION(name, id, firstField, lastField) \
-struct name##_AliasDepreciated##id \
+#define SLANG_ALIAS_DEPRECATED_VERSION(name, id, firstField, lastField) \
+struct name##_AliasDeprecated##id \
 { \
     static const ptrdiff_t kStart = SLANG_OFFSET_OF(name, firstField); \
     static const ptrdiff_t kEnd = SLANG_OFFSET_OF(name, lastField) + sizeof(name::lastField); \
