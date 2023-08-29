@@ -6631,6 +6631,14 @@ namespace Slang
         case kIROp_SPIRVAsmOperandResult:
             dump(context, "result");
             return;
+        case kIROp_SPIRVAsmOperandTruncate:
+            dump(context, "__truncate");
+            return;
+        case kIROp_SPIRVAsmOperandSampledType:
+            dump(context, "__sampledType(");
+            dumpInstExpr(context, inst->getOperand(0));
+            dump(context, ")");
+            return;
         }
 
         dump(context, opInfo.name);
