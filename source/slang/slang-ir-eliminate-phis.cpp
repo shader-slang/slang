@@ -531,7 +531,7 @@ struct PhiEliminationContext
                 auto user = use->getUser();
                 m_builder.setInsertBefore(user);
                 auto newVal = m_builder.emitLoad(temp);
-                use->set(newVal);
+                m_builder.replaceOperand(use, newVal);
             }
 
             // Once we've replaced all its uses, there is no need

@@ -14,7 +14,7 @@
 #include "slang-ast-natural-layout.h"
 
 #include "slang-lookup.h"
-
+#include "slang-lookup-spirv.h"
 #include "slang-ast-print.h"
 
 namespace Slang
@@ -3969,7 +3969,17 @@ namespace Slang
                         // Then see if it's an opcode (for OpSpecialize)
                         if(!enumValue)
                             enumValue = spirvInfo->opcodes.lookup(operand.token.getContent());
-
+                        if (inst.opcode.knownValue == SpvOpExtInst)
+                        {
+                            if (!enumValue)
+                            {
+                                GLSLstd450 val;
+                                if (lookupGLSLstd450(operand.token.getContent(), val))
+                                {
+                                    enumValue = (SpvWord)val;
+                                }
+                            }
+                        }
                         if(!enumValue)
                         {
                             failed = true;
@@ -3979,6 +3989,19 @@ namespace Slang
 
                         operand.knownValue = *enumValue;
                         operand.wrapInId = needsIdWrapper;
+                    }
+                    else if (operand.flavor == SPIRVAsmOperand::BuiltinVar)
+                    {
+                        operand.type = CheckProperType(operand.type);
+                        auto builtinVarKind = spirvInfo->allEnums.lookup(
+                            SPIRVCoreGrammarInfo::QualifiedEnumName{spirvInfo->operandKinds.lookup(UnownedStringSlice("BuiltIn")).value(), operand.token.getContent()});
+                        if (!builtinVarKind)
+                        {
+                            failed = true;
+                            getSink()->diagnose(operand.token, Diagnostics::spirvUnableToResolveName, operand.token.getContent());
+                            return;
+                        }
+                        operand.knownValue = builtinVarKind.value();
                     }
                     if(operand.bitwiseOrWith.getCount()
                         && operand.flavor != SPIRVAsmOperand::Literal
