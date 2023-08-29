@@ -654,6 +654,19 @@ struct InliningPassBase
 
 };
 
+static bool hasGenericAsmInst(IRInst* func)
+{
+    auto f = as<IRFunc>(getResolvedInstForDecorations(func));
+    if (!f)
+        return false;
+    for (auto b : f->getBlocks())
+    {
+        if (as<IRGenericAsm>(b->getTerminator()))
+            return true;
+    }
+    return false;
+}
+
     /// An inlining pass that inlines calls to `[unsafeForceInlineEarly]` functions
 struct MandatoryEarlyInliningPass : InliningPassBase
 {
@@ -668,9 +681,8 @@ struct MandatoryEarlyInliningPass : InliningPassBase
         if (info.callee->findDecoration<IRIntrinsicOpDecoration>())
             return true;
 
-        // Never inline a callee that has target intrinsic definition.
-        UnownedStringSlice definition;
-        if (findTargetIntrinsicDefinition(info.callee, CapabilitySet::makeEmpty(), definition))
+        // Never inline a callee that has genericASM instruction.
+        if (hasGenericAsmInst(info.callee))
             return false;
 
         if(info.callee->findDecoration<IRUnsafeForceInlineEarlyDecoration>())
@@ -788,9 +800,8 @@ struct ForceInliningPass : InliningPassBase
 
     bool shouldInline(CallSiteInfo const& info)
     {
-        // Never inline a callee that has target intrinsic definition.
-        UnownedStringSlice definition;
-        if (findTargetIntrinsicDefinition(info.callee, CapabilitySet::makeEmpty(), definition))
+        // Never inline a callee that has genericASM instruction.
+        if (hasGenericAsmInst(info.callee))
             return false;
 
         if (info.callee->findDecoration<IRForceInlineDecoration>() ||
