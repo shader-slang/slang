@@ -3098,6 +3098,17 @@ bool __isSignedInt()
     return __isSignedInt_impl(__declVal<T>());
 }
 
+__generic<T>
+__intrinsic_op($(kIROp_IsVector))
+bool __isVector_impl(T t);
+
+__generic<T>
+[__unsafeForceInlineEarly]
+bool __isVector()
+{
+    return __isVector_impl(__declVal<T>());
+}
+
 // Provide implementations to public generic arithmetic interfaces for builtin types.
 
 ${{{{

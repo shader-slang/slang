@@ -922,6 +922,7 @@ struct PeepholeContext : InstPassBase
         case kIROp_IsUnsignedInt:
         case kIROp_IsSignedInt:
         case kIROp_IsBool:
+        case kIROp_IsVector:
             {
                 auto type = inst->getOperand(0)->getDataType();
                 if (auto vectorType = as<IRVectorType>(type))
@@ -949,6 +950,9 @@ struct PeepholeContext : InstPassBase
                         break;
                     case kIROp_IsSignedInt:
                         result = isIntegralType(type) && getIntTypeInfo(type).isSigned;
+                        break;
+                    case kIROp_IsVector:
+                        result = as<IRVectorType>(type);
                         break;
                     }
                     inst->replaceUsesWith(builder.getBoolValue(result));

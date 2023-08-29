@@ -983,6 +983,7 @@ INST(IsBool, IsBool, 1, 0)
 INST(IsFloat, IsFloat, 1, 0)
 INST(IsUnsignedInt, IsUnsignedInt, 1, 0)
 INST(IsSignedInt, IsSignedInt, 1, 0)
+INST(IsVector, IsVector, 1, 0)
 
 INST(ForwardDifferentiate,                   ForwardDifferentiate,            1, 0)
 
