@@ -1327,6 +1327,48 @@ struct SPIRVEmitContext
                 SpvWord sampled = 1;
                 // TODO: can we do better?
                 SpvImageFormat format = SpvImageFormatUnknown;
+
+                //
+                // Capabilities, according to section 3.8
+                //
+                const auto emitCap = [&](const auto c){
+                    emitOpCapability(getSection(SpvLogicalSectionID::Capabilities), nullptr, c);
+                };
+                SLANG_ASSERT(sampled == 1 || sampled == 2);
+                switch(dim)
+                {
+                case SpvDim1D:
+                    emitCap(sampled == 1 ? SpvCapabilitySampled1D : SpvCapabilityImage1D);
+                    break;
+                case SpvDim2D:
+                    // Also requires Shader or Kernel, but these are a given (?)
+                    if(sampled == 2 && ms && arrayed)
+                        emitCap(SpvCapabilityImageMSArray);
+                    break;
+                case SpvDim3D:
+                    break;
+                case SpvDimCube:
+                    // Requires shader also
+                    if(sampled == 2 && arrayed)
+                        emitCap(SpvCapabilityImageCubeArray);
+                    break;
+                case SpvDimRect:
+                    emitCap(sampled == 1 ? SpvCapabilitySampledRect : SpvCapabilityImageRect);
+                    break;
+                case SpvDimBuffer:
+                    emitCap(sampled == 1 ? SpvCapabilitySampledBuffer : SpvCapabilityImageBuffer);
+                    break;
+                case SpvDimSubpassData:
+                    emitCap(SpvCapabilityInputAttachment);
+                    break;
+                case SpvDimTileImageDataEXT:
+                    SLANG_UNIMPLEMENTED_X("OpTypeImage Capabilities for SpvDimTileImageDataEXT");
+                    break;
+                }
+
+                //
+                // The op itself
+                //
                 return emitOpTypeImage(
                     inst,
                     dropVector(sampledType),
