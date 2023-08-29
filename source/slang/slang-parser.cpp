@@ -6411,7 +6411,8 @@ namespace Slang
         // At this point we can also parse bitwise or expressions
         //
         while(!(parser->LookAheadToken(TokenType::RBrace)
-            || parser->LookAheadToken(TokenType::Semicolon))
+            || parser->LookAheadToken(TokenType::Semicolon)
+            || parser->LookAheadToken(TokenType::EndOfFile))
             || resultTypeOperand
             || resultOperand)
         {
