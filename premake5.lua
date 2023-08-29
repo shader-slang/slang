@@ -442,7 +442,7 @@ workspace "slang"
         -- For including windows.h in a way that minimized namespace pollution.
         -- Although we define these here, we still set them manually in any header
         -- files which may be included by another project
-        defines { "WIN32_LEAN_AND_MEAN", "VC_EXTRALEAN", "NOMINMAX" }
+        defines { "WIN32_LEAN_AND_MEAN", "VC_EXTRALEAN", "NOMINMAX", "_ITERATOR_DEBUG_LEVEL=0" }
 
         if dxOnVk then
             defines { "SLANG_CONFIG_DX_ON_VK" }
@@ -1582,7 +1582,7 @@ standardProject("slang", "source/slang")
     links { "core", "compiler-core", "miniz", "lz4"}
     warnings "Extra"
     pic "On"
-
+    
     -- The way that we currently configure things through `slang.h`,
     -- we need to set a preprocessor definitions to ensure that
     -- we declare the Slang API functions for *export* and not *import*.
