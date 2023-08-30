@@ -1238,8 +1238,12 @@ static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
                 {
                     StdWriters::getOut().print(
                         "Check %s: Not Supported\n", RenderApiUtil::getApiName(apiType).begin());
-                    StdWriters::getOut().print(
-                        "%s\n%s\n", exeRes.standardError.getBuffer(), exeRes.standardOutput.getBuffer());
+                    const auto out = exeRes.standardOutput;
+                    const auto err = exeRes.standardError;
+                    if(err.getLength())
+                        StdWriters::getOut().print("%s\n", err.getBuffer());
+                    if(out.getLength())
+                        StdWriters::getOut().print("%s\n", out.getBuffer());
                 }
             }
         }

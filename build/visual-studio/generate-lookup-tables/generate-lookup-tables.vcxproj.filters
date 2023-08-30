@@ -21,11 +21,5 @@
     <CustomBuild Include="..\..\..\external\spirv-headers\include\spirv\unified1\extinst.glsl.std.450.grammar.json">
       <Filter>spirv-headers\include\spirv\unified1</Filter>
     </CustomBuild>
-    <CustomBuild Include="..\..\..\external\spirv-headers\include\spirv\unified1\spirv.core.grammar.json">
-      <Filter>spirv-headers\include\spirv\unified1</Filter>
-    </CustomBuild>
-    <CustomBuild Include="..\..\..\external\spirv\spirv-capabilities.txt">
-      <Filter>spirv</Filter>
-    </CustomBuild>
   </ItemGroup>
 </Project>

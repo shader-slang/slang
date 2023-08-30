@@ -33,4 +33,6 @@ DIAGNOSTIC(100005, Error, invalidArgumentForOption, "invalid argument format for
 
 DIAGNOSTIC(99999, Note, noteLocationOfInternalError, "an internal error threw an exception while working on code near this location")
 
+DIAGNOSTIC(29104, Error, spirvCoreGrammarJSONParseFailure, "unexpected JSON in spirv core grammar file: $0")
+
 #undef DIAGNOSTIC

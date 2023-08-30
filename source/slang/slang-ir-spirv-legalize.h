@@ -19,8 +19,12 @@ struct SPIRVEmitSharedContext
     TargetRequest* m_targetRequest;
     Dictionary<IRTargetIntrinsicDecoration*, RefPtr<SpvSnippet>> m_parsedSpvSnippets;
     DiagnosticSink* m_sink;
+    const SPIRVCoreGrammarInfo* m_grammarInfo;
     SPIRVEmitSharedContext(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
-        : m_irModule(module), m_targetRequest(target), m_sink(sink)
+        : m_irModule(module),
+          m_targetRequest(target),
+          m_sink(sink),
+          m_grammarInfo(&module->getSession()->getSPIRVCoreGrammarInfo())
     {}
     SpvSnippet* getParsedSpvSnippet(IRTargetIntrinsicDecoration* intrinsic);
 };

@@ -593,22 +593,29 @@ ComPtr<ISlangBlob> StringUtil::createStringBlob(const String& string)
         cur++;
     }
 
+    int radix = 10;
+    auto getDigit = CharUtil::getDecimalDigitValue;
+    if (cur+1 < end && *cur == '0' && (*(cur+1) == 'x' || *(cur+1) == 'X'))
+    {
+        radix = 16;
+        getDigit = CharUtil::getHexDigitValue;
+        cur += 2;
+    }
+
     // We need at least one digit
     if (cur >= end || !CharUtil::isDigit(*cur))
     {
         return SLANG_FAIL;
     }
     
-    Int value = *cur++ - '0';
-    // Do the remaining digits
+    Int value = 0;
+    // Do the digits
     for (; cur < end; ++cur)
     {
-        const char c = *cur;
-        if (!CharUtil::isDigit(c))
-        {
+        const auto d = getDigit(*cur);
+        if (d == -1)
             return SLANG_FAIL;
-        }
-        value = value * 10 + (c - '0');
+        value = value * radix + d;
     }
 
     value = negate ? -value : value;

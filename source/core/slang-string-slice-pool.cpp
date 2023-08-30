@@ -40,6 +40,9 @@ void StringSlicePool::_set(const ThisType& rhs)
     const Index startIndex = rhs.getFirstAddedIndex();
     const Count count = rhs.m_slices.getCount();
 
+    if (count == 0)
+        return;
+    
     // We need the same amount of slices
     m_slices.setCount(count);
 

@@ -137,6 +137,7 @@ class RequiredSPIRVCapabilityModifier : public Modifier
 {
     SLANG_AST_CLASS(RequiredSPIRVCapabilityModifier)
     int32_t capability;
+    String extensionName;
 };
 
 // A modifier to tag something as an intrinsic that requires

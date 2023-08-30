@@ -2342,6 +2342,16 @@ struct IRSwitch : IRTerminatorInst
     IRUse* getCaseLabelUse(UInt index) { return getOperands() + 3 + index * 2 + 1; }
 };
 
+// A compile-time switch based on the current code generation target.
+struct IRTargetSwitch : IRTerminatorInst
+{
+    IR_LEAF_ISA(TargetSwitch)
+    IRInst* getBreakBlock() { return getOperand(0); }
+    UInt getCaseCount() { return (getOperandCount() - 1) / 2; }
+    IRBlock* getCaseBlock(UInt index) { return (IRBlock*)getOperand(index * 2 + 2); }
+    IRInst* getCaseValue(UInt index) { return getOperand(index * 2 + 1); }
+};
+
 struct IRThrow : IRTerminatorInst
 {
     IR_LEAF_ISA(Throw);
@@ -2888,6 +2898,8 @@ struct IRSPIRVAsmOperand : IRInst
     IR_PARENT_ISA(SPIRVAsmOperand);
     IRInst* getValue()
     {
+        if(getOp() == kIROp_SPIRVAsmOperandResult)
+            return nullptr;
         return getOperand(0);
     }
 };
@@ -2896,20 +2908,20 @@ struct IRSPIRVAsmInst : IRInst
 {
     IR_LEAF_ISA(SPIRVAsmInst);
 
-    IRSPIRVAsmOperand* getOpcode()
+    IRSPIRVAsmOperand* getOpcodeOperand()
     {
-        // TODO: This only supports known opcodes at the moment, eventually we'll want
-        // another child of IRSPIRVAsm which just stores raw words
         const auto opcodeOperand = cast<IRSPIRVAsmOperand>(getOperand(0));
         SLANG_ASSERT(opcodeOperand->getOp() == kIROp_SPIRVAsmOperandEnum);
         return opcodeOperand;
     }
 
-    UnownedStringSlice getOpcodeString()
+    SpvWord getOpcodeOperandWord()
     {
-        const auto opcodeOperand = getOpcode();
-        const auto opcodeStringLit = cast<IRStringLit>(opcodeOperand->getValue());
-        return opcodeStringLit->getStringSlice();
+        const auto o = getOpcodeOperand();
+        SLANG_ASSERT(o->getOp() != kIROp_SPIRVAsmOperandResult);
+        const auto v = o->getValue();
+        const auto i = cast<IRIntLit>(v);
+        return SpvWord(i->getValue());
     }
 
     IROperandList<IRSPIRVAsmOperand> getSPIRVOperands()
@@ -2925,6 +2937,12 @@ struct IRSPIRVAsm : IRInst
     {
         return IRFilteredInstList<IRSPIRVAsmInst>(getFirstChild(), getLastChild());
     }
+};
+
+struct IRGenericAsm : IRInst
+{
+    IR_LEAF_ISA(GenericAsm)
+    UnownedStringSlice getAsm() { return as<IRStringLit>(getOperand(0))->getStringSlice(); }
 };
 
 struct IRBuilderSourceLocRAII;
@@ -3916,10 +3934,12 @@ public:
     IRSPIRVAsmOperand* emitSPIRVAsmOperandLiteral(IRInst* literal);
     IRSPIRVAsmOperand* emitSPIRVAsmOperandInst(IRInst* inst);
     IRSPIRVAsmOperand* emitSPIRVAsmOperandId(IRInst* inst);
+    IRSPIRVAsmOperand* emitSPIRVAsmOperandResult();
     IRSPIRVAsmOperand* emitSPIRVAsmOperandEnum(IRInst* inst);
+    IRSPIRVAsmOperand* emitSPIRVAsmOperandEnum(IRInst* inst, IRType* constantType);
     IRSPIRVAsmInst* emitSPIRVAsmInst(IRInst* opcode, List<IRInst*> operands);
     IRSPIRVAsm* emitSPIRVAsm(IRType* type);
-
+    IRInst* emitGenericAsm(UnownedStringSlice asmText);
     //
     // Decorations
     //
@@ -4126,9 +4146,23 @@ public:
         addDecoration(value, kIROp_RequireSPIRVVersionDecoration, getIntValue(getBasicType(BaseType::UInt64), intValue));
     }
 
-    void addRequireSPIRVCapabilityDecoration(IRInst* value, int32_t capabilityName)
+    void addRequireSPIRVCapabilityDecoration(IRInst* value, int32_t capabilityName, UnownedStringSlice extensionName)
     {
-        addDecoration(value, kIROp_RequireSPIRVCapabilityDecoration, getIntValue(getIntType(), IRIntegerValue(capabilityName)));
+        if (extensionName.getLength())
+        {
+            addDecoration(
+                value,
+                kIROp_RequireSPIRVCapabilityDecoration,
+                getIntValue(getIntType(), IRIntegerValue(capabilityName)),
+                getStringValue(extensionName));
+        }
+        else
+        {
+            addDecoration(
+                value,
+                kIROp_RequireSPIRVCapabilityDecoration,
+                getIntValue(getIntType(), IRIntegerValue(capabilityName)));
+        }
     }
 
     void addRequireCUDASMVersionDecoration(IRInst* value, const SemanticVersion& version)
@@ -4494,6 +4528,8 @@ IRTargetSpecificDecoration* findBestTargetDecoration(
 IRTargetSpecificDecoration* findBestTargetDecoration(
         IRInst*         val,
         CapabilityAtom  targetCapabilityAtom);
+
+bool findTargetIntrinsicDefinition(IRInst* callee, CapabilitySet const& targetCaps, UnownedStringSlice& outDefinition);
 
 inline IRTargetIntrinsicDecoration* findBestTargetIntrinsicDecoration(
     IRInst* inInst,

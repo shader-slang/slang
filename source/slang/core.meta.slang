@@ -2984,6 +2984,89 @@ __prefix T operator ~(T v0)
     return v0.bitNot();
 }
 
+// IR level type traits.
+
+__generic<T>
+__intrinsic_op($(kIROp_undefined))
+T __declVal();
+
+__generic<T>
+__intrinsic_op($(kIROp_DefaultConstruct))
+T __default();
+
+__generic<T, U>
+__intrinsic_op($(kIROp_TypeEquals))
+bool __type_equals_impl(T t, U u);
+
+__generic<T, U>
+[__unsafeForceInlineEarly]
+bool __type_equals(T t, U u)
+{
+    return __type_equals_impl(__declVal<T>(), __declVal<U>());
+}
+
+__generic<T, U>
+[__unsafeForceInlineEarly]
+bool __type_equals()
+{
+    return __type_equals_impl(__declVal<T>(), __declVal<U>());
+}
+
+__generic<T>
+__intrinsic_op($(kIROp_IsBool))
+bool __isBool_impl(T t);
+
+__generic<T>
+[__unsafeForceInlineEarly]
+bool __isBool()
+{
+    return __isBool_impl(__declVal<T>());
+}
+
+__generic<T>
+__intrinsic_op($(kIROp_IsInt))
+bool __isInt_impl(T t);
+
+__generic<T>
+[__unsafeForceInlineEarly]
+bool __isInt()
+{
+    return __isInt_impl(__declVal<T>());
+}
+
+__generic<T>
+__intrinsic_op($(kIROp_IsFloat))
+bool __isFloat_impl(T t);
+
+__generic<T>
+[__unsafeForceInlineEarly]
+bool __isFloat()
+{
+    return __isFloat_impl(__declVal<T>());
+}
+
+__generic<T>
+__intrinsic_op($(kIROp_IsUnsignedInt))
+bool __isUnsignedInt_impl(T t);
+
+__generic<T>
+[__unsafeForceInlineEarly]
+bool __isUnsignedInt()
+{
+    return __isUnsignedInt_impl(__declVal<T>());
+}
+
+__generic<T>
+__intrinsic_op($(kIROp_IsSignedInt))
+bool __isSignedInt_impl(T t);
+
+__generic<T>
+[__unsafeForceInlineEarly]
+bool __isSignedInt()
+{
+    return __isSignedInt_impl(__declVal<T>());
+}
+
 // Provide implementations to public generic arithmetic interfaces for builtin types.
 
 ${{{{

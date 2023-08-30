@@ -512,6 +512,7 @@ namespace Slang
         case kIROp_Unreachable:
         case kIROp_MissingReturn:
         case kIROp_discard:
+        case kIROp_GenericAsm:
             break;
 
         case kIROp_unconditionalBranch:
@@ -538,7 +539,11 @@ namespace Slang
             end = operands + terminator->getOperandCount() + 1;
             stride = 2;
             break;
-
+        case kIROp_TargetSwitch:
+            begin = operands + 2;
+            end = operands + terminator->getOperandCount() + 1;
+            stride = 2;
+            break;
         default:
             SLANG_UNEXPECTED("unhandled terminator instruction");
             UNREACHABLE_RETURN(IRBlock::SuccessorList(nullptr, nullptr));
@@ -5703,6 +5708,18 @@ namespace Slang
         return i;
     }
 
+    IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandResult()
+    {
+        SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
+        const auto i = createInst<IRSPIRVAsmOperand>(
+            this,
+            kIROp_SPIRVAsmOperandResult,
+            getVoidType()
+        );
+        addInst(i);
+        return i;
+    }
+
     IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandEnum(IRInst* inst)
     {
         SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
@@ -5711,6 +5728,20 @@ namespace Slang
             kIROp_SPIRVAsmOperandEnum,
             inst->getFullType(),
             inst
+        );
+        addInst(i);
+        return i;
+    }
+
+    IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandEnum(IRInst* inst, IRType* constantType)
+    {
+        SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
+        const auto i = createInst<IRSPIRVAsmOperand>(
+            this,
+            kIROp_SPIRVAsmOperandEnum,
+            inst->getFullType(),
+            inst,
+            constantType
         );
         addInst(i);
         return i;
@@ -5740,6 +5771,12 @@ namespace Slang
         );
         addInst(asmInst);
         return asmInst;
+    }
+
+    IRInst* IRBuilder::emitGenericAsm(UnownedStringSlice asmText)
+    {
+        IRInst* arg = getStringValue(asmText);
+        return emitIntrinsicInst(nullptr, kIROp_GenericAsm, 1, &arg);
     }
 
     //
@@ -6565,6 +6602,9 @@ namespace Slang
         case kIROp_SPIRVAsmOperandId:
             dump(context, "%");
             dumpInstExpr(context, inst->getOperand(0));
+            return;
+        case kIROp_SPIRVAsmOperandResult:
+            dump(context, "result");
             return;
         }
 
@@ -7714,6 +7754,26 @@ namespace Slang
         return findBestTargetDecoration(val, CapabilitySet(targetCapabilityAtom));
     }
 
+    bool findTargetIntrinsicDefinition(IRInst* callee, CapabilitySet const& targetCaps, UnownedStringSlice& outDefinition)
+    {
+        if (auto decor = findBestTargetIntrinsicDecoration(callee, targetCaps))
+        {
+            outDefinition = decor->getDefinition();
+            return true;
+        }
+        auto func = as<IRGlobalValueWithCode>(callee);
+        if (!func)
+            return false;
+        auto block = func->getFirstBlock();
+        if (!block)
+            return false;
+        if (auto genAsm = as<IRGenericAsm>(block->getTerminator()))
+        {
+            outDefinition = genAsm->getAsm();
+            return true;
+        }
+        return false;
+    }
 
 #if 0
     IRFunc* cloneSimpleFuncWithoutRegistering(IRSpecContextBase* context, IRFunc* originalFunc)

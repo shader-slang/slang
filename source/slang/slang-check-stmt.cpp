@@ -264,6 +264,26 @@ namespace Slang
         stmt->parentStmt = switchStmt;
     }
 
+    void SemanticsStmtVisitor::visitTargetSwitchStmt(TargetSwitchStmt* stmt)
+    {
+        WithOuterStmt subContext(this, stmt);
+
+        for (auto caseStmt : stmt->targetCases)
+            subContext.checkStmt(caseStmt);
+    }
+
+    void SemanticsStmtVisitor::visitTargetCaseStmt(TargetCaseStmt* stmt)
+    {
+        auto switchStmt = FindOuterStmt<TargetSwitchStmt>();
+
+        if (!switchStmt)
+        {
+            getSink()->diagnose(stmt, Diagnostics::caseOutsideSwitch);
+        }
+        WithOuterStmt subContext(this, stmt);
+        subContext.checkStmt(stmt->body);
+    }
+
     void SemanticsStmtVisitor::visitDefaultStmt(DefaultStmt* stmt)
     {
         auto switchStmt = FindOuterStmt<SwitchStmt>();
