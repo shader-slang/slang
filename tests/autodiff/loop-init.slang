@@ -1,5 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl -profile cs_5_0 -entry computeMain -line-directive-mode none
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -9,6 +10,12 @@ struct A : IDifferentiable
     float data[5];
 };
 
+// Check that the intermediate context of B.eval does not have an array for `i`.
+
+// CHECK: struct s_bwd_B_eval_Intermediates_0
+// CHECK-NOT: int {{[A-Za-z0-9_]+}}[{{.*}}]
+// CHECK: }
+
 __generic<let TBsdfCount : int>
 struct B
 {
@@ -17,7 +24,6 @@ struct B
     {
         float3 albedo;
         for (uint i = 0; i < 3; i++) albedo[i] = miData.data[i];
-        // albedo = float3(miData.data[0], miData.data[1], miData.data[2]);
 
         float3 result = float3(1.f);
         [ForceUnroll] for (uint i = 0; i < TBsdfCount; i++) result *= albedo;
