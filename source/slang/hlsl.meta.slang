@@ -1076,12 +1076,13 @@ bool all(matrix<T,N,M> x)
 }
 
 // Barrier for writes to all memory spaces (HLSL SM 5.0)
+__glsl_extension(GL_KHR_memory_scope_semantics)
 void AllMemoryBarrier()
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "AllMemoryBarrier";
-    case glsl: __intrinsic_asm "memoryBarrier()";
+    case glsl: __intrinsic_asm "memoryBarrier(gl_ScopeDevice, (gl_StorageSemanticsShared|gl_StorageSemanticsImage|gl_StorageSemanticsBuffer), gl_SemanticsAcquireRelease)";
     case cuda: __intrinsic_asm "__threadfence()";
     case spirv: spirv_asm
         {
@@ -2020,7 +2021,7 @@ void DeviceMemoryBarrier()
     __target_switch
     {
     case hlsl: __intrinsic_asm "DeviceMemoryBarrier";
-    case glsl: __intrinsic_asm "memoryBarrier(gl_ScopeDevice, (gl_StorageSemanticsShared|gl_StorageSemanticsImage|gl_StorageSemanticsBuffer), gl_SemanticsAcquireRelease)";
+    case glsl: __intrinsic_asm "memoryBarrier(gl_ScopeDevice, (gl_StorageSemanticsImage|gl_StorageSemanticsBuffer), gl_SemanticsAcquireRelease)";
     case cuda: __intrinsic_asm "__threadfence()";
     case spirv: spirv_asm
         {
@@ -2035,7 +2036,7 @@ void DeviceMemoryBarrierWithGroupSync()
     __target_switch
     {
     case hlsl: __intrinsic_asm "DeviceMemoryBarrierWithGroupSync";
-    case glsl: __intrinsic_asm "controlBarrier(gl_ScopeWorkgroup, gl_ScopeDevice, (gl_StorageSemanticsShared|gl_StorageSemanticsImage|gl_StorageSemanticsBuffer), gl_SemanticsAcquireRelease)";
+    case glsl: __intrinsic_asm "controlBarrier(gl_ScopeWorkgroup, gl_ScopeDevice, (gl_StorageSemanticsImage|gl_StorageSemanticsBuffer), gl_SemanticsAcquireRelease)";
     case cuda: __intrinsic_asm "__syncthreads()";
     case spirv: spirv_asm
         {
