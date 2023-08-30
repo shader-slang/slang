@@ -2013,13 +2013,35 @@ __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Determinant _0"
 T determinant(matrix<T,N,N> m);
 
 // Barrier for device memory
-__target_intrinsic(glsl, "memoryBarrier(), memoryBarrierImage(), memoryBarrierBuffer()")
-__target_intrinsic(cuda, "__threadfence()")
-void DeviceMemoryBarrier();
+void DeviceMemoryBarrier()
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "DeviceMemoryBarrier";
+    case glsl: __intrinsic_asm "memoryBarrier()";
+    case cuda: __intrinsic_asm "__threadfence()";
+    case spirv: spirv_asm
+        {
+            OpMemoryBarrier Device AcquireRelease|UniformMemory|ImageMemory;
+        };
+    }
+}
 
-__target_intrinsic(glsl, "memoryBarrier(), memoryBarrierImage(), memoryBarrierBuffer(), barrier()")
+__target_intrinsic(glsl, "barrier()")
 __target_intrinsic(glsl, "__syncthreads()")
-void DeviceMemoryBarrierWithGroupSync();
+void DeviceMemoryBarrierWithGroupSync()
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "DeviceMemoryBarrierWithGroupSync";
+    case glsl: __intrinsic_asm "barrier()";
+    case cuda: __intrinsic_asm "__threadfence()";
+    case spirv: spirv_asm
+        {
+            OpControlBarrier Workgroup Device AcquireRelease|UniformMemory|ImageMemory;
+        };
+    }
+}
 
 // Vector distance
 
