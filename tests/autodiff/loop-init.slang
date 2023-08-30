@@ -10,7 +10,11 @@ struct A : IDifferentiable
     float data[5];
 };
 
-// Check that the intermediate context of B.eval does not have an array for `i`.
+// Check that the intermediate context of B.eval does not have any arrays.
+// This will fail if the induction variable is not properly detected, or
+// if the various loop restructuring passes accidentally introduce additional 
+// loop state.
+// 
 
 // CHECK: struct s_bwd_B_eval_Intermediates_0
 // CHECK-NOT: int {{[A-Za-z0-9_]+}}[{{.*}}]
