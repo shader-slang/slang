@@ -25,6 +25,9 @@ namespace Slang
         /// Inline calls to functions that returns a resource/sampler via either return value or output parameter.
     void performGLSLResourceReturnFunctionInlining(IRModule* module);
 
+        /// Inline simple intrinsic functions whose definition is a single asm block.
+    void performIntrinsicFunctionFunctionInlining(IRModule* module);
+
         /// Inline a specific call.
     bool inlineCall(IRCall* call);
 }
