@@ -526,17 +526,20 @@ namespace Slang
         }
 
         // Check if both are integer values in general
-        const auto fstInt = as<IntVal>(fst);
-        const auto sndInt = as<IntVal>(snd);
+        auto fstInt = as<IntVal>(fst);
+        auto sndInt = as<IntVal>(snd);
         if (fstInt && sndInt)
         {
-            const auto paramUnderCast = [](IntVal* i){
-                if(const auto c = as<TypeCastIntVal>(i))
+            const auto unwrapTypeCasts = [](IntVal* i){
+                while(const auto c = as<TypeCastIntVal>(i))
                     i = as<IntVal>(c->getBase());
-                return as<GenericParamIntVal>(i);
+                return i;
             };
-            auto fstParam = paramUnderCast(fstInt);
-            auto sndParam = paramUnderCast(sndInt);
+            fstInt = unwrapTypeCasts(fstInt);
+            sndInt = unwrapTypeCasts(sndInt);
+
+            auto fstParam = as<GenericParamIntVal>(fstInt);
+            auto sndParam = as<GenericParamIntVal>(sndInt);
 
             bool okay = false;
             if (fstParam)
