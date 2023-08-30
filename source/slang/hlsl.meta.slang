@@ -2649,28 +2649,50 @@ float2 GetRenderTargetSamplePosition(int Index);
 
 // Group memory barrier
 __glsl_extension(GL_KHR_memory_scope_semantics)
-__target_intrinsic(glsl, "memoryBarrier(gl_ScopeWorkgroup, gl_StorageSemanticsShared, gl_SemanticsAcquireRelease)")
-__target_intrinsic(cuda, "__threadfence_block")
-__target_intrinsic(spirv, "OpMemoryBarrier const(int,ScopeWorkgroup)"
-                            "const(int, MemorySemanticsAcquireReleaseMask"
-                                     "| MemorySemanticsWorkgroupMemoryMask)")
-void GroupMemoryBarrier();
+void GroupMemoryBarrier()
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "memoryBarrier(gl_ScopeWorkgroup, gl_StorageSemanticsShared, gl_SemanticsAcquireRelease)";
+    case hlsl: __intrinsic_asm "GroupMemoryBarrier";
+    case cuda: __intrinsic_asm "__threadfence_block";
+    case spirv:
+        spirv_asm
+        {
+            OpMemoryBarrier Workgroup AcquireRelease|WorkgroupMemory
+        };
+    }
+}
 
-__target_intrinsic(glsl, "subgroupBarrier")
-__target_intrinsic(spirv, "OpControlBarrier const(int,ScopeSubgroup) const(int,ScopeSubgroup)"
-                            "const(int, MemorySemanticsAcquireReleaseMask"
-                                     "| MemorySemanticsUniformMemoryMask"
-                                     "| MemorySemanticsImageMemoryMask"
-                                     "| MemorySemanticsAtomicCounterMemoryMask"
-                                     "| MemorySemanticsWorkgroupMemoryMask)")
-void __subgroupBarrier();
+void __subgroupBarrier()
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "subgroupBarrier";
+    case hlsl: __intrinsic_asm "GroupMemoryBarrierWithGroupSync";
+    case cuda: __intrinsic_asm "__syncthreads()";
+    case spirv:
+        spirv_asm
+        {
+            OpControlBarrier Subgroup Subgroup AcquireRelease|WorkgroupMemory|ImageMemory|UniformMemory
+        };
+    }
+}
 
-__target_intrinsic(glsl, "barrier()")
-__target_intrinsic(cuda, "__syncthreads()")
-__target_intrinsic(spirv, "OpControlBarrier const(int,ScopeWorkgroup) const(int, ScopeWorkgroup)"
-                            "const(int, MemorySemanticsAcquireReleaseMask"
-                                     "| MemorySemanticsWorkgroupMemoryMask)")
-void GroupMemoryBarrierWithGroupSync();
+void GroupMemoryBarrierWithGroupSync()
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "barrier";
+    case hlsl: __intrinsic_asm "GroupMemoryBarrierWithGroupSync";
+    case cuda: __intrinsic_asm "__syncthreads()";
+    case spirv:
+        spirv_asm
+        {
+            OpControlBarrier Workgroup Workgroup AcquireRelease|WorkgroupMemory
+        };
+    }
+}
 
 // Atomics
 

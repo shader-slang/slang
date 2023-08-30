@@ -246,13 +246,6 @@ struct InliningPassBase
         //
         outCallSite.callee = calleeFunc;
 
-        if (callee->findDecoration<IRIntrinsicOpDecoration>())
-            return true;
-
-        // We cannot inline a function that is defined by a generic asm inst.
-        if (hasGenericAsmInst(callee))
-            return false;
-
         for (auto decor : callee->getDecorations())
         {
             switch (decor->getOp())
@@ -260,12 +253,14 @@ struct InliningPassBase
             case kIROp_IntrinsicOpDecoration:
                 return true;
             case kIROp_RequireSPIRVCapabilityDecoration:
-            case kIROp_RequireSPIRVVersionDecoration:
-            case kIROp_RequireGLSLExtensionDecoration:
-            case kIROp_RequireGLSLVersionDecoration:
+                // Don't inline a function with spirv capability decoration to avoid losing it.
                 return false;
             }
         }
+
+        // We cannot inline a function that is defined by a generic asm inst.
+        if (hasGenericAsmInst(callee))
+            return false;
 
         // At this point the `CallSiteInfo` is complete and
         // could be used for inlining, but we have additional
