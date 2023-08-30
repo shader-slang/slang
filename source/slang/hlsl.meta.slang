@@ -1091,12 +1091,13 @@ void AllMemoryBarrier()
 }
 
 // Thread-group sync and barrier for writes to all memory spaces (HLSL SM 5.0)
+__glsl_extension(GL_KHR_memory_scope_semantics)
 void AllMemoryBarrierWithGroupSync()
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "AllMemoryBarrierWithGroupSync";
-    case glsl: __intrinsic_asm "barrier()";
+    case glsl: __intrinsic_asm "controlBarrier(gl_ScopeWorkgroup, gl_ScopeDevice, (gl_StorageSemanticsShared|gl_StorageSemanticsImage|gl_StorageSemanticsBuffer), gl_SemanticsAcquireRelease)";
     case cuda: __intrinsic_asm "__syncthreads()";
     case spirv: spirv_asm
         {
@@ -2013,12 +2014,13 @@ __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Determinant _0"
 T determinant(matrix<T,N,N> m);
 
 // Barrier for device memory
+__glsl_extension(GL_KHR_memory_scope_semantics)
 void DeviceMemoryBarrier()
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "DeviceMemoryBarrier";
-    case glsl: __intrinsic_asm "memoryBarrier()";
+    case glsl: __intrinsic_asm "memoryBarrier(gl_ScopeDevice, (gl_StorageSemanticsShared|gl_StorageSemanticsImage|gl_StorageSemanticsBuffer), gl_SemanticsAcquireRelease)";
     case cuda: __intrinsic_asm "__threadfence()";
     case spirv: spirv_asm
         {
@@ -2027,15 +2029,14 @@ void DeviceMemoryBarrier()
     }
 }
 
-__target_intrinsic(glsl, "barrier()")
-__target_intrinsic(glsl, "__syncthreads()")
+__glsl_extension(GL_KHR_memory_scope_semantics)
 void DeviceMemoryBarrierWithGroupSync()
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "DeviceMemoryBarrierWithGroupSync";
-    case glsl: __intrinsic_asm "barrier()";
-    case cuda: __intrinsic_asm "__threadfence()";
+    case glsl: __intrinsic_asm "controlBarrier(gl_ScopeWorkgroup, gl_ScopeDevice, (gl_StorageSemanticsShared|gl_StorageSemanticsImage|gl_StorageSemanticsBuffer), gl_SemanticsAcquireRelease)";
+    case cuda: __intrinsic_asm "__syncthreads()";
     case spirv: spirv_asm
         {
             OpControlBarrier Workgroup Device AcquireRelease|UniformMemory|ImageMemory;
