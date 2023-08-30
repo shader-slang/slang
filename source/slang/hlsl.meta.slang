@@ -5658,7 +5658,7 @@ vector<T, N> WaveActiveMin(vector<T, N> expr)
     __target_switch
     {
     case glsl: __intrinsic_asm "subgroupMin($0)";
-    case hlsl: __intrinsic_asm "WaveActiveMinWaveActiveMin";
+    case hlsl: __intrinsic_asm "WaveActiveMin";
     case spirv:
         if (__isFloat<T>())
             return spirv_asm {OpGroupNonUniformFMin $$vector<T, N> result Subgroup Reduce $expr};
