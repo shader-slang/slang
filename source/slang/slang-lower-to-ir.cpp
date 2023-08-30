@@ -3289,9 +3289,9 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             case SPIRVAsmOperand::NamedValue:
                 {
                     const auto v = operand.knownValue;
-                    const auto i = builder->getIntValue(builder->getIntType(), v);
+                    const auto i = builder->getIntValue(builder->getUIntType(), v);
                     if(operand.wrapInId)
-                        return builder->emitSPIRVAsmOperandEnum(i, builder->getIntType());
+                        return builder->emitSPIRVAsmOperandEnum(i, builder->getUIntType());
                     else
                         return builder->emitSPIRVAsmOperandEnum(i);
                 }
