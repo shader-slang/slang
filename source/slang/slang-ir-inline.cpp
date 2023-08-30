@@ -893,10 +893,11 @@ struct IntrinsicFunctionInliningPass : InliningPassBase
             return false;
         if (func->findDecorationImpl(kIROp_RequireSPIRVCapabilityDecoration))
             return false;
-        if (!as<IRReturn>(func->getFirstBlock()->getTerminator()))
+        auto returnInst = as<IRReturn>(func->getFirstBlock()->getTerminator());
+        if (!returnInst)
             return false;
         auto firstInst = as<IRSPIRVAsm>(func->getFirstBlock()->getFirstOrdinaryInst());
-        return firstInst != nullptr;
+        return returnInst->getVal() == firstInst;
     }
 };
 
