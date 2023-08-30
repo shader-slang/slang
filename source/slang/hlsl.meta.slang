@@ -2648,7 +2648,8 @@ uint GetRenderTargetSampleCount();
 float2 GetRenderTargetSamplePosition(int Index);
 
 // Group memory barrier
-__target_intrinsic(glsl, "groupMemoryBarrier")
+__glsl_extension(GL_KHR_memory_scope_semantics)
+__target_intrinsic(glsl, "memoryBarrier(gl_ScopeWorkgroup, gl_StorageSemanticsShared, gl_SemanticsAcquireRelease)")
 __target_intrinsic(cuda, "__threadfence_block")
 __target_intrinsic(spirv, "OpMemoryBarrier const(int,ScopeWorkgroup)"
                             "const(int, MemorySemanticsAcquireReleaseMask"
