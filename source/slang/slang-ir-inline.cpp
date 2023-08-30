@@ -883,6 +883,34 @@ void performGLSLResourceReturnFunctionInlining(IRModule* module)
     }
 }
 
+struct IntrinsicFunctionInliningPass : InliningPassBase
+{
+    typedef InliningPassBase Super;
+
+    IntrinsicFunctionInliningPass(IRModule* module)
+        : Super(module)
+    {}
+
+    bool shouldInline(CallSiteInfo const& info)
+    {
+        auto func = as<IRFunc>(getResolvedInstForDecorations(info.callee));
+        if (!func)
+            return false;
+        if (func->findDecorationImpl(kIROp_RequireSPIRVCapabilityDecoration))
+            return false;
+        if (!as<IRReturn>(func->getFirstBlock()->getTerminator()))
+            return false;
+        auto firstInst = as<IRSPIRVAsm>(func->getFirstBlock()->getFirstOrdinaryInst());
+        return firstInst != nullptr;
+    }
+};
+
+void performIntrinsicFunctionFunctionInlining(IRModule* module)
+{
+    IntrinsicFunctionInliningPass pass(module);
+    pass.considerAllCallSites();
+}
+
 struct CustomInliningPass : InliningPassBase
 {
     typedef InliningPassBase Super;
