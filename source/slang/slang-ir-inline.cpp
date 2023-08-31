@@ -861,6 +861,8 @@ struct GLSLResourceReturnFunctionInliningPass : InliningPassBase
             auto outValueType = outType->getValueType();
             if (isResourceType(outValueType))
                 return true;
+            if (isIllegalGLSLParameterType(outValueType))
+                return true;
         }
         return false;
     }
