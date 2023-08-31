@@ -1062,7 +1062,7 @@ Val* TypeCastIntVal::_substituteImplOverride(ASTBuilder* astBuilder, Substitutio
             return newVal;
         else
         {
-            auto result = astBuilder->getOrCreate<TypeCastIntVal>(substType, substBase);
+            auto result = astBuilder->getTypeCastIntVal(substType, substBase);
             return result;
         }
     }
