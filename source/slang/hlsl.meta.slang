@@ -838,6 +838,7 @@ ${{{{
         __target_switch
         {
         case glsl: __intrinsic_asm "($3 = atomicAdd($0._data[$1/4], $2))";
+        case cuda: __intrinsic_asm "(*$3 = atomicAdd($0._getPtrAt<uint32_t>($1), $2))";
         case hlsl: __intrinsic_asm ".InterlockedAdd";
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
@@ -852,6 +853,7 @@ ${{{{
         __target_switch
         {
         case glsl: __intrinsic_asm "atomicAdd($0._data[$1/4], $2)";
+        case cuda: __intrinsic_asm "atomicAdd($0._getPtrAt<uint32_t>($1), $2)";
         case hlsl: __intrinsic_asm ".InterlockedAdd";
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
@@ -867,6 +869,7 @@ ${{{{
         __target_switch
         {
         case glsl: __intrinsic_asm "$3 = atomicAnd($0._data[$1/4], $2)";
+        case cuda: __intrinsic_asm "(*$3 = atomicAnd($0._getPtrAt<uint32_t>($1), $2))";
         case hlsl: __intrinsic_asm ".InterlockedAnd";
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
@@ -881,6 +884,7 @@ ${{{{
         __target_switch
         {
         case glsl: __intrinsic_asm "atomicAnd($0._data[$1/4], $2)";
+        case cuda: __intrinsic_asm "atomicAnd($0._getPtrAt<uint32_t>($1), $2)";
         case hlsl: __intrinsic_asm ".InterlockedAnd";
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
@@ -897,6 +901,7 @@ ${{{{
         __target_switch
         {
         case glsl: __intrinsic_asm "($4 = atomicCompSwap($0._data[$1/4], $2, $3))";
+        case cuda: __intrinsic_asm "(*$4 = atomicCAS($0._getPtrAt<uint32_t>($1), $2, $3))";
         case hlsl: __intrinsic_asm ".InterlockedCompareExchange";
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
@@ -912,6 +917,7 @@ ${{{{
         __target_switch
         {
         case glsl: __intrinsic_asm "atomicCompSwap($0._data[$1/4], $2, $3)";
+        case cuda: __intrinsic_asm "atomicCAS($0._getPtrAt<uint32_t>($1), $2, $3)";
         case hlsl: __intrinsic_asm ".InterlockedCompareStore";
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
@@ -927,6 +933,7 @@ ${{{{
         __target_switch
         {
         case glsl: __intrinsic_asm "($3 = atomicExchange($0._data[$1/4], $2))";
+        case cuda: __intrinsic_asm "(*$3 = atomicExch($0._getPtrAt<uint32_t>($1), $2))";
         case hlsl: __intrinsic_asm ".InterlockedExchange";
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
@@ -942,6 +949,7 @@ ${{{{
         __target_switch
         {
         case glsl: __intrinsic_asm "($3 = atomicMax($0._data[$1/4], $2))";
+        case cuda: __intrinsic_asm "(*$3 = atomicMax($0._getPtrAt<uint32_t>($1), $2))";
         case hlsl: __intrinsic_asm ".InterlockedMax";
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
@@ -956,6 +964,7 @@ ${{{{
         __target_switch
         {
         case glsl: __intrinsic_asm "atomicMax($0._data[$1/4], $2)";
+        case cuda: __intrinsic_asm "atomicMax($0._getPtrAt<uint32_t>($1), $2)";
         case hlsl: __intrinsic_asm ".InterlockedMax";
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
@@ -971,6 +980,7 @@ ${{{{
         __target_switch
         {
         case glsl: __intrinsic_asm "($3 = atomicMin($0._data[$1/4], $2))";
+        case cuda: __intrinsic_asm "(*$3 = atomicMin($0._getPtrAt<uint32_t>($1), $2))";
         case hlsl: __intrinsic_asm ".InterlockedMin";
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
@@ -985,6 +995,7 @@ ${{{{
         __target_switch
         {
         case glsl: __intrinsic_asm "atomicMin($0._data[$1/4], $2)";
+        case cuda: __intrinsic_asm "atomicMin($0._getPtrAt<uint32_t>($1), $2)";
         case hlsl: __intrinsic_asm ".InterlockedMin";
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
@@ -1000,6 +1011,7 @@ ${{{{
         __target_switch
         {
         case glsl: __intrinsic_asm "($3 = atomicOr($0._data[$1/4], $2))";
+        case cuda: __intrinsic_asm "(*$3 = atomicOr($0._getPtrAt<uint32_t>($1), $2))";
         case hlsl: __intrinsic_asm ".InterlockedOr";
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
@@ -1014,6 +1026,7 @@ ${{{{
         __target_switch
         {
         case glsl: __intrinsic_asm "atomicOr($0._data[$1/4], $2)";
+        case cuda: __intrinsic_asm "atomicOr($0._getPtrAt<uint32_t>($1), $2)";
         case hlsl: __intrinsic_asm ".InterlockedOr";
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
@@ -1029,6 +1042,7 @@ ${{{{
         __target_switch
         {
         case glsl: __intrinsic_asm "($3 = atomicXor($0._data[$1/4], $2))";
+        case cuda: __intrinsic_asm "(*$3 = atomicXor($0._getPtrAt<uint32_t>($1), $2))";
         case hlsl: __intrinsic_asm ".InterlockedXor";
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
@@ -1043,6 +1057,7 @@ ${{{{
         __target_switch
         {
         case glsl: __intrinsic_asm "atomicXor($0._data[$1/4], $2)";
+        case cuda: __intrinsic_asm "atomicXor($0._getPtrAt<uint32_t>($1), $2)";
         case hlsl: __intrinsic_asm ".InterlockedXor";
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
