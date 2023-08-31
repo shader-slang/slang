@@ -595,7 +595,7 @@ ${{{{
         case glsl:
         case spirv:
             {
-                RWStructuredBuffer<float> buf = __getEquivalentStructuredBuffer<float>(this);
+                let buf = __getEquivalentStructuredBuffer<float>(this);
                 originalValue = __atomicAdd(buf[byteAddress / 4], valueToAdd);
                 return;
             }
@@ -615,7 +615,7 @@ ${{{{
         case glsl:
         case spirv:
             {
-                RWStructuredBuffer<float> buf = __getEquivalentStructuredBuffer<float>(this);
+                let buf = __getEquivalentStructuredBuffer<float>(this);
                 __atomicAdd(buf[byteAddress / 4], valueToAdd);
                 return;
             }
@@ -634,7 +634,7 @@ ${{{{
         case glsl:
         case spirv:
             {
-                RWStructuredBuffer<int64_t> buf = __getEquivalentStructuredBuffer<int64_t>(this);
+                let buf = __getEquivalentStructuredBuffer<int64_t>(this);
                 originalValue = __atomicAdd(buf[byteAddress / 8], valueToAdd);
             }
         }
@@ -655,7 +655,7 @@ ${{{{
     __specialized_for_target(spirv)
     void InterlockedAddI64(uint byteAddress, int64_t valueToAdd)
     {
-        RWStructuredBuffer<int64_t> buf = __getEquivalentStructuredBuffer<int64_t>(this);
+        let buf = __getEquivalentStructuredBuffer<int64_t>(this);
         __atomicAdd(buf[byteAddress / 8], valueToAdd);
     }
 
@@ -674,7 +674,7 @@ ${{{{
     __specialized_for_target(spirv)
     void InterlockedCompareExchangeU64(uint byteAddress, uint64_t compareValue, uint64_t value, out uint64_t outOriginalValue)
     {
-        RWStructuredBuffer<uint64_t> buf = __getEquivalentStructuredBuffer<uint64_t>(this);
+        let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
         outOriginalValue = __cas(buf[byteAddress / 8], compareValue, value);
     }
 
@@ -691,7 +691,7 @@ ${{{{
     __specialized_for_target(spirv)
     uint64_t InterlockedMaxU64(uint byteAddress, uint64_t value)
     {
-        RWStructuredBuffer<uint64_t> buf = __getEquivalentStructuredBuffer<uint64_t>(this);
+        let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
         return __atomicMax(buf[byteAddress / 8], value);
     }
 
@@ -708,7 +708,7 @@ ${{{{
     __specialized_for_target(spirv)
     uint64_t InterlockedMinU64(uint byteAddress, uint64_t value)
     {
-        RWStructuredBuffer<uint64_t> buf = __getEquivalentStructuredBuffer<uint64_t>(this);
+        let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
         return __atomicMin(buf[byteAddress / 8], value);
     }
 
@@ -724,7 +724,7 @@ ${{{{
     __specialized_for_target(spirv)
     uint64_t InterlockedAndU64(uint byteAddress, uint64_t value)
     {
-        RWStructuredBuffer<uint64_t> buf = __getEquivalentStructuredBuffer<uint64_t>(this);
+        let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
         return __atomicAnd(buf[byteAddress / 8], value);
     }
 
@@ -740,7 +740,7 @@ ${{{{
     __specialized_for_target(spirv)
     uint64_t InterlockedOrU64(uint byteAddress, uint64_t value)
     {
-        RWStructuredBuffer<uint64_t> buf = __getEquivalentStructuredBuffer<uint64_t>(this);
+        let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
         return __atomicOr(buf[byteAddress / 8], value);
     }
 
@@ -756,7 +756,7 @@ ${{{{
     __specialized_for_target(spirv)
     uint64_t InterlockedXorU64(uint byteAddress, uint64_t value)
     {
-        RWStructuredBuffer<uint64_t> buf = __getEquivalentStructuredBuffer<uint64_t>(this);
+        let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
         return __atomicXor(buf[byteAddress / 8], value);
     }
 
@@ -772,7 +772,7 @@ ${{{{
     __specialized_for_target(spirv)
     uint64_t InterlockedExchangeU64(uint byteAddress, uint64_t value)
     {
-        RWStructuredBuffer<uint64_t> buf = __getEquivalentStructuredBuffer<uint64_t>(this);
+        let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
         return __atomicExchange(buf[byteAddress / 8], value);
     }
 
@@ -786,7 +786,7 @@ ${{{{
     __specialized_for_target(spirv)
     void InterlockedAdd64(uint byteAddress, int64_t valueToAdd, out int64_t originalValue)
     {
-        RWStructuredBuffer<int64_t> buf = __getEquivalentStructuredBuffer<int64_t>(this);
+        let buf = __getEquivalentStructuredBuffer<int64_t>(this);
         originalValue = __atomicAdd(buf[byteAddress / 8], valueToAdd);
     }
     __specialized_for_target(hlsl)
@@ -798,7 +798,7 @@ ${{{{
     __specialized_for_target(spirv)
     void InterlockedAdd64(uint byteAddress, uint64_t valueToAdd, out uint64_t originalValue)
     {
-        RWStructuredBuffer<uint64_t> buf = __getEquivalentStructuredBuffer<uint64_t>(this);
+        let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
         originalValue = __atomicAdd(buf[byteAddress / 8], valueToAdd);
     }
     __specialized_for_target(hlsl)
@@ -810,7 +810,7 @@ ${{{{
     __specialized_for_target(spirv)
     void InterlockedCompareExchange64(uint byteAddress, int64_t compareValue, int64_t value, out int64_t outOriginalValue)
     {
-        RWStructuredBuffer<int64_t> buf = __getEquivalentStructuredBuffer<int64_t>(this);
+        let buf = __getEquivalentStructuredBuffer<int64_t>(this);
         outOriginalValue = __cas(buf[byteAddress / 8], compareValue, value);
     }
     __specialized_for_target(hlsl)
@@ -822,11 +822,11 @@ ${{{{
     __specialized_for_target(spirv)
     void InterlockedCompareExchange64(uint byteAddress, uint64_t compareValue, uint64_t value, out uint64_t outOriginalValue)
     {
-        RWStructuredBuffer<uint64_t> buf = __getEquivalentStructuredBuffer<uint64_t>(this);
+        let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
         outOriginalValue = __cas(buf[byteAddress / 8], compareValue, value);
     }
 ${{{{
-    }
+    } // endif (type == RWByteAddressBuffer)
 }}}}
 
     // Added operations:
@@ -838,14 +838,13 @@ ${{{{
         __target_switch
         {
         case glsl: __intrinsic_asm "($3 = atomicAdd($0._data[$1/4], $2))";
-        case hlsl: ".InterlockedAdd";
+        case hlsl: __intrinsic_asm ".InterlockedAdd";
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedAdd(buf[dest / 4], value, original_value);
         }
     }
 
-    __target_intrinsic(glsl, "atomicAdd($0._data[$1/4], $2)")
     void InterlockedAdd(
         UINT dest,
         UINT value)
@@ -853,7 +852,7 @@ ${{{{
         __target_switch
         {
         case glsl: __intrinsic_asm "atomicAdd($0._data[$1/4], $2)";
-        case hlsl: ".InterlockedAdd";
+        case hlsl: __intrinsic_asm ".InterlockedAdd";
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedAdd(buf[dest / 4], value);
@@ -868,7 +867,7 @@ ${{{{
         __target_switch
         {
         case glsl: __intrinsic_asm "$3 = atomicAnd($0._data[$1/4], $2)";
-        case hlsl: ".InterlockedAnd";
+        case hlsl: __intrinsic_asm ".InterlockedAnd";
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedAnd(buf[dest / 4], value, original_value);
@@ -882,7 +881,7 @@ ${{{{
         __target_switch
         {
         case glsl: __intrinsic_asm "atomicAnd($0._data[$1/4], $2)";
-        case hlsl: ".InterlockedAnd";
+        case hlsl: __intrinsic_asm ".InterlockedAnd";
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedAnd(buf[dest / 4], value);
@@ -898,7 +897,7 @@ ${{{{
         __target_switch
         {
         case glsl: __intrinsic_asm "($4 = atomicCompSwap($0._data[$1/4], $2, $3))";
-        case hlsl: ".InterlockedCompareExchange";
+        case hlsl: __intrinsic_asm ".InterlockedCompareExchange";
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedCompareExchange(buf[dest / 4], compare_value, value, original_value);
@@ -913,7 +912,7 @@ ${{{{
         __target_switch
         {
         case glsl: __intrinsic_asm "atomicCompSwap($0._data[$1/4], $2, $3)";
-        case hlsl: ".InterlockedCompareStore";
+        case hlsl: __intrinsic_asm ".InterlockedCompareStore";
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedCompareStore(buf[dest / 4], compare_value, value);
@@ -928,7 +927,7 @@ ${{{{
         __target_switch
         {
         case glsl: __intrinsic_asm "($3 = atomicExchange($0._data[$1/4], $2))";
-        case hlsl: ".InterlockedExchange";
+        case hlsl: __intrinsic_asm ".InterlockedExchange";
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedExchange(buf[dest / 4], value, original_value);
@@ -943,7 +942,7 @@ ${{{{
         __target_switch
         {
         case glsl: __intrinsic_asm "($3 = atomicMax($0._data[$1/4], $2))";
-        case hlsl: ".InterlockedMax";
+        case hlsl: __intrinsic_asm ".InterlockedMax";
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedMax(buf[dest / 4], value, original_value);
@@ -957,7 +956,7 @@ ${{{{
         __target_switch
         {
         case glsl: __intrinsic_asm "atomicMax($0._data[$1/4], $2)";
-        case hlsl: ".InterlockedMax";
+        case hlsl: __intrinsic_asm ".InterlockedMax";
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedMax(buf[dest / 4], value);
@@ -972,7 +971,7 @@ ${{{{
         __target_switch
         {
         case glsl: __intrinsic_asm "($3 = atomicMin($0._data[$1/4], $2))";
-        case hlsl: ".InterlockedMin";
+        case hlsl: __intrinsic_asm ".InterlockedMin";
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedMin(buf[dest / 4], value, original_value);
@@ -986,7 +985,7 @@ ${{{{
         __target_switch
         {
         case glsl: __intrinsic_asm "atomicMin($0._data[$1/4], $2)";
-        case hlsl: ".InterlockedMin";
+        case hlsl: __intrinsic_asm ".InterlockedMin";
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedMin(buf[dest / 4], value);
@@ -1001,7 +1000,7 @@ ${{{{
         __target_switch
         {
         case glsl: __intrinsic_asm "($3 = atomicOr($0._data[$1/4], $2))";
-        case hlsl: ".InterlockedOr";
+        case hlsl: __intrinsic_asm ".InterlockedOr";
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedOr(buf[dest / 4], value, original_value);
@@ -1015,7 +1014,7 @@ ${{{{
         __target_switch
         {
         case glsl: __intrinsic_asm "atomicOr($0._data[$1/4], $2)";
-        case hlsl: ".InterlockedOr";
+        case hlsl: __intrinsic_asm ".InterlockedOr";
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedOr(buf[dest / 4], value);
@@ -1030,7 +1029,7 @@ ${{{{
         __target_switch
         {
         case glsl: __intrinsic_asm "($3 = atomicXor($0._data[$1/4], $2))";
-        case hlsl: ".InterlockedXor";
+        case hlsl: __intrinsic_asm ".InterlockedXor";
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedXor(buf[dest / 4], value, original_value);
@@ -1044,7 +1043,7 @@ ${{{{
         __target_switch
         {
         case glsl: __intrinsic_asm "atomicXor($0._data[$1/4], $2)";
-        case hlsl: ".InterlockedXor";
+        case hlsl: __intrinsic_asm ".InterlockedXor";
         case spirv:
             let buf = __getEquivalentStructuredBuffer<uint>(this);
             ::InterlockedXor(buf[dest / 4], value);
@@ -3079,7 +3078,7 @@ void InterlockedAnd(__ref  int dest,  int value)
     case spirv:
         spirv_asm
         {
-            result:$$int = OpAtomicIAdd &dest Device None $value;
+            result:$$int = OpAtomicAnd &dest Device None $value;
         };
     }
 }
@@ -3095,7 +3094,7 @@ void InterlockedAnd(__ref uint dest, uint value)
     case spirv:
         spirv_asm
         {
-            result:$$uint = OpAtomicIAdd &dest Device None $value;
+            result:$$uint = OpAtomicAnd &dest Device None $value;
         };
     }
 }
