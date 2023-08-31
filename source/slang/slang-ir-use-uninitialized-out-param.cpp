@@ -69,6 +69,7 @@ namespace Slang
                             stores.add(StoreSite{ use->getUser(), addr });
                         break;
                     case kIROp_Call:
+                    case kIROp_SPIRVAsm:
                         // If we see a call using this address, treat it as a store.
                         stores.add(StoreSite{ use->getUser(), addr });
                         break;

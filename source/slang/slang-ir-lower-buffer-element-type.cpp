@@ -165,7 +165,9 @@ namespace Slang
             for (IRIntegerValue ii = 0; ii < count; ++ii)
             {
                 auto packedElement = builder.emitElementExtract(packedArray, ii);
-                auto originalElement = builder.emitCallInst(innerTypeInfo.originalType, innerTypeInfo.convertLoweredToOriginal, 1, &packedElement);
+                auto originalElement = innerTypeInfo.convertLoweredToOriginal
+                    ? builder.emitCallInst(innerTypeInfo.originalType, innerTypeInfo.convertLoweredToOriginal, 1, &packedElement)
+                    : packedElement;
                 args[(Index)ii] = originalElement;
             }
             auto result = builder.emitMakeArray(arrayType, (UInt)args.getCount(), args.getBuffer());
@@ -194,7 +196,9 @@ namespace Slang
             for (IRIntegerValue ii = 0; ii < count; ++ii)
             {
                 auto originalElement = builder.emitElementExtract(originalParam, ii);
-                auto packedElement = builder.emitCallInst(innerTypeInfo.loweredType, innerTypeInfo.convertOriginalToLowered, 1, &originalElement);
+                auto packedElement = innerTypeInfo.convertOriginalToLowered
+                    ? builder.emitCallInst(innerTypeInfo.loweredType, innerTypeInfo.convertOriginalToLowered, 1, &originalElement)
+                    : originalElement;
                 args[(Index)ii] = packedElement;
             }
             auto packedArray = builder.emitMakeArray(innerArrayType, (UInt)args.getCount(), args.getBuffer());
@@ -259,7 +263,7 @@ namespace Slang
                 auto arrayType = builder.getArrayType(
                     vectorType,
                     isColMajor?matrixType->getColumnCount():matrixType->getRowCount(),
-                    builder.getIntValue(builder.getIntType(), elementSizeAlignment.size));
+                    builder.getIntValue(builder.getIntType(), elementSizeAlignment.getStride()));
                 builder.createStructField(loweredType, structKey, arrayType);
 
                 info.loweredType = loweredType;
@@ -272,10 +276,16 @@ namespace Slang
             else if (auto arrayType = as<IRArrayType>(type))
             {
                 auto loweredInnerTypeInfo = getLoweredTypeInfo(arrayType->getElementType(), rules);
-                if (!loweredInnerTypeInfo.convertLoweredToOriginal)
+                // For spirv backend, we always want to lower all array types, even if the element type
+                // comes out the same. This is because different layout rules may have different array
+                // stride requirements.
+                if (!target->shouldEmitSPIRVDirectly())
                 {
-                    info.loweredType = type;
-                    return info;
+                    if (!loweredInnerTypeInfo.convertLoweredToOriginal)
+                    {
+                        info.loweredType = type;
+                        return info;
+                    }
                 }
                 auto loweredType = builder.createStructType();
                 info.loweredType = loweredType;
@@ -287,12 +297,12 @@ namespace Slang
                 auto structKey = builder.createStructKey();
                 builder.addNameHintDecoration(structKey, UnownedStringSlice("data"));
                 IRSizeAndAlignment elementSizeAlignment;
-                getSizeAndAlignment(rules, loweredType, &elementSizeAlignment);
+                getSizeAndAlignment(rules, loweredInnerTypeInfo.loweredType, &elementSizeAlignment);
                 elementSizeAlignment = rules->alignCompositeElement(elementSizeAlignment);
                 auto innerArrayType = builder.getArrayType(
                     loweredInnerTypeInfo.loweredType,
                     arrayType->getElementCount(),
-                    builder.getIntValue(builder.getIntType(), elementSizeAlignment.size));
+                    builder.getIntValue(builder.getIntType(), elementSizeAlignment.getStride()));
                 builder.createStructField(loweredType, structKey, innerArrayType);
                 info.loweredInnerArrayType = innerArrayType;
                 info.loweredInnerStructKey = structKey;
@@ -312,12 +322,19 @@ namespace Slang
                     if (loweredFieldTypeInfo.convertLoweredToOriginal || rules->ruleName != IRTypeLayoutRuleName::Natural)
                         isTrivial = false;
                 }
-                if (isTrivial)
-                {
-                    info.loweredType = type;
-                    return info;
-                }
 
+                // For spirv backend, we always want to lower all array types, even if the element type
+                // comes out the same. This is because different layout rules may have different array
+                // stride requirements.
+                if (!target->shouldEmitSPIRVDirectly())
+                {
+                    // For non-spirv target, we skip lowering this type if all field types are unchanged.
+                    if (isTrivial)
+                    {
+                        info.loweredType = type;
+                        return info;
+                    }
+                }
                 auto loweredType = builder.createStructType();
                 StringBuilder nameSB;
                 getTypeNameHint(nameSB, type);
