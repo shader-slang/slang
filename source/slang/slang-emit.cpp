@@ -906,6 +906,9 @@ Result linkAndOptimizeIR(
 
     eliminateMultiLevelBreak(irModule);
 
+    if (isKhronosTarget(targetRequest) && targetRequest->shouldEmitSPIRVDirectly())
+        performIntrinsicFunctionFunctionInlining(irModule);
+
     simplifyIR(irModule, sink);
 
     // As a late step, we need to take the SSA-form IR and move things *out*

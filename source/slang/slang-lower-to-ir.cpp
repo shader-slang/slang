@@ -3289,11 +3289,22 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             case SPIRVAsmOperand::NamedValue:
                 {
                     const auto v = operand.knownValue;
-                    const auto i = builder->getIntValue(builder->getIntType(), v);
+                    const auto i = builder->getIntValue(builder->getUIntType(), v);
                     if(operand.wrapInId)
-                        return builder->emitSPIRVAsmOperandEnum(i, builder->getIntType());
+                        return builder->emitSPIRVAsmOperandEnum(i, builder->getUIntType());
                     else
                         return builder->emitSPIRVAsmOperandEnum(i);
+                }
+            case SPIRVAsmOperand::BuiltinVar:
+                {
+                    const auto kind = operand.knownValue;
+                    auto kindInst = builder->getIntValue(builder->getIntType(), kind);
+                    const auto type = lowerType(context, operand.type.type);
+                    return builder->emitSPIRVAsmOperandBuiltinVar(type, kindInst);
+                }
+            case SPIRVAsmOperand::GLSL450Set:
+                {
+                    return builder->emitSPIRVAsmOperandGLSL450Set();
                 }
             case SPIRVAsmOperand::SlangValue:
                 {

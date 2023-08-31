@@ -1075,25 +1075,29 @@ INST(SPIRVAsmInst, SPIRVAsmInst, 1, 0)
     // and a reference to a literal integer instruction
     //
     // A literal string or 32-bit integer to be passed as operands
-    INST(SPIRVAsmOperandLiteral, SPIRVAsmOperandLiteral, 1, 0)
+    INST(SPIRVAsmOperandLiteral, SPIRVAsmOperandLiteral, 1, HOISTABLE)
     // A reference to a slang IRInst, either a value or a type
-    INST(SPIRVAsmOperandInst, SPIRVAsmOperandInst, 1, 0)
+    INST(SPIRVAsmOperandInst, SPIRVAsmOperandInst, 1, HOISTABLE)
     // A named enumerator, the value is stored as a constant operand
     // It may have a second operand, which if present is a type with which to
     // construct a constant id to pass, instead of a literal constant
-    INST(SPIRVAsmOperandEnum, SPIRVAsmOperandEnum, 1, 0)
+    INST(SPIRVAsmOperandEnum, SPIRVAsmOperandEnum, 1, HOISTABLE)
+    // A reference to a builtin variable.
+    INST(SPIRVAsmOperandBuiltinVar, SPIRVAsmOperandBuiltinVar, 1, HOISTABLE)
+    // A reference to the glsl450 instruction set.
+    INST(SPIRVAsmOperandGLSL450Set, SPIRVAsmOperandGLSL450Set, 0, HOISTABLE)
     // A string which is given a unique ID in the backend, used to refer to
     // results of other instrucions in the same asm block
-    INST(SPIRVAsmOperandId, SPIRVAsmOperandId, 1, 0)
+    INST(SPIRVAsmOperandId, SPIRVAsmOperandId, 1, HOISTABLE)
     // A special instruction which marks the place to insert the generated
     // result operand
-    INST(SPIRVAsmOperandResult, SPIRVAsmOperandResult, 0, 0)
+    INST(SPIRVAsmOperandResult, SPIRVAsmOperandResult, 0, HOISTABLE)
     // A special instruction which represents a type directed truncation
     // operation where extra components are dropped
-    INST(SPIRVAsmOperandTruncate, __truncate, 0, 0)
+    INST(SPIRVAsmOperandTruncate, __truncate, 0, HOISTABLE)
     // A type function which returns the result type of sampling an image of
     // this component type
-    INST(SPIRVAsmOperandSampledType, __sampledType, 1, 0)
+    INST(SPIRVAsmOperandSampledType, __sampledType, 1, HOISTABLE)
 INST_RANGE(SPIRVAsmOperand, SPIRVAsmOperandLiteral, SPIRVAsmOperandSampledType)
 
 

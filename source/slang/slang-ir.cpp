@@ -5747,6 +5747,31 @@ namespace Slang
         return i;
     }
 
+    IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandBuiltinVar(IRInst* type, IRInst* builtinKind)
+    {
+        SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
+        const auto i = createInst<IRSPIRVAsmOperand>(
+            this,
+            kIROp_SPIRVAsmOperandBuiltinVar,
+            (IRType*)type,
+            builtinKind
+        );
+        addInst(i);
+        return i;
+    }
+
+    IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandGLSL450Set()
+    {
+        SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
+        const auto i = createInst<IRSPIRVAsmOperand>(
+            this,
+            kIROp_SPIRVAsmOperandGLSL450Set,
+            getVoidType()
+        );
+        addInst(i);
+        return i;
+    }
+
     IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandSampledType(IRType* elementType)
     {
         SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
@@ -7513,6 +7538,9 @@ namespace Slang
             return false;
 
         if(as<IRAttr>(this))
+            return false;
+
+        if (as<IRSPIRVAsmOperand>(this))
             return false;
 
         switch(getOp())

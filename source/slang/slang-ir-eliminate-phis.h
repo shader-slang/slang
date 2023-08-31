@@ -15,7 +15,11 @@ namespace Slang
         /// are not themselves based on an SSA representation.
         ///
         /// If livenessMode is enabled LiveRangeStarts will be inserted into the module.
-    void eliminatePhis(LivenessMode livenessMode, IRModule* module);
+    void eliminatePhis(LivenessMode livenessMode, IRModule* module, bool useRegisterAllocation = true);
 
-    void eliminatePhisInFunc(LivenessMode livenessMode, IRModule* module, IRGlobalValueWithCode* func);
+    void eliminatePhisInFunc(
+        LivenessMode livenessMode,
+        IRModule* module,
+        IRGlobalValueWithCode* func,
+        bool useRegisterAllocation = true);
 }

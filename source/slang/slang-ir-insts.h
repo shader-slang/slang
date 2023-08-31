@@ -3938,6 +3938,8 @@ public:
     IRSPIRVAsmOperand* emitSPIRVAsmOperandResult();
     IRSPIRVAsmOperand* emitSPIRVAsmOperandEnum(IRInst* inst);
     IRSPIRVAsmOperand* emitSPIRVAsmOperandEnum(IRInst* inst, IRType* constantType);
+    IRSPIRVAsmOperand* emitSPIRVAsmOperandBuiltinVar(IRInst* type, IRInst* builtinKind);
+    IRSPIRVAsmOperand* emitSPIRVAsmOperandGLSL450Set();
     IRSPIRVAsmOperand* emitSPIRVAsmOperandSampledType(IRType* elementType);
     IRSPIRVAsmOperand* emitSPIRVAsmOperandTruncate();
     IRSPIRVAsmInst* emitSPIRVAsmInst(IRInst* opcode, List<IRInst*> operands);

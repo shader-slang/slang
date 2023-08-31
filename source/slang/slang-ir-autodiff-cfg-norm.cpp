@@ -166,7 +166,17 @@ struct CFGNormalizationPass
 
             if (as<IRVar>(child))
             {
-                child->insertBefore(region->headerBlock->getTerminator());
+                if (auto loopInst = as<IRLoop>(region->headerBlock->getTerminator()))
+                {   
+                    // In order to avoid introducing unnecessary loop state, we'll move vars
+                    // to the loop's target (first loop block) instead of the loop header.
+                    // (unless the var is already in the header or target)
+                    // 
+                    if (block != region->headerBlock && block != loopInst->getTargetBlock())
+                        child->insertBefore(loopInst->getTargetBlock()->getTerminator());
+                }
+                else
+                    child->insertBefore(region->headerBlock->getTerminator());
             }
 
             child = nextChild;
@@ -701,7 +711,19 @@ static void legalizeDefUse(IRGlobalValueWithCode* func)
                 {
                     if (loopUser->getTargetBlock() == commonDominator)
                     {
-                        commonDominator = as<IRBlock>(loopUser->getParent());
+                        bool shouldMoveToHeader = false;
+                        // Check that the break-block dominates any of the uses are past the break block
+                        for (auto _use = inst->firstUse; _use; _use = _use->nextUse)
+                        {
+                            if (dom->dominates(loopUser->getBreakBlock(), _use->getUser()->getParent()))
+                            {
+                                shouldMoveToHeader = true;
+                                break;
+                            }
+                        }
+
+                        if (shouldMoveToHeader)
+                            commonDominator = as<IRBlock>(loopUser->getParent());
                         break;
                     }
                 }
@@ -751,7 +773,7 @@ void normalizeCFG(
     // Remove phis to simplify our pass. We'll add them back in later
     // with constructSSA.
     //
-    eliminatePhisInFunc(LivenessMode::Disabled, func->getModule(), func);
+    eliminatePhisInFunc(LivenessMode::Disabled, func->getModule(), func, false);
 
     CFGNormalizationContext context = {module, options.sink};
     CFGNormalizationPass cfgPass(context);

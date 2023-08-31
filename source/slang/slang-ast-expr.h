@@ -649,6 +649,8 @@ public:
         SlangType,
         SampledType, // __sampledType(T), this becomes a 4 vector of the component type of T
         TruncateMarker, // __truncate, an invented instruction which coerces to the result type by truncating the element count
+        BuiltinVar,
+        GLSL450Set,
     };
 
     // The flavour and token describes how this was parsed
@@ -674,8 +676,8 @@ public:
     // it as an id created with OpConstant
     bool wrapInId = false;
 
-    // Once we've checked things, the SlangType flavour operands will have this
-    // type populated.
+    // Once we've checked things, the SlangType and BuiltinVar flavour operands
+    // will have this type populated.
     TypeExp type = TypeExp();
 };
 

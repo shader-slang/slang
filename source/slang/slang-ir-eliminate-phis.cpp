@@ -68,11 +68,20 @@ struct PhiEliminationContext
     IRModule* m_module = nullptr;
     IRBuilder m_builder;
     LivenessMode m_livenessMode;
+    bool m_useRegisterAllocation;
 
     PhiEliminationContext(LivenessMode livenessMode, IRModule* module)
         : m_module(module)
         , m_builder(module)
         , m_livenessMode(livenessMode)
+        , m_useRegisterAllocation(true)
+    {}
+
+     PhiEliminationContext(LivenessMode livenessMode, IRModule* module, bool useRegisterAllocation)
+        : m_module(module)
+        , m_builder(module)
+        , m_livenessMode(livenessMode)
+        , m_useRegisterAllocation(useRegisterAllocation)
     {}
 
     // We start with the top-down logic of the pass, which is to process
@@ -210,8 +219,12 @@ struct PhiEliminationContext
     {
         m_func = func;
         m_dominatorTree = nullptr;
-        m_registerAllocation = allocateRegistersForFunc(func, m_dominatorTree);
-        m_mapRegToTempVar = createTempVarForInsts(func);
+
+        if (m_useRegisterAllocation)
+        {
+            m_registerAllocation = allocateRegistersForFunc(func, m_dominatorTree);
+            m_mapRegToTempVar = createTempVarForInsts(func);
+        }
     }
 
     Dictionary<RegisterInfo*, IRInst*> createTempVarForInsts(IRGlobalValueWithCode* func)
@@ -531,7 +544,7 @@ struct PhiEliminationContext
                 auto user = use->getUser();
                 m_builder.setInsertBefore(user);
                 auto newVal = m_builder.emitLoad(temp);
-                use->set(newVal);
+                m_builder.replaceOperand(use, newVal);
             }
 
             // Once we've replaced all its uses, there is no need
@@ -1109,15 +1122,19 @@ struct PhiEliminationContext
     }
 };
 
-void eliminatePhis(LivenessMode livenessMode, IRModule* module)
+void eliminatePhis(LivenessMode livenessMode, IRModule* module, bool useRegisterAllocation)
 {
-    PhiEliminationContext context(livenessMode, module);
+    PhiEliminationContext context(livenessMode, module, useRegisterAllocation);
     context.eliminatePhisInModule();
 }
 
-void eliminatePhisInFunc(LivenessMode livenessMode, IRModule* module, IRGlobalValueWithCode* func)
+void eliminatePhisInFunc(
+    LivenessMode livenessMode,
+    IRModule* module,
+    IRGlobalValueWithCode* func,
+    bool useRegisterAllocation)
 {
-    PhiEliminationContext context(livenessMode, module);
+    PhiEliminationContext context(livenessMode, module, useRegisterAllocation);
     context.eliminatePhisInFunc(func);
 }
 

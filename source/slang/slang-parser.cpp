@@ -6286,9 +6286,24 @@ namespace Slang
             return SPIRVAsmOperand{SPIRVAsmOperand::SampledType, Token{}, typeExpr};
         }
         // The pseudo-operand for component truncation
-        if(parser->LookAheadToken("__truncate"))
+        else if(parser->LookAheadToken("__truncate"))
         {
             return SPIRVAsmOperand{SPIRVAsmOperand::TruncateMarker, parser->ReadToken()};
+        }
+        else if (AdvanceIf(parser, "builtin"))
+        {
+            // reference to a builtin var.
+            parser->ReadToken(TokenType::LParent);
+            auto operand = SPIRVAsmOperand{ SPIRVAsmOperand::BuiltinVar, parser->ReadToken() };
+            parser->ReadToken(TokenType::Colon);
+            AdvanceIf(parser, TokenType::DollarDollar);
+            operand.type = parser->ParseTypeExp();
+            parser->ReadToken(TokenType::RParent);
+            return operand;
+        }
+        else if (parser->LookAheadToken("glsl450"))
+        {
+            return SPIRVAsmOperand{ SPIRVAsmOperand::GLSL450Set, parser->ReadToken() };
         }
         // A regular identifier
         else if(parser->LookAheadToken(TokenType::Identifier))
