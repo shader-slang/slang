@@ -372,6 +372,15 @@ public:
         return getOrCreate<ConstantIntVal>(type, value);
     }
 
+    TypeCastIntVal* getTypeCastIntVal(Type* type, Val* base)
+    {
+        // Unwrap any existing type casts.
+        while (auto baseTypeCast = as<TypeCastIntVal>(base))
+            base = baseTypeCast->getBase();
+            
+        return getOrCreate<TypeCastIntVal>(type, base);
+    }
+
     DeclRef<Decl> getGenericAppDeclRef(DeclRef<GenericDecl> genericDeclRef, ConstArrayView<Val*> args, Decl* innerDecl = nullptr)
     {
         if (!innerDecl)
