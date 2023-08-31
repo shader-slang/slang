@@ -49,41 +49,67 @@ RayDesc_0 makeRay_0(uint idx_0, uint variation_0)
     return ray_0;
 }
 
-MyAttributes_0 HitObject_GetAttributes_0(hitObjectNV this_0)
+hitObjectNV myTraceRay_0(uint idx_1)
 {
-    hitObjectGetAttributesNV((this_0), ((0)));
-    return t_0;
-}
-
-void accumulate_0(inout uint value_2, hitObjectNV hit_0)
-{
-    value_2 = value_2 * 256U;
-    bool _S1 = (hitObjectIsHitNV((hit_0)));
-    if(_S1)
-    {
-        MyAttributes_0 _S2 = HitObject_GetAttributes_0(hit_0);
-        value_2 = value_2 + (16U + _S2.value_0);
-    }
-    return;
-}
-
-void main()
-{
-    uvec3 _S3 = ((gl_LaunchIDEXT));
-    uint idx_1 = _S3.x;
-    uint r_0 = 0U;
     RayDesc_0 ray_1 = makeRay_0(idx_1, 0U);
     hitObjectNV hitObj_0;
     p_0.value_1 = idx_1;
     hitObjectTraceRayNV(hitObj_0, scene_0, 20U, 255U, 0U, 4U, 0U, ray_1.Origin_0, ray_1.TMin_0, ray_1.Direction_0, ray_1.TMax_0, (0));
-    accumulate_0(r_0, hitObj_0);
-    accumulate_0(r_0, hitObj_0);
-    RayDesc_0 ray_2 = makeRay_0(idx_1, 1U);
+    return hitObj_0;
+}
+
+void main()
+{
+    uvec3 _S1 = ((gl_LaunchIDEXT));
+    uint idx_2 = _S1.x;
+    bool _S2 = (hitObjectIsHitNV((myTraceRay_0(idx_2))));
+    uint r_0;
+    if(_S2)
+    {
+        hitObjectGetAttributesNV((myTraceRay_0(idx_2)), ((0)));
+        r_0 = 16U + t_0.value_0;
+    }
+    else
+    {
+        r_0 = 0U;
+    }
+    uint r_1 = r_0 * 256U;
+    bool _S3 = (hitObjectIsHitNV((myTraceRay_0(idx_2))));
+    if(_S3)
+    {
+        hitObjectGetAttributesNV((myTraceRay_0(idx_2)), ((0)));
+        r_0 = r_1 + (16U + t_0.value_0);
+    }
+    else
+    {
+        r_0 = r_1;
+    }
+    RayDesc_0 ray_2 = makeRay_0(idx_2, 1U);
     hitObjectNV hitObj_1;
-    hitObjectRecordMissNV(hitObj_1, idx_1, ray_2.Origin_0, ray_2.TMin_0, ray_2.Direction_0, ray_2.TMax_0);
-    accumulate_0(r_0, hitObj_1);
-    accumulate_0(r_0, hitObj_0);
-    outputBuffer_0._data[idx_1] = r_0;
+    hitObjectRecordMissNV(hitObj_1, idx_2, ray_2.Origin_0, ray_2.TMin_0, ray_2.Direction_0, ray_2.TMax_0);
+    uint r_2 = r_0 * 256U;
+    bool _S4 = (hitObjectIsHitNV((hitObj_1)));
+    if(_S4)
+    {
+        hitObjectGetAttributesNV((hitObj_1), ((0)));
+        r_0 = r_2 + (16U + t_0.value_0);
+    }
+    else
+    {
+        r_0 = r_2;
+    }
+    uint r_3 = r_0 * 256U;
+    bool _S5 = (hitObjectIsHitNV((myTraceRay_0(idx_2))));
+    if(_S5)
+    {
+        hitObjectGetAttributesNV((myTraceRay_0(idx_2)), ((0)));
+        r_0 = r_3 + (16U + t_0.value_0);
+    }
+    else
+    {
+        r_0 = r_3;
+    }
+    outputBuffer_0._data[idx_2] = r_0;
     return;
 }
 
