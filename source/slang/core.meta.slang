@@ -1365,19 +1365,115 @@ struct TextureTypeInfo
         if (isMultisample) sb << "MS";
         if (isArray) sb << "Array";
 //                        if (isShadow) sb << "Shadow";
-        sb << "\n{";
+        sb << "\n{\n";
 
         char const* samplerStateParam = prefixInfo.combined ? "" : "SamplerState s, ";
 
+        enum class ReadNoneMode
+        {
+            Never,
+            IfReadOnly,
+            Always
+        };
+
+        const auto i = "    ";
+        const auto i2 = "        ";
+        const auto i3 = "            ";
+        const auto writeFuncBody = [&](
+            const auto& funcName,
+            const String& glsl,
+            const String& cuda,
+            const String& spirv
+        ){
+            sb << i << "{\n";
+            sb << i2 << "__target_switch\n";
+            sb << i2 << "{\n";
+            sb << i2 << "case cpp:\n";
+            sb << i2 << "case hlsl:\n";
+            sb << i3 << "__intrinsic_asm \"." << funcName << "\";\n";
+            if(glsl.getLength())
+            {
+                sb << i2 << "case glsl:\n";
+                sb << i3 << "__intrinsic_asm \"." << glsl << "\";\n";
+            }
+            if(cuda.getLength())
+            {
+                sb << i2 << "case cuda:\n";
+                sb << i3 << "__intrinsic_asm \"." << cuda << "\";\n";
+            }
+            if(spirv.getLength())
+            {
+                sb << i2 << "case spirv:\n";
+                sb << i3 << "return spirv_asm\n";
+                sb << i3 << "{\n";
+                sb << i3 << spirv << "\n";
+                sb << i3 << "};\n";
+            }
+            sb << i2 << "}\n";
+            sb << i << "}\n";
+        };
+        const auto writeFuncDecorations = [&](
+            const String& glsl,
+            const String& cuda
+        ){
+            if(glsl.getLength())
+                sb << i << "__target_intrinsic(glsl, \"" << glsl << "\")\n";
+            if(cuda.getLength())
+                sb << i << "__target_intrinsic(cuda, \"" << cuda << "\")\n";
+        };
+        const auto writeFunc = [&](
+            const auto& returnType,
+            const auto& funcName,
+            const auto& params,
+            const String& glsl = String{},
+            const String& cuda = String{},
+            const String& spirv = String{},
+            const ReadNoneMode readNoneMode = ReadNoneMode::IfReadOnly
+        ){
+            const bool rn =
+                readNoneMode == ReadNoneMode::Always
+                || readNoneMode == ReadNoneMode::IfReadOnly && isReadOnly;
+            if(spirv.getLength())
+            {
+                if(rn)
+                    sb << i << "[__readNone]\n";
+                sb << i << returnType << " " << funcName << "(" << params << ")\n";
+                writeFuncBody(funcName, glsl, cuda, spirv);
+            }
+            else
+            {
+                writeFuncDecorations(glsl, cuda);
+                if(rn)
+                    sb << i << "[__readNone]\n";
+                sb << i << returnType << " " << funcName << "(" << params << ");\n";
+            }
+        };
+
+        const auto cat = [](const auto... xs) -> String{
+            return (StringBuilder{} << ... << xs);
+        };
+
         if( !isMultisample )
         {
-            sb << "__target_intrinsic(glsl, \"textureQueryLod($p, $2).x\")";
-            sb << "float CalculateLevelOfDetail(" << samplerStateParam;
-            sb << "float" << base.coordCount << " location);\n";
+            writeFunc(
+                "float",
+                "CalculateLevelOfDetail",
+                cat(samplerStateParam, "float", base.coordCount, " location"),
+                cat("textureQueryLod($p, $2).x"),
+                "",
+                "",
+                ReadNoneMode::Never
+            );
 
-            sb << "__target_intrinsic(glsl, \"textureQueryLod($p, $2).y\")";
-            sb << "float CalculateLevelOfDetailUnclamped(" << samplerStateParam;
-            sb << "float" << base.coordCount << " location);\n";
+            writeFunc(
+                "float",
+                "CalculateLevelOfDetailUnclamped",
+                cat(samplerStateParam, "float", base.coordCount, " location"),
+                cat("textureQueryLod($p, $2).y"),
+                "",
+                "",
+                ReadNoneMode::Never
+            );
         }
 
         // `GetDimensions`
@@ -1385,10 +1481,10 @@ struct TextureTypeInfo
         for(auto t : dimParamTypes)
         for(int includeMipInfo = 0; includeMipInfo < 2; ++includeMipInfo)
         {
+            StringBuilder glsl;
             {
-                sb << "__glsl_version(450)\n";
-                sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
-                sb << "__target_intrinsic(glsl, \"(";
+
+                glsl << "(";
 
                 int aa = 1;
                 String lodStr = ", 0";
@@ -1417,26 +1513,26 @@ struct TextureTypeInfo
                 switch(baseShape)
                 {
                 case TextureFlavor::Shape::Shape1D:
-                    sb << "($" << aa++ << opStr << ")"; 
+                    glsl << "($" << aa++ << opStr << ")";
                     if (isArray)
                     {
-                        sb << ".x";
+                        glsl << ".x";
                     }
-                    sb << ")";
+                    glsl << ")";
                     cc = 1;
                     break;
 
                 case TextureFlavor::Shape::Shape2D:
                 case TextureFlavor::Shape::ShapeCube:
-                    sb << "($" << aa++ << opStr << ").x)";
-                    sb << ", ($" << aa++ << opStr << ").y)";
+                    glsl << "($" << aa++ << opStr << ").x)";
+                    glsl << ", ($" << aa++ << opStr << ").y)";
                     cc = 2;
                     break;
 
                 case TextureFlavor::Shape::Shape3D:
-                    sb << "($" << aa++ << opStr << ").x)";
-                    sb << ", ($" << aa++ << opStr << ").y)";
-                    sb << ", ($" << aa++ << opStr << ").z)";
+                    glsl << "($" << aa++ << opStr << ").x)";
+                    glsl << ", ($" << aa++ << opStr << ").y)";
+                    glsl << ", ($" << aa++ << opStr << ").z)";
                     cc = 3;
                     break;
 
@@ -1447,44 +1543,43 @@ struct TextureTypeInfo
 
                 if(isArray)
                 {
-                    sb << ", ($" << aa++ << opStr << ")." << kComponentNames[cc] << ")";
+                    glsl << ", ($" << aa++ << opStr << ")." << kComponentNames[cc] << ")";
                 }
 
                 if(isMultisample)
                 {
-                    sb << ", ($" << aa++ << " = textureSamples($0))";
+                    glsl << ", ($" << aa++ << " = textureSamples($0))";
                 }
 
                 if (includeMipInfo)
                 {
-                    sb << ", ($" << aa++ << " = textureQueryLevels($0))";
+                    glsl << ", ($" << aa++ << " = textureQueryLevels($0))";
                 }
 
 
-                sb << ")\")\n";
+                glsl << ")";
             }
 
-            sb << "[__readNone]\n";
-            sb << "void GetDimensions(";
+            StringBuilder params;
             if(includeMipInfo)
-                sb << "uint mipLevel, ";
+                params << "uint mipLevel, ";
 
             switch(baseShape)
             {
             case TextureFlavor::Shape::Shape1D:
-                sb << t << "width";
+                params << t << "width";
                 break;
 
             case TextureFlavor::Shape::Shape2D:
             case TextureFlavor::Shape::ShapeCube:
-                sb << t << "width,";
-                sb << t << "height";
+                params << t << "width,";
+                params << t << "height";
                 break;
 
             case TextureFlavor::Shape::Shape3D:
-                sb << t << "width,";
-                sb << t << "height,";
-                sb << t << "depth";
+                params << t << "width,";
+                params << t << "height,";
+                params << t << "depth";
                 break;
 
             default:
@@ -1494,24 +1589,33 @@ struct TextureTypeInfo
 
             if(isArray)
             {
-                sb << ", " << t << "elements";
+                params << ", " << t << "elements";
             }
 
             if(isMultisample)
             {
-                sb << ", " << t << "sampleCount";
+                params << ", " << t << "sampleCount";
             }
 
             if(includeMipInfo)
-                sb << ", " << t << "numberOfLevels";
+                params << ", " << t << "numberOfLevels";
 
-            sb << ");\n";
+            sb << "    __glsl_version(450)\n";
+            sb << "    __glsl_extension(GL_EXT_samplerless_texture_functions)\n";
+            writeFunc(
+                "void",
+                "GetDimensions",
+                params,
+                glsl,
+                "",
+                "",
+                ReadNoneMode::Always);
         }
 
         // `GetSamplePosition()`
         if( isMultisample )
         {
-            sb << "float2 GetSamplePosition(int s);\n";
+            writeFunc("float2", "GetSamplePosition", "int s", "", "", "", ReadNoneMode::Never);
         }
 
         // `Load()`
@@ -1545,32 +1649,9 @@ struct TextureTypeInfo
             // At some point it may make sense to separate the read-only and
             // `RW`/`RasterizerOrdered` cases here rather than try to share code.
 
-            if (isMultisample)
-            {
-                sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
-                sb << "__target_intrinsic(glsl, \"$c" << glslFuncName << "($0, $1, $2)$z\")\n";
-            }
-            else
-            {
-                sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
-                sb << "__target_intrinsic(glsl, \"$c" << glslFuncName << "($0, ";
-                if( needsMipLevel )
-                {
-                    sb << "($1)." << kGLSLLoadCoordsSwizzle[loadCoordCount] << ", ($1)." << kGLSLLoadLODSwizzle[loadCoordCount];
-                }
-                else
-                {
-                    sb << "$1";
-                }
-                sb << ")$z\")\n";
-
-            }
-
             // CUDA
-            if (isMultisample)
-            {
-            }
-            else
+            StringBuilder cudaBuilder;
+            if(!isMultisample)
             {
                 if (access == SLANG_RESOURCE_ACCESS_READ_WRITE)
                 {
@@ -1579,49 +1660,49 @@ struct TextureTypeInfo
 
                     if( baseShape != TextureFlavor::Shape::ShapeCube )
                     {
-                        sb << "__target_intrinsic(cuda, \"surf" << coordCount << "D";
+                        cudaBuilder << "surf" << coordCount << "D";
                         if (isArray)
                         {
-                            sb << "Layered";
+                            cudaBuilder << "Layered";
                         }
-                        sb << "read";
-                        sb << "<$T0>($0";
+                        cudaBuilder << "read";
+                        cudaBuilder << "<$T0>($0";
                         for (int i = 0; i < coordCount; ++i)
                         {
-                            sb << ", ($1)";
+                            cudaBuilder << ", ($1)";
                             if (vecCount > 1)
                             {
-                                sb << '.' << char(i + 'x');
+                                cudaBuilder << '.' << char(i + 'x');
                             }
 
                             // Surface access is *byte* addressed in x in CUDA
                             if (i == 0) 
                             {
-                                sb << " * $E";
+                                cudaBuilder << " * $E";
                             }
                         }
                         if (isArray)
                         {
-                            sb << ", int(($1)." << char(coordCount + 'x') << ")";
+                            cudaBuilder << ", int(($1)." << char(coordCount + 'x') << ")";
                         }
-                        sb << ", SLANG_CUDA_BOUNDARY_MODE)\")\n";
+                        cudaBuilder << ", SLANG_CUDA_BOUNDARY_MODE)";
                     }
                     else
                     {
-                        sb << "__target_intrinsic(cuda, \"surfCubemap";
+                        cudaBuilder << "__target_intrinsic(cuda, \"surfCubemap";
                         if (isArray)
                         {
-                            sb << "Layered";
+                            cudaBuilder << "Layered";
                         }
-                        sb << "read";
+                        cudaBuilder << "read";
 
                         // Surface access is *byte* addressed in x in CUDA
-                        sb << "<$T0>($0, ($1).x * $E, ($1).y, ($1).z"; 
+                        cudaBuilder << "<$T0>($0, ($1).x * $E, ($1).y, ($1).z";
                         if (isArray)
                         {
-                            sb << ", int(($1).w)";
+                            cudaBuilder << ", int(($1).w)";
                         }
-                        sb << ", SLANG_CUDA_BOUNDARY_MODE)\")\n";
+                        cudaBuilder << ", SLANG_CUDA_BOUNDARY_MODE)";
                     }
                 }
                 else if (access == SLANG_RESOURCE_ACCESS_READ)
@@ -1629,66 +1710,57 @@ struct TextureTypeInfo
                     // We can allow this on Texture1D
                     if( baseShape == TextureFlavor::Shape::Shape1D && isArray == false)
                     {
-                        sb << "__target_intrinsic(cuda, \"tex1Dfetch<$T0>($0, ($1).x)\")\n";
+                        cudaBuilder << "tex1Dfetch<$T0>($0, ($1).x)";
                     }
                 }
             }
 
-            if (isReadOnly)
-                sb << "[__readNone]\n";
-            sb << "T Load(";
-            sb << "int" << loadCoordCount << " location";
-            if(isMultisample)
-            {
-                sb << ", int sampleIndex";
-            }
-            sb << ");\n";
+            sb << i << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
+            writeFunc(
+                "T",
+                "Load",
+                cat("int", loadCoordCount, " location", isMultisample ? ", int sampleIndex" : ""),
+                isMultisample ? cat("$c", glslFuncName, "($0, $1, $2)$z")
+                : needsMipLevel ? cat(
+                    "$c",
+                    glslFuncName,
+                    "($0, ($1).",
+                    kGLSLLoadCoordsSwizzle[loadCoordCount],
+                    ", ($1).",
+                    kGLSLLoadLODSwizzle[loadCoordCount],
+                    ")$z")
+                : cat("$c", glslFuncName, "($0, $1)$z"),
+                cudaBuilder
+            );
 
-
-            // GLSL
             glslFuncName = (access == SLANG_RESOURCE_ACCESS_READ) ? "texelFetchOffset" : "imageLoad";
-            if (isMultisample)
-            {
-                sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
-                sb << "__target_intrinsic(glsl, \"$c" << glslFuncName << "($0, $0, $1, $2)$z\")\n";
-            }
-            else
-            {
-                sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
-                sb << "__target_intrinsic(glsl, \"$c" << glslFuncName << "($0, ";
-                if( needsMipLevel )
-                {
-                    sb << "($1)." << kGLSLLoadCoordsSwizzle[loadCoordCount] << ", ($1)." << kGLSLLoadLODSwizzle[loadCoordCount];
-                    sb << ", $2)$z\")\n";
-                }
-                else
-                {
-                    sb << "$1, 0, $2)$z\")\n";
-                }
-            }
+            sb << i << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
+            writeFunc(
+                "T",
+                "Load",
+                cat(
+                    "int", loadCoordCount, " location",
+                    isMultisample ? ", int sampleIndex" : "",
+                    ", constexpr int", base.coordCount, " offset"
+                ),
+                isMultisample ? cat("$c", glslFuncName, "($0, $0, $1, $2)$z")
+                    : needsMipLevel ? cat(
+                        "$c", glslFuncName, "($0, ($1).", kGLSLLoadCoordsSwizzle[loadCoordCount],
+                        ", ($1).", kGLSLLoadLODSwizzle[loadCoordCount],
+                        ", $2)$z")
+                    : cat("$c", glslFuncName, "($0, $1, 0, $2)$z")
+            );
 
-            if (isReadOnly)
-                sb << "[__readNone]\n";
-            sb << "T Load(";
-            sb << "int" << loadCoordCount << " location";
-            if(isMultisample)
-            {
-                sb << ", int sampleIndex";
-            }
-            sb << ", constexpr int" << base.coordCount << " offset";
-            sb << ");\n";
-
-            if (isReadOnly)
-                sb << "[__readNone]\n";
-            sb << "T Load(";
-            sb << "int" << loadCoordCount << " location";
-            if(isMultisample)
-            {
-                sb << ", int sampleIndex";
-            }
-            sb << ", constexpr int" << base.coordCount << " offset";
-            sb << ", out uint status";
-            sb << ");\n";
+            writeFunc(
+                "T",
+                "Load",
+                cat(
+                    "int", loadCoordCount, " location",
+                    isMultisample ? ", int sampleIndex" : "",
+                    ", constexpr int", base.coordCount, " offset",
+                    ", out uint status"
+                )
+            );
         }
 
         if(baseShape != TextureFlavor::Shape::ShapeCube)
@@ -1706,7 +1778,7 @@ struct TextureTypeInfo
 
             // !!!!!!!!!!!!!!!!!!!! get !!!!!!!!!!!!!!!!!!!!!!!
 
-            // GLSL/SPIR-V distinguished sampled vs. non-sampled images
+            // GLSL/SPIR-V distinguishes sampled vs. non-sampled images
             {
                 switch( access )
                 {
@@ -1856,75 +1928,78 @@ struct TextureTypeInfo
         {
             // `Sample()`
 
-            sb << "__target_intrinsic(glsl, \"$ctexture($p, $2)$z\")\n";
-
             // CUDA
+            StringBuilder cudaBuilder;
             {
                 const int coordCount = base.coordCount;
                 const int vecCount = coordCount + int(isArray);
 
                 if( baseShape != TextureFlavor::Shape::ShapeCube )
                 {
-                    sb << "__target_intrinsic(cuda, \"tex" << coordCount << "D";
+                    cudaBuilder << "tex" << coordCount << "D";
                     if (isArray)
                     {
-                        sb << "Layered";
+                        cudaBuilder << "Layered";
                     }
-                    sb << "<$T0>($0";
+                    cudaBuilder << "<$T0>($0";
                     for (int i = 0; i < coordCount; ++i)
                     {
-                        sb << ", ($2)";
+                        cudaBuilder << ", ($2)";
                         if (vecCount > 1)
                         {
-                            sb << '.' << char(i + 'x');
+                            cudaBuilder << '.' << char(i + 'x');
                         }
                     }
                     if (isArray)
                     {
-                        sb << ", int(($2)." << char(coordCount + 'x') << ")";
+                        cudaBuilder << ", int(($2)." << char(coordCount + 'x') << ")";
                     }
-                    sb << ")\")\n";
+                    cudaBuilder << ")";
                 }
                 else
                 {
-                    sb << "__target_intrinsic(cuda, \"texCubemap";
+                    cudaBuilder << "texCubemap";
                     if (isArray)
                     {
-                        sb << "Layered";
+                        cudaBuilder << "Layered";
                     }
-                    sb << "<$T0>($0, ($2).x, ($2).y, ($2).z"; 
+                    cudaBuilder << "<$T0>($0, ($2).x, ($2).y, ($2).z";
                     if (isArray)
                     {
-                        sb << ", int(($2).w)";
+                        cudaBuilder << ", int(($2).w)";
                     }
-                    sb << ")\")\n";
+                    cudaBuilder << ")";
                 }
             }
 
-            if (isReadOnly)
-                sb << "[__readNone]\n";
-            sb << "T Sample(" << samplerStateParam;;
-            sb << "float" << base.coordCount + isArray << " location);\n";
+            writeFunc(
+                "T",
+                "Sample",
+                cat(samplerStateParam, "float", base.coordCount + isArray, " location"),
+                "$ctexture($p, $2)$z",
+                cudaBuilder
+            );
 
             if( baseShape != TextureFlavor::Shape::ShapeCube )
             {
-                sb << "__target_intrinsic(glsl, \"$ctextureOffset($p, $2, $3)$z\")\n";
-                if (isReadOnly)
-                    sb << "[__readNone]\n";
-                sb << "T Sample(" << samplerStateParam;;
-                sb << "float" << base.coordCount + isArray << " location, ";
-                sb << "constexpr int" << base.coordCount << " offset);\n";
+                writeFunc(
+                    "T",
+                    "Sample",
+                    cat(samplerStateParam, "float", base.coordCount + isArray, " location, ", "constexpr int", base.coordCount, " offset"),
+                    "$ctextureOffset($p, $2, $3)$z"
+                );
             }
 
-            if (isReadOnly)
-                sb << "[__readNone]\n";
-            sb << "T Sample(" << samplerStateParam;
-            sb << "float" << base.coordCount + isArray << " location, ";
-            if( baseShape != TextureFlavor::Shape::ShapeCube )
-            {
-                sb << "constexpr int" << base.coordCount << " offset, ";
-            }
-            sb << "float clamp);\n";
+            writeFunc(
+                "T",
+                "Sample",
+                cat(
+                    samplerStateParam,
+                    "float", base.coordCount + isArray, " location, ",
+                    baseShape == TextureFlavor::Shape::ShapeCube ? "" : cat("constexpr int", base.coordCount, " offset, "),
+                    "float clamp"
+                )
+            );
 
             if (isReadOnly)
                 sb << "[__readNone]\n";
@@ -2076,45 +2151,16 @@ struct TextureTypeInfo
 
             // `SampleLevel`
 
-            StringBuilder cppBuilder;
-            {
-                cppBuilder << "__intrinsic_asm \".SampleLevel\"";
-            }
-
-            StringBuilder hlslBuilder;
-            {
-                hlslBuilder << "__intrinsic_asm \".SampleLevel\"";
-            }
-
-            StringBuilder glslBuilder;
-            {
-                glslBuilder << "__intrinsic_asm \"$ctextureLod($p, $2, $3)$z\"";
-            }
-
-            // SPIR-V
-            StringBuilder spirvBuilder;
-            {
-                const String i = "            ";
-                spirvBuilder << "\n        ";
-                spirvBuilder << "return spirv_asm";
-                spirvBuilder << "\n        ";
-                spirvBuilder << "{\n";
-                spirvBuilder << i << "%sampledImageType = OpTypeSampledImage $$This;\n";
-                spirvBuilder << i << "%sampledImage : %sampledImageType = OpSampledImage $this $s;\n";
-                spirvBuilder << i << "%sampled : __sampledType(T) = OpImageSampleExplicitLod %sampledImage $location Lod $level;\n";
-                spirvBuilder << i << "__truncate $$T result __sampledType(T) %sampled;\n";
-                spirvBuilder << "        }";
-            }
 
             // CUDA
-            StringBuilder cudaBuilder;
+            cudaBuilder.clear();
             {
                 const int coordCount = base.coordCount;
                 const int vecCount = coordCount + int(isArray);
 
                 if( baseShape != TextureFlavor::Shape::ShapeCube )
                 {
-                    cudaBuilder << "__intrinsic_asm \"tex" << coordCount << "D";
+                    cudaBuilder << "tex" << coordCount << "D";
                     if (isArray)
                     {
                         cudaBuilder << "Layered";
@@ -2132,11 +2178,11 @@ struct TextureTypeInfo
                     {
                         cudaBuilder << ", int(($2)." << char(coordCount + 'x') << ")";
                     }
-                    cudaBuilder << ", $3)\"";
+                    cudaBuilder << ", $3)";
                 }
                 else
                 {
-                    cudaBuilder << "__intrinsic_asm \"texCubemap";
+                    cudaBuilder << "texCubemap";
                     if (isArray)
                     {
                         cudaBuilder << "Layered";
@@ -2146,26 +2192,30 @@ struct TextureTypeInfo
                     {
                         cudaBuilder << ", int(($2).w)";
                     }
-                    cudaBuilder << ", $3)\"";
+                    cudaBuilder << ", $3)";
                 }
             }
 
-            if (isReadOnly)
-                sb << "[__readNone]\n";
-            sb << "T SampleLevel(" << samplerStateParam;
-            sb << "float" << base.coordCount + isArray << " location, ";
-            sb << "float level)\n";
-            sb << "{\n";
-            sb << "    __target_switch\n";
-            sb << "    {\n";
-            sb << "    case cpp: " << cppBuilder << ";\n";
-            sb << "    case hlsl: " << hlslBuilder << ";\n";
-            sb << "    case glsl: " << glslBuilder << ";\n";
-            sb << "    case cuda: " << cudaBuilder << ";\n";
-            if(!prefixInfo.combined)
-                sb << "    case spirv: " << spirvBuilder << ";\n";
-            sb << "    }\n";
-            sb << "}\n";
+            // SPIR-V
+            const auto spirv = false && prefixInfo.combined ? R"(
+                %sampledImageType = OpTypeSampledImage $$This;
+                %sampledImage : %sampledImageType = OpSampledImage $this $s;
+                %sampled : __sampledType(T) = OpImageSampleExplicitLod %sampledImage $location Lod $level;
+                __truncate $$T result __sampledType(T) %sampled;
+            )" : "";
+
+            writeFunc(
+                "T",
+                "SampleLevel",
+                cat(
+                    samplerStateParam,
+                    "float", base.coordCount + isArray, " location, ",
+                    "float level"
+                ),
+                "$ctextureLod($p, $2, $3)$z",
+                cudaBuilder,
+                UnownedStringSlice{spirv}
+            );
 
             if( baseShape != TextureFlavor::Shape::ShapeCube )
             {
