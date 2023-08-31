@@ -355,11 +355,6 @@ struct ResourceOutputSpecializationPass
         if(as<IRSamplerStateTypeBase>(type))
             return true;
 
-        if(as<IRHitObjectType>(type))
-            return true;
-        if(as<IRRayQueryType>(type))
-            return true;
-
         // TODO: more cases here?
 
         return false;
@@ -1232,6 +1227,10 @@ bool isIllegalGLSLParameterType(IRType* type)
         }
     }
     if (as<IRMeshOutputType>(type))
+        return true;
+    if (as<IRRayQueryType>(type))
+        return true;
+    if (as<IRHitObjectType>(type))
         return true;
     return false;
 }

@@ -38,8 +38,6 @@ struct Ray
 
 RaytracingAccelerationStructure sceneBVH;
 
-// TODO: remove force inline here will result in an error.
-[ForceInline]
 bool traceSceneVisibilityRayImpl<let Flags : int>(const bool useAlphaTest, inout RayQuery<Flags> q, const Ray ray, uint rayFlags, uint instanceInclusionMask)
 {
     var rayDesc = ray.toRayDesc();
