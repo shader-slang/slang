@@ -32,7 +32,6 @@
 
 #define WAIT_FAILED 0xffffffff
 #define WAIT_OBJECT_0 0
-#define WAIT_TIMEOUT 258
 
 typedef struct _SECURITY_ATTRIBUTES *LPSECURITY_ATTRIBUTES;
 
