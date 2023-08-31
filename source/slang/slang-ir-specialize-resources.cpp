@@ -288,6 +288,9 @@ struct ResourceOutputSpecializationPass
         //
         if(!func->isDefinition())
             return false;
+        UnownedStringSlice def;
+        if (findTargetIntrinsicDefinition(func, targetRequest->getTargetCaps(), def))
+            return false;
 
         // If any of the parameters of the function are `out`
         // or `inout` parameters of a resource type, then we

@@ -2785,6 +2785,9 @@ namespace Slang
 
     Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr * expr)
     {
+        if (expr->type)
+            return expr;
+
         // Check the term we are applying first
         auto funcExpr = expr->functionExpr;
         funcExpr = CheckTerm(funcExpr);

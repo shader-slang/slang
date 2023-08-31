@@ -139,11 +139,12 @@ case kIROp_##TYPE##Type:                                        \
     {
         auto structType = cast<IRStructType>(type);
         IRSizeAndAlignment structLayout;
+        IRIntegerValue offset = 0;
         for (auto field : structType->getFields())
         {
             IRSizeAndAlignment fieldTypeLayout;
             SLANG_RETURN_ON_FAIL(getSizeAndAlignment(rules, field->getFieldType(), &fieldTypeLayout));
-            structLayout.size = align(structLayout.size, fieldTypeLayout.alignment);
+            structLayout.size = align(offset, fieldTypeLayout.alignment);
             structLayout.alignment = std::max(structLayout.alignment, fieldTypeLayout.alignment);
 
             IRIntegerValue fieldOffset = structLayout.size;
@@ -165,6 +166,11 @@ case kIROp_##TYPE##Type:                                        \
             }
 
             structLayout.size += fieldTypeLayout.size;
+            offset = structLayout.size;
+            if (as<IRMatrixType>(field->getFieldType()) || as<IRArrayTypeBase>(field->getFieldType()) || as<IRStructType>(field->getFieldType()))
+            {
+                offset = rules->adjustOffsetForNextAggregateMember(offset, fieldTypeLayout.alignment);
+            }
         }
         *outSizeAndAlignment = rules->alignCompositeElement(structLayout);
         return SLANG_OK;
@@ -380,7 +386,11 @@ struct NaturalLayoutRules : IRTypeLayoutRules
     {
         ruleName = IRTypeLayoutRuleName::Natural;
     }
-
+    virtual IRIntegerValue adjustOffsetForNextAggregateMember(IRIntegerValue currentSize, IRIntegerValue lastElementAlignment)
+    {
+        SLANG_UNUSED(lastElementAlignment);
+        return currentSize;
+    }
     virtual IRSizeAndAlignment alignCompositeElement(IRSizeAndAlignment elementSize)
     {
         return elementSize;
@@ -402,6 +412,11 @@ struct Std430LayoutRules : IRTypeLayoutRules
     {
         return elementSize;
     }
+    virtual IRIntegerValue adjustOffsetForNextAggregateMember(IRIntegerValue currentSize, IRIntegerValue lastElementAlignment)
+    {
+        return align(currentSize, (int)lastElementAlignment);
+    }
+
     virtual IRSizeAndAlignment getVectorSizeAndAlignment(IRSizeAndAlignment element, IRIntegerValue count)
     {
         IRIntegerValue countForAlignment = count;
@@ -418,6 +433,10 @@ struct Std140LayoutRules : IRTypeLayoutRules
         ruleName = IRTypeLayoutRuleName::Std140;
     }
 
+    virtual IRIntegerValue adjustOffsetForNextAggregateMember(IRIntegerValue currentSize, IRIntegerValue lastElementAlignment)
+    {
+        return align(currentSize, (int)lastElementAlignment);
+    }
     virtual IRSizeAndAlignment alignCompositeElement(IRSizeAndAlignment elementSize)
     {
         elementSize.alignment = (int)align(elementSize.alignment, 16);

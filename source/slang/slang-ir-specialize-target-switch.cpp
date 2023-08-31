@@ -30,10 +30,16 @@ namespace Slang
                         bestCapSet = capSet;
                     }
                 }
-                SLANG_ASSERT(targetBlock);
                 IRBuilder builder(targetSwitch);
                 builder.setInsertBefore(targetSwitch);
-                builder.emitBranch(targetBlock);
+                if (targetBlock)
+                {
+                    builder.emitBranch(targetBlock);
+                }
+                else
+                {
+                    builder.emitMissingReturn();
+                }
                 targetSwitch->removeAndDeallocate();
                 changed = true;
             }

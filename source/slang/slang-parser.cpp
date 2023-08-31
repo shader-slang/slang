@@ -6071,6 +6071,32 @@ namespace Slang
                 parser->ReadToken(TokenType::Identifier);
                 return varExpr;
             }
+        case TokenType::Scope:
+            {
+                parser->ReadToken(TokenType::Scope);
+                VarExpr* varExpr = parser->astBuilder->create<VarExpr>();
+                varExpr->scope = parser->currentScope;
+                while (varExpr->scope && !as<ModuleDecl>(varExpr->scope->containerDecl))
+                    varExpr->scope = varExpr->scope->parent;
+                parser->FillPosition(varExpr);
+
+                auto nameToken = peekToken(parser);
+                auto nameAndLoc = NameLoc(nameToken);
+                varExpr->name = nameAndLoc.name;
+                if (nameToken.type == TokenType::CompletionRequest)
+                {
+                    parser->hasSeenCompletionToken = true;
+                }
+                else
+                {
+                    parser->ReadToken(TokenType::Identifier);
+                    if (peekTokenType(parser) == TokenType::OpLess)
+                    {
+                        return maybeParseGenericApp(parser, varExpr);
+                    }
+                }
+                return varExpr;
+            }
         case TokenType::Identifier:
             {
                 // We will perform name lookup here so that we can find syntax
