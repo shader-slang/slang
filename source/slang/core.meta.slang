@@ -1365,9 +1365,13 @@ struct TextureTypeInfo
         if (isMultisample) sb << "MS";
         if (isArray) sb << "Array";
 //                        if (isShadow) sb << "Shadow";
-        sb << "\n{\n";
+        sb << "\n";
 
         char const* samplerStateParam = prefixInfo.combined ? "" : "SamplerState s, ";
+
+        //
+        // Utilities for writing these methods
+        //
 
         enum class ReadNoneMode
         {
@@ -1376,41 +1380,66 @@ struct TextureTypeInfo
             Always
         };
 
-        const auto i = "    ";
-        const auto i2 = "        ";
-        const auto i3 = "            ";
+        const auto cat = [](const auto... xs) -> String{
+            return (StringBuilder{} << ... << xs);
+        };
+
+        static const char spaces[] = "                    ";
+        const char* i = spaces + SLANG_COUNT_OF(spaces) - 1;
+        static_assert(SLANG_COUNT_OF(spaces) % 4 == 1);
+        struct BraceScope
+        {
+            BraceScope(const char*& i, StringBuilder& sb, const char* end = "\n")
+            :i(i), sb(sb), end(end)
+            {
+                SLANG_ASSERT(i != spaces);
+                sb << i << "{\n";
+                i -= 4;
+            }
+            ~BraceScope()
+            {
+                SLANG_ASSERT(*i != '\0');
+                i += 4;
+                sb << i << "}" << end;
+            }
+            const char*& i;
+            StringBuilder& sb;
+            const char* end;
+        };
+        {
+        BraceScope structBodyScope{i, sb, ";\n"};
+
         const auto writeFuncBody = [&](
             const auto& funcName,
             const String& glsl,
             const String& cuda,
             const String& spirv
         ){
-            sb << i << "{\n";
-            sb << i2 << "__target_switch\n";
-            sb << i2 << "{\n";
-            sb << i2 << "case cpp:\n";
-            sb << i2 << "case hlsl:\n";
-            sb << i3 << "__intrinsic_asm \"." << funcName << "\";\n";
-            if(glsl.getLength())
+            BraceScope funcScope{i, sb};
             {
-                sb << i2 << "case glsl:\n";
-                sb << i3 << "__intrinsic_asm \"." << glsl << "\";\n";
+                sb << i << "__target_switch\n";
+                BraceScope switchScope{i, sb};
+                sb << i << "case cpp:\n";
+                sb << i << "case hlsl:\n";
+                sb << i << "__intrinsic_asm \"." << funcName << "\";\n";
+                if(glsl.getLength())
+                {
+                    sb << i << "case glsl:\n";
+                    sb << i << "__intrinsic_asm \"." << glsl << "\";\n";
+                }
+                if(cuda.getLength())
+                {
+                    sb << i << "case cuda:\n";
+                    sb << i << "__intrinsic_asm \"." << cuda << "\";\n";
+                }
+                if(spirv.getLength())
+                {
+                    sb << i << "case spirv:\n";
+                    sb << i << "return spirv_asm\n";
+                    BraceScope spirvScope{i, sb, ";\n"};
+                    sb << i << spirv << "\n";
+                }
             }
-            if(cuda.getLength())
-            {
-                sb << i2 << "case cuda:\n";
-                sb << i3 << "__intrinsic_asm \"." << cuda << "\";\n";
-            }
-            if(spirv.getLength())
-            {
-                sb << i2 << "case spirv:\n";
-                sb << i3 << "return spirv_asm\n";
-                sb << i3 << "{\n";
-                sb << i3 << spirv << "\n";
-                sb << i3 << "};\n";
-            }
-            sb << i2 << "}\n";
-            sb << i << "}\n";
         };
         const auto writeFuncDecorations = [&](
             const String& glsl,
@@ -1421,10 +1450,9 @@ struct TextureTypeInfo
             if(cuda.getLength())
                 sb << i << "__target_intrinsic(cuda, \"" << cuda << "\")\n";
         };
-        const auto writeFunc = [&](
-            const auto& returnType,
+        const auto writeFuncWithSig = [&](
             const auto& funcName,
-            const auto& params,
+            const auto& sig,
             const String& glsl = String{},
             const String& cuda = String{},
             const String& spirv = String{},
@@ -1437,7 +1465,7 @@ struct TextureTypeInfo
             {
                 if(rn)
                     sb << i << "[__readNone]\n";
-                sb << i << returnType << " " << funcName << "(" << params << ")\n";
+                sb << i << sig << "\n";
                 writeFuncBody(funcName, glsl, cuda, spirv);
             }
             else
@@ -1445,14 +1473,32 @@ struct TextureTypeInfo
                 writeFuncDecorations(glsl, cuda);
                 if(rn)
                     sb << i << "[__readNone]\n";
-                sb << i << returnType << " " << funcName << "(" << params << ");\n";
+                sb << i << sig << ";\n";
             }
             sb << "\n";
         };
-
-        const auto cat = [](const auto... xs) -> String{
-            return (StringBuilder{} << ... << xs);
+        const auto writeFunc = [&](
+            const auto& returnType,
+            const auto& funcName,
+            const auto& params,
+            const String& glsl = String{},
+            const String& cuda = String{},
+            const String& spirv = String{},
+            const ReadNoneMode readNoneMode = ReadNoneMode::IfReadOnly
+        ){
+            writeFuncWithSig(
+                funcName,
+                cat(returnType, " ", funcName, "(", params, ")"),
+                glsl,
+                cuda,
+                spirv,
+                readNoneMode
+            );
         };
+
+        //
+        // The methods themselves
+        //
 
         if( !isMultisample )
         {
@@ -1775,105 +1821,106 @@ struct TextureTypeInfo
             auto ivecN = ivecNs[N];
 
             // subscript operator
-            sb << "__subscript(" << uintN << " location) -> T {\n";
+            sb << i << "__subscript(" << uintN << " location) -> T\n";
+            BraceScope subscriptScope{i, sb};
 
             // !!!!!!!!!!!!!!!!!!!! get !!!!!!!!!!!!!!!!!!!!!!!
 
             // GLSL/SPIR-V distinguishes sampled vs. non-sampled images
+            StringBuilder glslBuilder;
             {
                 switch( access )
                 {
                 case SLANG_RESOURCE_ACCESS_NONE:
                 case SLANG_RESOURCE_ACCESS_READ:
-                    sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
-                    sb << "__target_intrinsic(glsl, \"$ctexelFetch($0, " << ivecN << "($1)";
+                    sb << i << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
+                    glslBuilder << "$ctexelFetch($0, " << ivecN << "($1)";
                     if( !isMultisample )
                     {
-                        sb << ", 0";
+                        glslBuilder << ", 0";
                     }
                     else
                     {
                         // TODO: how to handle passing through sample index?
-                        sb << ", 0";
+                        glslBuilder << ", 0";
                     }
                     break;
 
                 default:
-                    sb << "__target_intrinsic(glsl, \"$cimageLoad($0, " << ivecN << "($1)";
+                    glslBuilder << "$cimageLoad($0, " << ivecN << "($1)";
                     if( isMultisample )
                     {
                         // TODO: how to handle passing through sample index?
-                        sb << ", 0";
+                        glslBuilder << ", 0";
                     }
                     break;
                 }
-                sb << ")$z\")\n";
+                glslBuilder << ")$z";
             }
 
             // CUDA
+            StringBuilder cudaBuilder;
             {
                 if (access == SLANG_RESOURCE_ACCESS_READ_WRITE)
                 {
                     const int coordCount = base.coordCount;
                     const int vecCount = coordCount + int(isArray);
 
-                    sb << "__target_intrinsic(cuda, \"surf";
+                    cudaBuilder << "surf";
                     if( baseShape != TextureFlavor::Shape::ShapeCube )
                     {
-                        sb << coordCount << "D";
+                        cudaBuilder << coordCount << "D";
                     }
                     else
                     {
-                        sb << "Cubemap";
+                        cudaBuilder << "Cubemap";
                     }
 
-                    sb << (isArray ? "Layered" : "");
-                    sb << "read$C<$T0>($0";
+                    cudaBuilder << (isArray ? "Layered" : "");
+                    cudaBuilder << "read$C<$T0>($0";
                                 
                     for (int i = 0; i < vecCount; ++i)
                     {
-                        sb << ", ($1)";
+                        cudaBuilder << ", ($1)";
                         if (vecCount > 1)
                         {
-                            sb << '.' << char(i + 'x');    
+                            cudaBuilder << '.' << char(i + 'x');
                         }
                         // Surface access is *byte* addressed in x in CUDA
                         if (i == 0)
                         {
-                            sb << " * $E";
+                            cudaBuilder << " * $E";
                         }
                     }
 
-                    sb << ", SLANG_CUDA_BOUNDARY_MODE)\")\n";
+                    cudaBuilder << ", SLANG_CUDA_BOUNDARY_MODE)";
                 }
                 else if (access == SLANG_RESOURCE_ACCESS_READ)
                 {
                     // We can allow this on Texture1D
                     if( baseShape == TextureFlavor::Shape::Shape1D && isArray == false)
                     {
-                        sb << "__target_intrinsic(cuda, \"tex1Dfetch<$T0>($0, $1)\")\n";
+                        cudaBuilder << "tex1Dfetch<$T0>($0, $1)";
                     }
                 }
             }
 
             // Output that has get
-            if (isReadOnly)
-                sb << "[__readNone]\n";
-            sb << " get;\n";
+            writeFuncWithSig(".operator[]", "get", glslBuilder, cudaBuilder);
 
             // !!!!!!!!!!!!!!!!!!!! set !!!!!!!!!!!!!!!!!!!!!!!
 
             if (!(access == SLANG_RESOURCE_ACCESS_NONE || access == SLANG_RESOURCE_ACCESS_READ))
             {
                 // GLSL
-                sb << "__target_intrinsic(glsl, \"imageStore($0, " << ivecN << "($1), $V2)\")\n";
+                sb << i << "__target_intrinsic(glsl, \"imageStore($0, " << ivecN << "($1), $V2)\")\n";
 
                 // CUDA
                 {
                     const int coordCount = base.coordCount;
                     const int vecCount = coordCount + int(isArray);
 
-                    sb << "__target_intrinsic(cuda, \"surf";
+                    sb << i << "__target_intrinsic(cuda, \"surf";
                     if( baseShape != TextureFlavor::Shape::ShapeCube )
                     {
                         sb << coordCount << "D";
@@ -1904,7 +1951,7 @@ struct TextureTypeInfo
                 }
 
                 // Set
-                sb << " [nonmutating] set;\n";
+                sb << i << "[nonmutating]\n" << i << "set;\n";
             }
 
             // !!!!!!!!!!!!!!!!!! ref !!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1918,11 +1965,9 @@ struct TextureTypeInfo
             case SLANG_RESOURCE_ACCESS_READ:
                 break;
             default:
-                sb << "__intrinsic_op(" << int(kIROp_ImageSubscript) << ") ref;\n";
+                sb << i << "__intrinsic_op(" << int(kIROp_ImageSubscript) << ") ref;\n";
                 break;
             }
-
-            sb << "}\n";
         }
 
         if( !isMultisample )
@@ -2229,8 +2274,7 @@ struct TextureTypeInfo
                 );
             }
         }
-
-        sb << "\n};\n";
+        } // The scope end to deindent and close-brace the struct definition
 
         // `Gather*()` operations are handled via an `extension` declaration,
         // because this lets us capture the element type of the texture.
