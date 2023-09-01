@@ -1546,12 +1546,6 @@ struct SPIRVEmitContext
                     varInst,
                     SpvLiteralInteger::from32(int32_t(index))
                 );
-                emitOpDecorateIndex(
-                    getSection(SpvLogicalSectionID::Annotations),
-                    nullptr,
-                    varInst,
-                    SpvLiteralInteger::from32(int32_t(space))
-                );
                 break;
             case LayoutResourceKind::VaryingOutput:
                 emitOpDecorateLocation(
