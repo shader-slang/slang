@@ -2204,6 +2204,7 @@ void GLSLSourceEmitter::emitTypeImpl(IRType* type, const StringSliceLoc* nameAnd
 {
     if (auto refType = as<IRRefType>(type))
     {
+        _requireGLSLExtension(UnownedStringSlice("GL_EXT_spirv_intrinsics"));
         m_writer->emit("spirv_by_reference ");
         type = refType->getValueType();
     }
@@ -2214,11 +2215,13 @@ void GLSLSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
 {
     if (auto refType = as<IRRefType>(type))
     {
+        _requireGLSLExtension(UnownedStringSlice("GL_EXT_spirv_intrinsics"));
         m_writer->emit("spirv_by_reference ");
         type = refType->getValueType();
     }
     else if (auto spirvLiteralType = as<IRSPIRVLiteralType>(type))
     {
+        _requireGLSLExtension(UnownedStringSlice("GL_EXT_spirv_intrinsics"));
         m_writer->emit("spirv_literal ");
         type = spirvLiteralType->getValueType();
     }

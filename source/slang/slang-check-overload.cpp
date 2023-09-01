@@ -508,10 +508,11 @@ namespace Slang
                         return nullptr;
                     }
 
-                    if (paramDeclRef.getDecl()->findModifier<OutModifier>())
+                    if (paramDeclRef.getDecl()->findModifier<OutModifier>() ||
+                        paramDeclRef.getDecl()->findModifier<RefModifier>())
                     {
                         // Function parameters marked with `out`, `inout`,
-                        // or `in out` are all mutable in a way where
+                        // `in out` or `ref` are all mutable in a way where
                         // the result of mutations will be visible to the
                         // caller.
                         //
