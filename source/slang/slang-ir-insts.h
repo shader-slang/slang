@@ -2893,6 +2893,8 @@ struct IRDebugLine : IRInst
     IRInst* getColEnd() { return getOperand(4); }
 };
 
+struct IRSPIRVAsm;
+
 struct IRSPIRVAsmOperand : IRInst
 {
     IR_PARENT_ISA(SPIRVAsmOperand);
@@ -2902,6 +2904,17 @@ struct IRSPIRVAsmOperand : IRInst
             return nullptr;
         return getOperand(0);
     }
+    IRSPIRVAsm* getAsmBlock()
+    {
+        const auto ret = as<IRSPIRVAsm>(getParent());
+        SLANG_ASSERT(ret);
+        return ret;
+    }
+};
+
+struct IRSPIRVAsmOperandInst : IRSPIRVAsmOperand
+{
+    IR_LEAF_ISA(SPIRVAsmOperandInst);
 };
 
 struct IRSPIRVAsmInst : IRInst
