@@ -91,8 +91,8 @@ private:
         const char* funcName,
         const String& sig,
         const String& glsl = String{},
-        const String& cuda = String{},
         const String& spirv = String{},
+        const String& cuda = String{},
         const ReadNoneMode readNoneMode = ReadNoneMode::IfReadOnly
     );
     void writeFunc(
@@ -100,8 +100,8 @@ private:
         const char* funcName,
         const String& params,
         const String& glsl = String{},
-        const String& cuda = String{},
         const String& spirv = String{},
+        const String& cuda = String{},
         const ReadNoneMode readNoneMode = ReadNoneMode::IfReadOnly
     );
 

@@ -106,8 +106,8 @@ void TextureTypeInfo::writeFuncWithSig(
     const char* funcName,
     const String& sig,
     const String& glsl,
-    const String& cuda,
     const String& spirv,
+    const String& cuda,
     const ReadNoneMode readNoneMode)
 {
     const bool isReadOnly = (accessInfo.access == SLANG_RESOURCE_ACCESS_READ);
@@ -136,16 +136,16 @@ void TextureTypeInfo::writeFunc(
     const char* funcName,
     const String& params,
     const String& glsl,
-    const String& cuda,
     const String& spirv,
+    const String& cuda,
     const ReadNoneMode readNoneMode)
 {
     writeFuncWithSig(
         funcName,
         cat(returnType, " ", funcName, "(", params, ")"),
         glsl,
-        cuda,
         spirv,
+        cuda,
         readNoneMode
     );
 }
@@ -504,6 +504,7 @@ void TextureTypeInfo::writeQueryFunctions()
                 kGLSLLoadLODSwizzle[loadCoordCount],
                 ")$z")
             : cat("$c", glslFuncName, "($0, $1)$z"),
+            "",
             cudaBuilder
         );
 
@@ -637,7 +638,7 @@ void TextureTypeInfo::writeSubscriptFunctions()
     }
 
     // Output that has get
-    writeFuncWithSig(".operator[]", "get", glslBuilder, cudaBuilder);
+    writeFuncWithSig(".operator[]", "get", glslBuilder, "", cudaBuilder);
 
     // !!!!!!!!!!!!!!!!!!!! set !!!!!!!!!!!!!!!!!!!!!!!
 
@@ -749,6 +750,71 @@ static String cudaSampleIntrinsic(const bool isArray, const BaseTextureShapeInfo
     return cudaBuilder;
 }
 
+const char* noBias = nullptr;
+const char* noLodLevel = nullptr;
+const char* noGradX = nullptr;
+const char* noGradY = nullptr;
+const char* noConstOffset = nullptr;
+const char* noMinLod = nullptr;
+
+static String spirvSampleIntrinsic(
+    const TextureTypePrefixInfo& prefixInfo,
+    const char* bias = nullptr,
+    const char* lodLevel = nullptr,
+    const char* gradX = nullptr,
+    const char* gradY = nullptr,
+    const char* constOffset = nullptr,
+    const char* minLod = nullptr)
+{
+    StringBuilder spirvBuilder;
+    const char* i = "                ";
+
+    SLANG_ASSERT(!(!gradX ^ !gradY));
+
+    if(minLod)
+        spirvBuilder << i << "OpCapability MinLod;\n";
+
+    const char* sampledImage;
+    if(prefixInfo.combined)
+    {
+        sampledImage = "$this";
+    }
+    else
+    {
+        const char* sampledImageType = "%sampledImageType";
+        sampledImage = "%sampledImage";
+        spirvBuilder << i << sampledImageType << " = OpTypeSampledImage $$This;\n";
+        spirvBuilder << i << sampledImage << " : " << sampledImageType << " = OpSampledImage $this $s;\n";
+    }
+
+    const char* op = lodLevel || gradX ? "OpImageSampleExplicitLod" : "OpImageSampleImplicitLod";
+    spirvBuilder << i << "%sampled : __sampledType(T) = " << op << " " << sampledImage << " $location";
+    spirvBuilder << " None";
+    if(bias)
+        spirvBuilder << "|Bias";
+    if(lodLevel)
+        spirvBuilder << "|Lod";
+    if(gradX)
+        spirvBuilder << "|Grad";
+    if(constOffset)
+        spirvBuilder << "|ConstOffset";
+    if(minLod)
+        spirvBuilder << "|MinLod";
+
+    if(bias)
+        spirvBuilder << " $" << bias;
+    if(lodLevel)
+        spirvBuilder << " $" << lodLevel;
+    if(gradX)
+        spirvBuilder << " $" << gradX << " $" << gradY;
+    if(constOffset)
+        spirvBuilder << " $" << constOffset;
+    if(minLod)
+        spirvBuilder << " $" << minLod;
+    spirvBuilder << ";\n";
+    spirvBuilder << i << "__truncate $$T result __sampledType(T) %sampled;\n";
+    return spirvBuilder;
+}
 
 void TextureTypeInfo::writeSampleFunctions()
 {
@@ -762,6 +828,7 @@ void TextureTypeInfo::writeSampleFunctions()
         "Sample",
         cat(samplerStateParam, "float", base.coordCount + isArray, " location"),
         "$ctexture($p, $2)$z",
+        spirvSampleIntrinsic(prefixInfo),
         cudaSampleIntrinsic(isArray, base, false)
     );
 
@@ -771,7 +838,8 @@ void TextureTypeInfo::writeSampleFunctions()
             "T",
             "Sample",
             cat(samplerStateParam, "float", base.coordCount + isArray, " location, ", "constexpr int", base.coordCount, " offset"),
-            "$ctextureOffset($p, $2, $3)$z"
+            "$ctextureOffset($p, $2, $3)$z",
+            spirvSampleIntrinsic(prefixInfo, noBias, noLodLevel, noGradX, noGradY, "offset")
         );
     }
 
@@ -783,9 +851,20 @@ void TextureTypeInfo::writeSampleFunctions()
             "float", base.coordCount + isArray, " location, ",
             baseShape == TextureFlavor::Shape::ShapeCube ? "" : cat("constexpr int", base.coordCount, " offset, "),
             "float clamp"
+        ),
+        "",
+        spirvSampleIntrinsic(
+            prefixInfo,
+            noBias,
+            noLodLevel,
+            noGradX,
+            noGradY,
+            baseShape == TextureFlavor::Shape::ShapeCube ? nullptr : "offset",
+            "clamp"
         )
     );
 
+    // SPIR-V todo, use OpImageSparseSampleImplicitLod
     writeFunc(
         "T",
         "Sample",
@@ -805,7 +884,8 @@ void TextureTypeInfo::writeSampleFunctions()
             "float", base.coordCount + isArray, " location, ",
             "float bias"
         ),
-        "$ctexture($p, $2, $3)$z"
+        "$ctexture($p, $2, $3)$z",
+        spirvSampleIntrinsic(prefixInfo, "bias")
     );
 
     if( baseShape != TextureFlavor::Shape::ShapeCube )
@@ -819,7 +899,8 @@ void TextureTypeInfo::writeSampleFunctions()
                 "float bias, ",
                 "constexpr int", base.coordCount, " offset"
             ),
-            "$ctextureOffset($p, $2, $3, $4)$z"
+            "$ctextureOffset($p, $2, $3, $4)$z",
+            spirvSampleIntrinsic(prefixInfo, "bias", noLodLevel, noGradX, noGradY, "offset")
         );
     }
     int baseCoordCount = base.coordCount;
@@ -896,7 +977,8 @@ void TextureTypeInfo::writeSampleFunctions()
             "float", base.coordCount, " gradX, ",
             "float", base.coordCount, " gradY, "
         ),
-        "$ctextureGrad($p, $2, $3, $4)$z"
+        "$ctextureGrad($p, $2, $3, $4)$z",
+        spirvSampleIntrinsic(prefixInfo, noBias, noLodLevel, "gradX", "gradY")
     );
 
     if( baseShape != TextureFlavor::Shape::ShapeCube )
@@ -911,7 +993,8 @@ void TextureTypeInfo::writeSampleFunctions()
                 "float", base.coordCount, " gradY, ",
                 "constexpr int", base.coordCount, " offset "
             ),
-            "$ctextureGradOffset($p, $2, $3, $4, $5)$z"
+            "$ctextureGradOffset($p, $2, $3, $4, $5)$z",
+            spirvSampleIntrinsic(prefixInfo, noBias, noLodLevel, "gradX", "gradY", "offset")
         );
 
         sb << i << "__glsl_extension(GL_ARB_sparse_texture_clamp)\n";
@@ -926,21 +1009,12 @@ void TextureTypeInfo::writeSampleFunctions()
                 "constexpr int", base.coordCount, " offset, ",
                 "float lodClamp"
             ),
-            "$ctextureGradOffsetClampARB($p, $2, $3, $4, $5, $6)$z"
+            "$ctextureGradOffsetClampARB($p, $2, $3, $4, $5, $6)$z",
+            spirvSampleIntrinsic(prefixInfo, noBias, noLodLevel, "gradX", "gradY", "offset", "lodClamp")
         );
     }
 
     // `SampleLevel`
-
-
-    // CUDA
-    // SPIR-V
-    const auto spirv = false && prefixInfo.combined ? R"(
-        %sampledImageType = OpTypeSampledImage $$This;
-        %sampledImage : %sampledImageType = OpSampledImage $this $s;
-        %sampled : __sampledType(T) = OpImageSampleExplicitLod %sampledImage $location Lod $level;
-        __truncate $$T result __sampledType(T) %sampled;
-    )" : "";
 
     writeFunc(
         "T",
@@ -951,8 +1025,8 @@ void TextureTypeInfo::writeSampleFunctions()
             "float level"
         ),
         "$ctextureLod($p, $2, $3)$z",
-        cudaSampleIntrinsic(isArray, base, true),
-        UnownedStringSlice{spirv}
+        spirvSampleIntrinsic(prefixInfo, noBias, "level"),
+        cudaSampleIntrinsic(isArray, base, true)
     );
 
     if( baseShape != TextureFlavor::Shape::ShapeCube )
@@ -966,7 +1040,8 @@ void TextureTypeInfo::writeSampleFunctions()
                 "float level, ",
                 "constexpr int", base.coordCount, " offset"
             ),
-            "$ctextureLodOffset($p, $2, $3, $4)$z"
+            "$ctextureLodOffset($p, $2, $3, $4)$z",
+            spirvSampleIntrinsic(prefixInfo, noBias, "level", noGradX, noGradY, "offset")
         );
     }
 }
