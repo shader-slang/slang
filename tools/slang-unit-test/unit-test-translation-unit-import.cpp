@@ -8,6 +8,7 @@
 #include "tools/unit-test/slang-unit-test.h"
 #include "../../slang-com-ptr.h"
 #include "../../source/core/slang-io.h"
+#include "../../source/core/slang-process.h"
 
 using namespace Slang;
 
@@ -46,8 +47,6 @@ SLANG_UNIT_TEST(translationUnitImport)
     auto session = spCreateSession();
     auto request = spCreateCompileRequest(session);
 
-    File::writeAllText("moduleG.slang", fileSource);
-
     spAddCodeGenTarget(request, SLANG_HLSL);
     int generatedTranslationUnitIndex = spAddTranslationUnit(request, SLANG_SOURCE_LANGUAGE_SLANG, "generatedUnit");
     spAddTranslationUnitSourceString(
@@ -67,7 +66,5 @@ SLANG_UNIT_TEST(translationUnitImport)
     
     spDestroyCompileRequest(request);
     spDestroySession(session);
-
-    File::remove("moduleG.slang");
 }
 

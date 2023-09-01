@@ -2,6 +2,7 @@
 #include "tools/unit-test/slang-unit-test.h"
 
 #include "../../source/core/slang-io.h"
+#include "../../source/core/slang-process.h"
 
 #include <atomic>
 #include <future>
@@ -10,7 +11,7 @@
 
 using namespace Slang;
 
-static const String fileName = Path::simplify(Path::getParentDirectory(Path::getExecutablePath()) + "/test_lock_file");
+static const String fileName = Path::simplify(Path::getParentDirectory(Path::getExecutablePath()) + "/test_lock_file" + String(Process::getId()));
 
 SLANG_UNIT_TEST(lockFileOpenClose)
 {
