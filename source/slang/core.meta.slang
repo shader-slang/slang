@@ -1447,6 +1447,7 @@ struct TextureTypeInfo
                     sb << i << "[__readNone]\n";
                 sb << i << returnType << " " << funcName << "(" << params << ");\n";
             }
+            sb << "\n";
         };
 
         const auto cat = [](const auto... xs) -> String{
@@ -2001,51 +2002,69 @@ struct TextureTypeInfo
                 )
             );
 
-            if (isReadOnly)
-                sb << "[__readNone]\n";
-            sb << "T Sample(" << samplerStateParam;
-            sb << "float" << base.coordCount + isArray << " location, ";
+            writeFunc(
+                "T",
+                "Sample",
+                cat(
+                    samplerStateParam,
+                    "float", base.coordCount + isArray, " location, ",
+                    baseShape != TextureFlavor::Shape::ShapeCube ? cat("constexpr int", base.coordCount, " offset, ") : "",
+                    "float clamp, out uint status"
+                )
+            );
+
+            writeFunc(
+                "T",
+                "SampleBias",
+                cat(
+                    samplerStateParam,
+                    "float", base.coordCount + isArray, " location, ",
+                    "float bias"
+                ),
+                "$ctexture($p, $2, $3)$z"
+            );
+
             if( baseShape != TextureFlavor::Shape::ShapeCube )
             {
-                sb << "constexpr int" << base.coordCount << " offset, ";
-            }
-            sb << "float clamp, out uint status);\n";
-
-            // `SampleBias()`
-            sb << "__target_intrinsic(glsl, \"$ctexture($p, $2, $3)$z\")\n";
-            if (isReadOnly)
-                sb << "[__readNone]\n";
-            sb << "T SampleBias(" << samplerStateParam;
-            sb << "float" << base.coordCount + isArray << " location, float bias);\n";
-
-            if( baseShape != TextureFlavor::Shape::ShapeCube )
-            {
-                sb << "__target_intrinsic(glsl, \"$ctextureOffset($p, $2, $3, $4)$z\")\n";
-                if (isReadOnly)
-                    sb << "[__readNone]\n";
-                sb << "T SampleBias(" << samplerStateParam;
-                sb << "float" << base.coordCount + isArray << " location, float bias, ";
-                sb << "constexpr int" << base.coordCount << " offset);\n";
+                writeFunc(
+                    "T",
+                    "SampleBias",
+                    cat(
+                        samplerStateParam,
+                        "float", base.coordCount + isArray, " location, ",
+                        "float bias, ",
+                        "constexpr int", base.coordCount, " offset"
+                    ),
+                    "$ctextureOffset($p, $2, $3, $4)$z"
+                );
             }
             int baseCoordCount = base.coordCount;
             int arrCoordCount = baseCoordCount + isArray;
             if (arrCoordCount <= 3)
             {
                 // `SampleCmp()` and `SampleCmpLevelZero`
-                sb << "__target_intrinsic(glsl, \"texture($p, vec" << arrCoordCount + 1 << "($2, $3))\")";
-                if (isReadOnly)
-                    sb << "[__readNone]\n";
-                sb << "float SampleCmp(SamplerComparisonState s, ";
-                sb << "float" << base.coordCount + isArray << " location, ";
-                sb << "float compareValue";
-                sb << ");\n";
-                sb << "__target_intrinsic(glsl, \"textureLod($p, vec" << arrCoordCount + 1 << "($2, $3), 0)\")";
-                if (isReadOnly)
-                    sb << "[__readNone]\n";
-                sb << "float SampleCmpLevelZero(SamplerComparisonState s, ";
-                sb << "float" << base.coordCount + isArray << " location, ";
-                sb << "float compareValue";
-                sb << ");\n";
+
+                writeFunc(
+                    "float",
+                    "SampleCmp",
+                    cat(
+                        "SamplerComparisonState s, ",
+                        "float", base.coordCount + isArray, " location, ",
+                        "float compareValue"
+                    ),
+                    cat("texture($p, vec", arrCoordCount + 1, "($2, $3))")
+                );
+
+                writeFunc(
+                    "float",
+                    "SampleCmpLevelZero",
+                    cat(
+                        "SamplerComparisonState s, ",
+                        "float", base.coordCount + isArray, " location, ",
+                        "float compareValue"
+                    ),
+                    cat("textureLod($p, vec", arrCoordCount + 1, "($2, $3), 0)")
+                );
             }
             if (arrCoordCount < 3)
             {
@@ -2086,7 +2105,6 @@ struct TextureTypeInfo
                 sb << ", vec" << baseCoordCount << "(0.0)";
                 sb << ")$z\")\n";
             }
-                    
 
             if( baseShape != TextureFlavor::Shape::ShapeCube )
             {
@@ -2096,57 +2114,75 @@ struct TextureTypeInfo
                 // saying they only exclude `offset` for cube maps (which makes
                 // sense). I'm going to assume the documentation for `SampleCmp`
                 // is just wrong.
-                sb << "__target_intrinsic(glsl, \"textureOffset($p, vec" << arrCoordCount + 1 << "($2, $3), $4)\")";
-                if (isReadOnly)
-                    sb << "[__readNone]\n";
-                sb << "float SampleCmp(SamplerComparisonState s, ";
-                sb << "float" << base.coordCount + isArray << " location, ";
-                sb << "float compareValue, ";
-                sb << "constexpr int" << base.coordCount << " offset);\n";
+                writeFunc(
+                    "float",
+                    "SampleCmp",
+                    cat(
+                        "SamplerComparisonState s, ",
+                        "float", base.coordCount + isArray, " location, ",
+                        "float compareValue, "
+                        "constexpr int", base.coordCount, " offset"
+                    ),
+                    cat("textureOffset($p, vec", arrCoordCount + 1, "($2, $3), $4)")
+                );
 
-                sb << "__target_intrinsic(glsl, \"textureLodOffset($p, vec" << arrCoordCount + 1 << "($2, $3), 0, $4)\")";
-                if (isReadOnly)
-                    sb << "[__readNone]\n";
-                sb << "float SampleCmpLevelZero(SamplerComparisonState s, ";
-                sb << "float" << base.coordCount + isArray << " location, ";
-                sb << "float compareValue, ";
-                sb << "constexpr int" << base.coordCount << " offset);\n";
+                writeFunc(
+                    "float",
+                    "SampleCmpLevelZero",
+                    cat(
+                        "SamplerComparisonState s, ",
+                        "float", base.coordCount + isArray, " location, ",
+                        "float compareValue, "
+                        "constexpr int", base.coordCount, " offset"
+                    ),
+                    cat("textureLodOffset($p, vec", arrCoordCount + 1, "($2, $3), 0, $4)")
+                );
             }
 
             // TODO(JS): Not clear how to map this to CUDA, because in HLSL, the gradient is a vector based on
             // the dimension. On CUDA there is texNDGrad, but it always just takes ddx, ddy.
             // I could just assume 0 for elements not supplied, and ignore z. For now will just leave                  
-            sb << "__target_intrinsic(glsl, \"$ctextureGrad($p, $2, $3, $4)$z\")\n";
-            if (isReadOnly)
-                sb << "[__readNone]\n";
-            sb << "T SampleGrad(" << samplerStateParam;
-            sb << "float" << base.coordCount + isArray << " location, ";
-            sb << "float" << base.coordCount << " gradX, ";
-            sb << "float" << base.coordCount << " gradY";
-            sb << ");\n";
+            writeFunc(
+                "T",
+                "SampleGrad",
+                cat(
+                    samplerStateParam,
+                    "float", base.coordCount + isArray, " location, ",
+                    "float", base.coordCount, " gradX, ",
+                    "float", base.coordCount, " gradY, "
+                ),
+                "$ctextureGrad($p, $2, $3, $4)$z"
+            );
 
             if( baseShape != TextureFlavor::Shape::ShapeCube )
             {
-                sb << "__target_intrinsic(glsl, \"$ctextureGradOffset($p, $2, $3, $4, $5)$z\")\n";
-                if (isReadOnly)
-                    sb << "[__readNone]\n";
-                sb << "T SampleGrad(" << samplerStateParam;
-                sb << "float" << base.coordCount + isArray << " location, ";
-                sb << "float" << base.coordCount << " gradX, ";
-                sb << "float" << base.coordCount << " gradY, ";
-                sb << "constexpr int" << base.coordCount << " offset);\n";
+                writeFunc(
+                    "T",
+                    "SampleGrad",
+                    cat(
+                        samplerStateParam,
+                        "float", base.coordCount + isArray, " location, ",
+                        "float", base.coordCount, " gradX, ",
+                        "float", base.coordCount, " gradY, ",
+                        "constexpr int", base.coordCount, " offset "
+                    ),
+                    "$ctextureGradOffset($p, $2, $3, $4, $5)$z"
+                );
 
-                sb << "__glsl_extension(GL_ARB_sparse_texture_clamp)";
-                sb << "__target_intrinsic(glsl, \"$ctextureGradOffsetClampARB($p, $2, $3, $4, $5, $6)$z\")\n";
-                if (isReadOnly)
-                    sb << "[__readNone]\n";
-                sb << "T SampleGrad(" << samplerStateParam;
-                sb << "float" << base.coordCount + isArray << " location, ";
-                sb << "float" << base.coordCount << " gradX, ";
-                sb << "float" << base.coordCount << " gradY, ";
-                sb << "constexpr int" << base.coordCount << " offset, ";
-                sb << "float lodClamp);\n";
-
+                sb << i << "__glsl_extension(GL_ARB_sparse_texture_clamp)\n";
+                writeFunc(
+                    "T",
+                    "SampleGrad",
+                    cat(
+                        samplerStateParam,
+                        "float", base.coordCount + isArray, " location, ",
+                        "float", base.coordCount, " gradX, ",
+                        "float", base.coordCount, " gradY, ",
+                        "constexpr int", base.coordCount, " offset, ",
+                        "float lodClamp"
+                    ),
+                    "$ctextureGradOffsetClampARB($p, $2, $3, $4, $5, $6)$z"
+                );
             }
 
             // `SampleLevel`
@@ -2219,13 +2255,17 @@ struct TextureTypeInfo
 
             if( baseShape != TextureFlavor::Shape::ShapeCube )
             {
-                sb << "__target_intrinsic(glsl, \"$ctextureLodOffset($p, $2, $3, $4)$z\")\n";
-                if (isReadOnly)
-                    sb << "[__readNone]\n";
-                sb << "T SampleLevel(" << samplerStateParam;
-                sb << "float" << base.coordCount + isArray << " location, ";
-                sb << "float level, ";
-                sb << "constexpr int" << base.coordCount << " offset);\n";
+                writeFunc(
+                    "T",
+                    "SampleLevel",
+                    cat(
+                        samplerStateParam,
+                        "float", base.coordCount + isArray, " location, ",
+                        "float level, ",
+                        "constexpr int", base.coordCount, " offset"
+                    ),
+                    "$ctextureLodOffset($p, $2, $3, $4)$z"
+                );
             }
         }
 
