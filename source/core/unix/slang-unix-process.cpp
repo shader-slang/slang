@@ -19,6 +19,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <process.h>
 
 #if SLANG_OSX
 #   include <signal.h>
@@ -647,6 +648,11 @@ closePipes:
         default: return SLANG_FAIL;
     }
     return SLANG_OK;
+}
+
+uint32_t Process::getId()
+{
+    return getpid();
 }
 
 } // namespace Slang

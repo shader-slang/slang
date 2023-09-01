@@ -403,43 +403,46 @@ namespace Slang
                 return info;
             }
 
-            switch (target->getTarget())
+            if (target->shouldEmitSPIRVDirectly())
             {
-            case CodeGenTarget::SPIRV:
-            case CodeGenTarget::SPIRVAssembly:
-                if (as<IRBoolType>(type))
+                switch (target->getTarget())
                 {
-                    // Bool is an abstract type in SPIRV, so we need to lower them into an int.
-                    info.loweredType = builder.getIntType();
-                    // Create unpack func.
+                case CodeGenTarget::SPIRV:
+                case CodeGenTarget::SPIRVAssembly:
+                    if (as<IRBoolType>(type))
                     {
-                        builder.setInsertAfter(type);
-                        info.convertLoweredToOriginal = builder.createFunc();
-                        builder.setInsertInto(info.convertLoweredToOriginal);
-                        builder.addNameHintDecoration(info.convertLoweredToOriginal, UnownedStringSlice("unpackStorage"));
-                        info.convertLoweredToOriginal->setFullType(builder.getFuncType(1, (IRType**)&info.loweredType, type));
-                        builder.emitBlock();
-                        auto loweredParam = builder.emitParam(info.loweredType);
-                        auto result = builder.emitCast(type, loweredParam);
-                        builder.emitReturn(result);
-                    }
+                        // Bool is an abstract type in SPIRV, so we need to lower them into an int.
+                        info.loweredType = builder.getIntType();
+                        // Create unpack func.
+                        {
+                            builder.setInsertAfter(type);
+                            info.convertLoweredToOriginal = builder.createFunc();
+                            builder.setInsertInto(info.convertLoweredToOriginal);
+                            builder.addNameHintDecoration(info.convertLoweredToOriginal, UnownedStringSlice("unpackStorage"));
+                            info.convertLoweredToOriginal->setFullType(builder.getFuncType(1, (IRType**)&info.loweredType, type));
+                            builder.emitBlock();
+                            auto loweredParam = builder.emitParam(info.loweredType);
+                            auto result = builder.emitCast(type, loweredParam);
+                            builder.emitReturn(result);
+                        }
 
-                    // Create pack func.
-                    {
-                        builder.setInsertAfter(info.convertLoweredToOriginal);
-                        info.convertOriginalToLowered = builder.createFunc();
-                        builder.setInsertInto(info.convertOriginalToLowered);
-                        builder.addNameHintDecoration(info.convertOriginalToLowered, UnownedStringSlice("packStorage"));
-                        info.convertOriginalToLowered->setFullType(builder.getFuncType(1, (IRType**)&type, info.loweredType));
-                        builder.emitBlock();
-                        auto param = builder.emitParam(type);
-                        auto result = builder.emitCast(info.loweredType, param);
-                        builder.emitReturn(result);
+                        // Create pack func.
+                        {
+                            builder.setInsertAfter(info.convertLoweredToOriginal);
+                            info.convertOriginalToLowered = builder.createFunc();
+                            builder.setInsertInto(info.convertOriginalToLowered);
+                            builder.addNameHintDecoration(info.convertOriginalToLowered, UnownedStringSlice("packStorage"));
+                            info.convertOriginalToLowered->setFullType(builder.getFuncType(1, (IRType**)&type, info.loweredType));
+                            builder.emitBlock();
+                            auto param = builder.emitParam(type);
+                            auto result = builder.emitCast(info.loweredType, param);
+                            builder.emitReturn(result);
+                        }
                     }
+                    break;
+                default:
+                    break;
                 }
-                break;
-            default:
-                break;
             }
 
             info.loweredType = type;

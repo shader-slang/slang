@@ -879,7 +879,11 @@ static Result _executeRPC(TestContext* context, SpawnType spawnType, const Unown
     }
 
     // Execute
-    SLANG_RETURN_ON_FAIL(rpcConnection->sendCall(method, rttiInfo, args));
+    if (SLANG_FAILED(rpcConnection->sendCall(method, rttiInfo, args)))
+    {
+        context->destroyRPCConnection();
+        return SLANG_FAIL;
+    }
 
     // Wait for the result
     rpcConnection->waitForResult(context->connectionTimeOutInMs);
@@ -893,12 +897,17 @@ static Result _executeRPC(TestContext* context, SpawnType spawnType, const Unown
 
     if (rpcConnection->getMessageType() != JSONRPCMessageType::Result)
     {
+        context->destroyRPCConnection();
         return SLANG_FAIL;
     }
 
     // Get the result
     TestServerProtocol::ExecutionResult exeRes;
-    SLANG_RETURN_ON_FAIL(rpcConnection->getMessage(&exeRes));
+    if (SLANG_FAILED(rpcConnection->getMessage(&exeRes)))
+    {
+        context->destroyRPCConnection();
+        return SLANG_FAIL;
+    }
 
     outRes.resultCode = exeRes.returnCode;
     outRes.standardError = exeRes.stdError;
@@ -1648,7 +1657,10 @@ TestResult runExecutableTest(TestContext* context, TestInput& input)
     // Just use shared library now, TestServer spawn mode seems to cause slangc to fail to find its own
     // executable path, and thus failed to find the `gfx.slang` file sitting along side `slangc.exe`.
     // We need to figure out what happened to `Path::getExecutablePath()` inside test-server.
-    TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, SpawnType::UseSharedLibrary, cmdLine, exeRes));
+    SpawnType slangcSpawnType = input.spawnType;
+    if (slangcSpawnType == SpawnType::UseTestServer)
+        slangcSpawnType = SpawnType::UseExe;
+    TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, slangcSpawnType, cmdLine, exeRes));
 
     String actualOutput;
 
@@ -1702,6 +1714,9 @@ TestResult runExecutableTest(TestContext* context, TestInput& input)
 
 TestResult runLanguageServerTest(TestContext* context, TestInput& input)
 {
+    // We don't support running language server tests in parallel yet.
+    std::lock_guard lock(context->mutex);
+
     if (!context->m_languageServerConnection)
     {
         if (SLANG_FAILED(context->createLanguageServerJSONRPCConnection(context->m_languageServerConnection)))
@@ -4072,6 +4087,42 @@ void getFilesInDirectory(String directoryPath, List<String>& files)
     }
 }
 
+template<typename F>
+void runTestsInParallel(TestContext* context, int count, const F& f)
+{
+    auto originalReporter = context->getTestReporter();
+    std::atomic<int> consumePtr;
+    consumePtr = 0;
+    auto threadFunc = [&](int threadId)
+    {
+        TestReporter reporter;
+        reporter.init(context->options.outputMode, context->options.expectedFailureList, true);
+        TestReporter::SuiteScope suiteScope(&reporter, "tests");
+        context->setThreadIndex(threadId);
+        context->setTestReporter(&reporter);
+        do
+        {
+            int index = consumePtr.fetch_add(1);
+            if (index >= count)
+                break;
+            f(index);
+        } while (true);
+        {
+            std::lock_guard<std::mutex> lock(context->mutex);
+            originalReporter->consolidateWith(&reporter);
+        }
+        context->setTestReporter(nullptr);
+    };
+    List<std::thread> threads;
+    for (int threadId = 0; threadId < context->options.serverCount; threadId++)
+    {
+        threads.add(std::thread(threadFunc, threadId));
+    }
+    for (auto& t : threads)
+        t.join();
+    context->setTestReporter(originalReporter);
+}
+
 void runTestsInDirectory(
     TestContext*		context,
     String				directoryPath)
@@ -4119,37 +4170,10 @@ void runTestsInDirectory(
     }
     else
     {
-        auto originalReporter = context->getTestReporter();
-        std::atomic<int> consumePtr;
-        consumePtr = 0;
-        auto threadFunc = [&](int threadId)
-        {
-            TestReporter reporter;
-            reporter.init(context->options.outputMode, context->options.expectedFailureList, true);
-            TestReporter::SuiteScope suiteScope(&reporter, "tests");
-            context->setThreadIndex(threadId);
-            context->setTestReporter(&reporter);
-            do
+        runTestsInParallel(context, (int)files.getCount(), [&](int index)
             {
-                int index = consumePtr.fetch_add(1);
-                if (index >= (int)files.getCount())
-                    break;
                 processFile(files[index]);
-            } while (true);
-            {
-                std::lock_guard<std::mutex> lock(context->mutex);
-                originalReporter->consolidateWith(&reporter);
-            }
-            context->setTestReporter(nullptr);
-        };
-        List<std::thread> threads;
-        for (int threadId = 0; threadId < context->options.serverCount; threadId++)
-        {
-            threads.add(std::thread(threadFunc, threadId));
-        }
-        for (auto& t : threads)
-            t.join();
-        context->setTestReporter(originalReporter);
+            });
     }
 }
 
@@ -4217,6 +4241,16 @@ static SlangResult runUnitTestModule(TestContext* context, TestOptions& testOpti
 
     auto testCount = testModule->getTestCount();
 
+    struct TestItem
+    {
+        UnitTestFunc testFunc;
+        String testName;
+        String command;
+    };
+
+    List<TestItem> tests;
+
+    // Discover all tests first.
     for (SlangInt i = 0; i < testCount; i++)
     {
         auto testFunc = testModule->getTestFunc(i);
@@ -4224,57 +4258,87 @@ static SlangResult runUnitTestModule(TestContext* context, TestOptions& testOpti
 
         StringBuilder filePath;
         filePath << moduleName << "/" << testName << ".internal";
+        auto command = filePath.produceString();
 
-        testOptions.command = filePath;
-
-        if (shouldRunTest(context, testOptions.command))
+        if (shouldRunTest(context, command))
         {
             if (testPassesCategoryMask(context, testOptions))
             {
-                if (spawnType == SpawnType::UseTestServer ||
-                    spawnType == SpawnType::UseFullyIsolatedTestServer)
-                {
-                    TestServerProtocol::ExecuteUnitTestArgs args;
-                    args.enabledApis = context->options.enabledApis;
-                    args.moduleName = moduleName;
-                    args.testName = testName;
-
-                    {
-                        TestReporter::TestScope scopeTest(reporter, testOptions.command);
-                        ExecuteResult exeRes;
-
-                        SlangResult rpcRes = _executeRPC(context, spawnType, TestServerProtocol::ExecuteUnitTestArgs::g_methodName, &args, exeRes);
-                        const auto testResult = _asTestResult(ToolReturnCode(exeRes.resultCode));
-
-                        // If the test fails, output any output - which might give information about individual tests that have failed.
-                        if (SLANG_FAILED(rpcRes) || testResult == TestResult::Fail)
-                        {
-                            String output = getOutput(exeRes);
-                            reporter->message(TestMessageType::TestFailure, output.getBuffer());
-                        }
-
-                        reporter->addResult(testResult);
-                    }
-                }
-                else
-                {
-                    TestReporter::TestScope scopeTest(reporter, testOptions.command);
-
-                    // TODO(JS): Problem here could be exception not handled properly across
-                    // shared library boundary. 
-
-                    try
-                    {
-                        testFunc(&unitTestContext);
-                    }
-                    catch (...)
-                    {
-                        reporter->message(TestMessageType::TestFailure, "Exception was thrown during execution");
-                        reporter->addResult(TestResult::Fail);
-                    }
-                }
+                tests.add(TestItem{ testFunc, testName, command });
             }
         }
+    }
+
+    auto runUnitTest = [&](TestItem test)
+    {
+        TestOptions options = testOptions;
+        options.command = test.command;
+
+        if (spawnType == SpawnType::UseTestServer ||
+            spawnType == SpawnType::UseFullyIsolatedTestServer)
+        {
+            TestServerProtocol::ExecuteUnitTestArgs args;
+            args.enabledApis = context->options.enabledApis;
+            args.moduleName = moduleName;
+            args.testName = test.testName;
+
+            {
+                TestReporter::TestScope scopeTest(reporter, options.command);
+                ExecuteResult exeRes;
+
+                SlangResult rpcRes = _executeRPC(context, spawnType, TestServerProtocol::ExecuteUnitTestArgs::g_methodName, &args, exeRes);
+                const auto testResult = _asTestResult(ToolReturnCode(exeRes.resultCode));
+
+                // If the test fails, output any output - which might give information about individual tests that have failed.
+                if (SLANG_FAILED(rpcRes) || testResult == TestResult::Fail)
+                {
+                    String output = getOutput(exeRes);
+                    reporter->message(TestMessageType::TestFailure, output.getBuffer());
+                }
+
+                reporter->addResult(testResult);
+            }
+        }
+        else
+        {
+            TestReporter::TestScope scopeTest(reporter, options.command);
+
+            // TODO(JS): Problem here could be exception not handled properly across
+            // shared library boundary. 
+
+            try
+            {
+                test.testFunc(&unitTestContext);
+            }
+            catch (...)
+            {
+                reporter->message(TestMessageType::TestFailure, "Exception was thrown during execution");
+                reporter->addResult(TestResult::Fail);
+            }
+        }
+    };
+
+    bool useMultiThread = false;
+    if (spawnType == SpawnType::UseTestServer ||
+        spawnType == SpawnType::UseFullyIsolatedTestServer)
+    {
+        if (context->options.serverCount > 1)
+        {
+            useMultiThread = true;
+        }
+    }
+
+    if (useMultiThread)
+    {
+        runTestsInParallel(context, (int)tests.getCount(), [&](int index)
+            {
+                runUnitTest(tests[index]);
+            });
+    }
+    else
+    {
+        for (auto t : tests)
+            runUnitTest(t);
     }
 
     testModule->destroy();

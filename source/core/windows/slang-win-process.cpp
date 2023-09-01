@@ -561,4 +561,10 @@ static const uint64_t g_frequency = _getClockFrequency();
     return counter.QuadPart;
 }
 
+uint32_t Process::getId()
+{
+    return _getpid();
+}
+
+
 } // namespace Slang
