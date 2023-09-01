@@ -5615,6 +5615,39 @@ namespace Slang
             paramDecl->type = typeExpr;
             checkMeshOutputDecl(paramDecl);
         }
+
+        if (auto declRefType = as<DeclRefType>(paramDecl->type.type))
+        {
+            if (declRefType->getDeclRef().getDecl()->findModifier<NonCopyableTypeAttribute>())
+            {
+                // Always pass a non-copyable type by reference.
+                // Remove all existing direction modifiers, and replace them with a single Ref modifier.
+                List<Modifier*> newModifiers;
+                bool hasRefModifier = false;
+                for (auto modifier : paramDecl->modifiers)
+                {
+                    if (as<InModifier>(modifier) || as<InOutModifier>(modifier) || as<OutModifier>(modifier))
+                    {
+                        continue;
+                    }
+                    if (as<RefModifier>(modifier))
+                    {
+                        hasRefModifier = true;
+                    }
+                    newModifiers.add(modifier);
+                }
+                if (!hasRefModifier)
+                    newModifiers.add(this->getASTBuilder()->create<RefModifier>());
+                paramDecl->modifiers.first = newModifiers.getFirst();
+                for (Index i = 0; i < newModifiers.getCount(); i++)
+                {
+                    if (i < newModifiers.getCount() - 1)
+                        newModifiers[i]->next = newModifiers[i + 1];
+                    else
+                        newModifiers[i]->next = nullptr;
+                }
+            }
+        }
     }
 
     // This checks that the declaration is marked as "out" and changes the hlsl

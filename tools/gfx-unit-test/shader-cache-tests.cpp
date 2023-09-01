@@ -7,7 +7,7 @@
 #include "source/core/slang-string-util.h"
 #include "source/core/slang-io.h"
 #include "source/core/slang-file-system.h"
-
+#include "source/core/slang-process.h"
 #include "gfx-test-texture-util.h"
 
 using namespace gfx;
@@ -112,9 +112,8 @@ namespace gfx_test
         {
             this->context = context;
             this->api = api;
-
-            testDirectory = Path::simplify(Path::getParentDirectory(Path::getExecutablePath()) + "/shader-cache-test");
-            cacheDirectory = Path::simplify(testDirectory + "/cache");
+            testDirectory = Path::simplify(Path::getParentDirectory(Path::getExecutablePath()) + "/shader-cache-test" + String(Process::getId()));
+            cacheDirectory = Path::simplify(testDirectory + "/cache" + String(Process::getId()));
 
             // Cleanup if there are stale files from a previously aborted test.
             removeDirectory(cacheDirectory);
