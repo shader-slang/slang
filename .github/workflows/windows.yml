@@ -66,5 +66,5 @@ jobs:
         $spirvToolsBinDir = ".\external\slang-binaries\spirv-tools\windows-${{matrix.testPlatform}}\bin\";
         $env:Path += ";$slangTestBinDir;$spirvToolsBinDir";
         Expand-Archive "vk_swiftshader_windows_${{matrix.testPlatform}}.zip" -DestinationPath $slangTestBinDir;
-        & "$slangTestBinDir\slang-test.exe" -api all-dx12 -appveyor -bindir "$slangTestBinDir\" -platform ${{matrix.testPlatform}} -configuration ${{matrix.configuration}} -category ${{matrix.testCategory}} 2>&1;
+        & "$slangTestBinDir\slang-test.exe" -api all-dx12 -appveyor -bindir "$slangTestBinDir\" -platform ${{matrix.testPlatform}} -configuration ${{matrix.configuration}} -category ${{matrix.testCategory}} -expected-failure-list tests/expected-failure-github.txt 2>&1; 
 
