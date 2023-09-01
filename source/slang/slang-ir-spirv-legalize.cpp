@@ -189,9 +189,22 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 }
                 for (auto use : uses)
                 {
-                    builder.setInsertBefore(use->getUser());
-                    auto loadedValue = builder.emitLoad(inst);
-                    use->set(loadedValue);
+                    if(const auto spirvAsmOperand = as<IRSPIRVAsmOperandInst>(use->user))
+                    {
+                        const auto asmBlock = spirvAsmOperand->getAsmBlock();
+                        builder.setInsertBefore(asmBlock);
+                        auto loadedValue = builder.emitLoad(inst);
+                        builder.setInsertBefore(spirvAsmOperand);
+                        auto loadedValueOperand = builder.emitSPIRVAsmOperandInst(loadedValue);
+                        spirvAsmOperand->replaceUsesWith(loadedValueOperand);
+                        spirvAsmOperand->removeAndDeallocate();
+                    }
+                    else
+                    {
+                        builder.setInsertBefore(use->getUser());
+                        auto loadedValue = builder.emitLoad(inst);
+                        use->set(loadedValue);
+                    }
                 }
             }
         }
