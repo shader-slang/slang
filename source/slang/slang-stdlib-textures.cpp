@@ -701,6 +701,55 @@ void TextureTypeInfo::writeSubscriptFunctions()
     }
 }
 
+static String cudaSampleIntrinsic(const bool isArray, const BaseTextureShapeInfo& base, bool sampleLevel)
+{
+    StringBuilder cudaBuilder;
+
+    TextureFlavor::Shape baseShape = base.baseShape;
+    const int coordCount = base.coordCount;
+    const int vecCount = coordCount + int(isArray);
+
+    if( baseShape != TextureFlavor::Shape::ShapeCube )
+    {
+        cudaBuilder << "tex" << coordCount << "D";
+        if (isArray)
+            cudaBuilder << "Layered";
+        if(sampleLevel)
+            cudaBuilder << "Lod";
+        cudaBuilder << "<$T0>($0";
+        for (int i = 0; i < coordCount; ++i)
+        {
+            cudaBuilder << ", ($2)";
+            if (vecCount > 1)
+            {
+                cudaBuilder << '.' << char(i + 'x');
+            }
+        }
+        if (isArray)
+            cudaBuilder << ", int(($2)." << char(coordCount + 'x') << ")";
+        if(sampleLevel)
+            cudaBuilder << ", $3";
+        cudaBuilder << ")";
+    }
+    else
+    {
+        cudaBuilder << "texCubemap";
+        if (isArray)
+            cudaBuilder << "Layered";
+        if(sampleLevel)
+            cudaBuilder << "Lod";
+        cudaBuilder << "<$T0>($0, ($2).x, ($2).y, ($2).z";
+        if (isArray)
+            cudaBuilder << ", int(($2).w)";
+        if(sampleLevel)
+            cudaBuilder << ", $3";
+        cudaBuilder << ")";
+    }
+
+    return cudaBuilder;
+}
+
+
 void TextureTypeInfo::writeSampleFunctions()
 {
     TextureFlavor::Shape baseShape = base.baseShape;
@@ -708,56 +757,12 @@ void TextureTypeInfo::writeSampleFunctions()
 
     // `Sample()`
 
-    // CUDA
-    StringBuilder cudaBuilder;
-    {
-        const int coordCount = base.coordCount;
-        const int vecCount = coordCount + int(isArray);
-
-        if( baseShape != TextureFlavor::Shape::ShapeCube )
-        {
-            cudaBuilder << "tex" << coordCount << "D";
-            if (isArray)
-            {
-                cudaBuilder << "Layered";
-            }
-            cudaBuilder << "<$T0>($0";
-            for (int i = 0; i < coordCount; ++i)
-            {
-                cudaBuilder << ", ($2)";
-                if (vecCount > 1)
-                {
-                    cudaBuilder << '.' << char(i + 'x');
-                }
-            }
-            if (isArray)
-            {
-                cudaBuilder << ", int(($2)." << char(coordCount + 'x') << ")";
-            }
-            cudaBuilder << ")";
-        }
-        else
-        {
-            cudaBuilder << "texCubemap";
-            if (isArray)
-            {
-                cudaBuilder << "Layered";
-            }
-            cudaBuilder << "<$T0>($0, ($2).x, ($2).y, ($2).z";
-            if (isArray)
-            {
-                cudaBuilder << ", int(($2).w)";
-            }
-            cudaBuilder << ")";
-        }
-    }
-
     writeFunc(
         "T",
         "Sample",
         cat(samplerStateParam, "float", base.coordCount + isArray, " location"),
         "$ctexture($p, $2)$z",
-        cudaBuilder
+        cudaSampleIntrinsic(isArray, base, false)
     );
 
     if( baseShape != TextureFlavor::Shape::ShapeCube )
@@ -929,49 +934,6 @@ void TextureTypeInfo::writeSampleFunctions()
 
 
     // CUDA
-    cudaBuilder.clear();
-    {
-        const int coordCount = base.coordCount;
-        const int vecCount = coordCount + int(isArray);
-
-        if( baseShape != TextureFlavor::Shape::ShapeCube )
-        {
-            cudaBuilder << "tex" << coordCount << "D";
-            if (isArray)
-            {
-                cudaBuilder << "Layered";
-            }
-            cudaBuilder << "Lod<$T0>($0";
-            for (int i = 0; i < coordCount; ++i)
-            {
-                cudaBuilder << ", ($2)";
-                if (vecCount > 1)
-                {
-                    cudaBuilder << '.' << char(i + 'x');
-                }
-            }
-            if (isArray)
-            {
-                cudaBuilder << ", int(($2)." << char(coordCount + 'x') << ")";
-            }
-            cudaBuilder << ", $3)";
-        }
-        else
-        {
-            cudaBuilder << "texCubemap";
-            if (isArray)
-            {
-                cudaBuilder << "Layered";
-            }
-            cudaBuilder << "Lod<$T0>($0, ($2).x, ($2).y, ($2).z";
-            if (isArray)
-            {
-                cudaBuilder << ", int(($2).w)";
-            }
-            cudaBuilder << ", $3)";
-        }
-    }
-
     // SPIR-V
     const auto spirv = false && prefixInfo.combined ? R"(
         %sampledImageType = OpTypeSampledImage $$This;
@@ -989,7 +951,7 @@ void TextureTypeInfo::writeSampleFunctions()
             "float level"
         ),
         "$ctextureLod($p, $2, $3)$z",
-        cudaBuilder,
+        cudaSampleIntrinsic(isArray, base, true),
         UnownedStringSlice{spirv}
     );
 
