@@ -798,6 +798,17 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
+    void processConstructor(IRInst* inst)
+    {
+        // If all of the operands to this instruction are global, we can hoist
+        // this constructor to be a global too
+        UIndex opIndex = 0;
+        for (auto operand = inst->getOperands(); opIndex < inst->getOperandCount(); operand++, opIndex++)
+            if(operand->get()->getParent() != m_module->getModuleInst())
+                return;
+        inst->insertAtEnd(m_module->getModuleInst());
+    }
+
     void processModule()
     {
         addToWorkList(m_module->getModuleInst());
@@ -850,6 +861,24 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             case kIROp_Switch:
                 processSwitch(as<IRSwitch>(inst));
                 break;
+
+            case kIROp_MakeVectorFromScalar:
+            case kIROp_MakeUInt64:
+            case kIROp_MakeVector:
+            case kIROp_MakeMatrix:
+            case kIROp_MakeMatrixFromScalar:
+            case kIROp_MatrixReshape:
+            case kIROp_MakeArray:
+            case kIROp_MakeArrayFromElement:
+            case kIROp_MakeStruct:
+            case kIROp_MakeTuple:
+            case kIROp_MakeTargetTuple:
+            case kIROp_MakeResultValue:
+            case kIROp_MakeResultError:
+            case kIROp_MakeOptionalValue:
+            case kIROp_MakeOptionalNone:
+                processConstructor(inst);
+
             default:
                 for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
                 {
