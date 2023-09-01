@@ -75,19 +75,19 @@ void TextureTypeInfo::writeFuncBody(
         if(glsl.getLength())
         {
             sb << i << "case glsl:\n";
-            sb << i << "__intrinsic_asm \"." << glsl << "\";\n";
+            sb << i << "__intrinsic_asm \"" << glsl << "\";\n";
         }
         if(cuda.getLength())
         {
             sb << i << "case cuda:\n";
-            sb << i << "__intrinsic_asm \"." << cuda << "\";\n";
+            sb << i << "__intrinsic_asm \"" << cuda << "\";\n";
         }
         if(spirv.getLength())
         {
             sb << i << "case spirv:\n";
             sb << i << "return spirv_asm\n";
             BraceScope spirvScope{i, sb, ";\n"};
-            sb << i << spirv << "\n";
+            sb << spirv << "\n";
         }
     }
 }
