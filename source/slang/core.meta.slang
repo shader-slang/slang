@@ -2066,45 +2066,6 @@ struct TextureTypeInfo
                     cat("textureLod($p, vec", arrCoordCount + 1, "($2, $3), 0)")
                 );
             }
-            if (arrCoordCount < 3)
-            {
-                int extCoordCount = arrCoordCount + 1;
-
-                if (extCoordCount < 3)
-                    extCoordCount = 3;
-
-                sb << "__target_intrinsic(glsl, \"$ctextureLod($p, ";
-
-                sb << "vec" << extCoordCount << "($2,";
-                for (int ii = arrCoordCount; ii < extCoordCount - 1; ++ii)
-                {
-                    sb << " 0.0,";
-                }
-                sb << "$3)";
-
-                sb << ", 0.0)$z\")\n";
-            }
-            else if(arrCoordCount <= 3)
-            {
-                int extCoordCount = arrCoordCount + 1;
-
-                if (extCoordCount < 3)
-                    extCoordCount = 3;
-
-                sb << "__target_intrinsic(glsl, \"$ctextureGrad($p, ";
-
-                sb << "vec" << extCoordCount << "($2,";
-                for (int ii = arrCoordCount; ii < extCoordCount - 1; ++ii)
-                {
-                    sb << " 0.0,";
-                }
-                sb << "$3)";
-
-                // Construct gradients
-                sb << ", vec" << baseCoordCount << "(0.0)";
-                sb << ", vec" << baseCoordCount << "(0.0)";
-                sb << ")$z\")\n";
-            }
 
             if( baseShape != TextureFlavor::Shape::ShapeCube )
             {
