@@ -4,6 +4,7 @@
 #include "slang-ir.h"
 #include "slang-syntax.h"
 #include "slang-ir-util.h"
+#include "slang-stdlib-textures.h"
 #include "../core/slang-string-util.h"
 
 #define STRINGIZE(x) STRINGIZE2(x)
