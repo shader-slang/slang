@@ -38,4 +38,4 @@ SLANG_TEST=${OUTPUTDIR}slang-test
 
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$OUTPUTDIR
 export PATH=$PATH:${OUTPUTDIR}
-${SLANG_TEST} -bindir ${OUTPUTDIR} -travis -category ${SLANG_TEST_CATEGORY} ${SLANG_TEST_FLAGS} -api all-vk -expected-failure-list tests/expected-failure-linux.txt
+${SLANG_TEST} -bindir ${OUTPUTDIR} -travis -category ${SLANG_TEST_CATEGORY} ${SLANG_TEST_FLAGS} -api all-vk -expected-failure-list tests/expected-failure-github.txt
