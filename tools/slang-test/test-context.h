@@ -159,8 +159,8 @@ class TestContext
         /// TODO(JS): We could split the stdlib compilation from other actions, and have timeout specific for
         /// that. To do this we could have a 'compileStdLib' RPC method.
         ///
-        /// Current default is 20 seconds.
-    Slang::Int connectionTimeOutInMs = 20 * 1000;
+        /// Current default is 60 seconds.
+    Slang::Int connectionTimeOutInMs = 60 * 1000;
 
     void setThreadIndex(int index);
     void setMaxTestRunnerThreadCount(int count);
