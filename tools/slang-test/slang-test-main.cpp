@@ -4229,10 +4229,6 @@ static SlangResult runUnitTestModule(TestContext* context, TestOptions& testOpti
     if (!testModule)
         return SLANG_FAIL;
 
-    auto reporter = TestReporter::get();
-
-    testModule->setTestReporter(reporter);
-
     UnitTestContext unitTestContext;
     unitTestContext.slangGlobalSession = context->getSession();
     unitTestContext.workDirectory = "";
@@ -4271,6 +4267,7 @@ static SlangResult runUnitTestModule(TestContext* context, TestOptions& testOpti
 
     auto runUnitTest = [&](TestItem test)
     {
+        auto reporter = context->getTestReporter();
         TestOptions options = testOptions;
         options.command = test.command;
 
@@ -4305,7 +4302,7 @@ static SlangResult runUnitTestModule(TestContext* context, TestOptions& testOpti
 
             // TODO(JS): Problem here could be exception not handled properly across
             // shared library boundary. 
-
+            testModule->setTestReporter(reporter);
             try
             {
                 test.testFunc(&unitTestContext);
@@ -4337,6 +4334,10 @@ static SlangResult runUnitTestModule(TestContext* context, TestOptions& testOpti
     }
     else
     {
+        auto reporter = TestReporter::get();
+
+        testModule->setTestReporter(reporter);
+
         for (auto t : tests)
             runUnitTest(t);
     }
