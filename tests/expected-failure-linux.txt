@@ -1,1 +1,0 @@
-tests/cpu-program/gfx-smoke.slang (cpu)
