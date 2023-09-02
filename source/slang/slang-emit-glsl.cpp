@@ -927,61 +927,6 @@ void GLSLSourceEmitter::emitLoopControlDecorationImpl(IRLoopControlDecoration* d
     }
 }
 
-void GLSLSourceEmitter::_emitInstAsVarInitializerImpl(IRInst* inst)
-{
-    // Some opcodes can be folded into a variable initialization
-    // by allowing the variable to be "default-constructed."
-    //
-    switch (inst->getOp())
-    {
-    case kIROp_AllocateOpaqueHandle:
-        //
-        // Note: semantically, we should only elide the initializer
-        // if `inst` is able to be folded here, since otherwise
-        // it could be a single allocation that is used to initialize
-        // multiple local variables (which should then alias the
-        // same location).
-        //
-        // However, since GlSL doesn't support assignment of opaque
-        // handle types, code will fail to compile downstream in
-        // the case where the initializer *doesn't* fold.
-        //
-        // The decision being made here should help ensure that we
-        // don't emit code that silently has different semantics
-        // than the input.
-        //
-        if (shouldFoldInstIntoUseSites(inst))
-        {
-            return;
-        }
-        break;
-
-    default:
-        break;
-    }
-
-    // We fall back to the default behavior for all targets,
-    // which is to emit `inst` as an initial-value expression
-    // after an `=`.
-    //
-    Super::_emitInstAsVarInitializerImpl(inst);
-}
-
-void GLSLSourceEmitter::_emitStoreImpl(IRStore* store)
-{
-    auto srcVal = store->getVal();
-    switch (srcVal->getOp())
-    {
-    default:
-        Super::_emitStoreImpl(store);
-        break;
-
-    case kIROp_AllocateOpaqueHandle:
-        break;
-    }
-
-}
-
 void GLSLSourceEmitter::_emitSpecialFloatImpl(IRType* type, const char* valueExpr)
 {
     if( type->getOp() != kIROp_FloatType )
@@ -2215,9 +2160,17 @@ void GLSLSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
 {
     if (auto refType = as<IRRefType>(type))
     {
-        _requireGLSLExtension(UnownedStringSlice("GL_EXT_spirv_intrinsics"));
-        m_writer->emit("spirv_by_reference ");
         type = refType->getValueType();
+
+        if (as<IRRayQueryType>(type) || as<IRHitObjectType>(type))
+        {
+            // GLSL will automatically pass these by reference, so we don't need to do anything.
+        }
+        else
+        {
+            _requireGLSLExtension(UnownedStringSlice("GL_EXT_spirv_intrinsics"));
+            m_writer->emit("spirv_by_reference ");
+        }
     }
     else if (auto spirvLiteralType = as<IRSPIRVLiteralType>(type))
     {

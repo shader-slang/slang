@@ -3769,6 +3769,32 @@ namespace Slang
         return CreateErrorExpr(expr);
     }
 
+    Expr* SemanticsExprVisitor::visitReturnValExpr(ReturnValExpr* expr)
+    {
+        auto scope = expr->scope;
+        if (scope)
+        {
+            auto parentFunc = as<CallableDecl>(getParentFunc(scope->containerDecl));
+            if (parentFunc)
+            {
+                if (as<ErrorType>(parentFunc->returnType.type))
+                {
+                    expr->type = parentFunc->returnType.type;
+                    return expr;
+                }
+                if (isNonCopyableType(parentFunc->returnType.type))
+                {
+                    expr->type.isLeftValue = true;
+                    expr->type.type = parentFunc->returnType.type;
+                    return expr;
+                }
+            }
+        }
+        getSink()->diagnose(expr, Diagnostics::returnValNotAvailable);
+        expr->type = getASTBuilder()->getErrorType();
+        return expr;
+    }
+
     Expr* SemanticsExprVisitor::visitAndTypeExpr(AndTypeExpr* expr)
     {
         // The left and right sides of an `&` for types must both be types.

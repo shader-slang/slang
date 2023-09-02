@@ -1136,31 +1136,6 @@ void HLSLSourceEmitter::_emitPrefixTypeAttr(IRAttr* attr)
     }
 }
 
-void HLSLSourceEmitter::_emitInstAsVarInitializerImpl(IRInst* inst)
-{
-    // Some opcodes can be folded into a variable initialization
-    // by allowing the variable to be "default-constructed."
-    //
-    switch (inst->getOp())
-    {
-    case kIROp_AllocateOpaqueHandle:
-        if (shouldFoldInstIntoUseSites(inst))
-        {
-            return;
-        }
-        break;
-
-    default:
-        break;
-    }
-
-    // We fall back to the default behavior for all targets,
-    // which is to emit `inst` as an initial-value expression
-    // after an `=`.
-    //
-    Super::_emitInstAsVarInitializerImpl(inst);
-}
-
 void HLSLSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
 {
     emitRateQualifiers(param);
