@@ -3450,7 +3450,7 @@ struct ExprLoweringContext
                 // which case we don't want to emit the result of the cast, but instead
                 // the source.
                 //
-                baseExpr = maybeIgnoreCastToInterface(baseExpr);
+                baseExpr = this->maybeIgnoreCastToInterface(baseExpr);
 
                 auto thisType = getThisParamTypeForCallable(context, funcDeclRef);
                 auto irThisType = lowerType(context, thisType);
@@ -3540,9 +3540,25 @@ struct ExprLoweringContext
 };
 
 template<typename Derived>
-struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>, public ExprLoweringContext<Derived>
+struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 {
     static bool isLValueContext() { return Derived::_isLValueContext(); }
+
+    ExprLoweringContext<Derived> sharedLoweringContext;
+
+    IRGenContext*& context;
+
+    ExprLoweringVisitorBase()
+        : context(sharedLoweringContext.context)
+    {
+    }
+
+    IRBuilder* getBuilder() { return context->irBuilder; }
+    ASTBuilder* getASTBuilder() { return context->astBuilder; }
+    LoweredValInfo lowerSubExpr(Expr* expr)
+    {
+        return sharedLoweringContext.lowerSubExpr(expr);
+    }
 
     LoweredValInfo lowerSubExprWithSubContext(Expr* expr, IRGenContext* subContext)
     {
@@ -3891,7 +3907,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>, pu
         auto loweredType = lowerType(context, expr->type);
 
         auto baseExpr = expr->baseExpression;
-        baseExpr = maybeIgnoreCastToInterface(baseExpr);
+        baseExpr = sharedLoweringContext.maybeIgnoreCastToInterface(baseExpr);
         auto loweredBase = lowerSubExpr(baseExpr);
 
         auto declRef = expr->declRef;
@@ -4357,7 +4373,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>, pu
 
     LoweredValInfo visitInvokeExpr(InvokeExpr* expr)
     {
-        return visitInvokeExprImpl(expr, LoweredValInfo(), TryClauseEnvironment());
+        return sharedLoweringContext.visitInvokeExprImpl(expr, LoweredValInfo(), TryClauseEnvironment());
     }
 
         /// Emit code for a `try` invoke.
@@ -4367,7 +4383,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>, pu
         assert(invokeExpr);
         TryClauseEnvironment tryEnv;
         tryEnv.clauseType = expr->tryClauseType;
-        return visitInvokeExprImpl(invokeExpr, LoweredValInfo(), tryEnv);
+        return sharedLoweringContext.visitInvokeExprImpl(invokeExpr, LoweredValInfo(), tryEnv);
     }
 
         /// Emit code to cast `value` to a concrete `superType` (e.g., a `struct`).
@@ -7561,7 +7577,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     {
         return Slang::getInterfaceRequirementKey(context, requirementDecl);
     }
-
+    
     LoweredValInfo visitAssocTypeDecl(AssocTypeDecl* decl)
     {
         SLANG_ASSERT(decl->parentDecl != nullptr);
