@@ -4620,7 +4620,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>, pu
         // based on the resulting values.
         //
         auto leftVal = lowerLValueExpr(context, expr->left);
-        assignExpr(context, leftVal, expr->right);
+        assignExpr(context, leftVal, expr->right, expr->loc);
 
         // The result value of the assignment expression is
         // the value of the left-hand side (and it is expected
@@ -4966,7 +4966,11 @@ struct DestinationDrivenRValueExprLoweringVisitor
 
     void visitInvokeExpr(InvokeExpr* expr)
     {
-        auto resultRVal = visitInvokeExprImpl(expr, destination, TryClauseEnvironment{});
+        LoweredValInfo resultRVal;
+        {
+            IRBuilderSourceLocRAII sourceLocInfo(context->irBuilder, expr->loc);
+            resultRVal = visitInvokeExprImpl(expr, destination, TryClauseEnvironment{});
+        }
         if (resultRVal.flavor != LoweredValInfo::Flavor::None)
         {
             // If we weren't able to fuse the destination write during lowering rvalue,
@@ -5016,8 +5020,6 @@ void lowerRValueExprWithDestination(
     LoweredValInfo destination,
     Expr* expr)
 {
-    IRBuilderSourceLocRAII sourceLocInfo(context->irBuilder, expr->loc);
-
     DestinationDrivenRValueExprLoweringVisitor visitor;
     visitor.context = context;
     visitor.destination = destination;
@@ -6268,9 +6270,11 @@ IRInst* getAddress(
 void assignExpr(
     IRGenContext* context,
     const LoweredValInfo& inLeft,
-    Expr* rightExpr)
+    Expr* rightExpr,
+    SourceLoc assignmentLoc)
 {
     auto left = tryGetAddress(context, inLeft, TryGetAddressMode::Default);
+    IRBuilderSourceLocRAII locRAII(context->irBuilder, assignmentLoc);
     switch (left.flavor)
     {
     case LoweredValInfo::Flavor::Ptr:
@@ -7545,7 +7549,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         if( auto initExpr = decl->initExpr )
         {
-            assignExpr(context, varVal, initExpr);
+            assignExpr(context, varVal, initExpr, decl->loc);
         }
 
         context->setGlobalValue(decl, varVal);

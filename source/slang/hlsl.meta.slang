@@ -8401,7 +8401,8 @@ struct HitObject
 
         attr = attributes;
 
-        return __glslMakeHit(
+        __glslMakeHit(
+            __return_val,
             AccelerationStructure,
             InstanceIndex,
             PrimitiveIndex,
@@ -8437,7 +8438,8 @@ struct HitObject
 
         attr = attributes;
 
-        return __glslMakeMotionHit(
+        __glslMakeMotionHit(
+            __return_val,
             AccelerationStructure,
             InstanceIndex,
             PrimitiveIndex,
@@ -8501,7 +8503,8 @@ struct HitObject
         __ref attr_t attr = __hitObjectAttributes<attr_t>();
         attr = attributes;
 
-        return __glslMakeHitWithIndex(
+        __glslMakeHitWithIndex(
+            __return_val,
             AccelerationStructure, 
             InstanceIndex,              ///? Same as instanceid ?
             GeometryIndex, 
@@ -8536,7 +8539,8 @@ struct HitObject
         __ref attr_t attr = __hitObjectAttributes<attr_t>();
         attr = attributes;
 
-        return __glslMakeMotionHitWithIndex(
+        __glslMakeMotionHitWithIndex(
+            __return_val,
             AccelerationStructure, 
             InstanceIndex,              ///? Same as instanceid ?
             GeometryIndex, 
@@ -8566,7 +8570,7 @@ struct HitObject
         uint MissShaderIndex, 
         RayDesc Ray)
     {
-        return __glslMakeMiss(MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax);
+        __glslMakeMiss(__return_val, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax);
     }
 
         /// See MakeMiss but handles Motion 
@@ -8578,7 +8582,7 @@ struct HitObject
         RayDesc Ray,
         float CurrentTime)
     {
-        return __glslMakeMotionMiss(MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax, CurrentTime);
+        __glslMakeMotionMiss(__return_val, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax, CurrentTime);
     }
 
         /// Creates a HitObject representing “NOP” (no operation) which is neither a hit nor a miss. Invoking a
@@ -8594,7 +8598,7 @@ struct HitObject
     __specialized_for_target(glsl)
     static HitObject MakeNop()
     {
-        return __glslMakeNop();
+        __glslMakeNop(__return_val);
     }
 
         /// Invokes closesthit or miss shading for the specified hit object. In case of a NOP HitObject, no
@@ -8628,18 +8632,21 @@ struct HitObject
     [__requiresNVAPI]
     __target_intrinsic(hlsl)
     __target_intrinsic(glsl, "hitObjectIsMissNV($0)")
+    __glsl_extension(GL_EXT_ray_tracing)
     bool IsMiss();
 
         /// Returns true if the HitObject encodes a hit, otherwise returns false.
     [__requiresNVAPI]
     __target_intrinsic(hlsl)
     __target_intrinsic(glsl, "hitObjectIsHitNV($0)")
+    __glsl_extension(GL_EXT_ray_tracing)
     bool IsHit();
 
         /// Returns true if the HitObject encodes a nop, otherwise returns false.
     [__requiresNVAPI]
     __target_intrinsic(hlsl)
     __target_intrinsic(glsl, "hitObjectIsEmptyNV($0)")
+    __glsl_extension(GL_EXT_ray_tracing)
     bool IsNop();
 
         /// Queries ray properties from HitObject. Valid if the hit object represents a hit or a miss.
@@ -8658,36 +8665,42 @@ struct HitObject
     [__requiresNVAPI]
     __target_intrinsic(hlsl)
     __target_intrinsic(glsl, "hitObjectGetShaderBindingTableRecordIndexNV($0)")
+    __glsl_extension(GL_EXT_ray_tracing)
     uint GetShaderTableIndex();
 
         /// Returns the instance index of a hit. Valid if the hit object represents a hit.
     [__requiresNVAPI]
     __target_intrinsic(hlsl)
     __target_intrinsic(glsl, "hitObjectGetInstanceCustomIndexNV($0)")
+    __glsl_extension(GL_EXT_ray_tracing)
     uint GetInstanceIndex();
 
         /// Returns the instance ID of a hit. Valid if the hit object represents a hit.
     [__requiresNVAPI]
     __target_intrinsic(hlsl)
     __target_intrinsic(glsl, "hitObjectGetInstanceIdNV($0)")
+    __glsl_extension(GL_EXT_ray_tracing)
     uint GetInstanceID();
 
         /// Returns the geometry index of a hit. Valid if the hit object represents a hit.
     [__requiresNVAPI]
     __target_intrinsic(hlsl)
     __target_intrinsic(glsl, "hitObjectGetGeometryIndexNV($0)")
+    __glsl_extension(GL_EXT_ray_tracing)
     uint GetGeometryIndex();
 
         /// Returns the primitive index of a hit. Valid if the hit object represents a hit.
     [__requiresNVAPI]
     __target_intrinsic(hlsl)
     __target_intrinsic(glsl, "hitObjectGetPrimitiveIndexNV($0)")
+    __glsl_extension(GL_EXT_ray_tracing)
     uint GetPrimitiveIndex();
 
         /// Returns the hit kind. Valid if the hit object represents a hit.
     [__requiresNVAPI]
     __target_intrinsic(hlsl)
     __target_intrinsic(glsl, "hitObjectGetHitKindNV($0)")
+    __glsl_extension(GL_EXT_ray_tracing)
     uint GetHitKind();
 
         /// Returns the attributes of a hit. Valid if the hit object represents a hit or a miss.
@@ -8769,8 +8782,10 @@ struct HitObject
 
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __glsl_extension(GL_EXT_ray_tracing)
-    __target_intrinsic(glsl, "hitObjectRecordMissNV($5, $0, $1, $2, $3, $4)")
-    static HitObject __glslMakeMiss(
+    __glsl_version(460)
+    __target_intrinsic(glsl, "hitObjectRecordMissNV")
+    static void __glslMakeMiss(
+        out HitObject hitObj,
         uint MissShaderIndex,
         float3 Origin,
         float TMin,
@@ -8781,8 +8796,10 @@ struct HitObject
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
-    __target_intrinsic(glsl, "hitObjectRecordMissNV($6, $0, $1, $2, $3, $4, $5)")
-    static HitObject __glslMakeMotionMiss(
+    __glsl_version(460)
+    __target_intrinsic(glsl, "hitObjectRecordMissMotionNV")
+    static void __glslMakeMotionMiss(
+        out HitObject hitObj,
         uint MissShaderIndex,
         float3 Origin,
         float TMin,
@@ -8792,8 +8809,8 @@ struct HitObject
 
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __glsl_extension(GL_EXT_ray_tracing)
-    __target_intrinsic(glsl, "hitObjectRecordEmptyNV($0)")
-    static HitObject __glslMakeNop();
+    __target_intrinsic(glsl, "hitObjectRecordEmptyNV")
+    static void __glslMakeNop(out HitObject hitObj);
 
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __target_intrinsic(glsl, "hitObjectGetObjectRayDirectionNV($0)")
@@ -8814,8 +8831,10 @@ struct HitObject
     // "void hitObjectRecordHitWithIndexNV(hitObjectNV, accelerationStructureEXT,int,int,int,uint,uint,vec3,float,vec3,float,int);"
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __glsl_extension(GL_EXT_ray_tracing)
-    __target_intrinsic(glsl, "hitObjectRecordHitWithIndexNV($11, $0, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10)")
-    static HitObject __glslMakeHitWithIndex(
+    __glsl_version(460)
+    __target_intrinsic(glsl, "hitObjectRecordHitWithIndexNV")
+    static void __glslMakeHitWithIndex(
+        out HitObject hitObj,
         RaytracingAccelerationStructure accelerationStructure,
         int instanceid,
         int primitiveid,
@@ -8832,8 +8851,9 @@ struct HitObject
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
-    __target_intrinsic(glsl, "hitObjectRecordHitWithIndexMotionNV($12, $0, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)")
-    static HitObject __glslMakeMotionHitWithIndex(
+    __target_intrinsic(glsl, "hitObjectRecordHitWithIndexMotionNV")
+    static void __glslMakeMotionHitWithIndex(
+        out HitObject hitObj,
         RaytracingAccelerationStructure accelerationStructure,
         int instanceid,
         int primitiveid,
@@ -8850,8 +8870,9 @@ struct HitObject
     // "void hitObjectRecordHitNV(hitObjectNV,accelerationStructureEXT,int,int,int,uint,uint,uint,vec3,float,vec3,float,int);"
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
-    __target_intrinsic(glsl, "hitObjectRecordHitNV($12, $0, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)")
-    static HitObject __glslMakeHit(
+    __target_intrinsic(glsl, "hitObjectRecordHitNV")
+    static void __glslMakeHit(
+        out HitObject hitObj,
         RaytracingAccelerationStructure accelerationStructure,
         int instanceid,
         int primitiveid,
@@ -8869,8 +8890,9 @@ struct HitObject
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
-    __target_intrinsic(glsl, "hitObjectRecordHitMotionNV($13, $0, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)")
-    static HitObject __glslMakeMotionHit(
+    __target_intrinsic(glsl, "hitObjectRecordHitMotionNV")
+    static void __glslMakeMotionHit(
+        out HitObject hitObj,
         RaytracingAccelerationStructure accelerationStructure,
         int instanceid,
         int primitiveid,

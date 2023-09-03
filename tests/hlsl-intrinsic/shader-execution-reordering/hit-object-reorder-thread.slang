@@ -1,7 +1,7 @@
 // hit-object-reorder-thread.slang
 
 //TEST:SIMPLE: -target dxil -entry rayGenerationMain -stage raygeneration -profile sm_6_5 -DNV_SHADER_EXTN_SLOT=u0
-//TEST:SIMPLE: -target glsl -entry rayGenerationMain -stage raygeneration -profile sm_6_5 -line-directive-mode none 
+//TEST:SIMPLE(filecheck=SPIRV): -target spirv -entry rayGenerationMain -stage raygeneration -profile sm_6_5 -line-directive-mode none 
 
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-d3d12 -output-using-type -use-dxil -profile sm_6_5 -render-feature ray-query
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-vk -output-using-type -render-feature ray-query
@@ -62,6 +62,7 @@ void rayGenerationMain()
     uint multiplierForGeometryContributionToHitGroupIndex = 4;
     uint missShaderIndex = 0;
 
+    // SPIRV: OpHitObjectTraceRayNV
     HitObject hit = HitObject::TraceRay(scene, 
         rayFlags, 
         instanceInclusionMask, 
@@ -70,42 +71,47 @@ void rayGenerationMain()
         missShaderIndex, 
         ray, 
         someValues);
-    
+
     uint r = calcValue(hit);
-    
+    // SPIRV: OpReorderThreadWithHitObjectNV
     ReorderThread( hit );
     
     // Change the payload
     SomeValues otherValues = { idx * -1, idx * 4.0f };
-    
+
     // Now Invoke to cast another ray, with the new payload
+    // SPIRV: OpHitObjectExecuteShaderNV
     HitObject::Invoke( scene, hit, otherValues );
     
     r += calcValue(hit);
   
     // !!! TODO(JS) !!!
     // NOTE! If I enable this I end up with a recursive failure in AST traversal, if 
-    // otherValues is redefined. 
-    
-    // Reorder 
+    // otherValues is redefined.
+
+    // Reorder
+    // SPIRV: OpReorderThreadWithHitObjectNV
     ReorderThread(hit, uint(idx & 3), 2);
 
     
     // Change the payload
     otherValues = { idx * -2, idx * 8.0f };
-    
+
     // Now Invoke to cast another ray, with the new payload
+    // SPIRV: OpHitObjectExecuteShaderNV
     HitObject::Invoke( scene, hit, otherValues );
     
     r += calcValue(hit);
 
-    // Reorder 
+    // Reorder
+    // SPIRV: OpReorderThreadWithHintNV
     ReorderThread(uint(idx & 1), 1);
     
     // Change the payload
     otherValues = { idx * -4, idx * 16.0f };
-    
+
     // Now Invoke to cast another ray, with the new payload
+    // SPIRV: OpHitObjectExecuteShaderNV
     HitObject::Invoke( scene, hit, otherValues );
     
     r += calcValue(hit);
