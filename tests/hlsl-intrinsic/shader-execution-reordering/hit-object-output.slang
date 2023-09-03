@@ -4,7 +4,7 @@
 // as function results (including `out` parameters)
 
 //TEST:SIMPLE: -target dxil -entry rayGenerationMain -stage raygeneration -profile sm_6_5 -DNV_SHADER_EXTN_SLOT=u0
-//TEST:SIMPLE: -target glsl -entry rayGenerationMain -stage raygeneration -profile sm_6_5 -line-directive-mode none 
+//TEST:SIMPLE(filecheck=SPIRV): -target spirv -entry rayGenerationMain -stage raygeneration -profile sm_6_5 -line-directive-mode none 
 
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-d3d12 -output-using-type -use-dxil -profile sm_6_5 -render-feature ray-query
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-vk -output-using-type -render-feature ray-query
@@ -57,7 +57,8 @@ HitObject myTraceRay(uint idx)
     uint multiplierForGeometryContributionToHitGroupIndex = 4;
     uint missShaderIndex = 0;
 
-    HitObject hit = HitObject::TraceRay(scene,
+    // SPIRV-DAG: OpHitObjectTraceRayNV
+    return HitObject::TraceRay(scene,
         rayFlags, 
         instanceInclusionMask, 
         rayContributionToHitGroupIndex, 
@@ -65,8 +66,6 @@ HitObject myTraceRay(uint idx)
         missShaderIndex, 
         ray, 
         payload);
-
-    return hit;
 }
 
 void copyHitObjectHandle(
@@ -94,16 +93,20 @@ void rayGenerationMain()
 
     accumulate(r, hit);
 
+#if 0 // cannot support this right now
     HitObject hit2;
     copyHitObjectHandle(hit2, hit);
 
     accumulate(r, hit2);
+#else
+    accumulate(r, hit);
 
-    HitObject hitBackup = hit;
+#endif
+
     myMakeMiss(idx, hit);
 
     accumulate(r, hit);
-    accumulate(r, hitBackup);
+    accumulate(r, hit);
 
     outputBuffer[idx] = r;
 }

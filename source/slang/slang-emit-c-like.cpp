@@ -1535,25 +1535,6 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     if(as<IRUnconditionalBranch>(user))
         return false;
 
-    // HACK: As a special case, an `allocateOpaqueHandle` operation should
-    // only be folded in if its only use is as the operand of a `store`
-    // that will *itself* get peephole merged in as the initial-value expression
-    // of a `var`:
-    //
-    if (inst->getOp() == kIROp_AllocateOpaqueHandle)
-    {
-        auto store = as<IRStore>(user);
-        if (!store) return false;
-        if (store->getVal() != inst) return false;
-
-        auto var = as<IRVar>(store->getPtr());
-        if (!var) return false;
-
-        if(var->getNextInst() != store) return false;
-
-        return true;
-    }
-
     // Okay, if we reach this point then the user comes later in
     // the same block, and there are no instructions with side
     // effects in between, so it seems safe to fold things in.
@@ -2003,7 +1984,6 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
 
     case kIROp_undefined:
     case kIROp_DefaultConstruct:
-    case kIROp_AllocateOpaqueHandle:
         m_writer->emit(getName(inst));
         break;
 
@@ -2676,11 +2656,7 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
         break;
 
     case kIROp_AllocateOpaqueHandle:
-        {
-            _emitAllocateOpaqueHandleImpl(inst);
-        }
         break;
-
     case kIROp_Var:
         {
             auto var = cast<IRVar>(inst);
@@ -2873,11 +2849,6 @@ void CLikeSourceEmitter::_emitInstAsDefaultInitializedVar(IRInst* inst, IRType* 
         break;
     }
     m_writer->emit(";\n");
-}
-
-void CLikeSourceEmitter::_emitAllocateOpaqueHandleImpl(IRInst* allocateInst)
-{
-    _emitInstAsDefaultInitializedVar(allocateInst, allocateInst->getDataType());
 }
 
 void CLikeSourceEmitter::emitSemanticsUsingVarLayout(IRVarLayout* varLayout)

@@ -1,7 +1,7 @@
 // hit-object-make-hit.slang
 
 //TEST:SIMPLE: -target dxil -entry rayGenerationMain -stage raygeneration -profile sm_6_5 -DNV_SHADER_EXTN_SLOT=u0 
-//TEST:SIMPLE: -target glsl -entry rayGenerationMain -stage raygeneration -profile sm_6_5 -line-directive-mode none 
+//TEST:SIMPLE(filecheck=SPIRV): -target spirv -entry rayGenerationMain -stage raygeneration -profile sm_6_5 -line-directive-mode none 
 
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-d3d12 -output-using-type -use-dxil -profile sm_6_5 -render-feature ray-query
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-vk -output-using-type -render-feature ray-query
@@ -18,8 +18,16 @@ struct SomeValues
     float b;
 };
 
+
 uint calcValue(HitObject hit)
 {
+    // SPIRV-DAG: OpHitObjectIsHitNV
+    // SPIRV: OpHitObjectGetInstanceCustomIndexNV
+    // SPIRV: OpHitObjectGetInstanceIdNV
+    // SPIRV: OpHitObjectGetGeometryIndexNV
+    // SPIRV: OpHitObjectGetPrimitiveIndexNV
+    // SPIRV: OpHitObjectGetHitKindNV
+    // SPIRV: OpHitObjectIsMissNV
     uint r = 0;
     
     if (hit.IsHit())
@@ -72,6 +80,7 @@ void rayGenerationMain()
 
     uint r = 0;
     {
+        // SPIRV-DAG: OpHitObjectRecordHitNV
         HitObject hit = HitObject::MakeHit(0, scene, idx, idx * 2, idx * 3, hitKind, ray, someValues);
         
         r = calcValue(hit);
