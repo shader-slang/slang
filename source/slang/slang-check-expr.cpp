@@ -1368,7 +1368,7 @@ namespace Slang
                 TypeCastIntVal::tryFoldImpl(m_astBuilder, targetBasicType, argVals[0], getSink()));
             if (foldVal)
                 return foldVal;
-            auto result = m_astBuilder->getOrCreate<TypeCastIntVal>(targetBasicType, argVals[0]);
+            auto result = m_astBuilder->getTypeCastIntVal(targetBasicType, argVals[0]);
             return result;
         }
         else
@@ -1594,7 +1594,7 @@ namespace Slang
                     TypeCastIntVal::tryFoldImpl(m_astBuilder, substType, val, getSink()));
                 if (foldVal)
                     return foldVal;
-                auto result = m_astBuilder->getOrCreate<TypeCastIntVal>(substType, val);
+                auto result = m_astBuilder->getTypeCastIntVal(substType, val);
                 return result;
             }
         }
@@ -2785,6 +2785,9 @@ namespace Slang
 
     Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr * expr)
     {
+        if (expr->type)
+            return expr;
+
         // Check the term we are applying first
         auto funcExpr = expr->functionExpr;
         funcExpr = CheckTerm(funcExpr);

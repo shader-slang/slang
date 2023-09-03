@@ -1292,7 +1292,6 @@ struct SPIRVEmitContext
                     SpvLiteralInteger::from32(stride));
                 return arrayType;
             }
-
         case kIROp_TextureType:
             {
                 const auto texTypeInst = as<IRTextureType>(inst);

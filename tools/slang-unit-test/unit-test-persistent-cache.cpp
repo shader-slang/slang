@@ -5,6 +5,7 @@
 #include "../../source/core/slang-io.h"
 #include "../../source/core/slang-file-system.h"
 #include "../../source/core/slang-random-generator.h"
+#include "../../source/core/slang-process.h"
 
 #include <chrono>
 #include <thread>
@@ -86,7 +87,7 @@ struct PersistentCacheTest
     PersistentCacheTest(Count maxEntryCount = 0)
     {
         osFileSystem = OSFileSystem::getMutableSingleton();
-        cacheDirectory = Path::simplify(Path::getParentDirectory(Path::getExecutablePath()) + "/persistent-cache-test");
+        cacheDirectory = Path::simplify(Path::getParentDirectory(Path::getExecutablePath()) + "/persistent-cache-test" + String(Process::getId()));
 
         removeCacheFiles();
 

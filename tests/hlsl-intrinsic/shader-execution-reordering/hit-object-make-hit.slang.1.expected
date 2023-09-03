@@ -5,6 +5,7 @@ standard output = {
 #version 460
 #extension GL_EXT_ray_tracing : require
 #extension GL_NV_shader_invocation_reorder : require
+#extension GL_EXT_spirv_intrinsics : require
 layout(row_major) uniform;
 layout(row_major) buffer;
 layout(binding = 0)
@@ -47,7 +48,7 @@ SomeValues_0 HitObject_GetAttributes_0(hitObjectNV this_1)
     return t_0;
 }
 
-uint calcValue_0(hitObjectNV hit_0)
+uint calcValue_0(spirv_by_reference hitObjectNV hit_0)
 {
     bool _S5 = (hitObjectIsHitNV((hit_0)));
     uint r_0;
@@ -99,11 +100,13 @@ void main()
     int _S14 = int(_S10);
     int _S15 = int(_S11);
     hitObjectRecordHitWithIndexNV(hitObj_0, scene_0, _S13, _S14, _S15, 0U, 0U, _S12.Origin_0, _S12.TMin_0, _S12.Direction_0, _S12.TMax_0, (0));
-    uint r_3 = calcValue_0(hitObj_0);
+    hitObjectNV hit_1 = hitObj_0;
+    uint r_3 = calcValue_0(hit_1);
     RayDesc_0 _S16 = ray_2;
     hitObjectNV hitObj_1;
     hitObjectRecordHitNV(hitObj_1, scene_0, _S13, _S15, _S14, 0U, 0U, 4U, _S16.Origin_0, _S16.TMin_0, _S16.Direction_0, _S16.TMax_0, (0));
-    uint _S17 = calcValue_0(hitObj_1);
+    hitObjectNV hit_2 = hitObj_1;
+    uint _S17 = calcValue_0(hit_2);
     outputBuffer_0._data[_S9] = r_3 + _S17;
     return;
 }

@@ -165,7 +165,9 @@ namespace Slang
             for (IRIntegerValue ii = 0; ii < count; ++ii)
             {
                 auto packedElement = builder.emitElementExtract(packedArray, ii);
-                auto originalElement = builder.emitCallInst(innerTypeInfo.originalType, innerTypeInfo.convertLoweredToOriginal, 1, &packedElement);
+                auto originalElement = innerTypeInfo.convertLoweredToOriginal
+                    ? builder.emitCallInst(innerTypeInfo.originalType, innerTypeInfo.convertLoweredToOriginal, 1, &packedElement)
+                    : packedElement;
                 args[(Index)ii] = originalElement;
             }
             auto result = builder.emitMakeArray(arrayType, (UInt)args.getCount(), args.getBuffer());
@@ -194,7 +196,9 @@ namespace Slang
             for (IRIntegerValue ii = 0; ii < count; ++ii)
             {
                 auto originalElement = builder.emitElementExtract(originalParam, ii);
-                auto packedElement = builder.emitCallInst(innerTypeInfo.loweredType, innerTypeInfo.convertOriginalToLowered, 1, &originalElement);
+                auto packedElement = innerTypeInfo.convertOriginalToLowered
+                    ? builder.emitCallInst(innerTypeInfo.loweredType, innerTypeInfo.convertOriginalToLowered, 1, &originalElement)
+                    : originalElement;
                 args[(Index)ii] = packedElement;
             }
             auto packedArray = builder.emitMakeArray(innerArrayType, (UInt)args.getCount(), args.getBuffer());
@@ -259,7 +263,7 @@ namespace Slang
                 auto arrayType = builder.getArrayType(
                     vectorType,
                     isColMajor?matrixType->getColumnCount():matrixType->getRowCount(),
-                    builder.getIntValue(builder.getIntType(), elementSizeAlignment.size));
+                    builder.getIntValue(builder.getIntType(), elementSizeAlignment.getStride()));
                 builder.createStructField(loweredType, structKey, arrayType);
 
                 info.loweredType = loweredType;
@@ -272,10 +276,16 @@ namespace Slang
             else if (auto arrayType = as<IRArrayType>(type))
             {
                 auto loweredInnerTypeInfo = getLoweredTypeInfo(arrayType->getElementType(), rules);
-                if (!loweredInnerTypeInfo.convertLoweredToOriginal)
+                // For spirv backend, we always want to lower all array types, even if the element type
+                // comes out the same. This is because different layout rules may have different array
+                // stride requirements.
+                if (!target->shouldEmitSPIRVDirectly())
                 {
-                    info.loweredType = type;
-                    return info;
+                    if (!loweredInnerTypeInfo.convertLoweredToOriginal)
+                    {
+                        info.loweredType = type;
+                        return info;
+                    }
                 }
                 auto loweredType = builder.createStructType();
                 info.loweredType = loweredType;
@@ -287,12 +297,12 @@ namespace Slang
                 auto structKey = builder.createStructKey();
                 builder.addNameHintDecoration(structKey, UnownedStringSlice("data"));
                 IRSizeAndAlignment elementSizeAlignment;
-                getSizeAndAlignment(rules, loweredType, &elementSizeAlignment);
+                getSizeAndAlignment(rules, loweredInnerTypeInfo.loweredType, &elementSizeAlignment);
                 elementSizeAlignment = rules->alignCompositeElement(elementSizeAlignment);
                 auto innerArrayType = builder.getArrayType(
                     loweredInnerTypeInfo.loweredType,
                     arrayType->getElementCount(),
-                    builder.getIntValue(builder.getIntType(), elementSizeAlignment.size));
+                    builder.getIntValue(builder.getIntType(), elementSizeAlignment.getStride()));
                 builder.createStructField(loweredType, structKey, innerArrayType);
                 info.loweredInnerArrayType = innerArrayType;
                 info.loweredInnerStructKey = structKey;
@@ -312,12 +322,19 @@ namespace Slang
                     if (loweredFieldTypeInfo.convertLoweredToOriginal || rules->ruleName != IRTypeLayoutRuleName::Natural)
                         isTrivial = false;
                 }
-                if (isTrivial)
-                {
-                    info.loweredType = type;
-                    return info;
-                }
 
+                // For spirv backend, we always want to lower all array types, even if the element type
+                // comes out the same. This is because different layout rules may have different array
+                // stride requirements.
+                if (!target->shouldEmitSPIRVDirectly())
+                {
+                    // For non-spirv target, we skip lowering this type if all field types are unchanged.
+                    if (isTrivial)
+                    {
+                        info.loweredType = type;
+                        return info;
+                    }
+                }
                 auto loweredType = builder.createStructType();
                 StringBuilder nameSB;
                 getTypeNameHint(nameSB, type);
@@ -386,43 +403,46 @@ namespace Slang
                 return info;
             }
 
-            switch (target->getTarget())
+            if (target->shouldEmitSPIRVDirectly())
             {
-            case CodeGenTarget::SPIRV:
-            case CodeGenTarget::SPIRVAssembly:
-                if (as<IRBoolType>(type))
+                switch (target->getTarget())
                 {
-                    // Bool is an abstract type in SPIRV, so we need to lower them into an int.
-                    info.loweredType = builder.getIntType();
-                    // Create unpack func.
+                case CodeGenTarget::SPIRV:
+                case CodeGenTarget::SPIRVAssembly:
+                    if (as<IRBoolType>(type))
                     {
-                        builder.setInsertAfter(type);
-                        info.convertLoweredToOriginal = builder.createFunc();
-                        builder.setInsertInto(info.convertLoweredToOriginal);
-                        builder.addNameHintDecoration(info.convertLoweredToOriginal, UnownedStringSlice("unpackStorage"));
-                        info.convertLoweredToOriginal->setFullType(builder.getFuncType(1, (IRType**)&info.loweredType, type));
-                        builder.emitBlock();
-                        auto loweredParam = builder.emitParam(info.loweredType);
-                        auto result = builder.emitCast(type, loweredParam);
-                        builder.emitReturn(result);
-                    }
+                        // Bool is an abstract type in SPIRV, so we need to lower them into an int.
+                        info.loweredType = builder.getIntType();
+                        // Create unpack func.
+                        {
+                            builder.setInsertAfter(type);
+                            info.convertLoweredToOriginal = builder.createFunc();
+                            builder.setInsertInto(info.convertLoweredToOriginal);
+                            builder.addNameHintDecoration(info.convertLoweredToOriginal, UnownedStringSlice("unpackStorage"));
+                            info.convertLoweredToOriginal->setFullType(builder.getFuncType(1, (IRType**)&info.loweredType, type));
+                            builder.emitBlock();
+                            auto loweredParam = builder.emitParam(info.loweredType);
+                            auto result = builder.emitCast(type, loweredParam);
+                            builder.emitReturn(result);
+                        }
 
-                    // Create pack func.
-                    {
-                        builder.setInsertAfter(info.convertLoweredToOriginal);
-                        info.convertOriginalToLowered = builder.createFunc();
-                        builder.setInsertInto(info.convertOriginalToLowered);
-                        builder.addNameHintDecoration(info.convertOriginalToLowered, UnownedStringSlice("packStorage"));
-                        info.convertOriginalToLowered->setFullType(builder.getFuncType(1, (IRType**)&type, info.loweredType));
-                        builder.emitBlock();
-                        auto param = builder.emitParam(type);
-                        auto result = builder.emitCast(info.loweredType, param);
-                        builder.emitReturn(result);
+                        // Create pack func.
+                        {
+                            builder.setInsertAfter(info.convertLoweredToOriginal);
+                            info.convertOriginalToLowered = builder.createFunc();
+                            builder.setInsertInto(info.convertOriginalToLowered);
+                            builder.addNameHintDecoration(info.convertOriginalToLowered, UnownedStringSlice("packStorage"));
+                            info.convertOriginalToLowered->setFullType(builder.getFuncType(1, (IRType**)&type, info.loweredType));
+                            builder.emitBlock();
+                            auto param = builder.emitParam(type);
+                            auto result = builder.emitCast(info.loweredType, param);
+                            builder.emitReturn(result);
+                        }
                     }
+                    break;
+                default:
+                    break;
                 }
-                break;
-            default:
-                break;
             }
 
             info.loweredType = type;

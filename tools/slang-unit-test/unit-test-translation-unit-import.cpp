@@ -8,6 +8,7 @@
 #include "tools/unit-test/slang-unit-test.h"
 #include "../../slang-com-ptr.h"
 #include "../../source/core/slang-io.h"
+#include "../../source/core/slang-process.h"
 
 using namespace Slang;
 
@@ -31,8 +32,7 @@ SLANG_UNIT_TEST(translationUnitImport)
         )";
 
     // Source for a module that transitively uses the generated source via a file.
-    const char* userSource = R"(
-        import moduleG;
+    const char* userSourceBody = R"(
         [shader("compute")]
         [numthreads(4,1,1)]
         void computeMain(
@@ -42,11 +42,12 @@ SLANG_UNIT_TEST(translationUnitImport)
             buffer[sv_dispatchThreadID.x] = g();
         })";
 
-    
+    auto moduleName = "moduleG" + String(Process::getId());
+    String userSource = "import " + moduleName + ";\n" + userSourceBody;
     auto session = spCreateSession();
     auto request = spCreateCompileRequest(session);
 
-    File::writeAllText("moduleG.slang", fileSource);
+    File::writeAllText(moduleName + ".slang", fileSource);
 
     spAddCodeGenTarget(request, SLANG_HLSL);
     int generatedTranslationUnitIndex = spAddTranslationUnit(request, SLANG_SOURCE_LANGUAGE_SLANG, "generatedUnit");
@@ -55,7 +56,7 @@ SLANG_UNIT_TEST(translationUnitImport)
 
     int entryPointTranslationUnitIndex = spAddTranslationUnit(request, SLANG_SOURCE_LANGUAGE_SLANG, "userUnit");
     spAddTranslationUnitSourceString(
-        request, entryPointTranslationUnitIndex, "userFile", userSource);
+        request, entryPointTranslationUnitIndex, "userFile", userSource.getUnownedSlice().begin());
     spAddEntryPoint(request, entryPointTranslationUnitIndex, "computeMain", SLANG_STAGE_COMPUTE);
 
     auto compileResult = spCompile(request);
@@ -67,7 +68,6 @@ SLANG_UNIT_TEST(translationUnitImport)
     
     spDestroyCompileRequest(request);
     spDestroySession(session);
-
-    File::remove("moduleG.slang");
+    File::remove(moduleName + ".slang");
 }
 

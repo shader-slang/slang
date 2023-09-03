@@ -649,4 +649,9 @@ closePipes:
     return SLANG_OK;
 }
 
+uint32_t Process::getId()
+{
+    return getpid();
+}
+
 } // namespace Slang

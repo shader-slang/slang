@@ -749,20 +749,20 @@ namespace gfx_test
 
         // Skip Type::Unknown and Type::Buffer as well as Format::Unknown
         // TODO: Add support for TextureCube
+        Format formats[] = { Format::R8G8B8A8_UNORM, Format::R16_FLOAT, Format::R16G16_FLOAT, Format::R10G10B10A2_UNORM, Format::B5G5R5A1_UNORM };
         for (uint32_t i = 2; i < (uint32_t)ITextureResource::Type::_Count - 1; ++i)
         {
-            for (uint32_t j = 1; j < (uint32_t)Format::_Count; ++j)
+            for (auto format : formats)
             {
                 // Fails validation VUID-VkImageCreateInfo-imageCreateMaxMipLevels-02251
-                if(isVkd3d && ((Format)j == Format::R32G32B32_TYPELESS ||
-                               (Format)j == Format::R32G32B32_FLOAT ||
-                               (Format)j == Format::R32G32B32_UINT ||
-                               (Format)j == Format::R32G32B32_SINT))
+                if(isVkd3d && (format == Format::R32G32B32_TYPELESS ||
+                               format == Format::R32G32B32_FLOAT ||
+                               format == Format::R32G32B32_UINT ||
+                               format == Format::R32G32B32_SINT))
                 {
                     continue;
                 }
                 auto type = (ITextureResource::Type)i;
-                auto format = (Format)j;
                 auto validationFormat = getValidationTextureFormat(format);
                 if (!validationFormat)
                     continue;

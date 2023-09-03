@@ -5,6 +5,7 @@ standard output = {
 #version 460
 #extension GL_EXT_ray_tracing : require
 #extension GL_NV_shader_invocation_reorder : require
+#extension GL_EXT_spirv_intrinsics : require
 layout(row_major) uniform;
 layout(row_major) buffer;
 layout(binding = 0)
@@ -37,7 +38,7 @@ SomeValues_0 HitObject_GetAttributes_0(hitObjectNV this_0)
     return t_0;
 }
 
-uint calcValue_0(hitObjectNV hit_0)
+uint calcValue_0(spirv_by_reference hitObjectNV hit_0)
 {
     bool _S1 = (hitObjectIsHitNV((hit_0)));
     uint r_0;
@@ -57,7 +58,7 @@ uint calcValue_0(hitObjectNV hit_0)
     return r_0;
 }
 
-void HitObject_Invoke_0(accelerationStructureEXT AccelerationStructure_0, hitObjectNV HitOrMiss_0, inout SomeValues_0 Payload_0)
+void HitObject_Invoke_0(accelerationStructureEXT AccelerationStructure_0, spirv_by_reference hitObjectNV HitOrMiss_0, inout SomeValues_0 Payload_0)
 {
     p_0 = Payload_0;
     hitObjectExecuteShaderNV(HitOrMiss_0, (0));
@@ -91,28 +92,29 @@ void main()
     p_1.a_0 = idx_0;
     p_1.b_0 = _S5;
     hitObjectTraceRayNV(hitObj_0, scene_0, 20U, 255U, 0U, 4U, 0U, _S6.Origin_0, _S6.TMin_0, _S6.Direction_0, _S6.TMax_0, (1));
-    uint r_1 = calcValue_0(hitObj_0);
-    reorderThreadNV(hitObj_0);
+    hitObjectNV hit_1 = hitObj_0;
+    uint r_1 = calcValue_0(hit_1);
+    reorderThreadNV(hit_1);
     float _S7 = _S4 * 4.0;
     SomeValues_0 otherValues_0;
     otherValues_0.a_0 = idx_0 * -1;
     otherValues_0.b_0 = _S7;
-    HitObject_Invoke_0(scene_0, hitObj_0, otherValues_0);
-    uint _S8 = calcValue_0(hitObj_0);
+    HitObject_Invoke_0(scene_0, hit_1, otherValues_0);
+    uint _S8 = calcValue_0(hit_1);
     uint r_2 = r_1 + _S8;
-    reorderThreadNV(hitObj_0, uint(idx_0 & 3), 2U);
+    reorderThreadNV(hit_1, uint(idx_0 & 3), 2U);
     float _S9 = _S4 * 8.0;
     otherValues_0.a_0 = idx_0 * -2;
     otherValues_0.b_0 = _S9;
-    HitObject_Invoke_0(scene_0, hitObj_0, otherValues_0);
-    uint _S10 = calcValue_0(hitObj_0);
+    HitObject_Invoke_0(scene_0, hit_1, otherValues_0);
+    uint _S10 = calcValue_0(hit_1);
     uint r_3 = r_2 + _S10;
     reorderThreadNV(uint(idx_0 & 1), 1U);
     float _S11 = _S4 * 16.0;
     otherValues_0.a_0 = idx_0 * -4;
     otherValues_0.b_0 = _S11;
-    HitObject_Invoke_0(scene_0, hitObj_0, otherValues_0);
-    uint _S12 = calcValue_0(hitObj_0);
+    HitObject_Invoke_0(scene_0, hit_1, otherValues_0);
+    uint _S12 = calcValue_0(hit_1);
     outputBuffer_0._data[uint(idx_0)] = r_3 + _S12;
     return;
 }

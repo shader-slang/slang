@@ -5,6 +5,7 @@ standard output = {
 #version 460
 #extension GL_EXT_ray_tracing : require
 #extension GL_NV_shader_invocation_reorder : require
+#extension GL_EXT_spirv_intrinsics : require
 layout(row_major) uniform;
 layout(row_major) buffer;
 layout(binding = 0)
@@ -33,7 +34,7 @@ SomeValues_0 HitObject_GetAttributes_0(hitObjectNV this_0)
     return t_0;
 }
 
-uint calcValue_0(hitObjectNV hit_0)
+uint calcValue_0(spirv_by_reference hitObjectNV hit_0)
 {
     bool _S1 = (hitObjectIsHitNV((hit_0)));
     uint r_0;
@@ -79,8 +80,9 @@ void main()
     p_0.a_0 = idx_0;
     p_0.b_0 = _S5;
     hitObjectTraceRayNV(hitObj_0, scene_0, 20U, 255U, 0U, 4U, 0U, _S6.Origin_0, _S6.TMin_0, _S6.Direction_0, _S6.TMax_0, (0));
+    hitObjectNV hit_1 = hitObj_0;
     uint _S7 = uint(idx_0);
-    uint _S8 = calcValue_0(hitObj_0);
+    uint _S8 = calcValue_0(hit_1);
     outputBuffer_0._data[_S7] = _S8;
     return;
 }

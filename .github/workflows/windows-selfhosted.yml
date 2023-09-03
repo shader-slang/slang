@@ -41,11 +41,11 @@ jobs:
       run: |
         $ErrorActionPreference = "SilentlyContinue"
         $env:Path += ';.\external\slang-binaries\spirv-tools\windows-${{matrix.testPlatform}}\bin\'
-        .\bin\windows-${{matrix.testPlatform}}\${{matrix.configuration}}\slang-test.exe tests/ -use-test-server -emit-spirv-directly -expected-failure-list tests/expected-failure.txt -api vk
+        .\bin\windows-${{matrix.testPlatform}}\${{matrix.configuration}}\slang-test.exe tests/ -use-test-server -server-count 8 -emit-spirv-directly -expected-failure-list tests/expected-failure.txt -api vk
       
     - name: test
       run: |
         $ErrorActionPreference = "SilentlyContinue"
         $env:Path += ';.\external\slang-binaries\spirv-tools\windows-${{matrix.testPlatform}}\bin\'
-        .\bin\windows-${{matrix.testPlatform}}\${{matrix.configuration}}\slang-test.exe -use-test-server -api all-cpu
+        .\bin\windows-${{matrix.testPlatform}}\${{matrix.configuration}}\slang-test.exe -use-test-server -server-count 8 -api all-cpu
       

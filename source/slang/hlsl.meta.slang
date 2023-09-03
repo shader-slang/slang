@@ -118,10 +118,22 @@ struct ByteAddressBuffer
 // We have separate int/float implementations, as the float version requires some specific extensions
 // https://www.khronos.org/registry/OpenGL/extensions/NV/NV_shader_atomic_float.txt
 
-__target_intrinsic(glsl, "atomicAdd($0, $1)")
 __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_float)
-float __atomicAdd(__ref float value, float amount);
+float __atomicAdd(__ref float value, float amount)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "atomicAdd($0, $1)";
+    case spirv:
+        return spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_atomic_float_add";
+            OpCapability AtomicFloat32AddEXT;
+            result:$$float = OpAtomicFAddEXT &value Device None $amount
+        };
+    }
+}
 
 // Helper for hlsl, using NVAPI
 __target_intrinsic(hlsl, "NvInterlockedAddUint64($0, $1, $2)")
@@ -137,23 +149,66 @@ void __atomicAdd(RWByteAddressBuffer buf, uint offset, uint64_t value, out uint6
 // Int versions require glsl 4.30
 // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/atomicAdd.xhtml
 
-__target_intrinsic(glsl, "atomicAdd($0, $1)")
 __glsl_version(430)
-int __atomicAdd(__ref int value, int amount);
+int __atomicAdd(__ref int value, int amount)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "atomicAdd($0, $1)";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$int = OpAtomicIAdd &value Device None $amount;
+        };
+    }
+}
 
-__target_intrinsic(glsl, "atomicAdd($0, $1)")
 __glsl_version(430)
-uint __atomicAdd(__ref uint value, uint amount);
+uint __atomicAdd(__ref uint value, uint amount)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "atomicAdd($0, $1)";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$uint = OpAtomicIAdd &value Device None $amount;
+        };
+    }
+}
+
+__glsl_version(430)
+__glsl_extension(GL_EXT_shader_atomic_int64)
+int64_t __atomicAdd(__ref int64_t value, int64_t amount)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "atomicAdd($0, $1)";
+    case spirv:
+        return spirv_asm
+        {
+            OpCapability Int64Atomics;
+            result:$$int64_t = OpAtomicIAdd &value Device None $amount
+        };
+    }
+}
 
 __target_intrinsic(glsl, "atomicAdd($0, $1)")
 __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_int64)
-int64_t __atomicAdd(__ref int64_t value, int64_t amount);
-
-__target_intrinsic(glsl, "atomicAdd($0, $1)")
-__glsl_version(430)
-__glsl_extension(GL_EXT_shader_atomic_int64)
-uint64_t __atomicAdd(__ref uint64_t value, uint64_t amount);
+uint64_t __atomicAdd(__ref uint64_t value, uint64_t amount)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "atomicAdd($0, $1)";
+    case spirv:
+        return spirv_asm
+        {
+            OpCapability Int64Atomics;
+            result:$$uint64_t = OpAtomicIAdd &value Device None $amount
+        };
+    }
+}
 
 // Cas - Compare and swap
 
@@ -169,15 +224,37 @@ void __cas(RWByteAddressBuffer buf, uint offset, in int64_t compare_value, in in
 __target_intrinsic(hlsl, "$0.InterlockedCompareExchange64($1, $2, $3, $4)")
 void __cas(RWByteAddressBuffer buf, uint offset, in uint64_t compare_value, in uint64_t value, out uint64_t original_value);
 
-__target_intrinsic(glsl, "atomicCompSwap($0, $1, $2)")
 __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_int64)
-uint64_t __cas(__ref int64_t ioValue, int64_t compareValue, int64_t newValue);
+int64_t __cas(__ref int64_t ioValue, int64_t compareValue, int64_t newValue)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "atomicCompSwap($0, $1, $2)";
+    case spirv:
+        return spirv_asm
+        {
+            OpCapability Int64Atomics;
+            result:$$int64_t = OpAtomicCompareExchange &ioValue Device None None $newValue $compareValue
+        };
+    }
+}
 
-__target_intrinsic(glsl, "atomicCompSwap($0, $1, $2)")
 __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_int64)
-uint64_t __cas(__ref uint64_t ioValue, uint64_t compareValue, uint64_t newValue);
+uint64_t __cas(__ref uint64_t ioValue, uint64_t compareValue, uint64_t newValue)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "atomicCompSwap($0, $1, $2)";
+    case spirv:
+        return spirv_asm
+        {
+            OpCapability Int64Atomics;
+            result:$$uint64_t = OpAtomicCompareExchange &ioValue Device None None $newValue $compareValue
+        };
+    }
+}
 
 // Max
 
@@ -185,10 +262,21 @@ __target_intrinsic(hlsl, "NvInterlockedMaxUint64($0, $1, $2)")
 [__requiresNVAPI]
 uint2 __atomicMax(RWByteAddressBuffer buf, uint offset, uint2 value);
 
-__target_intrinsic(glsl, "atomicMax($0, $1)")
 __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_int64)
-uint64_t __atomicMax(__ref uint64_t ioValue, uint64_t value);
+uint64_t __atomicMax(__ref uint64_t ioValue, uint64_t value)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "atomicMax($0, $1)";
+    case spirv:
+        return spirv_asm
+        {
+            OpCapability Int64Atomics;
+            result:$$uint64_t = OpAtomicUMax &ioValue Device None $value
+        };
+    }
+}
 
 // Min
 
@@ -196,10 +284,21 @@ __target_intrinsic(hlsl, "NvInterlockedMinUint64($0, $1, $2)")
 [__requiresNVAPI]
 uint2 __atomicMin(RWByteAddressBuffer buf, uint offset, uint2 value);
 
-__target_intrinsic(glsl, "atomicMin($0, $1)")
 __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_int64)
-uint64_t __atomicMin(__ref uint64_t ioValue, uint64_t value);
+uint64_t __atomicMin(__ref uint64_t ioValue, uint64_t value)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "atomicMin($0, $1)";
+    case spirv:
+        return spirv_asm
+        {
+            OpCapability Int64Atomics;
+            result:$$uint64_t = OpAtomicUMin &ioValue Device None $value
+        };
+    }
+}
 
 // And
 
@@ -207,10 +306,21 @@ __target_intrinsic(hlsl, "NvInterlockedAndUint64($0, $1, $2)")
 [__requiresNVAPI]
 uint2 __atomicAnd(RWByteAddressBuffer buf, uint offset, uint2 value);
 
-__target_intrinsic(glsl, "atomicAnd($0, $1)")
 __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_int64)
-uint64_t __atomicAnd(__ref uint64_t ioValue, uint64_t value);
+uint64_t __atomicAnd(__ref uint64_t ioValue, uint64_t value)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "atomicAnd($0, $1)";
+    case spirv:
+        return spirv_asm
+        {
+            OpCapability Int64Atomics;
+            result:$$uint64_t = OpAtomicAnd &ioValue Device None $value
+        };
+    }
+}
 
 // Or
 
@@ -218,10 +328,21 @@ __target_intrinsic(hlsl, "NvInterlockedOrUint64($0, $1, $2)")
 [__requiresNVAPI]
 uint2 __atomicOr(RWByteAddressBuffer buf, uint offset, uint2 value);
 
-__target_intrinsic(glsl, "atomicOr($0, $1)")
 __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_int64)
-uint64_t __atomicOr(__ref uint64_t ioValue, uint64_t value);
+uint64_t __atomicOr(__ref uint64_t ioValue, uint64_t value)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "atomicOr($0, $1)";
+    case spirv:
+        return spirv_asm
+        {
+            OpCapability Int64Atomics;
+            result:$$uint64_t = OpAtomicOr &ioValue Device None $value
+        };
+    }
+}
 
 // Xor
 
@@ -229,10 +350,21 @@ __target_intrinsic(hlsl, "NvInterlockedXorUint64($0, $1, $2)")
 [__requiresNVAPI]
 uint2 __atomicXor(RWByteAddressBuffer buf, uint offset, uint2 value);
 
-__target_intrinsic(glsl, "atomicXor($0, $1)")
 __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_int64)
-uint64_t __atomicXor(__ref uint64_t ioValue, uint64_t value);
+uint64_t __atomicXor(__ref uint64_t ioValue, uint64_t value)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "atomicXor($0, $1)";
+    case spirv:
+        return spirv_asm
+        {
+            OpCapability Int64Atomics;
+            result:$$uint64_t = OpAtomicXor &ioValue Device None $value
+        };
+    }
+}
 
 // Exchange
 
@@ -240,10 +372,21 @@ __target_intrinsic(hlsl, "NvInterlockedExchangeUint64($0, $1, $2)")
 [__requiresNVAPI]
 uint2 __atomicExchange(RWByteAddressBuffer buf, uint offset, uint2 value);
 
-__target_intrinsic(glsl, "atomicExchange($0, $1)")
 __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_int64)
-uint64_t __atomicExchange(__ref uint64_t ioValue, uint64_t value);
+uint64_t __atomicExchange(__ref uint64_t ioValue, uint64_t value)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "atomicExchange($0, $1)";
+    case spirv:
+        return spirv_asm
+        {
+            OpCapability Int64Atomics;
+            result:$$uint64_t = OpAtomicExchange &ioValue Device None $value
+        };
+    }
+}
 
 // Conversion between uint64_t and uint2
 
@@ -441,50 +584,60 @@ ${{{{
 
     // F32 Add
 
-    __target_intrinsic(hlsl, "($3 = NvInterlockedAddFp32($0, $1, $2))")
     __cuda_sm_version(2.0)
-    __target_intrinsic(cuda, "(*$3 = atomicAdd($0._getPtrAt<float>($1), $2))")
     [__requiresNVAPI]
-    void InterlockedAddF32(uint byteAddress, float valueToAdd, out float originalValue);
-
-    __specialized_for_target(glsl)
     void InterlockedAddF32(uint byteAddress, float valueToAdd, out float originalValue)
     {
-        RWStructuredBuffer<float> buf = __getEquivalentStructuredBuffer<float>(this);
-        originalValue = __atomicAdd(buf[byteAddress / 4], valueToAdd);
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "($3 = NvInterlockedAddFp32($0, $1, $2))";
+        case cuda: __intrinsic_asm "(*$3 = atomicAdd($0._getPtrAt<float>($1), $2))";
+        case glsl:
+        case spirv:
+            {
+                let buf = __getEquivalentStructuredBuffer<float>(this);
+                originalValue = __atomicAdd(buf[byteAddress / 4], valueToAdd);
+                return;
+            }
+        }
     }
 
     // Without returning original value
 
-    __target_intrinsic(hlsl, "(NvInterlockedAddFp32($0, $1, $2))")
     [__requiresNVAPI]
     __cuda_sm_version(2.0)
-    __target_intrinsic(cuda, "atomicAdd($0._getPtrAt<float>($1), $2)")
-    void InterlockedAddF32(uint byteAddress, float valueToAdd);
-
-    __specialized_for_target(glsl)
     void InterlockedAddF32(uint byteAddress, float valueToAdd)
     {
-        RWStructuredBuffer<float> buf = __getEquivalentStructuredBuffer<float>(this);
-        __atomicAdd(buf[byteAddress / 4], valueToAdd);
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "(NvInterlockedAddFp32($0, $1, $2))";
+        case cuda: __intrinsic_asm "atomicAdd($0._getPtrAt<float>($1), $2)";
+        case glsl:
+        case spirv:
+            {
+                let buf = __getEquivalentStructuredBuffer<float>(this);
+                __atomicAdd(buf[byteAddress / 4], valueToAdd);
+                return;
+            }
+        }
     }
 
     // Int64 Add
     __cuda_sm_version(6.0)
-    __target_intrinsic(cuda, "(*$3 = atomicAdd($0._getPtrAt<uint64_t>($1), $2))")
-    void InterlockedAddI64(uint byteAddress, int64_t valueToAdd, out int64_t originalValue);
-
-    __specialized_for_target(hlsl)
-    void InterlockedAddI64(uint byteAddress, int64_t valueToAdd, out int64_t outOriginalValue)
-    {
-        outOriginalValue = __asuint64(__atomicAdd(this, byteAddress, __asuint2(valueToAdd)));
-    }
-
-    __specialized_for_target(glsl)
     void InterlockedAddI64(uint byteAddress, int64_t valueToAdd, out int64_t originalValue)
     {
-        RWStructuredBuffer<int64_t> buf = __getEquivalentStructuredBuffer<int64_t>(this);
-        originalValue = __atomicAdd(buf[byteAddress / 8], valueToAdd);
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "(*$3 = atomicAdd($0._getPtrAt<uint64_t>($1), $2))";
+        case hlsl:
+            originalValue = __asuint64(__atomicAdd(this, byteAddress, __asuint2(valueToAdd)));
+        case glsl:
+        case spirv:
+            {
+                let buf = __getEquivalentStructuredBuffer<int64_t>(this);
+                originalValue = __atomicAdd(buf[byteAddress / 8], valueToAdd);
+            }
+        }
     }
 
     // Without returning original value
@@ -499,9 +652,10 @@ ${{{{
     }
 
     __specialized_for_target(glsl)
+    __specialized_for_target(spirv)
     void InterlockedAddI64(uint byteAddress, int64_t valueToAdd)
     {
-        RWStructuredBuffer<int64_t> buf = __getEquivalentStructuredBuffer<int64_t>(this);
+        let buf = __getEquivalentStructuredBuffer<int64_t>(this);
         __atomicAdd(buf[byteAddress / 8], valueToAdd);
     }
 
@@ -517,9 +671,10 @@ ${{{{
     }
 
     __specialized_for_target(glsl)
+    __specialized_for_target(spirv)
     void InterlockedCompareExchangeU64(uint byteAddress, uint64_t compareValue, uint64_t value, out uint64_t outOriginalValue)
     {
-        RWStructuredBuffer<uint64_t> buf = __getEquivalentStructuredBuffer<uint64_t>(this);
+        let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
         outOriginalValue = __cas(buf[byteAddress / 8], compareValue, value);
     }
 
@@ -533,9 +688,10 @@ ${{{{
     uint64_t InterlockedMaxU64(uint byteAddress, uint64_t value) { return __asuint64(__atomicMax(this, byteAddress, __asuint2(value))); }
 
     __specialized_for_target(glsl)
+    __specialized_for_target(spirv)
     uint64_t InterlockedMaxU64(uint byteAddress, uint64_t value)
     {
-        RWStructuredBuffer<uint64_t> buf = __getEquivalentStructuredBuffer<uint64_t>(this);
+        let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
         return __atomicMax(buf[byteAddress / 8], value);
     }
 
@@ -549,9 +705,10 @@ ${{{{
     uint64_t InterlockedMinU64(uint byteAddress, uint64_t value) { return __asuint64(__atomicMin(this, byteAddress, __asuint2(value))); }
 
     __specialized_for_target(glsl)
+    __specialized_for_target(spirv)
     uint64_t InterlockedMinU64(uint byteAddress, uint64_t value)
     {
-        RWStructuredBuffer<uint64_t> buf = __getEquivalentStructuredBuffer<uint64_t>(this);
+        let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
         return __atomicMin(buf[byteAddress / 8], value);
     }
 
@@ -564,9 +721,10 @@ ${{{{
     uint64_t InterlockedAndU64(uint byteAddress, uint64_t value) { return __asuint64(__atomicAnd(this, byteAddress, __asuint2(value))); }
 
     __specialized_for_target(glsl)
+    __specialized_for_target(spirv)
     uint64_t InterlockedAndU64(uint byteAddress, uint64_t value)
     {
-        RWStructuredBuffer<uint64_t> buf = __getEquivalentStructuredBuffer<uint64_t>(this);
+        let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
         return __atomicAnd(buf[byteAddress / 8], value);
     }
 
@@ -579,9 +737,10 @@ ${{{{
     uint64_t InterlockedOrU64(uint byteAddress, uint64_t value) { return __asuint64(__atomicOr(this, byteAddress, __asuint2(value))); }
 
     __specialized_for_target(glsl)
+    __specialized_for_target(spirv)
     uint64_t InterlockedOrU64(uint byteAddress, uint64_t value)
     {
-        RWStructuredBuffer<uint64_t> buf = __getEquivalentStructuredBuffer<uint64_t>(this);
+        let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
         return __atomicOr(buf[byteAddress / 8], value);
     }
 
@@ -594,9 +753,10 @@ ${{{{
     uint64_t InterlockedXorU64(uint byteAddress, uint64_t value) { return __asuint64(__atomicXor(this, byteAddress, __asuint2(value))); }
 
     __specialized_for_target(glsl)
+    __specialized_for_target(spirv)
     uint64_t InterlockedXorU64(uint byteAddress, uint64_t value)
     {
-        RWStructuredBuffer<uint64_t> buf = __getEquivalentStructuredBuffer<uint64_t>(this);
+        let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
         return __atomicXor(buf[byteAddress / 8], value);
     }
 
@@ -609,9 +769,10 @@ ${{{{
     uint64_t InterlockedExchangeU64(uint byteAddress, uint64_t value) { return __asuint64(__atomicExchange(this, byteAddress, __asuint2(value))); }
 
     __specialized_for_target(glsl)
+    __specialized_for_target(spirv)
     uint64_t InterlockedExchangeU64(uint byteAddress, uint64_t value)
     {
-        RWStructuredBuffer<uint64_t> buf = __getEquivalentStructuredBuffer<uint64_t>(this);
+        let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
         return __atomicExchange(buf[byteAddress / 8], value);
     }
 
@@ -622,9 +783,10 @@ ${{{{
         __atomicAdd(this, byteAddress, valueToAdd, outOriginalValue);
     }
     __specialized_for_target(glsl)
+    __specialized_for_target(spirv)
     void InterlockedAdd64(uint byteAddress, int64_t valueToAdd, out int64_t originalValue)
     {
-        RWStructuredBuffer<int64_t> buf = __getEquivalentStructuredBuffer<int64_t>(this);
+        let buf = __getEquivalentStructuredBuffer<int64_t>(this);
         originalValue = __atomicAdd(buf[byteAddress / 8], valueToAdd);
     }
     __specialized_for_target(hlsl)
@@ -633,9 +795,10 @@ ${{{{
         __atomicAdd(this, byteAddress, valueToAdd, outOriginalValue);
     }
     __specialized_for_target(glsl)
+    __specialized_for_target(spirv)
     void InterlockedAdd64(uint byteAddress, uint64_t valueToAdd, out uint64_t originalValue)
     {
-        RWStructuredBuffer<uint64_t> buf = __getEquivalentStructuredBuffer<uint64_t>(this);
+        let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
         originalValue = __atomicAdd(buf[byteAddress / 8], valueToAdd);
     }
     __specialized_for_target(hlsl)
@@ -644,9 +807,10 @@ ${{{{
         __cas(this, byteAddress, compareValue, value, outOriginalValue);
     }
     __specialized_for_target(glsl)
+    __specialized_for_target(spirv)
     void InterlockedCompareExchange64(uint byteAddress, int64_t compareValue, int64_t value, out int64_t outOriginalValue)
     {
-        RWStructuredBuffer<int64_t> buf = __getEquivalentStructuredBuffer<int64_t>(this);
+        let buf = __getEquivalentStructuredBuffer<int64_t>(this);
         outOriginalValue = __cas(buf[byteAddress / 8], compareValue, value);
     }
     __specialized_for_target(hlsl)
@@ -655,101 +819,251 @@ ${{{{
         __cas(this, byteAddress, compareValue, value, outOriginalValue);
     }
     __specialized_for_target(glsl)
+    __specialized_for_target(spirv)
     void InterlockedCompareExchange64(uint byteAddress, uint64_t compareValue, uint64_t value, out uint64_t outOriginalValue)
     {
-        RWStructuredBuffer<uint64_t> buf = __getEquivalentStructuredBuffer<uint64_t>(this);
+        let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
         outOriginalValue = __cas(buf[byteAddress / 8], compareValue, value);
     }
 ${{{{
-    }
+    } // endif (type == RWByteAddressBuffer)
 }}}}
 
     // Added operations:
-
-    __target_intrinsic(glsl, "($3 = atomicAdd($0._data[$1/4], $2))")
     void InterlockedAdd(
         UINT dest,
         UINT value,
-        out UINT original_value);
+        out UINT original_value)
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "($3 = atomicAdd($0._data[$1/4], $2))";
+        case cuda: __intrinsic_asm "(*$3 = atomicAdd($0._getPtrAt<uint32_t>($1), $2))";
+        case hlsl: __intrinsic_asm ".InterlockedAdd";
+        case spirv:
+            let buf = __getEquivalentStructuredBuffer<uint>(this);
+            ::InterlockedAdd(buf[dest / 4], value, original_value);
+        }
+    }
 
-    __target_intrinsic(glsl, "atomicAdd($0._data[$1/4], $2)")
     void InterlockedAdd(
         UINT dest,
-        UINT value);
+        UINT value)
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "atomicAdd($0._data[$1/4], $2)";
+        case cuda: __intrinsic_asm "atomicAdd($0._getPtrAt<uint32_t>($1), $2)";
+        case hlsl: __intrinsic_asm ".InterlockedAdd";
+        case spirv:
+            let buf = __getEquivalentStructuredBuffer<uint>(this);
+            ::InterlockedAdd(buf[dest / 4], value);
+        }
+    }
 
-    __target_intrinsic(glsl, "($3 = atomicAnd($0._data[$1/4], $2))")
     void InterlockedAnd(
         UINT dest,
         UINT value,
-        out UINT original_value);
+        out UINT original_value)
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "$3 = atomicAnd($0._data[$1/4], $2)";
+        case cuda: __intrinsic_asm "(*$3 = atomicAnd($0._getPtrAt<uint32_t>($1), $2))";
+        case hlsl: __intrinsic_asm ".InterlockedAnd";
+        case spirv:
+            let buf = __getEquivalentStructuredBuffer<uint>(this);
+            ::InterlockedAnd(buf[dest / 4], value, original_value);
+        }
+    }
 
-    __target_intrinsic(glsl, "atomicAnd($0._data[$1/4], $2)")
     void InterlockedAnd(
         UINT dest,
-        UINT value);
+        UINT value)
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "atomicAnd($0._data[$1/4], $2)";
+        case cuda: __intrinsic_asm "atomicAnd($0._getPtrAt<uint32_t>($1), $2)";
+        case hlsl: __intrinsic_asm ".InterlockedAnd";
+        case spirv:
+            let buf = __getEquivalentStructuredBuffer<uint>(this);
+            ::InterlockedAnd(buf[dest / 4], value);
+        }
+    }
 
-    __target_intrinsic(glsl, "($4 = atomicCompSwap($0._data[$1/4], $2, $3))")
     void InterlockedCompareExchange(
         UINT dest,
         UINT compare_value,
         UINT value,
-        out UINT original_value);
+        out UINT original_value)
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "($4 = atomicCompSwap($0._data[$1/4], $2, $3))";
+        case cuda: __intrinsic_asm "(*$4 = atomicCAS($0._getPtrAt<uint32_t>($1), $2, $3))";
+        case hlsl: __intrinsic_asm ".InterlockedCompareExchange";
+        case spirv:
+            let buf = __getEquivalentStructuredBuffer<uint>(this);
+            ::InterlockedCompareExchange(buf[dest / 4], compare_value, value, original_value);
+        }
+    }
 
-    __target_intrinsic(glsl, "atomicCompSwap($0._data[$1/4], $2, $3)")
     void InterlockedCompareStore(
         UINT dest,
         UINT compare_value,
-        UINT value);
+        UINT value)
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "atomicCompSwap($0._data[$1/4], $2, $3)";
+        case cuda: __intrinsic_asm "atomicCAS($0._getPtrAt<uint32_t>($1), $2, $3)";
+        case hlsl: __intrinsic_asm ".InterlockedCompareStore";
+        case spirv:
+            let buf = __getEquivalentStructuredBuffer<uint>(this);
+            ::InterlockedCompareStore(buf[dest / 4], compare_value, value);
+        }
+    }
 
-    __target_intrinsic(glsl, "($3 = atomicExchange($0._data[$1/4], $2))")
     void InterlockedExchange(
         UINT dest,
         UINT value,
-        out UINT original_value);
+        out UINT original_value)
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "($3 = atomicExchange($0._data[$1/4], $2))";
+        case cuda: __intrinsic_asm "(*$3 = atomicExch($0._getPtrAt<uint32_t>($1), $2))";
+        case hlsl: __intrinsic_asm ".InterlockedExchange";
+        case spirv:
+            let buf = __getEquivalentStructuredBuffer<uint>(this);
+            ::InterlockedExchange(buf[dest / 4], value, original_value);
+        }
+    }
 
-    __target_intrinsic(glsl, "($3 = atomicMax($0._data[$1/4], $2))")
     void InterlockedMax(
         UINT dest,
         UINT value,
-        out UINT original_value);
+        out UINT original_value)
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "($3 = atomicMax($0._data[$1/4], $2))";
+        case cuda: __intrinsic_asm "(*$3 = atomicMax($0._getPtrAt<uint32_t>($1), $2))";
+        case hlsl: __intrinsic_asm ".InterlockedMax";
+        case spirv:
+            let buf = __getEquivalentStructuredBuffer<uint>(this);
+            ::InterlockedMax(buf[dest / 4], value, original_value);
+        }
+    }
 
-    __target_intrinsic(glsl, "atomicMax($0._data[$1/4], $2)")
     void InterlockedMax(
         UINT dest,
-        UINT value);
+        UINT value)
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "atomicMax($0._data[$1/4], $2)";
+        case cuda: __intrinsic_asm "atomicMax($0._getPtrAt<uint32_t>($1), $2)";
+        case hlsl: __intrinsic_asm ".InterlockedMax";
+        case spirv:
+            let buf = __getEquivalentStructuredBuffer<uint>(this);
+            ::InterlockedMax(buf[dest / 4], value);
+        }
+    }
 
-    __target_intrinsic(glsl, "($3 = atomicMin($0._data[$1/4], $2))")
     void InterlockedMin(
         UINT dest,
         UINT value,
-        out UINT original_value);
+        out UINT original_value)
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "($3 = atomicMin($0._data[$1/4], $2))";
+        case cuda: __intrinsic_asm "(*$3 = atomicMin($0._getPtrAt<uint32_t>($1), $2))";
+        case hlsl: __intrinsic_asm ".InterlockedMin";
+        case spirv:
+            let buf = __getEquivalentStructuredBuffer<uint>(this);
+            ::InterlockedMin(buf[dest / 4], value, original_value);
+        }
+    }
 
-    __target_intrinsic(glsl, "atomicMin($0._data[$1/4], $2)")
     void InterlockedMin(
         UINT dest,
-        UINT value);
+        UINT value)
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "atomicMin($0._data[$1/4], $2)";
+        case cuda: __intrinsic_asm "atomicMin($0._getPtrAt<uint32_t>($1), $2)";
+        case hlsl: __intrinsic_asm ".InterlockedMin";
+        case spirv:
+            let buf = __getEquivalentStructuredBuffer<uint>(this);
+            ::InterlockedMin(buf[dest / 4], value);
+        }
+    }
 
-    __target_intrinsic(glsl, "($3 = atomicOr($0._data[$1/4], $2))")
     void InterlockedOr(
         UINT dest,
         UINT value,
-        out UINT original_value);
+        out UINT original_value)
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "($3 = atomicOr($0._data[$1/4], $2))";
+        case cuda: __intrinsic_asm "(*$3 = atomicOr($0._getPtrAt<uint32_t>($1), $2))";
+        case hlsl: __intrinsic_asm ".InterlockedOr";
+        case spirv:
+            let buf = __getEquivalentStructuredBuffer<uint>(this);
+            ::InterlockedOr(buf[dest / 4], value, original_value);
+        }
+    }
 
-    __target_intrinsic(glsl, "atomicOr($0._data[$1/4], $2)")
     void InterlockedOr(
         UINT dest,
-        UINT value);
+        UINT value)
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "atomicOr($0._data[$1/4], $2)";
+        case cuda: __intrinsic_asm "atomicOr($0._getPtrAt<uint32_t>($1), $2)";
+        case hlsl: __intrinsic_asm ".InterlockedOr";
+        case spirv:
+            let buf = __getEquivalentStructuredBuffer<uint>(this);
+            ::InterlockedOr(buf[dest / 4], value);
+        }
+    }
 
-    __target_intrinsic(glsl, "($3 = atomicXor($0._data[$1/4], $2))")
     void InterlockedXor(
         UINT dest,
         UINT value,
-        out UINT original_value);
+        out UINT original_value)
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "($3 = atomicXor($0._data[$1/4], $2))";
+        case cuda: __intrinsic_asm "(*$3 = atomicXor($0._getPtrAt<uint32_t>($1), $2))";
+        case hlsl: __intrinsic_asm ".InterlockedXor";
+        case spirv:
+            let buf = __getEquivalentStructuredBuffer<uint>(this);
+            ::InterlockedXor(buf[dest / 4], value, original_value);
+        }
+    }
 
-    __target_intrinsic(glsl, "atomicXor($0._data[$1/4], $2)")
     void InterlockedXor(
         UINT dest,
-        UINT value);
+        UINT value)
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "atomicXor($0._data[$1/4], $2)";
+        case cuda: __intrinsic_asm "atomicXor($0._getPtrAt<uint32_t>($1), $2)";
+        case hlsl: __intrinsic_asm ".InterlockedXor";
+        case spirv:
+            let buf = __getEquivalentStructuredBuffer<uint>(this);
+            ::InterlockedXor(buf[dest / 4], value);
+        }
+    }
 
     __target_intrinsic(hlsl)
     [ForceInline]
@@ -2325,7 +2639,7 @@ __target_intrinsic(spirv, "OpFConvert resultType resultId _0")
 [__readNone]
 vector<float16_t, N> f32tof16_(vector<float, N> value)
 {
-    VECTOR_MAP_UNARY(uint, N, f32tof16, value);
+    VECTOR_MAP_UNARY(float16_t, N, f32tof16, value);
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -2696,132 +3010,507 @@ void GroupMemoryBarrierWithGroupSync()
 
 // Atomics
 
-__target_intrinsic(glsl, "$atomicAdd($A, $1)")
-__target_intrinsic(cuda, "atomicAdd($0, $1)")
-void InterlockedAdd(__ref  int dest,  int value);
+__glsl_version(430)
+void InterlockedAdd(__ref  int dest,  int value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedAdd";
+    case cuda: __intrinsic_asm "atomicAdd($0, $1)";
+    case glsl: __intrinsic_asm "$atomicAdd($A, $1)";
+    case spirv:
+        spirv_asm
+        {
+            result:$$int = OpAtomicIAdd &dest Device None $value 
+        };
+    }
+}
 
-__target_intrinsic(glsl, "$atomicAdd($A, $1)")
-__target_intrinsic(cuda, "atomicAdd((uint*)$0, $1)")
-void InterlockedAdd(__ref uint dest, uint value);
+__glsl_version(430)
+void InterlockedAdd(__ref uint dest, uint value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedAdd";
+    case cuda: __intrinsic_asm "atomicAdd((int*)$0, $1)";
+    case glsl: __intrinsic_asm "$atomicAdd($A, $1)";
+    case spirv:
+        spirv_asm
+        {
+            result:$$uint = OpAtomicIAdd &dest Device None $value 
+        };
+    }
+}
 
-__target_intrinsic(glsl, "$atomicAdd($A, $1)")
-__target_intrinsic(cuda, "atomicAdd((uint*)$0, $1)")
-void InterlockedAdd(__ref uint dest, int value);
+[ForceInline]
+void InterlockedAdd(__ref uint dest, int value)
+{
+    InterlockedAdd(dest, (uint)value);
+}
 
-__target_intrinsic(glsl, "($2 = $atomicAdd($A, $1))")
-__target_intrinsic(cuda, "(*$2 = atomicAdd($0, $1))")
-void InterlockedAdd(__ref  int dest,  int value, out  int original_value);
+__glsl_version(430)
+void InterlockedAdd(__ref  int dest,  int value, out  int original_value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedAdd";
+    case cuda: __intrinsic_asm "(*$2 = atomicAdd($0, $1))";
+    case glsl: __intrinsic_asm "($2 = $atomicAdd($A, $1))";
+    case spirv:
+        spirv_asm
+        {
+            %original:$$int = OpAtomicIAdd &dest Device None $value;
+            OpStore &original_value %original
+        };
+    }
+}
 
-__target_intrinsic(glsl, "($2 = $atomicAdd($A, $1))")
-__target_intrinsic(cuda, "(*$2 = (uint)atomicAdd((uint*)$0, $1))")
-__target_intrinsic(spirv, "%old = OpAtomicIAdd _type(uint) resultId _0"
-                                "const(int, ScopeDevice) const(int, MemorySemanticsMaskNone) _1;"
-                          "OpStore _2 %old;")
-void InterlockedAdd(__ref uint dest, uint value, out uint original_value);
+__glsl_version(430)
+void InterlockedAdd(__ref uint dest, uint value, out uint original_value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedAdd";
+    case cuda: __intrinsic_asm "(*$2 = (uint)atomicAdd((int*)$0, $1))";
+    case glsl: __intrinsic_asm "($2 = $atomicAdd($A, $1))";
+    case spirv:
+        spirv_asm
+        {
+            %original:$$uint = OpAtomicIAdd &dest Device None $value;
+            OpStore &original_value %original
+        };
+    }
+}
 
-__target_intrinsic(glsl, "$atomicAnd($A, $1)")
-__target_intrinsic(cuda, "atomicAnd($0, $1)")
-void InterlockedAnd(__ref  int dest,  int value);
+__glsl_version(430)
+void InterlockedAnd(__ref  int dest,  int value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedAnd";
+    case cuda: __intrinsic_asm "atomicAnd($0, $1)";
+    case glsl: __intrinsic_asm "$atomicAnd($A, $1)";
+    case spirv:
+        spirv_asm
+        {
+            result:$$int = OpAtomicAnd &dest Device None $value;
+        };
+    }
+}
 
-__target_intrinsic(glsl, "$atomicAnd($A, $1)")
-__target_intrinsic(cuda, "atomicAnd((int*)$0, $1)")
-void InterlockedAnd(__ref uint dest, uint value);
+__glsl_version(430)
+void InterlockedAnd(__ref uint dest, uint value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedAnd";
+    case cuda: __intrinsic_asm "atomicAnd((int*)$0, $1)";
+    case glsl: __intrinsic_asm "$atomicAnd($A, $1)";
+    case spirv:
+        spirv_asm
+        {
+            result:$$uint = OpAtomicAnd &dest Device None $value;
+        };
+    }
+}
 
-__target_intrinsic(glsl, "($2 = $atomicAnd($A, $1))")
-__target_intrinsic(cuda, "(*$2 = atomicAnd($0, $1))")
-void InterlockedAnd(__ref  int dest,  int value, out  int original_value);
+__glsl_version(430)
+void InterlockedAnd(__ref  int dest,  int value, out  int original_value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedAnd";
+    case cuda: __intrinsic_asm "(*$2 = atomicAnd($0, $1))";
+    case glsl: __intrinsic_asm "($2 = $atomicAnd($A, $1))";
+    case spirv:
+        spirv_asm
+        {
+            %original:$$int = OpAtomicAnd &dest Device None $value;
+            OpStore &original_value %original
+        };
+    }
+}
 
-__target_intrinsic(glsl, "($2 = $atomicAnd($A, $1))")
-__target_intrinsic(cuda, "(*$2 = atomicAnd((int*)$0, $1))")
-void InterlockedAnd(__ref uint dest, uint value, out uint original_value);
+__glsl_version(430)
+void InterlockedAnd(__ref uint dest, uint value, out uint original_value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedAnd";
+    case glsl: __intrinsic_asm "($2 = atomicAnd($0, $1))";
+    case cuda: __intrinsic_asm "(*$2 = atomicAnd((int*)$0, $1))";
+    case spirv:
+        spirv_asm
+        {
+            %original:$$uint = OpAtomicAnd &dest Device None $value;
+            OpStore &original_value %original
+        };
+    }
+}
 
-__target_intrinsic(glsl, "($3 = $atomicCompSwap($A, $1, $2))")
-__target_intrinsic(cuda, "(*$3 = atomicCAS($0, $1, $2))")
-void InterlockedCompareExchange(__ref  int dest,  int compare_value,  int value, out  int original_value);
+__glsl_version(430)
+void InterlockedCompareExchange(__ref  int dest,  int compare_value,  int value, out  int original_value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedCompareExchange";
+    case glsl: __intrinsic_asm "($3 = $atomicCompSwap($A, $1, $2))";
+    case cuda: __intrinsic_asm "(*$3 = atomicCAS($0, $1, $2))";
+    case spirv:
+        spirv_asm
+        {
+            %original:$$int = OpAtomicCompareExchange &dest Device None None $value $compare_value;
+            OpStore &original_value %original
+        };
+    }
+}
 
-__target_intrinsic(glsl, "($3 = $atomicCompSwap($A, $1, $2))")
-__target_intrinsic(cuda, "(*$3 = (uint)atomicCAS((int*)$0, $1, $2))")
-void InterlockedCompareExchange(__ref uint dest, uint compare_value, uint value, out uint original_value);
+__glsl_version(430)
+void InterlockedCompareExchange(__ref uint dest, uint compare_value, uint value, out uint original_value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedCompareExchange";
+    case glsl: __intrinsic_asm "($3 = $atomicCompSwap($A, $1, $2))";
+    case cuda: __intrinsic_asm "(*$3 = (uint)atomicCAS((int*)$0, $1, $2))";
+    case spirv:
+        spirv_asm
+        {
+            %original:$$uint = OpAtomicCompareExchange &dest Device None None $value $compare_value;
+            OpStore &original_value %original
+        };
+    }
+}
 
-__target_intrinsic(glsl, "$atomicCompSwap($A, $1, $2)")
-__target_intrinsic(cuda, "atomicCAS($0, $1, $2)")
-void InterlockedCompareStore(__ref int dest,  int compare_value,  int value);
+__glsl_version(430)
+void InterlockedCompareStore(__ref int dest,  int compare_value,  int value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedCompareStore";
+    case glsl: __intrinsic_asm "$atomicCompSwap($A, $1, $2)";
+    case cuda: __intrinsic_asm "atomicCAS($0, $1, $2)";
+    case spirv:
+        spirv_asm
+        {
+            result:$$int = OpAtomicCompareExchange &dest Device None None $value $compare_value;
+        };
+    }
+}
 
-__target_intrinsic(glsl, "$atomicCompSwap($A, $1, $2)")
-__target_intrinsic(cuda, "atomicCAS((int*)$0, $1, $2)")
-void InterlockedCompareStore(__ref uint dest, uint compare_value, uint value);
+__glsl_version(430)
+void InterlockedCompareStore(__ref uint dest, uint compare_value, uint value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedCompareStore";
+    case glsl: __intrinsic_asm "$atomicCompSwap($A, $1, $2)";
+    case cuda: __intrinsic_asm "atomicCAS((int*)$0, $1, $2)";
+    case spirv:
+        spirv_asm
+        {
+            result:$$uint = OpAtomicCompareExchange &dest Device None None $value $compare_value;
+        };
+    }
+}
 
-__target_intrinsic(glsl, "($2 = $atomicExchange($A, $1))")
-__target_intrinsic(cuda, "(*$2 = atomicExch($0, $1))")
-void InterlockedExchange(__ref  int dest,  int value, out  int original_value);
+__glsl_version(430)
+void InterlockedExchange(__ref  int dest,  int value, out  int original_value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedExchange";
+    case glsl: __intrinsic_asm "($2 = $atomicExchange($A, $1))";
+    case cuda: __intrinsic_asm "(*$2 = atomicExch($0, $1))";
+    case spirv:
+        spirv_asm
+        {
+            %r:$$int = OpAtomicExchange &dest Device None $value;
+            OpStore &original_value %r
+        };
+    }
+}
 
-__target_intrinsic(glsl, "($2 = $atomicExchange($A, $1))")
-__target_intrinsic(cuda, "(*$2 = (uint)atomicExch((int*)$0, $1))")
-void InterlockedExchange(__ref uint dest, uint value, out uint original_value);
+__glsl_version(430)
+void InterlockedExchange(__ref uint dest, uint value, out uint original_value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedExchange";
+    case glsl: __intrinsic_asm "($2 = $atomicExchange($A, $1))";
+    case cuda: __intrinsic_asm "(*$2 = (uint)atomicExch((int*)$0, $1))";
+    case spirv:
+        spirv_asm
+        {
+            %r:$$uint = OpAtomicExchange &dest Device None $value;
+            OpStore &original_value %r
+        };
+    }
+}
 
-__target_intrinsic(glsl, "$atomicMax($A, $1)")
-__target_intrinsic(cuda, "atomicMax($0, $1)")
-void InterlockedMax(__ref  int dest,  int value);
+__glsl_version(430)
+void InterlockedMax(__ref  int dest,  int value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedMax";
+    case glsl: __intrinsic_asm "$atomicMax($A, $1)";
+    case cuda: __intrinsic_asm "atomicMax($0, $1)";
+    case spirv:
+        spirv_asm
+        {
+            result:$$int = OpAtomicSMax &dest Device None $value;
+        };
+    }
+}
 
-__target_intrinsic(glsl, "$atomicMax($A, $1)")
-__target_intrinsic(cuda, "atomicMax((int*)$0, $1)")
-void InterlockedMax(__ref uint dest, uint value);
+__glsl_version(430)
+void InterlockedMax(__ref uint dest, uint value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedMax";
+    case glsl: __intrinsic_asm "$atomicMax($A, $1)";
+    case cuda: __intrinsic_asm "atomicMax((int*)$0, $1)";
+    case spirv:
+        spirv_asm
+        {
+            result:$$uint = OpAtomicUMax &dest Device None $value;
+        };
+    }
+}
 
-__target_intrinsic(glsl, "($2 = $atomicMax($A, $1))")
-__target_intrinsic(cuda, "(*$2 = atomicMax($0, $1))")
-void InterlockedMax(__ref  int dest,  int value, out  int original_value);
+__glsl_version(430)
+void InterlockedMax(__ref  int dest,  int value, out  int original_value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedMax";
+    case glsl: __intrinsic_asm "($2 = $atomicMax($A, $1))";
+    case cuda: __intrinsic_asm "(*$2 = atomicMax($0, $1))";
+    case spirv:
+        spirv_asm
+        {
+            %v:$$int = OpAtomicSMax &dest Device None $value;
+            OpStore &original_value %v
+        };
+    }
+}
 
-__target_intrinsic(glsl, "($2 = $atomicMax($A, $1))")
-__target_intrinsic(cuda, "(*$2 = (uint)atomicMax((int*)$0, $1))")
-void InterlockedMax(__ref uint dest, uint value, out uint original_value);
+__glsl_version(430)
+void InterlockedMax(__ref uint dest, uint value, out uint original_value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedMax";
+    case glsl: __intrinsic_asm "($2 = $atomicMax($A, $1))";
+    case cuda: __intrinsic_asm "(*$2 = (uint)atomicMax((int*)$0, $1))";
+    case spirv:
+        spirv_asm
+        {
+            %v:$$uint = OpAtomicUMax &dest Device None $value;
+            OpStore &original_value %v
+        };
+    }
+}
 
-__target_intrinsic(glsl, "$atomicMin($A, $1)")
-__target_intrinsic(cuda, "atomicMin($0, $1)")
-void InterlockedMin(__ref  int dest,  int value);
+__glsl_version(430)
+void InterlockedMin(__ref  int dest,  int value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedMin";
+    case glsl: __intrinsic_asm "$atomicMin($A, $1)";
+    case cuda: __intrinsic_asm "atomicMin($0, $1)";
+    case spirv:
+        spirv_asm
+        {
+            result:$$int = OpAtomicSMin &dest Device None $value;
+        };
+    }
+}
 
-__target_intrinsic(glsl, "$atomicMin($A, $1)")
-__target_intrinsic(cuda, "atomicMin((int*)$0, $1)")
-void InterlockedMin(__ref uint dest, uint value);
+__glsl_version(430)
+void InterlockedMin(__ref uint dest, uint value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedMin";
+    case glsl: __intrinsic_asm "$atomicMin($A, $1)";
+    case cuda: __intrinsic_asm "atomicMin((int*)$0, $1)";
+    case spirv:
+        spirv_asm
+        {
+            result:$$uint = OpAtomicUMin &dest Device None $value;
+        };
+    }
+}
 
-__target_intrinsic(glsl, "($2 = $atomicMin($A, $1))")
-__target_intrinsic(cuda, "(*$2 = atomicMin($0, $1))")
-void InterlockedMin(__ref  int dest,  int value, out  int original_value);
+__glsl_version(430)
+void InterlockedMin(__ref  int dest,  int value, out  int original_value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedMin";
+    case glsl: __intrinsic_asm "($2 = $atomicMin($A, $1))";
+    case cuda: __intrinsic_asm "(*$2 = atomicMin($0, $1))";
+    case spirv:
+        spirv_asm
+        {
+            %v:$$int = OpAtomicSMin &dest Device None $value;
+            OpStore &original_value %v
+        };
+    }
+}
 
-__target_intrinsic(glsl, "($2 = $atomicMin($A, $1))")
-__target_intrinsic(cuda, "(*$2 = (uint)atomicMin((int*)$0, $1))")
-void InterlockedMin(__ref uint dest, uint value, out uint original_value);
+__glsl_version(430)
+void InterlockedMin(__ref uint dest, uint value, out uint original_value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedMin";
+    case glsl: __intrinsic_asm "($2 = $atomicMin($A, $1))";
+    case cuda: __intrinsic_asm "(*$2 = (uint)atomicMin((int*)$0, $1))";
+    case spirv:
+        spirv_asm
+        {
+            %v:$$uint = OpAtomicUMin &dest Device None $value;
+            OpStore &original_value %v
+        };
+    }
+}
 
-__target_intrinsic(glsl, "$atomicOr($A, $1)")
-__target_intrinsic(cuda, "atomicOr($0, $1)")
-void InterlockedOr(__ref  int dest,  int value);
+__glsl_version(430)
+void InterlockedOr(__ref  int dest,  int value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedOr";
+    case cuda: __intrinsic_asm "atomicOr((int*)$0, $1)";
+    case glsl: __intrinsic_asm "$atomicOr($A, $1)";
+    case spirv:
+        spirv_asm
+        {
+            result:$$int = OpAtomicOr &dest Device None $value;
+        };
+    }
+}
 
-__target_intrinsic(glsl, "$atomicOr($A, $1)")
-__target_intrinsic(cuda, "atomicOr((int*)$0, $1)")
-void InterlockedOr(__ref uint dest, uint value);
+__glsl_version(430)
+void InterlockedOr(__ref uint dest, uint value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedOr";
+    case cuda: __intrinsic_asm "atomicOr((int*)$0, $1)";
+    case glsl: __intrinsic_asm "$atomicOr($A, $1)";
+    case spirv:
+        spirv_asm
+        {
+            result:$$uint = OpAtomicOr &dest Device None $value;
+        };
+    }
+}
 
-__target_intrinsic(glsl, "($2 = $atomicOr($A, $1))")
-__target_intrinsic(cuda, "(*$2 = atomicOr($0, $1))")
-void InterlockedOr(__ref  int dest,  int value, out  int original_value);
+__glsl_version(430)
+void InterlockedOr(__ref  int dest,  int value, out  int original_value)
+{
+     __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedOr";
+    case glsl: __intrinsic_asm "($2 = atomicOr($0, $1))";
+    case cuda: __intrinsic_asm "(*$2 = atomicOr($0, $1))";
+    case spirv:
+        spirv_asm
+        {
+            %original:$$int = OpAtomicOr &dest Device None $value;
+            OpStore &original_value %original
+        };
+    }
+}
 
-__target_intrinsic(glsl, "($2 = $atomicOr($A, $1))")
-__target_intrinsic(cuda, "(*$2 = (uint)atomicOr((int*)$0, $1))")
-void InterlockedOr(__ref uint dest, uint value, out uint original_value);
+__glsl_version(430)
+void InterlockedOr(__ref uint dest, uint value, out uint original_value)
+{
+     __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedOr";
+    case glsl: __intrinsic_asm "($2 = atomicOr($0, $1))";
+    case cuda: __intrinsic_asm "(*$2 = atomicOr((int*)$0, $1))";
+    case spirv:
+        spirv_asm
+        {
+            %original:$$uint = OpAtomicOr &dest Device None $value;
+            OpStore &original_value %original
+        };
+    }
+}
 
-__target_intrinsic(glsl, "$atomicXor($A, $1)")
-__target_intrinsic(cuda, "atomicXor($0, $1)")
-void InterlockedXor(__ref  int dest,  int value);
+__glsl_version(430)
+void InterlockedXor(__ref  int dest,  int value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedXor";
+    case cuda: __intrinsic_asm "atomicXor((int*)$0, $1)";
+    case glsl: __intrinsic_asm "$atomicXor($A, $1)";
+    case spirv:
+        spirv_asm
+        {
+            result:$$int = OpAtomicXor &dest Device None $value;
+        };
+    }
+}
 
-__target_intrinsic(glsl, "$atomicXor($A, $1)")
-__target_intrinsic(cuda, "atomicXor((int*)$0, $1)")
-void InterlockedXor(__ref uint dest, uint value);
+__glsl_version(430)
+void InterlockedXor(__ref uint dest, uint value)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedXor";
+    case cuda: __intrinsic_asm "atomicXor((int*)$0, $1)";
+    case glsl: __intrinsic_asm "$atomicXor($A, $1)";
+    case spirv:
+        spirv_asm
+        {
+            result:$$uint = OpAtomicXor &dest Device None $value;
+        };
+    }
+}
 
-__target_intrinsic(glsl, "($2 = $atomicXor($A, $1))")
-__target_intrinsic(cuda, "(*$2 = atomicXor($0, $1))")
-void InterlockedXor(__ref  int dest,  int value, out  int original_value);
+__glsl_version(430)
+void InterlockedXor(__ref  int dest,  int value, out  int original_value)
+{
+     __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedXor";
+    case glsl: __intrinsic_asm "($2 = atomicXor($0, $1))";
+    case cuda: __intrinsic_asm "(*$2 = atomicXor($0, $1))";
+    case spirv:
+        spirv_asm
+        {
+            %original:$$int = OpAtomicXor &dest Device None $value;
+            OpStore &original_value %original
+        };
+    }
+}
 
-__target_intrinsic(glsl, "($2 = $atomicXor($A, $1))")
-__target_intrinsic(cuda, "(*$2 = (uint)atomicXor((int*)$0, $1))")
-void InterlockedXor(__ref uint dest, uint value, out uint original_value);
+__glsl_version(430)
+void InterlockedXor(__ref uint dest, uint value, out uint original_value)
+{
+     __target_switch
+    {
+    case hlsl: __intrinsic_asm "InterlockedXor";
+    case glsl: __intrinsic_asm "($2 = atomicXor($0, $1))";
+    case cuda: __intrinsic_asm "(*$2 = (uint)atomicXor((int*)$0, $1))";
+    case spirv:
+        spirv_asm
+        {
+            %original:$$uint = OpAtomicXor &dest Device None $value;
+            OpStore &original_value %original
+        };
+    }
+}
 
 // Is floating-point value finite?
 
@@ -3315,7 +4004,7 @@ uint4 msad4(uint reference, uint2 source, uint4 accum)
     int4 bytesX   = (source.x  >> uint4(24, 16, 8, 0)) & 0xFF;
     int4 bytesY   = (source.y  >> uint4(24, 16, 8, 0)) & 0xFF;
 
-    uint4 mask = bytesRef == 0 ? 0 : 0xFFFFFFFFu;
+    uint4 mask = select(bytesRef == 0, 0, 0xFFFFFFFFu);
 
     uint4 result = accum;
     result += mask.x & abs(bytesRef - int4(bytesX.x,           bytesY.y, bytesY.z, bytesY.w));

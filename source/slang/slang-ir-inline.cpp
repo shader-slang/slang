@@ -896,15 +896,39 @@ struct IntrinsicFunctionInliningPass : InliningPassBase
         auto returnInst = as<IRReturn>(func->getFirstBlock()->getTerminator());
         if (!returnInst)
             return false;
-        auto firstInst = as<IRSPIRVAsm>(func->getFirstBlock()->getFirstOrdinaryInst());
-        return returnInst->getVal() == firstInst;
+
+        // If a function body has only asm blocks + trivial insts (load/store),
+        // this is considered as a pure asm function, and we can inline it.
+        bool hasSpvAsm = false;
+        for (auto inst = func->getFirstBlock()->getFirstOrdinaryInst(); inst != returnInst; inst = inst->getNextInst())
+        {
+            switch (inst->getOp())
+            {
+            case kIROp_SPIRVAsmOperandInst:
+            case kIROp_SPIRVAsm:
+                hasSpvAsm = true;
+                continue;
+            case kIROp_Load:
+            case kIROp_swizzle:
+            case kIROp_Store:
+                continue;
+            default:
+                return false;
+            }
+        }
+        return hasSpvAsm;
     }
 };
 
 void performIntrinsicFunctionFunctionInlining(IRModule* module)
 {
     IntrinsicFunctionInliningPass pass(module);
-    pass.considerAllCallSites();
+    bool changed = true;
+
+    while (changed)
+    {
+        changed = pass.considerAllCallSites();
+    }
 }
 
 struct CustomInliningPass : InliningPassBase

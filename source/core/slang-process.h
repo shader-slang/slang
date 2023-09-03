@@ -73,6 +73,8 @@ public:
         /// Get the clock tick.
     static uint64_t getClockTick();
 
+    static uint32_t getId();
+
 protected:
     int32_t m_returnValue = 0;                              ///< Value returned if process terminated
     RefPtr<Stream> m_streams[Index(StdStreamType::CountOf)];   ///< Streams to communicate with the process

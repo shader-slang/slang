@@ -38,8 +38,11 @@ struct Ray
 
 RaytracingAccelerationStructure sceneBVH;
 
-// TODO: remove force inline here will result in an error.
-[ForceInline]
+uint getCommittedStatus<let Flags : int>(RayQuery<Flags> q)
+{
+    return q.CommittedStatus();
+}
+
 bool traceSceneVisibilityRayImpl<let Flags : int>(const bool useAlphaTest, inout RayQuery<Flags> q, const Ray ray, uint rayFlags, uint instanceInclusionMask)
 {
     var rayDesc = ray.toRayDesc();
@@ -49,7 +52,7 @@ bool traceSceneVisibilityRayImpl<let Flags : int>(const bool useAlphaTest, inout
         0xff,
         rayDesc);
     q.Proceed();
-    if (q.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
+    if (getCommittedStatus(q) == COMMITTED_TRIANGLE_HIT)
     {
         q.CommittedRayT();
         return true;
