@@ -3560,14 +3560,6 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         return sharedLoweringContext.lowerSubExpr(expr);
     }
 
-    LoweredValInfo lowerSubExprWithSubContext(Expr* expr, IRGenContext* subContext)
-    {
-        IRBuilderSourceLocRAII sourceLocInfo(getBuilder(), expr->loc);
-        Derived d;
-        d.context = subContext;
-        return d.dispatch(expr);
-    }
-
     LoweredValInfo visitIncompleteExpr(IncompleteExpr*)
     {
         SLANG_UNEXPECTED("a valid ast should not contain an IncompleteExpr.");
@@ -4967,9 +4959,14 @@ struct RValueExprLoweringVisitor : public ExprLoweringVisitorBase<RValueExprLowe
 //
 struct DestinationDrivenRValueExprLoweringVisitor 
     : ExprVisitor<DestinationDrivenRValueExprLoweringVisitor>
-    , ExprLoweringContext<DestinationDrivenRValueExprLoweringVisitor>
 {
+    ExprLoweringContext<DestinationDrivenRValueExprLoweringVisitor> sharedLoweringContext;
     LoweredValInfo destination;
+
+    IRGenContext*& context;
+    DestinationDrivenRValueExprLoweringVisitor()
+        : context(sharedLoweringContext.context)
+    {}
 
     static bool _isLValueContext() { return false; }
 
@@ -4985,7 +4982,7 @@ struct DestinationDrivenRValueExprLoweringVisitor
         LoweredValInfo resultRVal;
         {
             IRBuilderSourceLocRAII sourceLocInfo(context->irBuilder, expr->loc);
-            resultRVal = visitInvokeExprImpl(expr, destination, TryClauseEnvironment{});
+            resultRVal = sharedLoweringContext.visitInvokeExprImpl(expr, destination, TryClauseEnvironment{});
         }
         if (resultRVal.flavor != LoweredValInfo::Flavor::None)
         {
@@ -5002,7 +4999,7 @@ struct DestinationDrivenRValueExprLoweringVisitor
         assert(invokeExpr);
         TryClauseEnvironment tryEnv;
         tryEnv.clauseType = expr->tryClauseType;
-        return visitInvokeExprImpl(invokeExpr, destination, tryEnv);
+        return sharedLoweringContext.visitInvokeExprImpl(invokeExpr, destination, tryEnv);
     }
 
 };
