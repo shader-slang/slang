@@ -1239,6 +1239,12 @@ void assign(
     LoweredValInfo const&   left,
     LoweredValInfo const&   right);
 
+void assignExpr(
+    IRGenContext* context,
+    const LoweredValInfo& inLeft,
+    Expr* rightExpr,
+    SourceLoc assignmentLoc);
+
 IRInst* getAddress(
     IRGenContext*           context,
     LoweredValInfo const&   inVal,
