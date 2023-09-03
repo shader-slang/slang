@@ -220,6 +220,8 @@ struct ASTIterator
 
         void visitThisExpr(ThisExpr* expr) { iterator->maybeDispatchCallback(expr); }
         void visitThisTypeExpr(ThisTypeExpr* expr) { iterator->maybeDispatchCallback(expr); }
+        void visitReturnValExpr(ReturnValExpr* expr) { iterator->maybeDispatchCallback(expr); }
+
         void visitAndTypeExpr(AndTypeExpr* expr)
         {
             iterator->maybeDispatchCallback(expr);

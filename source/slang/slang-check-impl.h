@@ -2409,6 +2409,7 @@ namespace Slang
 
         Expr* visitThisExpr(ThisExpr* expr);
         Expr* visitThisTypeExpr(ThisTypeExpr* expr);
+        Expr* visitReturnValExpr(ReturnValExpr* expr);
         Expr* visitAndTypeExpr(AndTypeExpr* expr);
         Expr* visitPointerTypeExpr(PointerTypeExpr* expr);
         Expr* visitModifiedTypeExpr(ModifiedTypeExpr* expr);
