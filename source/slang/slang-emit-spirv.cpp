@@ -3952,20 +3952,6 @@ struct SPIRVEmitContext
                             emitOperand(SpvLiteralInteger::from32(uint32_t(i)));
                             break;
                         }
-                        case kIROp_SPIRVAsmOperandBuiltinVar:
-                        {
-                            const auto kind = (SpvBuiltIn)(getIntVal(operand->getOperand(0)));
-                            IRBuilder builder(operand);
-                            builder.setInsertBefore(operand);
-                            auto varInst = getBuiltinGlobalVar(builder.getPtrType(kIROp_PtrType, operand->getDataType(), SpvStorageClassInput), kind);
-                            emitOperand(varInst);
-                            break;
-                        }
-                        case kIROp_SPIRVAsmOperandGLSL450Set:
-                        {
-                            emitOperand(getGLSL450ExtInst());
-                            break;
-                        }
                         default:
                             SLANG_UNREACHABLE("Unhandled case in emitSPIRVAsm");
                         }
@@ -4004,6 +3990,20 @@ struct SPIRVEmitContext
                     const auto elementType = cast<IRType>(operand->getValue());
                     const auto sampledType = builder.getVectorType(dropVector(elementType), 4);
                     emitOperand(ensureInst(sampledType));
+                    break;
+                }
+                case kIROp_SPIRVAsmOperandBuiltinVar:
+                {
+                    const auto kind = (SpvBuiltIn)(getIntVal(operand->getOperand(0)));
+                    IRBuilder builder(operand);
+                    builder.setInsertBefore(operand);
+                    auto varInst = getBuiltinGlobalVar(builder.getPtrType(kIROp_PtrType, operand->getDataType(), SpvStorageClassInput), kind);
+                    emitOperand(varInst);
+                    break;
+                }
+                case kIROp_SPIRVAsmOperandGLSL450Set:
+                {
+                    emitOperand(getGLSL450ExtInst());
                     break;
                 }
                 default:
