@@ -974,6 +974,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             case kIROp_MakeOptionalValue:
             case kIROp_MakeOptionalNone:
                 processConstructor(inst);
+                break;
 
             default:
                 for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
