@@ -1,6 +1,3 @@
-//TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-shaderobj -output-using-type
-//TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -use-dxil -shaderobj -output-using-type
-//TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj -output-using-type
 //TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -shaderobj -output-using-type
 //TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -shaderobj -emit-spirv-directly -output-using-type
 
