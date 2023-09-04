@@ -126,7 +126,7 @@ Result FenceImpl::getSharedHandle(InteropHandle* outHandle)
     fdInfo.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;
 
     SLANG_VK_RETURN_ON_FAIL(m_device->m_api.vkGetSemaphoreFdKHR(
-        m_device->m_api.m_device, &handleInfo, (int*)&sharedHandle.handleValue));
+        m_device->m_api.m_device, &fdInfo, (int*)&sharedHandle.handleValue));
 #endif
 
     sharedHandle.api = InteropHandleAPI::Vulkan;
