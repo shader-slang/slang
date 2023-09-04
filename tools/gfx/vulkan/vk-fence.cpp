@@ -44,7 +44,9 @@ Result FenceImpl::init(const IFence::Desc& desc)
     createInfo.pNext = &timelineCreateInfo;
     createInfo.flags = 0;
 
+#if SLANG_WINDOWS_FAMILY
     VkExportSemaphoreWin32HandleInfoKHR exportSemaphoreWin32HandleInfoKHR;
+#endif
     VkExportSemaphoreCreateInfoKHR exportSemaphoreCreateInfo;
     if (desc.isShared)
     {
@@ -56,7 +58,7 @@ Result FenceImpl::init(const IFence::Desc& desc)
         exportSemaphoreWin32HandleInfoKHR.name = (LPCWSTR)NULL;
 #endif
         exportSemaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO_KHR;
-#ifdef SLANG_WINDOWS_FAMILY
+#if SLANG_WINDOWS_FAMILY
         exportSemaphoreCreateInfo.pNext = &exportSemaphoreWin32HandleInfoKHR;
         exportSemaphoreCreateInfo.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
 #else

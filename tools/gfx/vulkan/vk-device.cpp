@@ -615,7 +615,7 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
             {
                 deviceExtensions.add(VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME);
             }
-#elif
+#else
             if (extensionNames.contains(VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME))
             {
                 deviceExtensions.add(VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME);
