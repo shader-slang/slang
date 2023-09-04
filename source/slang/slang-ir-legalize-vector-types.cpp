@@ -51,8 +51,8 @@ namespace Slang
             return ptr && is1Vector(ptr->getValueType());
         }
 
-        // This creates a replacement instruction which is the scalar value of
-        // the 1-vector's only component.
+        // If necessary, this returns a new instruction which operates on the
+        // single component of a 1-vector.
         // If no new instruction was created, then the old one is returned
         // unmodified, when we replace the 1-vector type globally, only then
         // will the return type of that instruction be updated; thus you
@@ -60,55 +60,18 @@ namespace Slang
         // 1-vector return type (even if we didn't have the deferred
         // replacement this is not true, as it'll only eliminate at most one
         // level of 1-vectornes, and nested vectors exist)
-        IRInst* getReplacement(IRInst* vecProducer)
+        IRInst* getReplacement(IRInst* inst)
         {
-            IRInst* ret = nullptr;
-            if(replacements.tryGetValue(vecProducer, ret))
-                return ret;
+            IRInst* replacement = nullptr;
+            if(replacements.tryGetValue(inst, replacement))
+                return replacement;
 
-            const auto ptr = as<IRPtrTypeBase>(vecProducer->getDataType());
-            const auto vecTy = as<IRVectorType>(ptr ? ptr->getValueType() : vecProducer->getDataType());
-            SLANG_ASSERT(is1Vector(vecTy));
-
-            IRBuilder builder(module);
-            builder.setInsertBefore(vecProducer);
-
-            // This should match any instruction which can construct,
-            // specifically, a 1-vector. For example 'MakeVector'
-            //
-            // Instruction like, for example, arithmetic instructions don't
-            // need to be handled here, and they'll be fixed by the global
-            // 1-vector to scalar type replacement.
-            ret = instMatch<IRInst*>(vecProducer, nullptr,
-                [](IRMakeVectorFromScalar* inst){
-                    return inst->getOperand(0);
-                },
-                [](IRMakeVector* inst){
-                    return inst->getOperand(0);
-                });
-
-            // Sadly it's not really possible to catch missing cases here, as
-            // there are heaps of instructions which don't do anything special
-            // with vectors, but can return vector types, for example
-            // arithmetic, IRGetElement, IRGetField etc...
-
-            // If we did get a replacement, add that to our mapping and return
-            // it, otherwise return the
-            if(ret)
-                replacements.set(vecProducer, ret);
-
-            return ret ? ret : vecProducer;
-        }
-
-        void processInst(IRInst* inst)
-        {
             IRBuilder builder(module);
             builder.setInsertBefore(inst);
-
-            // This matches instructions which take a 1-vector as an operand
-            // and are sensitive to the fact that it's a vector. Likewise for
-            // pointers.
-            const auto rep = instMatch<IRInst*>(inst, nullptr,
+            replacement = instMatch<IRInst*>(inst, nullptr,
+                // The following match instructions which take a 1-vector as an
+                // operand and are sensitive to the fact that it's a vector.
+                // Likewise for pointers.
                 [&](IRGetElement* getElement){
                     const auto base = getElement->getBase();
                     return has1VectorType(base) ? getReplacement(base) : nullptr;
@@ -141,21 +104,45 @@ namespace Slang
                     return has1VectorPtrType(base)
                         ? builder.emitStore(getReplacement(base), swizzledStore->getSource())
                         : nullptr;
+                },
+                // The following should match any instruction which can construct,
+                // specifically, a 1-vector. For example 'MakeVector'
+                //
+                // Instruction like, for example, arithmetic instructions don't
+                // need to be handled here, and they'll be fixed by the global
+                // 1-vector to scalar type replacement.
+                [&](IRMakeVectorFromScalar* makeVec){
+                    return has1VectorType(makeVec)
+                        ? getReplacement(makeVec->getOperand(0))
+                        : nullptr;
+                },
+                [&](IRMakeVector* makeVec){
+                    return has1VectorType(makeVec)
+                        ? getReplacement(makeVec->getOperand(0))
+                        : nullptr;
+                },
+                // Otherwise if this is a 1-vector type itself, replace it with
+                // the scalar version.
+                [&](IRVectorType* vecTy){
+                    return is1Vector(vecTy)
+                        ? getReplacement(vecTy->getElementType())
+                        : nullptr;
                 });
 
-            // If we have a new instruction, add it to the list
-            if(rep)
-                replacements.set(inst, rep);
+            // Sadly it's not really possible to catch missing cases here, as
+            // there are heaps of instructions which don't do anything special
+            // with vectors, but can take or return vector types, for example
+            // arithmetic, IRGetElement, IRGetField etc...
 
-            // If this is a 1-vector type itself, make a replacement
-            if(const auto vecTy = as<IRVectorType>(inst))
+            // If we did get a replacement, add that to our mapping and return
+            // it, otherwise return the original (to maybe be updated later)
+            if(replacement)
             {
-                if(is1Vector(vecTy))
-                {
-                    const auto scalarTy = vecTy->getElementType();
-                    replacements.set(vecTy, scalarTy);
-                }
+                replacements.set(inst, replacement);
+                addToWorkList(replacement);
             }
+
+            return replacement ? replacement : inst;
         }
 
         void processModule()
@@ -169,7 +156,8 @@ namespace Slang
                 workList.removeLast();
                 workListSet.remove(inst);
 
-                processInst(inst);
+                // Run this inst through the replacer
+                getReplacement(inst);
 
                 for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
                 {
