@@ -5297,7 +5297,8 @@ T WaveMaskBroadcastLaneAt(WaveMask mask, T value, constexpr int lane)
     case cuda: __intrinsic_asm "__shfl_sync($0, $1, $2)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt($1, $2)";
     case spirv:
-        return spirv_asm {OpGroupNonUniformBroadcast $$T result Subgroup $value $lane};
+        let ulane = uint(lane);
+        return spirv_asm {OpGroupNonUniformBroadcast $$T result Subgroup $value $ulane};
     }
 }
 
@@ -5313,7 +5314,8 @@ vector<T,N> WaveMaskBroadcastLaneAt(WaveMask mask, vector<T,N> value, constexpr 
     case cuda: __intrinsic_asm "_waveShuffleMultiple($0, $1, $2)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt($1, $2)";
     case spirv:
-        return spirv_asm {OpGroupNonUniformBroadcast $$vector<T,N> result Subgroup $value $lane};
+        let ulane = uint(lane);
+        return spirv_asm {OpGroupNonUniformBroadcast $$vector<T,N> result Subgroup $value $ulane};
     }
 }
 __generic<T : __BuiltinType, let N : int, let M : int>
@@ -6797,7 +6799,8 @@ T WaveBroadcastLaneAt(T value, constexpr int lane)
     case glsl: __intrinsic_asm "subgroupBroadcast($0, $1)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt";
     case spirv:
-        return spirv_asm {OpGroupNonUniformBroadcast $$T result Subgroup $value $lane};
+        let ulane = uint(lane);
+        return spirv_asm {OpGroupNonUniformBroadcast $$T result Subgroup $value $ulane};
     default:
         return WaveMaskBroadcastLaneAt(WaveGetActiveMask(), value, lane);
     }
@@ -6814,7 +6817,8 @@ vector<T,N> WaveBroadcastLaneAt(vector<T,N> value, constexpr int lane)
     case glsl: __intrinsic_asm "subgroupBroadcast($0, $1)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt";
     case spirv:
-        return spirv_asm {OpGroupNonUniformBroadcast $$vector<T,N> result Subgroup $value $lane};
+        let ulane = uint(lane);
+        return spirv_asm {OpGroupNonUniformBroadcast $$vector<T,N> result Subgroup $value $ulane};
     default:
         return WaveMaskBroadcastLaneAt(WaveGetActiveMask(), value, lane);
     }
@@ -6841,7 +6845,8 @@ T WaveReadLaneAt(T value, int lane)
     case glsl: __intrinsic_asm "subgroupShuffle($0, $1)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt";
     case spirv:
-        return spirv_asm {OpGroupNonUniformShuffle $$T result Subgroup $value $lane};
+        let ulane = uint(lane);
+        return spirv_asm {OpGroupNonUniformShuffle $$T result Subgroup $value $ulane};
     default:
         return WaveMaskReadLaneAt(WaveGetActiveMask(), value, lane);
     }
@@ -6858,7 +6863,8 @@ vector<T,N> WaveReadLaneAt(vector<T,N> value, int lane)
     case glsl: __intrinsic_asm "subgroupShuffle($0, $1)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt";
     case spirv:
-        return spirv_asm {OpGroupNonUniformShuffle $$vector<T,N> result Subgroup $value $lane};
+        let ulane = uint(lane);
+        return spirv_asm {OpGroupNonUniformShuffle $$vector<T,N> result Subgroup $value $ulane};
     default:
         return WaveMaskReadLaneAt(WaveGetActiveMask(), value, lane);
     }
@@ -6886,7 +6892,8 @@ T WaveShuffle(T value, int lane)
     case glsl: __intrinsic_asm "subgroupShuffle($0, $1)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt";
     case spirv:
-        return spirv_asm {OpGroupNonUniformShuffle $$T result Subgroup $value $lane};
+        let ulane = uint(lane);
+        return spirv_asm {OpGroupNonUniformShuffle $$T result Subgroup $value $ulane};
     default:
         return WaveMaskShuffle(WaveGetActiveMask(), value, lane);
     }
@@ -6903,7 +6910,8 @@ vector<T,N> WaveShuffle(vector<T,N> value, int lane)
     case glsl: __intrinsic_asm "subgroupShuffle($0, $1)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt";
     case spirv:
-        return spirv_asm {OpGroupNonUniformShuffle $$vector<T,N> result Subgroup $value $lane};
+        let ulane = uint(lane);
+        return spirv_asm {OpGroupNonUniformShuffle $$vector<T,N> result Subgroup $value $ulane};
     default:
         return WaveMaskShuffle(WaveGetActiveMask(), value, lane);
     }
