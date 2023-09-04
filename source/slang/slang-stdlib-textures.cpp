@@ -441,16 +441,16 @@ void TextureTypeInfo::writeQueryFunctions()
                     }
                     cudaBuilder << "read";
                     cudaBuilder << "<$T0>($0";
-                    for (int i = 0; i < coordCount; ++i)
+                    for (int j = 0; j < coordCount; ++j)
                     {
                         cudaBuilder << ", ($1)";
                         if (vecCount > 1)
                         {
-                            cudaBuilder << '.' << char(i + 'x');
+                            cudaBuilder << '.' << char(j + 'x');
                         }
 
                         // Surface access is *byte* addressed in x in CUDA
-                        if (i == 0)
+                        if (j == 0)
                         {
                             cudaBuilder << " * $E";
                         }
@@ -628,15 +628,15 @@ void TextureTypeInfo::writeSubscriptFunctions()
             cudaBuilder << (isArray ? "Layered" : "");
             cudaBuilder << "read$C<$T0>($0";
 
-            for (int i = 0; i < vecCount; ++i)
+            for (int j = 0; j < vecCount; ++j)
             {
                 cudaBuilder << ", ($1)";
                 if (vecCount > 1)
                 {
-                    cudaBuilder << '.' << char(i + 'x');
+                    cudaBuilder << '.' << char(j + 'x');
                 }
                 // Surface access is *byte* addressed in x in CUDA
-                if (i == 0)
+                if (j == 0)
                 {
                     cudaBuilder << " * $E";
                 }
@@ -685,16 +685,16 @@ void TextureTypeInfo::writeSubscriptFunctions()
 
             cudaBuilder << (isArray ? "Layered" : "");
             cudaBuilder << "write$C<$T0>($2, $0";
-            for (int i = 0; i < vecCount; ++i)
+            for (int j = 0; j < vecCount; ++j)
             {
                 cudaBuilder << ", ($1)";
                 if (vecCount > 1)
                 {
-                    cudaBuilder << '.' << char(i + 'x');
+                    cudaBuilder << '.' << char(j + 'x');
                 }
 
                 // Surface access is *byte* addressed in x in CUDA
-                if (i == 0)
+                if (j == 0)
                 {
                     cudaBuilder << " * $E";
                 }
