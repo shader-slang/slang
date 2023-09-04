@@ -13,6 +13,8 @@ namespace Slang
         InstWorkList workList;
         InstHashSet workListSet;
 
+        Dictionary<IRInst*, IRInst*> replacements;
+
         VectorTypeLoweringContext(IRModule* module)
             :module(module), workList(module), workListSet(module)
         {}
@@ -32,248 +34,127 @@ namespace Slang
             workListSet.add(inst);
         }
 
-        void process1VectorPtrType(IRPtrTypeBase* ptr)
+        bool is1Vector(IRType* t)
         {
-            IRBuilder builder(module);
-            const auto vec1Type = cast<IRVectorType>(ptr->getValueType());
-            const auto scalarType = vec1Type->getElementType();
-            const auto scalarPtr = builder.getPtrType(ptr->getOp(), scalarType, ptr->getAddressSpace());
+            const auto lenLit = composeGetters<IRIntLit>(t, &IRVectorType::getElementCount);
+            return lenLit ? getIntVal(lenLit) == 1 : false;
+        };
 
-            traverseUses(ptr, [&](IRUse* use){
-                const auto user = use->user;
-
-                // Types will be updated later when we replaceUsesWith
-                if(as<IRType>(user))
-                    return;
-
-                InstHashSet vec1PtrConsumers(module);
-
-                if(user->getDataType() == ptr)
-                {
-                    for(auto u = user->firstUse; u; u = u->nextUse)
-                        if(!vec1PtrConsumers.contains(u->getUser()))
-                            vec1PtrConsumers.add(u->getUser());
-                }
-
-                switch(user->getOp())
-                {
-                case kIROp_FieldAddress:
-                {
-                    // const auto fa = cast<IRFieldAddress>(user);
-                    // const auto scalar = fa->getBase();
-                    // user->replaceUsesWith(scalar);
-                    // user->removeAndDeallocate();
-                }
-                break;
-                case kIROp_GetElementPtr:
-                // {
-                //     const auto fa = cast<IRGetElementPtr>(user);
-                //     const auto scalar = fa->getBase();
-                //     user->replaceUsesWith(scalar);
-                //     user->removeAndDeallocate();
-                // }
-                break;
-                case kIROp_Var:
-                {
-                    builder.setInsertBefore(user);
-                    const auto scalarVar = builder.emitVar(scalarType);
-                    user->replaceUsesWith(scalarVar);
-                    user->removeAndDeallocate();
-                }
-                break;
-
-                // Turn this on to easily find more cases to add
-#               if 1
-                default:
-                {
-                    String e = "Missing case in process1PtrVectorType:\n"
-                        + dumpIRToString(user, {IRDumpOptions::Mode::Detailed, 0});
-                    SLANG_UNIMPLEMENTED_X(e.begin());
-                }
-#               endif
-                }
-
-                //
-                // Now we handle the uses of all ptr<vec1> typed things
-                //
-                for(const auto vec1PtrConsumer : *vec1PtrConsumers.set)
-                {
-                    switch(vec1PtrConsumer->getOp())
-                    {
-                    case kIROp_GetElementPtr:
-                    {
-                        const auto fa = cast<IRGetElementPtr>(vec1PtrConsumer);
-                        const auto scalar = fa->getBase();
-                        vec1PtrConsumer->replaceUsesWith(scalar);
-                        vec1PtrConsumer->removeAndDeallocate();
-                    }
-
-                    // Turn this on to easily find more cases to add
-#               if 0
-                    default:
-                    {
-                        String e = "Missing case in process1VectorPtrType vec1PtrValUser:\n"
-                            + dumpIRToString(vec1PtrConsumer, {IRDumpOptions::Mode::Detailed, 0});
-                        SLANG_UNIMPLEMENTED_X(e.begin());
-                    }
-#endif
-                    }
-                }
-            });
+        bool has1VectorType(IRInst* i)
+        {
+            return is1Vector(i->getDataType());
         }
 
-        void process1VectorType(IRType* vecTy)
+        bool has1VectorPtrType(IRInst* i)
         {
-            InstHashSet vec1Consumers(module);
+            const auto ptr = as<IRPtrTypeBase>(i->getDataType());
+            return ptr && is1Vector(ptr->getValueType());
+        }
 
-            const auto vecDataTy
-                = as<IRVectorType>(vecTy) ? cast<IRVectorType>(vecTy)
-                : as<IRRateQualifiedType>(vecTy) ? as<IRVectorType>(cast<IRRateQualifiedType>(vecTy)->getValueType())
-                : nullptr;
+        // This creates a replacement instruction which is the scalar value of
+        // the 1-vector's only component.
+        // If no new instruction was created, then the old one is returned
+        // unmodified, when we replace the 1-vector type globally, only then
+        // will the return type of that instruction be updated; thus you
+        // shouldn't rely on this function returning an instruction with a non
+        // 1-vector return type (even if we didn't have the deferred
+        // replacement this is not true, as it'll only eliminate at most one
+        // level of 1-vectornes, and nested vectors exist)
+        IRInst* getReplacement(IRInst* vecProducer)
+        {
+            IRInst* ret = nullptr;
+            if(replacements.tryGetValue(vecProducer, ret))
+                return ret;
 
-            SLANG_ASSERT(vecDataTy);
+            const auto ptr = as<IRPtrTypeBase>(vecProducer->getDataType());
+            const auto vecTy = as<IRVectorType>(ptr ? ptr->getValueType() : vecProducer->getDataType());
+            SLANG_ASSERT(is1Vector(vecTy));
 
             IRBuilder builder(module);
-            auto scalarType = vecDataTy->getElementType();
-            if(const auto r = as<IRRateQualifiedType>(vecTy))
-                scalarType = builder.getRateQualifiedType(r->getRate(), scalarType);
+            builder.setInsertBefore(vecProducer);
 
-            traverseUses(vecTy, [&](IRUse* use){
-                const auto user = use->user;
-
-                if(const auto v1Ptr = as<IRPtrTypeBase>(user))
-                    process1VectorPtrType(v1Ptr);
-
-                if(const auto rateType = as<IRRateQualifiedType>(user))
-                    return process1VectorType(rateType);
-
-                // Types will be updated when we replaceUsesWith
-                if(as<IRType>(user))
-                    return;
-
-                //
-                // If this instruction produces a 1-vector, add its uses to the
-                // consumer list
-                //
-                if(user->getDataType() == vecTy)
-                {
-                    for(auto u = user->firstUse; u; u = u->nextUse)
-                        if(!vec1Consumers.contains(u->getUser()))
-                            vec1Consumers.add(u->getUser());
-                }
-
-                switch(user->getOp())
-                {
-                case kIROp_SPIRVAsmOperandInst:
-                    // TODO: Assume that the spirv_asm writer knows what they're doing
-                break;
-
-                // TODO: Handle more things here which create vectors
-
-                //
-                // Positive uses, a value of this type is being created
-                //
-                case kIROp_MakeVectorFromScalar:
-                case kIROp_MakeVector:
-                {
-                    const auto scalar = user->getOperand(0);
-                    user->replaceUsesWith(scalar);
-                    user->removeAndDeallocate();
-                }
-                break;
-
-                // Turn this on to easily find more cases to add
-#               if 0
-                default:
-                {
-                    String e = "Missing case in process1VectorType:\n"
-                        + dumpIRToString(user, {IRDumpOptions::Mode::Detailed, 0});
-                    SLANG_UNIMPLEMENTED_X(e.begin());
-                }
-#               endif
-                }
-            });
-
+            // This should match any instruction which can construct,
+            // specifically, a 1-vector. For example 'MakeVector'
             //
-            // Now we handle the uses of all vec1 typed things
-            //
-            for(const auto vec1Consumer : *vec1Consumers.set)
-            {
-                switch(vec1Consumer->getOp())
-                {
-                case kIROp_SPIRVAsmOperandInst:
-                    // TODO: Assume that the spirv_asm writer knows what they're doing
-                break;
+            // Instruction like, for example, arithmetic instructions don't
+            // need to be handled here, and they'll be fixed by the global
+            // 1-vector to scalar type replacement.
+            ret = instMatch<IRInst*>(vecProducer, nullptr,
+                [](IRMakeVectorFromScalar* inst){
+                    return inst->getOperand(0);
+                },
+                [](IRMakeVector* inst){
+                    return inst->getOperand(0);
+                });
 
-                // TODO: handle things here such as getElement, swizzle etc...
-                case kIROp_GetElementPtr:
-                case kIROp_SwizzledStore:
-                    SLANG_UNIMPLEMENTED_X("Vector user in 1-vector legalization");
+            // Sadly it's not really possible to catch missing cases here, as
+            // there are heaps of instructions which don't do anything special
+            // with vectors, but can return vector types, for example
+            // arithmetic, IRGetElement, IRGetField etc...
 
-                case kIROp_GetElement:
-                {
-                    const auto ge = cast<IRGetElement>(vec1Consumer);
-                    const auto scalar = ge->getBase();
-                    ge->replaceUsesWith(scalar);
-                    ge->removeAndDeallocate();
-                }
-                break;
+            // If we did get a replacement, add that to our mapping and return
+            // it, otherwise return the
+            if(ret)
+                replacements.set(vecProducer, ret);
 
-                case kIROp_swizzle:
-                {
-                    const auto swizzle = as<IRSwizzle>(vec1Consumer);
-                    const auto swizzleLength = swizzle->getElementCount();
-                    if(swizzleLength == 1)
-                    {
-                        swizzle->replaceUsesWith(swizzle->getBase());
-                    }
-                    else
-                    {
-                        builder.setInsertBefore(swizzle);
-                        // TODO: This isn't type-correct at this stage...
-                        const auto v = builder.emitMakeVectorFromScalar(
-                            vec1Consumer->getFullType(),
-                            swizzle->getBase());
-                        swizzle->replaceUsesWith(v);
-                    }
-                    swizzle->removeAndDeallocate();
-                }
-                break;
-
-                // Turn this on to easily find more cases to add
-#               if 0
-                default:
-                {
-                    String e = "Missing case in process1VectorType vec1ValUser:\n"
-                        + dumpIRToString(vec1Consumer, {IRDumpOptions::Mode::Detailed, 0});
-                    SLANG_UNIMPLEMENTED_X(e.begin());
-                }
-#endif
-                }
-            }
-
-            vecTy->replaceUsesWith(scalarType);
-            vecTy->removeAndDeallocate();
+            return ret ? ret : vecProducer;
         }
 
         void processInst(IRInst* inst)
         {
-            switch (inst->getOp())
+            IRBuilder builder(module);
+            builder.setInsertBefore(inst);
+
+            // This matches instructions which take a 1-vector as an operand
+            // and are sensitive to the fact that it's a vector. Likewise for
+            // pointers.
+            const auto rep = instMatch<IRInst*>(inst, nullptr,
+                [&](IRGetElement* getElement){
+                    const auto base = getElement->getBase();
+                    return has1VectorType(base) ? getReplacement(base) : nullptr;
+                },
+                [&](IRSwizzle* swizzle) -> IRInst*{
+                    const auto swizzled = swizzle->getBase();
+
+                    // Is this a swizzle of a 1-vector
+                    if(has1VectorType(swizzled))
+                    {
+                        // If this is a unary swizzle, just return the element
+                        // inside
+                        const auto scalar = getReplacement(swizzled);
+                        if(swizzle->getElementCount() == 1)
+                            return scalar;
+                        // Otherwise, create a broadcast of this scalar
+                        else
+                            return builder.emitMakeVectorFromScalar(
+                                swizzle->getFullType(),
+                                scalar);
+                    }
+                    return nullptr;
+                },
+                [&](IRGetElementPtr* gep){
+                    const auto base = gep->getBase();
+                    return has1VectorPtrType(base) ? getReplacement(base) : nullptr;
+                },
+                [&](IRSwizzledStore* swizzledStore){
+                    const auto base = swizzledStore->getDest();
+                    return has1VectorPtrType(base)
+                        ? builder.emitStore(getReplacement(base), swizzledStore->getSource())
+                        : nullptr;
+                });
+
+            // If we have a new instruction, add it to the list
+            if(rep)
+                replacements.set(inst, rep);
+
+            // If this is a 1-vector type itself, make a replacement
+            if(const auto vecTy = as<IRVectorType>(inst))
             {
-            case kIROp_VectorType:
-            {
-                const auto vec = cast<IRVectorType>(inst);
-                const auto lenInst = vec->getElementCount();
-                if(const auto lenLit = as<IRIntLit>(lenInst))
+                if(is1Vector(vecTy))
                 {
-                    const auto len = getIntVal(lenLit);
-                    if(len == 1)
-                        process1VectorType(vec);
+                    const auto scalarTy = vecTy->getElementType();
+                    replacements.set(vecTy, scalarTy);
                 }
-                break;
-            }
-            default:
-                break;
             }
         }
 
@@ -293,6 +174,23 @@ namespace Slang
                 for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
                 {
                     addToWorkList(child);
+                }
+            }
+
+            // Apply all replacements
+            //
+            // It's important to defer this as if we were updating things
+            // on-the-fly we would be losing information about what was
+            // actually a 1-vector or not. The alternative would be cloning
+            // every function with a 1-vector type as we process it, and
+            // cleaning up at the end. This involves less copying, but is
+            // necessarily a little less type-safe.
+            for (const auto& [old, replacement] : replacements)
+            {
+                if(old != replacement)
+                {
+                    old->replaceUsesWith(replacement);
+                    old->removeAndDeallocate();
                 }
             }
         }
