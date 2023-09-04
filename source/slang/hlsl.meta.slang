@@ -5073,10 +5073,9 @@ WaveMask WaveGetActiveMask()
         __intrinsic_asm "WaveActiveBallot(true).x";
     case spirv:
         let _true = true;
-        let _scope = 3; // subgroup
         return (spirv_asm
         {
-            OpGroupNonUniformBallot $$uint4 result $_scope $_true
+            OpGroupNonUniformBallot $$uint4 result Subgroup $_true
         }).x;
     default:
         return __WaveGetActiveMask();
@@ -5097,10 +5096,9 @@ bool WaveMaskIsFirstLane(WaveMask mask)
     case hlsl:
         __intrinsic_asm "WaveIsFirstLane()";
     case spirv:
-        let _scope = 3u; // subgroup
         return spirv_asm
         {
-            OpGroupNonUniformElect $$bool result $_scope
+            OpGroupNonUniformElect $$bool result Subgroup
         };
     default:
         return false;
@@ -5121,10 +5119,9 @@ bool WaveMaskAllTrue(WaveMask mask, bool condition)
     case hlsl:
         __intrinsic_asm "WaveActiveAllTrue($1)";
     case spirv:
-        let _scope = 3u; // subgroup
         return spirv_asm
         {
-            OpGroupNonUniformAll $$bool result $_scope $condition
+            OpGroupNonUniformAll $$bool result Subgroup $condition
         };
     default:
         return false;
@@ -5145,10 +5142,9 @@ bool WaveMaskAnyTrue(WaveMask mask, bool condition)
     case hlsl:
         __intrinsic_asm "WaveActiveAnyTrue($1)";
     case spirv:
-        let _scope = 3u; // subgroup
         return spirv_asm
         {
-            OpGroupNonUniformAny $$bool result $_scope $condition
+            OpGroupNonUniformAny $$bool result Subgroup $condition
         };
     default:
         return false;
@@ -5169,10 +5165,9 @@ WaveMask WaveMaskBallot(WaveMask mask, bool condition)
     case hlsl:
         __intrinsic_asm "WaveActiveBallot($1)";
     case spirv:
-        let _scope = 3u; // subgroup
         return (spirv_asm
         {
-            OpGroupNonUniformBallot $$uint4 result $_scope $condition
+            OpGroupNonUniformBallot $$uint4 result Subgroup $condition
         }).x;
     default:
         return 0;
@@ -5302,8 +5297,7 @@ T WaveMaskBroadcastLaneAt(WaveMask mask, T value, constexpr int lane)
     case cuda: __intrinsic_asm "__shfl_sync($0, $1, $2)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt($1, $2)";
     case spirv:
-        let _scope = 3u; // subgroup
-        return spirv_asm {OpGroupNonUniformBroadcast $$T result $_scope $value $lane};
+        return spirv_asm {OpGroupNonUniformBroadcast $$T result Subgroup $value $lane};
     }
 }
 
@@ -5319,8 +5313,7 @@ vector<T,N> WaveMaskBroadcastLaneAt(WaveMask mask, vector<T,N> value, constexpr 
     case cuda: __intrinsic_asm "_waveShuffleMultiple($0, $1, $2)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt($1, $2)";
     case spirv:
-        let _scope = 3u; // subgroup
-        return spirv_asm {OpGroupNonUniformBroadcast $$vector<T,N> result $_scope $value $lane};
+        return spirv_asm {OpGroupNonUniformBroadcast $$vector<T,N> result Subgroup $value $lane};
     }
 }
 __generic<T : __BuiltinType, let N : int, let M : int>
@@ -5342,8 +5335,8 @@ T WaveMaskReadLaneAt(WaveMask mask, T value, int lane)
     case cuda: __intrinsic_asm "__shfl_sync($0, $1, $2)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt($1, $2)";
     case spirv:
-        let _scope = 3u; // subgroup
-        return spirv_asm {OpGroupNonUniformShuffle $$T result $_scope $value $lane};
+        let ulane = uint(lane);
+        return spirv_asm {OpGroupNonUniformShuffle $$T result Subgroup $value $ulane};
     }
 }
 __generic<T : __BuiltinType, let N : int>
@@ -5358,8 +5351,8 @@ vector<T,N> WaveMaskReadLaneAt(WaveMask mask, vector<T,N> value, int lane)
     case cuda: __intrinsic_asm "_waveShuffleMultiple($0, $1, $2)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt($1, $2)";
     case spirv:
-        let _scope = 3u; // subgroup
-        return spirv_asm {OpGroupNonUniformShuffle $$vector<T,N> result $_scope $value $lane};
+        let ulane = uint(lane);
+        return spirv_asm {OpGroupNonUniformShuffle $$vector<T,N> result Subgroup $value $ulane};
     }
 }
 __generic<T : __BuiltinType, let N : int, let M : int>
@@ -5422,8 +5415,7 @@ T WaveMaskBitAnd(WaveMask mask, T expr)
     case cuda: __intrinsic_asm "_waveAnd($0, $1)";
     case hlsl: __intrinsic_asm "WaveActiveBitAnd($1)";
     case spirv:
-        let _scope = 3u; // subgroup
-        return spirv_asm {OpGroupNonUniformBitwiseAnd $$T result $_scope 0 $expr};
+        return spirv_asm {OpGroupNonUniformBitwiseAnd $$T result Subgroup 0 $expr};
     }
 }
 
@@ -5439,8 +5431,7 @@ vector<T,N> WaveMaskBitAnd(WaveMask mask, vector<T,N> expr)
     case cuda: __intrinsic_asm "_waveAndMultiple($0, $1)";
     case hlsl: __intrinsic_asm "WaveActiveBitAnd($1)";
     case spirv:
-        let _scope = 3u; // subgroup
-        return spirv_asm {OpGroupNonUniformBitwiseAnd $$vector<T,N> result $_scope 0 $expr};
+        return spirv_asm {OpGroupNonUniformBitwiseAnd $$vector<T,N> result Subgroup 0 $expr};
     }
 }
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
@@ -5460,8 +5451,7 @@ T WaveMaskBitOr(WaveMask mask, T expr)
     case cuda: __intrinsic_asm "_waveOr($0, $1)";
     case hlsl: __intrinsic_asm "WaveActiveBitOr($1)";
     case spirv:
-        let _scope = 3u; // subgroup
-        return spirv_asm {OpGroupNonUniformBitwiseOr $$T result $_scope 0 $expr};
+        return spirv_asm {OpGroupNonUniformBitwiseOr $$T result Subgroup 0 $expr};
     }
 }
 __generic<T : __BuiltinIntegerType, let N : int>
@@ -5476,8 +5466,7 @@ vector<T,N> WaveMaskBitOr(WaveMask mask, vector<T,N> expr)
     case cuda: __intrinsic_asm "_waveOrMultiple($0, $1)";
     case hlsl: __intrinsic_asm "WaveActiveBitOr($1)";
     case spirv:
-        let _scope = 3u; // subgroup
-        return spirv_asm {OpGroupNonUniformBitwiseOr $$vector<T,N> result $_scope 0 $expr};
+        return spirv_asm {OpGroupNonUniformBitwiseOr $$vector<T,N> result Subgroup 0 $expr};
     }
 }
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
@@ -5497,8 +5486,7 @@ T WaveMaskBitXor(WaveMask mask, T expr)
     case cuda: __intrinsic_asm "_waveXor($0, $1)";
     case hlsl: __intrinsic_asm "WaveActiveBitXor($1)";
     case spirv:
-        let _scope = 3u; // subgroup
-        return spirv_asm {OpGroupNonUniformBitwiseXor $$T result $_scope 0 $expr};
+        return spirv_asm {OpGroupNonUniformBitwiseXor $$T result Subgroup 0 $expr};
     }
 }
 __generic<T : __BuiltinIntegerType, let N : int>
@@ -5513,8 +5501,7 @@ vector<T,N> WaveMaskBitXor(WaveMask mask, vector<T,N> expr)
     case cuda: __intrinsic_asm "_waveXorMultiple($0, $1)";
     case hlsl: __intrinsic_asm "WaveActiveBitXor($1)";
     case spirv:
-        let _scope = 3u; // subgroup
-        return spirv_asm {OpGroupNonUniformBitwiseXor $$vector<T,N> result $_scope 0 $expr};
+        return spirv_asm {OpGroupNonUniformBitwiseXor $$vector<T,N> result Subgroup 0 $expr};
     }
 }
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
@@ -5534,13 +5521,12 @@ T WaveMaskMax(WaveMask mask, T expr)
     case cuda: __intrinsic_asm "_waveMax($0, $1)";
     case hlsl: __intrinsic_asm "WaveActiveMax($1)";
     case spirv:
-        let _scope = 3u; // subgroup
         if (__isFloat<T>())
-            return spirv_asm {OpGroupNonUniformFMax $$T result $_scope 0 $expr};
+            return spirv_asm {OpGroupNonUniformFMax $$T result Subgroup 0 $expr};
         else if (__isSignedInt<T>())
-            return spirv_asm {OpGroupNonUniformSMax $$T result $_scope 0 $expr};
+            return spirv_asm {OpGroupNonUniformSMax $$T result Subgroup 0 $expr};
         else if (__isUnsignedInt<T>())
-            return spirv_asm {OpGroupNonUniformUMax $$T result $_scope 0 $expr};
+            return spirv_asm {OpGroupNonUniformUMax $$T result Subgroup 0 $expr};
     }
 }
 __generic<T : __BuiltinArithmeticType, let N : int>
@@ -5555,13 +5541,12 @@ vector<T,N> WaveMaskMax(WaveMask mask, vector<T,N> expr)
     case cuda: __intrinsic_asm "_waveMaxMultiple($0, $1)";
     case hlsl: __intrinsic_asm "WaveActiveMax($1)";
     case spirv:
-        let _scope = 3u; // subgroup
         if (__isFloat<T>())
-            return spirv_asm {OpGroupNonUniformFMax $$vector<T,N> result $_scope 0 $expr};
+            return spirv_asm {OpGroupNonUniformFMax $$vector<T,N> result Subgroup 0 $expr};
         else if (__isSignedInt<T>())
-            return spirv_asm {OpGroupNonUniformSMax $$vector<T,N> result $_scope 0 $expr};
+            return spirv_asm {OpGroupNonUniformSMax $$vector<T,N> result Subgroup 0 $expr};
         else if (__isUnsignedInt<T>())
-            return spirv_asm {OpGroupNonUniformUMax $$vector<T,N> result $_scope 0 $expr};
+            return spirv_asm {OpGroupNonUniformUMax $$vector<T,N> result Subgroup 0 $expr};
     }
 }
 
@@ -5582,13 +5567,12 @@ T WaveMaskMin(WaveMask mask, T expr)
     case cuda: __intrinsic_asm "_waveMin($0, $1)";
     case hlsl: __intrinsic_asm "WaveActiveMin($1)";
     case spirv:
-        let _scope = 3u; // subgroup
         if (__isFloat<T>())
-            return spirv_asm {OpGroupNonUniformFMin $$T result $_scope 0 $expr};
+            return spirv_asm {OpGroupNonUniformFMin $$T result Subgroup 0 $expr};
         else if (__isSignedInt<T>())
-            return spirv_asm {OpGroupNonUniformSMin $$T result $_scope 0 $expr};
+            return spirv_asm {OpGroupNonUniformSMin $$T result Subgroup 0 $expr};
         else if (__isUnsignedInt<T>())
-            return spirv_asm {OpGroupNonUniformUMin $$T result $_scope 0 $expr};
+            return spirv_asm {OpGroupNonUniformUMin $$T result Subgroup 0 $expr};
     }
 }
 
@@ -5604,13 +5588,12 @@ vector<T,N> WaveMaskMin(WaveMask mask, vector<T,N> expr)
     case cuda: __intrinsic_asm "_waveMinMultiple($0, $1)";
     case hlsl: __intrinsic_asm "WaveActiveMin($1)";
     case spirv:
-        let _scope = 3u; // subgroup
         if (__isFloat<T>())
-            return spirv_asm {OpGroupNonUniformFMin $$vector<T,N>  result $_scope 0 $expr};
+            return spirv_asm {OpGroupNonUniformFMin $$vector<T,N>  result Subgroup 0 $expr};
         else if (__isSignedInt<T>())
-            return spirv_asm {OpGroupNonUniformSMin $$vector<T,N>  result $_scope 0 $expr};
+            return spirv_asm {OpGroupNonUniformSMin $$vector<T,N>  result Subgroup 0 $expr};
         else if (__isUnsignedInt<T>())
-            return spirv_asm {OpGroupNonUniformUMin $$vector<T,N>  result $_scope 0 $expr};
+            return spirv_asm {OpGroupNonUniformUMin $$vector<T,N>  result Subgroup 0 $expr};
     }
 }
 
@@ -5631,21 +5614,20 @@ T WaveMaskProduct(WaveMask mask, T expr)
     case cuda: __intrinsic_asm "_waveProduct($0, $1)";
     case hlsl: __intrinsic_asm "WaveActiveProduct($1)";
     case spirv:
-        let _scope = 3u; // subgroup
         if (__isFloat<T>())
-            return spirv_asm {OpGroupNonUniformFMul $$T result $_scope 0 $expr};
+            return spirv_asm {OpGroupNonUniformFMul $$T result Subgroup 0 $expr};
         else if (__isSignedInt<T>())
         {
             return spirv_asm
             {
                 // TODO: use the correct integer width
                 OpBitcast $$uint %uvalue $expr;
-                OpGroupNonUniformIMul $$T %mulResult $_scope 0 %uvalue;
+                OpGroupNonUniformIMul $$T %mulResult Subgroup 0 %uvalue;
                 OpBitcast $$T result %mulResult
             };
         }
         else if (__isUnsignedInt<T>())
-            return spirv_asm {OpGroupNonUniformIMul $$T result $_scope 0 $expr};
+            return spirv_asm {OpGroupNonUniformIMul $$T result Subgroup 0 $expr};
     }
 }
 
@@ -5661,21 +5643,20 @@ vector<T,N> WaveMaskProduct(WaveMask mask, vector<T,N> expr)
     case cuda: __intrinsic_asm "_waveProductMultiple($0, $1)";
     case hlsl: __intrinsic_asm "WaveActiveProduct($1)";
     case spirv:
-        let _scope = 3u; // subgroup
         if (__isFloat<T>())
-            return spirv_asm {OpGroupNonUniformFMul $$vector<T,N> result $_scope 0 $expr};
+            return spirv_asm {OpGroupNonUniformFMul $$vector<T,N> result Subgroup 0 $expr};
         else if (__isSignedInt<T>())
         {
             return spirv_asm
             {
                 // TODO: use the correct integer width
                 OpBitcast $$vector<uint,N> %uvalue $expr;
-                OpGroupNonUniformIMul $$vector<uint,N> %mulResult $_scope 0 %uvalue;
+                OpGroupNonUniformIMul $$vector<uint,N> %mulResult Subgroup 0 %uvalue;
                 OpBitcast $$vector<T,N> result %mulResult
             };
         }
         else if (__isUnsignedInt<T>())
-            return spirv_asm {OpGroupNonUniformIMul $$vector<T,N> result $_scope 0 $expr};
+            return spirv_asm {OpGroupNonUniformIMul $$vector<T,N> result Subgroup 0 $expr};
     }
 }
 
@@ -5696,21 +5677,20 @@ T WaveMaskSum(WaveMask mask, T expr)
     case cuda: __intrinsic_asm "_waveSum($0, $1)";
     case hlsl: __intrinsic_asm "WaveActiveSum($1)";
     case spirv:
-        let _scope = 3u; // subgroup
         if (__isFloat<T>())
-            return spirv_asm {OpGroupNonUniformFAdd $$T result $_scope 0 $expr};
+            return spirv_asm {OpGroupNonUniformFAdd $$T result Subgroup 0 $expr};
         else if (__isSignedInt<T>())
         {
             return spirv_asm
             {
                 // TODO: use the correct integer width
                 OpBitcast $$uint %uvalue $expr;
-                OpGroupNonUniformIAdd $$T %mulResult $_scope 0 %uvalue;
+                OpGroupNonUniformIAdd $$T %mulResult Subgroup 0 %uvalue;
                 OpBitcast $$T result %mulResult
             };
         }
         else if (__isUnsignedInt<T>())
-            return spirv_asm {OpGroupNonUniformIAdd $$T result $_scope 0 $expr};
+            return spirv_asm {OpGroupNonUniformIAdd $$T result Subgroup 0 $expr};
     }
 }
 __generic<T : __BuiltinArithmeticType, let N : int>
@@ -5725,21 +5705,20 @@ vector<T,N> WaveMaskSum(WaveMask mask, vector<T,N> expr)
     case cuda: __intrinsic_asm "_waveSumMultiple($0, $1)";
     case hlsl: __intrinsic_asm "WaveActiveSum($1)";
     case spirv:
-        let _scope = 3u; // subgroup
         if (__isFloat<T>())
-            return spirv_asm {OpGroupNonUniformFAdd $$vector<T,N> result $_scope 0 $expr};
+            return spirv_asm {OpGroupNonUniformFAdd $$vector<T,N> result Subgroup 0 $expr};
         else if (__isSignedInt<T>())
         {
             return spirv_asm
             {
                 // TODO: use the correct integer width
                 OpBitcast $$vector<uint,N> %uvalue $expr;
-                OpGroupNonUniformIAdd $$vector<uint,N> %mulResult $_scope 0 %uvalue;
+                OpGroupNonUniformIAdd $$vector<uint,N> %mulResult Subgroup 0 %uvalue;
                 OpBitcast $$vector<T,N> result %mulResult
             };
         }
         else if (__isUnsignedInt<T>())
-            return spirv_asm {OpGroupNonUniformIAdd $$vector<T,N> result $_scope 0 $expr};
+            return spirv_asm {OpGroupNonUniformIAdd $$vector<T,N> result Subgroup 0 $expr};
     }
 }
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
@@ -5763,10 +5742,9 @@ bool WaveMaskAllEqual(WaveMask mask, T value)
     case cuda:
         __intrinsic_asm "_waveAllEqual($0, $1)";
     case spirv:
-        let _scope = 3u; // subgroup
         return spirv_asm
         {
-            OpGroupNonUniformAllEqual $$bool result $_scope $value
+            OpGroupNonUniformAllEqual $$bool result Subgroup $value
         };
     default:
         return false;
@@ -5788,10 +5766,9 @@ bool WaveMaskAllEqual(WaveMask mask, vector<T,N> value)
     case cuda:
         __intrinsic_asm "_waveAllEqualMultiple($0, $1)";
     case spirv:
-        let _scope = 3u; // subgroup
         return spirv_asm
         {
-            OpGroupNonUniformAllEqual $$bool result $_scope $value
+            OpGroupNonUniformAllEqual $$bool result Subgroup $value
         };
     default:
         return false;
@@ -6526,10 +6503,9 @@ uint4 WaveActiveBallot(bool condition)
     case hlsl:
         __intrinsic_asm "WaveActiveBallot";
     case spirv:
-        let _scope = 3u; // Subgroup
         return spirv_asm
         {
-            OpGroupNonUniformBallot $$uint4 result $_scope $condition
+            OpGroupNonUniformBallot $$uint4 result Subgroup $condition
         };
     default:
         return WaveMaskBallot(WaveGetActiveMask(), condition);
