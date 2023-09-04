@@ -216,9 +216,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 innerType = arrayType->getElementType();
             }
 
-            if (as<IRResourceTypeBase>(innerType))
-                return;
-
             SpvStorageClass storageClass = SpvStorageClassPrivate;
             // Figure out storage class based on var layout.
             if (auto layout = getVarLayout(inst))
