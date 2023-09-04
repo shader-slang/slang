@@ -2605,7 +2605,7 @@ struct IRMakeVector : IRInst
 
 struct IRMakeVectorFromScalar : IRInst
 {
-    IR_LEAF_ISA(MakeVector)
+    IR_LEAF_ISA(MakeVectorFromScalar)
 };
 
 // An Instruction that creates a differential pair value from a
