@@ -736,7 +736,6 @@ static String cudaSampleIntrinsic(const bool isArray, const BaseTextureShapeInfo
 
     TextureFlavor::Shape baseShape = base.baseShape;
     const int coordCount = base.coordCount;
-    const int vecCount = coordCount + int(isArray);
 
     if( baseShape != TextureFlavor::Shape::ShapeCube )
     {
