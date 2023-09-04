@@ -571,7 +571,7 @@ Result linkAndOptimizeIR(
             sink);
     }
 
-    if(targetRequest->getTarget() == CodeGenTarget::SPIRV)
+    if(isKhronosTarget(targetRequest))
     {
         // SPIR-V doesn't support 1-vectors
         legalizeVectorTypes(irModule, sink);
