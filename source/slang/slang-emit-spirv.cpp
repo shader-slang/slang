@@ -1321,9 +1321,17 @@ struct SPIRVEmitContext
                 bool arrayed = texTypeInst->isArray();
                 SpvWord depth = 2; // No knowledge of if this is a depth image
                 bool ms = texTypeInst->isMultisample();
-                // TODO: This is wrong, it should be 1 if it's a sampled image and 2 if it's a RW image
+
                 SpvWord sampled = 1;
-                // TODO: can we do better?
+                switch(texTypeInst->getAccess())
+                {
+                    case SlangResourceAccess::SLANG_RESOURCE_ACCESS_READ_WRITE:
+                    case SlangResourceAccess::SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
+                        sampled = 2;
+                }
+
+                // TODO: we need to do as _emitGLSLImageFormatModifier does,
+                // take a guess at the image format
                 SpvImageFormat format = SpvImageFormatUnknown;
 
                 //
@@ -1362,6 +1370,13 @@ struct SPIRVEmitContext
                 case SpvDimTileImageDataEXT:
                     SLANG_UNIMPLEMENTED_X("OpTypeImage Capabilities for SpvDimTileImageDataEXT");
                     break;
+                }
+                if(format == SpvImageFormatUnknown && sampled == 2)
+                {
+                    // TODO: It may not be necessary to have both of these
+                    // depending on if we read or write
+                    emitCap(SpvCapabilityStorageImageReadWithoutFormat);
+                    emitCap(SpvCapabilityStorageImageWriteWithoutFormat);
                 }
 
                 //

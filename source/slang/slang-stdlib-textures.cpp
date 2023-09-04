@@ -1,6 +1,6 @@
 #include "slang-stdlib-textures.h"
 
-#define EMIT_LINE_DIRECTIVE() sb << "#line " << (__LINE__+1) << " \"slang-stdlib-textures.h\"\n"
+#define EMIT_LINE_DIRECTIVE() sb << "#line " << (__LINE__+1) << " \"slang-stdlib-textures.cpp\"\n"
 
 namespace Slang
 {
@@ -539,6 +539,23 @@ void TextureTypeInfo::writeQueryFunctions()
     }
 }
 
+static String spirvReadIntrinsic()
+{
+    StringBuilder spirvBuilder;
+    const char* i = "                    ";
+    spirvBuilder << i << "%sampled : __sampledType(T) = OpImageRead $this $location;\n";
+    spirvBuilder << i << "__truncate $$T result __sampledType(T) %sampled;";
+    return spirvBuilder;
+}
+
+static String spirvWriteIntrinsic()
+{
+    StringBuilder spirvBuilder;
+    const char* i = "                    ";
+    spirvBuilder << i << "OpImageWrite $this $location $newValue;";
+    return spirvBuilder;
+}
+
 void TextureTypeInfo::writeSubscriptFunctions()
 {
     TextureFlavor::Shape baseShape = base.baseShape;
@@ -565,7 +582,7 @@ void TextureTypeInfo::writeSubscriptFunctions()
         {
         case SLANG_RESOURCE_ACCESS_NONE:
         case SLANG_RESOURCE_ACCESS_READ:
-            sb << i << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
+            sb << i << "__glsl_extension(GL_EXT_samplerless_texture_functions)\n";
             glslBuilder << "$ctexelFetch($0, " << ivecN << "($1)";
             if( !isMultisample )
             {
@@ -638,52 +655,63 @@ void TextureTypeInfo::writeSubscriptFunctions()
     }
 
     // Output that has get
-    writeFuncWithSig(".operator[]", "get", glslBuilder, "", cudaBuilder);
+    writeFuncWithSig(
+        "operator[]",
+        "get",
+        glslBuilder,
+        spirvReadIntrinsic(),
+        cudaBuilder
+    );
 
     // !!!!!!!!!!!!!!!!!!!! set !!!!!!!!!!!!!!!!!!!!!!!
 
     if (!(access == SLANG_RESOURCE_ACCESS_NONE || access == SLANG_RESOURCE_ACCESS_READ))
     {
-        // GLSL
-        sb << i << "__target_intrinsic(glsl, \"imageStore($0, " << ivecN << "($1), $V2)\")\n";
-
         // CUDA
+        cudaBuilder.clear();
         {
             const int coordCount = base.coordCount;
             const int vecCount = coordCount + int(isArray);
 
-            sb << i << "__target_intrinsic(cuda, \"surf";
+            cudaBuilder << "surf";
             if( baseShape != TextureFlavor::Shape::ShapeCube )
             {
-                sb << coordCount << "D";
+                cudaBuilder << coordCount << "D";
             }
             else
             {
-                sb << "Cubemap";
+                cudaBuilder << "Cubemap";
             }
 
-            sb << (isArray ? "Layered" : "");
-            sb << "write$C<$T0>($2, $0";
+            cudaBuilder << (isArray ? "Layered" : "");
+            cudaBuilder << "write$C<$T0>($2, $0";
             for (int i = 0; i < vecCount; ++i)
             {
-                sb << ", ($1)";
+                cudaBuilder << ", ($1)";
                 if (vecCount > 1)
                 {
-                    sb << '.' << char(i + 'x');
+                    cudaBuilder << '.' << char(i + 'x');
                 }
 
                 // Surface access is *byte* addressed in x in CUDA
                 if (i == 0)
                 {
-                    sb << " * $E";
+                    cudaBuilder << " * $E";
                 }
             }
 
-            sb << ", SLANG_CUDA_BOUNDARY_MODE)\")\n";
+            cudaBuilder << ", SLANG_CUDA_BOUNDARY_MODE)";
         }
 
         // Set
-        sb << i << "[nonmutating]\n" << i << "set;\n";
+        sb << i << "[nonmutating]\n";
+        writeFuncWithSig(
+            "operator[]",
+            "set(T newValue)",
+            cat("imageStore($0, ", ivecN, "($1), $V2)"),
+            spirvWriteIntrinsic(),
+            cudaBuilder
+        );
     }
 
     // !!!!!!!!!!!!!!!!!! ref !!!!!!!!!!!!!!!!!!!!!!!!!
