@@ -4,6 +4,10 @@
 #include "vk-device.h"
 #include "vk-util.h"
 
+#if SLANG_WINDOWS_FAMILY
+#include <dxgi1_2.h>
+#endif
+
 namespace gfx
 {
 
@@ -39,6 +43,28 @@ Result FenceImpl::init(const IFence::Desc& desc)
     createInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
     createInfo.pNext = &timelineCreateInfo;
     createInfo.flags = 0;
+
+    VkExportSemaphoreWin32HandleInfoKHR exportSemaphoreWin32HandleInfoKHR;
+    VkExportSemaphoreCreateInfoKHR exportSemaphoreCreateInfo;
+    if (desc.isShared)
+    {
+#if SLANG_WINDOWS_FAMILY
+        exportSemaphoreWin32HandleInfoKHR.sType = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_WIN32_HANDLE_INFO_KHR;
+        exportSemaphoreWin32HandleInfoKHR.pNext = NULL;
+        exportSemaphoreWin32HandleInfoKHR.pAttributes = NULL;
+        exportSemaphoreWin32HandleInfoKHR.dwAccess = DXGI_SHARED_RESOURCE_READ | DXGI_SHARED_RESOURCE_WRITE;
+        exportSemaphoreWin32HandleInfoKHR.name = (LPCWSTR)NULL;
+#endif
+        exportSemaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO_KHR;
+#ifdef SLANG_WINDOWS_FAMILY
+        exportSemaphoreCreateInfo.pNext = &exportSemaphoreWin32HandleInfoKHR;
+        exportSemaphoreCreateInfo.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+#else
+        exportSemaphoreCreateInfo.pNext = NULL;
+        exportSemaphoreCreateInfo.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;
+#endif
+        timelineCreateInfo.pNext = &exportSemaphoreCreateInfo;
+    }
 
     SLANG_VK_RETURN_ON_FAIL(m_device->m_api.vkCreateSemaphore(
         m_device->m_api.m_device, &createInfo, nullptr, &m_semaphore));
@@ -89,9 +115,20 @@ Result FenceImpl::getSharedHandle(InteropHandle* outHandle)
     handleInfo.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
 
     SLANG_VK_RETURN_ON_FAIL(m_device->m_api.vkGetSemaphoreWin32HandleKHR(
-        m_device->m_api.m_device, &handleInfo, (HANDLE*)&outHandle->handleValue));
+        m_device->m_api.m_device, &handleInfo, (HANDLE*)&sharedHandle.handleValue));
+#else
+    VkSemaphoreGetFdInfoKHR fdInfo = {
+        VK_STRUCTURE_TYPE_SEMAPHORE_GET_FD_INFO_KHR};
+    fdInfo.pNext = nullptr;
+    fdInfo.semaphore = m_semaphore;
+    fdInfo.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;
+
+    SLANG_VK_RETURN_ON_FAIL(m_device->m_api.vkGetSemaphoreFdKHR(
+        m_device->m_api.m_device, &handleInfo, (int*)&sharedHandle.handleValue));
 #endif
+
     sharedHandle.api = InteropHandleAPI::Vulkan;
+    *outHandle = sharedHandle;
     return SLANG_OK;
 }
 

@@ -176,6 +176,7 @@ namespace gfx {
 #else
 #   define VK_API_DEVICE_PLATFORM_OPT_PROCS(x) \
     x(vkGetMemoryFdKHR) \
+    x(vkGetSemaphoreFdKHR) \
     /* */
 #endif
 

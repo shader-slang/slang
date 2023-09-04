@@ -607,6 +607,22 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
 #endif
             m_features.add("external-memory");
         }
+        if (extensionNames.contains(VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME))
+        {
+            deviceExtensions.add(VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME);
+#if SLANG_WINDOWS_FAMILY
+            if (extensionNames.contains(VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME))
+            {
+                deviceExtensions.add(VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME);
+            }
+#elif
+            if (extensionNames.contains(VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME))
+            {
+                deviceExtensions.add(VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME);
+            }
+#endif
+            m_features.add("external-semaphore");
+        }
         if (extensionNames.contains(VK_EXT_CONSERVATIVE_RASTERIZATION_EXTENSION_NAME))
         {
             deviceExtensions.add(VK_EXT_CONSERVATIVE_RASTERIZATION_EXTENSION_NAME);
