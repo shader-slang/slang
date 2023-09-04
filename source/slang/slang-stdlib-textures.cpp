@@ -749,10 +749,7 @@ static String cudaSampleIntrinsic(const bool isArray, const BaseTextureShapeInfo
         for (int i = 0; i < coordCount; ++i)
         {
             cudaBuilder << ", ($2)";
-            if (vecCount > 1)
-            {
-                cudaBuilder << '.' << char(i + 'x');
-            }
+            cudaBuilder << '.' << "xyzw"[i];
         }
         if (isArray)
             cudaBuilder << ", int(($2)." << char(coordCount + 'x') << ")";
