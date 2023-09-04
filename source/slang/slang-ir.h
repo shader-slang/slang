@@ -2483,7 +2483,6 @@ template<typename R, typename T>
 static T thisArg(R (T::*&&())());
 }
 
-#if __cplusplus >= 201703L
 // A tool to "pattern match" an instruction against multiple cases
 // Use like:
 //
@@ -2499,7 +2498,6 @@ static T thisArg(R (T::*&&())());
 template<typename R, typename F, typename... Fs>
 R instMatch(IRInst* i, R def, F f, Fs... fs)
 {
-    static_assert(__cplusplus >= 201703L, "Wait until we're on c++17 to use instMatch");
     // Recursive case
     using P = decltype(detail::argType(std::function{std::declval<F>()}));
     if(auto s = as<P>(i))
@@ -2531,7 +2529,6 @@ R instMatch(IRInst*, R def)
 template<typename F, typename... Fs>
 void instMatch_(IRInst* i, F f, Fs... fs)
 {
-    static_assert(__cplusplus >= 201703L, "Wait until we're on c++17 to use instMatch_");
     // Recursive case
     using P = decltype(detail::argType(std::function{std::declval<F>()}));
     if(auto s = as<P>(i))
@@ -2546,7 +2543,6 @@ void instMatch_(IRInst*)
 {
     // Base case with no eliminators
 }
-#endif
 
 // A tool to compose a bunch of downcasts and accessors
 // `composeGetters<R>(x, &MyStruct::getFoo, &MyOtherStruct::getBar)` translates to
