@@ -1077,7 +1077,9 @@ INST(SPIRVAsmInst, SPIRVAsmInst, 1, 0)
     // A literal string or 32-bit integer to be passed as operands
     INST(SPIRVAsmOperandLiteral, SPIRVAsmOperandLiteral, 1, HOISTABLE)
     // A reference to a slang IRInst, either a value or a type
-    INST(SPIRVAsmOperandInst, SPIRVAsmOperandInst, 1, HOISTABLE)
+    // This isn't hoistable, as we sometimes need to change the used value and
+    // instructions around the specific asm block
+    INST(SPIRVAsmOperandInst, SPIRVAsmOperandInst, 1, 0)
     // A named enumerator, the value is stored as a constant operand
     // It may have a second operand, which if present is a type with which to
     // construct a constant id to pass, instead of a literal constant
