@@ -834,5 +834,6 @@ class ModifiedType : public Type
 };
 
 Type* removeParamDirType(Type* type);
+bool isNonCopyableType(Type* type);
 
 } // namespace Slang

@@ -538,7 +538,7 @@ DIAGNOSTIC(38100, Error, typeDoesntImplementInterfaceRequirement, "type '$0' doe
 DIAGNOSTIC(38101, Error, thisExpressionOutsideOfTypeDecl, "'this' expression can only be used in members of an aggregate type")
 DIAGNOSTIC(38102, Error, initializerNotInsideType, "an 'init' declaration is only allowed inside a type or 'extension' declaration")
 DIAGNOSTIC(38103, Error, thisTypeOutsideOfTypeDecl, "'This' type can only be used inside of an aggregate type")
-
+DIAGNOSTIC(38104, Error, returnValNotAvailable, "cannot use '__return_val' here. '__return_val' is defined only in functions that return a non-copyable value.")
 DIAGNOSTIC(38020, Error, mismatchEntryPointTypeArgument, "expecting $0 entry-point type arguments, provided $1.")
 DIAGNOSTIC(38021, Error, typeArgumentForGenericParameterDoesNotConformToInterface, "type argument `$0` for generic parameter `$1` does not conform to interface `$2`.")
 

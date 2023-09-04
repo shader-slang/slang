@@ -469,6 +469,16 @@ class ThisExpr: public Expr
     Scope* scope = nullptr;
 };
 
+// Represent a reference to the virtual __return_val object holding the return value of
+// functions whose result type is non-copyable.
+class ReturnValExpr : public Expr
+{
+    SLANG_AST_CLASS(ReturnValExpr)
+
+    SLANG_UNREFLECTED
+    Scope* scope = nullptr;
+};
+
 // An expression that binds a temporary variable in a local expression context
 class LetExpr: public Expr
 {

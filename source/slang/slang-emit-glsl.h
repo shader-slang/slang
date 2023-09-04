@@ -56,9 +56,6 @@ protected:
     virtual void emitSimpleValueImpl(IRInst* inst) SLANG_OVERRIDE;
     virtual void emitLoopControlDecorationImpl(IRLoopControlDecoration* decl) SLANG_OVERRIDE;
 
-    virtual void _emitInstAsVarInitializerImpl(IRInst* inst) SLANG_OVERRIDE;
-    virtual void _emitStoreImpl(IRStore* store) SLANG_OVERRIDE;
-
     void _emitGLSLTextureOrTextureSamplerType(IRTextureTypeBase* type, char const* baseName);
     void _emitGLSLStructuredBuffer(IRGlobalParam* varDecl, IRHLSLStructuredBufferTypeBase* structuredBufferType);
 

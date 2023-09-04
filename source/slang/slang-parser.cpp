@@ -5299,6 +5299,13 @@ namespace Slang
         return expr;
     }
 
+    static NodeBase* parseReturnValExpr(Parser* parser, void* /*userData*/)
+    {
+        ReturnValExpr* expr = parser->astBuilder->create<ReturnValExpr>();
+        expr->scope = parser->currentScope;
+        return expr;
+    }
+
     static Expr* parseBoolLitExpr(Parser* parser, bool value)
     {
         BoolLiteralExpr* expr = parser->astBuilder->create<BoolLiteralExpr>();
@@ -7327,6 +7334,7 @@ namespace Slang
         _makeParseExpr("this",  parseThisExpr),
         _makeParseExpr("true",  parseTrueExpr),
         _makeParseExpr("false", parseFalseExpr),
+        _makeParseExpr("__return_val", parseReturnValExpr),
         _makeParseExpr("nullptr", parseNullPtrExpr),
         _makeParseExpr("none", parseNoneExpr),
         _makeParseExpr("try",     parseTryExpr),

@@ -796,4 +796,14 @@ Type* removeParamDirType(Type* type)
     return type;
 }
 
+bool isNonCopyableType(Type* type)
+{
+    auto declRefType = as<DeclRefType>(type);
+    if (!declRefType)
+        return false;
+    if (declRefType->getDeclRef().getDecl()->findModifier<NonCopyableTypeAttribute>())
+        return true;
+    return false;
+}
+
 } // namespace Slang

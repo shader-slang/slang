@@ -1,10 +1,10 @@
 //TEST:SIMPLE(filecheck=CHECK):-target glsl -profile glsl_450 -entry MainCs -stage compute  -fvk-b-shift 0 0 -fvk-s-shift 14 0 -fvk-t-shift 30 0 -fvk-u-shift 158 0
 
 
-// CHECK: layout(std430, binding = 159) buffer  
-// CHECK: } g_ByteBuffer
+// CHECK-DAG: layout(std430, binding = 159) buffer  
+// CHECK-DAG: } g_ByteBuffer
 
-// CHECK: layout(std430, binding = 158) buffer  
+// CHECK-DAG: layout(std430, binding = 158) buffer  
 
 RWStructuredBuffer<uint> g_OutputCullBits;
 RWByteAddressBuffer g_ByteBuffer;

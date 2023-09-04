@@ -563,6 +563,10 @@ struct IRGenContext
     // The IR witness value to use for `ThisType`
     IRInst* thisTypeWitness = nullptr;
 
+    // The return destination parameter to write to at return sites.
+    // (For use by functions that returns non-copyable types)
+    LoweredValInfo returnDestination;
+
     bool includeDebugInfo = false;
 
     explicit IRGenContext(SharedIRGenContext* inShared, ASTBuilder* inAstBuilder)
@@ -804,6 +808,11 @@ LoweredValInfo lowerRValueExpr(
     IRGenContext*   context,
     Expr*           expr);
 
+void lowerRValueExprWithDestination(
+    IRGenContext* context,
+    LoweredValInfo destination,
+    Expr* expr);
+
 IRType* lowerType(
     IRGenContext*   context,
     Type*           type);
@@ -1038,8 +1047,6 @@ LoweredValInfo extractField(
     }
 }
 
-
-
 LoweredValInfo materialize(
     IRGenContext*   context,
     LoweredValInfo  lowered)
@@ -1231,6 +1238,12 @@ void assign(
     IRGenContext*           context,
     LoweredValInfo const&   left,
     LoweredValInfo const&   right);
+
+void assignExpr(
+    IRGenContext* context,
+    const LoweredValInfo& inLeft,
+    Expr* rightExpr,
+    SourceLoc assignmentLoc);
 
 IRInst* getAddress(
     IRGenContext*           context,
@@ -2703,6 +2716,9 @@ struct IRLoweringParameterInfo
 
     // Is this the representation of a `this` parameter?
     bool                isThisParam = false;
+
+    // Is this the destination of address for non-copyable return val?
+    bool                isReturnDestination = false;
 };
 //
 // We need a way to be able to create a `IRLoweringParameterInfo` given the declaration
@@ -2771,6 +2787,19 @@ void addThisParameter(
     info.isThisParam = true;
 
     ioParameterLists->params.add(info);
+}
+
+void maybeAddReturnDestinationParam(ParameterLists* ioParameterLists, Type* resultType)
+{
+    if (isNonCopyableType(resultType))
+    {
+        IRLoweringParameterInfo info;
+        info.type = resultType;
+        info.decl = nullptr;
+        info.direction = kParameterDirection_Ref;
+        info.isReturnDestination = true;
+        ioParameterLists->params.add(info);
+    }
 }
 //
 // And here is our function that will do the recursive walk:
@@ -2842,6 +2871,7 @@ void collectParameterLists(
             {
                 ioParameterLists->params.add(getParameterInfo(context, paramDeclRef));
             }
+            maybeAddReturnDestinationParam(ioParameterLists, getResultType(context->astBuilder, callableDeclRef));
         }
     }
 }
@@ -2883,6 +2913,10 @@ struct FuncDeclBaseTypeInfo
     IRType*         resultType;
     ParameterLists  parameterLists;
     List<IRType*>   paramTypes;
+    // If the function returns a non-copyable value, this
+    // flag is set to indicate that the result should be
+    // returned via the last ref parameter.
+    bool            returnViaLastRefParam = false;
 };
 
 void _lowerFuncDeclBaseTypeInfo(
@@ -2947,24 +2981,34 @@ void _lowerFuncDeclBaseTypeInfo(
     }
 
     auto& irResultType = outInfo.resultType;
-    irResultType = lowerType(context, getResultType(context->astBuilder, declRef));
-
-    if (auto setterDeclRef = declRef.as<SetterDecl>())
+    
+    if (parameterLists.params.getCount() && parameterLists.params.getLast().isReturnDestination)
     {
-        // A `set` accessor always returns `void`
-        //
-        // TODO: We should handle this by making the result
-        // type of a `set` accessor be represented accurately
-        // at the AST level (ditto for the `ref` case below).
-        //
-        irResultType = builder->getVoidType();
+        irResultType = context->irBuilder->getVoidType();
+        outInfo.returnViaLastRefParam = true;
     }
-
-    if( auto refAccessorDeclRef = declRef.as<RefAccessorDecl>() )
+    else
     {
-        // A `ref` accessor needs to return a *pointer* to the value
-        // being accessed, rather than a simple value.
-        irResultType = builder->getPtrType(irResultType);
+        irResultType = lowerType(context, getResultType(context->astBuilder, declRef));
+
+
+        if (auto setterDeclRef = declRef.as<SetterDecl>())
+        {
+            // A `set` accessor always returns `void`
+            //
+            // TODO: We should handle this by making the result
+            // type of a `set` accessor be represented accurately
+            // at the AST level (ditto for the `ref` case below).
+            //
+            irResultType = builder->getVoidType();
+        }
+
+        if (auto refAccessorDeclRef = declRef.as<RefAccessorDecl>())
+        {
+            // A `ref` accessor needs to return a *pointer* to the value
+            // being accessed, rather than a simple value.
+            irResultType = builder->getPtrType(irResultType);
+        }
     }
   
     if (!getErrorCodeType(context->astBuilder, declRef)->equals(context->astBuilder->getBottomType()))
@@ -3023,10 +3067,8 @@ static LoweredValInfo _emitCallToAccessor(
     return result;
 }
 
-//
-
 template<typename Derived>
-struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
+struct ExprLoweringContext
 {
     static bool isLValueContext() { return Derived::_isLValueContext(); }
 
@@ -3035,20 +3077,493 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     IRBuilder* getBuilder() { return context->irBuilder; }
     ASTBuilder* getASTBuilder() { return context->astBuilder; }
 
+
+    struct ResolvedCallInfo
+    {
+        DeclRef<Decl>   funcDeclRef;
+        Expr* baseExpr = nullptr;
+    };
+
+    // Try to resolve a the function expression for a call
+    // into a reference to a specific declaration, along
+    // with some contextual information about the declaration
+    // we are calling.
+    bool tryResolveDeclRefForCall(
+        Expr* funcExpr,
+        ResolvedCallInfo* outInfo)
+    {
+        // TODO: unwrap any "identity" expressions that might
+        // be wrapping the callee.
+
+        // First look to see if the expression references a
+        // declaration at all.
+        auto declRefExpr = as<DeclRefExpr>(funcExpr);
+        if (!declRefExpr)
+            return false;
+
+        // A little bit of future proofing here: if we ever
+        // allow higher-order functions, then we might be
+        // calling through a variable/field that has a function
+        // type, but is not itself a function.
+        // In such a case we should be careful to not statically
+        // resolve things.
+        //
+        if (auto callableDecl = as<CallableDecl>(declRefExpr->declRef.getDecl()))
+        {
+            // Okay, the declaration is directly callable, so we can continue.
+        }
+        else
+        {
+            // The callee declaration isn't itself a callable (it must have
+            // a function type, though).
+            return false;
+        }
+
+        // Now we can look at the specific kinds of declaration references,
+        // and try to tease them apart.
+        if (auto memberFuncExpr = as<MemberExpr>(funcExpr))
+        {
+            outInfo->funcDeclRef = memberFuncExpr->declRef;
+            outInfo->baseExpr = memberFuncExpr->baseExpression;
+            return true;
+        }
+        else if (auto staticMemberFuncExpr = as<StaticMemberExpr>(funcExpr))
+        {
+            outInfo->funcDeclRef = staticMemberFuncExpr->declRef;
+            return true;
+        }
+        else if (auto varExpr = as<VarExpr>(funcExpr))
+        {
+            outInfo->funcDeclRef = varExpr->declRef;
+            return true;
+        }
+        else
+        {
+            // Seems to be a case of declaration-reference we don't know about.
+            SLANG_UNEXPECTED("unknown declaration reference kind");
+            //return false;
+        }
+    }
+
+    /// Return `expr` with any outer casts to interface types stripped away
+    Expr* maybeIgnoreCastToInterface(Expr* expr)
+    {
+        auto e = expr;
+        while (auto castExpr = as<CastToSuperTypeExpr>(e))
+        {
+            if (auto declRefType = as<DeclRefType>(e->type))
+            {
+                if (declRefType->getDeclRef().as<InterfaceDecl>())
+                {
+                    e = castExpr->valueArg;
+                    continue;
+                }
+            }
+            else if (auto andType = as<AndType>(e->type))
+            {
+                // TODO: We might eventually need to tell the difference
+                // between conjunctions of interfaces and conjunctions
+                // that might include non-interface types.
+                //
+                // For now we assume that any case to a conjunction
+                // is effectively a cast to an interface type.
+                //
+                e = castExpr->valueArg;
+                continue;
+            }
+            break;
+        }
+        return e;
+    }
+
+
     // Lower an expression that should have the same l-value-ness
     // as the visitor itself.
     LoweredValInfo lowerSubExpr(Expr* expr)
     {
         IRBuilderSourceLocRAII sourceLocInfo(getBuilder(), expr->loc);
-        return this->dispatch(expr);
+        if (isLValueContext())
+            return lowerLValueExpr(context, expr);
+        return lowerRValueExpr(context, expr);
     }
 
-    LoweredValInfo lowerSubExpr(Expr* expr, IRGenContext* subContext)
+    /// Create IR instructions for an argument at a call site, based on
+    /// AST-level expressions plus function signature information.
+    ///
+    /// The `funcType` parameter is always required, and specifies the types
+    /// of all the parameters. The `funcDeclRef` parameter is only required
+    /// if there are parameter positions for which the matching argument is
+    /// absent.
+    ///
+    void addDirectCallArgs(
+        InvokeExpr* expr,
+        Index                   argIndex,
+        IRType* paramType,
+        ParameterDirection      paramDirection,
+        DeclRef<ParamDecl>      paramDeclRef,
+        List<IRInst*>* ioArgs,
+        List<OutArgumentFixup>* ioFixups)
     {
-        IRBuilderSourceLocRAII sourceLocInfo(getBuilder(), expr->loc);
-        Derived d;
-        d.context = subContext;
-        return d.dispatch(expr);
+        Count argCount = expr->arguments.getCount();
+        if (argIndex < argCount)
+        {
+            auto argExpr = expr->arguments[argIndex];
+            addCallArgsForParam(context, paramType, paramDirection, argExpr, ioArgs, ioFixups);
+        }
+        else
+        {
+            // We have run out of arguments supplied at the call site,
+            // but there are still parameters remaining. This must mean
+            // that these parameters have default argument expressions
+            // associated with them.
+            //
+            // Currently we simply extract the initial-value expression
+            // from the parameter declaration and then lower it in
+            // the context of the caller.
+            //
+            // Note that the expression could involve subsitutions because
+            // in the general case it could depend on the generic parameters
+            // used the specialize the callee. For now we do not handle that
+            // case, and simply ignore generic arguments.
+            //
+            SubstExpr<Expr> argExpr = getInitExpr(getASTBuilder(), paramDeclRef);
+            SLANG_ASSERT(argExpr);
+
+            IRGenEnv subEnvStorage;
+            IRGenEnv* subEnv = &subEnvStorage;
+            subEnv->outer = context->env;
+
+            IRGenContext subContextStorage = *context;
+            IRGenContext* subContext = &subContextStorage;
+            subContext->env = subEnv;
+
+            _lowerSubstitutionEnv(subContext, argExpr.getSubsts() ? argExpr.getSubsts().declRef : nullptr);
+
+            addCallArgsForParam(subContext, paramType, paramDirection, argExpr.getExpr(), ioArgs, ioFixups);
+
+            // TODO: The approach we are taking here to default arguments
+            // is simplistic, and has consequences for the front-end as
+            // well as binary serialization of modules.
+            //
+            // We could consider some more refined approaches where, e.g.,
+            // functions with default arguments generate multiple IR-level
+            // functions, that compute and provide the default values.
+            //
+            // Alternatively, each parameter with defaults could be generated
+            // into its own callable function that provides the default value,
+            // so that calling modules can call into a pre-generated function.
+            //
+            // Each of these options involves trade-offs, and we need to
+            // make a conscious decision at some point.
+
+            // Assert that such an expression must have been present.
+        }
+    }
+
+    void addDirectCallArgs(
+        InvokeExpr* expr,
+        FuncType* funcType,
+        List<IRInst*>* ioArgs,
+        List<OutArgumentFixup>* ioFixups)
+    {
+        Count argCount = expr->arguments.getCount();
+        SLANG_ASSERT(argCount == funcType->getParamCount());
+
+        for (Index i = 0; i < argCount; ++i)
+        {
+            IRType* paramType = lowerType(context, funcType->getParamType(i));
+            ParameterDirection paramDirection = funcType->getParamDirection(i);
+            addDirectCallArgs(expr, i, paramType, paramDirection, DeclRef<ParamDecl>(), ioArgs, ioFixups);
+        }
+    }
+
+    void addDirectCallArgs(
+        InvokeExpr* expr,
+        DeclRef<CallableDecl>   funcDeclRef,
+        List<IRInst*>* ioArgs,
+        List<OutArgumentFixup>* ioFixups)
+    {
+        Count argCounter = 0;
+        for (auto paramDeclRef : getMembersOfType<ParamDecl>(getASTBuilder(), funcDeclRef))
+        {
+            auto paramDecl = paramDeclRef.getDecl();
+            IRType* paramType = lowerType(context, getType(getASTBuilder(), paramDeclRef));
+            auto paramDirection = getParameterDirection(paramDecl);
+
+            Index argIndex = argCounter++;
+            addDirectCallArgs(expr, argIndex, paramType, paramDirection, paramDeclRef, ioArgs, ioFixups);
+        }
+    }
+
+    // Add arguments that appeared directly in an argument list
+    // to the list of argument values for a call.
+    void addDirectCallArgs(
+        InvokeExpr* expr,
+        DeclRef<Decl>           funcDeclRef,
+        List<IRInst*>* ioArgs,
+        List<OutArgumentFixup>* ioFixups)
+    {
+        if (auto callableDeclRef = funcDeclRef.as<CallableDecl>())
+        {
+            addDirectCallArgs(expr, callableDeclRef, ioArgs, ioFixups);
+        }
+        else
+        {
+            SLANG_UNEXPECTED("callee was not a callable decl");
+        }
+    }
+
+    void addFuncBaseArgs(
+        LoweredValInfo funcVal,
+        List<IRInst*>* /*ioArgs*/)
+    {
+        switch (funcVal.flavor)
+        {
+        default:
+            return;
+        }
+    }
+
+
+    void _lowerSubstitutionArg(IRGenContext* subContext, GenericAppDeclRef* subst, Decl* paramDecl, Index argIndex)
+    {
+        SLANG_ASSERT(argIndex < subst->getArgs().getCount());
+        auto argVal = lowerVal(subContext, subst->getArgs()[argIndex]);
+        subContext->setValue(paramDecl, argVal);
+    }
+
+    void _lowerSubstitutionEnv(IRGenContext* subContext, DeclRefBase* subst)
+    {
+        if (!subst) return;
+        _lowerSubstitutionEnv(subContext, subst->getBase());
+
+        if (auto genSubst = as<GenericAppDeclRef>(subst))
+        {
+            auto genDecl = genSubst->getGenericDecl();
+
+            Index argCounter = 0;
+            for (auto memberDecl : genDecl->members)
+            {
+                if (auto typeParamDecl = as<GenericTypeParamDecl>(memberDecl))
+                {
+                    _lowerSubstitutionArg(subContext, genSubst, typeParamDecl, argCounter++);
+                }
+                else if (auto valParamDecl = as<GenericValueParamDecl>(memberDecl))
+                {
+                    _lowerSubstitutionArg(subContext, genSubst, valParamDecl, argCounter++);
+                }
+            }
+            for (auto memberDecl : genDecl->members)
+            {
+                if (auto constraintDecl = as<GenericTypeConstraintDecl>(memberDecl))
+                {
+                    _lowerSubstitutionArg(subContext, genSubst, constraintDecl, argCounter++);
+                }
+            }
+        }
+        // TODO: also need to handle this-type substitution here?
+    }
+
+    /// Lower an invoke expr, and attempt to fuse a store of the expr's result into destination.
+    /// If the store is fused, returns LoweredValInfo::None. Otherwise, returns the IR val representing the RValue.
+    LoweredValInfo visitInvokeExprImpl(InvokeExpr* expr, LoweredValInfo destination, const TryClauseEnvironment& tryEnv)
+    {
+        auto type = lowerType(context, expr->type);
+
+        // We are going to look at the syntactic form of
+        // the "function" expression, so that we can avoid
+        // a lot of complexity that would come from lowering
+        // it as a general expression first, and then trying
+        // to apply it. For example, given `obj.f(a,b)` we
+        // will try to detect that we are trying to compute
+        // something like `ObjType::f(obj, a, b)` (in pseudo-code),
+        // rather than trying to construct a meaningful
+        // intermediate value for `obj.f` first.
+        //
+        // Note that this doe not preclude having support
+        // for directly generating code from `obj.f` - it
+        // just may be that such usage is more complicated.
+
+        // Along the way, we may end up collecting additional
+        // arguments that will be part of the call.
+        List<IRInst*> irArgs;
+
+        // We will also collect "fixup" actions that need
+        // to be performed after the call, in order to
+        // copy the final values for `out` parameters
+        // back to their arguments.
+        List<OutArgumentFixup> argFixups;
+
+        auto funcExpr = expr->functionExpr;
+        ResolvedCallInfo resolvedInfo;
+        if (tryResolveDeclRefForCall(funcExpr, &resolvedInfo))
+        {
+            // In this case we know exactly what declaration we
+            // are going to call, and so we can resolve things
+            // appropriately.
+            auto funcDeclRef = resolvedInfo.funcDeclRef;
+            auto baseExpr = resolvedInfo.baseExpr;
+
+            // If the thing being invoked is a subscript operation,
+            // then we need to handle multiple extra details
+            // that don't arise for other kinds of calls.
+            //
+            // TODO: subscript operations probably deserve to
+            // be handled on their own path for this reason...
+            //
+            if (auto subscriptDeclRef = funcDeclRef.template as<SubscriptDecl>())
+            {
+                // A reference to a subscript declaration is a special case,
+                // because it is not possible to call a subscript directly;
+                // we must call one of its accessors.
+                //
+                auto loweredBase = lowerSubExpr(baseExpr);
+                addDirectCallArgs(expr, funcDeclRef, &irArgs, &argFixups);
+                auto result = lowerStorageReference(context, type, subscriptDeclRef, loweredBase, irArgs.getCount(), irArgs.getBuffer());
+
+                // TODO: Applying the fixups for arguments to the subscript at this point
+                // won't technically be correct, since the call to the subscript may
+                // not have occured at this point.
+                //
+                // It seems like we need to either:
+                //
+                // * Capture the arguments to the subscript as `LoweredValInfo` instead of `IRInst*`
+                //   so that we can deal with everything related to fixups around the actual call
+                //   site.
+                //
+                // OR
+                //
+                // * Handle everything to do with "fixups" differently, by treating them as deferred
+                // actions that gert queued up on the context itself and then flushed at certain
+                // well-defined points, so that we don't have to be as careful around them.
+                //
+                // OR
+                //
+                // * Switch to a more "destination-driven" approach to code generation, where we
+                // can determine on entry to the lowering of a sub-expression whether it will be
+                // used for read, write, or read/write, and resolve things like the choice of
+                // accessor at that point instead.
+                //
+                applyOutArgumentFixups(context, argFixups);
+                return result;
+            }
+
+            // First comes the `this` argument if we are calling
+            // a member function:
+            if (baseExpr)
+            {
+                // The base expression might be an "upcast" to a base interface, in
+                // which case we don't want to emit the result of the cast, but instead
+                // the source.
+                //
+                baseExpr = this->maybeIgnoreCastToInterface(baseExpr);
+
+                auto thisType = getThisParamTypeForCallable(context, funcDeclRef);
+                auto irThisType = lowerType(context, thisType);
+                addCallArgsForParam(
+                    context,
+                    irThisType,
+                    getThisParamDirection(funcDeclRef.getDecl(), kParameterDirection_In),
+                    baseExpr,
+                    &irArgs,
+                    &argFixups);
+            }
+
+            // Then we have the "direct" arguments to the call.
+            // These may include `out` and `inout` arguments that
+            // require "fixup" work on the other side.
+            //
+            FuncDeclBaseTypeInfo funcTypeInfo;
+            _lowerFuncDeclBaseTypeInfo(context, funcDeclRef.template as<FunctionDeclBase>(), funcTypeInfo);
+
+            auto funcType = funcTypeInfo.type;
+            addDirectCallArgs(expr, funcDeclRef, &irArgs, &argFixups);
+
+            LoweredValInfo result;
+            if (funcTypeInfo.returnViaLastRefParam)
+            {
+                // If the function returns a non-copyable type, then we need to
+                // pass in the destination that receives the result value as an `__ref` parameter.
+                //
+                if (destination.flavor != LoweredValInfo::Flavor::None)
+                {
+                    // If we have a known destination, we can use it directly as argument to the call.
+                    irArgs.add(destination.val);
+                    result = LoweredValInfo();
+                }
+                else
+                {
+                    // Otherwise, we need to create a temporary variable to hold the result.
+                    //
+                    auto tempVar = context->irBuilder->emitVar(tryGetPointedToType(context->irBuilder, funcTypeInfo.paramTypes.getLast()));
+                    irArgs.add(tempVar);
+                    result = LoweredValInfo::ptr(tempVar);
+                }
+            }
+
+            auto callResult = emitCallToDeclRef(
+                context,
+                type,
+                funcDeclRef,
+                funcType,
+                irArgs,
+                tryEnv);
+            applyOutArgumentFixups(context, argFixups);
+            
+            if (funcTypeInfo.returnViaLastRefParam)
+                return result;
+            return callResult;
+        }
+        else if (auto funcType = as<FuncType>(expr->functionExpr->type))
+        {
+            auto funcVal = lowerRValueExpr(context, expr->functionExpr);
+            addDirectCallArgs(expr, funcType, &irArgs, &argFixups);
+
+            auto result = emitCallToVal(context, type, funcVal, irArgs.getCount(), irArgs.getBuffer(), tryEnv);
+
+            applyOutArgumentFixups(context, argFixups);
+            return result;
+        }
+
+
+        // TODO: In this case we should be emitting code for the callee as
+        // an ordinary expression, then emitting the arguments according
+        // to the type information on the callee (e.g., which parameters
+        // are `out` or `inout`, and then finally emitting the `call`
+        // instruction.
+        //
+        // We don't currently have the case of emitting arguments according
+        // to function type info (instead of declaration info), and really
+        // this case can't occur unless we start adding first-class functions
+        // to the source language.
+        //
+        // For now we just bail out with an error.
+        //
+        SLANG_UNEXPECTED("could not resolve target declaration for call");
+        UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
+};
+
+template<typename Derived>
+struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
+{
+    static bool isLValueContext() { return Derived::_isLValueContext(); }
+
+    ExprLoweringContext<Derived> sharedLoweringContext;
+
+    IRGenContext*& context;
+
+    ExprLoweringVisitorBase()
+        : context(sharedLoweringContext.context)
+    {
+    }
+
+    IRBuilder* getBuilder() { return context->irBuilder; }
+    ASTBuilder* getASTBuilder() { return context->astBuilder; }
+    LoweredValInfo lowerSubExpr(Expr* expr)
+    {
+        return sharedLoweringContext.lowerSubExpr(expr);
     }
 
     LoweredValInfo visitIncompleteExpr(IncompleteExpr*)
@@ -3394,12 +3909,17 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         return context->thisVal;
     }
 
+    LoweredValInfo visitReturnValExpr(ReturnValExpr*)
+    {
+        return context->returnDestination;
+    }
+
     LoweredValInfo visitMemberExpr(MemberExpr* expr)
     {
         auto loweredType = lowerType(context, expr->type);
 
         auto baseExpr = expr->baseExpression;
-        baseExpr = maybeIgnoreCastToInterface(baseExpr);
+        baseExpr = sharedLoweringContext.maybeIgnoreCastToInterface(baseExpr);
         auto loweredBase = lowerSubExpr(baseExpr);
 
         auto declRef = expr->declRef;
@@ -3826,281 +4346,6 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
-    void _lowerSubstitutionArg(IRGenContext* subContext, GenericAppDeclRef* subst, Decl* paramDecl, Index argIndex)
-    {
-        SLANG_ASSERT(argIndex < subst->getArgs().getCount());
-        auto argVal = lowerVal(subContext, subst->getArgs()[argIndex]);
-        subContext->setValue(paramDecl, argVal);
-    }
-
-    void _lowerSubstitutionEnv(IRGenContext* subContext, DeclRefBase* subst)
-    {
-        if(!subst) return;
-        _lowerSubstitutionEnv(subContext, subst->getBase());
-
-        if (auto genSubst = as<GenericAppDeclRef>(subst))
-        {
-            auto genDecl = genSubst->getGenericDecl();
-
-            Index argCounter = 0;
-            for( auto memberDecl: genDecl->members )
-            {
-                if(auto typeParamDecl = as<GenericTypeParamDecl>(memberDecl) )
-                {
-                    _lowerSubstitutionArg(subContext, genSubst, typeParamDecl, argCounter++);
-                }
-                else if( auto valParamDecl = as<GenericValueParamDecl>(memberDecl) )
-                {
-                    _lowerSubstitutionArg(subContext, genSubst, valParamDecl, argCounter++);
-                }
-            }
-            for( auto memberDecl: genDecl->members )
-            {
-                if(auto constraintDecl = as<GenericTypeConstraintDecl>(memberDecl) )
-                {
-                    _lowerSubstitutionArg(subContext, genSubst, constraintDecl, argCounter++);
-                }
-            }
-        }
-        // TODO: also need to handle this-type substitution here?
-    }
-
-        /// Create IR instructions for an argument at a call site, based on
-        /// AST-level expressions plus function signature information.
-        ///
-        /// The `funcType` parameter is always required, and specifies the types
-        /// of all the parameters. The `funcDeclRef` parameter is only required
-        /// if there are parameter positions for which the matching argument is
-        /// absent.
-        ///
-    void addDirectCallArgs(
-        InvokeExpr*             expr,
-        Index                   argIndex,
-        IRType*                 paramType,
-        ParameterDirection      paramDirection,
-        DeclRef<ParamDecl>      paramDeclRef,
-        List<IRInst*>*          ioArgs,
-        List<OutArgumentFixup>* ioFixups)
-    {
-        Count argCount = expr->arguments.getCount();
-        if (argIndex < argCount)
-        {
-            auto argExpr = expr->arguments[argIndex];
-            addCallArgsForParam(context, paramType, paramDirection, argExpr, ioArgs, ioFixups);
-        }
-        else
-        {
-            // We have run out of arguments supplied at the call site,
-            // but there are still parameters remaining. This must mean
-            // that these parameters have default argument expressions
-            // associated with them.
-            //
-            // Currently we simply extract the initial-value expression
-            // from the parameter declaration and then lower it in
-            // the context of the caller.
-            //
-            // Note that the expression could involve subsitutions because
-            // in the general case it could depend on the generic parameters
-            // used the specialize the callee. For now we do not handle that
-            // case, and simply ignore generic arguments.
-            //
-            SubstExpr<Expr> argExpr = getInitExpr(getASTBuilder(), paramDeclRef);
-            SLANG_ASSERT(argExpr);
-
-            IRGenEnv subEnvStorage;
-            IRGenEnv* subEnv = &subEnvStorage;
-            subEnv->outer = context->env;
-
-            IRGenContext subContextStorage = *context;
-            IRGenContext* subContext = &subContextStorage;
-            subContext->env = subEnv;
-
-            _lowerSubstitutionEnv(subContext, argExpr.getSubsts() ? argExpr.getSubsts().declRef : nullptr);
-
-            addCallArgsForParam(subContext, paramType, paramDirection, argExpr.getExpr(), ioArgs, ioFixups);
-
-            // TODO: The approach we are taking here to default arguments
-            // is simplistic, and has consequences for the front-end as
-            // well as binary serialization of modules.
-            //
-            // We could consider some more refined approaches where, e.g.,
-            // functions with default arguments generate multiple IR-level
-            // functions, that compute and provide the default values.
-            //
-            // Alternatively, each parameter with defaults could be generated
-            // into its own callable function that provides the default value,
-            // so that calling modules can call into a pre-generated function.
-            //
-            // Each of these options involves trade-offs, and we need to
-            // make a conscious decision at some point.
-
-            // Assert that such an expression must have been present.
-        }
-    }
-
-    void addDirectCallArgs(
-        InvokeExpr*             expr,
-        FuncType*               funcType,
-        List<IRInst*>*          ioArgs,
-        List<OutArgumentFixup>* ioFixups)
-    {
-        Count argCount = expr->arguments.getCount();
-        SLANG_ASSERT(argCount == funcType->getParamCount());
-
-        for(Index i = 0; i < argCount; ++i)
-        {
-            IRType* paramType = lowerType(context, funcType->getParamType(i));
-            ParameterDirection paramDirection = funcType->getParamDirection(i);
-            addDirectCallArgs(expr, i, paramType, paramDirection, DeclRef<ParamDecl>(), ioArgs, ioFixups);
-        }
-    }
-
-
-    void addDirectCallArgs(
-        InvokeExpr*             expr,
-        DeclRef<CallableDecl>   funcDeclRef,
-        List<IRInst*>*          ioArgs,
-        List<OutArgumentFixup>* ioFixups)
-    {
-        Count argCounter = 0;
-        for (auto paramDeclRef : getMembersOfType<ParamDecl>(getASTBuilder(), funcDeclRef))
-        {
-            auto paramDecl = paramDeclRef.getDecl();
-            IRType* paramType = lowerType(context, getType(getASTBuilder(), paramDeclRef));
-            auto paramDirection = getParameterDirection(paramDecl);
-
-            Index argIndex = argCounter++;
-            addDirectCallArgs(expr, argIndex, paramType, paramDirection, paramDeclRef, ioArgs, ioFixups);
-        }
-    }
-
-    // Add arguments that appeared directly in an argument list
-    // to the list of argument values for a call.
-    void addDirectCallArgs(
-        InvokeExpr*             expr,
-        DeclRef<Decl>           funcDeclRef,
-        List<IRInst*>*         ioArgs,
-        List<OutArgumentFixup>* ioFixups)
-    {
-        if (auto callableDeclRef = funcDeclRef.as<CallableDecl>())
-        {
-            addDirectCallArgs(expr, callableDeclRef, ioArgs, ioFixups);
-        }
-        else
-        {
-            SLANG_UNEXPECTED("callee was not a callable decl");
-        }
-    }
-
-    void addFuncBaseArgs(
-        LoweredValInfo funcVal,
-        List<IRInst*>* /*ioArgs*/)
-    {
-        switch (funcVal.flavor)
-        {
-        default:
-            return;
-        }
-    }
-
-    struct ResolvedCallInfo
-    {
-        DeclRef<Decl>   funcDeclRef;
-        Expr*           baseExpr = nullptr;
-    };
-
-    // Try to resolve a the function expression for a call
-    // into a reference to a specific declaration, along
-    // with some contextual information about the declaration
-    // we are calling.
-    bool tryResolveDeclRefForCall(
-        Expr*        funcExpr,
-        ResolvedCallInfo*   outInfo)
-    {
-        // TODO: unwrap any "identity" expressions that might
-        // be wrapping the callee.
-
-        // First look to see if the expression references a
-        // declaration at all.
-        auto declRefExpr = as<DeclRefExpr>(funcExpr);
-        if(!declRefExpr)
-            return false;
-
-        // A little bit of future proofing here: if we ever
-        // allow higher-order functions, then we might be
-        // calling through a variable/field that has a function
-        // type, but is not itself a function.
-        // In such a case we should be careful to not statically
-        // resolve things.
-        //
-        if(auto callableDecl = as<CallableDecl>(declRefExpr->declRef.getDecl()))
-        {
-            // Okay, the declaration is directly callable, so we can continue.
-        }
-        else
-        {
-            // The callee declaration isn't itself a callable (it must have
-            // a function type, though).
-            return false;
-        }
-
-        // Now we can look at the specific kinds of declaration references,
-        // and try to tease them apart.
-        if (auto memberFuncExpr = as<MemberExpr>(funcExpr))
-        {
-            outInfo->funcDeclRef = memberFuncExpr->declRef;
-            outInfo->baseExpr = memberFuncExpr->baseExpression;
-            return true;
-        }
-        else if (auto staticMemberFuncExpr = as<StaticMemberExpr>(funcExpr))
-        {
-            outInfo->funcDeclRef = staticMemberFuncExpr->declRef;
-            return true;
-        }
-        else if (auto varExpr = as<VarExpr>(funcExpr))
-        {
-            outInfo->funcDeclRef = varExpr->declRef;
-            return true;
-        }
-        else
-        {
-            // Seems to be a case of declaration-reference we don't know about.
-            SLANG_UNEXPECTED("unknown declaration reference kind");
-            //return false;
-        }
-    }
-
-        /// Return `expr` with any outer casts to interface types stripped away
-    Expr* maybeIgnoreCastToInterface(Expr* expr)
-    {
-        auto e = expr;
-        while( auto castExpr = as<CastToSuperTypeExpr>(e) )
-        {
-            if(auto declRefType = as<DeclRefType>(e->type))
-            {
-                if(declRefType->getDeclRef().as<InterfaceDecl>())
-                {
-                    e = castExpr->valueArg;
-                    continue;
-                }
-            }
-            else if( auto andType = as<AndType>(e->type) )
-            {
-                // TODO: We might eventually need to tell the difference
-                // between conjunctions of interfaces and conjunctions
-                // that might include non-interface types.
-                //
-                // For now we assume that any case to a conjunction
-                // is effectively a cast to an interface type.
-                //
-                e = castExpr->valueArg;
-                continue;
-            }
-            break;
-        }
-        return e;
-    }
-
     LoweredValInfo visitSelectExpr(SelectExpr* expr)
     {
         // A vector typed `select` expr will turn into a normal `select` op.
@@ -4140,158 +4385,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitInvokeExpr(InvokeExpr* expr)
     {
-        return visitInvokeExprImpl(expr, TryClauseEnvironment());
-    }
-
-    LoweredValInfo visitInvokeExprImpl(InvokeExpr* expr, const TryClauseEnvironment& tryEnv)
-    {
-        auto type = lowerType(context, expr->type);
-
-        // We are going to look at the syntactic form of
-        // the "function" expression, so that we can avoid
-        // a lot of complexity that would come from lowering
-        // it as a general expression first, and then trying
-        // to apply it. For example, given `obj.f(a,b)` we
-        // will try to detect that we are trying to compute
-        // something like `ObjType::f(obj, a, b)` (in pseudo-code),
-        // rather than trying to construct a meaningful
-        // intermediate value for `obj.f` first.
-        //
-        // Note that this doe not preclude having support
-        // for directly generating code from `obj.f` - it
-        // just may be that such usage is more complicated.
-
-        // Along the way, we may end up collecting additional
-        // arguments that will be part of the call.
-        List<IRInst*> irArgs;
-
-        // We will also collect "fixup" actions that need
-        // to be performed after the call, in order to
-        // copy the final values for `out` parameters
-        // back to their arguments.
-        List<OutArgumentFixup> argFixups;
-
-        auto funcExpr = expr->functionExpr;
-        ResolvedCallInfo resolvedInfo;
-        if (tryResolveDeclRefForCall(funcExpr, &resolvedInfo))
-        {
-            // In this case we know exactly what declaration we
-            // are going to call, and so we can resolve things
-            // appropriately.
-            auto funcDeclRef = resolvedInfo.funcDeclRef;
-            auto baseExpr = resolvedInfo.baseExpr;
-
-            // If the thing being invoked is a subscript operation,
-            // then we need to handle multiple extra details
-            // that don't arise for other kinds of calls.
-            //
-            // TODO: subscript operations probably deserve to
-            // be handled on their own path for this reason...
-            //
-            if (auto subscriptDeclRef = funcDeclRef.template as<SubscriptDecl>())
-            {
-                // A reference to a subscript declaration is a special case,
-                // because it is not possible to call a subscript directly;
-                // we must call one of its accessors.
-                //
-                auto loweredBase = lowerSubExpr(baseExpr);
-                addDirectCallArgs(expr, funcDeclRef, &irArgs, &argFixups);
-                auto result = lowerStorageReference(context, type, subscriptDeclRef, loweredBase, irArgs.getCount(), irArgs.getBuffer());
-
-                // TODO: Applying the fixups for arguments to the subscript at this point
-                // won't technically be correct, since the call to the subscript may
-                // not have occured at this point.
-                //
-                // It seems like we need to either:
-                //
-                // * Capture the arguments to the subscript as `LoweredValInfo` instead of `IRInst*`
-                //   so that we can deal with everything related to fixups around the actual call
-                //   site.
-                //
-                // OR
-                //
-                // * Handle everything to do with "fixups" differently, by treating them as deferred
-                // actions that gert queued up on the context itself and then flushed at certain
-                // well-defined points, so that we don't have to be as careful around them.
-                //
-                // OR
-                //
-                // * Switch to a more "destination-driven" approach to code generation, where we
-                // can determine on entry to the lowering of a sub-expression whether it will be
-                // used for read, write, or read/write, and resolve things like the choice of
-                // accessor at that point instead.
-                //
-                applyOutArgumentFixups(context, argFixups);
-                return result;
-            }
-
-            // First comes the `this` argument if we are calling
-            // a member function:
-            if (baseExpr)
-            {
-                // The base expression might be an "upcast" to a base interface, in
-                // which case we don't want to emit the result of the cast, but instead
-                // the source.
-                //
-                baseExpr = maybeIgnoreCastToInterface(baseExpr);
-
-                auto thisType = getThisParamTypeForCallable(context, funcDeclRef);
-                auto irThisType = lowerType(context, thisType);
-                addCallArgsForParam(
-                    context,
-                    irThisType,
-                    getThisParamDirection(funcDeclRef.getDecl(), kParameterDirection_In),
-                    baseExpr,
-                    &irArgs,
-                    &argFixups);
-            }
-
-            // Then we have the "direct" arguments to the call.
-            // These may include `out` and `inout` arguments that
-            // require "fixup" work on the other side.
-            //
-            FuncDeclBaseTypeInfo funcTypeInfo;
-            _lowerFuncDeclBaseTypeInfo(context, funcDeclRef.template as<FunctionDeclBase>(), funcTypeInfo);
-
-            auto funcType = funcTypeInfo.type;
-            addDirectCallArgs(expr, funcDeclRef, &irArgs, &argFixups);
-            auto result = emitCallToDeclRef(
-                context,
-                type,
-                funcDeclRef,
-                funcType,
-                irArgs,
-                tryEnv);
-            applyOutArgumentFixups(context, argFixups);
-            return result;
-        }
-        else if(auto funcType = as<FuncType>(expr->functionExpr->type))
-        {
-            auto funcVal = lowerRValueExpr(context, expr->functionExpr);
-            addDirectCallArgs(expr, funcType, &irArgs, &argFixups);
-
-            auto result = emitCallToVal(context, type, funcVal, irArgs.getCount(), irArgs.getBuffer(), tryEnv);
-
-            applyOutArgumentFixups(context, argFixups);
-            return result;
-        }
-        
-
-        // TODO: In this case we should be emitting code for the callee as
-        // an ordinary expression, then emitting the arguments according
-        // to the type information on the callee (e.g., which parameters
-        // are `out` or `inout`, and then finally emitting the `call`
-        // instruction.
-        //
-        // We don't currently have the case of emitting arguments according
-        // to function type info (instead of declaration info), and really
-        // this case can't occur unless we start adding first-class functions
-        // to the source language.
-        //
-        // For now we just bail out with an error.
-        //
-        SLANG_UNEXPECTED("could not resolve target declaration for call");
-        UNREACHABLE_RETURN(LoweredValInfo());
+        return sharedLoweringContext.visitInvokeExprImpl(expr, LoweredValInfo(), TryClauseEnvironment());
     }
 
         /// Emit code for a `try` invoke.
@@ -4301,7 +4395,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         assert(invokeExpr);
         TryClauseEnvironment tryEnv;
         tryEnv.clauseType = expr->tryClauseType;
-        return visitInvokeExprImpl(invokeExpr, tryEnv);
+        return sharedLoweringContext.visitInvokeExprImpl(invokeExpr, LoweredValInfo(), tryEnv);
     }
 
         /// Emit code to cast `value` to a concrete `superType` (e.g., a `struct`).
@@ -4554,8 +4648,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         // based on the resulting values.
         //
         auto leftVal = lowerLValueExpr(context, expr->left);
-        auto rightVal = lowerRValueExpr(context, expr->right);
-        assign(context, leftVal, rightVal);
+        assignExpr(context, leftVal, expr->right, expr->loc);
 
         // The result value of the assignment expression is
         // the value of the left-hand side (and it is expected
@@ -4794,7 +4887,7 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
     }
 };
 
-struct RValueExprLoweringVisitor : ExprLoweringVisitorBase<RValueExprLoweringVisitor>
+struct RValueExprLoweringVisitor : public ExprLoweringVisitorBase<RValueExprLoweringVisitor>
 {
     static bool _isLValueContext() { return false; }
 
@@ -4882,6 +4975,55 @@ struct RValueExprLoweringVisitor : ExprLoweringVisitorBase<RValueExprLoweringVis
     }
 };
 
+// ExprLoweringVisitor that fuses the destination assignment.
+//
+struct DestinationDrivenRValueExprLoweringVisitor 
+    : ExprVisitor<DestinationDrivenRValueExprLoweringVisitor>
+{
+    ExprLoweringContext<DestinationDrivenRValueExprLoweringVisitor> sharedLoweringContext;
+    LoweredValInfo destination;
+
+    IRGenContext*& context;
+    DestinationDrivenRValueExprLoweringVisitor()
+        : context(sharedLoweringContext.context)
+    {}
+
+    static bool _isLValueContext() { return false; }
+
+    // The default case is lower the rvalue expr independently and then assign to destination.
+    void visitExpr(Expr* expr)
+    {
+        auto rValue = lowerRValueExpr(context, expr);
+        assign(context, destination, rValue);
+    }
+
+    void visitInvokeExpr(InvokeExpr* expr)
+    {
+        LoweredValInfo resultRVal;
+        {
+            IRBuilderSourceLocRAII sourceLocInfo(context->irBuilder, expr->loc);
+            resultRVal = sharedLoweringContext.visitInvokeExprImpl(expr, destination, TryClauseEnvironment{});
+        }
+        if (resultRVal.flavor != LoweredValInfo::Flavor::None)
+        {
+            // If we weren't able to fuse the destination write during lowering rvalue,
+            // we should insert the assign operation now.
+            assign(context, destination, resultRVal);
+        }
+    }
+
+    /// Emit code for a `try` invoke.
+    LoweredValInfo visitTryExpr(TryExpr* expr)
+    {
+        auto invokeExpr = as<InvokeExpr>(expr->base);
+        assert(invokeExpr);
+        TryClauseEnvironment tryEnv;
+        tryEnv.clauseType = expr->tryClauseType;
+        return sharedLoweringContext.visitInvokeExprImpl(invokeExpr, destination, tryEnv);
+    }
+
+};
+
 LoweredValInfo lowerLValueExpr(
     IRGenContext*   context,
     Expr*           expr)
@@ -4904,6 +5046,17 @@ LoweredValInfo lowerRValueExpr(
     visitor.context = context;
     auto info = visitor.dispatch(expr);
     return info;
+}
+
+void lowerRValueExprWithDestination(
+    IRGenContext* context,
+    LoweredValInfo destination,
+    Expr* expr)
+{
+    DestinationDrivenRValueExprLoweringVisitor visitor;
+    visitor.context = context;
+    visitor.destination = destination;
+    visitor.dispatch(expr);
 }
 
 struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
@@ -5478,6 +5631,14 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         //
         if( auto expr = stmt->expression )
         {
+            if (context->returnDestination.flavor != LoweredValInfo::Flavor::None)
+            {
+                // If this function should return via a __ref parameter, do that and return void.
+                lowerRValueExprWithDestination(context, context->returnDestination, expr);
+                getBuilder()->emitReturn();
+                return;
+            }
+
             // If the AST `return` statement had an expression, then we
             // need to lower it to the IR at this point, both to
             // compute its value and (in case we are returning a
@@ -6137,6 +6298,30 @@ IRInst* getAddress(
 
     context->getSink()->diagnose(diagnosticLocation, Diagnostics::invalidLValueForRefParameter);
     return nullptr;
+}
+
+void assignExpr(
+    IRGenContext* context,
+    const LoweredValInfo& inLeft,
+    Expr* rightExpr,
+    SourceLoc assignmentLoc)
+{
+    auto left = tryGetAddress(context, inLeft, TryGetAddressMode::Default);
+    IRBuilderSourceLocRAII locRAII(context->irBuilder, assignmentLoc);
+    switch (left.flavor)
+    {
+    case LoweredValInfo::Flavor::Ptr:
+        {
+            lowerRValueExprWithDestination(context, left, rightExpr);
+        }
+        break;
+    default:
+        {
+            auto right = lowerRValueExpr(context, rightExpr);
+            assign(context, inLeft, right);
+        }
+        break;
+    }
 }
 
 void assign(
@@ -7242,6 +7427,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
             subContextStorage.thisType = outerContext->thisType;
             subContextStorage.thisTypeWitness = outerContext->thisTypeWitness;
+
+            subContextStorage.returnDestination = LoweredValInfo();
         }
 
         IRBuilder* getBuilder() { return &subBuilderStorage; }
@@ -7395,9 +7582,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         if( auto initExpr = decl->initExpr )
         {
-            auto initVal = lowerRValueExpr(context, initExpr);
-
-            assign(context, varVal, initVal);
+            assignExpr(context, varVal, initExpr, decl->loc);
         }
 
         context->setGlobalValue(decl, varVal);
@@ -7409,7 +7594,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     {
         return Slang::getInterfaceRequirementKey(context, requirementDecl);
     }
-
+    
     LoweredValInfo visitAssocTypeDecl(AssocTypeDecl* decl)
     {
         SLANG_ASSERT(decl->parentDecl != nullptr);
@@ -8714,6 +8899,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
                     paramVal = LoweredValInfo::ptr(irParam);
 
+                    if (paramInfo.isReturnDestination)
+                        subContext->returnDestination = paramVal;
+
                     // TODO: We might want to copy the pointed-to value into
                     // a temporary at the start of the function, and then copy
                     // back out at the end, so that we don't have to worry
@@ -8829,14 +9017,19 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             auto constructorDecl = as<ConstructorDecl>(decl);
             if (constructorDecl)
             {
-                auto thisVar = subContext->irBuilder->emitVar(irResultType);
-                subContext->thisVal = LoweredValInfo::ptr(thisVar);
-
-                // For class-typed objects, we need to allocate it from heap.
-                if (isClassType(irResultType))
+                if (subContext->returnDestination.flavor != LoweredValInfo::Flavor::None)
+                    subContext->thisVal = subContext->returnDestination;
+                else
                 {
-                    auto allocatedObj = subContext->irBuilder->emitAllocObj(irResultType);
-                    subContext->irBuilder->emitStore(thisVar, allocatedObj);
+                    auto thisVar = subContext->irBuilder->emitVar(irResultType);
+                    subContext->thisVal = LoweredValInfo::ptr(thisVar);
+
+                    // For class-typed objects, we need to allocate it from heap.
+                    if (isClassType(irResultType))
+                    {
+                        auto allocatedObj = subContext->irBuilder->emitAllocObj(irResultType);
+                        subContext->irBuilder->emitStore(thisVar, allocatedObj);
+                    }
                 }
             }
 
@@ -8860,8 +9053,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     // path in an initializer/constructor attempts
                     // to do an early `return;`.
                     //
-                    subContext->irBuilder->emitReturn(
-                        getSimpleVal(subContext, subContext->thisVal));
+                    if (subContext->returnDestination.flavor != LoweredValInfo::Flavor::None)
+                        subContext->irBuilder->emitReturn();
+                    else
+                    {
+                        subContext->irBuilder->emitReturn(
+                            getSimpleVal(subContext, subContext->thisVal));
+                    }
                 }
                 else if (as<IRVoidType>(irResultType))
                 {
