@@ -2373,6 +2373,8 @@ struct IRTryCall : IRTerminatorInst
 
 struct IRSwizzle : IRInst
 {
+    IR_LEAF_ISA(swizzle);
+
     IRUse base;
 
     IRInst* getBase() { return base.get(); }
@@ -2388,6 +2390,8 @@ struct IRSwizzle : IRInst
 
 struct IRSwizzleSet : IRInst
 {
+    IR_LEAF_ISA(swizzleSet);
+
     IRUse base;
     IRUse source;
 
@@ -2592,6 +2596,16 @@ struct IRGetTargetTupleElement : IRInst
     IR_LEAF_ISA(GetTargetTupleElement)
     IRInst* getTuple() { return getOperand(0); }
     IRInst* getElementIndex() { return getOperand(1); }
+};
+
+struct IRMakeVector : IRInst
+{
+    IR_LEAF_ISA(MakeVector)
+};
+
+struct IRMakeVectorFromScalar : IRInst
+{
+    IR_LEAF_ISA(MakeVector)
 };
 
 // An Instruction that creates a differential pair value from a
