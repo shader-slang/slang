@@ -52,17 +52,17 @@ Result FenceImpl::init(const IFence::Desc& desc)
     {
 #if SLANG_WINDOWS_FAMILY
         exportSemaphoreWin32HandleInfoKHR.sType = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_WIN32_HANDLE_INFO_KHR;
-        exportSemaphoreWin32HandleInfoKHR.pNext = NULL;
-        exportSemaphoreWin32HandleInfoKHR.pAttributes = NULL;
+        exportSemaphoreWin32HandleInfoKHR.pNext = timelineCreateInfo.pNext;;
+        exportSemaphoreWin32HandleInfoKHR.pAttributes = nullptr;
         exportSemaphoreWin32HandleInfoKHR.dwAccess = DXGI_SHARED_RESOURCE_READ | DXGI_SHARED_RESOURCE_WRITE;
-        exportSemaphoreWin32HandleInfoKHR.name = (LPCWSTR)NULL;
+        exportSemaphoreWin32HandleInfoKHR.name = (LPCWSTR)nullptr;
 #endif
         exportSemaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO_KHR;
 #if SLANG_WINDOWS_FAMILY
         exportSemaphoreCreateInfo.pNext = &exportSemaphoreWin32HandleInfoKHR;
         exportSemaphoreCreateInfo.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
 #else
-        exportSemaphoreCreateInfo.pNext = NULL;
+        exportSemaphoreCreateInfo.pNext = timelineCreateInfo.pNext;
         exportSemaphoreCreateInfo.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;
 #endif
         timelineCreateInfo.pNext = &exportSemaphoreCreateInfo;
@@ -90,7 +90,7 @@ Result FenceImpl::setCurrentValue(uint64_t value)
     {
         VkSemaphoreSignalInfo signalInfo;
         signalInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO;
-        signalInfo.pNext = NULL;
+        signalInfo.pNext = nullptr;
         signalInfo.semaphore = m_semaphore;
         signalInfo.value = value;
 
