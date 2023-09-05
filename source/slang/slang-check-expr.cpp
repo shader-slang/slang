@@ -3953,10 +3953,11 @@ namespace Slang
             for(Index operandIndex = 0; operandIndex < inst.operands.getCount(); ++operandIndex)
             {
                 // Clamp to the end of the type info array, because the last one will be any variable operands
+                const auto invalidOperandKind = SPIRVCoreGrammarInfo::OperandKind{0xff};
                 const auto operandType
                     = opInfo.has_value()
                     ? opInfo->operandTypes[std::min(operandIndex, Index(opInfo->numOperandTypes)-1)]
-                    : SPIRVCoreGrammarInfo::OperandKind{0xff};
+                    : invalidOperandKind;
                 const auto baseOperandType
                     = spirvInfo->operandKindUnderneathIds.lookup(operandType).value_or(operandType);
                 const auto needsIdWrapper = baseOperandType != operandType;
@@ -3965,7 +3966,8 @@ namespace Slang
                     if(operand.flavor == SPIRVAsmOperand::SlangType
                         || operand.flavor == SPIRVAsmOperand::SampledType)
                     {
-                        // This is a $$type operand, fill in the TypeExp member of the operand
+                        // This is a $$type operand or __sampledType(T)
+                        // operand, fill in its TypeExp member.
                         TypeExp& typeExpr = operand.type;
                         typeExpr.exp = operand.expr;
                         typeExpr = CheckProperType(typeExpr);
