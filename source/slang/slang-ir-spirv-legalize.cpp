@@ -180,6 +180,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             }
             else if(const auto spirvAsmOperand = as<IRSPIRVAsmOperandInst>(user))
             {
+                // If this is being used in an asm block, insert the load to
+                // just prior to the block.
                 const auto asmBlock = spirvAsmOperand->getAsmBlock();
                 builder.setInsertBefore(asmBlock);
                 auto loadedValue = builder.emitLoad(addrInst);
@@ -888,7 +890,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     void processConstructor(IRInst* inst)
     {
         // If all of the operands to this instruction are global, we can hoist
-        // this constructor to be a global too
+        // this constructor to be a global too. This is important to make sure
+        // that vectors made of constant components end up being emitted as
+        // constant vectors (using OpConstantComposite).
         UIndex opIndex = 0;
         for (auto operand = inst->getOperands(); opIndex < inst->getOperandCount(); operand++, opIndex++)
             if(operand->get()->getParent() != m_module->getModuleInst())
