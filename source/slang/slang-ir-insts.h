@@ -2938,16 +2938,23 @@ struct IRSPIRVAsmInst : IRInst
     IRSPIRVAsmOperand* getOpcodeOperand()
     {
         const auto opcodeOperand = cast<IRSPIRVAsmOperand>(getOperand(0));
+        // This must be either:
+        // - An enum, such as 'OpNop'
+        // - The __truncate pseudo-instruction
+        // - A literal, like 107 (OpImageQuerySamples)
         SLANG_ASSERT(opcodeOperand->getOp() == kIROp_SPIRVAsmOperandEnum
-            || opcodeOperand->getOp() == kIROp_SPIRVAsmOperandTruncate);
+            || opcodeOperand->getOp() == kIROp_SPIRVAsmOperandTruncate
+            || opcodeOperand->getOp() == kIROp_SPIRVAsmOperandLiteral);
         return opcodeOperand;
     }
 
     SpvWord getOpcodeOperandWord()
     {
         const auto o = getOpcodeOperand();
-        SLANG_ASSERT(o->getOp() != kIROp_SPIRVAsmOperandResult);
         const auto v = o->getValue();
+        // It's not valid to call this on an operand which doesn't have a value
+        // (such as __truncate)
+        SLANG_ASSERT(v);
         const auto i = cast<IRIntLit>(v);
         return SpvWord(i->getValue());
     }
