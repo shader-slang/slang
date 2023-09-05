@@ -4132,7 +4132,6 @@ struct SPIRVEmitContext
                     const auto toVector = cast<IRVectorType>(toType);
                     const auto toVectorSize = getIntVal(toVector->getElementCount());
                     const auto fromVector = cast<IRVectorType>(fromType);
-                    [[maybe_unused]]
                     const auto fromVectorSize = getIntVal(fromVector->getElementCount());
                     if(toVectorSize > fromVectorSize)
                         m_sink->diagnose(inst, Diagnostics::spirvInvalidTruncate);
