@@ -158,36 +158,42 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             auto user = use->getUser();
             IRBuilder builder(user);
             builder.setInsertBefore(user);
-            switch (user->getOp())
+            if(as<IRGetElement>(user) || as<IRFieldExtract>(user))
             {
-            case kIROp_GetElement:
-            case kIROp_FieldExtract:
-                {
-                    auto basePtrType = as<IRPtrTypeBase>(addr->getDataType());
-                    IRType* ptrType = nullptr;
-                    if (basePtrType->hasAddressSpace())
-                        ptrType = builder.getPtrType(kIROp_PtrType, user->getDataType(), basePtrType->getAddressSpace());
-                    else
-                        ptrType = builder.getPtrType(kIROp_PtrType, user->getDataType());
-                    IRInst* subAddr = nullptr;
-                    if (user->getOp() == kIROp_GetElement)
-                        subAddr = builder.emitElementAddress(ptrType, addr, as<IRGetElement>(user)->getIndex());
-                    else
-                        subAddr = builder.emitFieldAddress(ptrType, addr, as<IRFieldExtract>(user)->getField());
+                auto basePtrType = as<IRPtrTypeBase>(addr->getDataType());
+                IRType* ptrType = nullptr;
+                if (basePtrType->hasAddressSpace())
+                    ptrType = builder.getPtrType(kIROp_PtrType, user->getDataType(), basePtrType->getAddressSpace());
+                else
+                    ptrType = builder.getPtrType(kIROp_PtrType, user->getDataType());
+                IRInst* subAddr = nullptr;
+                if (user->getOp() == kIROp_GetElement)
+                    subAddr = builder.emitElementAddress(ptrType, addr, as<IRGetElement>(user)->getIndex());
+                else
+                    subAddr = builder.emitFieldAddress(ptrType, addr, as<IRFieldExtract>(user)->getField());
 
-                    for (auto u = user->firstUse; u; u = u->nextUse)
-                    {
-                        workList.add(WorkItem{ subAddr, u });
-                    }
-                    instsToRemove.add(user);
-                    break;
-                }
-            default:
+                for (auto u = user->firstUse; u; u = u->nextUse)
                 {
-                    auto val = builder.emitLoad(addr);
-                    builder.replaceOperand(use, val);
-                    break;
+                    workList.add(WorkItem{ subAddr, u });
                 }
+                instsToRemove.add(user);
+            }
+            else if(const auto spirvAsmOperand = as<IRSPIRVAsmOperandInst>(user))
+            {
+                // If this is being used in an asm block, insert the load to
+                // just prior to the block.
+                const auto asmBlock = spirvAsmOperand->getAsmBlock();
+                builder.setInsertBefore(asmBlock);
+                auto loadedValue = builder.emitLoad(addrInst);
+                builder.setInsertBefore(spirvAsmOperand);
+                auto loadedValueOperand = builder.emitSPIRVAsmOperandInst(loadedValue);
+                spirvAsmOperand->replaceUsesWith(loadedValueOperand);
+                spirvAsmOperand->removeAndDeallocate();
+            }
+            else
+            {
+                auto val = builder.emitLoad(addr);
+                builder.replaceOperand(use, val);
             }
         }
 
@@ -212,9 +218,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 innerType = arrayType->getElementType();
             }
 
-            if (as<IRResourceTypeBase>(innerType))
-                return;
-
             SpvStorageClass storageClass = SpvStorageClassPrivate;
             // Figure out storage class based on var layout.
             if (auto layout = getVarLayout(inst))
@@ -229,6 +232,15 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     if (semanticName == "sv_pointsize")
                         storageClass = SpvStorageClassInput;
                 }
+            }
+
+            // Textures and Samplers can't be in Uniform for Vulkan, if they are
+            // placed here then put them in UniformConstant instead
+            if (storageClass == SpvStorageClassUniform
+                && (as<IRTextureTypeBase>(inst->getDataType())
+                    || as<IRSamplerStateTypeBase>(inst->getDataType())))
+            {
+                storageClass = SpvStorageClassUniformConstant;
             }
 
             // Strip any HLSL wrappers
@@ -875,6 +887,19 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
+    void processConstructor(IRInst* inst)
+    {
+        // If all of the operands to this instruction are global, we can hoist
+        // this constructor to be a global too. This is important to make sure
+        // that vectors made of constant components end up being emitted as
+        // constant vectors (using OpConstantComposite).
+        UIndex opIndex = 0;
+        for (auto operand = inst->getOperands(); opIndex < inst->getOperandCount(); operand++, opIndex++)
+            if(operand->get()->getParent() != m_module->getModuleInst())
+                return;
+        inst->insertAtEnd(m_module->getModuleInst());
+    }
+
     void processModule()
     {
         // Process global params before anything else, so we don't generate inefficient
@@ -936,6 +961,25 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             case kIROp_Switch:
                 processSwitch(as<IRSwitch>(inst));
                 break;
+
+            case kIROp_MakeVectorFromScalar:
+            case kIROp_MakeUInt64:
+            case kIROp_MakeVector:
+            case kIROp_MakeMatrix:
+            case kIROp_MakeMatrixFromScalar:
+            case kIROp_MatrixReshape:
+            case kIROp_MakeArray:
+            case kIROp_MakeArrayFromElement:
+            case kIROp_MakeStruct:
+            case kIROp_MakeTuple:
+            case kIROp_MakeTargetTuple:
+            case kIROp_MakeResultValue:
+            case kIROp_MakeResultError:
+            case kIROp_MakeOptionalValue:
+            case kIROp_MakeOptionalNone:
+                processConstructor(inst);
+                break;
+
             default:
                 for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
                 {

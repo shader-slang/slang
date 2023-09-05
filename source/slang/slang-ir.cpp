@@ -5772,6 +5772,31 @@ namespace Slang
         return i;
     }
 
+    IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandSampledType(IRType* elementType)
+    {
+        SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
+        const auto i = createInst<IRSPIRVAsmOperand>(
+            this,
+            kIROp_SPIRVAsmOperandSampledType,
+            getTypeType(),
+            elementType
+        );
+        addInst(i);
+        return i;
+    }
+
+    IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandTruncate()
+    {
+        SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
+        const auto i = createInst<IRSPIRVAsmOperand>(
+            this,
+            kIROp_SPIRVAsmOperandTruncate,
+            getVoidType()
+        );
+        addInst(i);
+        return i;
+    }
+
     IRSPIRVAsmInst* IRBuilder::emitSPIRVAsmInst(IRInst* opcode, List<IRInst*> operands)
     {
         SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
@@ -6630,6 +6655,14 @@ namespace Slang
             return;
         case kIROp_SPIRVAsmOperandResult:
             dump(context, "result");
+            return;
+        case kIROp_SPIRVAsmOperandTruncate:
+            dump(context, "__truncate");
+            return;
+        case kIROp_SPIRVAsmOperandSampledType:
+            dump(context, "__sampledType(");
+            dumpInstExpr(context, inst->getOperand(0));
+            dump(context, ")");
             return;
         }
 

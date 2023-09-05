@@ -1294,6 +1294,37 @@ struct SPIRVEmitContext
             }
         case kIROp_TextureType:
             {
+                // Some untyped constants from OpTypeImage
+                // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypeImage
+
+                // indicates not a depth image
+                [[maybe_unused]]
+                const SpvWord notDepthImage = 0;
+                // indicates a depth image
+                [[maybe_unused]]
+                const SpvWord isDepthImage = 1;
+                // means no indication as to whether this is a depth or non-depth image
+                const SpvWord unknownDepthImage = 2;
+
+                // indicates non-arrayed content
+                const SpvWord notArrayed = 0;
+                // indicates arrayed content
+                const SpvWord isArrayed = 1;
+
+                // indicates single-sampled content
+                const SpvWord notMultisampled = 0;
+                // indicates multisampled content
+                const SpvWord isMultisampled = 1;
+
+                // indicates this is only known at run time, not at compile time
+                const SpvWord sampledUnknown = 0;
+                // indicates an image compatible with sampling operations
+                const SpvWord sampledImage = 1;
+                // indicates an image compatible with read/write operations (a storage or subpass data image).
+                const SpvWord readWriteImage = 2;
+
+                //
+
                 const auto texTypeInst = as<IRTextureType>(inst);
                 const auto sampledType = texTypeInst->getElementType();
                 SpvDim dim = SpvDim1D; // Silence uninitialized warnings from msvc...
@@ -1318,16 +1349,78 @@ struct SPIRVEmitContext
                         dim = SpvDimBuffer;
                         break;
                 }
-                bool arrayed = texTypeInst->isArray();
-                SpvWord depth = 2; // No knowledge of if this is a depth image
-                bool ms = texTypeInst->isMultisample();
-                // TODO: can we do better here?
-                SpvWord sampled = 0; // Only known at run time
-                // TODO: can we do better?
+                SpvWord arrayed = texTypeInst->isArray() ? isArrayed : notArrayed;
+
+                // Vulkan spec 16.1: "The “Depth” operand of OpTypeImage is ignored."
+                SpvWord depth = unknownDepthImage; // No knowledge of if this is a depth image
+                SpvWord ms = texTypeInst->isMultisample() ? isMultisampled : notMultisampled;
+
+                SpvWord sampled = sampledUnknown;
+                switch(texTypeInst->getAccess())
+                {
+                    case SlangResourceAccess::SLANG_RESOURCE_ACCESS_READ_WRITE:
+                    case SlangResourceAccess::SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
+                        sampled = readWriteImage;
+                        break;
+                    case SlangResourceAccess::SLANG_RESOURCE_ACCESS_NONE:
+                    case SlangResourceAccess::SLANG_RESOURCE_ACCESS_READ:
+                        sampled = sampledImage;
+                        break;
+                }
+
+                // TODO: we need to do as _emitGLSLImageFormatModifier does,
+                // take a guess at the image format
                 SpvImageFormat format = SpvImageFormatUnknown;
+
+                //
+                // Capabilities, according to section 3.8
+                //
+                // SPIR-V requires that the sampled/rw info on the image isn't unknown
+                SLANG_ASSERT(sampled == sampledImage || sampled == readWriteImage);
+                switch(dim)
+                {
+                case SpvDim1D:
+                    requireSPIRVCapability(sampled == sampledImage ? SpvCapabilitySampled1D : SpvCapabilityImage1D);
+                    break;
+                case SpvDim2D:
+                    // Also requires Shader or Kernel, but these are a given (?)
+                    if(sampled == readWriteImage && ms == isMultisampled && arrayed == isArrayed)
+                        requireSPIRVCapability(SpvCapabilityImageMSArray);
+                    break;
+                case SpvDim3D:
+                    break;
+                case SpvDimCube:
+                    // Requires shader also
+                    if(sampled == readWriteImage && arrayed == isArrayed)
+                        requireSPIRVCapability(SpvCapabilityImageCubeArray);
+                    break;
+                case SpvDimRect:
+                    requireSPIRVCapability(sampled == sampledImage ? SpvCapabilitySampledRect : SpvCapabilityImageRect);
+                    break;
+                case SpvDimBuffer:
+                    requireSPIRVCapability(sampled == sampledImage ? SpvCapabilitySampledBuffer : SpvCapabilityImageBuffer);
+                    break;
+                case SpvDimSubpassData:
+                    requireSPIRVCapability(SpvCapabilityInputAttachment);
+                    break;
+                case SpvDimTileImageDataEXT:
+                    SLANG_UNIMPLEMENTED_X("OpTypeImage Capabilities for SpvDimTileImageDataEXT");
+                    break;
+                }
+                if(format == SpvImageFormatUnknown && sampled == readWriteImage)
+                {
+                    // TODO: It may not be necessary to have both of these
+                    // depending on if we read or write
+                    requireSPIRVCapability(SpvCapabilityStorageImageReadWithoutFormat);
+                    requireSPIRVCapability(SpvCapabilityStorageImageWriteWithoutFormat);
+                }
+
+                //
+                // The op itself
+                //
                 return emitOpTypeImage(
                     inst,
-                    sampledType,
+                    dropVector(sampledType),
                     dim,
                     SpvLiteralInteger::from32(depth),
                     SpvLiteralInteger::from32(arrayed),
@@ -1502,12 +1595,6 @@ struct SPIRVEmitContext
                     nullptr,
                     varInst,
                     SpvLiteralInteger::from32(int32_t(index))
-                );
-                emitOpDecorateIndex(
-                    getSection(SpvLogicalSectionID::Annotations),
-                    nullptr,
-                    varInst,
-                    SpvLiteralInteger::from32(int32_t(space))
                 );
                 break;
             case LayoutResourceKind::VaryingOutput:
@@ -3829,7 +3916,6 @@ struct SPIRVEmitContext
         for(const auto spvInst : inst->getInsts())
         {
             const bool isLast = spvInst == inst->getLastChild();
-            const SpvOp opcode = SpvOp(spvInst->getOpcodeOperandWord());
 
             const auto parentForOpCode = [this](SpvOp opcode, SpvInstParent* defaultParent) -> SpvInstParent*{
                 const auto info = m_grammarInfo->opInfos.lookup(opcode);
@@ -3859,122 +3945,242 @@ struct SPIRVEmitContext
                 }
             };
 
-            switch (opcode)
-            {
-            case SpvOpCapability:
-                requireSPIRVCapability((SpvCapability)getIntVal(spvInst->getOperand(1)->getOperand(0)));
-                continue;
-            case SpvOpExtension:
-                ensureExtensionDeclaration(as<IRStringLit>(spvInst->getOperand(1)->getOperand(0))->getStringSlice());
-                continue;
-            default:
-                break;
-            }
+            const auto emitSpvAsmOperand = [&](IRSPIRVAsmOperand* operand){
+                switch(operand->getOp())
+                {
+                case kIROp_SPIRVAsmOperandEnum:
+                case kIROp_SPIRVAsmOperandLiteral:
+                {
+                    const auto v = as<IRConstant>(operand->getValue());
+                    SLANG_ASSERT(v);
+                    if(operand->getOperandCount() >= 2)
 
-            last = emitInstCustomOperandFunc(
-                parentForOpCode(opcode, parent),
-                // We want the "result instruction" to refer to the top level
-                // block which assumes its value, the others are free to refer
-                // to whatever, so just use the internal spv inst rep
-                // TODO: This is not correct, because the instruction which is
-                // assigned to result is not necessarily the last instruction
-                isLast ? as<IRInst>(inst) : spvInst,
-                opcode,
-                [&](){
-                    for(const auto operand : spvInst->getSPIRVOperands())
                     {
-                        switch(operand->getOp())
+                        const auto constantType = cast<IRType>(operand->getOperand(1));
+                        SpvInst* constant;
+                        switch(v->getOp())
                         {
-                        case kIROp_SPIRVAsmOperandEnum:
-                        case kIROp_SPIRVAsmOperandLiteral:
+                        case kIROp_IntLit:
                         {
-                            const auto v = as<IRConstant>(operand->getValue());
-                            SLANG_ASSERT(v);
-                            if(operand->getOperandCount() >= 2)
-                            {
-                                const auto constantType = cast<IRType>(operand->getOperand(1));
-                                SpvInst* constant;
-                                switch(v->getOp())
-                                {
-                                case kIROp_IntLit:
-                                {
-                                    // TODO: range checking
-                                    const auto i = cast<IRIntLit>(v)->getValue();
-                                    constant = emitIntConstant(i, constantType);
-                                    break;
-                                }
-                                case kIROp_StringLit:
-                                    SLANG_UNIMPLEMENTED_X("String constants in SPIR-V emit");
-                                default:
-                                    SLANG_UNREACHABLE("Unhandled case in emitSPIRVAsm");
-                                }
-                                emitOperand(constant);
-                            }
-                            else
-                            {
-                                switch(v->getOp())
-                                {
-                                case kIROp_StringLit:
-                                    emitOperand(SpvLiteralBits::fromUnownedStringSlice(v->getStringSlice()));
-                                    break;
-                                case kIROp_IntLit:
-                                {
-                                    // TODO: range checking
-                                    const auto i = cast<IRIntLit>(v)->getValue();
-                                    emitOperand(SpvLiteralInteger::from32(uint32_t(i)));
-                                    break;
-                                }
-                                default:
-                                    SLANG_UNREACHABLE("Unhandled case in emitSPIRVAsm");
-                                }
-                            }
+                            // TODO: range checking
+                            const auto i = cast<IRIntLit>(v)->getValue();
+                            constant = emitIntConstant(i, constantType);
                             break;
                         }
-                        case kIROp_SPIRVAsmOperandInst:
-                        {
-                            const auto i = operand->getValue();
-                            emitOperand(ensureInst(i));
-
-                            break;
+                        case kIROp_StringLit:
+                            SLANG_UNIMPLEMENTED_X("String constants in SPIR-V emit");
+                        default:
+                            SLANG_UNREACHABLE("Unhandled case in emitSPIRVAsm");
                         }
-                        case kIROp_SPIRVAsmOperandResult:
+                        emitOperand(constant);
+                    }
+                    else
+                    {
+                        switch(v->getOp())
                         {
-                            SLANG_ASSERT(isLast);
-                            emitOperand(kResultID);
+                        case kIROp_StringLit:
+                            emitOperand(SpvLiteralBits::fromUnownedStringSlice(v->getStringSlice()));
                             break;
-                        }
-                        case kIROp_SPIRVAsmOperandId:
+                        case kIROp_IntLit:
                         {
-                            const auto idName = cast<IRStringLit>(operand->getValue())->getStringSlice();
-                            SpvWord id;
-                            if(!idMap.tryGetValue(idName, id))
-                            {
-                                id = freshID();
-                                idMap.set(idName, id);
-                            }
-                            emitOperand(id);
-                            break;
-                        }
-                        case kIROp_SPIRVAsmOperandBuiltinVar:
-                        {
-                            const auto kind = (SpvBuiltIn)(getIntVal(operand->getOperand(0)));
-                            IRBuilder builder(operand);
-                            builder.setInsertBefore(operand);
-                            auto varInst = getBuiltinGlobalVar(builder.getPtrType(kIROp_PtrType, operand->getDataType(), SpvStorageClassInput), kind);
-                            emitOperand(varInst);
-                            break;
-                        }
-                        case kIROp_SPIRVAsmOperandGLSL450Set:
-                        {
-                            emitOperand(getGLSL450ExtInst());
+                            // TODO: range checking
+                            const auto i = cast<IRIntLit>(v)->getValue();
+                            emitOperand(SpvLiteralInteger::from32(uint32_t(i)));
                             break;
                         }
                         default:
                             SLANG_UNREACHABLE("Unhandled case in emitSPIRVAsm");
                         }
                     }
+                    break;
                 }
-            );
+                case kIROp_SPIRVAsmOperandInst:
+                {
+                    const auto i = operand->getValue();
+                    emitOperand(ensureInst(i));
+
+                    break;
+                }
+                case kIROp_SPIRVAsmOperandResult:
+                {
+                    SLANG_ASSERT(isLast);
+                    emitOperand(kResultID);
+                    break;
+                }
+                case kIROp_SPIRVAsmOperandId:
+                {
+                    const auto idName = cast<IRStringLit>(operand->getValue())->getStringSlice();
+                    SpvWord id;
+                    if(!idMap.tryGetValue(idName, id))
+                    {
+                        id = freshID();
+                        idMap.set(idName, id);
+                    }
+                    emitOperand(id);
+                    break;
+                }
+                case kIROp_SPIRVAsmOperandSampledType:
+                {
+                    // Make a 4 vector of the component type
+                    IRBuilder builder(m_irModule);
+                    const auto elementType = cast<IRType>(operand->getValue());
+                    const auto sampledType = builder.getVectorType(dropVector(elementType), 4);
+                    emitOperand(ensureInst(sampledType));
+                    break;
+                }
+                case kIROp_SPIRVAsmOperandBuiltinVar:
+                {
+                    const auto kind = (SpvBuiltIn)(getIntVal(operand->getOperand(0)));
+                    IRBuilder builder(operand);
+                    builder.setInsertBefore(operand);
+                    auto varInst = getBuiltinGlobalVar(builder.getPtrType(kIROp_PtrType, operand->getDataType(), SpvStorageClassInput), kind);
+                    emitOperand(varInst);
+                    break;
+                }
+                case kIROp_SPIRVAsmOperandGLSL450Set:
+                {
+                    emitOperand(getGLSL450ExtInst());
+                    break;
+                }
+                default:
+                    SLANG_UNREACHABLE("Unhandled case in emitSPIRVAsm");
+                }
+            };
+
+            if(spvInst->getOpcodeOperand()->getOp() == kIROp_SPIRVAsmOperandTruncate)
+            {
+                const auto getSlangType = [&](IRSPIRVAsmOperand* operand) -> IRType*{
+                    switch(operand->getOp())
+                    {
+                    case kIROp_SPIRVAsmOperandInst:
+                        return cast<IRType>(operand->getValue());
+                    case kIROp_SPIRVAsmOperandSampledType:
+                        {
+                            // Make a 4 vector of the component type
+                            IRBuilder builder(m_irModule);
+                            const auto elementType = cast<IRType>(operand->getValue());
+                            return builder.getVectorType(dropVector(elementType), 4);
+                        }
+                    case kIROp_SPIRVAsmOperandEnum:
+                    case kIROp_SPIRVAsmOperandLiteral:
+                    case kIROp_SPIRVAsmOperandResult:
+                    case kIROp_SPIRVAsmOperandId:
+                        SLANG_UNEXPECTED("truncate should have been given slang types");
+                    default:
+                        SLANG_UNREACHABLE("Unhandled case in emitSPIRVAsm");
+                    }
+                };
+
+                SLANG_ASSERT(spvInst->getSPIRVOperands().getCount() == 4);
+                const auto toType = getSlangType(spvInst->getSPIRVOperands()[0]);
+                const auto toIdOperand = spvInst->getSPIRVOperands()[1];
+                const auto fromType = getSlangType(spvInst->getSPIRVOperands()[2]);
+                const auto fromIdOperand = spvInst->getSPIRVOperands()[3];
+
+                // The component types must be the same
+                SLANG_ASSERT(isTypeEqual(dropVector(toType), dropVector(fromType)));
+
+                // If we don't need truncation, but a different result ID is
+                // expected, then just unify them in the idMap
+                if(isTypeEqual(toType, fromType))
+                {
+                    // TODO: if this is the last inst, we should just remove it
+                    // and rewrite the penultimate one
+                    last = emitInstCustomOperandFunc(
+                        parent,
+                        isLast ? as<IRInst>(inst) : spvInst,
+                        SpvOpCopyObject,
+                        [&](){
+                            emitOperand(toType);
+                            emitSpvAsmOperand(toIdOperand);
+                            emitSpvAsmOperand(fromIdOperand);
+                        }
+                    );
+                }
+                // Otherwise, if we are truncating to a scalar, extract the first element
+                else if(!as<IRVectorType>(toType))
+                {
+                    last = emitInstCustomOperandFunc(
+                        parent,
+                        isLast ? as<IRInst>(inst) : spvInst,
+                        SpvOpCompositeExtract,
+                        [&](){
+                            emitOperand(toType);
+                            emitSpvAsmOperand(toIdOperand);
+                            emitSpvAsmOperand(fromIdOperand);
+                            emitOperand(SpvLiteralInteger::from32(0));
+                        }
+                    );
+                }
+                // Otherwise, if we are truncating to a 1-vector from a scalar
+                else if(as<IRVectorType>(toType) && !as<IRVectorType>(fromType))
+                {
+                    last = emitInstCustomOperandFunc(
+                        parent,
+                        isLast ? as<IRInst>(inst) : spvInst,
+                        SpvOpCompositeConstruct,
+                        [&](){
+                            emitOperand(toType);
+                            emitSpvAsmOperand(toIdOperand);
+                            emitSpvAsmOperand(fromIdOperand);
+                        }
+                    );
+                }
+                // Otherwise, we are truncating a vector to a smaller vector
+                else
+                {
+                    const auto toVector = cast<IRVectorType>(toType);
+                    const auto toVectorSize = getIntVal(toVector->getElementCount());
+                    const auto fromVector = cast<IRVectorType>(fromType);
+                    const auto fromVectorSize = getIntVal(fromVector->getElementCount());
+                    if(toVectorSize > fromVectorSize)
+                        m_sink->diagnose(inst, Diagnostics::spirvInvalidTruncate);
+                    last = emitInstCustomOperandFunc(
+                        parent,
+                        isLast ? as<IRInst>(inst) : spvInst,
+                        SpvOpVectorShuffle,
+                        [&](){
+                            emitOperand(toType);
+                            emitSpvAsmOperand(toIdOperand);
+                            emitSpvAsmOperand(fromIdOperand);
+                            emitOperand(emitOpUndef(parent, nullptr, fromVector));
+                            for(Int32 i = 0; i < toVectorSize; ++i)
+                                emitOperand(SpvLiteralInteger::from32(i));
+                        }
+                    );
+                }
+            }
+            else
+            {
+                const SpvOp opcode = SpvOp(spvInst->getOpcodeOperandWord());
+
+                switch (opcode)
+                {
+                case SpvOpCapability:
+                    requireSPIRVCapability((SpvCapability)getIntVal(spvInst->getOperand(1)->getOperand(0)));
+                    continue;
+                case SpvOpExtension:
+                    ensureExtensionDeclaration(as<IRStringLit>(spvInst->getOperand(1)->getOperand(0))->getStringSlice());
+                    continue;
+                default:
+                    break;
+                }
+
+                last = emitInstCustomOperandFunc(
+                    parentForOpCode(opcode, parent),
+                    // We want the "result instruction" to refer to the top level
+                    // block which assumes its value, the others are free to refer
+                    // to whatever, so just use the internal spv inst rep
+                    // TODO: This is not correct, because the instruction which is
+                    // assigned to result is not necessarily the last instruction
+                    isLast ? as<IRInst>(inst) : spvInst,
+                    opcode,
+                    [&](){
+                        for(const auto operand : spvInst->getSPIRVOperands())
+                            emitSpvAsmOperand(operand);
+                    }
+                );
+            }
         }
 
         for(const auto& [name, id] : idMap)
