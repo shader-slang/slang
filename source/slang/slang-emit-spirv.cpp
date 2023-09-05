@@ -1375,36 +1375,33 @@ struct SPIRVEmitContext
                 //
                 // Capabilities, according to section 3.8
                 //
-                const auto emitCap = [&](const auto c){
-                    emitOpCapability(getSection(SpvLogicalSectionID::Capabilities), nullptr, c);
-                };
                 // SPIR-V requires that the sampled/rw info on the image isn't unknown
                 SLANG_ASSERT(sampled == sampledImage || sampled == readWriteImage);
                 switch(dim)
                 {
                 case SpvDim1D:
-                    emitCap(sampled == sampledImage ? SpvCapabilitySampled1D : SpvCapabilityImage1D);
+                    requireSPIRVCapability(sampled == sampledImage ? SpvCapabilitySampled1D : SpvCapabilityImage1D);
                     break;
                 case SpvDim2D:
                     // Also requires Shader or Kernel, but these are a given (?)
                     if(sampled == readWriteImage && ms == isMultisampled && arrayed == isArrayed)
-                        emitCap(SpvCapabilityImageMSArray);
+                        requireSPIRVCapability(SpvCapabilityImageMSArray);
                     break;
                 case SpvDim3D:
                     break;
                 case SpvDimCube:
                     // Requires shader also
                     if(sampled == readWriteImage && arrayed == isArrayed)
-                        emitCap(SpvCapabilityImageCubeArray);
+                        requireSPIRVCapability(SpvCapabilityImageCubeArray);
                     break;
                 case SpvDimRect:
-                    emitCap(sampled == sampledImage ? SpvCapabilitySampledRect : SpvCapabilityImageRect);
+                    requireSPIRVCapability(sampled == sampledImage ? SpvCapabilitySampledRect : SpvCapabilityImageRect);
                     break;
                 case SpvDimBuffer:
-                    emitCap(sampled == sampledImage ? SpvCapabilitySampledBuffer : SpvCapabilityImageBuffer);
+                    requireSPIRVCapability(sampled == sampledImage ? SpvCapabilitySampledBuffer : SpvCapabilityImageBuffer);
                     break;
                 case SpvDimSubpassData:
-                    emitCap(SpvCapabilityInputAttachment);
+                    requireSPIRVCapability(SpvCapabilityInputAttachment);
                     break;
                 case SpvDimTileImageDataEXT:
                     SLANG_UNIMPLEMENTED_X("OpTypeImage Capabilities for SpvDimTileImageDataEXT");
@@ -1414,8 +1411,8 @@ struct SPIRVEmitContext
                 {
                     // TODO: It may not be necessary to have both of these
                     // depending on if we read or write
-                    emitCap(SpvCapabilityStorageImageReadWithoutFormat);
-                    emitCap(SpvCapabilityStorageImageWriteWithoutFormat);
+                    requireSPIRVCapability(SpvCapabilityStorageImageReadWithoutFormat);
+                    requireSPIRVCapability(SpvCapabilityStorageImageWriteWithoutFormat);
                 }
 
                 //
