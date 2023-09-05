@@ -10,6 +10,7 @@ uniform sampler sampler_0;
 
 layout(binding = 1)
 uniform texture2D samplerNormal_0;
+
 struct Light_0
 {
     vec4 position_0;
@@ -95,23 +96,18 @@ void main()
     uvec3 _S6 = ((gl_LaunchIDEXT));
     float _S7 = float(_S6.y) + 0.5;
     uvec3 _S8 = ((gl_LaunchSizeEXT));
-
     vec2 inUV_0 = vec2(_S5, _S7 / float(_S8.y));
-    vec4 _S9 = (texture(sampler2D(samplerPosition_0,sampler_0), (inUV_0)));
-    vec3 P_0 = _S9.xyz;
-    vec4 _S10 = (texture(sampler2D(samplerNormal_0,sampler_0), (inUV_0)));
-    vec3 N_0 = _S10.xyz * 2.0 - 1.0;
-
+    vec3 P_0 = (texture(sampler2D(samplerPosition_0,sampler_0), (inUV_0))).xyz;
+    vec3 N_0 = (texture(sampler2D(samplerNormal_0,sampler_0), (inUV_0))).xyz * 2.0 - 1.0;
     vec3 lightDelta_0 = ubo_0.light_0.position_0.xyz - P_0;
     float lightDist_0 = length(lightDelta_0);
     vec3 L_0 = normalize(lightDelta_0);
-    float _S11 = 1.0 / (lightDist_0 * lightDist_0);
+    float _S9 = 1.0 / (lightDist_0 * lightDist_0);
     RayDesc_0 ray_0;
     ray_0.Origin_0 = P_0;
     ray_0.TMin_0 = 0.00000099999999747524;
     ray_0.Direction_0 = lightDelta_0;
     ray_0.TMax_0 = lightDist_0;
-
     ShadowRay_0 shadowRay_0;
     shadowRay_0.hitDistance_0 = 0.0;
     TraceRay_0(as_0, 1U, 255U, 0U, 0U, 2U, ray_0, shadowRay_0);
@@ -122,14 +118,14 @@ void main()
     }
     else
     {
-        atten_0 = _S11;
+        atten_0 = _S9;
     }
     vec3 color_2 = ubo_0.light_0.color_0.xyz * saturate_0(dot(N_0, L_0)) * atten_0;
-
     ReflectionRay_0 reflectionRay_0;
     TraceRay_1(as_0, 1U, 255U, 0U, 0U, 2U, ray_0, reflectionRay_0);
     vec3 color_3 = color_2 + reflectionRay_0.color_1;
-    uvec3 _S12 = ((gl_LaunchIDEXT));
-    imageStore((outputImage_0), ivec2((uvec2(ivec2(_S12.xy)))), vec4(color_3, 1.0));
+    uvec3 _S10 = ((gl_LaunchIDEXT));
+    imageStore((outputImage_0), ivec2((uvec2(ivec2(_S10.xy)))), vec4(color_3, 1.0));
     return;
 }
+

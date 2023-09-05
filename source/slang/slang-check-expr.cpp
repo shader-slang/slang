@@ -3942,7 +3942,7 @@ namespace Slang
             // be able to deduce types for operands
             const auto opInfo = spirvInfo->opInfos.lookup(SpvOp(inst.opcode.knownValue));
 
-            if(opInfo->numOperandTypes == 0 && inst.operands.getCount())
+            if(opInfo && opInfo->numOperandTypes == 0 && inst.operands.getCount())
             {
                 failed = true;
                 getSink()->diagnose(inst.opcode.token, Diagnostics::spirvInstructionWithTooManyOperands, inst.opcode.token, 0);
@@ -3953,16 +3953,21 @@ namespace Slang
             for(Index operandIndex = 0; operandIndex < inst.operands.getCount(); ++operandIndex)
             {
                 // Clamp to the end of the type info array, because the last one will be any variable operands
+                const auto invalidOperandKind = SPIRVCoreGrammarInfo::OperandKind{0xff};
                 const auto operandType
-                    = opInfo->operandTypes[std::min(operandIndex, Index(opInfo->numOperandTypes)-1)];
+                    = opInfo.has_value()
+                    ? opInfo->operandTypes[std::min(operandIndex, Index(opInfo->numOperandTypes)-1)]
+                    : invalidOperandKind;
                 const auto baseOperandType
                     = spirvInfo->operandKindUnderneathIds.lookup(operandType).value_or(operandType);
                 const auto needsIdWrapper = baseOperandType != operandType;
 
                 const auto check = [&](const auto& go, auto& operand) -> void {
-                    if(operand.flavor == SPIRVAsmOperand::SlangType)
+                    if(operand.flavor == SPIRVAsmOperand::SlangType
+                        || operand.flavor == SPIRVAsmOperand::SampledType)
                     {
-                        // This is a $$type operand, fill in the TypeExp member of the operand
+                        // This is a $$type operand or __sampledType(T)
+                        // operand, fill in its TypeExp member.
                         TypeExp& typeExpr = operand.type;
                         typeExpr.exp = operand.expr;
                         typeExpr = CheckProperType(typeExpr);

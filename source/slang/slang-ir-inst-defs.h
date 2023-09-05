@@ -983,6 +983,7 @@ INST(IsBool, IsBool, 1, 0)
 INST(IsFloat, IsFloat, 1, 0)
 INST(IsUnsignedInt, IsUnsignedInt, 1, 0)
 INST(IsSignedInt, IsSignedInt, 1, 0)
+INST(IsVector, IsVector, 1, 0)
 
 INST(ForwardDifferentiate,                   ForwardDifferentiate,            1, 0)
 
@@ -1076,7 +1077,9 @@ INST(SPIRVAsmInst, SPIRVAsmInst, 1, 0)
     // A literal string or 32-bit integer to be passed as operands
     INST(SPIRVAsmOperandLiteral, SPIRVAsmOperandLiteral, 1, HOISTABLE)
     // A reference to a slang IRInst, either a value or a type
-    INST(SPIRVAsmOperandInst, SPIRVAsmOperandInst, 1, HOISTABLE)
+    // This isn't hoistable, as we sometimes need to change the used value and
+    // instructions around the specific asm block
+    INST(SPIRVAsmOperandInst, SPIRVAsmOperandInst, 1, 0)
     // A named enumerator, the value is stored as a constant operand
     // It may have a second operand, which if present is a type with which to
     // construct a constant id to pass, instead of a literal constant
@@ -1091,7 +1094,13 @@ INST(SPIRVAsmInst, SPIRVAsmInst, 1, 0)
     // A special instruction which marks the place to insert the generated
     // result operand
     INST(SPIRVAsmOperandResult, SPIRVAsmOperandResult, 0, HOISTABLE)
-INST_RANGE(SPIRVAsmOperand, SPIRVAsmOperandLiteral, SPIRVAsmOperandResult)
+    // A special instruction which represents a type directed truncation
+    // operation where extra components are dropped
+    INST(SPIRVAsmOperandTruncate, __truncate, 0, HOISTABLE)
+    // A type function which returns the result type of sampling an image of
+    // this component type
+    INST(SPIRVAsmOperandSampledType, __sampledType, 1, HOISTABLE)
+INST_RANGE(SPIRVAsmOperand, SPIRVAsmOperandLiteral, SPIRVAsmOperandSampledType)
 
 
 #undef PARENT

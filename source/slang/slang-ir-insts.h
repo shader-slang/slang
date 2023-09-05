@@ -2373,6 +2373,8 @@ struct IRTryCall : IRTerminatorInst
 
 struct IRSwizzle : IRInst
 {
+    IR_LEAF_ISA(swizzle);
+
     IRUse base;
 
     IRInst* getBase() { return base.get(); }
@@ -2388,6 +2390,8 @@ struct IRSwizzle : IRInst
 
 struct IRSwizzleSet : IRInst
 {
+    IR_LEAF_ISA(swizzleSet);
+
     IRUse base;
     IRUse source;
 
@@ -2592,6 +2596,16 @@ struct IRGetTargetTupleElement : IRInst
     IR_LEAF_ISA(GetTargetTupleElement)
     IRInst* getTuple() { return getOperand(0); }
     IRInst* getElementIndex() { return getOperand(1); }
+};
+
+struct IRMakeVector : IRInst
+{
+    IR_LEAF_ISA(MakeVector)
+};
+
+struct IRMakeVectorFromScalar : IRInst
+{
+    IR_LEAF_ISA(MakeVectorFromScalar)
 };
 
 // An Instruction that creates a differential pair value from a
@@ -2893,6 +2907,8 @@ struct IRDebugLine : IRInst
     IRInst* getColEnd() { return getOperand(4); }
 };
 
+struct IRSPIRVAsm;
+
 struct IRSPIRVAsmOperand : IRInst
 {
     IR_PARENT_ISA(SPIRVAsmOperand);
@@ -2902,6 +2918,17 @@ struct IRSPIRVAsmOperand : IRInst
             return nullptr;
         return getOperand(0);
     }
+    IRSPIRVAsm* getAsmBlock()
+    {
+        const auto ret = as<IRSPIRVAsm>(getParent());
+        SLANG_ASSERT(ret);
+        return ret;
+    }
+};
+
+struct IRSPIRVAsmOperandInst : IRSPIRVAsmOperand
+{
+    IR_LEAF_ISA(SPIRVAsmOperandInst);
 };
 
 struct IRSPIRVAsmInst : IRInst
@@ -2911,15 +2938,23 @@ struct IRSPIRVAsmInst : IRInst
     IRSPIRVAsmOperand* getOpcodeOperand()
     {
         const auto opcodeOperand = cast<IRSPIRVAsmOperand>(getOperand(0));
-        SLANG_ASSERT(opcodeOperand->getOp() == kIROp_SPIRVAsmOperandEnum);
+        // This must be either:
+        // - An enum, such as 'OpNop'
+        // - The __truncate pseudo-instruction
+        // - A literal, like 107 (OpImageQuerySamples)
+        SLANG_ASSERT(opcodeOperand->getOp() == kIROp_SPIRVAsmOperandEnum
+            || opcodeOperand->getOp() == kIROp_SPIRVAsmOperandTruncate
+            || opcodeOperand->getOp() == kIROp_SPIRVAsmOperandLiteral);
         return opcodeOperand;
     }
 
     SpvWord getOpcodeOperandWord()
     {
         const auto o = getOpcodeOperand();
-        SLANG_ASSERT(o->getOp() != kIROp_SPIRVAsmOperandResult);
         const auto v = o->getValue();
+        // It's not valid to call this on an operand which doesn't have a value
+        // (such as __truncate)
+        SLANG_ASSERT(v);
         const auto i = cast<IRIntLit>(v);
         return SpvWord(i->getValue());
     }
@@ -3939,6 +3974,8 @@ public:
     IRSPIRVAsmOperand* emitSPIRVAsmOperandEnum(IRInst* inst, IRType* constantType);
     IRSPIRVAsmOperand* emitSPIRVAsmOperandBuiltinVar(IRInst* type, IRInst* builtinKind);
     IRSPIRVAsmOperand* emitSPIRVAsmOperandGLSL450Set();
+    IRSPIRVAsmOperand* emitSPIRVAsmOperandSampledType(IRType* elementType);
+    IRSPIRVAsmOperand* emitSPIRVAsmOperandTruncate();
     IRSPIRVAsmInst* emitSPIRVAsmInst(IRInst* opcode, List<IRInst*> operands);
     IRSPIRVAsm* emitSPIRVAsm(IRType* type);
     IRInst* emitGenericAsm(UnownedStringSlice asmText);

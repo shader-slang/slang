@@ -657,6 +657,8 @@ public:
         SlangValue,
         SlangValueAddr,
         SlangType,
+        SampledType, // __sampledType(T), this becomes a 4 vector of the component type of T
+        TruncateMarker, // __truncate, an invented instruction which coerces to the result type by truncating the element count
         BuiltinVar,
         GLSL450Set,
     };
