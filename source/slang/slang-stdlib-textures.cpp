@@ -25,12 +25,16 @@ struct BraceScope
     BraceScope(const char*& i, StringBuilder& sb, const char* end = "\n")
     :i(i), sb(sb), end(end)
     {
+        // If we hit this assert, it means that we are indenting too deep and
+        // need more spaces in 'spaces' above.
         SLANG_ASSERT(i != spaces);
         sb << i << "{\n";
         i -= indentWidth;
     }
     ~BraceScope()
     {
+        // If we hit this assert, it means that we've got a bug unindenting
+        // more than we've indented.
         SLANG_ASSERT(*i != '\0');
         i += indentWidth;
         sb << i << "}" << end;
