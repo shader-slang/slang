@@ -23,10 +23,10 @@ public:
 
     BreakableReference<DeviceImpl> m_device;
 
-    Array<VkPipelineShaderStageCreateInfo, 8> m_stageCreateInfos;
-    Array<String, 8> m_entryPointNames;
-    Array<ComPtr<ISlangBlob>, 8> m_codeBlobs; //< To keep storage of code in scope
-    Array<VkShaderModule, 8> m_modules;
+    List<VkPipelineShaderStageCreateInfo> m_stageCreateInfos;
+    List<String> m_entryPointNames;
+    List<ComPtr<ISlangBlob>> m_codeBlobs; //< To keep storage of code in scope
+    List<VkShaderModule> m_modules;
     RefPtr<RootShaderObjectLayout> m_rootObjectLayout;
 
     VkPipelineShaderStageCreateInfo compileEntryPoint(
