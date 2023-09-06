@@ -586,9 +586,16 @@ namespace Slang
                 {
                     if(auto paramDecl = isReferenceIntoFunctionInputParameter(context.baseExpr))
                     {
-                        getSink()->diagnose(context.loc, Diagnostics::mutatingMethodOnFunctionInputParameter,
+                        const bool isNonCopyable = isNonCopyableType(paramDecl->getType());
+
+                        const auto& diagnotic = isNonCopyable ?
+                            Diagnostics::mutatingMethodOnFunctionInputParameterError :
+                            Diagnostics::mutatingMethodOnFunctionInputParameterWarning;
+
+                        getSink()->diagnose(context.loc, diagnotic,
                             funcDeclRef.getName(),
                             paramDecl->getName());
+
                     }
                 }
             }
