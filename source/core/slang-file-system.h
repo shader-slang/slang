@@ -172,7 +172,7 @@ class CacheFileSystem: public ISlangFileSystemExt, public ComBaseObject
     void setInnerFileSystem(ISlangFileSystem* fileSystem, UniqueIdentityMode uniqueIdentityMode = UniqueIdentityMode::Default, PathStyle pathStyle = PathStyle::Default);
 
         /// Ctor
-    CacheFileSystem(ISlangFileSystem* fileSystem, UniqueIdentityMode uniqueIdentityMode = UniqueIdentityMode::Default, PathStyle pathStyle = PathStyle::Default);
+    explicit CacheFileSystem(ISlangFileSystem* fileSystem, UniqueIdentityMode uniqueIdentityMode = UniqueIdentityMode::Default, PathStyle pathStyle = PathStyle::Default);
         /// Dtor
     virtual ~CacheFileSystem();
 

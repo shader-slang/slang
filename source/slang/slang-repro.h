@@ -174,9 +174,9 @@ struct ReproUtil
     static SlangResult loadFileSystem(OffsetBase& base, RequestState* requestState, ISlangFileSystem* fileSystem, ComPtr<ISlangFileSystemExt>& outFileSystem);
 
         /// Load the requestState into request
-        /// The fileSystem is optional and can be passed as nullptr. If set, as each file is loaded
+        /// The overrideFileSystem is optional and can be passed as nullptr. If set, as each file is loaded
         /// it will attempt to load from fileSystem the *uniqueName*
-    static SlangResult load(OffsetBase& base, RequestState* requestState, ISlangFileSystem* fileSystem, EndToEndCompileRequest* request);
+    static SlangResult load(OffsetBase& base, RequestState* requestState, ISlangFileSystem* overrideFileSystem, EndToEndCompileRequest* request);
 
     static SlangResult loadState(const String& filename, DiagnosticSink* sink, List<uint8_t>& outBuffer);
     static SlangResult loadState(Stream* stream, DiagnosticSink* sink, List<uint8_t>& outBuffer);

@@ -96,7 +96,6 @@ enum class OptionKind
     VulkanUseEntryPointName,
     VulkanUseGLLayout,
 
-
     GLSLForceScalarLayout,
     EnableEffectAnnotations,
 
@@ -111,6 +110,15 @@ enum class OptionKind
     DownstreamArgs,
     PassThrough,
 
+    // Repro
+
+    DumpRepro,
+    DumpReproOnError,
+    ExtractRepro,
+    LoadRepro,
+    LoadReproDirectory,
+    ReproFallbackDirectory,
+
     // Debugging
 
     DumpAst,
@@ -118,12 +126,7 @@ enum class OptionKind
     DumpIntermediates,
     DumpIr,
     DumpIrIds,
-    DumpRepro,
-    DumpReproOnError,
     PreprocessorOutput,
-    ExtractRepro,
-    LoadRepro,
-    LoadReproDirectory,
     NoCodeGen,
     OutputIncludes,
     ReproFileSystem,
@@ -223,6 +226,7 @@ void initCommandOptions(CommandOptions& options)
     options.addCategory(CategoryKind::Option, "Target", "Target code generation options");
     options.addCategory(CategoryKind::Option, "Downstream", "Downstream compiler options");
     options.addCategory(CategoryKind::Option, "Debugging", "Compiler debugging/instrumentation options");
+    options.addCategory(CategoryKind::Option, "Repro", "Slang repro system related");
     options.addCategory(CategoryKind::Option, "Experimental", "Experimental options (use at your own risk)");
     options.addCategory(CategoryKind::Option, "Internal", "Internal-use options (use at your own risk)");
     options.addCategory(CategoryKind::Option, "Deprecated", "Deprecated options (allowed but ignored; may be removed in future)");
@@ -562,6 +566,28 @@ void initCommandOptions(CommandOptions& options)
 
     _addOptions(makeConstArrayView(downstreamOpts), options);
 
+    /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Repro !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+    options.setCategory("Repro");
+
+    const Option reproOpts[] =
+    {
+        { OptionKind::DumpReproOnError, "-dump-repro-on-error", nullptr, "Dump `.slang-repro` file on any compilation error." },
+        { OptionKind::ExtractRepro, "-extract-repro", "-extract-repro <name>", "Extract the repro files into a folder." },
+        { OptionKind::LoadReproDirectory, "-load-repro-directory", "-load-repro-directory <path>", "Use repro along specified path" },
+        { OptionKind::LoadRepro, "-load-repro", "-load-repro <name>", "Load repro"},
+        { OptionKind::ReproFileSystem, "-repro-file-system", "-repro-file-system <name>", "Use a repro as a file system" },
+        { OptionKind::DumpRepro, "-dump-repro", nullptr, "Dump a `.slang-repro` file that can be used to reproduce "
+        "a compilation on another machine.\n"},
+        { OptionKind::ReproFallbackDirectory, "-repro-fallback-directory <path>", 
+        "Specify a directory to use if a file isn't found in a repro. Should be specified *before* any repro usage such as `load-repro`. \n"
+        "There are two *special* directories: \n\n"
+        " * 'none:' indicates no fallback, so if the file isn't found in the repro compliation will fail\n" 
+        " * 'default:' is the default (which is the OS file system)"}
+    };
+
+    _addOptions(makeConstArrayView(reproOpts), options);
+
     /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Debugging !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
     options.setCategory("Debugging");
@@ -574,16 +600,9 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::DumpIntermediates, "-dump-intermediates", nullptr, "Dump intermediate outputs for debugging." },
         { OptionKind::DumpIr, "-dump-ir", nullptr, "Dump the IR for debugging." },
         { OptionKind::DumpIrIds, "-dump-ir-ids", nullptr, "Dump the IDs with -dump-ir (debug builds only)" },
-        { OptionKind::DumpRepro, "-dump-repro", nullptr, "Dump a `.slang-repro` file that can be used to reproduce "
-        "a compilation on another machine.\n"},
-        { OptionKind::DumpReproOnError, "-dump-repro-on-error", nullptr, "Dump `.slang-repro` file on any compilation error." },
         { OptionKind::PreprocessorOutput, "-E,-output-preprocessor", nullptr, "Output the preprocessing result and exit." },
-        { OptionKind::ExtractRepro, "-extract-repro", "-extract-repro <name>", "Extract the repro files into a folder." },
-        { OptionKind::LoadReproDirectory, "-load-repro-directory", "-load-repro-directory <path>", "Use repro along specified path" },
-        { OptionKind::LoadRepro, "-load-repro", "-load-repro <name>", "Load repro"},
         { OptionKind::NoCodeGen, "-no-codegen", nullptr, "Skip the code generation step, just check the code and generate layout." },
         { OptionKind::OutputIncludes, "-output-includes", nullptr, "Print the hierarchy of the processed source files." },
-        { OptionKind::ReproFileSystem, "-repro-file-system", "-repro-file-system <name>", "Use a repro as a file system" },
         { OptionKind::SerialIr, "-serial-ir", nullptr, "Serialize the IR between front-end and back-end." },
         { OptionKind::SkipCodeGen, "-skip-codegen", nullptr, "Skip the code generation phase." },
         { OptionKind::ValidateIr, "-validate-ir", nullptr, "Validate the IR between the phases." },
@@ -789,7 +808,6 @@ struct OptionsParser
         char const* const* argv);
 
     static bool _passThroughRequiresStage(PassThroughMode passThrough);
-
 
     SlangResult _compileReproDirectory(SlangSession* session, EndToEndCompileRequest* originalRequest, const String& dir);
 
@@ -1166,7 +1184,33 @@ void OptionsParser::setFloatingPointMode(RawTarget* rawTarget, FloatingPointMode
     }
 }
 
-/* static */SlangResult OptionsParser::_compileReproDirectory(SlangSession* session, EndToEndCompileRequest* originalRequest, const String& dir)
+static SlangResult _loadRepro(const String& path, DiagnosticSink* sink, EndToEndCompileRequest* request)
+{
+    List<uint8_t> buffer;
+    SLANG_RETURN_ON_FAIL(ReproUtil::loadState(path, sink, buffer));
+
+    auto requestState = ReproUtil::getRequest(buffer);
+    MemoryOffsetBase base;
+    base.set(buffer.getBuffer(), buffer.getCount());
+
+    // If we can find a directory, that exists, we will set up a file system to load from that directory
+    ComPtr<ISlangFileSystem> optionalFileSystem;
+    String dirPath;
+    if (SLANG_SUCCEEDED(ReproUtil::calcDirectoryPathFromFilename(path, dirPath)))
+    {
+        SlangPathType pathType;
+        if (SLANG_SUCCEEDED(Path::getPathType(dirPath, &pathType)) && pathType == SLANG_PATH_TYPE_DIRECTORY)
+        {
+            optionalFileSystem = new RelativeFileSystem(OSFileSystem::getExtSingleton(), dirPath);
+        }
+    }
+
+    SLANG_RETURN_ON_FAIL(ReproUtil::load(base, requestState, optionalFileSystem, request));
+
+    return SLANG_OK;
+}
+
+SlangResult OptionsParser::_compileReproDirectory(SlangSession* session, EndToEndCompileRequest* originalRequest, const String& dir)
 {
     auto stdOut = originalRequest->getWriter(WriterChannel::StdOutput);
 
@@ -1175,33 +1219,27 @@ void OptionsParser::setFloatingPointMode(RawTarget* rawTarget, FloatingPointMode
 
     for (auto filename : visitor.m_filenames)
     {
-        auto path = Path::combine(dir, filename);
-
+        // Create a fresh request
         ComPtr<slang::ICompileRequest> request;
         SLANG_RETURN_ON_FAIL(session->createCompileRequest(request.writeRef()));
 
         auto requestImpl = asInternal(request);
 
-        List<uint8_t> buffer;
-        SLANG_RETURN_ON_FAIL(ReproUtil::loadState(path, m_sink, buffer));
+        // Copy over the fallback file system
+        requestImpl->m_reproFallbackFileSystem = originalRequest->m_reproFallbackFileSystem;
 
-        auto requestState = ReproUtil::getRequest(buffer);
-        MemoryOffsetBase base;
-        base.set(buffer.getBuffer(), buffer.getCount());
+        // Load the repro into it
+        auto path = Path::combine(dir, filename);
 
-        // If we can find a directory, that exists, we will set up a file system to load from that directory
-        ComPtr<ISlangFileSystem> fileSystem;
-        String dirPath;
-        if (SLANG_SUCCEEDED(ReproUtil::calcDirectoryPathFromFilename(path, dirPath)))
+        if (SLANG_FAILED(_loadRepro(path, m_sink, requestImpl)))
         {
-            SlangPathType pathType;
-            if (SLANG_SUCCEEDED(Path::getPathType(dirPath, &pathType)) && pathType == SLANG_PATH_TYPE_DIRECTORY)
+            if (stdOut)
             {
-                fileSystem = new RelativeFileSystem(OSFileSystem::getExtSingleton(), dirPath);
+                StringBuilder buf;
+                buf << filename << " - Failed to load!\n";
             }
+            continue;
         }
-
-        SLANG_RETURN_ON_FAIL(ReproUtil::load(base, requestState, fileSystem, requestImpl));
 
         if (stdOut)
         {
@@ -1616,33 +1654,11 @@ SlangResult OptionsParser::_parseLoadRepro(const CommandLineArg& arg)
     CommandLineArg reproName;
     SLANG_RETURN_ON_FAIL(m_reader.expectArg(reproName));
 
-    List<uint8_t> buffer;
+    if (SLANG_FAILED(_loadRepro(reproName.value, m_sink, m_requestImpl)))
     {
-        const Result res = ReproUtil::loadState(reproName.value, m_sink, buffer);
-        if (SLANG_FAILED(res))
-        {
-            m_sink->diagnose(reproName.loc, Diagnostics::unableToReadFile, reproName.value);
-            return res;
-        }
+        m_sink->diagnose(reproName.loc, Diagnostics::unableToReadFile, reproName.value);
+        return SLANG_FAIL;
     }
-
-    auto requestState = ReproUtil::getRequest(buffer);
-    MemoryOffsetBase base;
-    base.set(buffer.getBuffer(), buffer.getCount());
-
-    // If we can find a directory, that exists, we will set up a file system to load from that directory
-    ComPtr<ISlangFileSystem> fileSystem;
-    String dirPath;
-    if (SLANG_SUCCEEDED(ReproUtil::calcDirectoryPathFromFilename(reproName.value, dirPath)))
-    {
-        SlangPathType pathType;
-        if (SLANG_SUCCEEDED(Path::getPathType(dirPath, &pathType)) && pathType == SLANG_PATH_TYPE_DIRECTORY)
-        {
-            fileSystem = new RelativeFileSystem(OSFileSystem::getExtSingleton(), dirPath);
-        }
-    }
-
-    SLANG_RETURN_ON_FAIL(ReproUtil::load(base, requestState, fileSystem, m_requestImpl));
 
     m_hasLoadedRepro = true;
     return SLANG_OK;
@@ -1914,6 +1930,36 @@ SlangResult OptionsParser::_parse(
                 SLANG_RETURN_ON_FAIL(m_reader.expectArg(reproDirectory));
 
                 SLANG_RETURN_ON_FAIL(_compileReproDirectory(m_session, m_requestImpl, reproDirectory.value));
+                break;
+            }
+            case OptionKind::ReproFallbackDirectory:
+            {
+                CommandLineArg reproDirectory;
+                SLANG_RETURN_ON_FAIL(m_reader.expectArg(reproDirectory));
+
+                if (reproDirectory.value == toSlice("default:"))
+                {
+                    // The default is to use the OS file system
+                    m_requestImpl->m_reproFallbackFileSystem = OSFileSystem::getExtSingleton();
+                }
+                else if (reproDirectory.value == toSlice("none:"))
+                {
+                    // None, means that there isn't a fallback
+                    m_requestImpl->m_reproFallbackFileSystem.setNull();
+                }
+                else
+                {
+                    auto osFileSystem = OSFileSystem::getExtSingleton();
+
+                    SlangPathType pathType;
+                    if (SLANG_FAILED(osFileSystem->getPathType(reproDirectory.value.getBuffer(), &pathType) )
+                        || pathType != SLANG_PATH_TYPE_DIRECTORY)
+                    {
+                        return SLANG_FAIL;
+                    }
+                    // Make the fallback directory use a relative file system, to the specified directory
+                    m_requestImpl->m_reproFallbackFileSystem = new RelativeFileSystem(osFileSystem, reproDirectory.value);
+                }
                 break;
             }
             case OptionKind::ReproFileSystem: SLANG_RETURN_ON_FAIL(_parseReproFileSystem(arg)); break;

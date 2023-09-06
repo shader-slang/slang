@@ -133,8 +133,8 @@ public:
         // If it starts with ./ then attempt to strip it
         if (filePath.startsWith("./"))
         {
-            String remaining(filePath.subString(2, filePath.getLength() - 2));
-
+            const String remaining = filePath.getUnownedSlice().tail(2);
+            
             // Okay if we strip ./ and what we have is absolute, then it's the absolute path that we care about,
             // otherwise we just leave as is.
             if (Path::isAbsolute(remaining))
