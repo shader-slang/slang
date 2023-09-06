@@ -595,7 +595,6 @@ namespace Slang
                         getSink()->diagnose(context.loc, diagnotic,
                             funcDeclRef.getName(),
                             paramDecl->getName());
-
                     }
                 }
             }
