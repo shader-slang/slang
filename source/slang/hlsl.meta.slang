@@ -8543,7 +8543,7 @@ struct HitObject
         /// tracing a ray. The provided shader table index must reference a valid miss record in the shader
         /// table.
     [__requiresNVAPI]
-    __target_intrinsic(hlsl, "NvMakeMiss")
+    __target_intrinsic(hlsl, "($2=NvMakeMiss($0,$1))")
     static HitObject MakeMiss( 
         uint MissShaderIndex, 
         RayDesc Ray);
@@ -8575,7 +8575,7 @@ struct HitObject
         /// scenarios where future control flow for some threads is known to process neither a hit nor a
         /// miss.
     [__requiresNVAPI]
-    __target_intrinsic(hlsl, "NvMakeNop")
+    __target_intrinsic(hlsl, "($0 = NvMakeNop())")
     static HitObject MakeNop();
 
     [ForceInline]
@@ -8724,7 +8724,8 @@ struct HitObject
 
     __target_intrinsic(hlsl, "NvMakeHitWithRecordIndex")
     [__requiresNVAPI]
-    static void __hlslMakeHitWithRecordIndex<attr_t>(uint HitGroupRecordIndex, 
+    static void __hlslMakeHitWithRecordIndex<attr_t>(
+        uint HitGroupRecordIndex, 
         RaytracingAccelerationStructure AccelerationStructure, 
         uint InstanceIndex, 
         uint GeometryIndex, 
