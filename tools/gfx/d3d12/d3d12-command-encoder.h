@@ -26,6 +26,7 @@ public:
     DeviceImpl* m_renderer;
     ID3D12Device* m_device;
     ID3D12GraphicsCommandList* m_d3dCmdList;
+    ID3D12GraphicsCommandList6* m_d3dCmdList6;
     ID3D12GraphicsCommandList* m_preCmdList = nullptr;
 
     RefPtr<PipelineStateBase> m_currentPipeline;
@@ -290,6 +291,9 @@ public:
         GfxIndex startIndexLocation,
         GfxIndex baseVertexLocation,
         GfxIndex startInstanceLocation) override;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        drawMeshTasks(int x, int y, int z) override;
 };
 
 #if SLANG_GFX_HAS_DXR_SUPPORT

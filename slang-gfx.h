@@ -1339,6 +1339,7 @@ struct GraphicsPipelineStateDesc
     DepthStencilDesc    depthStencil;
     RasterizerDesc      rasterizer;
     BlendDesc           blend;
+    bool                meshShader;
 };
 
 struct ComputePipelineStateDesc
@@ -2612,6 +2613,11 @@ public:
         void* pipelineDesc,
         void** outPipelineState) = 0;
     virtual SLANG_NO_THROW Result SLANG_MCALL createGraphicsPipelineState(
+        IDevice* device,
+        slang::IComponentType* program,
+        void* pipelineDesc,
+        void** outPipelineState) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createMeshPipelineState(
         IDevice* device,
         slang::IComponentType* program,
         void* pipelineDesc,

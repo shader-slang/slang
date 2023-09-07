@@ -171,6 +171,7 @@ namespace
             pipelineDesc.framebufferLayout = framebufferLayout;
             pipelineDesc.depthStencil.depthTestEnable = false;
             pipelineDesc.depthStencil.depthWriteEnable = false;
+            pipelineDesc.meshShader = false;
             GFX_CHECK_CALL_ABORT(
                 device->createGraphicsPipelineState(pipelineDesc, pipelineState.writeRef()));
 
