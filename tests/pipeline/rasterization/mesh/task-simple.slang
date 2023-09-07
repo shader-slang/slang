@@ -7,8 +7,8 @@
 
 // CHECK:      0
 // CHECK-NEXT: 1
-// CHECK-NEXT: 4
-// CHECK-NEXT: 9
+// CHECK-NEXT: 8
+// CHECK-NEXT: 27
 
 //TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 
@@ -23,12 +23,20 @@ cbuffer Uniforms
 // Task shader
 //
 
+struct MeshPayload
+{
+    int exponent;
+};
+
 [outputtopology("triangle")]
 [numthreads(1, 1, 1)]
 void taskMain(in uint tig : SV_GroupIndex)
 {
-    DispatchMesh(1,1,1);
+    MeshPayload p;
+    p.exponent = 3;
+    DispatchMesh(1,1,1,p);
 }
+
 
 //
 // Mesh shader
@@ -61,6 +69,7 @@ const static uint MAX_PRIMS = 4;
 [numthreads(12, 1, 1)]
 void meshMain(
     in uint tig : SV_GroupIndex,
+    in payload MeshPayload meshPayload,
     out Vertices<Vertex, MAX_VERTS> verts,
     out Indices<uint3, MAX_PRIMS> triangles)
 {
@@ -71,7 +80,7 @@ void meshMain(
     if(tig < numVertices)
     {
         const int tri = tig / 3;
-        verts[tig] = {float4(positions[tig % 3], 0, 1), colors[tig % 3], tri, tri*tri};
+        verts[tig] = {float4(positions[tig % 3], 0, 1), colors[tig % 3], tri, int(pow(tri, meshPayload.exponent))};
     }
 
     if(tig < numPrimitives)
