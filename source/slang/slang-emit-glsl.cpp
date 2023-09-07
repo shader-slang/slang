@@ -874,15 +874,15 @@ void GLSLSourceEmitter::_maybeEmitGLSLBuiltin(IRGlobalParam* var, UnownedStringS
     }
     else if (name == "gl_ClipDistance")
     {
+        // Is this an output? We do not need to define input.
         auto varType = var->getDataType();
         if (auto outType = as<IROutType>(varType))
         {
             varType = outType->getValueType();
+            m_writer->emit("out ");
+            emitType(varType, getName(var));
+            m_writer->emit(";\n\n");
         }
-
-        m_writer->emit("out ");
-        emitType(varType, getName(var));
-        m_writer->emit(";\n\n");
     }
 }
 

@@ -52,7 +52,7 @@ SLANG_RETURN_NEVER void handleSignal(SignalType type, char const* message)
     switch (type)
     {
         case SignalType::InvalidOperation:  throw InvalidOperationException(_getMessage(type, message));
-        case SignalType::AbortCompilation:  throw AbortCompilationException();
+        case SignalType::AbortCompilation:  throw AbortCompilationException(_getMessage(type, message));
         default:    throw InternalError(_getMessage(type, message));
     }
 #else

@@ -5287,11 +5287,17 @@ SlangResult EndToEndCompileRequest::EndToEndCompileRequest::compile()
     {
         res = executeActions();
     }
-    catch (const AbortCompilationException&)
+    catch (const AbortCompilationException& e)
     {
         // This situation indicates a fatal (but not necessarily internal) error
         // that forced compilation to terminate. There should already have been
         // a diagnostic produced, so we don't need to add one here.
+        if (getSink()->getErrorCount() == 0)
+        {
+            // If for some reason we didn't output any diagnostic, something is
+            // going wrong, but we want to make sure we at least output something.
+            getSink()->diagnose(SourceLoc(), Diagnostics::compilationAbortedDueToException, typeid(e).name(), e.Message);
+        }
     }
     catch (const Exception& e)
     {

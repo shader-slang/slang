@@ -934,6 +934,65 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     return nullptr;
 }
 
+void createVarLayoutForLegalizedGlobalParam(
+    IRInst* globalParam,
+    IRBuilder* builder,
+    IRVarLayout* inVarLayout,
+    IRTypeLayout* typeLayout,
+    LayoutResourceKind kind,
+    UInt bindingIndex,
+    UInt bindingSpace,
+    GlobalVaryingDeclarator* declarator,
+    IRInst* leafVar,
+    GLSLSystemValueInfo* systemValueInfo)
+{
+    // We need to construct a fresh layout for the variable, even
+    // if the original had its own layout, because it might be
+    // an `inout` parameter, and we only want to deal with the case
+    // described by our `kind` parameter.
+    //
+    IRVarLayout::Builder varLayoutBuilder(builder, typeLayout);
+    varLayoutBuilder.cloneEverythingButOffsetsFrom(inVarLayout);
+    auto varOffsetInfo = varLayoutBuilder.findOrAddResourceInfo(kind);
+    varOffsetInfo->offset = bindingIndex;
+    varOffsetInfo->space = bindingSpace;
+    IRVarLayout* varLayout = varLayoutBuilder.build();
+    builder->addLayoutDecoration(globalParam, varLayout);
+
+    if (leafVar)
+    {
+        if (auto interpolationModeDecor = leafVar->findDecoration<IRInterpolationModeDecoration>())
+        {
+            builder->addInterpolationModeDecoration(globalParam, interpolationModeDecor->getMode());
+        }
+
+    }
+
+    if (declarator && declarator->flavor == GlobalVaryingDeclarator::Flavor::meshOutputPrimitives)
+    {
+        builder->addDecoration(globalParam, kIROp_GLSLPrimitivesRateDecoration);
+    }
+
+    if (systemValueInfo)
+    {
+        builder->addImportDecoration(globalParam, UnownedTerminatedStringSlice(systemValueInfo->name));
+
+        if (auto outerArrayName = systemValueInfo->outerArrayName)
+        {
+            builder->addGLSLOuterArrayDecoration(globalParam, UnownedTerminatedStringSlice(outerArrayName));
+        }
+
+        switch (systemValueInfo->kind)
+        {
+        case GLSLSystemValueKind::PositionOutput:
+            builder->addGLPositionOutputDecoration(globalParam);
+            break;
+        default:
+            break;
+        }
+    }
+}
+
 ScalarizedVal createSimpleGLSLGlobalVarying(
     GLSLLegalizationContext*    context,
     CodeGenContext*             codeGenContext,
@@ -975,9 +1034,9 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     {
         // If declarator is set we have a problem, because we can't have an array of arrays
         // so for now that's just an error
-        if (kind != LayoutResourceKind::VaryingOutput)
+        if (kind != LayoutResourceKind::VaryingOutput && kind != LayoutResourceKind::VaryingInput)
         {
-            SLANG_ABORT_COMPILATION("Can't handle anything but VaryingOutput.");
+            SLANG_UNIMPLEMENTED_X("Can't handle anything but VaryingOutput and VaryingInput.");
         }
 
         // Let's see if it has been already created
@@ -1005,17 +1064,18 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
                 type,
                 0);
 
-            IRType* paramType = builder->getOutType(arrayType);
+            IRType* paramType = kind == LayoutResourceKind::VaryingOutput
+                ? (IRType*)builder->getOutType(arrayType)
+                : arrayType;
 
             auto globalParam = addGlobalParam(builder->getModule(), paramType);
             moveValueBefore(globalParam, builder->getFunc());
-
+            
             builder->addImportDecoration(globalParam, systemValueName);
 
-            // We can't run layout here, because we don't actually no the size yet
-            // We could run at the end though
+            createVarLayoutForLegalizedGlobalParam(
+                globalParam, builder, inVarLayout, inTypeLayout, kind, bindingIndex, bindingSpace, declarator, leafVar, systemValueInfo);
 
-            //
             semanticGlobalTmp.globalParam = globalParam;
 
             semanticGlobal = &context->systemNameToGlobalMap.getOrAddValue(systemValueName, semanticGlobalTmp); 
@@ -1107,18 +1167,6 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
         }
     }
 
-    // We need to construct a fresh layout for the variable, even
-    // if the original had its own layout, because it might be
-    // an `inout` parameter, and we only want to deal with the case
-    // described by our `kind` parameter.
-    //
-    IRVarLayout::Builder varLayoutBuilder(builder, typeLayout);
-    varLayoutBuilder.cloneEverythingButOffsetsFrom(inVarLayout);
-    auto varOffsetInfo = varLayoutBuilder.findOrAddResourceInfo(kind);
-    varOffsetInfo->offset = bindingIndex;
-    varOffsetInfo->space = bindingSpace;
-    IRVarLayout* varLayout = varLayoutBuilder.build();
-
     // We are going to be creating a global parameter to replace
     // the function parameter, but we need to handle the case
     // where the parameter represents a varying *output* and not
@@ -1134,27 +1182,17 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     auto globalParam = addGlobalParam(builder->getModule(), paramType);
     moveValueBefore(globalParam, builder->getFunc());
 
-    if( leafVar )
-    {
-        if( auto interpolationModeDecor = leafVar->findDecoration<IRInterpolationModeDecoration>() )
-        {
-            builder->addInterpolationModeDecoration(globalParam, interpolationModeDecor->getMode());
-        }
-    }
-
     ScalarizedVal val = isOutput ? ScalarizedVal::address(globalParam) : ScalarizedVal::value(globalParam);
 
-    if( systemValueInfo )
+    if (systemValueInfo)
     {
-        builder->addImportDecoration(globalParam, UnownedTerminatedStringSlice(systemValueInfo->name));
-
-        if( auto fromType = systemValueInfo->requiredType )
+        if (auto fromType = systemValueInfo->requiredType)
         {
             // We may need to adapt from the declared type to/from
             // the actual type of the GLSL global.
             auto toType = inType;
 
-            if( !isTypeEqual(fromType, toType ))
+            if (!isTypeEqual(fromType, toType))
             {
                 RefPtr<ScalarizedTypeAdapterValImpl> typeAdapter = new ScalarizedTypeAdapterValImpl;
                 typeAdapter->actualType = systemValueInfo->requiredType;
@@ -1164,29 +1202,10 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
                 val = ScalarizedVal::typeAdapter(typeAdapter);
             }
         }
-
-        if(auto outerArrayName = systemValueInfo->outerArrayName)
-        {
-            builder->addGLSLOuterArrayDecoration(globalParam, UnownedTerminatedStringSlice(outerArrayName));
-        }
-
-        switch (systemValueInfo->kind)
-        {
-        case GLSLSystemValueKind::PositionOutput:
-            builder->addGLPositionOutputDecoration(globalParam);
-            break;
-        default:
-            break;
-        }
     }
 
-    if(declarator && declarator->flavor == GlobalVaryingDeclarator::Flavor::meshOutputPrimitives)
-    {
-        builder->addDecoration(globalParam, kIROp_GLSLPrimitivesRateDecoration);
-    }
-
-    builder->addLayoutDecoration(globalParam, varLayout);
-
+    createVarLayoutForLegalizedGlobalParam(
+        globalParam, builder, inVarLayout, typeLayout, kind, bindingIndex, bindingSpace, declarator, leafVar, systemValueInfo);
     return val;
 }
 
@@ -1828,6 +1847,11 @@ IRInst* materializeValue(
         }
         break;
 
+    case ScalarizedVal::Flavor::arrayIndex:
+        {
+            auto element = builder->emitElementExtract(val.irValue, as<ScalarizedArrayIndexValImpl>(val.impl)->index);
+            return element;
+        }
     case ScalarizedVal::Flavor::tuple:
         {
             //auto tupleVal = as<ScalarizedTupleValImpl>(val.impl);
