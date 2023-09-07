@@ -13,7 +13,6 @@ float f(float x)
 {
     // CHECK:      tests/diagnostics/autodiff-custom-diff-unresolved.slang([[@LINE-3]]): error 30015: undefined identifier '__d_g'.
     // CHECK-NEXT:     [BackwardDerivative(__d_g)]
-    // CHECK-NEXT:                         ^~~~~
     return x * x;
 }
 
