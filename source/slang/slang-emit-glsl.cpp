@@ -47,6 +47,7 @@ SlangResult GLSLSourceEmitter::init()
         case Stage::Amplification:
         {
             _requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_EXT_mesh_shader"));
+            _requireSPIRVVersion(SemanticVersion(1, 4));
             break;
         }
         default: break;
