@@ -1412,7 +1412,7 @@ namespace Slang
         options.requiredCapabilityVersions = SliceUtil::asSlice(requiredCapabilityVersions);
         options.libraries = SliceUtil::asSlice(libraries);
         options.libraryPaths = allocator.allocate(libraryPaths);
-
+        
         // Compile
         ComPtr<IArtifact> artifact;
         auto downstreamStartTime = std::chrono::high_resolution_clock::now();

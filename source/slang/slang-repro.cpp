@@ -888,7 +888,7 @@ struct LoadContext
     return SLANG_OK;
 }
 
-/* static */SlangResult ReproUtil::load(OffsetBase& base, RequestState* requestState, ISlangFileSystem* fileSystem, EndToEndCompileRequest* request)
+/* static */SlangResult ReproUtil::load(OffsetBase& base, RequestState* requestState, ISlangFileSystem* optionalFileSystem, EndToEndCompileRequest* request)
 {
     auto externalRequest = asExternal(request);
 
@@ -902,7 +902,7 @@ struct LoadContext
         linkage->targets.clear();
     }
 
-    LoadContext context(linkage->getSourceManager(), fileSystem, &base);
+    LoadContext context(linkage->getSourceManager(), optionalFileSystem, &base);
 
     // Try to set state through API - as doing so means if state stored in multiple places it will be ok
 
@@ -1046,7 +1046,7 @@ struct LoadContext
     }
 
     {
-        auto cacheFileSystem = new CacheFileSystem(nullptr);
+        auto cacheFileSystem = new CacheFileSystem(request->m_reproFallbackFileSystem);
         ComPtr<ISlangFileSystemExt> fileSystemExt(cacheFileSystem);
         auto& dstUniqueMap = cacheFileSystem->getUniqueMap();
         auto& dstPathMap = cacheFileSystem->getPathMap();

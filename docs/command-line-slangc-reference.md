@@ -16,6 +16,7 @@ slangc -help-style markdown -h
 * [Target](#Target)
 * [Downstream](#Downstream)
 * [Debugging](#Debugging)
+* [Repro](#Repro)
 * [Experimental](#Experimental)
 * [Internal](#Internal)
 * [Deprecated](#Deprecated)
@@ -379,9 +380,34 @@ Places the $Globals cbuffer at descriptor set &lt;descriptor-set&gt; and binding
 Negates (additively inverts) SV_Position.y before writing to stage output. 
 
 
+<a id="fvk-use-entrypoint-name"></a>
+## -fvk-use-entrypoint-name
+Uses the entrypoint name from the source instead of 'main' in the spirv output. 
+
+
+<a id="fvk-use-gl-layout"></a>
+## -fvk-use-gl-layout
+Use std430 layout instead of D3D buffer layout for raw buffer load/stores. 
+
+
 <a id="enable-effect-annotations"></a>
 ## -enable-effect-annotations
 Enables support for legacy effect annotation syntax. 
+
+
+<a id="emit-spirv-via-glsl"></a>
+## -emit-spirv-via-glsl
+Generate SPIR-V output by compiling generated GLSL with glslang (default) 
+
+
+<a id="emit-spirv-directly"></a>
+## -emit-spirv-directly
+Generate SPIR-V output direclty rather than by compiling generated GLSL with glslang 
+
+
+<a id="spirv-core-grammar"></a>
+## -spirv-core-grammar
+A path to a specific spirv.core.grammar.json to use when generating SPIR-V output 
 
 
 
@@ -391,7 +417,7 @@ Enables support for legacy effect annotation syntax.
 Downstream compiler options 
 
 <a id="none-path"></a>
-## -none-path, -fxc-path, -dxc-path, -glslang-path, -visualstudio-path, -clang-path, -gcc-path, -genericcpp-path, -nvrtc-path, -llvm-path
+## -none-path, -fxc-path, -dxc-path, -glslang-path, -spirv-dis-path, -visualstudio-path, -clang-path, -gcc-path, -genericcpp-path, -nvrtc-path, -llvm-path
 
 **-&lt;[compiler](#compiler)&gt;-path &lt;path&gt;**
 
@@ -460,45 +486,9 @@ Dump the IR for debugging.
 Dump the IDs with [-dump-ir](#dump-ir) (debug builds only) 
 
 
-<a id="dump-repro"></a>
-## -dump-repro
-Dump a `.slang-repro` file that can be used to reproduce a compilation on another machine. 
-
-
-
-
-<a id="dump-repro-on-error"></a>
-## -dump-repro-on-error
-Dump `.slang-repro` file on any compilation error. 
-
-
 <a id="E"></a>
 ## -E, -output-preprocessor
 Output the preprocessing result and exit. 
-
-
-<a id="extract-repro"></a>
-## -extract-repro
-
-**-extract-repro &lt;name&gt;**
-
-Extract the repro files into a folder. 
-
-
-<a id="load-repro-directory"></a>
-## -load-repro-directory
-
-**-load-repro-directory &lt;path&gt;**
-
-Use repro along specified path 
-
-
-<a id="load-repro"></a>
-## -load-repro
-
-**-load-repro &lt;name&gt;**
-
-Load repro 
 
 
 <a id="no-codegen"></a>
@@ -509,14 +499,6 @@ Skip the code generation step, just check the code and generate layout.
 <a id="output-includes"></a>
 ## -output-includes
 Print the hierarchy of the processed source files. 
-
-
-<a id="repro-file-system"></a>
-## -repro-file-system
-
-**-repro-file-system &lt;name&gt;**
-
-Use a repro as a file system 
 
 
 <a id="serial-ir"></a>
@@ -545,15 +527,76 @@ Verify IR in the front-end.
 
 
 
+<a id="Repro"></a>
+# Repro
+
+Slang repro system related 
+
+<a id="dump-repro-on-error"></a>
+## -dump-repro-on-error
+Dump `.slang-repro` file on any compilation error. 
+
+
+<a id="extract-repro"></a>
+## -extract-repro
+
+**-extract-repro &lt;name&gt;**
+
+Extract the repro files into a folder. 
+
+
+<a id="load-repro-directory"></a>
+## -load-repro-directory
+
+**-load-repro-directory &lt;path&gt;**
+
+Use repro along specified path 
+
+
+<a id="load-repro"></a>
+## -load-repro
+
+**-load-repro &lt;name&gt;**
+
+Load repro 
+
+
+<a id="repro-file-system"></a>
+## -repro-file-system
+
+**-repro-file-system &lt;name&gt;**
+
+Use a repro as a file system 
+
+
+<a id="dump-repro"></a>
+## -dump-repro
+Dump a `.slang-repro` file that can be used to reproduce a compilation on another machine. 
+
+
+
+
+<a id="repro-fallback-directory"></a>
+## -repro-fallback-directory
+
+**-repro-fallback-directory &lt;path&gt;**
+
+Specify a directory to use if a file isn't found in a repro. Should be specified *before* any repro usage such as `load-repro`. 
+
+There are two *special* &lt;path&gt;s: 
+
+
+
+* 'none:' indicates no fallback, so if the file isn't found in the repro compliation will fail 
+
+* 'default:' is the default (which is the OS file system) 
+
+
+
 <a id="Experimental"></a>
 # Experimental
 
 Experimental options (use at your own risk) 
-
-<a id="emit-spirv-via-glsl"></a>
-## -emit-spirv-via-glsl
-Generate SPIR-V output by generating and compiling GLSL using glslang
-
 
 <a id="file-system"></a>
 ## -file-system
@@ -667,6 +710,7 @@ Downstream Compilers (aka Pass through)
 * `fxc` : FXC HLSL compiler 
 * `dxc` : DXC HLSL compiler 
 * `glslang` : GLSLANG GLSL compiler 
+* `spirv-dis` : spirv-tools SPIRV disassembler 
 * `visualstudio`, `vs` : Visual Studio C/C++ compiler 
 * `clang` : Clang C/C++ compiler 
 * `gcc` : GCC C/C++ compiler 
@@ -847,12 +891,13 @@ A capability describes an optional feature that a target may or may not support.
 
 * `spirv_1_{ 0`, `1`, `2`, `3`, `4`, `5 }` : minimum supported SPIR - V version 
 * `invalid` 
+* `textual_source` 
 * `hlsl` 
 * `glsl` 
 * `c` 
 * `cpp` 
 * `cuda` 
-* `spirv`
+* `spirv` 
 * `GL_NV_ray_tracing` : enables the GL_NV_ray_tracing extension 
 * `GL_EXT_ray_tracing` : enables the GL_EXT_ray_tracing extension 
 * `GL_NV_fragment_shader_barycentric` : enables the GL_NV_fragment_shader_barycentric extension 

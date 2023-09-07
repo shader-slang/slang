@@ -19,6 +19,8 @@
 #include "../core/slang-std-writers.h"
 #include "../core/slang-command-options.h"
 
+#include "../core/slang-file-system.h"
+
 #include "../../slang-com-ptr.h"
 
 #include "slang-capability.h"
@@ -2696,6 +2698,9 @@ namespace Slang
         ComPtr<IArtifact> m_containerArtifact;
             /// Holds the container as a file system
         ComPtr<ISlangMutableFileSystem> m_containerFileSystem;
+
+            /// File system used by repro system if a file couldn't be found within the repro (or associated directory)
+        ComPtr<ISlangFileSystem> m_reproFallbackFileSystem = ComPtr<ISlangFileSystem>(OSFileSystem::getExtSingleton());
 
             // Path to output container to
         String m_containerOutputPath;
