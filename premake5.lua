@@ -1051,7 +1051,7 @@ toolSharedLibrary "slang-reflection-test"
 toolSharedLibrary "render-test"
     uuid "61F7EB00-7281-4BF3-9470-7C2EA92620C3"
 
-    includedirs { ".", "external", "source", "tools/gfx", "tools/platform" }
+    includedirs { ".", "external", "external/vulkan/include", "source", "tools/gfx", "tools/platform" }
     links { "core", "compiler-core", "slang", "gfx", "gfx-util", "platform" }
     if targetInfo.isWindows then
         addSourceDir "tools/render-test/windows"
@@ -1085,7 +1085,7 @@ tool "gfx"
 
     defines { "SLANG_GFX_DYNAMIC", "SLANG_GFX_DYNAMIC_EXPORT" }
 
-    includedirs { ".", "external", "source" }
+    includedirs { ".", "external", "external/vulkan/include", "source" }
 
     files {"slang-gfx.h"}
 
