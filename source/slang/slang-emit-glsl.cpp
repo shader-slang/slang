@@ -1187,6 +1187,11 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoin
             }
         }
         break;
+        case Stage::Amplification:
+        {
+            emitLocalSizeLayout();
+        }
+        break;
         // TODO: There are other stages that will need this kind of handling.
         default:
             break;

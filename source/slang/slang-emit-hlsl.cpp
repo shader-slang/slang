@@ -442,6 +442,11 @@ void HLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoin
             }
             break;
         }
+        case Stage::Amplification:
+        {
+            emitNumThreadsAttribute();
+            break;
+        }
         // TODO: There are other stages that will need this kind of handling.
         default:
             break;
