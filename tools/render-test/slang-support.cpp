@@ -20,6 +20,8 @@ static const char vertexEntryPointName[] = "vertexMain";
 static const char fragmentEntryPointName[] = "fragmentMain";
 static const char computeEntryPointName[] = "computeMain";
 static const char rtEntryPointName[] = "raygenMain";
+static const char taskEntryPointName[] = "taskMain";
+static const char meshEntryPointName[] = "meshMain";
 
 gfx::StageType translateStage(SlangStage slangStage)
 {
@@ -421,7 +423,10 @@ void ShaderCompilerUtil::Output::reset()
     //
     if( !options.dontAddDefaultEntryPoints )
     {
-        if (shaderType == Options::ShaderProgramType::Graphics || shaderType == Options::ShaderProgramType::GraphicsCompute)
+        switch(shaderType)
+        {
+        case Options::ShaderProgramType::Graphics:
+        case Options::ShaderProgramType::GraphicsCompute:
         {
             ShaderCompileRequest::EntryPoint vertexEntryPoint;
             vertexEntryPoint.name = vertexEntryPointName;
@@ -433,7 +438,29 @@ void ShaderCompilerUtil::Output::reset()
             fragmentEntryPoint.slangStage = SLANG_STAGE_FRAGMENT;
             compileRequest.entryPoints.add(fragmentEntryPoint);
         }
-        else if( shaderType == Options::ShaderProgramType::RayTracing )
+        break;
+        case Options::ShaderProgramType::GraphicsTaskMeshCompute:
+        {
+            ShaderCompileRequest::EntryPoint taskEntryPoint;
+            taskEntryPoint.name = taskEntryPointName;
+            taskEntryPoint.slangStage = SLANG_STAGE_AMPLIFICATION;
+            compileRequest.entryPoints.add(taskEntryPoint);
+        }
+        [[fallthrough]];
+        case Options::ShaderProgramType::GraphicsMeshCompute:
+        {
+            ShaderCompileRequest::EntryPoint meshEntryPoint;
+            meshEntryPoint.name = meshEntryPointName;
+            meshEntryPoint.slangStage = SLANG_STAGE_MESH;
+            compileRequest.entryPoints.add(meshEntryPoint);
+
+            ShaderCompileRequest::EntryPoint fragmentEntryPoint;
+            fragmentEntryPoint.name = fragmentEntryPointName;
+            fragmentEntryPoint.slangStage = SLANG_STAGE_FRAGMENT;
+            compileRequest.entryPoints.add(fragmentEntryPoint);
+        }
+        break;
+        case Options::ShaderProgramType::RayTracing:
         {
             // Note: Current GPU ray tracing pipelines allow for an
             // almost arbitrary mix of entry points for different stages
@@ -445,12 +472,14 @@ void ShaderCompilerUtil::Output::reset()
             // instead rely on `[shader(...)]` annotations to tell us
             // what entry points are present in the input code.
         }
-        else
+        break;
+        default:
         {
             ShaderCompileRequest::EntryPoint computeEntryPoint;
             computeEntryPoint.name = computeEntryPointName;
             computeEntryPoint.slangStage = SLANG_STAGE_COMPUTE;
             compileRequest.entryPoints.add(computeEntryPoint);
+        }
         }
     }
     compileRequest.globalSpecializationArgs = layout.globalSpecializationArgs;
