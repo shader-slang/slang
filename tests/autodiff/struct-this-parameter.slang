@@ -25,7 +25,7 @@ struct A : IDifferentiable
     [Differentiable]
     void write<let N : int>(vector<float, N> value, inout uint offset)
     {
-        [ForceUnroll] for (uint i = 0; i < N; i++) /*this.*/ write(value[i], offset);
+        [ForceUnroll] for (uint i = 0; i < N; i++) write(value[i], offset);
     }
 }
 
