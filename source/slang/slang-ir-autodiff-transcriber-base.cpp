@@ -1161,6 +1161,12 @@ InstPair AutoDiffTranscriberBase::transcribeInst(IRBuilder* builder, IRInst* ori
         return transcribeGeneric(builder, as<IRGeneric>(origInst));
     }
 
+    // At this point we should not see any global insts that are differentiable.
+    // If the inst's parent is IRModule, return (inst, null).
+    // 
+    if (as<IRModuleInst>(origInst->getParent()) && !as<IRType>(origInst))
+        return InstPair(origInst, nullptr);
+
     auto result = transcribeInstImpl(builder, origInst);
 
     if (result.primal == nullptr && result.differential == nullptr)

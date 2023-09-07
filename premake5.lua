@@ -1805,7 +1805,7 @@ standardProject("slang-glslang", "source/slang-glslang")
     uuid "C495878A-832C-485B-B347-0998A90CC936"
     kind "SharedLib"
     pic "On"
-
+    cppdialect "C++17"
     includedirs { "external/glslang", "external/spirv-tools", "external/spirv-tools/include", "external/spirv-headers/include",  "external/spirv-tools-generated", "external/glslang-generated" }
 
     defines
