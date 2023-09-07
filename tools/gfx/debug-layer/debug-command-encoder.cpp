@@ -203,6 +203,12 @@ Result DebugRenderCommandEncoder::drawIndexedInstanced(
         indexCount, instanceCount, startIndexLocation, baseVertexLocation, startInstanceLocation);
 }
 
+Result DebugRenderCommandEncoder::drawMeshTasks(int x, int y, int z)
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->drawMeshTasks(x, y, z);
+}
+
 void DebugResourceCommandEncoder::endEncoding()
 {
     SLANG_GFX_API_FUNC;

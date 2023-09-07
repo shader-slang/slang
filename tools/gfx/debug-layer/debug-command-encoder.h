@@ -231,6 +231,9 @@ public:
         GfxIndex baseVertexLocation,
         GfxIndex startInstanceLocation) override;
 
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        drawMeshTasks(int x, int y, int z) override;
+
 public:
     DebugCommandBuffer* commandBuffer;
     bool isOpen = false;

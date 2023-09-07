@@ -204,6 +204,7 @@ namespace gfx {
     x(vkCmdDebugMarkerBeginEXT) \
     x(vkCmdDebugMarkerEndEXT) \
     x(vkDebugMarkerSetObjectNameEXT) \
+    x(vkCmdDrawMeshTasksEXT) \
     /* */
 
 #define VK_API_ALL_GLOBAL_PROCS(x) \

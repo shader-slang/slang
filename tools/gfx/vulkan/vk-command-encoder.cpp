@@ -1214,6 +1214,14 @@ Result RenderCommandEncoder::drawIndexedInstanced(
     return SLANG_OK;
 }
 
+Result RenderCommandEncoder::drawMeshTasks(int x, int y, int z)
+{
+    SLANG_RETURN_ON_FAIL(prepareDraw());
+    auto& api = *m_api;
+    api.vkCmdDrawMeshTasksEXT(m_vkCommandBuffer, x, y, z);
+    return SLANG_OK;
+}
+
 void ComputeCommandEncoder::endEncoding() { endEncodingImpl(); }
 
 Result ComputeCommandEncoder::bindPipeline(
