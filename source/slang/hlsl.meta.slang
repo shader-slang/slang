@@ -7526,6 +7526,7 @@ void SetMeshOutputCounts(uint vertexCount, uint primitiveCount);
 //
 void DispatchMesh<P>(uint threadGroupCountX, uint threadGroupCountY, uint threadGroupCountZ, P meshPayload);
 
+// TODO: Remove, this doesn't exist in HLSL
 __target_intrinsic(glsl, "EmitMeshTasksEXT")
 __glsl_extension(GL_EXT_mesh_shader)
 __glsl_version(450)
