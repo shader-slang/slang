@@ -430,6 +430,10 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         extendedFeatures.atomicFloatFeatures.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &extendedFeatures.atomicFloatFeatures;
 
+        // mesh shader features
+        extendedFeatures.meshShaderFeatures.pNext = deviceFeatures2.pNext;
+        deviceFeatures2.pNext = &extendedFeatures.meshShaderFeatures;
+
         if (VK_MAKE_VERSION(majorVersion, minorVersion, 0) >= VK_API_VERSION_1_2)
         {
             extendedFeatures.vulkan12Features.pNext = deviceFeatures2.pNext;
@@ -564,6 +568,16 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
             deviceCreateInfo.pNext = &extendedFeatures.clockFeatures;
 
             m_features.add("realtime-clock");
+        }
+
+        if (extendedFeatures.meshShaderFeatures.meshShader)
+        {
+            deviceExtensions.add(VK_EXT_MESH_SHADER_EXTENSION_NAME);
+
+            extendedFeatures.meshShaderFeatures.pNext = (void*)deviceCreateInfo.pNext;
+            deviceCreateInfo.pNext = &extendedFeatures.meshShaderFeatures;
+
+            m_features.add("mesh-shader");
         }
 
         if (_hasAnySetBits(
