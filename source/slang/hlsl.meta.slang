@@ -7526,6 +7526,11 @@ void SetMeshOutputCounts(uint vertexCount, uint primitiveCount);
 //
 void DispatchMesh<P>(uint threadGroupCountX, uint threadGroupCountY, uint threadGroupCountZ, P meshPayload);
 
+__target_intrinsic(glsl, "EmitMeshTasksEXT")
+__glsl_extension(GL_EXT_mesh_shader)
+__glsl_version(450)
+void DispatchMesh(uint threadGroupCountX, uint threadGroupCountY, uint threadGroupCountZ);
+
 //
 // "Sampler feedback" types `FeedbackTexture2D` and `FeedbackTexture2DArray`.
 //
