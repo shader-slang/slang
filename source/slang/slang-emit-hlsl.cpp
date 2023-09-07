@@ -1139,7 +1139,6 @@ void HLSLSourceEmitter::_emitPrefixTypeAttr(IRAttr* attr)
 void HLSLSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
 {
     emitRateQualifiers(param);
-    emitMeshOutputModifiers(param);
 
     if (auto decor = param->findDecoration<IRGeometryInputPrimitiveTypeDecoration>())
     {
@@ -1200,7 +1199,7 @@ void HLSLSourceEmitter::emitPackOffsetModifier(IRInst* varInst, IRType* valueTyp
     // We emit packoffset as a semantic in `emitSemantic`, so nothing to do here.
 }
 
-void HLSLSourceEmitter::emitMeshOutputModifiersImpl(IRInst* varInst)
+void HLSLSourceEmitter::emitMeshShaderModifiersImpl(IRInst* varInst)
 {
     if(auto modifier = varInst->findDecoration<IRMeshOutputDecoration>())
     {
@@ -1211,6 +1210,11 @@ void HLSLSourceEmitter::emitMeshOutputModifiersImpl(IRInst* varInst)
             : nullptr;
         SLANG_ASSERT(s && "Unhandled type of mesh output decoration");
         m_writer->emit(s);
+    }
+    if(varInst->findDecoration<IRHLSLMeshPayloadDecoration>())
+    {
+        // DXC requires that mesh payload parameters have "in" specified
+        m_writer->emit("in payload ");
     }
 }
 

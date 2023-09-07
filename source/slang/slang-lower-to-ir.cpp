@@ -2110,6 +2110,10 @@ void addVarDecorations(
         {
             builder->addFormatDecoration(inst, formatAttr->format);
         }
+        else if(auto payloadMod = as<HLSLPayloadModifier>(mod))
+        {
+            builder->addSimpleDecoration<IRHLSLMeshPayloadDecoration>(inst);
+        }
 
         // TODO: what are other modifiers we need to propagate through?
     }

@@ -985,6 +985,11 @@ class HLSLPrimitivesModifier : public HLSLMeshShaderOutputModifier
     SLANG_AST_CLASS(HLSLPrimitivesModifier)
 };
 
+class HLSLPayloadModifier : public Modifier
+{
+    SLANG_AST_CLASS(HLSLPayloadModifier)
+};
+
 // A modifier to indicate that a constructor/initializer can be used
 // to perform implicit type conversion, and to specify the cost of
 // the conversion, if applied.

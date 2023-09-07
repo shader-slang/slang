@@ -846,7 +846,7 @@ void GLSLSourceEmitter::_maybeEmitGLSLBuiltin(IRGlobalParam* var, UnownedStringS
         // SLANG_ASSERT(layout && "Mesh shader builtin output has no layout");
         // SLANG_ASSERT(layout->usesResourceKind(LayoutResourceKind::VaryingOutput));
         // emitVarModifiers(layout, var, arrayType);
-        emitMeshOutputModifiers(var);
+        emitMeshShaderModifiers(var);
         m_writer->emit("out");
         m_writer->emit(" ");
         m_writer->emit(elementTypeName);
@@ -2566,7 +2566,7 @@ void GLSLSourceEmitter::emitPackOffsetModifier(IRInst* varInst, IRType* valueTyp
     m_writer->emit(")\n");
 }
 
-void GLSLSourceEmitter::emitMeshOutputModifiersImpl(IRInst* varInst)
+void GLSLSourceEmitter::emitMeshShaderModifiersImpl(IRInst* varInst)
 {
     if(varInst->findDecoration<IRGLSLPrimitivesRateDecoration>())
     {

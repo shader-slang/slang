@@ -3138,7 +3138,7 @@ void CLikeSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
             || layout->usesResourceKind(LayoutResourceKind::VaryingOutput))
         {
             emitInterpolationModifiers(param, paramType, layout);
-            emitMeshOutputModifiers(param);
+            emitMeshShaderModifiers(param);
         }
     }
 
@@ -3514,9 +3514,9 @@ void CLikeSourceEmitter::emitInterpolationModifiers(IRInst* varInst, IRType* val
     emitInterpolationModifiersImpl(varInst, valueType, layout);
 }
 
-void CLikeSourceEmitter::emitMeshOutputModifiers(IRInst* varInst)
+void CLikeSourceEmitter::emitMeshShaderModifiers(IRInst* varInst)
 {
-    emitMeshOutputModifiersImpl(varInst);
+    emitMeshShaderModifiersImpl(varInst);
 }
 
     /// Emit modifiers that should apply even for a declaration of an SSA temporary.
@@ -3547,7 +3547,7 @@ void CLikeSourceEmitter::emitVarModifiers(IRVarLayout* layout, IRInst* varDecl, 
         || layout->usesResourceKind(LayoutResourceKind::VaryingOutput))
     {
         emitInterpolationModifiers(varDecl, varType, layout);
-        emitMeshOutputModifiers(varDecl);
+        emitMeshShaderModifiers(varDecl);
     }
 
     // Output target specific qualifiers
