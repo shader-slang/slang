@@ -7041,6 +7041,11 @@ namespace Slang
         {
             if (declRefExpr->declRef)
                 visitor->ensureDecl(declRefExpr->declRef, DeclCheckState::TypesFullyResolved);
+            else
+            {
+                visitor->getSink()->diagnose(attr, Diagnostics::cannotResolveDerivativeFunction);
+                return;
+            }
         }
         else if (auto overloadedExpr = as<OverloadedExpr>(checkedFuncExpr))
         {
