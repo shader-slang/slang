@@ -948,6 +948,7 @@ void TextureTypeInfo::writeSampleFunctions()
             cat("texture($p, vec", arrCoordCount + 1, "($2, $3))")
         );
 
+        sb << "__glsl_extension(GL_EXT_texture_shadow_lod)\n";
         writeFunc(
             "float",
             "SampleCmpLevelZero",
@@ -980,6 +981,7 @@ void TextureTypeInfo::writeSampleFunctions()
             cat("textureOffset($p, vec", arrCoordCount + 1, "($2, $3), $4)")
         );
 
+        sb << "__glsl_extension(GL_EXT_texture_shadow_lod)\n";
         writeFunc(
             "float",
             "SampleCmpLevelZero",
