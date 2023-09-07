@@ -218,7 +218,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 innerType = arrayType->getElementType();
             }
 
-            SpvStorageClass storageClass = SpvStorageClassMax;
+            SpvStorageClass storageClass = SpvStorageClassPrivate;
             // Figure out storage class based on var layout.
             if (auto layout = getVarLayout(inst))
             {
