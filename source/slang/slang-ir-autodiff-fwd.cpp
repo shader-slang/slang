@@ -1521,6 +1521,8 @@ InstPair ForwardDiffTranscriber::transcribeFuncHeader(IRBuilder* inBuilder, IRFu
 
     inBuilder->addFloatingModeOverrideDecoration(diffFunc, FloatingPointMode::Fast);
 
+    copyOriginalDecorations(origFunc, diffFunc);
+
     FuncBodyTranscriptionTask task;
     task.type = FuncBodyTranscriptionTaskType::Forward;
     task.originalFunc = origFunc;
@@ -1689,7 +1691,7 @@ SlangResult ForwardDiffTranscriber::prepareFuncForForwardDiff(IRFunc* func)
     insertTempVarForMutableParams(autoDiffSharedContext->moduleInst->getModule(), func);
     removeLinkageDecorations(func);
 
-    performForceInlining(func);
+    performPreAutoDiffForceInlining(func);
     
     initializeLocalVariables(autoDiffSharedContext->moduleInst->getModule(), func);
 

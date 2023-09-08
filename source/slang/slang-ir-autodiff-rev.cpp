@@ -351,6 +351,7 @@ namespace Slang
             builder.setInsertBefore(diffFunc->getFirstDecorationOrChild());
             cloneInst(&cloneEnv, &builder, dictDecor);
         }
+        copyOriginalDecorations(origFunc, diffFunc);
         builder.addFloatingModeOverrideDecoration(diffFunc, FloatingPointMode::Fast);
         return InstPair(primalFunc, diffFunc);
     }
@@ -532,7 +533,7 @@ namespace Slang
     {
         removeLinkageDecorations(func);
 
-        performForceInlining(func);
+        performPreAutoDiffForceInlining(func);
 
         DifferentiableTypeConformanceContext diffTypeContext(autoDiffSharedContext);
         diffTypeContext.setFunc(func);
