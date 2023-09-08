@@ -140,6 +140,9 @@ namespace Slang
         // the element type of the vector)
         kConversionCost_ScalarToVector = 1,
 
+        // Additional cost when casting an LValue.
+        kConversionCost_LValueCast = 800,
+
         // Conversion is impossible
         kConversionCost_Impossible = 0xFFFFFFFF,
     };
@@ -520,6 +523,13 @@ namespace Slang
         {}
 
         QualType(Type* type);
+
+        QualType(Type* type, bool isLVal)
+            : QualType(type)
+        {
+            isLeftValue = isLVal;
+        }
+
 
         Type* Ptr() { return type; }
 

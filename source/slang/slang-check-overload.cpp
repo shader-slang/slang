@@ -394,21 +394,44 @@ namespace Slang
         return success;
     }
 
+    static QualType getParamQualType(ASTBuilder* astBuilder, DeclRef<ParamDecl> param)
+    {
+        auto paramType = getType(astBuilder, param);
+        bool isLVal = false;
+        switch (getParameterDirection(param.getDecl()))
+        {
+        case kParameterDirection_InOut:
+        case kParameterDirection_Out:
+        case kParameterDirection_Ref:
+            isLVal = true;
+            break;
+        }
+        return QualType(paramType, isLVal);
+    }
+
+    static QualType getParamQualType(Type* paramType)
+    {
+        if (auto paramDirType = as<ParamDirectionType>(paramType))
+        {
+            if (as<OutTypeBase>(paramDirType) || as<RefType>(paramDirType))
+                return QualType(paramDirType->getValueType(), true);
+        }
+        return paramType;
+    }
+
     bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
         OverloadResolveContext&	context,
         OverloadCandidate&		candidate)
     {
         Index argCount = context.getArgCount();
 
-        List<Type*> paramTypes;
-//        List<DeclRef<ParamDecl>> params;
+        List<QualType> paramTypes;
         switch (candidate.flavor)
         {
         case OverloadCandidate::Flavor::Func:
             for (auto param : getParameters(m_astBuilder, candidate.item.declRef.as<CallableDecl>()))
             {
-                auto paramType = getType(m_astBuilder, param);
-                paramTypes.add(paramType);
+                paramTypes.add(getParamQualType(m_astBuilder, param));
             }
             break;
 
@@ -418,13 +441,7 @@ namespace Slang
                 Count paramCount = funcType->getParamCount();
                 for (Index i = 0; i < paramCount; ++i)
                 {
-                    auto paramType = funcType->getParamType(i);
-
-                    if(auto paramDirectionType = as<ParamDirectionType>(paramType))
-                    {
-                        paramType = paramDirectionType->getValueType();
-                    }
-
+                    auto paramType = getParamQualType(funcType->getParamType(i));
                     paramTypes.add(paramType);
                 }
             }
@@ -445,8 +462,8 @@ namespace Slang
         for (Index ii = 0; ii < argCount; ++ii)
         {
             auto& arg = context.getArg(ii);
-            auto argType = context.getArgType(ii);
             auto paramType = paramTypes[ii];
+            auto argType = QualType(context.getArgType(ii), paramType.isLeftValue);
             if (!paramType)
                 return false;
             if (!argType)
@@ -1318,7 +1335,7 @@ namespace Slang
         DeclRef<GenericDecl>    genericDeclRef,
         OverloadResolveContext& context,
         ArrayView<Val*>         knownGenericArgs,
-        List<Type*>             *innerParameterTypes)
+        List<QualType>          *innerParameterTypes)
     {
         // We have been asked to infer zero or more arguments to
         // `genericDeclRef`, in a context where it is being applied
@@ -1360,13 +1377,13 @@ namespace Slang
 
         if (auto funcDeclRef = as<CallableDecl>(genericDeclRef.getDecl()->inner))
         {
-            List<Type*> paramTypes;
+            List<QualType> paramTypes;
             if (!innerParameterTypes)
             {
                 auto params = getParameters(m_astBuilder, funcDeclRef).toArray();
                 for (auto param : params)
                 {
-                    paramTypes.add(getType(m_astBuilder, param));
+                    paramTypes.add(getParamQualType(m_astBuilder, param));
                 }
                 innerParameterTypes = &paramTypes;
             }
@@ -1408,11 +1425,12 @@ namespace Slang
                 //
                 // So the question is then whether a mismatch during the
                 // unification step should be taken as an immediate failure...
-
+                auto argType = context.getArgTypeForInference(aa, this);
+                auto paramType = (*innerParameterTypes)[aa];
                 TryUnifyTypes(
                     constraints,
-                    context.getArgTypeForInference(aa, this),
-                    (*innerParameterTypes)[aa]);
+                    QualType(argType, paramType.isLeftValue),
+                    paramType);
             }
         }
         else
@@ -1679,10 +1697,10 @@ namespace Slang
                 SLANG_ASSERT(diffFuncType);
 
                 // Extract parameter list from processed type.
-                List<Type*> paramTypes;
+                List<QualType> paramTypes;
 
                 for (Index ii = 0; ii < diffFuncType->getParamCount(); ii++)
-                    paramTypes.add(removeParamDirType(diffFuncType->getParamType(ii)));
+                    paramTypes.add(getParamQualType(diffFuncType->getParamType(ii)));
 
                 // Try to infer generic arguments, based on the updated context.
                 OverloadResolveContext subContext = context;
