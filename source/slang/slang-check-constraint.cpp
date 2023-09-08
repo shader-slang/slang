@@ -174,8 +174,8 @@ namespace Slang
     }
 
     Type* SemanticsVisitor::TryJoinTypes(
-        Type*  left,
-        Type*  right)
+        QualType left,
+        QualType right)
     {
         // Easy case: they are the same type!
         if (left->equals(right))
@@ -186,8 +186,8 @@ namespace Slang
         {
             if (auto rightBasic = as<BasicExpressionType>(right))
             {
-                auto costConvertRightToLeft = getConversionCost(leftBasic, rightBasic);
-                auto costConvertLeftToRight = getConversionCost(rightBasic, leftBasic);
+                auto costConvertRightToLeft = getConversionCost(leftBasic, right);
+                auto costConvertLeftToRight = getConversionCost(rightBasic, left);
 
                 // Return the one that had lower conversion cost.
                 if (costConvertRightToLeft > costConvertLeftToRight)
@@ -217,8 +217,8 @@ namespace Slang
 
                 // Try to join the element types
                 auto joinElementType = TryJoinTypes(
-                    leftVector->getElementType(),
-                    rightVector->getElementType());
+                    QualType(leftVector->getElementType(), left.isLeftValue),
+                    QualType(rightVector->getElementType(), right.isLeftValue));
                 if(!joinElementType)
                     return nullptr;
 
@@ -339,13 +339,13 @@ namespace Slang
                     continue;
                 }
 
-                Type* type = nullptr;
+                QualType type;
                 for (auto& c : system->constraints)
                 {
                     if (c.decl != typeParam.getDecl())
                         continue;
 
-                    auto cType = as<Type>(c.val);
+                    auto cType = QualType(as<Type>(c.val), c.isUsedAsLValue);
                     SLANG_RELEASE_ASSERT(cType);
 
                     if (!type)
@@ -360,7 +360,7 @@ namespace Slang
                             // failure!
                             return DeclRef<Decl>();
                         }
-                        type = joinType;
+                        type = QualType(joinType, type.isLeftValue || cType.isLeftValue);
                     }
 
                     c.satisfied = true;
@@ -505,14 +505,16 @@ namespace Slang
     bool SemanticsVisitor::TryUnifyVals(
         ConstraintSystem&	constraints,
         Val*			fst,
-        Val*			snd)
+        bool            fstLVal,
+        Val*			snd,
+        bool            sndLVal)
     {
         // if both values are types, then unify types
         if (auto fstType = as<Type>(fst))
         {
             if (auto sndType = as<Type>(snd))
             {
-                return TryUnifyTypes(constraints, fstType, sndType);
+                return TryUnifyTypes(constraints, QualType(fstType, fstLVal), QualType(sndType, sndLVal));
             }
         }
 
@@ -582,7 +584,9 @@ namespace Slang
     bool SemanticsVisitor::tryUnifyDeclRef(
         ConstraintSystem& constraints,
         DeclRefBase* fst,
-        DeclRefBase* snd)
+        bool fstIsLVal,
+        DeclRefBase* snd,
+        bool sndIsLVal)
     {
         if (fst == snd)
             return true;
@@ -594,13 +598,15 @@ namespace Slang
             return true;
         if (fstGen == nullptr || sndGen == nullptr)
             return false;
-        return tryUnifyGenericAppDeclRef(constraints, fstGen, sndGen);
+        return tryUnifyGenericAppDeclRef(constraints, fstGen, fstIsLVal, sndGen, sndIsLVal);
     }
 
     bool SemanticsVisitor::tryUnifyGenericAppDeclRef(
         ConstraintSystem&           constraints,
         GenericAppDeclRef* fst,
-        GenericAppDeclRef* snd)
+        bool fstIsLVal,
+        GenericAppDeclRef* snd,
+        bool sndIsLVal)
     {
         SLANG_ASSERT(fst);
         SLANG_ASSERT(snd);
@@ -617,7 +623,7 @@ namespace Slang
         bool okay = true;
         for (Index aa = 0; aa < argCount; ++aa)
         {
-            if (!TryUnifyVals(constraints, fstGen->getArgs()[aa], sndGen->getArgs()[aa]))
+            if (!TryUnifyVals(constraints, fstGen->getArgs()[aa], fstIsLVal, sndGen->getArgs()[aa], sndIsLVal))
             {
                 okay = false;
             }
@@ -627,7 +633,7 @@ namespace Slang
         auto fstBase = fst->getBase();
         auto sndBase = snd->getBase();
 
-        if (!tryUnifyDeclRef(constraints, fstBase, sndBase))
+        if (!tryUnifyDeclRef(constraints, fstBase, fstIsLVal, sndBase, sndIsLVal))
         {
             okay = false;
         }
@@ -636,16 +642,16 @@ namespace Slang
     }
 
     bool SemanticsVisitor::TryUnifyTypeParam(
-        ConstraintSystem&				constraints,
+        ConstraintSystem&		constraints,
         GenericTypeParamDecl*	typeParamDecl,
-        Type*			type)
+        QualType			type)
     {
         // We want to constrain the given type parameter
         // to equal the given type.
         Constraint constraint;
         constraint.decl = typeParamDecl;
         constraint.val = type;
-
+        constraint.isUsedAsLValue = type.isLeftValue;
         constraints.constraints.add(constraint);
 
         return true;
@@ -691,8 +697,8 @@ namespace Slang
 
     bool SemanticsVisitor::TryUnifyTypesByStructuralMatch(
         ConstraintSystem&       constraints,
-        Type*  fst,
-        Type*  snd)
+        QualType  fst,
+        QualType  snd)
     {
         if (auto fstDeclRefType = as<DeclRefType>(fst))
         {
@@ -718,14 +724,17 @@ namespace Slang
                 if (!tryUnifyDeclRef(
                     constraints,
                     fstDeclRef,
-                    sndDeclRef))
+                    fst.isLeftValue,
+                    sndDeclRef,
+                    snd.isLeftValue))
                 {
                     return false;
                 }
 
                 return true;
             }
-        } else if(auto fstFunType = as<FuncType>(fst))
+        }
+        else if(auto fstFunType = as<FuncType>(fst))
         {
             if (auto sndFunType = as<FuncType>(snd))
             {
@@ -746,8 +755,8 @@ namespace Slang
 
     bool SemanticsVisitor::TryUnifyConjunctionType(
         ConstraintSystem&   constraints,
-        Type*               fst,
-        Type*               snd)
+        QualType            fst,
+        QualType            snd)
     {
         // Unifying a type `A & B` with `T` amounts to unifying
         // `A` with `T` and also `B` with `T` while
@@ -759,13 +768,13 @@ namespace Slang
         //
         if (auto fstAndType = as<AndType>(fst))
         {
-            return TryUnifyTypes(constraints, fstAndType->getLeft(), snd)
-                && TryUnifyTypes(constraints, fstAndType->getRight(), snd);
+            return TryUnifyTypes(constraints, QualType(fstAndType->getLeft(), fst.isLeftValue), snd)
+                && TryUnifyTypes(constraints, QualType(fstAndType->getRight(), fst.isLeftValue), snd);
         }
         else if (auto sndAndType = as<AndType>(snd))
         {
-            return TryUnifyTypes(constraints, fst, sndAndType->getLeft())
-                || TryUnifyTypes(constraints, fst, sndAndType->getRight());
+            return TryUnifyTypes(constraints, fst, QualType(sndAndType->getLeft(), snd.isLeftValue))
+                || TryUnifyTypes(constraints, fst, QualType(sndAndType->getRight(), snd.isLeftValue));
         }
         else
             return false;
@@ -773,8 +782,8 @@ namespace Slang
 
     bool SemanticsVisitor::TryUnifyTypes(
         ConstraintSystem&       constraints,
-        Type*  fst,
-        Type*  snd)
+        QualType  fst,
+        QualType  snd)
     {
         if (!fst) return false;
 
@@ -843,8 +852,8 @@ namespace Slang
             {
                 return TryUnifyTypes(
                     constraints,
-                    fstVectorType->getElementType(),
-                    sndScalarType);
+                    QualType(fstVectorType->getElementType(), fst.isLeftValue),
+                    QualType(sndScalarType, snd.isLeftValue));
             }
         }
 
@@ -854,8 +863,8 @@ namespace Slang
             {
                 return TryUnifyTypes(
                     constraints,
-                    fstScalarType,
-                    sndVectorType->getElementType());
+                    QualType(fstScalarType, fst.isLeftValue),
+                    QualType(sndVectorType->getElementType(), snd.isLeftValue));
             }
         }
 

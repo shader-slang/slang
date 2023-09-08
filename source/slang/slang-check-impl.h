@@ -46,7 +46,8 @@ namespace Slang
         uint32_t dim2 : 4;
         uint32_t knownConstantBitCount : 8;
         uint32_t knownNegative : 1;
-        uint32_t reserved : 7;
+        uint32_t isLValue : 1;
+        uint32_t reserved : 6;
         uint32_t getRaw() const
         {
             uint32_t val;
@@ -57,16 +58,16 @@ namespace Slang
         {
             return getRaw() == other.getRaw();
         }
-        static BasicTypeKey invalid() { return BasicTypeKey{ 0xff, 0, 0, 0, 0, 0 }; }
+        static BasicTypeKey invalid() { return BasicTypeKey{ 0xff, 0, 0, 0, 0, 0, 0 }; }
     };
 
-    SLANG_FORCE_INLINE BasicTypeKey makeBasicTypeKey(BaseType baseType, IntegerLiteralValue dim1 = 0, IntegerLiteralValue dim2 = 0)
+    SLANG_FORCE_INLINE BasicTypeKey makeBasicTypeKey(BaseType baseType, IntegerLiteralValue dim1 = 0, IntegerLiteralValue dim2 = 0, bool inIsLValue = false)
     {
         SLANG_ASSERT(dim1 >= 0 && dim2 >= 0);
-        return BasicTypeKey{ uint8_t(baseType), uint8_t(dim1), uint8_t(dim2), 0, 0, 0 };
+        return BasicTypeKey{ uint8_t(baseType), uint8_t(dim1), uint8_t(dim2), 0, 0, (inIsLValue?1u:0u), 0 };
     }
 
-    inline BasicTypeKey makeBasicTypeKey(Type* typeIn, Expr* exprIn = nullptr)
+    inline BasicTypeKey makeBasicTypeKey(QualType typeIn, Expr* exprIn = nullptr)
     {
         if (auto basicType = as<BasicExpressionType>(typeIn))
         {
@@ -79,6 +80,7 @@ namespace Slang
                 }
                 rs.knownConstantBitCount = getIntValueBitSize(constInt->value);
             }
+            rs.isLValue = typeIn.isLeftValue ? 1u : 0u;
             return rs;
         }
         else if (auto vectorType = as<VectorExpressionType>(typeIn))
@@ -87,7 +89,7 @@ namespace Slang
             {
                 if( auto elemBasicType = as<BasicExpressionType>(vectorType->getElementType()) )
                 {
-                    return makeBasicTypeKey(elemBasicType->getBaseType(), elemCount->getValue());
+                    return makeBasicTypeKey(elemBasicType->getBaseType(), elemCount->getValue(), 0, typeIn.isLeftValue);
                 }
             }
         }
@@ -99,7 +101,7 @@ namespace Slang
                 {
                     if( auto elemBasicType = as<BasicExpressionType>(matrixType->getElementType()) )
                     {
-                        return makeBasicTypeKey(elemBasicType->getBaseType(), elemCount1->getValue(), elemCount2->getValue());
+                        return makeBasicTypeKey(elemBasicType->getBaseType(), elemCount1->getValue(), elemCount2->getValue(), typeIn.isLeftValue);
                     }
                 }
             }
@@ -144,7 +146,7 @@ namespace Slang
 
             for (Index i = 0; i < opExpr->arguments.getCount(); i++)
             {
-                auto key = makeBasicTypeKey(opExpr->arguments[i]->type.Ptr(), opExpr->arguments[i]);
+                auto key = makeBasicTypeKey(opExpr->arguments[i]->type, opExpr->arguments[i]);
                 if (key.getRaw() == BasicTypeKey::invalid().getRaw())
                 {
                     return false;
@@ -1352,7 +1354,7 @@ namespace Slang
             CoercionSite site,
             Type*    toType,
             Expr**   outToExpr,
-            Type*    fromType,
+            QualType fromType,
             Expr*    fromExpr,
             ConversionCost* outCost);
 
@@ -1365,7 +1367,7 @@ namespace Slang
             ///
         bool canCoerce(
             Type*    toType,
-            Type*    fromType,
+            QualType fromType,
             Expr*    fromExpr,
             ConversionCost* outCost = 0);
 
@@ -1815,6 +1817,7 @@ namespace Slang
         {
             Decl*		decl = nullptr; // the declaration of the thing being constraints
             Val*	val = nullptr; // the value to which we are constraining it
+            bool isUsedAsLValue = false;   // If this constraint is for a type parameter, is the type used in an l-value parameter?
             bool satisfied = false; // Has this constraint been met?
         };
 
@@ -1909,9 +1912,9 @@ namespace Slang
         /// Does there exist an implicit conversion from `fromType` to `toType`?
         bool canConvertImplicitly(
             Type* toType,
-            Type* fromType);
+            QualType fromType);
 
-        ConversionCost getConversionCost(Type* toType, Type* fromType);
+        ConversionCost getConversionCost(Type* toType, QualType fromType);
 
         Type* _tryJoinTypeWithInterface(
             Type*                   type,
@@ -1919,8 +1922,8 @@ namespace Slang
 
         // Try to compute the "join" between two types
         Type* TryJoinTypes(
-            Type*  left,
-            Type*  right);
+            QualType  left,
+            QualType  right);
 
         // Try to solve a system of generic constraints.
         // The `system` argument provides the constraints.
@@ -1965,7 +1968,7 @@ namespace Slang
 
             Index getArgCount() { return argCount; }
             Expr*& getArg(Index index) { return args[index]; }
-            Type*& getArgType(Index index)
+            Type* getArgType(Index index)
             {
                 if(argTypes)
                     return argTypes[index];
@@ -2147,22 +2150,28 @@ namespace Slang
         bool TryUnifyVals(
             ConstraintSystem&	constraints,
             Val*			fst,
-            Val*			snd);
+            bool            fstLVal,
+            Val*			snd,
+            bool            sndLVal);
 
         bool tryUnifyDeclRef(
             ConstraintSystem&       constraints,
             DeclRefBase*   fst,
-            DeclRefBase*   snd);
+            bool           fstLVal,
+            DeclRefBase*   snd,
+            bool           sndLVal);
 
         bool tryUnifyGenericAppDeclRef(
             ConstraintSystem& constraints,
             GenericAppDeclRef* fst,
-            GenericAppDeclRef* snd);
+            bool            fstLVal,
+            GenericAppDeclRef* snd,
+            bool            sndLVal);
 
         bool TryUnifyTypeParam(
-            ConstraintSystem&				constraints,
-            GenericTypeParamDecl*	typeParamDecl,
-            Type*			type);
+            ConstraintSystem&     constraints,
+            GenericTypeParamDecl* typeParamDecl,
+            QualType              type);
 
         bool TryUnifyIntParam(
             ConstraintSystem&               constraints,
@@ -2176,18 +2185,18 @@ namespace Slang
 
         bool TryUnifyTypesByStructuralMatch(
             ConstraintSystem&       constraints,
-            Type*  fst,
-            Type*  snd);
+            QualType fst,
+            QualType snd);
 
         bool TryUnifyTypes(
             ConstraintSystem&       constraints,
-            Type*  fst,
-            Type*  snd);
+            QualType fst,
+            QualType snd);
 
         bool TryUnifyConjunctionType(
             ConstraintSystem&   constraints,
-            Type*            fst,
-            Type*               snd);
+            QualType            fst,
+            QualType            snd);
 
         // Is the candidate extension declaration actually applicable to the given type
         DeclRef<ExtensionDecl> applyExtensionToType(
@@ -2204,7 +2213,7 @@ namespace Slang
             DeclRef<GenericDecl>    genericDeclRef,
             OverloadResolveContext& context,
             ArrayView<Val*>         knownGenericArgs,
-            List<Type*>             *innerParameterTypes = nullptr);
+            List<QualType>             *innerParameterTypes = nullptr);
 
         void AddTypeOverloadCandidates(
             Type*	        type,

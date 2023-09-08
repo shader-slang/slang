@@ -705,7 +705,7 @@ namespace Slang
         CoercionSite site,
         Type*    toType,
         Expr**   outToExpr,
-        Type*    fromType,
+        QualType fromType,
         Expr*    fromExpr,
         ConversionCost* outCost)
     {
@@ -1060,7 +1060,7 @@ namespace Slang
         OverloadResolveContext overloadContext;
         overloadContext.disallowNestedConversions = true;
         overloadContext.argCount = 1;
-        overloadContext.argTypes = &fromType;
+        overloadContext.argTypes = &fromType.type;
         overloadContext.args = &fromExpr;
 
         overloadContext.originalExpr = nullptr;
@@ -1191,6 +1191,11 @@ namespace Slang
                     }
                 }
             }
+            if (fromType.isLeftValue)
+            {
+                // If we are implicitly casting the type of an l-value, we need to impose additional cost.
+                cost += kConversionCost_LValueCast;
+            }
             if(outCost)
                 *outCost = cost;
 
@@ -1245,7 +1250,7 @@ namespace Slang
 
     bool SemanticsVisitor::canCoerce(
         Type*    toType,
-        Type*    fromType,
+        QualType fromType,
         Expr*    fromExpr,
         ConversionCost* outCost)
     {
@@ -1380,7 +1385,7 @@ namespace Slang
 
     bool SemanticsVisitor::canConvertImplicitly(
         Type* toType,
-        Type* fromType)
+        QualType fromType)
     {
         auto conversionCost = getConversionCost(toType, fromType);
 
@@ -1391,7 +1396,7 @@ namespace Slang
         return true;
     }
 
-    ConversionCost SemanticsVisitor::getConversionCost(Type* toType, Type* fromType)
+    ConversionCost SemanticsVisitor::getConversionCost(Type* toType, QualType fromType)
     {
         ConversionCost conversionCost = kConversionCost_Impossible;
         if (!canCoerce(toType, fromType, nullptr, &conversionCost))
