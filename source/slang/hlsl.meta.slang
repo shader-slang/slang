@@ -6125,7 +6125,7 @@ ${{{{
 struct WaveActiveBitOpEntry { const char* hlslName; const char* glslName; const char* spirvName; };
 const WaveActiveBitOpEntry kWaveActiveBitOpEntries[] = {{"BitAnd", "And", "BitwiseAnd"}, {"BitOr", "Or", "BitwiseOr"}, {"BitXor", "Xor", "BitwiseXor"}};
 for (auto opName : kWaveActiveBitOpEntries) {
-}}}}wave
+}}}}
 
 __generic<T : __BuiltinIntegerType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)

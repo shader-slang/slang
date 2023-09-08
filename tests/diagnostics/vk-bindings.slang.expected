@@ -5,7 +5,7 @@ Texture2D t : register(t0);
               ^~~~~~~~
 tests/diagnostics/vk-bindings.slang(14): error 39015: shader parameter 'b' consumes whole descriptor sets, so the binding must be in the form '[[vk::binding(0, ...)]]'; the non-zero binding '2' is not allowed
 [[vk::binding(2,1)]]
-  ^~
+      ^~~~~~~
 }
 standard output = {
 }
