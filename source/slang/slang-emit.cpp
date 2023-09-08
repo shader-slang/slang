@@ -356,6 +356,9 @@ Result linkAndOptimizeIR(
 #endif
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
+    // Lower all the LValue implict casts (used for out/inout/ref scenarios)
+    lowerLValueCast(targetRequest, irModule);
+
     simplifyIR(irModule, sink);
 
     // Fill in default matrix layout into matrix types that left layout unspecified.
@@ -896,9 +899,6 @@ Result linkAndOptimizeIR(
     // Lower sizeof/alignof
 
     lowerSizeOfLike(targetRequest, irModule, sink);
-
-    // Lower all the LValue implict casts (used for out/inout/ref scenarios)
-    lowerLValueCast(targetRequest, irModule);
 
     // Lower all bit_cast operations on complex types into leaf-level
     // bit_cast on basic types.
