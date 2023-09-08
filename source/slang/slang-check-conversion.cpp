@@ -773,7 +773,7 @@ namespace Slang
             auto toBase = toModified ? toModified->getBase() : toType;
             //
             auto fromModified = as<ModifiedType>(fromType);
-            auto fromBase = fromModified ? fromModified->getBase() : fromType;
+            auto fromBase = fromModified ? QualType(fromModified->getBase(), fromType.isLeftValue) : fromType;
 
 
             if((toModified || fromModified) && toBase->equals(fromBase))
