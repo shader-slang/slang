@@ -123,6 +123,10 @@ TensorView make_tensor_view(torch::Tensor val, const char* name, torch::ScalarTy
         elementSize = 8;
         res.data = (uint8_t*)val.data_ptr<int64_t>();
         break;
+    case torch::kBool:
+        elementSize = 1;
+        res.data = (uint8_t*)val.data_ptr<bool>();
+        break;
     }
 
     if (val.dim() > kSlangTorchTensorMaxDim)
