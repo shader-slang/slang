@@ -2073,7 +2073,7 @@ namespace Slang
                                     // Replace the expression. This should make this situation easier to detect.
                                     expr->arguments[pp] = lValueImplicitCast;
                                 }
-                                else
+                                else if (!as<ErrorType>(argExpr->type))
                                 {
                                     getSink()->diagnose(
                                         argExpr,
@@ -2102,11 +2102,10 @@ namespace Slang
                                             // Fall back, in case there are other reasons...
                                             diagnostic = &Diagnostics::implicitCastUsedAsLValue;
                                         }
-
                                         getSink()->diagnoseWithoutSourceView(
                                             argExpr,
                                             *diagnostic,
-                                            implicitCastExpr->arguments[pp]->type,
+                                            implicitCastExpr->arguments[0]->type,
                                             implicitCastExpr->type);
                                     }
 

@@ -601,6 +601,9 @@ class AttributeBase : public Modifier
     
     AttributeDecl* attributeDecl = nullptr;
 
+    // The original identifier token representing the last part of the qualified name.
+    Token originalIdentifierToken;
+
     List<Expr*> args;
 };
 

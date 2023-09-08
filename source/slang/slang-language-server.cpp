@@ -714,6 +714,7 @@ SlangResult LanguageServer::hover(
     else if (auto attr = as<Attribute>(leafNode))
     {
         fillDeclRefHoverInfo(makeDeclRef(attr->attributeDecl));
+        hover.range.end.character = hover.range.start.character + (int)attr->originalIdentifierToken.getContentLength();
     }
     if (sb.getLength() == 0)
     {
