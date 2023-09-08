@@ -25,7 +25,7 @@ struct ObjectPool
     {
         auto id = m_pool.alloc(1);
         if (id == -1)
-            SLANG_ABORT_COMPILATION("container pool allocation failure.");
+            SLANG_UNEXPECTED("container pool allocation failure.");
         return &m_objects[id];
     }
 
