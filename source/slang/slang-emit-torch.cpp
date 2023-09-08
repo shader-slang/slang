@@ -38,15 +38,6 @@ void emitTorchScalarTypeName(SourceWriter* m_writer, IRInst* type)
     case kIROp_UInt8Type:
         m_writer->emit("kUInt8");
         break;
-    case kIROp_UInt16Type:
-        m_writer->emit("kUInt16");
-        break;
-    case kIROp_UIntType:
-        m_writer->emit("kUInt32");
-        break;
-    case kIROp_UInt64Type:
-        m_writer->emit("kUInt64");
-        break;
     case kIROp_Int8Type:
         m_writer->emit("kInt8");
         break;
@@ -59,8 +50,13 @@ void emitTorchScalarTypeName(SourceWriter* m_writer, IRInst* type)
     case kIROp_Int64Type:
         m_writer->emit("kInt64");
         break;
+    case kIROp_BoolType:
+        m_writer->emit("kBool");
+        break;
     default:
-        SLANG_UNEXPECTED("unknown scalar type in allocTorchTensor");
+        SLANG_UNEXPECTED((
+            std::string("unknown scalar type in allocTorchTensor: ") + 
+            std::string(getIROpInfo(type->getOp()).name)).c_str());
         break;
     }
 }
