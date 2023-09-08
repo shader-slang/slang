@@ -508,6 +508,19 @@ bool AutoDiffTranscriberBase::isExistentialType(IRType *type)
     }
 }
 
+void AutoDiffTranscriberBase::copyOriginalDecorations(IRInst* origFunc, IRInst* diffFunc)
+{
+    for (auto decor : origFunc->getDecorations())
+    {
+        switch (decor->getOp())
+        {
+        case kIROp_ForceInlineDecoration:
+            cloneDecoration(decor, diffFunc);
+            break;
+        }
+    }
+}
+
 InstPair AutoDiffTranscriberBase::transcribeExtractExistentialWitnessTable(IRBuilder* builder, IRInst* origInst)
 {
     IRInst* origBase = origInst->getOperand(0);
