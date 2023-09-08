@@ -10,6 +10,7 @@
 #include "d3d12-framebuffer.h"
 #include "d3d12-shader-program.h"
 #include "d3d12-vertex-layout.h"
+#include "d3d12-pipeline-state-stream.h"
 
 #include <climits>
 
@@ -211,7 +212,7 @@ Result PipelineStateImpl::ensureAPIPipelineStateCreated()
             }
             else
             {
-                CD3DX12_PIPELINE_MESH_STATE_STREAM meshStateStream{meshDesc};
+                CD3DX12_PIPELINE_STATE_STREAM2 meshStateStream{meshDesc};
                 D3D12_PIPELINE_STATE_STREAM_DESC streamDesc{sizeof(meshStateStream), &meshStateStream};
 
                 SLANG_RETURN_ON_FAIL(m_device->m_device5->CreatePipelineState(

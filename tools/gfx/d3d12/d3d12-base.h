@@ -32,11 +32,6 @@
 #include <d3d12.h>
 #include <dxgi1_4.h>
 
-// Don't include some STL based helpers in the d3dx12 header
-#define D3DX12_NO_STATE_OBJECT_HELPERS
-#define D3DX12_NO_CHECK_FEATURE_SUPPORT_CLASS
-#include <d3dx12.h>
-
 #ifndef __ID3D12GraphicsCommandList1_FWD_DEFINED__
 // If can't find a definition of CommandList1, just use an empty definition
 struct ID3D12GraphicsCommandList1
