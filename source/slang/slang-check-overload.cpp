@@ -441,17 +441,8 @@ namespace Slang
                 Count paramCount = funcType->getParamCount();
                 for (Index i = 0; i < paramCount; ++i)
                 {
-                    auto paramType = funcType->getParamType(i);
-                    bool isLVal = false;
-
-                    if(auto paramDirectionType = as<ParamDirectionType>(paramType))
-                    {
-                        paramType = paramDirectionType->getValueType();
-                        if (as<OutTypeBase>(paramType) || as<RefType>(paramType))
-                            isLVal = true;
-                    }
-
-                    paramTypes.add(QualType(paramType, isLVal));
+                    auto paramType = getParamQualType(funcType->getParamType(i));
+                    paramTypes.add(paramType);
                 }
             }
             break;
