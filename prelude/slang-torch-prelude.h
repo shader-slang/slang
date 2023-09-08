@@ -87,6 +87,10 @@ TensorView make_tensor_view(torch::Tensor val, const char* name, torch::ScalarTy
     if (val.dtype() != targetScalarType)
         throw std::runtime_error(std::string(name).append(": tensor is not of the expected type.").c_str());
 
+    // Check that the tensor is contiguous
+    if (!val.is_contiguous())
+        throw std::runtime_error(std::string(name).append(": tensor is not contiguous.").c_str());
+
     TensorView res = {};
     res.dimensionCount = val.dim();
     res.data = nullptr;
