@@ -21,6 +21,9 @@ namespace Slang
 
         /// Inline any call sites to functions marked `[ForceInline]` inside `func`.
     bool performForceInlining(IRGlobalValueWithCode* func);
+    
+        /// Perform force inlining of functions that does not have custom derivatives.
+    bool performPreAutoDiffForceInlining(IRGlobalValueWithCode* func);
 
         /// Inline calls to functions that returns a resource/sampler via either return value or output parameter.
     void performGLSLResourceReturnFunctionInlining(IRModule* module);

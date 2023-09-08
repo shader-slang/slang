@@ -140,6 +140,8 @@ struct AutoDiffTranscriberBase
 
     void _markInstAsDifferential(IRBuilder* builder, IRInst* diffInst, IRInst* primalInst = nullptr);
 
+    void copyOriginalDecorations(IRInst* origFunc, IRInst* diffFunc);
+
     virtual IRFuncType* differentiateFunctionType(IRBuilder* builder, IRInst* func, IRFuncType* funcType) = 0;
 
     // Create an empty func to represent the transcribed func of `origFunc`.

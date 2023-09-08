@@ -831,6 +831,47 @@ bool performForceInlining(IRGlobalValueWithCode* func)
     return pass.considerAllCallSitesRec(func);
 }
 
+struct PreAutoDiffForceInliningPass : InliningPassBase
+{
+    typedef InliningPassBase Super;
+
+    PreAutoDiffForceInliningPass(IRModule* module)
+        : Super(module)
+    {}
+
+    bool shouldInline(CallSiteInfo const& info)
+    {
+        if (info.callee->findDecoration<IRUnsafeForceInlineEarlyDecoration>() ||
+            info.callee->findDecoration<IRIntrinsicOpDecoration>())
+            return true;
+        bool hasForceInline = false;
+        bool hasUserDefinedDerivative = false;
+        for (auto decor : info.callee->getDecorations())
+        {
+            switch (decor->getOp())
+            {
+            case kIROp_UnsafeForceInlineEarlyDecoration:
+            case kIROp_IntrinsicOpDecoration:
+                return true;
+            case kIROp_ForceInlineDecoration:
+                hasForceInline = true;
+                break;
+            case kIROp_UserDefinedBackwardDerivativeDecoration:
+            case kIROp_ForwardDerivativeDecoration:
+                hasUserDefinedDerivative = true;
+                break;
+            }
+        }
+        return (hasForceInline && !hasUserDefinedDerivative);
+    }
+};
+
+bool performPreAutoDiffForceInlining(IRGlobalValueWithCode* func)
+{
+    PreAutoDiffForceInliningPass pass(func->getModule());
+    return pass.considerAllCallSitesRec(func);
+}
+
     // Defined in slang-ir-specialize-resource.cpp
 bool isResourceType(IRType* type);
 bool isIllegalGLSLParameterType(IRType* type);
