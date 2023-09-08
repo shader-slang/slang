@@ -199,7 +199,8 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
                 if (attr->getKeywordName())
                 {
                     SemanticToken token = _createSemanticToken(
-                        manager, attr->getKeywordNameAndLoc().loc, attr->getKeywordName());
+                        manager, attr->originalIdentifierToken.loc, nullptr);
+                    token.length = (int)attr->originalIdentifierToken.getContentLength();
                     token.type = SemanticTokenType::Type;
                     maybeInsertToken(token);
                 }

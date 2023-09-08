@@ -810,6 +810,7 @@ namespace Slang
 
         // First copy all of the state over from the original attribute.
         attr->keywordName  = uncheckedAttr->keywordName;
+        attr->originalIdentifierToken = uncheckedAttr->originalIdentifierToken;
         attr->args  = uncheckedAttr->args;
         attr->loc   = uncheckedAttr->loc;
         attr->attributeDecl = attrDecl;

@@ -684,8 +684,8 @@ bool _findAstNodeImpl(ASTLookupContext& context, SyntaxNode* node)
                 if (attribute->getKeywordName() &&
                     _isLocInRange(
                         &context,
-                        attribute->getKeywordNameAndLoc().loc,
-                        attribute->getKeywordName()->text.getLength()))
+                        attribute->originalIdentifierToken.loc,
+                        attribute->originalIdentifierToken.getContentLength()))
                 {
                     ASTLookupResult result;
                     result.path = context.nodePath;

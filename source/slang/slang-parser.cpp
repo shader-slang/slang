@@ -878,7 +878,7 @@ namespace Slang
 
     // 
     // '::'? identifier ('::' identifier)* 
-    static Token parseAttributeName(Parser* parser)
+    static Token parseAttributeName(Parser* parser, Token& outOriginalLastToken)
     {
         const SourceLoc scopedIdSourceLoc = parser->tokenReader.peekLoc();
 
@@ -892,6 +892,7 @@ namespace Slang
             return parser->ReadToken();
 
         const Token firstIdentifier = parser->ReadToken(TokenType::Identifier);
+        outOriginalLastToken = firstIdentifier;
         if (initialTokenType != TokenType::Scope && parser->tokenReader.peekTokenType() != TokenType::Scope)
         {
             return firstIdentifier;
@@ -911,6 +912,7 @@ namespace Slang
             scopedIdentifierBuilder.append('_'); 
             
             const Token nextIdentifier(parser->ReadToken(TokenType::Identifier));
+            outOriginalLastToken = nextIdentifier;
             scopedIdentifierBuilder.append(nextIdentifier.getContent());
         }
 
@@ -946,12 +948,14 @@ namespace Slang
             // seems better to not complicate the parsing process any more.
             //
 
-            Token nameToken = parseAttributeName(parser);
+            Token originalLastToken;
+            Token nameToken = parseAttributeName(parser, originalLastToken);
 
             UncheckedAttribute* modifier = parser->astBuilder->create<UncheckedAttribute>();
             modifier->keywordName = nameToken.getName();
-            modifier->loc = nameToken.getLoc();
+            modifier->loc = originalLastToken.getLoc();
             modifier->scope = parser->currentScope;
+            modifier->originalIdentifierToken = originalLastToken;
 
             if (AdvanceIf(parser, TokenType::LParent))
             {
