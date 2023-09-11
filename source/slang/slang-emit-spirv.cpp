@@ -1430,11 +1430,17 @@ struct SPIRVEmitContext
                 );
             }
         case kIROp_SamplerStateType:
-                return emitOpTypeSampler(inst);
-        // > OpTypeArray
-        // > OpTypeRuntimeArray
-        // > OpTypeOpaque
-        // > OpTypePointer
+            return emitOpTypeSampler(inst);
+
+        case kIROp_RaytracingAccelerationStructureType:
+            requireSPIRVCapability(SpvCapabilityRayTracingKHR);
+            ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_ray_tracing"));
+            return emitOpTypeAccelerationStructure(inst);
+
+        case kIROp_RayQueryType:
+            ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_ray_query"));
+            requireSPIRVCapability(SpvCapabilityRayQueryKHR);
+            return emitOpTypeRayQuery(inst);
 
         case kIROp_FuncType:
             // > OpTypeFunction
@@ -1544,6 +1550,8 @@ struct SPIRVEmitContext
             }
         case kIROp_GetStringHash:
             return emitGetStringHash(inst);
+        case kIROp_AllocateOpaqueHandle:
+            return nullptr;
         default:
             {
                 if (as<IRSPIRVAsmOperand>(inst))

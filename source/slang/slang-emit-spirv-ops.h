@@ -229,6 +229,20 @@ SpvInst* emitOpTypeSampler(IRInst* inst)
     );
 }
 
+SpvInst* emitOpTypeAccelerationStructure(IRInst* inst)
+{
+    return emitInstMemoized(
+        getSection(SpvLogicalSectionID::ConstantsAndTypes), inst, SpvOpTypeAccelerationStructureKHR, kResultID
+    );
+}
+
+SpvInst* emitOpTypeRayQuery(IRInst* inst)
+{
+    return emitInstMemoized(
+        getSection(SpvLogicalSectionID::ConstantsAndTypes), inst, SpvOpTypeRayQueryKHR, kResultID
+    );
+}
+
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypeArray
 template<typename T1, typename T2>
 SpvInst* emitOpTypeArray(IRInst* inst, const T1& elementType, const T2& length)
