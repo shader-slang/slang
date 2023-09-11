@@ -2921,8 +2921,11 @@ void legalizeDispatchMeshPayloadForGLSL(IRModule* module)
         {
             if(const auto dec = func->findDecoration<IRKnownBuiltinDecoration>())
             {
-                SLANG_ASSERT(!dispatchMeshFunc && "Multiple DispatchMesh functions found");
-                dispatchMeshFunc = func;
+                if(dec->getName() == "DispatchMesh")
+                {
+                    SLANG_ASSERT(!dispatchMeshFunc && "Multiple DispatchMesh functions found");
+                    dispatchMeshFunc = func;
+                }
             }
         }
     }
