@@ -23,7 +23,7 @@ SamplerState samplerState;
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     int i = dispatchThreadID.x;
-    float2 loc = float2(0,0);
+    float2 loc = float2(0.5, 0.5);
     float lod = 0;
     int2 offset = int2(0,0);
     float r = spirv_asm
@@ -36,7 +36,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         %sampled : __sampledType(float) = OpImageSampleExplicitLod %sampledImage $loc
             // Put some sampling operands in here to check that they don't warn
             // DIAG-NOT: warning{{.*}}too many operands
-            None|Lod|ConstOffset $lod $offset;
+            Lod|ConstOffset $lod $offset;
         // Samples in SPIR-V always return a 4-vector of the component type,
         // the __truncate function will drop elements so it fits into the
         // desired output type
