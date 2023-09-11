@@ -5948,9 +5948,8 @@ matrix<T,N,M> WaveMaskReadLaneFirst(WaveMask mask, matrix<T,N,M> expr);
 
 __generic<T : __BuiltinType>
 __glsl_extension(GL_NV_shader_subgroup_partitioned)
-__spirv_version(1.3)
+__spirv_version(1.1)
 __cuda_sm_version(7.0)
-__spirv_capability(GroupNonUniformPartitionedNV)
 WaveMask WaveMaskMatch(WaveMask mask, T value)
 {
     __target_switch
@@ -5959,14 +5958,18 @@ WaveMask WaveMaskMatch(WaveMask mask, T value)
     case cuda: __intrinsic_asm "_waveMatchScalar($0, $1).x";
     case hlsl: __intrinsic_asm "WaveMatch($1).x";
     case spirv:
-        return (spirv_asm {OpGroupNonUniformPartitionNV $$uint4 result $value}).x;
+        return (spirv_asm
+        {
+            OpCapability GroupNonUniformPartitionedNV;
+            OpExtension "SPV_NV_shader_subgroup_partitioned";
+            OpGroupNonUniformPartitionNV $$uint4 result $value
+        }).x;
     }
 }
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_NV_shader_subgroup_partitioned)
-__spirv_version(1.3)
+__spirv_version(1.1)
 __cuda_sm_version(7.0)
-__spirv_capability(GroupNonUniformPartitionedNV)
 WaveMask WaveMaskMatch(WaveMask mask, vector<T,N> value)
 {
     __target_switch
@@ -5975,7 +5978,12 @@ WaveMask WaveMaskMatch(WaveMask mask, vector<T,N> value)
     case cuda: __intrinsic_asm "_waveMatchMultiple($0, $1).x";
     case hlsl: __intrinsic_asm "WaveMatch($1).x";
     case spirv:
-        return (spirv_asm {OpGroupNonUniformPartitionNV $$uint4 result $value}).x;
+        return (spirv_asm
+        {
+            OpCapability GroupNonUniformPartitionedNV;
+            OpExtension "SPV_NV_shader_subgroup_partitioned";
+            OpGroupNonUniformPartitionNV $$uint4 result $value
+        }).x;
     }
 }
 
