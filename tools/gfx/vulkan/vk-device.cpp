@@ -592,9 +592,29 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
             VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
         VkPhysicalDeviceRayTracingPipelinePropertiesKHR rtProps = {
             VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR };
+        VkPhysicalDeviceSubgroupProperties subgroupProps = {
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES };
+        rtProps.pNext = extendedProps.pNext;
         extendedProps.pNext = &rtProps;
+        subgroupProps.pNext = extendedProps.pNext;
+        extendedProps.pNext = &subgroupProps;
         m_api.vkGetPhysicalDeviceProperties2(m_api.m_physicalDevice, &extendedProps);
         m_api.m_rtProperties = rtProps;
+
+        // Approximate DX12's WaveOps boolean
+        if(subgroupProps.supportedOperations &
+           ( VK_SUBGROUP_FEATURE_BASIC_BIT
+           | VK_SUBGROUP_FEATURE_VOTE_BIT
+           | VK_SUBGROUP_FEATURE_ARITHMETIC_BIT
+           | VK_SUBGROUP_FEATURE_BALLOT_BIT
+           | VK_SUBGROUP_FEATURE_SHUFFLE_BIT
+           | VK_SUBGROUP_FEATURE_SHUFFLE_RELATIVE_BIT
+           | VK_SUBGROUP_FEATURE_CLUSTERED_BIT
+           | VK_SUBGROUP_FEATURE_QUAD_BIT
+           | VK_SUBGROUP_FEATURE_PARTITIONED_BIT_NV))
+        {
+            m_features.add("wave-ops");
+        }
 
         uint32_t extensionCount = 0;
         m_api.vkEnumerateDeviceExtensionProperties(
