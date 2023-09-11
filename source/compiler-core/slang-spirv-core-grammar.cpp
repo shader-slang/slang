@@ -265,7 +265,17 @@ RefPtr<SPIRVCoreGrammarInfo> SPIRVCoreGrammarInfo::loadFromJSON(SourceView& sour
             numOperandTypes++;
             res->operandTypesStorage.add(*catIndex);
 
-            if(o.quantifier == "")
+            // The number of "ImageOperands" is dependent on the bitmask
+            // operand, for our purposes treat them as unbounded
+            if(o.quantifier == "*" || o.kind == "ImageOperands")
+            {
+                maxOperandCount = 0xffff;
+            }
+            else if(o.quantifier == "?")
+            {
+                maxOperandCount++;
+            }
+            else if(o.quantifier == "")
             {
                 // This catches the case where an "?" or "*" qualified operand
                 // appears before any unqualified operands
@@ -278,13 +288,13 @@ RefPtr<SPIRVCoreGrammarInfo> SPIRVCoreGrammarInfo::loadFromJSON(SourceView& sour
                 minOperandCount++;
                 maxOperandCount++;
             }
-            else if(o.quantifier == "?")
+            else
             {
-                maxOperandCount++;
-            }
-            else if(o.quantifier == "*")
-            {
-                maxOperandCount = 0xffff;
+                sink.diagnose(
+                    SourceLoc{},
+                    MiscDiagnostics::spirvCoreGrammarJSONParseFailure,
+                    "quantifier wasn't empty, * or ?"
+                );
             }
         }
 
