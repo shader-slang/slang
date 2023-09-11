@@ -7524,13 +7524,21 @@ void SetMeshOutputCounts(uint vertexCount, uint primitiveCount);
 // Specify the number of downstream mesh shader thread groups to invoke from an amplification shader,
 // and provide the values for per-mesh payload parameters.
 //
-void DispatchMesh<P>(uint threadGroupCountX, uint threadGroupCountY, uint threadGroupCountZ, P meshPayload);
-
-// TODO: Remove, this doesn't exist in HLSL
-__target_intrinsic(glsl, "EmitMeshTasksEXT")
-__glsl_extension(GL_EXT_mesh_shader)
-__glsl_version(450)
-void DispatchMesh(uint threadGroupCountX, uint threadGroupCountY, uint threadGroupCountZ);
+// This function doesn't return.
+//
+[KnownBuiltin("DispatchMesh")]
+void DispatchMesh<P>(uint threadGroupCountX, uint threadGroupCountY, uint threadGroupCountZ, __ref P meshPayload)
+{
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "DispatchMesh";
+    case glsl:
+        // This intrinsic doesn't take into account writing meshPayload. That
+        // is dealt with separately by 'legalizeDispatchMeshPayloadForGLSL'.
+        __intrinsic_asm "EmitMeshTasksEXT($0, $1, $2)";
+    }
+}
 
 //
 // "Sampler feedback" types `FeedbackTexture2D` and `FeedbackTexture2DArray`.

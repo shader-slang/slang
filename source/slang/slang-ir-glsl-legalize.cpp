@@ -7,8 +7,8 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-specialize-function-call.h"
-
 #include "slang-glsl-extension-tracker.h"
+#include "../../external/spirv-headers/include/spirv/unified1/spirv.h"
 
 namespace Slang
 {
@@ -1929,7 +1929,35 @@ void legalizeRayTracingEntryPointParameterForGLSL(
     builder->addDependsOnDecoration(func, globalParam);
 }
 
-void legalizeMeshOutputParam(
+static void legalizeMeshPayloadInputParam(
+    GLSLLegalizationContext* context,
+    CodeGenContext*          codeGenContext,
+    IRParam*                 pp)
+{
+    auto builder = context->getBuilder();
+    auto stage = context->getStage();
+    SLANG_ASSERT(stage == Stage::Mesh && "legalizing mesh payload input, but we're not a mesh shader");
+    IRBuilderInsertLocScope locScope{builder};
+    builder->setInsertInto(builder->getModule());
+
+    const auto g = builder->emitVar(pp->getDataType(), SpvStorageClassTaskPayloadWorkgroupEXT);
+    g->setFullType(builder->getRateQualifiedType(builder->getGroupSharedRate(), g->getFullType()));
+    // moveValueBefore(g, builder->getFunc());
+    builder->addNameHintDecoration(g, pp->findDecoration<IRNameHintDecoration>()->getName());
+    pp->replaceUsesWith(g);
+    struct MeshPayloadInputSpecializationCondition : FunctionCallSpecializeCondition
+    {
+        bool doesParamWantSpecialization(IRParam*, IRInst* arg)
+        {
+            return arg == g;
+        }
+        IRInst* g;
+    } condition;
+    condition.g = g;
+    specializeFunctionCalls(codeGenContext, builder->getModule(), &condition);
+}
+
+static void legalizeMeshOutputParam(
     GLSLLegalizationContext* context,
     CodeGenContext*          codeGenContext,
     IRFunc*                  func,
@@ -2354,6 +2382,7 @@ void legalizeEntryPointParameterForGLSL(
     // don't fit into the standard varying model.
     // - Geometry shader output streams
     // - Mesh shader outputs
+    // - Mesh shader payload input
     if( auto paramPtrType = as<IROutTypeBase>(paramType) )
     {
         auto valueType = paramPtrType->getValueType();
@@ -2475,6 +2504,10 @@ void legalizeEntryPointParameterForGLSL(
         {
             return legalizeMeshOutputParam(context, codeGenContext, func, pp, paramLayout, meshOutputType);
         }
+    }
+    else if(pp->findDecoration<IRHLSLMeshPayloadDecoration>())
+    {
+        return legalizeMeshPayloadInputParam(context, codeGenContext, pp);
     }
 
     // When we have an HLSL ray tracing shader entry point,
@@ -2877,5 +2910,81 @@ void legalizeConstantBufferLoadForGLSL(IRModule* module)
     }
 }
 
+
+void legalizeDispatchMeshPayloadForGLSL(IRModule* module)
+{
+    // Find out DispatchMesh function
+    IRGlobalValueWithCode* dispatchMeshFunc = nullptr;
+    for(const auto globalInst : module->getGlobalInsts())
+    {
+        if(const auto func = as<IRGlobalValueWithCode>(globalInst))
+        {
+            if(const auto dec = func->findDecoration<IRKnownBuiltinDecoration>())
+            {
+                SLANG_ASSERT(!dispatchMeshFunc && "Multiple DispatchMesh functions found");
+                dispatchMeshFunc = func;
+            }
+        }
+    }
+
+    if(!dispatchMeshFunc)
+        return;
+
+    IRBuilder builder{module};
+    builder.setInsertBefore(dispatchMeshFunc);
+
+    // We'll rewrite the calls to call EmitMeshTasksEXT
+    traverseUses(dispatchMeshFunc, [&](const IRUse* use){
+        if(const auto call = as<IRCall>(use->getUser()))
+        {
+            SLANG_ASSERT(call->getArgCount() == 4);
+            const auto payload = call->getArg(3);
+
+            const auto payloadPtrType = composeGetters<IRPtrTypeBase>(
+                payload,
+                &IRInst::getDataType
+            );
+            SLANG_ASSERT(payloadPtrType);
+            const auto payloadType = payloadPtrType->getValueType();
+            SLANG_ASSERT(payloadType);
+
+            const bool isGroupsharedGlobal =
+                payload->getParent() == module->getModuleInst() &&
+                composeGetters<IRGroupSharedRate>(payload, &IRInst::getRate);
+            if(isGroupsharedGlobal)
+            {
+                // If it's a groupshared global, then we put it in the address
+                // space we know to emit as taskPayloadSharedEXT instead (or
+                // naturally fall through correctly for SPIR-V emit)
+                //
+                // Keep it as a groupshared rate qualified type so we don't
+                // miss out on any further legalization requirement or
+                // optimization opportunities.
+                const auto payloadSharedPtrType =
+                    builder.getRateQualifiedType(
+                        builder.getGroupSharedRate(),
+                        builder.getPtrType(
+                            payloadPtrType->getOp(),
+                            payloadPtrType->getValueType(),
+                            SpvStorageClassTaskPayloadWorkgroupEXT
+                        )
+                    );
+                payload->setFullType(payloadSharedPtrType);
+            }
+            else
+            {
+                // ...
+                // If it's not a groupshared global, then create such a
+                // parameter and store into the value being passed to this
+                // call.
+                builder.setInsertInto(module->getModuleInst());
+                const auto v = builder.emitVar(payloadType, SpvStorageClassTaskPayloadWorkgroupEXT);
+                v->setFullType(builder.getRateQualifiedType(builder.getGroupSharedRate(), v->getFullType()));
+                builder.setInsertBefore(call);
+                builder.emitStore(v, payload);
+            }
+        }
+    });
+}
 
 } // namespace Slang

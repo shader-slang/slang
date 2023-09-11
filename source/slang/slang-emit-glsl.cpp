@@ -1217,7 +1217,7 @@ void GLSLSourceEmitter::_emitGLSLPerVertexVaryingFragmentInput(IRGlobalParam* pa
 
     emitVarModifiers(layout, param, type);
 
-    emitRateQualifiers(param);
+    emitRateQualifiersAndAddressSpace(param);
 
     auto name = getName(param);
     StringSliceLoc nameAndLoc(name.getUnownedSlice());
@@ -2446,9 +2446,13 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
     SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled type");
 }
 
-void GLSLSourceEmitter::emitRateQualifiersImpl(IRRate* rate)
+void GLSLSourceEmitter::emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, IRIntegerValue addressSpace)
 {
-    if (as<IRConstExprRate>(rate))
+    if(addressSpace == SpvStorageClassTaskPayloadWorkgroupEXT)
+    {
+        m_writer->emit("taskPayloadSharedEXT ");
+    }
+    else if (as<IRConstExprRate>(rate))
     {
         m_writer->emit("const ");
 

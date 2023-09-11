@@ -1355,7 +1355,10 @@ static void addLinkageDecoration(
         }
         else if (as<KnownBuiltinAttribute>(modifier))
         {
-            builder->addKnownBuiltinDecoration(inst, decl->getName()->text.getUnownedSlice());
+            // We add this to the internal instruction, like other name-like
+            // decorations, for instance "nameHint". This prevents it becoming
+            // lost during specialization.
+            builder->addKnownBuiltinDecoration(inInst, decl->getName()->text.getUnownedSlice());
         }
     }
     if (as<InterfaceDecl>(decl->parentDecl) &&
@@ -2977,6 +2980,12 @@ void _lowerFuncDeclBaseTypeInfo(
         }
 
         if (paramInfo.decl && paramInfo.decl->hasModifier<HLSLGroupSharedModifier>())
+        {
+            irParamType = builder->getRateQualifiedType(builder->getGroupSharedRate(), irParamType);
+        }
+
+        // The 'payload' parameter is a read-only groupshared value
+        if(paramInfo.decl && paramInfo.decl->hasModifier<HLSLPayloadModifier>())
         {
             irParamType = builder->getRateQualifiedType(builder->getGroupSharedRate(), irParamType);
         }

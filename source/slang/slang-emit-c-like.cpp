@@ -1638,11 +1638,14 @@ void CLikeSourceEmitter::emitArgs(IRInst* inst)
     m_writer->emit(")");
 }
 
-void CLikeSourceEmitter::emitRateQualifiers(IRInst* value)
+void CLikeSourceEmitter::emitRateQualifiersAndAddressSpace(IRInst* value)
 {
-    if (IRRate* rate = value->getRate())
+    const auto rate = value->getRate();
+    const auto ptrTy = composeGetters<IRPtrTypeBase>(value, &IRInst::getDataType);
+    const auto addressSpace = ptrTy ? ptrTy->getAddressSpace() : -1;
+    if (rate || addressSpace != -1)
     {
-        emitRateQualifiersImpl(rate);
+        emitRateQualifiersAndAddressSpaceImpl(rate, addressSpace);
     }
 }
 
@@ -1657,7 +1660,7 @@ void CLikeSourceEmitter::emitInstResultDecl(IRInst* inst)
 
     emitTempModifiers(inst);
 
-    emitRateQualifiers(inst);
+    emitRateQualifiersAndAddressSpace(inst);
 
     if(as<IRModuleInst>(inst->getParent()))
     {
@@ -3643,7 +3646,7 @@ void CLikeSourceEmitter::emitVar(IRVar* varDecl)
         break;
     }
 #endif
-    emitRateQualifiers(varDecl);
+    emitRateQualifiersAndAddressSpace(varDecl);
 
     emitType(varType, getName(varDecl));
 
@@ -3725,7 +3728,7 @@ void CLikeSourceEmitter::emitGlobalVar(IRGlobalVar* varDecl)
 
     emitVarModifiers(layout, varDecl, varType);
 
-    emitRateQualifiers(varDecl);
+    emitRateQualifiersAndAddressSpace(varDecl);
     emitType(varType, getName(varDecl));
 
     // TODO: These shouldn't be needed for ordinary
@@ -3788,7 +3791,7 @@ void CLikeSourceEmitter::emitGlobalParam(IRGlobalParam* varDecl)
 
     emitVarModifiers(layout, varDecl, varType);
 
-    emitRateQualifiers(varDecl);
+    emitRateQualifiersAndAddressSpace(varDecl);
     emitType(varType, getName(varDecl));
 
     emitSemantics(varDecl);

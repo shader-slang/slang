@@ -1037,7 +1037,7 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
     }
 }
 
-void HLSLSourceEmitter::emitRateQualifiersImpl(IRRate* rate)
+void HLSLSourceEmitter::emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, [[maybe_unused]] IRIntegerValue addressSpace)
 {
     if (as<IRGroupSharedRate>(rate))
     {
@@ -1143,7 +1143,11 @@ void HLSLSourceEmitter::_emitPrefixTypeAttr(IRAttr* attr)
 
 void HLSLSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
 {
-    emitRateQualifiers(param);
+    // A mesh shader input payload has it's own weird stuff going on, handled
+    // in emitMeshShaderModifiers, skip this bit which will introduce an
+    // invalid "groupshared" keyword.
+    if (!param->findDecoration<IRHLSLMeshPayloadDecoration>())
+        emitRateQualifiersAndAddressSpace(param);
 
     if (auto decor = param->findDecoration<IRGeometryInputPrimitiveTypeDecoration>())
     {
