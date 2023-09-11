@@ -10,3 +10,4 @@ tests/hlsl-intrinsic/texture-lod-shadow.slang.1
 tests/pipeline/rasterization/mesh/task-groupshared.slang.1 (vk)
 tests/pipeline/rasterization/mesh/task-simple.slang.1 (vk)
 tests/pipeline/rasterization/mesh/simple.slang.1 (vk)
+tests/language-feature/saturated-cooperation/fuse-product.slang (vk)
