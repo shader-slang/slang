@@ -7789,7 +7789,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "TraceRayInline";
+        case hlsl: __intrinsic_asm ".TraceRayInline";
         case glsl:
         case spirv:
             __rayQueryInitializeEXT(
@@ -7824,7 +7824,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "";
+        case hlsl: __intrinsic_asm ".Proceed";
         case glsl: __intrinsic_asm "rayQueryProceedEXT";
         case spirv: return spirv_asm
             {
@@ -7846,7 +7846,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "";
+        case hlsl: __intrinsic_asm ".Abort";
         case glsl: __intrinsic_asm "rayQueryTerminateEXT";
         case spirv: spirv_asm { OpRayQueryTerminateKHR &this };
         }
@@ -7869,7 +7869,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "";
+        case hlsl: __intrinsic_asm ".CandidateType";
         case glsl: __intrinsic_asm "rayQueryGetIntersectionTypeEXT($0, false)";
         case spirv:
             uint RayQueryCandidateIntersectionKHR = 0;
@@ -8003,7 +8003,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "";
+        case hlsl: __intrinsic_asm ".CommittedStatus";
         case glsl: __intrinsic_asm "rayQueryGetIntersectionTypeEXT($0, true)";
         case spirv:
             uint RayQueryCommittedIntersectionKHR = 1;
@@ -8049,7 +8049,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         __target_switch
         {
         case glsl: __intrinsic_asm "rayQueryGetIntersectionTEXT($0, true)";
-        case hlsl: __intrinsic_asm "";
+        case hlsl: __intrinsic_asm ".CommittedRayT";
         case spirv:
             uint RayQueryCommittedIntersectionKHR = 1;
             return spirv_asm
