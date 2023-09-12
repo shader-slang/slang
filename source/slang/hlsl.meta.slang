@@ -7861,7 +7861,6 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     // the kind of candidate hit that must be resolved by
     // user code.
     //
-    __target_intrinsic(glsl, "rayQueryGetIntersectionTypeEXT($0, false)")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
     [__readNone]
@@ -7995,7 +7994,6 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     void CommitProceduralPrimitiveHit(float t);
 
     // Get the status of the committed (closest) hit, if any.
-    __target_intrinsic(glsl, "rayQueryGetIntersectionTypeEXT($0, true)")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
     [__readNone]
@@ -8040,7 +8038,6 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     [__readNone]
     float4x3 CommittedWorldToObject4x3();
 
-    __target_intrinsic(glsl, "rayQueryGetIntersectionTEXT($0, true)")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
     [__readNone]
