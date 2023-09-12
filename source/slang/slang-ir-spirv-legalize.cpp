@@ -213,6 +213,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         case kIROp_RaytracingAccelerationStructureType:
         case kIROp_RayQueryType:
             return true;
+        default:
+            return false;
         }
     }
 
