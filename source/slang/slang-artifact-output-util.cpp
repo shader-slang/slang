@@ -75,7 +75,6 @@ SlangResult ArtifactOutputUtil::maybeDisassemble(Session* session, IArtifact* ar
 
     auto toDesc = desc;
     toDesc.kind = ArtifactKind::Assembly;
-
     // If this likes a playsible disassebly conversion
     if (ArtifactDescUtil::isDisassembly(desc, toDesc))
     {
