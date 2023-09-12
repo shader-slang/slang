@@ -264,6 +264,36 @@ extension TensorView<float>
     void InterlockedCompareExchange(vector<uint, N> index, float compare, float val);
 }
 
+
+__generic<T : IDifferentiable>
+struct DiffTensorViewAA
+{
+    TensorView<T> primal;
+    TensorView<T.Differential> diff;
+
+    [CudaHost]
+    __init(TorchTensor<T> primal)
+    {
+        this.primal = primal.getView();
+    }
+
+    [CudaHost]
+    __init(TorchTensor<T> primal, TorchTensor<T> diff)
+    {
+        this.primal = primal.getView();
+        this.diff = diff.getView();
+    }
+
+    [BackwardDerivative(load_backward)]
+    T load(uint x) { return primal.load(x); }
+
+    void load_backward(uint x, T.Differential dOut)
+    {
+        T oldVal;
+        diff.InterlockedAdd(x, dOut, oldVal);
+    }
+};
+
 /// Represents the handle of a Torch tensor object.
 __generic<T>
 __intrinsic_type($(kIROp_TorchTensorType))
