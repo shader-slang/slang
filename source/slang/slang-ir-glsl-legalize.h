@@ -25,4 +25,6 @@ void legalizeImageSubscriptForGLSL(IRModule* module);
 
 void legalizeConstantBufferLoadForGLSL(IRModule* module);
 
+void legalizeDispatchMeshPayloadForGLSL(IRModule* module);
+
 }

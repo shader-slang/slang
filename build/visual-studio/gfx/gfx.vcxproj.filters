@@ -180,6 +180,9 @@
     <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-helper-functions.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-pipeline-state-stream.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-pipeline-state.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -196,6 +199,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-resource.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-sal-defs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-sampler.h">

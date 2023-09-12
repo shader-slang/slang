@@ -192,6 +192,10 @@ VkShaderStageFlags VulkanUtil::getShaderStage(SlangStage stage)
         return VK_SHADER_STAGE_RAYGEN_BIT_KHR;
     case SLANG_STAGE_VERTEX:
         return VK_SHADER_STAGE_VERTEX_BIT;
+    case SLANG_STAGE_MESH:
+        return VK_SHADER_STAGE_MESH_BIT_EXT;
+    case SLANG_STAGE_AMPLIFICATION:
+        return VK_SHADER_STAGE_TASK_BIT_EXT;
     default:
         assert(!"unsupported stage.");
         return VkShaderStageFlags(-1);

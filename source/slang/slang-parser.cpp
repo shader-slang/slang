@@ -7297,6 +7297,7 @@ namespace Slang
         _makeParseModifier("vertices",      HLSLVerticesModifier::kReflectClassInfo),
         _makeParseModifier("indices",       HLSLIndicesModifier::kReflectClassInfo),
         _makeParseModifier("primitives",    HLSLPrimitivesModifier::kReflectClassInfo),
+        _makeParseModifier("payload",       HLSLPayloadModifier::kReflectClassInfo),
 
         // Modifiers for unary operator declarations
         _makeParseModifier("__prefix",      PrefixModifier::kReflectClassInfo),

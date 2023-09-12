@@ -432,7 +432,11 @@ IRCall* isKnownFunction(const char* n, IRInst* i)
     if(!generic)
         return nullptr;
 
-    auto h = generic->findDecoration<IRKnownBuiltinDecoration>();
+    auto inner = findGenericReturnVal(generic);
+    if(!inner)
+        return nullptr;
+
+    auto h = inner->findDecoration<IRKnownBuiltinDecoration>();
     if(!h || h->getName() != n)
         return nullptr;
     return call;

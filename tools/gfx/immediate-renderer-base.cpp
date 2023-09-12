@@ -413,6 +413,11 @@ public:
             return SLANG_OK;
         }
 
+        virtual SLANG_NO_THROW Result SLANG_MCALL drawMeshTasks(int, int, int) override
+        {
+            SLANG_UNIMPLEMENTED_X("ImmediateRenderBase::drawMeshTasks");
+        }
+
         virtual SLANG_NO_THROW Result SLANG_MCALL setSamplePositions(
             GfxCount samplesPerPixel,
             GfxCount pixelCount,

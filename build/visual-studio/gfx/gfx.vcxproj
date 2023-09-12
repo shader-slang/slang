@@ -165,7 +165,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <PreprocessorDefinitions>_DEBUG;WIN32_LEAN_AND_MEAN;VC_EXTRALEAN;NOMINMAX;_ITERATOR_DEBUG_LEVEL=0;SLANG_GFX_DYNAMIC;SLANG_GFX_DYNAMIC_EXPORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\..\..;..\..\..\external;..\..\..\source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..;..\..\..\external;..\..\..\external\vulkan\include;..\..\..\source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
       <MinimalRebuild>false</MinimalRebuild>
@@ -189,7 +189,7 @@ IF EXIST "$(SolutionDir)tools\gfx\slang.slang"\ (xcopy /Q /E /Y /I "$(SolutionDi
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <PreprocessorDefinitions>_DEBUG;WIN32_LEAN_AND_MEAN;VC_EXTRALEAN;NOMINMAX;_ITERATOR_DEBUG_LEVEL=0;SLANG_GFX_DYNAMIC;SLANG_GFX_DYNAMIC_EXPORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\..\..;..\..\..\external;..\..\..\source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..;..\..\..\external;..\..\..\external\vulkan\include;..\..\..\source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
       <MinimalRebuild>false</MinimalRebuild>
@@ -213,7 +213,7 @@ IF EXIST "$(SolutionDir)tools\gfx\slang.slang"\ (xcopy /Q /E /Y /I "$(SolutionDi
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <PreprocessorDefinitions>_DEBUG;WIN32_LEAN_AND_MEAN;VC_EXTRALEAN;NOMINMAX;_ITERATOR_DEBUG_LEVEL=0;SLANG_GFX_DYNAMIC;SLANG_GFX_DYNAMIC_EXPORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\..\..;..\..\..\external;..\..\..\source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..;..\..\..\external;..\..\..\external\vulkan\include;..\..\..\source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
       <MinimalRebuild>false</MinimalRebuild>
@@ -237,7 +237,7 @@ IF EXIST "$(SolutionDir)tools\gfx\slang.slang"\ (xcopy /Q /E /Y /I "$(SolutionDi
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <PreprocessorDefinitions>NDEBUG;WIN32_LEAN_AND_MEAN;VC_EXTRALEAN;NOMINMAX;_ITERATOR_DEBUG_LEVEL=0;SLANG_GFX_DYNAMIC;SLANG_GFX_DYNAMIC_EXPORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\..\..;..\..\..\external;..\..\..\source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..;..\..\..\external;..\..\..\external\vulkan\include;..\..\..\source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <Optimization>Full</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
@@ -264,7 +264,7 @@ IF EXIST "$(SolutionDir)tools\gfx\slang.slang"\ (xcopy /Q /E /Y /I "$(SolutionDi
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <PreprocessorDefinitions>NDEBUG;WIN32_LEAN_AND_MEAN;VC_EXTRALEAN;NOMINMAX;_ITERATOR_DEBUG_LEVEL=0;SLANG_GFX_DYNAMIC;SLANG_GFX_DYNAMIC_EXPORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\..\..;..\..\..\external;..\..\..\source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..;..\..\..\external;..\..\..\external\vulkan\include;..\..\..\source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <Optimization>Full</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
@@ -291,7 +291,7 @@ IF EXIST "$(SolutionDir)tools\gfx\slang.slang"\ (xcopy /Q /E /Y /I "$(SolutionDi
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <PreprocessorDefinitions>NDEBUG;WIN32_LEAN_AND_MEAN;VC_EXTRALEAN;NOMINMAX;_ITERATOR_DEBUG_LEVEL=0;SLANG_GFX_DYNAMIC;SLANG_GFX_DYNAMIC_EXPORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\..\..;..\..\..\external;..\..\..\source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..;..\..\..\external;..\..\..\external\vulkan\include;..\..\..\source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <Optimization>Full</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
@@ -371,12 +371,14 @@ IF EXIST "$(SolutionDir)tools\gfx\slang.slang"\ (xcopy /Q /E /Y /I "$(SolutionDi
     <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-fence.h" />
     <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-framebuffer.h" />
     <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-helper-functions.h" />
+    <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-pipeline-state-stream.h" />
     <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-pipeline-state.h" />
     <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-posix-synchapi.h" />
     <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-query.h" />
     <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-render-pass.h" />
     <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-resource-views.h" />
     <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-resource.h" />
+    <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-sal-defs.h" />
     <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-sampler.h" />
     <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-shader-object-layout.h" />
     <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-shader-object.h" />

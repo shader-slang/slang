@@ -33,10 +33,18 @@ struct Options
 
     enum class ShaderProgramType
     {
+        // Vertex and Fragment shader, writing an image out
         Graphics,
+        // Compute shader, writing buffer contents out
         Compute,
+        // Vertex and Fragment shader, writing buffer contents out
         GraphicsCompute,
+        // Ray tracing shaders, writing buffer contents out
         RayTracing,
+        // Mesh and Fragment shader, writing buffer contents out
+        GraphicsMeshCompute,
+        // Task, Mesh and Fragment shader, writing buffer contents out
+        GraphicsTaskMeshCompute,
     };
 
     Slang::String appName = "render-test";

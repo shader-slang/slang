@@ -100,6 +100,7 @@ public:
         const ShaderCompilerUtil::Input& input);
     void runCompute(IComputeCommandEncoder* encoder);
     void renderFrame(IRenderCommandEncoder* encoder);
+    void renderFrameMesh(IRenderCommandEncoder* encoder);
     void finalize();
 
     Result applyBinding(PipelineType pipelineType, ICommandEncoder* encoder);
@@ -582,6 +583,14 @@ SlangResult RenderTestApp::initialize(
                 m_pipelineState = device->createGraphicsPipelineState(desc);
             }
             break;
+        case Options::ShaderProgramType::GraphicsMeshCompute:
+        case Options::ShaderProgramType::GraphicsTaskMeshCompute:
+            {
+                GraphicsPipelineStateDesc desc;
+                desc.program = m_shaderProgram;
+                desc.framebufferLayout = m_framebufferLayout;
+                m_pipelineState = device->createGraphicsPipelineState(desc);
+            }
         }
     }
     // If success must have a pipeline state
@@ -876,6 +885,17 @@ void RenderTestApp::setProjectionMatrix(IShaderObject* rootObject)
         .setData(info.identityProjectionMatrix, sizeof(float) * 16);
 }
 
+void RenderTestApp::renderFrameMesh(IRenderCommandEncoder* encoder)
+{
+    auto pipelineType = PipelineType::Graphics;
+    applyBinding(pipelineType, encoder);
+	encoder->drawMeshTasks(
+        m_options.computeDispatchSize[0],
+        m_options.computeDispatchSize[1],
+        m_options.computeDispatchSize[2]
+    );
+}
+
 void RenderTestApp::renderFrame(IRenderCommandEncoder* encoder)
 {
     auto pipelineType = PipelineType::Graphics;
@@ -1009,7 +1029,11 @@ Result RenderTestApp::update()
         viewport.extentX = (float)gWindowWidth;
         viewport.extentY = (float)gWindowHeight;
         encoder->setViewportAndScissor(viewport);
-        renderFrame(encoder);
+        if(m_options.shaderType == Options::ShaderProgramType::GraphicsMeshCompute
+            || m_options.shaderType == Options::ShaderProgramType::GraphicsTaskMeshCompute)
+            renderFrameMesh(encoder);
+        else
+            renderFrame(encoder);
         encoder->endEncoding();
     }
     commandBuffer->close();
@@ -1060,7 +1084,10 @@ Result RenderTestApp::update()
 
         if (m_options.outputPath.getLength())
         {
-            if (m_options.shaderType == Options::ShaderProgramType::Compute || m_options.shaderType == Options::ShaderProgramType::GraphicsCompute)
+            if (m_options.shaderType == Options::ShaderProgramType::Compute
+                || m_options.shaderType == Options::ShaderProgramType::GraphicsCompute
+                || m_options.shaderType == Options::ShaderProgramType::GraphicsMeshCompute
+                || m_options.shaderType == Options::ShaderProgramType::GraphicsTaskMeshCompute)
             {
                 auto request = m_compilationOutput.output.getRequestForReflection();
                 auto slangReflection = (slang::ShaderReflection*) spGetReflection(request);

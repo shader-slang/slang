@@ -2601,79 +2601,79 @@ static bool getOpInfo(const SpvOp& k, SPIRVCoreGrammarInfo::OpInfo& v)
         case SpvOpImageSampleImplicitLod:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 5, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff, 5, operandTypes};
             return true;
         }
         case SpvOpImageSampleExplicitLod:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff, 5, operandTypes};
             return true;
         }
         case SpvOpImageSampleDrefImplicitLod:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 0xffff, 6, operandTypes};
             return true;
         }
         case SpvOpImageSampleDrefExplicitLod:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 0xffff, 6, operandTypes};
             return true;
         }
         case SpvOpImageSampleProjImplicitLod:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 5, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff, 5, operandTypes};
             return true;
         }
         case SpvOpImageSampleProjExplicitLod:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff, 5, operandTypes};
             return true;
         }
         case SpvOpImageSampleProjDrefImplicitLod:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 0xffff, 6, operandTypes};
             return true;
         }
         case SpvOpImageSampleProjDrefExplicitLod:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 0xffff, 6, operandTypes};
             return true;
         }
         case SpvOpImageFetch:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 5, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff, 5, operandTypes};
             return true;
         }
         case SpvOpImageGather:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 0xffff, 6, operandTypes};
             return true;
         }
         case SpvOpImageDrefGather:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 0xffff, 6, operandTypes};
             return true;
         }
         case SpvOpImageRead:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 5, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff, 5, operandTypes};
             return true;
         }
         case SpvOpImageWrite:
         {
             const static OperandKind operandTypes[] = {{47}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 4, 4, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, -1, -1, 3, 0xffff, 4, operandTypes};
             return true;
         }
         case SpvOpImage:
@@ -3796,67 +3796,67 @@ static bool getOpInfo(const SpvOp& k, SPIRVCoreGrammarInfo::OpInfo& v)
         case SpvOpImageSparseSampleImplicitLod:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 5, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff, 5, operandTypes};
             return true;
         }
         case SpvOpImageSparseSampleExplicitLod:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff, 5, operandTypes};
             return true;
         }
         case SpvOpImageSparseSampleDrefImplicitLod:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 0xffff, 6, operandTypes};
             return true;
         }
         case SpvOpImageSparseSampleDrefExplicitLod:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 0xffff, 6, operandTypes};
             return true;
         }
         case SpvOpImageSparseSampleProjImplicitLod:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 5, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff, 5, operandTypes};
             return true;
         }
         case SpvOpImageSparseSampleProjExplicitLod:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 5, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff, 5, operandTypes};
             return true;
         }
         case SpvOpImageSparseSampleProjDrefImplicitLod:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 0xffff, 6, operandTypes};
             return true;
         }
         case SpvOpImageSparseSampleProjDrefExplicitLod:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 6, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 0xffff, 6, operandTypes};
             return true;
         }
         case SpvOpImageSparseFetch:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 5, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff, 5, operandTypes};
             return true;
         }
         case SpvOpImageSparseGather:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 0xffff, 6, operandTypes};
             return true;
         }
         case SpvOpImageSparseDrefGather:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 6, 6, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 5, 0xffff, 6, operandTypes};
             return true;
         }
         case SpvOpImageSparseTexelsResident:
@@ -3885,7 +3885,7 @@ static bool getOpInfo(const SpvOp& k, SPIRVCoreGrammarInfo::OpInfo& v)
         case SpvOpImageSparseRead:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 5, 5, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 4, 0xffff, 5, operandTypes};
             return true;
         }
         case SpvOpSizeOf:
@@ -4680,7 +4680,7 @@ static bool getOpInfo(const SpvOp& k, SPIRVCoreGrammarInfo::OpInfo& v)
         case SpvOpImageSampleFootprintNV:
         {
             const static OperandKind operandTypes[] = {{43}, {44}, {47}, {47}, {47}, {47}, {0}};
-            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 7, 7, operandTypes};
+            v = {SPIRVCoreGrammarInfo::OpInfo::Other, 0, 1, 6, 0xffff, 7, operandTypes};
             return true;
         }
         case SpvOpEmitMeshTasksEXT:

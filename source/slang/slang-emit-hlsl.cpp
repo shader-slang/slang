@@ -442,6 +442,11 @@ void HLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoin
             }
             break;
         }
+        case Stage::Amplification:
+        {
+            emitNumThreadsAttribute();
+            break;
+        }
         // TODO: There are other stages that will need this kind of handling.
         default:
             break;
@@ -1032,7 +1037,7 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
     }
 }
 
-void HLSLSourceEmitter::emitRateQualifiersImpl(IRRate* rate)
+void HLSLSourceEmitter::emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, [[maybe_unused]] IRIntegerValue addressSpace)
 {
     if (as<IRGroupSharedRate>(rate))
     {
@@ -1138,8 +1143,11 @@ void HLSLSourceEmitter::_emitPrefixTypeAttr(IRAttr* attr)
 
 void HLSLSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
 {
-    emitRateQualifiers(param);
-    emitMeshOutputModifiers(param);
+    // A mesh shader input payload has it's own weird stuff going on, handled
+    // in emitMeshShaderModifiers, skip this bit which will introduce an
+    // invalid "groupshared" keyword.
+    if (!param->findDecoration<IRHLSLMeshPayloadDecoration>())
+        emitRateQualifiersAndAddressSpace(param);
 
     if (auto decor = param->findDecoration<IRGeometryInputPrimitiveTypeDecoration>())
     {
@@ -1200,7 +1208,7 @@ void HLSLSourceEmitter::emitPackOffsetModifier(IRInst* varInst, IRType* valueTyp
     // We emit packoffset as a semantic in `emitSemantic`, so nothing to do here.
 }
 
-void HLSLSourceEmitter::emitMeshOutputModifiersImpl(IRInst* varInst)
+void HLSLSourceEmitter::emitMeshShaderModifiersImpl(IRInst* varInst)
 {
     if(auto modifier = varInst->findDecoration<IRMeshOutputDecoration>())
     {
@@ -1211,6 +1219,11 @@ void HLSLSourceEmitter::emitMeshOutputModifiersImpl(IRInst* varInst)
             : nullptr;
         SLANG_ASSERT(s && "Unhandled type of mesh output decoration");
         m_writer->emit(s);
+    }
+    if(varInst->findDecoration<IRHLSLMeshPayloadDecoration>())
+    {
+        // DXC requires that mesh payload parameters have "in" specified
+        m_writer->emit("in payload ");
     }
 }
 

@@ -37,6 +37,7 @@ public:
     ComPtr<ID3D12GraphicsCommandList> m_cmdList;
     ComPtr<ID3D12GraphicsCommandList1> m_cmdList1;
     ComPtr<ID3D12GraphicsCommandList4> m_cmdList4;
+    ComPtr<ID3D12GraphicsCommandList6> m_cmdList6;
 
     BreakableReference<TransientResourceHeapImpl> m_transientHeap;
     // Weak reference is fine here since `m_transientHeap` already holds strong reference to
