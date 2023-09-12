@@ -2537,10 +2537,16 @@ ParameterDirection getParameterDirection(VarDeclBase* paramDecl)
     ///
 ParameterDirection getThisParamDirection(Decl* parentDecl, ParameterDirection defaultDirection)
 {
+    auto parentParent = getParentDecl(parentDecl);
     // The `this` parameter for a `class` is always `in`.
-    if (as<ClassDecl>(parentDecl->parentDecl))
+    if (as<ClassDecl>(parentParent))
     {
         return kParameterDirection_In;
+    }
+
+    if (parentParent->findModifier<NonCopyableTypeAttribute>())
+    {
+        return kParameterDirection_Ref;
     }
 
     // Applications can opt in to a mutable `this` parameter,

@@ -1,8 +1,5 @@
 tests/autodiff/global-param-hoisting.slang.1 (vk)
 tests/bugs/buffer-swizzle-store.slang.1 (vk)
-tests/bugs/gh-3075.slang.2 (vk)
-tests/bugs/ray-query-in-generic.slang.1 (vk)
-tests/compute/ray-tracing-inline.slang.1 (vk)
 tests/language-feature/constants/constexpr-loop.slang.1 (vk)
 tests/optimization/func-resource-result/func-resource-result-complex.slang.1 (vk)
 tests/type/texture-sampler/texture-sampler-2d.slang (vk)
