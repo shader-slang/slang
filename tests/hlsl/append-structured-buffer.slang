@@ -1,30 +1,31 @@
-
-//TEST:SIMPLE(filecheck=GLSL):-target glsl -profile glsl_450 -stage compute -entry computeMain -fvk-u-shift 10 0
-//TEST:SIMPLE(filecheck=SPIRV):-target spirv -profile glsl_450 -stage compute -entry computeMain
-
-//DISABLED_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type -xslang -fvk-use-gl-layout
+//DISABLE_TEST:SIMPLE(filecheck=GLSL):-line-directive-mode none -target glsl -profile glsl_450 -stage compute -entry computeMain -fvk-u-shift 10 0
+//DISABLE_TEST:SIMPLE(filecheck=SPIRV):-line-directive-mode none -target spirv -profile glsl_450 -stage compute -entry computeMain
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-dx12 -use-dxil -compute -output-using-type
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -output-using-type
+//DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -output-using-type -fvk-use-gl-layout
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 AppendStructuredBuffer<float2> appendBuffer;
 
-// GLSL: layout(std430, binding = 11) buffer StructuredBuffer_float2_t
-// GLSL: vec2 _data[];
-// GLSL: } appendBuffer_elements_0
+// GLSL:      layout(std430, binding = 11) buffer StructuredBuffer_float2_t
+// GLSL-NEXT:     vec2 _data[];
+// GLSL-NEXT: } appendBuffer_elements_0
 
-// GLSL: layout(std430, binding = 12) buffer StructuredBuffer_int_t
-// GLSL: int _data[];
-// GLSL: } appendBuffer_counter
+// GLSL:      layout(std430, binding = 12) buffer StructuredBuffer_int_t
+// GLSL-NEXT:     int _data[];
+// GLSL-NEXT: } appendBuffer_counter
 
-// GLSL: void AppendStructuredBuffer_Append_0(vec2 [[PARAM:[A-Za-z0-9_]+]])
-// GLSL:    int [[COUNTER:[A-Za-z0-9_]+]] = atomicAdd(appendBuffer_counter_0._data[0], 1);
-// GLSL:    appendBuffer_elements_0._data{{\[}}[[COUNTER]]{{\]}} = [[PARAM]];
+// GLSL:      void AppendStructuredBuffer_Append_0(vec2 [[PARAM:[A-Za-z0-9_]+]])
+// GLSL-NEXT: {
+// GLSL-NEXT:     int [[COUNTER:[A-Za-z0-9_]+]] = atomicAdd(appendBuffer_counter_0._data[0], 1);
+// GLSL-NEXT:     appendBuffer_elements_0._data{{\[}}[[COUNTER]]{{\]}} = [[PARAM]];
 
-// GLSL: uvec2 StructuredBuffer_GetDimensions_0()
-// GLSL: {
-// GLSL:     return uvec2(uint(appendBuffer_counter_0._data[0]), 8U);
-// GLSL: }
+// GLSL:      uvec2 StructuredBuffer_GetDimensions_0()
+// GLSL-NEXT: {
+// GLSL-NEXT:     return uvec2(uint(appendBuffer_counter_0._data[0]), 8U);
+// GLSL-NEXT: }
 
 // SPIRV: OpEntryPoint
 
@@ -40,4 +41,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     uint numStructs, stride;
     appendBuffer.GetDimensions(numStructs, stride);
     outputBuffer[dispatchThreadID.x] = numStructs; // expect 1.0
+    // BUF: type: float
+    // BUF-NEXT: 1.0
 }
