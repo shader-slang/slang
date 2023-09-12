@@ -47,6 +47,7 @@ SlangResult GLSLSourceEmitter::init()
         case Stage::Amplification:
         {
             _requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_EXT_mesh_shader"));
+            _requireSPIRVVersion(SemanticVersion(1, 4));
             break;
         }
         default: break;
@@ -845,7 +846,7 @@ void GLSLSourceEmitter::_maybeEmitGLSLBuiltin(IRGlobalParam* var, UnownedStringS
         // SLANG_ASSERT(layout && "Mesh shader builtin output has no layout");
         // SLANG_ASSERT(layout->usesResourceKind(LayoutResourceKind::VaryingOutput));
         // emitVarModifiers(layout, var, arrayType);
-        emitMeshOutputModifiers(var);
+        emitMeshShaderModifiers(var);
         m_writer->emit("out");
         m_writer->emit(" ");
         m_writer->emit(elementTypeName);
@@ -1186,6 +1187,11 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoin
             }
         }
         break;
+        case Stage::Amplification:
+        {
+            emitLocalSizeLayout();
+        }
+        break;
         // TODO: There are other stages that will need this kind of handling.
         default:
             break;
@@ -1211,7 +1217,7 @@ void GLSLSourceEmitter::_emitGLSLPerVertexVaryingFragmentInput(IRGlobalParam* pa
 
     emitVarModifiers(layout, param, type);
 
-    emitRateQualifiers(param);
+    emitRateQualifiersAndAddressSpace(param);
 
     auto name = getName(param);
     StringSliceLoc nameAndLoc(name.getUnownedSlice());
@@ -2440,9 +2446,13 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
     SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled type");
 }
 
-void GLSLSourceEmitter::emitRateQualifiersImpl(IRRate* rate)
+void GLSLSourceEmitter::emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, IRIntegerValue addressSpace)
 {
-    if (as<IRConstExprRate>(rate))
+    if(addressSpace == SpvStorageClassTaskPayloadWorkgroupEXT)
+    {
+        m_writer->emit("taskPayloadSharedEXT ");
+    }
+    else if (as<IRConstExprRate>(rate))
     {
         m_writer->emit("const ");
 
@@ -2565,7 +2575,7 @@ void GLSLSourceEmitter::emitPackOffsetModifier(IRInst* varInst, IRType* valueTyp
     m_writer->emit(")\n");
 }
 
-void GLSLSourceEmitter::emitMeshOutputModifiersImpl(IRInst* varInst)
+void GLSLSourceEmitter::emitMeshShaderModifiersImpl(IRInst* varInst)
 {
     if(varInst->findDecoration<IRGLSLPrimitivesRateDecoration>())
     {

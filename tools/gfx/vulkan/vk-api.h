@@ -204,6 +204,7 @@ namespace gfx {
     x(vkCmdDebugMarkerBeginEXT) \
     x(vkCmdDebugMarkerEndEXT) \
     x(vkDebugMarkerSetObjectNameEXT) \
+    x(vkCmdDrawMeshTasksEXT) \
     /* */
 
 #define VK_API_ALL_GLOBAL_PROCS(x) \
@@ -260,6 +261,11 @@ struct VulkanExtendedFeatureProperties
     // Clock features
     VkPhysicalDeviceShaderClockFeaturesKHR clockFeatures = { 
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_CLOCK_FEATURES_KHR
+    };
+
+    // Mesh shader features
+    VkPhysicalDeviceMeshShaderFeaturesEXT meshShaderFeatures = {
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT
     };
 
     // Vulkan 1.2 features.

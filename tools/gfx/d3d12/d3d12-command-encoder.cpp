@@ -41,6 +41,7 @@ void PipelineCommandEncoder::init(CommandBufferImpl* commandBuffer)
 {
     m_commandBuffer = commandBuffer;
     m_d3dCmdList = m_commandBuffer->m_cmdList;
+    m_d3dCmdList6 = m_commandBuffer->m_cmdList6;
     m_renderer = commandBuffer->m_renderer;
     m_transientHeap = commandBuffer->m_transientHeap;
     m_device = commandBuffer->m_renderer->m_device;
@@ -1182,6 +1183,13 @@ Result RenderCommandEncoderImpl::drawIndexedInstanced(
         (uint32_t)startIndexLocation,
         baseVertexLocation,
         (uint32_t)startInstanceLocation);
+    return SLANG_OK;
+}
+
+Result RenderCommandEncoderImpl::drawMeshTasks(int x, int y, int z)
+{
+    SLANG_RETURN_ON_FAIL(prepareDraw());
+    m_d3dCmdList6->DispatchMesh(x, y, z);
     return SLANG_OK;
 }
 

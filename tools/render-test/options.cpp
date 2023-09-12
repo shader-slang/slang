@@ -137,6 +137,14 @@ static gfx::DeviceType _toRenderType(Slang::RenderApiType apiType)
         {
             outOptions.shaderType = ShaderProgramType::RayTracing;
         }
+        else if (argValue == "-mesh")
+        {
+            outOptions.shaderType = ShaderProgramType::GraphicsMeshCompute;
+        }
+        else if (argValue == "-task")
+        {
+            outOptions.shaderType = ShaderProgramType::GraphicsTaskMeshCompute;
+        }
         else if(argValue == "-use-dxil")
         {
             outOptions.useDXIL = true;

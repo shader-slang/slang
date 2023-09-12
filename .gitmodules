@@ -28,3 +28,6 @@
 [submodule "external/unordered_dense"]
 	path = external/unordered_dense
 	url = https://github.com/martinus/unordered_dense.git
+[submodule "external/vulkan-headers"]
+	path = external/vulkan
+	url = https://github.com/KhronosGroup/Vulkan-Headers

@@ -220,7 +220,10 @@ Result PipelineStateImpl::createVKGraphicsPipelineState()
     dynamicStates.add(VK_DYNAMIC_STATE_SCISSOR);
     dynamicStates.add(VK_DYNAMIC_STATE_STENCIL_REFERENCE);
     dynamicStates.add(VK_DYNAMIC_STATE_BLEND_CONSTANTS);
-    if (m_device->m_api.m_extendedFeatures.extendedDynamicStateFeatures.extendedDynamicState)
+    // It's not valid to specify VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY_EXT when
+    // the pipeline contains a mesh shader.
+    if (!m_program->isMeshShaderProgram() && m_device->m_api.m_extendedFeatures.extendedDynamicStateFeatures.extendedDynamicState)
+
     {
         dynamicStates.add(VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY_EXT);
     }

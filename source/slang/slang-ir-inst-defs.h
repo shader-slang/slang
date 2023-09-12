@@ -813,6 +813,7 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         INST(IndicesDecoration, indices, 1, 0)
         INST(PrimitivesDecoration, primitives, 1, 0)
     INST_RANGE(MeshOutputDecoration, VerticesDecoration, PrimitivesDecoration)
+    INST(HLSLMeshPayloadDecoration, payload, 0, 0)
     INST(GLSLPrimitivesRateDecoration, perprimitive, 0, 0)
 
         // Marks an inst that represents the gl_Position output.

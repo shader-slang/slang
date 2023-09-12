@@ -806,9 +806,11 @@ Result linkAndOptimizeIR(
     {
     case CodeGenTarget::GLSL:
     case CodeGenTarget::SPIRV:
+    case CodeGenTarget::SPIRVAssembly:
         {
             legalizeImageSubscriptForGLSL(irModule);
             legalizeConstantBufferLoadForGLSL(irModule);
+            legalizeDispatchMeshPayloadForGLSL(irModule);
         }
         break;
     default:
@@ -879,6 +881,10 @@ Result linkAndOptimizeIR(
     //
     // If any have survived this far, change them back to regular (decorated)
     // arrays that the emitters can deal with.
+    //
+    // TODO: This is too early for the SPIR-V backend, which requires these
+    // types for when it calls legalizeEntryPointsForGLSL (later than GLSL does
+    // above)
     legalizeMeshOutputTypes(irModule);
 
     // We need to lower any types used in a buffer resource (e.g. ContantBuffer or StructuredBuffer) into

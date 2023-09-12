@@ -1760,6 +1760,8 @@ public:
         GfxIndex startIndexLocation,
         GfxIndex baseVertexLocation,
         GfxIndex startInstanceLocation) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        drawMeshTasks(int x, int y, int z) = 0;
 };
 
 class IComputeCommandEncoder : public IResourceCommandEncoder
@@ -2610,6 +2612,11 @@ public:
         void* pipelineDesc,
         void** outPipelineState) = 0;
     virtual SLANG_NO_THROW Result SLANG_MCALL createGraphicsPipelineState(
+        IDevice* device,
+        slang::IComponentType* program,
+        void* pipelineDesc,
+        void** outPipelineState) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createMeshPipelineState(
         IDevice* device,
         slang::IComponentType* program,
         void* pipelineDesc,

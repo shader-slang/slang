@@ -783,6 +783,18 @@ Result DeviceImpl::initialize(const Desc& desc)
                 }
             }
         }
+        // Check mesh shader support
+        {
+            D3D12_FEATURE_DATA_D3D12_OPTIONS7 options;
+            if (SLANG_SUCCEEDED(m_device->CheckFeatureSupport(
+                D3D12_FEATURE_D3D12_OPTIONS7, &options, sizeof(options))))
+            {
+                if (options.MeshShaderTier >= D3D12_MESH_SHADER_TIER_1)
+                {
+                    m_features.add("mesh-shader");
+                }
+            }
+        }
     }
 
     m_desc = desc;

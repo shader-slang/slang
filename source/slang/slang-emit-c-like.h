@@ -349,7 +349,7 @@ public:
     void emitArgs(IRInst* inst);
 
     
-    void emitRateQualifiers(IRInst* value);
+    void emitRateQualifiersAndAddressSpace(IRInst* value);
 
     void emitInstResultDecl(IRInst* inst);
 
@@ -430,7 +430,7 @@ public:
     void emitPostKeywordTypeAttributes(IRInst* inst) { emitPostKeywordTypeAttributesImpl(inst); }
 
     void emitInterpolationModifiers(IRInst* varInst, IRType* valueType, IRVarLayout* layout);
-    void emitMeshOutputModifiers(IRInst* varInst);
+    void emitMeshShaderModifiers(IRInst* varInst);
     virtual void emitPackOffsetModifier(IRInst* /*varInst*/, IRType* /*valueType*/, IRPackOffsetDecoration* /*decoration*/) {};
     
 
@@ -511,13 +511,13 @@ public:
         /// the appropriate generated declarations occur.
     virtual void emitPreModuleImpl() {}
 
-    virtual void emitRateQualifiersImpl(IRRate* rate) { SLANG_UNUSED(rate); }
+    virtual void emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, IRIntegerValue addressSpace) { SLANG_UNUSED(rate); SLANG_UNUSED(addressSpace); }
     virtual void emitSemanticsImpl(IRInst* inst, bool allowOffsetLayout) { SLANG_UNUSED(inst); SLANG_UNUSED(allowOffsetLayout); }
     virtual void emitSimpleFuncParamImpl(IRParam* param);
     virtual void emitSimpleFuncParamsImpl(IRFunc* func);
     virtual void emitInterpolationModifiersImpl(IRInst* varInst, IRType* valueType, IRVarLayout* layout) { SLANG_UNUSED(varInst); SLANG_UNUSED(valueType); SLANG_UNUSED(layout); }
 
-    virtual void emitMeshOutputModifiersImpl(IRInst* varInst) { SLANG_UNUSED(varInst) }
+    virtual void emitMeshShaderModifiersImpl(IRInst* varInst) { SLANG_UNUSED(varInst) }
     virtual void emitSimpleTypeImpl(IRType* type) = 0;
     virtual void emitVarDecorationsImpl(IRInst* varDecl) { SLANG_UNUSED(varDecl);  }
     virtual void emitMatrixLayoutModifiersImpl(IRVarLayout* layout) { SLANG_UNUSED(layout);  }

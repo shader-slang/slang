@@ -360,6 +360,7 @@ IR_SIMPLE_DECORATION(NoInlineDecoration)
 IR_SIMPLE_DECORATION(AlwaysFoldIntoUseSiteDecoration)
 IR_SIMPLE_DECORATION(StaticRequirementDecoration)
 IR_SIMPLE_DECORATION(NonCopyableTypeDecoration)
+IR_SIMPLE_DECORATION(HLSLMeshPayloadDecoration)
 
 struct IRNVAPIMagicDecoration : IRDecoration
 {

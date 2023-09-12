@@ -10,6 +10,7 @@
 #include "d3d12-framebuffer.h"
 #include "d3d12-shader-program.h"
 #include "d3d12-vertex-layout.h"
+#include "d3d12-pipeline-state-stream.h"
 
 #include <climits>
 
@@ -59,169 +60,219 @@ Result PipelineStateImpl::ensureAPIPipelineStateCreated()
         // Only actually create a D3D12 pipeline state if the pipeline is fully specialized.
         auto inputLayoutImpl = (InputLayoutImpl*)desc.graphics.inputLayout;
 
-        // Describe and create the graphics pipeline state object (PSO)
-        D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
+        // A helper to fill common fields between graphics and mesh pipeline descs
+        const auto fillCommonGraphicsState = [&](auto& psoDesc){
+            psoDesc.pRootSignature = programImpl->m_rootObjectLayout->m_rootSignature;
 
-        psoDesc.pRootSignature = programImpl->m_rootObjectLayout->m_rootSignature;
+            psoDesc.PrimitiveTopologyType = D3DUtil::getPrimitiveType(desc.graphics.primitiveType);
 
-        for (auto& shaderBin : programImpl->m_shaders)
-        {
-            switch (shaderBin.stage)
             {
-            case SLANG_STAGE_VERTEX:
-                psoDesc.VS = { shaderBin.code.getBuffer(), SIZE_T(shaderBin.code.getCount()) };
-                break;
-            case SLANG_STAGE_FRAGMENT:
-                psoDesc.PS = { shaderBin.code.getBuffer(), SIZE_T(shaderBin.code.getCount()) };
-                break;
-            case SLANG_STAGE_DOMAIN:
-                psoDesc.DS = { shaderBin.code.getBuffer(), SIZE_T(shaderBin.code.getCount()) };
-                break;
-            case SLANG_STAGE_HULL:
-                psoDesc.HS = { shaderBin.code.getBuffer(), SIZE_T(shaderBin.code.getCount()) };
-                break;
-            case SLANG_STAGE_GEOMETRY:
-                psoDesc.GS = { shaderBin.code.getBuffer(), SIZE_T(shaderBin.code.getCount()) };
-                break;
-            default:
-                getDebugCallback()->handleMessage(
-                    DebugMessageType::Error,
-                    DebugMessageSource::Layer,
-                    "Unsupported shader stage.");
-                return SLANG_E_NOT_AVAILABLE;
+                auto framebufferLayout =
+                    static_cast<FramebufferLayoutImpl*>(desc.graphics.framebufferLayout);
+                const int numRenderTargets = int(framebufferLayout->m_renderTargets.getCount());
+
+                if (framebufferLayout->m_hasDepthStencil)
+                {
+                    psoDesc.DSVFormat = D3DUtil::getMapFormat(framebufferLayout->m_depthStencil.format);
+                    psoDesc.SampleDesc.Count = framebufferLayout->m_depthStencil.sampleCount;
+                }
+                else
+                {
+                    psoDesc.DSVFormat = DXGI_FORMAT_UNKNOWN;
+                    if (framebufferLayout->m_renderTargets.getCount())
+                    {
+                        psoDesc.SampleDesc.Count = framebufferLayout->m_renderTargets[0].sampleCount;
+                    }
+                }
+                psoDesc.NumRenderTargets = numRenderTargets;
+                for (Int i = 0; i < numRenderTargets; i++)
+                {
+                    psoDesc.RTVFormats[i] =
+                        D3DUtil::getMapFormat(framebufferLayout->m_renderTargets[i].format);
+                }
+
+                psoDesc.SampleDesc.Quality = 0;
+                psoDesc.SampleMask = UINT_MAX;
             }
-        }
 
-        if (inputLayoutImpl)
-        {
-            psoDesc.InputLayout = {
-                inputLayoutImpl->m_elements.getBuffer(),
-                UINT(inputLayoutImpl->m_elements.getCount()) };
-        }
-
-        psoDesc.PrimitiveTopologyType = D3DUtil::getPrimitiveType(desc.graphics.primitiveType);
-
-        {
-            auto framebufferLayout =
-                static_cast<FramebufferLayoutImpl*>(desc.graphics.framebufferLayout);
-            const int numRenderTargets = int(framebufferLayout->m_renderTargets.getCount());
-
-            if (framebufferLayout->m_hasDepthStencil)
             {
-                psoDesc.DSVFormat = D3DUtil::getMapFormat(framebufferLayout->m_depthStencil.format);
-                psoDesc.SampleDesc.Count = framebufferLayout->m_depthStencil.sampleCount;
+                auto& rs = psoDesc.RasterizerState;
+                rs.FillMode = D3DUtil::getFillMode(desc.graphics.rasterizer.fillMode);
+                rs.CullMode = D3DUtil::getCullMode(desc.graphics.rasterizer.cullMode);
+                rs.FrontCounterClockwise =
+                    desc.graphics.rasterizer.frontFace == gfx::FrontFaceMode::CounterClockwise ? TRUE
+                    : FALSE;
+                rs.DepthBias = desc.graphics.rasterizer.depthBias;
+                rs.DepthBiasClamp = desc.graphics.rasterizer.depthBiasClamp;
+                rs.SlopeScaledDepthBias = desc.graphics.rasterizer.slopeScaledDepthBias;
+                rs.DepthClipEnable = desc.graphics.rasterizer.depthClipEnable ? TRUE : FALSE;
+                rs.MultisampleEnable = desc.graphics.rasterizer.multisampleEnable ? TRUE : FALSE;
+                rs.AntialiasedLineEnable =
+                    desc.graphics.rasterizer.antialiasedLineEnable ? TRUE : FALSE;
+                rs.ForcedSampleCount = desc.graphics.rasterizer.forcedSampleCount;
+                rs.ConservativeRaster = desc.graphics.rasterizer.enableConservativeRasterization
+                    ? D3D12_CONSERVATIVE_RASTERIZATION_MODE_ON
+                    : D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
+            }
+
+            {
+                D3D12_BLEND_DESC& blend = psoDesc.BlendState;
+                blend.IndependentBlendEnable = FALSE;
+                blend.AlphaToCoverageEnable = desc.graphics.blend.alphaToCoverageEnable ? TRUE : FALSE;
+                blend.RenderTarget[0].RenderTargetWriteMask = (uint8_t)RenderTargetWriteMask::EnableAll;
+                for (GfxIndex i = 0; i < desc.graphics.blend.targetCount; i++)
+                {
+                    auto& d3dDesc = blend.RenderTarget[i];
+                    d3dDesc.BlendEnable = desc.graphics.blend.targets[i].enableBlend ? TRUE : FALSE;
+                    d3dDesc.BlendOp = D3DUtil::getBlendOp(desc.graphics.blend.targets[i].color.op);
+                    d3dDesc.BlendOpAlpha = D3DUtil::getBlendOp(desc.graphics.blend.targets[i].alpha.op);
+                    d3dDesc.DestBlend =
+                        D3DUtil::getBlendFactor(desc.graphics.blend.targets[i].color.dstFactor);
+                    d3dDesc.DestBlendAlpha =
+                        D3DUtil::getBlendFactor(desc.graphics.blend.targets[i].alpha.dstFactor);
+                    d3dDesc.LogicOp = D3D12_LOGIC_OP_NOOP;
+                    d3dDesc.LogicOpEnable = FALSE;
+                    d3dDesc.RenderTargetWriteMask = desc.graphics.blend.targets[i].writeMask;
+                    d3dDesc.SrcBlend =
+                        D3DUtil::getBlendFactor(desc.graphics.blend.targets[i].color.srcFactor);
+                    d3dDesc.SrcBlendAlpha =
+                        D3DUtil::getBlendFactor(desc.graphics.blend.targets[i].alpha.srcFactor);
+                }
+                for (GfxIndex i = 1; i < desc.graphics.blend.targetCount; i++)
+                {
+                    if (memcmp(
+                        &desc.graphics.blend.targets[i],
+                        &desc.graphics.blend.targets[0],
+                        sizeof(desc.graphics.blend.targets[0])) != 0)
+                    {
+                        blend.IndependentBlendEnable = TRUE;
+                        break;
+                    }
+                }
+                for (uint32_t i = (uint32_t)desc.graphics.blend.targetCount;
+                    i < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT;
+                    ++i)
+                {
+                    blend.RenderTarget[i] = blend.RenderTarget[0];
+                }
+            }
+
+            {
+                auto& ds = psoDesc.DepthStencilState;
+
+                ds.DepthEnable = desc.graphics.depthStencil.depthTestEnable;
+                ds.DepthWriteMask = desc.graphics.depthStencil.depthWriteEnable
+                    ? D3D12_DEPTH_WRITE_MASK_ALL
+                    : D3D12_DEPTH_WRITE_MASK_ZERO;
+                ds.DepthFunc = D3DUtil::getComparisonFunc(desc.graphics.depthStencil.depthFunc);
+                ds.StencilEnable = desc.graphics.depthStencil.stencilEnable;
+                ds.StencilReadMask = (UINT8)desc.graphics.depthStencil.stencilReadMask;
+                ds.StencilWriteMask = (UINT8)desc.graphics.depthStencil.stencilWriteMask;
+                ds.FrontFace = D3DUtil::translateStencilOpDesc(desc.graphics.depthStencil.frontFace);
+                ds.BackFace = D3DUtil::translateStencilOpDesc(desc.graphics.depthStencil.backFace);
+            }
+
+            psoDesc.PrimitiveTopologyType = D3DUtil::getPrimitiveType(desc.graphics.primitiveType);
+
+        };
+
+        if(m_program->isMeshShaderProgram())
+        {
+            D3DX12_MESH_SHADER_PIPELINE_STATE_DESC meshDesc = {};
+            for (auto& shaderBin : programImpl->m_shaders)
+            {
+                switch (shaderBin.stage)
+                {
+                case SLANG_STAGE_FRAGMENT:
+                    meshDesc.PS = { shaderBin.code.getBuffer(), SIZE_T(shaderBin.code.getCount()) };
+                    break;
+                case SLANG_STAGE_AMPLIFICATION:
+                    meshDesc.AS = { shaderBin.code.getBuffer(), SIZE_T(shaderBin.code.getCount()) };
+                    break;
+                case SLANG_STAGE_MESH:
+                    meshDesc.MS = { shaderBin.code.getBuffer(), SIZE_T(shaderBin.code.getCount()) };
+                    break;
+                default:
+                    getDebugCallback()->handleMessage(
+                        DebugMessageType::Error,
+                        DebugMessageSource::Layer,
+                        "Unsupported shader stage.");
+                    return SLANG_E_NOT_AVAILABLE;
+                }
+            }
+            fillCommonGraphicsState(meshDesc);
+            if (m_device->m_pipelineCreationAPIDispatcher)
+            {
+                SLANG_RETURN_ON_FAIL(
+                    m_device->m_pipelineCreationAPIDispatcher->createMeshPipelineState(
+                        m_device,
+                        programImpl->linkedProgram.get(),
+                        &meshDesc,
+                        (void**)m_pipelineState.writeRef()));
             }
             else
             {
-                psoDesc.DSVFormat = DXGI_FORMAT_UNKNOWN;
-                if (framebufferLayout->m_renderTargets.getCount())
-                {
-                    psoDesc.SampleDesc.Count = framebufferLayout->m_renderTargets[0].sampleCount;
-                }
+                CD3DX12_PIPELINE_STATE_STREAM2 meshStateStream{meshDesc};
+                D3D12_PIPELINE_STATE_STREAM_DESC streamDesc{sizeof(meshStateStream), &meshStateStream};
+
+                SLANG_RETURN_ON_FAIL(m_device->m_device5->CreatePipelineState(
+                    &streamDesc, IID_PPV_ARGS(m_pipelineState.writeRef())));
             }
-            psoDesc.NumRenderTargets = numRenderTargets;
-            for (Int i = 0; i < numRenderTargets; i++)
-            {
-                psoDesc.RTVFormats[i] =
-                    D3DUtil::getMapFormat(framebufferLayout->m_renderTargets[i].format);
-            }
-
-            psoDesc.SampleDesc.Quality = 0;
-            psoDesc.SampleMask = UINT_MAX;
-        }
-
-        {
-            auto& rs = psoDesc.RasterizerState;
-            rs.FillMode = D3DUtil::getFillMode(desc.graphics.rasterizer.fillMode);
-            rs.CullMode = D3DUtil::getCullMode(desc.graphics.rasterizer.cullMode);
-            rs.FrontCounterClockwise =
-                desc.graphics.rasterizer.frontFace == gfx::FrontFaceMode::CounterClockwise ? TRUE
-                : FALSE;
-            rs.DepthBias = desc.graphics.rasterizer.depthBias;
-            rs.DepthBiasClamp = desc.graphics.rasterizer.depthBiasClamp;
-            rs.SlopeScaledDepthBias = desc.graphics.rasterizer.slopeScaledDepthBias;
-            rs.DepthClipEnable = desc.graphics.rasterizer.depthClipEnable ? TRUE : FALSE;
-            rs.MultisampleEnable = desc.graphics.rasterizer.multisampleEnable ? TRUE : FALSE;
-            rs.AntialiasedLineEnable =
-                desc.graphics.rasterizer.antialiasedLineEnable ? TRUE : FALSE;
-            rs.ForcedSampleCount = desc.graphics.rasterizer.forcedSampleCount;
-            rs.ConservativeRaster = desc.graphics.rasterizer.enableConservativeRasterization
-                ? D3D12_CONSERVATIVE_RASTERIZATION_MODE_ON
-                : D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
-        }
-
-        {
-            D3D12_BLEND_DESC& blend = psoDesc.BlendState;
-            blend.IndependentBlendEnable = FALSE;
-            blend.AlphaToCoverageEnable = desc.graphics.blend.alphaToCoverageEnable ? TRUE : FALSE;
-            blend.RenderTarget[0].RenderTargetWriteMask = (uint8_t)RenderTargetWriteMask::EnableAll;
-            for (GfxIndex i = 0; i < desc.graphics.blend.targetCount; i++)
-            {
-                auto& d3dDesc = blend.RenderTarget[i];
-                d3dDesc.BlendEnable = desc.graphics.blend.targets[i].enableBlend ? TRUE : FALSE;
-                d3dDesc.BlendOp = D3DUtil::getBlendOp(desc.graphics.blend.targets[i].color.op);
-                d3dDesc.BlendOpAlpha = D3DUtil::getBlendOp(desc.graphics.blend.targets[i].alpha.op);
-                d3dDesc.DestBlend =
-                    D3DUtil::getBlendFactor(desc.graphics.blend.targets[i].color.dstFactor);
-                d3dDesc.DestBlendAlpha =
-                    D3DUtil::getBlendFactor(desc.graphics.blend.targets[i].alpha.dstFactor);
-                d3dDesc.LogicOp = D3D12_LOGIC_OP_NOOP;
-                d3dDesc.LogicOpEnable = FALSE;
-                d3dDesc.RenderTargetWriteMask = desc.graphics.blend.targets[i].writeMask;
-                d3dDesc.SrcBlend =
-                    D3DUtil::getBlendFactor(desc.graphics.blend.targets[i].color.srcFactor);
-                d3dDesc.SrcBlendAlpha =
-                    D3DUtil::getBlendFactor(desc.graphics.blend.targets[i].alpha.srcFactor);
-            }
-            for (GfxIndex i = 1; i < desc.graphics.blend.targetCount; i++)
-            {
-                if (memcmp(
-                    &desc.graphics.blend.targets[i],
-                    &desc.graphics.blend.targets[0],
-                    sizeof(desc.graphics.blend.targets[0])) != 0)
-                {
-                    blend.IndependentBlendEnable = TRUE;
-                    break;
-                }
-            }
-            for (uint32_t i = (uint32_t)desc.graphics.blend.targetCount;
-                i < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT;
-                ++i)
-            {
-                blend.RenderTarget[i] = blend.RenderTarget[0];
-            }
-        }
-
-        {
-            auto& ds = psoDesc.DepthStencilState;
-
-            ds.DepthEnable = desc.graphics.depthStencil.depthTestEnable;
-            ds.DepthWriteMask = desc.graphics.depthStencil.depthWriteEnable
-                ? D3D12_DEPTH_WRITE_MASK_ALL
-                : D3D12_DEPTH_WRITE_MASK_ZERO;
-            ds.DepthFunc = D3DUtil::getComparisonFunc(desc.graphics.depthStencil.depthFunc);
-            ds.StencilEnable = desc.graphics.depthStencil.stencilEnable;
-            ds.StencilReadMask = (UINT8)desc.graphics.depthStencil.stencilReadMask;
-            ds.StencilWriteMask = (UINT8)desc.graphics.depthStencil.stencilWriteMask;
-            ds.FrontFace = D3DUtil::translateStencilOpDesc(desc.graphics.depthStencil.frontFace);
-            ds.BackFace = D3DUtil::translateStencilOpDesc(desc.graphics.depthStencil.backFace);
-        }
-
-        psoDesc.PrimitiveTopologyType = D3DUtil::getPrimitiveType(desc.graphics.primitiveType);
-
-        if (m_device->m_pipelineCreationAPIDispatcher)
-        {
-            SLANG_RETURN_ON_FAIL(
-                m_device->m_pipelineCreationAPIDispatcher->createGraphicsPipelineState(
-                    m_device,
-                    programImpl->linkedProgram.get(),
-                    &psoDesc,
-                    (void**)m_pipelineState.writeRef()));
         }
         else
         {
-            SLANG_RETURN_ON_FAIL(m_device->m_device->CreateGraphicsPipelineState(
-                &psoDesc, IID_PPV_ARGS(m_pipelineState.writeRef())));
+            D3D12_GRAPHICS_PIPELINE_STATE_DESC graphicsDesc = {};
+            for (auto& shaderBin : programImpl->m_shaders)
+            {
+                switch (shaderBin.stage)
+                {
+                case SLANG_STAGE_VERTEX:
+                    graphicsDesc.VS = { shaderBin.code.getBuffer(), SIZE_T(shaderBin.code.getCount()) };
+                    break;
+                case SLANG_STAGE_FRAGMENT:
+                    graphicsDesc.PS = { shaderBin.code.getBuffer(), SIZE_T(shaderBin.code.getCount()) };
+                    break;
+                case SLANG_STAGE_DOMAIN:
+                    graphicsDesc.DS = { shaderBin.code.getBuffer(), SIZE_T(shaderBin.code.getCount()) };
+                    break;
+                case SLANG_STAGE_HULL:
+                    graphicsDesc.HS = { shaderBin.code.getBuffer(), SIZE_T(shaderBin.code.getCount()) };
+                    break;
+                case SLANG_STAGE_GEOMETRY:
+                    graphicsDesc.GS = { shaderBin.code.getBuffer(), SIZE_T(shaderBin.code.getCount()) };
+                    break;
+                default:
+                    getDebugCallback()->handleMessage(
+                        DebugMessageType::Error,
+                        DebugMessageSource::Layer,
+                        "Unsupported shader stage.");
+                    return SLANG_E_NOT_AVAILABLE;
+                }
+            }
+
+            if (inputLayoutImpl)
+            {
+                graphicsDesc.InputLayout = {
+                    inputLayoutImpl->m_elements.getBuffer(),
+                    UINT(inputLayoutImpl->m_elements.getCount()) };
+            }
+
+            fillCommonGraphicsState(graphicsDesc);
+
+            if (m_device->m_pipelineCreationAPIDispatcher)
+            {
+                SLANG_RETURN_ON_FAIL(
+                    m_device->m_pipelineCreationAPIDispatcher->createGraphicsPipelineState(
+                        m_device,
+                        programImpl->linkedProgram.get(),
+                        &graphicsDesc,
+                        (void**)m_pipelineState.writeRef()));
+            }
+            else
+            {
+                SLANG_RETURN_ON_FAIL(m_device->m_device->CreateGraphicsPipelineState(
+                    &graphicsDesc, IID_PPV_ARGS(m_pipelineState.writeRef())));
+            }
         }
     }
     else

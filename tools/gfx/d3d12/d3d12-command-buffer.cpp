@@ -59,6 +59,13 @@ void CommandBufferImpl::init(
 
     reinit();
 
+    m_cmdList->QueryInterface<ID3D12GraphicsCommandList6>(m_cmdList6.writeRef());
+if (m_cmdList6)
+    {
+        m_cmdList4 = m_cmdList6;
+        m_cmdList1 = m_cmdList6;
+        return;
+    }
 #if SLANG_GFX_HAS_DXR_SUPPORT
     m_cmdList->QueryInterface<ID3D12GraphicsCommandList4>(m_cmdList4.writeRef());
     if (m_cmdList4)
