@@ -1,1 +1,2 @@
 tests/cpu-program/gfx-smoke.slang (cpu)
+tests/language-feature/spirv-asm/imageoperands-warning.slang (vk)
