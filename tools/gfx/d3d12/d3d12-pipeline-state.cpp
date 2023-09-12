@@ -176,7 +176,7 @@ Result PipelineStateImpl::ensureAPIPipelineStateCreated()
 
         };
 
-        if(desc.graphics.meshShader)
+        if(m_program->isMeshShaderProgram())
         {
             D3DX12_MESH_SHADER_PIPELINE_STATE_DESC meshDesc = {};
             for (auto& shaderBin : programImpl->m_shaders)

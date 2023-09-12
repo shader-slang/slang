@@ -580,7 +580,6 @@ SlangResult RenderTestApp::initialize(
                 desc.program = m_shaderProgram;
                 desc.inputLayout = inputLayout;
                 desc.framebufferLayout = m_framebufferLayout;
-                desc.meshShader = false;
                 m_pipelineState = device->createGraphicsPipelineState(desc);
             }
             break;
@@ -590,7 +589,6 @@ SlangResult RenderTestApp::initialize(
                 GraphicsPipelineStateDesc desc;
                 desc.program = m_shaderProgram;
                 desc.framebufferLayout = m_framebufferLayout;
-                desc.meshShader = true;
                 m_pipelineState = device->createGraphicsPipelineState(desc);
             }
         }

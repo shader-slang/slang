@@ -1054,6 +1054,26 @@ Result ShaderProgramBase::createShaderModule(
     return SLANG_OK;
 }
 
+bool ShaderProgramBase::isMeshShaderProgram() const
+{
+    // Similar to above, interrogate either explicity specified entry point
+    // componenets or the ones in the linked program entry point array
+    if(linkedEntryPoints.getCount())
+    {
+        for(const auto& e : linkedEntryPoints)
+            if(e->getLayout()->getEntryPointByIndex(0)->getStage() == SLANG_STAGE_MESH)
+                return true;
+    }
+    else
+    {
+        const auto programReflection = linkedProgram->getLayout();
+        for(SlangUInt i = 0; i < programReflection->getEntryPointCount(); ++i)
+            if(programReflection->getEntryPointByIndex(i)->getStage() == SLANG_STAGE_MESH)
+                return true;
+    }
+    return false;
+}
+
 Result RendererBase::maybeSpecializePipeline(
     PipelineStateBase* currentPipeline,
     ShaderObjectBase* rootObject,

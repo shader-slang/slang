@@ -759,7 +759,6 @@ Result initialize()
     pipelineStateDesc.framebufferLayout = gFramebufferLayout;
     pipelineStateDesc.inputLayout = inputLayout;
     pipelineStateDesc.primitiveType = PrimitiveType::Triangle;
-    pipelineStateDesc.meshShader = false;
     pipelineStateDesc.depthStencil.depthFunc = ComparisonFunc::LessEqual;
     pipelineStateDesc.depthStencil.depthTestEnable = true;
     gPipelineState = gDevice->createGraphicsPipelineState(pipelineStateDesc);

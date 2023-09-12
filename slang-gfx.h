@@ -1339,7 +1339,6 @@ struct GraphicsPipelineStateDesc
     DepthStencilDesc    depthStencil;
     RasterizerDesc      rasterizer;
     BlendDesc           blend;
-    bool                meshShader;
 };
 
 struct ComputePipelineStateDesc

@@ -222,7 +222,8 @@ Result PipelineStateImpl::createVKGraphicsPipelineState()
     dynamicStates.add(VK_DYNAMIC_STATE_BLEND_CONSTANTS);
     // It's not valid to specify VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY_EXT when
     // the pipeline contains a mesh shader.
-    if (!desc.graphics.meshShader && m_device->m_api.m_extendedFeatures.extendedDynamicStateFeatures.extendedDynamicState)
+    if (!m_program->isMeshShaderProgram() && m_device->m_api.m_extendedFeatures.extendedDynamicStateFeatures.extendedDynamicState)
+
     {
         dynamicStates.add(VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY_EXT);
     }

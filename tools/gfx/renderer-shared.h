@@ -868,6 +868,8 @@ public:
         return linkedProgram->getLayout()->findTypeByName(name);
     }
 
+    bool isMeshShaderProgram() const;
+
 };
 
 class InputLayoutBase
