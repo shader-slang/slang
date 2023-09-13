@@ -372,7 +372,7 @@ static void _lookUpMembersInSuperTypeDeclImpl(
     BreadcrumbInfo* inBreadcrumbs)
 {
     auto semantics = request.semantics;
-    if (!as<InterfaceDecl>(declRef.getDecl()) && name->text == "This")
+    if (!as<InterfaceDecl>(declRef.getDecl()) && getText(name) == "This")
     {
         // If we are looking for `This` in anything other than an InterfaceDecl,
         // we just need to return the declRef itself.
@@ -471,7 +471,7 @@ static void _lookUpMembersInSuperTypeDeclImpl(
             parentDeclRef = _maybeSpecializeSuperTypeDeclRef(
                 astBuilder, containerDeclRef, facet->getType(), facet->subtypeWitness)
                 .as<ContainerDecl>();
-            if (as<ThisTypeDecl>(parentDeclRef.getDecl()) && name->text == "This")
+            if (as<ThisTypeDecl>(parentDeclRef.getDecl()) && getText(name) == "This")
             {
                 // If we are going looking for `This` in a `ThisType`, we just need to return the declRef itself.
                 AddToLookupResult(ioResult, CreateLookupResultItem(parentDeclRef, inBreadcrumbs));
