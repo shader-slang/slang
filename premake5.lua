@@ -698,6 +698,10 @@ function tool(name)
     -- default.
     --
     kind "ConsoleApp"
+
+    if not targetInfo.isWindows then
+        links { "pthread" }
+    end
 end
 
 -- "Standard" projects will be those that go to make the binary
@@ -725,6 +729,10 @@ function toolSharedLibrary(name)
     defines { "SLANG_SHARED_LIBRARY_TOOL" }
 
     kind "SharedLib"
+
+    if not targetInfo.isWindows then
+        links { "pthread" }
+    end
 end
 
 function exampleLibrary(name)
@@ -771,6 +779,10 @@ function example(name)
     -- rather than in each example.
     links { "example-base", "slang", "gfx", "gfx-util", "platform", "core" }
 
+    if not targetInfo.isWindows then
+        links { "pthread" }
+    end
+
     if targetInfo.isWindows then
     else
         if enableXlib then
@@ -808,6 +820,10 @@ function generatorProject(name, sourcePath, projectKind)
         kind "Utility"
     else
         kind (projectKind)
+    end
+
+    if not targetInfo.isWindows then
+        links { "pthread" }
     end
 end
 
