@@ -5,7 +5,7 @@
 // where we cannot infer the required SPIR-V version from the code
 // (and glslang doesn't include any such inference ability).
 
-//TEST:CROSS_COMPILE: -profile glsl_460+spirv_1_4 -stage anyhit -entry main -target spirv-assembly
+//TEST:SIMPLE(filecheck=CHECK): -profile glsl_460+spirv_1_4 -stage anyhit -entry main -target spirv-assembly
 
 struct SphereHitAttributes
 {
@@ -45,3 +45,11 @@ void main(
         }
     }
 }
+
+// CHECK: OpCapability RayTracing
+// CHECK: OpEntryPoint AnyHitNV %main "main"
+// CHECK: %_ptr_HitAttributeNV_SphereHitAttributes_0 = OpTypePointer HitAttributeNV %SphereHitAttributes_0
+// CHECK: %_S{{.*}} = OpVariable %_ptr_HitAttributeNV_SphereHitAttributes_0 HitAttributeNV
+// CHECK: %{{.*}} = OpAccessChain %_ptr_HitAttributeNV_v3float %_S{{.*}} %int_0
+// CHECK: OpTerminateRayKHR
+// CHECK: OpIgnoreIntersectionKHR

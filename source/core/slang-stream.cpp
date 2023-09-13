@@ -2,6 +2,7 @@
 #ifdef _WIN32
 #include <share.h>
 #endif
+#include <thread>
 #include "slang-io.h"
 #include "slang-process.h"
 
@@ -586,6 +587,33 @@ SlangResult BufferedReadStream::readUntilContains(size_t size)
 
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!! StreamUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+SlangResult StreamUtil::readAndWrite(
+    Stream* writeStream,
+    ArrayView<Byte> bytesToWrite,
+    Stream* readStream, List<Byte>& outReadBytes,
+    Stream* errStream,
+    List<Byte>& outErrBytes)
+{
+    std::thread writeThread([&]()
+        {
+            writeStream->write(bytesToWrite.getBuffer(), (size_t)bytesToWrite.getCount());
+            writeStream->close();
+        });
+    SlangResult readResult = SLANG_OK;
+    std::thread readThread([&]()
+        {
+            readResult = readAll(readStream, 1024, outReadBytes);
+        });
+    std::thread readErrThread([&]()
+        {
+            readAll(errStream, 1024, outErrBytes);
+        });
+    writeThread.join();
+    readThread.join();
+    readErrThread.join();
+    return readResult;
+}
 
 /* static */SlangResult StreamUtil::readAll(Stream* stream, size_t readSize, List<Byte>& ioBytes)
 {

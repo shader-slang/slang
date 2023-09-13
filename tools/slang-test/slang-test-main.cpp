@@ -642,6 +642,7 @@ static TestResult _fileCheckTest(
     }
 
     const bool coloredOutput = true;
+    testReporter.message(TestMessageType::Info, outputToCheck.getBuffer());
     return fc->performTest(
         "slang-test",
         fileCheckRules.begin(),
