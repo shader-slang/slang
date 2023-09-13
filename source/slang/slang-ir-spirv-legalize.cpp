@@ -202,6 +202,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 i->removeAndDeallocate();
     }
 
+    // Returns true if the given type that should be decorated as in `UniformConstant` address space.
+    // These are typically opaque resource handles that can't be marked as `Uniform`.
     bool isSpirvUniformConstantType(IRType* type)
     {
         if (as<IRTextureTypeBase>(type))
@@ -250,7 +252,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 }
             }
 
-            // Textures and Samplers can't be in Uniform for Vulkan, if they are
+            // Opaque resource handles can't be in Uniform for Vulkan, if they are
             // placed here then put them in UniformConstant instead
             if (storageClass == SpvStorageClassUniform
                 && isSpirvUniformConstantType(inst->getDataType()))

@@ -698,6 +698,10 @@ function tool(name)
     -- default.
     --
     kind "ConsoleApp"
+
+    if not targetInfo.isWindows then
+        links { "pthread" }
+    end
 end
 
 -- "Standard" projects will be those that go to make the binary
@@ -725,6 +729,10 @@ function toolSharedLibrary(name)
     defines { "SLANG_SHARED_LIBRARY_TOOL" }
 
     kind "SharedLib"
+
+    if not targetInfo.isWindows then
+        links { "pthread" }
+    end
 end
 
 function exampleLibrary(name)
@@ -771,6 +779,10 @@ function example(name)
     -- rather than in each example.
     links { "example-base", "slang", "gfx", "gfx-util", "platform", "core" }
 
+    if not targetInfo.isWindows then
+        links { "pthread" }
+    end
+
     if targetInfo.isWindows then
     else
         if enableXlib then
@@ -808,6 +820,10 @@ function generatorProject(name, sourcePath, projectKind)
         kind "Utility"
     else
         kind (projectKind)
+    end
+
+    if not targetInfo.isWindows then
+        links { "pthread" }
     end
 end
 
@@ -944,6 +960,7 @@ standardProject("slang-rt", "source/slang-rt")
         addSourceDir "source/core/windows"
     else
         addSourceDir "source/core/unix"
+        links { "pthread" }
     end
 
 --
@@ -1241,6 +1258,9 @@ standardProject("slangc", "source/slangc")
     uuid "D56CBCEB-1EB5-4CA8-AEC4-48EA35ED61C7"
     kind "ConsoleApp"
     links { "core", "slang" }
+    if not targetInfo.isWindows then
+        links { "pthread" }
+    end
 
 function getBuildDir(isArm64)
     return "%{cfg.targetdir}"
@@ -1519,6 +1539,9 @@ if enableEmbedStdLib then
             "prelude/slang-cpp-host-prelude.h.cpp",
             "prelude/slang-torch-prelude.h.cpp"
         }
+        if not targetInfo.isWindows then
+            links { "pthread" }
+        end
 end
 
 if enableEmbedStdLib then
@@ -1674,6 +1697,10 @@ standardProject("slang", "source/slang")
     filter {"configurations:debug"}
         defines { "SLANG_ENABLE_IR_BREAK_ALLOC=1" }
     filter {}
+
+    if not targetInfo.isWindows then
+        links { "pthread" }
+    end
 
 toolSharedLibrary "gfx-unit-test"
     uuid "092DAB9F-1DA5-4538-ADD7-1A8D1DBFD519"
