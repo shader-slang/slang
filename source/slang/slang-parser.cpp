@@ -6294,13 +6294,8 @@ namespace Slang
     static std::optional<SPIRVAsmOperand> parseSPIRVAsmOperand(Parser* parser)
     {
         const auto slangIdentOperand = [&](auto flavor){
-            const auto tok = parser->ReadToken(TokenType::Identifier);
-
-            VarExpr* varExpr = parser->astBuilder->create<VarExpr>();
-            varExpr->scope = parser->currentScope;
-            varExpr->loc = tok.getLoc();
-            varExpr->name = tok.getName();
-            return SPIRVAsmOperand{flavor, tok, varExpr};
+            auto token = parser->tokenReader.peekToken();
+            return SPIRVAsmOperand{flavor, token, parseAtomicExpr(parser)};
         };
 
         const auto slangTypeExprOperand = [&](auto flavor) {

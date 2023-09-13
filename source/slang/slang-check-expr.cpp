@@ -670,6 +670,8 @@ namespace Slang
                         ThisExpr* expr = m_astBuilder->create<ThisExpr>();
                         expr->type.type = thisType;
                         expr->loc = loc;
+                        if (auto declRefExpr = as<DeclRefExpr>(originalExpr))
+                            expr->scope = declRefExpr->scope;
 
                         // Whether or not the implicit `this` is mutable depends
                         // on the context in which it is used, and the lookup

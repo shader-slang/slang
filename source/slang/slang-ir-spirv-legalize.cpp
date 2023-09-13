@@ -202,6 +202,22 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 i->removeAndDeallocate();
     }
 
+    bool isSpirvUniformConstantType(IRType* type)
+    {
+        if (as<IRTextureTypeBase>(type))
+            return true;
+        if (as<IRSamplerStateTypeBase>(type))
+            return true;
+        switch (type->getOp())
+        {
+        case kIROp_RaytracingAccelerationStructureType:
+        case kIROp_RayQueryType:
+            return true;
+        default:
+            return false;
+        }
+    }
+
     void processGlobalParam(IRGlobalParam* inst)
     {
         // If the global param is not a pointer type, make it so and insert explicit load insts.
@@ -237,8 +253,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             // Textures and Samplers can't be in Uniform for Vulkan, if they are
             // placed here then put them in UniformConstant instead
             if (storageClass == SpvStorageClassUniform
-                && (as<IRTextureTypeBase>(inst->getDataType())
-                    || as<IRSamplerStateTypeBase>(inst->getDataType())))
+                && isSpirvUniformConstantType(inst->getDataType()))
             {
                 storageClass = SpvStorageClassUniformConstant;
             }

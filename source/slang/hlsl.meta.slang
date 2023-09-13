@@ -7765,6 +7765,30 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __intrinsic_op($(kIROp_AllocateOpaqueHandle))
     __init();
 
+    
+    __target_intrinsic(glsl, "rayQueryInitializeEXT($0, $1, $2, $3, $4, $5, $6, $7)")
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_version(460)
+    [mutating]
+    void __rayQueryInitializeEXT(
+        RaytracingAccelerationStructure accelerationStructure,
+        RAY_FLAG                        rayFlags,
+        uint                            instanceInclusionMask,
+        float3                          origin,
+        float                           tMin,
+        float3                          direction,
+        float                           tMax)
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "rayQueryInitializeEXT($0, $1, $2, $3, $4, $5, $6, $7)";
+        case spirv:
+            spirv_asm {
+                OpRayQueryInitializeKHR &this $accelerationStructure $rayFlags $instanceInclusionMask $origin $tMin $direction $tMax;
+            };
+        }
+    }
+
     // Initialize a ray-tracing query.
     //
     // This method may be called on a "fresh" ray query, or
@@ -7777,29 +7801,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     // `RayQuery` to get the effective ray flags, which
     // must obey any API-imposed restrictions.
     //
-    __target_intrinsic(hlsl)
-    [mutating]
-    void TraceRayInline(
-        RaytracingAccelerationStructure accelerationStructure,
-        RAY_FLAG                        rayFlags,
-        uint                            instanceInclusionMask,
-        RayDesc                         ray);
-
-    __target_intrinsic(glsl, "rayQueryInitializeEXT($0, $1, $2, $3, $4, $5, $6, $7)")
-    __glsl_extension(GL_EXT_ray_query)
-    __glsl_version(460)
-    [mutating]
-    void __rayQueryInitializeEXT(
-        RaytracingAccelerationStructure accelerationStructure,
-        RAY_FLAG                        rayFlags,
-        uint                            instanceInclusionMask,
-        float3                          origin,
-        float                           tMin,
-        float3                          direction,
-        float                           tMax);
-
     [__unsafeForceInlineEarly]
-    __specialized_for_target(glsl)
     [mutating]
     void TraceRayInline(
         RaytracingAccelerationStructure accelerationStructure,
@@ -7807,16 +7809,22 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         uint                            instanceInclusionMask,
         RayDesc                         ray)
     {
-        __rayQueryInitializeEXT(
-            accelerationStructure,
-            rayFlags | rayFlagsGeneric,
-            instanceInclusionMask,
-            ray.Origin,
-            ray.TMin,
-            ray.Direction,
-            ray.TMax);
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".TraceRayInline";
+        case glsl:
+        case spirv:
+            __rayQueryInitializeEXT(
+                accelerationStructure,
+                rayFlags | rayFlagsGeneric,
+                instanceInclusionMask,
+                ray.Origin,
+                ray.TMin,
+                ray.Direction,
+                ray.TMax);
+        }
     }
-
+    
     // Resume the ray query coroutine.
     //
     // If the coroutine suspends because of encountering
@@ -7831,11 +7839,21 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     // functions to appropriately handle the closest hit (it any)
     // that was found.
     //
-    __target_intrinsic(glsl, rayQueryProceedEXT)
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
     [mutating]
-    bool Proceed();
+    bool Proceed()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".Proceed";
+        case glsl: __intrinsic_asm "rayQueryProceedEXT";
+        case spirv: return spirv_asm
+            {
+                result:$$bool = OpRayQueryProceedKHR &this
+            };
+        }
+    }
 
     // Causes the ray query to terminate.
     //
@@ -7843,11 +7861,18 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     // traversal has terminated, so that subsequent
     // `Proceed()` calls will return `false`.
     //
-    __target_intrinsic(glsl, rayQueryTerminateEXT)
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
     [mutating]
-    void Abort();
+    void Abort()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".Abort";
+        case glsl: __intrinsic_asm "rayQueryTerminateEXT";
+        case spirv: spirv_asm { OpRayQueryTerminateKHR &this };
+        }
+    }
 
     // Get the type of candidate hit being considered.
     //
@@ -7858,11 +7883,22 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     // the kind of candidate hit that must be resolved by
     // user code.
     //
-    __target_intrinsic(glsl, "rayQueryGetIntersectionTypeEXT($0, false)")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
     [__readNone]
-    CANDIDATE_TYPE CandidateType();
+    CANDIDATE_TYPE CandidateType()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".CandidateType";
+        case glsl: __intrinsic_asm "rayQueryGetIntersectionTypeEXT($0, false)";
+        case spirv:
+            uint RayQueryCandidateIntersectionKHR = 0;
+            return spirv_asm {
+                result:$$CANDIDATE_TYPE = OpRayQueryGetIntersectionTypeKHR &this $RayQueryCandidateIntersectionKHR;
+            };
+        }
+    }
 
     // Access properties of a candidate hit.
 
@@ -7980,11 +8016,23 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     void CommitProceduralPrimitiveHit(float t);
 
     // Get the status of the committed (closest) hit, if any.
-    __target_intrinsic(glsl, "rayQueryGetIntersectionTypeEXT($0, true)")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
     [__readNone]
-    COMMITTED_STATUS CommittedStatus();
+    COMMITTED_STATUS CommittedStatus()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".CommittedStatus";
+        case glsl: __intrinsic_asm "rayQueryGetIntersectionTypeEXT($0, true)";
+        case spirv:
+            uint RayQueryCommittedIntersectionKHR = 1;
+            return spirv_asm
+            {
+                result:$$COMMITTED_STATUS = OpRayQueryGetIntersectionTypeKHR &this $RayQueryCommittedIntersectionKHR;
+            };
+        }
+    }
 
     // Access properties of the committed hit.
     //
@@ -8012,11 +8060,23 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     [__readNone]
     float4x3 CommittedWorldToObject4x3();
 
-    __target_intrinsic(glsl, "rayQueryGetIntersectionTEXT($0, true)")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
     [__readNone]
-    float CommittedRayT();
+    float CommittedRayT()
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "rayQueryGetIntersectionTEXT($0, true)";
+        case hlsl: __intrinsic_asm ".CommittedRayT";
+        case spirv:
+            uint RayQueryCommittedIntersectionKHR = 1;
+            return spirv_asm
+            {
+                result:$$float = OpRayQueryGetIntersectionTKHR &this $RayQueryCommittedIntersectionKHR
+            };
+        }
+    }
 
     __target_intrinsic(glsl, "rayQueryGetIntersectionInstanceIdEXT($0, true)")
     __glsl_extension(GL_EXT_ray_query)
