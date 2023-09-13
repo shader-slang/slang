@@ -8069,6 +8069,7 @@ ${{{{
         {"uint", "InstanceIndex", "InstanceId"},
         {"uint", "InstanceID", "InstanceCustomIndex"},
         {"uint", "PrimitiveIndex", "PrimitiveIndex"},
+        {"uint", "GeometryIndex", "GeometryIndex"},
         {"uint", "InstanceContributionToHitGroupIndex", "InstanceShaderBindingTableRecordOffset"},
         {"float3", "ObjectRayOrigin", "ObjectRayOrigin"},
         {"float3", "ObjectRayDirection", "ObjectRayDirection"},
