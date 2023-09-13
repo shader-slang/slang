@@ -1695,6 +1695,10 @@ standardProject("slang", "source/slang")
         defines { "SLANG_ENABLE_IR_BREAK_ALLOC=1" }
     filter {}
 
+    if not targetInfo.isWindows then
+        links { "pthread" }
+    end
+
 toolSharedLibrary "gfx-unit-test"
     uuid "092DAB9F-1DA5-4538-ADD7-1A8D1DBFD519"
     includedirs { "." }
