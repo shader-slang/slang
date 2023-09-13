@@ -1258,6 +1258,9 @@ standardProject("slangc", "source/slangc")
     uuid "D56CBCEB-1EB5-4CA8-AEC4-48EA35ED61C7"
     kind "ConsoleApp"
     links { "core", "slang" }
+    if not targetInfo.isWindows then
+        links { "pthread" }
+    end
 
 function getBuildDir(isArm64)
     return "%{cfg.targetdir}"
