@@ -209,11 +209,28 @@ struct AssignValsFromLayoutContext
         ComPtr<IBufferResource> bufferResource;
         SLANG_RETURN_ON_FAIL(ShaderRendererUtil::createBufferResource(srcBuffer, /*entry.isOutput,*/ bufferSize, bufferData.getBuffer(), device, bufferResource));
 
+        ComPtr<IBufferResource> counterResource;
+        if(srcBuffer.counter != ~0u)
+        {
+            const InputBufferDesc& counterBufferDesc{
+                InputBufferType::StorageBuffer,
+                sizeof(uint32_t),
+                Format::Unknown,
+            };
+            SLANG_RETURN_ON_FAIL(ShaderRendererUtil::createBufferResource(
+                counterBufferDesc,
+                sizeof(srcBuffer.counter),
+                &srcBuffer.counter,
+                device,
+                counterResource
+            ));
+        }
+
         IResourceView::Desc viewDesc = {};
         viewDesc.type = IResourceView::Type::UnorderedAccess;
         viewDesc.format = srcBuffer.format;
         viewDesc.bufferElementSize = srcVal->bufferDesc.stride;
-        auto bufferView = device->createBufferView(bufferResource, nullptr, viewDesc);
+        auto bufferView = device->createBufferView(bufferResource, counterResource, viewDesc);
         dstCursor.setResource(bufferView);
         maybeAddOutput(dstCursor, srcVal, bufferResource);
 

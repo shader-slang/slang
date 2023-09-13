@@ -1665,9 +1665,11 @@ Result DeviceImpl::createBufferView(
 {
     auto resourceImpl = (BufferResourceImpl*)buffer;
     auto resourceDesc = *resourceImpl->getDesc();
+    const auto counterResourceImpl = static_cast<BufferResourceImpl*>(counterBuffer);
 
     RefPtr<ResourceViewImpl> viewImpl = new ResourceViewImpl();
     viewImpl->m_resource = resourceImpl;
+    viewImpl->m_counterResource = counterResourceImpl;
     viewImpl->m_desc = desc;
 
     switch (desc.type)
@@ -1722,7 +1724,6 @@ Result DeviceImpl::createBufferView(
         }
         else
         {
-            auto counterResourceImpl = static_cast<BufferResourceImpl*>(counterBuffer);
             SLANG_RETURN_ON_FAIL(m_cpuViewHeap->allocate(&viewImpl->m_descriptor));
             viewImpl->m_allocator = m_cpuViewHeap;
             m_device->CreateUnorderedAccessView(

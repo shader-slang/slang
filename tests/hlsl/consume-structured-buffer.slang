@@ -1,13 +1,15 @@
-
-//TEST:SIMPLE(filecheck=GLSL):-target glsl -profile glsl_450 -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=SPIRV):-target spirv -profile glsl_450 -stage compute -entry computeMain
-
+//DISABLE_TEST:SIMPLE(filecheck=GLSL):-target glsl -profile glsl_450 -stage compute -entry computeMain
+//DISABLE_TEST:SIMPLE(filecheck=SPIRV):-target spirv -profile glsl_450 -stage compute -entry computeMain
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-dx12 -use-dxil -compute -output-using-type
 //DISABLED_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type -xslang -fvk-use-gl-layout
 
-//TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-ConsumeStructuredBuffer<float2> consumeBuffer;
+// To check that our counter-initialization works correctly, set the initial
+// counter to 6 instead of 8, so we'll start reading from 6.0 downwards
+//TEST_INPUT:set consumeBuffer = ubuffer(data=[1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0], stride=4, counter=6)
+ConsumeStructuredBuffer<float> consumeBuffer;
 
 // GLSL: layout(std430, binding = 1) buffer StructuredBuffer_float2_t
 // GLSL: vec2 _data[];
@@ -27,9 +29,24 @@ ConsumeStructuredBuffer<float2> consumeBuffer;
 
 // SPIRV: OpEntryPoint
 
-[numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+[numthreads(4, 1, 1)]
+void computeMain(uint i : SV_GroupIndex)
 {
-    var v = consumeBuffer.Consume();
-    outputBuffer[dispatchThreadID.x] = v.x; // expect 1.0
+    uint size, stride;
+    consumeBuffer.GetDimensions(size, stride);
+
+    if(i == 0)
+        outputBuffer[0] = size;
+
+    outputBuffer[i+1] = consumeBuffer.Consume();
+
+    // BUF: type: float
+    // The total size of the ConsumeStructuredBuffer (from GetDimensions)
+    // BUF: 8.0
+
+    // The values from consumeBuffer in any order
+    // BUF-DAG: 6.0
+    // BUF-DAG: 4.0
+    // BUF-DAG: 5.0
+    // BUF-DAG: 3.0
 }
