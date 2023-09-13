@@ -98,9 +98,8 @@ protected:
     FileAccess m_access = FileAccess::None;
     WinHandle m_streamHandle;
     bool m_isOwned;
-    bool m_isPipe;          
+    bool m_isPipe;
 };
-
 
 class WinProcess : public Process
 {
@@ -526,12 +525,13 @@ void WinProcess::kill(int32_t returnCode)
     }
 
     RefPtr<Stream> streams[Index(StdStreamType::CountOf)];
+
     if (childStdErrRead)
         streams[Index(StdStreamType::ErrorOut)] = new WinPipeStream(childStdErrRead.detach(), FileAccess::Read);
     streams[Index(StdStreamType::Out)] = new WinPipeStream(childStdOutRead.detach(), FileAccess::Read);
     streams[Index(StdStreamType::In)] = new WinPipeStream(childStdInWrite.detach(), FileAccess::Write);
-
     outProcess = new WinProcess(processHandle.detach(), streams[0].readRef());
+
     return SLANG_OK;
 }
 

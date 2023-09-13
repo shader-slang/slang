@@ -253,6 +253,9 @@ enum class StreamBufferStyle
 
 struct StreamUtil
 {
+        // Write inputs to writeStream while simultaneously read from readStream and errStream.
+    static SlangResult readAndWrite(Stream* writeStream, ArrayView<Byte> bytesToWrite, Stream* readStream, List<Byte>& outReadBytes, Stream* errStream, List<Byte>& outErrBytes);
+
         /// Appends all bytes that can be read from stream into bytes
     static SlangResult readAll(Stream* stream, size_t readSize, List<Byte>& ioBytes);
 
