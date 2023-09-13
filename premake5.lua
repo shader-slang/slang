@@ -944,6 +944,7 @@ standardProject("slang-rt", "source/slang-rt")
         addSourceDir "source/core/windows"
     else
         addSourceDir "source/core/unix"
+        links { "pthread" }
     end
 
 --
