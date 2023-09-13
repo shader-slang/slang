@@ -1536,6 +1536,9 @@ if enableEmbedStdLib then
             "prelude/slang-cpp-host-prelude.h.cpp",
             "prelude/slang-torch-prelude.h.cpp"
         }
+        if not targetInfo.isWindows then
+            links { "pthread" }
+        end
 end
 
 if enableEmbedStdLib then
