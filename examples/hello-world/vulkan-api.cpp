@@ -74,7 +74,7 @@ int initializeVulkanDevice(VulkanAPI& api)
     VkApplicationInfo applicationInfo = {VK_STRUCTURE_TYPE_APPLICATION_INFO};
     applicationInfo.pApplicationName = "slang-hello-world";
     applicationInfo.pEngineName = "slang-hello-world";
-    applicationInfo.apiVersion = VK_API_VERSION_1_2;
+    applicationInfo.apiVersion = VK_API_VERSION_1_1;
     applicationInfo.engineVersion = 1;
     applicationInfo.applicationVersion = 1;
     const char* instanceExtensions[] = {
