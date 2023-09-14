@@ -459,6 +459,22 @@ struct IREntryPointDecoration : IRDecoration
 IR_SIMPLE_DECORATION(CudaHostDecoration)
 IR_SIMPLE_DECORATION(CudaKernelDecoration)
 
+struct IRCudaKernelForwardDerivativeDecoration : IRDecoration
+{
+    enum { kOp = kIROp_CudaKernelForwardDerivativeDecoration };
+    IR_LEAF_ISA(CudaKernelForwardDerivativeDecoration)
+
+    IRInst* getForwardDerivativeFunc() { return getOperand(0); }
+};
+
+struct IRCudaKernelBackwardDerivativeDecoration : IRDecoration
+{
+    enum { kOp = kIROp_CudaKernelBackwardDerivativeDecoration };
+    IR_LEAF_ISA(CudaKernelBackwardDerivativeDecoration)
+
+    IRInst* getBackwardDerivativeFunc() { return getOperand(0); }
+};
+
 struct IRGeometryInputPrimitiveTypeDecoration: IRDecoration
 {
     IR_PARENT_ISA(GeometryInputPrimitiveTypeDecoration)
@@ -564,6 +580,20 @@ struct IRTorchEntryPointDecoration : IRDecoration
     IRStringLit* getFunctionNameOperand() { return cast<IRStringLit>(getOperand(0)); }
     UnownedStringSlice getFunctionName() { return getFunctionNameOperand()->getStringSlice(); }
 };
+
+struct IRAutoPyBindCudaDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_AutoPyBindCudaDecoration
+    };
+    IR_LEAF_ISA(AutoPyBindCudaDecoration)
+
+    IRStringLit* getFunctionNameOperand() { return cast<IRStringLit>(getOperand(0)); }
+    UnownedStringSlice getFunctionName() { return getFunctionNameOperand()->getStringSlice(); }
+};
+
+IR_SIMPLE_DECORATION(AutoPyBindExportInfoDecoration)
 
 struct IRKnownBuiltinDecoration : IRDecoration
 {
@@ -4367,6 +4397,11 @@ public:
         addDecoration(value, kIROp_TorchEntryPointDecoration, getStringValue(functionName));
     }
 
+    void addAutoPyBindCudaDecoration(IRInst* value, UnownedStringSlice const& functionName)
+    {
+        addDecoration(value, kIROp_AutoPyBindCudaDecoration, getStringValue(functionName));
+    }
+
     void addCudaDeviceExportDecoration(IRInst* value, UnownedStringSlice const& functionName)
     {
         addDecoration(value, kIROp_CudaDeviceExportDecoration, getStringValue(functionName));
@@ -4380,6 +4415,21 @@ public:
     void addCudaKernelDecoration(IRInst* value)
     {
         addDecoration(value, kIROp_CudaKernelDecoration);
+    }
+
+    void addCudaKernelForwardDerivativeDecoration(IRInst* value, IRInst* func)
+    {
+        addDecoration(value, kIROp_CudaKernelForwardDerivativeDecoration, func);
+    }
+
+    void addCudaKernelBackwardDerivativeDecoration(IRInst* value, IRInst* func)
+    {
+        addDecoration(value, kIROp_CudaKernelBackwardDerivativeDecoration, func);
+    }
+
+    void addAutoPyBindExportInfoDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_AutoPyBindExportInfoDecoration);
     }
 
     void addEntryPointDecoration(IRInst* value, Profile profile, UnownedStringSlice const& name, UnownedStringSlice const& moduleName)

@@ -719,6 +719,10 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(CudaKernelDecoration,              CudaKernel,             0, 0)
     INST(CudaHostDecoration,                CudaHost,               0, 0)
     INST(TorchEntryPointDecoration,         TorchEntryPoint,        0, 0)
+    INST(AutoPyBindCudaDecoration,          AutoPyBindCUDA,         0, 0)
+    INST(CudaKernelForwardDerivativeDecoration,          CudaKernelFwdDiffRef,         0, 0)
+    INST(CudaKernelBackwardDerivativeDecoration,         CudaKernelBwdDiffRef,         0, 0)
+    INST(AutoPyBindExportInfoDecoration,    PyBindExportFuncInfo,   0, 0)
     
         /// Used to mark parameters that are moved from entry point parameters to global params as coming from the entry point.
     INST(EntryPointParamDecoration,         entryPointParam,        0, 0)

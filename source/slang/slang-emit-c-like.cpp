@@ -2286,7 +2286,11 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
             auto prec = getInfo(EmitOp::Postfix);
             needClose = maybeEmitParens(outerPrec, prec);
             emitOperand(inst->getOperand(0), leftSide(outerPrec, prec));
-            m_writer->emit("->getBuffer()");
+            if (as<IRPtrTypeBase>(inst->getOperand(0)->getDataType()))
+                m_writer->emit("->");
+            else
+                m_writer->emit(".");
+            m_writer->emit("getBuffer()");
             break;
         }
     case kIROp_MakeString:

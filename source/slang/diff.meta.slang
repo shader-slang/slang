@@ -264,33 +264,76 @@ extension TensorView<float>
     void InterlockedCompareExchange(vector<uint, N> index, float compare, float val);
 }
 
-
-__generic<T : IDifferentiable>
-struct DiffTensorViewAA
+__generic<T : __BuiltinFloatingPointType>
+struct DiffTensorView
 {
     TensorView<T> primal;
-    TensorView<T.Differential> diff;
+    TensorView<T> diff;
 
-    [CudaHost]
-    __init(TorchTensor<T> primal)
+    __init(TensorView<T> primal)
     {
-        this.primal = primal.getView();
+        this.primal = primal;
     }
 
-    [CudaHost]
-    __init(TorchTensor<T> primal, TorchTensor<T> diff)
+    __init(TensorView<T> primal, TensorView<T> diff)
     {
-        this.primal = primal.getView();
-        this.diff = diff.getView();
+        this.primal = primal;
+        this.diff = diff;
+    }
+
+    uint size(uint i)
+    {
+        return primal.size(i);
     }
 
     [BackwardDerivative(load_backward)]
+    [ForwardDerivative(load_forward)]
     T load(uint x) { return primal.load(x); }
+
+    DifferentialPair<T> load_forward(uint x)
+    {
+        return diffPair(primal.load(x), reinterpret<T.Differential, T>(diff.load(x)));
+    }
 
     void load_backward(uint x, T.Differential dOut)
     {
         T oldVal;
-        diff.InterlockedAdd(x, dOut, oldVal);
+        diff.InterlockedAdd(x, reinterpret<T, T.Differential>(dOut), oldVal);
+    }
+
+    [BackwardDerivative(storeOnce_backward)]
+    [ForwardDerivative(storeOnce_forward)]
+    void storeOnce(uint x, T val) { primal.store(x, val); }
+
+    void storeOnce_forward(uint x, DifferentialPair<T> dpval)
+    {
+        primal.store(x, dpval.p);
+        diff.store(x, reinterpret<T, T.Differential>(dpval.d));
+    }
+
+    void storeOnce_backward(uint x, inout DifferentialPair<T> dpval)
+    {
+        dpval = diffPair(dpval.p, reinterpret<T.Differential, T>(diff.load(x)));
+    }
+};
+
+extension DiffTensorViewAA<float>
+{
+    [BackwardDerivative(store_backward)]
+    [ForwardDerivative(store_forward)]
+    void store(uint x, float val) { primal.store(x, val); }
+
+    void store_forward(uint x, DifferentialPair<float> dpval)
+    {
+        primal.store(x, dpval.p);
+        diff.store(x, dpval.d);
+    }
+
+    void store_backward(uint x, inout DifferentialPair<float> dpval)
+    {
+        float dval;
+        diff.InterlockedExchange(x, (float)0, dval);
+        dpval = diffPair(dpval.p, dval);
     }
 };
 

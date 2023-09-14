@@ -1039,6 +1039,7 @@ void stripDerivativeDecorations(IRInst* inst)
     }
 }
 
+
 void stripAutoDiffDecorationsFromChildren(IRInst* parent)
 {
     for (auto inst : parent->getChildren())

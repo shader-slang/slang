@@ -94,6 +94,9 @@ struct BackwardDiffTranscriberBase : AutoDiffTranscriberBase
     // Transcribe a function definition.
     virtual InstPair transcribeFunc(IRBuilder* builder, IRFunc* primalFunc, IRFunc* diffFunc) = 0;
 
+    // Get transcribed function name from original name.
+    virtual IRStringLit* getTranscribedFuncName(IRBuilder* builder, IRGlobalValueWithCode* func) = 0;
+
     // Splits and transpose the parameter block.
     // After this operation, the parameter block will contain parameters for both the future
     // primal func and the future propagate func.
@@ -160,6 +163,19 @@ struct BackwardDiffPrimalTranscriber : BackwardDiffTranscriberBase
     {
         return kIROp_BackwardDerivativePrimalDecoration;
     }
+    virtual IRStringLit* getTranscribedFuncName(IRBuilder* builder, IRGlobalValueWithCode* func) override
+    {
+        if (auto nameHint = func->findDecoration<IRNameHintDecoration>())
+        {
+            StringBuilder sbuilder;
+            sbuilder << "s_primal_ctx_" << nameHint->getName();
+            return builder->getStringValue(sbuilder.getUnownedSlice());
+        }
+        else
+        {
+            return builder->getStringValue(String("s_primal_ctx_anonymous").getUnownedSlice());
+        }
+    }
 };
 
 struct BackwardDiffPropagateTranscriber : BackwardDiffTranscriberBase
@@ -195,6 +211,19 @@ struct BackwardDiffPropagateTranscriber : BackwardDiffTranscriberBase
     virtual IROp getInterfaceRequirementDerivativeDecorationOp() override
     {
         return kIROp_BackwardDerivativePropagateDecoration;
+    }
+    virtual IRStringLit* getTranscribedFuncName(IRBuilder* builder, IRGlobalValueWithCode* func) override
+    {
+        if (auto nameHint = func->findDecoration<IRNameHintDecoration>())
+        {
+            StringBuilder sbuilder;
+            sbuilder << "s_bwd_prop_" << nameHint->getName();
+            return builder->getStringValue(sbuilder.getUnownedSlice());
+        }
+        else
+        {
+            return builder->getStringValue(String("s_bwd_prop_anonymous").getUnownedSlice());
+        }
     }
 };
 
@@ -234,6 +263,19 @@ struct BackwardDiffTranscriber : BackwardDiffTranscriberBase
     virtual void addExistingDiffFuncDecor(IRBuilder* builder, IRInst* inst, IRInst* diffFunc) override
     {
         builder->addBackwardDerivativeDecoration(inst, diffFunc);
+    }
+    virtual IRStringLit* getTranscribedFuncName(IRBuilder* builder, IRGlobalValueWithCode* func) override
+    {
+        if (auto nameHint = func->findDecoration<IRNameHintDecoration>())
+        {
+            StringBuilder sbuilder;
+            sbuilder << "s_bwd_" << nameHint->getName();
+            return builder->getStringValue(sbuilder.getUnownedSlice());
+        }
+        else
+        {
+            return builder->getStringValue(String("s_bwd_anonymous").getUnownedSlice());
+        }
     }
 };
 

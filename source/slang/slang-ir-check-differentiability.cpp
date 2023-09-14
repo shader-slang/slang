@@ -295,8 +295,8 @@ public:
             }
         }
 
-        if (differentiableOutputs == 0)
-            sink->diagnose(funcInst, Diagnostics::differentiableFuncMustHaveOutput);
+        //if (differentiableOutputs == 0)
+        //    sink->diagnose(funcInst, Diagnostics::differentiableFuncMustHaveOutput);
 
         DifferentiableLevel requiredDiffLevel = DifferentiableLevel::Forward;
         if (isBackwardDifferentiableFunc(funcInst))

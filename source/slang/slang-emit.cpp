@@ -45,6 +45,7 @@
 #include "slang-ir-legalize-vector-types.h"
 #include "slang-ir-metadata.h"
 #include "slang-ir-optix-entry-point-uniforms.h"
+#include "slang-ir-pytorch-cpp-binding.h"
 #include "slang-ir-restructure.h"
 #include "slang-ir-restructure-scoping.h"
 #include "slang-ir-sccp.h"
@@ -369,6 +370,9 @@ Result linkAndOptimizeIR(
     // being passed to saturated_cooperation
     fuseCallsToSaturatedCooperation(irModule);
 
+    // Generate any requested derivative wrappers
+    generateDerivativeWrappers(irModule, sink);
+
     // Next, we need to ensure that the code we emit for
     // the target doesn't contain any operations that would
     // be illegal on the target platform. For example,
@@ -444,9 +448,11 @@ Result linkAndOptimizeIR(
     {
     case CodeGenTarget::PyTorchCppBinding:
         generatePyTorchCppBinding(irModule, sink);
+        handleAutoBindNames(irModule);
         break;
     case CodeGenTarget::CUDASource:
         removeTorchKernels(irModule);
+        handleAutoBindNames(irModule);
         break;
     default:
         break;
