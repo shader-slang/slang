@@ -2691,6 +2691,13 @@ void legalizeEntryPointForGLSL(
 
     context.builder = &builder;
 
+    // Rename the entrypoint to "main" to conform to GLSL standard,
+    // if the compile options require us to do it.
+    if (!shouldUseOriginalEntryPointName(codeGenContext))
+    {
+        entryPointDecor->setName(builder.getStringValue(UnownedStringSlice("main")));
+    }
+
     // We will start by looking at the return type of the
     // function, because that will enable us to do an
     // early-out check to avoid more work.
@@ -2863,11 +2870,6 @@ void legalizeEntryPointForGLSL(
             // Change the globals type
             value.globalParam->setFullType(sizedArrayType);
         }
-    }
-
-    if (!shouldUseOriginalEntryPointName(codeGenContext))
-    {
-        entryPointDecor->setName(builder.getStringValue(UnownedStringSlice("main")));
     }
 }
 
