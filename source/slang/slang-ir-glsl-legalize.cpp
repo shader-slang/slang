@@ -2634,6 +2634,18 @@ void legalizeEntryPointParameterForGLSL(
     }
 }
 
+bool shouldUseOriginalEntryPointName(CodeGenContext* codeGenContext)
+{
+    if (auto hlslOptions = codeGenContext->getTargetReq()->getHLSLToVulkanLayoutOptions())
+    {
+        if (hlslOptions->getUseOriginalEntryPointName())
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 void legalizeEntryPointForGLSL(
     Session*                session,
     IRModule*               module,
@@ -2851,6 +2863,11 @@ void legalizeEntryPointForGLSL(
             // Change the globals type
             value.globalParam->setFullType(sizedArrayType);
         }
+    }
+
+    if (!shouldUseOriginalEntryPointName(codeGenContext))
+    {
+        entryPointDecor->setName(builder.getStringValue(UnownedStringSlice("main")));
     }
 }
 
