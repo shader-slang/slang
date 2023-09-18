@@ -68,16 +68,8 @@ Result ShaderProgramImpl::createShaderModule(
 {
     m_codeBlobs.add(kernelCode);
     VkShaderModule shaderModule;
-    // HACK: our direct-spirv-emit path generates SPIRV that respects
-    // the original entry point name, while the glslang path always
-    // uses "main" as the name. We should introduce a compiler parameter
-    // to control the entry point naming behavior in SPIRV-direct path
-    // so we can remove the ad-hoc logic here.
     auto realEntryPointName = entryPointInfo->getNameOverride();
-    const char* spirvBinaryEntryPointName =
-        m_device->m_desc.slang.targetFlags & SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY
-        ? realEntryPointName
-        : "main";
+    const char* spirvBinaryEntryPointName = "main";
     m_stageCreateInfos.add(compileEntryPoint(
         spirvBinaryEntryPointName,
         kernelCode,

@@ -2634,6 +2634,18 @@ void legalizeEntryPointParameterForGLSL(
     }
 }
 
+bool shouldUseOriginalEntryPointName(CodeGenContext* codeGenContext)
+{
+    if (auto hlslOptions = codeGenContext->getTargetReq()->getHLSLToVulkanLayoutOptions())
+    {
+        if (hlslOptions->getUseOriginalEntryPointName())
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 void legalizeEntryPointForGLSL(
     Session*                session,
     IRModule*               module,
@@ -2678,6 +2690,13 @@ void legalizeEntryPointForGLSL(
     builder.setInsertInto(func);
 
     context.builder = &builder;
+
+    // Rename the entrypoint to "main" to conform to GLSL standard,
+    // if the compile options require us to do it.
+    if (!shouldUseOriginalEntryPointName(codeGenContext))
+    {
+        entryPointDecor->setName(builder.getStringValue(UnownedStringSlice("main")));
+    }
 
     // We will start by looking at the return type of the
     // function, because that will enable us to do an
