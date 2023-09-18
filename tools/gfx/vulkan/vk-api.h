@@ -141,9 +141,12 @@ namespace gfx {
 #   define VK_API_INSTANCE_PLATFORM_KHR_PROCS(x)          \
     x(vkCreateWin32SurfaceKHR) \
     /* */
-#else
+#elif SLANG_ENABLE_XLIB
 #   define VK_API_INSTANCE_PLATFORM_KHR_PROCS(x)          \
     x(vkCreateXlibSurfaceKHR) \
+    /* */
+#else
+#   define VK_API_INSTANCE_PLATFORM_KHR_PROCS(x)          \
     /* */
 #endif
 

@@ -1553,6 +1553,16 @@ Result DeviceImpl::createTextureView(
                     D3DUtil::getPlaneSlice(d3d12desc.Format, desc.subresourceRange.aspectMask);
             }
             break;
+        case IResource::Type::TextureCube:
+            d3d12desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
+            d3d12desc.Texture2DArray.MipSlice = desc.subresourceRange.mipLevel;
+            d3d12desc.Texture2DArray.ArraySize = desc.subresourceRange.layerCount == 0
+                ? resourceDesc.arraySize
+                : desc.subresourceRange.layerCount;
+            d3d12desc.Texture2DArray.FirstArraySlice = desc.subresourceRange.baseArrayLayer;
+            d3d12desc.Texture2DArray.PlaneSlice =
+                D3DUtil::getPlaneSlice(d3d12desc.Format, desc.subresourceRange.aspectMask);
+            break;
         case IResource::Type::Texture3D:
             d3d12desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE3D;
             d3d12desc.Texture3D.MipSlice = desc.subresourceRange.mipLevel;

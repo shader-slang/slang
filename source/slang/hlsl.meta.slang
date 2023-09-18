@@ -7874,6 +7874,36 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         }
     }
 
+    // Commit the current non-opaque triangle hit.
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_version(460)
+    [__NoSideEffect]
+    [mutating]
+    void CommitNonOpaqueTriangleHit()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".CommitNonOpaqueTriangleHit";
+        case glsl: __intrinsic_asm "rayQueryConfirmIntersectionEXT";
+        case spirv: spirv_asm { OpRayQueryConfirmIntersectionKHR &this };
+        }
+    }
+
+    // Commit the current procedural primitive hit, with hit time `t`.
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_version(460)
+    [__NoSideEffect]
+    [mutating]
+    void CommitProceduralPrimitiveHit(float t)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".CommitProceduralPrimitiveHit";
+        case glsl: __intrinsic_asm "rayQueryGenerateIntersectionEXT";
+        case spirv: spirv_asm { OpRayQueryGenerateIntersectionKHR &this $t };
+        }
+    }
+
     // Get the type of candidate hit being considered.
     //
     // The ray query coroutine will suspend when it encounters
@@ -7885,7 +7915,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     //
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
-    [__readNone]
+    [__NoSideEffect]
     CANDIDATE_TYPE CandidateType()
     {
         __target_switch
@@ -7900,125 +7930,10 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         }
     }
 
-    // Access properties of a candidate hit.
-
-    __target_intrinsic(glsl, "transpose(rayQueryGetIntersectionObjectToWorldEXT($0, false))")
-    __glsl_extension(GL_EXT_ray_query)
-    __glsl_version(460)
-    [__readNone]
-    float3x4 CandidateObjectToWorld3x4();
-
-    __target_intrinsic(glsl, "rayQueryGetIntersectionObjectToWorldEXT($0, false)")
-    __glsl_extension(GL_EXT_ray_query)
-    __glsl_version(460)
-    [__readNone]
-    float4x3 CandidateObjectToWorld4x3();
-
-    __target_intrinsic(glsl, "transpose(rayQueryGetIntersectionWorldToObjectEXT($0, false))")
-    __glsl_extension(GL_EXT_ray_query)
-    __glsl_version(460)
-    [__readNone]
-    float3x4 CandidateWorldToObject3x4();
-
-    __target_intrinsic(glsl, "rayQueryGetIntersectionWorldToObjectEXT($0, false)")
-    __glsl_extension(GL_EXT_ray_query)
-    __glsl_version(460)
-    [__readNone]
-    float4x3 CandidateWorldToObject4x3();
-
-    __target_intrinsic(glsl, "rayQueryGetIntersectionInstanceIdEXT($0, false)")
-    __glsl_extension(GL_EXT_ray_query)
-    __glsl_version(460)
-    [__readNone]
-    uint CandidateInstanceIndex();
-
-    __target_intrinsic(glsl, "rayQueryGetIntersectionInstanceCustomIndexEXT($0, false)")
-    __glsl_extension(GL_EXT_ray_query)
-    __glsl_version(460)
-    [__readNone]
-    uint CandidateInstanceID();
-
-    __target_intrinsic(glsl, "rayQueryGetIntersectionGeometryIndexEXT($0, false)")
-    __glsl_extension(GL_EXT_ray_query)
-    __glsl_version(460)
-    [__readNone]
-    uint CandidateGeometryIndex();
-
-    __target_intrinsic(glsl, "rayQueryGetIntersectionPrimitiveIndexEXT($0, false)")
-    __glsl_extension(GL_EXT_ray_query)
-    __glsl_version(460)
-    [__readNone]
-    uint CandidatePrimitiveIndex();
-
-    __target_intrinsic(glsl, "rayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetEXT($0, false)")
-    __glsl_extension(GL_EXT_ray_query)
-    __glsl_version(460)
-    [__readNone]
-    uint CandidateInstanceContributionToHitGroupIndex();
-
-    // Access properties of the ray being traced
-    // in the object space of a candidate hit.
-
-    __target_intrinsic(glsl, "rayQueryGetIntersectionObjectRayOriginEXT($0, false)")
-    __glsl_extension(GL_EXT_ray_query)
-    __glsl_version(460)
-    [__readNone]
-    float3 CandidateObjectRayOrigin();
-
-    __target_intrinsic(glsl, "rayQueryGetIntersectionObjectRayDirectionEXT($0, false)")
-    __glsl_extension(GL_EXT_ray_query)
-    __glsl_version(460)
-    [__readNone]
-    float3 CandidateObjectRayDirection();
-
-    // Access properties of a candidate procedural primitive hit.
-
-    __target_intrinsic(glsl, "rayQueryGetIntersectionCandidateAABBOpaqueEXT($0, false)")
-    __glsl_extension(GL_EXT_ray_query)
-    __glsl_version(460)
-    [__readNone]
-    bool CandidateProceduralPrimitiveNonOpaque();
-
-    // Access properties of a candidate non-opaque triangle hit.
-
-    __target_intrinsic(glsl, "rayQueryGetIntersectionFrontFaceEXT($0, false)")
-    __glsl_extension(GL_EXT_ray_query)
-    __glsl_version(460)
-    [__readNone]
-    bool CandidateTriangleFrontFace();
-
-    __target_intrinsic(glsl, "rayQueryGetIntersectionBarycentricsEXT($0, false)")
-    __glsl_extension(GL_EXT_ray_query)
-    __glsl_version(460)
-    [__readNone]
-    float2 CandidateTriangleBarycentrics();
-
-    __target_intrinsic(glsl, "rayQueryGetIntersectionTEXT($0, false)")
-    __glsl_extension(GL_EXT_ray_query)
-    __glsl_version(460)
-    [__readNone]
-    float CandidateTriangleRayT();
-
-    // Commit the current non-opaque triangle hit.
-    __target_intrinsic(glsl, rayQueryConfirmIntersectionEXT)
-    __glsl_extension(GL_EXT_ray_query)
-    __glsl_version(460)
-    [__NoSideEffect]
-    [mutating]
-    void CommitNonOpaqueTriangleHit();
-
-    // Commit the current procedural primitive hit, with hit time `t`.
-    __target_intrinsic(glsl, rayQueryGenerateIntersectionEXT)
-    __glsl_extension(GL_EXT_ray_query)
-    __glsl_version(460)
-    [__NoSideEffect]
-    [mutating]
-    void CommitProceduralPrimitiveHit(float t);
-
     // Get the status of the committed (closest) hit, if any.
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
-    [__readNone]
+    [__NoSideEffect]
     COMMITTED_STATUS CommittedStatus()
     {
         __target_switch
@@ -8034,134 +7949,222 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         }
     }
 
-    // Access properties of the committed hit.
-    //
-    __target_intrinsic(glsl, "transpose(rayQueryGetIntersectionObjectToWorldEXT($0, true))")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
-    [__readNone]
-    float3x4 CommittedObjectToWorld3x4();
-
-    __target_intrinsic(glsl, "rayQueryGetIntersectionObjectToWorldEXT($0, true)")
-    __glsl_extension(GL_EXT_ray_query)
-    __glsl_version(460)
-    [__readNone]
-    float4x3 CommittedObjectToWorld4x3();
-
-    __target_intrinsic(glsl, "transpose(rayQueryGetIntersectionWorldToObjectEXT($0, true))")
-    __glsl_extension(GL_EXT_ray_query)
-    __glsl_version(460)
-    [__readNone]
-    float3x4 CommittedWorldToObject3x4();
-
-    __target_intrinsic(glsl, "rayQueryGetIntersectionWorldToObjectEXT($0, true)")
-    __glsl_extension(GL_EXT_ray_query)
-    __glsl_version(460)
-    [__readNone]
-    float4x3 CommittedWorldToObject4x3();
-
-    __glsl_extension(GL_EXT_ray_query)
-    __glsl_version(460)
-    [__readNone]
-    float CommittedRayT()
+    [__NoSideEffect]
+    bool CandidateProceduralPrimitiveNonOpaque()
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "rayQueryGetIntersectionTEXT($0, true)";
-        case hlsl: __intrinsic_asm ".CommittedRayT";
+        case hlsl: __intrinsic_asm ".CandidateProceduralPrimitiveNonOpaque";
+        case glsl: __intrinsic_asm "(!rayQueryGetIntersectionCandidateAABBOpaqueEXT($0, false))";
         case spirv:
-            uint RayQueryCommittedIntersectionKHR = 1;
+            uint iCandidateOrCommitted = 0;
             return spirv_asm
             {
-                result:$$float = OpRayQueryGetIntersectionTKHR &this $RayQueryCommittedIntersectionKHR
+                %rr:$$bool = OpRayQueryGetIntersectionCandidateAABBOpaqueKHR &this $iCandidateOrCommitted;
+                result:$$bool = OpLogicalNot %rr;
             };
         }
     }
 
-    __target_intrinsic(glsl, "rayQueryGetIntersectionInstanceIdEXT($0, true)")
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_version(460)
+    [__NoSideEffect]
+    float CandidateTriangleRayT()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".CandidateTriangleRayT";
+        case glsl: __intrinsic_asm "rayQueryGetIntersectionTEXT($0, false)";
+        case spirv:
+            uint iCandidateOrCommitted = 0;
+            return spirv_asm
+            {
+                result:$$float = OpRayQueryGetIntersectionTKHR &this $iCandidateOrCommitted;
+            };
+        }
+    }
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_version(460)
+    [__NoSideEffect]
+    float CommittedRayT()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".CommittedRayT";
+        case glsl: __intrinsic_asm "rayQueryGetIntersectionTEXT($0, true)";
+        case spirv:
+            uint iCandidateOrCommitted = 1;
+            return spirv_asm
+            {
+                result:$$float = OpRayQueryGetIntersectionTKHR &this $iCandidateOrCommitted;
+            };
+        }
+    }
+
+${{{{
+    const char* kCandidateCommitted[] = {"Candidate", "Committed"};
+
+    // Access Candidate and Committed Matrices.
+    for (uint32_t candidateOrCommitted = 0; candidateOrCommitted < 2; candidateOrCommitted++)
+    {
+        auto ccName = kCandidateCommitted[candidateOrCommitted];
+        auto ccTF = candidateOrCommitted == 0 ? "false" : "true";
+}}}}
+
+    // CandidateObjectToWorld3x4, CandidateWorldToObject4x3
+    // CommittedObjectToWorld3x4, CommittedObjectToWorld4x3
+    ${{{{
+    const char* kRayQueryMatrixNames[] = {"ObjectToWorld", "WorldToObject"};
+    for (auto matName : kRayQueryMatrixNames) {
+    }}}}
+
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_version(460)
+    [__NoSideEffect]
+    float3x4 $(ccName)$(matName)3x4()
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "transpose(rayQueryGetIntersection$(matName)EXT($0, $(ccTF)))";
+        case hlsl: __intrinsic_asm ".$(ccName)$(matName)3x4";
+        case spirv:
+            uint iCandidateOrCommitted = $(candidateOrCommitted);
+            return spirv_asm {
+                %m:$$float4x3 = OpRayQueryGetIntersection$(matName)KHR &this $iCandidateOrCommitted;
+                result:$$float3x4 = OpTranspose %m;
+            };
+        }
+    }
+
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
     [__readNone]
-    uint CommittedInstanceIndex();
+    float4x3 $(ccName)$(matName)4x3()
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "rayQueryGetIntersection$(matName)EXT($0, $(ccTF))";
+        case hlsl: __intrinsic_asm ".$(ccName)$(matName)4x3";
+        case spirv:
+            uint iCandidateOrCommitted = $(candidateOrCommitted);
+            return spirv_asm {
+                result:$$float4x3 = OpRayQueryGetIntersection$(matName)KHR &this $iCandidateOrCommitted;
+            };
+        }
+    }
 
-    __target_intrinsic(glsl, "rayQueryGetIntersectionInstanceCustomIndexEXT($0, true)")
+${{{{
+    } // ObjectToWorld/WorldToObject.
+
+    // Access Candidate and Committed properties.
+    struct RayQueryMethodEntry
+    {
+        const char* type;
+        const char* hlslName;
+        const char* glslName;
+    };
+    const RayQueryMethodEntry rayQueryMethods[] = {
+        {"uint", "InstanceIndex", "InstanceId"},
+        {"uint", "InstanceID", "InstanceCustomIndex"},
+        {"uint", "PrimitiveIndex", "PrimitiveIndex"},
+        {"uint", "GeometryIndex", "GeometryIndex"},
+        {"uint", "InstanceContributionToHitGroupIndex", "InstanceShaderBindingTableRecordOffset"},
+        {"float3", "ObjectRayOrigin", "ObjectRayOrigin"},
+        {"float3", "ObjectRayDirection", "ObjectRayDirection"},
+        {"bool", "TriangleFrontFace", "FrontFace"},
+        {"float2", "TriangleBarycentrics", "Barycentrics"},
+    };
+    for (auto method : rayQueryMethods) {
+}}}}
+
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
-    [__readNone]
-    uint CommittedInstanceID();
-
-    __target_intrinsic(glsl, "rayQueryGetIntersectionGeometryIndexEXT($0, true)")
-    __glsl_extension(GL_EXT_ray_query)
-    __glsl_version(460)
-    [__readNone]
-    uint CommittedGeometryIndex();
-
-    __target_intrinsic(glsl, "rayQueryGetIntersectionPrimitiveIndexEXT($0, true)")
-    __glsl_extension(GL_EXT_ray_query)
-    __glsl_version(460)
-    [__readNone]
-    uint CommittedPrimitiveIndex();
-
-    __target_intrinsic(glsl, "rayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetEXT($0, true)")
-    __glsl_extension(GL_EXT_ray_query)
-    __glsl_version(460)
-    [__readNone]
-    uint CommittedInstanceContributionToHitGroupIndex();
-
-    // Access properties of the ray being traced
-    // in the object space of a committed hit.
-
-    __target_intrinsic(glsl, "rayQueryGetIntersectionObjectRayOriginEXT($0, true)")
-    __glsl_extension(GL_EXT_ray_query)
-    __glsl_version(460)
-    [__readNone]
-    float3 CommittedObjectRayOrigin();
-
-    __target_intrinsic(glsl, "rayQueryGetIntersectionObjectRayDirectionEXT($0, true)")
-    __glsl_extension(GL_EXT_ray_query)
-    __glsl_version(460)
-    [__readNone]
-    float3 CommittedObjectRayDirection();
-
-    // Access properties of a committed triangle hit.
-
-    __target_intrinsic(glsl, "rayQueryGetIntersectionFrontFaceEXT($0, true)")
-    __glsl_extension(GL_EXT_ray_query)
-    __glsl_version(460)
-    [__readNone]
-    bool CommittedTriangleFrontFace();
-
-    __target_intrinsic(glsl, "rayQueryGetIntersectionBarycentricsEXT($0, true)")
-    __glsl_extension(GL_EXT_ray_query)
-    __glsl_version(460)
-    [__readNone]
-    float2 CommittedTriangleBarycentrics();
+    [__NoSideEffect]
+    $(method.type) $(ccName)$(method.hlslName)()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".$(ccName)$(method.hlslName)";
+        case glsl: __intrinsic_asm "rayQueryGetIntersection$(method.glslName)EXT($0, $(ccTF))";
+        case spirv:
+            uint iCandidateOrCommitted = $(candidateOrCommitted);
+            return spirv_asm {
+                result:$$$(method.type) = OpRayQueryGetIntersection$(method.glslName)KHR &this $iCandidateOrCommitted;
+            };
+        }
+    }
+${{{{
+    } // Candidate/Committed properties.
+    } // for ("Candidate", "Committed")
+}}}}
 
     // Access properties of the ray being traced.
 
-    __target_intrinsic(glsl, rayQueryGetRayFlagsEXT)
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
-    [__readNone]
-    uint RayFlags();
+    [__NoSideEffect]
+    uint RayFlags()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".RayFlags";
+        case glsl: __intrinsic_asm "rayQueryGetRayFlagsEXT";
+        case spirv:
+            return spirv_asm {
+                result:$$uint = OpRayQueryGetRayFlagsKHR &this;
+            };
+        }
+    }
 
-    __target_intrinsic(glsl, rayQueryGetWorldRayOriginEXT)
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
-    [__readNone]
-    float3 WorldRayOrigin();
+    [__NoSideEffect]
+    float3 WorldRayOrigin()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".WorldRayOrigin";
+        case glsl: __intrinsic_asm "rayQueryGetWorldRayOriginEXT";
+        case spirv:
+            return spirv_asm {
+                result:$$float3 = OpRayQueryGetWorldRayOriginKHR &this;
+            };
+        }
+    }
 
-    __target_intrinsic(glsl, rayQueryGetWorldRayDirectionEXT)
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
-    [__readNone]
-    float3 WorldRayDirection();
+    [__NoSideEffect]
+    float3 WorldRayDirection()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".WorldRayDirection";
+        case glsl: __intrinsic_asm "rayQueryGetWorldRayDirectionEXT";
+        case spirv:
+            return spirv_asm {
+                result:$$float3 = OpRayQueryGetWorldRayDirectionKHR &this;
+            };
+        }
+    }
 
-    __target_intrinsic(glsl, rayQueryGetRayTMinEXT)
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
-    [__readNone]
-    float RayTMin();
+    [__NoSideEffect]
+    float RayTMin()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".RayTMin";
+        case glsl: __intrinsic_asm "rayQueryGetRayTMinEXT";
+        case spirv:
+            return spirv_asm {
+                result:$$float = OpRayQueryGetRayTMinKHR &this;
+            };
+        }
+    };
 }
 
 //
