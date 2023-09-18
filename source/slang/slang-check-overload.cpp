@@ -1510,7 +1510,6 @@ namespace Slang
             LookupResultItem innerItem;
             innerItem.breadcrumbs = genericItem.breadcrumbs;
             innerItem.declRef = innerRef;
-
             AddDeclRefOverloadCandidates(innerItem, context);
         }
         else
