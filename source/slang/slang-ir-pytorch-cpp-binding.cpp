@@ -581,6 +581,7 @@ void markTypeForPyExport(IRType* type, DiagnosticSink* sink)
 
 void generateReflectionForType(IRType* type, DiagnosticSink* sink)
 {
+    SLANG_UNUSED(sink);
     // Emit a function that returns a py::list.
     // The list will contain the names of all the fields of the type.
     //
@@ -870,6 +871,7 @@ void handleAutoBindNames(IRModule* module)
 
 void generateDerivativeWrappers(IRModule* module, DiagnosticSink* sink)
 {
+    SLANG_UNUSED(sink);
     for (auto globalInst : module->getGlobalInsts())
     {
         if (!as<IRFunc>(globalInst))
