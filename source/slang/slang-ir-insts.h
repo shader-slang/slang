@@ -595,6 +595,19 @@ struct IRAutoPyBindCudaDecoration : IRDecoration
 
 IR_SIMPLE_DECORATION(AutoPyBindExportInfoDecoration)
 
+struct IRPyExportDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_PyExportDecoration
+    };
+    IR_LEAF_ISA(PyExportDecoration)
+
+    IRStringLit* getExportNameOperand() { return cast<IRStringLit>(getOperand(0)); }
+    UnownedStringSlice getExportName() { return getExportNameOperand()->getStringSlice(); }
+};
+
+
 struct IRKnownBuiltinDecoration : IRDecoration
 {
     enum
@@ -4400,6 +4413,11 @@ public:
     void addAutoPyBindCudaDecoration(IRInst* value, UnownedStringSlice const& functionName)
     {
         addDecoration(value, kIROp_AutoPyBindCudaDecoration, getStringValue(functionName));
+    }
+
+    void addPyExportDecoration(IRInst* value, UnownedStringSlice const& exportName)
+    {
+        addDecoration(value, kIROp_PyExportDecoration, getStringValue(exportName));
     }
 
     void addCudaDeviceExportDecoration(IRInst* value, UnownedStringSlice const& functionName)

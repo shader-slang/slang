@@ -418,7 +418,7 @@ void generateReflectionFunc(IRBuilder* builder, IRFunc* kernelFunc, IRFunc* host
 
     // Go through func & generate a tuple of parameter names.
     List<IRInst*> paramNames;
-    List<IRType*> paramNameTypes;
+    List<IRInst*> paramTypeNames;
     UIndex paramCount = 0;
     for (auto param : hostFunc->getFirstBlock()->getParams())
     {
@@ -434,13 +434,39 @@ void generateReflectionFunc(IRBuilder* builder, IRFunc* kernelFunc, IRFunc* host
 
             paramNames.add(builder->emitGetNativeString(builder->getStringValue(argNameBuilder.getUnownedSlice())));
         }
-        paramNameTypes.add(builder->getNativeStringType());
         paramCount++;
     }
 
+    for (auto param : kernelFunc->getParams())
+    {
+        // Check for py-export decoration.
+        if (auto pyExportHint = param->getDataType()->findDecoration<IRPyExportDecoration>())
+        {
+            paramTypeNames.add(
+                builder->emitGetNativeString(
+                    builder->getStringValue(
+                        pyExportHint->getExportName())));
+        }
+        else
+        {
+            paramTypeNames.add(
+                builder->emitGetNativeString(
+                    builder->getStringValue(
+                        UnownedStringSlice(""))));
+        }
+    }
+
     // Create a target-tuple-type for the names
-    auto paramNamesTupleType = builder->getTargetTupleType((UInt)paramNameTypes.getCount(), paramNameTypes.getBuffer());
+    auto paramNamesTupleType = builder->getTargetTupleType(
+        (UInt)paramNames.getCount(),
+        List<IRType*>().makeRepeated(builder->getNativeStringType(), paramNames.getCount()).getBuffer());
     auto paramNamesTuple = builder->emitMakeTargetTuple(paramNamesTupleType, paramNames.getCount(), paramNames.getBuffer());
+
+    // Create a target-tuple-type for the type names
+    auto paramTypeNamesTupleType = builder->getTargetTupleType(
+        (UInt)paramTypeNames.getCount(),
+        List<IRType*>().makeRepeated(builder->getNativeStringType(), paramTypeNames.getCount()).getBuffer());
+    auto paramTypeNamesTuple = builder->emitMakeTargetTuple(paramTypeNamesTupleType, paramTypeNames.getCount(), paramTypeNames.getBuffer());
 
     // Find the fwd-diff function name (blank string indicates no fwd-diff)
     IRInst* fwdDiffName = builder->getStringValue(UnownedStringSlice(""));
@@ -467,15 +493,16 @@ void generateReflectionFunc(IRBuilder* builder, IRFunc* kernelFunc, IRFunc* host
     }
     
     auto stringType = builder->getNativeStringType();
-    auto returnTupleType = builder->getTargetTupleType(3, List<IRType*>(paramNamesTupleType, stringType, stringType).getBuffer());
+    auto returnTupleType = builder->getTargetTupleType(
+        4,
+        List<IRType*>(paramNamesTupleType, paramTypeNamesTupleType, stringType, stringType).getBuffer());
 
     // Create a target-tuple-type for the names
-    auto returnTupleArgs = List<IRInst*>( paramNamesTuple, fwdDiffName, bwdDiffName );
+    auto returnTupleArgs = List<IRInst*>( paramNamesTuple, paramTypeNamesTuple, fwdDiffName, bwdDiffName );
     auto returnTuple = builder->emitMakeTargetTuple(
         returnTupleType,
         returnTupleArgs.getCount(),
         returnTupleArgs.getBuffer());
-    
     builder->emitReturn(returnTuple);
 
     // Set function type.
@@ -515,6 +542,122 @@ IRInst* generateHostParamForCUDAParam(IRBuilder* builder, IRParam* param, Diagno
         return castedParam;
     
     return nullptr;
+}
+
+void markTypeForPyExport(IRType* type, DiagnosticSink* sink)
+{
+    // If it's a basic type, we're done.
+    if (as<IRBasicType>(type) || as<IRVoidType>(type))
+        return;
+    
+    // If it's a struct type, mark for py-export.
+    if (auto structType = as<IRStructType>(type))
+    {
+        IRBuilder builder(structType->getModule());
+
+        // If it already has a py-export decoration, we're done.
+        if (!structType->findDecoration<IRPyExportDecoration>())
+        {    
+            // Look for a name hint.
+            UnownedStringSlice nameHint;
+            if (auto nameHintDecoration = structType->findDecoration<IRNameHintDecoration>())
+                nameHint = nameHintDecoration->getName();
+            else
+            {
+                // If there's no name hint, we can't export this type.
+                SLANG_UNEXPECTED("struct marked for export has no name");
+            }
+
+            builder.addPyExportDecoration(structType, nameHint);
+        }
+
+        for (auto field : structType->getFields())
+        {
+            markTypeForPyExport(field->getFieldType(), sink);
+        }
+        return;
+    }
+}
+
+void generateReflectionForType(IRType* type, DiagnosticSink* sink)
+{
+    // Emit a function that returns a py::list.
+    // The list will contain the names of all the fields of the type.
+    //
+    
+    // TODO: Fix this to avoid emitting the same type reflection multiple times.
+    if (!type->findDecoration<IRPyExportDecoration>())
+        return;
+
+    IRBuilder builder(type->getModule());
+
+    auto reflFunc = builder.createFunc();
+    builder.setInsertInto(reflFunc);
+    builder.emitBlock();
+    
+    List<IRInst*> fieldNames;
+    List<IRInst*> fieldTypeNames;
+
+    switch (type->getOp())
+    {
+    case kIROp_StructType:
+    {
+        for (auto field : as<IRStructType>(type)->getFields())
+        {
+            auto structKey = field->getKey();
+            // Look for a name hint.
+            if (auto nameHintDecoration = structKey->findDecoration<IRNameHintDecoration>())
+                fieldNames.add(builder.emitGetNativeString(builder.getStringValue(nameHintDecoration->getName())));
+            else
+                fieldNames.add(builder.emitGetNativeString(builder.getStringValue(UnownedStringSlice(""))));
+
+            if (!field->getFieldType()->findDecoration<IRPyExportDecoration>())
+            {
+                fieldTypeNames.add(builder.emitGetNativeString(builder.getStringValue(UnownedStringSlice(""))));
+                continue;
+            }
+
+            auto fieldType = field->getFieldType();
+
+            fieldTypeNames.add(
+                builder.emitGetNativeString(
+                    builder.getStringValue(fieldType->findDecoration<IRPyExportDecoration>()->getExportName())));
+        }
+        break;
+    }
+    default:
+        break;
+    }
+
+    auto _nameListTupleType = builder.getTargetTupleType(
+        (UInt)fieldNames.getCount(),
+        List<IRType*>().makeRepeated(builder.getNativeStringType(), fieldNames.getCount()).getBuffer());
+    auto nameListTuple = builder.emitMakeTargetTuple(_nameListTupleType, (UInt)fieldNames.getCount(), fieldNames.getBuffer());
+
+    auto _typeNameListTupleType = builder.getTargetTupleType(
+        (UInt)fieldTypeNames.getCount(),
+        List<IRType*>().makeRepeated(builder.getNativeStringType(), fieldTypeNames.getCount()).getBuffer());
+    auto typeNameListTuple = builder.emitMakeTargetTuple(_typeNameListTupleType, (UInt)fieldTypeNames.getCount(), fieldTypeNames.getBuffer());
+
+    auto _nameAndTypeTupleType = builder.getTargetTupleType(2, List<IRType*>(_nameListTupleType, _typeNameListTupleType).getBuffer());
+    auto nameAndTypeTuple = builder.emitMakeTargetTuple(
+        _nameAndTypeTupleType,
+        2,
+        List<IRInst*>(nameListTuple, typeNameListTuple).getBuffer());
+    builder.emitReturn(nameAndTypeTuple);
+
+    // Set function type.
+    auto funcType = builder.getFuncType(List<IRType*>(), _nameAndTypeTupleType);
+    reflFunc->setFullType(funcType);
+
+    // Set function name.
+    StringBuilder reflFuncExportName;
+    reflFuncExportName << "__typeinfo__" << type->findDecoration<IRPyExportDecoration>()->getExportName();
+ 
+    builder.addTorchEntryPointDecoration(reflFunc, reflFuncExportName.getUnownedSlice());
+    builder.addExternCppDecoration(reflFunc, reflFuncExportName.getUnownedSlice());
+    builder.addPublicDecoration(reflFunc);
+    builder.addKeepAliveDecoration(reflFunc);
 }
 
 IRFunc* generateCUDAWrapperForFunc(IRFunc* func, DiagnosticSink* sink)
@@ -568,6 +711,7 @@ IRFunc* generateCUDAWrapperForFunc(IRFunc* func, DiagnosticSink* sink)
         IRType* hostParamType;
         mappedParams.add(generateHostParamForCUDAParam(&builder, param, sink, &hostParamType)); 
         hostParamTypes.add(hostParamType);
+        markTypeForPyExport(param->getDataType(), sink); // Should we be marking the host type?
     }
 
     // Dispatch the original function.
@@ -615,35 +759,35 @@ void generatePyTorchCppBinding(IRModule* module, DiagnosticSink* sink)
     List<IRFunc*> workList;
     List<IRFunc*> cudaKernels;
     List<IRFunc*> autoBindRequests;
+    List<IRType*> typesToExport;
     for (auto globalInst : module->getGlobalInsts())
     {
-        auto func = as<IRFunc>(globalInst);
-        if (!func)
-            continue;
-        if (func->findDecoration<IRAutoPyBindCudaDecoration>())
+        if (auto func = as<IRFunc>(globalInst))
         {
-            autoBindRequests.add(func);
-        }
-
-        if (func->findDecoration<IRTorchEntryPointDecoration>())
-        {
-            workList.add(func);
-        }
-        else if (func->findDecoration<IRCudaKernelDecoration>())
-        {
-            cudaKernels.add(func);
-        }
-        else
-        {
-            // Remove all other export decorations if this is not a cuda host func.
-            if (auto decor = func->findDecoration<IRPublicDecoration>())
-                decor->removeAndDeallocate();
-            if (auto decor = func->findDecoration<IRHLSLExportDecoration>())
-                decor->removeAndDeallocate();
-            if (auto decor = func->findDecoration<IRKeepAliveDecoration>())
-                decor->removeAndDeallocate();
-            if (auto decor = func->findDecoration<IRDllExportDecoration>())
-                decor->removeAndDeallocate();
+            if (func->findDecoration<IRAutoPyBindCudaDecoration>())
+            {
+                autoBindRequests.add(func);
+            }
+            if (func->findDecoration<IRTorchEntryPointDecoration>())
+            {
+                workList.add(func);
+            }
+            else if (func->findDecoration<IRCudaKernelDecoration>())
+            {
+                cudaKernels.add(func);
+            }
+            else
+            {
+                // Remove all other export decorations if this is not a cuda host func.
+                if (auto decor = func->findDecoration<IRPublicDecoration>())
+                    decor->removeAndDeallocate();
+                if (auto decor = func->findDecoration<IRHLSLExportDecoration>())
+                    decor->removeAndDeallocate();
+                if (auto decor = func->findDecoration<IRKeepAliveDecoration>())
+                    decor->removeAndDeallocate();
+                if (auto decor = func->findDecoration<IRDllExportDecoration>())
+                    decor->removeAndDeallocate();
+            }
         }
     }
 
@@ -669,6 +813,20 @@ void generatePyTorchCppBinding(IRModule* module, DiagnosticSink* sink)
             block = nextBlock;
         }
     }
+
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        if (auto type = as<IRType>(globalInst))
+        {
+            if (type->findDecoration<IRPyExportDecoration>())
+            {
+                typesToExport.add(type);
+            }
+        }
+    }
+
+    for (auto type : typesToExport)
+        generateReflectionForType(type, sink);
 }
 
 // Remove all [TorchEntryPoint] functions when emitting CUDA source.

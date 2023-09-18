@@ -723,6 +723,7 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(CudaKernelForwardDerivativeDecoration,          CudaKernelFwdDiffRef,         0, 0)
     INST(CudaKernelBackwardDerivativeDecoration,         CudaKernelBwdDiffRef,         0, 0)
     INST(AutoPyBindExportInfoDecoration,    PyBindExportFuncInfo,   0, 0)
+    INST(PyExportDecoration,    PyExportDecoration,   0, 0)
     
         /// Used to mark parameters that are moved from entry point parameters to global params as coming from the entry point.
     INST(EntryPointParamDecoration,         entryPointParam,        0, 0)

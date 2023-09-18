@@ -2266,6 +2266,9 @@ attribute_syntax [CudaKernel] : CudaKernelAttribute;
 __attributeTarget(FuncDecl)
 attribute_syntax[AutoPyBindCUDA] : AutoPyBindCudaAttribute;
 
+__attributeTarget(AggTypeDecl)
+attribute_syntax [PyExport(name: String)] : PyExportAttribute;
+
 __attributeTarget(InterfaceDecl)
 attribute_syntax [COM(guid: String)] : ComInterfaceAttribute;
 

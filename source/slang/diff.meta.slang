@@ -264,22 +264,58 @@ extension TensorView<float>
     void InterlockedCompareExchange(vector<uint, N> index, float compare, float val);
 }
 
-__generic<T : __BuiltinFloatingPointType>
+interface IDiffTensorWrapper
+{
+    __generic<T : __BuiltinFloatingPointType>
+    T load_forward(uint offset);
+
+    __generic<T : __BuiltinFloatingPointType>
+    void load_backward(uint offset, T dOut);
+
+    __generic<T : __BuiltinFloatingPointType>
+    void store_forward(uint offset, T dx);
+
+    __generic<T : __BuiltinFloatingPointType>
+    T store_backward(uint offset);
+};
+
+struct AtomicAdd : IDiffTensorWrapper
+{
+    TensorView<float> diff;
+
+    __generic<T : __BuiltinFloatingPointType>
+    T load_forward(uint x)
+    {
+        return __realCast<T, float>(diff.load(x));
+    }
+
+    __generic<T : __BuiltinFloatingPointType>
+    void load_backward(uint x, T dOut)
+    {
+        float oldVal;
+        diff.InterlockedAdd(x, __realCast<float, T>(dOut), oldVal);
+    }
+
+    __generic<T : __BuiltinFloatingPointType>
+    void store_forward(uint x, T dx)
+    {
+        diff.store(x, __realCast<float, T>(dx));
+    }
+
+    __generic<T : __BuiltinFloatingPointType>
+    T store_backward(uint x)
+    {
+        float oldVal;
+        diff.InterlockedExchange(x, (float)0, oldVal);
+        return __realCast<T, float>(oldVal);
+    }
+};
+
+__generic<T: __BuiltinFloatingPointType, A : IDiffTensorWrapper>
 struct DiffTensorView
 {
     TensorView<T> primal;
-    TensorView<T> diff;
-
-    __init(TensorView<T> primal)
-    {
-        this.primal = primal;
-    }
-
-    __init(TensorView<T> primal, TensorView<T> diff)
-    {
-        this.primal = primal;
-        this.diff = diff;
-    }
+    A diff;
 
     uint size(uint i)
     {
@@ -292,48 +328,27 @@ struct DiffTensorView
 
     DifferentialPair<T> load_forward(uint x)
     {
-        return diffPair(primal.load(x), reinterpret<T.Differential, T>(diff.load(x)));
+        return diffPair(primal.load(x), reinterpret<T.Differential, T>(diff.load_forward<T>(x)));
     }
 
     void load_backward(uint x, T.Differential dOut)
     {
-        T oldVal;
-        diff.InterlockedAdd(x, reinterpret<T, T.Differential>(dOut), oldVal);
+        diff.load_backward<T>(x, reinterpret<T, T.Differential>(dOut));
     }
 
-    [BackwardDerivative(storeOnce_backward)]
-    [ForwardDerivative(storeOnce_forward)]
-    void storeOnce(uint x, T val) { primal.store(x, val); }
-
-    void storeOnce_forward(uint x, DifferentialPair<T> dpval)
-    {
-        primal.store(x, dpval.p);
-        diff.store(x, reinterpret<T, T.Differential>(dpval.d));
-    }
-
-    void storeOnce_backward(uint x, inout DifferentialPair<T> dpval)
-    {
-        dpval = diffPair(dpval.p, reinterpret<T.Differential, T>(diff.load(x)));
-    }
-};
-
-extension DiffTensorViewAA<float>
-{
     [BackwardDerivative(store_backward)]
     [ForwardDerivative(store_forward)]
-    void store(uint x, float val) { primal.store(x, val); }
+    void store(uint x, T val) { primal.store(x, val); }
 
-    void store_forward(uint x, DifferentialPair<float> dpval)
+    void store_forward(uint x, DifferentialPair<T> dpval)
     {
         primal.store(x, dpval.p);
-        diff.store(x, dpval.d);
+        diff.store_forward<T>(x, reinterpret<T, T.Differential>(dpval.d));
     }
 
-    void store_backward(uint x, inout DifferentialPair<float> dpval)
+    void store_backward(uint x, inout DifferentialPair<T> dpval)
     {
-        float dval;
-        diff.InterlockedExchange(x, (float)0, dval);
-        dpval = diffPair(dpval.p, dval);
+        dpval = diffPair(dpval.p, reinterpret<T.Differential, T>(diff.store_backward<T>(x)));
     }
 };
 
