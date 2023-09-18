@@ -9,7 +9,7 @@ standard output = {
 ; Schema: 0
                OpCapability Shader
                OpMemoryModel Logical GLSL450
-               OpEntryPoint GLCompute %computeMain "computeMain"
+               OpEntryPoint GLCompute %computeMain "main"
                OpExecutionMode %computeMain LocalSize 4 1 1
 
                ; Debug Information

@@ -221,13 +221,15 @@ Result SwapchainImpl::init(DeviceImpl* renderer, const ISwapchain::Desc& desc, W
     surfaceCreateInfo.hwnd = (HWND)window.handleValues[0];
     SLANG_VK_RETURN_ON_FAIL(
         m_api->vkCreateWin32SurfaceKHR(m_api->m_instance, &surfaceCreateInfo, nullptr, &m_surface));
-#else
+#elif SLANG_ENABLE_XLIB
     VkXlibSurfaceCreateInfoKHR surfaceCreateInfo = {};
     surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR;
     surfaceCreateInfo.dpy = (Display*)window.handleValues[0];
     surfaceCreateInfo.window = (Window)window.handleValues[1];
     SLANG_VK_RETURN_ON_FAIL(
         m_api->vkCreateXlibSurfaceKHR(m_api->m_instance, &surfaceCreateInfo, nullptr, &m_surface));
+#else
+    return SLANG_E_NOT_AVAILABLE;
 #endif
 
     VkBool32 supported = false;

@@ -454,6 +454,7 @@ struct IREntryPointDecoration : IRDecoration
 
     IRStringLit* getName()  { return cast<IRStringLit>(getOperand(1)); }
     IRStringLit* getModuleName() { return cast<IRStringLit>(getOperand(2)); }
+    void setName(IRStringLit* name) { setOperand(1, name); }
 };
 
 IR_SIMPLE_DECORATION(CudaHostDecoration)

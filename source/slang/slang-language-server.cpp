@@ -910,6 +910,8 @@ SlangResult LanguageServer::completion(
     // Always create a new workspace version for the completion request since we
     // will use a modified source.
     auto version = m_workspace->createVersionForCompletion();
+    SLANG_AST_BUILDER_RAII(version->linkage->getASTBuilder());
+
     auto moduleName = getMangledNameFromNameString(canonicalPath.getUnownedSlice());
     version->linkage->contentAssistInfo.cursorLine = utf8Line;
     version->linkage->contentAssistInfo.cursorCol = utf8Col;
@@ -1007,6 +1009,7 @@ SlangResult LanguageServer::completionResolve(
         m_connection->sendResult(&resolvedItem, responseId);
         return SLANG_OK;
     }
+    SLANG_AST_BUILDER_RAII(version->linkage->getASTBuilder());
     auto& candidateItems = version->linkage->contentAssistInfo.completionSuggestions.candidateItems;
     if (itemId >= 0 && itemId < candidateItems.getCount())
     {
