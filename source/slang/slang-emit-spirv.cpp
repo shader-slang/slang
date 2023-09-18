@@ -1282,7 +1282,7 @@ struct SPIRVEmitContext
                 else
                 {
                     IRSizeAndAlignment sizeAndAlignment;
-                    getNaturalSizeAndAlignment(elementType, &sizeAndAlignment);
+                    getNaturalSizeAndAlignment(m_targetRequest, elementType, &sizeAndAlignment);
                     stride = (int)sizeAndAlignment.getStride();
                 }
                 emitOpDecorateArrayStride(
@@ -2127,7 +2127,21 @@ struct SPIRVEmitContext
             return emitOpUndef(parent, inst, inst->getDataType());
         case kIROp_SPIRVAsm:
             return emitSPIRVAsm(parent, as<IRSPIRVAsm>(inst));
+        case kIROp_ImageLoad:
+            return emitImageLoad(parent, as<IRImageLoad>(inst));
+        case kIROp_ImageStore:
+            return emitImageStore(parent, as<IRImageStore>(inst));
         }
+    }
+
+    SpvInst* emitImageLoad(SpvInstParent* parent, IRImageLoad* load)
+    {
+        return emitInst(parent, load, SpvOpImageRead, load->getDataType(), kResultID, load->getImage(), load->getCoord());
+    }
+
+    SpvInst* emitImageStore(SpvInstParent* parent, IRImageStore* store)
+    {
+        return emitInst(parent, store, SpvOpImageWrite, store->getImage(), store->getCoord(), store->getValue());
     }
 
     SpvInst* emitGetStringHash(IRInst* inst)
@@ -2415,7 +2429,7 @@ struct SPIRVEmitContext
             }
             else
             {
-                getOffset(IRTypeLayoutRules::get(layoutRuleName), field, &offset);
+                getOffset(m_targetRequest, IRTypeLayoutRules::get(layoutRuleName), field, &offset);
             }
             emitOpMemberDecorateOffset(
                 getSection(SpvLogicalSectionID::Annotations),
@@ -2440,7 +2454,7 @@ struct SPIRVEmitContext
                 IRIntegerValue matrixStride = 0;
                 auto rule = IRTypeLayoutRules::get(layoutRuleName);
                 IRSizeAndAlignment elementSizeAlignment;
-                getSizeAndAlignment(rule, matrixType->getElementType(), &elementSizeAlignment);
+                getSizeAndAlignment(m_targetRequest, rule, matrixType->getElementType(), &elementSizeAlignment);
 
                 // Reminder: the meaning of row/column major layout
                 // in our semantics is the *opposite* of what GLSL/SPIRV

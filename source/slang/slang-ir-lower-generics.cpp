@@ -217,7 +217,7 @@ namespace Slang
 
         checkTypeConformanceExists(&sharedContext);
 
-        inferAnyValueSizeWhereNecessary(module);
+        inferAnyValueSizeWhereNecessary(targetReq, module);
 
         // Replace all `makeExistential` insts with `makeExistentialWithRTTI`
         // before making any other changes. This is necessary because a parameter of

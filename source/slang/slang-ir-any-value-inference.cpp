@@ -86,6 +86,7 @@ namespace Slang
     }
 
     void inferAnyValueSizeWhereNecessary(
+        TargetRequest* targetReq,
         IRModule* module)
     {
         // Go through the global insts and collect all interface types.
@@ -212,7 +213,7 @@ namespace Slang
             for (auto implType : mapInterfaceToImplementations[interfaceType])
             {                            
                 IRSizeAndAlignment sizeAndAlignment;
-                getNaturalSizeAndAlignment((IRType*)implType, &sizeAndAlignment);
+                getNaturalSizeAndAlignment(targetReq, (IRType*)implType, &sizeAndAlignment);
                 
                 maxAnyValueSize = Math::Max(maxAnyValueSize, sizeAndAlignment.size);
             }

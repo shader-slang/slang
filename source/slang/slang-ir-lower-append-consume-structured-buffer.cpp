@@ -42,7 +42,7 @@ namespace Slang
 
         IRTypeLayout::Builder elementTypeLayoutBuilder(&builder);
         IRSizeAndAlignment elementSize;
-        getSizeAndAlignment(layoutRules, elementType, &elementSize);
+        getSizeAndAlignment(target, layoutRules, elementType, &elementSize);
         elementTypeLayoutBuilder.addResourceUsage(LayoutResourceKind::Uniform, LayoutSize((LayoutSize::RawValue)elementSize.getStride()));
         auto elementTypeLayout = elementTypeLayoutBuilder.build();
 
