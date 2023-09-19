@@ -257,7 +257,7 @@ namespace Slang
                 auto vectorType = builder.getVectorType(matrixType->getElementType(),
                     isColMajor?matrixType->getRowCount():matrixType->getColumnCount());
                 IRSizeAndAlignment elementSizeAlignment;
-                getSizeAndAlignment(rules, vectorType, &elementSizeAlignment);
+                getSizeAndAlignment(target, rules, vectorType, &elementSizeAlignment);
                 elementSizeAlignment = rules->alignCompositeElement(elementSizeAlignment);
 
                 auto arrayType = builder.getArrayType(
@@ -297,7 +297,7 @@ namespace Slang
                 auto structKey = builder.createStructKey();
                 builder.addNameHintDecoration(structKey, UnownedStringSlice("data"));
                 IRSizeAndAlignment elementSizeAlignment;
-                getSizeAndAlignment(rules, loweredInnerTypeInfo.loweredType, &elementSizeAlignment);
+                getSizeAndAlignment(target, rules, loweredInnerTypeInfo.loweredType, &elementSizeAlignment);
                 elementSizeAlignment = rules->alignCompositeElement(elementSizeAlignment);
                 auto innerArrayType = builder.getArrayType(
                     loweredInnerTypeInfo.loweredType,
@@ -456,7 +456,7 @@ namespace Slang
                 return info;
             info = getLoweredTypeInfoImpl(type, rules);
             IRSizeAndAlignment sizeAlignment;
-            getSizeAndAlignment(rules, info.loweredType, &sizeAlignment);
+            getSizeAndAlignment(target, rules, info.loweredType, &sizeAlignment);
             loweredTypeInfo[(int)rules->ruleName].set(type, info);
             mapLoweredTypeToInfo[(int)rules->ruleName].set(info.loweredType, info);
             return info;

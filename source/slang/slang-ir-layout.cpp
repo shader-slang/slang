@@ -51,6 +51,7 @@
 namespace Slang
 {
 static Result _calcArraySizeAndAlignment(
+    TargetRequest* target,
     IRTypeLayoutRules* rules,
     IRType* elementType,
     IRInst* elementCountInst,
@@ -68,7 +69,7 @@ static Result _calcArraySizeAndAlignment(
     }
 
     IRSizeAndAlignment elementTypeLayout;
-    SLANG_RETURN_ON_FAIL(getSizeAndAlignment(rules, elementType, &elementTypeLayout));
+    SLANG_RETURN_ON_FAIL(getSizeAndAlignment(target, rules, elementType, &elementTypeLayout));
 
     elementTypeLayout = rules->alignCompositeElement(elementTypeLayout);
     *outSizeAndAlignment = IRSizeAndAlignment(
@@ -84,10 +85,21 @@ IRIntegerValue getIntegerValueFromInst(IRInst* inst)
 }
 
 static Result _calcSizeAndAlignment(
+    TargetRequest* target,
     IRTypeLayoutRules* rules,
     IRType* type,
     IRSizeAndAlignment* outSizeAndAlignment)
 {
+    int kPointerSize = 8;
+    switch (target->getTarget())
+    {
+    case CodeGenTarget::HostCPPSource:
+    case CodeGenTarget::HostHostCallable:
+    case CodeGenTarget::HostExecutable:
+        kPointerSize = (int)sizeof(void*);
+        break;
+    }
+
     switch (type->getOp())
     {
 
@@ -113,8 +125,8 @@ case kIROp_##TYPE##Type:                                        \
 
         BASE(Int64, 8);
         BASE(UInt64, 8);
-        BASE(IntPtr, 8);
-        BASE(UIntPtr, 8);
+        BASE(IntPtr, kPointerSize);
+        BASE(UIntPtr, kPointerSize);
         BASE(Double, 8);
 
         // We are currently handling `bool` following the HLSL
@@ -143,7 +155,7 @@ case kIROp_##TYPE##Type:                                        \
         for (auto field : structType->getFields())
         {
             IRSizeAndAlignment fieldTypeLayout;
-            SLANG_RETURN_ON_FAIL(getSizeAndAlignment(rules, field->getFieldType(), &fieldTypeLayout));
+            SLANG_RETURN_ON_FAIL(getSizeAndAlignment(target, rules, field->getFieldType(), &fieldTypeLayout));
             structLayout.size = align(offset, fieldTypeLayout.alignment);
             structLayout.alignment = std::max(structLayout.alignment, fieldTypeLayout.alignment);
 
@@ -182,6 +194,7 @@ case kIROp_##TYPE##Type:                                        \
         auto arrayType = cast<IRArrayType>(type);
 
         return _calcArraySizeAndAlignment(
+            target,
             rules ,
             arrayType->getElementType(),
             arrayType->getElementCount(),
@@ -193,7 +206,7 @@ case kIROp_##TYPE##Type:                                        \
     {
         auto vecType = cast<IRVectorType>(type);
         IRSizeAndAlignment elementTypeLayout;
-        getSizeAndAlignment(rules, vecType->getElementType(), &elementTypeLayout);
+        getSizeAndAlignment(target, rules, vecType->getElementType(), &elementTypeLayout);
         *outSizeAndAlignment = rules->getVectorSizeAndAlignment(elementTypeLayout, getIntegerValueFromInst(vecType->getElementCount()));
         return SLANG_OK;
     }
@@ -215,7 +228,7 @@ case kIROp_##TYPE##Type:                                        \
         {
             auto elementType = tupleType->getOperand(i);
             IRSizeAndAlignment fieldTypeLayout;
-            SLANG_RETURN_ON_FAIL(getSizeAndAlignment(rules, (IRType*)elementType, &fieldTypeLayout));
+            SLANG_RETURN_ON_FAIL(getSizeAndAlignment(target, rules, (IRType*)elementType, &fieldTypeLayout));
             resultLayout.size = align(resultLayout.size, fieldTypeLayout.alignment);
             resultLayout.alignment = std::max(resultLayout.alignment, fieldTypeLayout.alignment);
         }
@@ -253,6 +266,7 @@ case kIROp_##TYPE##Type:                                        \
         {
             auto colVector = builder.getVectorType(matType->getElementType(), matType->getRowCount());
             return _calcArraySizeAndAlignment(
+                target,
                 rules,
                 colVector,
                 matType->getColumnCount(),
@@ -262,6 +276,7 @@ case kIROp_##TYPE##Type:                                        \
         {
             auto rowVector = builder.getVectorType(matType->getElementType(), matType->getColumnCount());
             return _calcArraySizeAndAlignment(
+                target,
                 rules,
                 rowVector,
                 matType->getRowCount(),
@@ -279,7 +294,7 @@ case kIROp_##TYPE##Type:                                        \
     case kIROp_NativeStringType:
     case kIROp_HLSLConstBufferPointerType:
     {
-        *outSizeAndAlignment = IRSizeAndAlignment(8, 8);
+        *outSizeAndAlignment = IRSizeAndAlignment(kPointerSize, kPointerSize);
         return SLANG_OK;
     }
     break;
@@ -307,7 +322,7 @@ IRSizeAndAlignmentDecoration* findSizeAndAlignmentDecorationForLayout(IRType* ty
     return nullptr;
 }
 
-Result getSizeAndAlignment(IRTypeLayoutRules* rules, IRType* type, IRSizeAndAlignment* outSizeAndAlignment)
+Result getSizeAndAlignment(TargetRequest* target, IRTypeLayoutRules* rules, IRType* type, IRSizeAndAlignment* outSizeAndAlignment)
 {
     if (auto decor = findSizeAndAlignmentDecorationForLayout(type, rules->ruleName))
     {
@@ -316,7 +331,7 @@ Result getSizeAndAlignment(IRTypeLayoutRules* rules, IRType* type, IRSizeAndAlig
     }
 
     IRSizeAndAlignment sizeAndAlignment;
-    SLANG_RETURN_ON_FAIL(_calcSizeAndAlignment(rules, type, &sizeAndAlignment));
+    SLANG_RETURN_ON_FAIL(_calcSizeAndAlignment(target, rules, type, &sizeAndAlignment));
 
     if (auto module = type->getModule())
     {
@@ -347,7 +362,7 @@ IROffsetDecoration* findOffsetDecorationForLayout(IRStructField* field, IRTypeLa
     return nullptr;
 }
 
-Result getOffset(IRTypeLayoutRules* rules, IRStructField* field, IRIntegerValue* outOffset)
+Result getOffset(TargetRequest* target, IRTypeLayoutRules* rules, IRStructField* field, IRIntegerValue* outOffset)
 {
     if (auto decor = findOffsetDecorationForLayout(field, rules->ruleName))
     {
@@ -365,7 +380,7 @@ Result getOffset(IRTypeLayoutRules* rules, IRStructField* field, IRIntegerValue*
         return SLANG_FAIL;
 
     IRSizeAndAlignment structTypeLayout;
-    SLANG_RETURN_ON_FAIL(getSizeAndAlignment(rules, structType, &structTypeLayout));
+    SLANG_RETURN_ON_FAIL(getSizeAndAlignment(target, rules, structType, &structTypeLayout));
 
     if (auto decor = findOffsetDecorationForLayout(field, rules->ruleName))
     {
@@ -451,15 +466,15 @@ struct Std140LayoutRules : IRTypeLayoutRules
     }
 };
 
-Result getNaturalSizeAndAlignment(IRType* type, IRSizeAndAlignment* outSizeAndAlignment)
+Result getNaturalSizeAndAlignment(TargetRequest* target, IRType* type, IRSizeAndAlignment* outSizeAndAlignment)
 {
-    return getSizeAndAlignment(IRTypeLayoutRules::getNatural(), type, outSizeAndAlignment);
+    return getSizeAndAlignment(target, IRTypeLayoutRules::getNatural(), type, outSizeAndAlignment);
 
 }
 
-Result getNaturalOffset(IRStructField* field, IRIntegerValue* outOffset)
+Result getNaturalOffset(TargetRequest* target, IRStructField* field, IRIntegerValue* outOffset)
 {
-    return getOffset(IRTypeLayoutRules::getNatural(), field, outOffset);
+    return getOffset(target, IRTypeLayoutRules::getNatural(), field, outOffset);
 }
 
 
@@ -467,14 +482,14 @@ Result getNaturalOffset(IRStructField* field, IRIntegerValue* outOffset)
 // Std430 Layout
 //////////////////////////
 
-Result getStd430SizeAndAlignment(IRType* type, IRSizeAndAlignment* outSizeAndAlignment)
+Result getStd430SizeAndAlignment(TargetRequest* target, IRType* type, IRSizeAndAlignment* outSizeAndAlignment)
 {
-    return getSizeAndAlignment(IRTypeLayoutRules::getStd430(), type, outSizeAndAlignment);
+    return getSizeAndAlignment(target, IRTypeLayoutRules::getStd430(), type, outSizeAndAlignment);
 }
 
-Result getStd430Offset(IRStructField* field, IRIntegerValue* outOffset)
+Result getStd430Offset(TargetRequest* target, IRStructField* field, IRIntegerValue* outOffset)
 {
-    return getOffset(IRTypeLayoutRules::getStd430(), field, outOffset);
+    return getOffset(target, IRTypeLayoutRules::getStd430(), field, outOffset);
 }
 
 IRTypeLayoutRules* IRTypeLayoutRules::getStd430()
