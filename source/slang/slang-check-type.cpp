@@ -321,7 +321,13 @@ namespace Slang
                     if (!witness)
                     {
                         // diagnose
-                        SLANG_ABORT_COMPILATION("unexpected");
+                        getSink()->diagnose(
+                            genericTypeParamDecl->initType.exp,
+                            Diagnostics::typeArgumentDoesNotConformToInterface,
+                            defaultType,
+                            constraintParam->sup);
+
+                        SLANG_UNEXPECTED("default type argument does not conform to interface");
                         return false;
                     }
                     witnessArgs.add(witness);
