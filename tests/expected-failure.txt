@@ -1,5 +1,4 @@
 tests/autodiff/global-param-hoisting.slang.1 (vk)
-tests/bugs/buffer-swizzle-store.slang.1 (vk)
 tests/language-feature/constants/constexpr-loop.slang.1 (vk)
 tests/optimization/func-resource-result/func-resource-result-complex.slang.1 (vk)
 tests/type/texture-sampler/texture-sampler-2d.slang (vk)
