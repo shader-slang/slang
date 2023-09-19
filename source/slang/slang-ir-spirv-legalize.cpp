@@ -210,6 +210,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             return true;
         if (as<IRSamplerStateTypeBase>(type))
             return true;
+        if (const auto arr = as<IRArrayTypeBase>(type))
+            return isSpirvUniformConstantType(arr->getElementType());
         switch (type->getOp())
         {
         case kIROp_RaytracingAccelerationStructureType:
