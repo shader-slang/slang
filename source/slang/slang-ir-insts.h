@@ -4021,7 +4021,7 @@ public:
     IRSPIRVAsmOperand* emitSPIRVAsmOperandGLSL450Set();
     IRSPIRVAsmOperand* emitSPIRVAsmOperandSampledType(IRType* elementType);
     IRSPIRVAsmOperand* emitSPIRVAsmOperandTruncate();
-    IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandEntryPoint();
+    IRSPIRVAsmOperand* emitSPIRVAsmOperandEntryPoint();
     IRSPIRVAsmInst* emitSPIRVAsmInst(IRInst* opcode, List<IRInst*> operands);
     IRSPIRVAsm* emitSPIRVAsm(IRType* type);
     IRInst* emitGenericAsm(UnownedStringSlice asmText);
