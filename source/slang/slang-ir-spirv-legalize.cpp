@@ -254,8 +254,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
             // Opaque resource handles can't be in Uniform for Vulkan, if they are
             // placed here then put them in UniformConstant instead
-            if (storageClass == SpvStorageClassUniform
-                && isSpirvUniformConstantType(inst->getDataType()))
+            if (isSpirvUniformConstantType(inst->getDataType()))
             {
                 storageClass = SpvStorageClassUniformConstant;
             }
