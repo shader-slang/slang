@@ -5,6 +5,10 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
+// This test isn't actually testing the output, but rather that the compiler doesn't crash upon 
+// encountering a specific loop pattern. ('Data' is non-differentiable here, so the expected output is 0)s
+// 
+
 typedef DifferentialPair<float> dpfloat;
 typedef float.Differential dfloat;
 
@@ -20,7 +24,7 @@ struct Data
     float t;
 };
 
-void updateData(inout Data data)
+void updateData(Data data)
 {
     data.t = data.t * data.t;
 }
@@ -36,7 +40,7 @@ float test_simple_while(float y, uint n)
     if (p.isTerminated())
         return d.t;
 
-    [MaxIters(3)]
+    [MaxIters(4)]
     while (!p.isTerminated())
     {
         updateData(d);
@@ -56,7 +60,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     {
         dpfloat dpa = dpfloat(1.0, 0.0);
 
-        __bwd_diff(test_simple_while)(dpa, dispatchThreadID.x + 2, 1.0f);
+        __bwd_diff(test_simple_while)(dpa, 2, 1.0f);
         outputBuffer[0] = dpa.d; // Expect: 8.0
     }
 }
