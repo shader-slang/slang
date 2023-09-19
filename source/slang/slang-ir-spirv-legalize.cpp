@@ -184,7 +184,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 // just prior to the block.
                 const auto asmBlock = spirvAsmOperand->getAsmBlock();
                 builder.setInsertBefore(asmBlock);
-                auto loadedValue = builder.emitLoad(addrInst);
+                auto loadedValue = builder.emitLoad(addr);
                 builder.setInsertBefore(spirvAsmOperand);
                 auto loadedValueOperand = builder.emitSPIRVAsmOperandInst(loadedValue);
                 spirvAsmOperand->replaceUsesWith(loadedValueOperand);
@@ -377,23 +377,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 traverseUses(inst, [&](IRUse* use)
                     {
                         insertLoadAtLatestLocation(inst, use);
-                    });
-            }
-            else if (arraySize)
-            {
-                traverseUses(inst, [&](IRUse* use)
-                    {
-                        auto user = use->getUser();
-                        if (auto getElement = as<IRGetElement>(user))
-                        {
-                            // For array resources, getElement(r, index) ==> getElementPtr(r, index).
-                            IRBuilder builder(getElement);
-                            builder.setInsertBefore(user);
-                            auto newAddr = builder.emitElementAddress(builder.getPtrType(kIROp_PtrType, innerElementType, storageClass), inst, getElement->getIndex());
-                            user->replaceUsesWith(newAddr);
-                            user->removeAndDeallocate();
-                            return;
-                        }
                     });
             }
         }
