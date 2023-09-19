@@ -25,7 +25,7 @@ float sin_series(float x, int iterations)
 // This differs from ./long-loop.slang in that it uses an equivalent do/while
 // loop, this tests checks that induction variables are still correctly identified.
 
-// CHECK: struct s_bwd_sin_series_Intermediates
+// CHECK: struct s_bwd_prop_sin_series_Intermediates
 // CHECK-NOT: int {{[A-Za-z0-9_]+}}[{{.*}}]
 // CHECK: }
 

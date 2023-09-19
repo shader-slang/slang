@@ -16,7 +16,7 @@ struct A : IDifferentiable
 // loop state.
 // 
 
-// CHECK: struct s_bwd_B_eval_Intermediates_0
+// CHECK: struct s_bwd_prop_B_eval_Intermediates_0
 // CHECK-NOT: int {{[A-Za-z0-9_]+}}[{{.*}}]
 // CHECK: }
 

@@ -21,7 +21,7 @@ float sin_series(float x, int iterations)
 
 // Check that the intermediate context of sin_series does not have an array for `i`.
 
-// CHECK: struct s_bwd_sin_series_Intermediates
+// CHECK: struct s_bwd_prop_sin_series_Intermediates
 // CHECK-NOT: int {{[A-Za-z0-9_]+}}[{{.*}}]
 // CHECK: }
 

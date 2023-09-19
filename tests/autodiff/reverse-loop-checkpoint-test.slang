@@ -31,7 +31,7 @@ float infinitesimal(float x)
 
 // Test that computeLoop's intermediates have no float sitting
 // around (must not cache the outvar from 'compute()')
-// CHECK: struct s_bwd_computeLoop_Intermediates
+// CHECK: struct s_bwd_prop_computeLoop_Intermediates
 // CHECK-NEXT: {
 // CHECK-NOT: {{[A-Za-z0-9_]+}} {{[A-Za-z0-9_]+}}[{{.*}}]
 // CHECK: }
