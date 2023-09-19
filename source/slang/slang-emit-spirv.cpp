@@ -1293,144 +1293,14 @@ struct SPIRVEmitContext
                 return arrayType;
             }
         case kIROp_TextureType:
-            {
-                // Some untyped constants from OpTypeImage
-                // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypeImage
-
-                // indicates not a depth image
-                [[maybe_unused]]
-                const SpvWord notDepthImage = 0;
-                // indicates a depth image
-                [[maybe_unused]]
-                const SpvWord isDepthImage = 1;
-                // means no indication as to whether this is a depth or non-depth image
-                const SpvWord unknownDepthImage = 2;
-
-                // indicates non-arrayed content
-                const SpvWord notArrayed = 0;
-                // indicates arrayed content
-                const SpvWord isArrayed = 1;
-
-                // indicates single-sampled content
-                const SpvWord notMultisampled = 0;
-                // indicates multisampled content
-                const SpvWord isMultisampled = 1;
-
-                // indicates this is only known at run time, not at compile time
-                const SpvWord sampledUnknown = 0;
-                // indicates an image compatible with sampling operations
-                const SpvWord sampledImage = 1;
-                // indicates an image compatible with read/write operations (a storage or subpass data image).
-                const SpvWord readWriteImage = 2;
-
-                //
-
-                const auto texTypeInst = as<IRTextureType>(inst);
-                const auto sampledType = texTypeInst->getElementType();
-                SpvDim dim = SpvDim1D; // Silence uninitialized warnings from msvc...
-                switch(texTypeInst->GetBaseShape())
-                {
-                    case TextureFlavor::Shape1D:
-                    case TextureFlavor::Shape1DArray:
-                        dim = SpvDim1D;
-                        break;
-                    case TextureFlavor::Shape2D:
-                    case TextureFlavor::Shape2DArray:
-                        dim = SpvDim2D;
-                        break;
-                    case TextureFlavor::Shape3D:
-                        dim = SpvDim3D;
-                        break;
-                    case TextureFlavor::ShapeCube:
-                    case TextureFlavor::ShapeCubeArray:
-                        dim = SpvDimCube;
-                        break;
-                    case TextureFlavor::ShapeBuffer:
-                        dim = SpvDimBuffer;
-                        break;
-                }
-                SpvWord arrayed = texTypeInst->isArray() ? isArrayed : notArrayed;
-
-                // Vulkan spec 16.1: "The “Depth” operand of OpTypeImage is ignored."
-                SpvWord depth = unknownDepthImage; // No knowledge of if this is a depth image
-                SpvWord ms = texTypeInst->isMultisample() ? isMultisampled : notMultisampled;
-
-                SpvWord sampled = sampledUnknown;
-                switch(texTypeInst->getAccess())
-                {
-                    case SlangResourceAccess::SLANG_RESOURCE_ACCESS_READ_WRITE:
-                    case SlangResourceAccess::SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
-                        sampled = readWriteImage;
-                        break;
-                    case SlangResourceAccess::SLANG_RESOURCE_ACCESS_NONE:
-                    case SlangResourceAccess::SLANG_RESOURCE_ACCESS_READ:
-                        sampled = sampledImage;
-                        break;
-                }
-
-                // TODO: we need to do as _emitGLSLImageFormatModifier does,
-                // take a guess at the image format
-                SpvImageFormat format = SpvImageFormatUnknown;
-
-                //
-                // Capabilities, according to section 3.8
-                //
-                // SPIR-V requires that the sampled/rw info on the image isn't unknown
-                SLANG_ASSERT(sampled == sampledImage || sampled == readWriteImage);
-                switch(dim)
-                {
-                case SpvDim1D:
-                    requireSPIRVCapability(sampled == sampledImage ? SpvCapabilitySampled1D : SpvCapabilityImage1D);
-                    break;
-                case SpvDim2D:
-                    // Also requires Shader or Kernel, but these are a given (?)
-                    if(sampled == readWriteImage && ms == isMultisampled && arrayed == isArrayed)
-                        requireSPIRVCapability(SpvCapabilityImageMSArray);
-                    break;
-                case SpvDim3D:
-                    break;
-                case SpvDimCube:
-                    // Requires shader also
-                    if(sampled == readWriteImage && arrayed == isArrayed)
-                        requireSPIRVCapability(SpvCapabilityImageCubeArray);
-                    break;
-                case SpvDimRect:
-                    requireSPIRVCapability(sampled == sampledImage ? SpvCapabilitySampledRect : SpvCapabilityImageRect);
-                    break;
-                case SpvDimBuffer:
-                    requireSPIRVCapability(sampled == sampledImage ? SpvCapabilitySampledBuffer : SpvCapabilityImageBuffer);
-                    break;
-                case SpvDimSubpassData:
-                    requireSPIRVCapability(SpvCapabilityInputAttachment);
-                    break;
-                case SpvDimTileImageDataEXT:
-                    SLANG_UNIMPLEMENTED_X("OpTypeImage Capabilities for SpvDimTileImageDataEXT");
-                    break;
-                }
-                if(format == SpvImageFormatUnknown && sampled == readWriteImage)
-                {
-                    // TODO: It may not be necessary to have both of these
-                    // depending on if we read or write
-                    requireSPIRVCapability(SpvCapabilityStorageImageReadWithoutFormat);
-                    requireSPIRVCapability(SpvCapabilityStorageImageWriteWithoutFormat);
-                }
-
-                //
-                // The op itself
-                //
-                return emitOpTypeImage(
-                    inst,
-                    dropVector(sampledType),
-                    dim,
-                    SpvLiteralInteger::from32(depth),
-                    SpvLiteralInteger::from32(arrayed),
-                    SpvLiteralInteger::from32(ms),
-                    SpvLiteralInteger::from32(sampled),
-                    format
-                );
-            }
+            return ensureTextureType(inst, cast<IRTextureType>(inst));
         case kIROp_SamplerStateType:
             return emitOpTypeSampler(inst);
+        case kIROp_TextureSamplerType:
+            return emitOpTypeSampledImage(
+                inst,
+                ensureTextureType(nullptr, cast<IRTextureTypeBase>(inst))
+            );
 
         case kIROp_RaytracingAccelerationStructureType:
             requireSPIRVCapability(SpvCapabilityRayTracingKHR);
@@ -1561,6 +1431,143 @@ struct SPIRVEmitContext
                 SLANG_UNIMPLEMENTED_X(e.begin());
             }
         }
+    }
+
+    SpvInst* ensureTextureType(IRInst* assignee, IRTextureTypeBase* inst)
+    {
+        // Some untyped constants from OpTypeImage
+        // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypeImage
+
+        // indicates not a depth image
+        [[maybe_unused]]
+        const SpvWord notDepthImage = 0;
+        // indicates a depth image
+        [[maybe_unused]]
+        const SpvWord isDepthImage = 1;
+        // means no indication as to whether this is a depth or non-depth image
+        const SpvWord unknownDepthImage = 2;
+
+        // indicates non-arrayed content
+        const SpvWord notArrayed = 0;
+        // indicates arrayed content
+        const SpvWord isArrayed = 1;
+
+        // indicates single-sampled content
+        const SpvWord notMultisampled = 0;
+        // indicates multisampled content
+        const SpvWord isMultisampled = 1;
+
+        // indicates this is only known at run time, not at compile time
+        const SpvWord sampledUnknown = 0;
+        // indicates an image compatible with sampling operations
+        const SpvWord sampledImage = 1;
+        // indicates an image compatible with read/write operations (a storage or subpass data image).
+        const SpvWord readWriteImage = 2;
+
+        //
+
+        const auto sampledType = inst->getElementType();
+        SpvDim dim = SpvDim1D; // Silence uninitialized warnings from msvc...
+        switch(inst->GetBaseShape())
+        {
+            case TextureFlavor::Shape1D:
+            case TextureFlavor::Shape1DArray:
+                dim = SpvDim1D;
+                break;
+            case TextureFlavor::Shape2D:
+            case TextureFlavor::Shape2DArray:
+                dim = SpvDim2D;
+                break;
+            case TextureFlavor::Shape3D:
+                dim = SpvDim3D;
+                break;
+            case TextureFlavor::ShapeCube:
+            case TextureFlavor::ShapeCubeArray:
+                dim = SpvDimCube;
+                break;
+            case TextureFlavor::ShapeBuffer:
+                dim = SpvDimBuffer;
+                break;
+        }
+        SpvWord arrayed = inst->isArray() ? isArrayed : notArrayed;
+
+        // Vulkan spec 16.1: "The “Depth” operand of OpTypeImage is ignored."
+        SpvWord depth = unknownDepthImage; // No knowledge of if this is a depth image
+        SpvWord ms = inst->isMultisample() ? isMultisampled : notMultisampled;
+
+        SpvWord sampled = sampledUnknown;
+        switch(inst->getAccess())
+        {
+            case SlangResourceAccess::SLANG_RESOURCE_ACCESS_READ_WRITE:
+            case SlangResourceAccess::SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
+                sampled = readWriteImage;
+                break;
+            case SlangResourceAccess::SLANG_RESOURCE_ACCESS_NONE:
+            case SlangResourceAccess::SLANG_RESOURCE_ACCESS_READ:
+                sampled = sampledImage;
+                break;
+        }
+
+        // TODO: we need to do as _emitGLSLImageFormatModifier does,
+        // take a guess at the image format
+        SpvImageFormat format = SpvImageFormatUnknown;
+
+        //
+        // Capabilities, according to section 3.8
+        //
+        // SPIR-V requires that the sampled/rw info on the image isn't unknown
+        SLANG_ASSERT(sampled == sampledImage || sampled == readWriteImage);
+        switch(dim)
+        {
+        case SpvDim1D:
+            requireSPIRVCapability(sampled == sampledImage ? SpvCapabilitySampled1D : SpvCapabilityImage1D);
+            break;
+        case SpvDim2D:
+            // Also requires Shader or Kernel, but these are a given (?)
+            if(sampled == readWriteImage && ms == isMultisampled && arrayed == isArrayed)
+                requireSPIRVCapability(SpvCapabilityImageMSArray);
+            break;
+        case SpvDim3D:
+            break;
+        case SpvDimCube:
+            // Requires shader also
+            if(sampled == readWriteImage && arrayed == isArrayed)
+                requireSPIRVCapability(SpvCapabilityImageCubeArray);
+            break;
+        case SpvDimRect:
+            requireSPIRVCapability(sampled == sampledImage ? SpvCapabilitySampledRect : SpvCapabilityImageRect);
+            break;
+        case SpvDimBuffer:
+            requireSPIRVCapability(sampled == sampledImage ? SpvCapabilitySampledBuffer : SpvCapabilityImageBuffer);
+            break;
+        case SpvDimSubpassData:
+            requireSPIRVCapability(SpvCapabilityInputAttachment);
+            break;
+        case SpvDimTileImageDataEXT:
+            SLANG_UNIMPLEMENTED_X("OpTypeImage Capabilities for SpvDimTileImageDataEXT");
+            break;
+        }
+        if(format == SpvImageFormatUnknown && sampled == readWriteImage)
+        {
+            // TODO: It may not be necessary to have both of these
+            // depending on if we read or write
+            requireSPIRVCapability(SpvCapabilityStorageImageReadWithoutFormat);
+            requireSPIRVCapability(SpvCapabilityStorageImageWriteWithoutFormat);
+        }
+
+        //
+        // The op itself
+        //
+        return emitOpTypeImage(
+            assignee,
+            dropVector(sampledType),
+            dim,
+            SpvLiteralInteger::from32(depth),
+            SpvLiteralInteger::from32(arrayed),
+            SpvLiteralInteger::from32(ms),
+            SpvLiteralInteger::from32(sampled),
+            format
+        );
     }
 
     // Ensures an SpvInst for the specified vector type is emitted.
