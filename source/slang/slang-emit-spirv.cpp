@@ -978,11 +978,12 @@ struct SPIRVEmitContext
     template<typename... Operands>
     SpvInst* emitInst(SpvInstParent* parent, IRInst* irInst, SpvOp opcode, const Operands& ...ops)
     {
-        InstConstructScope scopeInst(this, opcode, irInst);
-        SpvInst* spvInst = scopeInst;
-        (emitOperand(ops), ...);
-        parent->addInst(spvInst);
-        return spvInst;
+        return emitInstCustomOperandFunc(
+            parent,
+            irInst,
+            opcode,
+            [&](){(emitOperand(ops), ...);}
+        );
     }
 
     template<typename OperandEmitFunc>
@@ -1009,10 +1010,30 @@ struct SPIRVEmitContext
         const Operands& ...ops
     )
     {
+        return emitInstMemoizedCustomOperandFunc(
+            parent,
+            irInst,
+            opcode,
+            resultId,
+            [&](){(emitOperand(ops), ...);}
+        );
+    }
+
+    template<typename OperandEmitFunc>
+    SpvInst* emitInstMemoizedCustomOperandFunc(
+        SpvInstParent* parent,
+        IRInst* irInst,
+        SpvOp opcode,
+        // We take the resultId here explicitly here to make sure we don't try
+        // and memoize its value.
+        ResultIDToken resultId,
+        const OperandEmitFunc& f
+    )
+    {
         List<SpvWord> ourOperands;
         {
             auto scopePeek = OperandMemoizeScope(this);
-            (emitOperand(ops), ...);
+            f();
             // Steal our operands back, so we don't have to calculate them
             // again
             ourOperands = std::move(m_operandStack);
@@ -4194,21 +4215,63 @@ struct SPIRVEmitContext
                 default:
                     break;
                 }
+                const auto opParent = parentForOpCode(opcode, parent);
+                const auto opInfo = m_grammarInfo->opInfos.lookup(opcode);
 
-                last = emitInstCustomOperandFunc(
-                    parentForOpCode(opcode, parent),
-                    // We want the "result instruction" to refer to the top level
-                    // block which assumes its value, the others are free to refer
-                    // to whatever, so just use the internal spv inst rep
-                    // TODO: This is not correct, because the instruction which is
-                    // assigned to result is not necessarily the last instruction
-                    isLast ? as<IRInst>(inst) : spvInst,
-                    opcode,
-                    [&](){
-                        for(const auto operand : spvInst->getSPIRVOperands())
-                            emitSpvAsmOperand(operand);
+                // TODO: handle resultIdIndex == 1, for constants
+                const bool memoize = opParent == getSection(SpvLogicalSectionID::ConstantsAndTypes)
+                    && opInfo && opInfo->resultIdIndex == 0;
+
+                // We want the "result instruction" to refer to the top level
+                // block which assumes its value, the others are free to refer
+                // to whatever, so just use the internal spv inst rep
+                // TODO: This is not correct, because the instruction which is
+                // assigned to result is not necessarily the last instruction
+                const auto assignedInst = isLast ? as<IRInst>(inst) : spvInst;
+
+                if(memoize)
+                {
+                    last = emitInstMemoizedCustomOperandFunc(
+                        opParent,
+                        assignedInst,
+                        opcode,
+                        kResultID,
+                        [&](){
+                            Index i = 0;
+                            for(const auto operand : spvInst->getSPIRVOperands()) {
+                                if(i++ != 0)
+                                    emitSpvAsmOperand(operand);
+                            };
+                        }
+                    );
+
+                    // The result operand is the one at index 1, after the
+                    // opcode itself.
+                    // If this happens to be an "id" operand, then we need to
+                    // correct the Id we have stored in our map with the actual
+                    // memoized result. This is safe because a condition on
+                    // memoized instructions is that they come before their
+                    // uses.
+                    const auto resOperand = cast<IRSPIRVAsmOperand>(spvInst->getOperand(1));
+                    if(resOperand->getOp() == kIROp_SPIRVAsmOperandId)
+                    {
+                        const auto idName =
+                            cast<IRStringLit>(resOperand->getValue())->getStringSlice();
+                        idMap[idName] = last->id;
                     }
-                );
+                }
+                else
+                {
+                    emitInstCustomOperandFunc(
+                        opParent,
+                        assignedInst,
+                        opcode,
+                        [&](){
+                            for(const auto operand : spvInst->getSPIRVOperands())
+                                emitSpvAsmOperand(operand);
+                        }
+                    );
+                }
             }
         }
 
