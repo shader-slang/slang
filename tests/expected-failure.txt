@@ -1,4 +1,3 @@
-tests/language-feature/constants/constexpr-loop.slang.1 (vk)
 tests/optimization/func-resource-result/func-resource-result-complex.slang.1 (vk)
 tests/type/texture-sampler/texture-sampler-2d.slang (vk)
 tests/hlsl-intrinsic/texture-lod-shadow.slang.1
