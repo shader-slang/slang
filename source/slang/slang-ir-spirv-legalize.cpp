@@ -1094,8 +1094,27 @@ void legalizeSPIRV(SPIRVEmitSharedContext* sharedContext, IRModule* module)
 
 void buildEntryPointReferenceGraph(SPIRVEmitSharedContext* context, IRModule* module)
 {
-    struct WorkItem { IRFunc* entryPoint; IRInst* inst; };
+    struct WorkItem
+    {
+        IRFunc* entryPoint; IRInst* inst; 
+    
+        HashCode getHashCode() const
+        {
+            return combineHash(Slang::getHashCode(entryPoint), Slang::getHashCode(inst));
+        }
+        bool operator == (const WorkItem& other) const
+        {
+            return entryPoint == other.entryPoint && inst == other.inst;
+        }
+    };
+    HashSet<WorkItem> workListSet;
     List<WorkItem> workList;
+    auto addToWorkList = [&](WorkItem item)
+    {
+        if (workListSet.add(item))
+            workList.add(item);
+    };
+
     auto registerEntryPointReference = [&](IRFunc* entryPoint, IRInst* inst)
         {
             if (auto set = context->m_referencingEntryPoints.tryGetValue(inst))
@@ -1114,7 +1133,7 @@ void buildEntryPointReferenceGraph(SPIRVEmitSharedContext* context, IRModule* mo
                 registerEntryPointReference(entryPoint, inst);
                 for (auto child : code->getChildren())
                 {
-                    workList.add({ entryPoint, child });
+                    addToWorkList({ entryPoint, child });
                 }
                 return;
             }
@@ -1127,24 +1146,33 @@ void buildEntryPointReferenceGraph(SPIRVEmitSharedContext* context, IRModule* mo
             case kIROp_SPIRVAsm:
                 for (auto child : inst->getChildren())
                 {
-                    workList.add({ entryPoint, child });
+                    addToWorkList({ entryPoint, child });
                 }
                 break;
             case kIROp_Call:
                 {
                     auto call = as<IRCall>(inst);
-                    workList.add({ entryPoint, call->getCallee() });
+                    addToWorkList({ entryPoint, call->getCallee() });
                 }
                 break;
             case kIROp_SPIRVAsmOperandInst:
                 {
                     auto operand = as<IRSPIRVAsmOperandInst>(inst);
-                    workList.add({ entryPoint, operand->getValue() });
+                    addToWorkList({ entryPoint, operand->getValue() });
                 }
                 break;
             }
             for (UInt i = 0; i < inst->getOperandCount(); i++)
-                workList.add({ entryPoint, inst->getOperand(i) });
+            {
+                auto operand = inst->getOperand(i);
+                switch (operand->getOp())
+                {
+                case kIROp_GlobalParam:
+                case kIROp_GlobalVar:
+                    addToWorkList({ entryPoint, operand });
+                    break;
+                }
+            }
         };
 
     for (auto globalInst : module->getGlobalInsts())
