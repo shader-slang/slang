@@ -273,7 +273,8 @@ namespace Slang
 
             auto genericDeclRef = genericDeclRefType->getDeclRef();
             ensureDecl(genericDeclRef, DeclCheckState::CanSpecializeGeneric);
-            List<Expr*> args;
+            List<Val*> args;
+            List<Val*> witnessArgs;
             for (Decl* member : genericDeclRef.getDecl()->members)
             {
                 if (auto typeParam = as<GenericTypeParamDecl>(member))
@@ -290,7 +291,7 @@ namespace Slang
 
                     // TODO: this is one place where syntax should get cloned!
                     if (outProperType)
-                        args.add(typeParam->initType.exp);
+                        args.add(ExtractGenericArgVal(typeParam->initType.exp));
                 }
                 else if (auto valParam = as<GenericValueParamDecl>(member))
                 {
@@ -305,14 +306,36 @@ namespace Slang
                     }
                     // TODO: this is one place where syntax should get cloned!
                     if (outProperType)
-                        args.add(valParam->initExpr);
+                        args.add(ExtractGenericArgVal(valParam->initExpr));
+                }
+                else if (auto constraintParam = as<GenericTypeConstraintDecl>(member))
+                {
+                    auto genericParam = as<DeclRefType>(constraintParam->sub.type)->getDeclRef();
+                    if (!genericParam)
+                        return false;
+                    auto genericTypeParamDecl = as<GenericTypeParamDecl>(genericParam.getDecl());
+                    if (!genericTypeParamDecl)
+                        return false;
+                    auto defaultType = CheckProperType(genericTypeParamDecl->initType);
+                    auto witness = tryGetSubtypeWitness(defaultType, CheckProperType(constraintParam->sup));
+                    if (!witness)
+                    {
+                        // diagnose
+                        SLANG_ABORT_COMPILATION("unexpected");
+                        return false;
+                    }
+                    witnessArgs.add(witness);
                 }
                 else
                 {
                     // ignore non-parameter members
                 }
             }
-            result = InstantiateGenericType(genericDeclRef, args);
+            // Combine args and witnessArgs
+            args.addRange(witnessArgs);
+            
+            result = DeclRefType::create(getASTBuilder(),
+                getASTBuilder()->getGenericAppDeclRef(genericDeclRef, args.getArrayView()));
         }
             
         // default case: we expect this to already be a proper type
