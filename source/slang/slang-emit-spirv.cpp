@@ -1061,6 +1061,42 @@ struct SPIRVEmitContext
         return spvInst;
     }
 
+    template<typename OperandEmitFunc>
+    SpvInst* emitInstMemoizedNoResultIDCustomOperandFunc(
+        SpvInstParent* parent,
+        IRInst* irInst,
+        SpvOp opcode,
+        const OperandEmitFunc& f
+    )
+    {
+        List<SpvWord> ourOperands;
+        {
+            auto scopePeek = OperandMemoizeScope(this);
+            f();
+            // Steal our operands back, so we don't have to calculate them
+            // again
+            ourOperands = std::move(m_operandStack);
+        }
+
+        // Hash the whole global stack and opcode
+        SpvTypeInstKey key;
+        key.words.add(opcode);
+        key.words.addRange(ourOperands);
+
+        // If we have seen this before, return the memoized instruction
+        if (SpvInst** memoized = m_spvTypeInsts.tryGetValue(key))
+            return *memoized;
+
+        // Otherwise, we can construct our instruction and record the result
+        InstConstructScope scopeInst(this, opcode, irInst);
+        SpvInst* spvInst = scopeInst;
+        m_spvTypeInsts[key] = spvInst;
+
+        m_operandStack.addRange(ourOperands);
+
+        parent->addInst(spvInst);
+        return spvInst;
+    }
     //
     // Specific emit funcs
     //
@@ -2313,12 +2349,12 @@ struct SPIRVEmitContext
                 // to the new globals, which would be used in the SPIR-V emit case.
 
                 auto entryPointDecor = cast<IREntryPointDecoration>(decoration);
+                auto entryPoint = as<IRFunc>(decoration->getParent());
                 auto spvStage = mapStageToExecutionModel(entryPointDecor->getProfile().getStage());
                 auto name = entryPointDecor->getName()->getStringSlice();
                 List<SpvInst*> params;
                 HashSet<SpvInst*> paramsSet;
                 // `interface` part: reference all global variables that are used by this entrypoint.
-                // TODO: we may want to perform more accurate tracking.
                 for (auto globalInst : m_irModule->getModuleInst()->getChildren())
                 {
                     switch (globalInst->getOp())
@@ -2329,8 +2365,13 @@ struct SPIRVEmitContext
                         SpvInst* spvGlobalInst;
                         if (m_mapIRInstToSpvInst.tryGetValue(globalInst, spvGlobalInst))
                         {
-                            paramsSet.add(spvGlobalInst);
-                            params.add(spvGlobalInst);
+                            // Is this globalInst referenced by this entry point?
+                            auto refSet = m_referencingEntryPoints.tryGetValue(globalInst);
+                            if (refSet && refSet->contains(entryPoint))
+                            {
+                                paramsSet.add(spvGlobalInst);
+                                params.add(spvGlobalInst);
+                            }
                         }
                         break;
                     }
@@ -2622,6 +2663,7 @@ struct SPIRVEmitContext
                 else if (semanticName == "sv_innercoverage")
                 {
                     requireSPIRVCapability(SpvCapabilityFragmentFullyCoveredEXT);
+                    ensureExtensionDeclaration(UnownedStringSlice("SPV_EXT_fragment_fully_covered"));
                     return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInFullyCoveredEXT);
                 }
                 else if (semanticName == "sv_depth")
@@ -2694,6 +2736,7 @@ struct SPIRVEmitContext
                 else if (semanticName == "sv_stencilref")
                 {
                     requireSPIRVCapability(SpvCapabilityStencilExportEXT);
+                    ensureExtensionDeclaration(UnownedStringSlice("SPV_EXT_shader_stencil_export"));
                     return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInFragStencilRefEXT);
                 }
                 else if (semanticName == "sv_tessfactor")
@@ -2722,6 +2765,7 @@ struct SPIRVEmitContext
                 else if (semanticName == "nv_viewport_mask")
                 {
                     requireSPIRVCapability(SpvCapabilityPerViewAttributesNV);
+                    ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_mesh_shader"));
                     return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInViewportMaskPerViewNV);
                 }
                 else if (semanticName == "sv_barycentrics")
@@ -2729,11 +2773,13 @@ struct SPIRVEmitContext
                     if (m_targetRequest->getTargetCaps().implies(CapabilityAtom::GL_NV_fragment_shader_barycentric))
                     {
                         requireSPIRVCapability(SpvCapabilityFragmentBarycentricNV);
+                        ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_fragment_shader_barycentric"));
                         return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInBaryCoordNV);
                     }
                     else
                     {
                         requireSPIRVCapability(SpvCapabilityFragmentBarycentricKHR);
+                        ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_fragment_shader_barycentric"));
                         return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInBaryCoordKHR);
                     }
 
@@ -2744,11 +2790,13 @@ struct SPIRVEmitContext
                 else if (semanticName == "sv_cullprimitive")
                 {
                     requireSPIRVCapability(SpvCapabilityMeshShadingEXT);
+                    ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_mesh_shader"));
                     return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInCullPrimitiveEXT);
                 }
                 else if (semanticName == "sv_shadingrate")
                 {
                     requireSPIRVCapability(SpvCapabilityFragmentShadingRateKHR);
+                    ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_fragment_shading_rate"));
                     return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPrimitiveShadingRateKHR);
                 }
                 SLANG_UNREACHABLE("Unimplemented system value in spirv emit.");
@@ -3988,6 +4036,8 @@ struct SPIRVEmitContext
                                 return getSection(SpvLogicalSectionID::Capabilities);
                             case SpvOpExtension:
                                 return getSection(SpvLogicalSectionID::Extensions);
+                            case SpvOpExecutionMode:
+                                return getSection(SpvLogicalSectionID::ExecutionModes);
                             default:
                                 return defaultParent;
 
@@ -4212,6 +4262,22 @@ struct SPIRVEmitContext
                 case SpvOpExtension:
                     ensureExtensionDeclaration(as<IRStringLit>(spvInst->getOperand(1)->getOperand(0))->getStringSlice());
                     continue;
+                case SpvOpExecutionMode:
+                {
+                    if (auto refEntryPointSet = m_referencingEntryPoints.tryGetValue(getParentFunc(inst)))
+                    {
+                        for (auto entryPoint : *refEntryPointSet)
+                        {
+                            emitInstMemoizedNoResultIDCustomOperandFunc(getSection(SpvLogicalSectionID::ExecutionModes), nullptr, SpvOpExecutionMode,
+                                [&]() {
+                                    emitOperand(entryPoint);
+                                    for (UInt s = 2; s < spvInst->getOperandCount(); s++)
+                                        emitSpvAsmOperand(as<IRSPIRVAsmOperand>(spvInst->getOperand(s)));
+                                });
+                        }
+                    }
+                    continue;
+                }
                 default:
                     break;
                 }

@@ -18,6 +18,9 @@ struct SPIRVEmitSharedContext
     IRModule* m_irModule;
     TargetRequest* m_targetRequest;
     Dictionary<IRTargetIntrinsicDecoration*, RefPtr<SpvSnippet>> m_parsedSpvSnippets;
+
+    Dictionary<IRInst*, HashSet<IRFunc*>> m_referencingEntryPoints; // The entry-points that directly or transitively reference this global inst.
+
     DiagnosticSink* m_sink;
     const SPIRVCoreGrammarInfo* m_grammarInfo;
     SPIRVEmitSharedContext(IRModule* module, TargetRequest* target, DiagnosticSink* sink)

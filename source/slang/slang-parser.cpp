@@ -6322,6 +6322,11 @@ namespace Slang
         {
             return SPIRVAsmOperand{SPIRVAsmOperand::TruncateMarker, parser->ReadToken()};
         }
+        // The pseudo-operand for referencing entryPoint id.
+        else if (parser->LookAheadToken("__entryPoint"))
+        {
+            return SPIRVAsmOperand{ SPIRVAsmOperand::EntryPoint, parser->ReadToken() };
+        }
         else if (AdvanceIf(parser, "builtin"))
         {
             // reference to a builtin var.
