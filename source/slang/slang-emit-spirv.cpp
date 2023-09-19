@@ -978,11 +978,12 @@ struct SPIRVEmitContext
     template<typename... Operands>
     SpvInst* emitInst(SpvInstParent* parent, IRInst* irInst, SpvOp opcode, const Operands& ...ops)
     {
-        InstConstructScope scopeInst(this, opcode, irInst);
-        SpvInst* spvInst = scopeInst;
-        (emitOperand(ops), ...);
-        parent->addInst(spvInst);
-        return spvInst;
+        return emitInstCustomOperandFunc(
+            parent,
+            irInst,
+            opcode,
+            [&](){(emitOperand(ops), ...);}
+        );
     }
 
     template<typename OperandEmitFunc>
@@ -1009,10 +1010,30 @@ struct SPIRVEmitContext
         const Operands& ...ops
     )
     {
+        return emitInstMemoizedCustomOperandFunc(
+            parent,
+            irInst,
+            opcode,
+            resultId,
+            [&](){(emitOperand(ops), ...);}
+        );
+    }
+
+    template<typename OperandEmitFunc>
+    SpvInst* emitInstMemoizedCustomOperandFunc(
+        SpvInstParent* parent,
+        IRInst* irInst,
+        SpvOp opcode,
+        // We take the resultId here explicitly here to make sure we don't try
+        // and memoize its value.
+        ResultIDToken resultId,
+        const OperandEmitFunc& f
+    )
+    {
         List<SpvWord> ourOperands;
         {
             auto scopePeek = OperandMemoizeScope(this);
-            (emitOperand(ops), ...);
+            f();
             // Steal our operands back, so we don't have to calculate them
             // again
             ourOperands = std::move(m_operandStack);
