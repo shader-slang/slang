@@ -1,6 +1,4 @@
 tests/optimization/func-resource-result/func-resource-result-complex.slang.1 (vk)
-tests/type/texture-sampler/texture-sampler-2d.slang (vk)
-tests/hlsl-intrinsic/texture-lod-shadow.slang.1
 tests/pipeline/rasterization/mesh/task-groupshared.slang.1 (vk)
 tests/pipeline/rasterization/mesh/task-simple.slang.1 (vk)
 tests/pipeline/rasterization/mesh/simple.slang.1 (vk)

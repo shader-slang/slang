@@ -229,6 +229,15 @@ SpvInst* emitOpTypeSampler(IRInst* inst)
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypeSampler
+template<typename T1>
+SpvInst* emitOpTypeSampledImage(IRInst* inst, const T1& imageType)
+{
+    return emitInstMemoized(
+        getSection(SpvLogicalSectionID::ConstantsAndTypes), inst, SpvOpTypeSampledImage, kResultID, imageType
+    );
+}
+
 SpvInst* emitOpTypeAccelerationStructure(IRInst* inst)
 {
     return emitInstMemoized(
