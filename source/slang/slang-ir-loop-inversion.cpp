@@ -118,19 +118,22 @@ static IRParam* duplicateToParamWithDecorations(IRBuilder& builder, IRCloneEnv& 
 // s: ...1 goto c2
 // c2: if x then goto e2 else goto l (merge at b)
 // e2: goto b
-// l: loop break=b next=d
+// l: loop break=b2 next=d
 // d: goto c1:
 // c1: if x then goto e1 else goto e3 (merge at e3)
 // e3: goto d
-// e1: goto b
+// e1: goto b2
+// b2: goto b
 // b: ...2
 //
 // s is the Start block
 // c1, c2 are the Condition blocks
 // e1, e2, e3 are the critical Edge breakers
-// l is the Loop entering block
-// d is the loop boDy
-// b is the Break block
+// l is the loop entering block
+// d is the loop body
+// b is the merge point for the outer condition
+// b2 is the new break block for the loop
+//
 static void invertLoop(IRBuilder& builder, IRLoop* loop)
 {
     IRBuilderInsertLocScope builderScope(&builder);
@@ -195,25 +198,23 @@ static void invertLoop(IRBuilder& builder, IRLoop* loop)
     c1bUse.set(e1);
     c1Terminator->afterBlock.set(d);
 
-    // We create another block e4 to handle other breaks from inside the loop, and
-    // rewrite existing breaks to jump to it.
-    // We keep e4 and e1 distinct since after the inversion step, insts in e4 will
-    // be re-written to use values from the loop entry, while e1 will use values from 
-    // c1.
+    // We'll rewrite existing breaks to jump to b2, but via an intermediate jump block to 
+    // avoid a critical edge.
     // 
-    auto e4 = builder.emitBlock();
-    e4->insertBefore(c1);
-    builder.emitBranch(b2, c1Params.getCount(), c1Params.getBuffer());
     traverseUses(b, [&](IRUse* u){
         auto userBlock = u->getUser()->getParent();
         // Restrict this to just those blocks within this loop
-        if(userBlock != e4 && userBlock != e1 && userBlock != b2 && domTree->dominates(s, userBlock) && !domTree->dominates(b, userBlock))
-            u->set(e4);
+        if(userBlock != e1 && userBlock != b2 && domTree->dominates(s, userBlock) && !domTree->dominates(b, userBlock))
+        {
+            auto jumpToB2Block = builder.emitBlock();
+            jumpToB2Block->insertAfter(userBlock);
+            builder.emitBranch(b2, c1Params.getCount(), c1Params.getBuffer());
+            u->set(jumpToB2Block);
+        }
     });
 
     // We now have
     // s: ...1 loop break=b next=c1
-    // e4: goto b2
     // c1: if x then goto e1 else goto d (merge at d)
     // e1: goto b2
     // d: goto c1
@@ -238,7 +239,6 @@ static void invertLoop(IRBuilder& builder, IRLoop* loop)
 
     // We now have
     // s: ...1 loop break=b next=c1
-    // e4: goto b2
     // c2: if x then goto e2 else goto d (merge at b)
     // e2: goto b
     // c1: if x then goto e1 else goto d (merge at d)
@@ -251,13 +251,11 @@ static void invertLoop(IRBuilder& builder, IRLoop* loop)
     const auto l = builder.emitBlock();
     l->insertAfter(e2);
     loop->insertAtEnd(l);
-    e4->insertBefore(c1);
     // We now have
     // s: ...1 no-termiator
     // c2: if x then goto e2 else goto d (merge at b)
     // e2: goto b
     // l: loop break=b next=c1
-    // e4: goto b2
     // c1: if x then goto e1 else goto d (merge at d)
     // e1: goto b2
     // d: goto c1
@@ -276,7 +274,6 @@ static void invertLoop(IRBuilder& builder, IRLoop* loop)
     // c2: if x then goto e2 else goto d (merge at b)
     // e2: goto b
     // l: loop break=b next=c1
-    // e4: goto b2
     // c1: if x then goto e1 else goto d (merge at d)
     // e1: goto b2
     // d: goto c1
@@ -291,7 +288,6 @@ static void invertLoop(IRBuilder& builder, IRLoop* loop)
     // c2: if x then goto e2 else goto l (merge at b)
     // e2: goto b
     // l: loop break=b next=c1
-    // e4: goto b2
     // c1: if x then goto e1 else goto d (merge at d)
     // e1: goto b2
     // d: goto c1
@@ -336,7 +332,6 @@ static void invertLoop(IRBuilder& builder, IRLoop* loop)
     const auto e3 = builder.emitBlock();
     e3->insertAfter(c1);
     b2->insertBefore(b);
-    e4->insertAfter(c1);
     builder.emitBranch(d, ps.getCount(), ps.getBuffer());
     c1dUse.set(e3);
     c1Terminator->afterBlock.set(e3);
@@ -346,12 +341,11 @@ static void invertLoop(IRBuilder& builder, IRLoop* loop)
     // e2: goto b
     // l: loop break=b2 next=d
     // d: goto c1
-    // e4: goto b2
     // c1: if x then goto e1 else goto e3 (merge at e3)
     // e3: goto d
     // e1: goto b2
     // b2: goto b
-    // b: ...2
+    // b: ...2 
 }
 
 bool invertLoops(IRModule* module)
