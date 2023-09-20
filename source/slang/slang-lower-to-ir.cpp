@@ -5031,6 +5031,12 @@ struct DestinationDrivenRValueExprLoweringVisitor
         assign(context, destination, rValue);
     }
 
+    void visitSelectExpr(SelectExpr* expr)
+    {
+        auto rValue = lowerRValueExpr(context, expr);
+        assign(context, destination, rValue);
+    }
+
     void visitInvokeExpr(InvokeExpr* expr)
     {
         LoweredValInfo resultRVal;
