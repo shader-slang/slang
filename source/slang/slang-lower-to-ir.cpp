@@ -1353,6 +1353,17 @@ static void addLinkageDecoration(
             builder->addPublicDecoration(inst);
             builder->addExternCppDecoration(inst, decl->getName()->text.getUnownedSlice());
         }
+        else if (as<AutoPyBindCudaAttribute>(modifier))
+        {
+            builder->addAutoPyBindCudaDecoration(inst, decl->getName()->text.getUnownedSlice());
+            builder->addAutoPyBindExportInfoDecoration(inst);
+        }
+        else if (auto pyExportModifier = as<PyExportAttribute>(modifier))
+        {
+            builder->addPyExportDecoration(inst, pyExportModifier->name.getLength()
+                ? pyExportModifier->name.getUnownedSlice()
+                : decl->getName()->text.getUnownedSlice());
+        }
         else if (as<KnownBuiltinAttribute>(modifier))
         {
             // We add this to the internal instruction, like other name-like

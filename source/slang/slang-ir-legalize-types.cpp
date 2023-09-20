@@ -3659,7 +3659,14 @@ struct IRTypeLegalizationPass
         // * `i` is a child of `inst`.
         //
         if (legalVal.flavor == LegalVal::Flavor::simple)
+        {
+            // The resulting inst may be different from the one we added to the
+            // worklist, so ensure that the appropriate flags are set.
+            //
+            setHasBeenAddedOrProcessed(legalVal.irValue);
+
             inst = legalVal.irValue;
+        }
 
         for( auto use = inst->firstUse; use; use = use->nextUse )
         {

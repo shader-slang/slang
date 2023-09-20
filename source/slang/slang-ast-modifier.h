@@ -1134,6 +1134,18 @@ class CudaHostAttribute : public Attribute
     SLANG_AST_CLASS(CudaHostAttribute)
 };
 
+class AutoPyBindCudaAttribute : public Attribute
+{
+    SLANG_AST_CLASS(AutoPyBindCudaAttribute)
+};
+
+class PyExportAttribute : public Attribute
+{
+    SLANG_AST_CLASS(PyExportAttribute)
+
+    String name;
+};
+
 class PreferRecomputeAttribute : public Attribute
 {
     SLANG_AST_CLASS(PreferRecomputeAttribute)

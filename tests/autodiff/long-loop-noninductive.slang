@@ -25,7 +25,7 @@ float sin_series(float x, int iterations)
 // `i`. This test checks that the induction variable finder doesn't
 // accidentally succeed all the time
 
-// CHECK: struct s_bwd_sin_series_Intermediates
+// CHECK: struct s_bwd_prop_sin_series_Intermediates
 // CHECK: int {{[A-Za-z0-9_]+}}[{{.*}}]
 // CHECK: }
 

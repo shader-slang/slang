@@ -757,6 +757,19 @@ namespace Slang
 
             knownBuiltinAttr->name = name;
         }
+        else if (auto pyExportAttr = as<PyExportAttribute>(attr))
+        {
+            // Check name string.
+            SLANG_ASSERT(attr->args.getCount() == 1);
+
+            String name;
+            if(!checkLiteralStringVal(attr->args[0], &name))
+            {
+                return false;
+            }
+
+            pyExportAttr->name = name;
+        }
         else
         {
             if(attr->args.getCount() == 0)

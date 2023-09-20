@@ -332,12 +332,10 @@ namespace Slang
             as<IRFuncType>(origFunc->getFullType()));
         diffFunc->setFullType(diffFuncType);
 
-        if (auto nameHint = origFunc->findDecoration<IRNameHintDecoration>())
+        if (origFunc->findDecoration<IRNameHintDecoration>())
         {
-            auto originalName = nameHint->getName();
-            StringBuilder newNameSb;
-            newNameSb << "s_bwd_" << originalName;
-            builder.addNameHintDecoration(diffFunc, newNameSb.getUnownedSlice());
+            auto newName = this->getTranscribedFuncName(&builder, origFunc);
+            builder.addNameHintDecoration(diffFunc, newName);
         }
 
         // Transfer checkpoint hint decorations
@@ -492,6 +490,8 @@ namespace Slang
         builder.emitCallInst(builder.getVoidType(), propagateFunc, propagateArgs);
 
         builder.emitReturn();
+
+        addTranscribedFuncDecoration(builder, origFunc, cast<IRFunc>(header.differential));
         return header;
     }
 
