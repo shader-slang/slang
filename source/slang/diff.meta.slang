@@ -1259,7 +1259,7 @@ __generic<T : __BuiltinFloatingPointType>
 DifferentialPair<T> __d_atan2(DifferentialPair<T> dpy, DifferentialPair<T> dpx)
 {
     T.Differential dx = __mul_p_d(-dpy.p / (dpx.p * dpx.p + dpy.p * dpy.p), dpx.d);
-    T.Differential dy = __mul_p_d(-dpx.p / (dpx.p * dpx.p + dpy.p * dpy.p), dpy.d);
+    T.Differential dy = __mul_p_d(dpx.p / (dpx.p * dpx.p + dpy.p * dpy.p), dpy.d);
     return DifferentialPair<T>(
         atan2(dpy.p, dpx.p),
         T.dadd(dx, dy));
@@ -1271,8 +1271,8 @@ __generic<T : __BuiltinFloatingPointType>
 [BackwardDerivativeOf(atan2)]
 void __d_atan2(inout DifferentialPair<T> dpy, inout DifferentialPair<T> dpx, T.Differential dOut)
 {
-    dpx = diffPair(dpx.p, __mul_p_d(-dpy.p / (dpx.p * dpx.p + dpy.p * dpy.p), dpx.d));
-    dpy = diffPair(dpy.p, __mul_p_d(-dpx.p / (dpx.p * dpx.p + dpy.p * dpy.p), dpy.d));
+    dpx = diffPair(dpx.p, __mul_p_d(-dpy.p / (dpx.p * dpx.p + dpy.p * dpy.p), dOut));
+    dpy = diffPair(dpy.p, __mul_p_d(dpx.p / (dpx.p * dpx.p + dpy.p * dpy.p), dOut));
 }
 
 VECTOR_MATRIX_BINARY_DIFF_IMPL(atan2)
