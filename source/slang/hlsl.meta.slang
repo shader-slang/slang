@@ -2898,15 +2898,26 @@ matrix<T, N, M> fwidth(matrix<T, N, M> x)
 /// This function can be applied to scalars, vectors, and matrices of
 /// built-in scalar types.
 ///
-/// Note: these functions are not curently implemented for Vulkan/SPIR-V output.
-///
 __generic<T : __BuiltinType>
 [__readNone]
-__target_intrinsic(hlsl)
-__target_intrinsic(GL_NV_fragment_shader_barycentric, "$0[$1]")
-__target_intrinsic(GL_EXT_fragment_shader_barycentric, "$0[$1]")
 __glsl_version(450)
-T GetAttributeAtVertex(T attribute, uint vertexIndex);
+T GetAttributeAtVertex(T attribute, uint vertexIndex)
+{
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "GetAttributeAtVertex";
+    case GL_NV_fragment_shader_barycentric:
+    case GL_EXT_fragment_shader_barycentric: 
+        __intrinsic_asm "$0[$1]";
+    case spirv:
+        return spirv_asm {
+            %_ptr_Input_T = OpTypePointer Input $$T;
+            %addr = OpAccessChain %_ptr_Input_T $attribute $vertexIndex;
+            result:$$T = OpLoad %addr;
+        };
+    }
+}
 
 /// Get the value of a vertex attribute at a specific vertex.
 ///
@@ -2919,16 +2930,27 @@ T GetAttributeAtVertex(T attribute, uint vertexIndex);
 ///
 /// This function can be applied to scalars, vectors, and matrices of
 /// built-in scalar types.
-///
-/// Note: these functions are not curently implemented for Vulkan/SPIR-V output.
 ///
 __generic<T : __BuiltinType, let N : int>
 [__readNone]
-__target_intrinsic(hlsl)
-__target_intrinsic(GL_NV_fragment_shader_barycentric, "$0[$1]")
-__target_intrinsic(GL_EXT_fragment_shader_barycentric, "$0[$1]")
 __glsl_version(450)
-vector<T,N> GetAttributeAtVertex(vector<T,N> attribute, uint vertexIndex);
+vector<T,N> GetAttributeAtVertex(vector<T,N> attribute, uint vertexIndex)
+{
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "GetAttributeAtVertex";
+    case GL_NV_fragment_shader_barycentric:
+    case GL_EXT_fragment_shader_barycentric: 
+        __intrinsic_asm "$0[$1]";
+    case spirv:
+        return spirv_asm {
+            %_ptr_Input_vectorT = OpTypePointer Input $$vector<T,N>;
+            %addr = OpAccessChain %_ptr_Input_vectorT $attribute $vertexIndex;
+            result:$$vector<T,N> = OpLoad %addr;
+        };
+    }
+}
 
 /// Get the value of a vertex attribute at a specific vertex.
 ///
@@ -2942,16 +2964,26 @@ vector<T,N> GetAttributeAtVertex(vector<T,N> attribute, uint vertexIndex);
 /// This function can be applied to scalars, vectors, and matrices of
 /// built-in scalar types.
 ///
-/// Note: these functions are not curently implemented for Vulkan/SPIR-V output.
-///
 __generic<T : __BuiltinType, let N : int, let M : int>
 [__readNone]
-__target_intrinsic(hlsl)
-__target_intrinsic(GL_NV_fragment_shader_barycentric, "$0[$1]")
-__target_intrinsic(GL_EXT_fragment_shader_barycentric, "$0[$1]")
 __glsl_version(450)
-matrix<T,N,M> GetAttributeAtVertex(matrix<T,N,M> attribute, uint vertexIndex);
-
+matrix<T,N,M> GetAttributeAtVertex(matrix<T,N,M> attribute, uint vertexIndex)
+{
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "GetAttributeAtVertex";
+    case GL_NV_fragment_shader_barycentric:
+    case GL_EXT_fragment_shader_barycentric: 
+        __intrinsic_asm "$0[$1]";
+    case spirv:
+        return spirv_asm {
+            %_ptr_Input_matrixT = OpTypePointer Input $$matrix<T,N,M>;
+            %addr = OpAccessChain %_ptr_Input_matrixT $attribute $vertexIndex;
+            result:$$matrix<T,N,M> = OpLoad %addr;
+        };
+    }
+}
 
 // Get number of samples in render target
 [__readNone]

@@ -3906,6 +3906,10 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 {
                     return builder->emitSPIRVAsmOperandTruncate();
                 }
+            case SPIRVAsmOperand::EntryPoint:
+                {
+                    return builder->emitSPIRVAsmOperandEntryPoint();
+                }
             }
             SLANG_UNREACHABLE("Unhandled case in visitSPIRVAsmExpr");
         };
