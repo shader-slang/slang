@@ -7209,6 +7209,10 @@ namespace Slang
                 if (operand->getParent() != user->getParent())
                     continue;
 
+                // We allow out-of-order uses in global scope.
+                if (operand->getParent() && operand->getParent()->getOp() == kIROp_Module)
+                    continue;
+
                 // If the operand is defined after user, move it to before user.
                 if (_isInstDefinedAfter(operand, user))
                 {
