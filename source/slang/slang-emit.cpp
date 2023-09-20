@@ -409,6 +409,8 @@ Result linkAndOptimizeIR(
         // since we may be missing out cases prevented by the functions that we just specialzied.
         performMandatoryEarlyInlining(irModule);
 
+        performPreAutoDiffForceInlining(irModule);
+
         // Unroll loops.
         if (codeGenContext->getSink()->getErrorCount() == 0)
         {
