@@ -220,12 +220,50 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
+    Stage getReferencingEntryPointStage(IRInst* inst)
+    {
+        for (auto use = inst->firstUse; use; use = use->nextUse)
+        {
+            if (auto f = getParentFunc(use->getUser()))
+            {
+                if (auto d = f->findDecoration<IREntryPointDecoration>())
+                    return d->getProfile().getStage();
+            }
+        }
+        return Stage::Unknown;
+    }
+
+    bool translatePerVertexInputType(IRInst* param)
+    {
+        if (auto interpolationModeDecor = param->findDecoration<IRInterpolationModeDecoration>())
+        {
+            if (interpolationModeDecor->getMode() == IRInterpolationMode::PerVertex)
+            {
+                if (getReferencingEntryPointStage(param) == Stage::Fragment)
+                {
+                    auto originalType = param->getFullType();
+                    IRBuilder builder(param);
+                    builder.setInsertBefore(param);
+                    auto arrayType = builder.getArrayType(originalType, builder.getIntValue(builder.getIntType(), 3));
+                    param->setFullType(arrayType);
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     void processGlobalParam(IRGlobalParam* inst)
     {
         // If the global param is not a pointer type, make it so and insert explicit load insts.
         auto ptrType = as<IRPtrTypeBase>(inst->getDataType());
         if (!ptrType)
         {
+            bool needLoad = true;
+
+            if (translatePerVertexInputType(inst))
+                needLoad = false;
+
             auto innerType = inst->getFullType();
 
             auto arrayType = as<IRArrayType>(inst->getDataType());
@@ -261,7 +299,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
             // Strip any HLSL wrappers
             IRBuilder builder(m_sharedContext->m_irModule);
-            bool needLoad = true;
             auto cbufferType = as<IRConstantBufferType>(innerType);
             auto paramBlockType = as<IRParameterBlockType>(innerType);
             if (cbufferType || paramBlockType)
@@ -1055,6 +1092,100 @@ void legalizeSPIRV(SPIRVEmitSharedContext* sharedContext, IRModule* module)
     context.processModule();
 }
 
+void buildEntryPointReferenceGraph(SPIRVEmitSharedContext* context, IRModule* module)
+{
+    struct WorkItem
+    {
+        IRFunc* entryPoint; IRInst* inst; 
+    
+        HashCode getHashCode() const
+        {
+            return combineHash(Slang::getHashCode(entryPoint), Slang::getHashCode(inst));
+        }
+        bool operator == (const WorkItem& other) const
+        {
+            return entryPoint == other.entryPoint && inst == other.inst;
+        }
+    };
+    HashSet<WorkItem> workListSet;
+    List<WorkItem> workList;
+    auto addToWorkList = [&](WorkItem item)
+    {
+        if (workListSet.add(item))
+            workList.add(item);
+    };
+
+    auto registerEntryPointReference = [&](IRFunc* entryPoint, IRInst* inst)
+        {
+            if (auto set = context->m_referencingEntryPoints.tryGetValue(inst))
+                set->add(entryPoint);
+            else
+            {
+                HashSet<IRFunc*> newSet;
+                newSet.add(entryPoint);
+                context->m_referencingEntryPoints.add(inst, _Move(newSet));
+            }
+        };
+    auto visit = [&](IRFunc* entryPoint, IRInst* inst)
+        {
+            if (auto code = as<IRGlobalValueWithCode>(inst))
+            {
+                registerEntryPointReference(entryPoint, inst);
+                for (auto child : code->getChildren())
+                {
+                    addToWorkList({ entryPoint, child });
+                }
+                return;
+            }
+            switch (inst->getOp())
+            {
+            case kIROp_GlobalParam:
+                registerEntryPointReference(entryPoint, inst);
+                break;
+            case kIROp_Block:
+            case kIROp_SPIRVAsm:
+                for (auto child : inst->getChildren())
+                {
+                    addToWorkList({ entryPoint, child });
+                }
+                break;
+            case kIROp_Call:
+                {
+                    auto call = as<IRCall>(inst);
+                    addToWorkList({ entryPoint, call->getCallee() });
+                }
+                break;
+            case kIROp_SPIRVAsmOperandInst:
+                {
+                    auto operand = as<IRSPIRVAsmOperandInst>(inst);
+                    addToWorkList({ entryPoint, operand->getValue() });
+                }
+                break;
+            }
+            for (UInt i = 0; i < inst->getOperandCount(); i++)
+            {
+                auto operand = inst->getOperand(i);
+                switch (operand->getOp())
+                {
+                case kIROp_GlobalParam:
+                case kIROp_GlobalVar:
+                    addToWorkList({ entryPoint, operand });
+                    break;
+                }
+            }
+        };
+
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        if (globalInst->getOp() == kIROp_Func && globalInst->findDecoration<IREntryPointDecoration>())
+        {
+            visit(as<IRFunc>(globalInst), globalInst);
+        }
+    }
+    for (Index i = 0; i < workList.getCount(); i++)
+        visit(workList[i].entryPoint, workList[i].inst);
+}
+
 void legalizeIRForSPIRV(
     SPIRVEmitSharedContext* context,
     IRModule* module,
@@ -1064,6 +1195,7 @@ void legalizeIRForSPIRV(
     GLSLExtensionTracker extensionTracker;
     legalizeEntryPointsForGLSL(module->getSession(), module, entryPoints, codeGenContext, &extensionTracker);
     legalizeSPIRV(context, module);
+    buildEntryPointReferenceGraph(context, module);
 }
 
 } // namespace Slang

@@ -4,6 +4,15 @@
 
 //TEST:CROSS_COMPILE:-target dxil -entry main -stage fragment -profile sm_6_1
 //TEST:CROSS_COMPILE:-target spirv -entry main -stage fragment -profile glsl_450
+//TEST:SIMPLE(filecheck=CHECK):-emit-spirv-directly -target spirv -entry main -stage fragment -profile glsl_450
+
+// CHECK: OpCapability FragmentBarycentricKHR
+// CHECK: OpExtension "SPV_KHR_fragment_shader_barycentric"
+
+// CHECK: OpEntryPoint Fragment %main "main"
+// CHECK: %{{.*}} = OpAccessChain %_ptr_Input_{{.*}} %{{.*}} %uint_0
+// CHECK: %{{.*}} = OpAccessChain %_ptr_Input_{{.*}} %{{.*}} %uint_1
+// CHECK: %{{.*}} = OpAccessChain %_ptr_Input_{{.*}} %{{.*}} %uint_2
 
 [shader("fragment")]
 void main(

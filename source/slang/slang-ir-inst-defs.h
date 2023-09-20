@@ -1103,6 +1103,10 @@ INST(SPIRVAsmInst, SPIRVAsmInst, 1, 0)
     // A special instruction which represents a type directed truncation
     // operation where extra components are dropped
     INST(SPIRVAsmOperandTruncate, __truncate, 0, HOISTABLE)
+
+    // A special instruction which represents an ID of an entry point that references the current function.
+    INST(SPIRVAsmOperandEntryPoint, __entryPoint, 0, HOISTABLE)
+
     // A type function which returns the result type of sampling an image of
     // this component type
     INST(SPIRVAsmOperandSampledType, __sampledType, 1, HOISTABLE)

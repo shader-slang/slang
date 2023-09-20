@@ -3906,6 +3906,10 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 {
                     return builder->emitSPIRVAsmOperandTruncate();
                 }
+            case SPIRVAsmOperand::EntryPoint:
+                {
+                    return builder->emitSPIRVAsmOperandEntryPoint();
+                }
             }
             SLANG_UNREACHABLE("Unhandled case in visitSPIRVAsmExpr");
         };
@@ -5022,6 +5026,12 @@ struct DestinationDrivenRValueExprLoweringVisitor
 
     // The default case is lower the rvalue expr independently and then assign to destination.
     void visitExpr(Expr* expr)
+    {
+        auto rValue = lowerRValueExpr(context, expr);
+        assign(context, destination, rValue);
+    }
+
+    void visitSelectExpr(SelectExpr* expr)
     {
         auto rValue = lowerRValueExpr(context, expr);
         assign(context, destination, rValue);
