@@ -522,11 +522,6 @@ void generateReflectionFunc(IRBuilder* builder, IRFunc* kernelFunc, IRFunc* host
 
 IRInst* generateHostParamForCUDAParam(IRBuilder* builder, IRParam* param, DiagnosticSink* sink, IRType** outType = nullptr)
 {
-    auto typeMap = [&](IRType* t) -> IRType* {
-        if (auto tensorViewType = as<IRTensorViewType>(t))
-            return builder->getTorchTensorType(tensorViewType->getElementType());
-    };
-
     auto type = translateToHostType(builder, param->getDataType(), sink);
     if (outType)
         *outType = type;
