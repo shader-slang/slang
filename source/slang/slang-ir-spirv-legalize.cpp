@@ -184,7 +184,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 // just prior to the block.
                 const auto asmBlock = spirvAsmOperand->getAsmBlock();
                 builder.setInsertBefore(asmBlock);
-                auto loadedValue = builder.emitLoad(addrInst);
+                auto loadedValue = builder.emitLoad(addr);
                 builder.setInsertBefore(spirvAsmOperand);
                 auto loadedValueOperand = builder.emitSPIRVAsmOperandInst(loadedValue);
                 spirvAsmOperand->replaceUsesWith(loadedValueOperand);
@@ -210,6 +210,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             return true;
         if (as<IRSamplerStateTypeBase>(type))
             return true;
+        if (const auto arr = as<IRArrayTypeBase>(type))
+            return isSpirvUniformConstantType(arr->getElementType());
         switch (type->getOp())
         {
         case kIROp_RaytracingAccelerationStructureType:
