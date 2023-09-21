@@ -172,7 +172,7 @@ IRLoop* isLoopPhi(IRParam* param)
 bool opCanBeConstExprByBackwardPass(IRInst* value)
 {
     if (value->getOp() == kIROp_Param)
-        return isLoopPhi(as<IRParam>(value));
+        return isLoopPhi(as<IRParam, IRDynamicCastBehavior::NoUnwrap>(value));
     return opCanBeConstExpr(value->getOp());
 }
 
