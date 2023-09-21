@@ -14,191 +14,190 @@ In addition, using a per-thread programming model also results in more optimized
 
 In this tutorial, we will use a simple example to walk through the steps to use Slang in your PyTorch project.
 
-### Writing a simple kernel function as a Slang module
-
-Assume we want to write a kernel function that computes `x*x` for each element in the input tensor in Slang. To do so,
-we start by creating a `square.slang` file:
-
-```csharp
-// square.slang
-float square(float x)
-{
-    return x * x;
-}
-```
-
-This function is self-explanatory. To use it in PyTorch, we need to write a GPU kernel function (that maps to a 
-`__global__` CUDA function) that defines how to compute each element of the input tensor. So we continue to write
-the following Slang function:
-
-```csharp
-[CudaKernel]
-void square_fwd_kernel(TensorView<float> input, TensorView<float> output)
-{
-    uint3 globalIdx = cudaBlockIdx() * cudaBlockDim() + cudaThreadIdx();
-
-    if (globalIdx.x > input.size(0) || globalIdx.y > input.size(1))
-        return;
-    float result = square(input[globalIdx.xy]);
-    output[globalIdx.xy] = result;
-}
-```
-
-This code follows the standard pattern of a typical CUDA kernel function. It takes as input
-two tensors, `input` and `output`. 
-It first obtains the global dispatch index of the current thread and performs range check to make sure we don't read or write out
-of the bounds of input and output tensors, and then calls `square()` to compute the per-element result, and
-store it at the corresponding location in `output` tensor.
-
-With a kernel function defined, we then need to expose a CPU(host) function that defines how this kernel is dispatched:
-```csharp
-[TorchEntryPoint]
-TorchTensor<float> square_fwd(TorchTensor<float> input)
-{
-    var result = TorchTensor<float>.zerosLike(input);
-    let blockCount = uint3(1);
-    let groupSize = uint3(result.size(0), result.size(1), 1);
-    __dispatch_kernel(square_fwd_kernel, blockCount, groupSize)(input, result);
-    return result;
-}
-```
-Here, we mark the function with the `[TorchEntryPoint]` attribute, so it will be exported to Python. In the function body, we call `TorchTensor<float>.zerosLike` to allocate a 2D-tensor that has the same size as the input.
-`zerosLike` returns a `TorchTensor<float>` object that represents a CPU handle of a PyTorch tensor.
-Then we launch `square_fwd_kernel` with the `__dispatch_kernel` syntax. Note that we can directly pass
-`TorchTensor<float>` arguments to a `TensorView<float>` parameter and the compiler will automatically convert
-the type and obtain a view into the tensor that can be accessed by the GPU kernel function.
-
-### Calling Slang module from Python
-
-Next, let's see how we can call the `square_fwd` function we defined in the Slang module.
-To do so, we use a python package called `slangpy`. You can obtain it with
-
-```bash
+### Installation
+`slangpy` is available via PyPI, so you can install it simply through
+```sh
 pip install slangpy
 ```
 
-With that, you can use the following code to call `square_fwd` from Python:
+Note that `slangpy` requires `torch` with CUDA support. See the [pytorch](https://pytorch.org/) installation page to find the right version for your platform.
 
-```python
+
+You can check that you have the right installation by running: 
+```sh
+python -c "import torch; print(f'cuda: {torch.cuda.is_available()}')"
+```
+
+### Writing Slang kernels for `slangpy` >= **v1.1.5**
+
+From **v2023.4.0**, Slang supports auto-binding features that make it easier than ever to invoke Slang kernels from python, and interoperate seamlessly with `pytorch` tensors.
+
+Here's a barebones example of a simple squaring kernel written in Slang (`square.slang`):
+
+``` csharp
+[AutoPyBindCUDA]
+[CUDAKernel]
+void square(TensorView<float> input, TensorView<float> output)
+{
+    // Get the 'global' index of this thread.
+    uint3 launchIdx = cudaThreadIdx() + cudaBlockIdx() * cudaBlockDim();
+
+    // If the thread index is beyond the input size, exit early.
+    if (launchIdx.x < input.size(0))
+        return;
+
+    output[launchIdx.x] = input[launchIdx.x] * input[launchIdx.x];
+}
+
+```
+
+`square` performs **element-wise** squaring on `input` and writes them to `output`
+
+
+`slangpy` works by compiling kernels to CUDA and it identifies the functions to compile by checking for the `[CUDAKernel]` attribute.
+The second attribute `[AutoPyBindCUDA]` allows us to call `multiply` directly from python without having to write any host code. If you would like to write the host code yourself for finer control, see the other version of this example [here](#manually-binding-kernels).
+
+You can now simply invoke this kernel from python:
+
+``` Python
 import torch
 import slangpy
 
-m = slangpy.loadModule("square.slang")
+m = slangpy.loadModule('multiply.slang')
 
-x = torch.randn(2,2)
-print(f"X = {x}")
-y = m.square_fwd(x)
-print(f"Y = {y.cpu()}")
+A = torch.randn((1024,), dtype=torch.float).cuda()
+B = torch.randn((1024,), dtype=torch.float).cuda()
+
+output = torch.zeros_like(A).cuda()
+
+# Number of threads launched = blockSize * gridSize
+m.multiply(inputA=A, inputB=B, output=output).launchRaw(blockSize=(32, 1, 1), gridSize=(64, 1, 1))
+
+print(output)
 ```
 
-Result output:
-```
-X = tensor([[ 0.1407,  0.6594],
-        [-0.8978, -1.7230]])
-Y = tensor([[0.0198, 0.4349],
-        [0.8060, 2.9688]])
-```
+The python script `slangpy.loadModule("square.slang")` returns a scope that contains a handle to the `square` kernel.
 
-And that's it! `slangpy.loadModule` uses JIT compilation to compile your Slang source into CUDA binary.
-It may take a little longer the first time you execute the script, but the compiled binaries will be cached and as
-long as the kernel code is not changed, future runs will not rebuild the CUDA kernel.
+The kernel can be invoked by 
+1. calling `square` and binding `torch` tensors as arguments for the kernel, and then
+2. launching it using `launchRaw()` by specifying CUDA launch arguments to `blockSize` & `gridSize`. (Refer to the [CUDA documentation](https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#features-and-technical-specifications) for restrictions around `blockSize`)
 
-Because the PyTorch JIT system requires `ninja`, you need to make sure `ninja` is installed on your system
-and is discoverable from the current environment, you also need to have a C++ compiler available on the system.
-On Windows, this means that Visual Studio need to be installed.
+Note that for semantic clarity reasons, calling a kernel requires the use of keyword arguments with names that are lifted from the `.slang` implementation.
 
-### Exposing an automatically differentiated kernel to PyTorch
+### Invoking derivatives of kernels using slangpy
 
-The above example demonstrates how to write a simple kernel function in Slang and call it from Python.
-Another major benefit of using Slang is that the Slang compiler support generating backward derivative
-propagation functions automatically.
+The `[AutoPyBindCUDA]` attribute can also be used on differentiable functions defined in Slang, and will automatically bind the derivatives. To do this, simply add the `[Differentiable]` attribute.
 
-In the following section, we walk through how to use Slang to generate a backward propagation function
-for `square`, and expose it to PyTorch as an autograd function.
+One key point is that the basic `TensorView<T>` objects are not differentiable. They can be used as buffers for data that does not require derivatives, or even as buffers for the manual accumulation of derivatives.
 
-First we need to tell Slang compiler that we need the `square` function to be considered a differentiable function, so Slang compiler can generate a backward derivative propagation function for it:
-```csharp
+Instead, use the `DiffTensorView` type for when you need differentiable tensors. Currently, `DiffTensorView` only supports the `float` dtype variety, and requires the use of `.load(offset)` and `.store(offset, val)` instead of `[]`, although
+`offset` can be a scalar `uint` or vector `uint2`, `uint3`, etc.. for multi-dimensional indexing.
+
+Here's a barebones example of a differentiable `sqr` that computes the `sin(x)`
+
+``` C
+[AutoPyBindCUDA]
+[CUDAKernel]
 [Differentiable]
-float square(float x)
+void square(DiffTensorView input, DiffTensorView output)
 {
-    return x * x;
-}
-```
-This is done by simply adding a `[Differentiable]` attribute to our `square`function.
+    uint3 launchIdx = cudaThreadIdx() + cudaBlockIdx() * cudaBlockDim();
 
-With that, we can now define `square_bwd_kernel` that performs backward propagation as:
-
-```csharp
-[CudaKernel]
-void square_bwd_kernel(TensorView<float> input, TensorView<float> grad_out, TensorView<float> grad_propagated)
-{
-    uint3 globalIdx = cudaBlockIdx() * cudaBlockDim() + cudaThreadIdx();
-
-    if (globalIdx.x > input.size(0) || globalIdx.y > input.size(1))
+    if (launchIdx.x < inputA.size(0))
         return;
+    
+    float val = input.load(launchIdx.x);
 
-    DifferentialPair<float> dpInput = diffPair(input[globalIdx.xy]);
-    var gradInElem = grad_out[globalIdx.xy];
-    bwd_diff(square)(dpInput, gradInElem);
-    grad_propagated[globalIdx.xy] = dpInput.d;
+    float result = x * x;
+
+    output.store(launchIdx.x, result);
 }
 ```
 
-Note that the function follows the same structure of `square_fwd_kernel`, with the only difference being that
-instead of calling into `square` to compute the forward value for each tensor element, we are calling `bwd_diff(square)`
-that represents the automatically generated backward propagation function of `square`.
-`bwd_diff(square)` will have the following signature:
-```csharp
-void bwd_diff_square(inout DifferentialPair<float> dpInput, float dOut);
+Now, `slangpy.loadModule("square.slang")` returns a scope with three callable handles `square`, `square.fwd` for the forward-mode derivative & `square.bwd` for the reverse-mode derivative.
+
+You can invoke `square()` normally to get the same effect as the previous example, or invoke `square.fwd()` / `square.bwd()` by binding pairs of tensors to compute the derivatives.
+
+``` Python
+import torch
+import slangpy
+
+m = slangpy.loadModule('square.slang')
+
+input = torch.tensor((0, 1, 3, 4, 5), dtype=torch.float).cuda()
+output = torch.zeros_like(input).cuda()
+
+# Invoke normally
+m.square(input=input, output=output).launchRaw(blockSize=(6, 1, 1), gridSize=(1, 1, 1))
+
+print(output)
+
+# Invoke reverse-mode autodiff by first allocating tensors to hold the gradients
+input = torch.tensor((0, 1, 3, 4, 5), dtype=torch.float).cuda()
+input_grad = torch.zeros_like(input).cuda()
+
+output = torch.zeros_like(input)
+# Pass in all 1s as the output derivative for our example
+output_grad = torch.ones_like(output) 
+
+m.sqr.bwd(
+    input=(input, input_grad), output=(output, output_grad)
+).launchRaw(
+    blockSize=(6, 1, 1), gridSize=(1, 1, 1))
+
+# Derivatives get propagated to input_grad
+print(input_grad)
+
+# Note that the derivatives in output_grad are 'consumed'.
+# i.e. all zeros after the call.
+print(output_grad)
 ```
 
-Where the first parameter, `dpInput` represents a pair of original and derivative value for `input`, and the second parameter,
-`dOut`, represents the initial derivative with regard to some latent variable that we wish to back-prop through. The resulting
-derivative will be stored in `dpInput.d`. For example:
-
-```csharp
-// construct a pair where the primal value is 3, and derivative value is 0.
-var dp = diffPair(3.0);
-bwd_diff(square)(dp, 1.0);
-// dp.d is now 6.0
-```
-
-Similar to `square_fwd`, we can define the host side function `square_bwd` as:
-
-```csharp
-[TorchEntryPoint]
-TorchTensor<float> square_bwd(TorchTensor<float> input, TorchTensor<float> grad_out)
-{
-    var grad_propagated = TorchTensor<float>.zerosLike(input);
-    let blockCount = uint3(1);
-    let groupSize = uint3(input.size(0), input.size(1), 1);
-    __dispatch_kernel(square_bwd_kernel, blockCount, groupSize)(input, grad_out, grad_propagated);
-    return grad_propagated;
-}
-```
+`slangpy` also binds the forward-mode version of your kernel (propagate derivatives of inputs to the output) which can be invoked the same way using `module.sqr.fwd()`
 
 You can refer to [this documentation](07-autodiff.md) for a detailed reference of Slang's automatic differentiation feature.
 
-With this, the python script `slangpy.loadModule("square.slang")` will now return
-a scope that defines two functions, `square_fwd` and `square_bwd`. We can then use these
-two functions to define a PyTorch autograd function class:
+### Wrapping your kernels as pytorch functions
+
+`pytorch` offers an easy way to define a custom operation using `torch.autograd.Function`, and defining the `.forward()` and `.backward()` members.
+
+This can be very helpful to wrap your Slang kernels. Here's an example of the `square` kernel as a differentiable pytorch function.
 
 ```python
 m = slangpy.loadModule("square.slang")
 
-class MySquareFuncInSlang(torch.autograd.Function):
+class MySquareFunc(torch.autograd.Function):
     @staticmethod
     def forward(ctx, input):
-        ctx.save_for_backward(input)
-        return m.square_fwd(input)
+        output = torch.zeros_like(input)
+
+        kernel_with_args = m.square(input=input, output=output)
+        kernel_with_args.launchRaw(
+            blockSize=(32, 32, 1),
+            gridSize=((input.shape[0] + 31) / 32, (input.shape[1] + 31) / 32, 1))
+
+        ctx.save_for_backward(input, output)
+
+        return output
 
     @staticmethod
     def backward(ctx, grad_output):
-        [input] = ctx.saved_tensors
-        return m.square_bwd(input, grad_output)
+        (input, output) = ctx.saved_tensors
+
+        input_grad = torch.zeros_like(input)
+        
+        # Note: When using DiffTensorView, grad_output gets 'consumed' during the reverse-mode.
+        # If grad_output may be reused, consider calling grad_output = grad_output.clone()
+        #
+        kernel_with_args = m.square.bwd(input=(input, input_grad), output=(output, grad_output))
+        kernel_with_args.launchRaw(
+            blockSize=(32, 32, 1),
+            gridSize=((input.shape[0] + 31) / 32, (input.shape[1] + 31) / 32, 1))
+        
+        return input_grad
 ```
 
-Now we can use the autograd function `MySquareFuncInSlang` in our python script:
+Now we can use the autograd function `MySquareFunc` in our python script:
 
 ```python
 x = torch.tensor([[3.0, 4.0],[0.0, 1.0]], requires_grad=True, device='cuda')
@@ -446,6 +445,169 @@ back propagated derivative values.
 Again, to understand all the details of the automatic differentiation system, please refer to the 
 [Automatic Differentiation](07-autodiff.md) chapter for a detailed explanation.
 
+## Manually binding kernels
+`[AutoPyBindCUDA]` works for most use cases, but in certain situations, it may be necessary to write the *host* function by hand. The host function can also be written in Slang, and `slangpy` handles its compilation to C++.
+
+Here's the same `square` example from before, but with a hand-written host function:
+
+```csharp
+// square.slang
+float square(float x)
+{
+    return x * x;
+}
+```
+
+This function is self-explanatory. To use it in PyTorch, we need to write a GPU kernel function (that maps to a 
+`__global__` CUDA function) that defines how to compute each element of the input tensor. So we continue to write
+the following Slang function:
+
+```csharp
+[CudaKernel]
+void square_fwd_kernel(TensorView<float> input, TensorView<float> output)
+{
+    uint3 globalIdx = cudaBlockIdx() * cudaBlockDim() + cudaThreadIdx();
+
+    if (globalIdx.x > input.size(0) || globalIdx.y > input.size(1))
+        return;
+    float result = square(input[globalIdx.xy]);
+    output[globalIdx.xy] = result;
+}
+```
+
+This code follows the standard pattern of a typical CUDA kernel function. It takes as input
+two tensors, `input` and `output`. 
+It first obtains the global dispatch index of the current thread and performs range check to make sure we don't read or write out
+of the bounds of input and output tensors, and then calls `square()` to compute the per-element result, and
+store it at the corresponding location in `output` tensor.
+
+With a kernel function defined, we then need to expose a CPU(host) function that defines how this kernel is dispatched:
+```csharp
+[TorchEntryPoint]
+TorchTensor<float> square_fwd(TorchTensor<float> input)
+{
+    var result = TorchTensor<float>.zerosLike(input);
+    let blockCount = uint3(1);
+    let groupSize = uint3(result.size(0), result.size(1), 1);
+    __dispatch_kernel(square_fwd_kernel, blockCount, groupSize)(input, result);
+    return result;
+}
+```
+Here, we mark the function with the `[TorchEntryPoint]` attribute, so it will be exported to Python. In the function body, we call `TorchTensor<float>.zerosLike` to allocate a 2D-tensor that has the same size as the input.
+`zerosLike` returns a `TorchTensor<float>` object that represents a CPU handle of a PyTorch tensor.
+Then we launch `square_fwd_kernel` with the `__dispatch_kernel` syntax. Note that we can directly pass
+`TorchTensor<float>` arguments to a `TensorView<float>` parameter and the compiler will automatically convert
+the type and obtain a view into the tensor that can be accessed by the GPU kernel function.
+
+### Calling Slang module from Python
+
+Next, let's see how we can call the `square_fwd` function we defined in the Slang module.
+To do so, we use a python package called `slangpy`. You can obtain it with
+
+```bash
+pip install slangpy
+```
+
+With that, you can use the following code to call `square_fwd` from Python:
+
+```python
+import torch
+import slangpy
+
+m = slangpy.loadModule("square.slang")
+
+x = torch.randn(2,2)
+print(f"X = {x}")
+y = m.square_fwd(x)
+print(f"Y = {y.cpu()}")
+```
+
+Result output:
+```
+X = tensor([[ 0.1407,  0.6594],
+        [-0.8978, -1.7230]])
+Y = tensor([[0.0198, 0.4349],
+        [0.8060, 2.9688]])
+```
+
+And that's it! `slangpy.loadModule` uses JIT compilation to compile your Slang source into CUDA binary.
+It may take a little longer the first time you execute the script, but the compiled binaries will be cached and as
+long as the kernel code is not changed, future runs will not rebuild the CUDA kernel.
+
+Because the PyTorch JIT system requires `ninja`, you need to make sure `ninja` is installed on your system
+and is discoverable from the current environment, you also need to have a C++ compiler available on the system.
+On Windows, this means that Visual Studio need to be installed.
+
+### Manual binding for kernel derivatives
+
+The above example demonstrates how to write a simple kernel function in Slang and call it from Python.
+Another major benefit of using Slang is that the Slang compiler support generating backward derivative
+propagation functions automatically.
+
+In the following section, we walk through how to use Slang to generate a backward propagation function
+for `square`, and expose it to PyTorch as an autograd function.
+
+First we need to tell Slang compiler that we need the `square` function to be considered a differentiable function, so Slang compiler can generate a backward derivative propagation function for it:
+```csharp
+[Differentiable]
+float square(float x)
+{
+    return x * x;
+}
+```
+This is done by simply adding a `[Differentiable]` attribute to our `square`function.
+
+With that, we can now define `square_bwd_kernel` that performs backward propagation as:
+
+```csharp
+[CudaKernel]
+void square_bwd_kernel(TensorView<float> input, TensorView<float> grad_out, TensorView<float> grad_propagated)
+{
+    uint3 globalIdx = cudaBlockIdx() * cudaBlockDim() + cudaThreadIdx();
+
+    if (globalIdx.x > input.size(0) || globalIdx.y > input.size(1))
+        return;
+
+    DifferentialPair<float> dpInput = diffPair(input[globalIdx.xy]);
+    var gradInElem = grad_out[globalIdx.xy];
+    bwd_diff(square)(dpInput, gradInElem);
+    grad_propagated[globalIdx.xy] = dpInput.d;
+}
+```
+
+Note that the function follows the same structure of `square_fwd_kernel`, with the only difference being that
+instead of calling into `square` to compute the forward value for each tensor element, we are calling `bwd_diff(square)`
+that represents the automatically generated backward propagation function of `square`.
+`bwd_diff(square)` will have the following signature:
+```csharp
+void bwd_diff_square(inout DifferentialPair<float> dpInput, float dOut);
+```
+
+Where the first parameter, `dpInput` represents a pair of original and derivative value for `input`, and the second parameter,
+`dOut`, represents the initial derivative with regard to some latent variable that we wish to back-prop through. The resulting
+derivative will be stored in `dpInput.d`. For example:
+
+```csharp
+// construct a pair where the primal value is 3, and derivative value is 0.
+var dp = diffPair(3.0);
+bwd_diff(square)(dp, 1.0);
+// dp.d is now 6.0
+```
+
+Similar to `square_fwd`, we can define the host side function `square_bwd` as:
+
+```csharp
+[TorchEntryPoint]
+TorchTensor<float> square_bwd(TorchTensor<float> input, TorchTensor<float> grad_out)
+{
+    var grad_propagated = TorchTensor<float>.zerosLike(input);
+    let blockCount = uint3(1);
+    let groupSize = uint3(input.size(0), input.size(1), 1);
+    __dispatch_kernel(square_bwd_kernel, blockCount, groupSize)(input, grad_out, grad_propagated);
+    return grad_propagated;
+}
+```
+
 ## Builtin Library Support for PyTorch Interop
 
 As shown in previous tutorial, Slang has defined the `TorchTensor<T>` and `TensorView<T>` type for interop with PyTorch
@@ -526,6 +688,17 @@ Atomically swaps `val` into the element at `index`. Available for `float` and 32
 #### `void TensorView<T>.InterlockedCompareExchange(vector<uint, N> index, T compare, T val)`
 Atomically swaps `val` into the element at `index` if the element equals to `compare`. Available for `float` and 32/64 bit integer types only.
 
+### `DiffTensorView` methods
+
+#### `float DiffTensorView.load(vector<uint, N> index)`
+Loads the 32-bit floating point data at the specified multi-dimensional `index`. This method is **differentiable**, and in reverse-mode will perform an atomic-add.
+
+#### `void DiffTensorView.store(vector<uint, N> index, float val)`
+Stores the 32-bit floating point value `val` at the specified multi-dimensional `index`. This method is **differentiable**, and in reverse-mode will perform an *atomic exchange* to retrieve the derivative and replace with 0.
+
+#### `uint DiffTensorView.size(int dim)`
+Returns the tensor's size (in number of elements) at `dim`.
+
 ### CUDA Support Functions
 
 #### `cudaThreadIdx()`
@@ -551,7 +724,58 @@ Marks a function for export to Python. Functions marked with `[TorchEntryPoint]`
 #### `[CudaDeviceExport]` attribute
 Marks a function as a CUDA device function, and ensures the compiler to include it in the generated CUDA source.
 
+#### `[AutoPyBindCUDA]` attribute
+Markes a cuda kernel for automatic binding generation so that it may be invoked from python without having to hand-code the torch entry point. The marked function **must** also be marked with `[CudaKernel]`. If the marked function is also marked with `[Differentiable]`, this will also generate bindings for the derivative methods.
+
+Restriction: methods marked with `[AutoPyBindCUDA]` will not operate 
+
 ## Type Marshalling Between Slang and Python
+
+
+### Python-CUDA type marshalling for functions using `[AutoPyBindCUDA]` 
+
+When using auto-binding, aggregate types like structs are converted to Python `namedtuples` and are made available when using `slangpy.loadModule`. 
+
+```csharp
+// mesh.slang
+struct Mesh
+{
+    TensorView<float> vertices;
+    TensorView<int> indices;
+};
+
+[AutoPyBindCUDA]
+[CUDAKernel]
+void processMesh(Mesh mesh)
+{
+    /* ... */ 
+}
+```
+
+Here, since `Mesh` is being used by `renderMesh`, the loaded module will provide `Mesh` as a python `namedtuple` with named fields.
+While using the `namedtuple` is the best way to use structured arguments, they can also be passed as a python `dict` or `tuple`
+
+```python
+m = slangpy.loadModule('mesh.slang')
+
+vertices = torch.tensor()
+indices = torch.tensor()
+
+# use namedtuple to provide structured input.
+mesh = m.Mesh(vertices=vertices, indices=indices)
+m.processMesh(mesh=mesh).launchRaw(blockSize=(32, 32, 1), gridSize=(1, 1, 1))
+
+# use dict to provide input.
+mesh = {'vertices': vertices, 'indices':indices}
+m.processMesh(mesh=mesh).launchRaw(blockSize=(32, 32, 1), gridSize=(1, 1, 1))
+
+# use tuple to provide input (warning: user responsible for right order)
+mesh = (vertices, indices)
+m.processMesh(mesh=mesh).launchRaw(blockSize=(32, 32, 1), gridSize=(1, 1, 1))
+```
+
+
+### Python-CUDA type marshalling for functions using `[TorchEntryPoint]`
 
 The return types and parameters types of an exported `[TorchEntryPoint]` function can be a basic type (e.g. `float`, `int` etc.), a vector type (e.g. `float3`), a `TorchTensor<T>` type, an array type, or a struct type.
 
