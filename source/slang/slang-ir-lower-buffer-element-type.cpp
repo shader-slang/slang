@@ -438,8 +438,8 @@ namespace Slang
                             auto result = builder.emitCast(info.loweredType, param);
                             builder.emitReturn(result);
                         }
+                        return info;
                     }
-                    break;
                 default:
                     break;
                 }

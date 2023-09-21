@@ -953,6 +953,21 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         inst->insertAtEnd(m_module->getModuleInst());
     }
 
+    static bool isAsmInst(IRInst* inst)
+    {
+        return (as<IRSPIRVAsmInst>(inst) || as<IRSPIRVAsmOperand>(inst));
+    }
+
+    void processSPIRVAsm(IRSPIRVAsm* inst)
+    {
+        // Move anything that is not an spirv instruction to the outer parent.
+        for (auto child : inst->getModifiableChildren())
+        {
+            if (!isAsmInst(child))
+                child->insertBefore(inst);
+        }
+    }
+
     void processModule()
     {
         // Process global params before anything else, so we don't generate inefficient
@@ -1032,7 +1047,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             case kIROp_MakeOptionalNone:
                 processConstructor(inst);
                 break;
-
+            case kIROp_SPIRVAsm:
+                processSPIRVAsm(as<IRSPIRVAsm>(inst));
+                break;
             default:
                 for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
                 {
