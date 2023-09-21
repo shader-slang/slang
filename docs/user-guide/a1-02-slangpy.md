@@ -121,42 +121,6 @@ Now, `slangpy.loadModule("square.slang")` returns a scope with three callable ha
 You can invoke `square()` normally to get the same effect as the previous example, or invoke `square.fwd()` / `square.bwd()` by binding pairs of tensors to compute the derivatives.
 
 
-You can check that you have the right installation by running: 
-```sh
-python -c "import torch; print(f'cuda: {torch.cuda.is_available()}')"
-```
-
-### Writing Slang kernels for `slangpy` >= **v1.1.5**
-
-From **v2023.4.0**, Slang supports auto-binding features that make it easier than ever to invoke Slang kernels from python, and interoperate seamlessly with `pytorch` tensors.
-
-Here's a barebones example of a simple squaring kernel written in Slang (`square.slang`):
-
-``` csharp
-[AutoPyBindCUDA]
-[CUDAKernel]
-void square(TensorView<float> input, TensorView<float> output)
-{
-    // Get the 'global' index of this thread.
-    uint3 launchIdx = cudaThreadIdx() + cudaBlockIdx() * cudaBlockDim();
-
-    // If the thread index is beyond the input size, exit early.
-    if (launchIdx.x < input.size(0))
-        return;
-
-    output[launchIdx.x] = input[launchIdx.x] * input[launchIdx.x];
-}
-
-```
-
-`square` performs **element-wise** squaring on `input` and writes them to `output`
-
-
-`slangpy` works by compiling kernels to CUDA and it identifies the functions to compile by checking for the `[CUDAKernel]` attribute.
-The second attribute `[AutoPyBindCUDA]` allows us to call `multiply` directly from python without having to write any host code. If you would like to write the host code yourself for finer control, see the other version of this example [here](#manually-binding-kernels).
-
-You can now simply invoke this kernel from python:
-
 ``` Python
 import torch
 import slangpy
