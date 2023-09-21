@@ -543,12 +543,23 @@ void TextureTypeInfo::writeQueryFunctions()
     }
 }
 
-static String spirvReadIntrinsic()
+static String spirvReadIntrinsic(SlangResourceAccess access)
 {
     StringBuilder spirvBuilder;
     const char* i = "                    ";
-    spirvBuilder << i << "%sampled : __sampledType(T) = OpImageRead $this $location;\n";
-    spirvBuilder << i << "__truncate $$T result __sampledType(T) %sampled;";
+    switch (access)
+    {
+    case SLANG_RESOURCE_ACCESS_NONE:
+    case SLANG_RESOURCE_ACCESS_READ:
+        spirvBuilder << i << "%sampled : __sampledType(T) = OpImageFetch $this $location;\n";
+        spirvBuilder << i << "__truncate $$T result __sampledType(T) %sampled;";
+        break;
+
+    default:
+        spirvBuilder << i << "%sampled : __sampledType(T) = OpImageRead $this $location;\n";
+        spirvBuilder << i << "__truncate $$T result __sampledType(T) %sampled;";
+        break;
+    }
     return spirvBuilder;
 }
 
@@ -663,7 +674,7 @@ void TextureTypeInfo::writeSubscriptFunctions()
         "operator[]",
         "get",
         glslBuilder,
-        spirvReadIntrinsic(),
+        spirvReadIntrinsic(access),
         cudaBuilder
     );
 
