@@ -228,7 +228,7 @@ struct ExtractPrimalFuncContext
                     }
                     else
                     {
-                        if (as<IRParam>(inst))
+                        if (as<IRParam, IRDynamicCastBehavior::NoUnwrap>(inst))
                             builder.setInsertBefore(block->getFirstOrdinaryInst());
                         else
                             builder.setInsertAfter(inst);
@@ -427,7 +427,7 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
 
     for (auto inst : instsToRemove)
     {
-        if (as<IRParam>(inst))
+        if (as<IRParam, IRDynamicCastBehavior::NoUnwrap>(inst))
             removePhiArgs(inst);
         inst->removeAndDeallocate();
     }

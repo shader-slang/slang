@@ -471,7 +471,7 @@ public:
                 auto block = as<IRBlock>(inst->getParent());
                 if (block != funcInst->getFirstBlock())
                 {
-                    auto paramIndex = getParamIndexInBlock(as<IRParam>(inst));
+                    auto paramIndex = getParamIndexInBlock(as<IRParam, IRDynamicCastBehavior::NoUnwrap>(inst));
                     if (paramIndex != -1)
                     {
                         for (auto p : block->getPredecessors())

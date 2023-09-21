@@ -205,7 +205,7 @@ static bool doesLoopHasSideEffect(IRGlobalValueWithCode* func, IRLoop* loopInst)
         auto rootAddr = getRootAddr(addr);
         if (isGlobalOrUnknownMutableAddress(func, rootAddr))
             return true;
-        if (as<IRParam>(rootAddr))
+        if (as<IRParam, IRDynamicCastBehavior::NoUnwrap>(rootAddr))
             return true;
 
         // If we can't find the address from our map, we conservatively assume it is an unknown address.

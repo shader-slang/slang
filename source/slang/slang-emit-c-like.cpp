@@ -3321,6 +3321,20 @@ bool CLikeSourceEmitter::isTargetIntrinsic(IRInst* inst)
     return findTargetIntrinsicDefinition(inst, intrinsicDef);
 }
 
+bool shouldWrappInExternCBlock(IRFunc* func)
+{
+    for (auto decor : func->getDecorations())
+    {
+        switch (decor->getOp())
+        {
+        case kIROp_ExternCDecoration:
+        case kIROp_CudaKernelDecoration:
+            return true;
+        }
+    }
+    return false;
+}
+
 void CLikeSourceEmitter::emitFunc(IRFunc* func)
 {
     // Target-intrinsic functions should never be emitted
@@ -3329,6 +3343,15 @@ void CLikeSourceEmitter::emitFunc(IRFunc* func)
     if (isTargetIntrinsic(func))
         return;
 
+    bool shouldCloseExternCBlock = shouldWrappInExternCBlock(func);
+    if (shouldCloseExternCBlock)
+    {
+        // If this is a C++ `extern "C"` function, then we need to emit
+        // it as a C function, since that is what the C++ compiler will
+        // expect.
+        //
+        m_writer->emit("extern \"C\" {\n");
+    }
 
     if(!isDefinition(func))
     {
@@ -3344,6 +3367,10 @@ void CLikeSourceEmitter::emitFunc(IRFunc* func)
         // and we can emit it as such.
         //
         emitSimpleFunc(func);
+    }
+    if (shouldCloseExternCBlock)
+    {
+        m_writer->emit("}\n");
     }
 }
 

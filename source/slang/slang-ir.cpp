@@ -304,12 +304,12 @@ namespace Slang
 
     IRParam* IRParam::getNextParam()
     {
-        return as<IRParam>(getNextInst());
+        return as<IRParam, IRDynamicCastBehavior::NoUnwrap>(getNextInst());
     }
 
     IRParam* IRParam::getPrevParam()
     {
-        return as<IRParam>(getPrevInst());
+        return as<IRParam, IRDynamicCastBehavior::NoUnwrap>(getPrevInst());
     }
 
     // IRArrayTypeBase
@@ -472,7 +472,7 @@ namespace Slang
         // If the last instruction is a parameter, then
         // there are no ordinary instructions, so the last
         // one is a null pointer.
-        if (as<IRParam>(inst))
+        if (as<IRParam, IRDynamicCastBehavior::NoUnwrap>(inst))
             return nullptr;
 
         // Otherwise the last instruction is the last "ordinary"
@@ -1643,8 +1643,8 @@ namespace Slang
         // instructions, so they need to come after
         // any parameters of the parent.
         //
-        while(auto param = as<IRParam>(insertBeforeInst))
-            insertBeforeInst = param->getNextInst();
+        while (insertBeforeInst && insertBeforeInst->getOp() == kIROp_Param)
+            insertBeforeInst = insertBeforeInst->getNextInst();
 
         // For instructions that will be placed at module scope,
         // we don't care about relative ordering, but for everything
@@ -6425,14 +6425,14 @@ namespace Slang
 
         // First walk through any `param` instructions,
         // so that we can format them nicely
-        if (auto firstParam = as<IRParam>(inst))
+        if (auto firstParam = as<IRParam, IRDynamicCastBehavior::NoUnwrap>(inst))
         {
             dump(context, "(\n");
             context->indent += 2;
 
             for(;;)
             {
-                auto param = as<IRParam>(inst);
+                auto param = as<IRParam, IRDynamicCastBehavior::NoUnwrap>(inst);
                 if (!param)
                     break;
 
