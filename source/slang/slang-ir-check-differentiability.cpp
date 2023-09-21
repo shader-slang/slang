@@ -274,14 +274,11 @@ public:
         InstHashSet expectDiffSet(funcInst->getModule());
         InstHashSet carryNonTrivialDiffSet(funcInst->getModule());
 
-        int differentiableOutputs = 0;
         bool isDifferentiableReturnType = false;
         for (auto param : funcInst->getFirstBlock()->getParams())
         {
             if (isDifferentiableType(diffTypeContext, param->getFullType()))
             {
-                if (as<IROutTypeBase>(param->getFullType()))
-                    differentiableOutputs++;
                 produceDiffSet.add(param);
                 carryNonTrivialDiffSet.add(param);
             }
@@ -290,7 +287,6 @@ public:
         {
             if (isDifferentiableType(diffTypeContext, funcType->getResultType()))
             {
-                differentiableOutputs++;
                 isDifferentiableReturnType = true;
             }
         }

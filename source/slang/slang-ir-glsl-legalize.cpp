@@ -1519,7 +1519,7 @@ ScalarizedVal adaptType(
                 val = builder->emitVectorReshape(fromType, val);
             }
         }
-        else if (auto toBasicType = as<IRBasicType>(toType))
+        else if (as<IRBasicType>(toType))
         {
             UInt index = 0;
             val = builder->emitSwizzle(fromVector->getElementType(), val, 1, &index);
