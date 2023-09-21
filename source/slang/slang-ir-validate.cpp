@@ -80,7 +80,7 @@ namespace Slang
                 validate(context, state <= kState_AfterDecoration, child, "decorations must come before other child instructions");
                 state = kState_AfterDecoration;
             }
-            else if( as<IRParam>(child) )
+            else if( as<IRParam, IRDynamicCastBehavior::NoUnwrap>(child) )
             {
                 validate(context, state <= kState_AfterParam, child, "parameters must come before ordinary instructions");
                 state = kState_AfterParam;
