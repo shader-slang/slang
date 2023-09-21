@@ -522,11 +522,6 @@ void generateReflectionFunc(IRBuilder* builder, IRFunc* kernelFunc, IRFunc* host
 
 IRInst* generateHostParamForCUDAParam(IRBuilder* builder, IRParam* param, DiagnosticSink* sink, IRType** outType = nullptr)
 {
-    auto typeMap = [&](IRType* t) -> IRType* {
-        if (auto tensorViewType = as<IRTensorViewType>(t))
-            return builder->getTorchTensorType(tensorViewType->getElementType());
-    };
-
     auto type = translateToHostType(builder, param->getDataType(), sink);
     if (outType)
         *outType = type;
@@ -749,7 +744,7 @@ IRFunc* generateCUDAWrapperForFunc(IRFunc* func, DiagnosticSink* sink)
         builder.addExternCppDecoration(hostFunc, externCppHint->getName());
     }
 
-    if (auto exportInfoHint = func->findDecoration<IRAutoPyBindExportInfoDecoration>())
+    if (func->findDecoration<IRAutoPyBindExportInfoDecoration>())
         generateReflectionFunc(&builder, func, hostFunc);
 
     return hostFunc;
@@ -919,7 +914,7 @@ void generateDerivativeWrappers(IRModule* module, DiagnosticSink* sink)
                 builder.emitReturn(fwdDiffCall);
 
                 // If the original func is a CUDA kernel, mark the wrapper as a CUDA kernel as well.
-                if (auto kernelHint = func->findDecoration<IRCudaKernelDecoration>())
+                if (func->findDecoration<IRCudaKernelDecoration>())
                     builder.addCudaKernelDecoration(wrapperFunc);
 
                 // Add an auto-pybind-cuda decoration to the wrapper function to further generate the 
@@ -975,7 +970,7 @@ void generateDerivativeWrappers(IRModule* module, DiagnosticSink* sink)
                 builder.emitReturn(fwdDiffCall);
 
                 // If the original func is a CUDA kernel, mark the wrapper as a CUDA kernel as well.
-                if (auto kernelHint = func->findDecoration<IRCudaKernelDecoration>())
+                if (func->findDecoration<IRCudaKernelDecoration>())
                     builder.addCudaKernelDecoration(wrapperFunc);
 
                 // Add an auto-pybind-cuda decoration to the wrapper function to further generate the 
