@@ -61,8 +61,12 @@ static IRInst* floatTogether(IRInst* f, IRInst* g)
     {
         SLANG_ASSERT(i);
 
-        // If any instruction in x has side effects, we can't reorder things
-        if(i->mightHaveSideEffects())
+        // If the instruction is not movable, then obviously we can't move it.
+        //
+        // For a slight optimization: This is actually stricter than we need:
+        // if `x = p;q` and f and g are movable, then we can safely move f and
+        // g in and maintain the ordering of p and q
+        if(!isMovableInst(i))
             return nullptr;
             
         if(usedByG(i))
