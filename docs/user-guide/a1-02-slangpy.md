@@ -66,12 +66,11 @@ import slangpy
 m = slangpy.loadModule('multiply.slang')
 
 A = torch.randn((1024,), dtype=torch.float).cuda()
-B = torch.randn((1024,), dtype=torch.float).cuda()
 
 output = torch.zeros_like(A).cuda()
 
 # Number of threads launched = blockSize * gridSize
-m.multiply(inputA=A, inputB=B, output=output).launchRaw(blockSize=(32, 1, 1), gridSize=(64, 1, 1))
+m.multiply(input=A, output=output).launchRaw(blockSize=(32, 1, 1), gridSize=(64, 1, 1))
 
 print(output)
 ```
