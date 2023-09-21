@@ -8146,6 +8146,10 @@ namespace Slang
         case kIROp_ExtractExistentialValue:
         case kIROp_ExtractExistentialWitnessTable:
             return true;
+        case kIROp_Call:
+            // Similar to the case in IRInst::mightHaveSideEffects, pure
+            // calls are ok
+            return isSideEffectFreeFunctionalCall(cast<IRCall>(inst));
         case kIROp_Load:
             // Load is generally not movable, an exception is loading a global constant buffer.
             if (auto load = as<IRLoad>(inst))
