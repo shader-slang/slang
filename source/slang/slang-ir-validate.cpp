@@ -346,7 +346,7 @@ namespace Slang
         // validate its children.
         validateIRInstChildren(context, inst);
 
-        if (auto code = as<IRGlobalValueWithCode>(inst))
+        if (as<IRGlobalValueWithCode>(inst))
             context->domTree = nullptr;
     }
 

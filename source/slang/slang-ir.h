@@ -2427,6 +2427,9 @@ bool isBuiltin(IRInst* inst);
     // Get the enclosuing function of an instruction.
 IRFunc* getParentFunc(IRInst* inst);
 
+    // True if moving this inst will not change the semantics of the program
+bool isMovableInst(IRInst* inst);
+
 #if SLANG_ENABLE_IR_BREAK_ALLOC
 uint32_t& _debugGetIRAllocCounter();
 #endif
