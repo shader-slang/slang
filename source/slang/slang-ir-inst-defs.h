@@ -766,6 +766,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// An extern_cpp decoration marks the inst to emit its name without mangling for C++ interop.
     INST(ExternCppDecoration, externCpp, 1, 0)
 
+        // An externC decoration marks a function should be emitted inside an extern "C" block.
+    INST(ExternCDecoration, externC, 0, 0)
+
         /// An dllImport decoration marks a function as imported from a DLL. Slang will generate dynamic function loading logic to use this function at runtime.
     INST(DllImportDecoration, dllImport, 2, 0)
         /// An dllExport decoration marks a function as an export symbol. Slang will generate a native wrapper function that is exported to DLL.

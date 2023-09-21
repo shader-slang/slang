@@ -543,6 +543,15 @@ struct IRExternCppDecoration : IRDecoration
     UnownedStringSlice getName() { return getNameOperand()->getStringSlice(); }
 };
 
+struct IRExternCDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_ExternCDecoration
+    };
+    IR_LEAF_ISA(ExternCDecoration)
+};
+
 struct IRDllImportDecoration : IRDecoration
 {
     enum
@@ -4274,6 +4283,11 @@ public:
     void addExternCppDecoration(IRInst* value, UnownedStringSlice const& mangledName)
     {
         addDecoration(value, kIROp_ExternCppDecoration, getStringValue(mangledName));
+    }
+
+    void addExternCDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_ExternCDecoration);
     }
 
     void addForceInlineDecoration(IRInst* value)
