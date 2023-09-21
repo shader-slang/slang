@@ -381,6 +381,23 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                         insertLoadAtLatestLocation(inst, use);
                     });
             }
+            else if (arraySize)
+            {
+                traverseUses(inst, [&](IRUse* use)
+                    {
+                        auto user = use->getUser();
+                        if (auto getElement = as<IRGetElement>(user))
+                        {
+                            // For array resources, getElement(r, index) ==> getElementPtr(r, index).
+                            IRBuilder builder(getElement);
+                            builder.setInsertBefore(user);
+                            auto newAddr = builder.emitElementAddress(builder.getPtrType(kIROp_PtrType, innerElementType, storageClass), inst, getElement->getIndex());
+                            user->replaceUsesWith(newAddr);
+                            user->removeAndDeallocate();
+                            return;
+                        }
+                    });
+            }
         }
         processGlobalVar(inst);
     }
