@@ -92,7 +92,7 @@ One key point is that the basic `TensorView<T>` objects are not differentiable. 
 Instead, use the `DiffTensorView` type for when you need differentiable tensors. Currently, `DiffTensorView` only supports the `float` dtype variety, and requires the use of `.load(offset)` and `.store(offset, val)` instead of `[]`, although
 `offset` can be a scalar `uint` or vector `uint2`, `uint3`, etc.. for multi-dimensional indexing.
 
-Here's a barebones example of a differentiable `sqr` that computes the `sin(x)`
+Here's a barebones example of a differentiable `sqr` that computes `x*x`
 
 ``` C
 [AutoPyBindCUDA]
