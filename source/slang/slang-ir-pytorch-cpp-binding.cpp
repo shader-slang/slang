@@ -315,9 +315,11 @@ static void generateCppBindingForFunc(IRFunc* func, DiagnosticSink* sink)
         inst->removeAndDeallocate();
 }
 
-IRType* translateToHostType(IRBuilder* builder, IRType* type, DiagnosticSink* sink = nullptr)
+IRType* translateToHostType(IRBuilder* builder, IRType* type, IRInst* func, DiagnosticSink* sink = nullptr)
 {
     if (as<IRBasicType>(type))
+        return type;
+    if (as<IRVectorType>(type))
         return type;
 
     switch (type->getOp())
@@ -331,7 +333,7 @@ IRType* translateToHostType(IRBuilder* builder, IRType* type, DiagnosticSink* si
         List<IRType*> fieldTypes;
         for (auto field : as<IRStructType>(type)->getFields())
         {
-            fieldTypes.add(translateToHostType(builder, field->getFieldType()));
+            fieldTypes.add(translateToHostType(builder, field->getFieldType(), func));
         }
         auto hostStructType = builder->createStructType();
 
@@ -348,12 +350,14 @@ IRType* translateToHostType(IRBuilder* builder, IRType* type, DiagnosticSink* si
     }
 
     if (sink)
-        sink->diagnose(type->sourceLoc, Diagnostics::unableToAutoMapCUDATypeToHostType, type);
+        sink->diagnose(type->sourceLoc, Diagnostics::unableToAutoMapCUDATypeToHostType, type, func);
     return nullptr;
 }
 
 IRInst* castHostToCUDAType(IRBuilder* builder, IRType* hostType, IRType* cudaType, IRInst* inst)
 {
+    if (hostType == cudaType)
+        return inst;
     if (as<IRBasicType>(hostType) && as<IRBasicType>(cudaType))
         return inst;
 
@@ -522,7 +526,7 @@ void generateReflectionFunc(IRBuilder* builder, IRFunc* kernelFunc, IRFunc* host
 
 IRInst* generateHostParamForCUDAParam(IRBuilder* builder, IRParam* param, DiagnosticSink* sink, IRType** outType = nullptr)
 {
-    auto type = translateToHostType(builder, param->getDataType(), sink);
+    auto type = translateToHostType(builder, param->getDataType(), getParentFunc(param), sink);
     if (outType)
         *outType = type;
     auto hostParam = builder->emitParam(type);
