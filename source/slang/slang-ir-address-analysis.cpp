@@ -64,7 +64,7 @@ namespace Slang
             }
         }
 
-        if (!latestOperand || as<IRParam>(latestOperand))
+        if (!latestOperand || as<IRParam, IRDynamicCastBehavior::NoUnwrap>(latestOperand))
             inst->insertBefore(earliestBlock->getFirstOrdinaryInst());
         else
             inst->insertAfter(latestOperand);

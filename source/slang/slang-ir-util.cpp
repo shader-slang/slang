@@ -617,7 +617,7 @@ void removeLinkageDecorations(IRGlobalValueWithCode* func)
 
 void setInsertBeforeOrdinaryInst(IRBuilder* builder, IRInst* inst)
 {
-    if (as<IRParam>(inst))
+    if (as<IRParam, IRDynamicCastBehavior::NoUnwrap>(inst))
     {
         SLANG_RELEASE_ASSERT(as<IRBlock>(inst->getParent()));
         auto lastParam = as<IRBlock>(inst->getParent())->getLastParam();
@@ -631,7 +631,7 @@ void setInsertBeforeOrdinaryInst(IRBuilder* builder, IRInst* inst)
 
 void setInsertAfterOrdinaryInst(IRBuilder* builder, IRInst* inst)
 {
-    if (as<IRParam>(inst))
+    if (as<IRParam, IRDynamicCastBehavior::NoUnwrap>(inst))
     {
         SLANG_RELEASE_ASSERT(as<IRBlock>(inst->getParent()));
         auto lastParam = as<IRBlock>(inst->getParent())->getLastParam();
@@ -818,7 +818,7 @@ void moveParams(IRBlock* dest, IRBlock* src)
     for (auto param = src->getFirstChild(); param;)
     {
         auto nextInst = param->getNextInst();
-        if (as<IRDecoration>(param) || as<IRParam>(param))
+        if (as<IRDecoration>(param) || as<IRParam, IRDynamicCastBehavior::NoUnwrap>(param))
         {
             param->insertAtEnd(dest);
         }

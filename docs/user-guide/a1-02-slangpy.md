@@ -22,7 +22,6 @@ pip install slangpy
 
 Note that `slangpy` requires `torch` with CUDA support. See the [pytorch](https://pytorch.org/) installation page to find the right version for your platform.
 
-
 You can check that you have the right installation by running: 
 ```sh
 python -c "import torch; print(f'cuda: {torch.cuda.is_available()}')"
@@ -121,7 +120,44 @@ Now, `slangpy.loadModule("square.slang")` returns a scope with three callable ha
 
 You can invoke `square()` normally to get the same effect as the previous example, or invoke `square.fwd()` / `square.bwd()` by binding pairs of tensors to compute the derivatives.
 
-```python
+
+You can check that you have the right installation by running: 
+```sh
+python -c "import torch; print(f'cuda: {torch.cuda.is_available()}')"
+```
+
+### Writing Slang kernels for `slangpy` >= **v1.1.5**
+
+From **v2023.4.0**, Slang supports auto-binding features that make it easier than ever to invoke Slang kernels from python, and interoperate seamlessly with `pytorch` tensors.
+
+Here's a barebones example of a simple squaring kernel written in Slang (`square.slang`):
+
+``` csharp
+[AutoPyBindCUDA]
+[CUDAKernel]
+void square(TensorView<float> input, TensorView<float> output)
+{
+    // Get the 'global' index of this thread.
+    uint3 launchIdx = cudaThreadIdx() + cudaBlockIdx() * cudaBlockDim();
+
+    // If the thread index is beyond the input size, exit early.
+    if (launchIdx.x < input.size(0))
+        return;
+
+    output[launchIdx.x] = input[launchIdx.x] * input[launchIdx.x];
+}
+
+```
+
+`square` performs **element-wise** squaring on `input` and writes them to `output`
+
+
+`slangpy` works by compiling kernels to CUDA and it identifies the functions to compile by checking for the `[CUDAKernel]` attribute.
+The second attribute `[AutoPyBindCUDA]` allows us to call `multiply` directly from python without having to write any host code. If you would like to write the host code yourself for finer control, see the other version of this example [here](#manually-binding-kernels).
+
+You can now simply invoke this kernel from python:
+
+``` Python
 import torch
 import slangpy
 
@@ -503,16 +539,9 @@ Since this is a host function, we can perform tensor allocations. For instnace, 
 Then we launch `square_kernel` with the `__dispatch_kernel` syntax. Note that we can directly pass
 `TorchTensor<float>` arguments to a `TensorView<float>` parameter and the compiler will automatically convert the type and obtain a view into the tensor that can be accessed by the GPU kernel function.
 
-### Calling Slang module from Python
+### Calling a `[TorchEntryPoint]` function from Python
 
-Next, let's see how we can call the `square_fwd` function we defined in the Slang module.
-To do so, we use a python package called `slangpy`. You can obtain it with
-
-```bash
-pip install slangpy
-```
-
-With that, you can use the following code to call `square` from Python:
+You can use the following code to call `square` from Python:
 
 ```python
 import torch

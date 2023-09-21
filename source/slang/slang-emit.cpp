@@ -830,6 +830,10 @@ Result linkAndOptimizeIR(
     default:
         break;
 
+    case CodeGenTarget::SPIRV:
+    case CodeGenTarget::SPIRVAssembly:
+        moveGlobalVarInitializationToEntryPoints(irModule);
+        break;
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CUDASource:
         moveGlobalVarInitializationToEntryPoints(irModule);

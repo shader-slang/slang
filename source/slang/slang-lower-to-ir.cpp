@@ -2124,7 +2124,7 @@ void addVarDecorations(
         {
             builder->addFormatDecoration(inst, formatAttr->format);
         }
-        else if(auto payloadMod = as<HLSLPayloadModifier>(mod))
+        else if(as<HLSLPayloadModifier>(mod))
         {
             builder->addSimpleDecoration<IRHLSLMeshPayloadDecoration>(inst);
         }

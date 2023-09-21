@@ -172,7 +172,7 @@ IRLoop* isLoopPhi(IRParam* param)
 bool opCanBeConstExprByBackwardPass(IRInst* value)
 {
     if (value->getOp() == kIROp_Param)
-        return isLoopPhi(as<IRParam>(value));
+        return isLoopPhi(as<IRParam, IRDynamicCastBehavior::NoUnwrap>(value));
     return opCanBeConstExpr(value->getOp());
 }
 
@@ -272,7 +272,7 @@ bool isUnrollableLoop(IRLoop* loop)
                 if (!isConstExpr(ifElse->getCondition()))
                     return false;
             }
-            else if (auto switchInst = as<IRSwitch>(block->getTerminator()))
+            else if (as<IRSwitch>(block->getTerminator()))
             {
                 if (!isConstExpr(ifElse->getCondition()))
                     return false;

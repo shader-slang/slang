@@ -324,7 +324,7 @@ IRInst* DifferentialPairTypeBuilder::lowerDiffPairType(
         result = originalPairType;
         return result;
     }
-    if (as<IRParam>(primalType))
+    if (as<IRParam, IRDynamicCastBehavior::NoUnwrap>(primalType))
     {
         result = nullptr;
         return result;

@@ -1647,7 +1647,7 @@ bool isLocalPointer(IRInst* ptrInst)
     // referencing something outside the function scope.
     // 
     auto addr = getRootAddr(ptrInst);
-    return as<IRVar>(addr) || as<IRParam>(addr);
+    return as<IRVar>(addr) || as<IRParam, IRDynamicCastBehavior::NoUnwrap>(addr);
 }
 
 void lowerSwizzledStores(IRModule* module, IRFunc* func)
@@ -2067,7 +2067,7 @@ InstPair ForwardDiffTranscriber::transcribeFuncParam(IRBuilder* builder, IRParam
     }
 
     auto primalInst = cloneInst(&cloneEnv, builder, origParam);
-    if (auto primalParam = as<IRParam>(primalInst))
+    if (auto primalParam = as<IRParam, IRDynamicCastBehavior::NoUnwrap>(primalInst))
     {
         SLANG_RELEASE_ASSERT(builder->getInsertLoc().getBlock());
         primalParam->removeFromParent();

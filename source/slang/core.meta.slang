@@ -2290,6 +2290,15 @@ __attributeTarget(FuncDecl)
 attribute_syntax [CudaKernel] : CudaKernelAttribute;
 
 __attributeTarget(FuncDecl)
+attribute_syntax [CUDADeviceExport] : CudaDeviceExportAttribute;
+
+__attributeTarget(FuncDecl)
+attribute_syntax [CUDAHost] : CudaHostAttribute;
+
+__attributeTarget(FuncDecl)
+attribute_syntax [CUDAKernel] : CudaKernelAttribute;
+
+__attributeTarget(FuncDecl)
 attribute_syntax[AutoPyBindCUDA] : AutoPyBindCudaAttribute;
 
 __attributeTarget(AggTypeDecl)

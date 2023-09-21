@@ -304,12 +304,12 @@ namespace Slang
 
     IRParam* IRParam::getNextParam()
     {
-        return as<IRParam>(getNextInst());
+        return as<IRParam, IRDynamicCastBehavior::NoUnwrap>(getNextInst());
     }
 
     IRParam* IRParam::getPrevParam()
     {
-        return as<IRParam>(getPrevInst());
+        return as<IRParam, IRDynamicCastBehavior::NoUnwrap>(getPrevInst());
     }
 
     // IRArrayTypeBase
@@ -472,7 +472,7 @@ namespace Slang
         // If the last instruction is a parameter, then
         // there are no ordinary instructions, so the last
         // one is a null pointer.
-        if (as<IRParam>(inst))
+        if (as<IRParam, IRDynamicCastBehavior::NoUnwrap>(inst))
             return nullptr;
 
         // Otherwise the last instruction is the last "ordinary"
@@ -1643,8 +1643,8 @@ namespace Slang
         // instructions, so they need to come after
         // any parameters of the parent.
         //
-        while(auto param = as<IRParam>(insertBeforeInst))
-            insertBeforeInst = param->getNextInst();
+        while (insertBeforeInst && insertBeforeInst->getOp() == kIROp_Param)
+            insertBeforeInst = insertBeforeInst->getNextInst();
 
         // For instructions that will be placed at module scope,
         // we don't care about relative ordering, but for everything
@@ -6425,14 +6425,14 @@ namespace Slang
 
         // First walk through any `param` instructions,
         // so that we can format them nicely
-        if (auto firstParam = as<IRParam>(inst))
+        if (auto firstParam = as<IRParam, IRDynamicCastBehavior::NoUnwrap>(inst))
         {
             dump(context, "(\n");
             context->indent += 2;
 
             for(;;)
             {
-                auto param = as<IRParam>(inst);
+                auto param = as<IRParam, IRDynamicCastBehavior::NoUnwrap>(inst);
                 if (!param)
                     break;
 
@@ -8130,6 +8130,99 @@ namespace Slang
     IRDominatorTree* IRAnalysis::getDominatorTree()
     {
         return static_cast<IRDominatorTree*>(domTree.get());
+    }
+
+    bool isMovableInst(IRInst* inst)
+    {
+        // Don't try to modify hoistable insts, they are already globally deduplicated.
+        if (getIROpInfo(inst->getOp()).isHoistable())
+            return false;
+
+        switch (inst->getOp())
+        {
+        case kIROp_Add:
+        case kIROp_Sub:
+        case kIROp_Mul:
+        case kIROp_FRem:
+        case kIROp_IRem:
+        case kIROp_Lsh:
+        case kIROp_Rsh:
+        case kIROp_And:
+        case kIROp_Or:
+        case kIROp_Not:
+        case kIROp_Neg:
+        case kIROp_FieldExtract:
+        case kIROp_FieldAddress:
+        case kIROp_GetElement:
+        case kIROp_GetElementPtr:
+        case kIROp_UpdateElement:
+        case kIROp_Specialize:
+        case kIROp_LookupWitness:
+        case kIROp_OptionalHasValue:
+        case kIROp_GetOptionalValue:
+        case kIROp_MakeOptionalValue:
+        case kIROp_MakeTuple:
+        case kIROp_GetTupleElement:
+        case kIROp_MakeStruct:
+        case kIROp_MakeArray:
+        case kIROp_MakeArrayFromElement:
+        case kIROp_MakeVector:
+        case kIROp_MakeMatrix:
+        case kIROp_MakeMatrixFromScalar:
+        case kIROp_MakeVectorFromScalar:
+        case kIROp_swizzle:
+        case kIROp_swizzleSet:
+        case kIROp_MatrixReshape:
+        case kIROp_MakeString:
+        case kIROp_MakeResultError:
+        case kIROp_MakeResultValue:
+        case kIROp_GetResultError:
+        case kIROp_GetResultValue:
+        case kIROp_CastFloatToInt:
+        case kIROp_CastIntToFloat:
+        case kIROp_CastIntToPtr:
+        case kIROp_CastPtrToBool:
+        case kIROp_CastPtrToInt:
+        case kIROp_BitAnd:
+        case kIROp_BitNot:
+        case kIROp_BitOr:
+        case kIROp_BitXor:
+        case kIROp_BitCast:
+        case kIROp_IntCast:
+        case kIROp_FloatCast:
+        case kIROp_Reinterpret:
+        case kIROp_Greater:
+        case kIROp_Less:
+        case kIROp_Geq:
+        case kIROp_Leq:
+        case kIROp_Neq:
+        case kIROp_Eql:
+        case kIROp_ExtractExistentialType:
+        case kIROp_ExtractExistentialValue:
+        case kIROp_ExtractExistentialWitnessTable:
+            return true;
+        case kIROp_Call:
+            // Similar to the case in IRInst::mightHaveSideEffects, pure
+            // calls are ok
+            return isSideEffectFreeFunctionalCall(cast<IRCall>(inst));
+        case kIROp_Load:
+            // Load is generally not movable, an exception is loading a global constant buffer.
+            if (auto load = as<IRLoad>(inst))
+            {
+                auto addrType = load->getPtr()->getDataType();
+                switch (addrType->getOp())
+                {
+                case kIROp_ConstantBufferType:
+                case kIROp_ParameterBlockType:
+                    return true;
+                default:
+                    break;
+                }
+            }
+            return false;
+        default:
+            return false;
+        }
     }
 
 } // namespace Slang

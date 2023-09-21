@@ -828,31 +828,42 @@ struct IRInst
     void _insertAt(IRInst* inPrev, IRInst* inNext, IRInst* inParent);
 };
 
-template<typename T>
+enum class IRDynamicCastBehavior
+{
+    Unwrap, NoUnwrap
+};
+
+template<typename T, IRDynamicCastBehavior behavior = IRDynamicCastBehavior::Unwrap>
 T* dynamicCast(IRInst* inst)
 {
-    if (inst && T::isaImpl(inst->getOp()))
+    if (!inst) return nullptr;
+    if (T::isaImpl(inst->getOp()))
         return static_cast<T*>(inst);
+    if constexpr(behavior == IRDynamicCastBehavior::Unwrap)
+    {
+        if (inst->getOp() == kIROp_AttributedType)
+            return dynamicCast<T>(inst->getOperand(0));
+    }
     return nullptr;
 }
 
-template<typename T>
+template<typename T, IRDynamicCastBehavior behavior = IRDynamicCastBehavior::Unwrap>
 const T* dynamicCast(const IRInst* inst)
 {
-    return dynamicCast<T>(const_cast<IRInst*>(inst));
+    return dynamicCast<T, behavior>(const_cast<IRInst*>(inst));
 }
 
 // `dynamic_cast` equivalent (we just use dynamicCast)
-template<typename T>
+template<typename T, IRDynamicCastBehavior behavior = IRDynamicCastBehavior::Unwrap>
 T* as(IRInst* inst)
 {
-    return dynamicCast<T>(inst);
+    return dynamicCast<T, behavior>(inst);
 }
 
-template<typename T>
+template<typename T, IRDynamicCastBehavior behavior = IRDynamicCastBehavior::Unwrap>
 const T* as(const IRInst* inst)
 {
-    return dynamicCast<T>(inst);
+    return dynamicCast<T, behavior>(inst);
 }
 
 // `static_cast` equivalent, with debug validation
@@ -1228,7 +1239,7 @@ struct IRBlock : IRInst
     // instructions at the start of the block. These play
     // the role of function parameters for the entry block
     // of a function, and of phi nodes in other blocks.
-    IRParam* getFirstParam() { return as<IRParam>(getFirstInst()); }
+    IRParam* getFirstParam() { return as<IRParam, IRDynamicCastBehavior::NoUnwrap>(getFirstInst()); }
     IRParam* getLastParam();
     IRInstList<IRParam> getParams()
     {
@@ -2426,6 +2437,9 @@ bool isBuiltin(IRInst* inst);
 
     // Get the enclosuing function of an instruction.
 IRFunc* getParentFunc(IRInst* inst);
+
+    // True if moving this inst will not change the semantics of the program
+bool isMovableInst(IRInst* inst);
 
 #if SLANG_ENABLE_IR_BREAK_ALLOC
 uint32_t& _debugGetIRAllocCounter();
