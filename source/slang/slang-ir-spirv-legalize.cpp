@@ -4,6 +4,7 @@
 #include "slang-ir-glsl-legalize.h"
 
 #include "slang-ir-clone.h"
+#include "slang-ir-legalize-mesh-outputs.h"
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
 #include "slang-emit-base.h"
@@ -1213,6 +1214,8 @@ void legalizeIRForSPIRV(
 {
     GLSLExtensionTracker extensionTracker;
     legalizeEntryPointsForGLSL(module->getSession(), module, entryPoints, codeGenContext, &extensionTracker);
+    // TODO: move this
+    legalizeMeshOutputTypes(module);
     legalizeSPIRV(context, module);
     buildEntryPointReferenceGraph(context, module);
 }

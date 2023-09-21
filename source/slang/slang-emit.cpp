@@ -895,7 +895,8 @@ Result linkAndOptimizeIR(
     // TODO: This is too early for the SPIR-V backend, which requires these
     // types for when it calls legalizeEntryPointsForGLSL (later than GLSL does
     // above)
-    legalizeMeshOutputTypes(irModule);
+    if(target == CodeGenTarget::GLSL)
+        legalizeMeshOutputTypes(irModule);
 
     if (options.shouldLegalizeExistentialAndResourceTypes)
     {
