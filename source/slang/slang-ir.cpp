@@ -7177,6 +7177,57 @@ namespace Slang
 
     void validateIRInstOperands(IRInst*);
 
+    
+    // Returns true if `instToCheck` is defined after `otherInst`.
+    static bool _isInstDefinedAfter(IRInst* instToCheck, IRInst* otherInst)
+    {
+        for (auto inst = otherInst->getNextInst(); inst; inst = inst->getNextInst())
+        {
+            if (inst == instToCheck)
+                return true;
+        }
+        return false;
+    }
+
+    static void _maybeHoistOperand(IRUse* use)
+    {
+        ShortList<IRUse*, 16> workList1, workList2;
+        workList1.add(use);
+        while (workList1.getCount())
+        {
+            for (auto item : workList1)
+            {
+                auto user = item->getUser();
+                auto operand = item->get();
+                if (!operand)
+                    continue;
+
+                if (!getIROpInfo(operand->getOp()).isHoistable())
+                    continue;
+
+                // We can't handle the case where operand and user are in different blocks.
+                if (operand->getParent() != user->getParent())
+                    continue;
+
+                // We allow out-of-order uses in global scope.
+                if (operand->getParent() && operand->getParent()->getOp() == kIROp_Module)
+                    continue;
+
+                // If the operand is defined after user, move it to before user.
+                if (_isInstDefinedAfter(operand, user))
+                {
+                    operand->insertBefore(user);
+                    for (UInt i = 0; i < operand->getOperandCount(); i++)
+                    {
+                        workList2.add(operand->getOperands() + i);
+                    }
+                    workList2.add(&operand->typeUse);
+                }
+            }
+            workList1 = _Move(workList2);
+        }
+    }
+
     static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
     {
         IRDeduplicationContext* dedupContext = nullptr;
@@ -7258,6 +7309,10 @@ namespace Slang
                 
                 // Swap this use over to use the other value.
                 uu->usedValue = other;
+
+                // If `other` is hoistable, then we need to make sure `other` is hoisted
+                // to a point before `user`, if it is not already so.
+                _maybeHoistOperand(uu);
 
                 if (userIsHoistable)
                 {

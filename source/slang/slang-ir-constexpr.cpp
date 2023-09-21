@@ -272,7 +272,7 @@ bool isUnrollableLoop(IRLoop* loop)
                 if (!isConstExpr(ifElse->getCondition()))
                     return false;
             }
-            else if (auto switchInst = as<IRSwitch>(block->getTerminator()))
+            else if (as<IRSwitch>(block->getTerminator()))
             {
                 if (!isConstExpr(ifElse->getCondition()))
                     return false;
