@@ -969,7 +969,10 @@ void applyCheckpointSet(
             bool isInverted = checkpointInfo->invertSet.contains(param);
             bool loopInductionInfo = checkpointInfo->loopInductionInfo.tryGetValue(param);
             if (!isRecomputed && !isInverted)
+            {
+                ii++;
                 continue;
+            }
 
             if (!loopInductionInfo)
             {
@@ -982,7 +985,10 @@ void applyCheckpointSet(
             applyToInst(&builder, checkpointInfo, hoistInfo, cloneCtx, blockIndexInfo, param);
 
             if (loopInductionInfo)
+            {
+                ii++;
                 continue;
+            }
 
             // Copy primal branch-arg for predecessor blocks.
             HashSet<IRBlock*> predecessorSet;

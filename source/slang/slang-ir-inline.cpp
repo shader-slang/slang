@@ -872,6 +872,12 @@ bool performPreAutoDiffForceInlining(IRGlobalValueWithCode* func)
     return pass.considerAllCallSitesRec(func);
 }
 
+bool performPreAutoDiffForceInlining(IRModule* module)
+{
+    PreAutoDiffForceInliningPass pass(module);
+    return pass.considerAllCallSitesRec(module->getModuleInst());
+}
+
     // Defined in slang-ir-specialize-resource.cpp
 bool isResourceType(IRType* type);
 bool isIllegalGLSLParameterType(IRType* type);
