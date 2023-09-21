@@ -533,6 +533,8 @@ namespace Slang
     {
         removeLinkageDecorations(func);
 
+        performPreAutoDiffForceInlining(func);
+
         DifferentiableTypeConformanceContext diffTypeContext(autoDiffSharedContext);
         diffTypeContext.setFunc(func);
 

@@ -839,6 +839,8 @@ struct PreAutoDiffForceInliningPass : InliningPassBase
         : Super(module)
     {}
 
+    Dictionary<IRInst*, bool> m_funcCanInline;
+
     bool shouldInline(CallSiteInfo const& info)
     {
         if (info.callee->findDecoration<IRUnsafeForceInlineEarlyDecoration>() ||
@@ -862,7 +864,31 @@ struct PreAutoDiffForceInliningPass : InliningPassBase
                 break;
             }
         }
-        return (hasForceInline && !hasUserDefinedDerivative);
+        if (!hasForceInline || hasUserDefinedDerivative)
+        {
+            return false;
+        }
+        if (auto result = m_funcCanInline.tryGetValue(info.callee))
+            return *result;
+        bool canInline = true;
+        for (auto block : info.callee->getBlocks())
+        {
+            for (auto inst : block->getChildren())
+            {
+                switch (inst->getOp())
+                {
+                case kIROp_ForwardDifferentiate:
+                case kIROp_BackwardDifferentiate:
+                case kIROp_BackwardDifferentiatePrimal:
+                case kIROp_BackwardDifferentiatePropagate:
+                    canInline = false;
+                    goto end;
+                }
+            }
+        }
+    end:;
+        m_funcCanInline[info.callee] = canInline;
+        return canInline;
     }
 };
 

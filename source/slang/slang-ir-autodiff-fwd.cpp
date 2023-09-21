@@ -1691,6 +1691,8 @@ SlangResult ForwardDiffTranscriber::prepareFuncForForwardDiff(IRFunc* func)
     insertTempVarForMutableParams(autoDiffSharedContext->moduleInst->getModule(), func);
     removeLinkageDecorations(func);
     
+    performPreAutoDiffForceInlining(func);
+
     initializeLocalVariables(autoDiffSharedContext->moduleInst->getModule(), func);
 
     lowerSwizzledStores(autoDiffSharedContext->moduleInst->getModule(), func);
