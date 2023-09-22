@@ -1,4 +1,6 @@
-//TEST(compute):COMPARE_RENDER_COMPUTE: -shaderobj
+//TEST(compute):COMPARE_RENDER_COMPUTE: -shaderobj -output-using-type
+//TEST(compute):COMPARE_RENDER_COMPUTE: -shaderobj -output-using-type -vk
+
 
 //TEST_INPUT: Texture1D(size=4, content = one):name=t1D
 //TEST_INPUT: Texture2D(size=4, content = one):name=t2D
@@ -8,7 +10,7 @@
 //TEST_INPUT: Texture2D(size=4, content = one, arrayLength=2):name=t2dArray
 //TEST_INPUT: TextureCube(size=4, content = one, arrayLength=2):name=tCubeArray
 //TEST_INPUT: Sampler:name=samplerState
-//TEST_INPUT: ubuffer(data=[0], stride=4):out,name=outputBuffer
+//TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 
 Texture1D t1D;
 Texture2D t2D;
@@ -100,7 +102,16 @@ FragmentStageOutput fragmentMain(FragmentStageInput input)
     
     val += tCubeArray.Sample(samplerState, float4(uv, 0.5, 0.0));
     val += tCube.Sample(samplerState, float3(uv, 0.5));
-    
+
+    val += t2D.Load(int3(0), int2(0));
+    val += t2dArray.Load(int4(0));
+
+    val += t3D[int3(0)];
+
     outputBuffer[0] = val.x;
+
+    int w, h, l, lods;
+    t2dArray.GetDimensions(0, w, h, l, lods);
+    outputBuffer[1] = w + h + l + lods;
 	return output;
 }

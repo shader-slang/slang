@@ -72,7 +72,7 @@
 #include "slang-legalize-types.h"
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
-
+#include "slang-spirv-opt.h"
 #include "slang-syntax.h"
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
@@ -1259,11 +1259,15 @@ SlangResult emitSPIRVForEntryPointsDirectly(
     auto irModule = linkedIR.module;
     auto irEntryPoints = linkedIR.entryPoints;
 
-    List<uint8_t> spirv;
+    List<uint8_t> spirv, outSpirv;
     emitSPIRVFromIR(codeGenContext, irModule, irEntryPoints, spirv);
 
+    String optErr;
+    if (SLANG_FAILED(optimizeSPIRV(spirv, optErr, outSpirv)))
+        codeGenContext->getSink()->diagnose(SourceLoc(), Diagnostics::spirvOptFailed, optErr);
+
     auto artifact = ArtifactUtil::createArtifactForCompileTarget(asExternal(codeGenContext->getTargetFormat()));
-    artifact->addRepresentationUnknown(ListBlob::moveCreate(spirv));
+    artifact->addRepresentationUnknown(ListBlob::moveCreate(outSpirv));
 
     ArtifactUtil::addAssociated(artifact, linkedIR.metadata);
 

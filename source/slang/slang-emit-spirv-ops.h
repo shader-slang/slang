@@ -20,6 +20,20 @@ SpvInst* emitOpName(
     return emitInst(parent, inst, SpvOpName, target, name);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpMemberName
+template<typename T>
+SpvInst* emitOpMemberName(
+    SpvInstParent* parent,
+    IRInst* inst,
+    const T& target,
+    int index,
+    const UnownedStringSlice& name
+)
+{
+    static_assert(isSingular<T>);
+    return emitInst(parent, inst, SpvOpMemberName, target, SpvLiteralInteger::from32(index), name);
+}
+
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpExtension
 SpvInst* emitOpExtension(SpvInstParent* parent, IRInst* inst, const UnownedStringSlice& name)
 {
@@ -106,6 +120,36 @@ SpvInst* emitOpExecutionModeLocalSizeId(
     static_assert(isSingular<T4>);
     return emitInst(
         parent, inst, SpvOpExecutionMode, entryPoint, SpvExecutionModeLocalSizeId, xSize, ySize, zSize
+    );
+}
+
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpExecutionMode
+template<typename T>
+SpvInst* emitOpExecutionModeOutputVertices(
+    SpvInstParent* parent,
+    IRInst* inst,
+    const T& entryPoint,
+    const SpvLiteralInteger& vertexCount
+)
+{
+    static_assert(isSingular<T>);
+    return emitInst(
+        parent, inst, SpvOpExecutionMode, entryPoint, SpvExecutionModeOutputVertices, vertexCount
+    );
+}
+
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpExecutionMode
+template<typename T>
+SpvInst* emitOpExecutionModeInvocations(
+    SpvInstParent* parent,
+    IRInst* inst,
+    const T& entryPoint,
+    const SpvLiteralInteger& invocations
+)
+{
+    static_assert(isSingular<T>);
+    return emitInst(
+        parent, inst, SpvOpExecutionMode, entryPoint, SpvExecutionModeInvocations, invocations
     );
 }
 
@@ -1108,6 +1152,23 @@ SpvInst* emitOpCompositeExtract(
     static_assert(isSingular<T2>);
     return emitInst(
         parent, inst, SpvOpCompositeExtract, idResultType, kResultID, composite, indexes
+    );
+}
+
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpVectorExtractDynamic
+template<typename T1, typename T2, typename T3>
+SpvInst* emitOpVectorExtractDynamic(
+    SpvInstParent* parent,
+    IRInst* inst,
+    const T1& idResultType,
+    const T2& composite,
+    const T3& index)
+{
+    static_assert(isSingular<T1>);
+    static_assert(isSingular<T2>);
+    static_assert(isSingular<T3>);
+    return emitInst(
+        parent, inst, SpvOpVectorExtractDynamic, idResultType, kResultID, composite, index
     );
 }
 
