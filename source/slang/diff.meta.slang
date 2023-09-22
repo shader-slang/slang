@@ -479,6 +479,18 @@ struct DiffTensorView
         return primal.stride(i);
     }
 
+    // Constructors
+    __init(TensorView<T> primal, A diff)
+    {
+        this.primal = primal;
+        this.diff = diff;
+    }
+
+    __init(TensorView<T> primal)
+    {
+        this.primal = primal;
+    }
+
     // Universal load/store operations.
 
     [BackwardDerivative(__load_backward)]
