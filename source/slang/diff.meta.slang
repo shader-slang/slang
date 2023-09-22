@@ -89,15 +89,9 @@ struct TensorView
     T load(uint i0, uint i1, uint i2, uint i3, uint i4);
 
     [__NoSideEffect]
-    __generic<let N:int>
-    T load(vector<uint, N> index)
-    {
-        __target_switch
-        {
-        case cuda:
-            __intrinsic_asm "$0.load<$G0>($1)";
-        }
-    }
+    __generic<let N : int>
+    __target_intrinsic(cuda, "$0.load<$TR>($1)")
+    T load(vector<uint, N> index);
 
     __target_intrinsic(cuda, "$0.store<$G0>($1, $2)")
     void store(uint x, T val);
@@ -111,15 +105,9 @@ struct TensorView
     void store(uint i0, uint i1, uint i2, uint i3, uint i4, T val);
 
     [__NoSideEffect]
-    __generic<let N:int>
-    void store(vector<uint, N> index, T val)
-    {
-        __target_switch
-        {
-        case cuda:
-            __intrinsic_asm "$0.store<$G0>($1, $2)";
-        }
-    }
+    __generic<let N : int>
+    __target_intrinsic(cuda, "$0.store<$T1>($1)")
+    void store(vector<uint, N> index, T val);
 
     __target_intrinsic(cuda, "*($3) = atomicAdd($0.data_ptr_at<$T2>($1), $2)")
     void InterlockedAdd(uint index, T val, out T oldVal);
