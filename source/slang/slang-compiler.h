@@ -3008,6 +3008,8 @@ namespace Slang
             /// Get the downstream compiler for a transition
         IDownstreamCompiler* getDownstreamCompiler(CodeGenTarget source, CodeGenTarget target);
         
+        Index m_epochId = 1;
+
         Scope* baseLanguageScope = nullptr;
         Scope* coreLanguageScope = nullptr;
         Scope* hlslLanguageScope = nullptr;
