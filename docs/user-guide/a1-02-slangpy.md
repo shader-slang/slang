@@ -92,8 +92,7 @@ The `[AutoPyBindCUDA]` attribute can also be used on differentiable functions de
 
 One key point is that the basic `TensorView<T>` objects are not differentiable. They can be used as buffers for data that does not require derivatives, or even as buffers for the manual accumulation of derivatives.
 
-Instead, use the `DiffTensorView` type for when you need differentiable tensors. Currently, `DiffTensorView` only supports the `float` dtype variety, and requires the use of `.load(offset)` and `.store(offset, val)` instead of `[]`, although
-`offset` can be a scalar `uint` or vector `uint2`, `uint3`, etc.. for multi-dimensional indexing.
+Instead, use the `DiffTensorView` type for when you need differentiable tensors. Currently, `DiffTensorView` only supports the `float` dtype variety.
 
 Here's a barebones example of a differentiable version of `square`:
 
@@ -108,11 +107,7 @@ void square(DiffTensorView input, DiffTensorView output)
     if (dispatchIdx.x < input.size(0))
         return;
     
-    float val = input.load(dispatchIdx.x);
-
-    float result = val * val;
-
-    output.store(dispatchIdx.x, result);
+    output[dispatchIdx.x] = input[dispatchIdx.x] * input[dispatchIdx.x];
 }
 ```
 
@@ -679,14 +674,32 @@ Atomically swaps `val` into the element at `index` if the element equals to `com
 
 ### `DiffTensorView` methods
 
+#### `DiffTensorView.operator[uint x, uint y, ...]`
+Provide an accessor to data content in a tensor. This method is **differentiable**, and has the same semantics as using a `.load()` to get data, and `.store()` to set data.
+
+#### `DiffTensorView.operator[vector<uint, N> index]`
+Provide an accessor to data content in a tensor, indexed by a uint vector.`tensor[uint3(1,2,3)]` is equivalent to `tensor[1,2,3]`. This method is **differentiable**, and has the same semantics as using a `.load()` to get data, and `.store()` to set data.
+
 #### `float DiffTensorView.load(vector<uint, N> index)`
 Loads the 32-bit floating point data at the specified multi-dimensional `index`. This method is **differentiable**, and in reverse-mode will perform an atomic-add.
 
 #### `void DiffTensorView.store(vector<uint, N> index, float val)`
 Stores the 32-bit floating point value `val` at the specified multi-dimensional `index`. This method is **differentiable**, and in reverse-mode will perform an *atomic exchange* to retrieve the derivative and replace with 0.
 
+#### `float DiffTensorView.loadOnce(vector<uint, N> index)`
+Loads the 32-bit floating point data at the specified multi-dimensional `index`. This method is **differentiable**, and uses a simple `store` for the reverse-mode for faster gradient aggregation, but `loadOnce` **must** be used at most once per index. `loadOnce` is ideal for situations where each thread loads data from a unique index, but will cause incorrect gradients when an index may be accessed multiple times.
+
+#### `void DiffTensorView.storeOnce(vector<uint, N> index, float val)`
+Stores the 32-bit floating point value `val` at the specified multi-dimensional `index`. This method is **differentiable**, and uses a simple `load` for the reverse-mode for faster gradient loading, but `storeOnce` **must** be used at most once per index. `loadOnce` is ideal for situations where each thread stores data to a unique index, but will cause incorrect gradient propagation when an index may be accessed multiple times.
+
 #### `uint DiffTensorView.size(int dim)`
-Returns the tensor's size (in number of elements) at `dim`.
+Returns the underlying primal tensor's size (in number of elements) at `dim`.
+
+#### `uint DiffTensorView.dims()`
+Returns the underlying primal tensor's dimension count.
+
+#### `uint DiffTensorView.stride(uint dim)`
+Returns the stride of the underlying primal tensor's `dim` dimension
 
 ### CUDA Support Functions
 

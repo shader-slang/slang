@@ -469,6 +469,16 @@ struct DiffTensorView
         return primal.size(i);
     }
 
+    uint dims()
+    {
+        return primal.dims();
+    }
+
+    uint stride(uint i)
+    {
+        return primal.stride(i);
+    }
+
     // Universal load/store operations.
 
     [BackwardDerivative(__load_backward)]
