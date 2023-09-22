@@ -12,7 +12,18 @@ void myKernel(DiffTensorView inValues, DiffTensorView outValues)
 {
     if (cudaThreadIdx().x > 0)
         return;
-    outValues.store(cudaThreadIdx().x, sin(inValues.load(cudaThreadIdx().x)));
+    outValues[cudaThreadIdx().x] = sin(inValues[cudaThreadIdx().x]);
+}
+
+[AutoPyBindCUDA]
+[Differentiable]
+[CudaKernel]
+void myOtherKernel(DiffTensorView inValues, DiffTensorView outValues)
+{
+    if (cudaThreadIdx().x > 0)
+        return;
+    float val = inValues.loadOnce(cudaThreadIdx().x);
+    outValues.storeOnce(cudaThreadIdx().x, sin(val));
 }
 
 // TORCH:      {{^SLANG_PRELUDE_EXPORT$}}

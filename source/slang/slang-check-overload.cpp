@@ -964,10 +964,14 @@ namespace Slang
         {
             auto leftType = DeclRefType::create(m_astBuilder, left.declRef.getParent());
             auto rightType = DeclRefType::create(m_astBuilder, right.declRef.getParent());
-            if (isSubtype(leftType, rightType))
-                return -1;
-            if (isSubtype(rightType, leftType))
-                return 1;
+
+            if (!leftType->equals(rightType))
+            {
+                if (isSubtype(leftType, rightType))
+                    return -1;
+                if (isSubtype(rightType, leftType))
+                    return 1;
+            }
         }
 
         // TODO: We should generalize above rules such that in a tie a declaration
