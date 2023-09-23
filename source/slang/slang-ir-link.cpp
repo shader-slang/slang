@@ -589,7 +589,9 @@ IRGeneric* cloneGenericImpl(
         auto originalParam = originalGeneric->getFirstParam();
 
         ShortList<KeyValuePair<IRInst*, IRInst*>> paramMapping;
-        for (; clonedParam && originalParam; (clonedParam = as<IRParam>(clonedParam->next)), (originalParam = as<IRParam>(originalParam->next)))
+        for (; clonedParam && originalParam;
+            (clonedParam = as<IRParam, IRDynamicCastBehavior::NoUnwrap>(clonedParam->next)),
+            (originalParam = as<IRParam, IRDynamicCastBehavior::NoUnwrap>(originalParam->next)))
         {
             paramMapping.add(KeyValuePair<IRInst*, IRInst*>(clonedParam, originalParam));
         }

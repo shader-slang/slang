@@ -1022,7 +1022,7 @@ struct SCCPContext
         // that provide arguments. We will see that logic shortly, when
         // handling `IRUnconditionalBranch`.
         //
-        if(as<IRParam>(inst))
+        if(as<IRParam, IRDynamicCastBehavior::NoUnwrap>(inst))
             return;
 
         // We want to special-case terminator instructions here,

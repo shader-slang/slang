@@ -103,7 +103,7 @@ struct RegisterAllocateContext
 
     bool isUseOfParamAfterPhiAssignment(IRDominatorTree* dom, IRUse* useToTest, IRInst* phiParam, IRInst* phiArg)
     {
-        IRParam* param = as<IRParam>(phiParam);
+        IRParam* param = as<IRParam, IRDynamicCastBehavior::NoUnwrap>(phiParam);
         if (!param)
             return false;
         IRUse* branchUse = nullptr;

@@ -776,7 +776,7 @@ struct PeepholeContext : InstPassBase
                     break;
                 UInt paramIndex = 0;
                 auto prevParam = inst->getPrevInst();
-                while (as<IRParam>(prevParam))
+                while (as<IRParam, IRDynamicCastBehavior::NoUnwrap>(prevParam))
                 {
                     prevParam = prevParam->getPrevInst();
                     paramIndex++;
