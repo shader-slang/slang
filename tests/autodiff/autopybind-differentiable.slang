@@ -12,7 +12,7 @@ void myKernel(DiffTensorView inValues, DiffTensorView outValues)
 {
     if (cudaThreadIdx().x > 0)
         return;
-    outValues.store(cudaThreadIdx().x, sin(inValues.load(cudaThreadIdx().x)));
+    outValues[cudaThreadIdx().x] = sin(inValues[cudaThreadIdx().x]);
 }
 
 // TORCH:      {{^SLANG_PRELUDE_EXPORT$}}

@@ -118,6 +118,13 @@ bool TorchCppSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& 
         emitStringLiteral(getUnmangledName(inst->getOperand(0)));
         m_writer->emit(", ");
         emitTorchScalarTypeName(m_writer, inst->getOperand(0)->getDataType());
+        m_writer->emit(", ");
+
+        if (as<IRVectorType>(inst->getOperand(0)->getDataType()))
+            m_writer->emit("true");
+        else
+            m_writer->emit("false");
+            
         m_writer->emit(")");
         return true;
     }
