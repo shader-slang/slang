@@ -120,7 +120,8 @@ bool TorchCppSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& 
         emitTorchScalarTypeName(m_writer, inst->getOperand(0)->getDataType());
         m_writer->emit(", ");
 
-        if (as<IRVectorType>(inst->getOperand(0)->getDataType()))
+        auto tensorViewType = as<IRTensorViewType>(inst->getDataType());
+        if (as<IRVectorType>(tensorViewType->getElementType()))
             m_writer->emit("true");
         else
             m_writer->emit("false");
