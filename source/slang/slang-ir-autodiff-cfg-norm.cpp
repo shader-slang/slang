@@ -619,6 +619,7 @@ struct CFGNormalizationPass
                 // SLANG_UNEXPECTED("Switch-case normalization not implemented yet.");
                 BreakableRegionInfo info;
                 info.breakBlock = as<IRSwitch>(branchInst)->getBreakLabel();
+                info.headerBlock = as<IRBlock>(branchInst->getParent());
 
                 // Emit var into parent block.
                 builder.setInsertBefore(as<IRBlock>(branchInst->getParent())->getTerminator());
