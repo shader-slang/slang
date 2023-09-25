@@ -39,7 +39,7 @@ jobs:
       uses: microsoft/setup-msbuild@v1
     - name: build
       run: |
-        .\premake.bat vs2019 --enable-embed-stdlib=true --arch=${{matrix.platform}} --deps=true --no-progress=true
+        .\premake.bat vs2019 --arch=${{matrix.platform}} --deps=true --no-progress=true
         
         .\make-slang-tag-version.bat
         
