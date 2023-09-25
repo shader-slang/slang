@@ -3008,6 +3008,12 @@ namespace Slang
             /// Get the downstream compiler for a transition
         IDownstreamCompiler* getDownstreamCompiler(CodeGenTarget source, CodeGenTarget target);
         
+        // This needs to be atomic not because of contention between threads as `Session` is
+        // *not* multithreaded, but can be used exclusively on one thread at a time.
+        // The need for atomic is purely for visibility. If the session is used on a different 
+        // thread we need to be sure any changes to m_epochId are visible to this thread.
+        std::atomic<Index> m_epochId = 1;
+
         Scope* baseLanguageScope = nullptr;
         Scope* coreLanguageScope = nullptr;
         Scope* hlslLanguageScope = nullptr;

@@ -23,7 +23,7 @@ void NodeBase::_initDebug(ASTNodeType inAstNodeType, ASTBuilder* inAstBuilder)
 DeclRefBase* Decl::getDefaultDeclRef()
 {
     auto astBuilder = getCurrentASTBuilder();
-    if (astBuilder->getEpoch() != m_defaultDeclRefEpoch || !m_defaultDeclRef)
+    if (astBuilder && astBuilder->getEpoch() != m_defaultDeclRefEpoch || !m_defaultDeclRef)
     {
         m_defaultDeclRef = astBuilder->getOrCreate<DirectDeclRef>(this);
         m_defaultDeclRefEpoch = astBuilder->getEpoch();

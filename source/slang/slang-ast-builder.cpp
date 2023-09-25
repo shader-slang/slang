@@ -221,12 +221,6 @@ Decl* SharedASTBuilder::tryFindMagicDecl(const String& name)
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ASTBuilder !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-Index& _getGlobalASTEpochId()
-{
-    static thread_local Index epochId = 1;
-    return epochId;
-}
-
 ASTBuilder::ASTBuilder(SharedASTBuilder* sharedASTBuilder, const String& name):
     m_sharedASTBuilder(sharedASTBuilder),
     m_name(name),
@@ -260,12 +254,12 @@ ASTBuilder::~ASTBuilder()
 
 Index ASTBuilder::getEpoch()
 {
-    return _getGlobalASTEpochId();
+    return getSharedASTBuilder()->m_session->m_epochId;
 }
 
 void ASTBuilder::incrementEpoch()
 {
-    _getGlobalASTEpochId()++;
+    getSharedASTBuilder()->m_session->m_epochId++;
 }
 
 NodeBase* ASTBuilder::createByNodeType(ASTNodeType nodeType)
