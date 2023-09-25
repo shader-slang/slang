@@ -42,7 +42,7 @@ void square(TensorView<float> input, TensorView<float> output)
     uint3 dispatchIdx = cudaThreadIdx() + cudaBlockIdx() * cudaBlockDim();
 
     // If the thread index is beyond the input size, exit early.
-    if (dispatchIdx.x < input.size(0))
+    if (dispatchIdx.x >= input.size(0))
         return;
 
     output[dispatchIdx.x] = input[dispatchIdx.x] * input[dispatchIdx.x];
@@ -104,7 +104,7 @@ void square(DiffTensorView input, DiffTensorView output)
 {
     uint3 dispatchIdx = cudaThreadIdx() + cudaBlockIdx() * cudaBlockDim();
 
-    if (dispatchIdx.x < input.size(0))
+    if (dispatchIdx.x >= input.size(0))
         return;
     
     output[dispatchIdx.x] = input[dispatchIdx.x] * input[dispatchIdx.x];
@@ -116,7 +116,7 @@ Now, `slangpy.loadModule("square.slang")` returns a scope with three callable ha
 You can invoke `square()` normally to get the same effect as the previous example, or invoke `square.fwd()` / `square.bwd()` by binding pairs of tensors to compute the derivatives.
 
 
-``` Python
+```python
 import torch
 import slangpy
 
@@ -162,6 +162,9 @@ You can refer to [this documentation](07-autodiff.md) for a detailed reference o
 This can be a very helpful way to wrap your Slang kernels as pytorch-compatible operations. Here's an example of the `square` kernel as a differentiable pytorch function.
 
 ```python
+import torch
+import slangpy
+
 m = slangpy.loadModule("square.slang")
 
 class MySquareFunc(torch.autograd.Function):
@@ -172,7 +175,7 @@ class MySquareFunc(torch.autograd.Function):
         kernel_with_args = m.square(input=input, output=output)
         kernel_with_args.launchRaw(
             blockSize=(32, 32, 1),
-            gridSize=((input.shape[0] + 31) / 32, (input.shape[1] + 31) / 32, 1))
+            gridSize=((input.shape[0] + 31) // 32, (input.shape[1] + 31) // 32, 1))
 
         ctx.save_for_backward(input, output)
 
@@ -190,7 +193,7 @@ class MySquareFunc(torch.autograd.Function):
         kernel_with_args = m.square.bwd(input=(input, input_grad), output=(output, grad_output))
         kernel_with_args.launchRaw(
             blockSize=(32, 32, 1),
-            gridSize=((input.shape[0] + 31) / 32, (input.shape[1] + 31) / 32, 1))
+            gridSize=((input.shape[0] + 31) // 32, (input.shape[1] + 31) // 32, 1))
         
         return input_grad
 ```
@@ -468,7 +471,7 @@ void square_kernel(TensorView<float> input, TensorView<float> output)
 {
     uint3 globalIdx = cudaBlockIdx() * cudaBlockDim() + cudaThreadIdx();
 
-    if (globalIdx.x > input.size(0))
+    if (globalIdx.x >= input.size(0))
         return;
 
     float result = compute_square(input[globalIdx.x]);
@@ -549,7 +552,7 @@ void square_bwd_kernel(TensorView<float> input, TensorView<float> grad_out, Tens
 {
     uint3 globalIdx = cudaBlockIdx() * cudaBlockDim() + cudaThreadIdx();
 
-    if (globalIdx.x > input.size(0) || globalIdx.y > input.size(1))
+    if (globalIdx.x >= input.size(0) || globalIdx.y >= input.size(1))
         return;
 
     DifferentialPair<float> dpInput = diffPair(input[globalIdx.xy]);
