@@ -4726,7 +4726,11 @@ void Session::addBuiltinSource(
 
 Session::~Session()
 {
-    // Make sure we destroy first
+    // This is necessary because this ASTBuilder uses the SharedASTBuilder also owned by the session.
+    // If the SharedASTBuilder gets dtored before the globalASTBuilder it has a dangling pointer, which 
+    // is referenced in the ASTBuilder dtor (likely) causing a crash.
+    // 
+    // By destroying first we know it is destroyed, before the SharedASTBuilder.
     globalAstBuilder.setNull();
 
     // destroy modules next
