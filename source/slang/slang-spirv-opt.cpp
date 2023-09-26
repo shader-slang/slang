@@ -39,7 +39,7 @@ SlangResult optimizeSPIRV(const List<uint8_t>& spirv, String& outErr, List<uint8
 
     RefPtr<Process> p;
 
-    // If we failed to even start the process, then validation isn't available
+    // If we failed to even start the process, then spirv-opt isn't available
     SLANG_RETURN_ON_FAIL(Process::create(commandLine, 0, p));
     const auto in = p->getStream(StdStreamType::In);
     const auto out = p->getStream(StdStreamType::Out);
