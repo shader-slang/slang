@@ -1329,8 +1329,7 @@ void legalizeIRForSPIRV(
     const List<IRFunc*>& entryPoints,
     CodeGenContext* codeGenContext)
 {
-    GLSLExtensionTracker extensionTracker;
-    legalizeEntryPointsForGLSL(module->getSession(), module, entryPoints, codeGenContext, &extensionTracker);
+    SLANG_UNUSED(entryPoints);
     legalizeSPIRV(context, module);
     simplifyIRForSpirvLegalization(codeGenContext->getSink(), module);
     buildEntryPointReferenceGraph(context, module);

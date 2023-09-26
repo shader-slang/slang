@@ -7,7 +7,19 @@ struct GsOut
     float4 posH                             : SV_Position;
 };
 
-// CHECK: OpEntryPoint
+// CHECK-DAG: OpEntryPoint Geometry %gsMain "main" %[[OUT1:[A-Za-z0-9_]+]] %[[OUT2:[A-Za-z0-9_]+]] %gl_Position
+// CHECK-DAG:          %[[OUT1]] = OpVariable %_ptr_Output_v2float Output
+// CHECK-DAG:          %[[OUT2]] = OpVariable %_ptr_Output_v2float Output
+// CHECK-DAG: %gl_Position = OpVariable %_ptr_Output_v4float Output
+
+// CHECK-DAG: OpExecutionMode %gsMain Invocations 1
+// CHECK-DAG: OpExecutionMode %gsMain OutputTriangleStrip
+// CHECK-DAG: OpExecutionMode %gsMain Triangles
+// CHECK-DAG: OpExecutionMode %gsMain OutputVertices 15
+
+// CHECK: OpStore %gl_Position
+// CHECK: OpEmitVertex
+// CHECK: OpEndPrimitive
 
 [maxvertexcount(15)]
 void gsMain(uint triIdx : SV_PrimitiveID, inout TriangleStream<GsOut> outStream)

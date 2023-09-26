@@ -773,15 +773,20 @@ Result linkAndOptimizeIR(
     switch (target)
     {
     case CodeGenTarget::GLSL:
+    case CodeGenTarget::SPIRV:
+    case CodeGenTarget::SPIRVAssembly:
     {
-        auto glslExtensionTracker = as<GLSLExtensionTracker>(options.sourceEmitter->getExtensionTracker());
+        GLSLExtensionTracker glslExtensionTracker;
+        GLSLExtensionTracker* glslExtensionTrackerPtr = options.sourceEmitter
+            ? as<GLSLExtensionTracker>(options.sourceEmitter->getExtensionTracker())
+            : &glslExtensionTracker;
 
         legalizeEntryPointsForGLSL(
             session,
             irModule,
             irEntryPoints,
             codeGenContext,
-            glslExtensionTracker);
+            glslExtensionTrackerPtr);
 
 #if 0
             dumpIRIfEnabled(codeGenContext, irModule, "GLSL LEGALIZED");
