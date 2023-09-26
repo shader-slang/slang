@@ -3,7 +3,7 @@
 //TESTD:SIMPLE:-target spirv -entry computeMain -stage compute -emit-spirv-directly -force-glsl-scalar-layout
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -output-using-type
 
-// Test direct SPIR-V emit on control flows.
+// Test direct SPIR-V emit on arrays in uniforms.
 
 //TEST_INPUT:set resultBuffer = out ubuffer(data=[0 0 0 0], stride=4)
 RWStructuredBuffer<uint> resultBuffer;

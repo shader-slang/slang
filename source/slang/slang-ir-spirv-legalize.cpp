@@ -261,8 +261,121 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         return false;
     }
 
+    void inferTextureFormat(IRInst* textureInst, IRTextureTypeBase* textureType)
+    {
+        ImageFormat format = ImageFormat::unknown;
+        if (auto decor = textureInst->findDecoration<IRFormatDecoration>())
+        {
+            format = decor->getFormat();
+        }
+        if (format == ImageFormat::unknown)
+        {
+            // If the texture has no format decoration, try to infer it from the type.
+            auto elementType = textureType->getElementType();
+            Int vectorWidth = 1;
+            if (auto elementVecType = as<IRVectorType>(elementType))
+            {
+                if (auto intLitVal = as<IRIntLit>(elementVecType->getElementCount()))
+                {
+                    vectorWidth = (Int)intLitVal->getValue();
+                }
+                else
+                {
+                    vectorWidth = 0;
+                }
+                elementType = elementVecType->getElementType();
+            }
+            switch (elementType->getOp())
+            {
+            case kIROp_UIntType:
+                switch (vectorWidth)
+                {
+                case 1: format = ImageFormat::r32ui; break;
+                case 2: format = ImageFormat::rg32ui; break;
+                case 4: format = ImageFormat::rgba32ui; break;
+                }
+                break;
+            case kIROp_IntType:
+                switch (vectorWidth)
+                {
+                case 1: format = ImageFormat::r32i; break;
+                case 2: format = ImageFormat::rg32i; break;
+                case 4: format = ImageFormat::rgba32i; break;
+                }
+                break;
+            case kIROp_UInt16Type:
+                switch (vectorWidth)
+                {
+                case 1: format = ImageFormat::r16ui; break;
+                case 2: format = ImageFormat::rg16ui; break;
+                case 4: format = ImageFormat::rgba16ui; break;
+                }
+                break;
+            case kIROp_Int16Type:
+                switch (vectorWidth)
+                {
+                case 1: format = ImageFormat::r16i; break;
+                case 2: format = ImageFormat::rg16i; break;
+                case 4: format = ImageFormat::rgba16i; break;
+                }
+                break;
+            case kIROp_UInt8Type:
+                switch (vectorWidth)
+                {
+                case 1: format = ImageFormat::r8ui; break;
+                case 2: format = ImageFormat::rg8ui; break;
+                case 4: format = ImageFormat::rgba8ui; break;
+                }
+                break;
+            case kIROp_Int8Type:
+                switch (vectorWidth)
+                {
+                case 1: format = ImageFormat::r8i; break;
+                case 2: format = ImageFormat::rg8i; break;
+                case 4: format = ImageFormat::rgba8i; break;
+                }
+                break;
+            case kIROp_Int64Type:
+                switch (vectorWidth)
+                {
+                case 1: format = ImageFormat::r64i; break;
+                default: break;
+                }
+                break;
+            case kIROp_UInt64Type:
+                switch (vectorWidth)
+                {
+                case 1: format = ImageFormat::r64ui; break;
+                default: break;
+                }
+                break;
+            }
+        }
+        if (format != ImageFormat::unknown)
+        {
+            IRBuilder builder(textureInst->getModule());
+            builder.setInsertBefore(textureInst);
+            List<IRInst*> args;
+            args.add(textureType->getOperand(0));
+            if (textureType->getOperandCount() >= 2)
+                args.add(textureType->getOperand(1));
+            else
+                args.add(builder.getIntValue(builder.getUIntType(), 0));
+            args.add(builder.getIntValue(builder.getUIntType(), IRIntegerValue(format)));
+
+            auto newType = (IRType*)builder.emitIntrinsicInst(builder.getTypeKind(), textureType->getOp(), 3, args.getBuffer());
+            textureInst->setFullType(newType);
+        }
+    }
+
     void processGlobalParam(IRGlobalParam* inst)
     {
+        // If the param is a texture, infer its format.
+        if (auto textureType = as<IRTextureTypeBase>(inst->getDataType()))
+        {
+            inferTextureFormat(inst, textureType);
+        }
+
         // If the global param is not a pointer type, make it so and insert explicit load insts.
         auto ptrType = as<IRPtrTypeBase>(inst->getDataType());
         if (!ptrType)
@@ -743,6 +856,16 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 ptrType->getValueType(),
                 SpvStorageClassImage);
             subscript->setFullType(newPtrType);
+
+            // HACK: assumes the image operand is a load and replace it with
+            // the pointer to satisfy SPIRV requirements.
+            // We should consider changing the front-end to pass `this` by ref
+            // for the __ref accessor so we will be guaranteed to have a pointer
+            // image operand here.
+            auto image = subscript->getImage();
+            if (auto load = as<IRLoad>(image))
+                subscript->setOperand(0, load->getPtr());
+
             addUsersToWorkList(subscript);
         }
     }

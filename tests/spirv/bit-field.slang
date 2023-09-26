@@ -2,7 +2,7 @@
 
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -output-using-type
 
-// Test direct SPIR-V emit on control flows.
+// Test direct SPIR-V emit on bit field operations.
 
 //TEST_INPUT:set resultBuffer = out ubuffer(data=[0 0 0 0], stride=4)
 RWStructuredBuffer<uint> resultBuffer;

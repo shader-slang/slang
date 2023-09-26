@@ -1388,6 +1388,8 @@ struct IRResourceType : IRResourceTypeBase
 {
     IRType* getElementType() { return (IRType*)getOperand(0); }
     IRType* getSampleCount() { return (IRType*)getOperand(1); }
+    bool hasFormat() { return getOperandCount() >= 2; }
+    IRIntegerValue getFormat() { return getIntVal(getOperand(2)); }
 
     IR_PARENT_ISA(ResourceType)
 };

@@ -1504,6 +1504,84 @@ struct SPIRVEmitContext
         }
     }
 
+    static SpvImageFormat getSpvImageFormat(IRTextureTypeBase* type)
+    {
+        ImageFormat imageFormat = type->hasFormat() ? (ImageFormat)type->getFormat() : ImageFormat::unknown;
+        switch (imageFormat)
+        {
+        case ImageFormat::unknown:          return SpvImageFormatUnknown;
+        case ImageFormat::rgba32f:          return SpvImageFormatRgba32f;
+        case ImageFormat::rgba16f:          return SpvImageFormatRgba16f;
+        case ImageFormat::rg32f:            return SpvImageFormatRg32f;
+        case ImageFormat::rg16f:            return SpvImageFormatRg16f;
+        case ImageFormat::r11f_g11f_b10f:   return SpvImageFormatR11fG11fB10f;
+        case ImageFormat::r32f:             return SpvImageFormatR32f;
+        case ImageFormat::r16f:             return SpvImageFormatR16f;
+        case ImageFormat::rgba16:           return SpvImageFormatRgba16;
+        case ImageFormat::rgb10_a2:         return SpvImageFormatRgb10A2;
+        case ImageFormat::rgba8:            return SpvImageFormatRgba8;
+        case ImageFormat::rg16:             return SpvImageFormatRg16;
+        case ImageFormat::rg8:              return SpvImageFormatRg8;
+        case ImageFormat::r16:              return SpvImageFormatR16;
+        case ImageFormat::r8:               return SpvImageFormatR8;
+        case ImageFormat::rgba16_snorm:     return SpvImageFormatRgba16Snorm;
+        case ImageFormat::rgba8_snorm:      return SpvImageFormatRgba8Snorm;
+        case ImageFormat::rg16_snorm:       return SpvImageFormatRg16Snorm;
+        case ImageFormat::rg8_snorm:        return SpvImageFormatRg8Snorm;
+        case ImageFormat::r16_snorm:        return SpvImageFormatR16Snorm;
+        case ImageFormat::r8_snorm:         return SpvImageFormatR8Snorm;
+        case ImageFormat::rgba32i:          return SpvImageFormatRgba32i;
+        case ImageFormat::rgba16i:          return SpvImageFormatRgba16i;
+        case ImageFormat::rgba8i:           return SpvImageFormatRgba8i;
+        case ImageFormat::rg32i:            return SpvImageFormatRg32i;
+        case ImageFormat::rg16i:            return SpvImageFormatRg16i;
+        case ImageFormat::rg8i:             return SpvImageFormatRg8i;
+        case ImageFormat::r32i:             return SpvImageFormatR32i;
+        case ImageFormat::r16i:             return SpvImageFormatR16i;
+        case ImageFormat::r8i:              return SpvImageFormatR8i;
+        case ImageFormat::rgba32ui:         return SpvImageFormatRgba32ui;
+        case ImageFormat::rgba16ui:         return SpvImageFormatRgba16ui;
+        case ImageFormat::rgb10_a2ui:       return SpvImageFormatRgb10a2ui;
+        case ImageFormat::rgba8ui:          return SpvImageFormatRgba8ui;
+        case ImageFormat::rg32ui:           return SpvImageFormatRg32ui;
+        case ImageFormat::rg16ui:           return SpvImageFormatRg16ui;
+        case ImageFormat::rg8ui:            return SpvImageFormatRg8ui;
+        case ImageFormat::r32ui:            return SpvImageFormatR32ui;
+        case ImageFormat::r16ui:            return SpvImageFormatR16ui;
+        case ImageFormat::r8ui:             return SpvImageFormatR8ui;
+        case ImageFormat::r64ui:            return SpvImageFormatR64ui;
+        case ImageFormat::r64i:             return SpvImageFormatR64i;
+        default: SLANG_UNIMPLEMENTED_X("unknown image format for spirv emit");
+        }
+    }
+
+    SpvCapability getImageFormatCapability(SpvImageFormat format)
+    {
+        switch (format)
+        {
+        case SpvImageFormatUnknown:
+        case SpvImageFormatRgba32f:
+        case SpvImageFormatRgba16f:
+        case SpvImageFormatR32f:
+        case SpvImageFormatRgba8:
+        case SpvImageFormatRgba8Snorm:
+        case SpvImageFormatRgba32i:
+        case SpvImageFormatRgba16i:
+        case SpvImageFormatRgba8i:
+        case SpvImageFormatR32i:
+        case SpvImageFormatRgba32ui:
+        case SpvImageFormatRgba16ui:
+        case SpvImageFormatRgba8ui:
+        case SpvImageFormatR32ui:
+            return SpvCapabilityShader;
+        case SpvImageFormatR64ui:
+        case SpvImageFormatR64i:
+            return SpvCapabilityInt64ImageEXT;
+        default:
+            return SpvCapabilityStorageImageExtendedFormats;
+        }
+    }
+
     SpvInst* ensureTextureType(IRInst* assignee, IRTextureTypeBase* inst)
     {
         // Some untyped constants from OpTypeImage
@@ -1579,9 +1657,7 @@ struct SPIRVEmitContext
                 break;
         }
 
-        // TODO: we need to do as _emitGLSLImageFormatModifier does,
-        // take a guess at the image format
-        SpvImageFormat format = SpvImageFormatUnknown;
+        SpvImageFormat format = getSpvImageFormat(inst);
 
         //
         // Capabilities, according to section 3.8
@@ -1625,6 +1701,10 @@ struct SPIRVEmitContext
             requireSPIRVCapability(SpvCapabilityStorageImageReadWithoutFormat);
             requireSPIRVCapability(SpvCapabilityStorageImageWriteWithoutFormat);
         }
+        
+        auto formatCapability = getImageFormatCapability(format);
+        if (formatCapability != SpvCapabilityShader)
+            requireSPIRVCapability(formatCapability);
 
         //
         // The op itself
@@ -2291,7 +2371,7 @@ struct SPIRVEmitContext
     {
         IRBuilder builder(subscript);
         builder.setInsertBefore(subscript);
-        return emitInst(parent, subscript, SpvOpImageTexelPointer, subscript->getDataType(), subscript->getImage(), subscript->getCoord(), builder.getIntValue(builder.getIntType(), 0));
+        return emitInst(parent, subscript, SpvOpImageTexelPointer, subscript->getDataType(), kResultID, subscript->getImage(), subscript->getCoord(), builder.getIntValue(builder.getIntType(), 0));
     }
 
     SpvInst* emitGetStringHash(IRInst* inst)
