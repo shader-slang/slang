@@ -4726,6 +4726,9 @@ void Session::addBuiltinSource(
 
 Session::~Session()
 {
+    // Make sure we destroy first
+    globalAstBuilder.setNull();
+
     // destroy modules next
     stdlibModules = decltype(stdlibModules)();
 }
