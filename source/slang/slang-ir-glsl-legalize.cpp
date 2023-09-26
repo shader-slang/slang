@@ -7,6 +7,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-specialize-function-call.h"
+#include "slang-ir-util.h"
 #include "slang-glsl-extension-tracker.h"
 #include "../../external/spirv-headers/include/spirv/unified1/spirv.h"
 
@@ -2461,14 +2462,7 @@ void legalizeEntryPointParameterForGLSL(
                     if(callee->getOp() != kIROp_Func)
                         continue;
 
-                    // HACK: we will identify the operation based
-                    // on the target-intrinsic definition that was
-                    // given to it.
-                    auto decoration = as<IRTargetIntrinsicDecoration>(findBestTargetDecoration(callee, CapabilityAtom::GLSL));
-                    if(!decoration)
-                        continue;
-
-                    if(decoration->getDefinition() != UnownedStringSlice::fromLiteral("EmitVertex()"))
+                    if (getBuiltinFuncName(callee) != UnownedStringSlice::fromLiteral("GeometryStreamAppend"))
                     {
                         continue;
                     }

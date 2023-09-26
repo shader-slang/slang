@@ -257,6 +257,8 @@ HashSet<IRBlock*> getParentBreakBlockSet(IRDominatorTree* dom, IRBlock* block);
 
 IRVarLayout* findVarLayout(IRInst* value);
 
+UnownedStringSlice getBuiltinFuncName(IRInst* callee);
+
 // Run an operation over every block in a module
 template<typename F>
 static void overAllBlocks(IRModule* module, F f)

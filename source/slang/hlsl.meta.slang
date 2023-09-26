@@ -1167,6 +1167,7 @@ __magic_type(HLSLPointStreamType)
 __intrinsic_type($(kIROp_HLSLPointStreamType))
 struct PointStream
 {
+    [KnownBuiltin("GeometryStreamAppend")]
     void Append(T value)
     {
         __target_switch
@@ -1177,6 +1178,7 @@ struct PointStream
         }
     }
 
+    [KnownBuiltin("GeometryStreamRestart")]
     void RestartStrip()
     {
         __target_switch
@@ -1193,6 +1195,7 @@ __magic_type(HLSLLineStreamType)
 __intrinsic_type($(kIROp_HLSLLineStreamType))
 struct LineStream
 {
+    [KnownBuiltin("GeometryStreamAppend")]
     void Append(T value)
     {
         __target_switch
@@ -1203,6 +1206,7 @@ struct LineStream
         }
     }
 
+    [KnownBuiltin("GeometryStreamRestart")]
     void RestartStrip()
     {
         __target_switch
@@ -1219,6 +1223,7 @@ __magic_type(HLSLTriangleStreamType)
 __intrinsic_type($(kIROp_HLSLTriangleStreamType))
 struct TriangleStream
 {
+    [KnownBuiltin("GeometryStreamAppend")]
     void Append(T value)
     {
         __target_switch
@@ -1229,6 +1234,7 @@ struct TriangleStream
         }
     }
 
+    [KnownBuiltin("GeometryStreamRestart")]
     void RestartStrip()
     {
         __target_switch
