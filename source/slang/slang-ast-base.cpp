@@ -22,11 +22,14 @@ void NodeBase::_initDebug(ASTNodeType inAstNodeType, ASTBuilder* inAstBuilder)
 }
 DeclRefBase* Decl::getDefaultDeclRef()
 {
-    auto astBuilder = getCurrentASTBuilder();
-    if (astBuilder && astBuilder->getEpoch() != m_defaultDeclRefEpoch || !m_defaultDeclRef)
+    if (auto astBuilder = getCurrentASTBuilder())
     {
-        m_defaultDeclRef = astBuilder->getOrCreate<DirectDeclRef>(this);
-        m_defaultDeclRefEpoch = astBuilder->getEpoch();
+        const Index currentEpoch = astBuilder->getEpoch();
+        if (currentEpoch != m_defaultDeclRefEpoch || !m_defaultDeclRef)
+        {
+            m_defaultDeclRef = astBuilder->getOrCreate<DirectDeclRef>(this);
+            m_defaultDeclRefEpoch = currentEpoch;
+        }
     }
     return m_defaultDeclRef;
 }
