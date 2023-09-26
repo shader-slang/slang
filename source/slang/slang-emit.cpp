@@ -1269,7 +1269,10 @@ SlangResult emitSPIRVForEntryPointsDirectly(
 
     String optErr;
     if (SLANG_FAILED(optimizeSPIRV(spirv, optErr, outSpirv)))
+    {
         codeGenContext->getSink()->diagnose(SourceLoc(), Diagnostics::spirvOptFailed, optErr);
+        outSpirv = _Move(spirv);
+    }
 
     auto artifact = ArtifactUtil::createArtifactForCompileTarget(asExternal(codeGenContext->getTargetFormat()));
     artifact->addRepresentationUnknown(ListBlob::moveCreate(outSpirv));

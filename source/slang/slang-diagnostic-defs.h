@@ -728,7 +728,7 @@ DIAGNOSTIC(55102, Error, invalidTorchKernelParamType, "'$0' is not a valid param
 
 DIAGNOSTIC(56001, Error, unableToAutoMapCUDATypeToHostType, "Could not automatically map '$0' to a host type. Automatic binding generation failed for '$1'")
 
-DIAGNOSTIC(57001, Error, spirvOptFailed, "spirv-opt failed. $0")
+DIAGNOSTIC(57001, Warning, spirvOptFailed, "spirv-opt failed. $0")
 //
 // 8xxxx - Issues specific to a particular library/technology/platform/etc.
 //

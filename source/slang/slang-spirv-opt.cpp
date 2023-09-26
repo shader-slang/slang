@@ -26,12 +26,9 @@ SlangResult optimizeSPIRV(const List<uint8_t>& spirv, String& outErr, List<uint8
     commandLine.addArg("--merge-return");
     commandLine.addArg("--inline-entry-points-exhaustive");
     commandLine.addArg("--eliminate-dead-functions");
-    //commandLine.addArg("--private-to-local");
-    //commandLine.addArg("--fix-storage-class");
     commandLine.addArg("--eliminate-local-single-block");
     commandLine.addArg("--eliminate-local-single-store");
     commandLine.addArg("--eliminate-dead-code-aggressive");
-    //commandLine.addArg("--copy-propagate-arrays");
 
     commandLine.addArg("-o");
     String outFileName;
