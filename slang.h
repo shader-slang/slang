@@ -634,7 +634,6 @@ extern "C"
         SLANG_PASS_THROUGH_DXC,
         SLANG_PASS_THROUGH_GLSLANG,
         SLANG_PASS_THROUGH_SPIRV_DIS,
-        SLANG_PASS_THROUGH_SPIRV_OPT,
         SLANG_PASS_THROUGH_CLANG,                   ///< Clang C/C++ compiler 
         SLANG_PASS_THROUGH_VISUAL_STUDIO,           ///< Visual studio C/C++ compiler
         SLANG_PASS_THROUGH_GCC,                     ///< GCC C/C++ compiler
