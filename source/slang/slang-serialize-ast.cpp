@@ -86,6 +86,8 @@ struct ASTFieldAccess
 
         ASTBuilder builder(sharedASTBuilder, "Serialize Check");
 
+        SetASTBuilderContextRAII astBuilderRAII(&builder);
+
         DefaultSerialObjectFactory objectFactory(&builder);
 
         // We could now check that the loaded data matches

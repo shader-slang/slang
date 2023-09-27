@@ -667,12 +667,12 @@ DIAGNOSTIC(42001, Error, invalidUseOfTorchTensorTypeInDeviceFunc, "invalid use o
 
 DIAGNOSTIC(50010, Internal, missingExistentialBindingsForParameter, "missing argument for existential parameter slot")
 
-DIAGNOSTIC(50020, Error, invalidTessCoordType,          "TessCoord must have vec2 or vec3 type.")
-DIAGNOSTIC(50020, Error, invalidFragCoordType,          "FragCoord must be a vec4.")
-DIAGNOSTIC(50020, Error, invalidInvocationIdType,       "InvocationId must have int type.")
-DIAGNOSTIC(50020, Error, invalidThreadIdType,           "ThreadId must have int type.")
-DIAGNOSTIC(50020, Error, invalidPrimitiveIdType,        "PrimitiveId must have int type.")
-DIAGNOSTIC(50020, Error, invalidPatchVertexCountType,    "PatchVertexCount must have int type.")
+DIAGNOSTIC(50020, Error, invalidTessCoordType, "TessCoord must have vec2 or vec3 type.")
+DIAGNOSTIC(50020, Error, invalidFragCoordType, "FragCoord must be a vec4.")
+DIAGNOSTIC(50020, Error, invalidInvocationIdType, "InvocationId must have int type.")
+DIAGNOSTIC(50020, Error, invalidThreadIdType, "ThreadId must have int type.")
+DIAGNOSTIC(50020, Error, invalidPrimitiveIdType, "PrimitiveId must have int type.")
+DIAGNOSTIC(50020, Error, invalidPatchVertexCountType, "PatchVertexCount must have int type.")
 DIAGNOSTIC(50022, Error, worldIsNotDefined, "world '$0' is not defined.")
 DIAGNOSTIC(50023, Error, stageShouldProvideWorldAttribute, "'$0' should provide 'World' attribute.")
 DIAGNOSTIC(50040, Error, componentHasInvalidTypeForPositionOutput, "'$0': component used as 'loc' output must be of vec4 type.")
@@ -693,7 +693,7 @@ DIAGNOSTIC(50052, Error, hullShaderRequiresTessLevelOuter, "'HullShader' require
 DIAGNOSTIC(50053, Error, invalidTessellationDomian, "'Domain' should be either 'triangles' or 'quads'.")
 DIAGNOSTIC(50053, Error, invalidTessellationOutputTopology, "'OutputTopology' must be one of: 'point', 'line', 'triangle_cw', or 'triangle_ccw'.")
 DIAGNOSTIC(50053, Error, invalidTessellationPartitioning, "'Partitioning' must be one of: 'integer', 'pow2', 'fractional_even', or 'fractional_odd'.")
-DIAGNOSTIC(50053, Error, invalidTessellationDomain,     "'Domain' should be either 'triangles' or 'quads'.")
+DIAGNOSTIC(50053, Error, invalidTessellationDomain, "'Domain' should be either 'triangles' or 'quads'.")
 
 DIAGNOSTIC(50082, Error, importingFromPackedBufferUnsupported, "importing type '$0' from PackedBuffer is not supported by the GLSL backend.")
 DIAGNOSTIC(51090, Error, cannotGenerateCodeForExternComponentType, "cannot generate code for extern component type '$0'.")
@@ -716,7 +716,7 @@ DIAGNOSTIC(52006, Error, compilerNotDefinedForTransition, "compiler not defined 
 
 DIAGNOSTIC(52007, Error, typeCannotBeUsedInDynamicDispatch, "failed to generate dynamic dispatch code for type '$0'.")
 DIAGNOSTIC(52008, Error, dynamicDispatchOnSpecializeOnlyInterface, "type '$0' is marked for specialization only, but dynamic dispatch is needed for the call.")
-DIAGNOSTIC(53001,Error, invalidTypeMarshallingForImportedDLLSymbol, "invalid type marshalling in imported func $0.")
+DIAGNOSTIC(53001, Error, invalidTypeMarshallingForImportedDLLSymbol, "invalid type marshalling in imported func $0.")
 
 DIAGNOSTIC(54001, Error, meshOutputMustBeOut, "Mesh shader outputs must be declared with 'out'.")
 DIAGNOSTIC(54002, Error, meshOutputMustBeArray, "HLSL style mesh shader outputs must be arrays")
@@ -728,6 +728,7 @@ DIAGNOSTIC(55102, Error, invalidTorchKernelParamType, "'$0' is not a valid param
 
 DIAGNOSTIC(56001, Error, unableToAutoMapCUDATypeToHostType, "Could not automatically map '$0' to a host type. Automatic binding generation failed for '$1'")
 
+DIAGNOSTIC(57001, Warning, spirvOptFailed, "spirv-opt failed. $0")
 //
 // 8xxxx - Issues specific to a particular library/technology/platform/etc.
 //

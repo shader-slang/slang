@@ -1128,6 +1128,14 @@ IRVarLayout* findVarLayout(IRInst* value)
 
 }
 
+UnownedStringSlice getBuiltinFuncName(IRInst* callee)
+{
+    auto decor = getResolvedInstForDecorations(callee)->findDecoration<IRKnownBuiltinDecoration>();
+    if (!decor)
+        return UnownedStringSlice();
+    return decor->getName();
+}
+
 UnownedStringSlice getBasicTypeNameHint(IRType* basicType)
 {
     switch (basicType->getOp())

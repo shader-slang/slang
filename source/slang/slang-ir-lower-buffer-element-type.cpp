@@ -184,7 +184,7 @@ namespace Slang
             IRBuilder builder(structType);
             builder.setInsertAfter(structType);
             auto func = builder.createFunc();
-            auto funcType = builder.getFuncType(1, (IRType**)&structType, arrayType);
+            auto funcType = builder.getFuncType(1, (IRType**)&arrayType, structType);
             func->setFullType(funcType);
             builder.addNameHintDecoration(func, UnownedStringSlice("packStorage"));
             builder.setInsertInto(func);
@@ -637,6 +637,23 @@ namespace Slang
                                 ptrValsWorkList.add(user);
                                 break;
                             case kIROp_StructuredBufferGetDimensions:
+                                break;
+                            case kIROp_Call:
+                                {
+                                    // If we are calling a function with an l-value pointer from buffer access,
+                                    // we need to materialize the object as a local variable, and pass the address
+                                    // of the local variable to the function.
+                                    builder.setInsertBefore(user);
+                                    auto newLoad = builder.emitLoad(loweredElementTypeInfo.loweredType, ptrVal);
+                                    auto unpackedVal = builder.emitCallInst((IRType*)originalElementType, loweredElementTypeInfo.convertLoweredToOriginal, 1, &newLoad);
+                                    auto var = builder.emitVar((IRType*)originalElementType);
+                                    builder.emitStore(var, unpackedVal);
+                                    use->set(var);
+                                    builder.setInsertAfter(user);
+                                    auto newVal = builder.emitLoad(var);
+                                    auto packedVal = builder.emitCallInst((IRType*)loweredElementTypeInfo.loweredType, loweredElementTypeInfo.convertOriginalToLowered, 1, &newVal);
+                                    builder.emitStore(ptrVal, packedVal);
+                                }
                                 break;
                             default:
                                 SLANG_UNREACHABLE("unhandled inst of a buffer/pointer value that needs storage lowering.");

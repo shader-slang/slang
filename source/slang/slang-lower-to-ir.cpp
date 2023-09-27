@@ -1364,12 +1364,12 @@ static void addLinkageDecoration(
                 ? pyExportModifier->name.getUnownedSlice()
                 : decl->getName()->text.getUnownedSlice());
         }
-        else if (as<KnownBuiltinAttribute>(modifier))
+        else if (auto knownBuiltinModifier = as<KnownBuiltinAttribute>(modifier))
         {
             // We add this to the internal instruction, like other name-like
             // decorations, for instance "nameHint". This prevents it becoming
             // lost during specialization.
-            builder->addKnownBuiltinDecoration(inInst, decl->getName()->text.getUnownedSlice());
+            builder->addKnownBuiltinDecoration(inInst, knownBuiltinModifier->name.getUnownedSlice());
         }
     }
     if (as<InterfaceDecl>(decl->parentDecl) &&

@@ -1167,11 +1167,27 @@ __magic_type(HLSLPointStreamType)
 __intrinsic_type($(kIROp_HLSLPointStreamType))
 struct PointStream
 {
-    __target_intrinsic(glsl, "EmitVertex()")
-    void Append(T value);
+    [KnownBuiltin("GeometryStreamAppend")]
+    void Append(T value)
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "EmitVertex()";
+        case hlsl: __intrinsic_asm ".Append";
+        case spirv: spirv_asm { OpEmitVertex; };
+        }
+    }
 
-    __target_intrinsic(glsl, "EndPrimitive()")
-    void RestartStrip();
+    [KnownBuiltin("GeometryStreamRestart")]
+    void RestartStrip()
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "EndPrimitive()";
+        case hlsl: __intrinsic_asm ".RestartStrip";
+        case spirv: spirv_asm { OpEndPrimitive; };
+        }
+    }
 };
 
 __generic<T>
@@ -1179,11 +1195,27 @@ __magic_type(HLSLLineStreamType)
 __intrinsic_type($(kIROp_HLSLLineStreamType))
 struct LineStream
 {
-    __target_intrinsic(glsl, "EmitVertex()")
-    void Append(T value);
+    [KnownBuiltin("GeometryStreamAppend")]
+    void Append(T value)
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "EmitVertex()";
+        case hlsl: __intrinsic_asm ".Append";
+        case spirv: spirv_asm { OpEmitVertex; };
+        }
+    }
 
-    __target_intrinsic(glsl, "EndPrimitive()")
-    void RestartStrip();
+    [KnownBuiltin("GeometryStreamRestart")]
+    void RestartStrip()
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "EndPrimitive()";
+        case hlsl: __intrinsic_asm ".RestartStrip";
+        case spirv: spirv_asm { OpEndPrimitive; };
+        }
+    }
 };
 
 __generic<T>
@@ -1191,11 +1223,27 @@ __magic_type(HLSLTriangleStreamType)
 __intrinsic_type($(kIROp_HLSLTriangleStreamType))
 struct TriangleStream
 {
-    __target_intrinsic(glsl, "EmitVertex()")
-    void Append(T value);
+    [KnownBuiltin("GeometryStreamAppend")]
+    void Append(T value)
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "EmitVertex()";
+        case hlsl: __intrinsic_asm ".Append";
+        case spirv: spirv_asm { OpEmitVertex; };
+        }
+    }
 
-    __target_intrinsic(glsl, "EndPrimitive()")
-    void RestartStrip();
+    [KnownBuiltin("GeometryStreamRestart")]
+    void RestartStrip()
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "EndPrimitive()";
+        case hlsl: __intrinsic_asm ".RestartStrip";
+        case spirv: spirv_asm { OpEndPrimitive; };
+        }
+    }
 };
 
 #define VECTOR_MAP_UNARY(TYPE, COUNT, FUNC, VALUE) \
@@ -8019,7 +8067,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
             uint iCandidateOrCommitted = 0;
             return spirv_asm
             {
-                %rr:$$bool = OpRayQueryGetIntersectionCandidateAABBOpaqueKHR &this $iCandidateOrCommitted;
+                %rr:$$bool = OpRayQueryGetIntersectionCandidateAABBOpaqueKHR &this;
                 result:$$bool = OpLogicalNot %rr;
             };
         }

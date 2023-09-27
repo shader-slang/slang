@@ -7,6 +7,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-specialize-function-call.h"
+#include "slang-ir-util.h"
 #include "slang-glsl-extension-tracker.h"
 #include "../../external/spirv-headers/include/spirv/unified1/spirv.h"
 
@@ -2392,135 +2393,128 @@ void legalizeEntryPointParameterForGLSL(
     // will differ a bit between the pointer and non-pointer
     // cases.
     auto paramType = pp->getDataType();
-
+    auto valueType = paramType;
     // First we will special-case stage input/outputs that
     // don't fit into the standard varying model.
     // - Geometry shader output streams
     // - Mesh shader outputs
     // - Mesh shader payload input
-    if( auto paramPtrType = as<IROutTypeBase>(paramType) )
+    if (auto paramPtrType = as<IROutTypeBase>(paramType))
     {
-        auto valueType = paramPtrType->getValueType();
-        if( const auto gsStreamType = as<IRHLSLStreamOutputType>(valueType) )
+        valueType = paramPtrType->getValueType();
+    }
+    if( const auto gsStreamType = as<IRHLSLStreamOutputType>(valueType) )
+    {
+        // An output stream type like `TriangleStream<Foo>` should
+        // more or less translate into `out Foo` (plus scalarization).
+
+        auto globalOutputVal = createGLSLGlobalVaryings(
+            context,
+            codeGenContext,
+            builder,
+            valueType,
+            paramLayout,
+            LayoutResourceKind::VaryingOutput,
+            stage,
+            pp);
+
+        // TODO: a GS output stream might be passed into other
+        // functions, so that we should really be modifying
+        // any function that has one of these in its parameter
+        // list (and in the limit we should be leagalizing any
+        // type that nests these...).
+        //
+        // For now we will just try to deal with `Append` calls
+        // directly in this function.
+
+        for( auto bb = func->getFirstBlock(); bb; bb = bb->getNextBlock() )
         {
-            // An output stream type like `TriangleStream<Foo>` should
-            // more or less translate into `out Foo` (plus scalarization).
-
-            auto globalOutputVal = createGLSLGlobalVaryings(
-                context,
-                codeGenContext,
-                builder,
-                valueType,
-                paramLayout,
-                LayoutResourceKind::VaryingOutput,
-                stage,
-                pp);
-
-            // TODO: a GS output stream might be passed into other
-            // functions, so that we should really be modifying
-            // any function that has one of these in its parameter
-            // list (and in the limit we should be leagalizing any
-            // type that nests these...).
-            //
-            // For now we will just try to deal with `Append` calls
-            // directly in this function.
-
-            for( auto bb = func->getFirstBlock(); bb; bb = bb->getNextBlock() )
+            for( auto ii = bb->getFirstInst(); ii; ii = ii->getNextInst() )
             {
-                for( auto ii = bb->getFirstInst(); ii; ii = ii->getNextInst() )
-                {
-                    // Is it a call?
-                    if(ii->getOp() != kIROp_Call)
-                        continue;
+                // Is it a call?
+                if(ii->getOp() != kIROp_Call)
+                    continue;
 
-                    // Is it calling the append operation?
-                    auto callee = ii->getOperand(0);
-                    for(;;)
+                // Is it calling the append operation?
+                auto callee = ii->getOperand(0);
+                for(;;)
+                {
+                    // If the instruction is `specialize(X,...)` then
+                    // we want to look at `X`, and if it is `generic { ... return R; }`
+                    // then we want to look at `R`. We handle this
+                    // iteratively here.
+                    //
+                    // TODO: This idiom seems to come up enough that we
+                    // should probably have a dedicated convenience routine
+                    // for this.
+                    //
+                    // Alternatively, we could switch the IR encoding so
+                    // that decorations are added to the generic instead of the
+                    // value it returns.
+                    //
+                    switch(callee->getOp())
                     {
-                        // If the instruction is `specialize(X,...)` then
-                        // we want to look at `X`, and if it is `generic { ... return R; }`
-                        // then we want to look at `R`. We handle this
-                        // iteratively here.
-                        //
-                        // TODO: This idiom seems to come up enough that we
-                        // should probably have a dedicated convenience routine
-                        // for this.
-                        //
-                        // Alternatively, we could switch the IR encoding so
-                        // that decorations are added to the generic instead of the
-                        // value it returns.
-                        //
-                        switch(callee->getOp())
+                    case kIROp_Specialize:
                         {
-                        case kIROp_Specialize:
+                            callee = cast<IRSpecialize>(callee)->getOperand(0);
+                            continue;
+                        }
+
+                    case kIROp_Generic:
+                        {
+                            auto genericResult = findGenericReturnVal(cast<IRGeneric>(callee));
+                            if(genericResult)
                             {
-                                callee = cast<IRSpecialize>(callee)->getOperand(0);
+                                callee = genericResult;
                                 continue;
                             }
-
-                        case kIROp_Generic:
-                            {
-                                auto genericResult = findGenericReturnVal(cast<IRGeneric>(callee));
-                                if(genericResult)
-                                {
-                                    callee = genericResult;
-                                    continue;
-                                }
-                            }
-
-                        default:
-                            break;
                         }
+
+                    default:
                         break;
                     }
-                    if(callee->getOp() != kIROp_Func)
-                        continue;
-
-                    // HACK: we will identify the operation based
-                    // on the target-intrinsic definition that was
-                    // given to it.
-                    auto decoration = as<IRTargetIntrinsicDecoration>(findBestTargetDecoration(callee, CapabilityAtom::GLSL));
-                    if(!decoration)
-                        continue;
-
-                    if(decoration->getDefinition() != UnownedStringSlice::fromLiteral("EmitVertex()"))
-                    {
-                        continue;
-                    }
-
-                    // Okay, we have a declaration, and we want to modify it!
-
-                    builder->setInsertBefore(ii);
-
-                    assign(builder, globalOutputVal, ScalarizedVal::value(ii->getOperand(2)));
+                    break;
                 }
+                if(callee->getOp() != kIROp_Func)
+                    continue;
+
+                if (getBuiltinFuncName(callee) != UnownedStringSlice::fromLiteral("GeometryStreamAppend"))
+                {
+                    continue;
+                }
+
+                // Okay, we have a declaration, and we want to modify it!
+
+                builder->setInsertBefore(ii);
+
+                assign(builder, globalOutputVal, ScalarizedVal::value(ii->getOperand(2)));
             }
-
-            // We will still have references to the parameter coming
-            // from the `EmitVertex` calls, so we need to replace it
-            // with something. There isn't anything reasonable to
-            // replace it with that would have the right type, so
-            // we will replace it with an undefined value, knowing
-            // that the emitted code will not actually reference it.
-            //
-            // TODO: This approach to generating geometry shader code
-            // is not ideal, and we should strive to find a better
-            // approach that involes coding the `EmitVertex` operation
-            // directly in the stdlib, similar to how ray-tracing
-            // operations like `TraceRay` are handled.
-            //
-            builder->setInsertBefore(func->getFirstBlock()->getFirstOrdinaryInst());
-            auto undefinedVal = builder->emitUndefined(pp->getFullType());
-            pp->replaceUsesWith(undefinedVal);
-
-            return;
         }
-        if( auto meshOutputType = as<IRMeshOutputType>(valueType) )
-        {
-            return legalizeMeshOutputParam(context, codeGenContext, func, pp, paramLayout, meshOutputType);
-        }
+
+        // We will still have references to the parameter coming
+        // from the `EmitVertex` calls, so we need to replace it
+        // with something. There isn't anything reasonable to
+        // replace it with that would have the right type, so
+        // we will replace it with an undefined value, knowing
+        // that the emitted code will not actually reference it.
+        //
+        // TODO: This approach to generating geometry shader code
+        // is not ideal, and we should strive to find a better
+        // approach that involes coding the `EmitVertex` operation
+        // directly in the stdlib, similar to how ray-tracing
+        // operations like `TraceRay` are handled.
+        //
+        builder->setInsertBefore(func->getFirstBlock()->getFirstOrdinaryInst());
+        auto undefinedVal = builder->emitUndefined(pp->getFullType());
+        pp->replaceUsesWith(undefinedVal);
+
+        return;
     }
-    else if(pp->findDecoration<IRHLSLMeshPayloadDecoration>())
+    if( auto meshOutputType = as<IRMeshOutputType>(valueType) )
+    {
+        return legalizeMeshOutputParam(context, codeGenContext, func, pp, paramLayout, meshOutputType);
+    }
+    if(pp->findDecoration<IRHLSLMeshPayloadDecoration>())
     {
         return legalizeMeshPayloadInputParam(context, codeGenContext, pp);
     }
@@ -2558,7 +2552,7 @@ void legalizeEntryPointParameterForGLSL(
     // Is the parameter type a special pointer type
     // that indicates the parameter is used for `out`
     // or `inout` access?
-    if(auto paramPtrType = as<IROutTypeBase>(paramType) )
+    if( as<IROutTypeBase>(paramType) )
     {
         // Okay, we have the more interesting case here,
         // where the parameter was being passed by reference.
@@ -2566,12 +2560,10 @@ void legalizeEntryPointParameterForGLSL(
         // type, which will replace the parameter, along with
         // one or more global variables for the actual input/output.
 
-        auto valueType = paramPtrType->getValueType();
-
         auto localVariable = builder->emitVar(valueType);
         auto localVal = ScalarizedVal::address(localVariable);
 
-        if( const auto inOutType = as<IRInOutType>(paramPtrType) )
+        if( const auto inOutType = as<IRInOutType>(paramType) )
         {
             // In the `in out` case we need to declare two
             // sets of global variables: one for the `in`
