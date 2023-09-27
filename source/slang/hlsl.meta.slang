@@ -7257,9 +7257,8 @@ void __executeCallable(uint shaderIndex, int payloadLocation);
 // for a type being used in a `CallShader()` call for GLSL-based targets.
 //
 __generic<Payload>
-__target_intrinsic(__glslRayTracing, "$XC")
 [__readNone]
-[__AlwaysFoldIntoUseSiteAttribute]
+__intrinsic_op($(kIROp_GetVulkanRayTracingPayloadLocation))
 int __callablePayloadLocation(__ref Payload payload);
 
 // Now we provide a hard-coded definition of `CallShader()` for GLSL-based
@@ -7313,13 +7312,13 @@ void __traceRay(
 // syntax works in a pinch.
 //
 __generic<Payload>
-__target_intrinsic(__glslRayTracing, "$XP")
 [__readNone]
-[__AlwaysFoldIntoUseSiteAttribute]
+__intrinsic_op($(kIROp_GetVulkanRayTracingPayloadLocation))
 int __rayPayloadLocation(__ref Payload payload);
 
 __generic<payload_t>
 __specialized_for_target(glsl)
+__specialized_for_target(spirv)
 void TraceRay(
     RaytracingAccelerationStructure AccelerationStructure,
     uint                            RayFlags,
@@ -7387,6 +7386,7 @@ void __traceMotionRay(
 
 __generic<payload_t>
 __specialized_for_target(glsl)
+__specialized_for_target(spirv)
 void TraceMotionRay(
     RaytracingAccelerationStructure AccelerationStructure,
     uint                            RayFlags,
@@ -7428,6 +7428,7 @@ bool __reportIntersection(float tHit, uint hitKind);
 
 __generic<A>
 __specialized_for_target(glsl)
+__specialized_for_target(spirv)
 bool ReportHit(float tHit, uint hitKind, A attributes)
 {
     [__vulkanHitAttributes]
@@ -8327,9 +8328,7 @@ Ref<T> __hitObjectAttributes<T>()
 // for GLSL-based targets.
 //
 __generic<Attributes>
-__target_intrinsic(__glslRayTracing, "$XH")
-[__readNone]
-[__AlwaysFoldIntoUseSiteAttribute]
+__intrinsic_op($(kIROp_GetVulkanRayTracingPayloadLocation))
 int __hitObjectAttributesLocation(__ref Attributes attributes);
 
     /// Immutable data type representing a ray hit or a miss. Can be used to invoke hit or miss shading,

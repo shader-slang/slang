@@ -2653,6 +2653,61 @@ bool shouldUseOriginalEntryPointName(CodeGenContext* codeGenContext)
     return false;
 }
 
+void assignRayPayloadHitObjectAttributeLocations(IRModule* module)
+{
+    IRIntegerValue rayPayloadCounter = 0;
+    IRIntegerValue callablePayloadCounter = 0;
+    IRIntegerValue hitObjectAttributeCounter = 0;
+
+    IRBuilder builder(module);
+    for (auto inst : module->getGlobalInsts())
+    {
+        auto globalVar = as<IRGlobalVar>(inst);
+        if (!globalVar)
+            continue;
+        IRInst* location = nullptr;
+        for (auto decor : globalVar->getDecorations())
+        {
+            switch (decor->getOp())
+            {
+            case kIROp_VulkanRayPayloadDecoration:
+                builder.setInsertBefore(inst);
+                location = builder.getIntValue(builder.getIntType(), rayPayloadCounter);
+                decor->setOperand(0, location);
+                rayPayloadCounter++;
+                goto end;
+            case kIROp_VulkanCallablePayloadDecoration:
+                builder.setInsertBefore(inst);
+                location = builder.getIntValue(builder.getIntType(), callablePayloadCounter);
+                decor->setOperand(0, location);
+                callablePayloadCounter++;
+                goto end;
+            case kIROp_VulkanHitObjectAttributesDecoration:
+                builder.setInsertBefore(inst);
+                location = builder.getIntValue(builder.getIntType(), hitObjectAttributeCounter);
+                decor->setOperand(0, location);
+                hitObjectAttributeCounter++;
+                goto end;
+            default:
+                break;
+            }
+        }
+    end:;
+        if (location)
+        {
+            traverseUses(globalVar, [&](IRUse* use)
+                {
+                    auto user = use->getUser();
+                    if (user->getOp() == kIROp_GetVulkanRayTracingPayloadLocation)
+                    {
+                        user->replaceUsesWith(location);
+                        user->removeAndDeallocate();
+                    }
+                });
+        }
+    }
+}
+
 void legalizeEntryPointForGLSL(
     Session*                session,
     IRModule*               module,
@@ -2891,6 +2946,8 @@ void legalizeEntryPointsForGLSL(
     {
         legalizeEntryPointForGLSL(session, module, func, context, glslExtensionTracker);
     }
+
+    assignRayPayloadHitObjectAttributeLocations(module);
 }
 
 void legalizeConstantBufferLoadForGLSL(IRModule* module)

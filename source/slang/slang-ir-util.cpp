@@ -447,7 +447,7 @@ bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, I
             {
                 auto callee = call->getCallee();
                 if (callee &&
-                    doesCalleeHaveSideEffect(callee))
+                    !doesCalleeHaveSideEffect(callee))
                 {
                     // An exception is if the callee is side-effect free and is not reading from
                     // memory.

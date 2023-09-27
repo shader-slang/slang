@@ -17,48 +17,6 @@
 namespace Slang
 {
 
-class LocationTracker
-{
-public:
-    enum class Kind
-    {
-        Invalid = -1,
-        RayPayload,                 ///< GLSL rayPayload
-        CallablePayload,            ///< GLSL callableData
-        HitObjectAttribute,         ///< GLSL hitObjectAttribute
-        CountOf,
-    };
-
-        /// Given a decoration returns the Kind, or Kind::Invalid if that is not appropriate
-    static Kind getKindFromDecoration(IRDecoration* decoration);
-
-        /// Get the location value associated with inst (and decoration).
-        /// Will return -1, if no location is associated
-    Index getValue(IRInst* inst, IRDecoration* decoration);
-
-        /// Get the location value associated with inst (and decoration).
-        /// The kind must match that for the decoration.
-        /// Will return -1, if no location is associated
-    Index getValue(Kind kind, IRInst* inst, IRDecoration* decoration);
-
-protected:
-    struct Location
-    {
-        typedef Location ThisType;
-
-        bool operator==(const ThisType& rhs) const { return kind == rhs.kind && value == rhs.value; }
-        bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
-
-        Kind kind;          ///< The kind of location
-        Index value;          ///< The value of the location. Must be >= 0
-    };
-
-    Index m_nextValueForKind[Count(Kind::CountOf)] = { 0, };
-
-    Dictionary<IRInst*, Location> m_mapIRToLocations;
-};
-
-
 class CLikeSourceEmitter: public SourceEmitterBase
 {
 public:
@@ -277,8 +235,6 @@ public:
     Linkage* getLinkage() { return m_codeGenContext->getLinkage(); }
     ComponentType* getProgram() { return m_codeGenContext->getProgram(); }
     TargetProgram* getTargetProgram() { return m_codeGenContext->getTargetProgram(); }
-
-    LocationTracker& getLocationTracker() { return m_locationTracker; }
 
     //
     // Types
@@ -614,10 +570,6 @@ public:
     // Map an IR instruction to the name that we've decided
     // to use for it when emitting code.
     Dictionary<IRInst*, String> m_mapInstToName;
-
-    // Maps instructions to locations. Used for GLSL output for locations, but could potentially
-    // be used for other kinds of location.
-    LocationTracker m_locationTracker;
 };
 
 }
