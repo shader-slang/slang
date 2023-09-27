@@ -1605,7 +1605,7 @@ void insertTempVarForMutableParams(IRModule* module, IRFunc* func)
     List<IRParam*> params;
     for (auto param : firstBlock->getParams())
     {
-        if (const auto ptrType = as<IRPtrTypeBase>(param->getDataType()))
+        if (const auto ptrType = as<IROutTypeBase>(param->getDataType()))
         {
             params.add(param);
         }
