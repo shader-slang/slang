@@ -72,7 +72,7 @@
 #include "slang-legalize-types.h"
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
-
+#include "slang-spirv-opt.h"
 #include "slang-syntax.h"
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
@@ -773,15 +773,20 @@ Result linkAndOptimizeIR(
     switch (target)
     {
     case CodeGenTarget::GLSL:
+    case CodeGenTarget::SPIRV:
+    case CodeGenTarget::SPIRVAssembly:
     {
-        auto glslExtensionTracker = as<GLSLExtensionTracker>(options.sourceEmitter->getExtensionTracker());
+        GLSLExtensionTracker glslExtensionTracker;
+        GLSLExtensionTracker* glslExtensionTrackerPtr = options.sourceEmitter
+            ? as<GLSLExtensionTracker>(options.sourceEmitter->getExtensionTracker())
+            : &glslExtensionTracker;
 
         legalizeEntryPointsForGLSL(
             session,
             irModule,
             irEntryPoints,
             codeGenContext,
-            glslExtensionTracker);
+            glslExtensionTrackerPtr);
 
 #if 0
             dumpIRIfEnabled(codeGenContext, irModule, "GLSL LEGALIZED");
@@ -1259,11 +1264,18 @@ SlangResult emitSPIRVForEntryPointsDirectly(
     auto irModule = linkedIR.module;
     auto irEntryPoints = linkedIR.entryPoints;
 
-    List<uint8_t> spirv;
+    List<uint8_t> spirv, outSpirv;
     emitSPIRVFromIR(codeGenContext, irModule, irEntryPoints, spirv);
 
+    String optErr;
+    if (SLANG_FAILED(optimizeSPIRV(spirv, optErr, outSpirv)))
+    {
+        codeGenContext->getSink()->diagnose(SourceLoc(), Diagnostics::spirvOptFailed, optErr);
+        outSpirv = _Move(spirv);
+    }
+
     auto artifact = ArtifactUtil::createArtifactForCompileTarget(asExternal(codeGenContext->getTargetFormat()));
-    artifact->addRepresentationUnknown(ListBlob::moveCreate(spirv));
+    artifact->addRepresentationUnknown(ListBlob::moveCreate(outSpirv));
 
     ArtifactUtil::addAssociated(artifact, linkedIR.metadata);
 

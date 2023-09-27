@@ -1,4 +1,5 @@
 #include "slang-stdlib-textures.h"
+#include <spirv/unified1/spirv.h>
 
 #define EMIT_LINE_DIRECTIVE() sb << "#line " << (__LINE__+1) << " \"slang-stdlib-textures.cpp\"\n"
 
@@ -256,138 +257,231 @@ void TextureTypeInfo::writeQueryFunctions()
 
     // `GetDimensions`
     const char* dimParamTypes[] = {"out float ", "out int ", "out uint "};
-    for(auto t : dimParamTypes)
-    for(int includeMipInfo = 0; includeMipInfo < 2; ++includeMipInfo)
+    const char* dimParamTypesInner[] = { "float", "int", "uint" };
+    for (int tid = 0; tid < 3; tid++)
     {
-        StringBuilder glsl;
+        auto t = dimParamTypes[tid];
+        auto rawT = dimParamTypesInner[tid];
+
+        for (int includeMipInfo = 0; includeMipInfo < 2; ++includeMipInfo)
         {
-
-            glsl << "(";
-
-            int aa = 1;
-            String lodStr = ", 0";
+            int sizeDimCount = 0;
+            StringBuilder params;
             if (includeMipInfo)
-            {
-                int mipLevelArg = aa++;
-                lodStr = ", int($";
-                lodStr.append(mipLevelArg);
-                lodStr.append(")");
-            }
+                params << "uint mipLevel, ";
 
-            String opStr = " = textureSize($0" + lodStr;
-            switch( access )
-            {
-            case SLANG_RESOURCE_ACCESS_READ_WRITE:
-            case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
-                opStr = " = imageSize($0";
-                break;
-
-            default:
-                break;
-            }
-
-
-            int cc = 0;
-            switch(baseShape)
+            switch (baseShape)
             {
             case TextureFlavor::Shape::Shape1D:
-                glsl << "($" << aa++ << opStr << ")";
-                if (isArray)
-                {
-                    glsl << ".x";
-                }
-                glsl << ")";
-                cc = 1;
+                params << t << "width";
+                sizeDimCount = 1;
                 break;
 
             case TextureFlavor::Shape::Shape2D:
             case TextureFlavor::Shape::ShapeCube:
-                glsl << "($" << aa++ << opStr << ").x)";
-                glsl << ", ($" << aa++ << opStr << ").y)";
-                cc = 2;
+                params << t << "width,";
+                params << t << "height";
+                sizeDimCount = 2;
                 break;
 
             case TextureFlavor::Shape::Shape3D:
-                glsl << "($" << aa++ << opStr << ").x)";
-                glsl << ", ($" << aa++ << opStr << ").y)";
-                glsl << ", ($" << aa++ << opStr << ").z)";
-                cc = 3;
+                params << t << "width,";
+                params << t << "height,";
+                params << t << "depth";
+                sizeDimCount = 3;
                 break;
 
             default:
-                SLANG_UNEXPECTED("unhandled resource shape");
+                assert(!"unexpected");
                 break;
             }
 
-            if(isArray)
+            if (isArray)
             {
-                glsl << ", ($" << aa++ << opStr << ")." << kComponentNames[cc] << ")";
+                params << ", " << t << "elements";
+                sizeDimCount++;
             }
 
-            if(isMultisample)
+            if (isMultisample)
             {
-                glsl << ", ($" << aa++ << " = textureSamples($0))";
+                params << ", " << t << "sampleCount";
             }
 
             if (includeMipInfo)
+                params << ", " << t << "numberOfLevels";
+
+
+            StringBuilder glsl;
             {
-                glsl << ", ($" << aa++ << " = textureQueryLevels($0))";
+                glsl << "(";
+
+                int aa = 1;
+                String lodStr = ", 0";
+                if (includeMipInfo)
+                {
+                    int mipLevelArg = aa++;
+                    lodStr = ", int($";
+                    lodStr.append(mipLevelArg);
+                    lodStr.append(")");
+                }
+
+                String opStr = " = textureSize($0" + lodStr;
+                switch (access)
+                {
+                case SLANG_RESOURCE_ACCESS_READ_WRITE:
+                case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
+                    opStr = " = imageSize($0";
+                    break;
+
+                default:
+                    break;
+                }
+
+                int cc = 0;
+                switch (baseShape)
+                {
+                case TextureFlavor::Shape::Shape1D:
+                    glsl << "($" << aa++ << opStr << ")";
+                    if (isArray)
+                    {
+                        glsl << ".x";
+                    }
+                    glsl << ")";
+                    cc = 1;
+                    break;
+
+                case TextureFlavor::Shape::Shape2D:
+                case TextureFlavor::Shape::ShapeCube:
+                    glsl << "($" << aa++ << opStr << ").x)";
+                    glsl << ", ($" << aa++ << opStr << ").y)";
+                    cc = 2;
+                    break;
+
+                case TextureFlavor::Shape::Shape3D:
+                    glsl << "($" << aa++ << opStr << ").x)";
+                    glsl << ", ($" << aa++ << opStr << ").y)";
+                    glsl << ", ($" << aa++ << opStr << ").z)";
+                    cc = 3;
+                    break;
+
+                default:
+                    SLANG_UNEXPECTED("unhandled resource shape");
+                    break;
+                }
+
+                if (isArray)
+                {
+                    glsl << ", ($" << aa++ << opStr << ")." << kComponentNames[cc] << ")";
+                }
+
+                if (isMultisample)
+                {
+                    glsl << ", ($" << aa++ << " = textureSamples($0))";
+                }
+
+                if (includeMipInfo)
+                {
+                    glsl << ", ($" << aa++ << " = textureQueryLevels($0))";
+                }
+
+
+                glsl << ")";
             }
 
+            StringBuilder spirv;
+            {
+                spirv << "OpCapability ImageQuery; ";
+                spirv << "%vecSize:$$uint";
+                if (sizeDimCount > 1) spirv << sizeDimCount;
+                spirv << " = ";
+                if (isMultisample)
+                    spirv << "OpImageQuerySize $this;";
+                else
+                    spirv << "OpImageQuerySizeLod $this $0;";
+                auto convertAndStore = [&](UnownedStringSlice uintSourceVal, const char* destParam)
+                    {
+                        if (UnownedStringSlice(rawT) == "uint")
+                        {
+                            spirv << "OpStore &" << destParam << " %" << uintSourceVal << ";";
+                        }
+                        else
+                        {
+                            if (UnownedStringSlice(rawT) == "int")
+                            {
+                                spirv << "%c_" << uintSourceVal << " : $$" << rawT << " = OpBitcast %" << uintSourceVal << "; ";
+                            }
+                            else
+                            {
+                                spirv << "%c_" << uintSourceVal << " : $$" << rawT << " = OpConvertUToF %" << uintSourceVal << "; ";
+                            }
+                            spirv << "OpStore &" << destParam << "%c_" << uintSourceVal << ";";
+                        }
+                    };
+                auto extractSizeComponent = [&](int componentId, const char* destParam)
+                    {
+                        String elementVal = String("_") + destParam;
+                        if (sizeDimCount == 1)
+                        {
+                            spirv << "%" << elementVal << " : $$uint = OpCopyObject %vecSize; ";
+                        }
+                        else
+                        {
+                            spirv << "%" << elementVal << " : $$uint = OpCompositeExtract %vecSize " << componentId << "; ";
+                        }
+                        convertAndStore(elementVal.getUnownedSlice(), destParam);
+                    };
+                switch (baseShape)
+                {
+                case TextureFlavor::Shape::Shape1D:
+                    extractSizeComponent(0, "width");
+                    break;
 
-            glsl << ")";
+                case TextureFlavor::Shape::Shape2D:
+                case TextureFlavor::Shape::ShapeCube:
+                    extractSizeComponent(0, "width");
+                    extractSizeComponent(1, "height");
+                    break;
+
+                case TextureFlavor::Shape::Shape3D:
+                    extractSizeComponent(0, "width");
+                    extractSizeComponent(1, "height");
+                    extractSizeComponent(2, "depth");
+                    break;
+
+                default:
+                    assert(!"unexpected");
+                    break;
+                }
+
+                if (isArray)
+                {
+                    extractSizeComponent(sizeDimCount - 1, "elements");
+                }
+
+                if (isMultisample)
+                {
+                    spirv << "%_sampleCount : $$uint = OpImageQuerySamples $this;";
+                    convertAndStore(UnownedStringSlice("_sampleCount"), "sampleCount");
+                }
+
+                if (includeMipInfo)
+                {
+                    spirv << "%_levelCount : $$uint = OpImageQueryLevels $this;";
+                    convertAndStore(UnownedStringSlice("_levelCount"), "numberOfLevels");
+                }
+            }
+
+            sb << "    __glsl_version(450)\n";
+            sb << "    __glsl_extension(GL_EXT_samplerless_texture_functions)\n";
+            writeFunc(
+                "void",
+                "GetDimensions",
+                params,
+                glsl,
+                spirv,
+                "",
+                ReadNoneMode::Always);
         }
-
-        StringBuilder params;
-        if(includeMipInfo)
-            params << "uint mipLevel, ";
-
-        switch(baseShape)
-        {
-        case TextureFlavor::Shape::Shape1D:
-            params << t << "width";
-            break;
-
-        case TextureFlavor::Shape::Shape2D:
-        case TextureFlavor::Shape::ShapeCube:
-            params << t << "width,";
-            params << t << "height";
-            break;
-
-        case TextureFlavor::Shape::Shape3D:
-            params << t << "width,";
-            params << t << "height,";
-            params << t << "depth";
-            break;
-
-        default:
-            assert(!"unexpected");
-            break;
-        }
-
-        if(isArray)
-        {
-            params << ", " << t << "elements";
-        }
-
-        if(isMultisample)
-        {
-            params << ", " << t << "sampleCount";
-        }
-
-        if(includeMipInfo)
-            params << ", " << t << "numberOfLevels";
-
-        sb << "    __glsl_version(450)\n";
-        sb << "    __glsl_extension(GL_EXT_samplerless_texture_functions)\n";
-        writeFunc(
-            "void",
-            "GetDimensions",
-            params,
-            glsl,
-            "",
-            "",
-            ReadNoneMode::Always);
     }
 
     // `GetSamplePosition()`
@@ -493,6 +587,40 @@ void TextureTypeInfo::writeQueryFunctions()
             }
         }
 
+        // SPIRV
+        auto getSpirvIntrinsic = [&](bool hasSampleIndex, bool hasOffset)
+            {
+                StringBuilder spirv;
+                spirv << "%lod:$$int = OpCompositeExtract $location " << base.coordCount + isArray << "; ";
+                spirv << "%coord:$$int" << base.coordCount + isArray << " = OpVectorShuffle $location $location ";
+                for (int i = 0; i < base.coordCount + isArray; i++)
+                    spirv << " " << i;
+                spirv << "; ";
+                spirv << "%sampled:__sampledType(T) = ";
+                if (access == SLANG_RESOURCE_ACCESS_READ_WRITE)
+                    spirv << "OpImageRead";
+                else
+                    spirv << "OpImageFetch";
+                spirv << " $this %coord ";
+                uint32_t operandMask = 0;
+                if (!hasSampleIndex)
+                    operandMask |= SpvImageOperandsLodMask;
+                if (hasOffset)
+                    operandMask |= SpvImageOperandsConstOffsetMask;
+                if (hasSampleIndex)
+                    operandMask |= SpvImageOperandsSampleMask;
+                spirv << operandMask << " ";
+                if (operandMask & SpvImageOperandsLodMask)
+                    spirv << " %lod";
+                if (operandMask & SpvImageOperandsConstOffsetMask)
+                    spirv << " $offset";
+                if (operandMask & SpvImageOperandsSampleMask)
+                    spirv << " $sampleIndex";
+                spirv << ";";
+                spirv << i << "__truncate $$T result __sampledType(T) %sampled;";
+                return spirv.produceString();
+            };
+
         sb << i << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
         writeFunc(
             "T",
@@ -508,7 +636,7 @@ void TextureTypeInfo::writeQueryFunctions()
                 kGLSLLoadLODSwizzle[loadCoordCount],
                 ")$z")
             : cat("$c", glslFuncName, "($0, $1)$z"),
-            "",
+            getSpirvIntrinsic(isMultisample, false),
             cudaBuilder
         );
 
@@ -527,7 +655,8 @@ void TextureTypeInfo::writeQueryFunctions()
                     "$c", glslFuncName, "($0, ($1).", kGLSLLoadCoordsSwizzle[loadCoordCount],
                     ", ($1).", kGLSLLoadLODSwizzle[loadCoordCount],
                     ", $2)$z")
-                : cat("$c", glslFuncName, "($0, $1, 0, $2)$z")
+                : cat("$c", glslFuncName, "($0, $1, 0, $2)$z"),
+            getSpirvIntrinsic(isMultisample, true)
         );
 
         writeFunc(

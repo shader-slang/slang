@@ -12,6 +12,12 @@
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
 #include "slang-ir-dominators.h"
+#include "slang-ir-array-reg-to-mem.h"
+#include "slang-ir-sccp.h"
+#include "slang-ir-dce.h"
+#include "slang-ir-simplify-cfg.h"
+#include "slang-ir-peephole.h"
+#include "slang-ir-redundancy-removal.h"
 
 namespace Slang
 {
@@ -255,8 +261,121 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         return false;
     }
 
+    void inferTextureFormat(IRInst* textureInst, IRTextureTypeBase* textureType)
+    {
+        ImageFormat format = ImageFormat::unknown;
+        if (auto decor = textureInst->findDecoration<IRFormatDecoration>())
+        {
+            format = decor->getFormat();
+        }
+        if (format == ImageFormat::unknown)
+        {
+            // If the texture has no format decoration, try to infer it from the type.
+            auto elementType = textureType->getElementType();
+            Int vectorWidth = 1;
+            if (auto elementVecType = as<IRVectorType>(elementType))
+            {
+                if (auto intLitVal = as<IRIntLit>(elementVecType->getElementCount()))
+                {
+                    vectorWidth = (Int)intLitVal->getValue();
+                }
+                else
+                {
+                    vectorWidth = 0;
+                }
+                elementType = elementVecType->getElementType();
+            }
+            switch (elementType->getOp())
+            {
+            case kIROp_UIntType:
+                switch (vectorWidth)
+                {
+                case 1: format = ImageFormat::r32ui; break;
+                case 2: format = ImageFormat::rg32ui; break;
+                case 4: format = ImageFormat::rgba32ui; break;
+                }
+                break;
+            case kIROp_IntType:
+                switch (vectorWidth)
+                {
+                case 1: format = ImageFormat::r32i; break;
+                case 2: format = ImageFormat::rg32i; break;
+                case 4: format = ImageFormat::rgba32i; break;
+                }
+                break;
+            case kIROp_UInt16Type:
+                switch (vectorWidth)
+                {
+                case 1: format = ImageFormat::r16ui; break;
+                case 2: format = ImageFormat::rg16ui; break;
+                case 4: format = ImageFormat::rgba16ui; break;
+                }
+                break;
+            case kIROp_Int16Type:
+                switch (vectorWidth)
+                {
+                case 1: format = ImageFormat::r16i; break;
+                case 2: format = ImageFormat::rg16i; break;
+                case 4: format = ImageFormat::rgba16i; break;
+                }
+                break;
+            case kIROp_UInt8Type:
+                switch (vectorWidth)
+                {
+                case 1: format = ImageFormat::r8ui; break;
+                case 2: format = ImageFormat::rg8ui; break;
+                case 4: format = ImageFormat::rgba8ui; break;
+                }
+                break;
+            case kIROp_Int8Type:
+                switch (vectorWidth)
+                {
+                case 1: format = ImageFormat::r8i; break;
+                case 2: format = ImageFormat::rg8i; break;
+                case 4: format = ImageFormat::rgba8i; break;
+                }
+                break;
+            case kIROp_Int64Type:
+                switch (vectorWidth)
+                {
+                case 1: format = ImageFormat::r64i; break;
+                default: break;
+                }
+                break;
+            case kIROp_UInt64Type:
+                switch (vectorWidth)
+                {
+                case 1: format = ImageFormat::r64ui; break;
+                default: break;
+                }
+                break;
+            }
+        }
+        if (format != ImageFormat::unknown)
+        {
+            IRBuilder builder(textureInst->getModule());
+            builder.setInsertBefore(textureInst);
+            List<IRInst*> args;
+            args.add(textureType->getOperand(0));
+            if (textureType->getOperandCount() >= 2)
+                args.add(textureType->getOperand(1));
+            else
+                args.add(builder.getIntValue(builder.getUIntType(), 0));
+            args.add(builder.getIntValue(builder.getUIntType(), IRIntegerValue(format)));
+
+            auto newType = (IRType*)builder.emitIntrinsicInst(builder.getTypeKind(), textureType->getOp(), 3, args.getBuffer());
+            textureInst->setFullType(newType);
+        }
+    }
+
     void processGlobalParam(IRGlobalParam* inst)
     {
+        // If the param is a texture, infer its format.
+        if (auto textureType = as<IRTextureTypeBase>(inst->getDataType()))
+        {
+            inferTextureFormat(inst, textureType);
+        }
+
         // If the global param is not a pointer type, make it so and insert explicit load insts.
         auto ptrType = as<IRPtrTypeBase>(inst->getDataType());
         if (!ptrType)
@@ -724,6 +843,33 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         addUsersToWorkList(newStore);
     }
 
+    void processImageSubscript(IRImageSubscript* subscript)
+    {
+        if (auto ptrType = as<IRPtrTypeBase>(subscript->getDataType()))
+        {
+            if (ptrType->hasAddressSpace())
+                return;
+            IRBuilder builder(m_sharedContext->m_irModule);
+            builder.setInsertBefore(subscript);
+            auto newPtrType = builder.getPtrType(
+                ptrType->getOp(),
+                ptrType->getValueType(),
+                SpvStorageClassImage);
+            subscript->setFullType(newPtrType);
+
+            // HACK: assumes the image operand is a load and replace it with
+            // the pointer to satisfy SPIRV requirements.
+            // We should consider changing the front-end to pass `this` by ref
+            // for the __ref accessor so we will be guaranteed to have a pointer
+            // image operand here.
+            auto image = subscript->getImage();
+            if (auto load = as<IRLoad>(image))
+                subscript->setOperand(0, load->getPtr());
+
+            addUsersToWorkList(subscript);
+        }
+    }
+
     void processFieldAddress(IRFieldAddress* inst)
     {
         if (auto ptrType = as<IRPtrTypeBase>(inst->getBase()->getDataType()))
@@ -942,7 +1088,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
-    void processConstructor(IRInst* inst)
+    void maybeHoistConstructInstToGlobalScope(IRInst* inst)
     {
         // If all of the operands to this instruction are global, we can hoist
         // this constructor to be a global too. This is important to make sure
@@ -950,9 +1096,45 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // constant vectors (using OpConstantComposite).
         UIndex opIndex = 0;
         for (auto operand = inst->getOperands(); opIndex < inst->getOperandCount(); operand++, opIndex++)
-            if(operand->get()->getParent() != m_module->getModuleInst())
+            if (operand->get()->getParent() != m_module->getModuleInst())
                 return;
         inst->insertAtEnd(m_module->getModuleInst());
+    }
+
+    void processConstructor(IRInst* inst)
+    {
+        maybeHoistConstructInstToGlobalScope(inst);
+
+        if (inst->getOp() == kIROp_MakeVector
+            && inst->getParent()->getOp() == kIROp_Module
+            && inst->getOperandCount() != (UInt)getIntVal(as<IRVectorType>(inst->getDataType())->getElementCount()))
+        {
+            // SPIRV's OpConstantComposite inst requires the number of operands to
+            // exactly match the number of elements of the composite, so the general
+            // form of vector construction will not work, and we need to convert it.
+            //
+            List<IRInst*> args;
+            IRBuilder builder(inst);
+            builder.setInsertBefore(inst);
+            for (UInt i = 0; i < inst->getOperandCount(); i++)
+            {
+                auto operand = inst->getOperand(i);
+                if (auto operandVecType = as<IRVectorType>(operand->getDataType()))
+                {
+                    auto operandVecSize = getIntVal(operandVecType->getElementCount());
+                    for (IRIntegerValue j = 0; j < operandVecSize; j++)
+                    {
+                        args.add(builder.emitElementExtract(operand, j));
+                    }
+                }
+                else
+                {
+                    args.add(operand);
+                }
+            }
+            auto newMakeVector = builder.emitMakeVector(inst->getDataType(), args);
+            inst->replaceUsesWith(newMakeVector);
+        }
     }
 
     static bool isAsmInst(IRInst* inst)
@@ -967,6 +1149,18 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         {
             if (!isAsmInst(child))
                 child->insertBefore(inst);
+        }
+    }
+
+    void legalizeSPIRVEntryPoint(IRFunc* func, IREntryPointDecoration* entryPointDecor)
+    {
+        if (entryPointDecor->getProfile().getStage() == Stage::Geometry)
+        {
+            if (!func->findDecoration<IRInstanceDecoration>())
+            {
+                IRBuilder builder(func);
+                builder.addDecoration(func, kIROp_InstanceDecoration, builder.getIntValue(builder.getUIntType(), 1));
+            }
         }
     }
 
@@ -1009,6 +1203,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 break;
             case kIROp_FieldAddress:
                 processFieldAddress(as<IRFieldAddress>(inst));
+                break;
+            case kIROp_ImageSubscript:
+                processImageSubscript(as<IRImageSubscript>(inst));
                 break;
             case kIROp_RWStructuredBufferGetElementPtr:
                 processRWStructuredBufferGetElementPtr(as<IRRWStructuredBufferGetElementPtr>(inst));
@@ -1078,13 +1275,20 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             t->replaceUsesWith(builder.getPtrType(kIROp_PtrType, lowered.structType, SpvStorageClassStorageBuffer));
         }
 
-        // SPIRV requires a dominator block to appear before dominated blocks.
-        // After legalizing the control flow, we need to sort our blocks to ensure this is true.
         for (auto globalInst : m_module->getGlobalInsts())
         {
-            if (auto func = as<IRGlobalValueWithCode>(globalInst))
+            if (auto func = as<IRFunc>(globalInst))
+            {
+                if (auto entryPointDecor = func->findDecoration<IREntryPointDecoration>())
+                {
+                    legalizeSPIRVEntryPoint(func, entryPointDecor);
+                }
+                // SPIRV requires a dominator block to appear before dominated blocks.
+                // After legalizing the control flow, we need to sort our blocks to ensure this is true.
                 sortBlocksInFunc(func);
+            }
         }
+
     }
 };
 
@@ -1205,15 +1409,52 @@ void buildEntryPointReferenceGraph(SPIRVEmitSharedContext* context, IRModule* mo
         visit(workList[i].entryPoint, workList[i].inst);
 }
 
+void simplifyIRForSpirvLegalization(DiagnosticSink* sink, IRModule* module)
+{
+    bool changed = true;
+    const int kMaxIterations = 8;
+    const int kMaxFuncIterations = 16;
+    int iterationCounter = 0;
+
+    while (changed && iterationCounter < kMaxIterations)
+    {
+        if (sink && sink->getErrorCount())
+            break;
+
+        changed = false;
+
+        changed |= applySparseConditionalConstantPropagationForGlobalScope(module, sink);
+        changed |= peepholeOptimizeGlobalScope(module);
+
+        for (auto inst : module->getGlobalInsts())
+        {
+            auto func = as<IRGlobalValueWithCode>(inst);
+            if (!func)
+                continue;
+            bool funcChanged = true;
+            int funcIterationCount = 0;
+            while (funcChanged && funcIterationCount < kMaxFuncIterations)
+            {
+                funcChanged = false;
+                funcChanged |= applySparseConditionalConstantPropagation(func, sink);
+                funcChanged |= peepholeOptimize(func);
+                funcChanged |= removeRedundancyInFunc(func);
+                funcChanged |= simplifyCFG(func);
+                eliminateDeadCode(func);
+            }
+        }
+    }
+}
+
 void legalizeIRForSPIRV(
     SPIRVEmitSharedContext* context,
     IRModule* module,
     const List<IRFunc*>& entryPoints,
     CodeGenContext* codeGenContext)
 {
-    GLSLExtensionTracker extensionTracker;
-    legalizeEntryPointsForGLSL(module->getSession(), module, entryPoints, codeGenContext, &extensionTracker);
+    SLANG_UNUSED(entryPoints);
     legalizeSPIRV(context, module);
+    simplifyIRForSpirvLegalization(codeGenContext->getSink(), module);
     buildEntryPointReferenceGraph(context, module);
 }
 

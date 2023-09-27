@@ -2129,6 +2129,7 @@ struct IRCall : IRInst
         return IROperandList<IRInst>(getOperands() + 1, getOperands() + getOperandCount());
     }
     IRInst* getArg(UInt index) { return getOperand(index + 1); }
+    void setArg(UInt index, IRInst* arg) { setOperand(index + 1, arg); }
 };
 
 struct IRLoad : IRInst
