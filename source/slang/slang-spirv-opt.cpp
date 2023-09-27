@@ -4,19 +4,19 @@
 namespace Slang
 {
 
-    struct RemoveFileRAII
+struct RemoveFileRAII
+{
+    String fileName;
+
+    RemoveFileRAII(String inFileName)
+        :fileName(inFileName)
+    {}
+
+    ~RemoveFileRAII()
     {
-        String fileName;
-
-        RemoveFileRAII(String inFileName)
-            :fileName(inFileName)
-        {}
-
-        ~RemoveFileRAII()
-        {
-            File::remove(fileName);
-        }
-    };
+        File::remove(fileName);
+    }
+};
 
 SlangResult optimizeSPIRV(const List<uint8_t>& spirv, String& outErr, List<uint8_t>& outSpv)
 {
