@@ -2703,7 +2703,7 @@ struct SPIRVEmitContext
                     getSection(SpvLogicalSectionID::ExecutionModes),
                     decoration,
                     dstID,
-                    c->getMaxSize()->getValue()
+                    SpvLiteralInteger::from32(int32_t(c->getMaxSize()->getValue()))
                 );
             }
             break;
@@ -2715,7 +2715,7 @@ struct SPIRVEmitContext
                     getSection(SpvLogicalSectionID::ExecutionModes),
                     decoration,
                     dstID,
-                    c->getMaxSize()->getValue()
+                    SpvLiteralInteger::from32(int32_t(c->getMaxSize()->getValue()))
                 );
             }
             break;

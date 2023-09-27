@@ -140,6 +140,21 @@ SpvInst* emitOpExecutionModeOutputVertices(
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpExecutionMode
 template<typename T>
+SpvInst* emitOpExecutionModeOutputPrimitivesEXT(
+    SpvInstParent* parent,
+    IRInst* inst,
+    const T& entryPoint,
+    const SpvLiteralInteger& primitiveCount
+)
+{
+    static_assert(isSingular<T>);
+    return emitInst(
+        parent, inst, SpvOpExecutionMode, entryPoint, SpvExecutionModeOutputPrimitivesEXT, primitiveCount
+    );
+}
+
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpExecutionMode
+template<typename T>
 SpvInst* emitOpExecutionModeInvocations(
     SpvInstParent* parent,
     IRInst* inst,
