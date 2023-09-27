@@ -2624,6 +2624,8 @@ struct SPIRVEmitContext
         CASE(Geometry,  Geometry);
         CASE(Fragment,  Fragment);
         CASE(Compute,   GLCompute);
+        CASE(Mesh,      MeshEXT);
+        CASE(Amplification, TaskEXT);
 
         // TODO: Extended execution models for ray tracing, etc.
 
