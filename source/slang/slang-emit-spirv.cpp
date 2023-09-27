@@ -1769,7 +1769,6 @@ struct SPIRVEmitContext
     {
         bool needDefaultSetBindingDecoration = false;
         bool hasExplicitSetBinding = false;
-        bool isInput = false;
         for (auto rr : layout->getOffsetAttrs())
         {
             UInt index = rr->getOffset();
@@ -1786,7 +1785,6 @@ struct SPIRVEmitContext
                     varInst,
                     SpvLiteralInteger::from32(int32_t(index))
                 );
-                isInput = true;
                 break;
             case LayoutResourceKind::VaryingOutput:
                 emitOpDecorateLocation(
