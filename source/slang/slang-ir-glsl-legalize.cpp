@@ -2022,6 +2022,7 @@ static void legalizeMeshOutputParam(
     moveValueBefore(g, builder->getFunc());
     builder->addNameHintDecoration(g, pp->findDecoration<IRNameHintDecoration>()->getName());
     pp->replaceUsesWith(g);
+    // pp is only removed later on, so sadly we have to keep it around for now
     struct MeshOutputSpecializationCondition : FunctionCallSpecializeCondition
     {
         bool doesParamWantSpecialization(IRParam*, IRInst* arg)
@@ -2058,6 +2059,7 @@ static void legalizeMeshOutputParam(
                 IRBuilderInsertLocScope locScope{builder};
                 builder->setInsertBefore(a);
                 a->replaceUsesWith(d.irValue);
+                a->removeAndDeallocate();
                 return;
             }
             // Otherwise, go through the uses one by one and see what we can do
@@ -2133,7 +2135,11 @@ static void legalizeMeshOutputParam(
                     SLANG_UNEXPECTED("Unhandled use of mesh output parameter during GLSL legalization");
                 }
             });
+
+            SLANG_ASSERT(!a->hasUses());
+            a->removeAndDeallocate();
         };
+
         assignUses(globalOutputVal, l);
     });
 
