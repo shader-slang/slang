@@ -1041,7 +1041,7 @@ void CPPSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
     case kIROp_RefType:
         {
             auto ptrType = cast<IRPtrTypeBase>(type);
-            RefDeclaratorInfo refDeclarator(declarator);
+            PtrDeclaratorInfo refDeclarator(declarator);
             _emitType(ptrType->getValueType(), &refDeclarator);
         }
         break;

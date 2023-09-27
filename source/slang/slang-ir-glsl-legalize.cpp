@@ -1941,7 +1941,8 @@ static void legalizeMeshPayloadInputParam(
     IRBuilderInsertLocScope locScope{builder};
     builder->setInsertInto(builder->getModule());
 
-    const auto g = builder->emitVar(pp->getDataType(), SpvStorageClassTaskPayloadWorkgroupEXT);
+    const auto ptrType = cast<IRPtrTypeBase>(pp->getDataType());
+    const auto g = builder->createGlobalVar(ptrType->getValueType(), SpvStorageClassTaskPayloadWorkgroupEXT);
     g->setFullType(builder->getRateQualifiedType(builder->getGroupSharedRate(), g->getFullType()));
     // moveValueBefore(g, builder->getFunc());
     builder->addNameHintDecoration(g, pp->findDecoration<IRNameHintDecoration>()->getName());
@@ -2023,6 +2024,7 @@ static void legalizeMeshOutputParam(
     moveValueBefore(g, builder->getFunc());
     builder->addNameHintDecoration(g, pp->findDecoration<IRNameHintDecoration>()->getName());
     pp->replaceUsesWith(g);
+    // pp is only removed later on, so sadly we have to keep it around for now
     struct MeshOutputSpecializationCondition : FunctionCallSpecializeCondition
     {
         bool doesParamWantSpecialization(IRParam*, IRInst* arg)
@@ -2059,6 +2061,7 @@ static void legalizeMeshOutputParam(
                 IRBuilderInsertLocScope locScope{builder};
                 builder->setInsertBefore(a);
                 a->replaceUsesWith(d.irValue);
+                a->removeAndDeallocate();
                 return;
             }
             // Otherwise, go through the uses one by one and see what we can do
@@ -2134,7 +2137,11 @@ static void legalizeMeshOutputParam(
                     SLANG_UNEXPECTED("Unhandled use of mesh output parameter during GLSL legalization");
                 }
             });
+
+            SLANG_ASSERT(!a->hasUses());
+            a->removeAndDeallocate();
         };
+
         assignUses(globalOutputVal, l);
     });
 
@@ -2173,119 +2180,127 @@ static void legalizeMeshOutputParam(
     //
 
     // First, collect the subset of outputs being used
-    auto isMeshOutputBuiltin = [](IRInst* g)
+    const bool isSPIRV = codeGenContext->getTargetFormat() == CodeGenTarget::SPIRV
+        || codeGenContext->getTargetFormat() == CodeGenTarget::SPIRVAssembly;
+    if(!isSPIRV)
     {
-        if(const auto s = composeGetters<IRStringLit>(
-            g,
-            &IRInst::findDecoration<IRImportDecoration>,
-            &IRImportDecoration::getMangledNameOperand
-            ))
+        auto isMeshOutputBuiltin = [](IRInst* g)
         {
-            const auto n = s->getStringSlice();
-            if (n == "gl_Position" ||
-                n == "gl_PointSize" ||
-                n == "gl_ClipDistance" ||
-                n == "gl_CullDistance" ||
-                n == "gl_PrimitiveID" ||
-                n == "gl_Layer" ||
-                n == "gl_ViewportIndex" ||
-                n == "gl_CullPrimitiveEXT" ||
-                n == "gl_PrimitiveShadingRateEXT")
+            if(const auto s = composeGetters<IRStringLit>(
+                g,
+                &IRInst::findDecoration<IRImportDecoration>,
+                &IRImportDecoration::getMangledNameOperand
+                ))
             {
-                return s;
+                const auto n = s->getStringSlice();
+                if (n == "gl_Position" ||
+                    n == "gl_PointSize" ||
+                    n == "gl_ClipDistance" ||
+                    n == "gl_CullDistance" ||
+                    n == "gl_PrimitiveID" ||
+                    n == "gl_Layer" ||
+                    n == "gl_ViewportIndex" ||
+                    n == "gl_CullPrimitiveEXT" ||
+                    n == "gl_PrimitiveShadingRateEXT")
+                {
+                    return s;
+                }
+            }
+            return (IRStringLit*)nullptr;
+        };
+        auto leaves = globalOutputVal.leafAddresses();
+        struct BuiltinOutputInfo
+        {
+            IRInst* param;
+            IRStringLit* nameDecoration;
+            IRType* type;
+            IRStructKey* key;
+        };
+        List<BuiltinOutputInfo> builtins;
+        for(auto leaf : leaves)
+        {
+            if(auto decoration = isMeshOutputBuiltin(leaf))
+            {
+                builtins.add({leaf, decoration, nullptr, nullptr});
             }
         }
-        return (IRStringLit*)nullptr;
-    };
-    auto leaves = globalOutputVal.leafAddresses();
-    struct BuiltinOutputInfo
-    {
-        IRInst* param;
-        IRStringLit* nameDecoration;
-        IRType* type;
-        IRStructKey* key;
-    };
-    List<BuiltinOutputInfo> builtins;
-    for(auto leaf : leaves)
-    {
-        if(auto decoration = isMeshOutputBuiltin(leaf))
+        if(builtins.getCount() == 0)
         {
-            builtins.add({leaf, decoration, nullptr, nullptr});
+            return;
+        }
+        const auto _locScope = IRBuilderInsertLocScope{builder};
+        builder->setInsertBefore(func);
+        auto meshOutputBlockType = builder->createStructType();
+        {
+            const auto _locScope2 = IRBuilderInsertLocScope{builder};
+            builder->setInsertInto(meshOutputBlockType);
+            for(auto& builtin : builtins)
+            {
+                auto t = composeGetters<IRType>(
+                    builtin.param,
+                    &IRInst::getFullType,
+                    &IROutTypeBase::getValueType,
+                    &IRArrayTypeBase::getElementType);
+                auto key = builder->createStructKey();
+                auto n = builtin.nameDecoration->getStringSlice();
+                builder->addImportDecoration(key, n);
+                builder->createStructField(meshOutputBlockType, key, t);
+                builtin.type = t;
+                builtin.key = key;
+            }
+        }
+
+        // No emitter actually handles GLSLOutputParameterGroupTypes, this isn't a
+        // problem as it's used as an intrinsic.
+        // GLSL does permit redeclaring these particular ones, so it might be nice to
+        // add a linkage decoration instead of it being an intrinsic in the event
+        // that we start outputting the linkage decoration instead of it being an
+        // intrinsic in the event that we start outputting these.
+        auto blockParamType = builder->getGLSLOutputParameterGroupType(
+            builder->getArrayType(meshOutputBlockType, meshOutputType->getMaxElementCount()));
+        auto blockParam = builder->createGlobalParam(blockParamType);
+        bool isPerPrimitive = as<IRPrimitivesType>(meshOutputType);
+        auto typeName = isPerPrimitive ? "gl_MeshPerPrimitiveEXT" : "gl_MeshPerVertexEXT";
+        auto arrayName = isPerPrimitive ? "gl_MeshPrimitivesEXT" : "gl_MeshVerticesEXT";
+        builder->addTargetIntrinsicDecoration(
+            meshOutputBlockType,
+            CapabilitySet(CapabilityAtom::GLSL),
+            UnownedStringSlice(typeName));
+        builder->addImportDecoration(blockParam, UnownedStringSlice(arrayName));
+        if(isPerPrimitive)
+        {
+            builder->addDecoration(blockParam, kIROp_GLSLPrimitivesRateDecoration);
+        }
+        // // While this is probably a correct thing to do, LRK::VaryingOutput
+        // // isn't really used for redeclaraion of builtin outputs, and assumes
+        // // that it's got a layout location, the correct fix might be to add
+        // // LRK::BuiltinVaryingOutput, but that would be polluting LRK for no
+        // // real gain.
+        // //
+        // IRVarLayout::Builder varLayoutBuilder{builder, IRTypeLayout::Builder{builder}.build()};
+        // varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::VaryingOutput);
+        // varLayoutBuilder.setStage(Stage::Mesh);
+        // builder->addLayoutDecoration(blockParam, varLayoutBuilder.build());
+
+        for(auto builtin : builtins)
+        {
+            traverseUsers(builtin.param, [&](IRInst* u)
+            {
+                auto p = as<IRGetElementPtr>(u);
+                SLANG_ASSERT(p && "Mesh Output sentinel parameter wasn't used as an array");
+
+                IRBuilderInsertLocScope locScope{builder};
+                builder->setInsertBefore(p);
+                auto e = builder->emitElementAddress(builder->getPtrType(meshOutputBlockType), blockParam, p->getIndex());
+                auto a = builder->emitFieldAddress(builder->getPtrType(builtin.type), e, builtin.key);
+
+                p->replaceUsesWith(a);
+            });
         }
     }
-    if(builtins.getCount() == 0)
-    {
-        return;
-    }
-    const auto _locScope = IRBuilderInsertLocScope{builder};
-    builder->setInsertBefore(func);
-    auto meshOutputBlockType = builder->createStructType();
-    {
-        const auto _locScope2 = IRBuilderInsertLocScope{builder};
-        builder->setInsertInto(meshOutputBlockType);
-        for(auto& builtin : builtins)
-        {
-            auto t = composeGetters<IRType>(
-                builtin.param,
-                &IRInst::getFullType,
-                &IROutTypeBase::getValueType,
-                &IRArrayTypeBase::getElementType);
-            auto key = builder->createStructKey();
-            auto n = builtin.nameDecoration->getStringSlice();
-            builder->addImportDecoration(key, n);
-            builder->createStructField(meshOutputBlockType, key, t);
-            builtin.type = t;
-            builtin.key = key;
-        }
-    }
 
-    // No emitter actually handles GLSLOutputParameterGroupTypes, this isn't a
-    // problem as it's used as an intrinsic.
-    // GLSL does permit redeclaring these particular ones, so it might be nice to
-    // add a linkage decoration instead of it being an intrinsic in the event
-    // that we start outputting the linkage decoration instead of it being an
-    // intrinsic in the event that we start outputting these.
-    auto blockParamType = builder->getGLSLOutputParameterGroupType(
-        builder->getArrayType(meshOutputBlockType, meshOutputType->getMaxElementCount()));
-    auto blockParam = builder->createGlobalParam(blockParamType);
-    bool isPerPrimitive = as<IRPrimitivesType>(meshOutputType);
-    auto typeName = isPerPrimitive ? "gl_MeshPerPrimitiveEXT" : "gl_MeshPerVertexEXT";
-    auto arrayName = isPerPrimitive ? "gl_MeshPrimitivesEXT" : "gl_MeshVerticesEXT";
-    builder->addTargetIntrinsicDecoration(
-        meshOutputBlockType,
-        CapabilitySet(CapabilityAtom::GLSL),
-        UnownedStringSlice(typeName));
-    builder->addImportDecoration(blockParam, UnownedStringSlice(arrayName));
-    if(isPerPrimitive)
-    {
-        builder->addDecoration(blockParam, kIROp_GLSLPrimitivesRateDecoration);
-    }
-    // // While this is probably a correct thing to do, LRK::VaryingOutput
-    // // isn't really used for redeclaraion of builtin outputs, and assumes
-    // // that it's got a layout location, the correct fix might be to add
-    // // LRK::BuiltinVaryingOutput, but that would be polluting LRK for no
-    // // real gain.
-    // //
-    // IRVarLayout::Builder varLayoutBuilder{builder, IRTypeLayout::Builder{builder}.build()};
-    // varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::VaryingOutput);
-    // varLayoutBuilder.setStage(Stage::Mesh);
-    // builder->addLayoutDecoration(blockParam, varLayoutBuilder.build());
-
-    for(auto builtin : builtins)
-    {
-        traverseUsers(builtin.param, [&](IRInst* u)
-        {
-            auto p = as<IRGetElementPtr>(u);
-            SLANG_ASSERT(p && "Mesh Output sentinel parameter wasn't used as an array");
-
-            IRBuilderInsertLocScope locScope{builder};
-            builder->setInsertBefore(p);
-            auto e = builder->emitElementAddress(builder->getPtrType(meshOutputBlockType), blockParam, p->getIndex());
-            auto a = builder->emitFieldAddress(builder->getPtrType(builtin.type), e, builtin.key);
-
-            p->replaceUsesWith(a);
-        });
-    }
+    SLANG_ASSERT(!g->hasUses());
+    g->removeAndDeallocate();
 }
 
 void legalizeEntryPointParameterForGLSL(
@@ -2992,10 +3007,16 @@ void legalizeDispatchMeshPayloadForGLSL(IRModule* module)
                 // parameter and store into the value being passed to this
                 // call.
                 builder.setInsertInto(module->getModuleInst());
-                const auto v = builder.emitVar(payloadType, SpvStorageClassTaskPayloadWorkgroupEXT);
+                const auto v = builder.createGlobalVar(payloadType, SpvStorageClassTaskPayloadWorkgroupEXT);
                 v->setFullType(builder.getRateQualifiedType(builder.getGroupSharedRate(), v->getFullType()));
                 builder.setInsertBefore(call);
-                builder.emitStore(v, payload);
+                builder.emitStore(v, builder.emitLoad(payload));
+
+                // Then, make sure that it's this new global which is being
+                // passed into the call to DispatchMesh, this is unimportant
+                // for GLSL which ignores such a parameter, but the SPIR-V
+                // backend depends on it being the global
+                call->getArgs()[3].set(v);
             }
         }
     });

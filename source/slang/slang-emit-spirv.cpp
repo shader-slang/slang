@@ -1769,7 +1769,6 @@ struct SPIRVEmitContext
     {
         bool needDefaultSetBindingDecoration = false;
         bool hasExplicitSetBinding = false;
-        bool isInput = false;
         for (auto rr : layout->getOffsetAttrs())
         {
             UInt index = rr->getOffset();
@@ -1786,7 +1785,6 @@ struct SPIRVEmitContext
                     varInst,
                     SpvLiteralInteger::from32(int32_t(index))
                 );
-                isInput = true;
                 break;
             case LayoutResourceKind::VaryingOutput:
                 emitOpDecorateLocation(
@@ -1872,7 +1870,8 @@ struct SPIRVEmitContext
                 && layout->getStage() == Stage::Fragment
                 && layout->usesResourceKind(LayoutResourceKind::VaryingInput))
             {
-                if (isIntegralScalarOrCompositeType(var->getDataType()))
+                const auto ptrType = as<IRPtrTypeBase>(var->getDataType());
+                if (ptrType && isIntegralScalarOrCompositeType(ptrType->getValueType()))
                     emitOpDecorate(getSection(SpvLogicalSectionID::Annotations), nullptr, varInst, SpvDecorationFlat);
             }
         }
@@ -2683,6 +2682,44 @@ struct SPIRVEmitContext
                 );
             }
             break;
+
+        case kIROp_OutputTopologyDecoration:
+            {
+                const auto o = cast<IROutputTopologyDecoration>(decoration);
+                const auto t = o->getTopology()->getStringSlice();
+                const auto m =
+                      t == "triangle" ? SpvExecutionModeOutputTrianglesEXT
+                    : t == "line" ? SpvExecutionModeOutputLinesEXT
+                    : t == "point" ? SpvExecutionModeOutputPoints
+                    : SpvExecutionModeMax;
+                SLANG_ASSERT(m != SpvExecutionModeMax);
+                emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, m);
+            }
+            break;
+
+        case kIROp_VerticesDecoration:
+            {
+                const auto c = cast<IRVerticesDecoration>(decoration);
+                emitOpExecutionModeOutputVertices(
+                    getSection(SpvLogicalSectionID::ExecutionModes),
+                    decoration,
+                    dstID,
+                    SpvLiteralInteger::from32(int32_t(c->getMaxSize()->getValue()))
+                );
+            }
+            break;
+
+        case kIROp_PrimitivesDecoration:
+            {
+                const auto c = cast<IRPrimitivesDecoration>(decoration);
+                emitOpExecutionModeOutputPrimitivesEXT(
+                    getSection(SpvLogicalSectionID::ExecutionModes),
+                    decoration,
+                    dstID,
+                    SpvLiteralInteger::from32(int32_t(c->getMaxSize()->getValue()))
+                );
+            }
+            break;
         // ...
         }
     }
@@ -2822,6 +2859,8 @@ struct SPIRVEmitContext
         CASE(Geometry,  Geometry);
         CASE(Fragment,  Fragment);
         CASE(Compute,   GLCompute);
+        CASE(Mesh,      MeshEXT);
+        CASE(Amplification, TaskEXT);
 
         // TODO: Extended execution models for ray tracing, etc.
 
@@ -3038,6 +3077,23 @@ struct SPIRVEmitContext
                 SLANG_UNREACHABLE("Unimplemented system value in spirv emit.");
             }
         }
+
+        //
+        // These are system-value variables which require redeclaration in
+        // GLSL, SPIR-V makes no such distinction so we can use similar logic
+        // to above.
+        //
+        if(const auto linkageDecoration = inst->findDecoration<IRLinkageDecoration>())
+        {
+            const auto name = linkageDecoration->getMangledName();
+            if(name == "gl_PrimitiveTriangleIndicesEXT")
+                return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPrimitiveTriangleIndicesEXT);
+            if(name == "gl_PrimitiveLineIndicesEXT")
+                return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPrimitiveLineIndicesEXT);
+            if(name == "gl_PrimitivePointIndicesEXT")
+                return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPrimitivePointIndicesEXT);
+        }
+
         return nullptr;
     }
 

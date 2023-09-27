@@ -4288,6 +4288,20 @@ namespace Slang
         return globalVar;
     }
 
+    IRGlobalVar* IRBuilder::createGlobalVar(
+        IRType*         valueType,
+        IRIntegerValue  addressSpace)
+    {
+        auto ptrType = getPtrType(kIROp_PtrType, valueType, addressSpace);
+        IRGlobalVar* globalVar = createInst<IRGlobalVar>(
+            this,
+            kIROp_GlobalVar,
+            ptrType);
+        _maybeSetSourceLoc(globalVar);
+        addGlobalValue(this, globalVar);
+        return globalVar;
+    }
+
     IRGlobalParam* IRBuilder::createGlobalParam(
         IRType* valueType)
     {
