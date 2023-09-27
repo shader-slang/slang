@@ -2842,6 +2842,23 @@ struct SPIRVEmitContext
                 SLANG_UNREACHABLE("Unimplemented system value in spirv emit.");
             }
         }
+
+        //
+        // These are system-value variables which require redeclaration in
+        // GLSL, SPIR-V makes no such distinction so we can use similar logic
+        // to above.
+        //
+        if(const auto linkageDecoration = inst->findDecoration<IRLinkageDecoration>())
+        {
+            const auto name = linkageDecoration->getMangledName();
+            if(name == "gl_PrimitiveTriangleIndicesEXT")
+                return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPrimitiveTriangleIndicesEXT);
+            if(name == "gl_PrimitiveLineIndicesEXT")
+                return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPrimitiveLineIndicesEXT);
+            if(name == "gl_PrimitivePointIndicesEXT")
+                return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPrimitivePointIndicesEXT);
+        }
+
         return nullptr;
     }
 
