@@ -1870,7 +1870,8 @@ struct SPIRVEmitContext
                 && layout->getStage() == Stage::Fragment
                 && layout->usesResourceKind(LayoutResourceKind::VaryingInput))
             {
-                if (isIntegralScalarOrCompositeType(var->getDataType()))
+                const auto ptrType = as<IRPtrTypeBase>(var->getDataType());
+                if (ptrType && isIntegralScalarOrCompositeType(ptrType->getValueType()))
                     emitOpDecorate(getSection(SpvLogicalSectionID::Annotations), nullptr, varInst, SpvDecorationFlat);
             }
         }
