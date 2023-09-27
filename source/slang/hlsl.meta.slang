@@ -7598,6 +7598,9 @@ void DispatchMesh<P>(uint threadGroupCountX, uint threadGroupCountY, uint thread
             OpCapability MeshShadingEXT;
             OpExtension "SPV_EXT_mesh_shader";
             OpEmitMeshTasksEXT $threadGroupCountX $threadGroupCountY $threadGroupCountZ &meshPayload;
+            // OpEmitMeshTasksExt is a terminator, so we need to start a new
+            // block to hold whatever comes after this intrinsic
+            %_ = OpLabel
         };
     }
 }
