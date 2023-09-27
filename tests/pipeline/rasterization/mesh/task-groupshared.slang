@@ -31,7 +31,6 @@ struct MeshPayload
 
 groupshared MeshPayload p;
 
-[outputtopology("triangle")]
 [numthreads(1, 1, 1)]
 void taskMain(in uint tig : SV_GroupIndex)
 {
