@@ -4713,14 +4713,6 @@ namespace Slang
         if (base->getOp() == kIROp_MakeArrayFromElement)
             return base->getOperand(0);
 
-        if (auto constantIndex = as<IRIntLit>(index))
-        {
-            if (auto makeVector = as<IRMakeVector>(base))
-            {
-
-            }
-        }
-
         auto inst = createInst<IRGetElement>(
             this,
             kIROp_GetElement,
@@ -4749,7 +4741,6 @@ namespace Slang
         {
             type = getVectorType(matrixType->getElementType(), matrixType->getColumnCount());
         }
-
         SLANG_RELEASE_ASSERT(type);
 
         return emitElementExtract(type, base, index);

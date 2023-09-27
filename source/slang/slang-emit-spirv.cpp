@@ -2565,7 +2565,7 @@ struct SPIRVEmitContext
                     params
                 );
 
-                // Stage specific execution mode abd capability declarations.
+                // Stage specific execution mode and capability declarations.
                 switch (entryPointDecor->getProfile().getStage())
                 {
                 case Stage::Fragment:
