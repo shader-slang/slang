@@ -2457,6 +2457,44 @@ struct SPIRVEmitContext
                 );
             }
             break;
+
+        case kIROp_OutputTopologyDecoration:
+            {
+                const auto o = cast<IROutputTopologyDecoration>(decoration);
+                const auto t = o->getTopology()->getStringSlice();
+                const auto m =
+                      t == "triangle" ? SpvExecutionModeOutputTrianglesEXT
+                    : t == "line" ? SpvExecutionModeOutputLinesEXT
+                    : t == "point" ? SpvExecutionModeOutputPoints
+                    : SpvExecutionModeMax;
+                SLANG_ASSERT(m != SpvExecutionModeMax);
+                emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, m);
+            }
+            break;
+
+        case kIROp_VerticesDecoration:
+            {
+                const auto c = cast<IRVerticesDecoration>(decoration);
+                emitOpExecutionModeOutputVertices(
+                    getSection(SpvLogicalSectionID::ExecutionModes),
+                    decoration,
+                    dstID,
+                    c->getMaxSize()->getValue()
+                );
+            }
+            break;
+
+        case kIROp_PrimitivesDecoration:
+            {
+                const auto c = cast<IRPrimitivesDecoration>(decoration);
+                emitOpExecutionModeOutputPrimitivesEXT(
+                    getSection(SpvLogicalSectionID::ExecutionModes),
+                    decoration,
+                    dstID,
+                    c->getMaxSize()->getValue()
+                );
+            }
+            break;
         // ...
         }
     }
