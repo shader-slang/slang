@@ -7604,10 +7604,25 @@ float dot2add(float2 left, float2 right, float acc);
 //
 
 // Set the number of output vertices and primitives for a mesh shader invocation.
-__target_intrinsic(glsl, "SetMeshOutputsEXT")
 __glsl_extension(GL_EXT_mesh_shader)
 __glsl_version(450)
-void SetMeshOutputCounts(uint vertexCount, uint primitiveCount);
+void SetMeshOutputCounts(uint vertexCount, uint primitiveCount)
+{
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "SetMeshOutputCounts";
+    case glsl:
+        __intrinsic_asm "SetMeshOutputsEXT";
+    case spirv:
+        return spirv_asm
+        {
+            OpCapability MeshShadingEXT;
+            OpExtension "SPV_EXT_mesh_shader";
+            OpSetMeshOutputsEXT $vertexCount $primitiveCount;
+        };
+    }
+}
 
 // Specify the number of downstream mesh shader thread groups to invoke from an amplification shader,
 // and provide the values for per-mesh payload parameters.
@@ -7625,6 +7640,16 @@ void DispatchMesh<P>(uint threadGroupCountX, uint threadGroupCountY, uint thread
         // This intrinsic doesn't take into account writing meshPayload. That
         // is dealt with separately by 'legalizeDispatchMeshPayloadForGLSL'.
         __intrinsic_asm "EmitMeshTasksEXT($0, $1, $2)";
+    case spirv:
+        return spirv_asm
+        {
+            OpCapability MeshShadingEXT;
+            OpExtension "SPV_EXT_mesh_shader";
+            OpEmitMeshTasksEXT $threadGroupCountX $threadGroupCountY $threadGroupCountZ &meshPayload;
+            // OpEmitMeshTasksExt is a terminator, so we need to start a new
+            // block to hold whatever comes after this intrinsic
+            %_ = OpLabel
+        };
     }
 }
 

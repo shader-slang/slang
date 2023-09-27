@@ -896,10 +896,6 @@ Result linkAndOptimizeIR(
     //
     // If any have survived this far, change them back to regular (decorated)
     // arrays that the emitters can deal with.
-    //
-    // TODO: This is too early for the SPIR-V backend, which requires these
-    // types for when it calls legalizeEntryPointsForGLSL (later than GLSL does
-    // above)
     legalizeMeshOutputTypes(irModule);
 
     if (options.shouldLegalizeExistentialAndResourceTypes)

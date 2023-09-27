@@ -827,7 +827,7 @@ void GLSLSourceEmitter::_maybeEmitGLSLBuiltin(IRGlobalParam* var, UnownedStringS
         // that inline.
 
         auto paramGroupType = as<IRGLSLOutputParameterGroupType>(var->getFullType());
-        SLANG_ASSERT(paramGroupType && "Mesh shader builtin output was not a paramter group");
+        SLANG_ASSERT(paramGroupType && "Mesh shader builtin output was not a parameter group");
         auto arrayType = as<IRArrayTypeBase>(paramGroupType->getOperand(0));
         SLANG_ASSERT(paramGroupType && "Mesh shader builtin output was not an array");
         auto elementType = as<IRStructType>(arrayType->getElementType());
