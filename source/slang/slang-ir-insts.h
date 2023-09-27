@@ -3667,6 +3667,9 @@ public:
     IRFunc* createFunc();
     IRGlobalVar* createGlobalVar(
         IRType* valueType);
+    IRGlobalVar* createGlobalVar(
+        IRType*         valueType,
+        IRIntegerValue  addressSpace);
     IRGlobalParam* createGlobalParam(
         IRType* valueType);
     

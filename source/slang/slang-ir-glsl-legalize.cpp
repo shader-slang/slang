@@ -1940,7 +1940,8 @@ static void legalizeMeshPayloadInputParam(
     IRBuilderInsertLocScope locScope{builder};
     builder->setInsertInto(builder->getModule());
 
-    const auto g = builder->emitVar(pp->getDataType(), SpvStorageClassTaskPayloadWorkgroupEXT);
+    const auto ptrType = cast<IRPtrTypeBase>(pp->getDataType());
+    const auto g = builder->createGlobalVar(ptrType->getValueType(), SpvStorageClassTaskPayloadWorkgroupEXT);
     g->setFullType(builder->getRateQualifiedType(builder->getGroupSharedRate(), g->getFullType()));
     // moveValueBefore(g, builder->getFunc());
     builder->addNameHintDecoration(g, pp->findDecoration<IRNameHintDecoration>()->getName());
@@ -3014,10 +3015,16 @@ void legalizeDispatchMeshPayloadForGLSL(IRModule* module)
                 // parameter and store into the value being passed to this
                 // call.
                 builder.setInsertInto(module->getModuleInst());
-                const auto v = builder.emitVar(payloadType, SpvStorageClassTaskPayloadWorkgroupEXT);
+                const auto v = builder.createGlobalVar(payloadType, SpvStorageClassTaskPayloadWorkgroupEXT);
                 v->setFullType(builder.getRateQualifiedType(builder.getGroupSharedRate(), v->getFullType()));
                 builder.setInsertBefore(call);
-                builder.emitStore(v, payload);
+                builder.emitStore(v, builder.emitLoad(payload));
+
+                // Then, make sure that it's this new global which is being
+                // passed into the call to DispatchMesh, this is unimportant
+                // for GLSL which ignores such a parameter, but the SPIR-V
+                // backend depends on it being the global
+                call->getArgs()[3].set(v);
             }
         }
     });
