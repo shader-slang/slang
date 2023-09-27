@@ -1214,7 +1214,8 @@ void legalizeIRForSPIRV(
 {
     GLSLExtensionTracker extensionTracker;
     legalizeEntryPointsForGLSL(module->getSession(), module, entryPoints, codeGenContext, &extensionTracker);
-    // TODO: move this
+    // TODO: move this, it needs to happen after legalizeEntryPointForGLSL
+    // which happens here (much later) when emitting spir-v.
     legalizeMeshOutputTypes(module);
     legalizeSPIRV(context, module);
     buildEntryPointReferenceGraph(context, module);
