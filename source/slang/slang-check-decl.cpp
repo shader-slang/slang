@@ -5932,6 +5932,17 @@ namespace Slang
                     }
                 }
             }
+            if (!isEffectivelyStatic(decl))
+            {
+                auto constrefAttr = decl->findModifier<ConstRefAttribute>();
+                if (constrefAttr)
+                {
+                    if (isTypeDifferentiable(calcThisType(getParentDecl(decl))))
+                    {
+                        getSink()->diagnose(constrefAttr, Diagnostics::cannotUseConstRefOnDifferentiableMemberMethod);
+                    }
+                }
+            }
         }
     }
 
