@@ -20,8 +20,6 @@ int doThing(MutatingStruct s, int v)
 
 // For non-copyable types (such as HitObject or NonCopyableStruct declared below), if passed as as `in`
 // should produce an error.
-// NOTE! This *doesn't* produce an error (or warning) because NonCopyable types are *implicitly* 
-// made *ref* when parsed as arguments. 
 
 [__NonCopyableType]
 struct NonCopyableStruct
@@ -32,7 +30,6 @@ struct NonCopyableStruct
 
 int doThing2(NonCopyableStruct s, int v)
 {
-    // Currently doesn't produce an error/warning because NonCopyableStruct is passed as *ref* implicitly.
     s.setValue(v + 1);
     return s.m_value;
 }
