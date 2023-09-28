@@ -991,11 +991,12 @@ namespace Slang
             return true;
         }
 
-        if (auto refType = as<RefType>(toType))
+        if (auto refType = as<RefTypeBase>(toType))
         {
-            if (!refType->getValueType()->equals(fromType))
+            ConversionCost cost;
+            if (!canCoerce(refType->getValueType(), fromType, fromExpr, &cost))
                 return false;
-            if (!fromExpr->type.isLeftValue)
+            if (as<RefType>(toType) && !fromExpr->type.isLeftValue)
                 return false;
             
             ConversionCost subCost = kConversionCost_GetRef;
@@ -1016,7 +1017,7 @@ namespace Slang
 
 
         // Allow implicit dereferencing a reference type.
-        if (auto fromRefType = as<RefType>(fromType))
+        if (auto fromRefType = as<RefTypeBase>(fromType))
         {
             auto fromValueType = fromRefType->getValueType();
 

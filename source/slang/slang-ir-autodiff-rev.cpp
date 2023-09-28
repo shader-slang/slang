@@ -415,9 +415,9 @@ namespace Slang
 
                 // Fetch primal values to use as arguments in primal func call.
                 IRInst* primalArg = param;
-                if (!as<IROutType>(primalParamType))
+                if (!as<IROutType>(primalParamType) && !as<IRConstRefType>(primalParamType))
                 {
-                    // As long as the primal parameter is not an out type,
+                    // As long as the primal parameter is not an out or constref type,
                     // we need to fetch the primal value from the parameter.
                     if (as<IRPtrTypeBase>(propagateParamType))
                     {
@@ -428,7 +428,7 @@ namespace Slang
                         primalArg = builder.emitDifferentialPairGetPrimal(primalArg);
                     }
                 }
-                if (auto primalParamPtrType = as<IRPtrTypeBase>(primalParamType))
+                if (auto primalParamPtrType = isMutablePointerType(primalParamType))
                 {
                     // If primal parameter is mutable, we need to pass in a temp var.
                     auto tempVar = builder.emitVar(primalParamPtrType->getValueType());

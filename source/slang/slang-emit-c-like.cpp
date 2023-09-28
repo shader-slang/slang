@@ -3235,6 +3235,10 @@ void CLikeSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
         m_writer->emit("inout ");
         type = refType->getValueType();
     }
+    else if (auto constRefType = as<IRConstRefType>(type))
+    {
+        type = constRefType->getValueType();
+    }
 
     emitType(type, name);
 }

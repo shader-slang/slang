@@ -221,6 +221,8 @@ bool isZero(IRInst* inst);
 
 bool isOne(IRInst* inst);
 
+IRPtrTypeBase* isMutablePointerType(IRInst* inst);
+
 void initializeScratchData(IRInst* inst);
 void resetScratchDataBit(IRInst* inst, int bitIndex);
 

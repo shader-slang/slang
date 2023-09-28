@@ -1277,6 +1277,7 @@ struct SPIRVEmitContext
             }
         case kIROp_PtrType:
         case kIROp_RefType:
+        case kIROp_ConstRefType:
         case kIROp_OutType:
         case kIROp_InOutType:
             {

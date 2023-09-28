@@ -1637,6 +1637,7 @@ struct IRPtrTypeBase : IRType
 
 SIMPLE_IR_TYPE(PtrType, PtrTypeBase)
 SIMPLE_IR_TYPE(RefType, PtrTypeBase)
+SIMPLE_IR_TYPE(ConstRefType, PtrTypeBase)
 SIMPLE_IR_PARENT_TYPE(OutTypeBase, PtrTypeBase)
 SIMPLE_IR_TYPE(OutType, OutTypeBase)
 SIMPLE_IR_TYPE(InOutType, OutTypeBase)

@@ -63,6 +63,7 @@ List<LanguageServerProtocol::InlayHint> getInlayHints(
                         if (param->hasModifier<OutModifier>()) lblSb << "out ";
                         else if (param->hasModifier<InOutModifier>()) lblSb << "inout ";
                         else if (param->hasModifier<RefModifier>()) lblSb << "ref ";
+                        else if (param->hasModifier<ConstRefModifier>()) lblSb << "constref ";
                         lblSb << name->text;
                         lblSb << ":";
                         hint.label = lblSb.produceString();

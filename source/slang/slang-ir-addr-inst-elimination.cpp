@@ -97,6 +97,12 @@ struct AddressInstEliminationContext
         auto addr = use->get();
         auto call = as<IRCall>(use->getUser());
 
+        // Don't change the use if addr is a non mutable address.
+        if (auto refType = as<IRConstRefType>(addr->getDataType()))
+        {
+            return;
+        }
+
         IRBuilder builder(module);
         builder.setInsertBefore(call);
         auto tempVar = builder.emitVar(cast<IRPtrTypeBase>(addr->getFullType())->getValueType());
@@ -123,6 +129,8 @@ struct AddressInstEliminationContext
         {
             for (auto inst : block->getChildren())
             {
+                if (as<IRConstRefType>(getRootAddr(inst)->getDataType()))
+                    continue;
                 if (auto ptrType = as<IRPtrTypeBase>(inst->getDataType()))
                 {
                     auto valType = unwrapAttributedType(ptrType->getValueType());
