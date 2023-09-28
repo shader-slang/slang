@@ -813,6 +813,9 @@ IRType* DifferentiableTypeConformanceContext::differentiateType(IRBuilder* build
 
 IRInst* DifferentiableTypeConformanceContext::tryGetDifferentiableWitness(IRBuilder* builder, IRInst* primalType)
 {
+    if (isNoDiffType((IRType*)primalType))
+        return nullptr;
+
     IRInst* witness = lookUpConformanceForType((IRType*)primalType);
     if (witness)
     {
