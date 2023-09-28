@@ -5913,13 +5913,22 @@ namespace Slang
             // specialization.
             for (auto paramDecl : decl->getParameters())
             {
-                if (paramDecl->type.type && !isTypeDifferentiable(paramDecl->type.type))
+                if (!paramDecl->type.type)
+                    continue;
+                if (!isTypeDifferentiable(paramDecl->type.type))
                 {
                     if (!paramDecl->hasModifier<NoDiffModifier>())
                     {
                         auto noDiffModifier = m_astBuilder->create<NoDiffModifier>();
                         noDiffModifier->keywordName = getSession()->getNameObj("no_diff");
                         addModifier(paramDecl, noDiffModifier);
+                    }
+                }
+                if (!paramDecl->hasModifier<NoDiffModifier>())
+                {
+                    if (auto modifier = paramDecl->findModifier<ConstRefModifier>())
+                    {
+                        getSink()->diagnose(modifier, Diagnostics::cannotUseConstRefOnDifferentiableParameter);
                     }
                 }
             }

@@ -4055,7 +4055,18 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     {
         auto loweredBase = lowerLValueExpr(context, expr->base);
 
-        SLANG_ASSERT(loweredBase.flavor == LoweredValInfo::Flavor::Ptr);
+        if (loweredBase.flavor != LoweredValInfo::Flavor::Ptr)
+        {
+            SLANG_ASSERT(as<ConstRefType>(expr->type));
+            // If the base isn't a pointer, then we are trying to form
+            // a const ref to a temporary value.
+            // To do so we must copy it into a variable.
+            auto baseVal = getSimpleVal(context, loweredBase);
+            auto tempVar = context->irBuilder->emitVar(baseVal->getFullType());
+            context->irBuilder->emitStore(tempVar, baseVal);
+            loweredBase.val = tempVar;
+        }
+
         loweredBase.flavor = LoweredValInfo::Flavor::Simple;
         return loweredBase;
     }
