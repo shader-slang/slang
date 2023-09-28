@@ -560,6 +560,8 @@ namespace Slang
                     traverseUses(ptrVal, [&](IRUse* use)
                         {
                             auto user = use->getUser();
+                            if (as<IRDecoration>(user))
+                                return;
                             switch (user->getOp())
                             {
                             case kIROp_Load:

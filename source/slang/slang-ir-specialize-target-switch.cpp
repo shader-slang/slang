@@ -29,6 +29,11 @@ namespace Slang
                         targetBlock = targetSwitch->getCaseBlock(i);
                         bestCapSet = capSet;
                     }
+                    else if (bestCapSet.isInvalid() && !target->getTargetCaps().isIncompatibleWith(capSet))
+                    {
+                        targetBlock = targetSwitch->getCaseBlock(i);
+                        bestCapSet = capSet;
+                    }
                 }
                 IRBuilder builder(targetSwitch);
                 builder.setInsertBefore(targetSwitch);

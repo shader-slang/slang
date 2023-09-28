@@ -1442,6 +1442,8 @@ struct SPIRVEmitContext
              return emitGlobalParam(as<IRGlobalParam>(inst));
         case kIROp_GlobalVar:
             return emitGlobalVar(as<IRGlobalVar>(inst));
+        case kIROp_SPIRVAsmOperandBuiltinVar:
+            return emitBuiltinVar(inst);
         case kIROp_Var:
             return emitVar(getSection(SpvLogicalSectionID::GlobalVariables), inst);
         // ...
@@ -1930,6 +1932,16 @@ struct SPIRVEmitContext
         if(layout)
             emitVarLayout(globalVar, varInst, layout);
         maybeEmitName(varInst, globalVar);
+        return varInst;
+    }
+
+    SpvInst* emitBuiltinVar(IRInst* spvAsmBuiltinVar)
+    {
+        const auto kind = (SpvBuiltIn)(getIntVal(spvAsmBuiltinVar->getOperand(0)));
+        IRBuilder builder(spvAsmBuiltinVar);
+        builder.setInsertBefore(spvAsmBuiltinVar);
+        auto varInst = getBuiltinGlobalVar(builder.getPtrType(kIROp_PtrType, spvAsmBuiltinVar->getDataType(), SpvStorageClassInput), kind);
+        registerInst(spvAsmBuiltinVar, varInst);
         return varInst;
     }
 
@@ -2574,6 +2586,14 @@ struct SPIRVEmitContext
                 case Stage::Geometry:
                     requireSPIRVCapability(SpvCapabilityGeometry);
                     break;
+                case Stage::Miss:
+                case Stage::AnyHit:
+                case Stage::ClosestHit:
+                case Stage::Intersection:
+                case Stage::RayGeneration:
+                case Stage::Callable:
+                    requireSPIRVCapability(SpvCapabilityRayTracingKHR);
+                    ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_ray_tracing"));
                 default:
                     break;
                 }
@@ -2720,6 +2740,15 @@ struct SPIRVEmitContext
                 );
             }
             break;
+
+        case kIROp_VulkanCallablePayloadDecoration:
+        case kIROp_VulkanHitObjectAttributesDecoration:
+        case kIROp_VulkanRayPayloadDecoration:
+            emitOpDecorateLocation(getSection(SpvLogicalSectionID::Annotations),
+                decoration,
+                dstID,
+                SpvLiteralInteger::from32(int32_t(getIntVal(decoration->getOperand(0)))));
+            break;
         // ...
         }
     }
@@ -2861,7 +2890,12 @@ struct SPIRVEmitContext
         CASE(Compute,   GLCompute);
         CASE(Mesh,      MeshEXT);
         CASE(Amplification, TaskEXT);
-
+        CASE(ClosestHit, ClosestHitKHR);
+        CASE(AnyHit, AnyHitKHR);
+        CASE(Callable, CallableKHR);
+        CASE(Miss, MissKHR);
+        CASE(Intersection, IntersectionKHR);
+        CASE(RayGeneration, RayGenerationKHR);
         // TODO: Extended execution models for ray tracing, etc.
 
 #undef CASE
@@ -4436,11 +4470,7 @@ struct SPIRVEmitContext
                 }
                 case kIROp_SPIRVAsmOperandBuiltinVar:
                 {
-                    const auto kind = (SpvBuiltIn)(getIntVal(operand->getOperand(0)));
-                    IRBuilder builder(operand);
-                    builder.setInsertBefore(operand);
-                    auto varInst = getBuiltinGlobalVar(builder.getPtrType(kIROp_PtrType, operand->getDataType(), SpvStorageClassInput), kind);
-                    emitOperand(varInst);
+                    emitOperand(ensureInst(operand));
                     break;
                 }
                 case kIROp_SPIRVAsmOperandGLSL450Set:

@@ -199,8 +199,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             }
             else
             {
-                auto val = builder.emitLoad(addr);
-                builder.replaceOperand(use, val);
+                if (!as<IRDecoration>(use->getUser()))
+                {
+                    auto val = builder.emitLoad(addr);
+                    builder.replaceOperand(use, val);
+                }
             }
         }
 
@@ -546,10 +549,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             storageClass = SpvStorageClassPushConstant;
             break;
         case LayoutResourceKind::RayPayload:
-            storageClass = SpvStorageClassRayPayloadKHR;
+            storageClass = SpvStorageClassIncomingRayPayloadKHR;
             break;
         case LayoutResourceKind::CallablePayload:
-            storageClass = SpvStorageClassCallableDataKHR;
+            storageClass = SpvStorageClassIncomingCallableDataKHR;
             break;
         case LayoutResourceKind::HitAttributes:
             storageClass = SpvStorageClassHitAttributeKHR;
@@ -565,6 +568,12 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
     SpvStorageClass getGlobalParamStorageClass(IRVarLayout* varLayout)
     {
+        auto typeLayout = varLayout->getTypeLayout()->unwrapArray();
+        if (auto parameterGroupTypeLayout = as<IRParameterGroupTypeLayout>(typeLayout))
+        {
+            varLayout = parameterGroupTypeLayout->getContainerVarLayout();
+        }
+
         SpvStorageClass result = SpvStorageClassMax;
         for (auto rr : varLayout->getOffsetAttrs())
         {
@@ -612,7 +621,24 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             if (cls != SpvStorageClassMax)
                 storageClass = cls;
         }
-
+        for (auto decor : inst->getDecorations())
+        {
+            switch (decor->getOp())
+            {
+            case kIROp_VulkanRayPayloadDecoration:
+                storageClass = SpvStorageClassRayPayloadKHR;
+                break;
+            case kIROp_VulkanCallablePayloadDecoration:
+                storageClass = SpvStorageClassCallableDataKHR;
+                break;
+            case kIROp_VulkanHitObjectAttributesDecoration:
+                storageClass = SpvStorageClassHitObjectAttributeNV;
+                break;
+            case kIROp_VulkanHitAttributesDecoration:
+                storageClass = SpvStorageClassHitAttributeKHR;
+                break;
+            }
+        }
         IRBuilder builder(m_sharedContext->m_irModule);
         builder.setInsertBefore(inst);
         auto newPtrType =
@@ -1364,6 +1390,7 @@ void buildEntryPointReferenceGraph(SPIRVEmitSharedContext* context, IRModule* mo
             switch (inst->getOp())
             {
             case kIROp_GlobalParam:
+            case kIROp_SPIRVAsmOperandBuiltinVar:
                 registerEntryPointReference(entryPoint, inst);
                 break;
             case kIROp_Block:
@@ -1393,6 +1420,7 @@ void buildEntryPointReferenceGraph(SPIRVEmitSharedContext* context, IRModule* mo
                 {
                 case kIROp_GlobalParam:
                 case kIROp_GlobalVar:
+                case kIROp_SPIRVAsmOperandBuiltinVar:
                     addToWorkList({ entryPoint, operand });
                     break;
                 }
