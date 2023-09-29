@@ -603,6 +603,10 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             {
                 paramType = astBuilder->getRefType(paramType);
             }
+            else if (paramDecl->findModifier<ConstRefModifier>())
+            {
+                paramType = astBuilder->getConstRefType(paramType);
+            }
             else if( paramDecl->findModifier<OutModifier>() )
             {
                 if(paramDecl->findModifier<InOutModifier>() || paramDecl->findModifier<InModifier>())

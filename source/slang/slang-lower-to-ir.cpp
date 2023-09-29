@@ -2414,6 +2414,7 @@ void addArg(
 
     case kParameterDirection_Out:
     case kParameterDirection_InOut:
+    case kParameterDirection_ConstRef:
         {
             // According to our "calling convention" we need to
             // pass a pointer into the callee.
@@ -2434,6 +2435,12 @@ void addArg(
                 // If the value is not one that could yield a simple l-value
                 // then we need to convert it into a temporary
                 //
+                if (auto refType = as<IRConstRefType>(paramType))
+                {
+                    paramType = refType->getValueType();
+                    argVal = LoweredValInfo::simple(context->irBuilder->emitLoad(getSimpleVal(context, argPtr)));
+                }
+
                 LoweredValInfo tempVar = createVar(context, paramType);
 
                 // If the parameter is `in out` or `inout`, then we need
@@ -2441,7 +2448,8 @@ void addArg(
                 // in the argument, which we accomplish by assigning
                 // from the l-value to our temp.
                 //
-                if (paramDirection == kParameterDirection_InOut)
+                if (paramDirection == kParameterDirection_InOut ||
+                    paramDirection == kParameterDirection_ConstRef)
                 {
                     assign(context, tempVar, argVal);
                 }
@@ -2455,11 +2463,14 @@ void addArg(
                 // Finally, after the call we will need
                 // to copy in the other direction: from our
                 // temp back to the original l-value.
-                OutArgumentFixup fixup;
-                fixup.src = tempVar;
-                fixup.dst = argVal;
+                if (paramDirection != kParameterDirection_ConstRef)
+                {
+                    OutArgumentFixup fixup;
+                    fixup.src = tempVar;
+                    fixup.dst = argVal;
 
-                (*ioFixups).add(fixup);
+                    (*ioFixups).add(fixup);
+                }
             }
         }
         break;
@@ -2492,6 +2503,7 @@ void addCallArgsForParam(
     switch(paramDirection)
     {
     case kParameterDirection_Ref:
+    case kParameterDirection_ConstRef:
     case kParameterDirection_Out:
     case kParameterDirection_InOut:
         {
@@ -2525,6 +2537,10 @@ ParameterDirection getParameterDirection(VarDeclBase* paramDecl)
         // where this matters, so treat them as by-reference here.
 
         return kParameterDirection_Ref;
+    }
+    if (paramDecl->hasModifier<ConstRefModifier>())
+    {
+        return kParameterDirection_ConstRef;
     }
     if( paramDecl->hasModifier<InOutModifier>() )
     {
@@ -2563,7 +2579,10 @@ ParameterDirection getThisParamDirection(Decl* parentDecl, ParameterDirection de
 
     if (parentParent->findModifier<NonCopyableTypeAttribute>())
     {
-        return kParameterDirection_Ref;
+        if (parentDecl->hasModifier<MutatingAttribute>())
+            return kParameterDirection_Ref;
+        else
+            return kParameterDirection_ConstRef;
     }
 
     // Applications can opt in to a mutable `this` parameter,
@@ -2573,6 +2592,10 @@ ParameterDirection getThisParamDirection(Decl* parentDecl, ParameterDirection de
     if( parentDecl->hasModifier<MutatingAttribute>() )
     {
         return kParameterDirection_InOut;
+    }
+    else if (parentDecl->hasModifier<ConstRefAttribute>())
+    {
+        return kParameterDirection_ConstRef;
     }
 
     // A `set` accessor on a property or subscript declaration
@@ -2988,7 +3011,9 @@ void _lowerFuncDeclBaseTypeInfo(
         case kParameterDirection_Ref:
             irParamType = builder->getRefType(irParamType);
             break;
-
+        case kParameterDirection_ConstRef:
+            irParamType = builder->getConstRefType(irParamType);
+            break;
         default:
             SLANG_UNEXPECTED("unknown parameter direction");
             break;
@@ -4030,7 +4055,18 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     {
         auto loweredBase = lowerLValueExpr(context, expr->base);
 
-        SLANG_ASSERT(loweredBase.flavor == LoweredValInfo::Flavor::Ptr);
+        if (loweredBase.flavor != LoweredValInfo::Flavor::Ptr)
+        {
+            SLANG_ASSERT(as<ConstRefType>(expr->type));
+            // If the base isn't a pointer, then we are trying to form
+            // a const ref to a temporary value.
+            // To do so we must copy it into a variable.
+            auto baseVal = getSimpleVal(context, loweredBase);
+            auto tempVar = context->irBuilder->emitVar(baseVal->getFullType());
+            context->irBuilder->emitStore(tempVar, baseVal);
+            loweredBase.val = tempVar;
+        }
+
         loweredBase.flavor = LoweredValInfo::Flavor::Simple;
         return loweredBase;
     }

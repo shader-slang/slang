@@ -679,6 +679,12 @@ struct Ref
 {};
 
 __generic<T>
+__magic_type(ConstRefType)
+__intrinsic_type($(kIROp_ConstRefType))
+struct ConstRef
+{};
+
+__generic<T>
 __magic_type(OptionalType)
 __intrinsic_type($(kIROp_OptionalType))
 struct Optional
@@ -2236,6 +2242,9 @@ attribute_syntax [mutating] : MutatingAttribute;
 
 __attributeTarget(SetterDecl)
 attribute_syntax [nonmutating] : NonmutatingAttribute;
+
+__attributeTarget(FunctionDeclBase)
+attribute_syntax [constref] : ConstRefAttribute;
 
     /// Indicates that a function computes its result as a function of its arguments without loading/storing any memory or other state.
     ///

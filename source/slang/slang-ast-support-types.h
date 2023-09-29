@@ -1550,6 +1550,7 @@ namespace Slang
         kParameterDirection_Out,    ///< Copy out
         kParameterDirection_InOut,  ///< Copy in, copy out
         kParameterDirection_Ref,    ///< By-reference
+        kParameterDirection_ConstRef, ///< By-const-reference
     };
 
     /// The kind of a builtin interface requirement that can be automatically synthesized.

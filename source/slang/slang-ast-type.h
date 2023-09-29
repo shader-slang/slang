@@ -552,10 +552,21 @@ class InOutType : public OutTypeBase
     SLANG_AST_CLASS(InOutType)
 };
 
+class RefTypeBase : public ParamDirectionType
+{
+    SLANG_AST_CLASS(RefTypeBase)
+};
+
 // The type for an `ref` parameter, e.g., `ref T`
-class RefType : public ParamDirectionType
+class RefType : public RefTypeBase
 {
     SLANG_AST_CLASS(RefType)
+};
+
+// The type for an `constref` parameter, e.g., `constref T`
+class ConstRefType : public RefTypeBase
+{
+    SLANG_AST_CLASS(ConstRefType)
 };
 
 class OptionalType : public BuiltinType

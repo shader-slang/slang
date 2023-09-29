@@ -1478,9 +1478,8 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
                 continue;
 
             IRBlock* defBlock = nullptr;
-            if (const auto ptrInst = as<IRPtrTypeBase>(instToStore->getDataType()))
+            if (auto varInst = as<IRVar>(instToStore))
             {
-                auto varInst = as<IRVar>(instToStore);
                 auto storeUse = findEarliestUniqueWriteUse(varInst);
 
                 defBlock = getBlock(storeUse->getUser());
@@ -2126,6 +2125,10 @@ bool DefaultCheckpointPolicy::canRecompute(UseOrPseudoUse use)
         // We can't recompute a 'load' from a mutable function parameter.
         if (as<IRParam>(ptr) || as<IRVar>(ptr))
         {
+            // An exception is a load of a constref parameter, which should
+            // remain constant throughout the function.
+            if (as<IRConstRefType>(getRootAddr(ptr)->getDataType()))
+                return true;
             if (isInstInPrimalOrTransposedParameterBlocks(ptr))
                 return false;
         }

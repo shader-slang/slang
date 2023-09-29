@@ -105,7 +105,7 @@ struct TensorView
     void store(uint i0, uint i1, uint i2, uint i3, uint i4, T val);
 
     __generic<let N : int>
-    __target_intrinsic(cuda, "$0.store<$T1>($1)")
+    __target_intrinsic(cuda, "$0.store<$T2>($1, $2)")
     void store(vector<uint, N> index, T val);
 
     __target_intrinsic(cuda, "*($3) = atomicAdd($0.data_ptr_at<$T2>($1), $2)")
