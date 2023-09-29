@@ -136,6 +136,8 @@ attribute_syntax [BackwardDifferentiable(order:int = 0)] : BackwardDifferentiabl
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [Differentiable(order:int = 0)] : BackwardDifferentiableAttribute;
 
+__intrinsic_op($(kIROp_RequirePrelude))
+void __requirePrelude(constexpr String preludeText);
 
 /// Interface to denote types as differentiable.
 /// Allows for user-specified differential types as

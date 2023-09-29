@@ -3035,6 +3035,12 @@ struct IRGenericAsm : IRInst
     UnownedStringSlice getAsm() { return as<IRStringLit>(getOperand(0))->getStringSlice(); }
 };
 
+struct IRRequirePrelude : IRInst
+{
+    IR_LEAF_ISA(RequirePrelude)
+    UnownedStringSlice getPrelude() { return as<IRStringLit>(getOperand(0))->getStringSlice(); }
+};
+
 struct IRBuilderSourceLocRAII;
 
 struct IRBuilder

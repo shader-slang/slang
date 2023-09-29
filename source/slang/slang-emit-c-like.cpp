@@ -112,6 +112,15 @@ void CLikeSourceEmitter::emitFrontMatterImpl(TargetRequest* targetReq)
     SLANG_UNUSED(targetReq);
 }
 
+void CLikeSourceEmitter::emitPreModuleImpl()
+{
+    for (auto prelude : m_requiredPreludes)
+    {
+        m_writer->emit(prelude->getStringSlice());
+        m_writer->emit("\n");
+    }
+}
+
 //
 // Types
 //
@@ -1856,6 +1865,22 @@ void CLikeSourceEmitter::emitCallExpr(IRCall* inst, EmitOpInfo outerPrec)
     UnownedStringSlice intrinsicDefinition;
     if (findTargetIntrinsicDefinition(funcValue, intrinsicDefinition))
     {
+        // Make sure we register all required preludes for emit.
+        if (auto func = as<IRFunc>(getResolvedInstForDecorations(funcValue)))
+        {
+            for (auto block : func->getBlocks())
+            {
+                for (auto ii : block->getChildren())
+                {
+                    if (auto requirePrelude = as<IRRequirePrelude>(ii))
+                    {
+                        auto preludeTextInst = as<IRStringLit>(requirePrelude->getOperand(0));
+                        if (preludeTextInst)
+                            m_requiredPreludes.add(preludeTextInst);
+                    }
+                }
+            }
+        }
         emitIntrinsicCallExpr(inst, intrinsicDefinition, outerPrec);
     }
     else
