@@ -89,12 +89,12 @@ namespace Slang
     }
 
     template <typename KEY, typename VALUE>
-    SLANG_FORCE_INLINE const KEY* getValue(const std::pair<KEY, VALUE>* in)
+    SLANG_FORCE_INLINE const VALUE* getValue(const std::pair<KEY, VALUE>* in)
     {
         return &in->second;
     }
     template <typename KEY, typename VALUE>
-    SLANG_FORCE_INLINE const KEY* getValue(const KeyValuePair<KEY, VALUE>* in)
+    SLANG_FORCE_INLINE const VALUE* getValue(const KeyValuePair<KEY, VALUE>* in)
     {
         return &in->value;
     }
