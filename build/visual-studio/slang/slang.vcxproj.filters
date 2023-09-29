@@ -153,6 +153,9 @@
     <ClInclude Include="..\..\..\source\slang\slang-ir-any-value-marshalling.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-ir-array-reg-to-mem.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ir-augment-make-existential.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -603,6 +606,9 @@
     <ClInclude Include="..\..\..\source\slang\slang-serialize.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-spirv-opt.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-spirv-val.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -798,6 +804,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-any-value-marshalling.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-ir-array-reg-to-mem.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-augment-make-existential.cpp">
@@ -1230,6 +1239,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-spirv-core-grammar-embed.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-spirv-opt.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-spirv-val.cpp">

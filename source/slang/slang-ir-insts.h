@@ -2129,6 +2129,7 @@ struct IRCall : IRInst
         return IROperandList<IRInst>(getOperands() + 1, getOperands() + getOperandCount());
     }
     IRInst* getArg(UInt index) { return getOperand(index + 1); }
+    void setArg(UInt index, IRInst* arg) { setOperand(index + 1, arg); }
 };
 
 struct IRLoad : IRInst
@@ -3034,6 +3035,12 @@ struct IRGenericAsm : IRInst
     UnownedStringSlice getAsm() { return as<IRStringLit>(getOperand(0))->getStringSlice(); }
 };
 
+struct IRRequirePrelude : IRInst
+{
+    IR_LEAF_ISA(RequirePrelude)
+    UnownedStringSlice getPrelude() { return as<IRStringLit>(getOperand(0))->getStringSlice(); }
+};
+
 struct IRBuilderSourceLocRAII;
 
 struct IRBuilder
@@ -3245,6 +3252,7 @@ public:
     IROutType*  getOutType(IRType* valueType);
     IRInOutType*  getInOutType(IRType* valueType);
     IRRefType*  getRefType(IRType* valueType);
+    IRConstRefType* getConstRefType(IRType* valueType);
     IRPtrTypeBase*  getPtrType(IROp op, IRType* valueType);
     IRPtrType* getPtrType(IROp op, IRType* valueType, IRIntegerValue addressSpace);
 
@@ -3667,6 +3675,9 @@ public:
     IRFunc* createFunc();
     IRGlobalVar* createGlobalVar(
         IRType* valueType);
+    IRGlobalVar* createGlobalVar(
+        IRType*         valueType,
+        IRIntegerValue  addressSpace);
     IRGlobalParam* createGlobalParam(
         IRType* valueType);
     

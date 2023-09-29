@@ -739,58 +739,6 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
         }
         break;
 
-        // We will use the `$X` case as a prefix for
-        // special logic needed when cross-compiling ray-tracing
-        // shaders.
-        case 'X':
-        {
-            typedef LocationTracker::Kind LocationKind;
-
-            SLANG_RELEASE_ASSERT(*cursor);
-            const auto kindChar = *cursor++;
-
-            LocationKind kind = LocationKind::Invalid;
-
-            // The `$XP`/`$XC`/`$XH` case handles looking up
-            // the associated `location` for a variable
-            // used as the argument.
-            switch (kindChar)
-            {
-                case 'P':       kind = LocationKind::RayPayload; break;
-                case 'C':       kind = LocationKind::CallablePayload; break;
-                case 'H':       kind = LocationKind::HitObjectAttribute; break;
-                default:        break;
-            }
-
-            SLANG_ASSERT(kind != LocationKind::Invalid);
-
-            if (kind != LocationKind::Invalid)
-            {
-                Index argIndex = 0;
-                SLANG_RELEASE_ASSERT(m_argCount > argIndex);
-                auto arg = m_args[argIndex].get();
-
-                // Find the associated decoration
-                IRDecoration* foundDecoration = nullptr;
-                for (auto decoration : arg->getDecorations())
-                {
-                    const auto curKind = LocationTracker::getKindFromDecoration(decoration);
-                    if (curKind == kind)
-                    {
-                        foundDecoration = decoration;
-                        break;
-                    }
-                }
-
-                // Must have found the decoration
-                SLANG_ASSERT(foundDecoration);
-
-                const auto location = m_emitter->getLocationTracker().getValue(kind, arg, foundDecoration);
-                m_writer->emit(location);
-            }
-        }
-        break;
-
         case 'P':
             // Type-based prefix as used for CUDA and C++ targets
         {

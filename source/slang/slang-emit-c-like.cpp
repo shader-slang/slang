@@ -41,56 +41,6 @@ struct CLikeSourceEmitter::ComputeEmitActionsContext
     List<EmitAction>*   actions;
 };
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!! LocationTracker !!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-/* static */LocationTracker::Kind LocationTracker::getKindFromDecoration(IRDecoration* decoration)
-{
-    switch (decoration->getOp())
-    {
-        case kIROp_VulkanRayPayloadDecoration:          return Kind::RayPayload;
-        case kIROp_VulkanCallablePayloadDecoration:     return Kind::CallablePayload;
-        case kIROp_VulkanHitObjectAttributesDecoration: return Kind::HitObjectAttribute;
-        default: break;
-    }
-    return Kind::Invalid;
-}
-
-Index LocationTracker::getValue(IRInst* inst, IRDecoration* decoration)
-{
-    const Kind kind = getKindFromDecoration(decoration);
-    SLANG_RELEASE_ASSERT(kind != Kind::Invalid);
-    if (kind == Kind::Invalid)
-    {
-        return -1;
-    }
-
-    return getValue(kind, inst, decoration);
-}
-
-Index LocationTracker::getValue(Kind kind, IRInst* inst, IRDecoration* decoration)
-{
-    if (decoration->getOperandCount() > 0)
-    {
-        // TODO(JS):
-        // There could be a clash with the auto generated location, and the user set value/ 
-        // Perhaps the implication in practice is that either all are marked or none.
-        const int explicitLocation = int(getIntVal(decoration->getOperand(0)));
-        if (explicitLocation >= 0)
-            return UInt(explicitLocation);
-    }
-
-    auto& nextValue = m_nextValueForKind[Index(kind)];
-
-    const Location defaultLocation{kind, nextValue};
-    const Location foundLocation = m_mapIRToLocations.getOrAddValue(inst, defaultLocation);
-
-    // Increase if it was the default
-    nextValue += Index(defaultLocation == foundLocation);
-
-    // Has to match the kind
-    return (foundLocation.kind == kind) ? foundLocation.value : -1;
-}
-
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!! CLikeSourceEmitter !!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 /* static */SourceLanguage CLikeSourceEmitter::getSourceLanguage(CodeGenTarget target)
@@ -160,6 +110,15 @@ SlangResult CLikeSourceEmitter::init()
 void CLikeSourceEmitter::emitFrontMatterImpl(TargetRequest* targetReq)
 {
     SLANG_UNUSED(targetReq);
+}
+
+void CLikeSourceEmitter::emitPreModuleImpl()
+{
+    for (auto prelude : m_requiredPreludes)
+    {
+        m_writer->emit(prelude->getStringSlice());
+        m_writer->emit("\n");
+    }
 }
 
 //
@@ -1242,6 +1201,9 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     case kIROp_LookupWitness:
     case kIROp_GetValueFromBoundInterface:
         return true;
+
+    case kIROp_GetVulkanRayTracingPayloadLocation:
+        return true;
     }
 
     // Layouts and attributes are only present to annotate other
@@ -1903,6 +1865,22 @@ void CLikeSourceEmitter::emitCallExpr(IRCall* inst, EmitOpInfo outerPrec)
     UnownedStringSlice intrinsicDefinition;
     if (findTargetIntrinsicDefinition(funcValue, intrinsicDefinition))
     {
+        // Make sure we register all required preludes for emit.
+        if (auto func = as<IRFunc>(getResolvedInstForDecorations(funcValue)))
+        {
+            for (auto block : func->getBlocks())
+            {
+                for (auto ii : block->getChildren())
+                {
+                    if (auto requirePrelude = as<IRRequirePrelude>(ii))
+                    {
+                        auto preludeTextInst = as<IRStringLit>(requirePrelude->getOperand(0));
+                        if (preludeTextInst)
+                            m_requiredPreludes.add(preludeTextInst);
+                    }
+                }
+            }
+        }
         emitIntrinsicCallExpr(inst, intrinsicDefinition, outerPrec);
     }
     else
@@ -3234,6 +3212,10 @@ void CLikeSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
         // so we don't actually expect to encounter these in user code.
         m_writer->emit("inout ");
         type = refType->getValueType();
+    }
+    else if (auto constRefType = as<IRConstRefType>(type))
+    {
+        type = constRefType->getValueType();
     }
 
     emitType(type, name);

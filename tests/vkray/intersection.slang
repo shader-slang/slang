@@ -1,6 +1,6 @@
 // intersection.slang
-//TEST:CROSS_COMPILE: -profile glsl_460+GL_NV_ray_tracing -stage intersection -entry main -target spirv-assembly
-
+//TEST:SIMPLE(filecheck=CHECK): -profile glsl_460+GL_NV_ray_tracing -stage intersection -entry main -target spirv-assembly
+//TEST:SIMPLE(filecheck=CHECK): -emit-spirv-directly -stage intersection -entry main -target spirv-assembly
 struct Sphere
 {
 	float3 position;
@@ -45,3 +45,12 @@ void main()
 		ReportHit(tHit, 0, attrs);
 	}
 }
+
+// CHECK: OpEntryPoint IntersectionNV %main "main"
+// CHECK: OpDecorate %[[rayTMin:[a-zA-Z0-9_]+]] BuiltIn RayTminNV
+
+// CHECK-DAG: %[[ATTR:[A-Za-z0-9_]+]] = OpVariable %_ptr_HitAttributeNV_SphereHitAttributes{{.*}} HitAttributeNV
+// CHECK-DAG: %[[VAL:[A-Za-z0-9_]+]] = Op{{.+}} %SphereHitAttributes{{.*}} {{.*}}
+// CHECK-DAG: OpStore %[[ATTR]] %[[VAL]]
+
+// CHECK-DAG: OpReportIntersectionKHR

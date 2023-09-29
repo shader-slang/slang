@@ -7263,6 +7263,7 @@ namespace Slang
         _makeParseModifier("out",           OutModifier::kReflectClassInfo),
         _makeParseModifier("inout",         InOutModifier::kReflectClassInfo),
         _makeParseModifier("__ref",         RefModifier::kReflectClassInfo),
+        _makeParseModifier("__constref",    ConstRefModifier::kReflectClassInfo),
         _makeParseModifier("const",         ConstModifier::kReflectClassInfo),
         _makeParseModifier("instance",      InstanceModifier::kReflectClassInfo),
         _makeParseModifier("__builtin",     BuiltinModifier::kReflectClassInfo),

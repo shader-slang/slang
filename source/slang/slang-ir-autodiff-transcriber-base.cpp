@@ -319,6 +319,9 @@ IRWitnessTable* AutoDiffTranscriberBase::getArrayWitness(IRBuilder* builder, IRI
 
 IRInst* AutoDiffTranscriberBase::tryGetDifferentiableWitness(IRBuilder* builder, IRInst* originalType)
 {
+    if (isNoDiffType((IRType*)originalType))
+        return nullptr;
+
     IRInst* witness =
         differentiableTypeConformanceContext.lookUpConformanceForType((IRType*)originalType);
     if (witness)
@@ -384,6 +387,9 @@ IRType* AutoDiffTranscriberBase::getOrCreateDiffPairType(IRBuilder* builder, IRI
 
 IRType* AutoDiffTranscriberBase::differentiateType(IRBuilder* builder, IRType* origType)
 {
+    if (isNoDiffType(origType))
+        return nullptr;
+
     // Special-case for differentiable existential types.
     if (as<IRInterfaceType>(origType) || as<IRAssociatedType>(origType))
     {
@@ -406,6 +412,9 @@ IRType* AutoDiffTranscriberBase::differentiateType(IRBuilder* builder, IRType* o
 
 IRType* AutoDiffTranscriberBase::_differentiateTypeImpl(IRBuilder* builder, IRType* origType)
 {
+    if (isNoDiffType(origType))
+        return nullptr;
+
     if (auto ptrType = as<IRPtrTypeBase>(origType))
         return builder->getPtrType(
             origType->getOp(),

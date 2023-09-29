@@ -2755,6 +2755,11 @@ namespace Slang
         return (IRRefType*) getPtrType(kIROp_RefType, valueType);
     }
 
+    IRConstRefType* IRBuilder::getConstRefType(IRType* valueType)
+    {
+        return (IRConstRefType*)getPtrType(kIROp_ConstRefType, valueType);
+    }
+
     IRSPIRVLiteralType* IRBuilder::getSPIRVLiteralType(IRType* type)
     {
         IRInst* operands[] = { type };
@@ -3588,6 +3593,7 @@ namespace Slang
         case kIROp_OutType:
         case kIROp_RawPointerType:
         case kIROp_RefType:
+        case kIROp_ConstRefType:
         case kIROp_ComPtrType:
         case kIROp_NativePtrType:
         case kIROp_NativeStringType:
@@ -3697,6 +3703,7 @@ namespace Slang
         case kIROp_OutType:
         case kIROp_RawPointerType:
         case kIROp_RefType:
+        case kIROp_ConstRefType:
             return 3;
         case kIROp_VoidType:
             return 4;
@@ -4288,6 +4295,20 @@ namespace Slang
         return globalVar;
     }
 
+    IRGlobalVar* IRBuilder::createGlobalVar(
+        IRType*         valueType,
+        IRIntegerValue  addressSpace)
+    {
+        auto ptrType = getPtrType(kIROp_PtrType, valueType, addressSpace);
+        IRGlobalVar* globalVar = createInst<IRGlobalVar>(
+            this,
+            kIROp_GlobalVar,
+            ptrType);
+        _maybeSetSourceLoc(globalVar);
+        addGlobalValue(this, globalVar);
+        return globalVar;
+    }
+
     IRGlobalParam* IRBuilder::createGlobalParam(
         IRType* valueType)
     {
@@ -4708,7 +4729,12 @@ namespace Slang
         IRInst* base,
         IRInst* index)
     {
-        auto inst = createInst<IRFieldAddress>(
+        if (auto vectorFromScalar = as<IRMakeVectorFromScalar>(base))
+            return vectorFromScalar->getOperand(0);
+        if (base->getOp() == kIROp_MakeArrayFromElement)
+            return base->getOperand(0);
+
+        auto inst = createInst<IRGetElement>(
             this,
             kIROp_GetElement,
             type,
@@ -4737,15 +4763,8 @@ namespace Slang
             type = getVectorType(matrixType->getElementType(), matrixType->getColumnCount());
         }
         SLANG_RELEASE_ASSERT(type);
-        auto inst = createInst<IRGetElement>(
-            this,
-            kIROp_GetElement,
-            type,
-            base,
-            index);
 
-        addInst(inst);
-        return inst;
+        return emitElementExtract(type, base, index);
     }
 
     IRInst* IRBuilder::emitElementExtract(
@@ -8204,7 +8223,7 @@ namespace Slang
         case kIROp_Call:
             // Similar to the case in IRInst::mightHaveSideEffects, pure
             // calls are ok
-            return isSideEffectFreeFunctionalCall(cast<IRCall>(inst));
+            return isPureFunctionalCall(cast<IRCall>(inst));
         case kIROp_Load:
             // Load is generally not movable, an exception is loading a global constant buffer.
             if (auto load = as<IRLoad>(inst))

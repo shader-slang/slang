@@ -418,6 +418,7 @@ bool isPtrLikeOrHandleType(IRInst* type)
     case kIROp_InOutType:
     case kIROp_PtrType:
     case kIROp_RefType:
+    case kIROp_ConstRefType:
         return true;
     }
     return false;
@@ -447,7 +448,7 @@ bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, I
             {
                 auto callee = call->getCallee();
                 if (callee &&
-                    doesCalleeHaveSideEffect(callee))
+                    !doesCalleeHaveSideEffect(callee))
                 {
                     // An exception is if the callee is side-effect free and is not reading from
                     // memory.
@@ -970,6 +971,17 @@ bool isOne(IRInst* inst)
     }
 }
 
+IRPtrTypeBase* isMutablePointerType(IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_ConstRefType:
+        return nullptr;
+    default:
+        return as<IRPtrTypeBase>(inst);
+    }
+}
+
 void initializeScratchData(IRInst* inst)
 {
     List<IRInst*> workList;
@@ -1126,6 +1138,14 @@ IRVarLayout* findVarLayout(IRInst* value)
         return as<IRVarLayout>(layoutDecoration->getLayout());
     return nullptr;
 
+}
+
+UnownedStringSlice getBuiltinFuncName(IRInst* callee)
+{
+    auto decor = getResolvedInstForDecorations(callee)->findDecoration<IRKnownBuiltinDecoration>();
+    if (!decor)
+        return UnownedStringSlice();
+    return decor->getName();
 }
 
 UnownedStringSlice getBasicTypeNameHint(IRType* basicType)

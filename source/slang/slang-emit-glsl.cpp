@@ -827,7 +827,7 @@ void GLSLSourceEmitter::_maybeEmitGLSLBuiltin(IRGlobalParam* var, UnownedStringS
         // that inline.
 
         auto paramGroupType = as<IRGLSLOutputParameterGroupType>(var->getFullType());
-        SLANG_ASSERT(paramGroupType && "Mesh shader builtin output was not a paramter group");
+        SLANG_ASSERT(paramGroupType && "Mesh shader builtin output was not a parameter group");
         auto arrayType = as<IRArrayTypeBase>(paramGroupType->getOperand(0));
         SLANG_ASSERT(paramGroupType && "Mesh shader builtin output was not an array");
         auto elementType = as<IRStructType>(arrayType->getElementType());
@@ -2594,9 +2594,6 @@ void GLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
 
     for (auto decoration : varDecl->getDecorations())
     {
-        typedef LocationTracker::Kind LocationKind;
-
-        LocationKind locationKind = LocationKind::Invalid;
         UnownedStringSlice prefix;
         if (as<IRVulkanHitAttributesDecoration>(decoration))
         {
@@ -2604,37 +2601,34 @@ void GLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
         }
         else
         {
-            // Handle attributes that have location
-            const LocationKind decorationLocationKind = LocationTracker::getKindFromDecoration(decoration);
-            if (decorationLocationKind == LocationKind::Invalid)
+            IRIntegerValue locationValue = -1;
+            switch (decoration->getOp())
             {
-                // Next decoration
+            case kIROp_VulkanCallablePayloadDecoration:
+                prefix = toSlice("callableData");
+                locationValue = getIntVal(decoration->getOperand(0));
+                break;
+            case kIROp_VulkanRayPayloadDecoration:
+                prefix = toSlice("rayPayload");
+                locationValue = getIntVal(decoration->getOperand(0));
+                break;
+            case kIROp_VulkanHitObjectAttributesDecoration:
+                prefix = toSlice("hitObjectAttribute");
+                locationValue = getIntVal(decoration->getOperand(0));
+                break;
+            default:
                 continue;
             }
-
-            locationKind = decorationLocationKind;
-
-            // Get the location value
-            const auto locationValue = m_locationTracker.getValue(locationKind, varDecl, decoration);
-
             m_writer->emit(toSlice("layout(location = "));
             m_writer->emit(locationValue);
             m_writer->emit(toSlice(")\n"));
-
-            switch (locationKind)
-            {
-                case LocationKind::CallablePayload:             prefix = toSlice("callableData"); break;
-                case LocationKind::HitObjectAttribute:          prefix = toSlice("hitObjectAttribute"); break;
-                case LocationKind::RayPayload:                  prefix = toSlice("rayPayload"); break;
-                default: break;
-            }
         }
 
         SLANG_ASSERT(prefix.getLength());
         m_writer->emit(prefix);
 
         // Special case  hitObjectAttribute as is only NV currently 
-        if (locationKind == LocationKind::HitObjectAttribute ||
+        if (decoration->getOp() == kIROp_VulkanHitObjectAttributesDecoration ||
             getTargetCaps().implies(CapabilityAtom::GL_NV_ray_tracing))
         {
             m_writer->emit(toSlice("NV"));

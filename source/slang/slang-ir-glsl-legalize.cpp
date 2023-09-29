@@ -7,6 +7,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-specialize-function-call.h"
+#include "slang-ir-util.h"
 #include "slang-glsl-extension-tracker.h"
 #include "../../external/spirv-headers/include/spirv/unified1/spirv.h"
 
@@ -1940,7 +1941,8 @@ static void legalizeMeshPayloadInputParam(
     IRBuilderInsertLocScope locScope{builder};
     builder->setInsertInto(builder->getModule());
 
-    const auto g = builder->emitVar(pp->getDataType(), SpvStorageClassTaskPayloadWorkgroupEXT);
+    const auto ptrType = cast<IRPtrTypeBase>(pp->getDataType());
+    const auto g = builder->createGlobalVar(ptrType->getValueType(), SpvStorageClassTaskPayloadWorkgroupEXT);
     g->setFullType(builder->getRateQualifiedType(builder->getGroupSharedRate(), g->getFullType()));
     // moveValueBefore(g, builder->getFunc());
     builder->addNameHintDecoration(g, pp->findDecoration<IRNameHintDecoration>()->getName());
@@ -2022,6 +2024,7 @@ static void legalizeMeshOutputParam(
     moveValueBefore(g, builder->getFunc());
     builder->addNameHintDecoration(g, pp->findDecoration<IRNameHintDecoration>()->getName());
     pp->replaceUsesWith(g);
+    // pp is only removed later on, so sadly we have to keep it around for now
     struct MeshOutputSpecializationCondition : FunctionCallSpecializeCondition
     {
         bool doesParamWantSpecialization(IRParam*, IRInst* arg)
@@ -2058,6 +2061,7 @@ static void legalizeMeshOutputParam(
                 IRBuilderInsertLocScope locScope{builder};
                 builder->setInsertBefore(a);
                 a->replaceUsesWith(d.irValue);
+                a->removeAndDeallocate();
                 return;
             }
             // Otherwise, go through the uses one by one and see what we can do
@@ -2133,7 +2137,11 @@ static void legalizeMeshOutputParam(
                     SLANG_UNEXPECTED("Unhandled use of mesh output parameter during GLSL legalization");
                 }
             });
+
+            SLANG_ASSERT(!a->hasUses());
+            a->removeAndDeallocate();
         };
+
         assignUses(globalOutputVal, l);
     });
 
@@ -2172,119 +2180,127 @@ static void legalizeMeshOutputParam(
     //
 
     // First, collect the subset of outputs being used
-    auto isMeshOutputBuiltin = [](IRInst* g)
+    const bool isSPIRV = codeGenContext->getTargetFormat() == CodeGenTarget::SPIRV
+        || codeGenContext->getTargetFormat() == CodeGenTarget::SPIRVAssembly;
+    if(!isSPIRV)
     {
-        if(const auto s = composeGetters<IRStringLit>(
-            g,
-            &IRInst::findDecoration<IRImportDecoration>,
-            &IRImportDecoration::getMangledNameOperand
-            ))
+        auto isMeshOutputBuiltin = [](IRInst* g)
         {
-            const auto n = s->getStringSlice();
-            if (n == "gl_Position" ||
-                n == "gl_PointSize" ||
-                n == "gl_ClipDistance" ||
-                n == "gl_CullDistance" ||
-                n == "gl_PrimitiveID" ||
-                n == "gl_Layer" ||
-                n == "gl_ViewportIndex" ||
-                n == "gl_CullPrimitiveEXT" ||
-                n == "gl_PrimitiveShadingRateEXT")
+            if(const auto s = composeGetters<IRStringLit>(
+                g,
+                &IRInst::findDecoration<IRImportDecoration>,
+                &IRImportDecoration::getMangledNameOperand
+                ))
             {
-                return s;
+                const auto n = s->getStringSlice();
+                if (n == "gl_Position" ||
+                    n == "gl_PointSize" ||
+                    n == "gl_ClipDistance" ||
+                    n == "gl_CullDistance" ||
+                    n == "gl_PrimitiveID" ||
+                    n == "gl_Layer" ||
+                    n == "gl_ViewportIndex" ||
+                    n == "gl_CullPrimitiveEXT" ||
+                    n == "gl_PrimitiveShadingRateEXT")
+                {
+                    return s;
+                }
+            }
+            return (IRStringLit*)nullptr;
+        };
+        auto leaves = globalOutputVal.leafAddresses();
+        struct BuiltinOutputInfo
+        {
+            IRInst* param;
+            IRStringLit* nameDecoration;
+            IRType* type;
+            IRStructKey* key;
+        };
+        List<BuiltinOutputInfo> builtins;
+        for(auto leaf : leaves)
+        {
+            if(auto decoration = isMeshOutputBuiltin(leaf))
+            {
+                builtins.add({leaf, decoration, nullptr, nullptr});
             }
         }
-        return (IRStringLit*)nullptr;
-    };
-    auto leaves = globalOutputVal.leafAddresses();
-    struct BuiltinOutputInfo
-    {
-        IRInst* param;
-        IRStringLit* nameDecoration;
-        IRType* type;
-        IRStructKey* key;
-    };
-    List<BuiltinOutputInfo> builtins;
-    for(auto leaf : leaves)
-    {
-        if(auto decoration = isMeshOutputBuiltin(leaf))
+        if(builtins.getCount() == 0)
         {
-            builtins.add({leaf, decoration, nullptr, nullptr});
+            return;
+        }
+        const auto _locScope = IRBuilderInsertLocScope{builder};
+        builder->setInsertBefore(func);
+        auto meshOutputBlockType = builder->createStructType();
+        {
+            const auto _locScope2 = IRBuilderInsertLocScope{builder};
+            builder->setInsertInto(meshOutputBlockType);
+            for(auto& builtin : builtins)
+            {
+                auto t = composeGetters<IRType>(
+                    builtin.param,
+                    &IRInst::getFullType,
+                    &IROutTypeBase::getValueType,
+                    &IRArrayTypeBase::getElementType);
+                auto key = builder->createStructKey();
+                auto n = builtin.nameDecoration->getStringSlice();
+                builder->addImportDecoration(key, n);
+                builder->createStructField(meshOutputBlockType, key, t);
+                builtin.type = t;
+                builtin.key = key;
+            }
+        }
+
+        // No emitter actually handles GLSLOutputParameterGroupTypes, this isn't a
+        // problem as it's used as an intrinsic.
+        // GLSL does permit redeclaring these particular ones, so it might be nice to
+        // add a linkage decoration instead of it being an intrinsic in the event
+        // that we start outputting the linkage decoration instead of it being an
+        // intrinsic in the event that we start outputting these.
+        auto blockParamType = builder->getGLSLOutputParameterGroupType(
+            builder->getArrayType(meshOutputBlockType, meshOutputType->getMaxElementCount()));
+        auto blockParam = builder->createGlobalParam(blockParamType);
+        bool isPerPrimitive = as<IRPrimitivesType>(meshOutputType);
+        auto typeName = isPerPrimitive ? "gl_MeshPerPrimitiveEXT" : "gl_MeshPerVertexEXT";
+        auto arrayName = isPerPrimitive ? "gl_MeshPrimitivesEXT" : "gl_MeshVerticesEXT";
+        builder->addTargetIntrinsicDecoration(
+            meshOutputBlockType,
+            CapabilitySet(CapabilityAtom::GLSL),
+            UnownedStringSlice(typeName));
+        builder->addImportDecoration(blockParam, UnownedStringSlice(arrayName));
+        if(isPerPrimitive)
+        {
+            builder->addDecoration(blockParam, kIROp_GLSLPrimitivesRateDecoration);
+        }
+        // // While this is probably a correct thing to do, LRK::VaryingOutput
+        // // isn't really used for redeclaraion of builtin outputs, and assumes
+        // // that it's got a layout location, the correct fix might be to add
+        // // LRK::BuiltinVaryingOutput, but that would be polluting LRK for no
+        // // real gain.
+        // //
+        // IRVarLayout::Builder varLayoutBuilder{builder, IRTypeLayout::Builder{builder}.build()};
+        // varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::VaryingOutput);
+        // varLayoutBuilder.setStage(Stage::Mesh);
+        // builder->addLayoutDecoration(blockParam, varLayoutBuilder.build());
+
+        for(auto builtin : builtins)
+        {
+            traverseUsers(builtin.param, [&](IRInst* u)
+            {
+                auto p = as<IRGetElementPtr>(u);
+                SLANG_ASSERT(p && "Mesh Output sentinel parameter wasn't used as an array");
+
+                IRBuilderInsertLocScope locScope{builder};
+                builder->setInsertBefore(p);
+                auto e = builder->emitElementAddress(builder->getPtrType(meshOutputBlockType), blockParam, p->getIndex());
+                auto a = builder->emitFieldAddress(builder->getPtrType(builtin.type), e, builtin.key);
+
+                p->replaceUsesWith(a);
+            });
         }
     }
-    if(builtins.getCount() == 0)
-    {
-        return;
-    }
-    const auto _locScope = IRBuilderInsertLocScope{builder};
-    builder->setInsertBefore(func);
-    auto meshOutputBlockType = builder->createStructType();
-    {
-        const auto _locScope2 = IRBuilderInsertLocScope{builder};
-        builder->setInsertInto(meshOutputBlockType);
-        for(auto& builtin : builtins)
-        {
-            auto t = composeGetters<IRType>(
-                builtin.param,
-                &IRInst::getFullType,
-                &IROutTypeBase::getValueType,
-                &IRArrayTypeBase::getElementType);
-            auto key = builder->createStructKey();
-            auto n = builtin.nameDecoration->getStringSlice();
-            builder->addImportDecoration(key, n);
-            builder->createStructField(meshOutputBlockType, key, t);
-            builtin.type = t;
-            builtin.key = key;
-        }
-    }
 
-    // No emitter actually handles GLSLOutputParameterGroupTypes, this isn't a
-    // problem as it's used as an intrinsic.
-    // GLSL does permit redeclaring these particular ones, so it might be nice to
-    // add a linkage decoration instead of it being an intrinsic in the event
-    // that we start outputting the linkage decoration instead of it being an
-    // intrinsic in the event that we start outputting these.
-    auto blockParamType = builder->getGLSLOutputParameterGroupType(
-        builder->getArrayType(meshOutputBlockType, meshOutputType->getMaxElementCount()));
-    auto blockParam = builder->createGlobalParam(blockParamType);
-    bool isPerPrimitive = as<IRPrimitivesType>(meshOutputType);
-    auto typeName = isPerPrimitive ? "gl_MeshPerPrimitiveEXT" : "gl_MeshPerVertexEXT";
-    auto arrayName = isPerPrimitive ? "gl_MeshPrimitivesEXT" : "gl_MeshVerticesEXT";
-    builder->addTargetIntrinsicDecoration(
-        meshOutputBlockType,
-        CapabilitySet(CapabilityAtom::GLSL),
-        UnownedStringSlice(typeName));
-    builder->addImportDecoration(blockParam, UnownedStringSlice(arrayName));
-    if(isPerPrimitive)
-    {
-        builder->addDecoration(blockParam, kIROp_GLSLPrimitivesRateDecoration);
-    }
-    // // While this is probably a correct thing to do, LRK::VaryingOutput
-    // // isn't really used for redeclaraion of builtin outputs, and assumes
-    // // that it's got a layout location, the correct fix might be to add
-    // // LRK::BuiltinVaryingOutput, but that would be polluting LRK for no
-    // // real gain.
-    // //
-    // IRVarLayout::Builder varLayoutBuilder{builder, IRTypeLayout::Builder{builder}.build()};
-    // varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::VaryingOutput);
-    // varLayoutBuilder.setStage(Stage::Mesh);
-    // builder->addLayoutDecoration(blockParam, varLayoutBuilder.build());
-
-    for(auto builtin : builtins)
-    {
-        traverseUsers(builtin.param, [&](IRInst* u)
-        {
-            auto p = as<IRGetElementPtr>(u);
-            SLANG_ASSERT(p && "Mesh Output sentinel parameter wasn't used as an array");
-
-            IRBuilderInsertLocScope locScope{builder};
-            builder->setInsertBefore(p);
-            auto e = builder->emitElementAddress(builder->getPtrType(meshOutputBlockType), blockParam, p->getIndex());
-            auto a = builder->emitFieldAddress(builder->getPtrType(builtin.type), e, builtin.key);
-
-            p->replaceUsesWith(a);
-        });
-    }
+    SLANG_ASSERT(!g->hasUses());
+    g->removeAndDeallocate();
 }
 
 void legalizeEntryPointParameterForGLSL(
@@ -2377,135 +2393,128 @@ void legalizeEntryPointParameterForGLSL(
     // will differ a bit between the pointer and non-pointer
     // cases.
     auto paramType = pp->getDataType();
-
+    auto valueType = paramType;
     // First we will special-case stage input/outputs that
     // don't fit into the standard varying model.
     // - Geometry shader output streams
     // - Mesh shader outputs
     // - Mesh shader payload input
-    if( auto paramPtrType = as<IROutTypeBase>(paramType) )
+    if (auto paramPtrType = as<IROutTypeBase>(paramType))
     {
-        auto valueType = paramPtrType->getValueType();
-        if( const auto gsStreamType = as<IRHLSLStreamOutputType>(valueType) )
+        valueType = paramPtrType->getValueType();
+    }
+    if( const auto gsStreamType = as<IRHLSLStreamOutputType>(valueType) )
+    {
+        // An output stream type like `TriangleStream<Foo>` should
+        // more or less translate into `out Foo` (plus scalarization).
+
+        auto globalOutputVal = createGLSLGlobalVaryings(
+            context,
+            codeGenContext,
+            builder,
+            valueType,
+            paramLayout,
+            LayoutResourceKind::VaryingOutput,
+            stage,
+            pp);
+
+        // TODO: a GS output stream might be passed into other
+        // functions, so that we should really be modifying
+        // any function that has one of these in its parameter
+        // list (and in the limit we should be leagalizing any
+        // type that nests these...).
+        //
+        // For now we will just try to deal with `Append` calls
+        // directly in this function.
+
+        for( auto bb = func->getFirstBlock(); bb; bb = bb->getNextBlock() )
         {
-            // An output stream type like `TriangleStream<Foo>` should
-            // more or less translate into `out Foo` (plus scalarization).
-
-            auto globalOutputVal = createGLSLGlobalVaryings(
-                context,
-                codeGenContext,
-                builder,
-                valueType,
-                paramLayout,
-                LayoutResourceKind::VaryingOutput,
-                stage,
-                pp);
-
-            // TODO: a GS output stream might be passed into other
-            // functions, so that we should really be modifying
-            // any function that has one of these in its parameter
-            // list (and in the limit we should be leagalizing any
-            // type that nests these...).
-            //
-            // For now we will just try to deal with `Append` calls
-            // directly in this function.
-
-            for( auto bb = func->getFirstBlock(); bb; bb = bb->getNextBlock() )
+            for( auto ii = bb->getFirstInst(); ii; ii = ii->getNextInst() )
             {
-                for( auto ii = bb->getFirstInst(); ii; ii = ii->getNextInst() )
-                {
-                    // Is it a call?
-                    if(ii->getOp() != kIROp_Call)
-                        continue;
+                // Is it a call?
+                if(ii->getOp() != kIROp_Call)
+                    continue;
 
-                    // Is it calling the append operation?
-                    auto callee = ii->getOperand(0);
-                    for(;;)
+                // Is it calling the append operation?
+                auto callee = ii->getOperand(0);
+                for(;;)
+                {
+                    // If the instruction is `specialize(X,...)` then
+                    // we want to look at `X`, and if it is `generic { ... return R; }`
+                    // then we want to look at `R`. We handle this
+                    // iteratively here.
+                    //
+                    // TODO: This idiom seems to come up enough that we
+                    // should probably have a dedicated convenience routine
+                    // for this.
+                    //
+                    // Alternatively, we could switch the IR encoding so
+                    // that decorations are added to the generic instead of the
+                    // value it returns.
+                    //
+                    switch(callee->getOp())
                     {
-                        // If the instruction is `specialize(X,...)` then
-                        // we want to look at `X`, and if it is `generic { ... return R; }`
-                        // then we want to look at `R`. We handle this
-                        // iteratively here.
-                        //
-                        // TODO: This idiom seems to come up enough that we
-                        // should probably have a dedicated convenience routine
-                        // for this.
-                        //
-                        // Alternatively, we could switch the IR encoding so
-                        // that decorations are added to the generic instead of the
-                        // value it returns.
-                        //
-                        switch(callee->getOp())
+                    case kIROp_Specialize:
                         {
-                        case kIROp_Specialize:
+                            callee = cast<IRSpecialize>(callee)->getOperand(0);
+                            continue;
+                        }
+
+                    case kIROp_Generic:
+                        {
+                            auto genericResult = findGenericReturnVal(cast<IRGeneric>(callee));
+                            if(genericResult)
                             {
-                                callee = cast<IRSpecialize>(callee)->getOperand(0);
+                                callee = genericResult;
                                 continue;
                             }
-
-                        case kIROp_Generic:
-                            {
-                                auto genericResult = findGenericReturnVal(cast<IRGeneric>(callee));
-                                if(genericResult)
-                                {
-                                    callee = genericResult;
-                                    continue;
-                                }
-                            }
-
-                        default:
-                            break;
                         }
+
+                    default:
                         break;
                     }
-                    if(callee->getOp() != kIROp_Func)
-                        continue;
-
-                    // HACK: we will identify the operation based
-                    // on the target-intrinsic definition that was
-                    // given to it.
-                    auto decoration = as<IRTargetIntrinsicDecoration>(findBestTargetDecoration(callee, CapabilityAtom::GLSL));
-                    if(!decoration)
-                        continue;
-
-                    if(decoration->getDefinition() != UnownedStringSlice::fromLiteral("EmitVertex()"))
-                    {
-                        continue;
-                    }
-
-                    // Okay, we have a declaration, and we want to modify it!
-
-                    builder->setInsertBefore(ii);
-
-                    assign(builder, globalOutputVal, ScalarizedVal::value(ii->getOperand(2)));
+                    break;
                 }
+                if(callee->getOp() != kIROp_Func)
+                    continue;
+
+                if (getBuiltinFuncName(callee) != UnownedStringSlice::fromLiteral("GeometryStreamAppend"))
+                {
+                    continue;
+                }
+
+                // Okay, we have a declaration, and we want to modify it!
+
+                builder->setInsertBefore(ii);
+
+                assign(builder, globalOutputVal, ScalarizedVal::value(ii->getOperand(2)));
             }
-
-            // We will still have references to the parameter coming
-            // from the `EmitVertex` calls, so we need to replace it
-            // with something. There isn't anything reasonable to
-            // replace it with that would have the right type, so
-            // we will replace it with an undefined value, knowing
-            // that the emitted code will not actually reference it.
-            //
-            // TODO: This approach to generating geometry shader code
-            // is not ideal, and we should strive to find a better
-            // approach that involes coding the `EmitVertex` operation
-            // directly in the stdlib, similar to how ray-tracing
-            // operations like `TraceRay` are handled.
-            //
-            builder->setInsertBefore(func->getFirstBlock()->getFirstOrdinaryInst());
-            auto undefinedVal = builder->emitUndefined(pp->getFullType());
-            pp->replaceUsesWith(undefinedVal);
-
-            return;
         }
-        if( auto meshOutputType = as<IRMeshOutputType>(valueType) )
-        {
-            return legalizeMeshOutputParam(context, codeGenContext, func, pp, paramLayout, meshOutputType);
-        }
+
+        // We will still have references to the parameter coming
+        // from the `EmitVertex` calls, so we need to replace it
+        // with something. There isn't anything reasonable to
+        // replace it with that would have the right type, so
+        // we will replace it with an undefined value, knowing
+        // that the emitted code will not actually reference it.
+        //
+        // TODO: This approach to generating geometry shader code
+        // is not ideal, and we should strive to find a better
+        // approach that involes coding the `EmitVertex` operation
+        // directly in the stdlib, similar to how ray-tracing
+        // operations like `TraceRay` are handled.
+        //
+        builder->setInsertBefore(func->getFirstBlock()->getFirstOrdinaryInst());
+        auto undefinedVal = builder->emitUndefined(pp->getFullType());
+        pp->replaceUsesWith(undefinedVal);
+
+        return;
     }
-    else if(pp->findDecoration<IRHLSLMeshPayloadDecoration>())
+    if( auto meshOutputType = as<IRMeshOutputType>(valueType) )
+    {
+        return legalizeMeshOutputParam(context, codeGenContext, func, pp, paramLayout, meshOutputType);
+    }
+    if(pp->findDecoration<IRHLSLMeshPayloadDecoration>())
     {
         return legalizeMeshPayloadInputParam(context, codeGenContext, pp);
     }
@@ -2543,7 +2552,7 @@ void legalizeEntryPointParameterForGLSL(
     // Is the parameter type a special pointer type
     // that indicates the parameter is used for `out`
     // or `inout` access?
-    if(auto paramPtrType = as<IROutTypeBase>(paramType) )
+    if( as<IROutTypeBase>(paramType) )
     {
         // Okay, we have the more interesting case here,
         // where the parameter was being passed by reference.
@@ -2551,12 +2560,10 @@ void legalizeEntryPointParameterForGLSL(
         // type, which will replace the parameter, along with
         // one or more global variables for the actual input/output.
 
-        auto valueType = paramPtrType->getValueType();
-
         auto localVariable = builder->emitVar(valueType);
         auto localVal = ScalarizedVal::address(localVariable);
 
-        if( const auto inOutType = as<IRInOutType>(paramPtrType) )
+        if( const auto inOutType = as<IRInOutType>(paramType) )
         {
             // In the `in out` case we need to declare two
             // sets of global variables: one for the `in`
@@ -2644,6 +2651,61 @@ bool shouldUseOriginalEntryPointName(CodeGenContext* codeGenContext)
         }
     }
     return false;
+}
+
+void assignRayPayloadHitObjectAttributeLocations(IRModule* module)
+{
+    IRIntegerValue rayPayloadCounter = 0;
+    IRIntegerValue callablePayloadCounter = 0;
+    IRIntegerValue hitObjectAttributeCounter = 0;
+
+    IRBuilder builder(module);
+    for (auto inst : module->getGlobalInsts())
+    {
+        auto globalVar = as<IRGlobalVar>(inst);
+        if (!globalVar)
+            continue;
+        IRInst* location = nullptr;
+        for (auto decor : globalVar->getDecorations())
+        {
+            switch (decor->getOp())
+            {
+            case kIROp_VulkanRayPayloadDecoration:
+                builder.setInsertBefore(inst);
+                location = builder.getIntValue(builder.getIntType(), rayPayloadCounter);
+                decor->setOperand(0, location);
+                rayPayloadCounter++;
+                goto end;
+            case kIROp_VulkanCallablePayloadDecoration:
+                builder.setInsertBefore(inst);
+                location = builder.getIntValue(builder.getIntType(), callablePayloadCounter);
+                decor->setOperand(0, location);
+                callablePayloadCounter++;
+                goto end;
+            case kIROp_VulkanHitObjectAttributesDecoration:
+                builder.setInsertBefore(inst);
+                location = builder.getIntValue(builder.getIntType(), hitObjectAttributeCounter);
+                decor->setOperand(0, location);
+                hitObjectAttributeCounter++;
+                goto end;
+            default:
+                break;
+            }
+        }
+    end:;
+        if (location)
+        {
+            traverseUses(globalVar, [&](IRUse* use)
+                {
+                    auto user = use->getUser();
+                    if (user->getOp() == kIROp_GetVulkanRayTracingPayloadLocation)
+                    {
+                        user->replaceUsesWith(location);
+                        user->removeAndDeallocate();
+                    }
+                });
+        }
+    }
 }
 
 void legalizeEntryPointForGLSL(
@@ -2884,6 +2946,8 @@ void legalizeEntryPointsForGLSL(
     {
         legalizeEntryPointForGLSL(session, module, func, context, glslExtensionTracker);
     }
+
+    assignRayPayloadHitObjectAttributeLocations(module);
 }
 
 void legalizeConstantBufferLoadForGLSL(IRModule* module)
@@ -3000,10 +3064,16 @@ void legalizeDispatchMeshPayloadForGLSL(IRModule* module)
                 // parameter and store into the value being passed to this
                 // call.
                 builder.setInsertInto(module->getModuleInst());
-                const auto v = builder.emitVar(payloadType, SpvStorageClassTaskPayloadWorkgroupEXT);
+                const auto v = builder.createGlobalVar(payloadType, SpvStorageClassTaskPayloadWorkgroupEXT);
                 v->setFullType(builder.getRateQualifiedType(builder.getGroupSharedRate(), v->getFullType()));
                 builder.setInsertBefore(call);
-                builder.emitStore(v, payload);
+                builder.emitStore(v, builder.emitLoad(payload));
+
+                // Then, make sure that it's this new global which is being
+                // passed into the call to DispatchMesh, this is unimportant
+                // for GLSL which ignores such a parameter, but the SPIR-V
+                // backend depends on it being the global
+                call->getArgs()[3].set(v);
             }
         }
     });

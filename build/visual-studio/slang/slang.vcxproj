@@ -355,6 +355,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ir-address-analysis.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-any-value-inference.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-any-value-marshalling.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-array-reg-to-mem.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-augment-make-existential.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-autodiff-cfg-norm.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-autodiff-fwd.h" />
@@ -505,6 +506,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-serialize-types.h" />
     <ClInclude Include="..\..\..\source\slang\slang-serialize-value-type-info.h" />
     <ClInclude Include="..\..\..\source\slang\slang-serialize.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-spirv-opt.h" />
     <ClInclude Include="..\..\..\source\slang\slang-spirv-val.h" />
     <ClInclude Include="..\..\..\source\slang\slang-stdlib-textures.h" />
     <ClInclude Include="..\..\..\source\slang\slang-syntax.h" />
@@ -572,6 +574,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ir-address-analysis.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-any-value-inference.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-any-value-marshalling.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-array-reg-to-mem.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-augment-make-existential.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-autodiff-cfg-norm.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-autodiff-fwd.cpp" />
@@ -716,6 +719,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-serialize-types.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-serialize.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-spirv-core-grammar-embed.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-spirv-opt.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-spirv-val.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-stdlib-api.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-stdlib-textures.cpp" />

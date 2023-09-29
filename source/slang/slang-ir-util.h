@@ -221,6 +221,8 @@ bool isZero(IRInst* inst);
 
 bool isOne(IRInst* inst);
 
+IRPtrTypeBase* isMutablePointerType(IRInst* inst);
+
 void initializeScratchData(IRInst* inst);
 void resetScratchDataBit(IRInst* inst, int bitIndex);
 
@@ -256,6 +258,8 @@ List<IRBlock*> collectBlocksInRegion(IRGlobalValueWithCode* func,  IRLoop* loopI
 HashSet<IRBlock*> getParentBreakBlockSet(IRDominatorTree* dom, IRBlock* block);
 
 IRVarLayout* findVarLayout(IRInst* value);
+
+UnownedStringSlice getBuiltinFuncName(IRInst* callee);
 
 // Run an operation over every block in a module
 template<typename F>

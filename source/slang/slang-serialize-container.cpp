@@ -390,6 +390,9 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
                         astBuilder = new ASTBuilder(options.sharedASTBuilder, buf.produceString());
                     }
 
+                    /// We need to make the current ASTBuilder available for access via thread_local global.
+                    SetASTBuilderContextRAII astBuilderRAII(astBuilder);
+
                     DefaultSerialObjectFactory objectFactory(astBuilder);
 
                     SerialReader reader(serialClasses, &objectFactory);

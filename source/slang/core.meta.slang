@@ -136,6 +136,8 @@ attribute_syntax [BackwardDifferentiable(order:int = 0)] : BackwardDifferentiabl
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [Differentiable(order:int = 0)] : BackwardDifferentiableAttribute;
 
+__intrinsic_op($(kIROp_RequirePrelude))
+void __requirePrelude(constexpr String preludeText);
 
 /// Interface to denote types as differentiable.
 /// Allows for user-specified differential types as
@@ -676,6 +678,12 @@ __generic<T>
 __magic_type(RefType)
 __intrinsic_type($(kIROp_RefType))
 struct Ref
+{};
+
+__generic<T>
+__magic_type(ConstRefType)
+__intrinsic_type($(kIROp_ConstRefType))
+struct ConstRef
 {};
 
 __generic<T>
@@ -2236,6 +2244,9 @@ attribute_syntax [mutating] : MutatingAttribute;
 
 __attributeTarget(SetterDecl)
 attribute_syntax [nonmutating] : NonmutatingAttribute;
+
+__attributeTarget(FunctionDeclBase)
+attribute_syntax [constref] : ConstRefAttribute;
 
     /// Indicates that a function computes its result as a function of its arguments without loading/storing any memory or other state.
     ///

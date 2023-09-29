@@ -334,7 +334,46 @@ struct PeepholeContext : InstPassBase
                     changed = true;
                 }
             }
-            else if (inst->getOperand(0)->getOp() == kIROp_MakeArrayFromElement)
+            else if (inst->getOperand(0)->getOp() == kIROp_MakeVector)
+            {
+                auto index = as<IRIntLit>(as<IRGetElement>(inst)->getIndex());
+                if (!index)
+                    break;
+                auto opCount = inst->getOperand(0)->getOperandCount();
+                IRIntegerValue startIndex = 0;
+                for (UInt i = 0; i < opCount; i++)
+                {
+                    auto element = inst->getOperand(0)->getOperand(i);
+                    if (auto elementVecType = as<IRVectorType>(element->getDataType()))
+                    {
+                        auto vecSize = as<IRIntLit>(elementVecType->getElementCount());
+                        if (!vecSize)
+                            break;
+                        if (index->getValue() >= startIndex && index->getValue() < startIndex + vecSize->getValue())
+                        {
+                            IRBuilder builder(module);
+                            builder.setInsertBefore(inst);
+                            auto newElement = builder.emitElementExtract(element, builder.getIntValue(builder.getIntType(), index->getValue() - startIndex));
+                            inst->replaceUsesWith(newElement);
+                            maybeRemoveOldInst(inst);
+                            changed = true;
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        if (startIndex == index->getValue())
+                        {
+                            inst->replaceUsesWith(element);
+                            maybeRemoveOldInst(inst);
+                            changed = true;
+                            break;
+                        }
+                        startIndex++;
+                    }
+                }
+            }
+            else if (inst->getOperand(0)->getOp() == kIROp_MakeArrayFromElement || inst->getOperand(0)->getOp() == kIROp_MakeVectorFromScalar)
             {
                 inst->replaceUsesWith(inst->getOperand(0)->getOperand(0));
                 maybeRemoveOldInst(inst);

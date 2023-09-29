@@ -108,6 +108,7 @@ INST(Nop, nop, 0, 0)
     /* PtrTypeBase */
         INST(PtrType, Ptr, 1, HOISTABLE)
         INST(RefType, Ref, 1, HOISTABLE)
+        INST(ConstRefType, ConstRef, 1, HOISTABLE)
         // A `PsuedoPtr<T>` logically represents a pointer to a value of type
         // `T` on a platform that cannot support pointers. The expectation
         // is that the "pointer" will be legalized away by storing a value
@@ -549,6 +550,8 @@ INST(TargetSwitch, targetSwitch, 1, 0)
 // A generic asm inst has an return semantics that terminates the control flow.
 INST(GenericAsm, GenericAsm, 1, 0)
 
+INST(RequirePrelude, RequirePrelude, 1, 0)
+
 INST(discard, discard, 0, 0)
 
 /* IRUnreachable */
@@ -631,6 +634,8 @@ INST(GetOptiXHitAttribute, getOptiXHitAttribute, 2, 0)
 // Wrapper for OptiX intrinsics used to load shader binding table record data
 // using a pointer. 
 INST(GetOptiXSbtDataPtr, getOptiXSbtDataPointer, 0, 0)
+
+INST(GetVulkanRayTracingPayloadLocation, GetVulkanRayTracingPayloadLocation, 1, 0)
 
 INST(MakeArrayList, makeArrayList, 0, 0)
 INST(MakeTensorView, makeTensorView, 0, 0)

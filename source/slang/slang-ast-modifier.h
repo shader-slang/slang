@@ -161,6 +161,11 @@ class RefModifier : public Modifier
     SLANG_AST_CLASS(RefModifier)
 };
 
+// `__ref` modifier for by-reference parameter passing
+class ConstRefModifier : public Modifier
+{
+    SLANG_AST_CLASS(ConstRefModifier)
+};
 
 // This is a special sentinel modifier that gets added
 // to the list when we have multiple variable declarations
@@ -917,6 +922,14 @@ class MutatingAttribute : public Attribute
 class NonmutatingAttribute : public Attribute
 {
     SLANG_AST_CLASS(NonmutatingAttribute)
+};
+
+// A `[constref]` attribute, which indicates that the `this` parameter of
+// a member function should be passed by reference.
+//
+class ConstRefAttribute : public Attribute
+{
+    SLANG_AST_CLASS(ConstRefAttribute)
 };
 
 

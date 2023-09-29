@@ -356,6 +356,30 @@ struct CFGNormalizationPass
                     //
                     afterBaseRegion = true;
 
+                    // One case we do check for is if the after block is 'unreachable'
+                    // i.e. the terminator is an `unreachable` instruction.
+                    // In this case, we can safely assume that the after block does not
+                    // have anything to execute. Further, we need to re-wire the
+                    // previously unreachable block to the parent break block.
+                    // Note that this operation is safe because if the after block was 
+                    // originally unreachable, all potential paths to it must have 
+                    // broken out of the region.
+                    // 
+                    if (auto unreachInst = as<IRUnreachable>(afterBlock->getTerminator()))
+                    {
+                        // Link it to the parentAfterBlock.
+                        builder.setInsertInto(afterBlock);
+                        unreachInst->removeAndDeallocate();
+
+                        builder.emitBranch(parentAfterBlock);
+
+                        // We can now safely assume that the after block is empty.
+                        // Set 'afterBaseRegion' to false, which should lead the rest
+                        // of the logic to avoid splitting the after block
+                        // 
+                        afterBaseRegion = false;
+                    }
+
                     // Do we need to split the after region?
                     if (afterBaseRegion && afterBreakRegion)
                     {

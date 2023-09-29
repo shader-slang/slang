@@ -1,4 +1,5 @@
 //TEST:CROSS_COMPILE: -profile glsl_460+GL_EXT_ray_tracing -stage raygeneration -entry main -target spirv-assembly
+//TEST:SIMPLE(filecheck=CHECK): -emit-spirv-directly -stage raygeneration -entry main -target spirv-assembly
 
 #define TRACING_EPSILON 1e-6
 
@@ -46,8 +47,8 @@ void main()
         (float(gl_LaunchIDNV.y) + 0.5f) / float(gl_LaunchSizeNV.y)
     );
 
-    float3 P = samplerPosition.Sample(sampler, inUV).rgb;
-    float3 N = samplerNormal.Sample(sampler, inUV).rgb * 2.0 - 1.0;
+    float3 P = samplerPosition.SampleLevel(sampler, inUV, 0).rgb;
+    float3 N = samplerNormal.SampleLevel(sampler, inUV, 0).rgb * 2.0 - 1.0;
 
     float3 lightPos = ubo.light.position.xyz;
     float3 lightDelta = lightPos - P;
@@ -114,3 +115,6 @@ void main()
 
     outputImage[int2(gl_LaunchIDNV.xy)] = float4(color, 1.0);
 }
+
+// CHECK: %{{.*}} = OpVariable %_ptr_RayPayload{{(NV)?}}_ReflectionRay{{.*}} RayPayload
+// CHECK: OpTraceRayKHR

@@ -872,7 +872,10 @@ struct SPIRVEmitContext
         key.type = type;
         SpvInst* result = nullptr;
         if (m_spvIntConstants.tryGetValue(key, result))
+        {
+            m_mapIRInstToSpvInst[inst] = result;
             return result;
+        }
         switch (type->getOp())
         {
         case kIROp_Int64Type:
@@ -900,6 +903,7 @@ struct SPIRVEmitContext
         }
         }
         m_spvIntConstants[key] = result;
+        m_mapIRInstToSpvInst[inst] = result;
         return result;
     }
     SpvInst* emitFloatConstant(IRFloatingPointValue val, IRType* type, IRInst* inst = nullptr)
@@ -909,7 +913,10 @@ struct SPIRVEmitContext
         key.type = type;
         SpvInst* result = nullptr;
         if (m_spvFloatConstants.tryGetValue(key, result))
+        {
+            m_mapIRInstToSpvInst[inst] = result;
             return result;
+        }
         if (type->getOp() == kIROp_DoubleType)
         {
             result = emitOpConstant(
@@ -935,6 +942,7 @@ struct SPIRVEmitContext
         {
             SLANG_UNEXPECTED("missing case in SPIR-V emitFloatConstant");
         }
+        m_mapIRInstToSpvInst[inst] = result;
         m_spvFloatConstants[key] = result;
         return result;
     }
@@ -1269,6 +1277,7 @@ struct SPIRVEmitContext
             }
         case kIROp_PtrType:
         case kIROp_RefType:
+        case kIROp_ConstRefType:
         case kIROp_OutType:
         case kIROp_InOutType:
             {
@@ -1404,7 +1413,9 @@ struct SPIRVEmitContext
         case kIROp_IntLit:
         case kIROp_FloatLit:
         case kIROp_StringLit:
+        {
             return emitLit(inst);
+        }
         case kIROp_MakeVectorFromScalar:
         {
             const auto scalar = inst->getOperand(0);
@@ -1432,6 +1443,8 @@ struct SPIRVEmitContext
              return emitGlobalParam(as<IRGlobalParam>(inst));
         case kIROp_GlobalVar:
             return emitGlobalVar(as<IRGlobalVar>(inst));
+        case kIROp_SPIRVAsmOperandBuiltinVar:
+            return emitBuiltinVar(inst);
         case kIROp_Var:
             return emitVar(getSection(SpvLogicalSectionID::GlobalVariables), inst);
         // ...
@@ -1479,6 +1492,10 @@ struct SPIRVEmitContext
             return emitGetStringHash(inst);
         case kIROp_AllocateOpaqueHandle:
             return nullptr;
+        case kIROp_HLSLTriangleStreamType:
+        case kIROp_HLSLLineStreamType:
+        case kIROp_HLSLPointStreamType:
+            return nullptr;
         default:
             {
                 if (as<IRSPIRVAsmOperand>(inst))
@@ -1487,6 +1504,84 @@ struct SPIRVEmitContext
                     + dumpIRToString(inst, {IRDumpOptions::Mode::Detailed, 0});
                 SLANG_UNIMPLEMENTED_X(e.begin());
             }
+        }
+    }
+
+    static SpvImageFormat getSpvImageFormat(IRTextureTypeBase* type)
+    {
+        ImageFormat imageFormat = type->hasFormat() ? (ImageFormat)type->getFormat() : ImageFormat::unknown;
+        switch (imageFormat)
+        {
+        case ImageFormat::unknown:          return SpvImageFormatUnknown;
+        case ImageFormat::rgba32f:          return SpvImageFormatRgba32f;
+        case ImageFormat::rgba16f:          return SpvImageFormatRgba16f;
+        case ImageFormat::rg32f:            return SpvImageFormatRg32f;
+        case ImageFormat::rg16f:            return SpvImageFormatRg16f;
+        case ImageFormat::r11f_g11f_b10f:   return SpvImageFormatR11fG11fB10f;
+        case ImageFormat::r32f:             return SpvImageFormatR32f;
+        case ImageFormat::r16f:             return SpvImageFormatR16f;
+        case ImageFormat::rgba16:           return SpvImageFormatRgba16;
+        case ImageFormat::rgb10_a2:         return SpvImageFormatRgb10A2;
+        case ImageFormat::rgba8:            return SpvImageFormatRgba8;
+        case ImageFormat::rg16:             return SpvImageFormatRg16;
+        case ImageFormat::rg8:              return SpvImageFormatRg8;
+        case ImageFormat::r16:              return SpvImageFormatR16;
+        case ImageFormat::r8:               return SpvImageFormatR8;
+        case ImageFormat::rgba16_snorm:     return SpvImageFormatRgba16Snorm;
+        case ImageFormat::rgba8_snorm:      return SpvImageFormatRgba8Snorm;
+        case ImageFormat::rg16_snorm:       return SpvImageFormatRg16Snorm;
+        case ImageFormat::rg8_snorm:        return SpvImageFormatRg8Snorm;
+        case ImageFormat::r16_snorm:        return SpvImageFormatR16Snorm;
+        case ImageFormat::r8_snorm:         return SpvImageFormatR8Snorm;
+        case ImageFormat::rgba32i:          return SpvImageFormatRgba32i;
+        case ImageFormat::rgba16i:          return SpvImageFormatRgba16i;
+        case ImageFormat::rgba8i:           return SpvImageFormatRgba8i;
+        case ImageFormat::rg32i:            return SpvImageFormatRg32i;
+        case ImageFormat::rg16i:            return SpvImageFormatRg16i;
+        case ImageFormat::rg8i:             return SpvImageFormatRg8i;
+        case ImageFormat::r32i:             return SpvImageFormatR32i;
+        case ImageFormat::r16i:             return SpvImageFormatR16i;
+        case ImageFormat::r8i:              return SpvImageFormatR8i;
+        case ImageFormat::rgba32ui:         return SpvImageFormatRgba32ui;
+        case ImageFormat::rgba16ui:         return SpvImageFormatRgba16ui;
+        case ImageFormat::rgb10_a2ui:       return SpvImageFormatRgb10a2ui;
+        case ImageFormat::rgba8ui:          return SpvImageFormatRgba8ui;
+        case ImageFormat::rg32ui:           return SpvImageFormatRg32ui;
+        case ImageFormat::rg16ui:           return SpvImageFormatRg16ui;
+        case ImageFormat::rg8ui:            return SpvImageFormatRg8ui;
+        case ImageFormat::r32ui:            return SpvImageFormatR32ui;
+        case ImageFormat::r16ui:            return SpvImageFormatR16ui;
+        case ImageFormat::r8ui:             return SpvImageFormatR8ui;
+        case ImageFormat::r64ui:            return SpvImageFormatR64ui;
+        case ImageFormat::r64i:             return SpvImageFormatR64i;
+        default: SLANG_UNIMPLEMENTED_X("unknown image format for spirv emit");
+        }
+    }
+
+    SpvCapability getImageFormatCapability(SpvImageFormat format)
+    {
+        switch (format)
+        {
+        case SpvImageFormatUnknown:
+        case SpvImageFormatRgba32f:
+        case SpvImageFormatRgba16f:
+        case SpvImageFormatR32f:
+        case SpvImageFormatRgba8:
+        case SpvImageFormatRgba8Snorm:
+        case SpvImageFormatRgba32i:
+        case SpvImageFormatRgba16i:
+        case SpvImageFormatRgba8i:
+        case SpvImageFormatR32i:
+        case SpvImageFormatRgba32ui:
+        case SpvImageFormatRgba16ui:
+        case SpvImageFormatRgba8ui:
+        case SpvImageFormatR32ui:
+            return SpvCapabilityShader;
+        case SpvImageFormatR64ui:
+        case SpvImageFormatR64i:
+            return SpvCapabilityInt64ImageEXT;
+        default:
+            return SpvCapabilityStorageImageExtendedFormats;
         }
     }
 
@@ -1565,9 +1660,7 @@ struct SPIRVEmitContext
                 break;
         }
 
-        // TODO: we need to do as _emitGLSLImageFormatModifier does,
-        // take a guess at the image format
-        SpvImageFormat format = SpvImageFormatUnknown;
+        SpvImageFormat format = getSpvImageFormat(inst);
 
         //
         // Capabilities, according to section 3.8
@@ -1611,6 +1704,10 @@ struct SPIRVEmitContext
             requireSPIRVCapability(SpvCapabilityStorageImageReadWithoutFormat);
             requireSPIRVCapability(SpvCapabilityStorageImageWriteWithoutFormat);
         }
+        
+        auto formatCapability = getImageFormatCapability(format);
+        if (formatCapability != SpvCapabilityShader)
+            requireSPIRVCapability(formatCapability);
 
         //
         // The op itself
@@ -1648,7 +1745,30 @@ struct SPIRVEmitContext
         return result;
     }
 
-    void emitVarLayout(SpvInst* varInst, IRVarLayout* layout)
+    bool _maybeEmitInterpolationModifierDecoration(IRInterpolationMode mode, SpvInst* varInst)
+    {
+        switch (mode)
+        {
+        case IRInterpolationMode::NoInterpolation:
+            emitOpDecorate(getSection(SpvLogicalSectionID::Annotations), nullptr, varInst, SpvDecorationFlat);
+            return true;
+        case IRInterpolationMode::NoPerspective:
+            emitOpDecorate(getSection(SpvLogicalSectionID::Annotations), nullptr, varInst, SpvDecorationNoPerspective);
+            return true;
+        case IRInterpolationMode::Linear:
+            return true;
+        case IRInterpolationMode::Sample:
+            emitOpDecorate(getSection(SpvLogicalSectionID::Annotations), nullptr, varInst, SpvDecorationSample);
+            return true;
+        case IRInterpolationMode::Centroid:
+            emitOpDecorate(getSection(SpvLogicalSectionID::Annotations), nullptr, varInst, SpvDecorationCentroid);
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    void emitVarLayout(IRInst* var, SpvInst* varInst, IRVarLayout* layout)
     {
         bool needDefaultSetBindingDecoration = false;
         bool hasExplicitSetBinding = false;
@@ -1730,7 +1850,44 @@ struct SPIRVEmitContext
                 varInst,
                 SpvLiteralInteger::from32(int32_t(0)));
         }
+
+        bool anyModifiers = false;
+        for (auto dd : var->getDecorations())
+        {
+            if (dd->getOp() != kIROp_InterpolationModeDecoration)
+                continue;
+
+            auto decoration = (IRInterpolationModeDecoration*)dd;
+
+            anyModifiers |= _maybeEmitInterpolationModifierDecoration(decoration->getMode(), varInst);
+        }
+
+        // If the user didn't explicitly qualify a varying
+        // with integer type, then we need to explicitly
+        // add the `flat` modifier for GLSL.
+        if (!anyModifiers)
+        {
+            // Only emit a default `flat` for fragment
+            // stage varying inputs.
+            if (layout
+                && layout->getStage() == Stage::Fragment
+                && layout->usesResourceKind(LayoutResourceKind::VaryingInput))
+            {
+                const auto ptrType = as<IRPtrTypeBase>(var->getDataType());
+                if (ptrType && isIntegralScalarOrCompositeType(ptrType->getValueType()))
+                    emitOpDecorate(getSection(SpvLogicalSectionID::Annotations), nullptr, varInst, SpvDecorationFlat);
+            }
+        }
     }
+
+    void maybeEmitName(SpvInst* spvInst, IRInst* irInst)
+    {
+        if (auto nameDecor = irInst->findDecoration<IRNameHintDecoration>())
+        {
+            emitOpName(getSection(SpvLogicalSectionID::DebugNames), nullptr, spvInst, nameDecor->getName());
+        }
+    }
+
         /// Emit a global parameter definition.
     SpvInst* emitGlobalParam(IRGlobalParam* param)
     {
@@ -1752,8 +1909,9 @@ struct SPIRVEmitContext
             storageClass
         );
         if (auto layout = getVarLayout(param))
-            emitVarLayout(varInst, layout);
-        return varInst;   
+            emitVarLayout(param, varInst, layout);
+        maybeEmitName(varInst, param);
+        return varInst;
     }
 
         /// Emit a global variable definition.
@@ -1773,7 +1931,18 @@ struct SPIRVEmitContext
             storageClass
         );
         if(layout)
-            emitVarLayout(varInst, layout);
+            emitVarLayout(globalVar, varInst, layout);
+        maybeEmitName(varInst, globalVar);
+        return varInst;
+    }
+
+    SpvInst* emitBuiltinVar(IRInst* spvAsmBuiltinVar)
+    {
+        const auto kind = (SpvBuiltIn)(getIntVal(spvAsmBuiltinVar->getOperand(0)));
+        IRBuilder builder(spvAsmBuiltinVar);
+        builder.setInsertBefore(spvAsmBuiltinVar);
+        auto varInst = getBuiltinGlobalVar(builder.getPtrType(kIROp_PtrType, spvAsmBuiltinVar->getDataType(), SpvStorageClassInput), kind);
+        registerInst(spvAsmBuiltinVar, varInst);
         return varInst;
     }
 
@@ -2195,6 +2364,8 @@ struct SPIRVEmitContext
             return emitImageLoad(parent, as<IRImageLoad>(inst));
         case kIROp_ImageStore:
             return emitImageStore(parent, as<IRImageStore>(inst));
+        case kIROp_ImageSubscript:
+            return emitImageSubscript(parent, as<IRImageSubscript>(inst));
         }
     }
 
@@ -2206,6 +2377,13 @@ struct SPIRVEmitContext
     SpvInst* emitImageStore(SpvInstParent* parent, IRImageStore* store)
     {
         return emitInst(parent, store, SpvOpImageWrite, store->getImage(), store->getCoord(), store->getValue());
+    }
+
+    SpvInst* emitImageSubscript(SpvInstParent* parent, IRImageSubscript* subscript)
+    {
+        IRBuilder builder(subscript);
+        builder.setInsertBefore(subscript);
+        return emitInst(parent, subscript, SpvOpImageTexelPointer, subscript->getDataType(), kResultID, subscript->getImage(), subscript->getCoord(), builder.getIntValue(builder.getIntType(), 0));
     }
 
     SpvInst* emitGetStringHash(IRInst* inst)
@@ -2244,20 +2422,23 @@ struct SPIRVEmitContext
             }
         case kIROp_BoolLit:
             {
+                SpvInst* spvInst = nullptr;
                 if (cast<IRBoolLit>(inst)->getValue())
                 {
-                    return emitOpConstantTrue(
+                    spvInst = emitOpConstantTrue(
                         inst,
                         inst->getDataType()
                     );
                 }
                 else
                 {
-                    return emitOpConstantFalse(
+                    spvInst = emitOpConstantFalse(
                         inst,
                         inst->getDataType()
                     );
                 }
+                m_mapIRInstToSpvInst[inst] = spvInst;
+                return spvInst;
             }
         case kIROp_StringLit:
         {
@@ -2396,13 +2577,24 @@ struct SPIRVEmitContext
                     params
                 );
 
-                // Stage specific execution mode declarations.
+                // Stage specific execution mode and capability declarations.
                 switch (entryPointDecor->getProfile().getStage())
                 {
                 case Stage::Fragment:
                     //OpExecutionMode %main OriginUpperLeft
                     emitInst(getSection(SpvLogicalSectionID::ExecutionModes), nullptr, SpvOpExecutionMode, dstID, SpvExecutionModeOriginUpperLeft);
                     break;
+                case Stage::Geometry:
+                    requireSPIRVCapability(SpvCapabilityGeometry);
+                    break;
+                case Stage::Miss:
+                case Stage::AnyHit:
+                case Stage::ClosestHit:
+                case Stage::Intersection:
+                case Stage::RayGeneration:
+                case Stage::Callable:
+                    requireSPIRVCapability(SpvCapabilityRayTracingKHR);
+                    ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_ray_tracing"));
                 default:
                     break;
                 }
@@ -2436,7 +2628,61 @@ struct SPIRVEmitContext
                 );
             }
             break;
+        case kIROp_MaxVertexCountDecoration:
+            {
+                auto section = getSection(SpvLogicalSectionID::ExecutionModes);
+                auto maxVertexCount = cast<IRMaxVertexCountDecoration>(decoration);
+                emitOpExecutionModeOutputVertices(
+                    section,
+                    decoration,
+                    dstID,
+                    SpvLiteralInteger::from32(int32_t(getIntVal(maxVertexCount->getCount())))
+                );
+            }
+            break;
+        case kIROp_InstanceDecoration:
+            {
+                auto decor = as<IRInstanceDecoration>(decoration);
+                auto count = int32_t(getIntVal(decor->getCount()));
+                auto section = getSection(SpvLogicalSectionID::ExecutionModes);
+                emitOpExecutionModeInvocations(section, decoration, dstID, SpvLiteralInteger::from32(count));
+            }
+            break;
+        case kIROp_TriangleInputPrimitiveTypeDecoration:
+            emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, SpvExecutionModeTriangles);
+            break;
+        case kIROp_LineInputPrimitiveTypeDecoration:
+            emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, SpvExecutionModeInputLines);
+            break;
+        case kIROp_LineAdjInputPrimitiveTypeDecoration:
+            emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, SpvExecutionModeInputLinesAdjacency);
+            break;
+        case kIROp_PointInputPrimitiveTypeDecoration:
+            emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, SpvExecutionModeInputPoints);
+            break;
+        case kIROp_TriangleAdjInputPrimitiveTypeDecoration:
+            emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, SpvExecutionModeInputTrianglesAdjacency);
+            break;
+        case kIROp_StreamOutputTypeDecoration:
+            {
+                auto decor = as<IRStreamOutputTypeDecoration>(decoration);
+                IRType* type = decor->getStreamType();
 
+                switch (type->getOp())
+                {
+                case kIROp_HLSLPointStreamType:
+                    emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, SpvExecutionModeOutputPoints);
+                    break;
+                case kIROp_HLSLLineStreamType:
+                    emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, SpvExecutionModeOutputLineStrip);
+                    break;
+                case kIROp_HLSLTriangleStreamType:
+                    emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, SpvExecutionModeOutputTriangleStrip);
+                    break;
+                default: SLANG_ASSERT(!"Unknown stream out type");
+                }
+            }
+            break;
         case kIROp_SPIRVBufferBlockDecoration:
             {
                 emitOpDecorate(
@@ -2456,6 +2702,53 @@ struct SPIRVEmitContext
                     SpvDecorationBlock
                 );
             }
+            break;
+
+        case kIROp_OutputTopologyDecoration:
+            {
+                const auto o = cast<IROutputTopologyDecoration>(decoration);
+                const auto t = o->getTopology()->getStringSlice();
+                const auto m =
+                      t == "triangle" ? SpvExecutionModeOutputTrianglesEXT
+                    : t == "line" ? SpvExecutionModeOutputLinesEXT
+                    : t == "point" ? SpvExecutionModeOutputPoints
+                    : SpvExecutionModeMax;
+                SLANG_ASSERT(m != SpvExecutionModeMax);
+                emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, m);
+            }
+            break;
+
+        case kIROp_VerticesDecoration:
+            {
+                const auto c = cast<IRVerticesDecoration>(decoration);
+                emitOpExecutionModeOutputVertices(
+                    getSection(SpvLogicalSectionID::ExecutionModes),
+                    decoration,
+                    dstID,
+                    SpvLiteralInteger::from32(int32_t(c->getMaxSize()->getValue()))
+                );
+            }
+            break;
+
+        case kIROp_PrimitivesDecoration:
+            {
+                const auto c = cast<IRPrimitivesDecoration>(decoration);
+                emitOpExecutionModeOutputPrimitivesEXT(
+                    getSection(SpvLogicalSectionID::ExecutionModes),
+                    decoration,
+                    dstID,
+                    SpvLiteralInteger::from32(int32_t(c->getMaxSize()->getValue()))
+                );
+            }
+            break;
+
+        case kIROp_VulkanCallablePayloadDecoration:
+        case kIROp_VulkanHitObjectAttributesDecoration:
+        case kIROp_VulkanRayPayloadDecoration:
+            emitOpDecorateLocation(getSection(SpvLogicalSectionID::Annotations),
+                decoration,
+                dstID,
+                SpvLiteralInteger::from32(int32_t(getIntVal(decoration->getOperand(0)))));
             break;
         // ...
         }
@@ -2491,6 +2784,16 @@ struct SPIRVEmitContext
         int32_t id = 0;
         for (auto field : structType->getFields())
         {
+            if (auto fieldNameDecor = field->getKey()->findDecoration<IRNameHintDecoration>())
+            {
+                emitOpMemberName(
+                    getSection(SpvLogicalSectionID::DebugNames),
+                    nullptr,
+                    spvStructID,
+                    id,
+                    fieldNameDecor->getName());
+            }
+
             IRIntegerValue offset = 0;
             if (auto offsetDecor = field->getKey()->findDecoration<IRPackOffsetDecoration>())
             {
@@ -2586,7 +2889,14 @@ struct SPIRVEmitContext
         CASE(Geometry,  Geometry);
         CASE(Fragment,  Fragment);
         CASE(Compute,   GLCompute);
-
+        CASE(Mesh,      MeshEXT);
+        CASE(Amplification, TaskEXT);
+        CASE(ClosestHit, ClosestHitKHR);
+        CASE(AnyHit, AnyHitKHR);
+        CASE(Callable, CallableKHR);
+        CASE(Miss, MissKHR);
+        CASE(Intersection, IntersectionKHR);
+        CASE(RayGeneration, RayGenerationKHR);
         // TODO: Extended execution models for ray tracing, etc.
 
 #undef CASE
@@ -2802,12 +3112,31 @@ struct SPIRVEmitContext
                 SLANG_UNREACHABLE("Unimplemented system value in spirv emit.");
             }
         }
+
+        //
+        // These are system-value variables which require redeclaration in
+        // GLSL, SPIR-V makes no such distinction so we can use similar logic
+        // to above.
+        //
+        if(const auto linkageDecoration = inst->findDecoration<IRLinkageDecoration>())
+        {
+            const auto name = linkageDecoration->getMangledName();
+            if(name == "gl_PrimitiveTriangleIndicesEXT")
+                return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPrimitiveTriangleIndicesEXT);
+            if(name == "gl_PrimitiveLineIndicesEXT")
+                return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPrimitiveLineIndicesEXT);
+            if(name == "gl_PrimitivePointIndicesEXT")
+                return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPrimitivePointIndicesEXT);
+        }
+
         return nullptr;
     }
 
     SpvInst* emitParam(SpvInstParent* parent, IRInst* inst)
     {
-        return emitOpFunctionParameter(parent, inst, inst->getFullType());
+        auto paramSpvInst = emitOpFunctionParameter(parent, inst, inst->getFullType());
+        maybeEmitName(paramSpvInst, inst);
+        return paramSpvInst;
     }
 
     SpvInst* emitVar(SpvInstParent* parent, IRInst* inst)
@@ -2819,7 +3148,9 @@ struct SPIRVEmitContext
         {
             storageClass = (SpvStorageClass)ptrType->getAddressSpace();
         }
-        return emitOpVariable(parent, inst, inst->getFullType(), storageClass);
+        auto varSpvInst = emitOpVariable(parent, inst, inst->getFullType(), storageClass);
+        maybeEmitName(varSpvInst, inst);
+        return varSpvInst;
     }
 
         /// Cached `IRParam` indices in an `IRBlock`. For use in `getParamIndexInBlock`.
@@ -2948,7 +3279,7 @@ struct SPIRVEmitContext
         int paramIndex = getParamIndexInBlock(block, inst);
 
         // Emit a Phi instruction.
-        return emitInstCustomOperandFunc(parent, inst, SpvOpPhi, [&]() {
+        auto phiSpvInst = emitInstCustomOperandFunc(parent, inst, SpvOpPhi, [&]() {
             emitOperand(inst->getFullType());
             emitOperand(kResultID);
             // Find phi arguments from incoming branch instructions that target `block`.
@@ -2979,6 +3310,9 @@ struct SPIRVEmitContext
                 emitOperand(getIRInstSpvID(sourceBlock));
             }
         });
+
+        maybeEmitName(phiSpvInst, inst);
+        return phiSpvInst;
     }
 
     SpvInst* emitCall(SpvInstParent* parent, IRCall* inst)
@@ -3389,15 +3723,22 @@ struct SPIRVEmitContext
 
         IRBuilder builder(m_irModule);
         builder.setInsertBefore(inst);
-        auto index = getIntVal(inst->getIndex());
-
-        return emitOpCompositeExtract(
-            parent,
-            inst,
-            inst->getFullType(),
-            inst->getBase(),
-            makeArray(SpvLiteralInteger::from32((int32_t)index))
-        );
+        if (auto index = as<IRIntLit>(inst->getIndex()))
+        {
+            return emitOpCompositeExtract(
+                parent,
+                inst,
+                inst->getFullType(),
+                inst->getBase(),
+                makeArray(SpvLiteralInteger::from32((int32_t)index->getValue()))
+            );
+        }
+        else
+        {
+            SLANG_ASSERT(as<IRVectorType>(baseTy));
+            // SPIRV Only allows dynamic element extract on vector types.
+            return emitOpVectorExtractDynamic(parent, inst, inst->getFullType(), inst->getBase(), inst->getIndex());
+        }
     }
 
     SpvInst* emitLoad(SpvInstParent* parent, IRLoad* inst)
@@ -3910,7 +4251,7 @@ struct SPIRVEmitContext
             if (isBool)
                 opCode = SpvOpLogicalNot;
             else
-                opCode = SpvOpBitReverse;
+                opCode = SpvOpNot;
             break;
         case kIROp_Rsh:
             opCode = isSigned ? SpvOpShiftRightArithmetic : SpvOpShiftRightLogical;
@@ -4130,11 +4471,7 @@ struct SPIRVEmitContext
                 }
                 case kIROp_SPIRVAsmOperandBuiltinVar:
                 {
-                    const auto kind = (SpvBuiltIn)(getIntVal(operand->getOperand(0)));
-                    IRBuilder builder(operand);
-                    builder.setInsertBefore(operand);
-                    auto varInst = getBuiltinGlobalVar(builder.getPtrType(kIROp_PtrType, operand->getDataType(), SpvStorageClassInput), kind);
-                    emitOperand(varInst);
+                    emitOperand(ensureInst(operand));
                     break;
                 }
                 case kIROp_SPIRVAsmOperandGLSL450Set:

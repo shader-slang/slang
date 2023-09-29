@@ -287,6 +287,7 @@ case kIROp_##TYPE##Type:                                        \
     case kIROp_OutType:
     case kIROp_InOutType:
     case kIROp_RefType:
+    case kIROp_ConstRefType:
     case kIROp_RawPointerType:
     case kIROp_PtrType:
     case kIROp_NativePtrType:
