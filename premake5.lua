@@ -403,6 +403,9 @@ workspace "slang"
         }
     filter { "toolset:gcc*", "language:C++" }
         buildoptions { "-Wno-class-memaccess" }
+        -- If a function returns an address/reference to a local, we want it to produce an error, because 
+        -- it probably means something very bad.
+        buildoptions { "-Werror=return-local-addr" }
     filter { "toolset:clang", "language:C++" }
         buildoptions { "-Wno-assume" }
     filter { "toolset:clang or gcc*", "language:C++" }
