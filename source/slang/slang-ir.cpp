@@ -2755,6 +2755,11 @@ namespace Slang
         return (IRRefType*) getPtrType(kIROp_RefType, valueType);
     }
 
+    IRConstRefType* IRBuilder::getConstRefType(IRType* valueType)
+    {
+        return (IRConstRefType*)getPtrType(kIROp_ConstRefType, valueType);
+    }
+
     IRSPIRVLiteralType* IRBuilder::getSPIRVLiteralType(IRType* type)
     {
         IRInst* operands[] = { type };
@@ -3588,6 +3593,7 @@ namespace Slang
         case kIROp_OutType:
         case kIROp_RawPointerType:
         case kIROp_RefType:
+        case kIROp_ConstRefType:
         case kIROp_ComPtrType:
         case kIROp_NativePtrType:
         case kIROp_NativeStringType:
@@ -3697,6 +3703,7 @@ namespace Slang
         case kIROp_OutType:
         case kIROp_RawPointerType:
         case kIROp_RefType:
+        case kIROp_ConstRefType:
             return 3;
         case kIROp_VoidType:
             return 4;

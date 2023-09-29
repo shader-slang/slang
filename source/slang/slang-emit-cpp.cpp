@@ -403,8 +403,9 @@ void CPPSourceEmitter::useType(IRType* type)
             break;
         }
         case kIROp_RefType:
+        case kIROp_ConstRefType:
         {
-            type = static_cast<IRRefType*>(type)->getValueType();
+            type = static_cast<IRPtrTypeBase*>(type)->getValueType();
             break;
         }
         default: break;
@@ -1039,6 +1040,7 @@ void CPPSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
         }
         break;
     case kIROp_RefType:
+    case kIROp_ConstRefType:
         {
             auto ptrType = cast<IRPtrTypeBase>(type);
             PtrDeclaratorInfo refDeclarator(declarator);

@@ -451,6 +451,9 @@ public:
         // Construct the type `Ref<valueType>`
     RefType* getRefType(Type* valueType);
 
+        // Construct the type `ConstRef<valueType>`
+    ConstRefType* getConstRefType(Type* valueType);
+
         // Construct the type `Optional<valueType>`
     OptionalType* getOptionalType(Type* valueType);
 

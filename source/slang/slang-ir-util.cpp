@@ -418,6 +418,7 @@ bool isPtrLikeOrHandleType(IRInst* type)
     case kIROp_InOutType:
     case kIROp_PtrType:
     case kIROp_RefType:
+    case kIROp_ConstRefType:
         return true;
     }
     return false;
@@ -967,6 +968,17 @@ bool isOne(IRInst* inst)
         return isOne(inst->getOperand(0));
     default:
         return false;
+    }
+}
+
+IRPtrTypeBase* isMutablePointerType(IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_ConstRefType:
+        return nullptr;
+    default:
+        return as<IRPtrTypeBase>(inst);
     }
 }
 

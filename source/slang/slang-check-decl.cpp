@@ -1843,6 +1843,14 @@ namespace Slang
             return false;
         }
 
+        if (satisfyingMemberDeclRef.getDecl()->hasModifier<ConstRefAttribute>()
+            && !requiredMemberDeclRef.getDecl()->hasModifier<ConstRefAttribute>())
+        {
+            // A `[constref]` method can't satisfy a non-`[constref]` requirement,
+            // but vice-versa is okay.
+            return false;
+        }
+
         if(satisfyingMemberDeclRef.getDecl()->hasModifier<HLSLStaticModifier>()
             != requiredMemberDeclRef.getDecl()->hasModifier<HLSLStaticModifier>())
         {
@@ -2710,7 +2718,14 @@ namespace Slang
                 auto synMutatingAttr = m_astBuilder->create<MutatingAttribute>();
                 addModifier(synFuncDecl, synMutatingAttr);
             }
-
+            if (requiredMemberDeclRef.getDecl()->hasModifier<ConstRefAttribute>())
+            {
+                // If the interface requirement is `[constref]` then our
+                // synthesized method should be too.
+                //
+                auto synConstRefAttr = m_astBuilder->create<ConstRefAttribute>();
+                addModifier(synFuncDecl, synConstRefAttr);
+            }
             if (requiredMemberDeclRef.getDecl()->hasModifier<NoDiffThisAttribute>())
             {
                 auto noDiffThisAttr = m_astBuilder->create<NoDiffThisAttribute>();
@@ -5161,6 +5176,11 @@ namespace Slang
             //
             if(fstParam.getDecl()->hasModifier<RefModifier>() != sndParam.getDecl()->hasModifier<RefModifier>())
                 return false;
+
+            // If one parameter is `constref` and the other isn't, then they don't match.
+            //
+            if (fstParam.getDecl()->hasModifier<ConstRefModifier>() != sndParam.getDecl()->hasModifier<ConstRefModifier>())
+                return false;
         }
 
         // Note(tfoley): return type doesn't enter into it, because we can't take
@@ -5625,20 +5645,31 @@ namespace Slang
                 // Remove all existing direction modifiers, and replace them with a single Ref modifier.
                 List<Modifier*> newModifiers;
                 bool hasRefModifier = false;
+                bool isMutable = false;
                 for (auto modifier : paramDecl->modifiers)
                 {
-                    if (as<InModifier>(modifier) || as<InOutModifier>(modifier) || as<OutModifier>(modifier))
+                    if (as<InModifier>(modifier))
                     {
                         continue;
                     }
-                    if (as<RefModifier>(modifier))
+                    else if (as<InOutModifier>(modifier) || as<OutModifier>(modifier))
+                    {
+                        isMutable = true;
+                        continue;
+                    }
+                    if (as<RefModifier>(modifier) || as<ConstRefModifier>(modifier))
                     {
                         hasRefModifier = true;
                     }
                     newModifiers.add(modifier);
                 }
                 if (!hasRefModifier)
-                    newModifiers.add(this->getASTBuilder()->create<RefModifier>());
+                {
+                    if (isMutable)
+                        newModifiers.add(this->getASTBuilder()->create<RefModifier>());
+                    else
+                        newModifiers.add(this->getASTBuilder()->create<ConstRefModifier>());
+                }
                 paramDecl->modifiers.first = newModifiers.getFirst();
                 for (Index i = 0; i < newModifiers.getCount(); i++)
                 {
@@ -5774,6 +5805,9 @@ namespace Slang
             case ParameterDirection::kParameterDirection_Ref:
                 addModifier(param, m_astBuilder->create<RefModifier>());
                 break;
+            case ParameterDirection::kParameterDirection_ConstRef:
+                addModifier(param, m_astBuilder->create<ConstRefModifier>());
+                break;
             default:
                 break;
             }
@@ -5879,13 +5913,33 @@ namespace Slang
             // specialization.
             for (auto paramDecl : decl->getParameters())
             {
-                if (paramDecl->type.type && !isTypeDifferentiable(paramDecl->type.type))
+                if (!paramDecl->type.type)
+                    continue;
+                if (!isTypeDifferentiable(paramDecl->type.type))
                 {
                     if (!paramDecl->hasModifier<NoDiffModifier>())
                     {
                         auto noDiffModifier = m_astBuilder->create<NoDiffModifier>();
                         noDiffModifier->keywordName = getSession()->getNameObj("no_diff");
                         addModifier(paramDecl, noDiffModifier);
+                    }
+                }
+                if (!paramDecl->hasModifier<NoDiffModifier>())
+                {
+                    if (auto modifier = paramDecl->findModifier<ConstRefModifier>())
+                    {
+                        getSink()->diagnose(modifier, Diagnostics::cannotUseConstRefOnDifferentiableParameter);
+                    }
+                }
+            }
+            if (!isEffectivelyStatic(decl))
+            {
+                auto constrefAttr = decl->findModifier<ConstRefAttribute>();
+                if (constrefAttr)
+                {
+                    if (isTypeDifferentiable(calcThisType(getParentDecl(decl))))
+                    {
+                        getSink()->diagnose(constrefAttr, Diagnostics::cannotUseConstRefOnDifferentiableMemberMethod);
                     }
                 }
             }

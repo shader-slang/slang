@@ -108,6 +108,7 @@ INST(Nop, nop, 0, 0)
     /* PtrTypeBase */
         INST(PtrType, Ptr, 1, HOISTABLE)
         INST(RefType, Ref, 1, HOISTABLE)
+        INST(ConstRefType, ConstRef, 1, HOISTABLE)
         // A `PsuedoPtr<T>` logically represents a pointer to a value of type
         // `T` on a platform that cannot support pointers. The expectation
         // is that the "pointer" will be legalized away by storing a value

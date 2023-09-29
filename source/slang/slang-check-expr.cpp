@@ -214,11 +214,11 @@ namespace Slang
     {
         auto exprType = expr->type.type;
 
-        if (auto refType = as<RefType>(exprType))
+        if (auto refType = as<RefTypeBase>(exprType))
         {
             auto openRef = m_astBuilder->create<OpenRefExpr>();
             openRef->innerExpr = expr;
-            openRef->type.isLeftValue = true;
+            openRef->type.isLeftValue = (as<RefType>(exprType) != nullptr);
             openRef->type.type = refType->getValueType();
             return openRef;
         }

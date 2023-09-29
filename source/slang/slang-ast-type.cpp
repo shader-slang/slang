@@ -372,6 +372,10 @@ ParameterDirection FuncType::getParamDirection(Index index)
     {
         return kParameterDirection_Ref;
     }
+    else if (as<ConstRefType>(paramType))
+    {
+        return kParameterDirection_ConstRef;
+    }
     else if (as<InOutType>(paramType))
     {
         return kParameterDirection_InOut;

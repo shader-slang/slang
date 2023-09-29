@@ -311,6 +311,11 @@ RefType* ASTBuilder::getRefType(Type* valueType)
     return dynamicCast<RefType>(getPtrType(valueType, "RefType"));
 }
 
+ConstRefType* ASTBuilder::getConstRefType(Type* valueType)
+{
+    return dynamicCast<ConstRefType>(getPtrType(valueType, "ConstRefType"));
+}
+
 OptionalType* ASTBuilder::getOptionalType(Type* valueType)
 {
     auto rsType = getSpecializedBuiltinType(valueType, "OptionalType");
