@@ -1709,6 +1709,7 @@ void CPPSourceEmitter::emitPreModuleImpl()
         m_writer->emit("using namespace SLANG_PRELUDE_NAMESPACE;\n");
         m_writer->emit("#endif\n\n");
     }
+    Super::emitPreModuleImpl();
 }
 
 

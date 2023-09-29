@@ -1558,11 +1558,8 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
                     defBlockIndices.clear();
                 }
             }
-            if (const auto ptrInst = as<IRPtrTypeBase>(instToStore->getDataType()))
+            if (IRVar* varToStore = as<IRVar>(instToStore))
             {
-                IRVar* varToStore = as<IRVar>(instToStore);
-                SLANG_RELEASE_ASSERT(varToStore);
-
                 auto storeUse = findLatestUniqueWriteUse(varToStore);
 
                 bool isIndexedStore = (storeUse && defBlockIndices.getCount() > 0);

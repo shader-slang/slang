@@ -465,7 +465,7 @@ public:
         /// Emit any declarations, and other material that is needed before the modules contents
         /// For example on targets that don't have built in vector/matrix support, this is where
         /// the appropriate generated declarations occur.
-    virtual void emitPreModuleImpl() {}
+    virtual void emitPreModuleImpl();
 
     virtual void emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, IRIntegerValue addressSpace) { SLANG_UNUSED(rate); SLANG_UNUSED(addressSpace); }
     virtual void emitSemanticsImpl(IRInst* inst, bool allowOffsetLayout) { SLANG_UNUSED(inst); SLANG_UNUSED(allowOffsetLayout); }
@@ -570,6 +570,8 @@ public:
     // Map an IR instruction to the name that we've decided
     // to use for it when emitting code.
     Dictionary<IRInst*, String> m_mapInstToName;
+
+    OrderedHashSet<IRStringLit*> m_requiredPreludes;
 };
 
 }

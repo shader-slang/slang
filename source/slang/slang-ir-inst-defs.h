@@ -550,6 +550,8 @@ INST(TargetSwitch, targetSwitch, 1, 0)
 // A generic asm inst has an return semantics that terminates the control flow.
 INST(GenericAsm, GenericAsm, 1, 0)
 
+INST(RequirePrelude, RequirePrelude, 1, 0)
+
 INST(discard, discard, 0, 0)
 
 /* IRUnreachable */

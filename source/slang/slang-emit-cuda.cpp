@@ -819,16 +819,6 @@ void CUDASourceEmitter::emitMatrixLayoutModifiersImpl(IRVarLayout* layout)
     Super::emitMatrixLayoutModifiersImpl(layout);
 }
 
-void CUDASourceEmitter::emitPreModuleImpl()
-{
-    SourceWriter* writer = getSourceWriter();
-
-    // Emit generated types/functions
-
-    writer->emit("\n");
-}
-
-
 bool CUDASourceEmitter::tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType)
 {
     // A global shader parameter in the IR for CUDA output will
