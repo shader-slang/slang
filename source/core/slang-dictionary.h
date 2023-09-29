@@ -75,6 +75,32 @@ namespace Slang
         return KeyValuePair<TKey, TValue>(k, v);
     }
 
+    namespace KeyValueDetail {
+
+    template <typename KEY, typename VALUE>
+    SLANG_FORCE_INLINE const KEY* getKey(const std::pair<KEY, VALUE>* in)
+    {
+        return &in->first;
+    }
+    template <typename KEY, typename VALUE>
+    SLANG_FORCE_INLINE const KEY* getKey(const KeyValuePair<KEY, VALUE>* in)
+    {
+        return &in->key;
+    }
+
+    template <typename KEY, typename VALUE>
+    SLANG_FORCE_INLINE const VALUE* getValue(const std::pair<KEY, VALUE>* in)
+    {
+        return &in->second;
+    }
+    template <typename KEY, typename VALUE>
+    SLANG_FORCE_INLINE const VALUE* getValue(const KeyValuePair<KEY, VALUE>* in)
+    {
+        return &in->value;
+    }
+
+    } // namespace KeyValueDetail
+
     const float kMaxLoadFactor = 0.7f;
 
     template<typename TKey, typename TValue, typename Hash = Slang::Hash<TKey>, typename KeyEqual = std::equal_to<TKey>>
@@ -321,14 +347,13 @@ namespace Slang
             Iterator() = default;
             const T& operator*() const
             {
-                const auto& [k, v] = *iter;
-                return k;
+                return *KeyValueDetail::getKey(std::addressof(*iter));
             }
             const T* operator->() const
             {
-                const auto& [k, v] = *iter;
-                return &k;
+                return KeyValueDetail::getKey(std::addressof(*iter));
             }
+
             Iterator& operator++()
             {
                 ++iter;
