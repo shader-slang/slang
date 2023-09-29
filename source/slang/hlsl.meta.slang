@@ -8595,6 +8595,13 @@ Ref<T> __hitObjectAttributes<T>()
     static T t;
     return t;
 }
+[ForceInline]
+Ptr<T> __allocHitObjectAttributes<T>()
+{
+    [__vulkanHitObjectAttributes]   
+    static T t;
+    return &t;
+}
 
 // Next is the custom intrinsic that will compute the hitObjectAttributes location
 // for GLSL-based targets.
@@ -8618,7 +8625,7 @@ struct HitObject
 
         /// Executes ray traversal (including anyhit and intersection shaders) like TraceRay, but returns the
         /// resulting hit information as a HitObject and does not trigger closesthit or miss shaders.
-    __specialized_for_target(hlsl)
+    [ForceInline]
     static HitObject TraceRay<payload_t>(
         RaytracingAccelerationStructure AccelerationStructure,
         uint RayFlags,
@@ -8629,60 +8636,85 @@ struct HitObject
         RayDesc Ray,
         inout payload_t Payload)
     {
-        HitObject hitObj;
-        __hlslTraceRay(
-            AccelerationStructure, 
-            RayFlags, 
-            InstanceInclusionMask, 
-            RayContributionToHitGroupIndex, 
-            MultiplierForGeometryContributionToHitGroupIndex, 
-            MissShaderIndex, 
-            Ray, 
-            Payload,
-            hitObj);
-        return hitObj;
-    }
+        __target_switch
+        {
+        case hlsl:
+            {
+                HitObject hitObj;
+                __hlslTraceRay(
+                    AccelerationStructure, 
+                    RayFlags, 
+                    InstanceInclusionMask, 
+                    RayContributionToHitGroupIndex, 
+                    MultiplierForGeometryContributionToHitGroupIndex, 
+                    MissShaderIndex, 
+                    Ray, 
+                    Payload,
+                    hitObj);
+                return hitObj;
+            }
+        case glsl:
+            {
+                [__vulkanRayPayload]
+                static payload_t p;
 
-    [ForceInline]
-    __specialized_for_target(glsl)
-    static HitObject TraceRay<payload_t>( 
-        RaytracingAccelerationStructure AccelerationStructure, 
-        uint RayFlags, 
-        uint InstanceInclusionMask, 
-        uint RayContributionToHitGroupIndex, 
-        uint MultiplierForGeometryContributionToHitGroupIndex, 
-        uint MissShaderIndex, 
-        RayDesc Ray, 
-        inout payload_t Payload)
-    {
-        [__vulkanRayPayload]
-        static payload_t p;
+                // Save the payload
+                p = Payload;
 
-        // Save the payload
-        p = Payload;
-
-        __glslTraceRay(
-            __return_val,
-            AccelerationStructure,
-            RayFlags,                                           // Assumes D3D/VK have some RayFlags values
-            InstanceInclusionMask,                              // cullMask
-            RayContributionToHitGroupIndex,                     // sbtRecordOffset
-            MultiplierForGeometryContributionToHitGroupIndex,   // sbtRecordStride
-            MissShaderIndex,
-            Ray.Origin,
-            Ray.TMin,
-            Ray.Direction, 
-            Ray.TMax,
-            __rayPayloadLocation(p));
+                __glslTraceRay(
+                    __return_val,
+                    AccelerationStructure,
+                    RayFlags,                                           // Assumes D3D/VK have some RayFlags values
+                    InstanceInclusionMask,                              // cullMask
+                    RayContributionToHitGroupIndex,                     // sbtRecordOffset
+                    MultiplierForGeometryContributionToHitGroupIndex,   // sbtRecordStride
+                    MissShaderIndex,
+                    Ray.Origin,
+                    Ray.TMin,
+                    Ray.Direction, 
+                    Ray.TMax,
+                    __rayPayloadLocation(p));
         
-        // Write the payload out
-        Payload = p;
+                // Write the payload out
+                Payload = p;
+            }
+        case spirv:
+            {
+                [__vulkanRayPayload]
+                static payload_t p;
+
+                // Save the payload
+                p = Payload;
+
+                let origin = Ray.Origin;
+                let direction = Ray.Direction;
+                let tmin = Ray.TMin;
+                let tmax = Ray.TMax;
+                spirv_asm {
+                    OpHitObjectTraceRayNV
+                        /**/ &__return_val
+                        /**/ $AccelerationStructure
+                        /**/ $RayFlags
+                        /**/ $InstanceInclusionMask
+                        /**/ $RayContributionToHitGroupIndex
+                        /**/ $MultiplierForGeometryContributionToHitGroupIndex
+                        /**/ $MissShaderIndex
+                        /**/ $origin
+                        /**/ $tmin
+                        /**/ $direction
+                        /**/ $tmax
+                        /**/ &p;
+                };
+
+                // Write the payload out
+                Payload = p;
+            }
+        }
     }
 
         /// Executes motion ray traversal (including anyhit and intersection shaders) like TraceRay, but returns the
         /// resulting hit information as a HitObject and does not trigger closesthit or miss shaders.
     [ForceInline]
-    __specialized_for_target(glsl)
     static HitObject TraceMotionRay<payload_t>( 
         RaytracingAccelerationStructure AccelerationStructure, 
         uint RayFlags, 
@@ -8694,29 +8726,72 @@ struct HitObject
         float CurrentTime,
         inout payload_t Payload)
     {
-        [__vulkanRayPayload]
-        static payload_t p;
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm "TraceMotionRay";
+        case glsl:
+            {
+                [__vulkanRayPayload]
+                static payload_t p;
 
-        // Save the payload
-        p = Payload;
+                // Save the payload
+                p = Payload;
 
-        __glslTraceMotionRay(
-            __return_val,
-            AccelerationStructure,
-            RayFlags,                                           // Assumes D3D/VK have some RayFlags values
-            InstanceInclusionMask,                              // cullMask
-            RayContributionToHitGroupIndex,                     // sbtRecordOffset
-            MultiplierForGeometryContributionToHitGroupIndex,   // sbtRecordStride
-            MissShaderIndex,
-            Ray.Origin,
-            Ray.TMin,
-            Ray.Direction, 
-            Ray.TMax,
-            CurrentTime,
-            __rayPayloadLocation(p));
+                __glslTraceMotionRay(
+                    __return_val,
+                    AccelerationStructure,
+                    RayFlags,                                           // Assumes D3D/VK have some RayFlags values
+                    InstanceInclusionMask,                              // cullMask
+                    RayContributionToHitGroupIndex,                     // sbtRecordOffset
+                    MultiplierForGeometryContributionToHitGroupIndex,   // sbtRecordStride
+                    MissShaderIndex,
+                    Ray.Origin,
+                    Ray.TMin,
+                    Ray.Direction, 
+                    Ray.TMax,
+                    CurrentTime,
+                    __rayPayloadLocation(p));
         
-        // Write the payload out
-        Payload = p;
+                // Write the payload out
+                Payload = p;
+            }
+        case spirv:
+            {
+                [__vulkanRayPayload]
+                static payload_t p;
+
+                // Save the payload
+                p = Payload;
+
+                let origin = Ray.Origin;
+                let direction = Ray.Direction;
+                let tmin = Ray.TMin;
+                let tmax = Ray.TMax;
+                spirv_asm {
+                    OpCapability RayTracingMotionBlurNV;
+                    OpExtension "SPV_NV_ray_tracing_motion_blur";
+                    OpHitObjectTraceRayMotionNV
+                        /**/ &__return_val
+                        /**/ $AccelerationStructure
+                        /**/ $RayFlags
+                        /**/ $InstanceInclusionMask
+                        /**/ $RayContributionToHitGroupIndex
+                        /**/ $MultiplierForGeometryContributionToHitGroupIndex
+                        /**/ $MissShaderIndex
+                        /**/ $origin
+                        /**/ $tmin
+                        /**/ $direction
+                        /**/ $tmax
+                        /**/ $CurrentTime
+                        /**/ &p;
+                };
+        
+                // Write the payload out
+                Payload = p;
+            }
+        }
+        
     }
 
         /// Creates a HitObject representing a hit based on values explicitly passed as arguments, without
@@ -8725,7 +8800,7 @@ struct HitObject
         /// TraceRay. The computed index must reference a valid hit group record in the shader table. The
         /// Attributes parameter must either be an attribute struct, such as
         /// BuiltInTriangleIntersectionAttributes, or another HitObject to copy the attributes from.
-    __specialized_for_target(hlsl)
+    [ForceInline]
     static HitObject MakeHit<attr_t>(
         RaytracingAccelerationStructure AccelerationStructure,
         uint InstanceIndex,
@@ -8737,59 +8812,78 @@ struct HitObject
         RayDesc Ray,
         attr_t attributes)
     {
-        HitObject hitObj;
-        __hlslMakeHit(
-            AccelerationStructure, 
-            InstanceIndex,
-            GeometryIndex,
-            PrimitiveIndex,
-            HitKind,
-            RayContributionToHitGroupIndex,
-            MultiplierForGeometryContributionToHitGroupIndex,
-            Ray,
-            attributes,
-            hitObj);
-        return hitObj;
-    }
+        __target_switch
+        {
+        case hlsl:
+            HitObject hitObj;
+            __hlslMakeHit(
+                AccelerationStructure, 
+                InstanceIndex,
+                GeometryIndex,
+                PrimitiveIndex,
+                HitKind,
+                RayContributionToHitGroupIndex,
+                MultiplierForGeometryContributionToHitGroupIndex,
+                Ray,
+                attributes,
+                hitObj);
+            return hitObj;
+        case glsl:
+            {
+                // Save the attributes
+                __ref attr_t attr = __hitObjectAttributes<attr_t>();
 
-    [ForceInline]
-    __specialized_for_target(glsl)
-    static HitObject MakeHit<attr_t>( 
-        RaytracingAccelerationStructure AccelerationStructure, 
-        uint InstanceIndex, 
-        uint GeometryIndex, 
-        uint PrimitiveIndex, 
-        uint HitKind, 
-        uint RayContributionToHitGroupIndex, 
-        uint MultiplierForGeometryContributionToHitGroupIndex, 
-        RayDesc Ray, 
-        attr_t attributes)
-    {
-        // Save the attributes
-        __ref attr_t attr = __hitObjectAttributes<attr_t>();
+                attr = attributes;
 
-        attr = attributes;
+                __glslMakeHit(
+                    __return_val,
+                    AccelerationStructure,
+                    InstanceIndex,
+                    PrimitiveIndex,
+                    GeometryIndex,
+                    HitKind,
+                    RayContributionToHitGroupIndex,                         /// sbtRecordOffset?
+                    MultiplierForGeometryContributionToHitGroupIndex,       /// sbtRecordStride?
+                    Ray.Origin,
+                    Ray.TMin,
+                    Ray.Direction, 
+                    Ray.TMax,
+                    __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>()));
+            }
+        case spirv:
+            {
+                // Save the attributes
+                Ptr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
 
-        __glslMakeHit(
-            __return_val,
-            AccelerationStructure,
-            InstanceIndex,
-            PrimitiveIndex,
-            GeometryIndex,
-            HitKind,
-            RayContributionToHitGroupIndex,                         /// sbtRecordOffset?
-            MultiplierForGeometryContributionToHitGroupIndex,       /// sbtRecordStride?
-            Ray.Origin,
-            Ray.TMin,
-            Ray.Direction, 
-            Ray.TMax,
-            __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>()));
+                *attr = attributes;
+
+                let origin = Ray.Origin;
+                let direction = Ray.Direction;
+                let tmin = Ray.TMin;
+                let tmax = Ray.TMax;
+                spirv_asm {
+                    OpHitObjectRecordHitNV
+                        /**/ &__return_val
+                        /**/ $AccelerationStructure
+                        /**/ $InstanceIndex
+                        /**/ $PrimitiveIndex
+                        /**/ $GeometryIndex
+                        /**/ $HitKind
+                        /**/ $RayContributionToHitGroupIndex
+                        /**/ $MultiplierForGeometryContributionToHitGroupIndex
+                        /**/ $origin
+                        /**/ $tmin
+                        /**/ $direction
+                        /**/ $tmax
+                        /**/ $attr;
+                };
+            }
+        }
     }
 
         /// See MakeHit but handles Motion 
         /// Currently only supported on VK
     [ForceInline]
-    __specialized_for_target(glsl)
     static HitObject MakeMotionHit<attr_t>( 
         RaytracingAccelerationStructure AccelerationStructure, 
         uint InstanceIndex, 
@@ -8802,26 +8896,64 @@ struct HitObject
         float CurrentTime,
         attr_t attributes)
     {
-        // Save the attributes
-        __ref attr_t attr = __hitObjectAttributes<attr_t>();
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "MakeMotionHit";
+        case glsl:
+        {
+            // Save the attributes
+            __ref attr_t attr = __hitObjectAttributes<attr_t>();
 
-        attr = attributes;
+            attr = attributes;
 
-        __glslMakeMotionHit(
-            __return_val,
-            AccelerationStructure,
-            InstanceIndex,
-            PrimitiveIndex,
-            GeometryIndex,
-            HitKind,
-            RayContributionToHitGroupIndex,                         /// sbtRecordOffset?
-            MultiplierForGeometryContributionToHitGroupIndex,       /// sbtRecordStride?
-            Ray.Origin,
-            Ray.TMin,
-            Ray.Direction, 
-            Ray.TMax,
-            CurrentTime,
-            __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>()));
+            __glslMakeMotionHit(
+                __return_val,
+                AccelerationStructure,
+                InstanceIndex,
+                PrimitiveIndex,
+                GeometryIndex,
+                HitKind,
+                RayContributionToHitGroupIndex,                         /// sbtRecordOffset?
+                MultiplierForGeometryContributionToHitGroupIndex,       /// sbtRecordStride?
+                Ray.Origin,
+                Ray.TMin,
+                Ray.Direction, 
+                Ray.TMax,
+                CurrentTime,
+                __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>()));
+        }
+        case spirv:
+        {
+            // Save the attributes
+            Ptr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
+
+            *attr = attributes;
+
+            let origin = Ray.Origin;
+            let direction = Ray.Direction;
+            let tmin = Ray.TMin;
+            let tmax = Ray.TMax;
+            spirv_asm {
+                OpCapability RayTracingMotionBlurNV;
+                OpExtension "SPV_NV_ray_tracing_motion_blur";
+                OpHitObjectRecordHitMotionNV
+                    /**/ &__return_val
+                    /**/ $AccelerationStructure
+                    /**/ $InstanceIndex
+                    /**/ $PrimitiveIndex
+                    /**/ $GeometryIndex
+                    /**/ $HitKind
+                    /**/ $RayContributionToHitGroupIndex
+                    /**/ $MultiplierForGeometryContributionToHitGroupIndex
+                    /**/ $origin
+                    /**/ $tmin
+                    /**/ $direction
+                    /**/ $tmax
+                    /**/ $CurrentTime
+                    /**/ $attr;
+            };
+        }
+        }
     }
 
         /// Creates a HitObject representing a hit based on values explicitly passed as arguments, without
@@ -8831,7 +8963,7 @@ struct HitObject
         /// reference a valid hit group record in the shader table. The Attributes parameter must either be an
         /// attribute struct, such as BuiltInTriangleIntersectionAttributes, or another HitObject to copy the
         /// attributes from.
-    __specialized_for_target(hlsl)
+    [ForceInline]
     static HitObject MakeHit<attr_t>(
         uint HitGroupRecordIndex,
         RaytracingAccelerationStructure AccelerationStructure,
@@ -8842,55 +8974,72 @@ struct HitObject
         RayDesc Ray,
         attr_t attributes)
     {
-        HitObject hitObj;
-        __hlslMakeHitWithRecordIndex(
-            HitGroupRecordIndex, 
-            AccelerationStructure, 
-            InstanceIndex,
-            GeometryIndex,
-            PrimitiveIndex,
-            HitKind,
-            Ray,
-            attributes,
-            hitObj);
-        return hitObj;
+        __target_switch
+        {
+        case hlsl:
+            HitObject hitObj;
+            __hlslMakeHitWithRecordIndex(
+                HitGroupRecordIndex, 
+                AccelerationStructure, 
+                InstanceIndex,
+                GeometryIndex,
+                PrimitiveIndex,
+                HitKind,
+                Ray,
+                attributes,
+                hitObj);
+            return hitObj;
+        case glsl:
+        {
+            // Save the attributes
+            __ref attr_t attr = __hitObjectAttributes<attr_t>();
+            attr = attributes;
+
+            __glslMakeHitWithIndex(
+                __return_val,
+                AccelerationStructure, 
+                InstanceIndex,              ///? Same as instanceid ?
+                GeometryIndex, 
+                PrimitiveIndex,
+                HitKind,                    /// Assuming HitKinds are compatible
+                HitGroupRecordIndex,        /// sbtRecordIndex
+                Ray.Origin,
+                Ray.TMin,
+                Ray.Direction, 
+                Ray.TMax,
+                __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>()));
+        }
+        case spirv:
+        {
+            // Save the attributes
+            Ptr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
+            *attr = attributes;
+            let origin = Ray.Origin;
+            let direction = Ray.Direction;
+            let tmin = Ray.TMin;
+            let tmax = Ray.TMax;
+            spirv_asm {
+                OpHitObjectRecordHitWithIndexNV
+                    /**/ &__return_val
+                    /**/ $AccelerationStructure
+                    /**/ $InstanceIndex
+                    /**/ $PrimitiveIndex
+                    /**/ $GeometryIndex
+                    /**/ $HitKind
+                    /**/ $HitGroupRecordIndex
+                    /**/ $origin
+                    /**/ $tmin
+                    /**/ $direction
+                    /**/ $tmax
+                    /**/ $attr;
+            };
+        }
+        }
     }
-
-    [ForceInline]
-    __specialized_for_target(glsl)
-    static HitObject MakeHit<attr_t>( 
-        uint HitGroupRecordIndex, 
-        RaytracingAccelerationStructure AccelerationStructure, 
-        uint InstanceIndex, 
-        uint GeometryIndex, 
-        uint PrimitiveIndex, 
-        uint HitKind, 
-        RayDesc Ray, 
-        attr_t attributes)
-    {
-        // Save the attributes
-        __ref attr_t attr = __hitObjectAttributes<attr_t>();
-        attr = attributes;
-
-        __glslMakeHitWithIndex(
-            __return_val,
-            AccelerationStructure, 
-            InstanceIndex,              ///? Same as instanceid ?
-            GeometryIndex, 
-            PrimitiveIndex,
-            HitKind,                    /// Assuming HitKinds are compatible
-            HitGroupRecordIndex,        /// sbtRecordIndex
-            Ray.Origin,
-            Ray.TMin,
-            Ray.Direction, 
-            Ray.TMax,
-            __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>()));
-    }
-
         /// See MakeHit but handles Motion 
         /// Currently only supported on VK
+
     [ForceInline]
-    __specialized_for_target(glsl)
     static HitObject MakeMotionHit<attr_t>( 
         uint HitGroupRecordIndex, 
         RaytracingAccelerationStructure AccelerationStructure, 
@@ -8902,44 +9051,91 @@ struct HitObject
         float CurrentTime,
         attr_t attributes)
     {
-        HitObject hitObj;
+        __target_switch
+        {
+        case glsl:
+        {
+            // Save the attributes
+            __ref attr_t attr = __hitObjectAttributes<attr_t>();
+            attr = attributes;
 
-        // Save the attributes
-        __ref attr_t attr = __hitObjectAttributes<attr_t>();
-        attr = attributes;
-
-        __glslMakeMotionHitWithIndex(
-            __return_val,
-            AccelerationStructure, 
-            InstanceIndex,              ///? Same as instanceid ?
-            GeometryIndex, 
-            PrimitiveIndex,
-            HitKind,                    /// Assuming HitKinds are compatible
-            HitGroupRecordIndex,        /// sbtRecordIndex
-            Ray.Origin,
-            Ray.TMin,
-            Ray.Direction, 
-            Ray.TMax,
-            CurrentTime,
-            __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>()));
+            __glslMakeMotionHitWithIndex(
+                __return_val,
+                AccelerationStructure, 
+                InstanceIndex,              ///? Same as instanceid ?
+                GeometryIndex, 
+                PrimitiveIndex,
+                HitKind,                    /// Assuming HitKinds are compatible
+                HitGroupRecordIndex,        /// sbtRecordIndex
+                Ray.Origin,
+                Ray.TMin,
+                Ray.Direction, 
+                Ray.TMax,
+                CurrentTime,
+                __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>()));
+        }
+        case spirv:
+        {
+            // Save the attributes
+            Ptr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
+            *attr = attributes;
+            let origin = Ray.Origin;
+            let direction = Ray.Direction;
+            let tmin = Ray.TMin;
+            let tmax = Ray.TMax;
+            spirv_asm {
+                OpCapability RayTracingMotionBlurNV;
+                OpExtension "SPV_NV_ray_tracing_motion_blur";
+                OpHitObjectRecordHitWithIndexMotionNV
+                    /**/ &__return_val
+                    /**/ $AccelerationStructure
+                    /**/ $InstanceIndex
+                    /**/ $PrimitiveIndex
+                    /**/ $GeometryIndex
+                    /**/ $HitKind
+                    /**/ $HitGroupRecordIndex
+                    /**/ $origin
+                    /**/ $tmin
+                    /**/ $direction
+                    /**/ $tmax
+                    /**/ $CurrentTime
+                    /**/ $attr;
+            };
+        }
+        }
     }
 
         /// Creates a HitObject representing a miss based on values explicitly passed as arguments, without
         /// tracing a ray. The provided shader table index must reference a valid miss record in the shader
         /// table.
     [__requiresNVAPI]
-    __target_intrinsic(hlsl, "($2=NvMakeMiss($0,$1))")
-    static HitObject MakeMiss( 
-        uint MissShaderIndex, 
-        RayDesc Ray);
-
     [ForceInline]
-    __specialized_for_target(glsl)
     static HitObject MakeMiss( 
         uint MissShaderIndex, 
         RayDesc Ray)
     {
-        __glslMakeMiss(__return_val, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax);
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "($2=NvMakeMiss($0,$1))";
+        case glsl:
+            __glslMakeMiss(__return_val, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax);
+        case spirv:
+            {
+                let origin = Ray.Origin;
+                let direction = Ray.Direction;
+                let tmin = Ray.TMin;
+                let tmax = Ray.TMax;
+                spirv_asm {
+                    OpHitObjectRecordMissNV
+                        /**/ &__return_val
+                        /**/ $MissShaderIndex
+                        /**/ $origin
+                        /**/ $tmin
+                        /**/ $direction
+                        /**/ $tmax;
+                };
+            }
+        }
     }
 
         /// See MakeMiss but handles Motion 
@@ -8951,7 +9147,31 @@ struct HitObject
         RayDesc Ray,
         float CurrentTime)
     {
-        __glslMakeMotionMiss(__return_val, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax, CurrentTime);
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "($3=NvMakeMotionMiss($0,$1,$2))";
+        case glsl:
+            __glslMakeMotionMiss(__return_val, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax, CurrentTime);
+        case spirv:
+            {
+                let origin = Ray.Origin;
+                let direction = Ray.Direction;
+                let tmin = Ray.TMin;
+                let tmax = Ray.TMax;
+                spirv_asm {
+                    OpCapability RayTracingMotionBlurNV;
+                    OpExtension "SPV_NV_ray_tracing_motion_blur";
+                    OpHitObjectRecordMissMotionNV
+                        /**/ &__return_val
+                        /**/ $MissShaderIndex
+                        /**/ $origin
+                        /**/ $tmin
+                        /**/ $direction
+                        /**/ $tmax
+                        /**/ $CurrentTime;
+                };
+            }
+        }
     }
 
         /// Creates a HitObject representing “NOP” (no operation) which is neither a hit nor a miss. Invoking a
@@ -8960,138 +9180,270 @@ struct HitObject
         /// scenarios where future control flow for some threads is known to process neither a hit nor a
         /// miss.
     [__requiresNVAPI]
-    __target_intrinsic(hlsl, "($0 = NvMakeNop())")
-    static HitObject MakeNop();
-
     [ForceInline]
-    __specialized_for_target(glsl)
     static HitObject MakeNop()
     {
-        __glslMakeNop(__return_val);
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm "($0 = NvMakeNop())";
+        case glsl:
+            __glslMakeNop(__return_val);
+        case spirv:
+            spirv_asm {
+                OpHitObjectRecordEmptyNV
+                    /**/ &__return_val;
+            };
+        }
     }
 
         /// Invokes closesthit or miss shading for the specified hit object. In case of a NOP HitObject, no
         /// shader is invoked.
     [__requiresNVAPI]
-    __target_intrinsic(hlsl, "NvInvokeHitObject")
+    [ForceInline]
     static void Invoke<payload_t>(
         RaytracingAccelerationStructure AccelerationStructure,
         HitObject HitOrMiss,
-        inout payload_t Payload);
-
-    __specialized_for_target(glsl)
-    static void Invoke<payload_t>(
-        RaytracingAccelerationStructure AccelerationStructure,
-        HitObject HitOrMiss, 
         inout payload_t Payload)
     {
-        [__vulkanRayPayload]
-        static payload_t p;
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvInvokeHitObject";
+        case glsl:
+            {
+                [__vulkanRayPayload]
+                static payload_t p;
 
-        // Save the payload
-        p = Payload;
+                // Save the payload
+                p = Payload;
 
-        __glslInvoke(HitOrMiss, __rayPayloadLocation(p));
+                __glslInvoke(HitOrMiss, __rayPayloadLocation(p));
 
-        // Write payload result
-        Payload = p;
+                // Write payload result
+                Payload = p;
+            }
+        case spirv:
+            {
+                [__vulkanRayPayload]
+                static payload_t p;
+
+                // Save the payload
+                p = Payload;
+
+                spirv_asm {
+                    OpHitObjectExecuteShaderNV
+                        /**/ &HitOrMiss
+                        /**/ &p;
+                };
+
+                // Write payload result
+                Payload = p;
+            }
+        }
     }
 
         /// Returns true if the HitObject encodes a miss, otherwise returns false.
     [__requiresNVAPI]
-    __target_intrinsic(hlsl)
-    __target_intrinsic(glsl, "hitObjectIsMissNV($0)")
+    [ForceInline]
     __glsl_extension(GL_EXT_ray_tracing)
-    bool IsMiss();
+    bool IsMiss()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".IsMiss";
+        case glsl: __intrinsic_asm "hitObjectIsMissNV($0)";
+        case spirv: return spirv_asm {
+                result:$$bool = OpHitObjectIsMissNV &this;
+            };
+        }
+    }
 
         /// Returns true if the HitObject encodes a hit, otherwise returns false.
     [__requiresNVAPI]
-    __target_intrinsic(hlsl)
-    __target_intrinsic(glsl, "hitObjectIsHitNV($0)")
+    [ForceInline]
     __glsl_extension(GL_EXT_ray_tracing)
-    bool IsHit();
+    bool IsHit()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".IsHit";
+        case glsl: __intrinsic_asm "hitObjectIsHitNV($0)";
+        case spirv: return spirv_asm {
+                result:$$bool = OpHitObjectIsHitNV &this;
+            };
+        }
+    }
 
         /// Returns true if the HitObject encodes a nop, otherwise returns false.
     [__requiresNVAPI]
-    __target_intrinsic(hlsl)
-    __target_intrinsic(glsl, "hitObjectIsEmptyNV($0)")
+    [ForceInline]
     __glsl_extension(GL_EXT_ray_tracing)
-    bool IsNop();
+    bool IsNop()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".IsNop";
+        case glsl: __intrinsic_asm "hitObjectIsEmptyNV($0)";
+        case spirv: return spirv_asm {
+                result:$$bool = OpHitObjectIsEmptyNV &this;
+            };
+        }
+    }
 
         /// Queries ray properties from HitObject. Valid if the hit object represents a hit or a miss.
     [__requiresNVAPI]
+    [ForceInline]
     __target_intrinsic(hlsl)
-    RayDesc GetRayDesc();
-
-    __specialized_for_target(glsl)
     RayDesc GetRayDesc()
     {
-        RayDesc ray = { __glslGetRayWorldOrigin(), __glslGetTMin(), __glslGetRayDirection(), __glslGetTMax() };
-        return ray;
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm ".GetRayDesc";
+        case glsl:
+            {
+                RayDesc ray = { __glslGetRayWorldOrigin(), __glslGetTMin(), __glslGetRayWorldDirection(), __glslGetTMax() };
+                return ray;
+            }
+        case spirv:
+            return spirv_asm {
+                %origin:$$float3 = OpHitObjectGetWorldRayOriginNV &this;
+                %tmin:$$float = OpHitObjectGetRayTMinNV &this;
+                %direction:$$float3 = OpHitObjectGetWorldRayDirectionNV &this;
+                %tmax:$$float = OpHitObjectGetRayTMaxNV &this;
+                result:$$RayDesc = OpCompositeConstruct %origin %tmin %direction %tmax;
+            };
+        }
     }
 
         /// Queries shader table index from HitObject. Valid if the hit object represents a hit or a miss.
     [__requiresNVAPI]
-    __target_intrinsic(hlsl)
-    __target_intrinsic(glsl, "hitObjectGetShaderBindingTableRecordIndexNV($0)")
+    [ForceInline]
     __glsl_extension(GL_EXT_ray_tracing)
-    uint GetShaderTableIndex();
+    uint GetShaderTableIndex()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".GetShaderTableIndex";
+        case glsl: __intrinsic_asm "hitObjectGetShaderBindingTableRecordIndexNV($0)";
+        case spirv: return spirv_asm {
+                result:$$uint = OpHitObjectGetShaderBindingTableRecordIndexNV &this;
+            };
+        }
+    }
 
         /// Returns the instance index of a hit. Valid if the hit object represents a hit.
     [__requiresNVAPI]
-    __target_intrinsic(hlsl)
-    __target_intrinsic(glsl, "hitObjectGetInstanceCustomIndexNV($0)")
+    [ForceInline]
     __glsl_extension(GL_EXT_ray_tracing)
-    uint GetInstanceIndex();
+    uint GetInstanceIndex()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".GetInstanceIndex";
+        case glsl: __intrinsic_asm "hitObjectGetInstanceCustomIndexNV($0)";
+        case spirv: return spirv_asm {
+                result:$$uint = OpHitObjectGetInstanceCustomIndexNV &this;
+            };
+        }
+    }
 
         /// Returns the instance ID of a hit. Valid if the hit object represents a hit.
     [__requiresNVAPI]
-    __target_intrinsic(hlsl)
-    __target_intrinsic(glsl, "hitObjectGetInstanceIdNV($0)")
+    [ForceInline]
     __glsl_extension(GL_EXT_ray_tracing)
-    uint GetInstanceID();
+    uint GetInstanceID()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".GetInstanceID";
+        case glsl: __intrinsic_asm "hitObjectGetInstanceIdNV($0)";
+        case spirv: return spirv_asm {
+                result:$$uint = OpHitObjectGetInstanceIdNV &this;
+            };
+        }
+    }
 
         /// Returns the geometry index of a hit. Valid if the hit object represents a hit.
     [__requiresNVAPI]
-    __target_intrinsic(hlsl)
-    __target_intrinsic(glsl, "hitObjectGetGeometryIndexNV($0)")
+    [ForceInline]
     __glsl_extension(GL_EXT_ray_tracing)
-    uint GetGeometryIndex();
+    uint GetGeometryIndex()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".GetGeometryIndex";
+        case glsl: __intrinsic_asm "hitObjectGetGeometryIndexNV($0)";
+        case spirv: return spirv_asm {
+                result:$$uint = OpHitObjectGetGeometryIndexNV &this;
+            };
+        }
+    }
 
         /// Returns the primitive index of a hit. Valid if the hit object represents a hit.
     [__requiresNVAPI]
-    __target_intrinsic(hlsl)
-    __target_intrinsic(glsl, "hitObjectGetPrimitiveIndexNV($0)")
+    [ForceInline]
     __glsl_extension(GL_EXT_ray_tracing)
-    uint GetPrimitiveIndex();
+    uint GetPrimitiveIndex()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".GetPrimitiveIndex";
+        case glsl: __intrinsic_asm "hitObjectGetPrimitiveIndexNV($0)";
+        case spirv: return spirv_asm {
+                result:$$uint = OpHitObjectGetPrimitiveIndexNV &this;
+            };
+        }
+    }
 
         /// Returns the hit kind. Valid if the hit object represents a hit.
     [__requiresNVAPI]
-    __target_intrinsic(hlsl)
-    __target_intrinsic(glsl, "hitObjectGetHitKindNV($0)")
+    [ForceInline]
     __glsl_extension(GL_EXT_ray_tracing)
-    uint GetHitKind();
-
-        /// Returns the attributes of a hit. Valid if the hit object represents a hit or a miss.
-    __specialized_for_target(hlsl)
-    attr_t GetAttributes<attr_t>()
+    uint GetHitKind()
     {
-        attr_t v;
-        __hlslGetAttributesFromHitObject(v);
-        return v;
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".GetHitKind";
+        case glsl: __intrinsic_asm "hitObjectGetHitKindNV($0)";
+        case spirv: return spirv_asm {
+                result:$$uint = OpHitObjectGetHitKindNV &this;
+            };
+        }
     }
 
-    __specialized_for_target(glsl)
+        /// Returns the attributes of a hit. Valid if the hit object represents a hit or a miss.
+    [ForceInline]
     attr_t GetAttributes<attr_t>()
     {
-        // Work out the location
-        int attributeLocation = __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>());
+        __target_switch
+        {
+        case hlsl:
+            {
+                attr_t v;
+                __hlslGetAttributesFromHitObject(v);
+                return v;
+            }
+        case glsl:
+            {
+                // Work out the location
+                int attributeLocation = __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>());
 
-        // Load the attributes from the location
-        __glslGetAttributes(attributeLocation);
+                // Load the attributes from the location
+                __glslGetAttributes(attributeLocation);
 
-        // Return the attributes
-        return __hitObjectAttributes<attr_t>();
+                // Return the attributes
+                return __hitObjectAttributes<attr_t>();
+            }
+        case spirv:
+            {
+                Ptr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
+                spirv_asm {
+                    OpHitObjectGetAttributesNV &this $attr;
+                };
+                return *attr;
+            }
+        }
     }
         /// Loads a root constant from the local root table referenced by the hit object. Valid if the hit object
         /// represents a hit or a miss. RootConstantOffsetInBytes must be a multiple of 4.
@@ -9185,6 +9537,10 @@ struct HitObject
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __target_intrinsic(glsl, "hitObjectGetObjectRayDirectionNV($0)")
     float3 __glslGetRayDirection();
+
+    __glsl_extension(GL_NV_shader_invocation_reorder)
+    __target_intrinsic(glsl, "hitObjectGetWorldRayDirectionNV($0)")
+    float3 __glslGetRayWorldDirection();
 
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __target_intrinsic(glsl, "hitObjectGetWorldRayOriginNV($0)")
@@ -9335,11 +9691,22 @@ struct HitObject
     /// Where possible, reordering will also attempt to retain locality in the thread’s launch indices
     /// (DispatchRaysIndex in DXR).
 [__requiresNVAPI]
-__target_intrinsic(hlsl, "NvReorderThread")
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GL_EXT_ray_tracing)
-__target_intrinsic(glsl, "reorderThreadNV")
-void ReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB );
+void ReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "NvReorderThread";
+    case glsl: __intrinsic_asm "reorderThreadNV";
+    case spirv:
+        spirv_asm {
+            OpCapability ShaderInvocationReorderNV;
+            OpExtension "SPV_NV_shader_invocation_reorder";
+            OpReorderThreadWithHintNV $CoherenceHint $NumCoherenceHintBitsFromLSB;
+        };
+    }
+}
 
     /// Reorders threads based on a hit object, optionally extended by a coherence hint value. Coherence
     /// hints behave as described in the generic variant of ReorderThread. The maximum number of
@@ -9357,11 +9724,20 @@ void ReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB );
     /// groups, it will attempt to order threads by the value of their coherence hints. And within ranges
     /// of equal coherence hints, it will attempt to maximize locality in 3D space of the ray hit (if any).
 [__requiresNVAPI]
-__target_intrinsic(hlsl, "NvReorderThread")
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GL_EXT_ray_tracing)
-__target_intrinsic(glsl, "reorderThreadNV")
-void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHintBitsFromLSB );
+void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "NvReorderThread";
+    case glsl: __intrinsic_asm "reorderThreadNV";
+    case spirv:
+        spirv_asm {
+            OpReorderThreadWithHitObjectNV &HitOrMiss $CoherenceHint $NumCoherenceHintBitsFromLSB;
+        };
+    }
+}
 
     /// Is equivalent to
     /// ```
@@ -9369,10 +9745,19 @@ void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHi
     /// ```
     /// With CoherenceHint and NumCoherenceHintBitsFromLSB as 0, meaning they are ignored.
 [__requiresNVAPI]
-__target_intrinsic(hlsl, "NvReorderThread")
 __glsl_extension(GL_NV_shader_invocation_reorder)
-__target_intrinsic(glsl, "reorderThreadNV")
-void ReorderThread( HitObject HitOrMiss );
+void ReorderThread( HitObject HitOrMiss )
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "NvReorderThread";
+    case glsl: __intrinsic_asm "reorderThreadNV";
+    case spirv:
+        spirv_asm {
+            OpReorderThreadWithHitObjectNV &HitOrMiss;
+        };
+    }
+}
 
 
 ///

@@ -1378,6 +1378,11 @@ struct SPIRVEmitContext
             requireSPIRVCapability(SpvCapabilityRayQueryKHR);
             return emitOpTypeRayQuery(inst);
 
+        case kIROp_HitObjectType:
+            ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_shader_invocation_reorder"));
+            requireSPIRVCapability(SpvCapabilityShaderInvocationReorderNV);
+            return emitOpTypeHitObject(inst);
+
         case kIROp_FuncType:
             // > OpTypeFunction
             //
