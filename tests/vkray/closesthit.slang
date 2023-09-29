@@ -1,5 +1,6 @@
 // closesthit.slang
 //TEST:SIMPLE(filecheck=CHECK): -profile glsl_460+GL_NV_ray_tracing -stage closesthit -entry main -target spirv-assembly
+//TEST:SIMPLE(filecheck=CHECK): -stage closesthit -entry main -target spirv-assembly -emit-spirv-directly
 
 struct ReflectionRay
 {
@@ -33,15 +34,15 @@ void main(
 
 // CHECK: OpCapability RayTracing
 // CHECK: OpEntryPoint ClosestHitNV %main "main"
-// CHECK: OpDecorate %gl_InstanceID BuiltIn InstanceId
-// CHECK: OpDecorate %gl_InstanceCustomIndexNV BuiltIn InstanceCustomIndexNV
-// CHECK: OpDecorate %gl_PrimitiveID BuiltIn PrimitiveId
-// CHECK: OpDecorate %gl_HitKindNV BuiltIn HitKindNV
-// CHECK: OpDecorate %gl_RayTmaxNV BuiltIn RayTmaxNV
-// CHECK: OpDecorate %gl_RayTminNV BuiltIn RayTminNV
-// CHECK: %ShaderRecord_0 = OpVariable %_ptr_ShaderRecordBufferNV__S{{.*}} ShaderRecordBufferNV
-// CHECK: %{{.*}} = OpVariable %_ptr_IncomingRayPayloadNV_ReflectionRay_0 IncomingRayPayloadNV
-// CHECK: %{{.*}} = OpLoad %int %gl_InstanceID
-// CHECK: %{{.*}} = OpLoad %int %gl_InstanceCustomIndexNV
-// CHECK: %{{.*}} = OpAccessChain %_ptr_ShaderRecordBufferNV_uint %ShaderRecord_0 %int_0
-// CHECK: %{{.*}} = OpAccessChain %_ptr_IncomingRayPayloadNV_v4float %_S{{.*}} %int_0
+// CHECK-DAG: OpDecorate %[[INSTANCE_ID:[A-Za-z0-9_]+]] BuiltIn InstanceId
+// CHECK-DAG: OpDecorate %[[INSTANCE_INDEX:[A-Za-z0-9_]+]] BuiltIn InstanceCustomIndexNV
+// CHECK-DAG: OpDecorate %{{.*}} BuiltIn PrimitiveId
+// CHECK-DAG: OpDecorate %{{.*}} BuiltIn HitKindNV
+// CHECK-DAG: OpDecorate %{{.*}} BuiltIn RayTmaxNV
+// CHECK-DAG: OpDecorate %{{.*}} BuiltIn RayTminNV
+// CHECK-DAG: %ShaderRecord{{.*}} = OpVariable %_ptr_ShaderRecordBufferNV{{.*}} ShaderRecordBufferNV
+// CHECK-DAG: %{{.*}} = OpVariable %_ptr_IncomingRayPayloadNV_ReflectionRay{{.*}} IncomingRayPayloadNV
+// CHECK-DAG: %{{.*}} = OpLoad %{{u?}}int %[[INSTANCE_ID]]
+// CHECK-DAG: %{{.*}} = OpLoad %{{u?}}int %[[INSTANCE_INDEX]]
+// CHECK-DAG: %{{.*}} = OpAccessChain %_ptr_ShaderRecordBufferNV_uint %ShaderRecord{{.*}} %int_0
+// CHECK-DAG: %{{.*}} = OpAccessChain %_ptr_IncomingRayPayloadNV_v4float %{{.*}} %int_0

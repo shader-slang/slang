@@ -7243,9 +7243,6 @@ struct BuiltInTriangleIntersectionAttributes
 
 // 10.3.1
 
-__target_intrinsic(hlsl)
-void CallShader<Payload>(uint shaderIndex, inout Payload payload);
-
 // `executeCallableNV` is the GLSL intrinsic that will be used to implement
 // `CallShader()` for GLSL-based targets.
 //
@@ -7257,9 +7254,8 @@ void __executeCallable(uint shaderIndex, int payloadLocation);
 // for a type being used in a `CallShader()` call for GLSL-based targets.
 //
 __generic<Payload>
-__target_intrinsic(__glslRayTracing, "$XC")
 [__readNone]
-[__AlwaysFoldIntoUseSiteAttribute]
+__intrinsic_op($(kIROp_GetVulkanRayTracingPayloadLocation))
 int __callablePayloadLocation(__ref Payload payload);
 
 // Now we provide a hard-coded definition of `CallShader()` for GLSL-based
@@ -7267,29 +7263,35 @@ int __callablePayloadLocation(__ref Payload payload);
 // GLSL equivalent.
 //
 __generic<Payload>
-__specialized_for_target(glsl)
 void CallShader(uint shaderIndex, inout Payload payload)
 {
-    [__vulkanCallablePayload]
-    static Payload p;
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "CallShader";
+    case glsl:
+        {
+            [__vulkanCallablePayload]
+            static Payload p;
 
-    p = payload;
-    __executeCallable(shaderIndex, __callablePayloadLocation(p));
-    payload = p;
+            p = payload;
+            __executeCallable(shaderIndex, __callablePayloadLocation(p));
+            payload = p;
+        }
+    case spirv:
+        {
+            [__vulkanCallablePayload]
+            static Payload p;
+
+            p = payload;
+            spirv_asm {
+                OpExecuteCallableKHR $shaderIndex &p
+            };
+            payload = p;
+        }
+    }
 }
 
 // 10.3.2
-__target_intrinsic(hlsl)
-__target_intrinsic(cuda, "traceOptiXRay")
-void TraceRay<payload_t>(
-    RaytracingAccelerationStructure AccelerationStructure,
-    uint                            RayFlags,
-    uint                            InstanceInclusionMask,
-    uint                            RayContributionToHitGroupIndex,
-    uint                            MultiplierForGeometryContributionToHitGroupIndex,
-    uint                            MissShaderIndex,
-    RayDesc                         Ray,
-    inout payload_t                 Payload);
 
 __target_intrinsic(GL_NV_ray_tracing, "traceNV")
 __target_intrinsic(GL_EXT_ray_tracing, "traceRayEXT")
@@ -7313,13 +7315,11 @@ void __traceRay(
 // syntax works in a pinch.
 //
 __generic<Payload>
-__target_intrinsic(__glslRayTracing, "$XP")
 [__readNone]
-[__AlwaysFoldIntoUseSiteAttribute]
+__intrinsic_op($(kIROp_GetVulkanRayTracingPayloadLocation))
 int __rayPayloadLocation(__ref Payload payload);
 
 __generic<payload_t>
-__specialized_for_target(glsl)
 void TraceRay(
     RaytracingAccelerationStructure AccelerationStructure,
     uint                            RayFlags,
@@ -7330,42 +7330,64 @@ void TraceRay(
     RayDesc                         Ray,
     inout payload_t                 Payload)
 {
-    [__vulkanRayPayload]
-    static payload_t p;
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "TraceRay";
+    case cuda: __intrinsic_asm "traceOptiXRay";
+    case glsl:
+    {
+        [__vulkanRayPayload]
+        static payload_t p;
 
-    p = Payload;
-    __traceRay(
-        AccelerationStructure,
-        RayFlags,
-        InstanceInclusionMask,
-        RayContributionToHitGroupIndex,
-        MultiplierForGeometryContributionToHitGroupIndex,
-        MissShaderIndex,
-        Ray.Origin,
-        Ray.TMin,
-        Ray.Direction,
-        Ray.TMax,
-        __rayPayloadLocation(p));
-    Payload = p;
+        p = Payload;
+        __traceRay(
+            AccelerationStructure,
+            RayFlags,
+            InstanceInclusionMask,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            Ray.Origin,
+            Ray.TMin,
+            Ray.Direction,
+            Ray.TMax,
+            __rayPayloadLocation(p));
+        Payload = p;
+    }
+    case spirv:
+    {
+        [__vulkanRayPayload]
+        static payload_t p;
+
+        p = Payload;
+        let origin = Ray.Origin;
+        let direction = Ray.Direction;
+        let tmin = Ray.TMin;
+        let tmax = Ray.TMax;
+        spirv_asm {
+            OpTraceRayKHR 
+                /**/ $AccelerationStructure
+                /**/ $RayFlags
+                /**/ $InstanceInclusionMask
+                /**/ $RayContributionToHitGroupIndex
+                /**/ $MultiplierForGeometryContributionToHitGroupIndex
+                /**/ $MissShaderIndex
+                /**/ $origin
+                /**/ $tmin
+                /**/ $direction
+                /**/ $tmax
+                /**/ &p;
+        };
+        Payload = p;
+    }
+    }
 }
-
 
 // NOTE!
 // The name of the following functions may change when DXR supports
 // a feature similar to the `GL_NV_ray_tracing_motion_blur` extension
 //
 // https://github.com/KhronosGroup/GLSL/blob/master/extensions/nv/GLSL_NV_ray_tracing_motion_blur.txt
-
-void TraceMotionRay<payload_t>(
-    RaytracingAccelerationStructure AccelerationStructure,
-    uint                            RayFlags,
-    uint                            InstanceInclusionMask,
-    uint                            RayContributionToHitGroupIndex,
-    uint                            MultiplierForGeometryContributionToHitGroupIndex,
-    uint                            MissShaderIndex,
-    RayDesc                         Ray,
-    float                           CurrentTime,
-    inout payload_t                 Payload);
 
 __target_intrinsic(glsl, "traceRayMotionNV")
 __glsl_version(460)
@@ -7386,7 +7408,6 @@ void __traceMotionRay(
     int                             PayloadLocation);
 
 __generic<payload_t>
-__specialized_for_target(glsl)
 void TraceMotionRay(
     RaytracingAccelerationStructure AccelerationStructure,
     uint                            RayFlags,
@@ -7398,36 +7419,84 @@ void TraceMotionRay(
     float                           CurrentTime,
     inout payload_t                 Payload)
 {
-    [__vulkanRayPayload]
-    static payload_t p;
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "TraceMotionRay";
+    case glsl:
+    {
+        [__vulkanRayPayload]
+        static payload_t p;
 
-    p = Payload;
-    __traceMotionRay(
-        AccelerationStructure,
-        RayFlags,
-        InstanceInclusionMask,
-        RayContributionToHitGroupIndex,
-        MultiplierForGeometryContributionToHitGroupIndex,
-        MissShaderIndex,
-        Ray.Origin,
-        Ray.TMin,
-        Ray.Direction,
-        Ray.TMax,
-        CurrentTime,
-        __rayPayloadLocation(p));
-    Payload = p;
+        p = Payload;
+        __traceMotionRay(
+            AccelerationStructure,
+            RayFlags,
+            InstanceInclusionMask,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            Ray.Origin,
+            Ray.TMin,
+            Ray.Direction,
+            Ray.TMax,
+            CurrentTime,
+            __rayPayloadLocation(p));
+        Payload = p;
+    }
+    case spirv:
+    {
+        [__vulkanRayPayload]
+        static payload_t p;
+        
+        let origin = Ray.Origin;
+        let direction = Ray.Direction;
+        let tmin = Ray.TMin;
+        let tmax = Ray.TMax;
+
+        p = Payload;
+        spirv_asm {
+            OpCapability RayTracingMotionBlurNV;
+            OpExtension "SPV_NV_ray_tracing_motion_blur";
+
+            OpTraceRayMotionNV
+                /**/ $AccelerationStructure
+                /**/ $RayFlags
+                /**/ $InstanceInclusionMask
+                /**/ $RayContributionToHitGroupIndex
+                /**/ $MultiplierForGeometryContributionToHitGroupIndex
+                /**/ $MissShaderIndex
+                /**/ $origin
+                /**/ $tmin
+                /**/ $direction
+                /**/ $tmax
+                /**/ $CurrentTime
+                /**/ &p;
+        };
+        Payload = p;
+    }
+    }
 }
 
 // 10.3.3
 __target_intrinsic(hlsl)
 bool ReportHit<A>(float tHit, uint hitKind, A attributes);
 
-__target_intrinsic(GL_NV_ray_tracing, "reportIntersectionNV")
-__target_intrinsic(GL_EXT_ray_tracing, "reportIntersectionEXT")
-bool __reportIntersection(float tHit, uint hitKind);
+bool __reportIntersection(float tHit, uint hitKind)
+{
+    __target_switch
+    {
+    case GL_EXT_ray_tracing: __intrinsic_asm "reportIntersectionEXT";
+    case GL_NV_ray_tracing: __intrinsic_asm "reportIntersectionNV";
+    case spirv:
+        return spirv_asm {
+            result:$$bool = OpReportIntersectionKHR $tHit $hitKind;
+        };
+    }
+}
 
 __generic<A>
 __specialized_for_target(glsl)
+__specialized_for_target(spirv)
 bool ReportHit(float tHit, uint hitKind, A attributes)
 {
     [__vulkanHitAttributes]
@@ -7438,18 +7507,30 @@ bool ReportHit(float tHit, uint hitKind, A attributes)
 }
 
 // 10.3.4
-__target_intrinsic(hlsl)
-__target_intrinsic(GL_NV_ray_tracing, ignoreIntersectionNV)
-__target_intrinsic(GL_EXT_ray_tracing, "ignoreIntersectionEXT;")
-__target_intrinsic(cuda, "optixIgnoreIntersection")
-void IgnoreHit();
+void IgnoreHit()
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "IgnoreHit";
+    case GL_EXT_ray_tracing: __intrinsic_asm "ignoreIntersectionEXT;";
+    case GL_NV_ray_tracing: __intrinsic_asm "ignoreIntersectionNV";
+    case cuda: __intrinsic_asm "optixIgnoreIntersection";
+    case spirv: spirv_asm { OpIgnoreIntersectionKHR; %_ = OpLabel };
+    }
+}
 
 // 10.3.5
-__target_intrinsic(hlsl)
-__target_intrinsic(GL_NV_ray_tracing, terminateRayNV)
-__target_intrinsic(GL_EXT_ray_tracing, "terminateRayEXT;")
-__target_intrinsic(cuda, "optixTerminateRay")
-void AcceptHitAndEndSearch();
+void AcceptHitAndEndSearch()
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "AcceptHitAndEndSearch";
+    case GL_EXT_ray_tracing: __intrinsic_asm "terminateRayEXT;";
+    case GL_NV_ray_tracing: __intrinsic_asm "terminateRayNV";
+    case cuda: __intrinsic_asm "optixTerminateRay";
+    case spirv: spirv_asm { OpTerminateRayKHR; %_ = OpLabel };
+    }
+}
 
 // 10.4 - System Values and Special Semantics
 
@@ -7458,32 +7539,82 @@ void AcceptHitAndEndSearch();
 
 // 10.4.1 - Ray Dispatch System Values
 
-__target_intrinsic(GL_NV_ray_tracing, "(gl_LaunchIDNV)")
-__target_intrinsic(GL_EXT_ray_tracing, "(gl_LaunchIDEXT)")
-__target_intrinsic(cuda, "optixGetLaunchIndex")
-uint3 DispatchRaysIndex();
+uint3 DispatchRaysIndex()
+{
+    __target_switch
+    {
+    case hlsl:  __intrinsic_asm "DispatchRaysIndex";
+    case GL_EXT_ray_tracing: __intrinsic_asm "(gl_LaunchIDEXT)";
+    case GL_NV_ray_tracing: __intrinsic_asm "(gl_LaunchIDNV)";
+    case cuda: __intrinsic_asm "optixGetLaunchIndex";
+    case spirv:
+        return spirv_asm {
+            result:$$uint3 = OpLoad builtin(LaunchIdKHR:uint3);
+        };
+    }
+}
 
-__target_intrinsic(GL_NV_ray_tracing, "(gl_LaunchSizeNV)")
-__target_intrinsic(GL_EXT_ray_tracing, "(gl_LaunchSizeEXT)")
-__target_intrinsic(cuda, "optixGetLaunchDimensions")
-uint3 DispatchRaysDimensions();
+uint3 DispatchRaysDimensions()
+{
+    __target_switch
+    {
+    case hlsl:  __intrinsic_asm "DispatchRaysDimensions";
+    case GL_EXT_ray_tracing: __intrinsic_asm "(gl_LaunchSizeEXT)";
+    case GL_NV_ray_tracing: __intrinsic_asm "(gl_LaunchSizeNV)";
+    case cuda: __intrinsic_asm "optixGetLaunchDimensions";
+    case spirv:
+        return spirv_asm {
+            result:$$uint3 = OpLoad builtin(LaunchSizeKHR:uint3);
+        };
+    }
+}
 
 // 10.4.2 - Ray System Values
 
-__target_intrinsic(GL_NV_ray_tracing, "(gl_WorldRayOriginNV)")
-__target_intrinsic(GL_EXT_ray_tracing, "(gl_WorldRayOriginEXT)")
-__target_intrinsic(cuda, "optixGetWorldRayOrigin")
-float3 WorldRayOrigin();
+float3 WorldRayOrigin()
+{
+    __target_switch
+    {
+    case hlsl:  __intrinsic_asm "WorldRayOrigin";
+    case GL_EXT_ray_tracing: __intrinsic_asm "(gl_WorldRayOriginEXT)";
+    case GL_NV_ray_tracing: __intrinsic_asm "(gl_WorldRayOriginNV)";
+    case cuda: __intrinsic_asm "optixGetWorldRayOrigin";
+    case spirv:
+        return spirv_asm {
+            result:$$float3 = OpLoad builtin(WorldRayOriginKHR:float3);
+        };
+    }
+}
 
-__target_intrinsic(GL_NV_ray_tracing, "(gl_WorldRayDirectionNV)")
-__target_intrinsic(GL_EXT_ray_tracing, "(gl_WorldRayDirectionEXT)")
-__target_intrinsic(cuda, "optixGetWorldRayDirection")
-float3 WorldRayDirection();
+float3 WorldRayDirection()
+{
+    __target_switch
+    {
+    case hlsl:  __intrinsic_asm "WorldRayDirection";
+    case GL_EXT_ray_tracing: __intrinsic_asm "(gl_WorldRayDirectionEXT)";
+    case GL_NV_ray_tracing: __intrinsic_asm "(gl_WorldRayDirectionNV)";
+    case cuda: __intrinsic_asm "optixGetWorldRayDirection";
+    case spirv:
+        return spirv_asm {
+            result:$$float3 = OpLoad builtin(WorldRayDirectionKHR:float3);
+        };
+    }
+}
 
-__target_intrinsic(GL_NV_ray_tracing, "(gl_RayTminNV)")
-__target_intrinsic(GL_EXT_ray_tracing, "(gl_RayTminEXT)")
-__target_intrinsic(cuda, "optixGetRayTmin")
-float RayTMin();
+float RayTMin()
+{
+    __target_switch
+    {
+    case hlsl:  __intrinsic_asm "RayTMin";
+    case GL_EXT_ray_tracing: __intrinsic_asm "(gl_RayTminEXT)";
+    case GL_NV_ray_tracing: __intrinsic_asm "(gl_RayTminNV)";
+    case cuda: __intrinsic_asm "optixGetRayTmin";
+    case spirv:
+        return spirv_asm {
+            result:$$float = OpLoad builtin(RayTminKHR:float);
+        };
+    }
+}
 
 // Note: The `RayTCurrent()` intrinsic should translate to
 // either `gl_HitTNV` (for hit shaders) or `gl_RayTmaxNV`
@@ -7495,68 +7626,190 @@ float RayTMin();
 // we should simply provide two overloads here, specialized
 // to the appropriate Vulkan stages.
 //
-__target_intrinsic(GL_NV_ray_tracing, "(gl_RayTmaxNV)")
-__target_intrinsic(GL_EXT_ray_tracing, "(gl_RayTmaxEXT)")
-__target_intrinsic(cuda, "optixGetRayTmax")
-float RayTCurrent();
+float RayTCurrent()
+{
+    __target_switch
+    {
+    case hlsl:  __intrinsic_asm "RayTCurrent";
+    case GL_EXT_ray_tracing: __intrinsic_asm "(gl_RayTmaxEXT)";
+    case GL_NV_ray_tracing: __intrinsic_asm "(gl_RayTmaxNV)";
+    case cuda: __intrinsic_asm "optixGetRayTmax";
+    case spirv:
+        return spirv_asm {
+            result:$$float = OpLoad builtin(RayTmaxKHR:float);
+        };
+    }
+}
 
-__target_intrinsic(GL_NV_ray_tracing, "(gl_IncomingRayFlagsNV)")
-__target_intrinsic(GL_EXT_ray_tracing, "(gl_IncomingRayFlagsEXT)")
-__target_intrinsic(cuda, "optixGetRayFlags")
-uint RayFlags();
+uint RayFlags()
+{
+    __target_switch
+    {
+    case hlsl:  __intrinsic_asm "RayFlags";
+    case GL_EXT_ray_tracing: __intrinsic_asm "(gl_IncomingRayFlagsEXT)";
+    case GL_NV_ray_tracing: __intrinsic_asm "(gl_IncomingRayFlagsNV)";
+    case cuda: __intrinsic_asm "optixGetRayFlags";
+    case spirv:
+        return spirv_asm {
+            result:$$uint = OpLoad builtin(IncomingRayFlagsKHR:uint);
+        };
+    }
+}
 
 // 10.4.3 - Primitive/Object Space System Values
 
-__target_intrinsic(__glslRayTracing, "(gl_InstanceID)")
-__target_intrinsic(cuda, "optixGetInstanceIndex")
-uint InstanceIndex();
+uint InstanceIndex()
+{
+    __target_switch
+    {
+    case hlsl:  __intrinsic_asm "InstanceIndex";
+    case __glslRayTracing: __intrinsic_asm "(gl_InstanceID)";
+    case cuda: __intrinsic_asm "optixGetInstanceIndex";
+    case spirv:
+        return spirv_asm {
+            result:$$uint = OpLoad builtin(InstanceId:uint);
+        };
+    }
+}
 
-__target_intrinsic(GL_NV_ray_tracing, "(gl_InstanceCustomIndexNV)")
-__target_intrinsic(GL_EXT_ray_tracing, "(gl_InstanceCustomIndexEXT)")
-__target_intrinsic(cuda, "optixGetInstanceId")
-uint InstanceID();
+uint InstanceID()
+{
+    __target_switch
+    {
+    case hlsl:  __intrinsic_asm "InstanceID";
+    case GL_EXT_ray_tracing: __intrinsic_asm "(gl_InstanceCustomIndexEXT)";
+    case GL_NV_ray_tracing:  __intrinsic_asm "(gl_InstanceCustomIndexNV)";
+    case cuda: __intrinsic_asm "optixGetInstanceId";
+    case spirv:
+        return spirv_asm {
+            result:$$uint = OpLoad builtin(InstanceCustomIndexKHR:uint);
+        };
+    }
+}
 
-__target_intrinsic(__glslRayTracing, "(gl_PrimitiveID)")
-__target_intrinsic(cuda, "optixGetPrimitiveIndex")
-uint PrimitiveIndex();
+uint PrimitiveIndex()
+{
+    __target_switch
+    {
+    case hlsl:  __intrinsic_asm "PrimitiveIndex";
+    case __glslRayTracing:  __intrinsic_asm "(gl_PrimitiveID)";
+    case cuda: __intrinsic_asm "optixGetPrimitiveIndex";
+    case spirv:
+        return spirv_asm {
+            result:$$uint = OpLoad builtin(PrimitiveId:uint);
+        };
+    }
+}
 
-__target_intrinsic(GL_NV_ray_tracing, "(gl_ObjectRayOriginNV)")
-__target_intrinsic(GL_EXT_ray_tracing, "(gl_ObjectRayOriginEXT)")
-__target_intrinsic(cuda, "optixGetObjectRayOrigin")
-float3 ObjectRayOrigin();
+float3 ObjectRayOrigin()
+{
+    __target_switch
+    {
+    case hlsl:  __intrinsic_asm "ObjectRayOrigin";
+    case GL_EXT_ray_tracing: __intrinsic_asm "(gl_ObjectRayOriginEXT)";
+    case GL_NV_ray_tracing:  __intrinsic_asm "(gl_ObjectRayOriginNV)";
+    case cuda: __intrinsic_asm "optixGetObjectRayOrigin";
+    case spirv:
+        return spirv_asm {
+            result:$$float3 = OpLoad builtin(ObjectRayOriginKHR:float3);
+        };
+    }
+}
 
-__target_intrinsic(GL_NV_ray_tracing, "(gl_ObjectRayDirectionNV)")
-__target_intrinsic(GL_EXT_ray_tracing, "(gl_ObjectRayDirectionEXT)")
-__target_intrinsic(cuda, "optixGetObjectRayDirection")
-float3 ObjectRayDirection();
+float3 ObjectRayDirection()
+{
+    __target_switch
+    {
+    case hlsl:  __intrinsic_asm "ObjectRayDirection";
+    case GL_EXT_ray_tracing: __intrinsic_asm "(gl_ObjectRayDirectionEXT)";
+    case GL_NV_ray_tracing:  __intrinsic_asm "(gl_ObjectRayDirectionNV)";
+    case cuda: __intrinsic_asm "optixGetObjectRayDirection";
+    case spirv:
+        return spirv_asm {
+            result:$$float3 = OpLoad builtin(ObjectRayDirectionKHR:float3);
+        };
+    }
+}
 
 // TODO: optix has an optixGetObjectToWorldTransformMatrix function that returns 12
 // floats by reference.
-__target_intrinsic(GL_NV_ray_tracing, "transpose(gl_ObjectToWorldNV)")
-__target_intrinsic(GL_EXT_ray_tracing, "transpose(gl_ObjectToWorldEXT)")
-float3x4 ObjectToWorld3x4();
+float3x4 ObjectToWorld3x4()
+{
+    __target_switch
+    {
+    case hlsl:  __intrinsic_asm "ObjectToWorld3x4";
+    case GL_EXT_ray_tracing: __intrinsic_asm "transpose(gl_ObjectToWorldEXT)";
+    case GL_NV_ray_tracing:  __intrinsic_asm "transpose(gl_ObjectToWorldNV)";
+    case spirv:
+        return spirv_asm {
+            %mat = OpLoad builtin(ObjectToWorldKHR:float4x3);
+            result:$$float3x4 = OpTranspose %mat;
+        };
+    }
+}
 
-__target_intrinsic(GL_NV_ray_tracing, "transpose(gl_WorldToObjectNV)")
-__target_intrinsic(GL_EXT_ray_tracing, "transpose(gl_WorldToObjectEXT)")
-float3x4 WorldToObject3x4();
+float3x4 WorldToObject3x4()
+{
+    __target_switch
+    {
+    case hlsl:  __intrinsic_asm "WorldToObject3x4";
+    case GL_EXT_ray_tracing: __intrinsic_asm "transpose(gl_WorldToObjectEXT)";
+    case GL_NV_ray_tracing:  __intrinsic_asm "transpose(gl_WorldToObjectNV)";
+    case spirv:
+        return spirv_asm {
+            %mat = OpLoad builtin(WorldToObjectKHR:float4x3);
+            result:$$float3x4 = OpTranspose %mat;
+        };
+    }
+}
 
-__target_intrinsic(GL_NV_ray_tracing, "transpose(gl_ObjectToWorldNV)")
-__target_intrinsic(GL_EXT_ray_tracing, "transpose(gl_ObjectToWorld3x4EXT)")
-float4x3 ObjectToWorld4x3();
+float4x3 ObjectToWorld4x3()
+{
+    __target_switch
+    {
+    case hlsl:  __intrinsic_asm "ObjectToWorld4x3";
+    case GL_EXT_ray_tracing: __intrinsic_asm "(gl_ObjectToWorldEXT)";
+    case GL_NV_ray_tracing:  __intrinsic_asm "(gl_ObjectToWorldNV)";
+    case spirv:
+        return spirv_asm {
+            result:$$float4x3 = OpLoad builtin(ObjectToWorldKHR:float4x3);
+        };
+    }
+}
 
-__target_intrinsic(GL_NV_ray_tracing, "transpose(gl_WorldToObjectNV)")
-__target_intrinsic(GL_EXT_ray_tracing, "transpose(gl_WorldToObject3x4EXT)")
-float4x3 WorldToObject4x3();
+float4x3 WorldToObject4x3()
+{
+    __target_switch
+    {
+    case hlsl:  __intrinsic_asm "WorldToObject4x3";
+    case GL_EXT_ray_tracing: __intrinsic_asm "(gl_WorldToObject3x4EXT)";
+    case GL_NV_ray_tracing:  __intrinsic_asm "(gl_WorldToObjectNV)";
+    case spirv:
+        return spirv_asm {
+            result:$$float4x3 = OpLoad builtin(WorldToObjectKHR:float4x3);
+        };
+    }
+}
 
 // NOTE!
 // The name of the following functions may change when DXR supports
 // a feature similar to the `GL_NV_ray_tracing_motion_blur` extension
 
-__target_intrinsic(glsl, "(gl_CurrentRayTimeNV)")
 __glsl_version(460)
 __glsl_extension(GL_NV_ray_tracing_motion_blur)
 __glsl_extension(GL_EXT_ray_tracing)
-float RayCurrentTime();
+float RayCurrentTime()
+{
+    __target_switch
+    {
+    case hlsl:  __intrinsic_asm "RayCurrentTime";
+    case glsl:  __intrinsic_asm "(gl_CurrentRayTimeNV)";
+    case spirv:
+        return spirv_asm {
+            result:$$float = OpLoad builtin(CurrentRayTimeNV:float);
+        };
+    }
+}
 
 // Note: The provisional DXR spec included these unadorned
 // `ObjectToWorld()` and `WorldToObject()` functions, so
@@ -7571,10 +7824,20 @@ float3x4 ObjectToWorld() { return ObjectToWorld3x4(); }
 float3x4 WorldToObject() { return WorldToObject3x4(); }
 
 // 10.4.4 - Hit Specific System values
-__target_intrinsic(GL_NV_ray_tracing, "(gl_HitKindNV)")
-__target_intrinsic(GL_EXT_ray_tracing, "(gl_HitKindEXT)")
-__target_intrinsic(cuda, "optixGetHitKind")
-uint HitKind();
+uint HitKind()
+{
+    __target_switch
+    {
+    case hlsl:  __intrinsic_asm "HitKind";
+    case GL_EXT_ray_tracing:  __intrinsic_asm "(gl_HitKindEXT)";
+    case GL_NV_ray_tracing:  __intrinsic_asm "(gl_HitKindNV)";
+    case cuda:  __intrinsic_asm "optixGetHitKind";
+    case spirv:
+        return spirv_asm {
+            result:$$uint = OpLoad builtin(HitKindKHR:uint);
+        };
+    }
+}
 
 // Pre-defined hit kinds (not documented explicitly)
 static const uint HIT_KIND_TRIANGLE_FRONT_FACE  = 254;
@@ -7794,7 +8057,17 @@ struct FeedbackTexture2DArray<T : __BuiltinSamplerFeedbackType>
 
 // Get the index of the geometry that was hit in an intersection, any-hit, or closest-hit shader
 __target_intrinsic(GL_EXT_ray_tracing, "(gl_GeometryIndexEXT)")
-uint GeometryIndex();
+uint GeometryIndex()
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "GeometryIndex";
+    case glsl: __intrinsic_asm "(gl_GeometryIndexEXT)";
+    case spirv: return spirv_asm {
+            result:$$uint = OpLoad builtin(RayGeometryIndexKHR:uint);
+        };
+    }
+}
 
 // Status of whether a (closest) hit has been committed in a `RayQuery`.
 typedef uint COMMITTED_STATUS;
@@ -8327,9 +8600,7 @@ Ref<T> __hitObjectAttributes<T>()
 // for GLSL-based targets.
 //
 __generic<Attributes>
-__target_intrinsic(__glslRayTracing, "$XH")
-[__readNone]
-[__AlwaysFoldIntoUseSiteAttribute]
+__intrinsic_op($(kIROp_GetVulkanRayTracingPayloadLocation))
 int __hitObjectAttributesLocation(__ref Attributes attributes);
 
     /// Immutable data type representing a ray hit or a miss. Can be used to invoke hit or miss shading,

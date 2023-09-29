@@ -4,6 +4,7 @@
 // shaders properly map to the "shader record" in SPIR-V output.
 
 //TEST:SIMPLE(filecheck=CHECK): -profile glsl_460+spirv_1_4 -stage raygeneration -entry main -target spirv-assembly
+//TEST:SIMPLE(filecheck=CHECK): -stage raygeneration -entry main -target spirv-assembly -emit-spirv-directly
 
 RWStructuredBuffer<float> buffer;
 
@@ -16,7 +17,7 @@ void main(
 // CHECK: OpCapability RayTracingKHR
 // CHECK: OpExtension "SPV_KHR_ray_tracing"
 // CHECK: OpEntryPoint RayGenerationNV %main
-// CHECK: OpDecorate %gl_LaunchIDEXT BuiltIn LaunchIdNV
-// CHECK: %gl_LaunchIDEXT = OpVariable %_ptr_Input_v3uint Input
-// CHECK: %{{.*}} = OpLoad %v3uint %gl_LaunchIDEXT
-// CHECK: %{{.*}} = OpAccessChain %_ptr_ShaderRecordBufferNV_float %_S2 %int_0
+// CHECK-DAG: OpDecorate %[[LaunchID:[A-Za-z0-9_]+]] BuiltIn LaunchIdNV
+// CHECK-DAG: %[[LaunchID]] = OpVariable %_ptr_Input_v3uint Input
+// CHECK-DAG: %{{.*}} = OpLoad %v3uint %[[LaunchID]]
+// CHECK-DAG: %{{.*}} = OpAccessChain %_ptr_ShaderRecordBufferNV_float %{{.*}} %int_0

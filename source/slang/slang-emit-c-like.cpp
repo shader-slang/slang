@@ -41,56 +41,6 @@ struct CLikeSourceEmitter::ComputeEmitActionsContext
     List<EmitAction>*   actions;
 };
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!! LocationTracker !!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-/* static */LocationTracker::Kind LocationTracker::getKindFromDecoration(IRDecoration* decoration)
-{
-    switch (decoration->getOp())
-    {
-        case kIROp_VulkanRayPayloadDecoration:          return Kind::RayPayload;
-        case kIROp_VulkanCallablePayloadDecoration:     return Kind::CallablePayload;
-        case kIROp_VulkanHitObjectAttributesDecoration: return Kind::HitObjectAttribute;
-        default: break;
-    }
-    return Kind::Invalid;
-}
-
-Index LocationTracker::getValue(IRInst* inst, IRDecoration* decoration)
-{
-    const Kind kind = getKindFromDecoration(decoration);
-    SLANG_RELEASE_ASSERT(kind != Kind::Invalid);
-    if (kind == Kind::Invalid)
-    {
-        return -1;
-    }
-
-    return getValue(kind, inst, decoration);
-}
-
-Index LocationTracker::getValue(Kind kind, IRInst* inst, IRDecoration* decoration)
-{
-    if (decoration->getOperandCount() > 0)
-    {
-        // TODO(JS):
-        // There could be a clash with the auto generated location, and the user set value/ 
-        // Perhaps the implication in practice is that either all are marked or none.
-        const int explicitLocation = int(getIntVal(decoration->getOperand(0)));
-        if (explicitLocation >= 0)
-            return UInt(explicitLocation);
-    }
-
-    auto& nextValue = m_nextValueForKind[Index(kind)];
-
-    const Location defaultLocation{kind, nextValue};
-    const Location foundLocation = m_mapIRToLocations.getOrAddValue(inst, defaultLocation);
-
-    // Increase if it was the default
-    nextValue += Index(defaultLocation == foundLocation);
-
-    // Has to match the kind
-    return (foundLocation.kind == kind) ? foundLocation.value : -1;
-}
-
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!! CLikeSourceEmitter !!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 /* static */SourceLanguage CLikeSourceEmitter::getSourceLanguage(CodeGenTarget target)
@@ -1241,6 +1191,9 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     case kIROp_Specialize:
     case kIROp_LookupWitness:
     case kIROp_GetValueFromBoundInterface:
+        return true;
+
+    case kIROp_GetVulkanRayTracingPayloadLocation:
         return true;
     }
 

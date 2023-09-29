@@ -19,6 +19,8 @@ namespace Slang
                 for (UInt i = 0; i < targetSwitch->getCaseCount(); i++)
                 {
                     auto cap = (CapabilityAtom)getIntVal(targetSwitch->getCaseValue(i));
+                    if (target->getTargetCaps().isIncompatibleWith(cap))
+                        continue;
                     CapabilitySet capSet;
                     if (cap == CapabilityAtom::Invalid)
                         capSet = CapabilitySet::makeEmpty();
