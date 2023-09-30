@@ -3943,14 +3943,33 @@ struct SPIRVEmitContext
         SLANG_ASSERT(!as<IRVectorType>(fromTypeV) == !as<IRVectorType>(toTypeV));
         const auto fromType = dropVector(fromTypeV);
         const auto toType = dropVector(toTypeV);
-        SLANG_ASSERT(isIntegralType(fromType));
         SLANG_ASSERT(isFloatingType(toType));
 
-        const auto fromInfo = getIntTypeInfo(fromType);
+        if (isIntegralType(fromType))
+        {
+            const auto fromInfo = getIntTypeInfo(fromType);
 
-        return fromInfo.isSigned
-            ? emitOpConvertSToF(parent, inst, toTypeV, inst->getOperand(0))
-            : emitOpConvertUToF(parent, inst, toTypeV, inst->getOperand(0));
+            return fromInfo.isSigned
+                ? emitOpConvertSToF(parent, inst, toTypeV, inst->getOperand(0))
+                : emitOpConvertUToF(parent, inst, toTypeV, inst->getOperand(0));
+        }
+        else if (as<IRBoolType>(fromType))
+        {
+            IRBuilder builder(inst);
+            builder.setInsertBefore(inst);
+            auto one = builder.getFloatValue(toType, 1.0f);
+            auto zero = builder.getFloatValue(toType, 0.0f);
+            if (as<IRVectorType>(toTypeV))
+            {
+                one = builder.emitMakeVectorFromScalar(toTypeV, one);
+                zero = builder.emitMakeVectorFromScalar(toTypeV, zero);
+            }
+            return emitInst(parent, inst, SpvOpSelect, inst->getFullType(), kResultID, inst->getOperand(0), one, zero);
+        }
+        else
+        {
+            SLANG_UNREACHABLE("unknown from type");
+        }
     }
 
     SpvInst* emitFloatToIntCast(SpvInstParent* parent, IRCastFloatToInt* inst)

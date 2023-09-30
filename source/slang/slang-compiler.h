@@ -1564,6 +1564,18 @@ namespace Slang
         Binary = SLANG_WRITER_MODE_BINARY,
     };
 
+    class TargetRequest;
+
+    /// Are we generating code for a D3D API?
+    bool isD3DTarget(TargetRequest* targetReq);
+
+    /// Are we generating code for a Khronos API (OpenGL or Vulkan)?
+    bool isKhronosTarget(TargetRequest* targetReq);
+
+    /// Are we generating code for a CUDA API (CUDA / OptiX)?
+    bool isCUDATarget(TargetRequest* targetReq);
+
+
         /// A request to generate output in some target format.
     class TargetRequest : public RefObject
     {
@@ -1601,7 +1613,7 @@ namespace Slang
 
         bool shouldEmitSPIRVDirectly()
         {
-            return targetFlags & SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY;
+            return isKhronosTarget(this) && ((targetFlags & SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY) != 0);
         }
 
         bool isWholeProgramRequest()
@@ -1652,15 +1664,6 @@ namespace Slang
 
         RefPtr<HLSLToVulkanLayoutOptions> hlslToVulkanLayoutOptions;           ///< Optional vulkan layout options
     };
-
-        /// Are we generating code for a D3D API?
-    bool isD3DTarget(TargetRequest* targetReq);
-
-        /// Are we generating code for a Khronos API (OpenGL or Vulkan)?
-    bool isKhronosTarget(TargetRequest* targetReq);
-
-        /// Are we generating code for a CUDA API (CUDA / OptiX)?
-    bool isCUDATarget(TargetRequest* targetReq);
 
         /// Given a target request returns which (if any) intermediate source language is required
         /// to produce it.

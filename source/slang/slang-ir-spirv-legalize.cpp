@@ -694,6 +694,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         List<WriteBackPair> writeBacks;
         IRBuilder builder(inst);
         builder.setInsertBefore(inst);
+        auto funcType = as<IRFuncType>(funcValue->getFullType());
         for (UInt i = 0; i < inst->getArgCount(); i++)
         {
             auto arg = inst->getArg(i);
@@ -727,8 +728,17 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 switch (root->getOp())
                 {
                 case kIROp_RWStructuredBufferGetElementPtr:
-                    newArgs.add(arg);
-                    continue;
+                    if (funcType)
+                    {
+                        if (funcType->getParamCount() > i && as<IRRefType>(funcType->getParamType(i)))
+                        {
+                            // If we are passing an address from a structured buffer as a
+                            // ref argument, pass the original pointer as is.
+                            // This is to support stdlib atomic functions.
+                            newArgs.add(arg);
+                            continue;
+                        }
+                    }
                 }
             }
 
@@ -1181,14 +1191,27 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
     void legalizeSPIRVEntryPoint(IRFunc* func, IREntryPointDecoration* entryPointDecor)
     {
-        if (entryPointDecor->getProfile().getStage() == Stage::Geometry)
+        auto stage = entryPointDecor->getProfile().getStage();
+        switch (stage)
         {
+        case Stage::Geometry:
             if (!func->findDecoration<IRInstanceDecoration>())
             {
                 IRBuilder builder(func);
                 builder.addDecoration(func, kIROp_InstanceDecoration, builder.getIntValue(builder.getUIntType(), 1));
             }
+            break;
+        case Stage::Compute:
+            if (!func->findDecoration<IRNumThreadsDecoration>())
+            {
+                IRBuilder builder(func);
+                auto one = builder.getIntValue(builder.getUIntType(), 1);
+                IRInst* args[3] = { one, one, one };
+                builder.addDecoration(func, kIROp_NumThreadsDecoration, args, 3);
+            }
+            break;
         }
+
     }
 
     void processModule()
