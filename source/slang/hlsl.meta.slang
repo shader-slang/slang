@@ -7132,35 +7132,75 @@ for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
     sb << "struct ";
     sb << kBaseBufferAccessLevels[aa].name;
     sb << "Buffer {\n";
-    sb << "[__readNone]\n";
-    sb << "void GetDimensions(out uint dim);\n";
 
+    char const* glslTextureSizeFunc = (access == SLANG_RESOURCE_ACCESS_READ) ? "textureSize" : "imageSize";
     char const* glslLoadFuncName = (access == SLANG_RESOURCE_ACCESS_READ) ? "texelFetch" : "imageLoad";
-
-    sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
-    sb << "__target_intrinsic(glsl, \"" << glslLoadFuncName << "($0, $1)$z\")\n";
-    if (isReadOnly) sb << "[__readNone]\n";
-    sb << "T Load(int location);\n";
-
-    if (isReadOnly) sb << "[__readNone]\n";
-    sb << "T Load(int location, out uint status);\n";
-
-    sb << "__subscript(uint index) -> T {\n";
-
-    if (isReadOnly) sb << "[__readNone]\n";
-    sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
-    sb << "__target_intrinsic(glsl, \"" << glslLoadFuncName << "($0, int($1))$z\") get;\n";
-
-    if (access != SLANG_RESOURCE_ACCESS_READ)
+    char const* spvLoadInstName = (access == SLANG_RESOURCE_ACCESS_READ) ? "OpImageFetch" : "OpImageRead";
+}}}}
+    [__readNone]
+    void GetDimensions(out uint dim)
     {
-        sb << "__target_intrinsic(glsl, \"imageStore($0, int($1), $V2)\") [nonmutating] set;\n";
-
-        sb << "__intrinsic_op(" << int(kIROp_ImageSubscript) << ") ref;\n";
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".GetDimensions";
+        case glsl: __intrinsic_asm "($1 = $(glslTextureSizeFunc)($0))";
+        case spirv:
+            dim = spirv_asm {
+                OpCapability ImageQuery;
+                result:$$uint = OpImageQuerySize $this;
+            };
+        }
     }
 
-    sb << "}\n";
+    __glsl_extension(GL_EXT_samplerless_texture_functions)
+    $(isReadOnly?"[__readNone] ":"")
+    T Load(int location)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".Load";
+        case glsl: __intrinsic_asm "$(glslLoadFuncName)($0, $1)$z";
+        case spirv: return spirv_asm {
+                %sampled:__sampledType(T) = $(spvLoadInstName) $this $location;
+                __truncate $$T result __sampledType(T) %sampled;
+            };
+        }
+    }
 
-    sb << "};\n";
+    $(isReadOnly?"[__readNone] ":"")
+    T Load(int location, out uint status);
+
+    __subscript(uint index) -> T {
+
+        $(isReadOnly?"[__readNone] ":"")
+        [ForceInline]
+        get { return Load((int)index); }
+${{{{
+        if (access != SLANG_RESOURCE_ACCESS_READ) {
+}}}}
+            [nonmutating] set
+            {
+                __target_switch
+                {
+                case hlsl: __intrinsic_asm "($0)[$1] = $2";
+                case glsl: __intrinsic_asm "imageStore($0, int($1), $V2)";
+                case spirv: spirv_asm {
+                        OpImageWrite $this $index $newValue;
+                    };
+                }
+            }
+
+            __intrinsic_op($(kIROp_ImageSubscript))
+            ref;
+${{{{
+        } // access != SLANG_RESOURCE_ACCESS_READ
+}}}}
+
+    }
+    
+
+    };
+${{{{
 }
 }}}}
 
