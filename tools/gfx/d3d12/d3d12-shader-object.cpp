@@ -923,10 +923,14 @@ Result ShaderObjectImpl::setResource(ShaderOffset const& offset, IResourceView* 
 
     if (resourceView == nullptr)
     {
-        // Create null descriptor for the binding.
-        auto destDescriptor = m_descriptorSet.resourceTable.getCpuHandle(
-            bindingRange.baseIndex + (int32_t)offset.bindingArrayIndex);
-        return createNullDescriptor(d3dDevice, destDescriptor, bindingRange);
+        if (!bindingRange.isRootParameter)
+        {
+            // Create null descriptor for the binding.
+            auto destDescriptor = m_descriptorSet.resourceTable.getCpuHandle(
+                bindingRange.baseIndex + (int32_t)offset.bindingArrayIndex);
+            return createNullDescriptor(d3dDevice, destDescriptor, bindingRange);
+        }
+        return SLANG_OK;
     }
 
     ResourceViewInternalImpl* internalResourceView = nullptr;

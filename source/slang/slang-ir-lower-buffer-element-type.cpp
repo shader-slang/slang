@@ -409,10 +409,18 @@ namespace Slang
                 {
                 case CodeGenTarget::SPIRV:
                 case CodeGenTarget::SPIRVAssembly:
-                    if (as<IRBoolType>(type))
+                {
+                    auto scalarType = type;
+                    auto vectorType = as<IRVectorType>(scalarType);
+                    if (vectorType)
+                        scalarType = vectorType->getElementType();
+
+                    if (as<IRBoolType>(scalarType))
                     {
                         // Bool is an abstract type in SPIRV, so we need to lower them into an int.
                         info.loweredType = builder.getIntType();
+                        if (vectorType)
+                            info.loweredType = builder.getVectorType(info.loweredType, vectorType->getElementCount());
                         // Create unpack func.
                         {
                             builder.setInsertAfter(type);
@@ -440,6 +448,7 @@ namespace Slang
                         }
                         return info;
                     }
+                }
                 default:
                     break;
                 }
