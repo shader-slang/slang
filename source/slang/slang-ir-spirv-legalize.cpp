@@ -1214,21 +1214,109 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
     }
 
-    void processModule()
+    bool isInlinableGlobalInst(IRInst* inst)
     {
-        // Process global params before anything else, so we don't generate inefficient
-        // array marhalling code for array-typed global params.
-        for (auto globalInst : m_module->getGlobalInsts())
+        switch (inst->getOp())
         {
-            if (auto globalParam = as<IRGlobalParam>(globalInst))
-            {
-                processGlobalParam(globalParam);
-            }
-            else
-            {
-                addToWorkList(globalInst);
-            }
+        case kIROp_Add:
+        case kIROp_Sub:
+        case kIROp_Mul:
+        case kIROp_FRem:
+        case kIROp_IRem:
+        case kIROp_Lsh:
+        case kIROp_Rsh:
+        case kIROp_And:
+        case kIROp_Or:
+        case kIROp_Not:
+        case kIROp_Neg:
+        case kIROp_FieldExtract:
+        case kIROp_FieldAddress:
+        case kIROp_GetElement:
+        case kIROp_GetElementPtr:
+        case kIROp_UpdateElement:
+        case kIROp_MakeTuple:
+        case kIROp_GetTupleElement:
+        case kIROp_MakeStruct:
+        case kIROp_MakeArray:
+        case kIROp_MakeArrayFromElement:
+        case kIROp_MakeVector:
+        case kIROp_MakeMatrix:
+        case kIROp_MakeMatrixFromScalar:
+        case kIROp_MakeVectorFromScalar:
+        case kIROp_swizzle:
+        case kIROp_swizzleSet:
+        case kIROp_MatrixReshape:
+        case kIROp_MakeString:
+        case kIROp_MakeResultError:
+        case kIROp_MakeResultValue:
+        case kIROp_GetResultError:
+        case kIROp_GetResultValue:
+        case kIROp_CastFloatToInt:
+        case kIROp_CastIntToFloat:
+        case kIROp_CastIntToPtr:
+        case kIROp_CastPtrToBool:
+        case kIROp_CastPtrToInt:
+        case kIROp_BitAnd:
+        case kIROp_BitNot:
+        case kIROp_BitOr:
+        case kIROp_BitXor:
+        case kIROp_BitCast:
+        case kIROp_IntCast:
+        case kIROp_FloatCast:
+        case kIROp_Greater:
+        case kIROp_Less:
+        case kIROp_Geq:
+        case kIROp_Leq:
+        case kIROp_Neq:
+        case kIROp_Eql:
+        case kIROp_Call:
+            return true;
+        default:
+            return false;
         }
+    }
+
+    /// Inline `inst` in the local function body so they can be emitted as a local inst.
+    ///
+    IRInst* maybeInlineGlobalValue(IRBuilder& builder, IRInst* inst, IRCloneEnv& cloneEnv)
+    {
+        if (!isInlinableGlobalInst(inst))
+        {
+            switch (inst->getOp())
+            {
+            case kIROp_Func:
+            case kIROp_Specialize:
+            case kIROp_Generic:
+            case kIROp_LookupWitness:
+                return inst;
+            }
+            if (as<IRType>(inst))
+                return inst;
+
+            // If we encounter a global value that shouldn't be inlined, e.g. a const literal,
+            // we should insert a GlobalValueRef() inst to wrap around it, so all the dependent uses
+            // can be pinned to the function body.
+            auto result = builder.emitGlobalValueRef(inst);
+            cloneEnv.mapOldValToNew[inst] = result;
+            return result;
+        }
+        
+        // If the global value is inlinable, we make all its operands avaialble locally, and then copy it
+        // to the local scope.
+        ShortList<IRInst*> args;
+        for (UInt i = 0; i < inst->getOperandCount(); i++)
+        {
+            auto operand = inst->getOperand(i);
+            auto inlinedOperand = maybeInlineGlobalValue(builder, operand, cloneEnv);
+            args.add(inlinedOperand);
+        }
+        auto result = cloneInst(&cloneEnv, &builder, inst);
+        cloneEnv.mapOldValToNew[inst] = result;
+        return result;
+    }
+
+    void processWorkList()
+    {
 
         while (workList.getCount() != 0)
         {
@@ -1307,6 +1395,39 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 break;
             }
         }
+    }
+
+    void setInsertBeforeOutsideASM(IRBuilder& builder, IRInst* beforeInst)
+    {
+        auto parent = beforeInst->getParent();
+        while (parent)
+        {
+            if (as<IRSPIRVAsm>(parent))
+            {
+                builder.setInsertBefore(parent);
+                return;
+            }
+            parent = parent->getParent();
+        }
+        builder.setInsertBefore(beforeInst);
+    }
+
+    void processModule()
+    {
+        // Process global params before anything else, so we don't generate inefficient
+        // array marhalling code for array-typed global params.
+        for (auto globalInst : m_module->getGlobalInsts())
+        {
+            if (auto globalParam = as<IRGlobalParam>(globalInst))
+            {
+                processGlobalParam(globalParam);
+            }
+            else
+            {
+                addToWorkList(globalInst);
+            }
+        }
+        processWorkList();
 
         // Translate types.
         List<IRHLSLStructuredBufferTypeBase*> instsToProcess;
@@ -1325,6 +1446,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             t->replaceUsesWith(builder.getPtrType(kIROp_PtrType, lowered.structType, SpvStorageClassStorageBuffer));
         }
 
+        List<IRUse*> globalInstUsesToInline;
+
         for (auto globalInst : m_module->getGlobalInsts())
         {
             if (auto func = as<IRFunc>(globalInst))
@@ -1337,8 +1460,27 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 // After legalizing the control flow, we need to sort our blocks to ensure this is true.
                 sortBlocksInFunc(func);
             }
+
+            if (isInlinableGlobalInst(globalInst))
+            {
+                for (auto use = globalInst->firstUse; use; use = use->nextUse)
+                {
+                    if (getParentFunc(use->getUser()) != nullptr)
+                        globalInstUsesToInline.add(use);
+                }
+            }
         }
 
+        for (auto use : globalInstUsesToInline)
+        {
+            auto user = use->getUser();
+            IRBuilder builder(user);
+            setInsertBeforeOutsideASM(builder, user);
+            IRCloneEnv cloneEnv;
+            auto val = maybeInlineGlobalValue(builder, use->get(), cloneEnv);
+            if (val != use->get())
+                builder.replaceOperand(use, val);
+        }
     }
 };
 

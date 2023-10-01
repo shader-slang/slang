@@ -2268,6 +2268,12 @@ struct SPIRVEmitContext
         case kIROp_Rsh:
         case kIROp_Lsh:
             return emitArithmetic(parent, inst);
+        case kIROp_GlobalValueRef:
+            {
+                auto inner = ensureInst(inst->getOperand(0));
+                registerInst(inst, inner);
+                return inner;
+            }
         case kIROp_Return:
             if (as<IRReturn>(inst)->getVal()->getOp() == kIROp_VoidLit)
                 return emitOpReturn(parent, inst);
@@ -4230,7 +4236,7 @@ struct SPIRVEmitContext
             opCode = isFloatingPoint ? SpvOpFOrdEqual : isBool ? SpvOpLogicalEqual : SpvOpIEqual;
             break;
         case kIROp_Neq:
-            opCode = isFloatingPoint ? SpvOpFOrdNotEqual
+            opCode = isFloatingPoint ? SpvOpFUnordNotEqual
                 : isBool ? SpvOpLogicalNotEqual : SpvOpINotEqual;
             break;
         case kIROp_Geq:

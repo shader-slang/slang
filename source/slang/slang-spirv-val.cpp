@@ -18,20 +18,10 @@ static SlangResult disassembleSPIRV(const List<uint8_t>& spirv, String& outErr, 
     const auto out = p->getStream(StdStreamType::Out);
     const auto err = p->getStream(StdStreamType::ErrorOut);
 
-    // Write the assembly
-    SLANG_RETURN_ON_FAIL(in->write(spirv.getBuffer(), spirv.getCount()));
-    in->close();
-
-    // Wait for it to finish
     List<Byte> outData;
     List<Byte> outErrData;
-    while (!out->isEnd() || !err->isEnd())
-    {
-        if (!out->isEnd())
-            StreamUtil::readAll(out, 0, outData);
-        if (!err->isEnd())
-            StreamUtil::readAll(err, 0, outErrData);
-    }
+    SLANG_RETURN_ON_FAIL(StreamUtil::readAndWrite(in, spirv.getArrayView(), out, outData, err, outErrData));
+
     SLANG_RETURN_ON_FAIL(p->waitForTermination(10));
 
     outDis = String(

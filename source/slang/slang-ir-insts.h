@@ -1199,6 +1199,17 @@ struct IRAlloca : IRInst
     IRInst* getAllocSize() { return getOperand(0); }
 };
 
+/// A non-hoistable inst used to "pin" a global value inside a function body so any insts dependent on `value`
+/// can be emitted as local insts instead of global insts, as required by targets (e.g. spirv) that doesn't
+/// allow the dependent computation in the global scope.
+/// 
+struct IRGlobalValueRef : IRInst
+{
+    IR_LEAF_ISA(GlobalValueRef)
+
+    IRInst* getValue() { return getOperand(0); }
+};
+
 /// Packs a value into an `AnyValue`.
 /// Return type is `IRAnyValueType`.
 struct IRPackAnyValue : IRInst
@@ -3457,6 +3468,8 @@ public:
     IRInst* emitGetSequentialIDInst(IRInst* rttiObj);
 
     IRInst* emitAlloca(IRInst* type, IRInst* rttiObjPtr);
+
+    IRInst* emitGlobalValueRef(IRInst* globalInst);
 
     IRInst* emitPackAnyValue(IRType* type, IRInst* value);
 
