@@ -1214,6 +1214,25 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
     }
 
+    // Opcodes that can exist in global scope, as long as the operands are.
+    bool isLegalGlobalInst(IRInst* inst)
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_MakeStruct:
+        case kIROp_MakeArray:
+        case kIROp_MakeArrayFromElement:
+        case kIROp_MakeVector:
+        case kIROp_MakeMatrix:
+        case kIROp_MakeMatrixFromScalar:
+        case kIROp_MakeVectorFromScalar:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    // Opcodes that can be inlined into function bodies.
     bool isInlinableGlobalInst(IRInst* inst)
     {
         switch (inst->getOp())
@@ -1276,11 +1295,25 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
+    bool shouldInlineInst(IRInst* inst)
+    {
+        if (!isInlinableGlobalInst(inst))
+            return false;
+        if (isLegalGlobalInst(inst))
+        {
+            for (UInt i = 0; i < inst->getOperandCount(); i++)
+                if (shouldInlineInst(inst->getOperand(i)))
+                    return true;
+            return false;
+        }
+        return true;
+    }
+
     /// Inline `inst` in the local function body so they can be emitted as a local inst.
     ///
     IRInst* maybeInlineGlobalValue(IRBuilder& builder, IRInst* inst, IRCloneEnv& cloneEnv)
     {
-        if (!isInlinableGlobalInst(inst))
+        if (!shouldInlineInst(inst))
         {
             switch (inst->getOp())
             {
