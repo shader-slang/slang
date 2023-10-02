@@ -2274,6 +2274,20 @@ struct SPIRVEmitContext
                 registerInst(inst, inner);
                 return inner;
             }
+        case kIROp_GetVulkanRayTracingPayloadLocation:
+            {
+                IRInst* location = getVulkanPayloadLocation(inst->getOperand(0));
+                if (!location)
+                {
+                    SLANG_DIAGNOSE_UNEXPECTED(m_sink, inst, "no payload location assigned.");
+                    IRBuilder builder(inst);
+                    builder.setInsertBefore(inst);
+                    location = builder.getIntValue(builder.getIntType(), 0);
+                }
+                auto inner = ensureInst(location);
+                registerInst(inst, inner);
+                return inner;
+            }
         case kIROp_Return:
             if (as<IRReturn>(inst)->getVal()->getOp() == kIROp_VoidLit)
                 return emitOpReturn(parent, inst);

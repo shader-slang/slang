@@ -209,6 +209,8 @@ IRInst* findInterfaceRequirement(IRInterfaceType* type, IRInst* key);
 
 IRInst* findWitnessTableEntry(IRWitnessTable* table, IRInst* key);
 
+IRInst* getVulkanPayloadLocation(IRInst* payloadGlobalVar);
+
 void moveParams(IRBlock* dest, IRBlock* src);
 
 void removePhiArgs(IRInst* phiParam);
