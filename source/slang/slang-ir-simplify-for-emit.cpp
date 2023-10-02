@@ -137,7 +137,7 @@ struct SimplifyForEmitContext : public InstPassBase
         // If we reach here, it is OK to defer the load at use site.
         IRBuilder builder(module);
         builder.setInsertBefore(user);
-        auto newLoad = builder.emitLoad(load->getPtr());
+        auto newLoad = builder.emitLoad(load->getFullType(), load->getPtr());
         builder.replaceOperand(use, newLoad);
     }
 

@@ -62,18 +62,17 @@ struct ResourceParameterSpecializationCondition : FunctionCallSpecializeConditio
         //
         if( isKhronosTarget(targetRequest) )
         {
-            return isIllegalGLSLParameterType(type);
+            if (targetRequest->shouldEmitSPIRVDirectly())
+                return isIllegalSPIRVParameterType(type);
+            else
+                return isIllegalGLSLParameterType(type);
         }
+
 
         // For now, we will not treat any other parameters as
         // needing specialization, even if they use resource
         // types like `Texure2D`, because these are allowed
         // as function parameters in both HLSL and GLSL.
-        //
-        // TODO: Eventually, if we start generating SPIR-V
-        // directly rather than through glslang, we will need
-        // to specialize *all* resource-type parameters
-        // to follow the restrictions in the spec.
         //
         // TODO: We may want to perform more aggressive
         // specialization in general, especially insofar
@@ -1237,4 +1236,15 @@ bool isIllegalGLSLParameterType(IRType* type)
     return false;
 }
 
+bool isIllegalSPIRVParameterType(IRType* type)
+{
+    if (isIllegalGLSLParameterType(type))
+        return true;
+
+    // If we are emitting SPIRV direclty, we need to specialize
+    // all Texture types.
+    if (auto texType = as<IRTextureType>(type))
+        return true;
+    return false;
+}
 } // namespace Slang

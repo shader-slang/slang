@@ -304,6 +304,8 @@ INST(GetSequentialID, GetSequentialID, 1, HOISTABLE)
 INST(BindGlobalGenericParam, bind_global_generic_param, 2, 0)
 INST(AllocObj, allocObj, 0, 0)
 
+INST(GlobalValueRef, globalValueRef, 1, 0)
+
 INST(MakeUInt64, makeUInt64, 2, 0)
 INST(MakeVector, makeVector, 0, 0)
 INST(MakeMatrix, makeMatrix, 0, 0)

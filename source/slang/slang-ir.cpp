@@ -3448,6 +3448,18 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitGlobalValueRef(IRInst* globalInst)
+    {
+        auto inst = createInst<IRGlobalValueRef>(
+            this,
+            kIROp_GlobalValueRef,
+            (IRType*)globalInst->getFullType(),
+            globalInst);
+
+        addInst(inst);
+        return inst;
+    }
+
     IRInst* IRBuilder::emitPackAnyValue(IRType* type, IRInst* value)
     {
         auto inst = createInst<IRPackAnyValue>(
