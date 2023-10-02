@@ -2527,19 +2527,17 @@ void addCallArgsForParam(
     /// Compute the direction for a parameter based on its declaration
 ParameterDirection getParameterDirection(VarDeclBase* paramDecl)
 {
-    if( paramDecl->hasModifier<RefModifier>()
+    if( paramDecl->hasModifier<RefModifier>())
+    {
+        return kParameterDirection_Ref;
+    }
+    if (paramDecl->hasModifier<ConstRefModifier>()
         || paramDecl->hasModifier<HLSLPayloadModifier>() )
     {
-        // The AST specified `ref` or `payload`:
-
         // The payload types are a groupshared variable, and we really don't
         // want to copy that into registers in every invocation on platforms
         // where this matters, so treat them as by-reference here.
 
-        return kParameterDirection_Ref;
-    }
-    if (paramDecl->hasModifier<ConstRefModifier>())
-    {
         return kParameterDirection_ConstRef;
     }
     if( paramDecl->hasModifier<InOutModifier>() )
