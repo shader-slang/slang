@@ -33,9 +33,9 @@ namespace Slang
             if (auto arrayType = as<IRArrayTypeBase>(param->getFullType()))
             {
                 changed = true;
-                builder.setInsertBefore(param);
                 auto ptrArrayType = builder.getPtrType(arrayType);
-                auto newParam = builder.emitParam(ptrArrayType);
+                auto newParam = builder.createParam(ptrArrayType);
+                newParam->insertBefore(param);
                 setInsertAfterOrdinaryInst(&builder, param);
                 auto regVal = builder.emitLoad(newParam);
                 param->replaceUsesWith(regVal);
@@ -62,6 +62,7 @@ namespace Slang
                         for (auto paramId : arrayParamIds)
                         {
                             auto arg = call->getArg(paramId);
+                            SLANG_ASSERT(as<IRPtrTypeBase>(paramTypes[paramId]));
                             auto var = builder.emitVar(as<IRPtrTypeBase>(paramTypes[paramId])->getValueType());
                             builder.emitStore(var, arg);
                             call->setArg(paramId, var);

@@ -1516,6 +1516,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
     void processModule()
     {
+#if 0
+        eliminateArrayTypeSSARegisters(m_module);
+#endif
+
         // Process global params before anything else, so we don't generate inefficient
         // array marhalling code for array-typed global params.
         for (auto globalInst : m_module->getGlobalInsts())
