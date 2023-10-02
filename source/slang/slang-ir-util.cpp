@@ -814,6 +814,24 @@ IRInst* findWitnessTableEntry(IRWitnessTable* table, IRInst* key)
     return nullptr;
 }
 
+IRInst* getVulkanPayloadLocation(IRInst* payloadGlobalVar)
+{
+    IRInst* location = nullptr;
+    for (auto decor : payloadGlobalVar->getDecorations())
+    {
+        switch (decor->getOp())
+        {
+        case kIROp_VulkanRayPayloadDecoration:
+        case kIROp_VulkanCallablePayloadDecoration:
+        case kIROp_VulkanHitObjectAttributesDecoration:
+            return decor->getOperand(0);
+        default:
+            continue;
+        }
+    }
+    return location;
+}
+
 void moveParams(IRBlock* dest, IRBlock* src)
 {
     for (auto param = src->getFirstChild(); param;)

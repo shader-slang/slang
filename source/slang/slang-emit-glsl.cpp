@@ -1893,6 +1893,18 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 
             return true;
         }
+        case kIROp_GetVulkanRayTracingPayloadLocation:
+        {
+            auto payloadVar = inst->getOperand(0);
+            IRInst* location = getVulkanPayloadLocation(payloadVar);
+            if (!location)
+            {
+                SLANG_DIAGNOSE_UNEXPECTED(getSink(), inst, "no payload location assigned.");
+                m_writer->emit("0");
+            }
+            m_writer->emit(getIntVal(location));
+            return true;
+        }
         case kIROp_ImageLoad:
         {
             m_writer->emit("imageLoad(");

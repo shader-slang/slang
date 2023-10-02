@@ -2693,18 +2693,6 @@ void assignRayPayloadHitObjectAttributeLocations(IRModule* module)
             }
         }
     end:;
-        if (location)
-        {
-            traverseUses(globalVar, [&](IRUse* use)
-                {
-                    auto user = use->getUser();
-                    if (user->getOp() == kIROp_GetVulkanRayTracingPayloadLocation)
-                    {
-                        user->replaceUsesWith(location);
-                        user->removeAndDeallocate();
-                    }
-                });
-        }
     }
 }
 

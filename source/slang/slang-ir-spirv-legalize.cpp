@@ -265,7 +265,38 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         return false;
     }
 
-    void inferTextureFormat(IRInst* textureInst, IRTextureTypeBase* textureType)
+    static IRType* replaceImageElementType(IRInst* originalType, IRInst* newElementType)
+    {
+        switch(originalType->getOp())
+        {
+        case kIROp_ArrayType:
+        case kIROp_UnsizedArrayType:
+        case kIROp_PtrType:
+        case kIROp_OutType:
+        case kIROp_RefType:
+        case kIROp_ConstRefType:
+        case kIROp_InOutType:
+            {
+                auto newInnerType = replaceImageElementType(originalType->getOperand(0), newElementType);
+                if (newInnerType != originalType->getOperand(0))
+                {
+                    IRBuilder builder(originalType);
+                    builder.setInsertBefore(originalType);
+                    IRCloneEnv cloneEnv;
+                    cloneEnv.mapOldValToNew.add(originalType->getOperand(0), newInnerType);
+                    return (IRType*)cloneInst(&cloneEnv, &builder, originalType);
+                }
+                return (IRType*)originalType;
+            }
+            
+        default:
+            if (as<IRResourceTypeBase>(originalType))
+                return (IRType*)newElementType;
+            return (IRType*)originalType;
+        }
+    }
+
+    static void inferTextureFormat(IRInst* textureInst, IRTextureTypeBase* textureType)
     {
         ImageFormat format = ImageFormat::unknown;
         if (auto decor = textureInst->findDecoration<IRFormatDecoration>())
@@ -368,14 +399,52 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             args.add(builder.getIntValue(builder.getUIntType(), IRIntegerValue(format)));
 
             auto newType = (IRType*)builder.emitIntrinsicInst(builder.getTypeKind(), textureType->getOp(), 3, args.getBuffer());
-            textureInst->setFullType(newType);
+            if (textureInst->getFullType() == textureType)
+            {
+                // Simple texture typed global param.
+                textureInst->setFullType(newType);
+            }
+            else
+            {
+                // Array typed global param. We need to replace the type and the types of all getElement insts.
+                auto newInstType = (IRType*)replaceImageElementType(textureInst->getFullType(), newType);
+                textureInst->setFullType(newInstType);
+                List<IRUse*> typeReplacementWorkList;
+                HashSet<IRUse*> typeReplacementWorkListSet;
+                for (auto use = textureInst->firstUse; use; use = use->nextUse)
+                {
+                    if (typeReplacementWorkListSet.add(use))
+                        typeReplacementWorkList.add(use);
+                }
+                for (Index i = 0; i < typeReplacementWorkList.getCount(); i++)
+                {
+                    auto use = typeReplacementWorkList[i];
+                    auto user = use->getUser();
+                    switch (user->getOp())
+                    {
+                    case kIROp_GetElementPtr:
+                    case kIROp_GetElement:
+                    case kIROp_Load:
+                        {
+                            auto newUserType = (IRType*)replaceImageElementType(user->getFullType(), newType);
+                            user->setFullType(newUserType);
+                            for (auto u = user->firstUse; u; u = u->nextUse)
+                            {
+                                if (typeReplacementWorkListSet.add(u))
+                                    typeReplacementWorkList.add(u);
+                            }
+                            break;
+                        };
+                    }
+                }
+            }
         }
     }
 
     void processGlobalParam(IRGlobalParam* inst)
     {
         // If the param is a texture, infer its format.
-        if (auto textureType = as<IRTextureTypeBase>(inst->getDataType()))
+        if (auto textureType = as<IRTextureTypeBase>(unwrapArray(inst->getDataType())))
         {
             inferTextureFormat(inst, textureType);
         }
@@ -1447,6 +1516,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
     void processModule()
     {
+#if 0
+        eliminateArrayTypeSSARegisters(m_module);
+#endif
+
         // Process global params before anything else, so we don't generate inefficient
         // array marhalling code for array-typed global params.
         for (auto globalInst : m_module->getGlobalInsts())

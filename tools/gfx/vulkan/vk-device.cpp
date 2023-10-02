@@ -405,6 +405,10 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         extendedFeatures.rayTracingPipelineFeatures.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &extendedFeatures.rayTracingPipelineFeatures;
 
+        // SER features.
+        extendedFeatures.rayTracingInvocationReorderFeatures.pNext = deviceFeatures2.pNext;
+        deviceFeatures2.pNext = &extendedFeatures.rayTracingInvocationReorderFeatures;
+
         // Acceleration structure features
         extendedFeatures.accelerationStructureFeatures.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &extendedFeatures.accelerationStructureFeatures;
@@ -580,6 +584,16 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
             deviceCreateInfo.pNext = &extendedFeatures.meshShaderFeatures;
 
             m_features.add("mesh-shader");
+        }
+
+        if (extendedFeatures.rayTracingInvocationReorderFeatures.rayTracingInvocationReorder)
+        {
+            deviceExtensions.add(VK_NV_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME);
+
+            extendedFeatures.rayTracingInvocationReorderFeatures.pNext = (void*)deviceCreateInfo.pNext;
+            deviceCreateInfo.pNext = &extendedFeatures.rayTracingInvocationReorderFeatures;
+
+            m_features.add("shader-execution-reorder");
         }
 
         if (_hasAnySetBits(

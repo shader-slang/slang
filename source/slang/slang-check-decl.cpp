@@ -1836,18 +1836,20 @@ namespace Slang
         RefPtr<WitnessTable>    witnessTable)
     {
         if(satisfyingMemberDeclRef.getDecl()->hasModifier<MutatingAttribute>()
-            && !requiredMemberDeclRef.getDecl()->hasModifier<MutatingAttribute>())
+            != requiredMemberDeclRef.getDecl()->hasModifier<MutatingAttribute>())
         {
-            // A `[mutating]` method can't satisfy a non-`[mutating]` requirement,
-            // but vice-versa is okay.
+            // A `[mutating]` method can't satisfy a non-`[mutating]` requirement.
+            // The opposite direction is okay, but we will need to synthesize a wrapper
+            // to ensure type matches, so we will return false here either way.
             return false;
         }
 
         if (satisfyingMemberDeclRef.getDecl()->hasModifier<ConstRefAttribute>()
-            && !requiredMemberDeclRef.getDecl()->hasModifier<ConstRefAttribute>())
+            != requiredMemberDeclRef.getDecl()->hasModifier<ConstRefAttribute>())
         {
-            // A `[constref]` method can't satisfy a non-`[constref]` requirement,
-            // but vice-versa is okay.
+            // A `[constref]` method can't satisfy a non-`[constref]` requirement.
+            // The opposite direction is okay, but we will need to synthesize a wrapper
+            // to ensure type matches, so we will return false here either way.
             return false;
         }
 
@@ -2677,11 +2679,21 @@ namespace Slang
             synArg->type = paramType;
             synArgs.add(synArg);
 
-            if (paramDeclRef.getDecl()->findModifier<NoDiffModifier>())
+            // Add modifiers
+            for (auto modifier : paramDeclRef.getDecl()->modifiers)
             {
-                auto noDiffModifier = m_astBuilder->create<NoDiffModifier>();
-                noDiffModifier->keywordName = getSession()->getNameObj("no_diff");
-                addModifier(synParamDecl, noDiffModifier);
+                if (as<NoDiffModifier>(modifier))
+                {
+                    auto noDiffModifier = m_astBuilder->create<NoDiffModifier>();
+                    noDiffModifier->keywordName = getSession()->getNameObj("no_diff");
+                    addModifier(synParamDecl, noDiffModifier);
+                }
+                else if (as<InOutModifier>(modifier) || as<OutModifier>(modifier) || as<ConstRefModifier>(modifier) || as<RefModifier>(modifier))
+                {
+                    auto clonedModifier = (Modifier*)m_astBuilder->createByNodeType(modifier->astNodeType);
+                    clonedModifier->keywordName = modifier->keywordName;
+                    addModifier(synParamDecl, clonedModifier);
+                }
             }
         }
 
