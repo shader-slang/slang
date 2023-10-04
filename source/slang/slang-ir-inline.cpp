@@ -252,9 +252,6 @@ struct InliningPassBase
             {
             case kIROp_IntrinsicOpDecoration:
                 return true;
-            case kIROp_RequireSPIRVCapabilityDecoration:
-                // Don't inline a function with spirv capability decoration to avoid losing it.
-                return false;
             }
         }
 
@@ -947,7 +944,7 @@ void performGLSLResourceReturnFunctionInlining(IRModule* module)
     while (changed)
     {
         changed = pass.considerAllCallSites();
-        simplifyIR(module);
+        simplifyIR(module, IRSimplificationOptions::getFast());
     }
 }
 
@@ -963,8 +960,6 @@ struct IntrinsicFunctionInliningPass : InliningPassBase
     {
         auto func = as<IRFunc>(getResolvedInstForDecorations(info.callee));
         if (!func)
-            return false;
-        if (func->findDecorationImpl(kIROp_RequireSPIRVCapabilityDecoration))
             return false;
         auto returnInst = as<IRReturn>(func->getFirstBlock()->getTerminator());
         if (!returnInst)
@@ -1024,5 +1019,33 @@ bool inlineCall(IRCall* call)
     return pass.considerCallSite(call);
 }
 
+
+struct SpirvInliningPass : InliningPassBase
+{
+    typedef InliningPassBase Super;
+
+    SpirvInliningPass(IRModule* module)
+        : Super(module)
+    {}
+
+    bool shouldInline(CallSiteInfo const& info)
+    {
+        if (!info.callee->findDecoration<IREntryPointDecoration>())
+            return true;
+        return false;
+    }
+};
+
+void performSpirvInlining(IRModule* module)
+{
+    SLANG_PROFILE;
+    while (true)
+    {
+        SpirvInliningPass pass(module);
+        if (pass.considerAllCallSites())
+            continue;
+        break;
+    }
+}
 
 } // namespace Slang

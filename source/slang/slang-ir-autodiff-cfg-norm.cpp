@@ -798,7 +798,7 @@ void normalizeCFG(
     // Remove phis to simplify our pass. We'll add them back in later
     // with constructSSA.
     //
-    eliminatePhisInFunc(LivenessMode::Disabled, func->getModule(), func, false);
+    eliminatePhisInFunc(LivenessMode::Disabled, func->getModule(), func, PhiEliminationOptions::getFast());
 
     CFGNormalizationContext context = {module, options.sink};
     CFGNormalizationPass cfgPass(context);

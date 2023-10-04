@@ -1,6 +1,7 @@
 // slang-ir-eliminate-phis.cpp
 #include "slang-ir-eliminate-phis.h"
 #include "slang-ir-ssa-register-allocate.h"
+#include "slang-ir-util.h"
 
 // This file implements a pass to take code in the Slang IR out out SSA form
 // by eliminating all "phi nodes."
@@ -68,20 +69,20 @@ struct PhiEliminationContext
     IRModule* m_module = nullptr;
     IRBuilder m_builder;
     LivenessMode m_livenessMode;
-    bool m_useRegisterAllocation;
+    PhiEliminationOptions m_options;
 
     PhiEliminationContext(LivenessMode livenessMode, IRModule* module)
         : m_module(module)
         , m_builder(module)
         , m_livenessMode(livenessMode)
-        , m_useRegisterAllocation(true)
+        , m_options()
     {}
 
-     PhiEliminationContext(LivenessMode livenessMode, IRModule* module, bool useRegisterAllocation)
+     PhiEliminationContext(LivenessMode livenessMode, IRModule* module, PhiEliminationOptions options)
         : m_module(module)
         , m_builder(module)
         , m_livenessMode(livenessMode)
-        , m_useRegisterAllocation(useRegisterAllocation)
+        , m_options(options)
     {}
 
     // We start with the top-down logic of the pass, which is to process
@@ -220,9 +221,9 @@ struct PhiEliminationContext
         m_func = func;
         m_dominatorTree = nullptr;
 
-        if (m_useRegisterAllocation)
+        if (m_options.useRegisterAllocation)
         {
-            m_registerAllocation = allocateRegistersForFunc(func, m_dominatorTree);
+            m_registerAllocation = allocateRegistersForFunc(func, m_dominatorTree, m_options.eliminateCompositeTypedPhiOnly);
             m_mapRegToTempVar = createTempVarForInsts(func);
         }
     }
@@ -435,7 +436,7 @@ struct PhiEliminationContext
         {
             Index paramIndex = paramCounter++;
             mapParamToIndex.add(param, paramIndex);
-
+            
             IRInst* temp = nullptr;
 
             // Have we already allocated a register for this inst?
@@ -445,7 +446,9 @@ struct PhiEliminationContext
                 m_mapRegToTempVar.tryGetValue(registerInfo->get(), temp);
             }
 
-            if (!temp)
+            bool shouldAllocTemp = !m_options.eliminateCompositeTypedPhiOnly || isCompositeType(param->getFullType());
+
+            if (!temp && shouldAllocTemp)
             {
                 // Note that the `emitVar` operation expects to be passed the
                 // type *stored* in the variable, but the IR `var` instruction
@@ -471,7 +474,7 @@ struct PhiEliminationContext
             PhiInfo phiInfo;
             auto& paramInfo = phiInfo.param;
             paramInfo.param = param;
-            paramInfo.temp = cast<IRVar>(temp);
+            paramInfo.temp = as<IRVar>(temp);
             phiInfos.add(phiInfo);
         }
     }
@@ -515,6 +518,9 @@ struct PhiEliminationContext
             auto& paramInfo = phiInfo.param;
             auto param = paramInfo.param;
             auto temp = paramInfo.temp;
+            
+            if (!temp)
+                continue;
 
             // We will repeatedly replace whatever the *first*
             // use of `param` is, until there are no more uses
@@ -738,6 +744,10 @@ struct PhiEliminationContext
         {
             assignment.state = kState_Done;
         }
+        else if (!dstParam.temp)
+        {
+            assignment.state = kState_Done;
+        }
         else
         {
             // Otherwise we start out assuming that the assignment is ready
@@ -909,17 +919,24 @@ struct PhiEliminationContext
         static const Count kMaxNewOperandCount = 3;
         SLANG_ASSERT(newOperandCount <= kMaxNewOperandCount);
 
-        IRInst* newOperands[kMaxNewOperandCount] = {};
+        ShortList<IRInst*> newOperands;
         for (Index i = 0; i < newOperandCount; ++i)
         {
-            newOperands[i] = oldBranch->getOperand(i);
+            newOperands.add(oldBranch->getOperand(i));
+        }
+
+        // Add operands for any remaining phi parameters that has not been eliminated.
+        for (UInt i = 0; i < (UInt)phiInfos.getCount(); i++)
+        {
+            if (!phiInfos[i].param.temp)
+                newOperands.add(oldBranch->getArg(i));
         }
 
         auto newBranch = m_builder.emitIntrinsicInst(
             oldBranch->getFullType(),
             oldBranch->getOp(),
-            newOperandCount,
-            newOperands);
+            newOperands.getCount(),
+            newOperands.getArrayView().getBuffer());
         oldBranch->transferDecorationsTo(newBranch);
 
         // TODO: We could consider just modifying `branch` in-place by clearing
@@ -1122,9 +1139,9 @@ struct PhiEliminationContext
     }
 };
 
-void eliminatePhis(LivenessMode livenessMode, IRModule* module, bool useRegisterAllocation)
+void eliminatePhis(LivenessMode livenessMode, IRModule* module, PhiEliminationOptions options)
 {
-    PhiEliminationContext context(livenessMode, module, useRegisterAllocation);
+    PhiEliminationContext context(livenessMode, module, options);
     context.eliminatePhisInModule();
 }
 
@@ -1132,9 +1149,9 @@ void eliminatePhisInFunc(
     LivenessMode livenessMode,
     IRModule* module,
     IRGlobalValueWithCode* func,
-    bool useRegisterAllocation)
+    PhiEliminationOptions options)
 {
-    PhiEliminationContext context(livenessMode, module, useRegisterAllocation);
+    PhiEliminationContext context(livenessMode, module, options);
     context.eliminatePhisInFunc(func);
 }
 

@@ -11,12 +11,13 @@
 #include "slang-ir-redundancy-removal.h"
 #include "slang-ir-propagate-func-properties.h"
 #include "../core/slang-performance-profiler.h"
+#include "slang-ir-util.h"
 
 namespace Slang
 {
     // Run a combination of SSA, SCCP, SimplifyCFG, and DeadCodeElimination pass
     // until no more changes are possible.
-    void simplifyIR(IRModule* module, DiagnosticSink* sink)
+    void simplifyIR(IRModule* module, IRSimplificationOptions options, DiagnosticSink* sink)
     {
         SLANG_PROFILE;
         bool changed = true;
@@ -50,7 +51,7 @@ namespace Slang
                     funcChanged |= applySparseConditionalConstantPropagation(func, sink);
                     funcChanged |= peepholeOptimize(func);
                     funcChanged |= removeRedundancyInFunc(func);
-                    funcChanged |= simplifyCFG(func);
+                    funcChanged |= simplifyCFG(func, options.cfgOptions);
                     eliminateDeadCode(func);
                     funcChanged |= constructSSA(func);
                     changed |= funcChanged;
@@ -67,7 +68,7 @@ namespace Slang
         }
     }
 
-    void simplifyNonSSAIR(IRModule* module)
+    void simplifyNonSSAIR(IRModule* module, IRSimplificationOptions options)
     {
         bool changed = true;
         const int kMaxIterations = 8;
@@ -75,21 +76,24 @@ namespace Slang
         while (changed && iterationCounter < kMaxIterations)
         {
             changed = false;
+            auto irBefore = dumpIRToString(module->getModuleInst());
             changed |= peepholeOptimize(module);
+
             changed |= removeRedundancy(module);
-            changed |= simplifyCFG(module);
+            changed |= simplifyCFG(module, options.cfgOptions);
 
             // Note: we disregard the `changed` state from dead code elimination pass since
             // SCCP pass could be generating temporarily evaluated constant values and never actually use them.
             // DCE will always remove those nearly generated consts and always returns true here.
             eliminateDeadCode(module);
 
+            auto irAfter = dumpIRToString(module->getModuleInst());
             iterationCounter++;
         }
     }
 
 
-    void simplifyFunc(IRGlobalValueWithCode* func, DiagnosticSink* sink)
+    void simplifyFunc(IRGlobalValueWithCode* func, IRSimplificationOptions options, DiagnosticSink* sink)
     {
         bool changed = true;
         const int kMaxIterations = 8;
@@ -103,7 +107,7 @@ namespace Slang
             changed |= applySparseConditionalConstantPropagation(func, sink);
             changed |= peepholeOptimize(func);
             changed |= removeRedundancyInFunc(func);
-            changed |= simplifyCFG(func);
+            changed |= simplifyCFG(func, options.cfgOptions);
 
             // Note: we disregard the `changed` state from dead code elimination pass since
             // SCCP pass could be generating temporarily evaluated constant values and never actually use them.

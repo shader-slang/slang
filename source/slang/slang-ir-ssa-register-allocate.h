@@ -19,6 +19,6 @@ struct RegisterAllocationResult
     Dictionary<IRInst*, RefPtr<RegisterInfo>> mapInstToRegister;
 };
 
-RegisterAllocationResult allocateRegistersForFunc(IRGlobalValueWithCode* func, RefPtr<IRDominatorTree>& inOutDom);
+RegisterAllocationResult allocateRegistersForFunc(IRGlobalValueWithCode* func, RefPtr<IRDominatorTree>& inOutDom, bool allocateForCompositeTypesOnly);
 
 }

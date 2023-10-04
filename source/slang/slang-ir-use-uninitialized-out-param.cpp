@@ -20,7 +20,7 @@ namespace Slang
         if (!firstBlock)
             return;
 
-        ReachabilityContext reachability;
+        ReachabilityContext reachability(func);
 
         for (auto param : firstBlock->getParams())
         {

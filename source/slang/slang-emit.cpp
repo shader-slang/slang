@@ -10,6 +10,7 @@
 #include "slang-ir-byte-address-legalize.h"
 #include "slang-ir-collect-global-uniforms.h"
 #include "slang-ir-cleanup-void.h"
+#include "slang-ir-composite-reg-to-mem.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-diff-call.h"
 #include "slang-ir-autodiff.h"
@@ -360,7 +361,7 @@ Result linkAndOptimizeIR(
     // Lower all the LValue implict casts (used for out/inout/ref scenarios)
     lowerLValueCast(targetRequest, irModule);
 
-    simplifyIR(irModule, sink);
+    simplifyIR(irModule, IRSimplificationOptions::getDefault(), sink);
 
     // Fill in default matrix layout into matrix types that left layout unspecified.
     specializeMatrixLayout(codeGenContext->getTargetReq(), irModule);
@@ -472,7 +473,7 @@ Result linkAndOptimizeIR(
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
-    simplifyIR(irModule, sink);
+    simplifyIR(irModule, IRSimplificationOptions::getFast(), sink);
 
     if (!ArtifactDescUtil::isCpuLikeTarget(artifactDesc))
     {
@@ -501,7 +502,7 @@ Result linkAndOptimizeIR(
     // up downstream passes like type legalization, so we
     // will run a DCE pass to clean up after the specialization.
     //
-    simplifyIR(irModule, sink);
+    simplifyIR(irModule, IRSimplificationOptions::getDefault(), sink);
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
@@ -591,7 +592,7 @@ Result linkAndOptimizeIR(
     // to see if we can clean up any temporaries created by legalization.
     // (e.g., things that used to be aggregated might now be split up,
     // so that we can work with the individual fields).
-    simplifyIR(irModule, sink);
+    simplifyIR(irModule, IRSimplificationOptions::getFast(), sink);
 
 #if 0
     dumpIRIfEnabled(codeGenContext, irModule, "AFTER SSA");
@@ -924,12 +925,20 @@ Result linkAndOptimizeIR(
     // bit_cast on basic types.
     lowerBitCast(targetRequest, irModule);
 
-    eliminateMultiLevelBreak(irModule);
 
     if (isKhronosTarget(targetRequest) && targetRequest->shouldEmitSPIRVDirectly())
-        performIntrinsicFunctionFunctionInlining(irModule);
+    {
+        //performIntrinsicFunctionFunctionInlining(irModule);
+        performSpirvInlining(irModule);
+        eliminateDeadCode(irModule);
+    }
+    eliminateMultiLevelBreak(irModule);
 
-    simplifyIR(irModule, sink);
+    {
+        IRSimplificationOptions simplificationOptions = IRSimplificationOptions::getFast();
+        simplificationOptions.cfgOptions.removeTrivialSingleIterationLoops = true;
+        simplifyIR(irModule, IRSimplificationOptions::getFast(), sink);
+    }
 
     // As a late step, we need to take the SSA-form IR and move things *out*
     // of SSA form, by eliminating all "phi nodes" (block parameters) and
@@ -956,7 +965,13 @@ Result linkAndOptimizeIR(
         }
 
         // We only want to accumulate locations if liveness tracking is enabled.
-        eliminatePhis(livenessMode, irModule);
+        PhiEliminationOptions phiEliminationOptions;
+        if (isKhronosTarget(targetRequest) && targetRequest->shouldEmitSPIRVDirectly())
+        {
+            phiEliminationOptions.eliminateCompositeTypedPhiOnly = false;
+            phiEliminationOptions.useRegisterAllocation = true;
+        }
+        eliminatePhis(livenessMode, irModule, phiEliminationOptions);
 #if 0
         dumpIRIfEnabled(codeGenContext, irModule, "PHIS ELIMINATED");
 #endif
@@ -1000,7 +1015,7 @@ Result linkAndOptimizeIR(
     }
 
     // Run a final round of simplifications to clean up unused things after phi-elimination.
-    simplifyNonSSAIR(irModule);
+    simplifyNonSSAIR(irModule, IRSimplificationOptions::getFast());
 
     // We include one final step to (optionally) dump the IR and validate
     // it after all of the optimization passes are complete. This should
@@ -1263,15 +1278,18 @@ SlangResult emitSPIRVForEntryPointsDirectly(
     List<uint8_t> spirv, outSpirv;
     emitSPIRVFromIR(codeGenContext, irModule, irEntryPoints, spirv);
 
+#if 0
     String optErr;
     if (SLANG_FAILED(optimizeSPIRV(spirv, optErr, outSpirv)))
     {
+        File::writeAllBytes("D:\\problem-spirv.spv", spirv.getBuffer(), spirv.getCount());
         codeGenContext->getSink()->diagnose(SourceLoc(), Diagnostics::spirvOptFailed, optErr);
-        outSpirv = _Move(spirv);
+        spirv = _Move(outSpirv);
     }
+#endif
 
     auto artifact = ArtifactUtil::createArtifactForCompileTarget(asExternal(codeGenContext->getTargetFormat()));
-    artifact->addRepresentationUnknown(ListBlob::moveCreate(outSpirv));
+    artifact->addRepresentationUnknown(ListBlob::moveCreate(spirv));
 
     ArtifactUtil::addAssociated(artifact, linkedIR.metadata);
 

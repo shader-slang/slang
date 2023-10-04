@@ -355,7 +355,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ir-address-analysis.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-any-value-inference.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-any-value-marshalling.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-array-reg-to-mem.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-composite-reg-to-mem.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-augment-make-existential.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-autodiff-cfg-norm.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-autodiff-fwd.h" />
@@ -574,7 +574,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ir-address-analysis.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-any-value-inference.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-any-value-marshalling.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-array-reg-to-mem.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-composite-reg-to-mem.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-augment-make-existential.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-autodiff-cfg-norm.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-autodiff-fwd.cpp" />

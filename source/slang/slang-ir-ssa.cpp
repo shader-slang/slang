@@ -5,6 +5,7 @@
 #include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-validate.h"
+#include "slang-ir-util.h"
 
 namespace Slang {
 
@@ -843,6 +844,8 @@ void processBlock(
     IRBlock*                block,
     SSABlockInfo*           blockInfo)
 {
+    hoistInstOutOfASMBlocks(block);
+
     // Before starting, check if this block can be sealed
     maybeSealBlock(context, blockInfo);
 

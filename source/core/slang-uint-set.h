@@ -52,6 +52,8 @@ public:
         /// Returns true if the value is present
     inline bool contains(UInt val) const;
 
+    inline bool contains(const UIntSet& set) const;
+
         /// ==
     bool operator==(const UIntSet& set) const;
         /// !=
@@ -108,6 +110,25 @@ inline bool UIntSet::contains(UInt val) const
     const Index idx = Index(val >> kElementShift);
     return idx < m_buffer.getCount() &&
         ((m_buffer[idx] & (Element(1) << (val & kElementMask))) != 0);
+}
+
+// --------------------------------------------------------------------------
+inline bool UIntSet::contains(const UIntSet& set) const
+{
+    for (Index i = 0; i < set.m_buffer.getCount(); i++)
+    {
+        if (i >= m_buffer.getCount())
+        {
+            if (set.m_buffer[i])
+                return false;
+        }
+        else
+        {
+            if ((m_buffer[i] & set.m_buffer[i]) != set.m_buffer[i])
+                return false;
+        }
+    }
+    return true;
 }
 
 // --------------------------------------------------------------------------

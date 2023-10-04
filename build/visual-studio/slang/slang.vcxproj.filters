@@ -153,7 +153,7 @@
     <ClInclude Include="..\..\..\source\slang\slang-ir-any-value-marshalling.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\source\slang\slang-ir-array-reg-to-mem.h">
+    <ClInclude Include="..\..\..\source\slang\slang-ir-composite-reg-to-mem.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ir-augment-make-existential.h">
@@ -806,7 +806,7 @@
     <ClCompile Include="..\..\..\source\slang\slang-ir-any-value-marshalling.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\source\slang\slang-ir-array-reg-to-mem.cpp">
+    <ClCompile Include="..\..\..\source\slang\slang-ir-composite-reg-to-mem.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-augment-make-existential.cpp">

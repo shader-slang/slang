@@ -1185,7 +1185,7 @@ bool specializeResourceUsage(
             // and turned into SSA temporaries. Such optimization may enable
             // the following passes to "see" and specialize more cases.
             //
-            simplifyIR(irModule);
+            simplifyIR(irModule, IRSimplificationOptions::getFast());
             result |= changed;
         }
         if (unspecializableFuncs.getCount() == 0)
@@ -1205,7 +1205,7 @@ bool specializeResourceUsage(
                 inlineCall(call);
             });
         }
-        simplifyIR(irModule);
+        simplifyIR(irModule, IRSimplificationOptions::getFast());
     }
     return result;
 }

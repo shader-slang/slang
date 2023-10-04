@@ -720,6 +720,39 @@ struct SCCPContext
     {
         SLANG_SCCP_RETURN_IF_NONE_OR_ANY(v0)
         auto c0 = as<IRConstant>(v0.value);
+
+        uint64_t sourceValueBits = 0;
+        switch (c0->getDataType()->getOp())
+        {
+        case kIROp_FloatType:
+        {
+            float fval = (float)c0->value.floatVal;
+            memcpy(&sourceValueBits, &fval, sizeof(fval));
+            break;
+        }
+        case kIROp_DoubleType:
+        {
+            double dval = c0->value.floatVal;
+            memcpy(&sourceValueBits, &dval, sizeof(dval));
+            break;
+        }
+        case kIROp_BoolType:
+        {
+            sourceValueBits = c0->value.intVal;
+            break;
+        }
+        default:
+            if (isIntegralType(c0->getDataType()))
+            {
+                sourceValueBits = c0->value.intVal;
+            }
+            else
+            {
+                return LatticeVal::getAny();
+            }
+            break;
+        }
+
         IRInst* resultVal = nullptr;
         switch (type->getOp())
         {
@@ -729,7 +762,7 @@ struct SCCPContext
         case kIROp_IntPtrType:
         case kIROp_UIntPtrType:
 #endif
-            resultVal = getBuilder()->getIntValue(type, c0->value.intVal);
+            resultVal = getBuilder()->getIntValue(type, sourceValueBits);
             break;
         case kIROp_IntType:
         case kIROp_UIntType:
@@ -737,21 +770,17 @@ struct SCCPContext
         case kIROp_IntPtrType:
         case kIROp_UIntPtrType:
 #endif
-            {
-                float val = (float)c0->value.floatVal;
-                uint32_t intVal = (uint32_t)FloatAsInt(val);
-                resultVal = getBuilder()->getIntValue(type, intVal);
-            }
+            resultVal = getBuilder()->getIntValue(type, (uint32_t)sourceValueBits);
             break;
         case kIROp_FloatType:
             {
-                uint32_t val = (uint32_t)c0->value.intVal;
+                uint32_t val = (uint32_t)sourceValueBits;
                 float floatVal = IntAsFloat((int)val);
                 resultVal = getBuilder()->getFloatValue(type, floatVal);
             }
             break;
         case kIROp_DoubleType:
-            resultVal = getBuilder()->getFloatValue(type, Int64AsDouble(c0->value.intVal));
+            resultVal = getBuilder()->getFloatValue(type, Int64AsDouble(sourceValueBits));
             break;
         default:
             break;
