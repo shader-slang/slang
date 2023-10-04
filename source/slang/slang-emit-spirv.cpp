@@ -4814,7 +4814,6 @@ SlangResult emitSPIRVFromIR(
     // feature so we can skip
     if(SLANG_FAILED(validationResult) && validationResult != SLANG_E_NOT_AVAILABLE)
     {
-        File::writeAllBytes("d:\\bug.spv", spirvOut.getBuffer(), spirvOut.getCount());
         codeGenContext->getSink()->diagnoseWithoutSourceView(
             SourceLoc{},
             Diagnostics::spirvValidationFailed

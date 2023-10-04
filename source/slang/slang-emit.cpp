@@ -1282,7 +1282,6 @@ SlangResult emitSPIRVForEntryPointsDirectly(
     String optErr;
     if (SLANG_FAILED(optimizeSPIRV(spirv, optErr, outSpirv)))
     {
-        File::writeAllBytes("D:\\problem-spirv.spv", spirv.getBuffer(), spirv.getCount());
         codeGenContext->getSink()->diagnose(SourceLoc(), Diagnostics::spirvOptFailed, optErr);
         spirv = _Move(outSpirv);
     }
