@@ -3310,7 +3310,12 @@ struct SPIRVEmitContext
             // Find phi arguments from incoming branch instructions that target `block`.
             for (auto use = block->firstUse; use; use = use->nextUse)
             {
-                auto branchInst = use->getUser();
+                auto branchInst = as<IRUnconditionalBranch>(use->getUser());
+                if (!branchInst)
+                    continue;
+                if (branchInst->getTargetBlock() != inst->getParent())
+                    continue;
+
                 UInt argStartIndex = 0;
                 switch (branchInst->getOp())
                 {
@@ -4739,27 +4744,6 @@ struct SPIRVEmitContext
                 nullptr,
                 capability
             );
-        }
-    }
-
-    void handleRequiredCapabilitiesImpl(IRInst* inst)
-    {
-        for (auto decoration : inst->getDecorations())
-        {
-            switch (decoration->getOp())
-            {
-            default:
-                break;
-            case kIROp_RequireSPIRVCapabilityDecoration:
-                requireSPIRVCapability((SpvCapability)getIntVal(decoration->getOperand(0)));
-                if (decoration->getOperandCount() == 2)
-                {
-                    auto stringLit = as<IRStringLit>(decoration->getOperand(1));
-                    if (stringLit->getStringSlice().getLength())
-                        ensureExtensionDeclaration(stringLit->getStringSlice());
-                }
-                break;
-            }
         }
     }
 

@@ -13,6 +13,12 @@ namespace Slang
 struct RegisterAllocateContext
 {
     OrderedDictionary<IRType*, List<RefPtr<RegisterInfo>>> mapTypeToRegisterList;
+    bool allocateForCompositeTypeOnly;
+
+    RegisterAllocateContext(bool compositeTypeOnly)
+        :allocateForCompositeTypeOnly(compositeTypeOnly)
+    {}
+
     List<RefPtr<RegisterInfo>>& getRegisterListForType(IRType* type)
     {
         if (auto list = mapTypeToRegisterList.tryGetValue(type))
@@ -142,7 +148,7 @@ struct RegisterAllocateContext
 
     RegisterAllocationResult allocateRegisters(IRGlobalValueWithCode* func, RefPtr<IRDominatorTree>& inOutDom)
     {
-        ReachabilityContext reachabilityContext;
+        ReachabilityContext reachabilityContext(func);
         mapTypeToRegisterList.clear();
 
         auto dom = computeDominatorTree(func);
@@ -275,12 +281,15 @@ struct RegisterAllocateContext
         }
         return result;
     }
+
     bool instNeedsProcessing(IRGlobalValueWithCode* func, IRInst* inst)
     {
         switch (inst->getOp())
         {
         case kIROp_Param:
             if (inst->getParent() == func->getFirstBlock())
+                return false;
+            if (allocateForCompositeTypeOnly && !isCompositeType(inst->getFullType()))
                 return false;
             return true;
         case kIROp_UpdateElement:
@@ -303,9 +312,9 @@ struct RegisterAllocateContext
     }
 };
 
-RegisterAllocationResult allocateRegistersForFunc(IRGlobalValueWithCode* func, RefPtr<IRDominatorTree>& inOutDom)
+RegisterAllocationResult allocateRegistersForFunc(IRGlobalValueWithCode* func, RefPtr<IRDominatorTree>& inOutDom, bool allocateForCompositeTypeOnly)
 {
-    RegisterAllocateContext context;
+    RegisterAllocateContext context(allocateForCompositeTypeOnly);
     if (context.needProcessing(func))
         return context.allocateRegisters(func, inOutDom);
     return RegisterAllocationResult();

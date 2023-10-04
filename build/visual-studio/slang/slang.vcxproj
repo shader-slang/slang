@@ -355,7 +355,6 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ir-address-analysis.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-any-value-inference.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-any-value-marshalling.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-array-reg-to-mem.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-augment-make-existential.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-autodiff-cfg-norm.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-autodiff-fwd.h" />
@@ -375,6 +374,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ir-clone.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-collect-global-uniforms.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-com-interface.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-composite-reg-to-mem.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-constexpr.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-dce.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-deduplicate-generic-children.h" />
@@ -574,7 +574,6 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ir-address-analysis.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-any-value-inference.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-any-value-marshalling.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-array-reg-to-mem.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-augment-make-existential.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-autodiff-cfg-norm.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-autodiff-fwd.cpp" />
@@ -592,6 +591,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ir-clone.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-collect-global-uniforms.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-com-interface.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-composite-reg-to-mem.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-constexpr.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-dce.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-deduplicate-generic-children.cpp" />

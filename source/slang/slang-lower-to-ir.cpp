@@ -9371,8 +9371,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 getBuilder()->addRequireGLSLVersionDecoration(irFunc, Int(getIntegerLiteralValue(versionMod->versionNumberToken)));
             else if (auto spvVersion = as<RequiredSPIRVVersionModifier>(modifier))
                 getBuilder()->addRequireSPIRVVersionDecoration(irFunc, spvVersion->version);
-            else if (auto capMod = as<RequiredSPIRVCapabilityModifier>(modifier))
-                getBuilder()->addRequireSPIRVCapabilityDecoration(irFunc, capMod->capability, capMod->extensionName.getUnownedSlice());
             else if (auto cudasmVersion = as<RequiredCUDASMVersionModifier>(modifier))
                 getBuilder()->addRequireCUDASMVersionDecoration(irFunc, cudasmVersion->version);
         }
@@ -10164,7 +10162,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // temporaries and do basic simplifications.
     //
     constructSSA(module);
-    simplifyCFG(module);
+    simplifyCFG(module, CFGSimplificationOptions::getDefault());
     applySparseConditionalConstantPropagation(module, compileRequest->getSink());
     peepholeOptimize(module);
 
@@ -10213,7 +10211,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         bool changed = false;
         performMandatoryEarlyInlining(module);
         changed |= constructSSA(module);
-        simplifyCFG(module);
+        simplifyCFG(module, CFGSimplificationOptions::getDefault());
         changed |= applySparseConditionalConstantPropagation(module, compileRequest->getSink());
         changed |= peepholeOptimize(module);
         for (auto inst : module->getGlobalInsts())

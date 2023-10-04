@@ -23,8 +23,6 @@ SlangResult optimizeSPIRV(const List<uint8_t>& spirv, String& outErr, List<uint8
     // Set up our process
     CommandLine commandLine;
     commandLine.m_executableLocation.setName("spirv-opt");
-    commandLine.addArg("--merge-return");
-    commandLine.addArg("--inline-entry-points-exhaustive");
     commandLine.addArg("--eliminate-dead-functions");
     commandLine.addArg("--eliminate-local-single-block");
     commandLine.addArg("--eliminate-local-single-store");

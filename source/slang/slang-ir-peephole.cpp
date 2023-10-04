@@ -359,6 +359,7 @@ struct PeepholeContext : InstPassBase
                             changed = true;
                             break;
                         }
+                        startIndex += vecSize->getValue();
                     }
                     else
                     {
@@ -807,7 +808,6 @@ struct PeepholeContext : InstPassBase
         case kIROp_Or:
             changed = tryOptimizeArithmeticInst(inst);
             break;
-
         case kIROp_Param:
             {
                 auto block = as<IRBlock>(inst->parent);

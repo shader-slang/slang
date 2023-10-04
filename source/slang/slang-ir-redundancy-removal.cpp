@@ -53,9 +53,10 @@ struct RedundancyRemovalContext
         return changed;
     }
 
-    bool removeRedundancyInBlock(DeduplicateContext& deduplicateContext, IRGlobalValueWithCode* func, IRBlock* block)
+    bool removeRedundancyInBlock(Dictionary<IRBlock*, DeduplicateContext>& mapBlockToDedupContext, IRGlobalValueWithCode* func, IRBlock* block)
     {
         bool result = false;
+        auto& deduplicateContext = mapBlockToDedupContext.getValue(block);
         for (auto instP : block->getModifiableChildren())
         {
             auto resultInst = deduplicateContext.deduplicate(instP, [&](IRInst* inst)
@@ -82,9 +83,8 @@ struct RedundancyRemovalContext
         }
         for (auto child : dom->getImmediatelyDominatedBlocks(block))
         {
-            DeduplicateContext subContext;
+            DeduplicateContext& subContext = mapBlockToDedupContext.getValue(child);
             subContext.deduplicateMap = deduplicateContext.deduplicateMap;
-            result |= removeRedundancyInBlock(subContext, func, child);
         }
         return result;
     }
@@ -116,8 +116,28 @@ bool removeRedundancyInFunc(IRGlobalValueWithCode* func)
 
     RedundancyRemovalContext context;
     context.dom = computeDominatorTree(func);
-    DeduplicateContext deduplicateCtx;
-    bool result = context.removeRedundancyInBlock(deduplicateCtx, func, root);
+    Dictionary<IRBlock*, DeduplicateContext> mapBlockToDeduplicateContext;
+    for (auto block : func->getBlocks())
+    {
+        mapBlockToDeduplicateContext[block] = DeduplicateContext();
+    }
+    List<IRBlock*> workList, pendingWorkList;
+    workList.add(root);
+    bool result = false;
+    while (workList.getCount())
+    {
+        for (auto block : workList)
+        {
+            result |= context.removeRedundancyInBlock(mapBlockToDeduplicateContext, func, block);
+            
+            for (auto child : context.dom->getImmediatelyDominatedBlocks(block))
+            {
+                pendingWorkList.add(child);
+            }
+        }
+        workList.swapWith(pendingWorkList);
+        pendingWorkList.clear();
+    }
     if (auto normalFunc = as<IRFunc>(func))
     {
         result |= eliminateRedundantLoadStore(normalFunc);

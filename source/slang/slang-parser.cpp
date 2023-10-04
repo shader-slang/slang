@@ -6943,26 +6943,6 @@ namespace Slang
         return nullptr;
     }
 
-    static NodeBase* parseSPIRVCapabilityModifier(Parser* parser, void*)
-    {
-        parser->ReadToken(TokenType::LParent);
-        Token token = parser->ReadToken(TokenType::Identifier);
-        auto modifier = parser->astBuilder->create<RequiredSPIRVCapabilityModifier>();
-        const SPIRVCoreGrammarInfo& spirvInfo =
-            parser->astBuilder->getGlobalSession()->getSPIRVCoreGrammarInfo();
-        const auto cap = spirvInfo.capabilities.lookup(token.getContent());
-        if (!cap)
-        {
-            parser->sink->diagnose(token, Diagnostics::unknownSPIRVCapability, token);
-        }
-        else
-        {
-            modifier->capability = (int32_t)cap.value();
-        }
-        parser->ReadToken(TokenType::RParent);
-        return modifier;
-    }
-
     static NodeBase* parseCUDASMVersionModifier(Parser* parser, void* /*userData*/)
     {
         Token token;
@@ -7323,7 +7303,6 @@ namespace Slang
         _makeParseModifier("__glsl_extension",      parseGLSLExtensionModifier),
         _makeParseModifier("__glsl_version",        parseGLSLVersionModifier),
         _makeParseModifier("__spirv_version",       parseSPIRVVersionModifier),
-        _makeParseModifier("__spirv_capability",    parseSPIRVCapabilityModifier),
         _makeParseModifier("__cuda_sm_version",     parseCUDASMVersionModifier),
 
         _makeParseModifier("__builtin_type",        parseBuiltinTypeModifier),

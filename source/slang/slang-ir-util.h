@@ -279,6 +279,21 @@ static void overAllBlocks(IRModule* module, F f)
     }
 }
 
+void hoistInstOutOfASMBlocks(IRBlock* block);
+
+inline bool isCompositeType(IRType* type)
+{
+    switch (type->getOp())
+    {
+    case kIROp_StructType:
+    case kIROp_ArrayType:
+    case kIROp_UnsizedArrayType:
+        return true;
+    default:
+        return false;
+    }
+}
+
 }
 
 #endif

@@ -4264,25 +4264,6 @@ public:
         addDecoration(value, kIROp_RequireSPIRVVersionDecoration, getIntValue(getBasicType(BaseType::UInt64), intValue));
     }
 
-    void addRequireSPIRVCapabilityDecoration(IRInst* value, int32_t capabilityName, UnownedStringSlice extensionName)
-    {
-        if (extensionName.getLength())
-        {
-            addDecoration(
-                value,
-                kIROp_RequireSPIRVCapabilityDecoration,
-                getIntValue(getIntType(), IRIntegerValue(capabilityName)),
-                getStringValue(extensionName));
-        }
-        else
-        {
-            addDecoration(
-                value,
-                kIROp_RequireSPIRVCapabilityDecoration,
-                getIntValue(getIntType(), IRIntegerValue(capabilityName)));
-        }
-    }
-
     void addRequireCUDASMVersionDecoration(IRInst* value, const SemanticVersion& version)
     {
         SemanticVersion::IntegerType intValue = version.toInteger();
