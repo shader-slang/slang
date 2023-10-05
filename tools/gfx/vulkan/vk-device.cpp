@@ -323,6 +323,18 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         m_info.adapterName = m_adapterName.begin();
     }
 
+    // Query the available extensions
+    uint32_t extensionCount = 0;
+    m_api.vkEnumerateDeviceExtensionProperties(
+        m_api.m_physicalDevice, NULL, &extensionCount, NULL);
+    Slang::List<VkExtensionProperties> extensions;
+    extensions.setCount(extensionCount);
+    m_api.vkEnumerateDeviceExtensionProperties(
+        m_api.m_physicalDevice, NULL, &extensionCount, extensions.getBuffer());
+    HashSet<String> extensionNames;
+    for (const auto& e : extensions)
+        extensionNames.add(e.extensionName);
+
     List<const char*> deviceExtensions;
     deviceExtensions.add(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 
@@ -471,130 +483,132 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
             m_features.add("half");
         }
 
-        if (extendedFeatures.storage16BitFeatures.storageBuffer16BitAccess)
-        {
-            // Link into the creation features
-            extendedFeatures.storage16BitFeatures.pNext = (void*)deviceCreateInfo.pNext;
-            deviceCreateInfo.pNext = &extendedFeatures.storage16BitFeatures;
+        const auto addFeatureExtension = [&](const bool feature, auto& featureStruct, const char* extension = nullptr){
+            if(!feature)
+                return false;
+            if(extension)
+            {
+                if(!extensionNames.contains(extension))
+                    return false;
+                deviceExtensions.add(extension);
+            }
+            featureStruct.pNext = (void*)deviceCreateInfo.pNext;
+            deviceCreateInfo.pNext = &featureStruct;
+            return true;
+        };
 
-            // Add the 16-bit storage extension
-            deviceExtensions.add(VK_KHR_16BIT_STORAGE_EXTENSION_NAME);
+        // SIMPLE_EXTENSION_FEATURE(struct, feature member name, extension
+        // name, features...) will check for the presence of the boolean
+        // feature member in struct and the availability of the extensions. If
+        // they are both present then the extensions are addded, the struct
+        // linked into the deviceCreateInfo chain and the features added to the
+        // supported features list.
+#define SIMPLE_EXTENSION_FEATURE(s, m, e, ...) \
+        do{ \
+            const static auto fs = {__VA_ARGS__}; \
+            if(addFeatureExtension(s.m, s, e)) \
+                for(const auto& p : fs) \
+                    m_features.add(p); \
+        } while(0)
 
-            // We have half support
-            m_features.add("16-bit-storage");
-        }
+        SIMPLE_EXTENSION_FEATURE(
+            extendedFeatures.storage16BitFeatures,
+            storageBuffer16BitAccess,
+            VK_KHR_16BIT_STORAGE_EXTENSION_NAME,
+            "16-bit-storage"
+        );
 
-        if (extendedFeatures.vulkan12Features.shaderBufferInt64Atomics)
-        {
-            m_features.add("atomic-int64");
-        }
+        SIMPLE_EXTENSION_FEATURE(
+            extendedFeatures.atomicFloatFeatures,
+            shaderBufferFloat32AtomicAdd,
+            VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME,
+            "atomic-float"
+        );
 
-        if (extendedFeatures.atomicFloatFeatures.shaderBufferFloat32AtomicAdd)
-        {
-            // Link into the creation features
-            extendedFeatures.atomicFloatFeatures.pNext = (void*)deviceCreateInfo.pNext;
-            deviceCreateInfo.pNext = &extendedFeatures.atomicFloatFeatures;
+        SIMPLE_EXTENSION_FEATURE(
+            extendedFeatures.extendedDynamicStateFeatures,
+            extendedDynamicState,
+            VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME,
+            "extended-dynamic-states"
+        );
 
-            deviceExtensions.add(VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME);
-            m_features.add("atomic-float");
-        }
-
-        if (extendedFeatures.vulkan12Features.timelineSemaphore)
-        {
-            m_features.add("timeline-semaphore");
-        }
-
-        if (extendedFeatures.extendedDynamicStateFeatures.extendedDynamicState)
-        {
-            // Link into the creation features
-            extendedFeatures.extendedDynamicStateFeatures.pNext = (void*)deviceCreateInfo.pNext;
-            deviceCreateInfo.pNext = &extendedFeatures.extendedDynamicStateFeatures;
-            deviceExtensions.add(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
-            m_features.add("extended-dynamic-states");
-        }
-
-        if (extendedFeatures.vulkan12Features.shaderSubgroupExtendedTypes)
-        {
-            m_features.add("shader-subgroup-extended-types");
-        }
-
-        if (extendedFeatures.accelerationStructureFeatures.accelerationStructure)
+        if (extendedFeatures.accelerationStructureFeatures.accelerationStructure
+            && extensionNames.contains(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME)
+            && extensionNames.contains(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME))
         {
             extendedFeatures.accelerationStructureFeatures.pNext = (void*)deviceCreateInfo.pNext;
             deviceCreateInfo.pNext = &extendedFeatures.accelerationStructureFeatures;
             deviceExtensions.add(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
             deviceExtensions.add(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
             m_features.add("acceleration-structure");
+
+            // These both depend on VK_KHR_acceleration_structure
+
+            SIMPLE_EXTENSION_FEATURE(
+                extendedFeatures.rayQueryFeatures,
+                rayQuery,
+                VK_KHR_RAY_QUERY_EXTENSION_NAME,
+                "ray-query",
+                "ray-tracing",
+                "sm_6_6"
+            );
+
+            SIMPLE_EXTENSION_FEATURE(
+                extendedFeatures.rayTracingPipelineFeatures,
+                rayTracingPipeline,
+                VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
+                "ray-tracing-pipeline"
+            );
         }
 
-        if (extendedFeatures.rayTracingPipelineFeatures.rayTracingPipeline)
-        {
-            extendedFeatures.rayTracingPipelineFeatures.pNext = (void*)deviceCreateInfo.pNext;
-            deviceCreateInfo.pNext = &extendedFeatures.rayTracingPipelineFeatures;
-            deviceExtensions.add(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
-            m_features.add("ray-tracing-pipeline");
-        }
+        SIMPLE_EXTENSION_FEATURE(
+            extendedFeatures.inlineUniformBlockFeatures,
+            inlineUniformBlock,
+            VK_EXT_INLINE_UNIFORM_BLOCK_EXTENSION_NAME,
+            "inline-uniform-block",
+        );
 
-        if (extendedFeatures.rayQueryFeatures.rayQuery)
-        {
-            extendedFeatures.rayQueryFeatures.pNext = (void*)deviceCreateInfo.pNext;
-            deviceCreateInfo.pNext = &extendedFeatures.rayQueryFeatures;
-            deviceExtensions.add(VK_KHR_RAY_QUERY_EXTENSION_NAME);
-            m_features.add("ray-query");
-            m_features.add("ray-tracing");
-            m_features.add("sm_6_6");
-        }
+        SIMPLE_EXTENSION_FEATURE(
+            extendedFeatures.robustness2Features,
+            nullDescriptor,
+            VK_EXT_ROBUSTNESS_2_EXTENSION_NAME,
+            "robustness2",
+        );
+
+        SIMPLE_EXTENSION_FEATURE(
+            extendedFeatures.clockFeatures,
+            shaderDeviceClock,
+            VK_KHR_SHADER_CLOCK_EXTENSION_NAME,
+            "realtime-clock"
+        );
+
+        SIMPLE_EXTENSION_FEATURE(
+            extendedFeatures.meshShaderFeatures,
+            meshShader,
+            VK_EXT_MESH_SHADER_EXTENSION_NAME,
+            "mesh-shader"
+        );
+
+        SIMPLE_EXTENSION_FEATURE(
+            extendedFeatures.rayTracingInvocationReorderFeatures,
+            rayTracingInvocationReorder,
+            VK_NV_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME,
+            "shader-execution-reorder"
+        );
+
+#undef SIMPLE_EXTENSION_FEATURE
+
+        if (extendedFeatures.vulkan12Features.shaderBufferInt64Atomics)
+            m_features.add("atomic-int64");
+
+        if (extendedFeatures.vulkan12Features.timelineSemaphore)
+            m_features.add("timeline-semaphore");
+
+        if (extendedFeatures.vulkan12Features.shaderSubgroupExtendedTypes)
+            m_features.add("shader-subgroup-extended-types");
 
         if (extendedFeatures.vulkan12Features.bufferDeviceAddress)
-        {
             m_features.add("buffer-device-address");
-        }
-
-        if (extendedFeatures.inlineUniformBlockFeatures.inlineUniformBlock)
-        {
-            extendedFeatures.inlineUniformBlockFeatures.pNext = (void*)deviceCreateInfo.pNext;
-            deviceCreateInfo.pNext = &extendedFeatures.inlineUniformBlockFeatures;
-            deviceExtensions.add(VK_EXT_INLINE_UNIFORM_BLOCK_EXTENSION_NAME);
-            m_features.add("inline-uniform-block");
-        }
-
-        if (extendedFeatures.robustness2Features.nullDescriptor)
-        {
-            extendedFeatures.robustness2Features.pNext = (void*)deviceCreateInfo.pNext;
-            deviceCreateInfo.pNext = &extendedFeatures.robustness2Features;
-            deviceExtensions.add(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
-            m_features.add("robustness2");
-        }
-
-        if (extendedFeatures.clockFeatures.shaderDeviceClock)
-        {
-            deviceExtensions.add(VK_KHR_SHADER_CLOCK_EXTENSION_NAME);
-
-            extendedFeatures.clockFeatures.pNext = (void*)deviceCreateInfo.pNext;
-            deviceCreateInfo.pNext = &extendedFeatures.clockFeatures;
-
-            m_features.add("realtime-clock");
-        }
-
-        if (extendedFeatures.meshShaderFeatures.meshShader)
-        {
-            deviceExtensions.add(VK_EXT_MESH_SHADER_EXTENSION_NAME);
-
-            extendedFeatures.meshShaderFeatures.pNext = (void*)deviceCreateInfo.pNext;
-            deviceCreateInfo.pNext = &extendedFeatures.meshShaderFeatures;
-
-            m_features.add("mesh-shader");
-        }
-
-        if (extendedFeatures.rayTracingInvocationReorderFeatures.rayTracingInvocationReorder)
-        {
-            deviceExtensions.add(VK_NV_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME);
-
-            extendedFeatures.rayTracingInvocationReorderFeatures.pNext = (void*)deviceCreateInfo.pNext;
-            deviceCreateInfo.pNext = &extendedFeatures.rayTracingInvocationReorderFeatures;
-
-            m_features.add("shader-execution-reorder");
-        }
 
         if (_hasAnySetBits(
                 extendedFeatures.vulkan12Features,
@@ -630,20 +644,6 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
            | VK_SUBGROUP_FEATURE_PARTITIONED_BIT_NV))
         {
             m_features.add("wave-ops");
-        }
-
-        uint32_t extensionCount = 0;
-        m_api.vkEnumerateDeviceExtensionProperties(
-            m_api.m_physicalDevice, NULL, &extensionCount, NULL);
-        Slang::List<VkExtensionProperties> extensions;
-        extensions.setCount(extensionCount);
-        m_api.vkEnumerateDeviceExtensionProperties(
-            m_api.m_physicalDevice, NULL, &extensionCount, extensions.getBuffer());
-
-        HashSet<String> extensionNames;
-        for (const auto& e : extensions)
-        {
-            extensionNames.add(e.extensionName);
         }
 
         if (extensionNames.contains("VK_KHR_external_memory"))
