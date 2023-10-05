@@ -424,8 +424,7 @@ namespace Slang
 
     Expr* SemanticsVisitor::maybeUseSynthesizedDeclForLookupResult(
         LookupResultItem const& item,
-        Expr* originalExpr,
-        Expr* baseExpr)
+        Expr* originalExpr)
     {
         // If the only result from lookup is an entry in an interface decl, it could be that
         // the user is leaving out an explicit definition for the requirement and depending on
@@ -567,7 +566,7 @@ namespace Slang
     {
         // We could be referencing a decl that will be synthesized. If so create a placeholder
         // and return a DeclRefExpr to it.
-        if (auto lookupResultExpr = maybeUseSynthesizedDeclForLookupResult(item, originalExpr, baseExpr))
+        if (auto lookupResultExpr = maybeUseSynthesizedDeclForLookupResult(item, originalExpr))
             return lookupResultExpr;
 
         // If we collected any breadcrumbs, then these represent
