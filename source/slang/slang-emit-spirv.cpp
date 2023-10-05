@@ -89,6 +89,9 @@ enum class SpvLogicalSectionID
     Count,
 };
 
+// The registered id for the Slang compiler.
+static const uint32_t kSPIRVSlangCompilerId = 40;
+
 // While the SPIR-V module is nominally (according to the spec) just
 // a flat sequence of instructions, in practice some of the instructions
 // are logically in a parent/child relationship.
@@ -469,12 +472,8 @@ struct SPIRVEmitContext
         m_words.add(spvVersion1_5_0);
 
         // > Generator's magic number.
-        // > Its value does not affect any semantics, and is allowed to be 0.
         //
-        // TODO: We should eventually register a non-zero
-        // magic number to represent Slang/slangc.
-        //
-        m_words.add(0);
+        m_words.add(kSPIRVSlangCompilerId);
 
         // > Bound
         //
@@ -4799,6 +4798,13 @@ SlangResult emitSPIRVFromIR(
         if (as<IRDebugSource>(inst))
             context.ensureInst(inst);
     }
+
+    // Emit source language info.
+    context.emitInst(context.getSection(SpvLogicalSectionID::DebugStringsAndSource), nullptr, SpvOpSource,
+        // TODO: update this to SpvSourceLanguageSlang when a new release of spirv-tools is available.
+        SpvLiteralInteger::from32(0), // language identifier, should be SpvSourceLanguageSlang.
+        SpvLiteralInteger::from32(1)); // language version.
+
     for (auto irEntryPoint : irEntryPoints)
     {
         context.ensureInst(irEntryPoint);
