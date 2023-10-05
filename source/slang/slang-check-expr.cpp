@@ -422,7 +422,9 @@ namespace Slang
         return result;
     }
 
-    Expr* SemanticsVisitor::maybeUseSynthesizedDeclForLookupResult(LookupResultItem const& item, Expr* originalExpr)
+    Expr* SemanticsVisitor::maybeUseSynthesizedDeclForLookupResult(
+        LookupResultItem const& item,
+        Expr* originalExpr)
     {
         // If the only result from lookup is an entry in an interface decl, it could be that
         // the user is leaving out an explicit definition for the requirement and depending on
@@ -521,13 +523,16 @@ namespace Slang
                 conformanceDecl->base.type = m_astBuilder->getDiffInterfaceType();
                 conformanceDecl->parentDecl = structDecl;
                 structDecl->members.add(conformanceDecl);
+                structDecl->parentDecl = parent;
 
                 synthesizedDecl = structDecl;
                 auto typeDef = m_astBuilder->create<TypeAliasDecl>();
                 typeDef->nameAndLoc.name = getName("Differential");
-                auto declRef = createDefaultSubstitutionsIfNeeded(m_astBuilder, this, makeDeclRef(structDecl));
-                typeDef->type.type = DeclRefType::create(m_astBuilder, declRef);
                 typeDef->parentDecl = structDecl;
+
+                auto synthDeclRef = createDefaultSubstitutionsIfNeeded(m_astBuilder, this, makeDeclRef(structDecl));
+
+                typeDef->type.type = DeclRefType::create(m_astBuilder, synthDeclRef);
                 structDecl->members.add(typeDef);
             }
             break;
@@ -545,8 +550,9 @@ namespace Slang
         auto toBeSynthesized = m_astBuilder->create<ToBeSynthesizedModifier>();
         addModifier(synthesizedDecl, toBeSynthesized);
 
+        auto synthDeclMemberRef = m_astBuilder->getMemberDeclRef(subType->getDeclRef(), synthesizedDecl);
         return ConstructDeclRefExpr(
-            makeDeclRef(synthesizedDecl),
+            synthDeclMemberRef,
             nullptr,
             originalExpr ? originalExpr->loc : SourceLoc(),
             originalExpr);

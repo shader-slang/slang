@@ -1855,37 +1855,40 @@ struct SynthesizeActiveMaskForFunctionContext
         }
         else if( toBlock->getPredecessors().getCount() > 1 )
         {
-            // If the target block is one with multiple
-            // predecessors, such that it will have an
-            // added block parameter (phi node) to select
-            // the corect mask value, then we need to
-            // pass along the mask value to use as an
-            // additional argument on the unconditional branch.
-            //
-            // If the old unconditional branch was:
-            //
-            //      <op>(arg0, arg1, arg2, ...);
-            //
-            // Then our new branch will be:
-            //
-            //      <op>(arg0, arg1, arg2, ..., toActiveMask);
-            //
-            List<IRInst*> newOperands;
-            UInt oldOperandCount = terminator->getOperandCount();
-            for( UInt i = 0; i < oldOperandCount; ++i )
+            if (doesBlockNeedActiveMask(toBlock))
             {
-                newOperands.add(terminator->getOperand(i));
+                // If the target block is one with multiple
+                // predecessors, such that it will have an
+                // added block parameter (phi node) to select
+                // the corect mask value, then we need to
+                // pass along the mask value to use as an
+                // additional argument on the unconditional branch.
+                //
+                // If the old unconditional branch was:
+                //
+                //      <op>(arg0, arg1, arg2, ...);
+                //
+                // Then our new branch will be:
+                //
+                //      <op>(arg0, arg1, arg2, ..., toActiveMask);
+                //
+                List<IRInst*> newOperands;
+                UInt oldOperandCount = terminator->getOperandCount();
+                for( UInt i = 0; i < oldOperandCount; ++i )
+                {
+                    newOperands.add(terminator->getOperand(i));
+                }
+                newOperands.add(toActiveMask);
+
+                IRInst* newTerminator = builder.emitIntrinsicInst(
+                    terminator->getFullType(),
+                    terminator->getOp(),
+                    newOperands.getCount(),
+                    newOperands.getBuffer());
+
+                terminator->replaceUsesWith(newTerminator);
+                terminator->removeAndDeallocate();
             }
-            newOperands.add(toActiveMask);
-
-            IRInst* newTerminator = builder.emitIntrinsicInst(
-                terminator->getFullType(),
-                terminator->getOp(),
-                newOperands.getCount(),
-                newOperands.getBuffer());
-
-            terminator->replaceUsesWith(newTerminator);
-            terminator->removeAndDeallocate();
         }
         else
         {

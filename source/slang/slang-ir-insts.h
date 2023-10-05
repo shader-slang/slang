@@ -3040,7 +3040,7 @@ struct IRSPIRVAsm : IRInst
     }
 };
 
-struct IRGenericAsm : IRInst
+struct IRGenericAsm : IRTerminatorInst
 {
     IR_LEAF_ISA(GenericAsm)
     UnownedStringSlice getAsm() { return as<IRStringLit>(getOperand(0))->getStringSlice(); }
