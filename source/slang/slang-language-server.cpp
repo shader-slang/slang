@@ -1470,7 +1470,8 @@ SlangResult LanguageServer::formatting(const LanguageServerProtocol::DocumentFor
     if (m_formatOptions.clangFormatLocation.getLength() == 0)
         m_formatOptions.clangFormatLocation = findClangFormatTool();
     m_formatOptions.fileName = canonicalPath;
-    auto edits = formatSource(doc->getText().getUnownedSlice(), -1, -1, -1, m_formatOptions);
+    List<TextRange> exclusionRange = extractFormattingExclusionRanges(doc->getText().getUnownedSlice());
+    auto edits = formatSource(doc->getText().getUnownedSlice(), -1, -1, -1, exclusionRange, m_formatOptions);
     auto textEdits = translateTextEdits(doc, edits);
     m_connection->sendResult(&textEdits, responseId);
     return SLANG_OK;
@@ -1493,7 +1494,8 @@ SlangResult LanguageServer::rangeFormatting(const LanguageServerProtocol::Docume
     auto options = m_formatOptions;
     if (!m_formatOptions.allowLineBreakInRangeFormatting)
         options.behavior = FormatBehavior::PreserveLineBreak;
-    auto edits = formatSource(doc->getText().getUnownedSlice(), args.range.start.line, args.range.end.line, endOffset, options);
+    List<TextRange> exclusionRange = extractFormattingExclusionRanges(doc->getText().getUnownedSlice());
+    auto edits = formatSource(doc->getText().getUnownedSlice(), args.range.start.line, args.range.end.line, endOffset, exclusionRange, options);
     auto textEdits = translateTextEdits(doc, edits);
     m_connection->sendResult(&textEdits, responseId);
     return SLANG_OK;
@@ -1521,7 +1523,8 @@ SlangResult LanguageServer::onTypeFormatting(const LanguageServerProtocol::Docum
     auto options = m_formatOptions;
     if (!m_formatOptions.allowLineBreakInOnTypeFormatting)
         options.behavior = FormatBehavior::PreserveLineBreak;
-    auto edits = formatSource(doc->getText().getUnownedSlice(), args.position.line, args.position.line, cursorOffset, options);
+    List<TextRange> exclusionRange = extractFormattingExclusionRanges(doc->getText().getUnownedSlice());
+    auto edits = formatSource(doc->getText().getUnownedSlice(), args.position.line, args.position.line, cursorOffset, exclusionRange, options);
     auto textEdits = translateTextEdits(doc, edits);
     m_connection->sendResult(&textEdits, responseId);
     return SLANG_OK;

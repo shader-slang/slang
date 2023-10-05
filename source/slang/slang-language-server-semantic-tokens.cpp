@@ -17,7 +17,8 @@ const char* kSemanticTokenTypes[] = {
     "property",
     "namespace",
     "keyword",
-    "macro"
+    "macro",
+    "string"
 };
 
 static_assert(SLANG_COUNT_OF(kSemanticTokenTypes) == (int)SemanticTokenType::NormalText, "kSemanticTokenTypes must match SemanticTokenType");
@@ -211,6 +212,47 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
                     token.length = (int)attr->originalIdentifierToken.getContentLength();
                     token.type = SemanticTokenType::Type;
                     maybeInsertToken(token);
+                }
+            }
+            else if (auto spirvAsmExpr = as<SPIRVAsmExpr>(node))
+            {
+                // Highlight opcodes and enums.
+                for (auto inst : spirvAsmExpr->insts)
+                {
+                    // OpCode
+                    {
+                        SemanticToken token = _createSemanticToken(
+                            manager, inst.opcode.token.loc, inst.opcode.token.getName());
+                        token.type = SemanticTokenType::Function;
+                        maybeInsertToken(token);
+                    }
+                    // Other operands
+                    for (auto operand : inst.operands)
+                    {
+                        SemanticTokenType operandTokenType = SemanticTokenType::NormalText;
+                        switch (operand.flavor)
+                        {
+                        case SPIRVAsmOperand::Flavor::NamedValue:
+                        case SPIRVAsmOperand::Flavor::BuiltinVar:
+                            operandTokenType = SemanticTokenType::EnumMember;
+                            break;
+                        case SPIRVAsmOperand::Flavor::ResultMarker:
+                        case SPIRVAsmOperand::Flavor::TruncateMarker:
+                        case SPIRVAsmOperand::Flavor::GLSL450Set:
+                            operandTokenType = SemanticTokenType::Macro;
+                            break;
+                        case SPIRVAsmOperand::Flavor::Id:
+                            operandTokenType = SemanticTokenType::String;
+                            break;
+                        }
+                        if (operandTokenType != SemanticTokenType::NormalText)
+                        {
+                            SemanticToken token = _createSemanticToken(
+                                manager, operand.token.loc, operand.token.getName());
+                            token.type = operandTokenType;
+                            maybeInsertToken(token);
+                        }
+                    }
                 }
             }
         });
