@@ -472,10 +472,9 @@ bool unrollLoopsInModule(IRModule* module, DiagnosticSink* sink)
     for (auto inst : module->getGlobalInsts())
     {
         if (auto genFunc = as<IRGeneric>(inst))
-        {
-            return false;
-        }
-        else if (auto func = as<IRGlobalValueWithCode>(inst))
+            continue;
+            
+        if (auto func = as<IRGlobalValueWithCode>(inst))
         {
             bool result = unrollLoopsInFunc(module, func, sink);
             if (!result)
