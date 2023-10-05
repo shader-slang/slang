@@ -552,8 +552,6 @@ INST(TargetSwitch, targetSwitch, 1, 0)
 // A generic asm inst has an return semantics that terminates the control flow.
 INST(GenericAsm, GenericAsm, 1, 0)
 
-INST(RequirePrelude, RequirePrelude, 1, 0)
-
 INST(discard, discard, 0, 0)
 
 /* IRUnreachable */
@@ -562,6 +560,8 @@ INST(Unreachable, unreachable, 0, 0)
 INST_RANGE(Unreachable, MissingReturn, Unreachable)
 
 INST_RANGE(TerminatorInst, Return, Unreachable)
+
+INST(RequirePrelude, RequirePrelude, 1, 0)
 
 // TODO: We should consider splitting the basic arithmetic/comparison
 // ops into cases for signed integers, unsigned integers, and floating-point

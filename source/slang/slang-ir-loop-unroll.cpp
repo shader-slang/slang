@@ -473,12 +473,7 @@ bool unrollLoopsInModule(IRModule* module, DiagnosticSink* sink)
     {
         if (auto genFunc = as<IRGeneric>(inst))
         {
-            if (auto func = as<IRGlobalValueWithCode>(findGenericReturnVal(genFunc)))
-            {
-                bool result = unrollLoopsInFunc(module, func, sink);
-                if (!result)
-                    return false;
-            }
+            return false;
         }
         else if (auto func = as<IRGlobalValueWithCode>(inst))
         {

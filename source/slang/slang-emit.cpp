@@ -458,6 +458,9 @@ Result linkAndOptimizeIR(
         break;
     }
 
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
+
     // If we have a target that is GPU like we use the string hashing mechanism
     // but for that to work we need to inline such that calls (or returns) of strings
     // boil down into getStringHash(stringLiteral)

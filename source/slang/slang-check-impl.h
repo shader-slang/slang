@@ -1028,7 +1028,8 @@ namespace Slang
 
         Expr* maybeUseSynthesizedDeclForLookupResult(
             LookupResultItem const& item,
-            Expr* orignalExpr);
+            Expr* orignalExpr,
+            Expr* baseExpr = nullptr);
 
         Expr* ConstructLookupResultExpr(
             LookupResultItem const& item,
