@@ -13,7 +13,7 @@
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
 #include "slang-ir-dominators.h"
-#include "slang-ir-array-reg-to-mem.h"
+#include "slang-ir-composite-reg-to-mem.h"
 #include "slang-ir-sccp.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-simplify-cfg.h"
@@ -1516,9 +1516,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
     void processModule()
     {
-#if 0
-        eliminateArrayTypeSSARegisters(m_module);
-#endif
+        convertCompositeTypeParametersToPointers(m_module);
 
         // Process global params before anything else, so we don't generate inefficient
         // array marhalling code for array-typed global params.
@@ -1739,7 +1737,7 @@ void simplifyIRForSpirvLegalization(DiagnosticSink* sink, IRModule* module)
                 funcChanged |= applySparseConditionalConstantPropagation(func, sink);
                 funcChanged |= peepholeOptimize(func);
                 funcChanged |= removeRedundancyInFunc(func);
-                funcChanged |= simplifyCFG(func);
+                funcChanged |= simplifyCFG(func, CFGSimplificationOptions::getFast());
                 eliminateDeadCode(func);
             }
         }

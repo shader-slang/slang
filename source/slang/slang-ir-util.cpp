@@ -1166,6 +1166,23 @@ UnownedStringSlice getBuiltinFuncName(IRInst* callee)
     return decor->getName();
 }
 
+void hoistInstOutOfASMBlocks(IRBlock* block)
+{
+    for (auto inst : block->getChildren())
+    {
+        if (auto asmBlock = as<IRSPIRVAsm>(inst))
+        {
+            IRInst* next = nullptr;
+            for (auto i = asmBlock->getFirstChild(); i; i = next)
+            {
+                next = i->getNextInst();
+                if (!as<IRSPIRVAsmInst>(i) && !as<IRSPIRVAsmOperand>(i))
+                    i->insertBefore(asmBlock);
+            }
+        }
+    }
+}
+
 UnownedStringSlice getBasicTypeNameHint(IRType* basicType)
 {
     switch (basicType->getOp())

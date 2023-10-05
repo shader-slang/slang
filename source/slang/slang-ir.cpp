@@ -397,7 +397,10 @@ namespace Slang
         //
         if (auto lastParam = getLastParam())
         {
-            param->insertAfter(lastParam);
+            if (lastParam->next)
+                param->insertAfter(lastParam);
+            else
+                param->insertAtEnd(this);
         }
         //
         // Otherwise, if there are any existing

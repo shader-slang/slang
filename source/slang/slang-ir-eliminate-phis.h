@@ -8,6 +8,13 @@ namespace Slang
     struct CodeGenContext;
     struct IRModule;
 
+    struct PhiEliminationOptions
+    {
+        bool eliminateCompositeTypedPhiOnly = false;
+        bool useRegisterAllocation = true;
+        static PhiEliminationOptions getFast() { return PhiEliminationOptions{ false, false }; }
+    };
+
         /// Eliminate all "phi nodes" from the given `module`.
         ///
         /// This process moves the code in `module` *out* of SSA form,
@@ -15,11 +22,11 @@ namespace Slang
         /// are not themselves based on an SSA representation.
         ///
         /// If livenessMode is enabled LiveRangeStarts will be inserted into the module.
-    void eliminatePhis(LivenessMode livenessMode, IRModule* module, bool useRegisterAllocation = true);
+    void eliminatePhis(LivenessMode livenessMode, IRModule* module, PhiEliminationOptions options);
 
     void eliminatePhisInFunc(
         LivenessMode livenessMode,
         IRModule* module,
         IRGlobalValueWithCode* func,
-        bool useRegisterAllocation = true);
+        PhiEliminationOptions options);
 }

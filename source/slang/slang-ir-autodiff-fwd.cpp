@@ -1702,7 +1702,7 @@ SlangResult ForwardDiffTranscriber::prepareFuncForForwardDiff(IRFunc* func)
     if (SLANG_SUCCEEDED(result))
     {
         disableIRValidationAtInsert();
-        simplifyFunc(func);
+        simplifyFunc(func, IRSimplificationOptions::getDefault());
         enableIRValidationAtInsert();
     }
     return result;
@@ -1945,6 +1945,7 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_BitAnd:
     case kIROp_BitNot:
     case kIROp_BitXor:
+    case kIROp_BitOr:
     case kIROp_BitCast:
     case kIROp_Lsh:
     case kIROp_Rsh:

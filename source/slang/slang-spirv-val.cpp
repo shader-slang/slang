@@ -55,21 +55,13 @@ SlangResult debugValidateSPIRV(const List<uint8_t>& spirv)
     const auto out = p->getStream(StdStreamType::Out);
     const auto err = p->getStream(StdStreamType::ErrorOut);
 
-    // Write the assembly
-    SLANG_RETURN_ON_FAIL(in->write(spirv.getBuffer(), spirv.getCount()));
-    in->close();
+    List<Byte> outData;
+    List<Byte> errData;
+    SLANG_RETURN_ON_FAIL(StreamUtil::readAndWrite(in, spirv.getArrayView(), out, outData, err, errData));
 
     // Wait for it to finish
     if(!p->waitForTermination(1000))
         return SLANG_FAIL;
-
-
-    // TODO: allow inheriting stderr in Process
-    List<Byte> outData;
-    SLANG_RETURN_ON_FAIL(StreamUtil::readAll(out, 0, outData));
-    fwrite(outData.getBuffer(), outData.getCount(), 1, stderr);
-    outData.clear();
-    SLANG_RETURN_ON_FAIL(StreamUtil::readAll(err, 0, outData));
 
     // If we failed, dump the spirv first.
     const auto ret = p->getReturnValue();
@@ -83,6 +75,7 @@ SlangResult debugValidateSPIRV(const List<uint8_t>& spirv)
     }
 
     fwrite(outData.getBuffer(), outData.getCount(), 1, stderr);
+    fwrite(errData.getBuffer(), errData.getCount(), 1, stderr);
 
     return ret == 0 ? SLANG_OK : SLANG_FAIL;
 }

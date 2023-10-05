@@ -15,19 +15,8 @@ struct CFGSimplificationContext
 {
     RefPtr<RegionTree> regionTree;
     RefPtr<IRDominatorTree> domTree;
+    Dictionary<IRInst*, List<IRInst*>> relatedAddrMap;
 };
-
-static BreakableRegion* findBreakableRegion(Region* region)
-{
-    for (;;)
-    {
-        if (auto b = as<BreakableRegion>(region))
-            return b;
-        region = region->getParent();
-        if (!region)
-            return nullptr;
-    }
-}
 
 static bool isBlockInRegion(IRDominatorTree* domTree, IRTerminatorInst* regionHeader, IRBlock* block)
 {
@@ -55,10 +44,26 @@ static bool isBlockInRegion(IRDominatorTree* domTree, IRTerminatorInst* regionHe
     return true;
 }
 
+static IRInst* findBreakableRegionHeaderInst(IRDominatorTree* domTree, IRBlock* block)
+{
+    for (auto idom = domTree->getImmediateDominator(block); idom; idom = domTree->getImmediateDominator(idom))
+    {
+        auto terminator = idom->getTerminator();
+        switch (terminator->getOp())
+        {
+        case kIROp_Switch:
+        case kIROp_loop:
+            return terminator;
+        }
+    }
+    return nullptr;
+}
+
 // Test if a loop is trivial: a trivial loop runs for a single iteration without any back edges, and
 // there is only one break out of the loop at the very end. The function generates `regionTree` if
 // it is needed and hasn't been generated yet.
 static bool isTrivialSingleIterationLoop(
+    CFGSimplificationContext& context,
     IRGlobalValueWithCode* func,
     IRLoop* loop)
 {
@@ -80,40 +85,21 @@ static bool isTrivialSingleIterationLoop(
     // 
     // We need to verify this is a trivial loop by checking if there is any multi-level breaks
     // that skips out of this loop.
-    CFGSimplificationContext context;
     if (!context.domTree)
         context.domTree = computeDominatorTree(func);
-    if (!context.regionTree)
-        context.regionTree = generateRegionTreeForFunc(func, nullptr);
-
-    SimpleRegion* targetBlockRegion = nullptr;
-    if (!context.regionTree->mapBlockToRegion.tryGetValue(targetBlock, targetBlockRegion))
+    bool hasMultiLevelBreaks = false;
+    auto loopBlocks = collectBlocksInRegion(context.domTree, loop, &hasMultiLevelBreaks);
+    if (hasMultiLevelBreaks)
         return false;
-    BreakableRegion* loopBreakableRegion = findBreakableRegion(targetBlockRegion);
-    LoopRegion* loopRegion = as<LoopRegion>(loopBreakableRegion);
-    if (!loopRegion)
-        return false;
-    for (auto block : func->getBlocks())
+    for (auto block : loopBlocks)
     {
-        if (!context.domTree->dominates(loop->getTargetBlock(), block))
-            continue;
-        if (context.domTree->dominates(loop->getBreakBlock(), block))
-            continue;
-        SimpleRegion* region = nullptr;
-        if (!context.regionTree->mapBlockToRegion.tryGetValue(block, region))
-            return false;
-
         for (auto branchTarget : block->getSuccessors())
         {
-            SimpleRegion* targetRegion = nullptr;
-            if (!context.regionTree->mapBlockToRegion.tryGetValue(branchTarget, targetRegion))
+            if (!context.domTree->dominates(loop->getParent(), branchTarget))
                 return false;
-            // If multi-level break out that skips over this loop exists, then this is not a trivial loop.
-            if (targetRegion->isDescendentOf(loopRegion))
-                continue;
             if (targetBlock != loop->getBreakBlock())
                 return false;
-            if (findBreakableRegion(region) != loopRegion)
+            if (findBreakableRegionHeaderInst(context.domTree, block) != loop)
             {
                 // If the break is initiated from a nested region, this is not trivial.
                 return false;
@@ -164,10 +150,12 @@ static bool isTrivialSingleIterationLoop(
     return true;
 }
 
-static bool doesLoopHasSideEffect(IRGlobalValueWithCode* func, IRLoop* loopInst)
+static bool doesLoopHasSideEffect(CFGSimplificationContext& context, ReachabilityContext& reachability, IRGlobalValueWithCode* func, IRLoop* loopInst)
 {
     bool hasMultiLevelBreaks = false;
-    auto blocks = collectBlocksInRegion(func, loopInst, &hasMultiLevelBreaks);
+    if (!context.domTree)
+        context.domTree = computeDominatorTree(func);
+    auto blocks = collectBlocksInRegion(context.domTree.get(), loopInst, &hasMultiLevelBreaks);
 
     // We'll currently not deal with loops that contain multi-level breaks.
     if (hasMultiLevelBreaks)
@@ -177,25 +165,26 @@ static bool doesLoopHasSideEffect(IRGlobalValueWithCode* func, IRLoop* loopInst)
     for (auto b : blocks)
         loopBlocks.add(b);
 
-    ReachabilityContext reachability = {};
-    
     // Construct a map from a root address to all derived addresses.
-    Dictionary<IRInst*, List<IRInst*>> relatedAddrMap;
-    for (auto b : func->getBlocks())
+    Dictionary<IRInst*, List<IRInst*>>& relatedAddrMap = context.relatedAddrMap;
+    if (!relatedAddrMap.getCount())
     {
-        for (auto inst : b->getChildren())
+        for (auto b : func->getBlocks())
         {
-            if (as<IRPtrTypeBase>(inst->getDataType()))
+            for (auto inst : b->getChildren())
             {
-                auto root = getRootAddr(inst);
-                if (!root) continue;
-                auto list = relatedAddrMap.tryGetValue(root);
-                if (!list)
+                if (as<IRPtrTypeBase>(inst->getDataType()))
                 {
-                    relatedAddrMap.add(root, List<IRInst*>());
-                    list = relatedAddrMap.tryGetValue(root);
+                    auto root = getRootAddr(inst);
+                    if (!root) continue;
+                    auto list = relatedAddrMap.tryGetValue(root);
+                    if (!list)
+                    {
+                        relatedAddrMap.add(root, List<IRInst*>());
+                        list = relatedAddrMap.tryGetValue(root);
+                    }
+                    list->add(inst);
                 }
-                list->add(inst);
             }
         }
     }
@@ -779,13 +768,17 @@ static bool removeTrivialPhiParams(IRBlock* block)
     return changed;
 }
 
-static bool processFunc(IRGlobalValueWithCode* func)
+static bool processFunc(IRGlobalValueWithCode* func, CFGSimplificationOptions options)
 {
     auto firstBlock = func->getFirstBlock();
     if (!firstBlock)
         return false;
 
     IRBuilder builder(func->getModule());
+
+    bool isReachabilityContextValid = false;
+    ReachabilityContext reachabilityContext;
+    CFGSimplificationContext simplificationContext;
 
     bool changed = false;
     for (;;)
@@ -815,6 +808,7 @@ static bool processFunc(IRGlobalValueWithCode* func)
                     {
                         loop->continueBlock.set(loop->getTargetBlock());
                         continueBlock->removeAndDeallocate();
+                        simplificationContext = CFGSimplificationContext();
                         changed = true;
                     }
 
@@ -822,7 +816,7 @@ static bool processFunc(IRGlobalValueWithCode* func)
                     // break at the end of the loop, we can remove the header and turn it into
                     // a normal branch.
                     auto targetBlock = loop->getTargetBlock();
-                    if (isTrivialSingleIterationLoop(func, loop))
+                    if (options.removeTrivialSingleIterationLoops && isTrivialSingleIterationLoop(simplificationContext, func, loop))
                     {
                         builder.setInsertBefore(loop);
                         List<IRInst*> args;
@@ -832,26 +826,44 @@ static bool processFunc(IRGlobalValueWithCode* func)
                         }
                         builder.emitBranch(targetBlock, args.getCount(), args.getBuffer());
                         loop->removeAndDeallocate();
+                        simplificationContext = CFGSimplificationContext();
                         changed = true;
                     }
-                    else if (!doesLoopHasSideEffect(func, loop))
+                    else if (options.removeSideEffectFreeLoops)
                     {
-                        // The loop isn't computing anything useful outside the loop.
-                        // We can delete the entire loop.
-                        builder.setInsertBefore(loop);
-                        SLANG_ASSERT(loop->getBreakBlock()->getFirstParam() == nullptr);
-                        builder.emitBranch(loop->getBreakBlock());
-                        loop->removeAndDeallocate();
-                        changed = true;
+                        if (!isReachabilityContextValid)
+                        {
+                            isReachabilityContextValid = true;
+                            reachabilityContext = ReachabilityContext(func);
+                        }
+                        if (!doesLoopHasSideEffect(simplificationContext, reachabilityContext, func, loop))
+                        {
+                            // The loop isn't computing anything useful outside the loop.
+                            // We can delete the entire loop.
+                            builder.setInsertBefore(loop);
+                            SLANG_ASSERT(loop->getBreakBlock()->getFirstParam() == nullptr);
+                            builder.emitBranch(loop->getBreakBlock());
+                            loop->removeAndDeallocate();
+                            simplificationContext = CFGSimplificationContext();
+                            changed = true;
+                        }
                     }
                 }
                 else if (auto condBranch = as<IRIfElse>(block->getTerminator()))
                 {
-                    changed |= trySimplifyIfElse(builder, condBranch);
+                    if (trySimplifyIfElse(builder, condBranch))
+                    {
+                        simplificationContext = CFGSimplificationContext();
+                        changed = true;
+                    }
                 }
                 else if (auto switchBranch = as<IRSwitch>(block->getTerminator()))
                 {
-                    changed |= trySimplifySwitch(builder, switchBranch);
+                    if (trySimplifySwitch(builder, switchBranch))
+                    {
+                        simplificationContext = CFGSimplificationContext();
+                        changed = true;
+                    }
                 }
 
                 // If `block` does not end with an unconditional branch, bail.
@@ -867,6 +879,7 @@ static bool processFunc(IRGlobalValueWithCode* func)
                 if (block->hasMoreThanOneUse())
                     break;
                 changed = true;
+                simplificationContext = CFGSimplificationContext();
                 Index paramIndex = 0;
                 auto inst = successor->getFirstDecorationOrChild();
                 while (inst)
@@ -911,7 +924,7 @@ static bool processFunc(IRGlobalValueWithCode* func)
     return changed;
 }
 
-bool simplifyCFG(IRModule* module)
+bool simplifyCFG(IRModule* module, CFGSimplificationOptions options)
 {
     bool changed = false;
     for (auto inst : module->getGlobalInsts())
@@ -922,15 +935,15 @@ bool simplifyCFG(IRModule* module)
         }
         if (auto func = as<IRFunc>(inst))
         {
-            changed |= processFunc(func);
+            changed |= processFunc(func, options);
         }
     }
     return changed;
 }
 
-bool simplifyCFG(IRGlobalValueWithCode* func)
+bool simplifyCFG(IRGlobalValueWithCode* func, CFGSimplificationOptions options)
 {
-    return processFunc(func);
+    return processFunc(func, options);
 }
 
 } // namespace Slang

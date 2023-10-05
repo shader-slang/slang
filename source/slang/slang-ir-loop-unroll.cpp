@@ -459,7 +459,7 @@ bool unrollLoopsInFunc(
 
         // Make sure we simplify things as much as possible before
         // attempting to potentially unroll outer loop.
-        simplifyCFG(func);
+        simplifyCFG(func, CFGSimplificationOptions::getDefault());
         eliminateDeadCode(func);
     }
     return true;

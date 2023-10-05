@@ -18,7 +18,7 @@ struct SingleReturnContext : public InstPassBase
     void processFunc(IRGlobalValueWithCode* func)
     {
         IRBuilder builder(module);
-        simplifyCFG(func);
+        simplifyCFG(func, CFGSimplificationOptions::getFast());
 
         // We make use of the `eliminate-multi-level-break` pass to implement the transformation.
         // To be able to do that, we need to prepare `func` so that the entire function body
