@@ -4848,19 +4848,20 @@ namespace Slang
     {
         IRType* type = nullptr;
         auto basePtrType = as<IRPtrTypeBase>(basePtr->getDataType());
-        if (auto arrayType = as<IRArrayType>(basePtrType->getValueType()))
+        auto valueType = unwrapAttributedType(basePtrType->getValueType());
+        if (auto arrayType = as<IRArrayType>(valueType))
         {
             type = arrayType->getElementType();
         }
-        else if (auto vectorType = as<IRVectorType>(basePtrType->getValueType()))
+        else if (auto vectorType = as<IRVectorType>(valueType))
         {
             type = vectorType->getElementType();
         }
-        else if (auto matrixType = as<IRMatrixType>(basePtrType->getValueType()))
+        else if (auto matrixType = as<IRMatrixType>(valueType))
         {
             type = getVectorType(matrixType->getElementType(), matrixType->getColumnCount());
         }
-        else if (const auto basicType = as<IRBasicType>(basePtrType->getValueType()))
+        else if (const auto basicType = as<IRBasicType>(valueType))
         {
             // HLSL support things like float.x, in which case we just return the base pointer.
             return basePtr;
@@ -4884,10 +4885,11 @@ namespace Slang
         for (auto access : accessChain)
         {
             auto basePtrType = cast<IRPtrTypeBase>(basePtr->getDataType());
+            auto valueType = unwrapAttributedType(basePtrType->getValueType());
             IRType* resultType = nullptr;
             if (auto structKey = as<IRStructKey>(access))
             {
-                auto structType = as<IRStructType>(basePtrType->getValueType());
+                auto structType = as<IRStructType>(valueType);
                 SLANG_RELEASE_ASSERT(structType);
                 for (auto field : structType->getFields())
                 {

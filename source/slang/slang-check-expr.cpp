@@ -372,7 +372,24 @@ namespace Slang
                 {
                     expr->type.isLeftValue = false;
                 }
-
+                else
+                {
+                    // If we are accessing a readonly property, then the result
+                    // is not an l-value.
+                    if (auto propertyDecl = as<PropertyDecl>(declRef.getDecl()))
+                    {
+                        bool isLValue = false;
+                        for (auto member : propertyDecl->members)
+                        {
+                            if (as<SetterDecl>(member) || as< RefAccessorDecl>(member))
+                            {
+                                isLValue = true;
+                                break;
+                            }
+                        }
+                        expr->type.isLeftValue = isLValue;
+                    }
+                }
                 return expr;
             }
         }
@@ -3322,7 +3339,10 @@ namespace Slang
 
         // A swizzle can be used as an l-value as long as there
         // were no duplicates in the list of components
-        swizExpr->type.isLeftValue = !anyDuplicates;
+        swizExpr->type.isLeftValue = !anyDuplicates &&
+            swizExpr->base &&
+            swizExpr->base->type &&
+            swizExpr->base->type.isLeftValue;
 
         return swizExpr;
     }
