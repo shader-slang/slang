@@ -152,6 +152,7 @@ private:
     void registerCapability(const char* methodName);
     void logMessage(int type, String message);
 
+    FormatOptions getFormatOptions(Workspace* workspace, FormatOptions inOptions);
     SlangResult tryGetMacroHoverInfo(
         WorkspaceVersion* version,
         DocumentVersion* doc,
