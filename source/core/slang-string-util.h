@@ -87,6 +87,9 @@ struct StringUtil
     static String calcCharReplaced(const UnownedStringSlice& slice, char fromChar, char toChar);
     static String calcCharReplaced(const String& string, char fromChar, char toChar);
     
+        /// Replaces all occurrances of subStr with replacement.
+    static String replaceAll(UnownedStringSlice text, UnownedStringSlice subStr, UnownedStringSlice replacement);
+
         /// Create a blob from a string
     static ComPtr<ISlangBlob> createStringBlob(const String& string);
 

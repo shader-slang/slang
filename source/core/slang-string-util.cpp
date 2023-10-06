@@ -392,6 +392,31 @@ ComPtr<ISlangBlob> StringUtil::createStringBlob(const String& string)
     return (fromChar == toChar || string.indexOf(fromChar) == Index(-1)) ? string : calcCharReplaced(string.getUnownedSlice(), fromChar, toChar);
 }
 
+String StringUtil::replaceAll(UnownedStringSlice text, UnownedStringSlice subStr, UnownedStringSlice replacement)
+{
+    StringBuilder builder;
+    for (Index i = 0; i < text.getLength();)
+    {
+        if (i + subStr.getLength() >= text.getLength())
+        {
+            builder.append(text.subString(i, text.getLength() - i));
+            break;
+        }
+        if (text.subString(i, subStr.getLength()) == subStr)
+        {
+            builder.append(replacement);
+            i += subStr.getLength();
+        }
+        else
+        {
+            builder.append(text[i]);
+            i++;
+        }
+    }
+    return builder.produceString();
+}
+
+
 /* static */void StringUtil::appendStandardLines(const UnownedStringSlice& text, StringBuilder& out)
 {
     const char* cur = text.begin();

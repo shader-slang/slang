@@ -1469,9 +1469,10 @@ SlangResult LanguageServer::formatting(const LanguageServerProtocol::DocumentFor
     }
     if (m_formatOptions.clangFormatLocation.getLength() == 0)
         m_formatOptions.clangFormatLocation = findClangFormatTool();
-    m_formatOptions.fileName = canonicalPath;
+    auto options = getFormatOptions(m_workspace, m_formatOptions);
+    options.fileName = canonicalPath;
     List<TextRange> exclusionRange = extractFormattingExclusionRanges(doc->getText().getUnownedSlice());
-    auto edits = formatSource(doc->getText().getUnownedSlice(), -1, -1, -1, exclusionRange, m_formatOptions);
+    auto edits = formatSource(doc->getText().getUnownedSlice(), -1, -1, -1, exclusionRange, options);
     auto textEdits = translateTextEdits(doc, edits);
     m_connection->sendResult(&textEdits, responseId);
     return SLANG_OK;
@@ -1491,7 +1492,7 @@ SlangResult LanguageServer::rangeFormatting(const LanguageServerProtocol::Docume
     Index endOffset = doc->getOffset(endLine, endCol);
     if (m_formatOptions.clangFormatLocation.getLength() == 0)
         m_formatOptions.clangFormatLocation = findClangFormatTool();
-    auto options = m_formatOptions;
+    auto options = getFormatOptions(m_workspace, m_formatOptions);
     if (!m_formatOptions.allowLineBreakInRangeFormatting)
         options.behavior = FormatBehavior::PreserveLineBreak;
     List<TextRange> exclusionRange = extractFormattingExclusionRanges(doc->getText().getUnownedSlice());
@@ -1520,7 +1521,7 @@ SlangResult LanguageServer::onTypeFormatting(const LanguageServerProtocol::Docum
     Index line, col;
     doc->zeroBasedUTF16LocToOneBasedUTF8Loc(args.position.line, args.position.character, line, col);
     auto cursorOffset = doc->getOffset(line, col);
-    auto options = m_formatOptions;
+    auto options = getFormatOptions(m_workspace, m_formatOptions);
     if (!m_formatOptions.allowLineBreakInOnTypeFormatting)
         options.behavior = FormatBehavior::PreserveLineBreak;
     List<TextRange> exclusionRange = extractFormattingExclusionRanges(doc->getText().getUnownedSlice());
@@ -1758,6 +1759,19 @@ void LanguageServer::logMessage(int type, String message)
     args.type = type;
     args.message = message;
     m_connection->sendCall(LanguageServerProtocol::LogMessageParams::methodName, &args);
+}
+
+FormatOptions LanguageServer::getFormatOptions(Workspace* workspace, FormatOptions inOptions)
+{
+    FormatOptions result = inOptions;
+    if (workspace->rootDirectories.getCount())
+    {
+        result.clangFormatLocation = StringUtil::replaceAll(
+            result.clangFormatLocation.getUnownedSlice(),
+            toSlice("${workspaceFolder}"),
+            workspace->rootDirectories.getFirst().getUnownedSlice());
+    }
+    return result;
 }
 
 SlangResult LanguageServer::tryGetMacroHoverInfo(

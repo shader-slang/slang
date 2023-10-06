@@ -152,9 +152,15 @@ inline bool isGenericParam(IRInst* param)
 
 inline IRInst* unwrapAttributedType(IRInst* type)
 {
-    while (auto attrType = as<IRAttributedType>(type))
-        type = attrType->getBaseType();
-    return type;
+    for (;;)
+    {
+        if (auto attrType = as<IRAttributedType>(type))
+            type = attrType->getBaseType();
+        else if (auto rateType = as<IRRateQualifiedType>(type))
+            type = rateType->getValueType();
+        else
+            return type;
+    }
 }
 
 // Remove hlsl's 'unorm' and 'snorm' modifiers

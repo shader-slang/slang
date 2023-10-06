@@ -85,7 +85,12 @@ public:
         switch (func->getOp())
         {
         case kIROp_ForwardDifferentiate:
+            if (auto fwdDerivative = func->getOperand(0)->findDecoration<IRForwardDerivativeDecoration>())
+                return isDifferentiableFunc(fwdDerivative->getForwardDerivativeFunc(), level);
+            return isDifferentiableFunc(func->getOperand(0), level);
         case kIROp_BackwardDifferentiate:
+            if (auto bwdDerivative = func->getOperand(0)->findDecoration<IRUserDefinedBackwardDerivativeDecoration>())
+                return isDifferentiableFunc(bwdDerivative->getBackwardDerivativeFunc(), level);
             return isDifferentiableFunc(func->getOperand(0), level);
         default:
             break;
