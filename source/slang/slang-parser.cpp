@@ -6468,7 +6468,6 @@ namespace Slang
                 Diagnostics::spirvInstructionWithoutResultTypeId,
                 ret.opcode.token
             );
-            return std::nullopt;
         }
 
         //
@@ -6519,9 +6518,10 @@ namespace Slang
                 ret.operands.add(*operand);
             }
             else
-                return std::nullopt;
+            {
+                break;
+            }
         }
-
         return ret;
     }
 
@@ -6552,7 +6552,7 @@ namespace Slang
         }
         parser->ReadMatchingToken(TokenType::RBrace);
 
-        return failed ? nullptr : asmExpr;
+        return asmExpr;
     }
 
     static Expr* parsePrefixExpr(Parser* parser)

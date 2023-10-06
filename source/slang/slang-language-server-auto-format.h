@@ -13,6 +13,12 @@ struct Edit
     String text;
 };
 
+struct TextRange
+{
+    Index offsetStart;
+    Index offsetEnd;
+};
+
 enum class FormatBehavior
 {
     Standard,
@@ -31,6 +37,9 @@ struct FormatOptions
 };
 
 String findClangFormatTool();
-List<Edit> formatSource(UnownedStringSlice text, Index lineStart, Index lineEnd, Index cursorOffset, const FormatOptions& options);
+
+List<TextRange> extractFormattingExclusionRanges(UnownedStringSlice text);
+
+List<Edit> formatSource(UnownedStringSlice text, Index lineStart, Index lineEnd, Index cursorOffset, const List<TextRange>& exclusionRanges, const FormatOptions& options);
 
 } // namespace Slang

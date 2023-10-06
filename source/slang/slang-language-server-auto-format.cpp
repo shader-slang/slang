@@ -58,6 +58,80 @@ String findClangFormatTool()
     return String();
 }
 
+List<TextRange> extractFormattingExclusionRanges(UnownedStringSlice text)
+{
+    List<TextRange> resultRanges;
+    // Search the document and find all the spirv-asm blocks to exclude them from formatting.
+    Lexer lexer;
+    SourceManager manager;
+    manager.initialize(nullptr, nullptr);
+    auto sourceFile = manager.createSourceFileWithString(PathInfo(), text);
+    auto sourceView = manager.createSourceView(sourceFile, nullptr, SourceLoc());
+    DiagnosticSink sink;
+    RootNamePool rootPool;
+    NamePool namePool;
+    namePool.setRootNamePool(&rootPool);
+    MemoryArena memory;
+    memory.init(1 << 16);
+    lexer.initialize(sourceView, &sink, &namePool, &memory);
+    for (;;)
+    {
+        auto headerToken = lexer.lexToken();
+        if (headerToken.type == TokenType::EndOfFile)
+            break;
+        if (headerToken.type != TokenType::Identifier || headerToken.getContent() != toSlice("spirv_asm"))
+        {
+            continue;
+        }
+        
+        // We have found a spirv-asm block, now find the end of it.
+        int braceCounter = 0;
+        Token endToken;
+        Token startToken;
+        for (;;)
+        {
+            auto token = lexer.lexToken();
+            if (token.type == TokenType::EndOfFile)
+                break;
+            switch (token.type)
+            {
+            case TokenType::RBrace:
+                braceCounter--;
+                if (braceCounter == 0)
+                {
+                    endToken = token;
+                    goto breakLabel;
+                }
+            case TokenType::LBrace:
+                {
+                    if (braceCounter == 0)
+                        startToken = token;
+                    braceCounter++;
+                }
+                break;
+            case TokenType::WhiteSpace:
+            case TokenType::LineComment:
+            case TokenType::BlockComment:
+            case TokenType::NewLine:
+                break;
+            default:
+                if (braceCounter == 0)
+                    goto breakLabel;
+                break;
+            }
+        }
+        breakLabel:;
+        if (endToken.type == TokenType::RBrace)
+        {
+            TextRange range;
+            range.offsetStart = startToken.getLoc().getRaw();
+            range.offsetEnd = endToken.getLoc().getRaw();
+            resultRanges.add(range);
+        }
+    }
+    return resultRanges;
+}
+
 void translateXmlEscape(StringBuilder& sb, UnownedStringSlice text)
 {
     if (text.getLength() == 0)
@@ -152,7 +226,7 @@ bool shouldUseFallbackStyle(const FormatOptions& options)
     return true;
 }
 
-List<Edit> formatSource(UnownedStringSlice text, Index lineStart, Index lineEnd, Index cursorOffset, const FormatOptions& options)
+List<Edit> formatSource(UnownedStringSlice text, Index lineStart, Index lineEnd, Index cursorOffset, const List<TextRange>& exclusionRanges, const FormatOptions& options)
 {
     List<Edit> edits;
 
@@ -231,6 +305,16 @@ List<Edit> formatSource(UnownedStringSlice text, Index lineStart, Index lineEnd,
         edt.offset = StringUtil::parseIntAndAdvancePos(line, pos);
         pos = line.indexOf(lengthStr);
         if (pos == -1)
+            continue;
+        Index exclusionRangeId = exclusionRanges.binarySearch(edt.offset, [](TextRange range, Index offset)
+            {
+                if (range.offsetEnd <= offset)
+                    return -1;
+                if (range.offsetStart > offset)
+                    return 1;
+                return 0;
+            });
+        if (exclusionRangeId != -1)
             continue;
         pos += lengthStr.getLength();
         if (pos < line.getLength() && line[pos] == '\'')
