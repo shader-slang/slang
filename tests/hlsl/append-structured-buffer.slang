@@ -1,12 +1,13 @@
 //DISABLE_TEST:SIMPLE(filecheck=GLSL):-line-directive-mode none -target glsl -profile glsl_450 -stage compute -entry computeMain -fvk-u-shift 10 0
 //DISABLE_TEST:SIMPLE(filecheck=SPIRV):-line-directive-mode none -target spirv -profile glsl_450 -stage compute -entry computeMain
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-dx12 -use-dxil -compute -output-using-type
-//DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -output-using-type
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -output-using-type
 //DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -output-using-type -fvk-use-gl-layout
 
 // To check that our counter-initialization works correctly, set the initial
 // counter to 1 instead of 0
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4, counter=1):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 1 2 3 0 0 0 0], stride=4, counter=1):out,name=outputBuffer.elements
+//TEST_INPUT:ubuffer(data=[1], stride=4, counter=1):out,name=outputBuffer.counter
 AppendStructuredBuffer<float> outputBuffer;
 
 // GLSL:      layout(std430, binding = 11) buffer StructuredBuffer_float2_t
