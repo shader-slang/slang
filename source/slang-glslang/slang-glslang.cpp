@@ -413,6 +413,32 @@ static void glslang_optimizeSPIRV(spv_target_env targetEnv, const glslang_Compil
     }
 }
 
+static int spirv_Optimize_1_2(const glslang_CompileRequest_1_2& request)
+{
+    std::vector<SPIRVOptimizationDiagnostic> diagnostics;
+    std::vector<uint32_t> spirvBuffer;
+    size_t inputBlobSize = (char*)request.inputEnd - (char*)request.inputBegin;
+    spirvBuffer.resize(inputBlobSize / sizeof(uint32_t));
+    memcpy(spirvBuffer.data(), request.inputBegin, inputBlobSize);
+
+    glslang_optimizeSPIRV(SPV_ENV_UNIVERSAL_1_5, request, diagnostics, spirvBuffer);
+    if (request.outputFunc)
+    {
+        request.outputFunc(spirvBuffer.data(), spirvBuffer.size() * sizeof(uint32_t), request.outputUserData);
+    }
+    if (request.diagnosticFunc)
+    {
+        for (auto& diagnostic : diagnostics)
+        {
+            request.diagnosticFunc(
+                (void*)diagnostic.message.c_str(),
+                diagnostic.message.size() * sizeof(char),
+                request.diagnosticUserData);
+        }
+    }
+    return SLANG_OK;
+}
+
 static glslang::EShTargetLanguageVersion _makeTargetLanguageVersion(int majorVersion, int minorVersion)
 {
     return glslang::EShTargetLanguageVersion((uint32_t(majorVersion) << 16) | (uint32_t(minorVersion) << 8));
@@ -769,6 +795,10 @@ static int _compile(const glslang_CompileRequest_1_2& request)
 
         case GLSLANG_ACTION_DISSASSEMBLE_SPIRV:
             result = glslang_dissassembleSPIRV(request);
+            break;
+        
+        case GLSLANG_ACTION_OPTIMIZE_SPIRV:
+            result = spirv_Optimize_1_2(request);
             break;
     }
 

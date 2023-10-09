@@ -13,6 +13,12 @@ struct GlslangDownstreamCompilerUtil
     static SlangResult locateCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set);
 };
 
+
+struct SpirvOptDownstreamCompilerUtil
+{
+    static SlangResult locateCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set);
+};
+
 }
 
 #endif

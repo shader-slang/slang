@@ -80,12 +80,13 @@ static const NamesDescriptionValue s_compilerInfos[] =
     { SLANG_PASS_THROUGH_DXC,       "dxc",      "DXC HLSL compiler" },
     { SLANG_PASS_THROUGH_GLSLANG,   "glslang",  "GLSLANG GLSL compiler" },
     { SLANG_PASS_THROUGH_SPIRV_DIS, "spirv-dis",  "spirv-tools SPIRV disassembler" },
-    { SLANG_PASS_THROUGH_VISUAL_STUDIO, "visualstudio,vs", "Visual Studio C/C++ compiler" },
     { SLANG_PASS_THROUGH_CLANG,     "clang",    "Clang C/C++ compiler" },
+    { SLANG_PASS_THROUGH_VISUAL_STUDIO, "visualstudio,vs", "Visual Studio C/C++ compiler" },
     { SLANG_PASS_THROUGH_GCC,       "gcc",      "GCC C/C++ compiler" },
     { SLANG_PASS_THROUGH_GENERIC_C_CPP, "genericcpp,c,cpp", "A generic C++ compiler (can be any one of visual studio, clang or gcc depending on system and availability)" },
     { SLANG_PASS_THROUGH_NVRTC,     "nvrtc",     "NVRTC CUDA compiler" },
     { SLANG_PASS_THROUGH_LLVM,      "llvm",     "LLVM/Clang `slang-llvm`" },
+    { SLANG_PASS_THROUGH_SPIRV_OPT, "spirv-opt",  "spirv-tools SPIRV optimizer" },
 };
 
 static const NamesDescriptionValue s_archiveTypeInfos[] =

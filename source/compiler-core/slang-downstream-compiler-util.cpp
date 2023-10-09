@@ -55,6 +55,7 @@ struct DownstreamCompilerInfos
     infos.infos[int(SLANG_PASS_THROUGH_DXC)] = Info(SourceLanguageFlag::HLSL);
     infos.infos[int(SLANG_PASS_THROUGH_FXC)] = Info(SourceLanguageFlag::HLSL);
     infos.infos[int(SLANG_PASS_THROUGH_GLSLANG)] = Info(SourceLanguageFlag::GLSL);
+    infos.infos[int(SLANG_PASS_THROUGH_SPIRV_OPT)] = Info(SourceLanguageFlag::SPIRV);
 
     return infos;
 }
@@ -327,6 +328,7 @@ DownstreamCompilerMatchVersion DownstreamCompilerUtil::getCompiledVersion()
     outFuncs[int(SLANG_PASS_THROUGH_DXC)] = &DXCDownstreamCompilerUtil::locateCompilers;
     outFuncs[int(SLANG_PASS_THROUGH_FXC)] = &FXCDownstreamCompilerUtil::locateCompilers;
     outFuncs[int(SLANG_PASS_THROUGH_GLSLANG)] = &GlslangDownstreamCompilerUtil::locateCompilers;
+    outFuncs[int(SLANG_PASS_THROUGH_SPIRV_OPT)] = &SpirvOptDownstreamCompilerUtil::locateCompilers;
     outFuncs[int(SLANG_PASS_THROUGH_LLVM)] = &LLVMDownstreamCompilerUtil::locateCompilers;
     outFuncs[int(SLANG_PASS_THROUGH_SPIRV_DIS)] = &SPIRVDisDownstreamCompilerUtil::locateCompilers;
 }
