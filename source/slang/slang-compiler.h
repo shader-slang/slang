@@ -3154,6 +3154,8 @@ namespace Slang
         DiagnosticSink* sink,
         const LoadedModuleDictionary* additionalLoadedModules);
 
+    SlangResult passthroughDownstreamDiagnostics(DiagnosticSink* sink, IDownstreamCompiler* compiler, IArtifact* artifact);
+
 //
 // The following functions are utilties to convert between
 // matching "external" (public API) and "internal" (implementation)

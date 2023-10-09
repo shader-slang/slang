@@ -1314,6 +1314,8 @@ SlangResult emitSPIRVForEntryPointsDirectly(
         {
             artifact = _Move(optimizedArtifact);
         }
+
+        SLANG_RETURN_ON_FAIL(passthroughDownstreamDiagnostics(codeGenContext->getSink(), compiler, artifact));
     }
 
     ArtifactUtil::addAssociated(artifact, linkedIR.metadata);

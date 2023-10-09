@@ -953,6 +953,71 @@ namespace Slang
         return false;
     }
 
+    SlangResult passthroughDownstreamDiagnostics(DiagnosticSink* sink, IDownstreamCompiler* compiler, IArtifact* artifact)
+    {
+        auto diagnostics = findAssociatedRepresentation<IArtifactDiagnostics>(artifact);
+
+        if (!diagnostics)
+            return SLANG_OK;
+
+        if (diagnostics->getCount())
+        {
+            StringBuilder compilerText;
+            DownstreamCompilerUtil::appendAsText(compiler->getDesc(), compilerText);
+
+            StringBuilder builder;
+
+            auto const diagnosticCount = diagnostics->getCount();
+            for (Index i = 0; i < diagnosticCount; ++i)
+            {
+                const auto& diagnostic = *diagnostics->getAt(i);
+
+                builder.clear();
+
+                const Severity severity = _getDiagnosticSeverity(diagnostic.severity);
+
+                if (diagnostic.filePath.count == 0 && diagnostic.location.line == 0 && severity == Severity::Note)
+                {
+                    // If theres no filePath line number and it's info, output severity and text alone
+                    builder << getSeverityName(severity) << " : ";
+                }
+                else
+                {
+                    if (diagnostic.filePath.count)
+                    {
+                        builder << asStringSlice(diagnostic.filePath);
+                    }
+
+                    if (diagnostic.location.line)
+                    {
+                        builder << "(" << diagnostic.location.line << ")";
+                    }
+
+                    builder << ": ";
+
+                    if (diagnostic.stage == ArtifactDiagnostic::Stage::Link)
+                    {
+                        builder << "link ";
+                    }
+
+                    builder << getSeverityName(severity);
+                    builder << " " << asStringSlice(diagnostic.code) << ": ";
+                }
+
+                builder << asStringSlice(diagnostic.text);
+                reportExternalCompileError(compilerText.getBuffer(), severity, SLANG_OK, builder.getUnownedSlice(), sink);
+            }
+        }
+
+        // If any errors are emitted, then we are done
+        if (diagnostics->hasOfAtLeastSeverity(ArtifactDiagnostic::Severity::Error))
+        {
+            return SLANG_FAIL;
+        }
+
+        return SLANG_OK;
+    }
+
     SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& outArtifact)
     {
         outArtifact.setNull();
@@ -1421,62 +1486,7 @@ namespace Slang
             (std::chrono::high_resolution_clock::now() - downstreamStartTime).count() * 0.000000001;
         getSession()->addDownstreamCompileTime(downstreamElapsedTime);
 
-        auto diagnostics = findAssociatedRepresentation<IArtifactDiagnostics>(artifact);
-
-        if (diagnostics->getCount())
-        {
-            StringBuilder compilerText;
-            DownstreamCompilerUtil::appendAsText(compiler->getDesc(), compilerText);
-
-            StringBuilder builder;
-
-            auto const diagnosticCount = diagnostics->getCount();
-            for (Index i = 0; i < diagnosticCount; ++i)
-            {
-                const auto& diagnostic = *diagnostics->getAt(i);
-
-                builder.clear();
-
-                const Severity severity = _getDiagnosticSeverity(diagnostic.severity);
-                
-                if (diagnostic.filePath.count == 0 && diagnostic.location.line == 0 && severity == Severity::Note)
-                {
-                    // If theres no filePath line number and it's info, output severity and text alone
-                    builder << getSeverityName(severity) << " : ";
-                }
-                else
-                {
-                    if (diagnostic.filePath.count)
-                    {
-                        builder << asStringSlice(diagnostic.filePath);
-                    }
-
-                    if (diagnostic.location.line)
-                    {
-                        builder << "(" << diagnostic.location.line <<")";
-                    }
-
-                    builder << ": ";
-
-                    if (diagnostic.stage == ArtifactDiagnostic::Stage::Link)
-                    {
-                        builder << "link ";
-                    }
-
-                    builder << getSeverityName(severity);
-                    builder << " " << asStringSlice(diagnostic.code) << ": ";
-                }
-
-                builder << asStringSlice(diagnostic.text);
-                reportExternalCompileError(compilerText.getBuffer(), severity, SLANG_OK, builder.getUnownedSlice(), sink);
-            }
-        }
-
-        // If any errors are emitted, then we are done
-        if (diagnostics->hasOfAtLeastSeverity(ArtifactDiagnostic::Severity::Error))
-        {
-            return SLANG_FAIL;
-        }
+        SLANG_RETURN_ON_FAIL(passthroughDownstreamDiagnostics(getSink(), compiler, artifact));
 
         // Copy over all of the information associated with the source into the output
         if (sourceArtifact)
