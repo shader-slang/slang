@@ -19,6 +19,11 @@ struct SpirvOptDownstreamCompilerUtil
     static SlangResult locateCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set);
 };
 
+struct SpirvDisDownstreamCompilerUtil
+{
+    static SlangResult locateCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set);
+};
+
 }
 
 #endif

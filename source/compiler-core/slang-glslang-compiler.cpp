@@ -399,6 +399,11 @@ SlangResult SpirvOptDownstreamCompilerUtil::locateCompilers(const String& path, 
     return locateGlslangSpirvDownstreamCompiler(path, loader, set, SLANG_PASS_THROUGH_SPIRV_OPT);
 }
 
+SlangResult SpirvDisDownstreamCompilerUtil::locateCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)
+{
+    return locateGlslangSpirvDownstreamCompiler(path, loader, set, SLANG_PASS_THROUGH_SPIRV_DIS);
+}
+
 #else // SLANG_ENABLE_GLSLANG_SUPPORT
 
 /* static */SlangResult GlslangDownstreamCompilerUtil::locateCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)
