@@ -732,15 +732,15 @@ static int glslang_dissassembleSPIRV(const glslang_CompileRequest_1_2& request)
     typedef unsigned int SPIRVWord;
 
     SPIRVWord const* spirvBegin = (SPIRVWord const*)request.inputBegin;
-    SPIRVWord const* spirvEnd   = (SPIRVWord const*)request.inputEnd;
+    SPIRVWord const* spirvEnd = (SPIRVWord const*)request.inputEnd;
 
     std::vector<SPIRVWord> spirv(spirvBegin, spirvEnd);
 
-    std::stringstream spirvAsmStream;
-    spv::Disassemble(spirvAsmStream, spirv);
-    std::string result = spirvAsmStream.str();
-    dump(result.c_str(), result.length(), request.outputFunc, request.outputUserData, stdout);
+    std::string result;
+    spvtools::SpirvTools spirvTools(SPV_ENV_UNIVERSAL_1_5);
+    spirvTools.Disassemble(spirv, &result, SPV_BINARY_TO_TEXT_OPTION_FRIENDLY_NAMES | SPV_BINARY_TO_TEXT_OPTION_COMMENT);
 
+    dump(result.c_str(), result.length(), request.outputFunc, request.outputUserData, stdout);
     return 0;
 }
 
