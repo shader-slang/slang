@@ -52,7 +52,7 @@ public:
         /// Must be called before use
     SlangResult init(ISlangSharedLibrary* library);
 
-    GlslangDownstreamCompiler() {}
+    GlslangDownstreamCompiler(SlangPassThrough compilerType) : m_compilerType(compilerType) {}
     
 protected:
 
@@ -63,6 +63,8 @@ protected:
     glslang_CompileFunc_1_2 m_compile_1_2 = nullptr;
 
     ComPtr<ISlangSharedLibrary> m_sharedLibrary;
+
+    SlangPassThrough m_compilerType;
 };
 
 SlangResult GlslangDownstreamCompiler::init(ISlangSharedLibrary* library)
@@ -80,7 +82,7 @@ SlangResult GlslangDownstreamCompiler::init(ISlangSharedLibrary* library)
     m_sharedLibrary = library;
 
     // It's not clear how to query for a version, but we can get a version number from the header
-    m_desc = Desc(SLANG_PASS_THROUGH_GLSLANG);
+    m_desc = Desc(m_compilerType);
 
     Slang::String filename;
     if (m_compile_1_2)
@@ -173,9 +175,9 @@ SlangResult GlslangDownstreamCompiler::compile(const CompileOptions& inOptions, 
 
     IArtifact* sourceArtifact = options.sourceArtifacts[0];
 
-    if (options.sourceLanguage != SLANG_SOURCE_LANGUAGE_GLSL || options.targetType != SLANG_SPIRV)
+    if (options.targetType != SLANG_SPIRV)
     {
-        SLANG_ASSERT(!"Can only compile GLSL to SPIR-V");
+        SLANG_ASSERT(!"Can only compile to SPIR-V");
         return SLANG_FAIL;
     }
 
@@ -199,7 +201,19 @@ SlangResult GlslangDownstreamCompiler::compile(const CompileOptions& inOptions, 
     memset(&request, 0, sizeof(request));
     request.sizeInBytes = sizeof(request);
 
-    request.action = GLSLANG_ACTION_COMPILE_GLSL_TO_SPIRV;
+    switch (options.sourceLanguage)
+    {
+    case SLANG_SOURCE_LANGUAGE_GLSL:
+        request.action = GLSLANG_ACTION_COMPILE_GLSL_TO_SPIRV;
+        break;
+    case SLANG_SOURCE_LANGUAGE_SPIRV:
+        request.action = GLSLANG_ACTION_OPTIMIZE_SPIRV;
+        break;
+    default:
+        SLANG_ASSERT(!"Can only handle GLSL or SPIR-V as input.");
+        return SLANG_FAIL;
+    }
+
     request.sourcePath = sourcePath.getBuffer();
 
     request.slangStage = options.stage;
@@ -340,7 +354,7 @@ SlangResult GlslangDownstreamCompiler::getVersionString(slang::IBlob** outVersio
     return SLANG_OK;
 }
 
-/* static */SlangResult GlslangDownstreamCompilerUtil::locateCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)
+static SlangResult locateGlslangSpirvDownstreamCompiler(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set, SlangPassThrough compilerType)
 {
     ComPtr<ISlangSharedLibrary> library;
 
@@ -367,12 +381,27 @@ SlangResult GlslangDownstreamCompiler::getVersionString(slang::IBlob** outVersio
         return SLANG_FAIL;
     }
 
-    auto compiler = new GlslangDownstreamCompiler;
+    auto compiler = new GlslangDownstreamCompiler(compilerType);
     ComPtr<IDownstreamCompiler> compilerIntf(compiler);
     SLANG_RETURN_ON_FAIL(compiler->init(library));
 
     set->addCompiler(compilerIntf);
     return SLANG_OK;
+}
+
+SlangResult GlslangDownstreamCompilerUtil::locateCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)
+{
+    return locateGlslangSpirvDownstreamCompiler(path, loader, set, SLANG_PASS_THROUGH_GLSLANG);
+}
+
+SlangResult SpirvOptDownstreamCompilerUtil::locateCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)
+{
+    return locateGlslangSpirvDownstreamCompiler(path, loader, set, SLANG_PASS_THROUGH_SPIRV_OPT);
+}
+
+SlangResult SpirvDisDownstreamCompilerUtil::locateCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)
+{
+    return locateGlslangSpirvDownstreamCompiler(path, loader, set, SLANG_PASS_THROUGH_SPIRV_DIS);
 }
 
 #else // SLANG_ENABLE_GLSLANG_SUPPORT

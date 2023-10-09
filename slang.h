@@ -640,6 +640,7 @@ extern "C"
         SLANG_PASS_THROUGH_GENERIC_C_CPP,           ///< Generic C or C++ compiler, which is decided by the source type
         SLANG_PASS_THROUGH_NVRTC,                   ///< NVRTC Cuda compiler
         SLANG_PASS_THROUGH_LLVM,                    ///< LLVM 'compiler' - includes LLVM and Clang
+        SLANG_PASS_THROUGH_SPIRV_OPT,               ///< SPIRV-opt
         SLANG_PASS_THROUGH_COUNT_OF,
     };
 

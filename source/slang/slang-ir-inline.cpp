@@ -1019,33 +1019,4 @@ bool inlineCall(IRCall* call)
     return pass.considerCallSite(call);
 }
 
-
-struct SpirvInliningPass : InliningPassBase
-{
-    typedef InliningPassBase Super;
-
-    SpirvInliningPass(IRModule* module)
-        : Super(module)
-    {}
-
-    bool shouldInline(CallSiteInfo const& info)
-    {
-        if (!info.callee->findDecoration<IREntryPointDecoration>())
-            return true;
-        return false;
-    }
-};
-
-void performSpirvInlining(IRModule* module)
-{
-    SLANG_PROFILE;
-    while (true)
-    {
-        SpirvInliningPass pass(module);
-        if (pass.considerAllCallSites())
-            continue;
-        break;
-    }
-}
-
 } // namespace Slang

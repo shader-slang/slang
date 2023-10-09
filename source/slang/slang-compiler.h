@@ -1197,6 +1197,7 @@ namespace Slang
         GenericCCpp = SLANG_PASS_THROUGH_GENERIC_C_CPP,     ///< Generic C/C++ compiler
         NVRTC = SLANG_PASS_THROUGH_NVRTC,                   ///< NVRTC CUDA compiler
         LLVM = SLANG_PASS_THROUGH_LLVM,                     ///< LLVM 'compiler'
+        SpirvOpt = SLANG_PASS_THROUGH_SPIRV_OPT,            ///< pass thorugh spirv to spirv-opt
         CountOf = SLANG_PASS_THROUGH_COUNT_OF,              
     };
     void printDiagnosticArg(StringBuilder& sb, PassThroughMode val);
@@ -3152,6 +3153,8 @@ namespace Slang
         SourceLoc const& loc,
         DiagnosticSink* sink,
         const LoadedModuleDictionary* additionalLoadedModules);
+
+    SlangResult passthroughDownstreamDiagnostics(DiagnosticSink* sink, IDownstreamCompiler* compiler, IArtifact* artifact);
 
 //
 // The following functions are utilties to convert between

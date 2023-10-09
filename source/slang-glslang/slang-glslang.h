@@ -12,6 +12,7 @@ enum
 {
     GLSLANG_ACTION_COMPILE_GLSL_TO_SPIRV,
     GLSLANG_ACTION_DISSASSEMBLE_SPIRV,
+    GLSLANG_ACTION_OPTIMIZE_SPIRV,
 };
 
 struct glsl_SPIRVVersion
@@ -128,17 +129,17 @@ struct glslang_CompileRequest_1_2
     const char* entryPointName; // The name of the entrypoint that will appear in output spirv.
 };
 
-void glslang_CompileRequest_1_0::set(const glslang_CompileRequest_1_1& in)
+inline void glslang_CompileRequest_1_0::set(const glslang_CompileRequest_1_1& in)
 {
     SLANG_GLSLANG_COMPILE_REQUEST_1_0(SLANG_GLSLANG_FIELD_COPY)
 }
 
-void glslang_CompileRequest_1_1::set(const glslang_CompileRequest_1_0& in)
+inline void glslang_CompileRequest_1_1::set(const glslang_CompileRequest_1_0& in)
 {
     SLANG_GLSLANG_COMPILE_REQUEST_1_0(SLANG_GLSLANG_FIELD_COPY)
 }
 
-void glslang_CompileRequest_1_2::set(const glslang_CompileRequest_1_1& in)
+inline void glslang_CompileRequest_1_2::set(const glslang_CompileRequest_1_1& in)
 {
     memcpy(this, &in, sizeof(in));
 }
@@ -146,6 +147,5 @@ void glslang_CompileRequest_1_2::set(const glslang_CompileRequest_1_1& in)
 typedef int (*glslang_CompileFunc_1_0)(glslang_CompileRequest_1_0* request);
 typedef int (*glslang_CompileFunc_1_1)(glslang_CompileRequest_1_1* request);
 typedef int (*glslang_CompileFunc_1_2)(glslang_CompileRequest_1_2* request);
-
 
 #endif

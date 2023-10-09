@@ -73,7 +73,6 @@
 #include "slang-legalize-types.h"
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
-#include "slang-spirv-opt.h"
 #include "slang-syntax.h"
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
@@ -931,8 +930,7 @@ Result linkAndOptimizeIR(
 
     if (isKhronosTarget(targetRequest) && targetRequest->shouldEmitSPIRVDirectly())
     {
-        //performIntrinsicFunctionFunctionInlining(irModule);
-        performSpirvInlining(irModule);
+        performIntrinsicFunctionFunctionInlining(irModule);
         eliminateDeadCode(irModule);
     }
     eliminateMultiLevelBreak(irModule);
@@ -1289,9 +1287,35 @@ SlangResult emitSPIRVForEntryPointsDirectly(
         spirv = _Move(outSpirv);
     }
 #endif
-
     auto artifact = ArtifactUtil::createArtifactForCompileTarget(asExternal(codeGenContext->getTargetFormat()));
     artifact->addRepresentationUnknown(ListBlob::moveCreate(spirv));
+
+    IDownstreamCompiler* compiler = codeGenContext->getSession()->getOrLoadDownstreamCompiler(
+        PassThroughMode::SpirvOpt, codeGenContext->getSink());
+    if (compiler)
+    {
+        ComPtr<IArtifact> optimizedArtifact;
+        DownstreamCompileOptions downstreamOptions;
+        downstreamOptions.sourceArtifacts = makeSlice(artifact.readRef(), 1);
+        downstreamOptions.targetType = SLANG_SPIRV;
+        downstreamOptions.sourceLanguage = SLANG_SOURCE_LANGUAGE_SPIRV;
+        auto linkage = codeGenContext->getLinkage();
+        switch (linkage->optimizationLevel)
+        {
+        case OptimizationLevel::None:       downstreamOptions.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::None; break;
+        case OptimizationLevel::Default:    downstreamOptions.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::Default;  break;
+        case OptimizationLevel::High:       downstreamOptions.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::High;  break;
+        case OptimizationLevel::Maximal:    downstreamOptions.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::Maximal;  break;
+        default: SLANG_ASSERT(!"Unhandled optimization level"); break;
+        }
+
+        if (SLANG_SUCCEEDED(compiler->compile(downstreamOptions, optimizedArtifact.writeRef())))
+        {
+            artifact = _Move(optimizedArtifact);
+        }
+
+        SLANG_RETURN_ON_FAIL(passthroughDownstreamDiagnostics(codeGenContext->getSink(), compiler, artifact));
+    }
 
     ArtifactUtil::addAssociated(artifact, linkedIR.metadata);
 

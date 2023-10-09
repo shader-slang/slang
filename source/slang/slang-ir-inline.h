@@ -34,9 +34,6 @@ namespace Slang
         /// Inline simple intrinsic functions whose definition is a single asm block.
     void performIntrinsicFunctionFunctionInlining(IRModule* module);
 
-        /// Inline all functions for SPIRV emit.
-    void performSpirvInlining(IRModule* module);
-
         /// Inline a specific call.
     bool inlineCall(IRCall* call);
 }

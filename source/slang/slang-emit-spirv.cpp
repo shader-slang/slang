@@ -4815,18 +4815,22 @@ SlangResult emitSPIRVFromIR(
         (uint8_t const*) context.m_words.getBuffer(),
         context.m_words.getCount() * Index(sizeof(context.m_words[0])));
 
-    const auto validationResult = debugValidateSPIRV(spirvOut);
-    // If validation isn't available, don't say it failed, it's just a debug
-    // feature so we can skip
-    if(SLANG_FAILED(validationResult) && validationResult != SLANG_E_NOT_AVAILABLE)
+    StringBuilder runSpirvValEnvVar;
+    PlatformUtil::getEnvironmentVariable(UnownedStringSlice("SLANG_RUN_SPIRV_VALIDATION"), runSpirvValEnvVar);
+    if (runSpirvValEnvVar.getUnownedSlice() == "1")
     {
-        codeGenContext->getSink()->diagnoseWithoutSourceView(
-            SourceLoc{},
-            Diagnostics::spirvValidationFailed
-        );
-        return validationResult;
+        const auto validationResult = debugValidateSPIRV(spirvOut);
+        // If validation isn't available, don't say it failed, it's just a debug
+        // feature so we can skip
+        if (SLANG_FAILED(validationResult) && validationResult != SLANG_E_NOT_AVAILABLE)
+        {
+            codeGenContext->getSink()->diagnoseWithoutSourceView(
+                SourceLoc{},
+                Diagnostics::spirvValidationFailed
+            );
+            return validationResult;
+        }
     }
-
     return SLANG_OK;
 }
 
