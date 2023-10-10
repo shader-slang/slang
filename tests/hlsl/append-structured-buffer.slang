@@ -6,9 +6,8 @@
 
 // To check that our counter-initialization works correctly, set the initial
 // counter to 1 instead of 0
-//TEST_INPUT:ubuffer(data=[0 1 2 3 0 0 0 0], stride=4, counter=1):out,name=outputBuffer.elements
-//TEST_INPUT:ubuffer(data=[1], stride=4, counter=1):out,name=outputBuffer.counter
-AppendStructuredBuffer<float> outputBuffer;
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4, counter=1):out,name=outputBuffer
+AppendStructuredBuffer<int> outputBuffer;
 
 // GLSL:      layout(std430, binding = 11) buffer StructuredBuffer_float2_t
 // GLSL-NEXT:     vec2 _data[];
@@ -30,13 +29,13 @@ AppendStructuredBuffer<float> outputBuffer;
 
 // SPIRV: OpEntryPoint
 
-//TEST_INPUT:set inBuffer = ubuffer(data=[1.0 2.0 3.0 4.0], stride=4)
-RWStructuredBuffer<float> inBuffer;
+//TEST_INPUT:set inBuffer = ubuffer(data=[1 2 3 4], stride=4)
+RWStructuredBuffer<int> inBuffer;
 
 [numthreads(4, 1, 1)]
 void computeMain(uint i : SV_GroupIndex)
 {
-    float g = inBuffer[i];
+    int g = inBuffer[i];
     outputBuffer.Append(g);
 
     GroupMemoryBarrier();
@@ -44,22 +43,22 @@ void computeMain(uint i : SV_GroupIndex)
     uint numStructs, stride;
     outputBuffer.GetDimensions(numStructs, stride);
     if(i == 0)
-        outputBuffer.Append(float(numStructs));
+        outputBuffer.Append(int(numStructs));
 
-    // BUF: type: float
+    // BUF: type: int32_t
     // Never assigned, as we set the initial counter to 1
-    // BUF: 0.0
+    // BUF: 0
 
     // The values from inBuffer in any order
-    // BUF-DAG: 1.0
-    // BUF-DAG: 3.0
-    // BUF-DAG: 2.0
-    // BUF-DAG: 4.0
+    // BUF-DAG: 1
+    // BUF-DAG: 3
+    // BUF-DAG: 2
+    // BUF-DAG: 4
 
     // The total size of the AppendStructuredBuffer (from GetDimensions)
-    // BUF: 8.0
+    // BUF: 8
 
     // Never assigned
-    // BUF: 0.0
-    // BUF: 0.0
+    // BUF: 0
+    // BUF: 0
 }
