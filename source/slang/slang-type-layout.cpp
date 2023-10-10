@@ -228,6 +228,11 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
         // and instead it will be injected in the concrete implementations
         // that require it.
     }
+
+    bool DoStructuredBuffersNeedSeparateCounterBuffer() override
+    {
+        return true;
+    }
 };
 
     /// Common behavior for GLSL-family layout.
@@ -600,6 +605,14 @@ struct HLSLStructuredBufferLayoutRulesImpl : DefaultLayoutRulesImpl
     // but retain the rules around not adjusting the size of an array or
     // structure to its alignment. In this way they should match our
     // default layout rules.
+    //
+    // DirectX does however allow transparently managing the counter buffer
+    // resource for StructuredBuffers.
+
+    bool DoStructuredBuffersNeedSeparateCounterBuffer() override
+    {
+        return false;
+    }
 };
 
 struct DefaultVaryingLayoutRulesImpl : DefaultLayoutRulesImpl
@@ -733,8 +746,7 @@ struct GLSLObjectLayoutRulesImpl : ObjectLayoutRulesImpl
 
         // In Vulkan GLSL, pretty much every object is just a descriptor-table slot.
         // Except for AppendConsumeStructuredBuffer, which takes two slots.
-        if (kind == ShaderParameterKind::AppendConsumeStructuredBuffer)
-            slotCount = 2;
+        // This, however, is added in 'createStructuredBufferWithCounterTypeLayout'
 
         if (options.hlslToVulkanKindFlags)
         {
@@ -2785,6 +2797,49 @@ RefPtr<TypeLayout> createParameterGroupTypeLayout(
         elementTypeRules);
 }
 
+// Create a type layout for a structured buffer type with an associated counter
+RefPtr<StructuredBufferTypeLayout>
+createStructuredBufferWithCounterTypeLayout(
+    TypeLayoutContext const& context,
+    ShaderParameterKind kind,
+    Type* structuredBufferType,
+    RefPtr<TypeLayout> elementTypeLayout)
+{
+    auto typeLayout = createStructuredBufferTypeLayout(context, kind, structuredBufferType, elementTypeLayout);
+
+    const auto structuredBufferLayoutRules = context.getRulesFamily()->getStructuredBufferRules(context.targetReq);
+
+    const auto counterType = context.astBuilder->getIntType();
+    const auto counterBufferType = context.astBuilder->getRWStructuredBufferType(counterType);
+    const auto counterTypeLayout = createTypeLayoutWith(context, structuredBufferLayoutRules, counterBufferType);
+
+    const auto counterVarDecl = context.astBuilder->create<VarDecl>();
+    counterVarDecl->type.type = counterBufferType;
+    counterVarDecl->nameAndLoc.name =
+      context.astBuilder->getSharedASTBuilder()->getNamePool()->getName("counter");
+
+    RefPtr<VarLayout> counterVarLayout = new VarLayout();
+    counterVarLayout->varDecl = makeDeclRef(counterVarDecl);
+    counterVarLayout->typeLayout = counterTypeLayout;
+
+    for(auto& typeResourceInfo : typeLayout->resourceInfos)
+    {
+        const auto counterResourceInfo
+            = counterVarLayout->findOrAddResourceInfo(typeResourceInfo.kind);
+        const auto counterTypeResourceInfo
+            = counterVarLayout->getTypeLayout()->FindResourceInfo(typeResourceInfo.kind);
+        // We expect this index to be 1
+        counterResourceInfo->index = typeResourceInfo.count.getFiniteValue();
+        // likewise
+        typeResourceInfo.count += counterTypeResourceInfo->count;
+    }
+
+    typeLayout->counterVarLayout = counterVarLayout;
+    typeLayout->addResourceUsageFrom(counterTypeLayout);
+
+    return typeLayout;
+}
+
 // Create a type layout for a structured buffer type.
 RefPtr<StructuredBufferTypeLayout>
 createStructuredBufferTypeLayout(
@@ -2845,12 +2900,24 @@ createStructuredBufferTypeLayout(
         structuredBufferLayoutRules,
         elementType);
 
-    return createStructuredBufferTypeLayout(
-        context,
-        kind,
-        structuredBufferType,
-        elementTypeLayout);
-
+    if(kind == ShaderParameterKind::AppendConsumeStructuredBuffer
+        && structuredBufferLayoutRules->DoStructuredBuffersNeedSeparateCounterBuffer())
+    {
+        return createStructuredBufferWithCounterTypeLayout(
+            context,
+            kind,
+            structuredBufferType,
+            elementTypeLayout
+        );
+    }
+    else
+    {
+        return createStructuredBufferTypeLayout(
+            context,
+            kind,
+            structuredBufferType,
+            elementTypeLayout);
+    }
 }
 
     /// Create layout information for the given `type`.
