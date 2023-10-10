@@ -210,20 +210,41 @@ struct AssignValsFromLayoutContext
         SLANG_RETURN_ON_FAIL(ShaderRendererUtil::createBufferResource(srcBuffer, /*entry.isOutput,*/ bufferSize, bufferData.getBuffer(), device, bufferResource));
 
         ComPtr<IBufferResource> counterResource;
+        const auto explicitCounterCursor = dstCursor.getExplicitCounter();
         if(srcBuffer.counter != ~0u)
         {
-            const InputBufferDesc& counterBufferDesc{
-                InputBufferType::StorageBuffer,
-                sizeof(uint32_t),
-                Format::Unknown,
-            };
-            SLANG_RETURN_ON_FAIL(ShaderRendererUtil::createBufferResource(
-                counterBufferDesc,
-                sizeof(srcBuffer.counter),
-                &srcBuffer.counter,
-                device,
-                counterResource
-            ));
+            if(explicitCounterCursor.isValid())
+            {
+                // If this cursor has a full buffer object associated with the
+                // resource, then assign to that.
+                ShaderInputLayout::BufferVal counterVal;
+                counterVal.bufferData.add(srcBuffer.counter);
+                assignBuffer(explicitCounterCursor, &counterVal);
+            }
+            else
+            {
+                // Otherwise, this API (D3D) must be handling the buffer object
+                // specially, in which case create the buffer resource to pass
+                // into `createBufferView`
+                const InputBufferDesc& counterBufferDesc{
+                    InputBufferType::StorageBuffer,
+                    sizeof(uint32_t),
+                    Format::Unknown,
+                };
+                SLANG_RETURN_ON_FAIL(ShaderRendererUtil::createBufferResource(
+                    counterBufferDesc,
+                    sizeof(srcBuffer.counter),
+                    &srcBuffer.counter,
+                    device,
+                    counterResource
+                ));
+            }
+        }
+        else if(explicitCounterCursor.isValid())
+        {
+            // If we know we require a counter for this resource but haven't
+            // been given one, error
+            return SLANG_E_INVALID_ARG;
         }
 
         IResourceView::Desc viewDesc = {};
