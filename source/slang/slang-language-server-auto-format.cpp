@@ -102,6 +102,7 @@ List<TextRange> extractFormattingExclusionRanges(UnownedStringSlice text)
                     endToken = token;
                     goto breakLabel;
                 }
+                break;
             case TokenType::LBrace:
                 {
                     if (braceCounter == 0)
