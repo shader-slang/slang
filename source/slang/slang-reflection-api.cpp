@@ -2371,7 +2371,9 @@ SLANG_API SlangInt spReflectionTypeLayout_getExplicitCounterBindingRangeOffset(S
     if(const auto structuredBufferTypeLayout = as<StructuredBufferTypeLayout>(typeLayout))
     {
         getExtendedTypeLayout(structuredBufferTypeLayout);
-        return structuredBufferTypeLayout->counterVarLayout->bindingRangeOffset;
+        return structuredBufferTypeLayout->counterVarLayout
+            ? structuredBufferTypeLayout->counterVarLayout->bindingRangeOffset
+            : 0;
     }
 
     return 0;
