@@ -9451,6 +9451,36 @@ struct HitObject
         }
     }
 
+    [__requiresNVAPI]
+    [ForceInline]
+    __glsl_extension(GL_EXT_ray_tracing)
+    float4x3 GetWorldToObject()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".GetWorldToObject";
+        case glsl: __intrinsic_asm "hitObjectGetWorldToObjectNV($0)";
+        case spirv: return spirv_asm {
+                result:$$float4x3 = OpHitObjectGetWorldToObjectNV &this;
+            };
+        }
+    }
+
+    [__requiresNVAPI]
+    [ForceInline]
+    __glsl_extension(GL_EXT_ray_tracing)
+    float4x3 GetObjectToWorld()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".GetObjectToWorld";
+        case glsl: __intrinsic_asm "hitObjectGetObjectToWorldNV($0)";
+        case spirv: return spirv_asm {
+                result:$$float4x3 = OpHitObjectGetObjectToWorldNV &this;
+            };
+        }
+    }
+
         /// Returns the attributes of a hit. Valid if the hit object represents a hit or a miss.
     [ForceInline]
     attr_t GetAttributes<attr_t>()
