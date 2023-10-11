@@ -1308,11 +1308,14 @@ SlangResult emitSPIRVForEntryPointsDirectly(
         case OptimizationLevel::Maximal:    downstreamOptions.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::Maximal;  break;
         default: SLANG_ASSERT(!"Unhandled optimization level"); break;
         }
-
+        auto downstreamStartTime = std::chrono::high_resolution_clock::now();
         if (SLANG_SUCCEEDED(compiler->compile(downstreamOptions, optimizedArtifact.writeRef())))
         {
             artifact = _Move(optimizedArtifact);
         }
+        auto downstreamElapsedTime =
+            (std::chrono::high_resolution_clock::now() - downstreamStartTime).count() * 0.000000001;
+        codeGenContext->getSession()->addDownstreamCompileTime(downstreamElapsedTime);
 
         SLANG_RETURN_ON_FAIL(passthroughDownstreamDiagnostics(codeGenContext->getSink(), compiler, artifact));
     }
