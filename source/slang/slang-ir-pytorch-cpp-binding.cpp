@@ -650,7 +650,7 @@ void markTypeForPyExport(IRType* type, DiagnosticSink* sink)
 
 String tryGetExportTypeName(IRBuilder* builder, IRType* type)
 {
-    if (auto structType = as<IRStructType>(type))
+    if (as<IRStructType>(type))
     {
         if (auto pyExportDecoration = type->findDecoration<IRPyExportDecoration>())
             return String(pyExportDecoration->getExportName());

@@ -1243,7 +1243,7 @@ bool isIllegalSPIRVParameterType(IRType* type)
 
     // If we are emitting SPIRV direclty, we need to specialize
     // all Texture types.
-    if (auto texType = as<IRTextureType>(type))
+    if (as<IRTextureType>(type))
         return true;
     return false;
 }
