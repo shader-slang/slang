@@ -938,7 +938,7 @@ Result linkAndOptimizeIR(
     {
         IRSimplificationOptions simplificationOptions = IRSimplificationOptions::getFast();
         simplificationOptions.cfgOptions.removeTrivialSingleIterationLoops = true;
-        simplifyIR(irModule, IRSimplificationOptions::getFast(), sink);
+        simplifyIR(irModule, simplificationOptions, sink);
     }
 
     // As a late step, we need to take the SSA-form IR and move things *out*
