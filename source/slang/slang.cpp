@@ -3064,8 +3064,6 @@ RefPtr<Module> Linkage::loadModule(
     DiagnosticSink*     sink,
     const LoadedModuleDictionary* additionalLoadedModules)
 {
-    CompileTimerRAII recordCompileTime(static_cast<Session*>(getGlobalSession()));
-
     RefPtr<FrontEndCompileRequest> frontEndReq = new FrontEndCompileRequest(this, nullptr, sink);
 
     frontEndReq->additionalLoadedModules = additionalLoadedModules;
