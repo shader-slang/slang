@@ -7821,7 +7821,7 @@ float4x3 WorldToObject4x3()
     __target_switch
     {
     case hlsl:  __intrinsic_asm "WorldToObject4x3";
-    case GL_EXT_ray_tracing: __intrinsic_asm "(gl_WorldToObject3x4EXT)";
+    case GL_EXT_ray_tracing: __intrinsic_asm "(gl_WorldToObjectEXT)";
     case GL_NV_ray_tracing:  __intrinsic_asm "(gl_WorldToObjectNV)";
     case spirv:
         return spirv_asm {
@@ -9447,6 +9447,36 @@ struct HitObject
         case glsl: __intrinsic_asm "hitObjectGetHitKindNV($0)";
         case spirv: return spirv_asm {
                 result:$$uint = OpHitObjectGetHitKindNV &this;
+            };
+        }
+    }
+
+    [__requiresNVAPI]
+    [ForceInline]
+    __glsl_extension(GL_EXT_ray_tracing)
+    float4x3 GetWorldToObject()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".GetWorldToObject";
+        case glsl: __intrinsic_asm "hitObjectGetWorldToObjectNV($0)";
+        case spirv: return spirv_asm {
+                result:$$float4x3 = OpHitObjectGetWorldToObjectNV &this;
+            };
+        }
+    }
+
+    [__requiresNVAPI]
+    [ForceInline]
+    __glsl_extension(GL_EXT_ray_tracing)
+    float4x3 GetObjectToWorld()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".GetObjectToWorld";
+        case glsl: __intrinsic_asm "hitObjectGetObjectToWorldNV($0)";
+        case spirv: return spirv_asm {
+                result:$$float4x3 = OpHitObjectGetObjectToWorldNV &this;
             };
         }
     }
