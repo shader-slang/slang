@@ -107,14 +107,14 @@ namespace gfx {
 
     PipelineDumpContext dumpContext;
 
-    VkResult createPipelineLayout(VkDevice device, const VkPipelineLayoutCreateInfo* createInfo, const VkAllocationCallbacks* callbacks, VkPipelineLayout* outLayout)
+    VkResult SLANG_MCALL createPipelineLayout(VkDevice device, const VkPipelineLayoutCreateInfo* createInfo, const VkAllocationCallbacks* callbacks, VkPipelineLayout* outLayout)
     {
         auto result = dumpContext.api.vkCreatePipelineLayout(device, createInfo, callbacks, outLayout);
         dumpContext.writePipelineLayout(*outLayout, createInfo);
         return result;
     }
 
-    VkResult createComputePipelines(VkDevice device, VkPipelineCache cache, uint32_t createInfoCount, const VkComputePipelineCreateInfo* createInfos, const VkAllocationCallbacks* callbacks, VkPipeline* outPipelines)
+    VkResult SLANG_MCALL createComputePipelines(VkDevice device, VkPipelineCache cache, uint32_t createInfoCount, const VkComputePipelineCreateInfo* createInfos, const VkAllocationCallbacks* callbacks, VkPipeline* outPipelines)
     {
         auto result = dumpContext.api.vkCreateComputePipelines(device, cache, createInfoCount, createInfos, callbacks, outPipelines);
         for (uint32_t i = 0; i < createInfoCount; i++)
@@ -122,14 +122,14 @@ namespace gfx {
         return result;
     }
 
-    VkResult createShaderModule(VkDevice device, const VkShaderModuleCreateInfo* createInfo, const VkAllocationCallbacks* callbacks, VkShaderModule* outShaderModule)
+    VkResult SLANG_MCALL createShaderModule(VkDevice device, const VkShaderModuleCreateInfo* createInfo, const VkAllocationCallbacks* callbacks, VkShaderModule* outShaderModule)
     {
         auto result = dumpContext.api.vkCreateShaderModule(device, createInfo, callbacks, outShaderModule);
         dumpContext.writeShaderModule(*outShaderModule, createInfo);
         return result;
     }
 
-    VkResult createDescriptorSetLayout(VkDevice device, const VkDescriptorSetLayoutCreateInfo* createInfo, const VkAllocationCallbacks* callbacks, VkDescriptorSetLayout* outDescSetLayout)
+    VkResult SLANG_MCALL createDescriptorSetLayout(VkDevice device, const VkDescriptorSetLayoutCreateInfo* createInfo, const VkAllocationCallbacks* callbacks, VkDescriptorSetLayout* outDescSetLayout)
     {
         auto result = dumpContext.api.vkCreateDescriptorSetLayout(device, createInfo, callbacks, outDescSetLayout);
         dumpContext.writeDescriptorSetLayout(*outDescSetLayout, createInfo);
