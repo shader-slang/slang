@@ -7821,7 +7821,7 @@ float4x3 WorldToObject4x3()
     __target_switch
     {
     case hlsl:  __intrinsic_asm "WorldToObject4x3";
-    case GL_EXT_ray_tracing: __intrinsic_asm "(gl_WorldToObject3x4EXT)";
+    case GL_EXT_ray_tracing: __intrinsic_asm "(gl_WorldToObjectEXT)";
     case GL_NV_ray_tracing:  __intrinsic_asm "(gl_WorldToObjectNV)";
     case spirv:
         return spirv_asm {
