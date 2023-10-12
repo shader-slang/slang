@@ -1015,7 +1015,7 @@ Result RenderTestApp::writeBindingOutput(const String& fileName)
                 m_transientHeap->finish();
                 m_transientHeap->synchronizeAndReset();
 
-                m_device->readBufferResource(stagingBuffer, 0, bufferSize, blob.writeRef());
+                SLANG_RETURN_ON_FAIL(m_device->readBufferResource(stagingBuffer, 0, bufferSize, blob.writeRef()));
             }
 
             if (!blob)
