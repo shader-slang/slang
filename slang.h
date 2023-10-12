@@ -862,20 +862,20 @@ extern "C"
     ie for a facility 'DRIVER' it might make sense to have an error of the form SLANG_E_DRIVER_OUT_OF_MEMORY
     */
 
-    typedef int32_t SlangResult;
+    enum class SlangResult : int32_t {};
 
     //! Use to test if a result was failure. Never use result != SLANG_OK to test for failure, as there may be successful codes != SLANG_OK.
-#define SLANG_FAILED(status) ((status) < 0)
+#define SLANG_FAILED(status) (int32_t(status) < 0)
     //! Use to test if a result succeeded. Never use result == SLANG_OK to test for success, as will detect other successful codes as a failure.
-#define SLANG_SUCCEEDED(status) ((status) >= 0)
+#define SLANG_SUCCEEDED(status) (int32_t(status) >= 0)
 
     //! Get the facility the result is associated with
-#define SLANG_GET_RESULT_FACILITY(r)    ((int32_t)(((r) >> 16) & 0x7fff))
+#define SLANG_GET_RESULT_FACILITY(r)    ((int32_t)((int32_t(r) >> 16) & 0x7fff))
     //! Get the result code for the facility
-#define SLANG_GET_RESULT_CODE(r)        ((int32_t)((r) & 0xffff))
+#define SLANG_GET_RESULT_CODE(r)        ((int32_t)(int32_t(r) & 0xffff))
 
-#define SLANG_MAKE_ERROR(fac, code)        ((((int32_t)(fac)) << 16) | ((int32_t)(code)) | int32_t(0x80000000))
-#define SLANG_MAKE_SUCCESS(fac, code)    ((((int32_t)(fac)) << 16) | ((int32_t)(code)))
+#define SLANG_MAKE_ERROR(fac, code)        SlangResult(((((int32_t)(fac)) << 16) | ((int32_t)(code)) | int32_t(0x80000000)))
+#define SLANG_MAKE_SUCCESS(fac, code)    SlangResult(((((int32_t)(fac)) << 16) | ((int32_t)(code))))
 
     /*************************** Facilities ************************************/
 
@@ -901,7 +901,7 @@ extern "C"
     // https://msdn.microsoft.com/en-us/library/windows/desktop/aa378137(v=vs.85).aspx
 
     //! SLANG_OK indicates success, and is equivalent to SLANG_MAKE_SUCCESS(SLANG_FACILITY_WIN_GENERAL, 0)
-#define SLANG_OK                          0
+#define SLANG_OK                          SlangResult(0)
     //! SLANG_FAIL is the generic failure code - meaning a serious error occurred and the call couldn't complete
 #define SLANG_FAIL                          SLANG_MAKE_ERROR(SLANG_FACILITY_WIN_GENERAL, 0x4005)
 

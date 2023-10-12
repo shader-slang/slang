@@ -1,5 +1,7 @@
 #pragma once
 
+#include "slang.h"
+
 #define VK_NO_PROTOTYPES
 #include "vulkan/vulkan.h"
 
@@ -118,15 +120,14 @@ struct VulkanAPI
     ~VulkanAPI();
 };
 
-#define RETURN_ON_FAIL(x) \
+#define SLANG_RETURN_ON_FAIL_VK(x) \
     {                           \
-        auto _res = x;          \
-        if (_res != 0)          \
+        if ((x) < 0) \
         {                       \
-            return -1;          \
+            return SLANG_FAIL;          \
         }                       \
     }
 
 // Loads Vulkan library and creates a VkDevice.
 // Returns 0 if successful.
-int initializeVulkanDevice(VulkanAPI& api);
+SlangResult initializeVulkanDevice(VulkanAPI& api);

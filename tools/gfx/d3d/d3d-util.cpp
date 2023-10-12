@@ -540,7 +540,7 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
             }
 
             ComPtr<IDXGIFactory4> factory;
-            SLANG_RETURN_ON_FAIL(createFactory2(dxgiFlags, IID_PPV_ARGS(factory.writeRef())));
+            SLANG_RETURN_ON_FAIL(SlangResult(createFactory2(dxgiFlags, IID_PPV_ARGS(factory.writeRef()))));
 
             outFactory = factory;
             return SLANG_OK;
@@ -554,7 +554,7 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
             fprintf(stderr, "error: failed load symbol '%s'\n", "CreateDXGIFactory");
             return SLANG_FAIL;
         }
-        return createFactory(IID_PPV_ARGS(outFactory.writeRef()));
+        return SlangResult(createFactory(IID_PPV_ARGS(outFactory.writeRef())));
     }
 }
 

@@ -114,9 +114,9 @@ public:
         if (intf)
         {
             *out = intf;
-            return SLANG_OK;
+            return S_OK;
         }
-        return SLANG_E_NO_INTERFACE;
+        return E_NOINTERFACE;
     }
     SLANG_NO_THROW ULONG SLANG_MCALL AddRef() SLANG_OVERRIDE { return 1; }
     SLANG_NO_THROW ULONG SLANG_MCALL Release() SLANG_OVERRIDE { return 1; }
@@ -150,7 +150,7 @@ public:
         // NOTE! This only works because ISlangBlob is *binary compatible* with IDxcBlob, if either
         // change things could go boom
         *outSource = (IDxcBlob*)blob.detach();
-        return res;
+        return HRESULT(res);
     }
 
     DxcIncludeHandler(SearchDirectoryList* searchDirectories, ISlangFileSystemExt* fileSystemExt, SourceManager* sourceManager = nullptr) :
@@ -227,7 +227,7 @@ SlangResult DXCDownstreamCompiler::init(ISlangSharedLibrary* library)
     // Must be able to create the compiler. We inly do this here, because we want to get the compiler 
     // version.
     ComPtr<IDxcCompiler> dxcCompiler;
-    SLANG_RETURN_ON_FAIL(m_createInstance(CLSID_DxcCompiler, __uuidof(dxcCompiler), (LPVOID*)dxcCompiler.writeRef()));
+    SLANG_RETURN_ON_FAIL(SlangResult(m_createInstance(CLSID_DxcCompiler, __uuidof(dxcCompiler), (LPVOID*)dxcCompiler.writeRef())));
 
     uint32_t major = 0;
     uint32_t minor = 0;
@@ -323,7 +323,7 @@ static SlangResult _handleOperationResult(IDxcOperationResult* dxcResult, IArtif
 {
     // Retrieve result.
     HRESULT resultCode = S_OK;
-    SLANG_RETURN_ON_FAIL(dxcResult->GetStatus(&resultCode));
+    SLANG_RETURN_ON_FAIL(SlangResult(dxcResult->GetStatus(&resultCode)));
 
     // Note: it seems like the dxcompiler interface
     // doesn't support querying diagnostic output
@@ -332,7 +332,7 @@ static SlangResult _handleOperationResult(IDxcOperationResult* dxcResult, IArtif
 
     if (SLANG_SUCCEEDED(diagnostics->getResult()))
     {
-        diagnostics->setResult(resultCode);
+        diagnostics->setResult(SlangResult(resultCode));
     }
 
     // Try getting the error/diagnostics blob
@@ -365,7 +365,7 @@ static SlangResult _handleOperationResult(IDxcOperationResult* dxcResult, IArtif
     {
         // Okay, the compile supposedly succeeded, so we
         // just need to grab the buffer with the output DXIL.
-        SLANG_RETURN_ON_FAIL(dxcResult->GetResult(outBlob.writeRef()));
+        SLANG_RETURN_ON_FAIL(SlangResult(dxcResult->GetResult(outBlob.writeRef())));
     }
 
     return SLANG_OK;
@@ -412,20 +412,20 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
     }
 
     ComPtr<IDxcCompiler> dxcCompiler;
-    SLANG_RETURN_ON_FAIL(m_createInstance(CLSID_DxcCompiler, __uuidof(dxcCompiler), (LPVOID*)dxcCompiler.writeRef()));
+    SLANG_RETURN_ON_FAIL(SlangResult(m_createInstance(CLSID_DxcCompiler, __uuidof(dxcCompiler), (LPVOID*)dxcCompiler.writeRef())));
     ComPtr<IDxcLibrary> dxcLibrary;
-    SLANG_RETURN_ON_FAIL(m_createInstance(CLSID_DxcLibrary, __uuidof(dxcLibrary), (LPVOID*)dxcLibrary.writeRef()));
+    SLANG_RETURN_ON_FAIL(SlangResult(m_createInstance(CLSID_DxcLibrary, __uuidof(dxcLibrary), (LPVOID*)dxcLibrary.writeRef())));
 
     ComPtr<ISlangBlob> sourceBlob;
     SLANG_RETURN_ON_FAIL(sourceArtifact->loadBlob(ArtifactKeep::Yes, sourceBlob.writeRef()));
 
     // Create blob from the string
     ComPtr<IDxcBlobEncoding> dxcSourceBlob;
-    SLANG_RETURN_ON_FAIL(dxcLibrary->CreateBlobWithEncodingFromPinned(
+    SLANG_RETURN_ON_FAIL(SlangResult(dxcLibrary->CreateBlobWithEncodingFromPinned(
         (LPBYTE)sourceBlob->getBufferPointer(),
         (UINT32)sourceBlob->getBufferSize(),
         0,
-        dxcSourceBlob.writeRef()));
+        dxcSourceBlob.writeRef())));
 
     List<const WCHAR*> args;
 
@@ -567,7 +567,7 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
     DxcIncludeHandler includeHandler(&searchDirectories, options.fileSystemExt, options.sourceManager);
 
     ComPtr<IDxcOperationResult> dxcOperationResult;
-    SLANG_RETURN_ON_FAIL(dxcCompiler->Compile(dxcSourceBlob,
+    SLANG_RETURN_ON_FAIL(SlangResult(dxcCompiler->Compile(dxcSourceBlob,
         wideSourcePath.begin(),
         wideEntryPointName.begin(),
         wideProfileName.begin(),
@@ -576,7 +576,7 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
         nullptr,            // `#define`s
         0,                  // `#define` count
         &includeHandler,    // `#include` handler
-        dxcOperationResult.writeRef()));
+        dxcOperationResult.writeRef())));
 
     auto diagnostics = ArtifactDiagnostics::create();
     
@@ -588,7 +588,7 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
     if (libraries.getCount())
     {
         ComPtr<IDxcLinker> linker;
-        SLANG_RETURN_ON_FAIL(m_createInstance(CLSID_DxcLinker, __uuidof(linker), (void**)linker.writeRef()));
+        SLANG_RETURN_ON_FAIL(SlangResult(m_createInstance(CLSID_DxcLinker, __uuidof(linker), (void**)linker.writeRef())));
 
         StringSlicePool pool(StringSlicePool::Style::Default);
 
@@ -634,14 +634,14 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
             linkLibraryNames[i] = libraryNames[i].begin();
 
             // Register the library
-            SLANG_RETURN_ON_FAIL(linker->RegisterLibrary(linkLibraryNames[i], (IDxcBlob*)libraryBlobs[i].get()));
+            SLANG_RETURN_ON_FAIL(SlangResult(linker->RegisterLibrary(linkLibraryNames[i], (IDxcBlob*)libraryBlobs[i].get())));
         }
 
         // Use the original profile name
         wideProfileName = asString(options.profileName).toWString();
 
         ComPtr<IDxcOperationResult> linkDxcResult;
-        SLANG_RETURN_ON_FAIL(linker->Link(wideEntryPointName.begin(), wideProfileName.begin(), linkLibraryNames.getBuffer(), UINT32(librariesCount), nullptr, 0, linkDxcResult.writeRef()));
+        SLANG_RETURN_ON_FAIL(SlangResult(linker->Link(wideEntryPointName.begin(), wideProfileName.begin(), linkLibraryNames.getBuffer(), UINT32(librariesCount), nullptr, 0, linkDxcResult.writeRef())));
 
         ComPtr<IDxcBlob> linkedBlob;
         SLANG_RETURN_ON_FAIL(_handleOperationResult(linkDxcResult, diagnostics, linkedBlob));
@@ -720,16 +720,16 @@ SlangResult DXCDownstreamCompiler::convert(IArtifact* from, const ArtifactDesc& 
     SLANG_RETURN_ON_FAIL(from->loadBlob(ArtifactKeep::No, dxilBlob.writeRef()));
 
     ComPtr<IDxcCompiler> dxcCompiler;
-    SLANG_RETURN_ON_FAIL(m_createInstance(CLSID_DxcCompiler, __uuidof(dxcCompiler), (LPVOID*)dxcCompiler.writeRef()));
+    SLANG_RETURN_ON_FAIL(SlangResult(m_createInstance(CLSID_DxcCompiler, __uuidof(dxcCompiler), (LPVOID*)dxcCompiler.writeRef())));
     ComPtr<IDxcLibrary> dxcLibrary;
-    SLANG_RETURN_ON_FAIL(m_createInstance(CLSID_DxcLibrary, __uuidof(dxcLibrary), (LPVOID*)dxcLibrary.writeRef()));
+    SLANG_RETURN_ON_FAIL(SlangResult(m_createInstance(CLSID_DxcLibrary, __uuidof(dxcLibrary), (LPVOID*)dxcLibrary.writeRef())));
 
     // Create blob from the input data
     ComPtr<IDxcBlobEncoding> dxcSourceBlob;
-    SLANG_RETURN_ON_FAIL(dxcLibrary->CreateBlobWithEncodingFromPinned((LPBYTE)dxilBlob->getBufferPointer(), (UINT32)dxilBlob->getBufferSize(), 0, dxcSourceBlob.writeRef()));
+    SLANG_RETURN_ON_FAIL(SlangResult(dxcLibrary->CreateBlobWithEncodingFromPinned((LPBYTE)dxilBlob->getBufferPointer(), (UINT32)dxilBlob->getBufferSize(), 0, dxcSourceBlob.writeRef())));
 
     ComPtr<IDxcBlobEncoding> dxcResultBlob;
-    SLANG_RETURN_ON_FAIL(dxcCompiler->Disassemble(dxcSourceBlob, dxcResultBlob.writeRef()));
+    SLANG_RETURN_ON_FAIL(SlangResult(dxcCompiler->Disassemble(dxcSourceBlob, dxcResultBlob.writeRef())));
 
     auto artifact = ArtifactUtil::createArtifact(to);
 

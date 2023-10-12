@@ -941,11 +941,11 @@ Result RootShaderObjectLayoutImpl::createRootSignatureFromSlang(
         return SLANG_FAIL;
     }
 
-    SLANG_RETURN_ON_FAIL(device->m_device->CreateRootSignature(
+    SLANG_RETURN_ON_FAIL(SlangResult(device->m_device->CreateRootSignature(
         0,
         signature->GetBufferPointer(),
         signature->GetBufferSize(),
-        IID_PPV_ARGS(outRootSignature)));
+        IID_PPV_ARGS(outRootSignature))));
     return SLANG_OK;
 }
 

@@ -31,7 +31,7 @@ Result TransientResourceHeapImpl::synchronizeAndReset()
     m_stagingCpuSamplerHeap.freeAll();
     m_stagingCpuViewHeap.freeAll();
     m_commandListAllocId = 0;
-    SLANG_RETURN_ON_FAIL(m_commandAllocator->Reset());
+    SLANG_RETURN_ON_FAIL(SlangResult(m_commandAllocator->Reset()));
     Super::reset();
     return SLANG_OK;
 }
@@ -138,8 +138,8 @@ Result TransientResourceHeapImpl::init(
         D3D12_DESCRIPTOR_HEAP_FLAG_NONE);
 
     auto d3dDevice = device->m_device;
-    SLANG_RETURN_ON_FAIL(d3dDevice->CreateCommandAllocator(
-        D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(m_commandAllocator.writeRef())));
+    SLANG_RETURN_ON_FAIL(SlangResult(d3dDevice->CreateCommandAllocator(
+        D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(m_commandAllocator.writeRef()))));
 
     allocateNewViewDescriptorHeap(device);
     allocateNewSamplerDescriptorHeap(device);
@@ -202,12 +202,12 @@ Result TransientResourceHeapImpl::createCommandBuffer(ICommandBuffer** outCmdBuf
         return SLANG_OK;
     }
     ComPtr<ID3D12GraphicsCommandList> cmdList;
-    SLANG_RETURN_ON_FAIL(m_device->m_device->CreateCommandList(
+    SLANG_RETURN_ON_FAIL(SlangResult(m_device->m_device->CreateCommandList(
         0,
         D3D12_COMMAND_LIST_TYPE_DIRECT,
         m_commandAllocator,
         nullptr,
-        IID_PPV_ARGS(cmdList.writeRef())));
+        IID_PPV_ARGS(cmdList.writeRef()))));
 
     m_d3dCommandListPool.add(cmdList);
     RefPtr<CommandBufferImpl> cmdBuffer = new CommandBufferImpl();

@@ -21,5 +21,8 @@ int main(int argc, const char* const* argv)
     {
         std::this_thread::sleep_for(std::chrono::seconds(10));
     }
-    return Slang::runLanguageServer();
+    if(SLANG_SUCCEEDED(Slang::runLanguageServer()))
+        return 0;
+    else
+        return -1;
 }

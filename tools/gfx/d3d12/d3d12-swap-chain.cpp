@@ -19,9 +19,9 @@ Result SwapchainImpl::init(
     m_dxgiFactory = renderer->m_deviceInfo.m_dxgiFactory;
     SLANG_RETURN_ON_FAIL(
         D3DSwapchainBase::init(swapchainDesc, window, DXGI_SWAP_EFFECT_FLIP_DISCARD));
-    SLANG_RETURN_ON_FAIL(renderer->m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(m_fence.writeRef())));
+    SLANG_RETURN_ON_FAIL(SlangResult(renderer->m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(m_fence.writeRef()))));
 
-    SLANG_RETURN_ON_FAIL(m_swapChain->QueryInterface(m_swapChain3.writeRef()));
+    SLANG_RETURN_ON_FAIL(SlangResult(m_swapChain->QueryInterface(m_swapChain3.writeRef())));
     for (GfxIndex i = 0; i < swapchainDesc.imageCount; i++)
     {
         m_frameEvents.add(CreateEventEx(
@@ -94,7 +94,7 @@ bool SwapchainImpl::isOccluded()
 
 Result SwapchainImpl::setFullScreenMode(bool mode)
 {
-    return m_swapChain3->SetFullscreenState(mode, nullptr);
+    return Result(m_swapChain3->SetFullscreenState(mode, nullptr));
 }
 
 } // namespace d3d12

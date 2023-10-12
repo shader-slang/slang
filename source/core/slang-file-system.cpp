@@ -257,7 +257,7 @@ SlangResult OSFileSystem::remove(const char* path)
 SlangResult OSFileSystem::createDirectory(const char* path)
 {
     SLANG_RETURN_ON_FAIL(_checkMutable(m_style));
-    return Path::createDirectory(path);
+    return Path::createDirectory(path) ? SLANG_OK : SLANG_FAIL;
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CacheFileSystem !!!!!!!!!!!!!!!!!!!!!!!!!!!

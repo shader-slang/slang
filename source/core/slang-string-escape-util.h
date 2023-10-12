@@ -85,7 +85,7 @@ struct StringEscapeUtil
 
         /// True if requires 'shell-like' unescape. With shell-like, quoting does *not* have to start at the start of the slice.
         /// and there may be multiple quoted section
-    static SlangResult isUnescapeShellLikeNeeded(Handler* handler, const UnownedStringSlice& slice);
+    static bool isUnescapeShellLikeNeeded(Handler* handler, const UnownedStringSlice& slice);
 
         /// Shells can have multiple quoted sections. This function makes a string with out quoting
     static SlangResult unescapeShellLike(Handler* handler, const UnownedStringSlice& slice, StringBuilder& out);

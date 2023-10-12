@@ -40,7 +40,7 @@ struct ExecutionResult
 {
     String stdOut;
     String stdError;
-    int32_t result = SLANG_OK;
+    SlangResult result = SLANG_OK;
     int32_t returnCode = 0;                         ///< As returned if invoked as command line
 
     static const StructRttiInfo g_rttiInfo;

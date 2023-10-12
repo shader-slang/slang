@@ -22,7 +22,8 @@ static SlangResult disassembleSPIRV(const List<uint8_t>& spirv, String& outErr, 
     List<Byte> outErrData;
     SLANG_RETURN_ON_FAIL(StreamUtil::readAndWrite(in, spirv.getArrayView(), out, outData, err, outErrData));
 
-    SLANG_RETURN_ON_FAIL(p->waitForTermination(10));
+    if(!p->waitForTermination(10))
+        return SLANG_FAIL;
 
     outDis = String(
         reinterpret_cast<const char*>(outData.begin()),

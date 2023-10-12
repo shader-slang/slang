@@ -643,8 +643,8 @@ Result ShaderObjectLayoutImpl::_init(Builder const* builder)
         createInfo.pBindings = descriptorSetInfo.vkBindings.getBuffer();
         createInfo.bindingCount = (uint32_t)descriptorSetInfo.vkBindings.getCount();
         VkDescriptorSetLayout vkDescSetLayout;
-        SLANG_RETURN_ON_FAIL(renderer->m_api.vkCreateDescriptorSetLayout(
-            renderer->m_api.m_device, &createInfo, nullptr, &vkDescSetLayout));
+        if(renderer->m_api.vkCreateDescriptorSetLayout(renderer->m_api.m_device, &createInfo, nullptr, &vkDescSetLayout) != VK_SUCCESS)
+            return SLANG_FAIL;
         descriptorSetInfo.descriptorSetLayout = vkDescSetLayout;
     }
     return SLANG_OK;
@@ -788,8 +788,8 @@ Result RootShaderObjectLayout::_init(Builder const* builder)
             (uint32_t)m_allPushConstantRanges.getCount();
         pipelineLayoutCreateInfo.pPushConstantRanges = m_allPushConstantRanges.getBuffer();
     }
-    SLANG_RETURN_ON_FAIL(m_renderer->m_api.vkCreatePipelineLayout(
-        m_renderer->m_api.m_device, &pipelineLayoutCreateInfo, nullptr, &m_pipelineLayout));
+    if(m_renderer->m_api.vkCreatePipelineLayout(m_renderer->m_api.m_device, &pipelineLayoutCreateInfo, nullptr, &m_pipelineLayout) != VK_SUCCESS)
+        return SLANG_FAIL;
     return SLANG_OK;
 }
 

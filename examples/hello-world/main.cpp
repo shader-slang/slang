@@ -41,24 +41,24 @@ struct HelloWorldExample
     VkPipeline pipeline = VK_NULL_HANDLE;
 
     // Initializes the Vulkan instance and device.
-    int initVulkanInstanceAndDevice();
+    SlangResult initVulkanInstanceAndDevice();
 
     // This function contains the most interesting part of this example.
     // It loads the `hello-world.slang` shader and compile it using the Slang API
     // into a SPIRV module, then create a Vulkan pipeline from the compiled shader.
-    int createComputePipelineFromShader();
+    SlangResult createComputePipelineFromShader();
 
     // Creates the input and output buffers.
-    int createInOutBuffers();
+    SlangResult createInOutBuffers();
 
     // Sets up descriptor set bindings and dispatches the compute task.
-    int dispatchCompute();
+    SlangResult dispatchCompute();
 
     // Reads back and prints the result of the compute task.
-    int printComputeResults();
+    SlangResult printComputeResults();
 
     // Main logic of this example.
-    int run();
+    SlangResult run();
 
     ~HelloWorldExample();
 
@@ -68,47 +68,48 @@ int main()
 {
     initDebugCallback();
     HelloWorldExample example;
-    return example.run();
+    if(SLANG_FAILED(example.run()))
+        return -1;
 }
 
 /************************************************************/
 /* HelloWorldExample Implementation */
 /************************************************************/
 
-int HelloWorldExample::run()
+SlangResult HelloWorldExample::run()
 {
-    RETURN_ON_FAIL(initVulkanInstanceAndDevice());
-    RETURN_ON_FAIL(createComputePipelineFromShader());
-    RETURN_ON_FAIL(createInOutBuffers());
-    RETURN_ON_FAIL(dispatchCompute());
-    RETURN_ON_FAIL(printComputeResults());
-    return 0;
+    SLANG_RETURN_ON_FAIL(initVulkanInstanceAndDevice());
+    SLANG_RETURN_ON_FAIL(createComputePipelineFromShader());
+    SLANG_RETURN_ON_FAIL(createInOutBuffers());
+    SLANG_RETURN_ON_FAIL(dispatchCompute());
+    SLANG_RETURN_ON_FAIL(printComputeResults());
+    return SLANG_OK;
 }
 
-int HelloWorldExample::initVulkanInstanceAndDevice()
+SlangResult HelloWorldExample::initVulkanInstanceAndDevice()
 {
-    if (initializeVulkanDevice(vkAPI) != 0)
+    if (SLANG_FAILED(initializeVulkanDevice(vkAPI)))
     {
         printf("Failed to load Vulkan.\n");
-        return -1;
+        return SLANG_FAIL;
     }
 
     VkCommandPoolCreateInfo poolCreateInfo = {};
     poolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     poolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     poolCreateInfo.queueFamilyIndex = vkAPI.queueFamilyIndex;
-    RETURN_ON_FAIL(vkAPI.vkCreateCommandPool(
+    SLANG_RETURN_ON_FAIL_VK(vkAPI.vkCreateCommandPool(
         vkAPI.device, &poolCreateInfo, nullptr, &commandPool));
 
     vkAPI.vkGetDeviceQueue(vkAPI.device, vkAPI.queueFamilyIndex, 0, &queue);
-    return 0;
+    return SLANG_OK;
 }
 
-int HelloWorldExample::createComputePipelineFromShader()
+SlangResult HelloWorldExample::createComputePipelineFromShader()
 {
     // First we need to create slang global session with work with the Slang API.
     ComPtr<slang::IGlobalSession> slangGlobalSession;
-    RETURN_ON_FAIL(slang::createGlobalSession(slangGlobalSession.writeRef()));
+    SLANG_RETURN_ON_FAIL(slang::createGlobalSession(slangGlobalSession.writeRef()));
 
     // Next we create a compilation session to generate SPIRV code from Slang source.
     slang::SessionDesc sessionDesc = {};
@@ -121,7 +122,7 @@ int HelloWorldExample::createComputePipelineFromShader()
     sessionDesc.targetCount = 1;
 
     ComPtr<slang::ISession> session;
-    RETURN_ON_FAIL(slangGlobalSession->createSession(sessionDesc, session.writeRef()));
+    SLANG_RETURN_ON_FAIL(slangGlobalSession->createSession(sessionDesc, session.writeRef()));
 
     // Once the session has been obtained, we can start loading code into it.
     //
@@ -140,7 +141,7 @@ int HelloWorldExample::createComputePipelineFromShader()
         slangModule = session->loadModule("hello-world", diagnosticBlob.writeRef());
         diagnoseIfNeeded(diagnosticBlob);
         if (!slangModule)
-            return -1;
+            return SLANG_FAIL;
     }
 
     // Loading the `hello-world` module will compile and check all the shader code in it,
@@ -188,7 +189,7 @@ int HelloWorldExample::createComputePipelineFromShader()
             composedProgram.writeRef(),
             diagnosticsBlob.writeRef());
         diagnoseIfNeeded(diagnosticsBlob);
-        RETURN_ON_FAIL(result);
+        SLANG_RETURN_ON_FAIL(result);
     }
 
     // Now we can call `composedProgram->getEntryPointCode()` to retrieve the
@@ -200,7 +201,7 @@ int HelloWorldExample::createComputePipelineFromShader()
         SlangResult result = composedProgram->getEntryPointCode(
             0, 0, spirvCode.writeRef(), diagnosticsBlob.writeRef());
         diagnoseIfNeeded(diagnosticsBlob);
-        RETURN_ON_FAIL(result);
+        SLANG_RETURN_ON_FAIL(result);
     }
 
     // The following steps are all Vulkan API calls to create a pipeline.
@@ -226,13 +227,13 @@ int HelloWorldExample::createComputePipelineFromShader()
         binding.pImmutableSamplers = nullptr;
     }
     descSetLayoutCreateInfo.pBindings = bindings;
-    RETURN_ON_FAIL(vkAPI.vkCreateDescriptorSetLayout(
+    SLANG_RETURN_ON_FAIL_VK(vkAPI.vkCreateDescriptorSetLayout(
         vkAPI.device, &descSetLayoutCreateInfo, nullptr, &descriptorSetLayout));
     VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
         VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
     pipelineLayoutCreateInfo.setLayoutCount = 1;
     pipelineLayoutCreateInfo.pSetLayouts = &descriptorSetLayout;
-    RETURN_ON_FAIL(vkAPI.vkCreatePipelineLayout(
+    SLANG_RETURN_ON_FAIL_VK(vkAPI.vkCreatePipelineLayout(
         vkAPI.device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
 
     // Next we create a shader module from the compiled SPIRV code.
@@ -240,7 +241,7 @@ int HelloWorldExample::createComputePipelineFromShader()
     shaderCreateInfo.codeSize = spirvCode->getBufferSize();
     shaderCreateInfo.pCode = static_cast<const uint32_t*>(spirvCode->getBufferPointer());
     VkShaderModule vkShaderModule;
-    RETURN_ON_FAIL(
+    SLANG_RETURN_ON_FAIL_VK(
         vkAPI.vkCreateShaderModule(vkAPI.device, &shaderCreateInfo, nullptr, &vkShaderModule));
 
     // Now we have all we need to create a compute pipeline.
@@ -251,16 +252,16 @@ int HelloWorldExample::createComputePipelineFromShader()
     pipelineCreateInfo.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
     pipelineCreateInfo.stage.pName = "main";
     pipelineCreateInfo.layout = pipelineLayout;
-    RETURN_ON_FAIL(vkAPI.vkCreateComputePipelines(
+    SLANG_RETURN_ON_FAIL_VK(vkAPI.vkCreateComputePipelines(
         vkAPI.device, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &pipeline));
 
     // We can destroy shader module now since it will no longer be used.
     vkAPI.vkDestroyShaderModule(vkAPI.device, vkShaderModule, nullptr);
 
-    return 0;
+    return SLANG_OK;
 }
 
-int HelloWorldExample::createInOutBuffers()
+SlangResult HelloWorldExample::createInOutBuffers()
 {
     // Create input and output buffers that resides in device-local memory.
     for (int i = 0; i < 3; i++)
@@ -270,7 +271,7 @@ int HelloWorldExample::createInOutBuffers()
         bufferCreateInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
                                  VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
                                  VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-        RETURN_ON_FAIL(
+        SLANG_RETURN_ON_FAIL_VK(
             vkAPI.vkCreateBuffer(vkAPI.device, &bufferCreateInfo, nullptr, &inOutBuffers[i]));
         VkMemoryRequirements memoryReqs = {};
         vkAPI.vkGetBufferMemoryRequirements(vkAPI.device, inOutBuffers[i], &memoryReqs);
@@ -285,9 +286,9 @@ int HelloWorldExample::createInOutBuffers()
         VkMemoryAllocateInfo allocateInfo = {VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
         allocateInfo.allocationSize = memoryReqs.size;
         allocateInfo.memoryTypeIndex = memoryTypeIndex;
-        RETURN_ON_FAIL(
+        SLANG_RETURN_ON_FAIL_VK(
             vkAPI.vkAllocateMemory(vkAPI.device, &allocateInfo, nullptr, &bufferMemories[i]));
-        RETURN_ON_FAIL(
+        SLANG_RETURN_ON_FAIL_VK(
             vkAPI.vkBindBufferMemory(vkAPI.device, inOutBuffers[i], bufferMemories[i], 0));
     }
 
@@ -298,7 +299,7 @@ int HelloWorldExample::createInOutBuffers()
         bufferCreateInfo.size = bufferSize;
         bufferCreateInfo.usage =
             VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-        RETURN_ON_FAIL(
+        SLANG_RETURN_ON_FAIL_VK(
             vkAPI.vkCreateBuffer(vkAPI.device, &bufferCreateInfo, nullptr, &stagingBuffer));
         VkMemoryRequirements memoryReqs = {};
         vkAPI.vkGetBufferMemoryRequirements(vkAPI.device, stagingBuffer, &memoryReqs);
@@ -314,16 +315,16 @@ int HelloWorldExample::createInOutBuffers()
         VkMemoryAllocateInfo allocateInfo = {VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
         allocateInfo.allocationSize = memoryReqs.size;
         allocateInfo.memoryTypeIndex = memoryTypeIndex;
-        RETURN_ON_FAIL(
+        SLANG_RETURN_ON_FAIL_VK(
             vkAPI.vkAllocateMemory(vkAPI.device, &allocateInfo, nullptr, &stagingMemory));
-        RETURN_ON_FAIL(vkAPI.vkBindBufferMemory(vkAPI.device, stagingBuffer, stagingMemory, 0));
+        SLANG_RETURN_ON_FAIL_VK(vkAPI.vkBindBufferMemory(vkAPI.device, stagingBuffer, stagingMemory, 0));
     }
 
     // Map staging buffer and writes in the initial input content.
     float* stagingBufferData = nullptr;
     vkAPI.vkMapMemory(vkAPI.device, stagingMemory, 0, bufferSize, 0, (void**)&stagingBufferData);
     if (!stagingBufferData)
-        return -1;
+        return SLANG_FAIL;
     for (size_t i = 0; i < inputElementCount; i++)
         stagingBufferData[i] = static_cast<float>(i);
     vkAPI.vkUnmapMemory(vkAPI.device, stagingMemory);
@@ -336,7 +337,7 @@ int HelloWorldExample::createInOutBuffers()
     commandBufferAllocInfo.commandBufferCount = 1;
     commandBufferAllocInfo.commandPool = commandPool;
     commandBufferAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    RETURN_ON_FAIL(vkAPI.vkAllocateCommandBuffers(vkAPI.device, &commandBufferAllocInfo, &uploadCommandBuffer));
+    SLANG_RETURN_ON_FAIL_VK(vkAPI.vkAllocateCommandBuffers(vkAPI.device, &commandBufferAllocInfo, &uploadCommandBuffer));
 
     VkCommandBufferBeginInfo beginInfo = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
     vkAPI.vkBeginCommandBuffer(uploadCommandBuffer, &beginInfo);
@@ -351,10 +352,10 @@ int HelloWorldExample::createInOutBuffers()
     vkAPI.vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE);
     vkAPI.vkQueueWaitIdle(queue);
     vkAPI.vkFreeCommandBuffers(vkAPI.device, commandPool, 1, &uploadCommandBuffer);
-    return 0;
+    return SLANG_OK;
 }
 
-int HelloWorldExample::dispatchCompute()
+SlangResult HelloWorldExample::dispatchCompute()
 {
     // Create a descriptor pool.
     VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {
@@ -366,7 +367,7 @@ int HelloWorldExample::dispatchCompute()
     descriptorPoolCreateInfo.pPoolSizes = poolSizes;
     descriptorPoolCreateInfo.flags = 0;
     VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
-    RETURN_ON_FAIL(vkAPI.vkCreateDescriptorPool(
+    SLANG_RETURN_ON_FAIL_VK(vkAPI.vkCreateDescriptorPool(
         vkAPI.device, &descriptorPoolCreateInfo, nullptr, &descriptorPool));
 
     // Allocate descriptor set.
@@ -375,7 +376,7 @@ int HelloWorldExample::dispatchCompute()
     descSetAllocInfo.descriptorSetCount = 1;
     descSetAllocInfo.pSetLayouts = &descriptorSetLayout;
     VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
-    RETURN_ON_FAIL(vkAPI.vkAllocateDescriptorSets(vkAPI.device, &descSetAllocInfo, &descriptorSet));
+    SLANG_RETURN_ON_FAIL_VK(vkAPI.vkAllocateDescriptorSets(vkAPI.device, &descSetAllocInfo, &descriptorSet));
 
     // Write descriptor set.
     VkWriteDescriptorSet descriptorSetWrites[3] = {};
@@ -402,7 +403,7 @@ int HelloWorldExample::dispatchCompute()
     commandBufferAllocInfo.commandBufferCount = 1;
     commandBufferAllocInfo.commandPool = commandPool;
     commandBufferAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    RETURN_ON_FAIL(
+    SLANG_RETURN_ON_FAIL_VK(
         vkAPI.vkAllocateCommandBuffers(vkAPI.device, &commandBufferAllocInfo, &commandBuffer));
     VkCommandBufferBeginInfo beginInfo = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
     vkAPI.vkBeginCommandBuffer(commandBuffer, &beginInfo);
@@ -429,10 +430,10 @@ int HelloWorldExample::dispatchCompute()
 
     // Clean up.
     vkAPI.vkDestroyDescriptorPool(vkAPI.device, descriptorPool, nullptr);
-    return 0;
+    return SLANG_OK;
 }
 
-int HelloWorldExample::printComputeResults()
+SlangResult HelloWorldExample::printComputeResults()
 {
     // Allocate command buffer to read back data.
     VkCommandBuffer commandBuffer;
@@ -441,7 +442,7 @@ int HelloWorldExample::printComputeResults()
     commandBufferAllocInfo.commandBufferCount = 1;
     commandBufferAllocInfo.commandPool = commandPool;
     commandBufferAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    RETURN_ON_FAIL(
+    SLANG_RETURN_ON_FAIL_VK(
         vkAPI.vkAllocateCommandBuffers(vkAPI.device, &commandBufferAllocInfo, &commandBuffer));
 
     // Record commands to copy output buffer into staging buffer.
@@ -464,12 +465,12 @@ int HelloWorldExample::printComputeResults()
     float* stagingBufferData = nullptr;
     vkAPI.vkMapMemory(vkAPI.device, stagingMemory, 0, bufferSize, 0, (void**)&stagingBufferData);
     if (!stagingBufferData)
-        return -1;
+        return SLANG_FAIL;
     for (size_t i = 0; i < inputElementCount; i++)
     {
         printf("%f\n", stagingBufferData[i]);
     }
-    return 0;
+    return SLANG_OK;
 }
 
 HelloWorldExample::~HelloWorldExample()

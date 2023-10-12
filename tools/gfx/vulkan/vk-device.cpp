@@ -1047,8 +1047,8 @@ SlangResult DeviceImpl::readTextureResource(
 
     // Write out the data from the buffer
     void* mappedData = nullptr;
-    SLANG_RETURN_ON_FAIL(
-        m_api.vkMapMemory(m_device, staging.m_memory, 0, bufferSize, 0, &mappedData));
+    if(m_api.vkMapMemory(m_device, staging.m_memory, 0, bufferSize, 0, &mappedData) != VK_SUCCESS)
+        return SLANG_FAIL;
 
     ::memcpy(blobData.getBuffer(), mappedData, bufferSize);
     m_api.vkUnmapMemory(m_device, staging.m_memory);
@@ -1092,7 +1092,8 @@ SlangResult DeviceImpl::readBufferResource(
 
     // Write out the data from the buffer
     void* mappedData = nullptr;
-    SLANG_RETURN_ON_FAIL(m_api.vkMapMemory(m_device, staging.m_memory, 0, size, 0, &mappedData));
+    if(m_api.vkMapMemory(m_device, staging.m_memory, 0, size, 0, &mappedData) != VK_SUCCESS)
+        return SLANG_FAIL;
 
     ::memcpy(blobData.getBuffer(), mappedData, size);
     m_api.vkUnmapMemory(m_device, staging.m_memory);

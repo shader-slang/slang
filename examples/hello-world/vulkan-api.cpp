@@ -31,7 +31,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL debugMessageCallback(
     return 1;
 }
 
-int initializeVulkanDevice(VulkanAPI& api)
+SlangResult initializeVulkanDevice(VulkanAPI& api)
 {
     // Load vulkan library.
     const char* dynamicLibraryName = "Unknown";
@@ -50,17 +50,17 @@ int initializeVulkanDevice(VulkanAPI& api)
     // Initialize all the global functions.
     VK_API_ALL_GLOBAL_PROCS(VK_API_GET_GLOBAL_PROC)
     if (!api.vkCreateInstance)
-        return -1;
+        return SLANG_FAIL;
 
     // Enable validation layer if available.
     std::vector<const char*> layers;
 #ifdef ENABLE_VALIDATION_LAYER
     uint32_t propertyCount;
     if (api.vkEnumerateInstanceLayerProperties(&propertyCount, nullptr) != 0)
-        return -1;
+        return SLANG_FAIL;
     std::vector< VkLayerProperties> properties(propertyCount);
     if (api.vkEnumerateInstanceLayerProperties(&propertyCount, properties.data()) != 0)
-        return -1;
+        return SLANG_FAIL;
     for (const auto& p : properties)
     {
         if (strcmp(p.layerName, "VK_LAYER_KHRONOS_validation") == 0)
@@ -91,7 +91,7 @@ int initializeVulkanDevice(VulkanAPI& api)
         instanceCreateInfo.enabledLayerCount = (uint32_t)layers.size();
     }
     if (api.vkCreateInstance(&instanceCreateInfo, nullptr, &api.instance) != 0)
-        return -1;
+        return SLANG_FAIL;
 
     // Load instance functions.
     api.initInstanceProcs();
@@ -108,17 +108,17 @@ int initializeVulkanDevice(VulkanAPI& api)
         debugCreateInfo.pUserData = nullptr;
         debugCreateInfo.flags = debugFlags;
 
-        RETURN_ON_FAIL(api.vkCreateDebugReportCallbackEXT(
+        SLANG_RETURN_ON_FAIL_VK(api.vkCreateDebugReportCallbackEXT(
             api.instance, &debugCreateInfo, nullptr, &api.debugReportCallback));
     }
 
     // Enumerate physical devices.
     uint32_t numPhysicalDevices = 0;
-    RETURN_ON_FAIL(
+    SLANG_RETURN_ON_FAIL_VK(
         api.vkEnumeratePhysicalDevices(api.instance, &numPhysicalDevices, nullptr));
     std::vector<VkPhysicalDevice> physicalDevices;
     physicalDevices.resize(numPhysicalDevices);
-    RETURN_ON_FAIL(api.vkEnumeratePhysicalDevices(
+    SLANG_RETURN_ON_FAIL_VK(api.vkEnumeratePhysicalDevices(
         api.instance, &numPhysicalDevices, &physicalDevices[0]));
 
     // We will use device 0.
@@ -148,7 +148,7 @@ int initializeVulkanDevice(VulkanAPI& api)
         }
     }
     if (api.queueFamilyIndex == -1)
-        return -1;
+        return SLANG_FAIL;
 
     VkDeviceQueueCreateInfo queueCreateInfo = {VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO};
     float queuePriority = 0.0f;
@@ -158,12 +158,12 @@ int initializeVulkanDevice(VulkanAPI& api)
     deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
     deviceCreateInfo.enabledExtensionCount = 0;
     deviceCreateInfo.ppEnabledExtensionNames = nullptr;
-    RETURN_ON_FAIL(api.vkCreateDevice(api.physicalDevice, &deviceCreateInfo, nullptr, &api.device));
+    SLANG_RETURN_ON_FAIL_VK(api.vkCreateDevice(api.physicalDevice, &deviceCreateInfo, nullptr, &api.device));
 
     // Load device functions.
     api.initDeviceProcs();
 
-    return 0;
+    return SLANG_OK;
 }
 
 int VulkanAPI::initInstanceProcs()

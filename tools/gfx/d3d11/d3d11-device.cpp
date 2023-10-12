@@ -144,7 +144,7 @@ SlangResult DeviceImpl::initialize(const Desc& desc)
             const int startFeatureIndex = (deviceCheckFlags & DeviceCheckFlag::UseFullFeatureLevel) ? 0 : 1;
             const UINT deviceFlags = (deviceCheckFlags & DeviceCheckFlag::UseDebug) ? D3D11_CREATE_DEVICE_DEBUG : 0;
 
-            res = D3D11CreateDevice_(
+            res = SlangResult(D3D11CreateDevice_(
                 adapter,
                 driverType,
                 nullptr,
@@ -154,7 +154,7 @@ SlangResult DeviceImpl::initialize(const Desc& desc)
                 D3D11_SDK_VERSION,
                 m_device.writeRef(),
                 &featureLevel,
-                m_immediateContext.writeRef());
+                m_immediateContext.writeRef()));
 
 #ifdef GFX_NV_AFTERMATH
             if (SLANG_SUCCEEDED(res))
@@ -248,8 +248,8 @@ SlangResult DeviceImpl::initialize(const Desc& desc)
         // Create a TIMESTAMP_DISJOINT query object to query/update frequency info.
         D3D11_QUERY_DESC disjointQueryDesc = {};
         disjointQueryDesc.Query = D3D11_QUERY_TIMESTAMP_DISJOINT;
-        SLANG_RETURN_ON_FAIL(m_device->CreateQuery(
-            &disjointQueryDesc, m_disjointQuery.writeRef()));
+        SLANG_RETURN_ON_FAIL(SlangResult(m_device->CreateQuery(
+            &disjointQueryDesc, m_disjointQuery.writeRef())));
         m_immediateContext->Begin(m_disjointQuery);
         m_immediateContext->End(m_disjointQuery);
         D3D11_QUERY_DATA_TIMESTAMP_DISJOINT disjointData = {};
@@ -443,7 +443,7 @@ SlangResult DeviceImpl::readTextureResource(
     if (texture->getDesc()->sampleDesc.numSamples > 1)
     {
         fprintf(stderr, "ERROR: cannot capture multi-sample texture\n");
-        return E_INVALIDARG;
+        return SLANG_E_INVALID_ARG;
     }
 
     FormatInfo sizeInfo;
@@ -480,7 +480,7 @@ SlangResult DeviceImpl::readTextureResource(
         if (FAILED(hr))
         {
             fprintf(stderr, "ERROR: failed to create staging texture\n");
-            return hr;
+            return SlangResult(hr);
         }
 
         m_immediateContext->CopyResource(stagingTexture, d3d11Texture);
@@ -489,7 +489,7 @@ SlangResult DeviceImpl::readTextureResource(
     // Now just read back texels from the staging textures
     {
         D3D11_MAPPED_SUBRESOURCE mappedResource;
-        SLANG_RETURN_ON_FAIL(m_immediateContext->Map(stagingTexture, 0, D3D11_MAP_READ, 0, &mappedResource));
+        SLANG_RETURN_ON_FAIL(SlangResult(m_immediateContext->Map(stagingTexture, 0, D3D11_MAP_READ, 0, &mappedResource)));
 
         List<uint8_t> data;
 
@@ -573,7 +573,7 @@ Result DeviceImpl::createTextureResource(const ITextureResource::Desc& descIn, c
         desc.Usage = D3D11_USAGE_DEFAULT;
 
         ComPtr<ID3D11Texture1D> texture1D;
-        SLANG_RETURN_ON_FAIL(m_device->CreateTexture1D(&desc, subResourcesPtr, texture1D.writeRef()));
+        SLANG_RETURN_ON_FAIL(SlangResult(m_device->CreateTexture1D(&desc, subResourcesPtr, texture1D.writeRef())));
 
         texture->m_resource = texture1D;
         break;
@@ -601,7 +601,7 @@ Result DeviceImpl::createTextureResource(const ITextureResource::Desc& descIn, c
         }
 
         ComPtr<ID3D11Texture2D> texture2D;
-        SLANG_RETURN_ON_FAIL(m_device->CreateTexture2D(&desc, subResourcesPtr, texture2D.writeRef()));
+        SLANG_RETURN_ON_FAIL(SlangResult(m_device->CreateTexture2D(&desc, subResourcesPtr, texture2D.writeRef())));
 
         texture->m_resource = texture2D;
         break;
@@ -620,7 +620,7 @@ Result DeviceImpl::createTextureResource(const ITextureResource::Desc& descIn, c
         desc.Usage = D3D11_USAGE_DEFAULT;
 
         ComPtr<ID3D11Texture3D> texture3D;
-        SLANG_RETURN_ON_FAIL(m_device->CreateTexture3D(&desc, subResourcesPtr, texture3D.writeRef()));
+        SLANG_RETURN_ON_FAIL(SlangResult(m_device->CreateTexture3D(&desc, subResourcesPtr, texture3D.writeRef())));
 
         texture->m_resource = texture3D;
         break;
@@ -711,7 +711,7 @@ Result DeviceImpl::createBufferResource(const IBufferResource::Desc& descIn, con
 
     RefPtr<BufferResourceImpl> buffer(new BufferResourceImpl(srcDesc));
 
-    SLANG_RETURN_ON_FAIL(m_device->CreateBuffer(&bufferDesc, initData ? &subResourceData : nullptr, buffer->m_buffer.writeRef()));
+    SLANG_RETURN_ON_FAIL(SlangResult(m_device->CreateBuffer(&bufferDesc, initData ? &subResourceData : nullptr, buffer->m_buffer.writeRef())));
     buffer->m_d3dUsage = bufferDesc.Usage;
 
     if (srcDesc.memoryType == MemoryType::ReadBack || bufferDesc.Usage != D3D11_USAGE_DYNAMIC)
@@ -722,7 +722,7 @@ Result DeviceImpl::createBufferResource(const IBufferResource::Desc& descIn, con
         bufDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
         bufDesc.Usage = D3D11_USAGE_STAGING;
 
-        SLANG_RETURN_ON_FAIL(m_device->CreateBuffer(&bufDesc, nullptr, buffer->m_staging.writeRef()));
+        SLANG_RETURN_ON_FAIL(SlangResult(m_device->CreateBuffer(&bufDesc, nullptr, buffer->m_staging.writeRef())));
     }
     returnComPtr(outResource, buffer);
     return SLANG_OK;
@@ -759,9 +759,9 @@ Result DeviceImpl::createSamplerState(ISamplerState::Desc const& desc, ISamplerS
     dxDesc.MaxLOD = desc.maxLOD;
 
     ComPtr<ID3D11SamplerState> sampler;
-    SLANG_RETURN_ON_FAIL(m_device->CreateSamplerState(
+    SLANG_RETURN_ON_FAIL(SlangResult(m_device->CreateSamplerState(
         &dxDesc,
-        sampler.writeRef()));
+        sampler.writeRef())));
 
     RefPtr<SamplerStateImpl> samplerImpl = new SamplerStateImpl();
     samplerImpl->m_sampler = sampler;
@@ -781,7 +781,7 @@ Result DeviceImpl::createTextureView(ITextureResource* texture, IResourceView::D
     case IResourceView::Type::RenderTarget:
     {
         ComPtr<ID3D11RenderTargetView> rtv;
-        SLANG_RETURN_ON_FAIL(m_device->CreateRenderTargetView(resourceImpl->m_resource, nullptr, rtv.writeRef()));
+        SLANG_RETURN_ON_FAIL(SlangResult(m_device->CreateRenderTargetView(resourceImpl->m_resource, nullptr, rtv.writeRef())));
 
         RefPtr<RenderTargetViewImpl> viewImpl = new RenderTargetViewImpl();
         viewImpl->m_type = ResourceViewImpl::Type::RTV;
@@ -802,7 +802,7 @@ Result DeviceImpl::createTextureView(ITextureResource* texture, IResourceView::D
     case IResourceView::Type::DepthStencil:
     {
         ComPtr<ID3D11DepthStencilView> dsv;
-        SLANG_RETURN_ON_FAIL(m_device->CreateDepthStencilView(resourceImpl->m_resource, nullptr, dsv.writeRef()));
+        SLANG_RETURN_ON_FAIL(SlangResult(m_device->CreateDepthStencilView(resourceImpl->m_resource, nullptr, dsv.writeRef())));
 
         RefPtr<DepthStencilViewImpl> viewImpl = new DepthStencilViewImpl();
         viewImpl->m_type = ResourceViewImpl::Type::DSV;
@@ -819,7 +819,7 @@ Result DeviceImpl::createTextureView(ITextureResource* texture, IResourceView::D
     case IResourceView::Type::UnorderedAccess:
     {
         ComPtr<ID3D11UnorderedAccessView> uav;
-        SLANG_RETURN_ON_FAIL(m_device->CreateUnorderedAccessView(resourceImpl->m_resource, nullptr, uav.writeRef()));
+        SLANG_RETURN_ON_FAIL(SlangResult(m_device->CreateUnorderedAccessView(resourceImpl->m_resource, nullptr, uav.writeRef())));
 
         RefPtr<UnorderedAccessViewImpl> viewImpl = new UnorderedAccessViewImpl();
         viewImpl->m_type = ResourceViewImpl::Type::UAV;
@@ -837,7 +837,7 @@ Result DeviceImpl::createTextureView(ITextureResource* texture, IResourceView::D
         initSrvDesc(resourceImpl->getType(), *resourceImpl->getDesc(), D3DUtil::getMapFormat(desc.format), srvDesc);
 
         ComPtr<ID3D11ShaderResourceView> srv;
-        SLANG_RETURN_ON_FAIL(m_device->CreateShaderResourceView(resourceImpl->m_resource, &srvDesc, srv.writeRef()));
+        SLANG_RETURN_ON_FAIL(SlangResult(m_device->CreateShaderResourceView(resourceImpl->m_resource, &srvDesc, srv.writeRef())));
 
         RefPtr<ShaderResourceViewImpl> viewImpl = new ShaderResourceViewImpl();
         viewImpl->m_type = ResourceViewImpl::Type::SRV;
@@ -890,7 +890,7 @@ Result DeviceImpl::createBufferView(
         }
 
         ComPtr<ID3D11UnorderedAccessView> uav;
-        SLANG_RETURN_ON_FAIL(m_device->CreateUnorderedAccessView(resourceImpl->m_buffer, &uavDesc, uav.writeRef()));
+        SLANG_RETURN_ON_FAIL(SlangResult(m_device->CreateUnorderedAccessView(resourceImpl->m_buffer, &uavDesc, uav.writeRef())));
 
         RefPtr<UnorderedAccessViewImpl> viewImpl = new UnorderedAccessViewImpl();
         viewImpl->m_type = ResourceViewImpl::Type::UAV;
@@ -939,7 +939,7 @@ Result DeviceImpl::createBufferView(
         }
 
         ComPtr<ID3D11ShaderResourceView> srv;
-        SLANG_RETURN_ON_FAIL(m_device->CreateShaderResourceView(resourceImpl->m_buffer, &srvDesc, srv.writeRef()));
+        SLANG_RETURN_ON_FAIL(SlangResult(m_device->CreateShaderResourceView(resourceImpl->m_buffer, &srvDesc, srv.writeRef())));
 
         RefPtr<ShaderResourceViewImpl> viewImpl = new ShaderResourceViewImpl();
         viewImpl->m_type = ResourceViewImpl::Type::SRV;
@@ -1015,8 +1015,8 @@ Result DeviceImpl::createInputLayout(IInputLayout::Desc const& desc, IInputLayou
     SLANG_RETURN_ON_FAIL(D3DUtil::compileHLSLShader("inputLayout", hlslBuffer, "main", "vs_5_0", vertexShaderBlob));
 
     ComPtr<ID3D11InputLayout> inputLayout;
-    SLANG_RETURN_ON_FAIL(m_device->CreateInputLayout(&inputElements[0], (UINT)inputElementCount, vertexShaderBlob->GetBufferPointer(), vertexShaderBlob->GetBufferSize(),
-        inputLayout.writeRef()));
+    SLANG_RETURN_ON_FAIL(SlangResult(m_device->CreateInputLayout(&inputElements[0], (UINT)inputElementCount, vertexShaderBlob->GetBufferPointer(), vertexShaderBlob->GetBufferSize(),
+        inputLayout.writeRef())));
 
     RefPtr<InputLayoutImpl> impl = new InputLayoutImpl;
     impl->m_layout.swap(inputLayout);
@@ -1091,7 +1091,7 @@ void* DeviceImpl::map(IBufferResource* bufferIn, MapFlavor flavor)
     // of the example, but we don't actually load different data
     // per-frame (we always use an identity projection).
     D3D11_MAPPED_SUBRESOURCE mappedSub;
-    SLANG_RETURN_NULL_ON_FAIL(m_immediateContext->Map(buffer, 0, mapType, 0, &mappedSub));
+    SLANG_RETURN_NULL_ON_FAIL(SlangResult(m_immediateContext->Map(buffer, 0, mapType, 0, &mappedSub)));
 
     return mappedSub.pData;
 }
@@ -1384,25 +1384,25 @@ Result DeviceImpl::createProgram(
         {
         case SLANG_STAGE_COMPUTE:
             SLANG_ASSERT(entryPointCount == 1);
-            SLANG_RETURN_ON_FAIL(m_device->CreateComputeShader(
+            SLANG_RETURN_ON_FAIL(SlangResult(m_device->CreateComputeShader(
                 kernelCode->getBufferPointer(),
                 kernelCode->getBufferSize(),
                 nullptr,
-                shaderProgram->m_computeShader.writeRef()));
+                shaderProgram->m_computeShader.writeRef())));
             break;
         case SLANG_STAGE_VERTEX:
-            SLANG_RETURN_ON_FAIL(m_device->CreateVertexShader(
+            SLANG_RETURN_ON_FAIL(SlangResult(m_device->CreateVertexShader(
                 kernelCode->getBufferPointer(),
                 kernelCode->getBufferSize(),
                 nullptr,
-                shaderProgram->m_vertexShader.writeRef()));
+                shaderProgram->m_vertexShader.writeRef())));
             break;
         case SLANG_STAGE_FRAGMENT:
-            SLANG_RETURN_ON_FAIL(m_device->CreatePixelShader(
+            SLANG_RETURN_ON_FAIL(SlangResult(m_device->CreatePixelShader(
                 kernelCode->getBufferPointer(),
                 kernelCode->getBufferSize(),
                 nullptr,
-                shaderProgram->m_pixelShader.writeRef()));
+                shaderProgram->m_pixelShader.writeRef())));
             break;
         default:
             SLANG_ASSERT(!"pipeline stage not implemented");
@@ -1580,9 +1580,9 @@ Result DeviceImpl::createGraphicsPipelineState(const GraphicsPipelineStateDesc& 
         FACE(FrontFace, frontFace);
         FACE(BackFace, backFace);
 
-        SLANG_RETURN_ON_FAIL(m_device->CreateDepthStencilState(
+        SLANG_RETURN_ON_FAIL(SlangResult(m_device->CreateDepthStencilState(
             &dsDesc,
-            depthStencilState.writeRef()));
+            depthStencilState.writeRef())));
     }
 
     ComPtr<ID3D11RasterizerState> rasterizerState;
@@ -1599,9 +1599,9 @@ Result DeviceImpl::createGraphicsPipelineState(const GraphicsPipelineStateDesc& 
         rsDesc.MultisampleEnable = desc.rasterizer.multisampleEnable;
         rsDesc.AntialiasedLineEnable = desc.rasterizer.antialiasedLineEnable;
 
-        SLANG_RETURN_ON_FAIL(m_device->CreateRasterizerState(
+        SLANG_RETURN_ON_FAIL(SlangResult(m_device->CreateRasterizerState(
             &rsDesc,
-            rasterizerState.writeRef()));
+            rasterizerState.writeRef())));
 
     }
 
@@ -1661,9 +1661,9 @@ Result DeviceImpl::createGraphicsPipelineState(const GraphicsPipelineStateDesc& 
         dstDesc.IndependentBlendEnable = srcDesc.targetCount > 1;
         dstDesc.AlphaToCoverageEnable = srcDesc.alphaToCoverageEnable;
 
-        SLANG_RETURN_ON_FAIL(m_device->CreateBlendState(
+        SLANG_RETURN_ON_FAIL(SlangResult(m_device->CreateBlendState(
             &dstDesc,
-            blendState.writeRef()));
+            blendState.writeRef())));
     }
 
     RefPtr<GraphicsPipelineStateImpl> state = new GraphicsPipelineStateImpl();

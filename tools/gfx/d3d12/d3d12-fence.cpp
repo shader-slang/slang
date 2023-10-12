@@ -26,10 +26,10 @@ HANDLE FenceImpl::getWaitEvent()
 
 Result FenceImpl::init(DeviceImpl* device, const IFence::Desc& desc)
 {
-    SLANG_RETURN_ON_FAIL(device->m_device->CreateFence(
+    SLANG_RETURN_ON_FAIL(SlangResult(device->m_device->CreateFence(
         desc.initialValue,
         desc.isShared ? D3D12_FENCE_FLAG_SHARED : D3D12_FENCE_FLAG_NONE,
-        IID_PPV_ARGS(m_fence.writeRef())));
+        IID_PPV_ARGS(m_fence.writeRef()))));
     return SLANG_OK;
 }
 
@@ -41,7 +41,7 @@ Result FenceImpl::getCurrentValue(uint64_t* outValue)
 
 Result FenceImpl::setCurrentValue(uint64_t value)
 {
-    SLANG_RETURN_ON_FAIL(m_fence->Signal(value));
+    SLANG_RETURN_ON_FAIL(SlangResult(m_fence->Signal(value)));
     return SLANG_OK;
 }
 
