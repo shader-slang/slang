@@ -59,7 +59,7 @@ struct CppString
     }
 }
 ```
-When compiling the above code to C++, the `CppString` struct will not be emitted as a C++ struct. Instead, all uses of `CppString` will be emitted as use a `std::string`.
+When compiling the above code to C++, the `CppString` struct will not be emitted as a C++ struct. Instead, all uses of `CppString` will be emitted as `std::string`.
 
 ## Injecting Preludes
 
@@ -124,11 +124,16 @@ uint2 getRealtimeClock()
             OpExtension "SPV_KHR_shader_clock";
             result : $$uint2 = OpReadClockKHR Device
         };
+    default:
+        return uint2(0, 0);
     }
 }
 ```
 This definition causes `getRealtimeClock()` to translate to a call to NVAPI when targeting HLSL, to `clockRealtime2x32EXT()` when targeting
-GLSL, and to the `OpReadClockKHR` instruction when compiling directly to SPIRV through the inline SPIRV assembly block.
+GLSL, and to the `OpReadClockKHR` instruction when compiling directly to SPIRV through the inline SPIRV assembly block. The `default` case is
+used for target not specified in the `__target_switch` statement.
+
+Currently, the following target names are supported in a `case` statement: `cpp`, `cuda`, `glsl`, `hlsl`, and `spirv`.
 
 ## Inline SPIRV Assembly
 
