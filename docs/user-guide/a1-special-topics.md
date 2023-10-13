@@ -11,3 +11,4 @@ In this chapter:
 1. [Handling matrix layout differences on different platforms](a1-01-matrix-layout.md)
 2. [Using Slang to write PyTorch kernels](a1-02-slangpy.md)
 3. [Obfuscation](a1-03-obfuscation.md)
+4. [Interoperation with target-specific code](a1-04-interop.md)
