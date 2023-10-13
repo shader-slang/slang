@@ -39,12 +39,12 @@ The `__intrinsic_asm` statement in `myPrint` serves as the definition for the fu
 
 | Macro     |  Expands to |
 |-----------|-------------|
-| $<index>  |  Argument `<index>`, starting from 0 |
-| $T<index> |  Type of argument `<index>` |
-| $TR       |  The return type. |
-| $N<index> |  The element count of argument `<index>`, if the argument is a vector. |
-| $S<index> |  The scalar type of argument `<index>`, if the argument is a matrix or vector. |
-| $*<index> |  Emit all arguments starting from `<index>` as comma separated list |
+| `$<index>`  |  Argument `<index>`, starting from 0 |
+| `$T<index>` |  Type of argument `<index>` |
+| `$TR`       |  The return type. |
+| `$N<index>` |  The element count of argument `<index>`, if the argument is a vector. |
+| `$S<index>` |  The scalar type of argument `<index>`, if the argument is a matrix or vector. |
+| `$*<index>` |  Emit all arguments starting from `<index>` as comma separated list |
 
 ## Defining Intrinsic Types
 
