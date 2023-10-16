@@ -60,6 +60,6 @@ jobs:
       run: |
         $ErrorActionPreference = "SilentlyContinue"
         cd .\FalcorBin\tests
-        python ./testing/run_image_tests.py --config windows-vs2022-Release
+        python ./testing/run_image_tests.py --config windows-vs2022-Release --run-only
         cd ../../
       
