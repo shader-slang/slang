@@ -34,12 +34,12 @@ jobs:
       run: |
         mkdir FalcorBin
         cd FalcorBin
-        Copy-Item -Path 'C:\Falcor\build\windows-vs2022\bin\*' -Destination '.\build\windows-vs2022\bin\' -Recurse -Exclude ("*.pdb")
-        Copy-Item -Path 'C:\Falcor\tests\*' -Destination '.\tests\' -Recurse
-        Copy-Item -Path 'C:\Falcor\tools\*' -Destination '.\tools\' -Recurse
-        Copy-Item -Path 'C:\Falcor\media\*' -Destination '.\media\' -Recurse
-        Copy-Item -Path 'C:\Falcor\media_internal\*' -Destination '.\media_internal\' -Recurse
-        Copy-Item -Path 'C:\Falcor\scripts\*' -Destination '.\scripts\' -Recurse
+        Copy-Item -Path 'C:\Falcor\build\windows-vs2022\bin' -Destination '.\build\windows-vs2022' -Recurse -Exclude ("*.pdb")
+        Copy-Item -Path 'C:\Falcor\tests' -Destination '.\' -Recurse
+        Copy-Item -Path 'C:\Falcor\tools' -Destination '.\' -Recurse
+        Copy-Item -Path 'C:\Falcor\media' -Destination '.\' -Recurse
+        Copy-Item -Path 'C:\Falcor\media_internal' -Destination '.\' -Recurse
+        Copy-Item -Path 'C:\Falcor\scripts' -Destination '.\' -Recurse
         cd ..\
     - name: build
       run: |
