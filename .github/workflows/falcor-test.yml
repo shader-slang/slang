@@ -34,7 +34,7 @@ jobs:
       run: |
         mkdir FalcorBin
         cd FalcorBin
-        Copy-Item -Path 'C:\Falcor\build\windows-vs2022\bin' -Destination '.\build\windows-vs2022' -Recurse -Exclude ("*.pdb")
+        Copy-Item -Path 'C:\Falcor\build\windows-vs2022\bin' -Destination '.\build\windows-vs2022\bin' -Recurse -Exclude ("*.pdb")
         Copy-Item -Path 'C:\Falcor\tests' -Destination '.\' -Recurse
         Copy-Item -Path 'C:\Falcor\tools' -Destination '.\' -Recurse
         Copy-Item -Path 'C:\Falcor\media' -Destination '.\' -Recurse
@@ -54,7 +54,7 @@ jobs:
       run: |
         $ErrorActionPreference = "SilentlyContinue"
         cd .\FalcorBin\tests
-        python ./testing/run_unit_tests.py
+        python ./testing/run_unit_tests.py --config windows-vs2022-Release
         cd ../../
     - name: falcor-image-test
       run: |
