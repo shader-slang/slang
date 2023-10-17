@@ -98,7 +98,7 @@ struct AddressInstEliminationContext
         auto call = as<IRCall>(use->getUser());
 
         // Don't change the use if addr is a non mutable address.
-        if (auto refType = as<IRConstRefType>(getRootAddr(addr)->getDataType()))
+        if (as<IRConstRefType>(getRootAddr(addr)->getDataType()))
         {
             return;
         }

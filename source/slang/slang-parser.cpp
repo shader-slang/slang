@@ -6530,7 +6530,6 @@ namespace Slang
         SPIRVAsmExpr* asmExpr = parser->astBuilder->create<SPIRVAsmExpr>();
 
         parser->ReadToken(TokenType::LBrace);
-        bool failed = false;
         while(!parser->tokenReader.isAtEnd())
         {
             if(parser->LookAheadToken(TokenType::RBrace))
@@ -6539,7 +6538,6 @@ namespace Slang
                 asmExpr->insts.add(*inst);
             else
             {
-                failed = true;
                 // Recover to the semi or brace
                 while(!(parser->LookAheadToken(TokenType::Semicolon)
                     || parser->LookAheadToken(TokenType::RBrace)
