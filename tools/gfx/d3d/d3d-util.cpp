@@ -540,7 +540,7 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
             }
 
             ComPtr<IDXGIFactory4> factory;
-            SLANG_RETURN_ON_FAIL(SlangResult(createFactory2(dxgiFlags, IID_PPV_ARGS(factory.writeRef()))));
+            SLANG_RETURN_ON_FAIL_HRESULT(createFactory2(dxgiFlags, IID_PPV_ARGS(factory.writeRef())));
 
             outFactory = factory;
             return SLANG_OK;

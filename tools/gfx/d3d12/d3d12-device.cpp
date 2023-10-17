@@ -158,8 +158,8 @@ Result DeviceImpl::createBuffer(
 
         ID3D12Resource* dxUploadResource = uploadResourceRef.getResource();
 
-        SLANG_RETURN_ON_FAIL(SlangResult(
-            dxUploadResource->Map(0, &readRange, reinterpret_cast<void**>(&dstData))));
+        SLANG_RETURN_ON_FAIL_HRESULT(
+            dxUploadResource->Map(0, &readRange, reinterpret_cast<void**>(&dstData)));
         ::memcpy(dstData, srcData, srcDataSize);
         dxUploadResource->Unmap(0, nullptr);
 
@@ -271,7 +271,7 @@ Result DeviceImpl::captureTextureToSurface(
         UINT8* data;
         D3D12_RANGE readRange = { 0, bufferSize };
 
-        SLANG_RETURN_ON_FAIL(SlangResult(dxResource->Map(0, &readRange, reinterpret_cast<void**>(&data))));
+        SLANG_RETURN_ON_FAIL_HRESULT(dxResource->Map(0, &readRange, reinterpret_cast<void**>(&data)));
 
         List<uint8_t> blobData;
 
@@ -926,8 +926,8 @@ Result DeviceImpl::initialize(const Desc& desc)
         desc.pArgumentDescs = &args;
         desc.NodeMask = 0;
 
-        SLANG_RETURN_ON_FAIL(SlangResult(m_device->CreateCommandSignature(
-            &desc, nullptr, IID_PPV_ARGS(drawIndirectCmdSignature.writeRef()))));
+        SLANG_RETURN_ON_FAIL_HRESULT(m_device->CreateCommandSignature(
+            &desc, nullptr, IID_PPV_ARGS(drawIndirectCmdSignature.writeRef())));
     }
 
     // Allocate a D3D12 "command signature" object that matches the behavior
@@ -942,8 +942,8 @@ Result DeviceImpl::initialize(const Desc& desc)
         desc.pArgumentDescs = &args;
         desc.NodeMask = 0;
 
-        SLANG_RETURN_ON_FAIL(SlangResult(m_device->CreateCommandSignature(
-            &desc, nullptr, IID_PPV_ARGS(drawIndexedIndirectCmdSignature.writeRef()))));
+        SLANG_RETURN_ON_FAIL_HRESULT(m_device->CreateCommandSignature(
+            &desc, nullptr, IID_PPV_ARGS(drawIndexedIndirectCmdSignature.writeRef())));
     }
 
     // Allocate a D3D12 "command signature" object that matches the behavior
@@ -958,8 +958,8 @@ Result DeviceImpl::initialize(const Desc& desc)
         desc.pArgumentDescs = &args;
         desc.NodeMask = 0;
 
-        SLANG_RETURN_ON_FAIL(SlangResult(m_device->CreateCommandSignature(
-            &desc, nullptr, IID_PPV_ARGS(dispatchIndirectCmdSignature.writeRef()))));
+        SLANG_RETURN_ON_FAIL_HRESULT(m_device->CreateCommandSignature(
+            &desc, nullptr, IID_PPV_ARGS(dispatchIndirectCmdSignature.writeRef())));
     }
     m_isInitialized = true;
     return SLANG_OK;
@@ -1614,8 +1614,8 @@ Result DeviceImpl::getFormatSupportedResourceStates(Format format, ResourceState
 {
     D3D12_FEATURE_DATA_FORMAT_SUPPORT support;
     support.Format = D3DUtil::getMapFormat(format);
-    SLANG_RETURN_ON_FAIL(SlangResult(
-        m_device->CheckFeatureSupport(D3D12_FEATURE_FORMAT_SUPPORT, &support, sizeof(support))));
+    SLANG_RETURN_ON_FAIL_HRESULT(
+        m_device->CheckFeatureSupport(D3D12_FEATURE_FORMAT_SUPPORT, &support, sizeof(support)));
 
     ResourceStateSet allowedStates;
 
@@ -1991,8 +1991,8 @@ Result DeviceImpl::readBufferResource(
         UINT8* data;
         D3D12_RANGE readRange = { 0, size };
 
-        SLANG_RETURN_ON_FAIL(SlangResult(
-            stageBufRef.getResource()->Map(0, &readRange, reinterpret_cast<void**>(&data))));
+        SLANG_RETURN_ON_FAIL_HRESULT(
+            stageBufRef.getResource()->Map(0, &readRange, reinterpret_cast<void**>(&data)));
 
         // Copy to memory buffer
         blobData.setCount(size);
@@ -2190,8 +2190,8 @@ Result DeviceImpl::waitForFences(
     {
         auto fenceImpl = static_cast<FenceImpl*>(fences[i]);
         waitHandles.add(fenceImpl->getWaitEvent());
-        SLANG_RETURN_ON_FAIL(SlangResult(
-            fenceImpl->m_fence->SetEventOnCompletion(fenceValues[i], fenceImpl->getWaitEvent())));
+        SLANG_RETURN_ON_FAIL_HRESULT(
+            fenceImpl->m_fence->SetEventOnCompletion(fenceValues[i], fenceImpl->getWaitEvent()));
     }
     auto result = WaitForMultipleObjects(
         fenceCount,

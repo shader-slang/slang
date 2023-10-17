@@ -16,12 +16,20 @@
 
 //! Helper macro, that makes it easy to add result checking to calls in functions/methods that themselves return Result. 
 #define SLANG_RETURN_ON_FAIL(x) { SlangResult _res = (x); if (SLANG_FAILED(_res)) { SLANG_HANDLE_RESULT_FAIL(_res); return _res; } }
+//! Similar to SLANG_RETURN_ON_FAIL, except takes any integral type with values corresponding to HRESULT error codes
+#define SLANG_RETURN_ON_FAIL_HRESULT(x) SLANG_RETURN_ON_FAIL(SlangResult(x))
 //! Helper macro that can be used to test the return value from a call, and will return in a void method/function
 #define SLANG_RETURN_VOID_ON_FAIL(x) { SlangResult _res = (x); if (SLANG_FAILED(_res)) { SLANG_HANDLE_RESULT_FAIL(_res); return; } }
+//! Similar to SLANG_RETURN_VOID_ON_FAIL, except takes any integral type with values corresponding to HRESULT error codes
+#define SLANG_RETURN_VOID_ON_FAIL_HRESULT(x) SLANG_RETURN_VOID_ON_FAIL(SlangResult(x))
 //! Helper macro that will return false on failure.
 #define SLANG_RETURN_FALSE_ON_FAIL(x) { SlangResult _res = (x); if (SLANG_FAILED(_res)) { SLANG_HANDLE_RESULT_FAIL(_res); return false; } }
+//! Similar to SLANG_RETURN_FALSE_ON_FAIL, except takes any integral type with values corresponding to HRESULT error codes
+#define SLANG_RETURN_FALSE_ON_FAIL_HRESULT(x) SLANG_RETURN_FALSE_ON_FAIL(SlangResult(x))
 //! Helper macro that will return nullptr on failure.
 #define SLANG_RETURN_NULL_ON_FAIL(x) { SlangResult _res = (x); if (SLANG_FAILED(_res)) { SLANG_HANDLE_RESULT_FAIL(_res); return nullptr; } }
+//! Similar to SLANG_RETURN_NULL_ON_FAIL, except takes any integral type with values corresponding to HRESULT error codes
+#define SLANG_RETURN_NULL_ON_FAIL_HRESULT(x) SLANG_RETURN_NULL_ON_FAIL(SlangResult(x))
 
 //! Helper macro that will assert if the return code from a call is failure, also returns the failure.
 #define SLANG_ASSERT_ON_FAIL(x) { SlangResult _res = (x); if (SLANG_FAILED(_res)) { assert(false); return _res; } }

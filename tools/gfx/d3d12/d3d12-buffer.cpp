@@ -65,8 +65,8 @@ Result BufferResourceImpl::map(MemoryRange* rangeToRead, void** outPointer)
         range.Begin = (SIZE_T)rangeToRead->offset;
         range.End = (SIZE_T)(rangeToRead->offset + rangeToRead->size);
     }
-    SLANG_RETURN_ON_FAIL(SlangResult(
-        m_resource.getResource()->Map(0, rangeToRead ? &range : nullptr, outPointer)));
+    SLANG_RETURN_ON_FAIL_HRESULT(
+        m_resource.getResource()->Map(0, rangeToRead ? &range : nullptr, outPointer));
     return SLANG_OK;
 }
 

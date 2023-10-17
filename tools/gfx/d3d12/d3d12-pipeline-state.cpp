@@ -215,8 +215,8 @@ Result PipelineStateImpl::ensureAPIPipelineStateCreated()
                 CD3DX12_PIPELINE_STATE_STREAM2 meshStateStream{meshDesc};
                 D3D12_PIPELINE_STATE_STREAM_DESC streamDesc{sizeof(meshStateStream), &meshStateStream};
 
-                SLANG_RETURN_ON_FAIL(SlangResult(m_device->m_device5->CreatePipelineState(
-                    &streamDesc, IID_PPV_ARGS(m_pipelineState.writeRef()))));
+                SLANG_RETURN_ON_FAIL_HRESULT(m_device->m_device5->CreatePipelineState(
+                    &streamDesc, IID_PPV_ARGS(m_pipelineState.writeRef())));
             }
         }
         else
@@ -270,8 +270,8 @@ Result PipelineStateImpl::ensureAPIPipelineStateCreated()
             }
             else
             {
-                SLANG_RETURN_ON_FAIL(SlangResult(m_device->m_device->CreateGraphicsPipelineState(
-                    &graphicsDesc, IID_PPV_ARGS(m_pipelineState.writeRef()))));
+                SLANG_RETURN_ON_FAIL_HRESULT(m_device->m_device->CreateGraphicsPipelineState(
+                    &graphicsDesc, IID_PPV_ARGS(m_pipelineState.writeRef())));
             }
         }
     }
@@ -336,8 +336,8 @@ Result PipelineStateImpl::ensureAPIPipelineStateCreated()
                 }
                 else
                 {
-                    SLANG_RETURN_ON_FAIL(SlangResult(m_device->m_device->CreateComputePipelineState(
-                        &computeDesc, IID_PPV_ARGS(m_pipelineState.writeRef()))));
+                    SLANG_RETURN_ON_FAIL_HRESULT(m_device->m_device->CreateComputePipelineState(
+                        &computeDesc, IID_PPV_ARGS(m_pipelineState.writeRef())));
                 }
             }
         }
@@ -510,8 +510,8 @@ Result RayTracingPipelineStateImpl::ensureAPIPipelineStateCreated()
     rtpsoDesc.Type = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
     rtpsoDesc.NumSubobjects = (UINT)subObjects.getCount();
     rtpsoDesc.pSubobjects = subObjects.getBuffer();
-    SLANG_RETURN_ON_FAIL(SlangResult(
-        m_device->m_device5->CreateStateObject(&rtpsoDesc, IID_PPV_ARGS(m_stateObject.writeRef()))));
+    SLANG_RETURN_ON_FAIL_HRESULT(
+        m_device->m_device5->CreateStateObject(&rtpsoDesc, IID_PPV_ARGS(m_stateObject.writeRef())));
 
     if (m_device->m_pipelineCreationAPIDispatcher)
     {

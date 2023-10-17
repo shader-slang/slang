@@ -124,7 +124,7 @@ Result D3D12Resource::initCommitted(ID3D12Device* device, const D3D12_HEAP_PROPE
 {
 	setResourceNull();
 	ComPtr<ID3D12Resource> resource;
-	SLANG_RETURN_ON_FAIL(SlangResult(device->CreateCommittedResource(&heapProps, heapFlags, &resourceDesc, initState, clearValue, IID_PPV_ARGS(resource.writeRef()))));
+	SLANG_RETURN_ON_FAIL_HRESULT(device->CreateCommittedResource(&heapProps, heapFlags, &resourceDesc, initState, clearValue, IID_PPV_ARGS(resource.writeRef())));
 	setResource(resource);
 	return SLANG_OK;
 }

@@ -439,8 +439,8 @@ Result uploadBufferDataImpl(
     readRange.Begin = 0;
     readRange.End = 0;
     void* uploadData;
-    SLANG_RETURN_ON_FAIL(SlangResult(
-        uploadResourceRef.getResource()->Map(0, &readRange, reinterpret_cast<void**>(&uploadData))));
+    SLANG_RETURN_ON_FAIL_HRESULT(
+        uploadResourceRef.getResource()->Map(0, &readRange, reinterpret_cast<void**>(&uploadData)));
     memcpy((uint8_t*)uploadData + uploadResourceOffset, data, size);
     D3D12_RANGE writtenRange = {};
     writtenRange.Begin = uploadResourceOffset;

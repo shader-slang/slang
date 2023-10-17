@@ -59,11 +59,11 @@ public:
         if (!dxgiFactory2)
         {
             ComPtr<IDXGISwapChain> swapChain;
-            SLANG_RETURN_ON_FAIL(SlangResult(getDXGIFactory()->CreateSwapChain(
-                getOwningDevice(), &swapChainDesc, swapChain.writeRef())));
-            SLANG_RETURN_ON_FAIL(SlangResult(getDXGIFactory()->MakeWindowAssociation(
-                (HWND)window.handleValues[0], DXGI_MWA_NO_ALT_ENTER)));
-            SLANG_RETURN_ON_FAIL(SlangResult(swapChain->QueryInterface(m_swapChain.writeRef())));
+            SLANG_RETURN_ON_FAIL_HRESULT(getDXGIFactory()->CreateSwapChain(
+                getOwningDevice(), &swapChainDesc, swapChain.writeRef()));
+            SLANG_RETURN_ON_FAIL_HRESULT(getDXGIFactory()->MakeWindowAssociation(
+                (HWND)window.handleValues[0], DXGI_MWA_NO_ALT_ENTER));
+            SLANG_RETURN_ON_FAIL_HRESULT(swapChain->QueryInterface(m_swapChain.writeRef()));
         }
         else
         {
@@ -77,14 +77,14 @@ public:
             desc1.SampleDesc = swapChainDesc.SampleDesc;
             desc1.SwapEffect = swapChainDesc.SwapEffect;
             ComPtr<IDXGISwapChain1> swapChain1;
-            SLANG_RETURN_ON_FAIL(SlangResult(dxgiFactory2->CreateSwapChainForHwnd(
+            SLANG_RETURN_ON_FAIL_HRESULT(dxgiFactory2->CreateSwapChainForHwnd(
                 getOwningDevice(),
                 (HWND)window.handleValues[0],
                 &desc1,
                 nullptr,
                 nullptr,
-                swapChain1.writeRef())));
-            SLANG_RETURN_ON_FAIL(SlangResult(swapChain1->QueryInterface(m_swapChain.writeRef())));
+                swapChain1.writeRef()));
+            SLANG_RETURN_ON_FAIL_HRESULT(swapChain1->QueryInterface(m_swapChain.writeRef()));
         }
 
         createSwapchainBufferImages();
