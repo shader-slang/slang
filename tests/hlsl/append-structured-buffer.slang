@@ -1,43 +1,42 @@
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-dx12 -use-dxil -compute -output-using-type
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -output-using-type
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -output-using-type -emit-spirv-directly
 
-//TEST:SIMPLE(filecheck=GLSL):-target glsl -profile glsl_450 -stage compute -entry computeMain -fvk-u-shift 10 0
-//TEST:SIMPLE(filecheck=SPIRV):-target spirv -profile glsl_450 -stage compute -entry computeMain
+// To check that our counter-initialization works correctly, set the initial
+// counter to 1 instead of 0
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4, counter=1):out,name=outputBuffer
+AppendStructuredBuffer<int> outputBuffer;
 
-//DISABLED_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type -xslang -fvk-use-gl-layout
+//TEST_INPUT:set inBuffer = ubuffer(data=[1 2 3 4], stride=4)
+RWStructuredBuffer<int> inBuffer;
 
-//TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
-RWStructuredBuffer<float> outputBuffer;
-
-AppendStructuredBuffer<float2> appendBuffer;
-
-// GLSL: layout(std430, binding = 11) buffer StructuredBuffer_float2_t
-// GLSL: vec2 _data[];
-// GLSL: } appendBuffer_elements_0
-
-// GLSL: layout(std430, binding = 12) buffer StructuredBuffer_int_t
-// GLSL: int _data[];
-// GLSL: } appendBuffer_counter
-
-// GLSL: void AppendStructuredBuffer_Append_0(vec2 [[PARAM:[A-Za-z0-9_]+]])
-// GLSL:    int [[COUNTER:[A-Za-z0-9_]+]] = atomicAdd(appendBuffer_counter_0._data[0], 1);
-// GLSL:    appendBuffer_elements_0._data{{\[}}[[COUNTER]]{{\]}} = [[PARAM]];
-
-// GLSL: uvec2 StructuredBuffer_GetDimensions_0()
-// GLSL: {
-// GLSL:     return uvec2(uint(appendBuffer_counter_0._data[0]), 8U);
-// GLSL: }
-
-// SPIRV: OpEntryPoint
-
-//TEST_INPUT:set inBuffer = ubuffer(data=[1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0], stride=4)
-RWByteAddressBuffer inBuffer;
-
-[numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+[numthreads(4, 1, 1)]
+void computeMain(uint i : SV_GroupIndex)
 {
-    var g = inBuffer.Load<float4>(4);
-    appendBuffer.Append(g.xy);
+    int g = inBuffer[i];
+    outputBuffer.Append(g);
+
+    GroupMemoryBarrier();
 
     uint numStructs, stride;
-    appendBuffer.GetDimensions(numStructs, stride);
-    outputBuffer[dispatchThreadID.x] = numStructs; // expect 1.0
+    outputBuffer.GetDimensions(numStructs, stride);
+    if(i == 0)
+        outputBuffer.Append(int(numStructs));
+
+    // BUF: type: int32_t
+    // Never assigned, as we set the initial counter to 1
+    // BUF: 0
+
+    // The values from inBuffer in any order
+    // BUF-DAG: 1
+    // BUF-DAG: 3
+    // BUF-DAG: 2
+    // BUF-DAG: 4
+
+    // The total size of the AppendStructuredBuffer (from GetDimensions)
+    // BUF: 8
+
+    // Never assigned
+    // BUF: 0
+    // BUF: 0
 }

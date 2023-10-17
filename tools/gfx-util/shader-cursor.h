@@ -63,6 +63,13 @@ struct ShaderCursor
         return cursor;
     }
 
+    /// Some resources such as RWStructuredBuffer, AppendStructuredBuffer and
+    /// ConsumeStructuredBuffer need to have their counter explicitly bound on
+    /// APIs other than DirectX, this will return a valid ShaderCursor pointing
+    /// to that resource if that is the case.
+    /// Otherwise, this returns an invalid cursor.
+    ShaderCursor getExplicitCounter() const;
+
     ShaderCursor getElement(GfxIndex index) const;
 
     static Result followPath(const char* path, ShaderCursor& ioCursor);

@@ -20,6 +20,58 @@ Result gfx::ShaderCursor::getDereferenced(ShaderCursor& outCursor) const
     }
 }
 
+ShaderCursor ShaderCursor::getExplicitCounter() const
+{
+    // Similar to getField below
+
+    // The alternative to handling this here would be to augment IResourceView
+    // with a `getCounterResourceView()`, and set that also in `setResource`
+    if(const auto counterVarLayout = m_typeLayout->getExplicitCounter())
+    {
+        ShaderCursor counterCursor;
+
+        // The counter cursor will point into the same parent object.
+        counterCursor.m_baseObject = m_baseObject;
+
+        // The type being pointed to is the type of the field.
+        counterCursor.m_typeLayout = counterVarLayout->getTypeLayout();
+
+        // The byte offset is the current offset plus the relative offset of the counter.
+        // The offset in binding ranges is computed similarly.
+        counterCursor.m_offset.uniformOffset
+            = m_offset.uniformOffset + SlangInt(counterVarLayout->getOffset());
+        counterCursor.m_offset.bindingRangeIndex
+            = m_offset.bindingRangeIndex + GfxIndex(m_typeLayout->getExplicitCounterBindingRangeOffset());
+
+        // The index of the counter within any binding ranges will be the same
+        // as the index computed for the parent structure.
+        //
+        // Note: this case would arise for an array of structured buffers
+        //
+        //      AppendStructuredBuffer g[4];
+        //
+        // In this scenario, `g` holds two binding ranges:
+        //
+        // * Range #0 comprises 4 element buffers, representing `g[...].elements`
+        // * Range #1 comprises 4 counter buffers, representing `g[...].counter`
+        //
+        // A cursor for `g[2]` would have a `bindingRangeIndex` of zero but
+        // a `bindingArrayIndex` of 2, indicating that we could end up
+        // referencing either range, but no matter what we know the index
+        // is 2. Thus when we form a cursor for `g[2].counter` we want to
+        // apply the binding range offset to get a `bindingRangeIndex` of
+        // 1, while the `bindingArrayIndex` is unmodified.
+        //
+        // The result is that `g[2].counter` is stored in range #1 at array index 2.
+        //
+        counterCursor.m_offset.bindingArrayIndex = m_offset.bindingArrayIndex;
+
+        return counterCursor;
+    }
+    // Otherwise, return an invalid cursor
+    return ShaderCursor{};
+}
+
 Result ShaderCursor::getField(const char* name, const char* nameEnd, ShaderCursor& outCursor) const
 {
     // If this cursor is invalid, then can't possible fetch a field.

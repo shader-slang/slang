@@ -58,6 +58,10 @@ struct InputBufferDesc
     InputBufferType type = InputBufferType::StorageBuffer;
     int stride = 0; // stride == 0 indicates an unstructured buffer.
     Format format = Format::Unknown;
+    // For RWStructuredBuffer, AppendStructuredBuffer, ConsumeStructuredBuffer
+    // the default value of 0xffffffff indicates that a counter buffer should
+    // not be assigned
+    uint32_t counter = ~0u;
 };
 
 struct InputSamplerDesc

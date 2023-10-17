@@ -197,6 +197,7 @@ public:
     DescriptorSet m_cachedGPUDescriptorSet;
 
     ShortList<RefPtr<Resource>, 8> m_boundResources;
+    ShortList<RefPtr<Resource>, 8> m_boundCounterResources;
     List<D3D12_GPU_VIRTUAL_ADDRESS> m_rootArguments;
     /// A constant buffer used to stored ordinary data for this object
     /// and existential-type sub-objects.

@@ -8633,6 +8633,23 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return v;
     }
 
+    void addSpecializedForTargetDecorations(IRInst* inst, Decl* decl)
+    {
+        // If this declaration was marked as being an intrinsic for a particular
+        // target, then we should reflect that here.
+        for (auto targetMod : decl->getModifiersOfType<SpecializedForTargetModifier>())
+        {
+            // `targetMod` indicates that this particular declaration represents
+            // a specialized definition of the particular function for the given
+            // target, and we need to reflect that at the IR level.
+
+            auto targetName = targetMod->targetToken.getContent();
+            auto targetCap = findCapabilityAtom(targetName);
+
+            getBuilder()->addTargetDecoration(inst, CapabilitySet(targetCap));
+        }
+    }
+
     // Attach target-intrinsic decorations to an instruction,
     // based on modifiers on an AST declaration.
     void addTargetIntrinsicDecorations(
@@ -9170,19 +9187,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         getBuilder()->addHighLevelDeclDecoration(irFunc, decl);
 
-        // If this declaration was marked as being an intrinsic for a particular
-        // target, then we should reflect that here.
-        for (auto targetMod : decl->getModifiersOfType<SpecializedForTargetModifier>())
-        {
-            // `targetMod` indicates that this particular declaration represents
-            // a specialized definition of the particular function for the given
-            // target, and we need to reflect that at the IR level.
-
-            auto targetName = targetMod->targetToken.getContent();
-            auto targetCap = findCapabilityAtom(targetName);
-
-            getBuilder()->addTargetDecoration(irFunc, CapabilitySet(targetCap));
-        }
+        addSpecializedForTargetDecorations(irFunc, decl);
 
         // If this declaration was marked as having a target-specific lowering
         // for a particular target, then handle that here.

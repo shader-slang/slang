@@ -473,6 +473,8 @@ public:
 
     HLSLStructuredBufferType* getStructuredBufferType(Type* elementType);
 
+    HLSLRWStructuredBufferType* getRWStructuredBufferType(Type* elementType);
+
     SamplerStateType* getSamplerStateType();
 
     DifferentialPairType* getDifferentialPairType(
