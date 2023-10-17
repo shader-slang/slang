@@ -862,8 +862,6 @@ extern "C"
     ie for a facility 'DRIVER' it might make sense to have an error of the form SLANG_E_DRIVER_OUT_OF_MEMORY
     */
 
-    enum class SlangResult : int32_t {};
-
     //! Use to test if a result was failure. Never use result != SLANG_OK to test for failure, as there may be successful codes != SLANG_OK.
 #define SLANG_FAILED(status) (int32_t(status) < 0)
     //! Use to test if a result succeeded. Never use result == SLANG_OK to test for success, as will detect other successful codes as a failure.
@@ -897,51 +895,53 @@ extern "C"
     /// Base for external facilities. Facilities should be unique across modules.
 #define SLANG_FACILITY_EXTERNAL_BASE 0x210
 
-    /* ************************ Win COM compatible Results ******************************/
-    // https://msdn.microsoft.com/en-us/library/windows/desktop/aa378137(v=vs.85).aspx
-
-    //! SLANG_OK indicates success, and is equivalent to SLANG_MAKE_SUCCESS(SLANG_FACILITY_WIN_GENERAL, 0)
-#define SLANG_OK                          SlangResult(0)
-    //! SLANG_FAIL is the generic failure code - meaning a serious error occurred and the call couldn't complete
-#define SLANG_FAIL                          SLANG_MAKE_ERROR(SLANG_FACILITY_WIN_GENERAL, 0x4005)
-
 #define SLANG_MAKE_WIN_GENERAL_ERROR(code)  SLANG_MAKE_ERROR(SLANG_FACILITY_WIN_GENERAL, code)
-
-    //! Functionality is not implemented
-#define SLANG_E_NOT_IMPLEMENTED             SLANG_MAKE_WIN_GENERAL_ERROR(0x4001)
-    //! Interface not be found
-#define SLANG_E_NO_INTERFACE                SLANG_MAKE_WIN_GENERAL_ERROR(0x4002)
-    //! Operation was aborted (did not correctly complete)
-#define SLANG_E_ABORT                       SLANG_MAKE_WIN_GENERAL_ERROR(0x4004) 
-
-    //! Indicates that a handle passed in as parameter to a method is invalid.
-#define SLANG_E_INVALID_HANDLE              SLANG_MAKE_ERROR(SLANG_FACILITY_WIN_API, 6)
-    //! Indicates that an argument passed in as parameter to a method is invalid.
-#define SLANG_E_INVALID_ARG                 SLANG_MAKE_ERROR(SLANG_FACILITY_WIN_API, 0x57)
-    //! Operation could not complete - ran out of memory
-#define SLANG_E_OUT_OF_MEMORY               SLANG_MAKE_ERROR(SLANG_FACILITY_WIN_API, 0xe)
-
-    /* *************************** other Results **************************************/
-
 #define SLANG_MAKE_CORE_ERROR(code)         SLANG_MAKE_ERROR(SLANG_FACILITY_CORE, code)
 
-    // Supplied buffer is too small to be able to complete
-#define SLANG_E_BUFFER_TOO_SMALL            SLANG_MAKE_CORE_ERROR(1)
-    //! Used to identify a Result that has yet to be initialized.
-    //! It defaults to failure such that if used incorrectly will fail, as similar in concept to using an uninitialized variable.
-#define SLANG_E_UNINITIALIZED               SLANG_MAKE_CORE_ERROR(2)
-    //! Returned from an async method meaning the output is invalid (thus an error), but a result for the request is pending, and will be returned on a subsequent call with the async handle.
-#define SLANG_E_PENDING                     SLANG_MAKE_CORE_ERROR(3)
-    //! Indicates a file/resource could not be opened
-#define SLANG_E_CANNOT_OPEN                 SLANG_MAKE_CORE_ERROR(4)
-    //! Indicates a file/resource could not be found
-#define SLANG_E_NOT_FOUND                   SLANG_MAKE_CORE_ERROR(5)
-    //! An unhandled internal failure (typically from unhandled exception)
-#define SLANG_E_INTERNAL_FAIL               SLANG_MAKE_CORE_ERROR(6)
-    //! Could not complete because some underlying feature (hardware or software) was not available 
-#define SLANG_E_NOT_AVAILABLE               SLANG_MAKE_CORE_ERROR(7)
-        //! Could not complete because the operation times out. 
-#define SLANG_E_TIME_OUT                    SLANG_MAKE_CORE_ERROR(8)
+    enum SlangResult : int32_t
+    {
+        /* ************************ Win COM compatible Results ******************************/
+        // https://msdn.microsoft.com/en-us/library/windows/desktop/aa378137(v=vs.85).aspx
+
+        //! SLANG_OK indicates success, and is equivalent to SLANG_MAKE_SUCCESS(SLANG_FACILITY_WIN_GENERAL, 0)
+        SLANG_OK = 0,
+        //! SLANG_FAIL is the generic failure code - meaning a serious error occurred and the call couldn't complete
+        SLANG_FAIL = int32_t(SLANG_MAKE_ERROR(SLANG_FACILITY_WIN_GENERAL, 0x4005)),
+
+        //! Functionality is not implemented
+        SLANG_E_NOT_IMPLEMENTED = int32_t(SLANG_MAKE_WIN_GENERAL_ERROR(0x4001)),
+        //! Interface not be found
+        SLANG_E_NO_INTERFACE = int32_t(SLANG_MAKE_WIN_GENERAL_ERROR(0x4002)),
+        //! Operation was aborted (did not correctly complete)
+        SLANG_E_ABORT = int32_t(SLANG_MAKE_WIN_GENERAL_ERROR(0x4004) ),
+
+        //! Indicates that a handle passed in as parameter to a method is invalid.
+        SLANG_E_INVALID_HANDLE = int32_t(SLANG_MAKE_ERROR(SLANG_FACILITY_WIN_API, 6)),
+        //! Indicates that an argument passed in as parameter to a method is invalid.
+        SLANG_E_INVALID_ARG = int32_t(SLANG_MAKE_ERROR(SLANG_FACILITY_WIN_API, 0x57)),
+        //! Operation could not complete - ran out of memory
+        SLANG_E_OUT_OF_MEMORY = int32_t(SLANG_MAKE_ERROR(SLANG_FACILITY_WIN_API, 0xe)),
+
+        /* *************************** other Results **************************************/
+
+        // Supplied buffer is too small to be able to complete
+        SLANG_E_BUFFER_TOO_SMALL = int32_t(SLANG_MAKE_CORE_ERROR(1)),
+        //! Used to identify a Result that has yet to be initialized.
+        //! It defaults to failure such that if used incorrectly will fail, as similar in concept to using an uninitialized variable.
+        SLANG_E_UNINITIALIZED = int32_t(SLANG_MAKE_CORE_ERROR(2)),
+        //! Returned from an async method meaning the output is invalid (thus an error), but a result for the request is pending, and will be returned on a subsequent call with the async handle.
+        SLANG_E_PENDING = int32_t(SLANG_MAKE_CORE_ERROR(3)),
+        //! Indicates a file/resource could not be opened
+        SLANG_E_CANNOT_OPEN = int32_t(SLANG_MAKE_CORE_ERROR(4)),
+        //! Indicates a file/resource could not be found
+        SLANG_E_NOT_FOUND = int32_t(SLANG_MAKE_CORE_ERROR(5)),
+        //! An unhandled internal failure (typically from unhandled exception)
+        SLANG_E_INTERNAL_FAIL = int32_t(SLANG_MAKE_CORE_ERROR(6)),
+        //! Could not complete because some underlying feature (hardware or software) was not available
+        SLANG_E_NOT_AVAILABLE = int32_t(SLANG_MAKE_CORE_ERROR(7)),
+            //! Could not complete because the operation times out.
+        SLANG_E_TIME_OUT = int32_t(SLANG_MAKE_CORE_ERROR(8)),
+    };
 
     /** A "Universally Unique Identifier" (UUID)
 
