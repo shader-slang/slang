@@ -935,6 +935,14 @@ SLANG_API SlangInt spReflectionTypeLayout_findFieldIndexByName(SlangReflectionTy
     return -1;
 }
 
+SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_GetExplicitCounter(SlangReflectionTypeLayout* inTypeLayout)
+{
+    const auto typeLayout = convert(inTypeLayout);
+    if(const auto structuredBufferTypeLayout = as<StructuredBufferTypeLayout>(typeLayout))
+        return (SlangReflectionVariableLayout*) structuredBufferTypeLayout->counterVarLayout.Ptr();
+    return nullptr;
+}
+
 SLANG_API size_t spReflectionTypeLayout_GetElementStride(SlangReflectionTypeLayout* inTypeLayout, SlangParameterCategory category)
 {
     auto typeLayout = convert(inTypeLayout);
@@ -1784,6 +1792,75 @@ namespace Slang
                 m_extendedInfo->m_bindingRanges.add(bindingRange);
                 m_extendedInfo->m_subObjectRanges.add(subObjectRange);
             }
+            else if(const auto structuredBufferTypeLayout = as<StructuredBufferTypeLayout>(typeLayout))
+            {
+                // For structured buffers we expect them to consume a single
+                // resource descriptor slot (not counting the possible counter
+                // buffer)
+                SLANG_ASSERT(typeLayout->resourceInfos.getCount() == 1);
+                const auto& resInfo = typeLayout->resourceInfos[0];
+
+                const auto bindingType = as<HLSLStructuredBufferType>(typeLayout->getType())
+                    ? SLANG_BINDING_TYPE_RAW_BUFFER
+                    : SLANG_BINDING_TYPE_MUTABLE_RAW_BUFFER;
+
+                // We now allocate a descriptor range for this buffer
+                TypeLayout::ExtendedInfo::DescriptorRangeInfo descriptorRange;
+                descriptorRange.kind = resInfo.kind;
+                descriptorRange.bindingType = bindingType;
+                // Note that we don't use resInfo.count here, as each
+                // structuredBufferType is essentially a struct of 2 fields
+                // (elements, counter) and not an array of length 2.
+                SLANG_ASSERT(resInfo.count != 2 || structuredBufferTypeLayout->counterVarLayout);
+                SLANG_ASSERT(resInfo.count != 1 || !structuredBufferTypeLayout->counterVarLayout);
+                descriptorRange.count = multiplier;
+                descriptorRange.indexOffset = _calcIndexOffset(path.primary, resInfo.kind);
+
+                Int descriptorSetIndex = _findOrAddDescriptorSet(_calcSpaceOffset(path.primary, resInfo.kind));
+                const RefPtr<TypeLayout::ExtendedInfo::DescriptorSetInfo> descriptorSet
+                    = m_extendedInfo->m_descriptorSets[descriptorSetIndex];
+                auto descriptorRangeIndex = descriptorSet->descriptorRanges.getCount();
+                descriptorSet->descriptorRanges.add(descriptorRange);
+
+                // We will map the elements buffer to a single binding range
+                TypeLayout::ExtendedInfo::BindingRangeInfo bindingRange;
+                bindingRange.leafTypeLayout = typeLayout;
+                bindingRange.leafVariable = path.primary ? path.primary->var->getVariable() : nullptr;
+                bindingRange.bindingType = bindingType;
+                bindingRange.count = multiplier;
+                bindingRange.descriptorSetIndex = descriptorSetIndex;
+                bindingRange.firstDescriptorRangeIndex = descriptorRangeIndex;
+                bindingRange.descriptorRangeCount = 1;
+
+                auto bindingRangeIndex = m_extendedInfo->m_bindingRanges.getCount();
+                m_extendedInfo->m_bindingRanges.add(bindingRange);
+
+                // We also make sure to report it as a sub-object range.
+                TypeLayout::ExtendedInfo::SubObjectRangeInfo subObjectRange;
+                subObjectRange.bindingRangeIndex = bindingRangeIndex;
+                subObjectRange.offsetVarLayout = createOffsetVarLayout(typeLayout, path);
+                subObjectRange.spaceOffset = 0;
+                m_extendedInfo->m_subObjectRanges.add(subObjectRange);
+
+                // If we have an associated counter for this structured buffer,
+                // add its ranges
+                if(structuredBufferTypeLayout->counterVarLayout)
+                {
+                    ExtendedBindingRangePath counterPath(
+                        path,
+                        structuredBufferTypeLayout->counterVarLayout
+                    );
+                    // This should always be 1, because it comes after the
+                    // single binding range we just added
+                    structuredBufferTypeLayout->counterVarLayout->bindingRangeOffset =
+                        m_extendedInfo->m_bindingRanges.getCount() - bindingRangeIndex;
+                    addRangesRec(
+                        structuredBufferTypeLayout->counterVarLayout->typeLayout,
+                        counterPath,
+                        multiplier
+                    );
+                }
+            }
             else
             {
                 // Here we have the catch-all case that handles "leaf" fields
@@ -1940,19 +2017,7 @@ namespace Slang
                     bindingRange.descriptorRangeCount++;
                 }
 
-                auto bindingRangeIndex = m_extendedInfo->m_bindingRanges.getCount();
-
                 m_extendedInfo->m_bindingRanges.add(bindingRange);
-
-                // For `StructuredBuffer` fields, we also make sure to report it as a sub-object range.
-                if (const auto structuredBufferTypeLayout = as<StructuredBufferTypeLayout>(typeLayout))
-                {
-                    TypeLayout::ExtendedInfo::SubObjectRangeInfo subObjectRange;
-                    subObjectRange.bindingRangeIndex = bindingRangeIndex;
-                    subObjectRange.offsetVarLayout = createOffsetVarLayout(typeLayout, path);
-                    subObjectRange.spaceOffset = 0;
-                    m_extendedInfo->m_subObjectRanges.add(subObjectRange);
-                }
             }
         }
     };
@@ -2293,6 +2358,22 @@ SLANG_API SlangInt spReflectionTypeLayout_getFieldBindingRangeOffset(SlangReflec
         getExtendedTypeLayout(structTypeLayout);
 
         return structTypeLayout->fields[fieldIndex]->bindingRangeOffset;
+    }
+
+    return 0;
+}
+
+SLANG_API SlangInt spReflectionTypeLayout_getExplicitCounterBindingRangeOffset(SlangReflectionTypeLayout* inTypeLayout)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if(!typeLayout) return 0;
+
+    if(const auto structuredBufferTypeLayout = as<StructuredBufferTypeLayout>(typeLayout))
+    {
+        getExtendedTypeLayout(structuredBufferTypeLayout);
+        return structuredBufferTypeLayout->counterVarLayout
+            ? structuredBufferTypeLayout->counterVarLayout->bindingRangeOffset
+            : 0;
     }
 
     return 0;

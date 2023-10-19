@@ -181,7 +181,11 @@ Result ShaderObjectImpl::init(
         // referenced by descriptors in this object does not get
         // freed while the object is still live.
         //
+        // The doubling here is because any buffer resource could
+        // have a counter buffer associated with it, which we 
+        // also need to ensure isn't destroyed prematurely.
         m_boundResources.setCount(resourceCount);
+        m_boundCounterResources.setCount(resourceCount);
     }
     if (auto samplerCount = layout->getSamplerSlotCount())
     {
@@ -950,8 +954,9 @@ Result ShaderObjectImpl::setResource(ShaderOffset const& offset, IResourceView* 
     {
         auto resourceViewImpl = static_cast<ResourceViewImpl*>(resourceView);
         // Hold a reference to the resource to prevent its destruction.
-        m_boundResources[bindingRange.baseIndex + offset.bindingArrayIndex] =
-            resourceViewImpl->m_resource;
+        const auto resourceOffset = bindingRange.baseIndex + offset.bindingArrayIndex;
+        m_boundResources[resourceOffset] = resourceViewImpl->m_resource;
+        m_boundCounterResources[resourceOffset] = resourceViewImpl->m_counterResource;
         internalResourceView = resourceViewImpl;
     }
     break;

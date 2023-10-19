@@ -203,6 +203,11 @@ namespace renderer_test
                 parser.Read("=");
                 val->bufferDesc.stride = parser.ReadInt();
             }
+            else if (word == "counter")
+            {
+                parser.Read("=");
+                val->bufferDesc.counter = parser.ReadInt();
+            }
             else if (word == "random")
             {
                 parser.Read("(");

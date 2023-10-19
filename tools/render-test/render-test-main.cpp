@@ -209,11 +209,49 @@ struct AssignValsFromLayoutContext
         ComPtr<IBufferResource> bufferResource;
         SLANG_RETURN_ON_FAIL(ShaderRendererUtil::createBufferResource(srcBuffer, /*entry.isOutput,*/ bufferSize, bufferData.getBuffer(), device, bufferResource));
 
+        ComPtr<IBufferResource> counterResource;
+        const auto explicitCounterCursor = dstCursor.getExplicitCounter();
+        if(srcBuffer.counter != ~0u)
+        {
+            if(explicitCounterCursor.isValid())
+            {
+                // If this cursor has a full buffer object associated with the
+                // resource, then assign to that.
+                ShaderInputLayout::BufferVal counterVal;
+                counterVal.bufferData.add(srcBuffer.counter);
+                assignBuffer(explicitCounterCursor, &counterVal);
+            }
+            else
+            {
+                // Otherwise, this API (D3D) must be handling the buffer object
+                // specially, in which case create the buffer resource to pass
+                // into `createBufferView`
+                const InputBufferDesc& counterBufferDesc{
+                    InputBufferType::StorageBuffer,
+                    sizeof(uint32_t),
+                    Format::Unknown,
+                };
+                SLANG_RETURN_ON_FAIL(ShaderRendererUtil::createBufferResource(
+                    counterBufferDesc,
+                    sizeof(srcBuffer.counter),
+                    &srcBuffer.counter,
+                    device,
+                    counterResource
+                ));
+            }
+        }
+        else if(explicitCounterCursor.isValid())
+        {
+            // If we know we require a counter for this resource but haven't
+            // been given one, error
+            return SLANG_E_INVALID_ARG;
+        }
+
         IResourceView::Desc viewDesc = {};
         viewDesc.type = IResourceView::Type::UnorderedAccess;
         viewDesc.format = srcBuffer.format;
         viewDesc.bufferElementSize = srcVal->bufferDesc.stride;
-        auto bufferView = device->createBufferView(bufferResource, nullptr, viewDesc);
+        auto bufferView = device->createBufferView(bufferResource, counterResource, viewDesc);
         dstCursor.setResource(bufferView);
         maybeAddOutput(dstCursor, srcVal, bufferResource);
 
@@ -977,7 +1015,7 @@ Result RenderTestApp::writeBindingOutput(const String& fileName)
                 m_transientHeap->finish();
                 m_transientHeap->synchronizeAndReset();
 
-                m_device->readBufferResource(stagingBuffer, 0, bufferSize, blob.writeRef());
+                SLANG_RETURN_ON_FAIL(m_device->readBufferResource(stagingBuffer, 0, bufferSize, blob.writeRef()));
             }
 
             if (!blob)

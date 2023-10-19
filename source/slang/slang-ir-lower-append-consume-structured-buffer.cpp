@@ -154,14 +154,15 @@ namespace Slang
             builder.setInsertInto(getDimensionsFunc);
             builder.emitBlock();
             auto bufferParam = builder.emitParam(structType);
-            auto counterBuffer = builder.emitFieldExtract(counterBufferType, bufferParam, counterBufferKey);
-            IRInst* getCounterPtrArgs[] = { counterBuffer, builder.getIntValue(builder.getIntType(), 0) };
-            auto counterBufferPtr = builder.emitIntrinsicInst(builder.getPtrType(builder.getIntType()), kIROp_RWStructuredBufferGetElementPtr, 2, getCounterPtrArgs);
-            auto counter = builder.emitLoad(counterBufferPtr);
-            counter = builder.emitCast(builder.getUIntType(), counter);
-            auto stride = builder.getIntValue(builder.getUIntType(), elementSize.getStride());
-            IRInst* vecArgs[] = { counter, stride };
-            builder.emitReturn(builder.emitMakeVector(uint2Type, 2, vecArgs));
+            auto elementBuffer = builder.emitFieldExtract(elementBufferType, bufferParam, elementBufferKey);
+
+            const auto dim = builder.emitIntrinsicInst(
+                uint2Type,
+                kIROp_StructuredBufferGetDimensions,
+                1,
+                &elementBuffer
+            );
+            builder.emitReturn(dim);
         }
 
         // Replace all insts with synthesized functions.

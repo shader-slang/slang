@@ -358,6 +358,11 @@ HLSLStructuredBufferType* ASTBuilder::getStructuredBufferType(Type* elementType)
     return as<HLSLStructuredBufferType>(getSpecializedBuiltinType(elementType, "HLSLStructuredBufferType"));
 }
 
+HLSLRWStructuredBufferType* ASTBuilder::getRWStructuredBufferType(Type* elementType)
+{
+    return as<HLSLRWStructuredBufferType>(getSpecializedBuiltinType(elementType, "HLSLRWStructuredBufferType"));
+}
+
 SamplerStateType* ASTBuilder::getSamplerStateType()
 {
     return as<SamplerStateType>(getSpecializedBuiltinType(nullptr, "HLSLStructuredBufferType"));
