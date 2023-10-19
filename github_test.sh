@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+set -x
 
 PLATFORM=$(uname -s | tr '[:upper:]' '[:lower:]')
 ARCHITECTURE=$(uname -m)
