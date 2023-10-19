@@ -407,7 +407,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // TODO: need to figure out how to unify this with the logic
     // in the generic case...
-    DeclRefType* DeclRefType::create(
+    Type* DeclRefType::create(
         ASTBuilder*     astBuilder,
         DeclRef<Decl>   declRef)
     {

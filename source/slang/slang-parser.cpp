@@ -3061,7 +3061,7 @@ namespace Slang
                 parser->FillPosition(paramConstraint);
 
                 // substitution needs to be filled during check
-                DeclRefType* paramType = DeclRefType::create(parser->astBuilder, DeclRef<Decl>(decl));
+                Type* paramType = DeclRefType::create(parser->astBuilder, DeclRef<Decl>(decl));
 
                 SharedTypeExpr* paramTypeExpr = parser->astBuilder->create<SharedTypeExpr>();
                 paramTypeExpr->loc = decl->loc;

@@ -2653,7 +2653,7 @@ namespace Slang
             (IRInst**)constraintTypes.getBuffer());
     }
 
-    IRThisType* IRBuilder::getThisType(IRInterfaceType* interfaceType)
+    IRThisType* IRBuilder::getThisType(IRType* interfaceType)
     {
         return (IRThisType*)getType(kIROp_ThisType, interfaceType);
     }

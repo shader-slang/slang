@@ -636,9 +636,9 @@ Val* ExistentialSpecializedType::_substituteImplOverride(ASTBuilder* astBuilder,
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ThisType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-InterfaceDecl* ThisType::getInterfaceDecl()
+DeclRef<InterfaceDecl> ThisType::getInterfaceDeclRef()
 {
-    return dynamicCast<InterfaceDecl>(getDeclRefBase()->getDecl()->parentDecl);
+    return DeclRef<Decl>(getDeclRefBase()->getParent()).template as<InterfaceDecl>();
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! AndType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
