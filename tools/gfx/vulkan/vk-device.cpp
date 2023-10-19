@@ -15,8 +15,11 @@
 #include "vk-swap-chain.h"
 #include "vk-transient-heap.h"
 #include "vk-vertex-layout.h"
+#include "vk-pipeline-dump-layer.h"
 
 #include "vk-helper-functions.h"
+
+#include "source/core/slang-platform.h"
 
 #ifdef GFX_NV_AFTERMATH
 #   include "GFSDK_Aftermath.h"
@@ -32,8 +35,20 @@ using namespace Slang;
 namespace vk
 {
 
+static bool shouldDumpPipeline()
+{
+    StringBuilder dumpPipelineSettings;
+    PlatformUtil::getEnvironmentVariable(toSlice("SLANG_GFX_DUMP_PIPELINE"), dumpPipelineSettings);
+    return dumpPipelineSettings.produceString() == "1";
+}
+
 DeviceImpl::~DeviceImpl()
 {
+    if (shouldDumpPipeline())
+    {
+        writePipelineDump(toSlice("gfx-vk-pipeline-dump.bin"));
+    }
+
     // Check the device queue is valid else, we can't wait on it..
     if (m_deviceQueue.isValid())
     {
@@ -782,6 +797,10 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
 
     SLANG_RETURN_ON_FAIL(m_api.initDeviceProcs(m_device));
 
+    if (shouldDumpPipeline())
+    {
+        installPipelineDumpLayer(m_api);
+    }
     return SLANG_OK;
 }
 
