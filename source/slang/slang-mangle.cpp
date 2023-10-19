@@ -223,7 +223,7 @@ namespace Slang
         else if( auto thisType = dynamicCast<ThisType>(type) )
         {
             emitRaw(context, "t");
-            emitQualifiedName(context, thisType->getInterfaceDecl());
+            emitQualifiedName(context, thisType->getInterfaceDeclRef());
         }
         else if (const auto errorType = dynamicCast<ErrorType>(type))
         {

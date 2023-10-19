@@ -3226,7 +3226,7 @@ public:
     IRType* getCapabilitySetType();
 
     IRAssociatedType* getAssociatedType(ArrayView<IRInterfaceType*> constraintTypes);
-    IRThisType* getThisType(IRInterfaceType* interfaceType);
+    IRThisType* getThisType(IRType* interfaceType);
     IRRawPointerType* getRawPointerType();
     IRRTTIPointerType* getRTTIPointerType(IRInst* rttiPtr);
     IRRTTIType* getRTTIType();
