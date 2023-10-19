@@ -62,8 +62,8 @@ Result TextureResourceImpl::getSharedHandle(InteropHandle* outHandle)
         return SLANG_FAIL;
     }
     SLANG_RETURN_ON_FAIL(
-        vkCreateSharedHandle(m_device->m_device, &info, (HANDLE*)&outHandle->handleValue) !=
-        VK_SUCCESS);
+        vkCreateSharedHandle(m_device->m_device, &info, (HANDLE*)&outHandle->handleValue) >= 0
+            ? SLANG_OK : SLANG_FAIL);
 #endif
     outHandle->api = InteropHandleAPI::Vulkan;
     return SLANG_OK;

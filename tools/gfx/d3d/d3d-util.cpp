@@ -495,7 +495,7 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
 #endif
     }
 
-    SLANG_RETURN_ON_FAIL(hr);
+    SLANG_RETURN_ON_FAIL_HRESULT(hr);
     shaderBlobOut.swap(shaderBlob);
     return SLANG_OK;
 #endif // SLANG_ENABLE_DXBC_SUPPORT

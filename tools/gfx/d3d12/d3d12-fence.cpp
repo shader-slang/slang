@@ -59,7 +59,7 @@ Result FenceImpl::getSharedHandle(InteropHandle* outHandle)
 
     ComPtr<ID3D12Device> devicePtr;
     m_fence->GetDevice(IID_PPV_ARGS(devicePtr.writeRef()));
-    SLANG_RETURN_ON_FAIL(devicePtr->CreateSharedHandle(
+    SLANG_RETURN_ON_FAIL_HRESULT(devicePtr->CreateSharedHandle(
         m_fence, NULL, GENERIC_ALL, nullptr, (HANDLE*)&outHandle->handleValue));
     outHandle->api = InteropHandleAPI::D3D12;
     sharedHandle = *outHandle;
