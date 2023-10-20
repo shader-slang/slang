@@ -838,7 +838,7 @@ end
 example "hello-world"
     kind "ConsoleApp"
     includedirs {"external/vulkan/include"}
---
+
 -- Note how we are calling our custom `example()` subroutine with
 -- the same syntax sugar that Premake usually advocates for their
 -- `project()` function. This allows us to treat `example` as
@@ -1006,7 +1006,14 @@ tool "slangd"
     uuid "B2D63B45-92B0-40F7-B242-CCA4DFD64341"
     includedirs { "." }
     links { "compiler-core", "core", "slang" }
+  
+tool "vk-pipeline-create"
+    uuid "9ED23316-AE8B-4018-9407-271F4DDB8CBA"
+    includedirs { ".", "external/vulkan/include"}
+    files { "examples/hello-world/vulkan-api.cpp", "examples/hello-world/vulkan-api.h" }
+    links { "slang", "gfx", "gfx-util", "platform", "core" }
 
+--
 --
 -- `slang-generate` is a tool we use for source code generation on
 -- the compiler. It depends on the `core` library, so we need to

@@ -2227,6 +2227,8 @@ extern "C"
 
     SLANG_API SlangInt spReflectionTypeLayout_findFieldIndexByName(SlangReflectionTypeLayout* typeLayout, const char* nameBegin, const char* nameEnd);
 
+    SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_GetExplicitCounter(SlangReflectionTypeLayout* typeLayout);
+
     SLANG_API size_t spReflectionTypeLayout_GetElementStride(SlangReflectionTypeLayout* type, SlangParameterCategory category);
     SLANG_API SlangReflectionTypeLayout* spReflectionTypeLayout_GetElementTypeLayout(SlangReflectionTypeLayout* type);
     SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_GetElementVarLayout(SlangReflectionTypeLayout* type);
@@ -2253,6 +2255,7 @@ extern "C"
     SLANG_API SlangReflectionTypeLayout* spReflectionTypeLayout_getBindingRangeLeafTypeLayout(SlangReflectionTypeLayout* typeLayout, SlangInt index);
     SLANG_API SlangReflectionVariable* spReflectionTypeLayout_getBindingRangeLeafVariable(SlangReflectionTypeLayout* typeLayout, SlangInt index);
     SLANG_API SlangInt spReflectionTypeLayout_getFieldBindingRangeOffset(SlangReflectionTypeLayout* typeLayout, SlangInt fieldIndex);
+    SLANG_API SlangInt spReflectionTypeLayout_getExplicitCounterBindingRangeOffset(SlangReflectionTypeLayout* inTypeLayout);
 
     SLANG_API SlangInt spReflectionTypeLayout_getBindingRangeDescriptorSetIndex(SlangReflectionTypeLayout* typeLayout, SlangInt index);
     SLANG_API SlangInt spReflectionTypeLayout_getBindingRangeFirstDescriptorRangeIndex(SlangReflectionTypeLayout* typeLayout, SlangInt index);
@@ -2711,6 +2714,11 @@ namespace slang
             return spReflectionTypeLayout_findFieldIndexByName((SlangReflectionTypeLayout*) this, nameBegin, nameEnd);
         }
 
+        VariableLayoutReflection* getExplicitCounter()
+        {
+            return (VariableLayoutReflection*) spReflectionTypeLayout_GetExplicitCounter((SlangReflectionTypeLayout*) this);
+        }
+
         bool isArray() { return getType()->isArray(); }
 
         TypeLayoutReflection* unwrapArray()
@@ -2869,6 +2877,12 @@ namespace slang
             return spReflectionTypeLayout_getFieldBindingRangeOffset(
                 (SlangReflectionTypeLayout*) this,
                 fieldIndex);
+        }
+
+        SlangInt getExplicitCounterBindingRangeOffset()
+        {
+            return spReflectionTypeLayout_getExplicitCounterBindingRangeOffset(
+                (SlangReflectionTypeLayout*) this);
         }
 
         TypeLayoutReflection* getBindingRangeLeafTypeLayout(SlangInt index)

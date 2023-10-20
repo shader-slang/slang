@@ -435,6 +435,7 @@ IF EXIST "$(SolutionDir)tools\gfx\slang.slang"\ (xcopy /Q /E /Y /I "$(SolutionDi
     <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-framebuffer.h" />
     <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-helper-functions.h" />
     <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-module.h" />
+    <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-pipeline-dump-layer.h" />
     <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-pipeline-state.h" />
     <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-query.h" />
     <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-render-pass.h" />
@@ -543,6 +544,7 @@ IF EXIST "$(SolutionDir)tools\gfx\slang.slang"\ (xcopy /Q /E /Y /I "$(SolutionDi
     <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-framebuffer.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-helper-functions.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-module.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-pipeline-dump-layer.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-pipeline-state.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-query.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-render-pass.cpp" />

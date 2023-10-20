@@ -2313,4 +2313,56 @@ SpvInst* emitOpExecutionModeIdLocalSizeId(
         zSize
     );
 }
+
+template<typename T1, typename T2, typename T3, typename T4>
+SpvInst* emitOpAtomicIIncrement(
+    SpvInstParent* parent,
+    IRInst* inst,
+    const T1& idResultType,
+    const T2& pointer,
+    const T3& memory,
+    const T4& semantics
+)
+{
+    static_assert(isSingular<T1>);
+    static_assert(isSingular<T2>);
+    static_assert(isSingular<T3>);
+    static_assert(isSingular<T4>);
+    return emitInst(
+        parent,
+        inst,
+        SpvOpAtomicIIncrement,
+        idResultType,
+        kResultID,
+        pointer,
+        memory,
+        semantics
+    );
+}
+
+template<typename T1, typename T2, typename T3, typename T4>
+SpvInst* emitOpAtomicIDecrement(
+    SpvInstParent* parent,
+    IRInst* inst,
+    const T1& idResultType,
+    const T2& pointer,
+    const T3& memory,
+    const T4& semantics
+)
+{
+    static_assert(isSingular<T1>);
+    static_assert(isSingular<T2>);
+    static_assert(isSingular<T3>);
+    static_assert(isSingular<T4>);
+    return emitInst(
+        parent,
+        inst,
+        SpvOpAtomicIDecrement,
+        idResultType,
+        kResultID,
+        pointer,
+        memory,
+        semantics
+    );
+}
 #endif        // SLANG_IN_SPIRV_EMIT_CONTEXT

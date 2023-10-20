@@ -628,6 +628,10 @@ class StructuredBufferTypeLayout : public TypeLayout
 {
 public:
     RefPtr<TypeLayout> elementTypeLayout;
+    // If required, this is the VarLayout for a buffer which contains the
+    // counter associated with the buffer, most often used for
+    // AppendStructuredBuffer or ConsumeStructuredBuffer
+    RefPtr<VarLayout> counterVarLayout;
 };
 
     /// Type layout for a logical sequence type
@@ -962,6 +966,10 @@ struct SimpleLayoutRulesImpl
 
     // End layout for a struct, and finalize its size/alignment.
     virtual void EndStructLayout(UniformLayoutInfo* ioStructInfo) = 0;
+
+    // Do structured buffers need a separate binding for the counter buffer?
+    // (DirectX is the exception in managing these together)
+    virtual bool DoStructuredBuffersNeedSeparateCounterBuffer() = 0;
 };
 
 struct ObjectLayoutRulesImpl
@@ -1019,6 +1027,13 @@ struct LayoutRulesImpl
     void EndStructLayout(UniformLayoutInfo* ioStructInfo)
     {
         return simpleRules->EndStructLayout(ioStructInfo);
+    }
+
+    // Do structured buffers need a separate binding for the counter buffer?
+    // (DirectX is the exception in managing these together)
+    bool DoStructuredBuffersNeedSeparateCounterBuffer()
+    {
+        return simpleRules->DoStructuredBuffersNeedSeparateCounterBuffer();
     }
 
     // Forward `ObjectLayoutRulesImpl` interface
@@ -1305,6 +1320,13 @@ createStructuredBufferTypeLayout(
     ShaderParameterKind         kind,
     Type*                structuredBufferType,
     Type*                elementType);
+
+RefPtr<StructuredBufferTypeLayout>
+createStructuredBufferTypeLayout(
+    TypeLayoutContext const& context,
+    ShaderParameterKind      kind,
+    Type*                    structuredBufferType,
+    RefPtr<TypeLayout>       elementTypeLayout);
 
     /// Create a type layout for an unspecialized `globalGenericParamDecl`.
 RefPtr<TypeLayout> createTypeLayoutForGlobalGenericTypeParam(

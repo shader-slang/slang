@@ -2390,6 +2390,20 @@ struct SPIRVEmitContext
             return emitImageStore(parent, as<IRImageStore>(inst));
         case kIROp_ImageSubscript:
             return emitImageSubscript(parent, as<IRImageSubscript>(inst));
+        case kIROp_AtomicCounterIncrement:
+            {
+                IRBuilder builder{inst};
+                const auto memoryScope =  emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType());
+                const auto memorySemantics =  emitIntConstant(IRIntegerValue{SpvMemorySemanticsMaskNone}, builder.getUIntType());
+                return emitOpAtomicIIncrement(parent, inst, inst->getFullType(), inst->getOperand(0), memoryScope, memorySemantics);
+            }
+        case kIROp_AtomicCounterDecrement:
+            {
+                IRBuilder builder{inst};
+                const auto memoryScope =  emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType());
+                const auto memorySemantics =  emitIntConstant(IRIntegerValue{SpvMemorySemanticsMaskNone}, builder.getUIntType());
+                return emitOpAtomicIDecrement(parent, inst, inst->getFullType(), inst->getOperand(0), memoryScope, memorySemantics);
+            }
         }
     }
 
