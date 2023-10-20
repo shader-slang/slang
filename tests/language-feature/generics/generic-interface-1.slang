@@ -1,8 +1,7 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type
 
-__generic<T>
-interface IEqlTestable
+interface IEqlTestable<T>
 {
     bool testEql(T v1);
 }
