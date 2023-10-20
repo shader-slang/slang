@@ -1604,6 +1604,8 @@ namespace Slang
 
     void SemanticsDeclBasesVisitor::visitThisTypeConstraintDecl(ThisTypeConstraintDecl* thisTypeConstraintDecl)
     {
+        // Make sure IFoo<T>.This.ThisIsIFooConstraint.base.type is properly set
+        // to DeclRefType(IFoo<T>) with default generic arguments.
         if (!thisTypeConstraintDecl->base.type)
         {
             auto parentTypeDecl = getParentDecl(getParentDecl(thisTypeConstraintDecl));
@@ -4320,21 +4322,6 @@ namespace Slang
 
     void SemanticsDeclBasesVisitor::visitInterfaceDecl(InterfaceDecl* decl)
     {
-        // Make sure IFoo<T>.This.ThisIsIFooConstraint.base.type is properly set
-        // to DeclRefType(IFoo<T>) with default generic arguments.
-        for (auto thisTypeDecl : decl->getMembersOfType<ThisTypeDecl>())
-        {
-            for (auto thisTypeConstraintDecl : thisTypeDecl->getMembersOfType<ThisTypeConstraintDecl>())
-            {
-                if (!thisTypeConstraintDecl->base.type)
-                {
-                    thisTypeConstraintDecl->base.type = DeclRefType::create(
-                        m_astBuilder,
-                        createDefaultSubstitutionsIfNeeded(m_astBuilder, this, getDefaultDeclRef(decl)));
-                }
-            }
-        }
-
         for( auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>() )
         {
             ensureDecl(inheritanceDecl, DeclCheckState::CanUseBaseOfInheritanceDecl);
