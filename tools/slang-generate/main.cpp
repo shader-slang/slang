@@ -697,7 +697,7 @@ void emitTemplateNodes(
 
 void usage(char const* appName)
 {
-    fprintf(stderr, "usage: %s <input>\n", appName);
+    fprintf(stderr, "usage: %s [FILE]... [--target-directory FILE]\n", appName);
 }
 
 SlangResult readAllText(char const * fileName, String& outString)
@@ -804,6 +804,11 @@ SourceFile* parseSourceFile(const String& path)
 {
     FILE* inputStream;
     fopen_s(&inputStream, path.getBuffer(), "rb");
+    if(!inputStream)
+    {
+        fprintf(stderr, "unable to read input file: %s\n", path.getBuffer());
+        return nullptr;
+    }
     fseek(inputStream, 0, SEEK_END);
     size_t inputSize = ftell(inputStream);
     fseek(inputStream, 0, SEEK_SET);
@@ -845,6 +850,7 @@ int main(
 {
     // Parse command-line arguments.
     List<String> inputPaths;
+    String outputDir;
     char const* appName = "slang-generate";
 
     {
@@ -855,12 +861,27 @@ int main(
         {
             appName = *argCursor++;
         }
-        // Copy the input paths
+        // Parse arguments
         for (; argCursor != argEnd; ++argCursor)
         {
-            // We simplify here because doing so also means paths separators are set to /
-            // and that makes path emitting work correctly
-            inputPaths.add(Path::simplify(UnownedStringSlice(*argCursor)));
+            const auto arg = UnownedStringSlice(*argCursor);
+            if(arg == "--target-directory")
+            {
+                argCursor++;
+                if(argCursor == argEnd)
+                {
+                    usage(appName);
+                    fprintf(stderr, "--target-directory expects an argument\n");
+                    exit(1);
+                }
+                outputDir = Path::simplify(UnownedStringSlice(*argCursor));
+            }
+            else
+            {
+                // We simplify here because doing so also means paths separators are set to /
+                // and that makes path emitting work correctly
+                inputPaths.add(Path::simplify(arg));
+            }
         }
     }
 
@@ -875,9 +896,15 @@ int main(
     for (auto& inputPath: inputPaths)
     {
         SourceFile* sourceFile = parseSourceFile(inputPath);
-        if (sourceFile)
+        gSourceFiles.add(sourceFile);
+    }
+
+    for (auto sourceFile : gSourceFiles)
+    {
+        if(!sourceFile)
         {
-            gSourceFiles.add(sourceFile);
+            fprintf(stderr, "failed to parse source files\n");
+            exit(1);
         }
     }
 
@@ -901,7 +928,10 @@ int main(
 
         // update final output only when content has changed
         StringBuilder outputPathFinal;
-        outputPathFinal << inputPath << ".h";
+        if(outputDir.getLength())
+            outputPathFinal << outputDir << "/" << Slang::Path::getFileName(inputPath) << ".h";
+        else
+            outputPathFinal << inputPath << ".h";
 
         String allTextOld, allTextNew;
         readAllText(outputPathFinal.getBuffer(), allTextOld);

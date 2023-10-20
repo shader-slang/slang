@@ -59,6 +59,7 @@ struct App
 {
     char const* appName = "slang-embed";
     char const* inputPath = nullptr;
+    char const* outputPath = nullptr;
     Slang::HashSet<Slang::String> includedFiles;
 
     void parseOptions(int argc, char** argv)
@@ -78,9 +79,15 @@ struct App
             argc--;
         }
 
+        if( argc > 0 )
+        {
+            outputPath = *argv++;
+            argc--;
+        }
+
         if( !inputPath || (argc != 0) )
         {
-            fprintf(stderr, "usage: %s <inputPath>\n", appName);
+            fprintf(stderr, "usage: %s inputPath [outputPath]\n", appName);
             exit(1);
         }
     }
@@ -201,15 +208,14 @@ struct App
         // single invocation of the tool, but for now we only have
         // a single file to process.
 
-        // We derive an output path simply by appending `.cpp` to the input path.
-        //
-        // TODO: If we start adding more complicated options, a `-o` option
-        // to specify a desired output path would be an obvious choice.
-        //
-        char* outputPath = (char*) malloc(strlen(inputPath) + strlen(".cpp") + 1);
-        ScopedMemory outputPathCleanup(outputPath);
-        strcpy(outputPath, inputPath);
-        strcat(outputPath, ".cpp");
+        // We derive an output path simply by appending `.cpp` to the input
+        // path, if not otherwise specified
+        char* defaultOutputPath = (char*) malloc(strlen(inputPath) + strlen(".cpp") + 1);
+        ScopedMemory outputPathCleanup(defaultOutputPath);
+        strcpy(defaultOutputPath, inputPath);
+        strcat(defaultOutputPath, ".cpp");
+        if(!outputPath)
+            outputPath = defaultOutputPath;
 
         FILE* outputFile = fopen(outputPath, "w");
         ScopedFile outputFileCleanup(outputFile);
