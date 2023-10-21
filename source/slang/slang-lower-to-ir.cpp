@@ -1432,9 +1432,10 @@ bool shouldDeclBeTreatedAsInterfaceRequirement(Decl* requirementDecl)
 {
     if (const auto funcDecl = as<CallableDecl>(requirementDecl))
     {
-    }
-    else if (const auto propertyDecl = as<PropertyDecl>(requirementDecl))
-    {
+        // Subscript decl itself won't have a witness table entry.
+        // But its accessors will.
+        if (const auto subscriptDecl = as<SubscriptDecl>(requirementDecl))
+            return false;
     }
     else if (const auto assocTypeDecl = as<AssocTypeDecl>(requirementDecl))
     {
@@ -1451,6 +1452,9 @@ bool shouldDeclBeTreatedAsInterfaceRequirement(Decl* requirementDecl)
     }
     else
     {
+        // We will return false for PropertyDecl because the property decl itself
+        // won't have a witness table entry. Instead there will be witness entries
+        // for its accessors.
         return false;
     }
     return true;
@@ -3501,6 +3505,14 @@ struct ExprLoweringContext
             // appropriately.
             auto funcDeclRef = resolvedInfo.funcDeclRef;
             auto baseExpr = resolvedInfo.baseExpr;
+            if (baseExpr)
+            {
+                // The base expression might be an "upcast" to a base interface, in
+                // which case we don't want to emit the result of the cast, but instead
+                // the source.
+                //
+                baseExpr = this->maybeIgnoreCastToInterface(baseExpr);
+            }
 
             // If the thing being invoked is a subscript operation,
             // then we need to handle multiple extra details
@@ -3550,12 +3562,6 @@ struct ExprLoweringContext
             // a member function:
             if (baseExpr)
             {
-                // The base expression might be an "upcast" to a base interface, in
-                // which case we don't want to emit the result of the cast, but instead
-                // the source.
-                //
-                baseExpr = this->maybeIgnoreCastToInterface(baseExpr);
-
                 auto thisType = getThisParamTypeForCallable(context, funcDeclRef);
                 auto irThisType = lowerType(context, thisType);
                 addCallArgsForParam(

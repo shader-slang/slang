@@ -133,6 +133,11 @@ namespace Slang
         return declRef.substitute(astBuilder, declRef.getDecl()->type.Ptr());
     }
 
+    inline Type* getType(ASTBuilder* astBuilder, DeclRef<SubscriptDecl> declRef)
+    {
+        return declRef.substitute(astBuilder, declRef.getDecl()->returnType.Ptr());
+    }
+
     inline Type* getType(ASTBuilder* astBuilder, DeclRef<EnumCaseDecl> declRef)
     {
         return declRef.substitute(astBuilder, declRef.getDecl()->type.Ptr());

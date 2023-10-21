@@ -1445,6 +1445,12 @@ namespace Slang
             DeclRef<PropertyDecl>   satisfyingMemberDeclRef,
             DeclRef<PropertyDecl>   requiredMemberDeclRef,
             RefPtr<WitnessTable>    witnessTable);
+
+        bool doesSubscriptMatchRequirement(
+            DeclRef<SubscriptDecl>  satisfyingMemberDeclRef,
+            DeclRef<SubscriptDecl>  requiredMemberDeclRef,
+            RefPtr<WitnessTable>    witnessTable);
+
         bool doesVarMatchRequirement(
             DeclRef<VarDeclBase>   satisfyingMemberDeclRef,
             DeclRef<VarDeclBase>   requiredMemberDeclRef,

@@ -317,10 +317,27 @@ interface __FlagsEnumType : __EnumType
 {
 };
 
+interface IArray<T>
+{
+    int getCount();
+    __subscript(int index) -> T
+    {
+        get;
+    }
+}
+
 __generic<T, let N:int>
 __magic_type(ArrayExpressionType)
-struct Array
+struct Array : IArray<T>
 {
+    [ForceInline]
+    int getCount() { return N; }
+
+    __subscript(int index) -> T
+    {
+        __intrinsic_op($(kIROp_GetElement))
+        get;
+    }
 }
 
 // The "comma operator" is effectively just a generic function that returns its second
@@ -885,7 +902,7 @@ extension int16_t
     /// An `N` component vector with elements of type `T`.
 __generic<T = float, let N : int = 4>
 __magic_type(VectorExpressionType)
-struct vector
+struct vector : IArray<T>
 {
         /// The element type of the vector
     typedef T Element;
@@ -900,6 +917,11 @@ struct vector
     // TODO: we should revise semantic checking so this kind of "identity" conversion is not required
     __intrinsic_op(0)
     __init(vector<T,N> value);
+
+    [ForceInline]
+    int getCount() { return N; }
+
+    __subscript(int index) -> T { __intrinsic_op($(kIROp_GetElement)) get; }
 }
 
 const int kRowMajorMatrixLayout = $(SLANG_MATRIX_LAYOUT_ROW_MAJOR);
@@ -908,10 +930,15 @@ const int kColumnMajorMatrixLayout = $(SLANG_MATRIX_LAYOUT_COLUMN_MAJOR);
     /// A matrix with `R` rows and `C` columns, with elements of type `T`.
 __generic<T = float, let R : int = 4, let C : int = 4, let L : int = $(SLANG_MATRIX_LAYOUT_MODE_UNKNOWN)>
 __magic_type(MatrixExpressionType)
-struct matrix
+struct matrix : IArray<vector<T,C>>
 {
     __intrinsic_op($(kIROp_MakeMatrixFromScalar))
     __init(T val);
+
+    [ForceInline]
+    int getCount() { return R; }
+
+    __subscript(int index) -> vector<T,C> { __intrinsic_op($(kIROp_GetElement)) get; }
 }
 
 ${{{{
