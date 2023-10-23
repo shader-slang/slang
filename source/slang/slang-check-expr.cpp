@@ -1827,7 +1827,9 @@ namespace Slang
             m_astBuilder,
             this,
             operatorName,
-            baseType);
+            baseType,
+            LookupMask::Default,
+            LookupOptions::NoDeref);
         if (!lookupResult.isValid())
         {
             getSink()->diagnose(subscriptExpr, Diagnostics::subscriptNonArray, baseType);
