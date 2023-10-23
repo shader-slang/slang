@@ -1752,7 +1752,7 @@ namespace Slang
 
     Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
     {
-        auto baseExpr = CheckTerm(subscriptExpr->baseExpression);
+        auto baseExpr = checkBaseForMemberExpr(subscriptExpr->baseExpression);
 
         for (auto& arg : subscriptExpr->indexExprs)
         {
@@ -1821,27 +1821,32 @@ namespace Slang
         // Default behavior is to look at all available `__subscript`
         // declarations on the type and try to call one of them.
 
-        auto baseMemberExpr = m_astBuilder->create<MemberExpr>();
-        baseMemberExpr->baseExpression = subscriptExpr->baseExpression;
-        baseMemberExpr->name = getName("operator[]");
-        baseMemberExpr->loc = subscriptExpr->loc;
-        auto checkedBaseMemberExpr = CheckTerm(baseMemberExpr);
+        auto operatorName = getName("operator[]");
 
-        if (checkedBaseMemberExpr)
-        {
-            InvokeExpr* subscriptCallExpr = m_astBuilder->create<InvokeExpr>();
-            subscriptCallExpr->loc = subscriptExpr->loc;
-            subscriptCallExpr->functionExpr = checkedBaseMemberExpr;
-            subscriptCallExpr->arguments.addRange(subscriptExpr->indexExprs);
-            subscriptCallExpr->argumentDelimeterLocs.addRange(subscriptExpr->argumentDelimeterLocs);
-
-            return CheckInvokeExprWithCheckedOperands(subscriptCallExpr);
-        }
-        else
+        LookupResult lookupResult = lookUpMember(
+            m_astBuilder,
+            this,
+            operatorName,
+            baseType);
+        if (!lookupResult.isValid())
         {
             getSink()->diagnose(subscriptExpr, Diagnostics::subscriptNonArray, baseType);
             return CreateErrorExpr(subscriptExpr);
         }
+        auto subscriptFuncExpr = createLookupResultExpr(
+            operatorName,
+            lookupResult,
+            subscriptExpr->baseExpression,
+            subscriptExpr->loc,
+            subscriptExpr);
+
+        InvokeExpr* subscriptCallExpr = m_astBuilder->create<InvokeExpr>();
+        subscriptCallExpr->loc = subscriptExpr->loc;
+        subscriptCallExpr->functionExpr = subscriptFuncExpr;
+        subscriptCallExpr->arguments.addRange(subscriptExpr->indexExprs);
+        subscriptCallExpr->argumentDelimeterLocs.addRange(subscriptExpr->argumentDelimeterLocs);
+
+        return CheckInvokeExprWithCheckedOperands(subscriptCallExpr);
     }
 
     Expr* SemanticsExprVisitor::visitParenExpr(ParenExpr* expr)

@@ -3024,6 +3024,7 @@ void _lowerFuncDeclBaseTypeInfo(
     auto& parameterLists = outInfo.parameterLists;
     collectParameterLists(
         context,
+
         declRef,
         &parameterLists, kParameterListCollectMode_Default, kParameterDirection_In);
 
