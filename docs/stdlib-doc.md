@@ -60352,14 +60352,14 @@ matrix<T,N,M> frac<T, N:int, M:int>(matrix<T,N,M> x);
 /// See Availability 1
 T frexp<T>(
     T                    x,
-    out T                exp);
+    out int              exp);
 vector<T,N> frexp<T, N:int>(
     vector<T,N>          x,
-    out vector<T,N>      exp);
+    out vector<int,N>    exp);
 /// See Availability 2
 matrix<T,N,M> frexp<T, N:int, M:int>(
     matrix<T,N,M>        x,
-    out matrix<T,N,M>    exp);
+    out matrix<int,N,M>  exp);
 ```
 
 ## Availability

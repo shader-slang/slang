@@ -169,7 +169,8 @@ float F32_fmod(float a, float b);
 float F32_remainder(float a, float b);
 float F32_atan2(float a, float b);
 
-float F32_frexp(float x, float* e);
+float F32_frexp(float x, int* e);
+
 float F32_modf(float x, float* ip);
 
 // Ternary
@@ -213,13 +214,8 @@ SLANG_FORCE_INLINE float F32_fmod(float a, float b) { return ::fmodf(a, b); }
 SLANG_FORCE_INLINE float F32_remainder(float a, float b) { return ::remainderf(a, b); }
 SLANG_FORCE_INLINE float F32_atan2(float a, float b) { return float(::atan2(a, b)); }
 
-SLANG_FORCE_INLINE float F32_frexp(float x, float* e)
-{
-    int ei;
-    float m = ::frexpf(x, &ei);
-    *e = float(ei);
-    return m;
-}
+SLANG_FORCE_INLINE float F32_frexp(float x, int* e) { return ::frexpf(x, e); }
+
 SLANG_FORCE_INLINE float F32_modf(float x, float* ip)
 {
     return ::modff(x, ip);
@@ -289,7 +285,7 @@ double F64_fmod(double a, double b);
 double F64_remainder(double a, double b);
 double F64_atan2(double a, double b);
 
-double F64_frexp(double x, double* e);
+double F64_frexp(double x, int* e);
 
 double F64_modf(double x, double* ip);
 
@@ -335,13 +331,7 @@ SLANG_FORCE_INLINE double F64_fmod(double a, double b) { return ::fmod(a, b); }
 SLANG_FORCE_INLINE double F64_remainder(double a, double b) { return ::remainder(a, b); }
 SLANG_FORCE_INLINE double F64_atan2(double a, double b) { return ::atan2(a, b); }
 
-SLANG_FORCE_INLINE double F64_frexp(double x, double* e)
-{
-    int ei;
-    double m = ::frexp(x, &ei);
-    *e = float(ei);
-    return m;
-}
+SLANG_FORCE_INLINE double F64_frexp(double x, int* e) { return ::frexp(x, e); }
 
 SLANG_FORCE_INLINE double F64_modf(double x, double* ip)
 {
