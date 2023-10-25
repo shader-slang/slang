@@ -173,7 +173,7 @@ struct PipelineCreationReplay
         vkAPI.vkDestroyPipeline(vkAPI.device, pipeline, nullptr);
     }
 
-    int createComputePipelineFromShader(UnownedStringSlice path, Int pipelineIndex)
+    SlangResult createComputePipelineFromShader(UnownedStringSlice path, Int pipelineIndex)
     {
         RefPtr<FileStream> f = new FileStream();
         f->init(path, FileMode::Open);
@@ -210,7 +210,7 @@ struct PipelineCreationReplay
         for (auto p : shaderModules)
             vkAPI.vkDestroyShaderModule(vkAPI.device, *KeyValueDetail::getValue(&p), nullptr);
 
-        return 0;
+        return SLANG_OK;
     }
 
     int run(int argc, const char** argv);
@@ -244,7 +244,7 @@ int PipelineCreationReplay::run(int argc, const char** argv)
         StringUtil::parseInt(UnownedStringSlice(argv[2]), pipelineIndex);
     }
 
-    RETURN_ON_FAIL(createComputePipelineFromShader(path, pipelineIndex));
+    SLANG_RETURN_ON_FAIL(createComputePipelineFromShader(path, pipelineIndex));
 
     vkAPI.vkDestroyDevice = nullptr;
     vkAPI.vkDestroyDebugReportCallbackEXT = nullptr;
