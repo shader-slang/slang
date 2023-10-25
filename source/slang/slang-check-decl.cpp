@@ -169,6 +169,8 @@ namespace Slang
 
         void visitInheritanceDecl(InheritanceDecl* inheritanceDecl);
 
+        void visitThisTypeConstraintDecl(ThisTypeConstraintDecl* thisTypeConstraintDecl);
+
             /// Validate that `decl` isn't illegally inheriting from a type in another module.
             ///
             /// This call checks a single `inheritanceDecl` to make sure that it either
@@ -1600,6 +1602,22 @@ namespace Slang
         // based on the declaration that is doing the inheriting.
     }
 
+    void SemanticsDeclBasesVisitor::visitThisTypeConstraintDecl(ThisTypeConstraintDecl* thisTypeConstraintDecl)
+    {
+        // Make sure IFoo<T>.This.ThisIsIFooConstraint.base.type is properly set
+        // to DeclRefType(IFoo<T>) with default generic arguments.
+        if (!thisTypeConstraintDecl->base.type)
+        {
+            auto parentTypeDecl = getParentDecl(getParentDecl(thisTypeConstraintDecl));
+            thisTypeConstraintDecl->base.type = DeclRefType::create(
+                m_astBuilder,
+                createDefaultSubstitutionsIfNeeded(
+                    m_astBuilder,
+                    this,
+                    getDefaultDeclRef(parentTypeDecl)));
+        }
+    }
+
         // Concretize interface conformances so that we have witnesses as required for lookup.
         // for lookup.
     struct SemanticsDeclConformancesVisitor
@@ -2033,6 +2051,90 @@ namespace Slang
         // probably create a new `RequirementWitness` case that
         // represents a witness value that is only needed by the front-end,
         // and that can be ignored by IR and emit logic.
+        //
+        witnessTable->add(
+            requiredMemberDeclRef.getDecl(),
+            RequirementWitness(satisfyingMemberDeclRef));
+        return true;
+    }
+
+    bool SemanticsVisitor::doesSubscriptMatchRequirement(
+        DeclRef<SubscriptDecl> satisfyingMemberDeclRef,
+        DeclRef<SubscriptDecl> requiredMemberDeclRef,
+        RefPtr<WitnessTable> witnessTable)
+    {
+        // The result type and parameters of the satisfying member must match the type of the required member.
+        //
+        auto requiredParams = getParameters(m_astBuilder, requiredMemberDeclRef).toArray();
+        auto satisfyingParams = getParameters(m_astBuilder, satisfyingMemberDeclRef).toArray();
+        auto paramCount = requiredParams.getCount();
+        if (satisfyingParams.getCount() != paramCount)
+            return false;
+
+        for (Index paramIndex = 0; paramIndex < paramCount; ++paramIndex)
+        {
+            auto requiredParam = requiredParams[paramIndex];
+            auto satisfyingParam = satisfyingParams[paramIndex];
+
+            auto requiredParamType = getType(m_astBuilder, requiredParam);
+            auto satisfyingParamType = getType(m_astBuilder, satisfyingParam);
+
+            if (!requiredParamType->equals(satisfyingParamType))
+                return false;
+        }
+
+        auto requiredResultType = getResultType(m_astBuilder, requiredMemberDeclRef);
+        auto satisfyingResultType = getResultType(m_astBuilder, satisfyingMemberDeclRef);
+        if (!requiredResultType->equals(satisfyingResultType))
+            return false;
+
+        // Each accessor in the requirement must be accounted for by an accessor
+        // in the satisfying member.
+        //
+        // Note: it is fine for the satisfying member to provide *more* accessors
+        // than the original declaration.
+        //
+        Dictionary<DeclRef<AccessorDecl>, DeclRef<AccessorDecl>> mapRequiredToSatisfyingAccessorDeclRef;
+        for (auto requiredAccessorDeclRef : getMembersOfType<AccessorDecl>(m_astBuilder, requiredMemberDeclRef))
+        {
+            // We need to search for an accessor that can satisfy the requirement.
+            //
+            // For now we will do the simplest (and slowest) thing of a linear search,
+            // which is mostly fine because the number of accessors is bounded.
+            //
+            bool found = false;
+            for (auto satisfyingAccessorDeclRef : getMembersOfType<AccessorDecl>(m_astBuilder, satisfyingMemberDeclRef))
+            {
+                if (doesAccessorMatchRequirement(satisfyingAccessorDeclRef, requiredAccessorDeclRef))
+                {
+                    // When we find a match on an accessor, we record it so that
+                    // we can set up the witness values later, but we do *not*
+                    // record it into the actual witness table yet, in case
+                    // a later accessor comes along that doesn't find a match.
+                    //
+                    mapRequiredToSatisfyingAccessorDeclRef.add(requiredAccessorDeclRef, satisfyingAccessorDeclRef);
+                    found = true;
+                    break;
+                }
+            }
+            if (!found)
+                return false;
+        }
+
+        // Once things are done, we will install the satisfying values
+        // into the witness table for the requirements.
+        //
+        for (const auto& [key, value] : mapRequiredToSatisfyingAccessorDeclRef)
+        {
+            witnessTable->add(
+                key.getDecl(),
+                RequirementWitness(value));
+        }
+        //
+        // Note: the subscript declaration itself isn't something that
+        // has a useful value/representation in downstream passes, so
+        // we are mostly just installing it into the witness table
+        // as a way to mark this requirement as being satisfied.
         //
         witnessTable->add(
             requiredMemberDeclRef.getDecl(),
@@ -2494,6 +2596,14 @@ namespace Slang
             {
                 ensureDecl(varDeclRef, DeclCheckState::SignatureChecked);
                 return doesVarMatchRequirement(varDeclRef, requiredVarDeclRef, witnessTable);
+            }
+        }
+        else if (auto subscriptDeclRef = memberDeclRef.as<SubscriptDecl>())
+        {
+            if (auto requiredSubscriptDeclRef = requiredMemberDeclRef.as<SubscriptDecl>())
+            {
+                ensureDecl(subscriptDeclRef, DeclCheckState::CanUseFuncSignature);
+                return doesSubscriptMatchRequirement(subscriptDeclRef, requiredSubscriptDeclRef, witnessTable);
             }
         }
         // Default: just assume that thing aren't being satisfied.

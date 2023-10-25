@@ -734,6 +734,7 @@ public:
         SLANG_RELEASE_ASSERT(state >= checkState.getState());
         checkState.setState(state);
     }
+    bool isChildOf(Decl* other) const;
 
 private:
     SLANG_UNREFLECTED DeclRefBase* m_defaultDeclRef = nullptr;

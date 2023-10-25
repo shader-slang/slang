@@ -150,6 +150,11 @@ Val* LookupDeclRef::_resolveImplOverride()
 
 DeclRefBase* LookupDeclRef::_getBaseOverride()
 {
+    auto supType = getWitness()->getSup();
+    if (auto declRefType = as<DeclRefType>(supType))
+    {
+        return declRefType->getDeclRef();
+    }
     return nullptr;
 }
 
@@ -432,9 +437,12 @@ DeclRef<Decl> createDefaultSubstitutionsIfNeeded(
     ShortList<GenericDecl*> genericParentDecls;
     auto lastSubstNode = SubstitutionSet(declRef).getInnerMostNodeWithSubstInfo();
     auto lastGenApp = as<GenericAppDeclRef>(lastSubstNode);
+    auto lastLookup = as<LookupDeclRef>(lastSubstNode);
     for (auto dd = declRef.getDecl()->parentDecl; dd; dd = dd->parentDecl)
     {
         if (lastGenApp && dd == lastGenApp->getGenericDecl())
+            break;
+        if (lastLookup && lastLookup->getDecl()->isChildOf(dd))
             break;
         if (auto gen = as<GenericDecl>(dd))
             genericParentDecls.add(gen);
@@ -454,6 +462,8 @@ DeclRef<Decl> createDefaultSubstitutionsIfNeeded(
         }
         parentDeclRef = astBuilder->getGenericAppDeclRef(parentDeclRef.as<GenericDecl>(), args.getArrayView());
     }
+    if (!parentDeclRef)
+        return declRef;
     if (parentDeclRef.getDecl() == declRef.getDecl())
         return parentDeclRef;
     return astBuilder->getMemberDeclRef(parentDeclRef, declRef.getDecl());

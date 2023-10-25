@@ -1398,7 +1398,7 @@ struct SPIRVEmitContext
 
         case kIROp_RateQualifiedType:
             {
-                auto result = emitGlobalInst(as<IRRateQualifiedType>(inst)->getValueType());
+                auto result = ensureInst(as<IRRateQualifiedType>(inst)->getValueType());
                 registerInst(inst, result);
                 return result;
             }

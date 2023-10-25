@@ -17,6 +17,7 @@ namespace Slang
         InstHashSet workListSet;
         void addToWorkList(IRInst* inst)
         {
+            SLANG_ASSERT(inst);
             if (workListSet.contains(inst))
                 return;
 
@@ -139,6 +140,7 @@ namespace Slang
                     default:
                         break;
                     }
+                    SLANG_ASSERT(child);
                     if (shouldInstBeLiveIfParentIsLive(child, IRDeadCodeEliminationOptions()))
                         addToWorkList(child);
                 }

@@ -1752,8 +1752,7 @@ namespace Slang
 
     Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
     {
-        auto baseExpr = subscriptExpr->baseExpression;
-        baseExpr = CheckExpr(baseExpr);
+        auto baseExpr = checkBaseForMemberExpr(subscriptExpr->baseExpression);
 
         for (auto& arg : subscriptExpr->indexExprs)
         {
@@ -1822,47 +1821,34 @@ namespace Slang
         // Default behavior is to look at all available `__subscript`
         // declarations on the type and try to call one of them.
 
-        {
-            Name* name = getName("operator[]");
-            LookupResult lookupResult = lookUpMember(
-                m_astBuilder,
-                this,
-                name,
-                baseType,
-                LookupMask::Default,
-                LookupOptions::NoDeref);
-            if (!lookupResult.isValid())
-            {
-                goto fail;
-            }
+        auto operatorName = getName("operator[]");
 
-            // Now that we know there is at least one subscript member,
-            // we will construct a reference to it and try to call it.
-            //
-            // Note: the expression may be an `OverloadedExpr`, in which
-            // case the attempt to call it will trigger overload
-            // resolution.
-            Expr* subscriptFuncExpr = createLookupResultExpr(
-                name,
-                lookupResult,
-                subscriptExpr->baseExpression,
-                subscriptExpr->loc,
-                subscriptExpr);
-
-            InvokeExpr* subscriptCallExpr = m_astBuilder->create<InvokeExpr>();
-            subscriptCallExpr->loc = subscriptExpr->loc;
-            subscriptCallExpr->functionExpr = subscriptFuncExpr;
-            subscriptCallExpr->arguments.addRange(subscriptExpr->indexExprs);
-            subscriptCallExpr->argumentDelimeterLocs.addRange(subscriptExpr->argumentDelimeterLocs);
-
-            return CheckInvokeExprWithCheckedOperands(subscriptCallExpr);
-        }
-
-    fail:
+        LookupResult lookupResult = lookUpMember(
+            m_astBuilder,
+            this,
+            operatorName,
+            baseType,
+            LookupMask::Default,
+            LookupOptions::NoDeref);
+        if (!lookupResult.isValid())
         {
             getSink()->diagnose(subscriptExpr, Diagnostics::subscriptNonArray, baseType);
             return CreateErrorExpr(subscriptExpr);
         }
+        auto subscriptFuncExpr = createLookupResultExpr(
+            operatorName,
+            lookupResult,
+            subscriptExpr->baseExpression,
+            subscriptExpr->loc,
+            subscriptExpr);
+
+        InvokeExpr* subscriptCallExpr = m_astBuilder->create<InvokeExpr>();
+        subscriptCallExpr->loc = subscriptExpr->loc;
+        subscriptCallExpr->functionExpr = subscriptFuncExpr;
+        subscriptCallExpr->arguments.addRange(subscriptExpr->indexExprs);
+        subscriptCallExpr->argumentDelimeterLocs.addRange(subscriptExpr->argumentDelimeterLocs);
+
+        return CheckInvokeExprWithCheckedOperands(subscriptCallExpr);
     }
 
     Expr* SemanticsExprVisitor::visitParenExpr(ParenExpr* expr)
@@ -2306,7 +2292,6 @@ namespace Slang
                 expr->type = GetTypeForDeclRef(expr->declRef, expr->loc);
             return expr;
         }
-
         expr->type = QualType(m_astBuilder->getErrorType());
         auto lookupResult = lookUp(
             m_astBuilder,

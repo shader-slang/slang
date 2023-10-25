@@ -55,7 +55,7 @@ class DeclRefType : public Type
 {
     SLANG_AST_CLASS(DeclRefType)
 
-    static DeclRefType* create(ASTBuilder* astBuilder, DeclRef<Decl> declRef);
+    static Type* create(ASTBuilder* astBuilder, DeclRef<Decl> declRef);
 
     DeclRef<Decl> getDeclRef() const { return DeclRef<Decl>(as<DeclRefBase>(getOperand(0))); }
     DeclRefBase* getDeclRefBase() const { return as<DeclRefBase>(getOperand(0)); }
@@ -786,7 +786,7 @@ class ThisType : public DeclRefType
 
     ThisType(DeclRefBase* declRef) : DeclRefType(declRef) {}
 
-    InterfaceDecl* getInterfaceDecl();
+    DeclRef<InterfaceDecl> getInterfaceDeclRef();
 };
 
     /// The type of `A & B` where `A` and `B` are types
