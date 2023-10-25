@@ -213,7 +213,7 @@ struct App
 
         FILE* outputFile = fopen(outputPath, "w");
         ScopedFile outputFileCleanup(outputFile);
-        if( !outputPath )
+        if( !outputFile )
         {
             fprintf(stderr, "%s: error: failed to open '%s' for reading\n", appName, outputPath);
             exit(1);
