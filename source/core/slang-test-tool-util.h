@@ -53,7 +53,7 @@ struct TestToolUtil
         /// Given the exePath, give return the absolute path to the directory the exe is in
     static SlangResult getExeDirectoryPath(const char* exePath, String& outExeDirectoryPath);
 
-        /// Sets the default preludes on the session based on the executable path
+        /// Sets the default preludes on the session based on an explicit path
     static SlangResult setSessionDefaultPreludeFromRootPath(const String& rootPath, slang::IGlobalSession* session);
 
         /// Calculates the path that is the combination of parentPath, and relPath

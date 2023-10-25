@@ -122,9 +122,8 @@ TestContext::InnerMainFunc TestContext::getInnerMainFunc(const String& dirPath, 
     sharedLibToolBuilder.append(name);
     sharedLibToolBuilder.append("-tool");
 
-    StringBuilder builder;
-    SharedLibrary::appendPlatformFileName(sharedLibToolBuilder.getUnownedSlice(), builder);
-    String path = Path::combine(dirPath, builder);
+    StringBuilder path;
+    SharedLibrary::appendPlatformFileName(sharedLibToolBuilder.getUnownedSlice(), path);
 
     DefaultSharedLibraryLoader* loader = DefaultSharedLibraryLoader::getSingleton();
 

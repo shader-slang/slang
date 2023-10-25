@@ -809,7 +809,11 @@ SourceFile* parseSourceFile(const String& path)
     fseek(inputStream, 0, SEEK_SET);
 
     char* input = (char*)malloc(inputSize + 1);
-    fread(input, inputSize, 1, inputStream);
+    if(fread(input, inputSize, 1, inputStream) != 1)
+    {
+        fprintf(stderr, "unable to read input file: %s\n", path.getBuffer());
+        return nullptr;
+    }
     input[inputSize] = 0;
 
     char const* inputEnd = input + inputSize;
