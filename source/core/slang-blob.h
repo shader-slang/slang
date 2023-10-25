@@ -129,6 +129,7 @@ public:
         /// Allocate size including a 0 byte at `size`.
     void* allocateTerminated(size_t size)
     {
+        SLANG_ASSUME(size != std::numeric_limits<size_t>::max());
         uint8_t* data = (uint8_t*)allocate(size + 1);
         data[size] = 0;
         m_sizeInBytes = size;
