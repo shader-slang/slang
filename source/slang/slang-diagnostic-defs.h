@@ -274,7 +274,7 @@ DIAGNOSTIC(30010, Error, whilePredicateTypeError2, "'while': expression must eva
 DIAGNOSTIC(30011, Error, assignNonLValue, "left of '=' is not an l-value.")
 DIAGNOSTIC(30012, Error, noApplicationUnaryOperator, "no overload found for operator $0 ($1).")
 DIAGNOSTIC(30012, Error, noOverloadFoundForBinOperatorOnTypes, "no overload found for operator $0  ($1, $2).")
-DIAGNOSTIC(30013, Error, subscriptNonArray, "no subscript operation found for  type '$0'")
+DIAGNOSTIC(30013, Error, subscriptNonArray, "no subscript operation found for type '$0'")
 DIAGNOSTIC(30014, Error, subscriptIndexNonInteger, "index expression must evaluate to int.")
 DIAGNOSTIC(30015, Error, undefinedIdentifier2, "undefined identifier '$0'.")
 DIAGNOSTIC(30018, Error, typeNotInTheSameHierarchy, "invalid use of 'as' operator: expression evaluates to '$0', which is not in the same type hierarchy as target type '$1'.")
