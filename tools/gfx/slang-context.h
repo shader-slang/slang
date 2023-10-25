@@ -40,6 +40,7 @@ namespace gfx
             targetDesc.floatingPointMode = desc.floatingPointMode;
             targetDesc.lineDirectiveMode = desc.lineDirectiveMode;
             targetDesc.flags = desc.targetFlags;
+            targetDesc.forceGLSLScalarBufferLayout = true;
 
             slangSessionDesc.targets = &targetDesc;
             slangSessionDesc.targetCount = 1;
