@@ -97,8 +97,8 @@ static bool isTrivialSingleIterationLoop(
         {
             if (!context.domTree->dominates(loop->getParent(), branchTarget))
                 return false;
-            if (targetBlock != loop->getBreakBlock())
-                return false;
+            if (branchTarget != loop->getBreakBlock())
+                continue;
             if (findBreakableRegionHeaderInst(context.domTree, block) != loop)
             {
                 // If the break is initiated from a nested region, this is not trivial.
