@@ -1,5 +1,5 @@
 add_library(
-  slang-unit-test EXCLUDE_FROM_ALL
+  slang-unit-test SHARED EXCLUDE_FROM_ALL
   unit-test-byte-encode.cpp
   unit-test-chunked-list.cpp
   unit-test-com-host-callable.cpp
@@ -28,3 +28,6 @@ add_library(
 set_default_compile_options(slang-unit-test)
 target_link_libraries(slang-unit-test PRIVATE core compiler-core unit-test
                                               slang Threads::Threads)
+target_compile_definitions(slang-unit-test PRIVATE SLANG_SHARED_LIBRARY_TOOL)
+set_target_properties(slang-unit-test PROPERTIES OUTPUT_NAME
+                                                 slang-unit-test-tool)

@@ -289,7 +289,6 @@ foreach(type obj ast value)
          "slang-generated-${type}${macro}.h")
   endforeach()
 endforeach()
-message(${SLANG_REFLECT_GENERATED_HEADERS})
 
 add_custom_command(
   OUTPUT ${SLANG_REFLECT_GENERATED_HEADERS}

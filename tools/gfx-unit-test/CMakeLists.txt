@@ -1,5 +1,5 @@
 add_library(
-  gfx-unit-test
+  gfx-unit-test SHARED EXCLUDE_FROM_ALL
   buffer-barrier-test.cpp
   clear-texture-test.cpp
   compute-smoke.cpp
@@ -30,3 +30,5 @@ add_library(
 set_default_compile_options(gfx-unit-test)
 target_link_libraries(gfx-unit-test PRIVATE core slang unit-test gfx gfx-util
                                             platform)
+target_compile_definitions(gfx-unit-test PRIVATE SLANG_SHARED_LIBRARY_TOOL)
+set_target_properties(gfx-unit-test PROPERTIES OUTPUT_NAME gfx-unit-test-tool)

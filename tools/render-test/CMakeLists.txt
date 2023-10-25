@@ -1,5 +1,5 @@
 add_library(
-  render-test EXCLUDE_FROM_ALL
+  render-test SHARED EXCLUDE_FROM_ALL
   diagnostics.cpp
   options.cpp
   png-serialize-util.cpp
@@ -8,16 +8,14 @@ add_library(
   shader-renderer-util.cpp
   slang-support.cpp)
 set_default_compile_options(render-test)
-target_link_libraries(
-  render-test
-  core
-  compiler-core
-  slang
-  gfx
-  gfx-util
-  platform)
+target_link_libraries(render-test PRIVATE core compiler-core slang gfx gfx-util
+                                          platform)
+target_compile_definitions(render-test PRIVATE SLANG_SHARED_LIBRARY_TOOL)
 
-if(SLANG_ENABLE_CUDA)
+set_target_properties(render-test PROPERTIES OUTPUT_NAME render-test-tool)
+
+if(SLANG_ENABLE_CUDA AND CUDAToolkit_FOUND)
+  target_link_libraries(render-test PRIVATE CUDA::cuda_driver CUDA::cudart)
   target_compile_definitions(render-test PRIVATE RENDER_TEST_CUDA)
 endif()
 

@@ -1,4 +1,4 @@
-add_library(unit-test STATIC EXCLUDE_FROM_ALL slang-unit-test.cpp)
+add_library(unit-test OBJECT EXCLUDE_FROM_ALL slang-unit-test.cpp)
 set_default_compile_options(unit-test)
 # For slang.h
 target_include_directories(unit-test

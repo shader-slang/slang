@@ -14,13 +14,6 @@ include(CompilerFlags)
 set(SLANG_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
 #
-# Dependencies
-#
-
-find_package(Threads REQUIRED)
-add_subdirectory(external)
-
-#
 # Options
 #
 
@@ -29,7 +22,7 @@ option(SLANG_ENABLE_OPTIX "Enable OptiX build/tests, requires enable-cuda")
 set(SLANG_OPTIX_SDK_PATH CACHE STRING "Path to the OptiX SDK")
 option(SLANG_ENABLE_NVAPI "Use NVAPI as found in external/nvapi")
 option(SLANG_ENABLE_XLIB
-       "Build gfx and platform with Xlib to support windowed apps on Linux")
+       "Build gfx and platform with Xlib to support windowed apps on Linux" ON)
 option(SLANG_ENABLE_DX_ON_VK "Use dxvk and vkd3d-proton for DirectX support")
 option(SLANG_ENABLE_AFTERMATH
        "Enable Aftermath in GFX, and add aftermath crash example to project")
@@ -39,6 +32,23 @@ option(SLANG_EMBED_STDLIB_SOURCE "Do not include stdlib source in the binary")
 
 option(SLANG_ENABLE_FULL_IR_VALIDATION "Enable full IR validation (SLOW!)")
 option(SLANG_ENABLE_ASAN "Enable ASAN (address sanitizer)")
+
+#
+# Dependencies
+#
+
+find_package(Threads REQUIRED)
+
+if(SLANG_ENABLE_CUDA)
+  find_package(CUDAToolkit REQUIRED)
+endif()
+
+if(SLANG_ENABLE_OPTIX)
+  find_path(OPTIX_INCLUDE optix.h REQUIRED
+            PATHS ${SLANG_OPTIX_SDK_PATH}/include)
+endif()
+
+add_subdirectory(external)
 
 #
 # Our targets

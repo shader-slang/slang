@@ -3,6 +3,7 @@ add_library(
            placeholder/placeholder-window.cpp windows/win-window.cpp)
 set_default_compile_options(platform)
 target_link_libraries(platform PRIVATE core)
+target_include_directories(platform PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 # For slang-gfx.h
 target_include_directories(platform
