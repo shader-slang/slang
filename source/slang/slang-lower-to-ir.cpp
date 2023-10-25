@@ -535,6 +535,22 @@ struct SharedIRGenContext
     List<IRInst*> m_stringLiterals;
 };
 
+struct IRGenContext;
+
+struct AstOrIRType
+{
+    Type* astType = nullptr;
+    IRInst* irType = nullptr;
+    IRInst* getIRType(IRGenContext* context);
+
+    AstOrIRType& operator=(Type* t) { astType = t; irType = nullptr; return *this; }
+    AstOrIRType& operator=(IRInst* t) { astType = nullptr; irType = t; return *this; }
+    explicit operator bool()
+    {
+        return astType || irType;
+    }
+};
+
 struct IRGenContext
 {
     ASTBuilder* astBuilder;
@@ -558,7 +574,7 @@ struct IRGenContext
     LoweredValInfo thisVal;
 
     // The IRType value to lower into for `ThisType`.
-    IRInst* thisType = nullptr;
+    AstOrIRType thisType;
 
     // The IR witness value to use for `ThisType`
     IRInst* thisTypeWitness = nullptr;
@@ -822,6 +838,14 @@ static IRType* lowerType(
     QualType const& type)
 {
     return lowerType(context, type.type);
+}
+
+IRInst* AstOrIRType::getIRType(IRGenContext* context)
+{
+    if (irType)
+        return irType;
+    irType = lowerType(context, astType);
+    return irType;
 }
 
 // Given a `DeclRef` for something callable, along with a bunch of
@@ -1984,9 +2008,17 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         // Therefore, `context->thisType` should have been set to `IRThisType`
         // in `visitInterfaceDecl`, and we can just use that value here.
         //
-        if (context->thisType != nullptr)
-            return LoweredValInfo::simple(context->thisType);
-        return emitDeclRef(context, makeDeclRef(type->getInterfaceDecl()), getBuilder()->getTypeKind());
+        if (context->thisType.irType)
+        {
+            return LoweredValInfo::simple(context->thisType.irType);
+        }
+        auto interfaceType = emitDeclRef(context, type->getInterfaceDeclRef(), getBuilder()->getTypeKind());
+        auto result = LoweredValInfo::simple(getBuilder()->getThisType((IRType*)getSimpleVal(context, interfaceType)));
+        if (context->thisType.astType == type)
+        {
+            context->thisType = getSimpleVal(context, result);
+        }
+        return result;
     }
 
     LoweredValInfo visitAndType(AndType* type)
@@ -2668,7 +2700,9 @@ static Type* _findReplacementThisParamType(
 
     if (auto interfaceDeclRef = parentDeclRef.as<InterfaceDecl>())
     {
-        auto thisType = DeclRefType::create(context->astBuilder, interfaceDeclRef.getDecl()->getThisTypeDecl());
+        auto thisType = DeclRefType::create(
+            context->astBuilder,
+            context->astBuilder->getMemberDeclRef(interfaceDeclRef, interfaceDeclRef.getDecl()->getThisTypeDecl()));
         return thisType;
     }
 
@@ -2704,6 +2738,11 @@ Type* getThisParamTypeForCallable(
     IRGenContext*   context,
     DeclRef<Decl>   callableDeclRef)
 {
+    if (auto lookup = as<LookupDeclRef>((callableDeclRef.declRefBase)))
+    {
+        return lookup->getLookupSource();
+    }
+
     auto parentDeclRef = callableDeclRef.getParent();
 
     if(auto subscriptDeclRef = parentDeclRef.as<SubscriptDecl>())
@@ -7751,13 +7790,19 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // Allocate an IRInterfaceType with the `operandCount` operands.
         IRInterfaceType* irInterface = subBuilder->createInterfaceType(operandCount, nullptr);
+        auto finalVal = finishOuterGenerics(subBuilder, irInterface, outerGeneric);
 
         // Add `irInterface` to decl mapping now to prevent cyclic lowering.
-        context->setValue(decl, LoweredValInfo::simple(irInterface));
+        context->setValue(decl, LoweredValInfo::simple(finalVal));
+
+        subBuilder->setInsertBefore(irInterface);
 
         // Setup subContext for proper lowering `ThisType`, associated types and
         // the interface decl's self reference.
-        auto thisType = getBuilder()->getThisType(irInterface);
+        
+        auto thisType = DeclRefType::create(
+            context->astBuilder,
+            createDefaultSpecializedDeclRef(subContext, nullptr, decl->getThisTypeDecl()));
         subContext->thisType = thisType;
 
         // TODO: Need to add an appropriate stand-in witness here.
@@ -7880,14 +7925,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
 
         subBuilder->setInsertInto(irInterface);
-        // TODO: are there any interface members that should be
-        // nested inside the interface type itself?
-
-        irInterface->moveToEnd();
 
         addTargetIntrinsicDecorations(subContext, irInterface, decl);
 
-        auto finalVal = finishOuterGenerics(subBuilder, irInterface, outerGeneric);
         return LoweredValInfo::simple(finalVal);
     }
 
@@ -7939,8 +7979,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo visitThisTypeDecl(ThisTypeDecl* decl)
     {
-        auto interfaceType = ensureDecl(context, decl->parentDecl).val;
-        return LoweredValInfo::simple(context->irBuilder->getThisType(as<IRInterfaceType>(interfaceType)));
+        SLANG_UNUSED(decl);
+        return LoweredValInfo();
     }
 
     LoweredValInfo visitThisTypeConstraintDecl(ThisTypeConstraintDecl* decl)
@@ -7968,14 +8008,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         const bool isPublicType = decl->findModifier<PublicModifier>() != nullptr;
 
-        // Given a declaration of a type, we need to make sure
-        // to output "witness tables" for any interfaces this
-        // type has declared conformance to.
-        for( auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>() )
-        {
-            ensureDecl(context, inheritanceDecl);
-        }
-
         // We are going to create nested IR building state
         // to use when emitting the members of the type.
         //
@@ -8001,11 +8033,21 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             return LoweredValInfo::simple(subBuilder->getVoidType());
         }
 
-        const auto finishedVal = _getFinishOuterGenericsReturnValue(irAggType, outerGeneric);
+        auto finalFinishedVal = finishOuterGenerics(subBuilder, irAggType, outerGeneric);
 
         // We add the decl now such that if there are Ptr or other references 
         // to this type they can still complete
-        context->setValue(decl, LoweredValInfo::simple(finishedVal));
+        context->setValue(decl, LoweredValInfo::simple(finalFinishedVal));
+
+        subBuilder->setInsertBefore(irAggType);
+
+        // Given a declaration of a type, we need to make sure
+        // to output "witness tables" for any interfaces this
+        // type has declared conformance to.
+        for (auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
+        {
+            ensureDecl(subContext, inheritanceDecl);
+        }
 
         addNameHint(context, irAggType, decl);
         addLinkageDecoration(context, irAggType, decl);
@@ -8022,8 +8064,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         //
         for( auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>() )
         {
-            if (isPublicType)
-                ensureDecl(context, inheritanceDecl);
             auto superType = inheritanceDecl->base;
             if(auto superDeclRefType = as<DeclRefType>(superType))
             {
@@ -8031,7 +8071,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     superDeclRefType->getDeclRef().as<ClassDecl>())
                 {
                     auto superKey = (IRStructKey*) getSimpleVal(context, ensureDecl(context, inheritanceDecl));
-                    auto irSuperType = lowerType(context, superType.type);
+                    auto irSuperType = lowerType(subContext, superType.type);
                     subBuilder->createStructField(
                         irAggType,
                         superKey,
@@ -8053,8 +8093,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
             // Each ordinary field will need to turn into a struct "key"
             // that is used for fetching the field.
-            IRInst* fieldKeyInst = getSimpleVal(context,
-                ensureDecl(context, fieldDecl));
+            IRInst* fieldKeyInst = getSimpleVal(subContext,
+                ensureDecl(subContext, fieldDecl));
             auto fieldKey = as<IRStructKey>(fieldKeyInst);
             SLANG_ASSERT(fieldKey);
 
@@ -8085,7 +8125,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // Instead we will force emission of all children of aggregate
         // type declarations later, from the top-level emit logic.
 
-        irAggType->moveToEnd();
         addTargetIntrinsicDecorations(subContext, irAggType, decl);
         for (auto modifier : decl->modifiers)
         {
@@ -8093,9 +8132,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 subBuilder->addNonCopyableTypeDecoration(irAggType);
         }
      
-        auto finalFinishedVal = finishOuterGenerics(subBuilder, irAggType, outerGeneric);
-        // Confirm that _getFinishOuterGenericsReturnValue above returned the same result
-        SLANG_ASSERT(finalFinishedVal == finishedVal);
 
         return LoweredValInfo::simple(finalFinishedVal);
     }
@@ -8611,27 +8647,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return v;
     }
 
-    // This function matches the return value from finishOuterGenerics
-    // so that we can create the target value without finishOuterGenerics having to be called. 
-    IRInst* _getFinishOuterGenericsReturnValue(
-        IRInst* val,
-        IRGeneric* parentGeneric)
-    {
-        IRInst* v = val;
-        while (parentGeneric)
-        {
-            // There might be more outer generics,
-            // so we need to loop until we run out.
-            v = parentGeneric;
-            auto parentBlock = as<IRBlock>(v->getParent());
-            if (!parentBlock) break;
-
-            parentGeneric = as<IRGeneric>(parentBlock->getParent());
-            if (!parentGeneric) break;
-
-        }
-        return v;
-    }
 
     void addSpecializedForTargetDecorations(IRInst* inst, Decl* decl)
     {
@@ -9699,6 +9714,26 @@ LoweredValInfo emitDeclRef(
 {
     const auto initialSubst = subst;
     SLANG_UNUSED(initialSubst);
+
+
+    if (auto thisTypeDecl = as<ThisTypeDecl>(decl))
+    {
+        // A declref to ThisType decl should be lowered differently
+        // from other decls. In general, IFoo<T>.ThisType should lower to
+        // ThisType(specialize(IFoo,T)) instead of specialize(IFoo.ThisType, T).
+        SLANG_ASSERT(subst->getDecl() == decl);
+        IRType* parentInterfaceType = nullptr;
+        if (auto lookupDeclRef = as<LookupDeclRef>(subst))
+        {
+            parentInterfaceType = lowerType(context, lookupDeclRef->getWitness()->getSup());
+        }
+        else
+        {
+            parentInterfaceType = lowerType(context, DeclRefType::create(context->astBuilder, subst->getParent()));
+        }
+        auto thisType = context->irBuilder->getThisType(parentInterfaceType);
+        return LoweredValInfo::simple(thisType);
+    }
 
     // We need to proceed by considering the specializations that
     // have been put in place.

@@ -294,7 +294,6 @@ public:
         interfaceDecl->addMember(thisDecl);
         auto thisConstraint = create<ThisTypeConstraintDecl>();
         thisConstraint->loc = loc;
-        thisConstraint->base.type = DeclRefType::create(this, getDirectDeclRef(interfaceDecl));
         thisDecl->addMember(thisConstraint);
         return interfaceDecl;
     }

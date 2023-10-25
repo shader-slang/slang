@@ -169,6 +169,8 @@ namespace Slang
 
         void visitInheritanceDecl(InheritanceDecl* inheritanceDecl);
 
+        void visitThisTypeConstraintDecl(ThisTypeConstraintDecl* thisTypeConstraintDecl);
+
             /// Validate that `decl` isn't illegally inheriting from a type in another module.
             ///
             /// This call checks a single `inheritanceDecl` to make sure that it either
@@ -1598,6 +1600,22 @@ namespace Slang
         // is valid to use for inheritance here, because there could
         // be contextual factors that need to be taken into account
         // based on the declaration that is doing the inheriting.
+    }
+
+    void SemanticsDeclBasesVisitor::visitThisTypeConstraintDecl(ThisTypeConstraintDecl* thisTypeConstraintDecl)
+    {
+        // Make sure IFoo<T>.This.ThisIsIFooConstraint.base.type is properly set
+        // to DeclRefType(IFoo<T>) with default generic arguments.
+        if (!thisTypeConstraintDecl->base.type)
+        {
+            auto parentTypeDecl = getParentDecl(getParentDecl(thisTypeConstraintDecl));
+            thisTypeConstraintDecl->base.type = DeclRefType::create(
+                m_astBuilder,
+                createDefaultSubstitutionsIfNeeded(
+                    m_astBuilder,
+                    this,
+                    getDefaultDeclRef(parentTypeDecl)));
+        }
     }
 
         // Concretize interface conformances so that we have witnesses as required for lookup.
