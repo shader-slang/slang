@@ -1,7 +1,3 @@
-# slang_include_directories = [
-# '../../',
-# '../../external/spirv-headers/include', ]
-
 set(SLANG_SOURCE
     slang-api.cpp
     slang-artifact-output-util.cpp
@@ -218,20 +214,18 @@ set(SLANG_SOURCE
 #
 
 # List of *.meta.slang headers
-set(SLANG_STDLIB_META_SOURCE core.meta.slang hlsl.meta.slang diff.meta.slang)
+glob_append(SLANG_STDLIB_META_SOURCE "*.meta.slang")
 
 # Generate the output file list
 list(TRANSFORM SLANG_STDLIB_META_SOURCE
-     APPEND .h # REPLACE "\.meta\.slang$" ".meta.slang.h"
-            OUTPUT_VARIABLE SLANG_STDLIB_META_GENERATED_HEADERS)
-# Make them absolute
-list(TRANSFORM SLANG_STDLIB_META_SOURCE PREPEND ${CMAKE_CURRENT_SOURCE_DIR}/)
+     APPEND .h OUTPUT_VARIABLE SLANG_STDLIB_META_GENERATED_HEADERS)
 
 add_custom_command(
   OUTPUT ${SLANG_STDLIB_META_GENERATED_HEADERS}
   COMMAND slang-generate ${SLANG_STDLIB_META_SOURCE} --target-directory
           ${CMAKE_CURRENT_BINARY_DIR}
   DEPENDS ${SLANG_STDLIB_META_SOURCE}
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   VERBATIM)
 
 add_library(slang-meta-headers INTERFACE EXCLUDE_FROM_ALL)
@@ -244,12 +238,15 @@ target_include_directories(slang-meta-headers
 # Slang static
 #
 
-add_library(slang-static STATIC EXCLUDE_FROM_ALL ${SLANG_SOURCE})
-target_link_libraries(slang-static PRIVATE core compiler-core prelude
-                                           slang-meta-headers SPIRV-Headers)
-set_default_compile_options(slang-static)
-target_compile_definitions(slang-static PRIVATE SLANG_STATIC
-                                                SLANG_WITHOUT_EMBEDDED_STD_LIB)
+slang_add_target(
+  . STATIC
+  TARGET_NAME slang-static
+  EXCLUDE_FROM_ALL
+  LINK_WITH_PRIVATE core compiler-core prelude slang-meta-headers SPIRV-Headers)
+target_compile_definitions(
+  slang-static
+  PUBLIC SLANG_STATIC
+  PRIVATE SLANG_WITHOUT_EMBEDDED_STD_LIB)
 
 #
 # Generate an embeddable stdlib
@@ -272,15 +269,7 @@ target_include_directories(slang-stdlib-embed-headers
 # generated headers for reflection
 #
 
-set(SLANG_REFLECT_SOURCE
-    slang-ast-support-types.h
-    slang-ast-base.h
-    slang-ast-decl.h
-    slang-ast-expr.h
-    slang-ast-modifier.h
-    slang-ast-stmt.h
-    slang-ast-type.h
-    slang-ast-val.h)
+glob_append(SLANG_REFLECT_SOURCE "slang-ast-*.h")
 
 set(SLANG_REFLECT_GENERATED_HEADERS)
 foreach(type obj ast value)
@@ -298,34 +287,25 @@ add_custom_command(
     _CLASS ${SLANG_REFLECT_SOURCE}
   DEPENDS ${SLANG_REFLECT_SOURCE}
   VERBATIM)
-add_library(slang-reflect-headers INTERFACE EXCLUDE_FROM_ALL
-            ${SLANG_REFLECT_SOURCE})
+add_library(slang-reflect-headers INTERFACE EXCLUDE_FROM_ALL)
+target_sources(slang-reflect-headers INTERFACE ${SLANG_REFLECT_SOURCE})
+target_include_directories(slang-reflect-headers
+                           INTERFACE ${CMAKE_CURRENT_BINARY_DIR})
 
 #
 # Slang itself
 #
-add_library(slang ${SLANG_SOURCE})
-set_default_compile_options(slang)
-target_link_libraries(slang PRIVATE core compiler-core prelude SPIRV-Headers)
-
-# slang.h is in the project root, so include that directory in the interface for
-# slang
-target_include_directories(
-  slang PUBLIC $<BUILD_INTERFACE:${SLANG_ROOT_DIR}>
-               $<INSTALL_INTERFACE:include> # <prefix>/include/
-)
-
-get_target_property(SLANG_TARGET_TYPE slang TYPE)
-if(SLANG_TARGET_TYPE STREQUAL SHARED_LIBRARY)
-  target_compile_definitions(slang PRIVATE SLANG_DYNAMIC_EXPORT)
-endif()
+slang_add_target(
+  . SHARED
+  LINK_WITH_PRIVATE core compiler-core prelude SPIRV-Headers
+  # slang.h is in the project root, so include that directory in the interface
+  # for slang
+  INCLUDE_DIRECTORIES_PUBLIC ${SLANG_ROOT_DIR}
+  EXPORT_MACRO_PREFIX SLANG
+  )
 
 if(NOT SLANG_EMBED_STDLIB_SOURCE)
   target_compile_definitions(slang PRIVATE SLANG_DISABLE_STDLIB_SOURCE)
-endif()
-
-if(SLANG_ENABLE_FULL_DEBUG_VALIDATION)
-  target_compile_definitions(slang PRIVATE SLANG_ENABLE_FULL_IR_VALIDATION)
 endif()
 
 if(SLANG_EMBED_STDLIB)

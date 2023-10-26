@@ -14,11 +14,11 @@ target_compile_definitions(render-test PRIVATE SLANG_SHARED_LIBRARY_TOOL)
 
 set_target_properties(render-test PROPERTIES OUTPUT_NAME render-test-tool)
 
-if(SLANG_ENABLE_CUDA AND CUDAToolkit_FOUND)
-  target_link_libraries(render-test PRIVATE CUDA::cuda_driver CUDA::cudart)
-  target_compile_definitions(render-test PRIVATE RENDER_TEST_CUDA)
-endif()
-
-if(SLANG_ENABLE_OPTIX)
-  target_compile_definitions(render-test PRIVATE RENDER_TEST_OPTIX)
-endif()
+# if(SLANG_ENABLE_CUDA AND CUDAToolkit_FOUND)
+#   target_link_libraries(render-test PRIVATE CUDA::cuda_driver CUDA::cudart)
+#   target_compile_definitions(render-test PRIVATE RENDER_TEST_CUDA)
+# endif()
+#
+# if(SLANG_ENABLE_OPTIX)
+#   target_compile_definitions(render-test PRIVATE RENDER_TEST_OPTIX)
+# endif()

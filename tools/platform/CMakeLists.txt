@@ -6,17 +6,16 @@ target_link_libraries(platform PRIVATE core)
 target_include_directories(platform PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 # For slang-gfx.h
-target_include_directories(platform
-                           PRIVATE $<TARGET_PROPERTY:gfx,INCLUDE_DIRECTORIES>)
+target_include_directories(
+  platform PRIVATE $<TARGET_PROPERTY:gfx,INTERFACE_INCLUDE_DIRECTORIES>)
 
 get_target_property(SLANG_PLATFORM_TARGET_TYPE platform TYPE)
 if(SLANG_PLATFORM_TARGET_TYPE STREQUAL SHARED_LIBRARY)
-  target_compile_definitions(platform PRIVATE SLANG_PLATFORM_DYNAMIC
-                                              SLANG_PLATFORM_DYNAMIC_EXPORT)
+  target_compile_definitions(platform PUBLIC SLANG_PLATFORM_DYNAMIC
+                                             SLANG_PLATFORM_DYNAMIC_EXPORT)
 endif()
 
 if(SLANG_ENABLE_XLIB)
   find_package(X11 REQUIRED)
   target_link_libraries(platform PRIVATE X11::X11)
-  target_compile_definitions(platform PRIVATE SLANG_ENABLE_XLIB)
 endif()

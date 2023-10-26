@@ -2,6 +2,8 @@
 # Given a list of flags, add those which the C++ compiler supports to the target
 #
 function(add_supported_cxx_flags target)
+  cmake_parse_arguments(ARG "EXCLUDE_FROM_ALL" "" "LINK_WITH" ${ARGN})
+
   set(flags ${ARGN})
   foreach(flag ${flags})
     # remove the `no-` prefix from warnings because gcc doesn't treat it as an
@@ -22,19 +24,31 @@ endfunction()
 # Pass USE_EXTRA_WARNINGS to enable -WExtra or /W3
 #
 function(set_default_compile_options target)
-  # Check if the use_extra_warnings argument is provided
-  if(ARGN)
-    list(FIND ARGV "USE_EXTRA_WARNINGS" use_extra_index)
-    if(use_extra_index GREATER -1)
-      set(warning_flags -Wall -Wextra /W3)
-    else()
-      set(warning_flags -Wall /W2)
-    endif()
+  cmake_parse_arguments(ARG "USE_EXTRA_WARNINGS;USE_FEWER_WARNINGS" "" ""
+                        ${ARGN})
+
+  if(ARG_USE_EXTRA_WARNINGS)
+    set(warning_flags -Wall -Wextra /W3)
+  elseif(ARG_USE_FEWER_WARNINGS)
+    set(warning_flags
+        /W1
+        -Wall
+        -Wno-class-memaccess
+        -Wno-unused-variable
+        -Wno-unused-parameter
+        -Wno-sign-compare
+        -Wno-unused-function
+        -Wno-unused-value
+        -Wno-unused-but-set-variable
+        -Wno-implicit-fallthrough
+        -Wno-missing-field-initializers)
+  else()
+    set(warning_flags -Wall /W2)
   endif()
 
-  add_supported_cxx_flags(${target} ${warning_flags})
-  add_supported_cxx_flags(
-    ${target}
+  list(
+    APPEND
+    warning_flags
     # Disabled warnings:
     -Wno-switch
     -Wno-parentheses
@@ -48,9 +62,9 @@ function(set_default_compile_options target)
     # bad.
     -Werror=return-local-addr
     # This approximates the default in MSVC
-    -Wnarrowing
-    # Flags: Makes all symbols hidden by default unless explicitly 'exported'
-    -fvisibility=hidden)
+    -Wnarrowing)
+
+  add_supported_cxx_flags(${target} ${warning_flags})
 
   # TODO: use check_link_flag if we move to cmake 3.18
   if(NOT MSVC)
@@ -58,23 +72,44 @@ function(set_default_compile_options target)
     target_link_options(${target} PRIVATE "-Wl,--no-undefined")
   endif()
 
-  # C++ standard
-  set_target_properties(${target} PROPERTIES CXX_STANDARD 17)
+  set_target_properties(
+    ${target}
+    PROPERTIES # -fvisibility=hidden
+               CXX_VISIBILITY_PRESET hidden
+               # C++ standard
+               CXX_STANDARD 17
+               # pic
+               POSITION_INDEPENDENT_CODE ON)
 
-  # PIC
-  set_target_properties(${target} PROPERTIES POSITION_INDEPENDENT_CODE ON)
+  target_compile_definitions(
+    ${target}
+    PRIVATE # Add _DEBUG depending on the build configuration
+            $<$<CONFIG:Debug>:_DEBUG>
+            # For including windows.h in a way that minimized namespace
+            # pollution. Although we define these here, we still set them
+            # manually in any header files which may be included by another
+            # project
+            WIN32_LEAN_AND_MEAN
+            VC_EXTRALEAN
+            NOMINMAX
+            # Disable slow stdlib debug functionality for MSVC
+            _ITERATOR_DEBUG_LEVEL=0)
 
-  # Add _DEBUG depending on the build type
-  target_compile_definitions(${target} PRIVATE $<$<CONFIG:Debug>:_DEBUG>)
+  #
+  # Settings dependent on config options
+  #
 
-  # For including windows.h in a way that minimized namespace pollution.
-  # Although we define these here, we still set them manually in any header
-  # files which may be included by another project
-  target_compile_definitions(${target} PRIVATE WIN32_LEAN_AND_MEAN VC_EXTRALEAN
-                                               NOMINMAX _ITERATOR_DEBUG_LEVEL=0)
+  if(SLANG_ENABLE_FULL_DEBUG_VALIDATION)
+    target_compile_definitions(${target}
+                               PRIVATE SLANG_ENABLE_FULL_IR_VALIDATION)
+  endif()
 
   if(SLANG_ENABLE_DX_ON_VK)
     target_compile_definitions(${target} PRIVATE SLANG_CONFIG_DX_ON_VK)
+  endif()
+
+  if(SLANG_ENABLE_XLIB)
+    target_compile_definitions(${target} PRIVATE SLANG_ENABLE_XLIB)
   endif()
 
   if(SLANG_ENABLE_ASAN)
