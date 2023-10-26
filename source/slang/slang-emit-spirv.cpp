@@ -323,6 +323,7 @@ struct SpvLiteralBits
         char* dst = (char*)(result.value.getBuffer());
 
         // Copy the text
+        SLANG_ASSUME(textCount >= 0);
         memcpy(dst, text.begin(), textCount);
 
         // Set terminating 0, and remaining buffer 0s
@@ -1397,7 +1398,7 @@ struct SPIRVEmitContext
 
         case kIROp_RateQualifiedType:
             {
-                auto result = emitGlobalInst(as<IRRateQualifiedType>(inst)->getValueType());
+                auto result = ensureInst(as<IRRateQualifiedType>(inst)->getValueType());
                 registerInst(inst, result);
                 return result;
             }

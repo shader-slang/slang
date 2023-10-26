@@ -126,7 +126,8 @@ namespace Slang
         List<char> buffer;
         auto copySize = builder.getLength();
         buffer.setCount(copySize + 1);
-        SLANG_ASSERT(copySize < PTRDIFF_MAX); // Shhh gcc, it's ok, we're not copying 9000 Petabytes
+        // Satisfy GCC
+        SLANG_ASSUME(copySize < PTRDIFF_MAX && copySize > 0);
         ::memcpy(buffer.getBuffer(), builder.getBuffer(), copySize);
         buffer[copySize] = 0;
 

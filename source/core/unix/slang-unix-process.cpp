@@ -516,7 +516,8 @@ static int pipeCLOEXEC(int pipefd[2])
 
         // Signal the failure to our parent
         int execErr = errno;
-        ::write(execWatchPipe[1], &execErr, sizeof(execErr));
+        if(::write(execWatchPipe[1], &execErr, sizeof(execErr)))
+            fprintf(stderr, "error: `exec` watch pipe write failed\n");
 
         // NOTE! Because we have dup2 into STDERR_FILENO, this error will *not* generally appear on
         // the terminal but in the stderrPipe. 

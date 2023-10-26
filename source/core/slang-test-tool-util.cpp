@@ -103,12 +103,21 @@ static SlangResult _addCUDAPrelude(const String& rootPath, slang::IGlobalSession
     String parentPath;
     SLANG_RETURN_ON_FAIL(getExeDirectoryPath(inExePath, parentPath));
 
-    // From directory to the root is ../../.. 
-    // Work out the relative path to the root
-    String rootRelPath = Path::combine(parentPath, "../../../");
+    // Work out the relative path to the root, we will search upwards until we
+    // find a directory containing 'prelude/slang-cpp-prelude.h'
+    String rootRelPath;
+    SLANG_RETURN_ON_FAIL(Path::getCanonical(parentPath, rootRelPath));
+    do
+    {
+        if(File::exists(Path::combine(rootRelPath, "prelude/slang-cpp-prelude.h")))
+            break;
 
-    // We want the absolute path to the root
-    SLANG_RETURN_ON_FAIL(Path::getCanonical(rootRelPath, outExePath));
+        rootRelPath = Path::getParentDirectory(rootRelPath);
+        if(rootRelPath == "")
+            return SLANG_E_NOT_AVAILABLE;
+    } while(1);
+
+    outExePath = std::move(rootRelPath);
     return SLANG_OK;
 }
 

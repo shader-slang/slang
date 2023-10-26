@@ -716,8 +716,38 @@ namespace Slang
                     if (typeParamDecl->parentDecl == constraints.genericDecl)
                         return TryUnifyTypeParam(constraints, typeParamDecl, fst);
 
-                // can't be unified if they refer to different declarations.
-                if (fstDeclRef.getDecl() != sndDeclRef.getDecl()) return false;
+                // If they refer to different declarations, we need to check if one type's super type
+                // matches the other type, if so we can unify them.
+                if (fstDeclRef.getDecl() != sndDeclRef.getDecl())
+                {
+                    {
+                        auto fstTypeInheritanceInfo = getShared()->getInheritanceInfo(fstDeclRefType);
+                        for (auto supType : fstTypeInheritanceInfo.facets)
+                        {
+                            if (supType->origin.declRef.getDecl() == sndDeclRef.getDecl())
+                            {
+                                fstDeclRef = supType->origin.declRef;
+                                goto endMatch;
+                            }
+                        }
+                    }
+                    // try the other direction
+                    {
+                        auto sndTypeInheritanceInfo = getShared()->getInheritanceInfo(sndDeclRefType);
+                        for (auto supType : sndTypeInheritanceInfo.facets)
+                        {
+                            if (supType->origin.declRef.getDecl() == fstDeclRef.getDecl())
+                            {
+                                sndDeclRef = supType->origin.declRef;
+                                goto endMatch;
+                            }
+                        }
+                    }
+                endMatch:;
+                    // If they still refer to different decls, then we can't unify them.
+                    if (fstDeclRef.getDecl() != sndDeclRef.getDecl())
+                        return false;
+                }
 
                 // next we need to unify the substitutions applied
                 // to each declaration reference.

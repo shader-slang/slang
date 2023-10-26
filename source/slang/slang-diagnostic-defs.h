@@ -274,7 +274,7 @@ DIAGNOSTIC(30010, Error, whilePredicateTypeError2, "'while': expression must eva
 DIAGNOSTIC(30011, Error, assignNonLValue, "left of '=' is not an l-value.")
 DIAGNOSTIC(30012, Error, noApplicationUnaryOperator, "no overload found for operator $0 ($1).")
 DIAGNOSTIC(30012, Error, noOverloadFoundForBinOperatorOnTypes, "no overload found for operator $0  ($1, $2).")
-DIAGNOSTIC(30013, Error, subscriptNonArray, "no subscript operation found for  type '$0'")
+DIAGNOSTIC(30013, Error, subscriptNonArray, "no subscript operation found for type '$0'")
 DIAGNOSTIC(30014, Error, subscriptIndexNonInteger, "index expression must evaluate to int.")
 DIAGNOSTIC(30015, Error, undefinedIdentifier2, "undefined identifier '$0'.")
 DIAGNOSTIC(30018, Error, typeNotInTheSameHierarchy, "invalid use of 'as' operator: expression evaluates to '$0', which is not in the same type hierarchy as target type '$1'.")
@@ -393,7 +393,13 @@ DIAGNOSTIC(31147, Error, cannotResolveOriginalFunctionForDerivative, "cannot res
 DIAGNOSTIC(31148, Error, cannotResolveDerivativeFunction, "cannot resolve the custom derivative function")
 DIAGNOSTIC(31149, Error, customDerivativeSignatureMismatchAtPosition, "invalid custom derivative. parameter type mismatch at position $0. expected '$1', got '$2'")
 DIAGNOSTIC(31150, Error, customDerivativeSignatureMismatch, "invalid custom derivative. could not resolve function with expected signature '$0'")
-
+DIAGNOSTIC(31151, Error, cannotResolveGenericArgumentForDerivativeFunction,
+    "The generic arguments to the derivative function cannot be deduced from the parameter list of the original function. "
+    "Consider using [ForwardDerivative], [BackwardDerivative] or [PrimalSubstitute] attributes on the primal function"
+    " with explicit generic arguments to associate it with a generic derivative function. Note that [ForwardDerivativeOf], "
+    "[BackwardDerivativeOf], and [PrimalSubstituteOf] attributes are not supported when the generic arguments to the derivatives cannot be automatically deduced.")
+DIAGNOSTIC(31152, Error, cannotAssociateInterfaceRequirementWithDerivative, "cannot associate an interface requirement with a derivative.")
+DIAGNOSTIC(31153, Error, cannotUseInterfaceRequirementAsDerivative, "cannot use an interface requirement as a derivative.")
 DIAGNOSTIC(31200, Warning, deprecatedUsage, "$0 has been deprecated: $1")
 
 // Enums

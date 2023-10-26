@@ -3061,7 +3061,7 @@ namespace Slang
                 parser->FillPosition(paramConstraint);
 
                 // substitution needs to be filled during check
-                DeclRefType* paramType = DeclRefType::create(parser->astBuilder, DeclRef<Decl>(decl));
+                Type* paramType = DeclRefType::create(parser->astBuilder, DeclRef<Decl>(decl));
 
                 SharedTypeExpr* paramTypeExpr = parser->astBuilder->create<SharedTypeExpr>();
                 paramTypeExpr->loc = decl->loc;
@@ -3128,12 +3128,14 @@ namespace Slang
         AdvanceIf(parser, TokenType::CompletionRequest);
 
         decl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
-
-        parseOptionalInheritanceClause(parser, decl);
-
-        parseDeclBody(parser, decl);
-
-        return decl;
+        return parseOptGenericDecl(parser, [&](GenericDecl*)
+            {
+                // We allow for an inheritance clause on a `struct`
+                // so that it can conform to interfaces.
+                parseOptionalInheritanceClause(parser, decl);
+                parseDeclBody(parser, decl);
+                return decl;
+            });
     }
 
     static NodeBase* parseNamespaceDecl(Parser* parser, void* /*userData*/)

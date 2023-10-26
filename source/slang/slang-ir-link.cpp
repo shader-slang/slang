@@ -307,7 +307,7 @@ IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
             registerClonedValue(this, clonedValue, originalValue);
             
             cloneDecorationsAndChildren(this, clonedValue, originalValue);
-            builder->addInst(clonedValue);
+            addHoistableInst(builder, clonedValue);
 
             return clonedValue;
         }

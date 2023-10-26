@@ -348,7 +348,11 @@ void ShaderCompilerUtil::Output::reset()
     fseek(sourceFile, 0, SEEK_SET);
 
     outSourceText.setCount(sourceSize + 1);
-    fread(outSourceText.getBuffer(), sourceSize, 1, sourceFile);
+    if(fread(outSourceText.getBuffer(), sourceSize, 1, sourceFile) != 1)
+    {
+        fprintf(stderr, "error: failed to read from '%s'\n", inSourcePath.getBuffer());
+        return SLANG_FAIL;
+    }
     fclose(sourceFile);
     outSourceText[sourceSize] = 0;
 
