@@ -1,7 +1,7 @@
 //DISABLE_TEST:SIMPLE:-target dxil-assembly -entry fragmentMain -profile sm_6_5 -stage fragment -DNV_SHADER_EXTN_SLOT=u0 
 
 //TEST:SIMPLE(filecheck=SPIRV):-target spirv-assembly -entry fragmentMain -stage fragment
-//DISABLED_TEST:SIMPLE(filecheck=DXIL):-target dxil-assembly -entry fragmentMain -stage fragment
+//TEST:SIMPLE(filecheck=DXIL):-target dxil-assembly -entry fragmentMain -profile sm_6_5 -stage fragment -DNV_SHADER_EXTN_SLOT=u0 
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry fragmentMain -stage fragment
 
 //DISABLED_TEST:SIMPLE:-target spirv-assembly -entry fragmentMain -stage fragment
@@ -66,6 +66,8 @@ void fragmentMain(
 
 // SPIRV: Extension  "SPV_NV_shader_image_footprint"
 // SPIRV: ImageSampleFootprintNV
+
+// DXIL: struct struct.NvShaderExtnStruct
 
 // HLSL: NvFootprintCoarse
 
