@@ -288,7 +288,114 @@ struct BindingQueryLoweringContext : public WorkListPass
     //
     OpaqueValueInfo computeOpaqueValueInfo(IRInst* opaqueValue)
     {
-        if (auto globalParam = as<IRGlobalParam>(opaqueValue))
+        if (auto getElement = as<IRGetElement>(opaqueValue))
+        {
+            IRInst* baseInst = getElement->getBase();
+            IRInst* indexInst = getElement->getIndex();
+
+            IRInst* elementType = getElement->getDataType();
+
+            // TODO(JS): This a hack to make this work for arrays of resource type.
+            // It won't work in the general case as it stands because we would need
+            // to propogate layout kind types needed at usage sites.
+            // Without knowing the resource kind that is being processed it's not possible
+            // to accumulate the calculation.
+            //
+            // So presumably we need to request a binding query for a specific resource kind.
+            // We could do this by making the type of the binding query hold the type.
+
+            // We need to add instructions which will work out the binding for the base
+            OpaqueValueInfo baseInfo = findOrComputeOpaqueValueInfo(baseInst);
+
+            // If we couldn't find it we are done
+            if (baseInfo.registerIndex == nullptr ||
+                baseInfo.registerSpace == nullptr)
+            {
+                return baseInfo;
+            }
+
+
+            LayoutResourceKind kind = LayoutResourceKind::None;
+            Index stride = 1;
+
+            if (auto resourceType = as<IRResourceType>(elementType))
+            {
+                const auto shape = resourceType->getShape();
+
+                switch (shape)
+                {
+                    case SLANG_TEXTURE_1D:
+                    case SLANG_TEXTURE_2D:
+                    case SLANG_TEXTURE_3D:
+                    case SLANG_TEXTURE_CUBE:
+                    case SLANG_STRUCTURED_BUFFER:
+                    case SLANG_BYTE_ADDRESS_BUFFER:
+                    case SLANG_TEXTURE_BUFFER:
+                    {
+                        const auto access = resourceType->getAccess();
+                        bool isReadOnly = (access == SLANG_RESOURCE_ACCESS_READ);
+
+                        kind = isReadOnly ? LayoutResourceKind::ShaderResource : LayoutResourceKind::UnorderedAccess;
+                        break;
+                    }
+                    default: break;
+                }
+            }
+            else if (as< IRSamplerStateTypeBase>(elementType))
+            {
+                kind = LayoutResourceKind::SamplerState;
+            }
+            else if (as<IRConstantBufferType>(elementType))
+            {
+                kind = LayoutResourceKind::ConstantBuffer;
+            }
+
+            if (kind == LayoutResourceKind::None)
+            {
+                // Can't determine the kind
+                return OpaqueValueInfo();
+            }
+
+            // If the element type has type layout we can try and use that
+            if (auto layoutDecoration = elementType->findDecoration<IRLayoutDecoration>())
+            {
+                // We have to calculate
+                if (auto elementTypeLayout = as<IRTypeLayout>(layoutDecoration->getLayout()))
+                {
+                    IRTypeSizeAttr* sizeAttr = elementTypeLayout->findSizeAttr(kind);
+                    sizeAttr = sizeAttr ? sizeAttr : elementTypeLayout->findSizeAttr(LayoutResourceKind::DescriptorTableSlot);
+
+                    if (!sizeAttr)
+                    {
+                        // Couldn't work it out
+                        return OpaqueValueInfo();
+                    }
+
+                    // TODO(JS): Perhaps we have to do something else if not finite?
+                    stride = sizeAttr->getFiniteSize();
+                }
+            }
+
+            SLANG_UNUSED(indexInst);
+
+            // Okay we need to create an instruction which is
+            // base + stride * index
+
+            IRBuilder builder(module);
+
+            builder.setInsertBefore(opaqueValue);
+
+            auto calcRegisterInst = builder.emitAdd(indexType,
+                builder.emitMul(indexType, builder.getIntValue(indexType, stride), indexInst),
+                baseInfo.registerIndex);
+
+            OpaqueValueInfo finalInfo;
+            finalInfo.registerIndex = calcRegisterInst;
+            finalInfo.registerSpace = baseInfo.registerSpace;
+
+            return finalInfo;
+        }
+        else if (auto globalParam = as<IRGlobalParam>(opaqueValue))
         {
             // The simple/base case is when we have a global shader
             // parameter that has layout information attached.
