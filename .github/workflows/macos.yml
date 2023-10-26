@@ -52,7 +52,7 @@ jobs:
         7z a ${SLANG_BINARY_ARCHIVE} bin/*/*/slangc
         7z a ${SLANG_BINARY_ARCHIVE} bin/*/*/slangd
         7z a ${SLANG_BINARY_ARCHIVE} docs/*.md
-        echo "::set-output name=SLANG_BINARY_ARCHIVE::${SLANG_BINARY_ARCHIVE}"
+        echo "SLANG_BINARY_ARCHIVE=${SLANG_BINARY_ARCHIVE}" >> $GITHUB_OUTPUT
     - uses: actions/upload-artifact@v3
       with:
         name: slang-build-${{matrix.configuration}}-${{matrix.targetPlatform}}-${{matrix.compiler}}
