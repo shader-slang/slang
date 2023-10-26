@@ -58,7 +58,7 @@ jobs:
 
       - name: Install nortarize tools
         run: |
-          brew install mitchellh/gon/gon
+          brew install Bearer/tap/gon
           security find-identity -v
           brew install coreutils
       - name: Sign binaries
@@ -99,6 +99,8 @@ jobs:
       - name: Notarize
         env:
           AC_PASSWORD: ${{secrets.APPLE_ID_PASSWORD}}
+          AC_PROVIDER: ${{secrets.APPLE_ID_PPOVIDER}}
+          AC_USERNAME: ${{secrets.APPLE_ID_USERNAME}}
         run: |
           cp ./bin/macosx-${{matrix.targetPlatform}}/release/libslang.dylib libslang.dylib
           cp ./bin/macosx-${{matrix.targetPlatform}}/release/slangd slangd
