@@ -2,8 +2,17 @@
 
 // Test that a simple mesh shader compiles
 
-//TEST:CROSS_COMPILE:-target spirv-assembly -entry main -stage mesh -profile glsl_450+spirv_1_4
-//TEST:CROSS_COMPILE:-target dxil-assembly  -entry main -stage mesh -profile sm_6_6
+//TEST:CROSS_COMPILE(filecheck=SPIRV):-target spirv-assembly -entry main -stage mesh -profile glsl_450+spirv_1_4
+//TEST:CROSS_COMPILE(filecheck=DXIL):-target dxil-assembly  -entry main -stage mesh -profile sm_6_6
+
+// DXIL: call void @dx.op.setMeshOutputCounts
+// DXIL: call void @dx.op.storeVertexOutput.f32
+// DXIL: call void @dx.op.emitIndices
+// SPIRV: OpEntryPoint MeshEXT %main
+// SPIRV: OpExecutionMode %main OutputVertices 3
+// SPIRV: OpExecutionMode %main OutputPrimitivesNV 1
+// SPIRV: OpExecutionMode %main OutputTrianglesNV
+// SPIRV: OpSetMeshOutputsEXT
 
 const static float2 positions[3] = {
   float2(0.0, -0.5),
