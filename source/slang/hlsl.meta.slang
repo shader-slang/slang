@@ -2888,18 +2888,20 @@ matrix<T, N, M> frac(matrix<T, N, M> x)
 
 // Split float into mantissa and exponent
 __generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(cpp, "$P_frexp($0, $1)")
+__target_intrinsic(cuda, "$P_frexp($0, $1)")
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Frexp _0 _1")
 [__readNone]
-T frexp(T x, out T exp);
+T frexp(T x, out int exp);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Frexp _0 _1")
 [__readNone]
-vector<T, N> frexp(vector<T, N> x, out vector<T, N> exp)
+vector<T, N> frexp(vector<T, N> x, out vector<int, N> exp)
 {
     VECTOR_MAP_BINARY(T, N, frexp, x, exp);
 }
@@ -2907,7 +2909,7 @@ vector<T, N> frexp(vector<T, N> x, out vector<T, N> exp)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L : int>
 __target_intrinsic(hlsl)
 [__readNone]
-matrix<T, N, M> frexp(matrix<T, N, M> x, out matrix<T, N, M, L> exp)
+matrix<T, N, M> frexp(matrix<T, N, M> x, out matrix<int, N, M, L> exp)
 {
     MATRIX_MAP_BINARY(T, N, M, frexp, x, exp);
 }
