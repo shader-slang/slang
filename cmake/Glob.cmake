@@ -1,13 +1,15 @@
 #
-# glob_append(MY_VAR my_glob) will append the results of
-# file(GLOB CONFIGURE_DEPENDS my_glob) to MY_VAR
+# glob_append(MY_VAR my_glob) will append the results of file(GLOB
+# CONFIGURE_DEPENDS my_glob) to MY_VAR
 #
 # Any number of globs may be specified
 #
 function(glob_append dest)
   file(GLOB files CONFIGURE_DEPENDS ${ARGN})
   list(APPEND ${dest} ${files})
-  set(${dest} ${${dest}} PARENT_SCOPE)
+  set(${dest}
+      ${${dest}}
+      PARENT_SCOPE)
 endfunction()
 
 #
@@ -18,7 +20,9 @@ endfunction()
 function(glob_append_if cond dest)
   if(${cond})
     glob_append(${dest} ${ARGN})
-    set(${dest} ${${dest}} PARENT_SCOPE)
+    set(${dest}
+        ${${dest}}
+        PARENT_SCOPE)
   endif()
 endfunction()
 
@@ -31,5 +35,7 @@ function(slang_glob_sources var)
     list(FILTER files EXCLUDE REGEX "(^|/)unix/.*")
   endif()
   list(APPEND ${var} ${files})
-  set(${var} ${${var}} PARENT_SCOPE)
+  set(${var}
+      ${${var}}
+      PARENT_SCOPE)
 endfunction()

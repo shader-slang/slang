@@ -301,8 +301,7 @@ slang_add_target(
   # slang.h is in the project root, so include that directory in the interface
   # for slang
   INCLUDE_DIRECTORIES_PUBLIC ${SLANG_ROOT_DIR}
-  EXPORT_MACRO_PREFIX SLANG
-  )
+  EXPORT_MACRO_PREFIX SLANG)
 
 if(NOT SLANG_EMBED_STDLIB_SOURCE)
   target_compile_definitions(slang PRIVATE SLANG_DISABLE_STDLIB_SOURCE)
