@@ -103,7 +103,8 @@ set(SLANG_GFX_SOURCE
     vulkan/vk-swap-chain.cpp
     vulkan/vk-texture.cpp
     vulkan/vk-transient-heap.cpp
-    vulkan/vk-util.cpp)
+    vulkan/vk-util.cpp
+)
 
 add_library(gfx ${SLANG_GFX_SOURCE})
 set_default_compile_options(gfx)
@@ -112,36 +113,40 @@ target_link_libraries(gfx PRIVATE core slang Vulkan-Headers)
 # slang-gfx.h is in the project root, so include that directory in the interface
 # for gfx
 target_include_directories(
-  gfx PUBLIC $<BUILD_INTERFACE:${SLANG_ROOT_DIR}>
-             $<INSTALL_INTERFACE:include> # <prefix>/include/
+    gfx
+    PUBLIC
+        $<BUILD_INTERFACE:${SLANG_ROOT_DIR}>
+        $<INSTALL_INTERFACE:include> # <prefix>/include/
 )
 
 get_target_property(SLANG_GFX_TARGET_TYPE gfx TYPE)
 if(SLANG_GFX_TARGET_TYPE STREQUAL SHARED_LIBRARY)
-  target_compile_definitions(gfx PRIVATE SLANG_GFX_DYNAMIC
-                                         SLANG_GFX_DYNAMIC_EXPORT)
+    target_compile_definitions(
+        gfx
+        PRIVATE SLANG_GFX_DYNAMIC SLANG_GFX_DYNAMIC_EXPORT
+    )
 endif()
 
 if(SLANG_ENABLE_AFTERMATH)
-  target_compile_definitions(gfx PRIVATE GFX_NV_AFTERMATH)
-  target_link_libraries(gfx PRIVATE aftermath)
+    target_compile_definitions(gfx PRIVATE GFX_NV_AFTERMATH)
+    target_link_libraries(gfx PRIVATE aftermath)
 endif()
 
 if(SLANG_ENABLE_XLIB)
-  find_package(X11 REQUIRED)
-  target_link_libraries(gfx PRIVATE X11::X11)
+    find_package(X11 REQUIRED)
+    target_link_libraries(gfx PRIVATE X11::X11)
 endif()
 
 if(SLANG_ENABLE_NVAPI)
-  target_compile_definitions(gfx PRIVATE GFX_NVAPI)
+    target_compile_definitions(gfx PRIVATE GFX_NVAPI)
 endif()
 
 if(SLANG_ENABLE_CUDA AND CUDAToolkit_FOUND)
-  target_link_libraries(gfx PRIVATE CUDA::cuda_driver CUDA::cudart)
-  target_compile_definitions(gfx PRIVATE RENDER_TEST_CUDA)
+    target_link_libraries(gfx PRIVATE CUDA::cuda_driver CUDA::cudart)
+    target_compile_definitions(gfx PRIVATE RENDER_TEST_CUDA)
 endif()
 
 if(SLANG_ENABLE_OPTIX AND OPTIX_INCLUDE)
-  target_compile_definitions(gfx PRIVATE RENDER_TEST_OPTIX)
-  target_include_directories(gfx PRIVATE ${OPTIX_INCLUDE})
+    target_compile_definitions(gfx PRIVATE RENDER_TEST_OPTIX)
+    target_include_directories(gfx PRIVATE ${OPTIX_INCLUDE})
 endif()

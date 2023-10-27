@@ -5,11 +5,9 @@
 # Any number of globs may be specified
 #
 function(glob_append dest)
-  file(GLOB files CONFIGURE_DEPENDS ${ARGN})
-  list(APPEND ${dest} ${files})
-  set(${dest}
-      ${${dest}}
-      PARENT_SCOPE)
+    file(GLOB files CONFIGURE_DEPENDS ${ARGN})
+    list(APPEND ${dest} ${files})
+    set(${dest} ${${dest}} PARENT_SCOPE)
 endfunction()
 
 #
@@ -18,24 +16,20 @@ endfunction()
 # Example usage: glob_append_if(WIN32 MY_VAR "windows/*.cpp")
 #
 function(glob_append_if cond dest)
-  if(${cond})
-    glob_append(${dest} ${ARGN})
-    set(${dest}
-        ${${dest}}
-        PARENT_SCOPE)
-  endif()
+    if(${cond})
+        glob_append(${dest} ${ARGN})
+        set(${dest} ${${dest}} PARENT_SCOPE)
+    endif()
 endfunction()
 
 function(slang_glob_sources var)
-  file(GLOB_RECURSE files CONFIGURE_DEPENDS ${ARGN})
-  if(NOT WIN32)
-    list(FILTER files EXCLUDE REGEX "(^|/)windows/.*")
-  endif()
-  if(NOT UNIX)
-    list(FILTER files EXCLUDE REGEX "(^|/)unix/.*")
-  endif()
-  list(APPEND ${var} ${files})
-  set(${var}
-      ${${var}}
-      PARENT_SCOPE)
+    file(GLOB_RECURSE files CONFIGURE_DEPENDS ${ARGN})
+    if(NOT WIN32)
+        list(FILTER files EXCLUDE REGEX "(^|/)windows/.*")
+    endif()
+    if(NOT UNIX)
+        list(FILTER files EXCLUDE REGEX "(^|/)unix/.*")
+    endif()
+    list(APPEND ${var} ${files})
+    set(${var} ${${var}} PARENT_SCOPE)
 endfunction()
