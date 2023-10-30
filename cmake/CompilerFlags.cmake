@@ -2,8 +2,6 @@
 # Given a list of flags, add those which the C++ compiler supports to the target
 #
 function(add_supported_cxx_flags target)
-    cmake_parse_arguments(ARG "EXCLUDE_FROM_ALL" "" "LINK_WITH" ${ARGN})
-
     set(flags ${ARGN})
     foreach(flag ${flags})
         # remove the `no-` prefix from warnings because gcc doesn't treat it as an
@@ -19,6 +17,44 @@ function(add_supported_cxx_flags target)
         check_cxx_compiler_flag("${flag_to_test}" ${test_name})
         if(${test_name})
             target_compile_options(${target} PRIVATE ${flag})
+        endif()
+    endforeach()
+endfunction()
+
+#
+# Given a list of linker flags, add those which the compiler supports to the
+# target
+#
+include(CheckLinkerFlag)
+function(add_supported_cxx_linker_flags target)
+    cmake_parse_arguments(ARG "PRIVATE;PUBLIC;BEFORE;AFTER" "" "FLAGS" ${ARGN})
+
+    if(ARG_PRIVATE)
+        set(private PRIVATE)
+    endif()
+    if(ARG_PUBLIC)
+        set(public PUBLIC)
+    endif()
+    if(ARG_BEFORE)
+        set(before BEFORE)
+    endif()
+    if(ARG_AFTER)
+        set(after AFTER)
+    endif()
+
+    set(flags ARG_FLAGS)
+    foreach(flag ${flags})
+        string(REGEX REPLACE "[^a-zA-Z0-9]+" "_" test_name "CXXLINKFLAG_${flag}")
+        check_linker_flag(CXX "${flag}" ${test_name})
+        if(${test_name})
+            target_compile_options(
+                ${target}
+                ${private}
+                ${public}
+                ${before}
+                ${after}
+                ${flag}
+            )
         endif()
     endforeach()
 endfunction()
@@ -80,11 +116,8 @@ function(set_default_compile_options target)
 
     add_supported_cxx_flags(${target} ${warning_flags})
 
-    # TODO: use check_link_flag if we move to cmake 3.18
-    if(NOT MSVC)
-        # Don't assume that symbols will be resolved at runtime
-        target_link_options(${target} PRIVATE "-Wl,--no-undefined")
-    endif()
+    # Don't assume that symbols will be resolved at runtime
+    add_supported_cxx_linker_flags(${target} PRIVATE "-Wl,--no-undefined")
 
     set_target_properties(
         ${target}
@@ -135,10 +168,12 @@ function(set_default_compile_options target)
 
     if(SLANG_ENABLE_ASAN)
         add_supported_cxx_flags(${target} /fsanitize=address -fsanitize=address)
-        if(MSVC)
-            target_link_options(${target} BEFORE PUBLIC /INCREMENTAL:NO)
-        else()
-            target_link_options(${target} BEFORE PUBLIC -fsanitize=address)
-        endif()
+        add_supported_cxx_linker_flags(
+            ${target}
+            BEFORE
+            PUBLIC
+            /INCREMENTAL:NO
+            -fsanitize=address
+        )
     endif()
 endfunction()
