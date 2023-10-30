@@ -2,16 +2,15 @@ function(slang_add_target dir type)
     set(no_value_args
         # Don't include in the 'all' target
         EXCLUDE_FROM_ALL
-        # This is a tool used for compile-time generation
-        GENERATOR_TOOL
-        # This is a tool used for testing
-        TEST_TOOL
         # This is loaded at runtime as a shared library
         SHARED_LIBRARY_TOOL
         # -Wextra
         USE_EXTRA_WARNINGS
         # don't set -Wall
         USE_FEWER_WARNINGS
+        # Make this a Windows app, rather than a console app, only makes a
+        # difference when compiling for Windows
+        WIN32_EXECUTABLE
     )
     set(single_value_args
         # Set the target name, useful for multiple targets from the same
@@ -20,6 +19,11 @@ function(slang_add_target dir type)
         TARGET_NAME
         # Set the output name, otherwise defaults to the target name
         OUTPUT_NAME
+        # Set an explicit output directory relative to the cmake binary
+        # directory. otherwise defaults to the binary directory root.
+        # Outputs are always placed in a further subdirectory according to
+        # build config
+        OUTPUT_DIR
         # If this is a shared library then the ${EXPORT_MACRO_PREFIX}_DYNAMIC and
         # ${EXPORT_MACRO_PREFIX}_DYNAMIC_EXPORT macros are set for using and
         # building respectively
@@ -32,19 +36,36 @@ function(slang_add_target dir type)
         LINK_WITH_PRIVATE
         # Targets whose headers we use, but don't link with
         INCLUDE_FROM_PRIVATE
-        # Any shared libraries used at runtime, this adds a build dependency and
-        # sets the correct RPATH
-        MODULE_DEPENDS
         # Any include directories other targets need to use this target
         INCLUDE_DIRECTORIES_PUBLIC
+        # Add a dependency on the new target to the specified targets
+        REQUIRED_BY
+        # Add a dependency to the new target on the specified targets
+        REQUIRES
     )
     cmake_parse_arguments(
         ARG
         "${no_value_args}"
         "${single_value_args}"
         "${multi_value_args}"
-        ${ARGV}
+        ${ARGN}
     )
+
+    if(DEFINED ARG_UNPARSED_ARGUMENTS OR DEFINED ARG_KEYWORDS_MISSING_VALUES)
+        foreach(unparsed_arg ${ARG_UNPARSED_ARGUMENTS})
+            message(
+                SEND_ERROR
+                "Unrecognized argument in slang_add_target: ${unparsed_arg}"
+            )
+        endforeach()
+        foreach(bad_kwarg ${ARG_KEYWORDS_MISSING_VALUES})
+            message(
+                SEND_ERROR
+                "Keyword argument missing values in slang_add_target: ${bad_kwarg}"
+            )
+        endforeach()
+        return()
+    endif()
 
     #
     # Set up some variables, including the target name
@@ -91,36 +112,27 @@ function(slang_add_target dir type)
     #
     # Set the output directory
     #
-    # We don't want the output directory to be sensitive to where slang_add_target
-    # is called from, so set it explicitly here.
+    # We don't want the output directory to be sensitive to where
+    # slang_add_target is called from, so set it explicitly here.
     #
-    if(ARG_GENERATOR_TOOL)
-        # generators go in generators/
-        set(output_dir "generators")
-    elseif(ARG_TEST_TOOL)
-        # tests go in test/
-        set(output_dir "test")
+    if(DEFINED ARG_OUTPUT_DIR)
+        set(output_dir "${CMAKE_BINARY_DIR}/${ARG_OUTPUT_DIR}/$<CONFIG>")
     else()
-        # Everything else is placed according to its source
-        file(
-            RELATIVE_PATH
-            dir_source_relative
-            ${CMAKE_SOURCE_DIR}
-            ${dir_absolute}
-        )
-        set(output_dir "${dir_source_relative}")
+        # Default to placing things in the cmake binary root.
+        #
+        # While it would be nice to place things according to their
+        # subdirectory, Windows' inflexibility in being able to find DLLs makes
+        # this tricky there.
+        set(output_dir "${CMAKE_BINARY_DIR}/$<CONFIG>")
     endif()
-
-    if(DEFINED output_dir)
-        set(output_dir "${CMAKE_BINARY_DIR}/${output_dir}/$<CONFIG>")
-        set_target_properties(
-            ${target}
-            PROPERTIES
-                ARCHIVE_OUTPUT_DIRECTORY ${output_dir}
-                LIBRARY_OUTPUT_DIRECTORY ${output_dir}
-                RUNTIME_OUTPUT_DIRECTORY ${output_dir}
-        )
-    endif()
+    set_target_properties(
+        ${target}
+        PROPERTIES
+            ARCHIVE_OUTPUT_DIRECTORY "${output_dir}/lib"
+            LIBRARY_OUTPUT_DIRECTORY "${output_dir}/lib"
+            RUNTIME_OUTPUT_DIRECTORY "${output_dir}/bin"
+            PDB_OUTPUT_DIRECTORY "${output_dir}/bin"
+    )
 
     #
     # Set common compile options and properties
@@ -136,6 +148,11 @@ function(slang_add_target dir type)
     set_target_properties(
         ${target}
         PROPERTIES EXCLUDE_FROM_ALL ${ARG_EXCLUDE_FROM_ALL}
+    )
+
+    set_target_properties(
+        ${target}
+        PROPERTIES WIN32_EXECUTABLE ${ARG_WIN32_EXECUTABLE}
     )
 
     if(DEFINED ARG_OUTPUT_NAME)
@@ -170,24 +187,6 @@ function(slang_add_target dir type)
     endforeach()
 
     #
-    # Runtime dependencies on other targets
-    #
-    if(DEFINED ARG_MODULE_DEPENDS)
-        add_dependencies(${target} ${ARG_MODULE_DEPENDS})
-        list(
-            TRANSFORM ARG_MODULE_DEPENDS
-            REPLACE "(.+)" "$<TARGET_FILE_DIR:\\1>"
-            OUTPUT_VARIABLE build_rpaths
-        )
-        set_property(
-            TARGET ${target}
-            APPEND
-            PROPERTY BUILD_RPATH ${build_rpaths}
-        )
-        get_target_property(x ${target} BUILD_RPATH)
-    endif()
-
-    #
     # Set up export macros
     #
     if(ARG_SHARED_LIBRARY_TOOL)
@@ -206,5 +205,16 @@ function(slang_add_target dir type)
                 PRIVATE "${ARG_EXPORT_MACRO_PREFIX}_DYNAMIC_EXPORT"
             )
         endif()
+    endif()
+
+    #
+    # Other dependencies
+    #
+    foreach(requirer ${ARG_REQUIRED_BY})
+        add_dependencies(${requirer} ${target})
+    endforeach()
+
+    if(DEFINED ARG_REQUIRES)
+        add_dependencies(${target} ${ARG_REQUIRES})
     endif()
 endfunction()

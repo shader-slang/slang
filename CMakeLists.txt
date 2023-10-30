@@ -3,11 +3,19 @@ cmake_minimum_required(VERSION 3.17)
 project(slang VERSION 2023.4.0 LANGUAGES C CXX)
 
 #
+# Global CMake options, generally to be avoided
+#
+
+# Don't use absolute paths to the build tree in RPATH
+set(CMAKE_BUILD_RPATH_USE_ORIGIN TRUE)
+# Our module dir
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
+
+#
 # Our utils
 #
 
-set(SLANG_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
-set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
+set(SLANG_ROOT_DIR ${CMAKE_CURRENT_LIST_DIR})
 include(CompilerFlags)
 include(Glob)
 include(SlangTarget)
@@ -32,10 +40,21 @@ option(
 option(SLANG_ENABLE_DX_ON_VK "Use dxvk and vkd3d-proton for DirectX support")
 
 option(SLANG_EMBED_STDLIB "Build slang with an embedded version of the stdlib")
-option(SLANG_EMBED_STDLIB_SOURCE "Do not include stdlib source in the binary")
+option(SLANG_EMBED_STDLIB_SOURCE "Embed stdlib source in the binary" ON)
 
 option(SLANG_ENABLE_FULL_IR_VALIDATION "Enable full IR validation (SLOW!)")
 option(SLANG_ENABLE_ASAN "Enable ASAN (address sanitizer)")
+
+#
+# Option validation
+#
+
+if(NOT SLANG_EMBED_STDLIB AND NOT SLANG_EMBED_STDLIB_SOURCE)
+    message(
+        SEND_ERROR
+        "One of SLANG_EMBED_STDLIB and SLANG_EMBED_STDLIB_SOURCE must be enabled"
+    )
+endif()
 
 #
 # Dependencies
@@ -101,50 +120,60 @@ endif()
 # Tools used to generate source during the build:
 #
 
+add_custom_target(
+    generators
+    COMMENT "meta target which depends on all examples"
+)
 slang_add_target(
     tools/slang-cpp-extractor
     EXECUTABLE
     EXCLUDE_FROM_ALL
-    GENERATOR_TOOL
+    OUTPUT_DIR generators
     LINK_WITH_PRIVATE core compiler-core
+    REQUIRED_BY generators
 )
 slang_add_target(
     tools/slang-embed
     EXECUTABLE
     EXCLUDE_FROM_ALL
-    GENERATOR_TOOL
+    OUTPUT_DIR generators
     LINK_WITH_PRIVATE core
+    REQUIRED_BY generators
 )
 slang_add_target(
     tools/slang-generate
     EXECUTABLE
     EXCLUDE_FROM_ALL
-    GENERATOR_TOOL
+    OUTPUT_DIR generators
     USE_FEWER_WARNINGS
     LINK_WITH_PRIVATE core
+    REQUIRED_BY generators
 )
 slang_add_target(
     tools/slang-lookup-generator
     EXECUTABLE
     EXCLUDE_FROM_ALL
-    GENERATOR_TOOL
+    OUTPUT_DIR generators
     LINK_WITH_PRIVATE core compiler-core
+    REQUIRED_BY generators
 )
 slang_add_target(
     tools/slang-spirv-embed-generator
     EXECUTABLE
     EXCLUDE_FROM_ALL
-    GENERATOR_TOOL
+    OUTPUT_DIR generators
     LINK_WITH_PRIVATE core compiler-core
+    REQUIRED_BY generators
 )
 slang_add_target(
     source/slangc
     EXECUTABLE
     USE_FEWER_WARNINGS
-    GENERATOR_TOOL
+    OUTPUT_DIR generators
     TARGET_NAME slang-bootstrap
     EXCLUDE_FROM_ALL
     LINK_WITH_PRIVATE core slang-static Threads::Threads
+    REQUIRED_BY generators
 )
 
 #
@@ -201,6 +230,9 @@ slang_add_target(
     STATIC
     LINK_WITH_PRIVATE core
     INCLUDE_FROM_PRIVATE gfx
+    # The headers are included with 'include "gfx-util/blah.h"' which is found
+    # in the tools directory
+    INCLUDE_DIRECTORIES_PUBLIC tools
 )
 
 #
@@ -211,33 +243,25 @@ slang_add_target(
     tools/slang-test
     EXECUTABLE
     USE_FEWER_WARNINGS
-    TEST_TOOL
     LINK_WITH_PRIVATE core compiler-core slang ${CMAKE_DL_LIBS} Threads::Threads
-    MODULE_DEPENDS
-        slang-reflection-test
-        render-test
-        slang-unit-test
-        gfx-unit-test
+    REQUIRES slang-reflection-test render-test slang-unit-test gfx-unit-test
 )
 slang_add_target(
     tools/test-server
     EXECUTABLE
     EXCLUDE_FROM_ALL
-    TEST_TOOL
     LINK_WITH_PRIVATE core compiler-core slang
 )
 slang_add_target(
     tools/test-process
     EXECUTABLE
     EXCLUDE_FROM_ALL
-    TEST_TOOL
     LINK_WITH_PRIVATE core compiler-core
 )
 slang_add_target(
     tools/slang-profile
     EXECUTABLE
     EXCLUDE_FROM_ALL
-    TEST_TOOL
     LINK_WITH_PRIVATE slang-static
 )
 
@@ -245,7 +269,6 @@ slang_add_target(
     tools/unit-test
     OBJECT
     EXCLUDE_FROM_ALL
-    TEST_TOOL
     INCLUDE_FROM_PRIVATE slang
 )
 
@@ -255,7 +278,6 @@ slang_add_target(
     MODULE
     EXCLUDE_FROM_ALL
     SHARED_LIBRARY_TOOL
-    TEST_TOOL
     USE_FEWER_WARNINGS
     LINK_WITH_PRIVATE core slang unit-test gfx gfx-util platform
     OUTPUT_NAME gfx-unit-test-tool
@@ -265,7 +287,6 @@ slang_add_target(
     MODULE
     EXCLUDE_FROM_ALL
     SHARED_LIBRARY_TOOL
-    TEST_TOOL
     USE_FEWER_WARNINGS
     LINK_WITH_PRIVATE core compiler-core unit-test slang Threads::Threads
     OUTPUT_NAME slang-unit-test-tool
@@ -275,7 +296,6 @@ slang_add_target(
     MODULE
     EXCLUDE_FROM_ALL
     SHARED_LIBRARY_TOOL
-    TEST_TOOL
     USE_FEWER_WARNINGS
     LINK_WITH_PRIVATE core slang
     OUTPUT_NAME slang-reflection-test-tool
@@ -285,8 +305,43 @@ slang_add_target(
     MODULE
     EXCLUDE_FROM_ALL
     SHARED_LIBRARY_TOOL
-    TEST_TOOL
     USE_FEWER_WARNINGS
     LINK_WITH_PRIVATE core compiler-core slang gfx gfx-util platform
     OUTPUT_NAME render-test-tool
 )
+
+#
+# Examples
+#
+
+slang_add_target(
+    examples/example-base
+    STATIC
+    EXCLUDE_FROM_ALL
+    LINK_WITH_PRIVATE core slang gfx platform
+)
+
+add_custom_target(examples COMMENT "meta target which depends on all examples")
+function(example dir)
+    slang_add_target(
+        ${dir}
+        EXECUTABLE
+        EXCLUDE_FROM_ALL
+        USE_FEWER_WARNINGS
+        LINK_WITH_PRIVATE core example-base slang gfx gfx-util platform ${ARGN}
+        REQUIRED_BY examples
+    )
+endfunction()
+
+example(examples/autodiff-texture WIN32_EXECUTABLE)
+example(examples/cpu-com-example )
+example(examples/cpu-hello-world )
+example(examples/gpu-printing )
+example(examples/hello-world LINK_WITH_PRIVATE Vulkan-Headers)
+example(examples/model-viewer WIN32_EXECUTABLE)
+# example(examples/nv-aftermath-example WIN32_EXECUTABLE)
+example(examples/ray-tracing WIN32_EXECUTABLE)
+example(examples/ray-tracing-pipeline WIN32_EXECUTABLE)
+example(examples/shader-object )
+example(examples/shader-toy WIN32_EXECUTABLE)
+example(examples/triangle WIN32_EXECUTABLE)
