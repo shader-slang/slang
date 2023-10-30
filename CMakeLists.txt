@@ -128,6 +128,7 @@ slang_add_target(
     tools/slang-cpp-extractor
     EXECUTABLE
     EXCLUDE_FROM_ALL
+    USE_FEWER_WARNINGS
     OUTPUT_DIR generators
     LINK_WITH_PRIVATE core compiler-core
     REQUIRED_BY generators
@@ -182,7 +183,13 @@ slang_add_target(
 
 add_subdirectory(prelude)
 add_subdirectory(source/slang)
-slang_add_target(tools/slangd EXECUTABLE LINK_WITH_PRIVATE core slang)
+correct_generated_properties()
+
+slang_add_target(
+    tools/slangd
+    EXECUTABLE
+    LINK_WITH_PRIVATE core slang slang-reflect-headers
+)
 slang_add_target(
     source/slangc
     EXECUTABLE

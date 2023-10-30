@@ -5,20 +5,32 @@
 # List of *.meta.slang headers
 glob_append(SLANG_STDLIB_META_SOURCE "*.meta.slang")
 
+set(SLANG_STDLIB_META_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/stdlib-meta")
+
 # Generate the output file list
-list(
-    TRANSFORM SLANG_STDLIB_META_SOURCE
-    APPEND .h
-    OUTPUT_VARIABLE SLANG_STDLIB_META_GENERATED_HEADERS
-)
+set(SLANG_STDLIB_META_GENERATED_HEADERS)
+foreach(meta_source ${SLANG_STDLIB_META_SOURCE})
+    file(
+        RELATIVE_PATH
+        meta_source_relative
+        ${CMAKE_CURRENT_LIST_DIR}
+        ${meta_source}
+    )
+    list(
+        APPEND
+        SLANG_STDLIB_META_GENERATED_HEADERS
+        "${SLANG_STDLIB_META_OUTPUT_DIR}/${meta_source_relative}.h"
+    )
+endforeach()
 
 add_custom_command(
     OUTPUT ${SLANG_STDLIB_META_GENERATED_HEADERS}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${SLANG_STDLIB_META_OUTPUT_DIR}
     COMMAND
         slang-generate ${SLANG_STDLIB_META_SOURCE} --target-directory
-        ${CMAKE_CURRENT_BINARY_DIR}
+        ${SLANG_STDLIB_META_OUTPUT_DIR}
     DEPENDS ${SLANG_STDLIB_META_SOURCE}
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
     VERBATIM
 )
 
@@ -29,7 +41,69 @@ target_sources(
 )
 target_include_directories(
     slang-meta-headers
-    INTERFACE ${CMAKE_CURRENT_BINARY_DIR}
+    INTERFACE ${SLANG_STDLIB_META_OUTPUT_DIR}
+)
+
+#
+# generated headers for reflection
+#
+
+set(SLANG_REFLECT_INPUT
+    slang-ast-support-types.h
+    slang-ast-base.h
+    slang-ast-decl.h
+    slang-ast-expr.h
+    slang-ast-modifier.h
+    slang-ast-stmt.h
+    slang-ast-type.h
+    slang-ast-val.h
+)
+# Make them absolute
+list(TRANSFORM SLANG_REFLECT_INPUT PREPEND "${CMAKE_CURRENT_LIST_DIR}/")
+
+set(SLANG_REFLECT_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/ast-reflect")
+
+set(SLANG_REFLECT_GENERATED_HEADERS)
+foreach(type obj ast value)
+    foreach(macro "" -macro)
+        list(
+            APPEND
+            SLANG_REFLECT_GENERATED_HEADERS
+            "${SLANG_REFLECT_OUTPUT_DIR}/slang-generated-${type}${macro}.h"
+        )
+    endforeach()
+endforeach()
+
+# Work around https://gitlab.kitware.com/cmake/cmake/-/issues/18399
+set(SLANG_REFLECT_GENERATED_HEADERS
+    ${SLANG_REFLECT_GENERATED_HEADERS}
+    PARENT_SCOPE
+)
+function(correct_generated_properties)
+    foreach(reflect-header ${SLANG_REFLECT_GENERATED_HEADERS})
+        set_source_files_properties(${reflect-header} PROPERTIES GENERATED 1)
+    endforeach()
+endfunction()
+
+add_custom_command(
+    OUTPUT ${SLANG_REFLECT_GENERATED_HEADERS}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${SLANG_REFLECT_OUTPUT_DIR}
+    COMMAND
+        slang-cpp-extractor ${SLANG_REFLECT_INPUT} -strip-prefix slang- -o
+        ${SLANG_REFLECT_OUTPUT_DIR}/slang-generated -output-fields -mark-suffix
+        _CLASS
+    DEPENDS ${SLANG_REFLECT_INPUT}
+    VERBATIM
+)
+
+add_library(slang-reflect-headers INTERFACE EXCLUDE_FROM_ALL)
+target_sources(
+    slang-reflect-headers
+    INTERFACE ${SLANG_REFLECT_GENERATED_HEADERS}
+)
+target_include_directories(
+    slang-reflect-headers
+    INTERFACE ${SLANG_REFLECT_OUTPUT_DIR}
 )
 
 #
@@ -46,6 +120,7 @@ slang_add_target(
         compiler-core
         prelude
         slang-meta-headers
+        slang-reflect-headers
         SPIRV-Headers
 )
 target_compile_definitions(
@@ -79,45 +154,18 @@ target_include_directories(
 )
 
 #
-# generated headers for reflection
-#
-
-glob_append(SLANG_REFLECT_SOURCE "slang-ast-*.h")
-
-set(SLANG_REFLECT_GENERATED_HEADERS)
-foreach(type obj ast value)
-    foreach(macro "" -macro)
-        list(
-            APPEND
-            SLANG_REFLECT_GENERATED_HEADERS
-            "slang-generated-${type}${macro}.h"
-        )
-    endforeach()
-endforeach()
-
-add_custom_command(
-    OUTPUT ${SLANG_REFLECT_GENERATED_HEADERS}
-    COMMAND
-        slang-cpp-extractor -strip-prefix slang- -o
-        ${CMAKE_CURRENT_BINARY_DIR}/slang-generated -output-fields -mark-suffix
-        _CLASS ${SLANG_REFLECT_SOURCE}
-    DEPENDS ${SLANG_REFLECT_SOURCE}
-    VERBATIM
-)
-add_library(slang-reflect-headers INTERFACE EXCLUDE_FROM_ALL)
-target_sources(slang-reflect-headers INTERFACE ${SLANG_REFLECT_SOURCE})
-target_include_directories(
-    slang-reflect-headers
-    INTERFACE ${CMAKE_CURRENT_BINARY_DIR}
-)
-
-#
 # Slang itself
 #
 slang_add_target(
     .
     SHARED
-    LINK_WITH_PRIVATE core compiler-core prelude SPIRV-Headers
+    LINK_WITH_PRIVATE
+        core
+        compiler-core
+        prelude
+        slang-meta-headers
+        slang-reflect-headers
+        SPIRV-Headers
     # slang.h is in the project root, so include that directory in the interface
     # for slang
     INCLUDE_DIRECTORIES_PUBLIC ${SLANG_ROOT_DIR}
