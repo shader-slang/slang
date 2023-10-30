@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.17)
+cmake_minimum_required(VERSION 3.20)
 
 project(slang VERSION 2023.4.0 LANGUAGES C CXX)
 
@@ -113,6 +113,7 @@ if(NOT MSVC)
     set_source_files_properties(
         source/compiler-core/slang-dxc-compiler.cpp
         PROPERTIES COMPILE_OPTIONS "-fms-extensions"
+        DIRECTORY ${SLANG_ROOT_DIR}
     )
 endif()
 
@@ -183,7 +184,6 @@ slang_add_target(
 
 add_subdirectory(prelude)
 add_subdirectory(source/slang)
-correct_generated_properties()
 
 slang_add_target(
     tools/slangd

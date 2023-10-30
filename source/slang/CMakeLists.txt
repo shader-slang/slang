@@ -61,29 +61,19 @@ set(SLANG_REFLECT_INPUT
 # Make them absolute
 list(TRANSFORM SLANG_REFLECT_INPUT PREPEND "${CMAKE_CURRENT_LIST_DIR}/")
 
-set(SLANG_REFLECT_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/ast-reflect")
-
-set(SLANG_REFLECT_GENERATED_HEADERS)
-foreach(type obj ast value)
-    foreach(macro "" -macro)
-        list(
-            APPEND
-            SLANG_REFLECT_GENERATED_HEADERS
-            "${SLANG_REFLECT_OUTPUT_DIR}/slang-generated-${type}${macro}.h"
-        )
-    endforeach()
-endforeach()
-
-# Work around https://gitlab.kitware.com/cmake/cmake/-/issues/18399
 set(SLANG_REFLECT_GENERATED_HEADERS
-    ${SLANG_REFLECT_GENERATED_HEADERS}
-    PARENT_SCOPE
+    slang-generated-obj.h
+    slang-generated-obj-macro.h
+    slang-generated-ast.h
+    slang-generated-ast-macro.h
+    slang-generated-value.h
+    slang-generated-value-macro.h
 )
-function(correct_generated_properties)
-    foreach(reflect-header ${SLANG_REFLECT_GENERATED_HEADERS})
-        set_source_files_properties(${reflect-header} PROPERTIES GENERATED 1)
-    endforeach()
-endfunction()
+set(SLANG_REFLECT_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/ast-reflect")
+list(
+    TRANSFORM SLANG_REFLECT_GENERATED_HEADERS
+    PREPEND "${SLANG_REFLECT_OUTPUT_DIR}/"
+)
 
 add_custom_command(
     OUTPUT ${SLANG_REFLECT_GENERATED_HEADERS}
