@@ -95,6 +95,8 @@ slang_add_target(
 slang_add_target(
     source/slang-rt
     SHARED
+    USE_EXTRA_WARNINGS
+    # This compiles 'core' again with the SLANG_RT_DYNAMIC_EXPORT macro defined
     EXTRA_SOURCE_DIRS source/core
     LINK_WITH_PRIVATE miniz lz4_static Threads::Threads
     EXPORT_MACRO_PREFIX SLANG_RT
@@ -214,7 +216,6 @@ slang_add_target(
 #
 # GFX
 #
-
 slang_add_target(
     tools/gfx
     SHARED
@@ -230,6 +231,18 @@ slang_add_target(
     # slang-gfx is in this directory, anything which depends on gfx should include
     # this
     INCLUDE_DIRECTORIES_PUBLIC .
+    REQUIRES copy-gfx-slang-modules
+)
+add_custom_target(
+    copy-gfx-slang-modules
+    COMMAND
+        ${CMAKE_COMMAND} -E copy tools/gfx/gfx.slang
+        $<TARGET_FILE_DIR:slang-test>
+    COMMAND
+        ${CMAKE_COMMAND} -E copy tools/gfx/slang.slang
+        $<TARGET_FILE_DIR:slang-test>
+    WORKING_DIRECTORY ${SLANG_ROOT_DIR}
+    VERBATIM
 )
 
 slang_add_target(
@@ -251,7 +264,16 @@ slang_add_target(
     EXECUTABLE
     USE_FEWER_WARNINGS
     LINK_WITH_PRIVATE core compiler-core slang ${CMAKE_DL_LIBS} Threads::Threads
-    REQUIRES slang-reflection-test render-test slang-unit-test gfx-unit-test slangd
+    REQUIRES
+        # Shared libraries dlopened by slang-test
+        slang-reflection-test
+        render-test
+        slang-unit-test
+        gfx-unit-test
+        # Used by some tests when they run
+        slangd
+        slang-rt
+        gfx
 )
 slang_add_target(
     tools/test-server

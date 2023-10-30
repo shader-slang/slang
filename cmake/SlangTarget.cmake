@@ -217,4 +217,14 @@ function(slang_add_target dir type)
     if(DEFINED ARG_REQUIRES)
         add_dependencies(${target} ${ARG_REQUIRES})
     endif()
+
+    #
+    # Since we do a lot of dynamic loading, unconditionally set the build rpath
+    # to find our libraries. Ordinarily CMake would sort this out, but we do
+    # have libraries which at build time don't depend on any other shared
+    # libraries of ours but which do load them at runtime, hence the need to do
+    # this explicitly here.
+    #
+    set_property(TARGET ${target} APPEND PROPERTY BUILD_RPATH "$ORIGIN/../lib")
+    set_property(TARGET ${target} APPEND PROPERTY INSTALL_RPATH "$ORIGIN/../lib")
 endfunction()
