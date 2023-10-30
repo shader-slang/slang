@@ -100,22 +100,25 @@ target_include_directories(
 # Slang static
 #
 
+# TODO: Avoid compiling everything in this directory twice (once here and again
+# for the shared library). This will be easier once premake is gone and we can
+# move slang-stdlib-api.cpp to the build directory. It's basically instant with
+# ccache, but that's not available everywhere.
 slang_add_target(
     .
-    STATIC
-    TARGET_NAME slang-static
+    OBJECT
+    TARGET_NAME slang-no-embedded-stdlib
     EXCLUDE_FROM_ALL
     LINK_WITH_PRIVATE
         core
         compiler-core
-        prelude
+        # Bundle the source unconditionally
         slang-meta-headers
         slang-reflect-headers
         SPIRV-Headers
 )
 target_compile_definitions(
-    slang-static
-    PUBLIC SLANG_STATIC
+    slang-no-embedded-stdlib
     PRIVATE SLANG_WITHOUT_EMBEDDED_STD_LIB
 )
 
@@ -133,10 +136,11 @@ add_custom_command(
         ${SLANG_STDLIB_GENERATED_HEADER}
     VERBATIM
 )
-add_library(slang-stdlib-embed-headers INTERFACE EXCLUDE_FROM_ALL)
-target_sources(
+add_library(
     slang-stdlib-embed-headers
-    INTERFACE ${SLANG_STDLIB_GENERATED_HEADER}
+    INTERFACE
+    EXCLUDE_FROM_ALL
+    ${SLANG_STDLIB_GENERATED_HEADER}
 )
 target_include_directories(
     slang-stdlib-embed-headers
@@ -153,7 +157,6 @@ slang_add_target(
         core
         compiler-core
         prelude
-        slang-meta-headers
         slang-reflect-headers
         SPIRV-Headers
     # slang.h is in the project root, so include that directory in the interface
@@ -162,7 +165,9 @@ slang_add_target(
     EXPORT_MACRO_PREFIX SLANG
 )
 
-if(NOT SLANG_EMBED_STDLIB_SOURCE)
+if(SLANG_EMBED_STDLIB_SOURCE)
+    target_link_libraries(slang PRIVATE slang-meta-headers)
+else()
     target_compile_definitions(slang PRIVATE SLANG_DISABLE_STDLIB_SOURCE)
 endif()
 

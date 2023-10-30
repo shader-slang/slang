@@ -174,7 +174,7 @@ slang_add_target(
     OUTPUT_DIR generators
     TARGET_NAME slang-bootstrap
     EXCLUDE_FROM_ALL
-    LINK_WITH_PRIVATE core slang-static Threads::Threads
+    LINK_WITH_PRIVATE core prelude slang-no-embedded-stdlib Threads::Threads
     REQUIRED_BY generators
 )
 
@@ -251,7 +251,7 @@ slang_add_target(
     EXECUTABLE
     USE_FEWER_WARNINGS
     LINK_WITH_PRIVATE core compiler-core slang ${CMAKE_DL_LIBS} Threads::Threads
-    REQUIRES slang-reflection-test render-test slang-unit-test gfx-unit-test
+    REQUIRES slang-reflection-test render-test slang-unit-test gfx-unit-test slangd
 )
 slang_add_target(
     tools/test-server
@@ -269,7 +269,7 @@ slang_add_target(
     tools/slang-profile
     EXECUTABLE
     EXCLUDE_FROM_ALL
-    LINK_WITH_PRIVATE slang-static
+    LINK_WITH_PRIVATE core slang
 )
 
 slang_add_target(
