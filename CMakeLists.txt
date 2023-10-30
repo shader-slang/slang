@@ -123,7 +123,7 @@ endif()
 
 add_custom_target(
     generators
-    COMMENT "meta target which depends on all examples"
+    COMMENT "meta target which depends on all generators"
 )
 slang_add_target(
     tools/slang-cpp-extractor
