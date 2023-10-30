@@ -34,10 +34,11 @@ add_custom_command(
     VERBATIM
 )
 
-add_library(slang-meta-headers INTERFACE EXCLUDE_FROM_ALL)
-target_sources(
+add_library(
     slang-meta-headers
-    INTERFACE ${SLANG_STDLIB_META_GENERATED_HEADERS}
+    INTERFACE
+    EXCLUDE_FROM_ALL
+    ${SLANG_STDLIB_META_GENERATED_HEADERS}
 )
 target_include_directories(
     slang-meta-headers
@@ -86,10 +87,11 @@ add_custom_command(
     VERBATIM
 )
 
-add_library(slang-reflect-headers INTERFACE EXCLUDE_FROM_ALL)
-target_sources(
+add_library(
     slang-reflect-headers
-    INTERFACE ${SLANG_REFLECT_GENERATED_HEADERS}
+    INTERFACE
+    EXCLUDE_FROM_ALL
+    ${SLANG_REFLECT_GENERATED_HEADERS}
 )
 target_include_directories(
     slang-reflect-headers
