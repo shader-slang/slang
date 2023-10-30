@@ -632,7 +632,7 @@ static SlangResult _parseGCCFamilyLine(SliceAllocator& allocator, const UnownedS
 
     if (options.libraryPaths.count && options.targetType == SLANG_HOST_EXECUTABLE)
     {
-        cmdLine.addArg("-Wl,-rpath,$ORIGIN");
+        cmdLine.addArg("-Wl,-rpath,$ORIGIN:$ORIGIN/../lib");
     }
 
     StringSlicePool libPathPool(StringSlicePool::Style::Default);
