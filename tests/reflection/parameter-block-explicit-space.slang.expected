@@ -6,7 +6,7 @@ standard output = {
     "parameters": [
         {
             "name": "a",
-            "binding": {"kind": "registerSpace", "index": 2},
+            "binding": {"kind": "subElementRegisterSpace", "index": 2},
             "type": {
                 "kind": "parameterBlock",
                 "elementType": {
@@ -53,7 +53,7 @@ standard output = {
                 "containerVarLayout": {
                     "bindings": [
                         {"kind": "constantBuffer", "index": 0},
-                        {"kind": "registerSpace", "index": 0}
+                        {"kind": "subElementRegisterSpace", "index": 0}
                     ]
                 },
                 "elementVarLayout": {
@@ -108,7 +108,7 @@ standard output = {
         },
         {
             "name": "b",
-            "binding": {"kind": "registerSpace", "index": 3},
+            "binding": {"kind": "subElementRegisterSpace", "index": 3},
             "type": {
                 "kind": "parameterBlock",
                 "elementType": {
@@ -147,7 +147,7 @@ standard output = {
                 "containerVarLayout": {
                     "bindings": [
                         {"kind": "constantBuffer", "index": 0},
-                        {"kind": "registerSpace", "index": 0}
+                        {"kind": "subElementRegisterSpace", "index": 0}
                     ]
                 },
                 "elementVarLayout": {

@@ -1425,6 +1425,25 @@ IRVarLayout* getFieldLayout(
     return nullptr;
 }
 
+Index findRegisterSpaceResourceInfo(IRVarLayout* layout)
+{
+    if (auto parameterGroupLayout = as<IRParameterGroupTypeLayout>(layout->getTypeLayout()))
+    {
+        auto registerInfo = parameterGroupLayout->getContainerVarLayout()->findOffsetAttr(LayoutResourceKind::RegisterSpace);
+        auto containerRegisterInfo = layout->findOffsetAttr(LayoutResourceKind::SubElementRegisterSpace);
+        if (registerInfo)
+        {
+            if (containerRegisterInfo)
+                return (Index)(registerInfo->getOffset() + containerRegisterInfo->getOffset());
+            else
+                return (Index)(registerInfo->getOffset());
+        }
+    }
+    if (auto registerSpaceOffset = layout->findOffsetAttr(LayoutResourceKind::RegisterSpace))
+        return (Index)registerSpaceOffset->getOffset();
+    return -1;
+}
+
 void buildSimpleVarLayout(
     IRVarLayout::Builder*   builder,
     SimpleLegalVarChain*    varChain,
@@ -1478,11 +1497,26 @@ void buildSimpleVarLayout(
     {
         // Sum up contributions from all parents.
         UInt space = 0;
+        bool useSubElementSpace = false;
         for (auto vv = varChain; vv; vv = vv->next)
         {
-            if (auto parentResInfo = vv->varLayout->findOffsetAttr(LayoutResourceKind::RegisterSpace))
+            if (!useSubElementSpace)
             {
-                space += parentResInfo->getOffset();
+                auto spaceOffset = findRegisterSpaceResourceInfo(vv->varLayout);
+                if (spaceOffset != -1)
+                {
+                    space += spaceOffset;
+                    useSubElementSpace = true;
+                }
+            }
+            else
+            {
+                // Once we found the first RegisterSpace usage, we will sum up offets from parent's SubElementReigsterSpace info.
+                if (auto parentResInfo = vv->varLayout->findOffsetAttr(LayoutResourceKind::SubElementRegisterSpace))
+                {
+                    space += parentResInfo->getOffset();
+                    useSubElementSpace = true;
+                }
             }
         }
 

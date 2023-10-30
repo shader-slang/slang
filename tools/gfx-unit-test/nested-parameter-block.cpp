@@ -145,11 +145,8 @@ namespace gfx_test
         runTestImpl(nestedParameterBlockTestImpl, unitTestContext, Slang::RenderApiFlag::D3D12);
     }
 
-    // TODO: Vulkan's PipelineLayout creation logic is still wrong.
-#if 0
     SLANG_UNIT_TEST(nestedParameterBlockTestVulkan)
     {
         runTestImpl(nestedParameterBlockTestImpl, unitTestContext, Slang::RenderApiFlag::Vulkan);
     }
-#endif
 }

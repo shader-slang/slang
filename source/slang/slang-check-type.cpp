@@ -317,6 +317,8 @@ namespace Slang
                     if (!genericTypeParamDecl)
                         return false;
                     auto defaultType = CheckProperType(genericTypeParamDecl->initType);
+                    if (!defaultType)
+                        return false;
                     auto witness = tryGetSubtypeWitness(defaultType, CheckProperType(constraintParam->sup));
                     if (!witness)
                     {
@@ -326,8 +328,6 @@ namespace Slang
                             Diagnostics::typeArgumentDoesNotConformToInterface,
                             defaultType,
                             constraintParam->sup);
-
-                        SLANG_UNEXPECTED("default type argument does not conform to interface");
                         return false;
                     }
                     witnessArgs.add(witness);

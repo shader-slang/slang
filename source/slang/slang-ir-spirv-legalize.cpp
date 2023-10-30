@@ -526,7 +526,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                         varLayout = as<IRVarLayout>(varLayoutInst->getLayout());
                     if (varLayout)
                     {
-                        auto registerSpaceOffsetAttr = varLayout->findOffsetAttr(LayoutResourceKind::RegisterSpace);
+                        auto registerSpaceOffsetAttr = varLayout->findOffsetAttr(LayoutResourceKind::SubElementRegisterSpace);
                         if (registerSpaceOffsetAttr)
                         {
                             List<IRInst*> operands;

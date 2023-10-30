@@ -131,4 +131,9 @@ namespace gfx_test
     {
         runTestImpl(rootShaderParameterTestImpl, unitTestContext, Slang::RenderApiFlag::D3D12);
     }
+
+    SLANG_UNIT_TEST(rootShaderParameterVulkan)
+    {
+        runTestImpl(rootShaderParameterTestImpl, unitTestContext, Slang::RenderApiFlag::Vulkan);
+    }
 }

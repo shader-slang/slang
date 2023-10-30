@@ -65,7 +65,7 @@ standard output = {
         },
         {
             "name": "ee",
-            "binding": {"kind": "registerSpace", "index": 3, "count": 2},
+            "binding": {"kind": "subElementRegisterSpace", "index": 3, "count": 2},
             "type": {
                 "kind": "array",
                 "elementCount": 0,

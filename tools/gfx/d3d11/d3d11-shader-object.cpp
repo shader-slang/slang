@@ -334,7 +334,7 @@ Result ShaderObjectImpl::bindAsConstantBuffer(
     // Note that this call will use the `offset` value that might have
     // been modified during `_bindOrindaryDataBufferIfNeeded`.
     //
-    SLANG_RETURN_ON_FAIL(bindAsValue(context, offset, specializedLayout));
+    SLANG_RETURN_ON_FAIL(bindAsValue(context, inOffset, specializedLayout));
 
     return SLANG_OK;
 }

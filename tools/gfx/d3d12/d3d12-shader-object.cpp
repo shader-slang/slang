@@ -440,7 +440,7 @@ void ShaderObjectImpl::updateSubObjectsRecursive()
             if (!subObject)
                 continue;
             subObject->updateSubObjectsRecursive();
-            if (m_subObjectVersions[objectIndex] != m_objects[objectIndex]->m_version)
+            if (m_subObjectVersions.getCount() > objectIndex && m_subObjectVersions[objectIndex] != m_objects[objectIndex]->m_version)
             {
                 ShaderOffset offset;
                 offset.bindingRangeIndex = (GfxIndex)subObjectRange.bindingRangeIndex;

@@ -320,7 +320,7 @@ public:
                 if (varLayout)
                 {
                     spaceOffset =
-                        (UINT)varLayout->getOffset(SLANG_PARAMETER_CATEGORY_REGISTER_SPACE);
+                        (UINT)varLayout->getOffset(SLANG_PARAMETER_CATEGORY_SUB_ELEMENT_REGISTER_SPACE);
                     offsetForRangeType[D3D12_DESCRIPTOR_RANGE_TYPE_CBV] =
                         (UINT)varLayout->getOffset(SLANG_PARAMETER_CATEGORY_CONSTANT_BUFFER);
                     offsetForRangeType[D3D12_DESCRIPTOR_RANGE_TYPE_SRV] =

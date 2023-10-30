@@ -2090,6 +2090,9 @@ extern "C"
         //
         SLANG_PARAMETER_CATEGORY_EXISTENTIAL_OBJECT_PARAM,
 
+        // The register space offset for the sub-elements that occupies register spaces.
+        SLANG_PARAMETER_CATEGORY_SUB_ELEMENT_REGISTER_SPACE,
+
         //
         SLANG_PARAMETER_CATEGORY_COUNT,
 
@@ -2637,6 +2640,8 @@ namespace slang
 
         ExistentialTypeParam = SLANG_PARAMETER_CATEGORY_EXISTENTIAL_TYPE_PARAM,
         ExistentialObjectParam = SLANG_PARAMETER_CATEGORY_EXISTENTIAL_OBJECT_PARAM,
+
+        SubElementRegisterSpace = SLANG_PARAMETER_CATEGORY_SUB_ELEMENT_REGISTER_SPACE,
 
         // DEPRECATED:
         VertexInput = SLANG_PARAMETER_CATEGORY_VERTEX_INPUT,

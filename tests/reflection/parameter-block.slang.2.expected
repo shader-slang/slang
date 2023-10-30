@@ -6,7 +6,7 @@ standard output = {
     "parameters": [
         {
             "name": "a",
-            "binding": {"kind": "registerSpace", "index": 1},
+            "binding": {"kind": "subElementRegisterSpace", "index": 1},
             "type": {
                 "kind": "parameterBlock",
                 "elementType": {
@@ -31,7 +31,7 @@ standard output = {
                     ]
                 },
                 "containerVarLayout": {
-                    "binding": {"kind": "registerSpace", "index": 0}
+                    "binding": {"kind": "subElementRegisterSpace", "index": 0}
                 },
                 "elementVarLayout": {
                     "type": {

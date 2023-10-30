@@ -451,6 +451,9 @@ UnownedStringSlice DocumentVersion::peekIdentifier(Index& offset)
 {
     Index start = offset;
     Index end = offset;
+    if (start >= text.getLength())
+        return UnownedStringSlice("");
+
     while (start >= 0 && _isIdentifierChar(text[start]))
         start--;
     while (end < text.getLength() && _isIdentifierChar(text[end]))
