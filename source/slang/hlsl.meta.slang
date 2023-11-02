@@ -2431,6 +2431,7 @@ T distance(T x, T y)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
+__target_intrinsic(spirv, "OpDot resultType resultId _0 _1")
 [__readNone]
 T dot(vector<T, N> x, vector<T, N> y)
 {
