@@ -2072,6 +2072,26 @@ SLANG_API SlangBindingType spReflectionTypeLayout_getBindingRangeType(SlangRefle
     return bindingRange.bindingType;
 }
 
+SLANG_API SlangInt spReflectionTypeLayout_isBindingRangeSpecializable(SlangReflectionTypeLayout* inTypeLayout, SlangInt index)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if (!typeLayout) return SLANG_BINDING_TYPE_UNKNOWN;
+
+    auto extTypeLayout = Slang::getExtendedTypeLayout(typeLayout);
+    if (index < 0) return SLANG_BINDING_TYPE_UNKNOWN;
+    if (index >= extTypeLayout->m_bindingRanges.getCount()) return SLANG_BINDING_TYPE_UNKNOWN;
+    auto& bindingRange = extTypeLayout->m_bindingRanges[index];
+    auto type = bindingRange.leafTypeLayout->getType();
+    if (asInterfaceType(type))
+        return 1;
+    if (auto parameterGroupType = as<ParameterGroupType>(type))
+    {
+        if (asInterfaceType(parameterGroupType->getElementType()))
+            return 1;
+    }
+    return 0;
+}
+
 SLANG_API SlangInt spReflectionTypeLayout_getBindingRangeBindingCount(SlangReflectionTypeLayout* inTypeLayout, SlangInt index)
 {
     auto typeLayout = convert(inTypeLayout);

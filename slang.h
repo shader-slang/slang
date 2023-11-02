@@ -2254,6 +2254,7 @@ extern "C"
 
     SLANG_API SlangInt spReflectionTypeLayout_getBindingRangeCount(SlangReflectionTypeLayout* typeLayout);
     SLANG_API SlangBindingType spReflectionTypeLayout_getBindingRangeType(SlangReflectionTypeLayout* typeLayout, SlangInt index);
+    SLANG_API SlangInt spReflectionTypeLayout_isBindingRangeSpecializable(SlangReflectionTypeLayout* typeLayout, SlangInt index);
     SLANG_API SlangInt spReflectionTypeLayout_getBindingRangeBindingCount(SlangReflectionTypeLayout* typeLayout, SlangInt index);
     SLANG_API SlangReflectionTypeLayout* spReflectionTypeLayout_getBindingRangeLeafTypeLayout(SlangReflectionTypeLayout* typeLayout, SlangInt index);
     SLANG_API SlangReflectionVariable* spReflectionTypeLayout_getBindingRangeLeafVariable(SlangReflectionTypeLayout* typeLayout, SlangInt index);
@@ -2852,6 +2853,14 @@ namespace slang
             return (BindingType) spReflectionTypeLayout_getBindingRangeType(
                 (SlangReflectionTypeLayout*) this,
                 index);
+        }
+
+        bool isBindingRangeSpecializable(SlangInt index)
+        {
+            return (bool)spReflectionTypeLayout_isBindingRangeSpecializable(
+                (SlangReflectionTypeLayout*)this,
+                index);
+
         }
 
         SlangInt getBindingRangeBindingCount(SlangInt index)

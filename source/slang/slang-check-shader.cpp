@@ -301,6 +301,27 @@ namespace Slang
         return entryPointFuncDecl;
     }
 
+    // Is a entry pointer parmaeter of `type` always a uniform parameter?
+    bool isUniformParameterType(Type* type)
+    {
+        if (as<ResourceType>(type))
+            return true;
+        if (as<HLSLStructuredBufferTypeBase>(type))
+            return true;
+        if (as<UntypedBufferResourceType>(type))
+            return true;
+        if (as<UniformParameterGroupType>(type))
+            return true;
+        if (as<SamplerStateType>(type))
+            return true;
+        return false;
+    }
+
+    bool isBuiltinParameterType(Type* type)
+    {
+        return as<BuiltinType>(type) != nullptr;
+    }
+
     // Validate that an entry point function conforms to any additional
     // constraints based on the stage (and profile?) it specifies.
     void validateEntryPoint(
@@ -420,6 +441,31 @@ namespace Slang
                             sink->diagnose(param->loc, Diagnostics::invalidDispatchThreadIDType, typeString);
                             return;
                         }
+                    }
+                }
+            }
+        }
+
+        for (const auto& param : entryPointFuncDecl->getParameters())
+        {
+            if (isUniformParameterType(param->getType()))
+            {
+                // Automatically add `uniform` modifier to entry point parameters.
+                if (!param->hasModifier<HLSLUniformModifier>())
+                    addModifier(param, getCurrentASTBuilder()->create<HLSLUniformModifier>());
+            }
+            else if (isBuiltinParameterType(param->getType()))
+            {
+            }
+            else
+            {
+                // For all non-uniform parameters of a general type, we require the parameter be associated with
+                // a system value semantic.
+                if (!param->hasModifier<HLSLUniformModifier>())
+                {
+                    if (!param->findModifier<HLSLSemantic>())
+                    {
+                        sink->diagnose(param, Diagnostics::nonUniformEntryPointParameterMustHaveSemantic, param->getName());
                     }
                 }
             }

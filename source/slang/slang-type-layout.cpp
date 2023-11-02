@@ -2426,6 +2426,12 @@ static RefPtr<TypeLayout> _createParameterGroupTypeLayout(
     if( wantSpaceOrSet )
     {
         containerTypeLayout->addResourceUsage(LayoutResourceKind::SubElementRegisterSpace, 1);
+
+        // Add a RegisterSpace entry to containerVarLayout to signal that this ParameterGroupTypeLayout
+        // initiates a new space for its element. This allows us to distinguish between the ConstantBuffer
+        // and ParameterBlock cases. The index of this entry is set to 0 since there is already a
+        // SubElementRegisterSpace entry stored in `typeLayout` that corresponds to the space used by
+        // this parameter group.
         containerVarLayout->findOrAddResourceInfo(LayoutResourceKind::RegisterSpace);
     }
 

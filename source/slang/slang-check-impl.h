@@ -17,6 +17,8 @@ namespace Slang
 
     bool isGlobalDecl(Decl* decl);
 
+    bool isUniformParameterType(Type* type);
+
     Type* checkProperType(
         Linkage*        linkage,
         TypeExp         typeExp,

@@ -1524,16 +1524,20 @@ Result ShaderObjectBaseImpl<TShaderObjectImpl, TShaderObjectLayoutImpl, TShaderO
                 case slang::BindingType::ConstantBuffer:
                 case slang::BindingType::RawBuffer:
                 case slang::BindingType::MutableRawBuffer:
-                    // Currently we only handle the case where the field's type is
-                    // `ParameterBlock<SomeStruct>` or `ConstantBuffer<SomeStruct>`, where
-                    // `SomeStruct` is a struct type (not directly an interface type). In this case,
-                    // we just recursively collect the specialization arguments from the bound sub
-                    // object.
+                    // If the field's type is `ParameterBlock<IFoo>`, we want to pull in the type argument
+                    // from the sub object for specialization.
+                    if (bindingRange.isSpecializable)
+                    {
+                        ExtendedShaderObjectType specializedSubObjType;
+                        SLANG_RETURN_ON_FAIL(
+                            subObject->getSpecializedShaderObjectType(&specializedSubObjType));
+                        typeArgs.add(specializedSubObjType);
+                    }
+
+                    // If field's type is `ParameterBlock<SomeStruct>` or `ConstantBuffer<SomeStruct>`, where
+                    // `SomeStruct` is a struct type (not directly an interface type), we need to recursively
+                    // collect the specialization arguments from the bound sub object.
                     SLANG_RETURN_ON_FAIL(subObject->collectSpecializationArgs(typeArgs));
-                    // TODO: we need to handle the case where the field is of the form
-                    // `ParameterBlock<IFoo>`. We should treat this case the same way as the
-                    // `ExistentialValue` case here, but currently we lack a mechanism to
-                    // distinguish the two scenarios.
                     break;
             }
 

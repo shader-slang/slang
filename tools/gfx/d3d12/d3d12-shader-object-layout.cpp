@@ -124,6 +124,7 @@ Result ShaderObjectLayoutImpl::Builder::setElementTypeLayout(
             static_cast<DeviceImpl*>(m_renderer)->m_extendedDesc.rootParameterShaderAttributeName,
             typeLayout,
             r);
+        bindingRangeInfo.isSpecializable = typeLayout->isBindingRangeSpecializable(r);
         if (bindingRangeInfo.isRootParameter)
         {
             RootParameterInfo rootInfo = {};

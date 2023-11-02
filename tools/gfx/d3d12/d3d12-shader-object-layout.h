@@ -67,6 +67,9 @@ public:
         uint32_t subObjectIndex;
 
         bool isRootParameter;
+
+        /// Is this binding range represent a specialization point, such as an existential value, or a `ParameterBlock<IFoo>`.
+        bool isSpecializable;
     };
 
     /// Offset information for a sub-object range

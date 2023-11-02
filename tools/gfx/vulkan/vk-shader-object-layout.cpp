@@ -394,7 +394,7 @@ void ShaderObjectLayoutImpl::Builder::addBindingRanges(slang::TypeLayoutReflecti
         bindingRangeInfo.count = count;
         bindingRangeInfo.baseIndex = baseIndex;
         bindingRangeInfo.subObjectIndex = subObjectIndex;
-
+        bindingRangeInfo.isSpecializable = typeLayout->isBindingRangeSpecializable(r);
         // We'd like to extract the information on the GLSL/SPIR-V
         // `binding` that this range should bind into (or whatever
         // other specific kind of offset/index is appropriate to it).
