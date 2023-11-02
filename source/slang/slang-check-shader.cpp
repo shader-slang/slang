@@ -322,6 +322,35 @@ namespace Slang
         return as<BuiltinType>(type) != nullptr;
     }
 
+    bool doStructFieldsHaveSemanticImpl(Type* type, HashSet<Type*>& seenTypes)
+    {
+        auto declRefType = as<DeclRefType>(type);
+        if (!declRefType)
+            return false;
+        auto structDecl = as<StructDecl>(declRefType->getDeclRef().getDecl());
+        if (!structDecl)
+            return false;
+        seenTypes.add(type);
+        for (auto field : structDecl->getFields())
+        {
+            if (!field->findModifier<HLSLSemantic>())
+            {
+                if (!seenTypes.contains(type))
+                {
+                    if (!doStructFieldsHaveSemanticImpl(field->getType(), seenTypes))
+                        return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    bool doStructFieldsHaveSemantic(Type* type)
+    {
+        HashSet<Type*> seenTypes;
+        return doStructFieldsHaveSemanticImpl(type, seenTypes);
+    }
+
     // Validate that an entry point function conforms to any additional
     // constraints based on the stage (and profile?) it specifies.
     void validateEntryPoint(
@@ -465,7 +494,8 @@ namespace Slang
                 {
                     if (!param->findModifier<HLSLSemantic>())
                     {
-                        sink->diagnose(param, Diagnostics::nonUniformEntryPointParameterMustHaveSemantic, param->getName());
+                        if (!doStructFieldsHaveSemantic(param->getType()))
+                            sink->diagnose(param, Diagnostics::nonUniformEntryPointParameterMustHaveSemantic, param->getName());
                     }
                 }
             }
