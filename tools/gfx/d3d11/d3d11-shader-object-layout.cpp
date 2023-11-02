@@ -51,7 +51,7 @@ Result ShaderObjectLayoutImpl::Builder::setElementTypeLayout(slang::TypeLayoutRe
         BindingRangeInfo bindingRangeInfo;
         bindingRangeInfo.bindingType = slangBindingType;
         bindingRangeInfo.count = count;
-
+        bindingRangeInfo.isSpecializable = typeLayout->isBindingRangeSpecializable(r);
         switch (slangBindingType)
         {
         case slang::BindingType::ConstantBuffer:

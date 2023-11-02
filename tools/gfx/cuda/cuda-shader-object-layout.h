@@ -31,6 +31,8 @@ struct BindingRangeInfo
     // range index and array index.
     //
     Index uniformOffset; // Uniform offset for a resource typed field.
+
+    bool isSpecializable;
 };
 
 struct SubObjectRangeInfo

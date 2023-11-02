@@ -19,7 +19,14 @@ Type* Type::_createCanonicalTypeOverride()
 Val* Type::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
 {
     int diff = 0;
-    auto canSubst = getCanonicalType()->substituteImpl(astBuilder, subst, &diff);
+    auto canonicalType = getCanonicalType();
+
+    // If canonicalType is identical to this, then we shouldn't try to call
+    // canonicalType->substituteImpl because that would lead to infinite recursion.
+    if (canonicalType == this)
+        return this;
+
+    auto canSubst = canonicalType->substituteImpl(astBuilder, subst, &diff);
 
     // If nothing changed, then don't drop any sugar that is applied
     if (!diff)

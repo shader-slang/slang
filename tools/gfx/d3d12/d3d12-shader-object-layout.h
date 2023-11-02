@@ -67,6 +67,9 @@ public:
         uint32_t subObjectIndex;
 
         bool isRootParameter;
+
+        /// Is this binding range represent a specialization point, such as an existential value, or a `ParameterBlock<IFoo>`.
+        bool isSpecializable;
     };
 
     /// Offset information for a sub-object range
@@ -320,7 +323,7 @@ public:
                 if (varLayout)
                 {
                     spaceOffset =
-                        (UINT)varLayout->getOffset(SLANG_PARAMETER_CATEGORY_REGISTER_SPACE);
+                        (UINT)varLayout->getOffset(SLANG_PARAMETER_CATEGORY_SUB_ELEMENT_REGISTER_SPACE);
                     offsetForRangeType[D3D12_DESCRIPTOR_RANGE_TYPE_CBV] =
                         (UINT)varLayout->getOffset(SLANG_PARAMETER_CATEGORY_CONSTANT_BUFFER);
                     offsetForRangeType[D3D12_DESCRIPTOR_RANGE_TYPE_SRV] =

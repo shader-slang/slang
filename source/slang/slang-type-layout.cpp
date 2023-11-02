@@ -1689,7 +1689,7 @@ static SimpleLayoutInfo _getParameterGroupLayoutInfo(
         //
         // TODO: wouldn't it be any different to just allocate this
         // as an empty `SimpleLayoutInfo` of any other kind?
-        return SimpleLayoutInfo(LayoutResourceKind::RegisterSpace, 0);
+        return SimpleLayoutInfo(LayoutResourceKind::SubElementRegisterSpace, 0);
     }
 
     // TODO: the vertex-input and fragment-output cases should
@@ -1902,6 +1902,23 @@ static bool shouldAllocateRegisterSpaceForParameterBlock(
         return true;
     }
 
+    return false;
+}
+
+bool canTypeDirectlyUseRegisterSpace(TypeLayout* layout)
+{
+    // A ParameterBlock type will directly use a register space, if it is non empty.
+    if (as<ParameterBlockType>(layout->getType()))
+        return true;
+    // An infinite array type will also consume a register space.
+    if (auto arrLayout = as<ArrayTypeLayout>(layout))
+    {
+        for (auto info : arrLayout->resourceInfos)
+        {
+            if (info.count.isInfinite())
+                return true;
+        }
+    }
     return false;
 }
 
@@ -2191,7 +2208,7 @@ static void _addUnmaskedResourceUsage(
             }
             break;
 
-        case LayoutResourceKind::RegisterSpace:
+        case LayoutResourceKind::SubElementRegisterSpace:
         case LayoutResourceKind::ExistentialTypeParam:
             // A parameter group will always pay for full registers
             // spaces consumed by its element type.
@@ -2394,7 +2411,7 @@ static RefPtr<TypeLayout> _createParameterGroupTypeLayout(
 
         for( auto elementResourceInfo : rawElementTypeLayout->resourceInfos )
         {
-            if(elementResourceInfo.kind != LayoutResourceKind::RegisterSpace)
+            if(elementResourceInfo.kind != LayoutResourceKind::SubElementRegisterSpace)
             {
                 wantSpaceOrSet = true;
                 break;
@@ -2408,7 +2425,14 @@ static RefPtr<TypeLayout> _createParameterGroupTypeLayout(
     //
     if( wantSpaceOrSet )
     {
-        containerTypeLayout->addResourceUsage(LayoutResourceKind::RegisterSpace, 1);
+        containerTypeLayout->addResourceUsage(LayoutResourceKind::SubElementRegisterSpace, 1);
+
+        // Add a RegisterSpace entry to containerVarLayout to signal that this ParameterGroupTypeLayout
+        // initiates a new space for its element. This allows us to distinguish between the ConstantBuffer
+        // and ParameterBlock cases. The index of this entry is set to 0 since there is already a
+        // SubElementRegisterSpace entry stored in `typeLayout` that corresponds to the space used by
+        // this parameter group.
+        containerVarLayout->findOrAddResourceInfo(LayoutResourceKind::RegisterSpace);
     }
 
     // Now that we've computed basic resource requirements for the container
@@ -3152,7 +3176,7 @@ static RefPtr<TypeLayout> maybeAdjustLayoutForArrayElementType(
             auto originalFieldTypeLayout = originalField->typeLayout;
 
             LayoutSize originalFieldSpaceCount = 0;
-            if(auto resInfo = originalFieldTypeLayout->FindResourceInfo(LayoutResourceKind::RegisterSpace))
+            if(auto resInfo = originalFieldTypeLayout->FindResourceInfo(LayoutResourceKind::SubElementRegisterSpace))
                 originalFieldSpaceCount = resInfo->count;
 
             // Compute the adjusted type for the field
@@ -3180,6 +3204,7 @@ static RefPtr<TypeLayout> maybeAdjustLayoutForArrayElementType(
             // the adjusted field, and try to figure out what
             // to do with it all.
             //
+            bool requireNewSpace = false;
             for(auto& resInfo : adjustedField->resourceInfos )
             {
                 if( doesResourceRequireAdjustmentForArrayOfStructs(resInfo.kind) )
@@ -3198,10 +3223,15 @@ static RefPtr<TypeLayout> maybeAdjustLayoutForArrayElementType(
                         // field with resource type will turn into its own space,
                         // and it will start at register zero in that space.
                         //
+                        requireNewSpace = true;
                         resInfo.index = 0;
-                        resInfo.space = spaceOffsetForField.getFiniteValue();
+                        resInfo.space = 0;
                     }
                 }
+            }
+            if (requireNewSpace)
+            {
+                adjustedField->findOrAddResourceInfo(LayoutResourceKind::RegisterSpace)->index = spaceOffsetForField.getFiniteValue();
             }
 
             adjustedStructTypeLayout->fields.add(adjustedField);
@@ -3328,6 +3358,16 @@ RefPtr<VarLayout> StructTypeLayoutBuilder::addField(
     // fields to be safe...
     //
     LayoutSize uniformOffset = m_info.size;
+    if (fieldInfo.size == 0)
+    {
+        // In case the field has a mixed resource usage,
+        // the simple view will not be able to represent the uniform usage.
+        // we try to find uniform usage from res info.
+        if (auto uniformUsage = fieldTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform))
+        {
+            fieldInfo.size = uniformUsage->count;
+        }
+    }
     if(fieldInfo.size != 0)
     {
         uniformOffset = m_rules->AddStructField(&m_info, fieldInfo);
@@ -3377,14 +3417,17 @@ RefPtr<VarLayout> StructTypeLayoutBuilder::addField(
         {
             // We need to add one register space to own the storage for this field.
             //
-            auto structTypeSpaceResourceInfo = m_typeLayout->findOrAddResourceInfo(LayoutResourceKind::RegisterSpace);
+            auto structTypeSpaceResourceInfo = m_typeLayout->findOrAddResourceInfo(LayoutResourceKind::SubElementRegisterSpace);
             auto spaceOffset = structTypeSpaceResourceInfo->count;
             structTypeSpaceResourceInfo->count += 1;
-
+            
             // The field itself will record itself as having a zero offset into
-            // the chosen space.
+            // the chosen space. We encode the space offset as a separate RegisterSpace
+            // entry in the field layout so consuming code can use the existance of RegisterSpace entry
+            // to tell that the field is introducing a new space for itself.
             //
-            fieldResourceInfo->space = spaceOffset.getFiniteValue();
+            fieldLayout->findOrAddResourceInfo(LayoutResourceKind::RegisterSpace)->index = spaceOffset.getFiniteValue();
+            fieldResourceInfo->space = 0;
             fieldResourceInfo->index = 0;
         }
         else
@@ -3397,6 +3440,11 @@ RefPtr<VarLayout> StructTypeLayoutBuilder::addField(
             auto structTypeResourceInfo = m_typeLayout->findOrAddResourceInfo(fieldTypeResourceInfo.kind);
             fieldResourceInfo->index = structTypeResourceInfo->count.getFiniteValue();
             structTypeResourceInfo->count += fieldTypeResourceInfo.count;
+            if (fieldTypeResourceInfo.kind == LayoutResourceKind::SubElementRegisterSpace &&
+                canTypeDirectlyUseRegisterSpace(fieldTypeLayout))
+            {
+                fieldLayout->findOrAddResourceInfo(LayoutResourceKind::RegisterSpace)->index = fieldResourceInfo->index;
+            }
         }
     }
 
@@ -3677,7 +3725,7 @@ static TypeLayoutResult createArrayLikeTypeLayout(
     //
     if( adjustedElementTypeLayout != elementTypeLayout )
     {
-        typeLayout->addResourceUsage(LayoutResourceKind::RegisterSpace, additionalSpacesNeededForAdjustedElementType);
+        typeLayout->addResourceUsage(LayoutResourceKind::SubElementRegisterSpace, additionalSpacesNeededForAdjustedElementType);
     }
 
     return TypeLayoutResult(typeLayout, arrayUniformInfo);

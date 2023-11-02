@@ -1539,56 +1539,50 @@ namespace Slang
                 //
                 Index bindingRangeIndex = m_extendedInfo->m_bindingRanges.getCount();
                 SlangBindingType bindingType = SLANG_BINDING_TYPE_CONSTANT_BUFFER;
-                Index spaceOffset = -1;
                 bool shouldAllocDescriptorSet = true;
                 LayoutResourceKind kind = LayoutResourceKind::None;
 
-                // TODO: It is unclear if this should be looking at the resource
-                // usage of the parameter group, or of its "container" layout.
-                //
-                for(auto& resInfo : parameterGroupTypeLayout->resourceInfos)
+                // If the parameter group container starts a new space,
+                // we do not want to allocate a descriptor set from the current parent.
+                if (parameterGroupTypeLayout->containerVarLayout->FindResourceInfo(LayoutResourceKind::RegisterSpace))
                 {
-                    if( spaceOffset == -1 )
-                    {
-                        spaceOffset = _calcSpaceOffset(path.primary, kind);
-                    }
-
-                    kind = resInfo.kind;
-                    switch(kind)
-                    {
-                    default:
-                        continue;
-
-                    case LayoutResourceKind::ConstantBuffer:
-                    case LayoutResourceKind::PushConstantBuffer:
-                    case LayoutResourceKind::DescriptorTableSlot:
-                        break;
-
-                        // Certain cases indicate a parameter block that
-                        // actually involves indirection.
-                        //
-                        // Note: the only case where a parameter group should
-                        // reflect as consuming `Uniform` storage is on CPU/CUDA,
-                        // where that will be the only resource it contains.
-                    case LayoutResourceKind::Uniform:
-                        break;
-                        //
-                        // TODO: If we ever support targets that don't have
-                        // constant buffers at all, this logic would be questionable.
-                        //
-                    case LayoutResourceKind::RegisterSpace:
-                        shouldAllocDescriptorSet = false;
-                        break;
-                    }
-
-                    bindingType = _calcBindingType(typeLayout, kind);
-                    break;
-                }
-                if(spaceOffset == -1)
-                {
-                    spaceOffset = 0;
+                    kind = LayoutResourceKind::RegisterSpace;
+                    bindingType = SLANG_BINDING_TYPE_PARAMETER_BLOCK;
+                    shouldAllocDescriptorSet = false;
                 }
 
+                if (shouldAllocDescriptorSet)
+                {
+                    // If this is not a parameter block, derive the binding type
+                    // from resource infos.
+                    for(auto& resInfo : parameterGroupTypeLayout->resourceInfos)
+                    {
+                        kind = resInfo.kind;
+                        switch(kind)
+                        {
+                        default:
+                            continue;
+
+                        case LayoutResourceKind::ConstantBuffer:
+                        case LayoutResourceKind::PushConstantBuffer:
+                        case LayoutResourceKind::DescriptorTableSlot:
+                            break;
+
+                            // Certain cases indicate a parameter block that
+                            // actually involves indirection.
+                            //
+                            // Note: the only case where a parameter group should
+                            // reflect as consuming `Uniform` storage is on CPU/CUDA,
+                            // where that will be the only resource it contains.
+                        case LayoutResourceKind::Uniform:
+                            break;
+                        }
+
+                        bindingType = _calcBindingType(typeLayout, kind);
+                        break;
+                    }
+                }
+                
                 TypeLayout::ExtendedInfo::BindingRangeInfo bindingRange;
                 bindingRange.leafTypeLayout = typeLayout;
                 bindingRange.leafVariable = path.primary ? path.primary->var->getVariable() : nullptr;
@@ -1606,10 +1600,12 @@ namespace Slang
                 subObjectRange.bindingRangeIndex = bindingRangeIndex;
                 subObjectRange.offsetVarLayout = createOffsetVarLayout(typeLayout, path);
                 subObjectRange.spaceOffset = 0;
-                if (kind == LayoutResourceKind::RegisterSpace && path.primary)
+                if (kind == LayoutResourceKind::SubElementRegisterSpace && path.primary)
                 {
-                    auto resInfo = path.primary->var->FindResourceInfo(LayoutResourceKind::RegisterSpace);
-                    subObjectRange.spaceOffset = resInfo->index;
+                    if (auto resInfo = path.primary->var->FindResourceInfo(LayoutResourceKind::SubElementRegisterSpace))
+                    {
+                        subObjectRange.spaceOffset = resInfo->index;
+                    }
                 }
                 // It is possible that the sub-object has descriptor ranges
                 // that will need to be exposed upward, into the parent.
@@ -1659,7 +1655,7 @@ namespace Slang
                     // (If the contents of a group consume whole spaces/sets, then
                     // those resources will be accounted for separately).
                     //
-                    Int descriptorSetIndex = _findOrAddDescriptorSet(spaceOffset);
+                    Int descriptorSetIndex = _findOrAddDescriptorSet(0);
                     auto descriptorSet = m_extendedInfo->m_descriptorSets[descriptorSetIndex];
                     auto firstDescriptorRangeIndex = descriptorSet->descriptorRanges.getCount();
 
@@ -1672,7 +1668,7 @@ namespace Slang
                         // more whole register spaces/sets, then nothing should
                         // leak through that is measured in descriptor sets.
                         //
-                    case LayoutResourceKind::RegisterSpace:
+                    case LayoutResourceKind::SubElementRegisterSpace:
                     case LayoutResourceKind::None:
                         break;
 
@@ -1686,7 +1682,7 @@ namespace Slang
                             {
                                 switch( resInfo.kind )
                                 {
-                                case LayoutResourceKind::RegisterSpace:
+                                case LayoutResourceKind::SubElementRegisterSpace:
                                     continue;
 
                                 default:
@@ -1715,7 +1711,7 @@ namespace Slang
                         // be no "leakage" of descriptor ranges from the element type
                         // to the parent.
                         //
-                    case LayoutResourceKind::RegisterSpace:
+                    case LayoutResourceKind::SubElementRegisterSpace:
                     case LayoutResourceKind::Uniform:
                     case LayoutResourceKind::None:
                         break;
@@ -1797,8 +1793,21 @@ namespace Slang
                 // For structured buffers we expect them to consume a single
                 // resource descriptor slot (not counting the possible counter
                 // buffer)
-                SLANG_ASSERT(typeLayout->resourceInfos.getCount() == 1);
-                const auto& resInfo = typeLayout->resourceInfos[0];
+                SLANG_ASSERT(typeLayout->resourceInfos.getCount() >= 1);
+                TypeLayout::ResourceInfo resInfo;
+                for (auto& info : typeLayout->resourceInfos)
+                {
+                    switch (info.kind)
+                    {
+                    case LayoutResourceKind::UnorderedAccess:
+                    case LayoutResourceKind::ShaderResource:
+                    case LayoutResourceKind::DescriptorTableSlot:
+                    case LayoutResourceKind::Uniform:
+                        resInfo = info;
+                        break;
+                    }
+                }
+                SLANG_ASSERT(resInfo.kind != LayoutResourceKind::None);
 
                 const auto bindingType = as<HLSLStructuredBufferType>(typeLayout->getType())
                     ? SLANG_BINDING_TYPE_RAW_BUFFER
@@ -1967,7 +1976,7 @@ namespace Slang
                         // TODO: Make some clear decisions about what should and should
                         // not appear here.
                         //
-                    case LayoutResourceKind::RegisterSpace:
+                    case LayoutResourceKind::SubElementRegisterSpace:
                     case LayoutResourceKind::VaryingInput:
                     case LayoutResourceKind::VaryingOutput:
                     case LayoutResourceKind::HitAttributes:
@@ -2061,6 +2070,26 @@ SLANG_API SlangBindingType spReflectionTypeLayout_getBindingRangeType(SlangRefle
     auto& bindingRange = extTypeLayout->m_bindingRanges[index];
 
     return bindingRange.bindingType;
+}
+
+SLANG_API SlangInt spReflectionTypeLayout_isBindingRangeSpecializable(SlangReflectionTypeLayout* inTypeLayout, SlangInt index)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if (!typeLayout) return SLANG_BINDING_TYPE_UNKNOWN;
+
+    auto extTypeLayout = Slang::getExtendedTypeLayout(typeLayout);
+    if (index < 0) return SLANG_BINDING_TYPE_UNKNOWN;
+    if (index >= extTypeLayout->m_bindingRanges.getCount()) return SLANG_BINDING_TYPE_UNKNOWN;
+    auto& bindingRange = extTypeLayout->m_bindingRanges[index];
+    auto type = bindingRange.leafTypeLayout->getType();
+    if (asInterfaceType(type))
+        return 1;
+    if (auto parameterGroupType = as<ParameterGroupType>(type))
+    {
+        if (asInterfaceType(parameterGroupType->getElementType()))
+            return 1;
+    }
+    return 0;
 }
 
 SLANG_API SlangInt spReflectionTypeLayout_getBindingRangeBindingCount(SlangReflectionTypeLayout* inTypeLayout, SlangInt index)
@@ -2580,6 +2609,9 @@ SLANG_API size_t spReflectionVariableLayout_GetSpace(SlangReflectionVariableLayo
     {
         space += info->space;
     }
+
+    if (auto regSpaceInfo = varLayout->FindResourceInfo(LayoutResourceKind::RegisterSpace))
+        space += regSpaceInfo->index;
 
     // Note: this code used to try and take a variable with
     // an offset for `LayoutResourceKind::RegisterSpace` and

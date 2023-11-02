@@ -642,9 +642,14 @@ UInt CLikeSourceEmitter::getBindingOffsetForKinds(EmitVarChain* chain, LayoutRes
     return offset;
 }
 
+Index findRegisterSpaceResourceInfo(IRVarLayout* layout);
+
 UInt CLikeSourceEmitter::getBindingSpaceForKinds(EmitVarChain* chain, LayoutResourceKindFlags kindFlags)
 {
     UInt space = 0;
+
+    bool useSubElementSpace = false;
+
     for (auto cc = chain; cc; cc = cc->next)
     {
         auto varLayout = cc->varLayout;
@@ -657,10 +662,21 @@ UInt CLikeSourceEmitter::getBindingSpaceForKinds(EmitVarChain* chain, LayoutReso
                 space += offsetAttr->getSpace();
             }
         }
-
-        if (auto resInfo = varLayout->findOffsetAttr(LayoutResourceKind::RegisterSpace))
+        if (!useSubElementSpace)
         {
-            space += resInfo->getOffset();
+            auto spaceOffset = findRegisterSpaceResourceInfo(varLayout);
+            if (spaceOffset != -1)
+            {
+                space += spaceOffset;
+                useSubElementSpace = true;
+            }
+        }
+        else
+        {
+            if (auto resInfo = varLayout->findOffsetAttr(LayoutResourceKind::SubElementRegisterSpace))
+            {
+                space += resInfo->getOffset();
+            }
         }
     }
     return space;
@@ -669,6 +685,7 @@ UInt CLikeSourceEmitter::getBindingSpaceForKinds(EmitVarChain* chain, LayoutReso
 UInt CLikeSourceEmitter::getBindingOffset(EmitVarChain* chain, LayoutResourceKind kind)
 {
     UInt offset = 0;
+
     for(auto cc = chain; cc; cc = cc->next)
     {
         if(auto resInfo = cc->varLayout->findOffsetAttr(kind))
@@ -682,6 +699,7 @@ UInt CLikeSourceEmitter::getBindingOffset(EmitVarChain* chain, LayoutResourceKin
 UInt CLikeSourceEmitter::getBindingSpace(EmitVarChain* chain, LayoutResourceKind kind)
 {
     UInt space = 0;
+    bool useSubElementSpace = false;
     for(auto cc = chain; cc; cc = cc->next)
     {
         auto varLayout = cc->varLayout;
@@ -689,9 +707,21 @@ UInt CLikeSourceEmitter::getBindingSpace(EmitVarChain* chain, LayoutResourceKind
         {
             space += resInfo->getSpace();
         }
-        if(auto resInfo = varLayout->findOffsetAttr(LayoutResourceKind::RegisterSpace))
+        if (!useSubElementSpace)
         {
-            space += resInfo->getOffset();
+            auto spaceOffset = findRegisterSpaceResourceInfo(varLayout);
+            if (spaceOffset != -1)
+            {
+                space += spaceOffset;
+                useSubElementSpace = true;
+            }
+        }
+        else
+        {
+            if (auto resInfo = varLayout->findOffsetAttr(LayoutResourceKind::SubElementRegisterSpace))
+            {
+                space += resInfo->getOffset();
+            }
         }
     }
     return space;

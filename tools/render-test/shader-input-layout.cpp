@@ -436,7 +436,13 @@ namespace renderer_test
             {
                 StringBuilder sb;
                 sb << typeName << "<";
-                sb << parseTypeName(parser);
+                for (;;)
+                {
+                    sb << parseTypeName(parser);
+                    if (!parser.AdvanceIf(","))
+                        break;
+                    sb << ",";
+                }
                 sb << ">";
                 parser.Read(">");
                 return sb.produceString();

@@ -130,12 +130,8 @@ Result PipelineCommandEncoder::bindRootShaderObjectImpl(VkPipelineBindPoint bind
     // by the specialized program layout.
     //
     List<VkDescriptorSet> descriptorSetsStorage;
-    auto descriptorSetCount = specializedLayout->getTotalDescriptorSetCount();
 
-    descriptorSetsStorage.setCount(descriptorSetCount);
-    auto descriptorSets = descriptorSetsStorage.getBuffer();
-
-    context.descriptorSets = descriptorSets;
+    context.descriptorSets = &descriptorSetsStorage;
 
     // We kick off recursive binding of shader objects to the pipeline (plus
     // the state in `context`).
@@ -151,15 +147,15 @@ Result PipelineCommandEncoder::bindRootShaderObjectImpl(VkPipelineBindPoint bind
     // Once we've filled in all the descriptor sets, we bind them
     // to the pipeline at once.
     //
-    if (descriptorSetCount > 0)
+    if (descriptorSetsStorage.getCount() > 0)
     {
         m_device->m_api.vkCmdBindDescriptorSets(
             m_commandBuffer->m_commandBuffer,
             bindPoint,
             specializedLayout->m_pipelineLayout,
             0,
-            (uint32_t)descriptorSetCount,
-            descriptorSets,
+            (uint32_t)descriptorSetsStorage.getCount(),
+            descriptorSetsStorage.getBuffer(),
             0,
             nullptr);
     }

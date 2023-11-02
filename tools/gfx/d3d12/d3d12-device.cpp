@@ -98,6 +98,7 @@ Result DeviceImpl::createBuffer(
 
     D3D12_RESOURCE_STATES initialState = finalState;
 
+
     switch (memoryType)
     {
     case MemoryType::ReadBack:
@@ -106,18 +107,17 @@ Result DeviceImpl::createBuffer(
         heapProps.Type = D3D12_HEAP_TYPE_READBACK;
         desc.Flags = D3D12_RESOURCE_FLAG_NONE;
         initialState |= D3D12_RESOURCE_STATE_COPY_DEST;
-
         break;
     case MemoryType::Upload:
 
         heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
         desc.Flags = D3D12_RESOURCE_FLAG_NONE;
         initialState |= D3D12_RESOURCE_STATE_GENERIC_READ;
-
         break;
     case MemoryType::DeviceLocal:
         heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
-        initialState = (srcData ? D3D12_RESOURCE_STATE_COPY_DEST : finalState);
+        if (initialState != D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE)
+            initialState = D3D12_RESOURCE_STATE_COMMON;
         break;
     default:
         return SLANG_FAIL;

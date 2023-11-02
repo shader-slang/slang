@@ -78,7 +78,8 @@ ShaderObjectLayoutImpl::ShaderObjectLayoutImpl(RendererBase* renderer, slang::Ty
         bindingRangeInfo.baseIndex = baseIndex;
         bindingRangeInfo.uniformOffset = uniformOffset;
         bindingRangeInfo.subObjectIndex = subObjectIndex;
-        m_bindingRanges.add(bindingRangeInfo);
+        bindingRangeInfo.isSpecializable = m_elementTypeLayout->isBindingRangeSpecializable(r);
+                m_bindingRanges.add(bindingRangeInfo);
     }
 
     SlangInt subObjectRangeCount = m_elementTypeLayout->getSubObjectRangeCount();

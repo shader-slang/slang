@@ -269,6 +269,7 @@ typedef slang::ParameterCategory LayoutResourceKind;
     x(ExistentialTypeParam) \
     x(ExistentialObjectParam) \
     \
+    x(SubElementRegisterSpace) \
     x(VertexInput) \
     x(FragmentOutput)
 
@@ -1359,6 +1360,8 @@ IRVarLayout* applyOffsetToVarLayout(
     IRBuilder*      irBuilder,
     IRVarLayout*    baseLayout,
     IRVarLayout*    offsetLayout);
+
+bool canTypeDirectlyUseRegisterSpace(TypeLayout* layout);
 
 }
 

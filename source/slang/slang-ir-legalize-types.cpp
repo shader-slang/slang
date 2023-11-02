@@ -3254,7 +3254,6 @@ static LegalVal declareVars(
         {
             // Just declare a variable of the pointed-to type,
             // since we are removing the indirection.
-
             auto val = declareVars(
                 context,
                 op,

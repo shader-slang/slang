@@ -515,7 +515,7 @@ LayoutResourceKind findRegisterClassFromName(UnownedStringSlice const& registerC
     case 5:
         if( registerClassName == toSlice("space") )
         {
-            return LayoutResourceKind::RegisterSpace;
+            return LayoutResourceKind::SubElementRegisterSpace;
         }
         break;
 
@@ -583,7 +583,7 @@ LayoutSemanticInfo extractHLSLLayoutSemanticInfo(
         UnownedStringSlice spaceDigits;
         splitNameAndIndex(spaceName, spaceSpelling, spaceDigits);
 
-        if( kind == LayoutResourceKind::RegisterSpace )
+        if( kind == LayoutResourceKind::SubElementRegisterSpace)
         {
             sink->diagnose(spaceLoc, Diagnostics::unexpectedSpecifierAfterSpace, spaceName);
         }
@@ -902,7 +902,7 @@ static void addExplicitParameterBinding(
         bindingInfo.space = semanticInfo.space;
 
         VarLayout* overlappedVarLayout = nullptr;
-        if( kind == LayoutResourceKind::RegisterSpace )
+        if( kind == LayoutResourceKind::RegisterSpace || kind == LayoutResourceKind::SubElementRegisterSpace )
         {
             // Parameter is being bound to an entire space, so we
             // need to mark the given space as used and report
@@ -1071,7 +1071,7 @@ static void addExplicitParameterBindings_GLSL(
             semanticInfo.space = attr->set;
         }
     }
-    else if( (foundResInfo = typeLayout->FindResourceInfo(LayoutResourceKind::RegisterSpace)) != nullptr )
+    else if( (foundResInfo = typeLayout->FindResourceInfo(LayoutResourceKind::SubElementRegisterSpace)) != nullptr )
     {
         // Try to find `set`
         if (auto attr = varDecl.getDecl()->findModifier<GLSLBindingAttribute>())
@@ -1243,7 +1243,7 @@ static void completeBindingsForParameterImpl(
             }
             break;
 
-        case LayoutResourceKind::RegisterSpace:
+        case LayoutResourceKind::SubElementRegisterSpace:
             // If the parameter consumes any full spaces (e.g., it
             // is a `struct` type with one or more unbounded arrays
             // for fields), then we will include those spaces in
@@ -1312,7 +1312,7 @@ static void completeBindingsForParameterImpl(
         //
         switch( kind )
         {
-        case LayoutResourceKind::RegisterSpace:
+        case LayoutResourceKind::SubElementRegisterSpace:
             {
                 // The parameter's type needs to consume some number of whole
                 // register spaces, and we have already allocated a contiguous
@@ -3547,6 +3547,7 @@ static bool _calcNeedsDefaultSpace(SharedParameterBindingContext& sharedContext)
             switch (resInfo.kind)
             {
                 case LayoutResourceKind::RegisterSpace:
+                case LayoutResourceKind::SubElementRegisterSpace:
                 case LayoutResourceKind::PushConstantBuffer:
                     continue;
                 case LayoutResourceKind::Uniform:
@@ -3579,7 +3580,7 @@ static bool _calcNeedsDefaultSpace(SharedParameterBindingContext& sharedContext)
     //
     for (auto& entryPoint : sharedContext.programLayout->entryPoints)
     {
-        auto paramsLayout = entryPoint->parametersLayout;
+        auto paramsLayout = entryPoint->parametersLayout->getTypeLayout();
         for (auto resInfo : paramsLayout->resourceInfos)
         {
             switch (resInfo.kind)

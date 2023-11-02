@@ -1986,76 +1986,91 @@ SlangResult LanguageServer::queueJSONCall(JSONRPCCall call)
 
 SlangResult LanguageServer::runCommand(Command& call)
 {
-    // Do different things
-    if (call.method == DidOpenTextDocumentParams::methodName)
+    try
     {
-        return didOpenTextDocument(call.openDocArgs.get());
+        // Do different things
+        if (call.method == DidOpenTextDocumentParams::methodName)
+        {
+            return didOpenTextDocument(call.openDocArgs.get());
+        }
+        else if (call.method == DidCloseTextDocumentParams::methodName)
+        {
+            return didCloseTextDocument(call.closeDocArgs.get());
+        }
+        else if (call.method == DidChangeTextDocumentParams::methodName)
+        {
+            return didChangeTextDocument(call.changeDocArgs.get());
+        }
+        else if (call.method.startsWith("$/"))
+        {
+            // Ignore.
+            return SLANG_OK;
+        }
     }
-    else if (call.method == DidCloseTextDocumentParams::methodName)
+    catch (...)
     {
-        return didCloseTextDocument(call.closeDocArgs.get());
+        return SLANG_FAIL;
     }
-    else if (call.method == DidChangeTextDocumentParams::methodName)
+
+    try
     {
-        return didChangeTextDocument(call.changeDocArgs.get());
+        if (call.method == HoverParams::methodName)
+        {
+            return hover(call.hoverArgs.get(), call.id);
+        }
+        else if (call.method == DefinitionParams::methodName)
+        {
+            return gotoDefinition(call.definitionArgs.get(), call.id);
+        }
+        else if (call.method == CompletionParams::methodName)
+        {
+            return completion(call.completionArgs.get(), call.id);
+        }
+        else if (call.method == SemanticTokensParams::methodName)
+        {
+            return semanticTokens(call.semanticTokenArgs.get(), call.id);
+        }
+        else if (call.method == SignatureHelpParams::methodName)
+        {
+            return signatureHelp(call.signatureHelpArgs.get(), call.id);
+        }
+        else if (call.method == "completionItem/resolve")
+        {
+            return completionResolve(call.completionResolveArgs.get(), call.textEditCompletionResolveArgs.get(), call.id);
+        }
+        else if (call.method == DocumentSymbolParams::methodName)
+        {
+            return documentSymbol(call.documentSymbolArgs.get(), call.id);
+        }
+        else if (call.method == DidChangeConfigurationParams::methodName)
+        {
+            return didChangeConfiguration(call.changeConfigArgs.get());
+        }
+        else if (call.method == InlayHintParams::methodName)
+        {
+            return inlayHint(call.inlayHintArgs.get(), call.id);
+        }
+        else if (call.method == DocumentOnTypeFormattingParams::methodName)
+        {
+            return onTypeFormatting(call.onTypeFormattingArgs.get(), call.id);
+        }
+        else if (call.method == DocumentRangeFormattingParams::methodName)
+        {
+            return rangeFormatting(call.rangeFormattingArgs.get(), call.id);
+        }
+        else if (call.method == DocumentFormattingParams::methodName)
+        {
+            return formatting(call.formattingArgs.get(), call.id);
+        }
     }
-    else if (call.method == HoverParams::methodName)
+    catch (...)
     {
-        return hover(call.hoverArgs.get(), call.id);
+        // If we encountered an internal compiler error, don't crash the language server.
+        // Instead we just return a null response.
+        return m_connection->sendResult(NullResponse::get(), call.id);
     }
-    else if (call.method == DefinitionParams::methodName)
-    {
-        return gotoDefinition(call.definitionArgs.get(), call.id);
-    }
-    else if (call.method == CompletionParams::methodName)
-    {
-        return completion(call.completionArgs.get(), call.id);
-    }
-    else if (call.method == SemanticTokensParams::methodName)
-    {
-        return semanticTokens(call.semanticTokenArgs.get(), call.id);
-    }
-    else if (call.method == SignatureHelpParams::methodName)
-    {
-        return signatureHelp(call.signatureHelpArgs.get(), call.id);
-    }
-    else if (call.method == "completionItem/resolve")
-    {
-        return completionResolve(call.completionResolveArgs.get(), call.textEditCompletionResolveArgs.get(), call.id);
-    }
-    else if (call.method == DocumentSymbolParams::methodName)
-    {
-        return documentSymbol(call.documentSymbolArgs.get(), call.id);
-    }
-    else if (call.method == DidChangeConfigurationParams::methodName)
-    {
-        return didChangeConfiguration(call.changeConfigArgs.get());
-    }
-    else if (call.method == InlayHintParams::methodName)
-    {
-        return inlayHint(call.inlayHintArgs.get(), call.id);
-    }
-    else if (call.method == DocumentOnTypeFormattingParams::methodName)
-    {
-        return onTypeFormatting(call.onTypeFormattingArgs.get(), call.id);
-    }
-    else if (call.method == DocumentRangeFormattingParams::methodName)
-    {
-        return rangeFormatting(call.rangeFormattingArgs.get(), call.id);
-    }
-    else if (call.method == DocumentFormattingParams::methodName)
-    {
-        return formatting(call.formattingArgs.get(), call.id);
-    }
-    else if (call.method.startsWith("$/"))
-    {
-        // Ignore.
-        return SLANG_OK;
-    }
-    else
-    {
-        return m_connection->sendError(JSONRPC::ErrorCode::MethodNotFound, call.id);
-    }
+
+    return m_connection->sendError(JSONRPC::ErrorCode::MethodNotFound, call.id);
 }
 
 void LanguageServer::processCommands()

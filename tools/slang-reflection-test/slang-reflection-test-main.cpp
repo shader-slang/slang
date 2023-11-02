@@ -291,6 +291,7 @@ static void emitReflectionVarBindingInfoJSON(
     CASE(SPECIALIZATION_CONSTANT, specializationConstant);
     CASE(MIXED, mixed);
     CASE(REGISTER_SPACE, registerSpace);
+    CASE(SUB_ELEMENT_REGISTER_SPACE, subElementRegisterSpace);
     CASE(GENERIC, generic);
 
     #undef CASE

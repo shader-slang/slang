@@ -59,6 +59,10 @@ public:
         // TODO: Ideally we could refactor so that only the root shader object layout
         // stores a set offset for its binding ranges, and all other objects skip
         // storing a field that never actually matters.
+
+        // Is this binding range representing a specialization point, such as
+        // an existential value or a ParameterBlock<IFoo>.
+        bool isSpecializable;
     };
 
     // Sometimes we just want to iterate over the ranges that represent

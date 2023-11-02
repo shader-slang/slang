@@ -124,6 +124,7 @@ Result ShaderObjectLayoutImpl::Builder::setElementTypeLayout(
             static_cast<DeviceImpl*>(m_renderer)->m_extendedDesc.rootParameterShaderAttributeName,
             typeLayout,
             r);
+        bindingRangeInfo.isSpecializable = typeLayout->isBindingRangeSpecializable(r);
         if (bindingRangeInfo.isRootParameter)
         {
             RootParameterInfo rootInfo = {};
@@ -587,7 +588,7 @@ Result RootShaderObjectLayoutImpl::RootSignatureDescBuilder::addDescriptorRange(
         physicalDescriptorSetIndex,
         rangeType,
         (UINT)index + elementOffset[rangeType],
-        (UINT)space + containerOffset.spaceOffset,
+        (UINT)space + elementOffset.spaceOffset,
         (UINT)count,
         isRootParameter);
 }
@@ -646,7 +647,10 @@ void RootShaderObjectLayoutImpl::RootSignatureDescBuilder::addAsValue(
     slang::VariableLayoutReflection* varLayout, Index physicalDescriptorSetIndex)
 {
     BindingRegisterOffsetPair offset(varLayout);
-    addAsValue(varLayout->getTypeLayout(), physicalDescriptorSetIndex, offset, offset);
+    auto elementOffset = offset;
+    elementOffset.primary.spaceOffset = 0;
+    elementOffset.pending.spaceOffset = 0;
+    addAsValue(varLayout->getTypeLayout(), physicalDescriptorSetIndex, offset, elementOffset);
 }
 
 /// Add binding ranges and parameter blocks to the root signature.
@@ -658,30 +662,34 @@ void RootShaderObjectLayoutImpl::RootSignatureDescBuilder::addAsValue(
 /// the descriptor set that binding ranges not belonging to nested
 /// parameter blocks should be added to.
 ///
-/// The `offset` encodes information about space and/or register offsets that
-/// should be applied to descrptor ranges.
+/// The `offsetForChildrenThatNeedNewSpace` and `offsetForOrdinaryChildren` parameters
+/// encode information about space and/or register offsets that should be applied to
+/// descrptor ranges. `offsetForChildrenThatNeedNewSpace` will contain a space offset
+/// for children that requires a new space, such as a ParameterBlock.
+/// `offsetForOrdinaryChildren` contains the space for all direct children that should
+/// be placed in.
 ///
 
 void RootShaderObjectLayoutImpl::RootSignatureDescBuilder::addAsConstantBuffer(
     slang::TypeLayoutReflection* typeLayout,
     Index physicalDescriptorSetIndex,
-    BindingRegisterOffsetPair const& containerOffset,
-    BindingRegisterOffsetPair const& elementOffset)
+    BindingRegisterOffsetPair const& offsetForChildrenThatNeedNewSpace,
+    BindingRegisterOffsetPair const& offsetForOrdinaryChildren)
 {
     if (typeLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM) != 0)
     {
         auto descriptorRangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-        auto& offsetForRangeType = containerOffset.primary.offsetForRangeType[descriptorRangeType];
+        auto& offsetForRangeType = offsetForOrdinaryChildren.primary.offsetForRangeType[descriptorRangeType];
         addDescriptorRange(
             physicalDescriptorSetIndex,
             descriptorRangeType,
             offsetForRangeType,
-            containerOffset.primary.spaceOffset,
+            offsetForOrdinaryChildren.primary.spaceOffset,
             1,
             false);
     }
 
-    addAsValue(typeLayout, physicalDescriptorSetIndex, containerOffset, elementOffset);
+    addAsValue(typeLayout, physicalDescriptorSetIndex, offsetForChildrenThatNeedNewSpace, offsetForOrdinaryChildren);
 }
 
 void RootShaderObjectLayoutImpl::RootSignatureDescBuilder::addAsValue(
@@ -743,6 +751,8 @@ void RootShaderObjectLayoutImpl::RootSignatureDescBuilder::addAsValue(
         BindingRegisterOffsetPair subObjectRangeElementOffset = elementOffset;
         subObjectRangeElementOffset +=
             BindingRegisterOffsetPair(typeLayout->getSubObjectRangeOffset(subObjectRangeIndex));
+        subObjectRangeElementOffset.primary.spaceOffset = elementOffset.primary.spaceOffset;
+        subObjectRangeElementOffset.pending.spaceOffset = elementOffset.pending.spaceOffset;
 
         switch (bindingType)
         {
@@ -781,23 +791,30 @@ void RootShaderObjectLayoutImpl::RootSignatureDescBuilder::addAsValue(
 
             BindingRegisterOffsetPair subDescriptorSetOffset;
             subDescriptorSetOffset.primary.spaceOffset =
-                subObjectRangeElementOffset.primary.spaceOffset;
+                subObjectRangeContainerOffset.primary.spaceOffset;
             subDescriptorSetOffset.pending.spaceOffset =
-                subObjectRangeElementOffset.pending.spaceOffset;
+                subObjectRangeContainerOffset.pending.spaceOffset;
 
             auto subPhysicalDescriptorSetIndex = addDescriptorSet();
 
-            BindingRegisterOffsetPair containerOffset = subDescriptorSetOffset;
-            containerOffset += BindingRegisterOffsetPair(containerVarLayout);
-
-            BindingRegisterOffsetPair elementOffset = subDescriptorSetOffset;
-            elementOffset += BindingRegisterOffsetPair(elementVarLayout);
+            // We recursively call `addAsConstantBuffer` to actually generate
+            // the root signature bindings for children in the parameter block.
+            // We must compute `containerOffset`, which include a space offset
+            // that any sub ParameterBlocks should start from, and `elementOffset`
+            // that encodes the space offset of the current parameter block.
+            // The space offset of the current parameter block can be obtained from the
+            // `containerVarLayout`, and the space offset of any sub ParameterBlocks
+            // are obatined from `elementVarLayout`.
+            BindingRegisterOffsetPair offsetForChildrenThatNeedNewSpace = subDescriptorSetOffset;
+            offsetForChildrenThatNeedNewSpace += BindingRegisterOffsetPair(elementVarLayout);
+            BindingRegisterOffsetPair offsetForOrindaryChildren = subDescriptorSetOffset;
+            offsetForOrindaryChildren += BindingRegisterOffsetPair(containerVarLayout);
 
             addAsConstantBuffer(
                 elementTypeLayout,
                 subPhysicalDescriptorSetIndex,
-                containerOffset,
-                elementOffset);
+                offsetForChildrenThatNeedNewSpace,
+                offsetForOrindaryChildren);
         }
         break;
 

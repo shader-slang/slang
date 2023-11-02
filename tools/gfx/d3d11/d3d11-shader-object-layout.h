@@ -52,6 +52,9 @@ public:
             /// An index into the sub-object array if this binding range is treated
             /// as a sub-object.
         Index subObjectIndex;
+
+            /// Is this binding range specializable, e.g. an existential value or ParameterBlock<IFoo>.
+        bool isSpecializable;
     };
 
     // Sometimes we just want to iterate over the ranges that represent
