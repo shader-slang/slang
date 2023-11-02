@@ -2919,11 +2919,15 @@ matrix<T, N, M> frexp(matrix<T, N, M> x, out matrix<int, N, M, L> exp)
 // Texture filter width
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(spirv, "OpFWidth resultType resultId _0")
 T fwidth(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
+__target_intrinsic(spirv, "OpFWidth resultType resultId _0")
 [__readNone]
 vector<T, N> fwidth(vector<T, N> x)
 {
