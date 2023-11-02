@@ -70,8 +70,6 @@ struct ForwardDiffTranscriber : AutoDiffTranscriberBase
 
     InstPair transcribeUpdateElement(IRBuilder* builder, IRInst* originalInst);
 
-    InstPair transcribeLoop(IRBuilder* builder, IRLoop* origLoop);
-
     InstPair transcribeIfElse(IRBuilder* builder, IRIfElse* origIfElse);
 
     InstPair transcribeSwitch(IRBuilder* builder, IRSwitch* origSwitch);
@@ -97,13 +95,8 @@ struct ForwardDiffTranscriber : AutoDiffTranscriberBase
     // Transcribe a function definition.
     InstPair transcribeFunc(IRBuilder* inBuilder, IRFunc* primalFunc, IRFunc* diffFunc);
 
-    // Transcribe a generic definition
-    InstPair transcribeGeneric(IRBuilder* inBuilder, IRGeneric* origGeneric);
-
     // Transcribe a function without marking the result as a decoration.
     IRFunc* transcribeFuncHeaderImpl(IRBuilder* inBuilder, IRFunc* origFunc);
-
-    List<IRInst*> transcribePhiArgs(IRBuilder* builder, List<IRInst*> origPhiArgs);
 
     void checkAutodiffInstDecorations(IRFunc* fwdFunc);
 
