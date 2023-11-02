@@ -3732,19 +3732,25 @@ struct SPIRVEmitContext
 
     SpvInst* emitGetElementPtr(SpvInstParent* parent, IRGetElementPtr* inst)
     {
+        IRBuilder builder(m_irModule);
         auto base = inst->getBase();
-        SpvWord baseId = 0;
-        // Only used in debug build, but we don't want a warning/error for an unused initialized variable
+        const SpvWord baseId = getID(ensureInst(base));
 
-        if (as<IRPointerLikeType>(base->getDataType()) || as<IRPtrTypeBase>(base->getDataType()))
+        // We might replace resultType with a different storage class equivalent
+        auto resultType = as<IRPtrTypeBase>(inst->getFullType());
+        SLANG_ASSERT(resultType);
+
+        if(const auto basePtrType = as<IRPtrTypeBase>(base->getDataType()))
         {
-            baseId = getID(ensureInst(base));
+            // If the base pointer has a specific address space and the
+            // expected result type doesn't, then make sure they match.
+            // It's invalid spir-v if they don't match
+            resultType = getPtrTypeWithAddressSpace(cast<IRPtrTypeBase>(inst->getDataType()), basePtrType->getAddressSpace());
         }
         else
         {
-            SLANG_ASSERT(!"invalid IR: base of getElementPtr must be a pointer.");
+            SLANG_ASSERT(as<IRPointerLikeType>(base->getDataType()) || !"invalid IR: base of getElementPtr must be a pointer.");
         }
-        SLANG_ASSERT(as<IRPtrTypeBase>(inst->getFullType()));
         return emitOpAccessChain(
             parent,
             inst,
@@ -3835,12 +3841,36 @@ struct SPIRVEmitContext
         return emitOpVectorShuffle(parent, inst, inst->getFullType(), inst->getBase(), inst->getSource(), shuffleIndices.getArrayView());
     }
 
+    IRPtrTypeBase* getPtrTypeWithAddressSpace(IRPtrTypeBase* ptrTypeWithNoAddressSpace, IRIntegerValue addressSpace)
+    {
+        // If it's already ok, return as is
+        if(ptrTypeWithNoAddressSpace->getAddressSpace() == addressSpace)
+            return ptrTypeWithNoAddressSpace;
+
+        // It has an address space, but it doesn't match fail, this indicates a
+        // problem with whatever's creating these types
+        SLANG_ASSERT(!ptrTypeWithNoAddressSpace->hasAddressSpace());
+
+        IRBuilder builder(ptrTypeWithNoAddressSpace);
+        return builder.getPtrType(
+            ptrTypeWithNoAddressSpace->getOp(),
+            ptrTypeWithNoAddressSpace->getValueType(),
+            addressSpace
+        );
+    }
+
     SpvInst* emitStructuredBufferGetElementPtr(SpvInstParent* parent, IRInst* inst)
     {
         //"%addr = OpAccessChain resultType*StorageBuffer resultId _0 const(int, 0) _1;"
         IRBuilder builder(inst);
-        auto addr = emitInst(parent, inst, SpvOpAccessChain, inst->getDataType(), kResultID, inst->getOperand(0), emitIntConstant(0, builder.getIntType()), inst->getOperand(1));
-        return addr;
+        return emitOpAccessChain(
+            parent,
+            inst,
+            // Make sure the resulting pointer has the correct storage class
+            getPtrTypeWithAddressSpace(cast<IRPtrTypeBase>(inst->getDataType()), SpvStorageClassStorageBuffer),
+            inst->getOperand(0),
+            makeArray(emitIntConstant(0, builder.getIntType()), ensureInst(inst->getOperand(1)))
+        );
     }
 
     SpvInst* emitStructuredBufferGetDimensions(SpvInstParent* parent, IRInst* inst)
