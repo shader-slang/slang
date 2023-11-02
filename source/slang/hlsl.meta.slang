@@ -4360,22 +4360,48 @@ __generic<let N : int> float noise(vector<float, N> x)
 /// to this function as necessary in output code, rather than make this
 /// the user's responsibility, so that the default behavior of the language
 /// is more semantically "correct."
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl, nonuniformEXT)
 __glsl_extension(GL_EXT_nonuniform_qualifier)
 [__readNone]
 uint NonUniformResourceIndex(uint index)
 {
-    return index;
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "NonUniformResourceIndex";
+    case glsl:
+        __intrinsic_asm "nonuniformEXT";
+    case spirv:
+        spirv_asm
+        {
+            OpCapability ShaderNonUniform;
+            OpDecorate $index NonUniform;
+        };
+        return index;
+    default:
+        return index;
+    }
 }
 
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl, nonuniformEXT)
 __glsl_extension(GL_EXT_nonuniform_qualifier)
 [__readNone]
 int NonUniformResourceIndex(int index)
 {
-    return index;
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "NonUniformResourceIndex";
+    case glsl:
+        __intrinsic_asm "nonuniformEXT";
+    case spirv:
+        spirv_asm
+        {
+            OpCapability ShaderNonUniform;
+            OpDecorate $index NonUniform;
+        };
+        return index;
+    default:
+        return index;
+    }
 }
 
 /// HLSL allows NonUniformResourceIndex around non int/uint types.
