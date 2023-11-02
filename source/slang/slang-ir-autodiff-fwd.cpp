@@ -871,6 +871,7 @@ InstPair ForwardDiffTranscriber::transcribeControlFlow(IRBuilder* builder, IRIns
                     auto breakBlock = findOrTranscribeDiffInst(builder, origLoop->getBreakBlock());
                     auto continueBlock = findOrTranscribeDiffInst(builder, origLoop->getContinueBlock());
                     List<IRInst*> operands;
+                    operands.add(diffBlock);
                     operands.add(breakBlock);
                     operands.add(continueBlock);
                     operands.addRange(newArgs);
