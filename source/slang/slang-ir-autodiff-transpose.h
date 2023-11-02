@@ -739,19 +739,6 @@ struct DiffTransposePass
 
         return false;
     }
-    
-    IRParam* getParamAt(IRBlock* block, UIndex ii)
-    {
-        UIndex index = 0;
-        for (auto param : block->getParams())
-        {
-            if (ii == index)
-                return param;
-
-            index ++;
-        }
-        SLANG_UNEXPECTED("ii >= paramCount");
-    }
 
     void transposeBlock(IRBlock* fwdBlock, IRBlock* revBlock)
     {

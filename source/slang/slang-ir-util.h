@@ -300,6 +300,8 @@ inline bool isCompositeType(IRType* type)
     }
 }
 
+IRParam* getParamAt(IRBlock* block, UIndex ii);
+
 }
 
 #endif

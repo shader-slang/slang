@@ -1183,6 +1183,19 @@ void hoistInstOutOfASMBlocks(IRBlock* block)
     }
 }
 
+IRParam* getParamAt(IRBlock* block, UIndex ii)
+{
+    UIndex index = 0;
+    for (auto param : block->getParams())
+    {
+        if (ii == index)
+            return param;
+
+        index++;
+    }
+    SLANG_UNEXPECTED("ii >= paramCount");
+}
+
 UnownedStringSlice getBasicTypeNameHint(IRType* basicType)
 {
     switch (basicType->getOp())
