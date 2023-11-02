@@ -4063,6 +4063,9 @@ matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y)
 
 // split into integer and fractional parts (both with same sign)
 __generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Modf _0 _1")
 [__readNone]
 T modf(T x, out T ip);
 
