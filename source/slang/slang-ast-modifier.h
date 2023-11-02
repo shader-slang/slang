@@ -433,6 +433,8 @@ class IntrinsicTypeModifier : public Modifier
     // The IR opcode to use when constructing a type
     uint32_t irOp;
 
+    Token opToken;
+
     // Additional literal opreands to provide when creating instances.
     // (e.g., for a texture type this passes in shape/mutability info)
     List<uint32_t> irOperands;
