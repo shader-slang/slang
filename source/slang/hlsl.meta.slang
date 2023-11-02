@@ -5083,6 +5083,7 @@ matrix<T,N,M> tanh(matrix<T,N,M> x)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
+__target_intrinsic(spirv, "OpTranspose resultType resultId _0")
 [__readNone]
 [PreferRecompute]
 matrix<T, M, N> transpose(matrix<T, N, M> x)
@@ -5096,6 +5097,7 @@ matrix<T, M, N> transpose(matrix<T, N, M> x)
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
+__target_intrinsic(spirv, "OpTranspose resultType resultId _0")
 [__readNone]
 [PreferRecompute]
 matrix<T, M, N> transpose(matrix<T, N, M> x)
@@ -5109,6 +5111,7 @@ matrix<T, M, N> transpose(matrix<T, N, M> x)
 __generic<T : __BuiltinLogicalType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
+__target_intrinsic(spirv, "OpTranspose resultType resultId _0")
 [__readNone]
 [PreferRecompute]
 matrix<T, M, N> transpose(matrix<T, N, M> x)
