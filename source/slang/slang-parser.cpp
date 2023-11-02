@@ -6773,6 +6773,31 @@ namespace Slang
         addBuiltinSyntaxImpl(session, scope, name, &parseSimpleSyntax, (void*) syntaxClass.classInfo, getClass<T>());
     }
 
+    static IROp parseIROp(Parser* parser, Token& outToken)
+    {
+        if (AdvanceIf(parser, TokenType::OpSub))
+        {
+            outToken = parser->ReadToken();
+            return IROp(-stringToInt(outToken.getContent()));
+        }
+        else if (parser->LookAheadToken(TokenType::IntegerLiteral))
+        {
+            outToken = parser->ReadToken();
+            return IROp(stringToInt(outToken.getContent()));
+        }
+        else
+        {
+            outToken = parser->ReadToken(TokenType::Identifier);;
+            auto op = findIROp(outToken.getContent());
+
+            if (op == kIROp_Invalid)
+            {
+                parser->sink->diagnose(outToken, Diagnostics::unimplemented, "unknown intrinsic op");
+            }
+            return op;
+        }
+    }
+
     static NodeBase* parseIntrinsicOpModifier(Parser* parser, void* /*userData*/)
     {
         IntrinsicOpModifier* modifier = parser->astBuilder->create<IntrinsicOpModifier>();
@@ -6794,26 +6819,7 @@ namespace Slang
         //
         if (AdvanceIf(parser, TokenType::LParent))
         {
-            if (AdvanceIf(parser, TokenType::OpSub))
-            {
-                modifier->op = IROp(-stringToInt(parser->ReadToken().getContent()));
-            }
-            else if (parser->LookAheadToken(TokenType::IntegerLiteral))
-            {
-                modifier->op = IROp(stringToInt(parser->ReadToken().getContent()));
-            }
-            else
-            {
-                modifier->opToken = parser->ReadToken(TokenType::Identifier);
-
-                modifier->op = findIROp(modifier->opToken.getContent());
-
-                if (modifier->op == kIROp_Invalid)
-                {
-                    parser->sink->diagnose(modifier->opToken, Diagnostics::unimplemented, "unknown intrinsic op");
-                }
-            }
-
+            modifier->op = parseIROp(parser, modifier->opToken);
             parser->ReadToken(TokenType::RParent);
         }
 
@@ -7124,7 +7130,7 @@ namespace Slang
     {
         IntrinsicTypeModifier* modifier = parser->astBuilder->create<IntrinsicTypeModifier>();
         parser->ReadToken(TokenType::LParent);
-        modifier->irOp = uint32_t(stringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
+        modifier->irOp = parseIROp(parser, modifier->opToken);
         while( AdvanceIf(parser, TokenType::Comma) )
         {
             auto operand = uint32_t(stringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
