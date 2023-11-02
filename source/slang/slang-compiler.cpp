@@ -764,6 +764,7 @@ namespace Slang
         CASE(DX_6_4,             _6_4);
         CASE(DX_6_5,             _6_5);
         CASE(DX_6_6,             _6_6);
+        CASE(DX_6_7,             _6_7);
     #undef CASE
 
         default:
