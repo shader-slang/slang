@@ -341,7 +341,7 @@ DIAGNOSTIC(30093, Error, uncaughtTryCallInNonThrowFunc, "the current function or
 DIAGNOSTIC(30094, Error, mustUseTryClauseToCallAThrowFunc, "the callee may throw an error, and therefore must be called within a 'try' clause")
 DIAGNOSTIC(30095, Error, errorTypeOfCalleeIncompatibleWithCaller, "the error type `$1` of callee `$0` is not compatible with the caller's error type `$2`.")
 
-DIAGNOSTIC(30096, Error, differentialTypeShouldServeAsItsOwnDifferentialType, "cannot use type '$0' a `Differential` type. A differential type's differential must be itself, however, the '$0.Differential' is '$1'.")
+DIAGNOSTIC(30096, Error, differentialTypeShouldServeAsItsOwnDifferentialType, "cannot use type '$0' a `Differential` type. A differential type's differential must be itself. However, '$0.Differential' is '$1'.")
 DIAGNOSTIC(30097, Error, functionNotMarkedAsDifferentiable, "function '$0' is not marked as $1-differentiable.")
 DIAGNOSTIC(30098, Error, nonStaticMemberFunctionNotAllowedAsDiffOperand, "non-static function reference '$0' is not allowed here.")
 
