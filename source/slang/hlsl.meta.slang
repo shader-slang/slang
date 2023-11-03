@@ -6240,7 +6240,9 @@ matrix<T,N,M> WaveMaskPrefixBitXor(WaveMask mask, matrix<T,N,M> expr);
 // Information for GLSL wave/subgroup support
 // https://github.com/KhronosGroup/GLSL/blob/master/extensions/khr/GL_KHR_shader_subgroup.txt
 
-__generic<T : __BuiltinType> T QuadReadLaneAt(T sourceValue, uint quadLaneID)
+__generic<T : __BuiltinType>
+__glsl_extension(GL_KHR_shader_subgroup_quad)
+T QuadReadLaneAt(T sourceValue, uint quadLaneID)
 {
     __target_switch
     {
@@ -6255,11 +6257,29 @@ __generic<T : __BuiltinType> T QuadReadLaneAt(T sourceValue, uint quadLaneID)
         };
     }
 }
-__generic<T : __BuiltinType, let N : int> vector<T,N> QuadReadLaneAt(vector<T,N> sourceValue, uint quadLaneID);
+__generic<T : __BuiltinType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_quad)
+vector<T,N> QuadReadLaneAt(vector<T,N> sourceValue, uint quadLaneID)
+{
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "QuadReadLaneAt";
+    case glsl:
+        __intrinsic_asm "subgroupQuadBroadcast";
+    case spirv:
+        return spirv_asm {
+            OpCapability GroupNonUniformQuad;
+            result:$$vector<T,N> = OpGroupNonUniformQuadBroadcast Subgroup $sourceValue $quadLaneID;
+        };
+    }
+}
 __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadLaneAt(matrix<T,N,M> sourceValue, uint quadLaneID);
 
 
-__generic<T : __BuiltinType> T QuadReadAcrossX(T localValue)
+__generic<T : __BuiltinType>
+__glsl_extension(GL_KHR_shader_subgroup_quad)
+T QuadReadAcrossX(T localValue)
 {
     __target_switch
     {
@@ -6275,7 +6295,9 @@ __generic<T : __BuiltinType> T QuadReadAcrossX(T localValue)
     }
 }
 
-__generic<T : __BuiltinType, let N : int> vector<T,N> QuadReadAcrossX(vector<T,N> localValue)
+__generic<T : __BuiltinType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_quad)
+vector<T,N> QuadReadAcrossX(vector<T,N> localValue)
 {
     __target_switch
     {
@@ -6286,14 +6308,15 @@ __generic<T : __BuiltinType, let N : int> vector<T,N> QuadReadAcrossX(vector<T,N
     case spirv:
         return spirv_asm {
             OpCapability GroupNonUniformQuad;
-            result:$$T = OpGroupNonUniformQuadSwap Subgroup $localValue $0;
+            result:$$vector<T,N> = OpGroupNonUniformQuadSwap Subgroup $localValue $0;
         };
     }
 }
 __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadAcrossX(matrix<T,N,M> localValue);
 
-__generic<T : __BuiltinType> T QuadReadAcrossY(T localValue);
-__generic<T : __BuiltinType, let N : int> vector<T,N> QuadReadAcrossY(vector<T,N> localValue)
+__generic<T : __BuiltinType>
+__glsl_extension(GL_KHR_shader_subgroup_quad)
+T QuadReadAcrossY(T localValue)
 {
     __target_switch
     {
@@ -6308,7 +6331,9 @@ __generic<T : __BuiltinType, let N : int> vector<T,N> QuadReadAcrossY(vector<T,N
         };
     }
 }
-__generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadAcrossY(matrix<T,N,M> localValue)
+__generic<T : __BuiltinType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_quad)
+vector<T,N> QuadReadAcrossY(vector<T,N> localValue)
 {
     __target_switch
     {
@@ -6319,10 +6344,12 @@ __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadAcr
     case spirv:
         return spirv_asm {
             OpCapability GroupNonUniformQuad;
-            result:$$T = OpGroupNonUniformQuadSwap Subgroup $localValue $1;
+            result:$$vector<T,N> = OpGroupNonUniformQuadSwap Subgroup $localValue $1;
         };
     }
 }
+
+__generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadAcrossY(matrix<T,N,M> localValue);
 
 __generic<T : __BuiltinType> T QuadReadAcrossDiagonal(T localValue)
 {
@@ -6350,7 +6377,7 @@ __generic<T : __BuiltinType, let N : int> vector<T,N> QuadReadAcrossDiagonal(vec
     case spirv:
         return spirv_asm {
             OpCapability GroupNonUniformQuad;
-            result:$$T = OpGroupNonUniformQuadSwap Subgroup $localValue $2;
+            result:$$vector<T,N> = OpGroupNonUniformQuadSwap Subgroup $localValue $2;
         };
     }
 }
