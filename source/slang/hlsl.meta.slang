@@ -6242,6 +6242,7 @@ matrix<T,N,M> WaveMaskPrefixBitXor(WaveMask mask, matrix<T,N,M> expr);
 
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
+__spirv_version(1.3)
 T QuadReadLaneAt(T sourceValue, uint quadLaneID)
 {
     __target_switch
@@ -6259,6 +6260,7 @@ T QuadReadLaneAt(T sourceValue, uint quadLaneID)
 }
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
+__spirv_version(1.3)
 vector<T,N> QuadReadLaneAt(vector<T,N> sourceValue, uint quadLaneID)
 {
     __target_switch
@@ -6279,6 +6281,7 @@ __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadLan
 
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
+__spirv_version(1.3)
 T QuadReadAcrossX(T localValue)
 {
     __target_switch
@@ -6297,6 +6300,7 @@ T QuadReadAcrossX(T localValue)
 
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
+__spirv_version(1.3)
 vector<T,N> QuadReadAcrossX(vector<T,N> localValue)
 {
     __target_switch
@@ -6316,6 +6320,7 @@ __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadAcr
 
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
+__spirv_version(1.3)
 T QuadReadAcrossY(T localValue)
 {
     __target_switch
@@ -6333,6 +6338,7 @@ T QuadReadAcrossY(T localValue)
 }
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
+__spirv_version(1.3)
 vector<T,N> QuadReadAcrossY(vector<T,N> localValue)
 {
     __target_switch
@@ -6351,7 +6357,10 @@ vector<T,N> QuadReadAcrossY(vector<T,N> localValue)
 
 __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadAcrossY(matrix<T,N,M> localValue);
 
-__generic<T : __BuiltinType> T QuadReadAcrossDiagonal(T localValue)
+__generic<T : __BuiltinType>
+__glsl_extension(GL_KHR_shader_subgroup_quad)
+__spirv_version(1.3)
+T QuadReadAcrossDiagonal(T localValue)
 {
     __target_switch
     {
@@ -6366,7 +6375,10 @@ __generic<T : __BuiltinType> T QuadReadAcrossDiagonal(T localValue)
         };
     }
 }
-__generic<T : __BuiltinType, let N : int> vector<T,N> QuadReadAcrossDiagonal(vector<T,N> localValue)
+__generic<T : __BuiltinType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_quad)
+__spirv_version(1.3)
+vector<T,N> QuadReadAcrossDiagonal(vector<T,N> localValue)
 {
     __target_switch
     {
