@@ -14,9 +14,6 @@ float test(float x, no_diff out float y)
     return x * x;
 }
 
-T operator +<T:IDifferentiable>(T a, T b)
-{}
-
 [Differentiable]
 float caller(float x, no_diff out float y)
 {
