@@ -30,12 +30,12 @@ void main()
     // HLSL: QuadReadAcrossDiagonal
     // HLSL: QuadReadAcrossDiagonal
 
-    // SPIRV: OpGroupNonUniformQuadBroadcast {{.*}} %{{u?int_3}} {{.*}}  %{{u?int_1}}
-    // SPIRV: OpGroupNonUniformQuadBroadcast {{.*}} %{{u?int_3}} {{.*}}  %{{u?int_1}}
-    // SPIRV: OpGroupNonUniformQuadSwap {{.*}}  %{{u?int_3}} {{.*}} %{{u?int_0}}
-    // SPIRV: OpGroupNonUniformQuadSwap {{.*}}  %{{u?int_3}} {{.*}}  %{{u?int_0}}
-    // SPIRV: OpGroupNonUniformQuadSwap {{.*}}  %{{u?int_3}} {{.*}}  %{{u?int_1}}
-    // SPIRV: OpGroupNonUniformQuadSwap {{.*}}  %{{u?int_3}} {{.*}}  %{{u?int_1}}
-    // SPIRV: OpGroupNonUniformQuadSwap {{.*}}  %{{u?int_3}} {{.*}}  %{{u?int_2}}
-    // SPIRV: OpGroupNonUniformQuadSwap {{.*}}  %{{u?int_3}} {{.*}}  %{{u?int_2}}
+    // SPIRV: OpGroupNonUniformQuadBroadcast {{.*}} %{{u?int_3}} {{.*}} %{{u?int_1}}
+    // SPIRV: OpGroupNonUniformQuadBroadcast {{.*}} %{{u?int_3}} {{.*}} %{{u?int_1}}
+    // SPIRV: OpGroupNonUniformQuadSwap {{.*}} %{{u?int_3}} {{.*}} %{{u?int_0}}
+    // SPIRV: OpGroupNonUniformQuadSwap {{.*}} %{{u?int_3}} {{.*}} %{{u?int_0}}
+    // SPIRV: OpGroupNonUniformQuadSwap {{.*}} %{{u?int_3}} {{.*}} %{{u?int_1}}
+    // SPIRV: OpGroupNonUniformQuadSwap {{.*}} %{{u?int_3}} {{.*}} %{{u?int_1}}
+    // SPIRV: OpGroupNonUniformQuadSwap {{.*}} %{{u?int_3}} {{.*}} %{{u?int_2}}
+    // SPIRV: OpGroupNonUniformQuadSwap {{.*}} %{{u?int_3}} {{.*}} %{{u?int_2}}
 }
