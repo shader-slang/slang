@@ -585,6 +585,15 @@ float fwd_derivative(float a, DifferentialPair<float> x);
 void back_prop(float a, inout DifferentialPair<float> x, float d_y);
 ```
 
+By default, the implicit `this` parameter will be treated as differentiable if the enclosing type of the member method is differentiable. If you wish to exclude `this` parameter from differentiation, use `[NoDiffThis]` attribute on the method:
+```csharp
+struct MyDifferentiableType : IDifferentiable
+{
+    [NoDiffThis]   // Make `this` parameter `no_diff`.
+    float compute(float x) { ... }
+}
+```
+
 ### Excluding Struct Members from Differentiation
 
 When using automatic `IDifferentiable` conformance synthesis for a `struct` type, Slang will by-default treat all struct members that have a differentiable type as differentiable, and thus include a corresponding field in the generated `Differential` type for the struct.
