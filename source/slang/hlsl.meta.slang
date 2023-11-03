@@ -6291,9 +6291,10 @@ T QuadReadAcrossX(T localValue)
     case glsl:
         __intrinsic_asm "subgroupQuadSwapHorizontal($0)";
     case spirv:
+        uint direction = 0u;
         return spirv_asm {
             OpCapability GroupNonUniformQuad;
-            result:$$T = OpGroupNonUniformQuadSwap Subgroup $localValue $0;
+            result:$$T = OpGroupNonUniformQuadSwap Subgroup $localValue $direction;
         };
     }
 }
@@ -6310,9 +6311,10 @@ vector<T,N> QuadReadAcrossX(vector<T,N> localValue)
     case glsl:
         __intrinsic_asm "subgroupQuadSwapHorizontal($0)";
     case spirv:
+        uint direction = 0u;
         return spirv_asm {
             OpCapability GroupNonUniformQuad;
-            result:$$vector<T,N> = OpGroupNonUniformQuadSwap Subgroup $localValue $0;
+            result:$$vector<T,N> = OpGroupNonUniformQuadSwap Subgroup $localValue $direction;
         };
     }
 }
@@ -6330,9 +6332,10 @@ T QuadReadAcrossY(T localValue)
     case glsl:
         __intrinsic_asm "subgroupQuadSwapVertical($0)";
     case spirv:
+        uint direction = 1u;
         return spirv_asm {
             OpCapability GroupNonUniformQuad;
-            result:$$T = OpGroupNonUniformQuadSwap Subgroup $localValue $1;
+            result:$$T = OpGroupNonUniformQuadSwap Subgroup $localValue $direction;
         };
     }
 }
@@ -6348,9 +6351,10 @@ vector<T,N> QuadReadAcrossY(vector<T,N> localValue)
     case glsl:
         __intrinsic_asm "subgroupQuadSwapVertical($0)";
     case spirv:
+        uint direction = 1u;
         return spirv_asm {
             OpCapability GroupNonUniformQuad;
-            result:$$vector<T,N> = OpGroupNonUniformQuadSwap Subgroup $localValue $1;
+            result:$$vector<T,N> = OpGroupNonUniformQuadSwap Subgroup $localValue $direction;
         };
     }
 }
@@ -6369,9 +6373,10 @@ T QuadReadAcrossDiagonal(T localValue)
     case glsl:
         __intrinsic_asm "subgroupQuadSwapDiagonal($0)";
     case spirv:
+        uint direction = 2u;
         return spirv_asm {
             OpCapability GroupNonUniformQuad;
-            result:$$T = OpGroupNonUniformQuadSwap Subgroup $localValue $2;
+            result:$$T = OpGroupNonUniformQuadSwap Subgroup $localValue $direction;
         };
     }
 }
@@ -6387,9 +6392,10 @@ vector<T,N> QuadReadAcrossDiagonal(vector<T,N> localValue)
     case glsl:
         __intrinsic_asm "subgroupQuadSwapDiagonal($0)";
     case spirv:
+        uint direction = 2u;
         return spirv_asm {
             OpCapability GroupNonUniformQuad;
-            result:$$vector<T,N> = OpGroupNonUniformQuadSwap Subgroup $localValue $2;
+            result:$$vector<T,N> = OpGroupNonUniformQuadSwap Subgroup $localValue $direction;
         };
     }
 }
