@@ -6240,20 +6240,165 @@ matrix<T,N,M> WaveMaskPrefixBitXor(WaveMask mask, matrix<T,N,M> expr);
 // Information for GLSL wave/subgroup support
 // https://github.com/KhronosGroup/GLSL/blob/master/extensions/khr/GL_KHR_shader_subgroup.txt
 
-__generic<T : __BuiltinType> T QuadReadLaneAt(T sourceValue, uint quadLaneID);
-__generic<T : __BuiltinType, let N : int> vector<T,N> QuadReadLaneAt(vector<T,N> sourceValue, uint quadLaneID);
+__generic<T : __BuiltinType>
+__glsl_extension(GL_KHR_shader_subgroup_quad)
+__spirv_version(1.3)
+T QuadReadLaneAt(T sourceValue, uint quadLaneID)
+{
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "QuadReadLaneAt";
+    case glsl:
+        __intrinsic_asm "subgroupQuadBroadcast";
+    case spirv:
+        return spirv_asm {
+            OpCapability GroupNonUniformQuad;
+            result:$$T = OpGroupNonUniformQuadBroadcast Subgroup $sourceValue $quadLaneID;
+        };
+    }
+}
+__generic<T : __BuiltinType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_quad)
+__spirv_version(1.3)
+vector<T,N> QuadReadLaneAt(vector<T,N> sourceValue, uint quadLaneID)
+{
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "QuadReadLaneAt";
+    case glsl:
+        __intrinsic_asm "subgroupQuadBroadcast";
+    case spirv:
+        return spirv_asm {
+            OpCapability GroupNonUniformQuad;
+            result:$$vector<T,N> = OpGroupNonUniformQuadBroadcast Subgroup $sourceValue $quadLaneID;
+        };
+    }
+}
 __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadLaneAt(matrix<T,N,M> sourceValue, uint quadLaneID);
 
-__generic<T : __BuiltinType> T QuadReadAcrossX(T localValue);
-__generic<T : __BuiltinType, let N : int> vector<T,N> QuadReadAcrossX(vector<T,N> localValue);
+
+__generic<T : __BuiltinType>
+__glsl_extension(GL_KHR_shader_subgroup_quad)
+__spirv_version(1.3)
+T QuadReadAcrossX(T localValue)
+{
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "QuadReadAcrossX";
+    case glsl:
+        __intrinsic_asm "subgroupQuadSwapHorizontal($0)";
+    case spirv:
+        uint direction = 0u;
+        return spirv_asm {
+            OpCapability GroupNonUniformQuad;
+            result:$$T = OpGroupNonUniformQuadSwap Subgroup $localValue $direction;
+        };
+    }
+}
+
+__generic<T : __BuiltinType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_quad)
+__spirv_version(1.3)
+vector<T,N> QuadReadAcrossX(vector<T,N> localValue)
+{
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "QuadReadAcrossX";
+    case glsl:
+        __intrinsic_asm "subgroupQuadSwapHorizontal($0)";
+    case spirv:
+        uint direction = 0u;
+        return spirv_asm {
+            OpCapability GroupNonUniformQuad;
+            result:$$vector<T,N> = OpGroupNonUniformQuadSwap Subgroup $localValue $direction;
+        };
+    }
+}
 __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadAcrossX(matrix<T,N,M> localValue);
 
-__generic<T : __BuiltinType> T QuadReadAcrossY(T localValue);
-__generic<T : __BuiltinType, let N : int> vector<T,N> QuadReadAcrossY(vector<T,N> localValue);
+__generic<T : __BuiltinType>
+__glsl_extension(GL_KHR_shader_subgroup_quad)
+__spirv_version(1.3)
+T QuadReadAcrossY(T localValue)
+{
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "QuadReadAcrossY";
+    case glsl:
+        __intrinsic_asm "subgroupQuadSwapVertical($0)";
+    case spirv:
+        uint direction = 1u;
+        return spirv_asm {
+            OpCapability GroupNonUniformQuad;
+            result:$$T = OpGroupNonUniformQuadSwap Subgroup $localValue $direction;
+        };
+    }
+}
+__generic<T : __BuiltinType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_quad)
+__spirv_version(1.3)
+vector<T,N> QuadReadAcrossY(vector<T,N> localValue)
+{
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "QuadReadAcrossY";
+    case glsl:
+        __intrinsic_asm "subgroupQuadSwapVertical($0)";
+    case spirv:
+        uint direction = 1u;
+        return spirv_asm {
+            OpCapability GroupNonUniformQuad;
+            result:$$vector<T,N> = OpGroupNonUniformQuadSwap Subgroup $localValue $direction;
+        };
+    }
+}
+
 __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadAcrossY(matrix<T,N,M> localValue);
 
-__generic<T : __BuiltinType> T QuadReadAcrossDiagonal(T localValue);
-__generic<T : __BuiltinType, let N : int> vector<T,N> QuadReadAcrossDiagonal(vector<T,N> localValue);
+__generic<T : __BuiltinType>
+__glsl_extension(GL_KHR_shader_subgroup_quad)
+__spirv_version(1.3)
+T QuadReadAcrossDiagonal(T localValue)
+{
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "QuadReadAcrossDiagonal";
+    case glsl:
+        __intrinsic_asm "subgroupQuadSwapDiagonal($0)";
+    case spirv:
+        uint direction = 2u;
+        return spirv_asm {
+            OpCapability GroupNonUniformQuad;
+            result:$$T = OpGroupNonUniformQuadSwap Subgroup $localValue $direction;
+        };
+    }
+}
+__generic<T : __BuiltinType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_quad)
+__spirv_version(1.3)
+vector<T,N> QuadReadAcrossDiagonal(vector<T,N> localValue)
+{
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "QuadReadAcrossDiagonal";
+    case glsl:
+        __intrinsic_asm "subgroupQuadSwapDiagonal($0)";
+    case spirv:
+        uint direction = 2u;
+        return spirv_asm {
+            OpCapability GroupNonUniformQuad;
+            result:$$vector<T,N> = OpGroupNonUniformQuadSwap Subgroup $localValue $direction;
+        };
+    }
+}
 __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadAcrossDiagonal(matrix<T,N,M> localValue);
 
 // WaveActiveBitAnd, WaveActiveBitOr, WaveActiveBitXor

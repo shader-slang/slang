@@ -1685,8 +1685,8 @@ namespace Slang
             if (!differentialType->equals(diffDiffType))
             {
                 SourceLoc sourceLoc = differentialType->getDeclRef().getDecl()->loc;
-                getSink()->diagnose(sourceLoc, Diagnostics::differentialTypeShouldServeAsItsOwnDifferentialType, differentialType);
-                getSink()->diagnose(inheritanceDecl, Diagnostics::noteSeeUseOfDifferentialType, differentialType, inheritanceDecl->getSup());
+                getSink()->diagnose(inheritanceDecl, Diagnostics::differentialTypeShouldServeAsItsOwnDifferentialType, differentialType, diffDiffType);
+                getSink()->diagnose(sourceLoc, Diagnostics::seeDefinitionOf, differentialType);
             }
         }
     };
