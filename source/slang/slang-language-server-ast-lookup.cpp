@@ -363,7 +363,21 @@ public:
         return false;
     }
 
-    bool visitThisExpr(ThisExpr*) { return false; }
+    bool visitThisExpr(ThisExpr* expr)
+    {
+        static const int thisTokenLength = 4;
+        if (_isLocInRange(
+            context, expr->loc, thisTokenLength))
+        {
+            ASTLookupResult result;
+            result.path = context->nodePath;
+            result.path.add(expr);
+            context->results.add(result);
+            return true;
+        }
+        return false;
+    }
+
     bool visitThisTypeExpr(ThisTypeExpr*) { return false; }
     bool visitAndTypeExpr(AndTypeExpr* expr)
     {

@@ -642,10 +642,26 @@ SlangResult LanguageServer::hover(
             }
         }
     };
+    auto fillLoc = [&](SourceLoc loc)
+    {
+        auto humaneLoc = version->linkage->getSourceManager()->getHumaneLoc(loc, SourceLocType::Actual);
+        hover.range.start.line = int(humaneLoc.line - 1);
+        hover.range.end.line = int(humaneLoc.line - 1);
+        hover.range.start.character = int(humaneLoc.column - 1);
+        hover.range.end.character = hover.range.start.character + int(doc->getTokenLength(humaneLoc.line, humaneLoc.column));
+    };
     auto fillExprHoverInfo = [&](Expr* expr)
     {
         if (auto declRefExpr = as<DeclRefExpr>(expr))
             return fillDeclRefHoverInfo(declRefExpr->declRef);
+        else if (auto thisExpr = as<ThisExpr>(expr))
+        {
+            if (expr->type)
+            {
+                sb << "```\n" << expr->type->toString() << " this" << "\n```\n";
+            }
+            fillLoc(expr->loc);
+        }
         if (const auto higherOrderExpr = as<HigherOrderInvokeExpr>(expr))
         {
             String documentation;
@@ -657,12 +673,7 @@ SlangResult LanguageServer::hover(
                 << "\n```\n";
             sb << documentation;
             maybeAppendAdditionalOverloadsHint();
-            auto humaneLoc = version->linkage->getSourceManager()->getHumaneLoc(
-                expr->loc, SourceLocType::Actual);
-            hover.range.start.line = int(humaneLoc.line - 1);
-            hover.range.end.line = int(humaneLoc.line - 1);
-            hover.range.start.character = int(humaneLoc.column - 1);
-            hover.range.end.character = hover.range.start.character + int(doc->getTokenLength(humaneLoc.line, humaneLoc.column));
+            fillLoc(expr->loc);
         }
     };
     if (auto declRefExpr = as<DeclRefExpr>(leafNode))
@@ -685,6 +696,10 @@ SlangResult LanguageServer::hover(
     else if (auto higherOrderExpr = as<HigherOrderInvokeExpr>(leafNode))
     {
         fillExprHoverInfo(higherOrderExpr);
+    }
+    else if (auto thisExprExpr = as<ThisExpr>(leafNode))
+    {
+        fillExprHoverInfo(thisExprExpr);
     }
     else if (auto importDecl = as<ImportDecl>(leafNode))
     {

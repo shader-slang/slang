@@ -1659,17 +1659,16 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         // produce transitive witnesses in shapes that will cuase us
         // problems here.
         //
-
         if (!baseWitnessTable)
         {
             // If we don't have a valid baseWitnessTable,
-            // we are in a situation that `subToMid` is a `DifferentialBottomSubtypeWitness`
-            // that applies for all non-differentiable types.
-            // In this case `midToSup` will give us the `DifferentialBottom:IDifferentiable`
-            // witness table and we can just use that as the final result of
-            // this transitive witness.
-            SLANG_RELEASE_ASSERT(midToSup && as<IRWitnessTableType>(midToSup->getDataType()));
-            return LoweredValInfo::simple(midToSup);
+            // This can happen when we are looking up an associatedtype defined in the base interface from
+            // a derived interface that inherits the base interface.
+            // For now, we just emit a null witness.
+            // In the future, we may want to consider lower `ThisTypeConstraint` into IR as something like
+            // `IRThisTypeWitness`, and emit an explicit lookup through that witness instead.
+            SLANG_RELEASE_ASSERT(as<ThisType>(val->getSub()));
+            return LoweredValInfo();
         }
 
         if (auto declaredMidToSup = as<DeclaredSubtypeWitness>(val->getMidToSup()))
@@ -9854,6 +9853,25 @@ LoweredValInfo emitDeclRef(
             // witness table for the concrete type that conforms to `ISomething<Foo>`.
             //
             auto irWitnessTable = lowerSimpleVal(context, thisTypeSubst->getWitness());
+            if (!irWitnessTable)
+            {
+                // If `thisTypeSubst` doesn't lower into an IRWitnessTable,
+                // this is a lookup of an interface requirement
+                // defined in some base interface from an interface type.
+                // For now we just lower that decl as if it is referenced
+                // from the same interface directly, e.g. a reference to
+                // IBase.AssocType from IDerived:IBase will be lowered as
+                // IRAssocType(IBase).
+                // We may want to consider extend our IR representation to
+                // have a `IRThisTypeWitness` object, so we can lower this case
+                // into an explicit lookup from `IRThisTypeWitness`,
+                // just like any other cases.
+                return emitDeclRef(
+                    context,
+                    createDefaultSpecializedDeclRef(context, nullptr, decl),
+                    context->irBuilder->getTypeKind());
+            }
+
             //
             // The key to use for looking up the interface member is
             // derived from the declaration.

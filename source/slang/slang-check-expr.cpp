@@ -581,6 +581,12 @@ namespace Slang
         SourceLoc loc,
         Expr* originalExpr)
     {
+        if (!item.declRef)
+        {
+            originalExpr->type = QualType(m_astBuilder->getErrorType());
+            return originalExpr;
+        }
+
         // We could be referencing a decl that will be synthesized. If so create a placeholder
         // and return a DeclRefExpr to it.
         if (auto lookupResultExpr = maybeUseSynthesizedDeclForLookupResult(item, originalExpr))

@@ -41,6 +41,7 @@ DIAGNOSTIC(-1, Note, seeRequirementDeclaration, "see requirement declaration")
 DIAGNOSTIC(-1, Note, doYouForgetToMakeComponentAccessible, "do you forget to make component '$0' acessible from '$1' (missing public qualifier)?")
 
 DIAGNOSTIC(-1, Note, seeDeclarationOf, "see declaration of '$0'")
+DIAGNOSTIC(-1, Note, seeDeclarationOfInterfaceRequirement, "see interface requirement declaration of '$0'")
 // An alternate wording of the above note, emphasing the position rather than content of the declaration.
 DIAGNOSTIC(-1, Note, declaredHere, "declared here")
 DIAGNOSTIC(-1, Note, seeOtherDeclarationOf, "see other declaration of '$0'")
@@ -542,6 +543,7 @@ DIAGNOSTIC(38008, Error, specializationParameterNotSpecialized, "no specializati
 DIAGNOSTIC(38009, Error, expectedValueOfTypeForSpecializationArg, "expected a constant value of type '$0' as argument for specialization parameter '$1'")
 
 DIAGNOSTIC(38100, Error, typeDoesntImplementInterfaceRequirement, "type '$0' does not provide required interface member '$1'")
+DIAGNOSTIC(38105, Error, memberDoesNotMatchRequirementSignature, "member '$0' does not match interface requirement.")
 DIAGNOSTIC(38101, Error, thisExpressionOutsideOfTypeDecl, "'this' expression can only be used in members of an aggregate type")
 DIAGNOSTIC(38102, Error, initializerNotInsideType, "an 'init' declaration is only allowed inside a type or 'extension' declaration")
 DIAGNOSTIC(38103, Error, thisTypeOutsideOfTypeDecl, "'This' type can only be used inside of an aggregate type")

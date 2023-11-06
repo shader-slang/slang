@@ -2937,6 +2937,17 @@ namespace Slang
         // With the big picture spelled out, we can settle into
         // the work of constructing our synthesized method.
         //
+
+        // First, we check that the differentiabliity of the method matches the requirement,
+        // and we don't attempt to synthesize a method if they don't match.
+        if (getShared()->getFuncDifferentiableLevel(
+                as<FunctionDeclBase>(lookupResult.item.declRef.getDecl()))
+            < getShared()->getFuncDifferentiableLevel(
+                as<FunctionDeclBase>(requiredMemberDeclRef.getDecl())))
+        {
+            return false;
+        }
+
         ThisExpr* synThis = nullptr;
         List<Expr*> synArgs;
         auto synFuncDecl = synthesizeMethodSignatureForRequirementWitness(
@@ -3945,8 +3956,15 @@ namespace Slang
         // and if nothing is found we print the candidates that made it
         // furthest in checking.
         //
-        getSink()->diagnose(inheritanceDecl, Diagnostics::typeDoesntImplementInterfaceRequirement, subType, requiredMemberDeclRef);
-        getSink()->diagnose(requiredMemberDeclRef, Diagnostics::seeDeclarationOf, requiredMemberDeclRef);
+        if (!lookupResult.isOverloaded() && lookupResult.isValid())
+        {
+            getSink()->diagnose(lookupResult.item.declRef, Diagnostics::memberDoesNotMatchRequirementSignature, lookupResult.item.declRef);
+        }
+        else
+        {
+            getSink()->diagnose(inheritanceDecl, Diagnostics::typeDoesntImplementInterfaceRequirement, subType, requiredMemberDeclRef);
+        }
+        getSink()->diagnose(requiredMemberDeclRef, Diagnostics::seeDeclarationOfInterfaceRequirement, requiredMemberDeclRef);
         return false;
     }
 
@@ -7004,6 +7022,9 @@ namespace Slang
 
     FunctionDifferentiableLevel SharedSemanticsContext::_getFuncDifferentiableLevelImpl(FunctionDeclBase* func, int recurseLimit)
     {
+        if (!func)
+            return FunctionDifferentiableLevel::None;
+
         if (recurseLimit > 0)
         {
             if (auto primalSubst = func->findModifier<PrimalSubstituteAttribute>())
