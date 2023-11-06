@@ -9836,23 +9836,6 @@ LoweredValInfo emitDeclRef(
 
         if(isInterfaceRequirement(decl))
         {
-            if (as<ThisType>(thisTypeSubst->getWitness()->getSub()))
-            {
-                // If this is a lookup from ThisType, we are looking up a decl
-                // defined in some base interface from an interface type.
-                // For now we just lower that decl as if it is referenced
-                // from the same interface directly, e.g. a reference to
-                // IBase.AssocType from IDerived:IBase will be lowered as
-                // IRAssocType(IBase).
-                // We may want to consider extend our IR representation to
-                // have a `IRThisTypeWitness` object, so we can lower this case
-                // into an explicit lookup from `IRThisTypeWitness`,
-                // just like any other cases.
-                return emitDeclRef(
-                    context,
-                    createDefaultSpecializedDeclRef(context, nullptr, decl),
-                    context->irBuilder->getTypeKind());
-            }
             // If we reach here, somebody is trying to look up an interface
             // requirement "through" some concrete type. We need to lower this
             // decl-ref as a lookup of the corresponding member in a witness
@@ -9870,6 +9853,25 @@ LoweredValInfo emitDeclRef(
             // witness table for the concrete type that conforms to `ISomething<Foo>`.
             //
             auto irWitnessTable = lowerSimpleVal(context, thisTypeSubst->getWitness());
+            if (!irWitnessTable)
+            {
+                // If `thisTypeSubst` doesn't lower into an IRWitnessTable,
+                // this is a lookup of an interface requirement
+                // defined in some base interface from an interface type.
+                // For now we just lower that decl as if it is referenced
+                // from the same interface directly, e.g. a reference to
+                // IBase.AssocType from IDerived:IBase will be lowered as
+                // IRAssocType(IBase).
+                // We may want to consider extend our IR representation to
+                // have a `IRThisTypeWitness` object, so we can lower this case
+                // into an explicit lookup from `IRThisTypeWitness`,
+                // just like any other cases.
+                return emitDeclRef(
+                    context,
+                    createDefaultSpecializedDeclRef(context, nullptr, decl),
+                    context->irBuilder->getTypeKind());
+            }
+
             //
             // The key to use for looking up the interface member is
             // derived from the declaration.
