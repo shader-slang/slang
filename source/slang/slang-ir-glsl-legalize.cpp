@@ -29,7 +29,12 @@ IRType* getIRVectorBaseType(IRType* type)
 void legalizeImageSubscriptStoreForGLSL(IRBuilder& builder, IRInst* storeInst)
 {
     builder.setInsertBefore(storeInst);
-    auto imageSubscript = as<IRImageSubscript>(storeInst->getOperand(0));
+    auto getElementPtr = as<IRGetElementPtr>(storeInst->getOperand(0));
+    IRImageSubscript* imageSubscript = nullptr;
+    if (getElementPtr)
+        imageSubscript = as<IRImageSubscript>(getElementPtr->getBase());
+    else
+        imageSubscript = as<IRImageSubscript>(storeInst->getOperand(0));
     assert(imageSubscript);
     auto imageElementType = cast<IRPtrTypeBase>(imageSubscript->getDataType())->getValueType();
     auto coordType = imageSubscript->getCoord()->getDataType();
@@ -52,14 +57,26 @@ void legalizeImageSubscriptStoreForGLSL(IRBuilder& builder, IRInst* storeInst)
     {
     case kIROp_Store:
         {
-            auto newValue = storeInst->getOperand(1);
-            if (getIRVectorElementSize(imageElementType) != 4)
+            IRInst* newValue = nullptr;
+            if (getElementPtr)
             {
                 auto vectorBaseType = getIRVectorBaseType(imageElementType);
-                newValue = builder.emitVectorReshape(
-                    builder.getVectorType(
-                        vectorBaseType, builder.getIntValue(builder.getIntType(), 4)),
-                    newValue);
+                IRType* vector4Type = builder.getVectorType(vectorBaseType, 4);
+                auto originalValue = builder.emitImageLoad(vector4Type, imageSubscript->getImage(), legalizedCoord);
+                auto index = getElementPtr->getIndex();
+                newValue = builder.emitSwizzleSet(vector4Type, originalValue, storeInst->getOperand(1), 1, &index);
+            }
+            else
+            {
+                newValue = storeInst->getOperand(1);
+                if (getIRVectorElementSize(imageElementType) != 4)
+                {
+                    auto vectorBaseType = getIRVectorBaseType(imageElementType);
+                    newValue = builder.emitVectorReshape(
+                        builder.getVectorType(
+                            vectorBaseType, builder.getIntValue(builder.getIntType(), 4)),
+                        newValue);
+                }
             }
             auto imageStore = builder.emitImageStore(
                 builder.getVoidType(),
@@ -128,7 +145,7 @@ void legalizeImageSubscriptForGLSL(IRModule* module)
                 {
                 case kIROp_Store:
                 case kIROp_SwizzledStore:
-                    if (inst->getOperand(0)->getOp() == kIROp_ImageSubscript)
+                    if (getRootAddr(inst->getOperand(0))->getOp() == kIROp_ImageSubscript)
                     {
                         legalizeImageSubscriptStoreForGLSL(builder, inst);
                     }

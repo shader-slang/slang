@@ -3827,16 +3827,30 @@ struct SPIRVEmitContext
 
     SpvInst* emitSwizzleSet(SpvInstParent* parent, IRSwizzleSet* inst)
     {
+        if (inst->getElementCount() == 1)
+        {
+            auto index = inst->getElementIndex(0);
+            if (auto intLit = as<IRIntLit>(index))
+                return emitOpCompositeInsert(parent, inst, inst->getFullType(), inst->getSource(), inst->getBase(), makeArray(SpvLiteralInteger::from32((uint32_t)intLit->value.intVal)));
+        }
         auto resultVectorType = as<IRVectorType>(inst->getDataType());
         List<SpvLiteralInteger> shuffleIndices;
         shuffleIndices.setCount((Index)getIntVal(resultVectorType->getElementCount()));
         for (Index i = 0; i < shuffleIndices.getCount(); i++)
             shuffleIndices[i] = SpvLiteralInteger::from32((int32_t)i);
+
         for (UInt i = 0; i < inst->getElementCount(); i++)
         {
             auto destIndex = (int32_t)getIntVal(inst->getElementIndex(i));
             SLANG_ASSERT(destIndex < shuffleIndices.getCount());
             shuffleIndices[destIndex] = SpvLiteralInteger::from32((int32_t)(i + shuffleIndices.getCount()));
+        }
+        auto source = inst->getSource();
+        if (!as<IRVectorType>(source->getDataType()))
+        {
+            IRBuilder builder(inst);
+            builder.setInsertBefore(inst);
+            source = builder.emitMakeVectorFromScalar(resultVectorType, source);
         }
         return emitOpVectorShuffle(parent, inst, inst->getFullType(), inst->getBase(), inst->getSource(), shuffleIndices.getArrayView());
     }
