@@ -841,16 +841,18 @@ InstPair ForwardDiffTranscriber::transcribeControlFlow(IRBuilder* builder, IRIns
         case kIROp_unconditionalBranch:
         case kIROp_loop:
             auto origBranch = as<IRUnconditionalBranch>(origInst);
+            auto targetBlock = origBranch->getTargetBlock();
 
             // Grab the differentials for any phi nodes.
             List<IRInst*> newArgs;
             for (UIndex ii = 0; ii < origBranch->getArgCount(); ii++)
             {
+                auto origParam = getParamAt(targetBlock, ii);
                 auto origArg = origBranch->getArg(ii);
                 auto primalArg = lookupPrimalInst(builder, origArg);
                 newArgs.add(primalArg);
 
-                if (differentiateType(builder, origArg->getDataType()))
+                if (differentiateType(builder, origParam->getDataType()))
                 {
                     auto diffArg = lookupDiffInst(origArg, nullptr);
                     if (diffArg)
@@ -869,6 +871,7 @@ InstPair ForwardDiffTranscriber::transcribeControlFlow(IRBuilder* builder, IRIns
                     auto breakBlock = findOrTranscribeDiffInst(builder, origLoop->getBreakBlock());
                     auto continueBlock = findOrTranscribeDiffInst(builder, origLoop->getContinueBlock());
                     List<IRInst*> operands;
+                    operands.add(diffBlock);
                     operands.add(breakBlock);
                     operands.add(continueBlock);
                     operands.addRange(newArgs);
@@ -877,6 +880,8 @@ InstPair ForwardDiffTranscriber::transcribeControlFlow(IRBuilder* builder, IRIns
                         kIROp_loop,
                         operands.getCount(),
                         operands.getBuffer());
+                    if (auto maxItersDecoration = origLoop->findDecoration<IRLoopMaxItersDecoration>())
+                        builder->addLoopMaxItersDecoration(diffBranch, maxItersDecoration->getMaxIters());
                 }
                 else
                 {
@@ -1156,71 +1161,6 @@ InstPair ForwardDiffTranscriber::transcribeUpdateElement(IRBuilder* builder, IRI
         }
     }
     return InstPair(primalUpdateField, diffUpdateElement);
-}
-
-List<IRInst*> ForwardDiffTranscriber::transcribePhiArgs(IRBuilder* builder, List<IRInst*> origPhiArgs)
-{
-    // Grab the differentials for any phi nodes.
-    List<IRInst*> newArgs;
-    for (auto origArg : origPhiArgs)
-    {
-        auto primalArg = lookupPrimalInst(builder, origArg);
-        newArgs.add(primalArg);
-
-        if (differentiateType(builder, origArg->getDataType()))
-        {
-            auto diffArg = lookupDiffInst(origArg, nullptr);
-            if (diffArg)
-                newArgs.add(diffArg);
-            else
-                newArgs.add(
-                    getDifferentialZeroOfType(builder, origArg->getDataType()));
-        }
-    }
-
-    return newArgs;
-}
-
-InstPair ForwardDiffTranscriber::transcribeLoop(IRBuilder* builder, IRLoop* origLoop)
-{
-    // The loop comes with three blocks.. we just need to transcribe each one
-    // and assemble the new loop instruction.
-    
-    // Transcribe the target block (this is the 'condition' part of the loop, which
-    // will branch into the loop body)
-    auto diffTargetBlock = findOrTranscribeDiffInst(builder, origLoop->getTargetBlock());
-
-    // Transcribe the continue block (this is the 'update' part of the loop, which will
-    // branch into the condition block)
-    auto diffContinueBlock = findOrTranscribeDiffInst(builder, origLoop->getContinueBlock());
-
-    // Transcribe the break block (this is the block after the exiting the loop)
-    auto diffBreakBlock = findOrTranscribeDiffInst(builder, origLoop->getBreakBlock());
-        
-    List<IRInst*> diffLoopOperands;
-    diffLoopOperands.add(diffTargetBlock);
-    diffLoopOperands.add(diffBreakBlock);
-    diffLoopOperands.add(diffContinueBlock);
-    
-    List<IRInst*> phiArgs;
-    for (UIndex ii = diffLoopOperands.getCount(); ii < origLoop->getOperandCount(); ii++)
-        phiArgs.add(origLoop->getOperand(ii));
-
-    auto newPhiArgs = transcribePhiArgs(builder, phiArgs);
-    for (auto newArg : newPhiArgs)
-        diffLoopOperands.add(newArg);
-
-    IRInst* diffLoop = builder->emitIntrinsicInst(
-        nullptr,
-        kIROp_loop,
-        diffLoopOperands.getCount(),
-        diffLoopOperands.getBuffer());
-    builder->markInstAsMixedDifferential(diffLoop);
-
-    if (auto maxItersDecoration = origLoop->findDecoration<IRLoopMaxItersDecoration>())
-        builder->addLoopMaxItersDecoration(diffLoop, maxItersDecoration->getMaxIters());
-
-    return InstPair(diffLoop, diffLoop);
 }
 
 InstPair ForwardDiffTranscriber::transcribeSwitch(IRBuilder* builder, IRSwitch* origSwitch)
@@ -1858,6 +1798,7 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
         return transcribeUpdateElement(builder, origInst);
 
     case kIROp_unconditionalBranch:
+    case kIROp_loop:
         return transcribeControlFlow(builder, origInst);
 
     case kIROp_FloatLit:
@@ -1875,9 +1816,6 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_GetElement:
     case kIROp_GetElementPtr:
         return transcribeGetElement(builder, origInst);
-    
-    case kIROp_loop:
-        return transcribeLoop(builder, as<IRLoop>(origInst));
 
     case kIROp_ifElse:
         return transcribeIfElse(builder, as<IRIfElse>(origInst));

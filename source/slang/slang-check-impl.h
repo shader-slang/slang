@@ -2151,8 +2151,18 @@ namespace Slang
 
         // If the given declaration has generic parameters, then
         // return the corresponding `GenericDecl` that holds the
-        // parameters, etc.
+        // parameters, etc. This returns the immediate generic parent
+        // of `decl`, e.g. the generic for f<T>, and *not* any indirect
+        // generic parents, such as P<T>.f().
         GenericDecl* GetOuterGeneric(Decl* decl);
+
+        // If `decl` is inside a generic, return that outer generic,
+        // otherwise returns `decl`.
+        Decl* getOuterGenericOrSelf(Decl* decl);
+
+        // Find the next outer generic parent of `decl`, including
+        // indirect parents.
+        GenericDecl* findNextOuterGeneric(Decl* decl);
 
         // Try to find a unification for two values
         bool TryUnifyVals(
