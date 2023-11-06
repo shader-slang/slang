@@ -6,7 +6,9 @@ RWStructuredBuffer<float> outputBuffer;
 
 interface IFoo : IDifferentiable
 {
-    __init(This.Differential)
+    [Differentiable]
+    __init<T:IFoo>(T d); 
+    
     [Differentiable]
     static This create(Differential d);
 
@@ -17,7 +19,12 @@ interface IFoo : IDifferentiable
 struct Impl : IFoo
 {
     float x;
-
+    [Differentiable]
+    __init<T : IFoo>(T d)
+    {
+        this = (Impl)d;
+    }
+    
     [Differentiable]
     static This create(Differential d)
     {

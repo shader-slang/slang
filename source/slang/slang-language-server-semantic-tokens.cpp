@@ -21,6 +21,8 @@ const char* kSemanticTokenTypes[] = {
     "string"
 };
 
+static const int kInitTokenLegnth = 6;
+
 static_assert(SLANG_COUNT_OF(kSemanticTokenTypes) == (int)SemanticTokenType::NormalText, "kSemanticTokenTypes must match SemanticTokenType");
 
 SemanticToken _createSemanticToken(SourceManager* manager, SourceLoc loc, Name* name)
@@ -180,6 +182,17 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
                     SemanticToken token = _createSemanticToken(
                         manager, funcDecl->getNameLoc(), funcDecl->getName());
                     token.type = SemanticTokenType::Function;
+                    maybeInsertToken(token);
+                }
+            }
+            else if (auto ctorDecl = as<ConstructorDecl>(node))
+            {
+                if (ctorDecl->getName())
+                {
+                    SemanticToken token = _createSemanticToken(
+                        manager, ctorDecl->getNameLoc(), ctorDecl->getName());
+                    token.type = SemanticTokenType::Function;
+                    token.length = kInitTokenLegnth;
                     maybeInsertToken(token);
                 }
             }

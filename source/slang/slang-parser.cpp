@@ -1048,7 +1048,7 @@ namespace Slang
     }
 
     template<typename T>
-    bool tryParseUsingSyntaxDecl(
+    bool tryParseUsingSyntaxDeclImpl(
         Parser*     parser,
         SyntaxDecl* syntaxDecl,
         T**  outSyntax)
@@ -1068,12 +1068,24 @@ namespace Slang
             return false;
         }
 
-        auto syntax = as<T>(parsedObject);
+        auto innerParsedObject = parsedObject;
+        auto genericDecl = as<GenericDecl>(parsedObject);
+        if (genericDecl)
+            innerParsedObject = genericDecl->inner;
+
+        auto syntax = as<T>(innerParsedObject);
         if (syntax)
         {
             if (!syntax->loc.isValid())
             {
                 syntax->loc = keywordToken.loc;
+                if (genericDecl)
+                {
+                    genericDecl->nameAndLoc.loc = syntax->loc;
+                    genericDecl->loc = syntax->loc;
+                }
+                if (auto decl = as<Decl>(syntax))
+                    decl->nameAndLoc.loc = syntax->loc;
             }
         }
         else if (parsedObject)
@@ -1082,8 +1094,12 @@ namespace Slang
             SLANG_DIAGNOSE_UNEXPECTED(parser->sink, keywordToken, "parser callback did not return the expected type");
         }
 
-        *outSyntax = syntax;
-        return true;
+        if (auto converted = as<T>(parsedObject))
+        {
+            *outSyntax = converted;
+            return true;
+        }
+        return false;
     }
 
     template<typename T>
@@ -1102,7 +1118,7 @@ namespace Slang
         if (!syntaxDecl)
             return false;
 
-        return tryParseUsingSyntaxDecl(parser, syntaxDecl, outSyntax);
+        return tryParseUsingSyntaxDeclImpl<T>(parser, syntaxDecl, outSyntax);
     }
 
     static Modifiers ParseModifiers(Parser* parser)
@@ -3285,31 +3301,34 @@ namespace Slang
     {
         ConstructorDecl* decl = parser->astBuilder->create<ConstructorDecl>();
 
-        // Note: we leave the source location of this decl as invalid, to
-        // trigger the fallback logic that fills in the location of the
-        // `__init` keyword later.
+        return parseOptGenericDecl(parser, [&](GenericDecl*)
+            {
+                // Note: we leave the source location of this decl as invalid, to
+                // trigger the fallback logic that fills in the location of the
+                // `__init` keyword later.
 
-        parser->PushScope(decl);
+                parser->PushScope(decl);
 
-        // TODO: we need to make sure that all initializers have
-        // the same name, but that this name doesn't conflict
-        // with any user-defined names.
-        // Giving them a name (rather than leaving it null)
-        // ensures that we can use name-based lookup to find
-        // all of the initializers on a type (and has
-        // the potential to unify initializer lookup with
-        // ordinary member lookup).
-        decl->nameAndLoc.name = getName(parser, "$init");
+                // TODO: we need to make sure that all initializers have
+                // the same name, but that this name doesn't conflict
+                // with any user-defined names.
+                // Giving them a name (rather than leaving it null)
+                // ensures that we can use name-based lookup to find
+                // all of the initializers on a type (and has
+                // the potential to unify initializer lookup with
+                // ordinary member lookup).
+                decl->nameAndLoc.name = getName(parser, "$init");
 
-        parseParameterList(parser, decl);
+                parseParameterList(parser, decl);
 
-        decl->body = parseOptBody(parser);
+                decl->body = parseOptBody(parser);
 
-        if (auto block = as<BlockStmt>(decl->body))
-            decl->closingSourceLoc = block->closingSourceLoc;
+                if (auto block = as<BlockStmt>(decl->body))
+                    decl->closingSourceLoc = block->closingSourceLoc;
 
-        parser->PopScope();
-        return decl;
+                parser->PopScope();
+                return decl;
+            });
     }
 
     static AccessorDecl* parseAccessorDecl(Parser* parser)
