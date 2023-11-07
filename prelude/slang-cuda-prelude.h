@@ -53,7 +53,8 @@
 #   define SLANG_CUDA_WARP_SIZE 32
 #endif
 
-#define SLANG_CUDA_WARP_MASK (SLANG_CUDA_WARP_SIZE - 1)
+#define SLANG_CUDA_WARP_MASK (SLANG_CUDA_WARP_SIZE - 1) // Used for masking threadIdx.x to the warp lane index
+#define SLANG_CUDA_WARP_BITMASK (~int(0))
 
 //
 #define SLANG_FORCE_INLINE inline
@@ -1418,10 +1419,16 @@ __inline__ __device__ bool _waveIsSingleLane(WarpMask mask)
 }
 
 // Returns the power of 2 size of run of set bits. Returns 0 if not a suitable run.
+// Examples:
+// 0b00000000'00000000'00000000'11111111 -> 8
+// 0b11111111'11111111'11111111'11111111 -> 32
+// 0b00000000'00000000'00000000'00011111 -> 0 (since 5 is not a power of 2)
+// 0b00000000'00000000'00000000'11110000 -> 0 (since the run of bits does not start at the LSB)
+// 0b00000000'00000000'00000000'00100111 -> 0 (since it is not a single contiguous run)
 __inline__ __device__ int _waveCalcPow2Offset(WarpMask mask)
 {
     // This should be the most common case, so fast path it
-    if (mask == SLANG_CUDA_WARP_MASK)
+    if (mask == SLANG_CUDA_WARP_BITMASK)
     {
         return SLANG_CUDA_WARP_SIZE;
     }
@@ -1646,6 +1653,36 @@ __inline__ __device__ T _waveMin(WarpMask mask, T val) { return _waveReduceScala
 
 template <typename T>
 __inline__ __device__ T _waveMax(WarpMask mask, T val) { return _waveReduceScalar<WaveOpMax<T>, T>(mask, val); }
+
+// Fast-path specializations when CUDA warp reduce operators are available
+#if __CUDA_ARCH__ >= 800 // 8.x or higher
+template<>
+__inline__ __device__ unsigned _waveOr<unsigned>(WarpMask mask, unsigned val) { return __reduce_or_sync(mask, val); }
+
+template<>
+__inline__ __device__ unsigned _waveAnd<unsigned>(WarpMask mask, unsigned val) { return __reduce_and_sync(mask, val); }
+
+template<>
+__inline__ __device__ unsigned _waveXor<unsigned>(WarpMask mask, unsigned val) { return __reduce_xor_sync(mask, val); }
+
+template<>
+__inline__ __device__ unsigned _waveSum<unsigned>(WarpMask mask, unsigned val) { return __reduce_add_sync(mask, val); }
+
+template<>
+__inline__ __device__ int _waveSum<int>(WarpMask mask, int val) { return __reduce_add_sync(mask, val); }
+
+template<>
+__inline__ __device__ unsigned _waveMin<unsigned>(WarpMask mask, unsigned val) { return __reduce_min_sync(mask, val); }
+
+template<>
+__inline__ __device__ int _waveMin<int>(WarpMask mask, int val) { return __reduce_min_sync(mask, val); }
+
+template<>
+__inline__ __device__ unsigned _waveMax<unsigned>(WarpMask mask, unsigned val) { return __reduce_max_sync(mask, val); }
+
+template<>
+__inline__ __device__ int _waveMax<int>(WarpMask mask, int val) { return __reduce_max_sync(mask, val); }
+#endif
 
 
 // Multiple
