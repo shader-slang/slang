@@ -831,7 +831,7 @@ SlangResult NVRTCDownstreamCompiler::compile(const DownstreamCompileOptions& inO
             // (with everything before `compute_52` being deprecated).
             version = SemanticVersion(5, 0);
         }
-        if( m_desc.version.m_major == 11 )
+        else if ( m_desc.version.m_major == 11 )
         {
             // NVRTC in CUDA 11 only supports `compute_35` and up
             // (with everything before `compute_52` being deprecated).
