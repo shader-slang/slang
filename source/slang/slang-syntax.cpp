@@ -245,6 +245,22 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return m_obj.as<WitnessTable>();
     }
 
+    RefPtr<WitnessTable> WitnessTable::specialize(ASTBuilder* astBuilder, SubstitutionSet const& subst)
+    {
+        auto newBaseType = baseType->substitute(astBuilder, subst);
+        auto newWitnessedType = witnessedType->substitute(astBuilder, subst);
+        if (newBaseType == baseType && newWitnessedType == witnessedType)
+            return this;
+        RefPtr<WitnessTable> result = new WitnessTable();
+        result->baseType = as<Type>(newBaseType);
+        result->witnessedType = as<Type>(newWitnessedType);
+        for (auto requirement : m_requirements)
+        {
+            auto newRequirement = requirement.value.specialize(astBuilder, subst);
+            result->add(requirement.key, newRequirement);
+        }
+        return result;
+    }
 
     RequirementWitness RequirementWitness::specialize(ASTBuilder* astBuilder, SubstitutionSet const& subst)
     {
@@ -256,8 +272,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             return RequirementWitness();
 
         case RequirementWitness::Flavor::witnessTable:
-            SLANG_ASSERT(subst.findGenericAppDeclRef() == nullptr);
-            return *this;
+            return RequirementWitness(this->getWitnessTable()->specialize(astBuilder, subst));
 
         case RequirementWitness::Flavor::declRef:
             {

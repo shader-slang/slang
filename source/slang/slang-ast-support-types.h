@@ -1482,6 +1482,9 @@ namespace Slang
 
         // Cached dictionary for looking up satisfying values.
         SLANG_UNREFLECTED RequirementDictionary m_requirementDictionary;
+
+        RefPtr<WitnessTable> specialize(ASTBuilder* astBuilder, SubstitutionSet const& subst);
+
     };
 
     struct SpecializationParam

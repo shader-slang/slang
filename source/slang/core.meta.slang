@@ -539,16 +539,15 @@ ${{{{
         [__unsafeForceInlineEarly] bool equals(This other){return this==other;}
         [__unsafeForceInlineEarly] bool lessThan(This other){return this<other;}
         [__unsafeForceInlineEarly] bool lessThanOrEquals(This other){return this<=other;}
-        [__unsafeForceInlineEarly] This shl(int other) { return __shl(this, other); }
-        [__unsafeForceInlineEarly] This shr(int other) { return __shr(this, other); }
+        [__unsafeForceInlineEarly] This shl(int other) { return (This)__shl((int)this, other); }
+        [__unsafeForceInlineEarly] This shr(int other) { return (This)__shr((int)this, other); }
         [__unsafeForceInlineEarly] This bitAnd(This other) { return __and(this, other); }
         [__unsafeForceInlineEarly] This bitOr(This other) { return __or(this, other); }
         [__unsafeForceInlineEarly] This and(This other) { return __logicalAnd(this, other); }
         [__unsafeForceInlineEarly] This or(This other) { return __logicalOr(this, other); }
         [__unsafeForceInlineEarly] This bitXor(This other) { return __xor(this, other); }
-        [__unsafeForceInlineEarly] This bitNot() { return __not(this); }
+        [__unsafeForceInlineEarly] This bitNot() { return (This)__not(this); }
         [__unsafeForceInlineEarly] This not() { return __logicalNot(this); }
-        __intrinsic_op($(kIROp_IntCast)) __init(T value);
 ${{{{
         break;
     case BaseType::UInt8:
