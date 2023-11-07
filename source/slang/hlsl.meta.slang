@@ -9565,9 +9565,9 @@ struct HitObject
         __target_switch
         {
         case hlsl: __intrinsic_asm ".GetInstanceIndex";
-        case glsl: __intrinsic_asm "hitObjectGetInstanceCustomIndexNV($0)";
+        case glsl: __intrinsic_asm "hitObjectGetInstanceIdNV($0)";
         case spirv: return spirv_asm {
-                result:$$uint = OpHitObjectGetInstanceCustomIndexNV &this;
+                result:$$uint = OpHitObjectGetInstanceIdNV &this;
             };
         }
     }
@@ -9581,9 +9581,9 @@ struct HitObject
         __target_switch
         {
         case hlsl: __intrinsic_asm ".GetInstanceID";
-        case glsl: __intrinsic_asm "hitObjectGetInstanceIdNV($0)";
+        case glsl: __intrinsic_asm "hitObjectGetInstanceCustomIndexNV($0)";
         case spirv: return spirv_asm {
-                result:$$uint = OpHitObjectGetInstanceIdNV &this;
+                result:$$uint = OpHitObjectGetInstanceCustomIndexNV &this;
             };
         }
     }
