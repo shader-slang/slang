@@ -74,6 +74,91 @@ syntax snorm : SNormModifier;
 ///
 syntax __extern_cpp : ExternCppModifier;
 
+interface IComparable
+{
+    bool equals(This other);
+    bool lessThan(This other);
+    bool lessThanOrEquals(This other);
+}
+
+interface IRangedValue
+{
+    static const This maxValue;
+    static const This minValue;
+}
+
+__attributeTarget(DeclBase)
+attribute_syntax [TreatAsDifferentiable] : TreatAsDifferentiableAttribute;
+
+interface IArithmetic : IComparable
+{
+    This add(This other);
+    This sub(This other);
+    This mul(This other);
+    This div(This other);
+    This mod(This other);
+    This neg();
+
+    __init(int val);
+
+        /// Initialize from the same type.
+    __init(This value);
+}
+
+interface ILogical : IComparable
+{
+    This shl(int value);
+    This shr(int value);
+    This bitAnd(This other);
+    This bitOr(This other);
+    This bitXor(This other);
+    This bitNot();
+    This and(This other);
+    This or(This other);
+    This not();
+    __init(int val);
+}
+
+interface IInteger : IArithmetic, ILogical
+{
+    int toInt();
+    int64_t toInt64();
+    uint toUInt();
+    uint64_t toUInt64();
+}
+
+interface IFloat : IArithmetic, IDifferentiable
+{
+    [Differentiable]
+    __init(float value);
+
+    [Differentiable]
+    float toFloat();
+
+    [Differentiable]
+    This add(This other);
+
+    [Differentiable]
+    This sub(This other);
+
+    [Differentiable]
+    This mul(This other);
+
+    [Differentiable]
+    This div(This other);
+
+    [Differentiable]
+    This mod(This other);
+
+    [Differentiable]
+    This neg();
+
+    [Differentiable]
+    __init(This value);
+
+    [Differentiable]
+    This scale<T:__BuiltinFloatingPointType>(T scale);
+}
 
 /// A type that can be used as an operand for builtins
 [sealed]
@@ -83,22 +168,15 @@ interface __BuiltinType {}
 /// A type that can be used for arithmetic operations
 [sealed]
 [builtin]
-interface __BuiltinArithmeticType : __BuiltinType
+interface __BuiltinArithmeticType : __BuiltinType, IArithmetic
 {
-        /// Initialize from a 32-bit signed integer value.
-    __init(int value);
-
-        /// Initialize from the same type.
-    __init(This value);
 }
 
 /// A type that can be used for logical/bitwise operations
 [sealed]
 [builtin]
-interface __BuiltinLogicalType : __BuiltinType
+interface __BuiltinLogicalType : __BuiltinType, ILogical
 {
-        /// Initialize from a 32-bit signed integer value.
-    __init(int value);
 }
 
 /// A type that logically has a sign (positive/negative/zero)
@@ -243,12 +321,10 @@ struct DifferentialPair : IDifferentiable
 [sealed]
 [builtin]
 [TreatAsDifferentiable]
-interface __BuiltinFloatingPointType : __BuiltinRealType, IDifferentiable
+interface __BuiltinFloatingPointType : __BuiltinRealType, IFloat
 {
-        /// Initialize from a 32-bit floating-point value.
-    __init(float value);
-
         /// Get the value of the mathematical constant pi in this type.
+    [Differentiable]
     static This getPi();
 }
 
@@ -455,23 +531,72 @@ ${{{{
 ${{{{
     }
 
-    // If this is a basic integer type, then define explicit
-    // initializers that take a value of an `enum` type.
-    //
-    // TODO: This should actually be restricted, so that this
-    // only applies `where T.__Tag == Self`, but we don't have
-    // the needed features in our type system to implement
-    // that constraint right now.
-    //
+    // Integer type implementations.
     switch (kBaseTypes[tt].tag)
     {
-        // TODO: should this cover the full gamut of integer types?
-    case BaseType::Int:
-    case BaseType::UInt:
+    case BaseType::Bool:
 }}}}
+        [__unsafeForceInlineEarly] bool equals(This other){return this==other;}
+        [__unsafeForceInlineEarly] bool lessThan(This other){return this<other;}
+        [__unsafeForceInlineEarly] bool lessThanOrEquals(This other){return this<=other;}
+        [__unsafeForceInlineEarly] This shl(int other) { return __shl(this, other); }
+        [__unsafeForceInlineEarly] This shr(int other) { return __shr(this, other); }
+        [__unsafeForceInlineEarly] This bitAnd(This other) { return __and(this, other); }
+        [__unsafeForceInlineEarly] This bitOr(This other) { return __or(this, other); }
+        [__unsafeForceInlineEarly] This and(This other) { return __logicalAnd(this, other); }
+        [__unsafeForceInlineEarly] This or(This other) { return __logicalOr(this, other); }
+        [__unsafeForceInlineEarly] This bitXor(This other) { return __xor(this, other); }
+        [__unsafeForceInlineEarly] This bitNot() { return __not(this); }
+        [__unsafeForceInlineEarly] This not() { return __logicalNot(this); }
+        __intrinsic_op($(kIROp_IntCast)) __init(T value);
+${{{{
+        break;
+    case BaseType::UInt8:
+    case BaseType::UInt16:
+    case BaseType::UInt:
+    case BaseType::UInt64:
+    case BaseType::Int8:
+    case BaseType::Int16:
+    case BaseType::Int:
+    case BaseType::Int64:
+    case BaseType::IntPtr:
+    case BaseType::UIntPtr:
+}}}}
+        // If this is a basic integer type, then define explicit
+        // initializers that take a value of an `enum` type.
+        //
+        // TODO: This should actually be restricted, so that this
+        // only applies `where T.__Tag == Self`, but we don't have
+        // the needed features in our type system to implement
+        // that constraint right now.
+        //
         __generic<T:__EnumType>
         __intrinsic_op($(kIROp_IntCast))
         __init(T value);
+
+        // Implementation of the `IInteger` interface.
+        [__unsafeForceInlineEarly] bool equals(This other){return this==other;}
+        [__unsafeForceInlineEarly] bool lessThan(This other){return this<other;}
+        [__unsafeForceInlineEarly] bool lessThanOrEquals(This other){return this<=other;}
+        [__unsafeForceInlineEarly] This add(This other) { return __add(this, other); }
+        [__unsafeForceInlineEarly] This sub(This other) { return __sub(this, other); }
+        [__unsafeForceInlineEarly] This mul(This other) { return __mul(this, other); }
+        [__unsafeForceInlineEarly] This div(This other) { return __div(this, other); }
+        [__unsafeForceInlineEarly] This mod(This other) { return __irem(this, other); }
+        [__unsafeForceInlineEarly] This neg() { return __neg(this); }
+        [__unsafeForceInlineEarly] This shl(int other) { return __shl(this, other); }
+        [__unsafeForceInlineEarly] This shr(int other) { return __shr(this, other); }
+        [__unsafeForceInlineEarly] This bitAnd(This other) { return __and(this, other); }
+        [__unsafeForceInlineEarly] This bitOr(This other) { return __or(this, other); }
+        [__unsafeForceInlineEarly] This and(This other) { return __logicalAnd(this, other); }
+        [__unsafeForceInlineEarly] This or(This other) { return __logicalOr(this, other); }
+        [__unsafeForceInlineEarly] This bitXor(This other) { return __xor(this, other); }
+        [__unsafeForceInlineEarly] This bitNot() { return __not(this); }
+        [__unsafeForceInlineEarly] This not() { return __logicalNot(this); }
+        [__unsafeForceInlineEarly] int toInt() { return int(this); }
+        [__unsafeForceInlineEarly] int64_t toInt64() { return int64_t(this); }
+        [__unsafeForceInlineEarly] uint toUInt() { return uint(this); }
+        [__unsafeForceInlineEarly] uint64_t toUInt64() { return uint64_t(this); }
 ${{{{
         break;
 
@@ -480,8 +605,8 @@ ${{{{
     }
 
     // If this is a floating-point type, then we need to
-    // define the basic `getPi()` function that is used
-    // to implement generic versions of `degrees()` and
+    // implement the `IFloat` interface, which defines the basic `getPi()`
+    // function that is used to implement generic versions of `degrees()` and
     // `radians()`.
     //
     switch (kBaseTypes[tt].tag)
@@ -492,8 +617,20 @@ ${{{{
     case BaseType::Float:
     case BaseType::Double:
 }}}}
+        [TreatAsDifferentiable]
         static $(kBaseTypes[tt].name) getPi() { return $(kBaseTypes[tt].name)(3.14159265358979323846264338328); }
 
+        [Differentiable][__unsafeForceInlineEarly] bool lessThan(This other) { return this < other; }
+        [Differentiable][__unsafeForceInlineEarly] bool lessThanOrEquals(This other) { return this <= other; }
+        [Differentiable][__unsafeForceInlineEarly] bool equals(This other) { return this == other; }
+        [Differentiable][__unsafeForceInlineEarly] This add(This other) { return __add(this, other); }
+        [Differentiable][__unsafeForceInlineEarly] This sub(This other) { return __sub(this, other); }
+        [Differentiable][__unsafeForceInlineEarly] This mul(This other) { return __mul(this, other); }
+        [Differentiable][__unsafeForceInlineEarly] This div(This other) { return __div(this, other); }
+        [Differentiable][__unsafeForceInlineEarly] This mod(This other) { return __frem(this, other); }
+        [Differentiable][__unsafeForceInlineEarly] This neg() { return __neg(this); }
+        [Differentiable][__unsafeForceInlineEarly] float toFloat() { return float(this); }
+        [Differentiable][__unsafeForceInlineEarly] This scale<T:__BuiltinFloatingPointType>(T s) { return __mul(this, __realCast<This>(s)); }
         typedef $(kBaseTypes[tt].name) Differential;
     
         [__unsafeForceInlineEarly]
@@ -628,7 +765,7 @@ __generic<T>
 __intrinsic_op($(kIROp_Eql))
 bool operator==(Ptr<T> p1, Ptr<T> p2);
 
-extension bool
+extension bool : IRangedValue
 {
     __generic<T>
     __implicit_conversion($(kConversionCost_PtrToBool))
@@ -639,7 +776,7 @@ extension bool
     static const bool minValue = false;
 }
 
-extension uint64_t
+extension uint64_t : IRangedValue
 {
     __generic<T>
     __intrinsic_op($(kIROp_CastPtrToInt))
@@ -649,7 +786,7 @@ extension uint64_t
     static const uint64_t minValue = 0;
 }
 
-extension int64_t
+extension int64_t : IRangedValue
 {
     __generic<T>
     __intrinsic_op($(kIROp_CastPtrToInt))
@@ -659,7 +796,7 @@ extension int64_t
     static const int64_t minValue = -0x8000000000000000LL;
 }
 
-extension intptr_t
+extension intptr_t : IRangedValue
 {
     __generic<T>
     __intrinsic_op($(kIROp_CastPtrToInt))
@@ -669,7 +806,7 @@ extension intptr_t
     static const int size = $(SLANG_PROCESSOR_X86_64?"8":"4");
 }
 
-extension uintptr_t
+extension uintptr_t : IRangedValue
 {
     __generic<T>
     __intrinsic_op($(kIROp_CastPtrToInt))
@@ -844,56 +981,56 @@ __intrinsic_type($(kIROp_DynamicType))
 struct __Dynamic
 {};
 
-extension half
+extension half : IRangedValue
 {
     static const half maxValue = half(65504);
     static const half minValue = half(-65504);
 }
 
-extension float
+extension float : IRangedValue
 {
     static const float maxValue = 340282346638528859811704183484516925440.0f;
     static const float minValue = -340282346638528859811704183484516925440.0f;
 
 }
 
-extension double
+extension double : IRangedValue
 {
     static const double maxValue = 179769313486231570814527423731704356798070567525844996598917476803157260780028538760589558632766878171540458953514382464234321326889464182768467546703537516986049910576551282076245490090389328944075868508455133942304583236903222948165808559332123348274797826204144723168738177180919299881250404026184124858368.0;
     static const double minValue = -179769313486231570814527423731704356798070567525844996598917476803157260780028538760589558632766878171540458953514382464234321326889464182768467546703537516986049910576551282076245490090389328944075868508455133942304583236903222948165808559332123348274797826204144723168738177180919299881250404026184124858368.0;
 }
 
-extension int
+extension int : IRangedValue
 {
     static const int maxValue = 2147483647;
     static const int minValue = -2147483648;
 }
 
-extension uint
+extension uint : IRangedValue
 {
     static const uint maxValue = 4294967295;
     static const uint minValue = 0;
 }
 
-extension int8_t
+extension int8_t : IRangedValue
 {
     static const int8_t maxValue = 127;
     static const int8_t minValue = -128;
 }
 
-extension uint8_t
+extension uint8_t : IRangedValue
 {
     static const uint8_t maxValue = 255;
     static const uint8_t minValue = 0;
 }
 
-extension uint16_t
+extension uint16_t : IRangedValue
 {
     static const uint16_t maxValue = 65535;
     static const uint16_t minValue = 0;
 }
 
-extension int16_t
+extension int16_t : IRangedValue
 {
     static const int16_t maxValue = 32767;
     static const int16_t minValue = -32768;
@@ -939,6 +1076,38 @@ struct matrix : IArray<vector<T,C>>
     int getCount() { return R; }
 
     __subscript(int index) -> vector<T,C> { __intrinsic_op($(kIROp_GetElement)) get; }
+}
+
+__generic<T:__BuiltinFloatingPointType, let N : int>
+extension vector<T,N> : IFloat
+{
+    [__unsafeForceInlineEarly] bool lessThan(This other) { return this < other; }
+    [__unsafeForceInlineEarly] bool lessThanOrEquals(This other) { return this <= other; }
+    [__unsafeForceInlineEarly] bool equals(This other) { return this == other; }
+    [__unsafeForceInlineEarly] This add(This other) { return __add(this, other); }
+    [__unsafeForceInlineEarly] This sub(This other) { return __sub(this, other); }
+    [__unsafeForceInlineEarly] This mul(This other) { return __mul(this, other); }
+    [__unsafeForceInlineEarly] This div(This other) { return __div(this, other); }
+    [__unsafeForceInlineEarly] This mod(This other) { return __frem(this, other); }
+    [__unsafeForceInlineEarly] This neg() { return __neg(this); }
+    [__unsafeForceInlineEarly] This scale<T1:__BuiltinFloatingPointType>(T1 s) { return __mul(this, __realCast<T>(s)); }
+    [__unsafeForceInlineEarly] float toFloat() { return this[0]; }
+}
+
+__generic<T:__BuiltinFloatingPointType, let N : int, let M : int>
+extension matrix<T,N,M> : IFloat
+{
+    [__unsafeForceInlineEarly] bool lessThan(This other) { return this < other; }
+    [__unsafeForceInlineEarly] bool lessThanOrEquals(This other) { return this <= other; }
+    [__unsafeForceInlineEarly] bool equals(This other) { return this == other; }
+    [__unsafeForceInlineEarly] This add(This other) { return __add(this, other); }
+    [__unsafeForceInlineEarly] This sub(This other) { return __sub(this, other); }
+    [__unsafeForceInlineEarly] This mul(This other) { return __mul(this, other); }
+    [__unsafeForceInlineEarly] This div(This other) { return __div(this, other); }
+    [__unsafeForceInlineEarly] This mod(This other) { return __frem(this, other); }
+    [__unsafeForceInlineEarly] This neg() { return __neg(this); }
+    [__unsafeForceInlineEarly] This scale<T1:__BuiltinFloatingPointType>(T1 s) { return __mul(this, __realCast<T>(s)); }
+    [__unsafeForceInlineEarly] float toFloat() { return this[0]; }
 }
 
 ${{{{
@@ -1334,10 +1503,6 @@ for (auto op : intrinsicUnaryOps)
         char const* resultType = "T";
         if (op.flags & BOOL_RESULT) resultType = "bool";
 
-        // scalar version
-        sb << "__generic<T : " << op.interface << ">\n";
-        sb << "__prefix __intrinsic_op(" << int(op.opCode) << ") " << resultType << " operator" << op.opName << "(" << "T value);\n";
-
         // vector version
         sb << "__generic<T : " << op.interface << ", let N : int> ";
         sb << "__prefix __intrinsic_op(" << int(op.opCode) << ") vector<" << resultType << ",N> operator" << op.opName << "(vector<T,N> value);\n";
@@ -1369,7 +1534,7 @@ Ptr<T> operator-(Ptr<T> value, int64_t offset)
     return __getElementPtr(value, -offset);
 }
 
-__generic<T : __BuiltinArithmeticType>
+__generic<T : IArithmetic>
 [__unsafeForceInlineEarly]
 __prefix T operator+(T value)
 { return value; }
@@ -1529,10 +1694,6 @@ for (auto op : intrinsicBinaryOps)
 
         if (op.flags & BOOL_RESULT) resultType = "bool";
         // TODO: handle `SHIFT`
-
-        // scalar version
-        sb << "__generic<T : " << op.interface << ">\n";
-        sb << "__intrinsic_op(" << int(op.opCode) << ") " << resultType << " operator" << op.opName << "(" << leftType << " left, " << rightType << " right);\n";
 
         // vector version
         sb << "__generic<T : " << op.interface << ", let N : int> ";
@@ -1848,50 +2009,6 @@ bool operator!=(E left, E right);
 
 // public interfaces for generic arithmetic types.
 
-interface IComparable
-{
-    bool equals(This other);
-    bool lessThan(This other);
-    bool lessThanOrEquals(This other);
-}
-
-__attributeTarget(DeclBase)
-attribute_syntax [TreatAsDifferentiable] : TreatAsDifferentiableAttribute;
-
-[TreatAsDifferentiable]
-interface IArithmetic : IComparable
-{
-    This add(This other);
-    This sub(This other);
-    This mul(This other);
-    This div(This other);
-    This mod(This other);
-    This neg();
-    __init(int val);
-    static const This maxValue;
-    static const This minValue;
-}
-
-interface IInteger : IArithmetic
-{
-    This shl(int value);
-    This shr(int value);
-    This bitAnd(This other);
-    This bitOr(This other);
-    This bitXor(This other);
-    This bitNot();
-    int toInt();
-    int64_t toInt64();
-    uint toUInt();
-    uint64_t toUInt64();
-}
-
-interface IFloat : IArithmetic
-{
-    __init(float value);
-    float toFloat();
-}
-
 __generic<T : IComparable>
 [__unsafeForceInlineEarly]
 bool operator<(T v0, T v1)
@@ -1929,70 +2046,106 @@ bool operator !=(T v0, T v1)
     return !v0.equals(v1);
 }
 
-__generic<T : IArithmetic>
+${{{{
+const char* arithmeticInterfaces[] = {"IArithmetic", "IFloat"};
+const char* attribs[] = {"", "[Differentiable]"};
+for (Index i = 0; i < 2; i++) {
+    const auto interfaceName = arithmeticInterfaces[i];
+    const auto attrib = attribs[i];
+}}}}
+$(attrib)
+__generic<T : $(interfaceName)>
 [__unsafeForceInlineEarly]
 T operator +(T v0, T v1)
 {
     return v0.add(v1);
 }
 
-__generic<T : IArithmetic>
+$(attrib)
+__generic<T : $(interfaceName)>
 [__unsafeForceInlineEarly]
 T operator -(T v0, T v1)
 {
     return v0.sub(v1);
 }
 
-__generic<T : IArithmetic>
+$(attrib)
+__generic<T : $(interfaceName)>
 [__unsafeForceInlineEarly]
 T operator *(T v0, T v1)
 {
     return v0.mul(v1);
 }
 
-__generic<T : IArithmetic>
+$(attrib)
+__generic<T : $(interfaceName)>
 [__unsafeForceInlineEarly]
 T operator /(T v0, T v1)
 {
     return v0.div(v1);
 }
 
-__generic<T : IArithmetic>
+$(attrib)
+__generic<T : $(interfaceName)>
 [__unsafeForceInlineEarly]
 T operator %(T v0, T v1)
 {
     return v0.mod(v1);
 }
 
-__generic<T : IArithmetic>
+$(attrib)
+__generic<T : $(interfaceName)>
 [__unsafeForceInlineEarly]
 __prefix T operator -(T v0)
 {
     return v0.neg();
 }
-__generic<T : IInteger>
+
+${{{{
+    } // foreach ["IArithmetic", "IFloat"]
+}}}}
+
+__generic<T : ILogical>
 [__unsafeForceInlineEarly]
 T operator &(T v0, T v1)
 {
     return v0.bitAnd(v1);
 }
-__generic<T : IInteger>
+__generic<T : ILogical>
+[__unsafeForceInlineEarly]
+T operator &&(T v0, T v1)
+{
+    return v0.and(v1);
+}
+__generic<T : ILogical>
 [__unsafeForceInlineEarly]
 T operator |(T v0, T v1)
 {
     return v0.bitOr(v1);
 }
-__generic<T : IInteger>
+__generic<T : ILogical>
+[__unsafeForceInlineEarly]
+T operator ||(T v0, T v1)
+{
+    return v0.or(v1);
+}
+__generic<T : ILogical>
 [__unsafeForceInlineEarly]
 T operator ^(T v0, T v1)
 {
     return v0.bitXor(v1);
 }
-__generic<T : IInteger>
+__generic<T : ILogical>
 [__unsafeForceInlineEarly]
 __prefix T operator ~(T v0)
 {
     return v0.bitNot();
+}
+__generic<T : ILogical>
+[__unsafeForceInlineEarly]
+__prefix T operator !(T v0)
+{
+    return v0.not();
 }
 
 // IR level type traits.
@@ -2089,61 +2242,6 @@ bool __isVector()
     return __isVector_impl(__declVal<T>());
 }
 
-// Provide implementations to public generic arithmetic interfaces for builtin types.
-
-${{{{
-// Code gen integer type implementations.
-
-for (int tt = 0; tt < kBaseTypeCount; ++tt)
-{
-    if (kBaseTypes[tt].flags & (SINT_MASK | UINT_MASK))
-    {
-}}}}
-extension $(kBaseTypes[tt].name) : IInteger
-{
-    [__unsafeForceInlineEarly] bool equals(This other){return this==other;}
-    [__unsafeForceInlineEarly] bool lessThan(This other){return this<other;}
-    [__unsafeForceInlineEarly] bool lessThanOrEquals(This other){return this<=other;}
-    [__unsafeForceInlineEarly] This add(This other) { return __add(this, other); }
-    [__unsafeForceInlineEarly] This sub(This other) { return __sub(this, other); }
-    [__unsafeForceInlineEarly] This mul(This other) { return __mul(this, other); }
-    [__unsafeForceInlineEarly] This div(This other) { return __div(this, other); }
-    [__unsafeForceInlineEarly] This mod(This other) { return __irem(this, other); }
-    [__unsafeForceInlineEarly] This neg() { return __neg(this); }
-    [__unsafeForceInlineEarly] This shl(int other) { return __shl(this, other); }
-    [__unsafeForceInlineEarly] This shr(int other) { return __shr(this, other); }
-    [__unsafeForceInlineEarly] This bitAnd(This other) { return __add(this, other); }
-    [__unsafeForceInlineEarly] This bitOr(This other) { return __or(this, other); }
-    [__unsafeForceInlineEarly] This bitXor(This other) { return __xor(this, other); }
-    [__unsafeForceInlineEarly] This bitNot() { return __not(this); }
-    [__unsafeForceInlineEarly] int toInt() { return int(this); }
-    [__unsafeForceInlineEarly] int64_t toInt64() { return int64_t(this); }
-    [__unsafeForceInlineEarly] uint toUInt() { return uint(this); }
-    [__unsafeForceInlineEarly] uint64_t toUInt64() { return uint64_t(this); }
-}
-${{{{
-    }
-    else if (kBaseTypes[tt].flags & FLOAT_MASK)
-    {
-}}}}
-
-extension $(kBaseTypes[tt].name) : IFloat
-{
-    [__unsafeForceInlineEarly] bool lessThan(This other) { return this < other; }
-    [__unsafeForceInlineEarly] bool lessThanOrEquals(This other) { return this <= other; }
-    [__unsafeForceInlineEarly] bool equals(This other) { return this == other; }
-    [__unsafeForceInlineEarly] This add(This other) { return __add(this, other); }
-    [__unsafeForceInlineEarly] This sub(This other) { return __sub(this, other); }
-    [__unsafeForceInlineEarly] This mul(This other) { return __mul(this, other); }
-    [__unsafeForceInlineEarly] This div(This other) { return __div(this, other); }
-    [__unsafeForceInlineEarly] This mod(This other) { return __frem(this, other); }
-    [__unsafeForceInlineEarly] This neg() { return __neg(this); }
-    [__unsafeForceInlineEarly] float toFloat() { return float(this); }
-}
-${{{{
-    }
-}
-}}}}
 
 // Binding Attributes
 

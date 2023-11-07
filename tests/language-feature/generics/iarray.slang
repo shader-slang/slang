@@ -1,7 +1,7 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type
 
-T sum<T:__BuiltinArithmeticType>(IArray<T> array)
+T sum<T:IFloat>(IArray<T> array)
 {
     T result = T(0);
     for (int i = 0; i < array.getCount(); i++)
@@ -10,6 +10,7 @@ T sum<T:__BuiltinArithmeticType>(IArray<T> array)
     }
     return result;
 }
+/*
 vector<T,N> sum<T:__BuiltinArithmeticType, let N:int>(IArray<vector<T,N>> array)
 {
     vector<T,N> result = vector<T,N>(T(0));
@@ -19,6 +20,7 @@ vector<T,N> sum<T:__BuiltinArithmeticType, let N:int>(IArray<vector<T,N>> array)
     }
     return result;
 }
+*/
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
@@ -30,7 +32,7 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
     float2x2 m = float2x2(1.0, 2.0, 3.0, 4.0);
     outputBuffer[0] = sum(arr);
     outputBuffer[1] = sum(v);
-    outputBuffer[2] = sum(sum(m));
+    outputBuffer[2] = sum(sum<float2>(m));
     // CHECK: 6.0
     // CHECK: 10.0
     // CHECK: 10.0

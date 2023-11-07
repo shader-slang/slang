@@ -256,7 +256,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             return RequirementWitness();
 
         case RequirementWitness::Flavor::witnessTable:
-            SLANG_ASSERT(!subst);
+            SLANG_ASSERT(subst.findGenericAppDeclRef() == nullptr);
             return *this;
 
         case RequirementWitness::Flavor::declRef:
