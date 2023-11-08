@@ -592,8 +592,8 @@ ${{{{
         __intrinsic_op($(kIROp_Rsh)) This shr(int other);
         __intrinsic_op($(kIROp_BitAnd)) This bitAnd(This other);
         __intrinsic_op($(kIROp_BitOr)) This bitOr(This other);
-        __intrinsic_op($(kIROp_And)) This and(This other);
-        __intrinsic_op($(kIROp_Or)) This or(This other);
+        [__unsafeForceInlineEarly] This and(This other) {return __intCast<This>(__intCast<bool>(this) && __intCast<bool>(other)); }
+        [__unsafeForceInlineEarly] This or(This other) {return __intCast<This>(__intCast<bool>(this) || __intCast<bool>(other)); }
         __intrinsic_op($(kIROp_BitXor)) This bitXor(This other);
         __intrinsic_op($(kIROp_BitNot)) This bitNot();
         [__unsafeForceInlineEarly] This not() {return __intCast<This>(!__intCast<bool>(this)); }
