@@ -546,12 +546,12 @@ ${{{{
         [__unsafeForceInlineEarly] __intrinsic_op($(kIROp_Leq)) bool lessThanOrEquals(This other);
         [__unsafeForceInlineEarly] This shl(int other) { return __intCast<This>(__shl(__intCast<int>(this), other)); }
         [__unsafeForceInlineEarly] This shr(int other) { return __intCast<This>(__shr(__intCast<int>(this), other)); }
-        [__unsafeForceInlineEarly] __intrinsic_op($(kIROp_BitAnd)) This bitAnd(This other);
-        [__unsafeForceInlineEarly] __intrinsic_op($(kIROp_BitOr)) This bitOr(This other);
+        [__unsafeForceInlineEarly] This bitAnd(This other) { return __intCast<This>(__and(__intCast<int>(this), __intCast<int>(other))); }
+        [__unsafeForceInlineEarly] This bitOr(This other) { return __intCast<This>(__or(__intCast<int>(this), __intCast<int>(other))); }
         [__unsafeForceInlineEarly] __intrinsic_op($(kIROp_And)) This and(This other);
         [__unsafeForceInlineEarly] __intrinsic_op($(kIROp_Or)) This or(This other);
-        [__unsafeForceInlineEarly] __intrinsic_op($(kIROp_BitXor)) This bitXor(This other);
-        [__unsafeForceInlineEarly] __intrinsic_op($(kIROp_BitNot)) This bitNot();
+        [__unsafeForceInlineEarly] This bitXor(This other)  { return __intCast<This>(__xor(__intCast<int>(this), __intCast<int>(other))); }
+        [__unsafeForceInlineEarly] This bitNot()  { return __intCast<This>(__not(__intCast<int>(this))); }
         [__unsafeForceInlineEarly] __intrinsic_op($(kIROp_Not)) This not();
 ${{{{
         break;
@@ -596,7 +596,7 @@ ${{{{
         __intrinsic_op($(kIROp_Or)) This or(This other);
         __intrinsic_op($(kIROp_BitXor)) This bitXor(This other);
         __intrinsic_op($(kIROp_BitNot)) This bitNot();
-        __intrinsic_op($(kIROp_Not)) This not();
+        [__unsafeForceInlineEarly] This not() {return __intCast<This>(!__intCast<bool>(this)); }
         __intrinsic_op($(kIROp_IntCast)) int toInt();
         __intrinsic_op($(kIROp_IntCast)) int64_t toInt64();
         __intrinsic_op($(kIROp_IntCast)) uint toUInt();
