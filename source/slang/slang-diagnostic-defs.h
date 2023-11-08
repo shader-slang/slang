@@ -66,7 +66,7 @@ DIAGNOSTIC(    8, Error, outputPathsImplyDifferentFormats,
     "the output paths '$0' and '$1' require different code-generation targets")
 
 DIAGNOSTIC(    10, Error, explicitOutputPathsAndMultipleTargets, "canot use both explicit output paths ('-o') and multiple targets ('-target')")
-DIAGNOSTIC(    11, Error, glslIsNotSupported, "the Slang compiler does not support GLSL as a source language")
+DIAGNOSTIC(    11, Error, glslIsNotSupported, "the Slang compiler does not support GLSL as a source language by default, please use -allow-glsl")
 DIAGNOSTIC(    12, Error, cannotDeduceSourceLanguage, "can't deduce language for input file '$0'")
 DIAGNOSTIC(    13, Error, unknownCodeGenerationTarget, "unknown code generation target '$0'")
 DIAGNOSTIC(    14, Error, unknownProfile, "unknown profile '$0'")

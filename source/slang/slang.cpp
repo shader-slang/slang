@@ -2534,22 +2534,26 @@ SlangResult FrontEndCompileRequest::executeActionsInner()
 {
     SLANG_AST_BUILDER_RAII(getLinkage()->getASTBuilder());
 
-    // We currently allow GlSL files on the command line so that we can
-    // drive our "pass-through" mode, but we really want to issue an error
-    // message if the user is seriously asking us to compile them.
     for (TranslationUnitRequest* translationUnit : translationUnits)
     {
         // Make sure SourceFile representation is available for all translationUnits
         SLANG_RETURN_ON_FAIL(translationUnit->requireSourceFiles());
 
-        switch(translationUnit->sourceLanguage)
+        if(!m_allowGLSLInput)
         {
-        default:
-            break;
+            // We currently allow GlSL files on the command line so that we can
+            // drive our "pass-through" mode, but we really want to issue an error
+            // message if the user is seriously asking us to compile them and
+            // doesn't explicitly opt into the glsl frontend
+            switch(translationUnit->sourceLanguage)
+            {
+            default:
+                break;
 
-        case SourceLanguage::GLSL:
-            getSink()->diagnose(SourceLoc(), Diagnostics::glslIsNotSupported);
-            return SLANG_FAIL;
+            case SourceLanguage::GLSL:
+                getSink()->diagnose(SourceLoc(), Diagnostics::glslIsNotSupported);
+                return SLANG_FAIL;
+            }
         }
     }
 
@@ -5265,6 +5269,11 @@ SlangResult EndToEndCompileRequest::setTypeNameForEntryPointExistentialTypeParam
         typeArgStrings.setCount(slotIndex + 1);
     typeArgStrings[slotIndex] = String(typeName);
     return SLANG_OK;
+}
+
+void EndToEndCompileRequest::setAllowGLSLInput(bool value)
+{
+    getFrontEndReq()->m_allowGLSLInput = value;
 }
 
 SlangResult EndToEndCompileRequest::EndToEndCompileRequest::compile()

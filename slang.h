@@ -3881,6 +3881,11 @@ namespace slang
             int                     slotIndex,
             char const*             typeName) = 0;
 
+            /** Enable or disable an experimental, best-effort GLSL frontend
+             */
+        virtual SLANG_NO_THROW void SLANG_MCALL setAllowGLSLInput(
+            bool                    value) = 0;
+
             /** Execute the compilation request.
 
             @returns  SlangResult, SLANG_OK on success. Use SLANG_SUCCEEDED() and SLANG_FAILED() to test SlangResult.
