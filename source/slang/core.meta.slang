@@ -2038,36 +2038,42 @@ bool operator!=(E left, E right);
 
 __generic<T : IComparable>
 [__unsafeForceInlineEarly]
+[OverloadRank(-10)]
 bool operator<(T v0, T v1)
 {
     return v0.lessThan(v1);
 }
 __generic<T : IComparable>
 [__unsafeForceInlineEarly]
+[OverloadRank(-10)]
 bool operator>(T v0, T v1)
 {
     return v1.lessThan(v0);
 }
 __generic<T : IComparable>
 [__unsafeForceInlineEarly]
+[OverloadRank(-10)]
 bool operator ==(T v0, T v1)
 {
     return v0.equals(v1);
 }
 __generic<T : IComparable>
 [__unsafeForceInlineEarly]
+[OverloadRank(-10)]
 bool operator >=(T v0, T v1)
 {
     return v1.lessThan(v1);
 }
 __generic<T : IComparable>
 [__unsafeForceInlineEarly]
+[OverloadRank(-10)]
 bool operator <=(T v0, T v1)
 {
     return v0.lessThanOrEquals(v1);
 }
 __generic<T : IComparable>
 [__unsafeForceInlineEarly]
+[OverloadRank(-10)]
 bool operator !=(T v0, T v1)
 {
     return !v0.equals(v1);
@@ -2141,42 +2147,49 @@ ${{{{
 
 __generic<T : ILogical>
 [__unsafeForceInlineEarly]
+[OverloadRank(-10)]
 T operator &(T v0, T v1)
 {
     return v0.bitAnd(v1);
 }
 __generic<T : ILogical>
 [__unsafeForceInlineEarly]
+[OverloadRank(-10)]
 T operator &&(T v0, T v1)
 {
     return v0.and(v1);
 }
 __generic<T : ILogical>
 [__unsafeForceInlineEarly]
+[OverloadRank(-10)]
 T operator |(T v0, T v1)
 {
     return v0.bitOr(v1);
 }
 __generic<T : ILogical>
 [__unsafeForceInlineEarly]
+[OverloadRank(-10)]
 T operator ||(T v0, T v1)
 {
     return v0.or(v1);
 }
 __generic<T : ILogical>
 [__unsafeForceInlineEarly]
+[OverloadRank(-10)]
 T operator ^(T v0, T v1)
 {
     return v0.bitXor(v1);
 }
 __generic<T : ILogical>
 [__unsafeForceInlineEarly]
+[OverloadRank(-10)]
 __prefix T operator ~(T v0)
 {
     return v0.bitNot();
 }
 __generic<T : ILogical>
 [__unsafeForceInlineEarly]
+[OverloadRank(-10)]
 __prefix T operator !(T v0)
 {
     return v0.not();
