@@ -4381,6 +4381,17 @@ namespace Slang
         return entry;
     }
 
+    IRInst* IRBuilder::createThisTypeWitness(IRType* interfaceType)
+    {
+        IRInst* witness = createInst<IRThisTypeWitness>(
+            this,
+            kIROp_ThisTypeWitness,
+            getWitnessTableType(interfaceType));
+        addGlobalValue(this, witness);
+        return witness;
+    }
+
+
     IRStructType* IRBuilder::createStructType()
     {
         IRStructType* structType = createInst<IRStructType>(
@@ -7691,6 +7702,7 @@ namespace Slang
         case kIROp_GlobalParam:
         case kIROp_StructKey:
         case kIROp_GlobalGenericParam:
+        case kIROp_ThisTypeWitness:
         case kIROp_WitnessTable:
         case kIROp_WitnessTableEntry:
         case kIROp_InterfaceRequirementEntry:

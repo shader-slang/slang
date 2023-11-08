@@ -1802,6 +1802,16 @@ struct IRThisType : IRType
     }
 };
 
+struct IRThisTypeWitness : IRInst
+{
+    IR_LEAF_ISA(ThisTypeWitness)
+
+    IRInst* getConstraintType()
+    {
+        return getOperand(0);
+    }
+};
+
 struct IRInterfaceRequirementEntry : IRInst
 {
     IRInst* getRequirementKey() { return getOperand(0); }

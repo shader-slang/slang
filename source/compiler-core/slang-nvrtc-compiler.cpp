@@ -820,15 +820,21 @@ SlangResult NVRTCDownstreamCompiler::compile(const DownstreamCompileOptions& inO
 
     {
         // The lowest supported CUDA architecture version supported
-        // by NVRTC is `compute_30`.
+        // by any version of NVRTC we support is `compute_30`.
         //
         SemanticVersion version(3);
 
-        // Newer releases of NVRTC only support `compute_35` and up
-        // (with everything before `compute_52` being deprecated).
-        //
-        if( m_desc.version.m_major >= 11 )
+        // Newer releases of NVRTC only support newer CUDA architectures.
+        if ( m_desc.version.m_major >= 12 )
         {
+            // NVRTC in CUDA 12 only supports `compute_50` and up
+            // (with everything before `compute_52` being deprecated).
+            version = SemanticVersion(5, 0);
+        }
+        else if ( m_desc.version.m_major == 11 )
+        {
+            // NVRTC in CUDA 11 only supports `compute_35` and up
+            // (with everything before `compute_52` being deprecated).
             version = SemanticVersion(3, 5);
         }
 
