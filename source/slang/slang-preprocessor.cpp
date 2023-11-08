@@ -3635,6 +3635,23 @@ static void HandlePragmaDirective(PreprocessorDirectiveContext* context)
     (subDirective->callback)(context, subDirectiveToken);
 }
 
+static void HandleVersionDirective(PreprocessorDirectiveContext* context)
+{
+    [[maybe_unused]]
+    int version;
+    switch(PeekTokenType(context))
+    {
+    case TokenType::IntegerLiteral:
+        version = stringToInt(AdvanceToken(context).getContent());
+        break;
+    default:
+        GetSink(context)->diagnose(GetDirectiveLoc(context), Diagnostics::expectedIntegralVersionNumber);
+        break;
+    }
+
+    // TODO, just skip the version for now
+}
+
 // Handle an invalid directive
 static void HandleInvalidDirective(PreprocessorDirectiveContext* context)
 {
@@ -3688,6 +3705,9 @@ static const PreprocessorDirective kDirectives[] =
     { "error",      &HandleErrorDirective,      DontConsumeDirectiveAutomatically },
     { "line",       &HandleLineDirective,       0 },
     { "pragma",     &HandlePragmaDirective,     0 },
+
+    // GLSL
+    { "version",    &HandleVersionDirective,    0 },
 
     { nullptr, nullptr, 0 },
 };

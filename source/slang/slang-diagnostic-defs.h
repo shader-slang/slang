@@ -173,6 +173,7 @@ DIAGNOSTIC(15202, Error, divideByZeroInPreprocessorExpression, "division by zero
 DIAGNOSTIC(15203, Error, expectedTokenInDefinedExpression, "expected '$0' in 'defined' expression")
 DIAGNOSTIC(15204, Warning, directiveExpectsExpression, "'$0' directive requires an expression")
 DIAGNOSTIC(15205, Warning, undefinedIdentifierInPreprocessorExpression, "undefined identifier '$0' in preprocessor expression will evaluate to zero")
+DIAGNOSTIC(15206, Error, expectedIntegralVersionNumber, "Expected integer for #version number")
 
 DIAGNOSTIC(-1, Note, seeOpeningToken, "see opening '$0'")
 
