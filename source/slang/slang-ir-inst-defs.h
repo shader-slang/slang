@@ -261,6 +261,9 @@ INST(StructKey, key, 0, GLOBAL)
 INST(GlobalGenericParam, global_generic_param, 0, GLOBAL)
 INST(WitnessTable, witness_table, 0, 0)
 
+// A placeholder witness that ThisType implements the enclosing interface.
+// Used only in interface definitions.
+INST(ThisTypeWitness, thisTypeWitness, 1, 0)
 INST(GlobalHashedStringLiterals, global_hashed_string_literals, 0, 0)
 
 INST(Module, module, 0, PARENT)

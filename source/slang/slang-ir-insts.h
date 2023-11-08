@@ -3703,6 +3703,8 @@ public:
         IRInst*        requirementKey,
         IRInst*        satisfyingVal);
 
+    IRInst* createThisTypeWitness(IRType* interfaceType);
+
     IRInterfaceRequirementEntry* createInterfaceRequirementEntry(
         IRInst* requirementKey,
         IRInst* requirementVal);
