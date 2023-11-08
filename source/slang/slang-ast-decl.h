@@ -151,6 +151,10 @@ class ClassDecl : public AggTypeDecl
     SLANG_AST_CLASS(ClassDecl)
 };
 
+class GLSLInterfaceBlockDecl : public AggTypeDecl
+{
+    SLANG_AST_CLASS(GLSLInterfaceBlockDecl);
+};
 
 // TODO: Is it appropriate to treat an `enum` as an aggregate type?
 // Most code that looks for, e.g., conformances assumes user-defined

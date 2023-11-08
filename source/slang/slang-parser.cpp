@@ -186,6 +186,7 @@ namespace Slang
         void parseSourceFile(ModuleDecl* program);
         Decl* ParseStruct();
         ClassDecl* ParseClass();
+        GLSLInterfaceBlockDecl* ParseGLSLInterfaceBlock();
         Stmt* ParseStatement(Stmt* parentStmt = nullptr);
         Stmt* parseBlockStatement();
         Stmt* parseLabelStatement();
@@ -2400,7 +2401,7 @@ namespace Slang
     }
 
         /// Parse a type specifier, without dealing with modifiers.
-    static TypeSpec _parseSimpleTypeSpec(Parser* parser)
+    static TypeSpec _parseSimpleTypeSpec(Parser* parser, bool mightBeGLSLInterfaceBlock)
     {
         TypeSpec typeSpec;
 
@@ -2432,6 +2433,17 @@ namespace Slang
         else if( parser->LookAheadToken("class") )
         {
             auto decl = parser->ParseClass();
+            typeSpec.decl = decl;
+            typeSpec.expr = createDeclRefType(parser, decl);
+            return typeSpec;
+        }
+        // TODO: Only consider this branch if we've seen a interface-block
+        // compatible modifier, and are in GLSL mode
+        else if( mightBeGLSLInterfaceBlock
+                && parser->LookAheadToken(TokenType::Identifier)
+                && parser->LookAheadToken(TokenType::LBrace,1) )
+        {
+            auto decl = parser->ParseGLSLInterfaceBlock();
             typeSpec.decl = decl;
             typeSpec.expr = createDeclRefType(parser, decl);
             return typeSpec;
@@ -2493,6 +2505,11 @@ namespace Slang
         return typeSpec;
     }
 
+    static bool hasPotentialGLSLInterfaceBlockModifier(Modifiers& mods)
+    {
+        return mods.hasModifier<GLSLBufferModifier>();
+    }
+
         /// Parse a type specifier, following the given list of modifiers.
         ///
         /// If there are any modifiers in `ioModifiers`, this function may modify it
@@ -2501,7 +2518,7 @@ namespace Slang
         ///
     static TypeSpec _parseTypeSpec(Parser* parser, Modifiers& ioModifiers)
     {
-        TypeSpec typeSpec = _parseSimpleTypeSpec(parser);
+        TypeSpec typeSpec = _parseSimpleTypeSpec(parser, hasPotentialGLSLInterfaceBlockModifier(ioModifiers));
 
         // We don't know whether `ioModifiers` has any modifiers in it,
         // or which of them might be type modifiers, so we will delegate
@@ -2526,7 +2543,7 @@ namespace Slang
     static TypeSpec _parseTypeSpec(Parser* parser)
     {
         Modifiers modifiers = ParseModifiers(parser);
-        TypeSpec typeSpec = _parseSimpleTypeSpec(parser);
+        TypeSpec typeSpec = _parseSimpleTypeSpec(parser, hasPotentialGLSLInterfaceBlockModifier(modifiers));
 
         typeSpec = _applyModifiersToTypeSpec(parser, typeSpec, modifiers);
 
@@ -4136,6 +4153,23 @@ namespace Slang
 
         parseOptionalInheritanceClause(this, rs);
 
+        parseDeclBody(this, rs);
+        return rs;
+    }
+
+    GLSLInterfaceBlockDecl* Parser::ParseGLSLInterfaceBlock()
+    {
+        //
+        // MyBlockName { float myData[]; } myBufferName;
+        //
+
+        auto* rs = astBuilder->create<GLSLInterfaceBlockDecl>();
+        FillPosition(rs);
+
+        // As for struct, skip completion request token to prevent producing a
+        // block named completion request.
+        AdvanceIf(this, TokenType::CompletionRequest);
+        rs->nameAndLoc = expectIdentifier(this);
         parseDeclBody(this, rs);
         return rs;
     }
@@ -6703,7 +6737,7 @@ namespace Slang
             // If there are any modifiers, then we know that we are actually
             // in the type case.
             //
-            auto typeSpec = _parseSimpleTypeSpec(parser);
+            auto typeSpec = _parseSimpleTypeSpec(parser, hasPotentialGLSLInterfaceBlockModifier(modifiers));
             typeSpec = _applyModifiersToTypeSpec(parser, typeSpec, modifiers);
 
             auto typeExpr = typeSpec.expr;
@@ -7296,6 +7330,7 @@ namespace Slang
         _makeParseModifier("uniform",       HLSLUniformModifier::kReflectClassInfo),
         _makeParseModifier("volatile",      HLSLVolatileModifier::kReflectClassInfo),
         _makeParseModifier("export",        HLSLExportModifier::kReflectClassInfo),
+        _makeParseModifier("buffer",        GLSLBufferModifier::kReflectClassInfo),
 
         // Modifiers for geometry shader input
         _makeParseModifier("point",         HLSLPointModifier::kReflectClassInfo),
