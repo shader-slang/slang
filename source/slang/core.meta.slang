@@ -579,28 +579,28 @@ ${{{{
         __init(T value);
 
         // Implementation of the `IInteger` interface.
-        [__unsafeForceInlineEarly] bool equals(This other){return this==other;}
-        [__unsafeForceInlineEarly] bool lessThan(This other){return this<other;}
-        [__unsafeForceInlineEarly] bool lessThanOrEquals(This other){return this<=other;}
-        [__unsafeForceInlineEarly] This add(This other) { return __add(this, other); }
-        [__unsafeForceInlineEarly] This sub(This other) { return __sub(this, other); }
-        [__unsafeForceInlineEarly] This mul(This other) { return __mul(this, other); }
-        [__unsafeForceInlineEarly] This div(This other) { return __div(this, other); }
-        [__unsafeForceInlineEarly] This mod(This other) { return __irem(this, other); }
-        [__unsafeForceInlineEarly] This neg() { return __neg(this); }
-        [__unsafeForceInlineEarly] This shl(int other) { return __shl(this, other); }
-        [__unsafeForceInlineEarly] This shr(int other) { return __shr(this, other); }
-        [__unsafeForceInlineEarly] This bitAnd(This other) { return __and(this, other); }
-        [__unsafeForceInlineEarly] This bitOr(This other) { return __or(this, other); }
-        [__unsafeForceInlineEarly] This and(This other) { return __intCast<This>(__logicalAnd(__intCast<bool>(this), __intCast<bool>(other))); }
-        [__unsafeForceInlineEarly] This or(This other) { return __intCast<This>(__logicalOr(__intCast<bool>(this), __intCast<bool>(other))); }
-        [__unsafeForceInlineEarly] This bitXor(This other) { return __xor(this, other); }
-        [__unsafeForceInlineEarly] This bitNot() { return __not(this); }
-        [__unsafeForceInlineEarly] This not() { return __intCast<This>(__logicalNot(__intCast<bool>(this))); }
-        [__unsafeForceInlineEarly] int toInt() { return int(this); }
-        [__unsafeForceInlineEarly] int64_t toInt64() { return int64_t(this); }
-        [__unsafeForceInlineEarly] uint toUInt() { return uint(this); }
-        [__unsafeForceInlineEarly] uint64_t toUInt64() { return uint64_t(this); }
+        __intrinsic_op($(kIROp_Less)) bool lessThan(This other);
+        __intrinsic_op($(kIROp_Leq))  bool lessThanOrEquals(This other);
+        __intrinsic_op($(kIROp_Eql))  bool equals(This other);
+        __intrinsic_op($(kIROp_Add))  This add(This other);
+        __intrinsic_op($(kIROp_Sub))  This sub(This other);
+        __intrinsic_op($(kIROp_Mul))  This mul(This other);
+        __intrinsic_op($(kIROp_Div))  This div(This other);
+        __intrinsic_op($(kIROp_FRem)) This mod(This other);
+        __intrinsic_op($(kIROp_Neg))  This neg();
+        __intrinsic_op($(kIROp_Lsh)) This shl(int other);
+        __intrinsic_op($(kIROp_Rsh)) This shr(int other);
+        __intrinsic_op($(kIROp_BitAnd)) This bitAnd(This other);
+        __intrinsic_op($(kIROp_BitOr)) This bitOr(This other);
+        __intrinsic_op($(kIROp_And)) This and(This other);
+        __intrinsic_op($(kIROp_Or)) This or(This other);
+        __intrinsic_op($(kIROp_BitXor)) This bitXor(This other);
+        __intrinsic_op($(kIROp_BitNot)) This bitNot();
+        __intrinsic_op($(kIROp_Not)) This not();
+        __intrinsic_op($(kIROp_IntCast)) int toInt();
+        __intrinsic_op($(kIROp_IntCast)) int64_t toInt64();
+        __intrinsic_op($(kIROp_IntCast)) uint toUInt();
+        __intrinsic_op($(kIROp_IntCast)) uint64_t toUInt64();
 ${{{{
         break;
 
@@ -1110,10 +1110,36 @@ extension vector<T,N> : IFloat
     [__unsafeForceInlineEarly] __init(int v) { return vector<T,N>(T(v)); }
     [OverloadRank(-1)]
     [__unsafeForceInlineEarly] __init(float v) { return vector<T,N>(T(v)); }
+
+    // IDifferentiable
+
+    typedef vector<T, N> Differential;
+
+    [__unsafeForceInlineEarly]
+    [BackwardDifferentiable]
+    static Differential dzero()
+    {
+        return Differential(__slang_noop_cast<T>(T.dzero()));
+    }
+
+    [__unsafeForceInlineEarly]
+    [BackwardDifferentiable]
+    static Differential dadd(Differential a, Differential b)
+    {
+        return a + b;
+    }
+
+    __generic<U : __BuiltinRealType>
+    [__unsafeForceInlineEarly]
+    [BackwardDifferentiable]
+    static Differential dmul(U a, Differential b)
+    {
+        return __realCast<T, U>(a) * b;
+    }
 }
 
-__generic<T:__BuiltinFloatingPointType, let N : int, let M : int>
-extension matrix<T,N,M> : IFloat
+__generic<T:__BuiltinFloatingPointType, let N : int, let M : int, let L : int>
+extension matrix<T,N,M,L> : IFloat
 {
     [TreatAsDifferentiable][__unsafeForceInlineEarly] bool lessThan(This other) { return this < other; }
     [TreatAsDifferentiable][__unsafeForceInlineEarly] bool lessThanOrEquals(This other) { return this <= other; }
@@ -1132,6 +1158,31 @@ extension matrix<T,N,M> : IFloat
     [TreatAsDifferentiable][__unsafeForceInlineEarly] __init(int v) { return matrix<T,N,M>(T(v)); }
     [OverloadRank(-1)]
     [TreatAsDifferentiable][__unsafeForceInlineEarly] __init(float v) { return matrix<T,N,M>(T(v)); }
+
+    // IDifferentiable.
+    typedef matrix<T, N,M,L> Differential;
+
+    [__unsafeForceInlineEarly]
+    [BackwardDifferentiable]
+    static Differential dzero()
+    {
+        return matrix<T, N,M,L>(__slang_noop_cast<T>(T.dzero()));
+    }
+
+    [__unsafeForceInlineEarly]
+    [BackwardDifferentiable]
+    static Differential dadd(Differential a, Differential b)
+    {
+        return a + b;
+    }
+    
+    __generic<U : __BuiltinRealType>
+    [__unsafeForceInlineEarly]
+    [BackwardDifferentiable]
+    static Differential dmul(U a, Differential b)
+    {
+        return __realCast<T, U>(a) * b;
+    }
 }
 
 ${{{{
@@ -1377,7 +1428,7 @@ for (int tt = 0; tt < kBaseTypeCount; ++tt)
     auto toType = kBaseTypes[tt].name;
 }}}}
 
-__generic<let R : int, let C : int> extension matrix<$(toType),R,C>
+__generic<let R : int, let C : int, let L : int> extension matrix<$(toType),R,C,L>
 {
 ${{{{
     for (int ff = 0; ff < kBaseTypeCount; ++ff)
@@ -1395,7 +1446,7 @@ ${{{{
 }}}}
     __implicit_conversion($(cost))
     __intrinsic_op($(op))
-    __init(matrix<$(fromType),R,C> value);
+    __init(matrix<$(fromType),R,C,L> value);
 ${{{{
     }
 }}}}
@@ -1408,61 +1459,6 @@ __generic<T, U>
 __intrinsic_op(0)
 T __slang_noop_cast(U u);
 
-__generic<T:__BuiltinFloatingPointType, let N: int>
-extension vector<T, N> : IDifferentiable
-{
-    typedef vector<T, N> Differential;
-
-    [__unsafeForceInlineEarly]
-    [BackwardDifferentiable]
-    static Differential dzero()
-    {
-        return Differential(__slang_noop_cast<T>(T.dzero()));
-    }
-
-    [__unsafeForceInlineEarly]
-    [BackwardDifferentiable]
-    static Differential dadd(Differential a, Differential b)
-    {
-        return a + b;
-    }
-
-    __generic<U : __BuiltinRealType>
-    [__unsafeForceInlineEarly]
-    [BackwardDifferentiable]
-    static Differential dmul(U a, Differential b)
-    {
-        return __realCast<T, U>(a) * b;
-    }
-}
-
-__generic<T:__BuiltinFloatingPointType, let R: int, let C: int, let L : int>
-extension matrix<T, R, C, L> : IDifferentiable
-{
-    typedef matrix<T, R, C, L> Differential;
-
-    [__unsafeForceInlineEarly]
-    [BackwardDifferentiable]
-    static Differential dzero()
-    {
-        return matrix<T, R, C, L>(__slang_noop_cast<T>(T.dzero()));
-    }
-
-    [__unsafeForceInlineEarly]
-    [BackwardDifferentiable]
-    static Differential dadd(Differential a, Differential b)
-    {
-        return a + b;
-    }
-    
-    __generic<U : __BuiltinRealType>
-    [__unsafeForceInlineEarly]
-    [BackwardDifferentiable]
-    static Differential dmul(U a, Differential b)
-    {
-        return __realCast<T, U>(a) * b;
-    }
-}
 
 //@ public:
 
@@ -1520,12 +1516,17 @@ for (auto op : intrinsicUnaryOps)
         sb << "__generic<let N : int, let M : int> ";
         sb << "__prefix __intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" <<  "matrix<" << type.name << ",N,M> value);\n";
     }
-    
+
     // Synthesize generic versions
     if(op.interface)
     {
         char const* resultType = "T";
         if (op.flags & BOOL_RESULT) resultType = "bool";
+        
+        // scalar version
+        sb << "__generic<T : " << op.interface << ">\n";
+        sb << "[OverloadRank(10)]";
+        sb << "__prefix __intrinsic_op(" << int(op.opCode) << ") " << resultType << " operator" << op.opName << "(" << "T value);\n";
 
         // vector version
         sb << "__generic<T : " << op.interface << ", let N : int> ";
@@ -1720,6 +1721,12 @@ for (auto op : intrinsicBinaryOps)
 
         if (op.flags & BOOL_RESULT) resultType = "bool";
         // TODO: handle `SHIFT`
+
+        // scalar version
+        sb << "__generic<T : " << op.interface << ">\n";
+        sb << "[OverloadRank(10)]";
+        sb << "__intrinsic_op(" << int(op.opCode) << ") " << resultType << " operator" << op.opName << "(" << leftType << " left, " << rightType << " right);\n";
+
         // vector version
         sb << "__generic<T : " << op.interface << ", let N : int> ";
         sb << "[OverloadRank(10)]";
@@ -1732,16 +1739,20 @@ for (auto op : intrinsicBinaryOps)
 
         // scalar-vector and scalar-matrix
         sb << "__generic<T : " << op.interface << ", let N : int> ";
+        sb << "[OverloadRank(10)]";
         sb << "__intrinsic_op(" << int(op.opCode) << ") vector<" << resultType << ",N> operator" << op.opName << "(" << leftType << " left, vector<" << rightType << ",N> right);\n";
 
         sb << "__generic<T : " << op.interface << ", let N : int, let M : int> ";
+        sb << "[OverloadRank(10)]";
         sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" <<  leftType << " left, matrix<" << rightType << ",N,M> right);\n";
 
         // vector-scalar and matrix-scalar
         sb << "__generic<T : " << op.interface << ", let N : int> ";
+        sb << "[OverloadRank(10)]";
         sb << "__intrinsic_op(" << int(op.opCode) << ") vector<" << resultType << ",N> operator" << op.opName << "(vector<" << leftType << ",N> left, " << rightType << " right);\n";
 
         sb << "__generic<T : " << op.interface << ", let N : int, let M : int> ";
+        sb << "[OverloadRank(10)]";
         sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(matrix<" << leftType << ",N,M> left, " << rightType << " right);\n";
     }
 }
@@ -2085,7 +2096,7 @@ const char* attribs[] = {"", "[TreatAsDifferentiable]"};
 for (Index i = 0; i < 2; i++) {
     const auto interfaceName = arithmeticInterfaces[i];
     const auto attrib = attribs[i];
-    Index overloadRank = i;
+    Index overloadRank = i - 3;
 }}}}
 $(attrib)
 __generic<T : $(interfaceName)>

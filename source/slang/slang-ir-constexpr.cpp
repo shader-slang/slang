@@ -56,6 +56,9 @@ bool isConstExpr(IRInst* value)
     case kIROp_FloatLit:
     case kIROp_BoolLit:
     case kIROp_Func:
+    case kIROp_StructKey:
+    case kIROp_WitnessTable:
+    case kIROp_Generic:
         return true;
 
     default:
@@ -136,6 +139,8 @@ bool opCanBeConstExpr(IROp op)
     case kIROp_GetOptionalValue:
     case kIROp_DifferentialPairGetDifferential:
     case kIROp_DifferentialPairGetPrimal:
+    case kIROp_LookupWitness:
+    case kIROp_Specialize:
     // TODO: more cases
         return true;
 
@@ -146,10 +151,8 @@ bool opCanBeConstExpr(IROp op)
 
 bool opCanBeConstExprByForwardPass(IRInst* value)
 {
-    // TODO: realistically need to special-case `call`
-    // operations here, so that we check whether the
-    // callee function is fixed/known, and if it is
-    // whether it has been declared as constant-foldable
+    // TODO: handle call inst here.
+
     if (value->getOp() == kIROp_Param)
         return false;
     return opCanBeConstExpr(value->getOp());
