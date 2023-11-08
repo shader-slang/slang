@@ -10,17 +10,7 @@ T sum<T:IFloat>(IArray<T> array)
     }
     return result;
 }
-/*
-vector<T,N> sum<T:__BuiltinArithmeticType, let N:int>(IArray<vector<T,N>> array)
-{
-    vector<T,N> result = vector<T,N>(T(0));
-    for (int i = 0; i < array.getCount(); i++)
-    {
-        result = result + array[i];
-    }
-    return result;
-}
-*/
+
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
@@ -32,7 +22,7 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
     float2x2 m = float2x2(1.0, 2.0, 3.0, 4.0);
     outputBuffer[0] = sum(arr);
     outputBuffer[1] = sum(v);
-    outputBuffer[2] = sum(sum<float2>(m));
+    outputBuffer[2] = sum(sum(m));
     // CHECK: 6.0
     // CHECK: 10.0
     // CHECK: 10.0
