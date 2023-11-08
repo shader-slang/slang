@@ -371,6 +371,22 @@ namespace Slang
                 if(!baseExpr->type.isLeftValue)
                 {
                     expr->type.isLeftValue = false;
+
+                    // One exception to this is if we're reading the contents
+                    // of a GLSL buffer interface block which isn't marked as
+                    // read_only
+                    if(const auto baseDerefExpr = as<DerefExpr>(baseExpr))
+                    {
+                        if(const auto baseVarExpr = as<VarExpr>(baseDerefExpr->base))
+                        {
+                            const auto b = baseVarExpr->type->isDerivedFrom(ASTNodeType::GLSLInterfaceBlockDecl);
+                            const auto d = baseVarExpr->declRef.getDecl();
+                            if(d->hasModifier<GLSLBufferModifier>() && !d->hasModifier<GLSLReadOnlyModifier>())
+                            {
+                                expr->type.isLeftValue = true;
+                            }
+                        }
+                    }
                 }
                 else
                 {

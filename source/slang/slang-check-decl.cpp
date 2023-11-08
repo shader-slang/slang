@@ -389,11 +389,6 @@ namespace Slang
         //
         if(decl->hasModifier<HLSLStaticModifier>()) return false;
 
-        // GLSL buffers are read-write by default
-        // TODO: Remove this, it's not the right place
-        if(decl->hasModifier<GLSLBufferModifier>()
-           && !decl->hasModifier<GLSLReadOnlyModifier>())
-            return false;
 
         // The `groupshared` modifier indicates that a variable cannot
         // be a shader parameters, but is instead transient storage
