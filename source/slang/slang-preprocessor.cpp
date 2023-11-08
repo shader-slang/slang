@@ -3649,6 +3649,7 @@ static void HandleVersionDirective(PreprocessorDirectiveContext* context)
         break;
     }
 
+    SkipToEndOfLine(context);
     // TODO, just skip the version for now
 }
 

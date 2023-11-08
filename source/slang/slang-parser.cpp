@@ -82,6 +82,7 @@ namespace Slang
     struct ParserOptions
     {
         bool enableEffectAnnotations = false;
+        bool allowGLSLInput = false;
     };
 
     // TODO: implement two pass parsing for file reference and struct type recognition
@@ -1162,7 +1163,22 @@ namespace Slang
                         AddModifier(&modifierLink, parsedModifier);
                         continue;
                     }
-
+                    else if (parser->options.allowGLSLInput)
+                    {
+                        if (AdvanceIf(parser, "flat"))
+                        {
+                            parsedModifier = parser->astBuilder->create<HLSLNoInterpolationModifier>();
+                            parsedModifier->keywordName = nameToken.getName();
+                            parsedModifier->loc = nameToken.loc;
+                            AddModifier(&modifierLink, parsedModifier);
+                            continue;
+                        }
+                        else if (AdvanceIf(parser, "highp") || AdvanceIf(parser, "lowp") || AdvanceIf(parser, "mediump"))
+                        {
+                            // Skip glsl precision modifiers.
+                            continue;
+                        }
+                    }
                     // If there was no match for a modifier keyword, then we
                     // must be at the end of the modifier sequence
                     return modifiers;
@@ -4043,6 +4059,21 @@ namespace Slang
         return nullptr;
     }
 
+    static bool parseGLSLGlobalDecl(Parser* parser, ContainerDecl* containerDecl)
+    {
+        SLANG_UNUSED(containerDecl);
+
+        if (AdvanceIf(parser, "precision"))
+        {
+            // skip global precision declarations.
+            parser->ReadToken();
+            parser->ReadToken();
+            parser->ReadToken(TokenType::Semicolon);
+            return true;
+        }
+
+        return false;
+    }
 
     static void parseDecls(
         Parser*             parser,
@@ -4052,6 +4083,11 @@ namespace Slang
         Token closingBraceToken;
         while (!AdvanceIfMatch(parser, matchType, &closingBraceToken))
         {
+            if (parser->options.allowGLSLInput)
+            {
+                if (parseGLSLGlobalDecl(parser, containerDecl))
+                    continue;
+            }
             ParseDecl(parser, containerDecl);
         }
         containerDecl->closingSourceLoc = closingBraceToken.loc;
@@ -6776,6 +6812,7 @@ namespace Slang
     {
         ParserOptions options = {};
         options.enableEffectAnnotations = translationUnit->compileRequest->getLinkage()->getEnableEffectAnnotations();
+        options.allowGLSLInput = translationUnit->compileRequest->m_allowGLSLInput;
 
         Parser parser(astBuilder, tokens, sink, outerScope, options);
         parser.namePool = translationUnit->getNamePool();
@@ -6958,7 +6995,6 @@ namespace Slang
         return modifier;
     }
 
-
     static SlangResult parseSemanticVersion(Parser* parser, Token& outToken, SemanticVersion& outVersion)
     {
         parser->ReadToken(TokenType::LParent);
@@ -7015,7 +7051,7 @@ namespace Slang
         parser->sink->diagnose(token, Diagnostics::invalidCUDASMVersion);
         return nullptr;
     }
-
+    
     static NodeBase* parseLayoutModifier(Parser* parser, void* /*userData*/)
     {
         ModifierListBuilder listBuilder;

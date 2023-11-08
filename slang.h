@@ -4264,6 +4264,7 @@ namespace slang
         ISlangFileSystem* fileSystem = nullptr;
 
         bool enableEffectAnnotations = false;
+        bool allowGLSLSyntax = false;
     };
 
     enum class ContainerType

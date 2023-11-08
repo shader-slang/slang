@@ -2157,7 +2157,7 @@ SlangResult OptionsParser::_parse(
                 m_compileRequest->setEnableEffectAnnotations(true);
                 break;
             }
-            
+
             case OptionKind::EntryPointName:
             {
                 CommandLineArg name;
