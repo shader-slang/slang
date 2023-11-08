@@ -765,6 +765,12 @@ class DisableArrayFlatteningAttribute : public Attribute
     SLANG_AST_CLASS(DisableArrayFlatteningAttribute);
 };
 
+// A GLSL layout(local_size_x = 64, ... attribute)
+class GLSLLayoutLocalSizeAttribute : public Attribute
+{
+    SLANG_AST_CLASS(GLSLLayoutLocalSizeAttribute)
+};
+
 // TODO: for attributes that take arguments, the syntax node
 // classes should provide accessors for the values of those arguments.
 

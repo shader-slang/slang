@@ -7020,7 +7020,7 @@ namespace Slang
     {
         ModifierListBuilder listBuilder;
 
-        UncheckedAttribute* numThreadsAttrib = nullptr;
+        GLSLLayoutLocalSizeAttribute* numThreadsAttrib = nullptr;
 
         listBuilder.add(parser->astBuilder->create<GLSLLayoutModifierGroupBegin>());
         
@@ -7043,13 +7043,12 @@ namespace Slang
             {
                 if (!numThreadsAttrib)
                 {
-                    numThreadsAttrib = parser->astBuilder->create<UncheckedAttribute>();
+                    numThreadsAttrib = parser->astBuilder->create<GLSLLayoutLocalSizeAttribute>();
                     numThreadsAttrib->args.setCount(3);
 
                     // Just mark the loc and name from the first in the list
                     numThreadsAttrib->keywordName = getName(parser, "numthreads");
                     numThreadsAttrib->loc = nameAndLoc.loc;
-                    numThreadsAttrib->scope = parser->currentScope;
                 }
 
                 if (AdvanceIf(parser, TokenType::OpAssign))
