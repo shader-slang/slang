@@ -64,6 +64,7 @@
 #include "slang-ir-wrap-structured-buffers.h"
 #include "slang-ir-liveness.h"
 #include "slang-ir-glsl-liveness.h"
+#include "slang-ir-translate-glsl-global-var.h"
 #include "slang-ir-legalize-uniform-buffer-load.h"
 #include "slang-ir-lower-buffer-element-type.h"
 #include "slang-ir-string-hash.h"
@@ -231,12 +232,15 @@ Result linkAndOptimizeIR(
     dumpIRIfEnabled(codeGenContext, irModule, "LINKED");
 #endif
 
+
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
     // If the user specified the flag that they want us to dump
     // IR, then do it here, for the target-specific, but
     // un-specialized IR.
     dumpIRIfEnabled(codeGenContext, irModule);
+
+    translateGLSLGlobalVar(codeGenContext, irModule);
 
     // Replace any global constants with their values.
     //

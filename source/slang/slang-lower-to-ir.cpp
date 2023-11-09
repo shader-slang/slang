@@ -30,7 +30,6 @@
 #include "slang-ir-obfuscate-loc.h"
 #include "slang-ir-use-uninitialized-out-param.h"
 #include "slang-ir-peephole.h"
-
 #include "slang-mangle.h"
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
@@ -2155,7 +2154,14 @@ void addVarDecorations(
         {
             builder->addSimpleDecoration<IRHLSLMeshPayloadDecoration>(inst);
         }
-
+        else if (as<OutModifier>(mod))
+        {
+            builder->addSimpleDecoration<IRGlobalOutputDecoration>(inst);
+        }
+        else if (as<InModifier>(mod))
+        {
+            builder->addSimpleDecoration<IRGlobalInputDecoration>(inst);
+        }
         // TODO: what are other modifiers we need to propagate through?
     }
     if(auto t = composeGetters<IRMeshOutputType>(inst->getFullType(), &IROutTypeBase::getValueType))
