@@ -732,6 +732,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
   <ItemGroup>
     <None Include="..\..\..\source\slang\core.meta.slang" />
     <None Include="..\..\..\source\slang\diff.meta.slang" />
+    <None Include="..\..\..\source\slang\glsl.meta.slang" />
     <None Include="..\..\..\source\slang\hlsl.meta.slang" />
     <None Include="..\..\..\source\slang\slang.natjmc" />
   </ItemGroup>

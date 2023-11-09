@@ -1220,6 +1220,22 @@ namespace Slang
                     varDecl->type.type = m_astBuilder->getConstantBufferType(varDecl->type);
                 }
             }
+
+            if (getLinkage()->getAllowGLSLInput())
+            {
+                // If we are in GLSL compatiblity mode, we want to treat all global variables
+                // without any `uniform` modifiers as true global variables by default.
+                if (!varDecl->findModifier<HLSLUniformModifier>() &&
+                    !varDecl->findModifier<InModifier>() &&
+                    !varDecl->findModifier<OutModifier>())
+                {
+                    if (!as<ResourceType>(varDecl->type) && !as<PointerLikeType>(varDecl->type))
+                    {
+                        auto staticModifier = m_astBuilder->create<HLSLStaticModifier>();
+                        addModifier(varDecl, staticModifier);
+                    }
+                }
+            }
         }
     }
 

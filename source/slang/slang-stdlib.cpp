@@ -335,4 +335,16 @@ namespace Slang
 #endif
         return autodiffLibraryCode;
     }
+
+    ComPtr<ISlangBlob> Session::getGLSLLibraryCode()
+    {
+        if (!glslLibraryCode)
+        {
+            const String path = getStdlibPath();
+            StringBuilder sb;
+#include "glsl.meta.slang.h"
+            glslLibraryCode = StringBlob::moveCreate(sb);
+        }
+        return glslLibraryCode;
+    }
 }

@@ -2993,12 +2993,9 @@ namespace Slang
         reflectionNameModifier->nameAndLoc = NameLoc(reflectionNameToken);
         addModifier(bufferVarDecl, reflectionNameModifier);
 
-        // Both the buffer variable and its type need to have names generated
-        bufferVarDecl->nameAndLoc.name = generateName(parser, "parameterGroup_" + String(reflectionNameToken.getContent()));
+        // The parameter group type need to have its name generated.
         bufferDataTypeDecl->nameAndLoc.name = generateName(parser, "ParameterGroup_" + String(reflectionNameToken.getContent()));
 
-        addModifier(bufferDataTypeDecl, parser->astBuilder->create<ImplicitParameterGroupElementTypeModifier>());
-        addModifier(bufferVarDecl, parser->astBuilder->create<ImplicitParameterGroupVariableModifier>());
 
         // TODO(tfoley): We end up constructing unchecked syntax here that
         // is expected to type check into the right form, but it might be
@@ -3036,12 +3033,28 @@ namespace Slang
         // The declarations in the body belong to the data type.
         parseDeclBody(parser, bufferDataTypeDecl);
 
-        // All HLSL buffer declarations are "transparent" in that their
-        // members are implicitly made visible in the parent scope.
-        // We achieve this by applying the transparent modifier to the variable.
-        auto transparentModifier = parser->astBuilder->create<TransparentModifier>();
-        transparentModifier->next = bufferVarDecl->modifiers.first;
-        bufferVarDecl->modifiers.first = transparentModifier;
+        if (parser->LookAheadToken(TokenType::Identifier) &&
+            parser->LookAheadToken(TokenType::Semicolon, 1))
+        {
+            // If the user specified an explicit name of the buffer var, use it.
+            bufferVarDecl->nameAndLoc = ParseDeclName(parser);
+            parser->ReadToken(TokenType::Semicolon);
+        }
+        else
+        {
+            // Otherwise, we need to generate a name for the buffer variable.
+            bufferVarDecl->nameAndLoc.name = generateName(parser, "parameterGroup_" + String(reflectionNameToken.getContent()));
+
+            // We also need to make the declaration "transparent" so that their
+            // members are implicitly made visible in the parent scope.
+            // We achieve this by applying the transparent modifier to the variable.
+            auto transparentModifier = parser->astBuilder->create<TransparentModifier>();
+            transparentModifier->next = bufferVarDecl->modifiers.first;
+            bufferVarDecl->modifiers.first = transparentModifier;
+
+            addModifier(bufferVarDecl, parser->astBuilder->create<ImplicitParameterGroupVariableModifier>());
+            addModifier(bufferDataTypeDecl, parser->astBuilder->create<ImplicitParameterGroupElementTypeModifier>());
+        }
 
         // Because we are constructing two declarations, we have a thorny
         // issue that were are only supposed to return one.
@@ -4071,7 +4084,35 @@ namespace Slang
             parser->ReadToken(TokenType::Semicolon);
             return true;
         }
+        
+        Modifier* layoutModifier = nullptr;
+        if (parser->LookAheadToken("layout"))
+        {
+            tryParseUsingSyntaxDecl<Modifier>(parser, &layoutModifier);
+        }
 
+        DeclBase* decl = nullptr;
+        if (parser->LookAheadToken("uniform", 0) &&
+            (parser->LookAheadToken(TokenType::LBrace, 1) || 
+                parser->LookAheadToken(TokenType::Identifier, 1) &&
+                parser->LookAheadToken(TokenType::LBrace, 2)))
+        {
+            parser->ReadToken();
+            decl = as<Decl>(parseHLSLCBufferDecl(parser, containerDecl));
+            if (decl)
+                AddMember(parser->currentScope, (Decl*)decl);
+        }
+        else if (layoutModifier)
+        {
+            decl = ParseDecl(parser, containerDecl);
+        }
+
+        if (decl)
+        {
+            layoutModifier->next = decl->modifiers.first;
+            decl->modifiers.first = layoutModifier;
+            return true;
+        }
         return false;
     }
 
@@ -4132,6 +4173,18 @@ namespace Slang
         if(!program->loc.isValid())
         {
             program->loc = tokenReader.peekLoc();
+        }
+
+        if (options.allowGLSLInput)
+        {
+            auto glslName = getName(this, "glsl");
+            if (program->nameAndLoc.name != glslName)
+            {
+                auto importDecl = astBuilder->create<ImportDecl>();
+                importDecl->moduleNameAndLoc.name = glslName;
+                importDecl->scope = currentScope;
+                AddMember(currentScope, importDecl);
+            }
         }
 
         parseDecls(this, program, MatchedTokenType::File);
@@ -6812,7 +6865,7 @@ namespace Slang
     {
         ParserOptions options = {};
         options.enableEffectAnnotations = translationUnit->compileRequest->getLinkage()->getEnableEffectAnnotations();
-        options.allowGLSLInput = translationUnit->compileRequest->m_allowGLSLInput;
+        options.allowGLSLInput = translationUnit->compileRequest->getLinkage()->getAllowGLSLInput();
 
         Parser parser(astBuilder, tokens, sink, outerScope, options);
         parser.namePool = translationUnit->getNamePool();

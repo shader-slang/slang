@@ -1812,6 +1812,14 @@ namespace Slang
         {
             m_enableEffectAnnotations = value;
         }
+        bool getAllowGLSLInput()
+        {
+            return m_allowGLSLInput;
+        }
+        void setAllowGLSLInput(bool value)
+        {
+            m_allowGLSLInput = value;
+        }
 
         // Information on the targets we are being asked to
         // generate code for.
@@ -1972,6 +1980,7 @@ namespace Slang
         bool m_requireCacheFileSystem = false;
         bool m_useFalcorCustomSharedKeywordSemantics = false;
         bool m_enableEffectAnnotations = false;
+        bool m_allowGLSLInput = false;
 
         // Modules that have been read in with the -r option
         List<ComPtr<IArtifact>> m_libModules;
@@ -2133,8 +2142,6 @@ namespace Slang
 
         // Definitions to provide during preprocessing
         Dictionary<String, String> preprocessorDefinitions;
-
-        bool m_allowGLSLInput = false;
 
         void parseTranslationUnit(
             TranslationUnitRequest* translationUnit);
@@ -3058,7 +3065,7 @@ namespace Slang
         ComPtr<ISlangBlob> coreLibraryCode;
         //ComPtr<ISlangBlob> slangLibraryCode;
         ComPtr<ISlangBlob> hlslLibraryCode;
-        //ComPtr<ISlangBlob> glslLibraryCode;
+        ComPtr<ISlangBlob> glslLibraryCode;
         ComPtr<ISlangBlob> autodiffLibraryCode;
 
         String  getStdlibPath();
@@ -3066,6 +3073,7 @@ namespace Slang
         ComPtr<ISlangBlob> getCoreLibraryCode();
         ComPtr<ISlangBlob> getHLSLLibraryCode();
         ComPtr<ISlangBlob> getAutodiffLibraryCode();
+        ComPtr<ISlangBlob> getGLSLLibraryCode();
 
         RefPtr<SharedASTBuilder> m_sharedASTBuilder;
 
