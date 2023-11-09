@@ -49,9 +49,7 @@ tools/gfx-unit-test/test-tmp-*
 
 # Intermediate source files generated during build process
 /source/slang/slang-generated-*.h
-/source/slang/hlsl.meta.slang.h
-/source/slang/core.meta.slang.h
-/source/slang/diff.meta.slang.h
+/source/slang/*.meta.slang.h
 prelude/*.h.cpp
 /source/slang/cpp.hint
 /source/slang/slang-value-generated.h
