@@ -44,6 +44,7 @@ struct TextureTypeInfo
         BaseTextureShapeInfo const& base,
         bool isArray,
         bool isMultisample,
+        bool isShadow,
         BaseTextureAccessInfo const& accessInfo,
         StringBuilder& inSB,
         String const& inPath);
@@ -52,6 +53,7 @@ struct TextureTypeInfo
     BaseTextureShapeInfo const& base;
     bool isArray;
     bool isMultisample;
+    bool isShadow;
     BaseTextureAccessInfo const& accessInfo;
     StringBuilder& sb;
     String path;

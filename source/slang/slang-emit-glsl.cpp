@@ -732,6 +732,10 @@ void GLSLSourceEmitter::_emitGLSLTextureOrTextureSamplerType(IRTextureTypeBase* 
     {
         m_writer->emit("Array");
     }
+    if (type->isShadow())
+    {
+        m_writer->emit("Shadow");
+    }
 }
 
 void GLSLSourceEmitter::_emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloat)

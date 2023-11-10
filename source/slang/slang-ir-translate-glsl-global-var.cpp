@@ -15,12 +15,29 @@ namespace Slang
             List<IRInst*> outputVars;
             List<IRInst*> inputVars;
             List<IRInst*> entryPoints;
+            auto _add = [](List<IRInst*>& list, IRInst* inst)
+                {
+                    bool hasNonTrivialUse = false;
+                    for (auto use = inst->firstUse; use; use = use->nextUse)
+                    {
+                        if (as<IRAttr>(use->getUser()))
+                            continue;
+                        if (as<IRDecoration>(use->getUser()))
+                            continue;
+                        hasNonTrivialUse = true;
+                        break;
+                    }
+                    if (hasNonTrivialUse)
+                    {
+                        list.add(inst);
+                    }
+                };
             for (auto inst : module->getGlobalInsts())
             {
                 if (inst->findDecoration<IRGlobalOutputDecoration>())
-                    outputVars.add(inst);
+                    _add(outputVars, inst);
                 if (inst->findDecoration<IRGlobalInputDecoration>())
-                    inputVars.add(inst);
+                    _add(inputVars, inst);
                 if (inst->findDecoration<IREntryPointDecoration>())
                     entryPoints.add(inst);
             }
@@ -28,28 +45,6 @@ namespace Slang
             IRBuilder builder(module);
             Dictionary<IRInst*, IRInst*> mapInputToGlobalVar;
 
-            // For each input parameter, create a global var to represent it.
-            // Replace all uses of the input with a `load` of the global var.
-            for (auto input : inputVars)
-            {
-                // Introduce a global var for the parameter.
-                auto type = input->getDataType();
-                builder.setInsertBefore(input);
-                auto globalVar = builder.createGlobalVar(type);
-                mapInputToGlobalVar.add(input, globalVar);
-
-                // Replace all uses of the input with a `load` of the global var.
-                traverseUses(input, [&](IRUse* use)
-                    {
-                        if (as<IRAttr>(use->getUser()))
-                            return;
-                        if (as<IRDecoration>(use->getUser()))
-                            return;
-                        builder.setInsertBefore(use->getUser());
-                        auto load = builder.emitLoad(globalVar);
-                        builder.replaceOperand(use, load);
-                    });
-            }
 
             bool hasInput = inputVars.getCount() != 0;
             bool hasOutput = outputVars.getCount() != 0;
@@ -77,7 +72,7 @@ namespace Slang
                 List<IRStructKey*> inputKeys;
                 for (auto input : inputVars)
                 {
-                    auto inputType = input->getDataType();
+                    auto inputType = cast<IRPtrTypeBase>(input->getDataType())->getValueType();
                     auto key = builder.createStructKey();
                     inputKeys.add(key);
                     if (auto nameHint = input->findDecoration<IRNameHintDecoration>())
@@ -124,10 +119,10 @@ namespace Slang
                 for (Index i = 0; i < inputVars.getCount(); i++)
                 {
                     auto input = inputVars[i];
-                    auto globalVar = mapInputToGlobalVar[input];
                     setInsertBeforeOrdinaryInst(&builder, firstBlock->getFirstOrdinaryInst());
-                    builder.emitStore(globalVar,
-                        builder.emitFieldExtract(input->getDataType(), inputParam, inputKeys[i]));
+                    auto inputType = cast<IRPtrTypeBase>(input->getDataType())->getValueType();
+                    builder.emitStore(input,
+                        builder.emitFieldExtract(inputType, inputParam, inputKeys[i]));
                 }
 
                 // For each entry point, introduce a new parameter to represent each input parameter,
@@ -225,6 +220,7 @@ namespace Slang
 
     void translateGLSLGlobalVar(CodeGenContext* context, IRModule* module)
     {
+        
         GlobalVarTranslationContext ctx;
         ctx.context = context;
         ctx.processModule(module);

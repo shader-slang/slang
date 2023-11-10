@@ -392,6 +392,7 @@ namespace Slang
         // While not normally allowed, out variables are not constant
         // parameters, this can happen for example in GLSL mode
         if(decl->hasModifier<OutModifier>()) return false;
+        if(decl->hasModifier<InModifier>()) return false;
 
         // The `groupshared` modifier indicates that a variable cannot
         // be a shader parameters, but is instead transient storage

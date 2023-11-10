@@ -1293,9 +1293,14 @@ for(auto& prefixInfo : kTexturePrefixes)
 for(auto& shapeInfo : kBaseTextureShapes)
 for(int isArray = 0; isArray < 2; ++isArray)
 for(int isMultisample = 0; isMultisample < 2; ++isMultisample)
+for(int isShadow = 0; isShadow < 2; ++isShadow)
 for(auto& accessInfo : kBaseTextureAccessLevels)
 {
-    TextureTypeInfo info(prefixInfo, shapeInfo, isArray, isMultisample, accessInfo, sb, path);
+    // Define `Shadow` flavored types only for combined texture-samplers.
+    if (!prefixInfo.combined && isShadow == 1)
+        continue;
+
+    TextureTypeInfo info(prefixInfo, shapeInfo, isArray, isMultisample, isShadow, accessInfo, sb, path);
     info.emitTypeDecl();
 }
 

@@ -1378,6 +1378,7 @@ struct IRResourceTypeBase : IRType
     bool isFeedback() const { return getFlavor().isFeedback(); }
     bool isMultisample() const { return getFlavor().isMultisample(); }
     bool isArray() const { return getFlavor().isArray(); }
+    bool isShadow() const { return getFlavor().isShadow(); }
     SlangResourceShape getShape() const { return getFlavor().getShape(); }
     SlangResourceAccess getAccess() const { return getFlavor().getAccess(); }
 
