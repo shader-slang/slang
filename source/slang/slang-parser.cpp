@@ -2453,8 +2453,6 @@ namespace Slang
             typeSpec.expr = createDeclRefType(parser, decl);
             return typeSpec;
         }
-        // TODO: Only consider this branch if we've seen a interface-block
-        // compatible modifier, and are in GLSL mode
         else if( mightBeGLSLInterfaceBlock
                 && parser->LookAheadToken(TokenType::Identifier)
                 && parser->LookAheadToken(TokenType::LBrace,1) )
@@ -2521,9 +2519,17 @@ namespace Slang
         return typeSpec;
     }
 
-    static bool hasPotentialGLSLInterfaceBlockModifier(Modifiers& mods)
+    static bool hasPotentialGLSLInterfaceBlockModifier(Parser* parser, Modifiers& mods)
     {
-        return mods.hasModifier<GLSLBufferModifier>();
+        if (!parser->options.allowGLSLInput)
+            return false;
+
+        for (auto mod : mods)
+        {
+            if (as<GLSLBufferModifier>(mod) || as<InModifier>(mod) || as<OutModifier>(mod))
+                return true;
+        }
+        return false;
     }
 
         /// Parse a type specifier, following the given list of modifiers.
@@ -2534,7 +2540,7 @@ namespace Slang
         ///
     static TypeSpec _parseTypeSpec(Parser* parser, Modifiers& ioModifiers)
     {
-        TypeSpec typeSpec = _parseSimpleTypeSpec(parser, hasPotentialGLSLInterfaceBlockModifier(ioModifiers));
+        TypeSpec typeSpec = _parseSimpleTypeSpec(parser, hasPotentialGLSLInterfaceBlockModifier(parser, ioModifiers));
 
         // We don't know whether `ioModifiers` has any modifiers in it,
         // or which of them might be type modifiers, so we will delegate
@@ -2559,7 +2565,7 @@ namespace Slang
     static TypeSpec _parseTypeSpec(Parser* parser)
     {
         Modifiers modifiers = ParseModifiers(parser);
-        TypeSpec typeSpec = _parseSimpleTypeSpec(parser, hasPotentialGLSLInterfaceBlockModifier(modifiers));
+        TypeSpec typeSpec = _parseSimpleTypeSpec(parser, hasPotentialGLSLInterfaceBlockModifier(parser, modifiers));
 
         typeSpec = _applyModifiersToTypeSpec(parser, typeSpec, modifiers);
 
@@ -6825,7 +6831,7 @@ namespace Slang
             // If there are any modifiers, then we know that we are actually
             // in the type case.
             //
-            auto typeSpec = _parseSimpleTypeSpec(parser, hasPotentialGLSLInterfaceBlockModifier(modifiers));
+            auto typeSpec = _parseSimpleTypeSpec(parser, false);
             typeSpec = _applyModifiersToTypeSpec(parser, typeSpec, modifiers);
 
             auto typeExpr = typeSpec.expr;

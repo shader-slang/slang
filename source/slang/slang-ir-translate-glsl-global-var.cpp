@@ -15,36 +15,17 @@ namespace Slang
             List<IRInst*> outputVars;
             List<IRInst*> inputVars;
             List<IRInst*> entryPoints;
-            auto _add = [](List<IRInst*>& list, IRInst* inst)
-                {
-                    bool hasNonTrivialUse = false;
-                    for (auto use = inst->firstUse; use; use = use->nextUse)
-                    {
-                        if (as<IRAttr>(use->getUser()))
-                            continue;
-                        if (as<IRDecoration>(use->getUser()))
-                            continue;
-                        hasNonTrivialUse = true;
-                        break;
-                    }
-                    if (hasNonTrivialUse)
-                    {
-                        list.add(inst);
-                    }
-                };
             for (auto inst : module->getGlobalInsts())
             {
                 if (inst->findDecoration<IRGlobalOutputDecoration>())
-                    _add(outputVars, inst);
+                    outputVars.add(inst);
                 if (inst->findDecoration<IRGlobalInputDecoration>())
-                    _add(inputVars, inst);
+                    inputVars.add(inst);
                 if (inst->findDecoration<IREntryPointDecoration>())
                     entryPoints.add(inst);
             }
 
             IRBuilder builder(module);
-            Dictionary<IRInst*, IRInst*> mapInputToGlobalVar;
-
 
             bool hasInput = inputVars.getCount() != 0;
             bool hasOutput = outputVars.getCount() != 0;
@@ -159,7 +140,7 @@ namespace Slang
                         {
                             if (auto locationDecoration = output->findDecoration<IRGLSLLocationDecoration>())
                             {
-                                varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::VaryingInput)->offset = (UInt)getIntVal(locationDecoration->getLocation());
+                                varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::VaryingOutput)->offset = (UInt)getIntVal(locationDecoration->getLocation());
                             }
                             if (entryPointDecor->getProfile().getStage() == Stage::Fragment)
                             {

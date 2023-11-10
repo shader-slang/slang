@@ -1991,13 +1991,25 @@ namespace Slang
                 typeCheckingCache->resolvedOperatorOverloadCache[key] = *context.bestCandidate;
             return CompleteOverloadCandidate(context, *context.bestCandidate);
         }
-        else
+        else if (auto typetype = as<TypeType>(funcExprType))
         {
-            // Nothing at all was found that we could even consider invoking
-            getSink()->diagnose(expr->functionExpr, Diagnostics::expectedFunction, funcExprType);
-            expr->type = QualType(m_astBuilder->getErrorType());
-            return expr;
+            // We allow a special case when `funcExpr` represents a composite type,
+            // in which case we will try to construct the type via memberwise assignment from the arguments.
+            //
+            auto initListExpr = m_astBuilder->create<InitializerListExpr>();
+            initListExpr->loc = expr->loc;
+            initListExpr->args.addRange(expr->arguments);
+            initListExpr->type = m_astBuilder->getInitializerListType();
+            Expr* outExpr = nullptr;
+            if (_coerceInitializerList(typetype->getType(), &outExpr, initListExpr))
+                return outExpr;
         }
+
+        // Nothing at all was found that we could even consider invoking.
+        // In all other cases, this is an error.
+        getSink()->diagnose(expr->functionExpr, Diagnostics::expectedFunction, funcExprType);
+        expr->type = QualType(m_astBuilder->getErrorType());
+        return expr;
     }
 
     void SemanticsVisitor::AddGenericOverloadCandidate(

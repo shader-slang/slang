@@ -8039,6 +8039,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             irAggType = subBuilder->createClassType();
         }
+        else if (as<GLSLInterfaceBlockDecl>(decl))
+        {
+            return LoweredValInfo();
+        }
         else
         {
             getSink()->diagnose(decl->loc, Diagnostics::unimplemented, "lower unknown AggType to IR");
