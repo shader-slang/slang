@@ -317,7 +317,7 @@ struct PeepholeContext : InstPassBase
             }
             else
             {
-                changed = tryFoldElementExtractFromUpdateInst(inst);
+                changed |= tryFoldElementExtractFromUpdateInst(inst);
             }
             break;
         case kIROp_GetElement:
@@ -382,7 +382,7 @@ struct PeepholeContext : InstPassBase
             }
             else
             {
-                changed = tryFoldElementExtractFromUpdateInst(inst);
+                changed |= tryFoldElementExtractFromUpdateInst(inst);
             }
             break;
         case kIROp_UpdateElement:
@@ -806,7 +806,7 @@ struct PeepholeContext : InstPassBase
         case kIROp_Div:
         case kIROp_And:
         case kIROp_Or:
-            changed = tryOptimizeArithmeticInst(inst);
+            changed |= tryOptimizeArithmeticInst(inst);
             break;
         case kIROp_Param:
             {

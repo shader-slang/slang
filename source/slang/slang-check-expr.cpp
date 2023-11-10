@@ -2247,11 +2247,15 @@ namespace Slang
     {
         // check the base expression first
         expr->functionExpr = CheckTerm(expr->functionExpr);
+
+        auto treatAsDifferentiableExpr = m_treatAsDifferentiableExpr;
+        m_treatAsDifferentiableExpr = nullptr;
         // Next check the argument expressions
         for (auto & arg : expr->arguments)
         {
             arg = CheckTerm(arg);
         }
+        m_treatAsDifferentiableExpr = treatAsDifferentiableExpr;
 
         // If we are in a differentiable function, register differential witness tables involved in
         // this call.

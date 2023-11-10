@@ -19,7 +19,7 @@ RWStructuredBuffer<int> outputBuffer;
 // A standard loop
 // CHECK-LABEL: int a_{{.*}}()
 // CHECK-NOT: break;
-// CHECK: int j_{{.*}} = j_{{.*}} + [[i:i_[0-9]+]]
+// CHECK: int {{.*}} = j_{{.*}} + [[i:i_[0-9]+]]
 // CHECK: [[i]] + int(1);
 // CHECK: if(
 // CHECK: break;
@@ -35,7 +35,7 @@ int a()
 // A vanilla while loop
 // CHECK-LABEL: int b_{{.*}}()
 // CHECK-NOT: break;
-// CHECK: int j_{{.*}} = j_{{.*}} + [[i:i_[0-9]+]]
+// CHECK: int {{.*}} = j_{{.*}} + [[i:i_[0-9]+]]
 // CHECK: [[i]] + int(1);
 // CHECK: if(
 // CHECK: break;
@@ -55,7 +55,7 @@ int b()
 // A while loop with a break on the false branch
 // CHECK-LABEL: int c_{{.*}}()
 // CHECK-NOT: break;
-// CHECK: int j_{{.*}} = j_{{.*}} + [[i:i_[0-9]+]]
+// CHECK: int {{.*}} = j_{{.*}} + [[i:i_[0-9]+]]
 // CHECK: [[i]] + int(1);
 // CHECK: if(
 // CHECK: break;
@@ -79,7 +79,7 @@ int c()
 // A while loop with a break on the true branch
 // CHECK-LABEL: int d_{{.*}}()
 // CHECK-NOT: break;
-// CHECK: int j_{{.*}} = j_{{.*}} + [[i:i_[0-9]+]]
+// CHECK: int {{.*}} = j_{{.*}} + [[i:i_[0-9]+]]
 // CHECK: [[i]] + int(1);
 // CHECK: if(
 // CHECK: break;

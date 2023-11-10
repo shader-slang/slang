@@ -1,7 +1,7 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type
 
-T sum<T:__BuiltinArithmeticType>(IArray<T> array)
+T sum<T:IFloat>(IArray<T> array)
 {
     T result = T(0);
     for (int i = 0; i < array.getCount(); i++)
@@ -10,15 +10,7 @@ T sum<T:__BuiltinArithmeticType>(IArray<T> array)
     }
     return result;
 }
-vector<T,N> sum<T:__BuiltinArithmeticType, let N:int>(IArray<vector<T,N>> array)
-{
-    vector<T,N> result = vector<T,N>(T(0));
-    for (int i = 0; i < array.getCount(); i++)
-    {
-        result = result + array[i];
-    }
-    return result;
-}
+
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 

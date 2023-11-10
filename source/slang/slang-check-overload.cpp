@@ -1070,6 +1070,15 @@ namespace Slang
         return 0;
     }
 
+    int getOverloadRank(DeclRef<Decl> declRef)
+    {
+        if (!declRef.getDecl())
+            return 0;
+        if (auto attr = declRef.getDecl()->findModifier<OverloadRankAttribute>())
+            return attr->rank;
+        return 0;
+    }
+
     int SemanticsVisitor::CompareOverloadCandidates(
         OverloadCandidate*	left,
         OverloadCandidate*	right)
@@ -1142,6 +1151,11 @@ namespace Slang
             auto specificityDiff = compareOverloadCandidateSpecificity(left->item, right->item);
             if(specificityDiff)
                 return specificityDiff;
+
+            // If we reach here, we will attempt to use overload rank to break the ties.
+            auto overloadRankDiff = getOverloadRank(right->item.declRef) - getOverloadRank(left->item.declRef);
+            if (overloadRankDiff)
+                return overloadRankDiff;
         }
 
         return 0;
