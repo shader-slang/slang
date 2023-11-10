@@ -51,7 +51,11 @@ namespace Slang
                     });
             }
 
+            bool hasInput = inputVars.getCount() != 0;
             bool hasOutput = outputVars.getCount() != 0;
+
+            if (!hasInput && !hasOutput)
+                return;
 
             for (auto entryPoint : entryPoints)
             {
