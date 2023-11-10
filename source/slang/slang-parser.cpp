@@ -1173,11 +1173,6 @@ namespace Slang
                             AddModifier(&modifierLink, parsedModifier);
                             continue;
                         }
-                        else if (AdvanceIf(parser, "highp") || AdvanceIf(parser, "lowp") || AdvanceIf(parser, "mediump"))
-                        {
-                            // Skip glsl precision modifiers.
-                            continue;
-                        }
                     }
                     // If there was no match for a modifier keyword, then we
                     // must be at the end of the modifier sequence
@@ -4969,9 +4964,10 @@ namespace Slang
         FillPosition(stmt);
         ReadToken("for");
         ReadToken(TokenType::LParent);
-        if (peekTypeName(this))
+        auto modifiers = ParseModifiers(this);
+        if (peekTypeName(this) || !modifiers.isEmpty())
         {
-            stmt->initialStatement = parseVarDeclrStatement(Modifiers());
+            stmt->initialStatement = parseVarDeclrStatement(modifiers);
         }
         else
         {
@@ -7399,6 +7395,9 @@ namespace Slang
         _makeParseModifier("const",         ConstModifier::kReflectClassInfo),
         _makeParseModifier("instance",      InstanceModifier::kReflectClassInfo),
         _makeParseModifier("__builtin",     BuiltinModifier::kReflectClassInfo),
+        _makeParseModifier("highp",         GLSLPrecisionModifier::kReflectClassInfo),
+        _makeParseModifier("lowp",          GLSLPrecisionModifier::kReflectClassInfo),
+        _makeParseModifier("mediump",       GLSLPrecisionModifier::kReflectClassInfo),
 
         _makeParseModifier("__global",      ActualGlobalModifier::kReflectClassInfo),
 
