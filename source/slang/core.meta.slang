@@ -74,6 +74,91 @@ syntax snorm : SNormModifier;
 ///
 syntax __extern_cpp : ExternCppModifier;
 
+interface IComparable
+{
+    bool equals(This other);
+    bool lessThan(This other);
+    bool lessThanOrEquals(This other);
+}
+
+interface IRangedValue
+{
+    static const This maxValue;
+    static const This minValue;
+}
+
+__attributeTarget(DeclBase)
+attribute_syntax [TreatAsDifferentiable] : TreatAsDifferentiableAttribute;
+
+interface IArithmetic : IComparable
+{
+    This add(This other);
+    This sub(This other);
+    This mul(This other);
+    This div(This other);
+    This mod(This other);
+    This neg();
+
+    __init(int val);
+
+        /// Initialize from the same type.
+    __init(This value);
+}
+
+interface ILogical : IComparable
+{
+    This shl(int value);
+    This shr(int value);
+    This bitAnd(This other);
+    This bitOr(This other);
+    This bitXor(This other);
+    This bitNot();
+    This and(This other);
+    This or(This other);
+    This not();
+    __init(int val);
+}
+
+interface IInteger : IArithmetic, ILogical
+{
+    int toInt();
+    int64_t toInt64();
+    uint toUInt();
+    uint64_t toUInt64();
+}
+
+interface IFloat : IArithmetic, IDifferentiable
+{
+    [TreatAsDifferentiable]
+    __init(float value);
+
+    [TreatAsDifferentiable]
+    float toFloat();
+
+    [TreatAsDifferentiable]
+    This add(This other);
+
+    [TreatAsDifferentiable]
+    This sub(This other);
+
+    [TreatAsDifferentiable]
+    This mul(This other);
+
+    [TreatAsDifferentiable]
+    This div(This other);
+
+    [TreatAsDifferentiable]
+    This mod(This other);
+
+    [TreatAsDifferentiable]
+    This neg();
+
+    [TreatAsDifferentiable]
+    __init(This value);
+
+    [TreatAsDifferentiable]
+    This scale<T:__BuiltinFloatingPointType>(T scale);
+}
 
 /// A type that can be used as an operand for builtins
 [sealed]
@@ -83,22 +168,15 @@ interface __BuiltinType {}
 /// A type that can be used for arithmetic operations
 [sealed]
 [builtin]
-interface __BuiltinArithmeticType : __BuiltinType
+interface __BuiltinArithmeticType : __BuiltinType, IArithmetic
 {
-        /// Initialize from a 32-bit signed integer value.
-    __init(int value);
-
-        /// Initialize from the same type.
-    __init(This value);
 }
 
 /// A type that can be used for logical/bitwise operations
 [sealed]
 [builtin]
-interface __BuiltinLogicalType : __BuiltinType
+interface __BuiltinLogicalType : __BuiltinType, ILogical
 {
-        /// Initialize from a 32-bit signed integer value.
-    __init(int value);
 }
 
 /// A type that logically has a sign (positive/negative/zero)
@@ -243,12 +321,10 @@ struct DifferentialPair : IDifferentiable
 [sealed]
 [builtin]
 [TreatAsDifferentiable]
-interface __BuiltinFloatingPointType : __BuiltinRealType, IDifferentiable
+interface __BuiltinFloatingPointType : __BuiltinRealType, IFloat
 {
-        /// Initialize from a 32-bit floating-point value.
-    __init(float value);
-
         /// Get the value of the mathematical constant pi in this type.
+    [Differentiable]
     static This getPi();
 }
 
@@ -365,7 +441,8 @@ __generic<T, let N : int> __intrinsic_op(select) vector<T,N> select(vector<bool,
 // Allow real-number types to be cast into each other
 __intrinsic_op($(kIROp_FloatCast))
     T __realCast<T : __BuiltinRealType, U : __BuiltinRealType>(U val);
-
+__intrinsic_op($(kIROp_IntCast))
+    T __intCast<T : __BuiltinType, U : __BuiltinType>(U val);
 ${{{{
 // We are going to use code generation to produce the
 // declarations for all of our base types.
@@ -446,8 +523,12 @@ ${{{{
         if (kBaseTypes[tt].tag == BaseType::Double &&
             kBaseTypes[ss].tag == BaseType::Float)
             builtinConversionKind = kBuiltinConversion_FloatToDouble;
-}}}}
 
+        const char* attrib = "";
+        if ((kBaseTypes[tt].flags & kBaseTypes[ss].flags & FLOAT_MASK) != 0)
+            attrib = "[TreatAsDifferentiable]";
+}}}}
+    $(attrib)
     __intrinsic_op($(intrinsicOpCode))
     __implicit_conversion($(conversionCost), $(builtinConversionKind))
     __init($(kBaseTypes[ss].name) value);
@@ -455,23 +536,71 @@ ${{{{
 ${{{{
     }
 
-    // If this is a basic integer type, then define explicit
-    // initializers that take a value of an `enum` type.
-    //
-    // TODO: This should actually be restricted, so that this
-    // only applies `where T.__Tag == Self`, but we don't have
-    // the needed features in our type system to implement
-    // that constraint right now.
-    //
+    // Integer type implementations.
     switch (kBaseTypes[tt].tag)
     {
-        // TODO: should this cover the full gamut of integer types?
-    case BaseType::Int:
-    case BaseType::UInt:
+    case BaseType::Bool:
 }}}}
+        [__unsafeForceInlineEarly] __intrinsic_op($(kIROp_Eql)) bool equals(This other);
+        [__unsafeForceInlineEarly] __intrinsic_op($(kIROp_Less)) bool lessThan(This other);
+        [__unsafeForceInlineEarly] __intrinsic_op($(kIROp_Leq)) bool lessThanOrEquals(This other);
+        [__unsafeForceInlineEarly] This shl(int other) { return __intCast<This>(__shl(__intCast<int>(this), other)); }
+        [__unsafeForceInlineEarly] This shr(int other) { return __intCast<This>(__shr(__intCast<int>(this), other)); }
+        [__unsafeForceInlineEarly] This bitAnd(This other) { return __intCast<This>(__and(__intCast<int>(this), __intCast<int>(other))); }
+        [__unsafeForceInlineEarly] This bitOr(This other) { return __intCast<This>(__or(__intCast<int>(this), __intCast<int>(other))); }
+        [__unsafeForceInlineEarly] __intrinsic_op($(kIROp_And)) This and(This other);
+        [__unsafeForceInlineEarly] __intrinsic_op($(kIROp_Or)) This or(This other);
+        [__unsafeForceInlineEarly] This bitXor(This other)  { return __intCast<This>(__xor(__intCast<int>(this), __intCast<int>(other))); }
+        [__unsafeForceInlineEarly] This bitNot()  { return __intCast<This>(__not(__intCast<int>(this))); }
+        [__unsafeForceInlineEarly] __intrinsic_op($(kIROp_Not)) This not();
+${{{{
+        break;
+    case BaseType::UInt8:
+    case BaseType::UInt16:
+    case BaseType::UInt:
+    case BaseType::UInt64:
+    case BaseType::Int8:
+    case BaseType::Int16:
+    case BaseType::Int:
+    case BaseType::Int64:
+    case BaseType::IntPtr:
+    case BaseType::UIntPtr:
+}}}}
+        // If this is a basic integer type, then define explicit
+        // initializers that take a value of an `enum` type.
+        //
+        // TODO: This should actually be restricted, so that this
+        // only applies `where T.__Tag == Self`, but we don't have
+        // the needed features in our type system to implement
+        // that constraint right now.
+        //
         __generic<T:__EnumType>
         __intrinsic_op($(kIROp_IntCast))
         __init(T value);
+
+        // Implementation of the `IInteger` interface.
+        __intrinsic_op($(kIROp_Less)) bool lessThan(This other);
+        __intrinsic_op($(kIROp_Leq))  bool lessThanOrEquals(This other);
+        __intrinsic_op($(kIROp_Eql))  bool equals(This other);
+        __intrinsic_op($(kIROp_Add))  This add(This other);
+        __intrinsic_op($(kIROp_Sub))  This sub(This other);
+        __intrinsic_op($(kIROp_Mul))  This mul(This other);
+        __intrinsic_op($(kIROp_Div))  This div(This other);
+        __intrinsic_op($(kIROp_FRem)) This mod(This other);
+        __intrinsic_op($(kIROp_Neg))  This neg();
+        __intrinsic_op($(kIROp_Lsh)) This shl(int other);
+        __intrinsic_op($(kIROp_Rsh)) This shr(int other);
+        __intrinsic_op($(kIROp_BitAnd)) This bitAnd(This other);
+        __intrinsic_op($(kIROp_BitOr)) This bitOr(This other);
+        [__unsafeForceInlineEarly] This and(This other) {return __intCast<This>(__intCast<bool>(this) && __intCast<bool>(other)); }
+        [__unsafeForceInlineEarly] This or(This other) {return __intCast<This>(__intCast<bool>(this) || __intCast<bool>(other)); }
+        __intrinsic_op($(kIROp_BitXor)) This bitXor(This other);
+        __intrinsic_op($(kIROp_BitNot)) This bitNot();
+        [__unsafeForceInlineEarly] This not() {return __intCast<This>(!__intCast<bool>(this)); }
+        __intrinsic_op($(kIROp_IntCast)) int toInt();
+        __intrinsic_op($(kIROp_IntCast)) int64_t toInt64();
+        __intrinsic_op($(kIROp_IntCast)) uint toUInt();
+        __intrinsic_op($(kIROp_IntCast)) uint64_t toUInt64();
 ${{{{
         break;
 
@@ -480,8 +609,8 @@ ${{{{
     }
 
     // If this is a floating-point type, then we need to
-    // define the basic `getPi()` function that is used
-    // to implement generic versions of `degrees()` and
+    // implement the `IFloat` interface, which defines the basic `getPi()`
+    // function that is used to implement generic versions of `degrees()` and
     // `radians()`.
     //
     switch (kBaseTypes[tt].tag)
@@ -492,8 +621,20 @@ ${{{{
     case BaseType::Float:
     case BaseType::Double:
 }}}}
+        [TreatAsDifferentiable]
         static $(kBaseTypes[tt].name) getPi() { return $(kBaseTypes[tt].name)(3.14159265358979323846264338328); }
 
+         __intrinsic_op($(kIROp_Less)) bool lessThan(This other);
+         __intrinsic_op($(kIROp_Leq))  bool lessThanOrEquals(This other);
+         __intrinsic_op($(kIROp_Eql))  bool equals(This other);
+         __intrinsic_op($(kIROp_Add))  This add(This other);
+         __intrinsic_op($(kIROp_Sub))  This sub(This other);
+         __intrinsic_op($(kIROp_Mul))  This mul(This other);
+         __intrinsic_op($(kIROp_Div))  This div(This other);
+         __intrinsic_op($(kIROp_FRem)) This mod(This other);
+         __intrinsic_op($(kIROp_Neg))  This neg();
+         __intrinsic_op($(kIROp_FloatCast)) float toFloat();
+         __intrinsic_op($(kIROp_Mul)) This scale<T:__BuiltinFloatingPointType>(T s) { return __mul(this, __realCast<This>(s)); }
         typedef $(kBaseTypes[tt].name) Differential;
     
         [__unsafeForceInlineEarly]
@@ -628,7 +769,7 @@ __generic<T>
 __intrinsic_op($(kIROp_Eql))
 bool operator==(Ptr<T> p1, Ptr<T> p2);
 
-extension bool
+extension bool : IRangedValue
 {
     __generic<T>
     __implicit_conversion($(kConversionCost_PtrToBool))
@@ -639,7 +780,7 @@ extension bool
     static const bool minValue = false;
 }
 
-extension uint64_t
+extension uint64_t : IRangedValue
 {
     __generic<T>
     __intrinsic_op($(kIROp_CastPtrToInt))
@@ -649,7 +790,7 @@ extension uint64_t
     static const uint64_t minValue = 0;
 }
 
-extension int64_t
+extension int64_t : IRangedValue
 {
     __generic<T>
     __intrinsic_op($(kIROp_CastPtrToInt))
@@ -659,7 +800,7 @@ extension int64_t
     static const int64_t minValue = -0x8000000000000000LL;
 }
 
-extension intptr_t
+extension intptr_t : IRangedValue
 {
     __generic<T>
     __intrinsic_op($(kIROp_CastPtrToInt))
@@ -669,7 +810,7 @@ extension intptr_t
     static const int size = $(SLANG_PROCESSOR_X86_64?"8":"4");
 }
 
-extension uintptr_t
+extension uintptr_t : IRangedValue
 {
     __generic<T>
     __intrinsic_op($(kIROp_CastPtrToInt))
@@ -844,56 +985,56 @@ __intrinsic_type($(kIROp_DynamicType))
 struct __Dynamic
 {};
 
-extension half
+extension half : IRangedValue
 {
     static const half maxValue = half(65504);
     static const half minValue = half(-65504);
 }
 
-extension float
+extension float : IRangedValue
 {
     static const float maxValue = 340282346638528859811704183484516925440.0f;
     static const float minValue = -340282346638528859811704183484516925440.0f;
 
 }
 
-extension double
+extension double : IRangedValue
 {
     static const double maxValue = 179769313486231570814527423731704356798070567525844996598917476803157260780028538760589558632766878171540458953514382464234321326889464182768467546703537516986049910576551282076245490090389328944075868508455133942304583236903222948165808559332123348274797826204144723168738177180919299881250404026184124858368.0;
     static const double minValue = -179769313486231570814527423731704356798070567525844996598917476803157260780028538760589558632766878171540458953514382464234321326889464182768467546703537516986049910576551282076245490090389328944075868508455133942304583236903222948165808559332123348274797826204144723168738177180919299881250404026184124858368.0;
 }
 
-extension int
+extension int : IRangedValue
 {
     static const int maxValue = 2147483647;
     static const int minValue = -2147483648;
 }
 
-extension uint
+extension uint : IRangedValue
 {
     static const uint maxValue = 4294967295;
     static const uint minValue = 0;
 }
 
-extension int8_t
+extension int8_t : IRangedValue
 {
     static const int8_t maxValue = 127;
     static const int8_t minValue = -128;
 }
 
-extension uint8_t
+extension uint8_t : IRangedValue
 {
     static const uint8_t maxValue = 255;
     static const uint8_t minValue = 0;
 }
 
-extension uint16_t
+extension uint16_t : IRangedValue
 {
     static const uint16_t maxValue = 65535;
     static const uint16_t minValue = 0;
 }
 
-extension int16_t
+extension int16_t : IRangedValue
 {
     static const int16_t maxValue = 32767;
     static const int16_t minValue = -32768;
@@ -909,13 +1050,15 @@ struct vector : IArray<T>
 
 
         /// Initialize a vector where all elements have the same scalar `value`.
+    [TreatAsDifferentiable]
     __implicit_conversion($(kConversionCost_ScalarToVector))
     __intrinsic_op($(kIROp_MakeVectorFromScalar))
     __init(T value);
 
-        /// Initialize a vector from a value of the same type
+    /// Initialize a vector from a value of the same type
     // TODO: we should revise semantic checking so this kind of "identity" conversion is not required
     __intrinsic_op(0)
+    [TreatAsDifferentiable]
     __init(vector<T,N> value);
 
     [ForceInline]
@@ -933,12 +1076,113 @@ __magic_type(MatrixExpressionType)
 struct matrix : IArray<vector<T,C>>
 {
     __intrinsic_op($(kIROp_MakeMatrixFromScalar))
+    [TreatAsDifferentiable]
     __init(T val);
+
+    /// Initialize a vector from a value of the same type
+    // TODO: we should revise semantic checking so this kind of "identity" conversion is not required
+    __intrinsic_op(0)
+    [TreatAsDifferentiable]
+    __init(This value);
 
     [ForceInline]
     int getCount() { return R; }
 
     __subscript(int index) -> vector<T,C> { __intrinsic_op($(kIROp_GetElement)) get; }
+}
+
+__generic<T:__BuiltinFloatingPointType, let N : int>
+extension vector<T,N> : IFloat
+{
+    [__unsafeForceInlineEarly] bool lessThan(This other) { return this < other; }
+    [__unsafeForceInlineEarly] bool lessThanOrEquals(This other) { return this <= other; }
+    [__unsafeForceInlineEarly] bool equals(This other) { return all(this == other); }
+    __intrinsic_op($(kIROp_Add)) This add(This other);
+    __intrinsic_op($(kIROp_Sub)) This sub(This other);
+    __intrinsic_op($(kIROp_Mul)) This mul(This other);
+    __intrinsic_op($(kIROp_Div)) This div(This other);
+    __intrinsic_op($(kIROp_FRem)) This mod(This other);
+    __intrinsic_op($(kIROp_Neg)) This neg();
+    __intrinsic_op($(kIROp_Mul)) This scale<T1:__BuiltinFloatingPointType>(T1 s);
+    [__unsafeForceInlineEarly] float toFloat() { return __realCast<float>(this[0]); }
+
+    [OverloadRank(-1)]
+    [__unsafeForceInlineEarly] __init(int v) { return vector<T,N>(T(v)); }
+    [OverloadRank(-1)]
+    [__unsafeForceInlineEarly] __init(float v) { return vector<T,N>(T(v)); }
+
+    // IDifferentiable
+
+    typedef vector<T, N> Differential;
+
+    [__unsafeForceInlineEarly]
+    [BackwardDifferentiable]
+    static Differential dzero()
+    {
+        return Differential(__slang_noop_cast<T>(T.dzero()));
+    }
+
+    [__unsafeForceInlineEarly]
+    [BackwardDifferentiable]
+    static Differential dadd(Differential a, Differential b)
+    {
+        return a + b;
+    }
+
+    __generic<U : __BuiltinRealType>
+    [__unsafeForceInlineEarly]
+    [BackwardDifferentiable]
+    static Differential dmul(U a, Differential b)
+    {
+        return __realCast<T, U>(a) * b;
+    }
+}
+
+__generic<T:__BuiltinFloatingPointType, let N : int, let M : int, let L : int>
+extension matrix<T,N,M,L> : IFloat
+{
+    [TreatAsDifferentiable][__unsafeForceInlineEarly] bool lessThan(This other) { return this < other; }
+    [TreatAsDifferentiable][__unsafeForceInlineEarly] bool lessThanOrEquals(This other) { return this <= other; }
+    [TreatAsDifferentiable][__unsafeForceInlineEarly] bool equals(This other) { return all(this == other); }
+    [TreatAsDifferentiable] __intrinsic_op($(kIROp_Add)) This add(This other);
+    [TreatAsDifferentiable] __intrinsic_op($(kIROp_Sub)) This sub(This other);
+    [TreatAsDifferentiable] __intrinsic_op($(kIROp_Mul))This mul(This other);
+    [TreatAsDifferentiable] __intrinsic_op($(kIROp_Div)) This div(This other);
+    [TreatAsDifferentiable] __intrinsic_op($(kIROp_FRem)) This mod(This other);
+    [TreatAsDifferentiable] __intrinsic_op($(kIROp_Neg)) This neg();
+    [TreatAsDifferentiable] __intrinsic_op($(kIROp_Mul)) This scale<T1:__BuiltinFloatingPointType>(T1 s);
+    [TreatAsDifferentiable][__unsafeForceInlineEarly] This scale<T1:__BuiltinFloatingPointType>(T1 s);
+    [TreatAsDifferentiable][__unsafeForceInlineEarly] float toFloat() { return __realCast<float>(this[0][0]); }
+
+    [OverloadRank(-1)]
+    [TreatAsDifferentiable][__unsafeForceInlineEarly] __init(int v) { return matrix<T,N,M>(T(v)); }
+    [OverloadRank(-1)]
+    [TreatAsDifferentiable][__unsafeForceInlineEarly] __init(float v) { return matrix<T,N,M>(T(v)); }
+
+    // IDifferentiable.
+    typedef matrix<T, N,M,L> Differential;
+
+    [__unsafeForceInlineEarly]
+    [BackwardDifferentiable]
+    static Differential dzero()
+    {
+        return matrix<T, N,M,L>(__slang_noop_cast<T>(T.dzero()));
+    }
+
+    [__unsafeForceInlineEarly]
+    [BackwardDifferentiable]
+    static Differential dadd(Differential a, Differential b)
+    {
+        return a + b;
+    }
+    
+    __generic<U : __BuiltinRealType>
+    [__unsafeForceInlineEarly]
+    [BackwardDifferentiable]
+    static Differential dmul(U a, Differential b)
+    {
+        return __realCast<T, U>(a) * b;
+    }
 }
 
 ${{{{
@@ -1184,7 +1428,7 @@ for (int tt = 0; tt < kBaseTypeCount; ++tt)
     auto toType = kBaseTypes[tt].name;
 }}}}
 
-__generic<let R : int, let C : int> extension matrix<$(toType),R,C>
+__generic<let R : int, let C : int, let L : int> extension matrix<$(toType),R,C,L>
 {
 ${{{{
     for (int ff = 0; ff < kBaseTypeCount; ++ff)
@@ -1202,7 +1446,7 @@ ${{{{
 }}}}
     __implicit_conversion($(cost))
     __intrinsic_op($(op))
-    __init(matrix<$(fromType),R,C> value);
+    __init(matrix<$(fromType),R,C,L> value);
 ${{{{
     }
 }}}}
@@ -1215,61 +1459,6 @@ __generic<T, U>
 __intrinsic_op(0)
 T __slang_noop_cast(U u);
 
-__generic<T:__BuiltinFloatingPointType, let N: int>
-extension vector<T, N> : IDifferentiable
-{
-    typedef vector<T, N> Differential;
-
-    [__unsafeForceInlineEarly]
-    [BackwardDifferentiable]
-    static Differential dzero()
-    {
-        return Differential(__slang_noop_cast<T>(T.dzero()));
-    }
-
-    [__unsafeForceInlineEarly]
-    [BackwardDifferentiable]
-    static Differential dadd(Differential a, Differential b)
-    {
-        return a + b;
-    }
-
-    __generic<U : __BuiltinRealType>
-    [__unsafeForceInlineEarly]
-    [BackwardDifferentiable]
-    static Differential dmul(U a, Differential b)
-    {
-        return __realCast<T, U>(a) * b;
-    }
-}
-
-__generic<T:__BuiltinFloatingPointType, let R: int, let C: int, let L : int>
-extension matrix<T, R, C, L> : IDifferentiable
-{
-    typedef matrix<T, R, C, L> Differential;
-
-    [__unsafeForceInlineEarly]
-    [BackwardDifferentiable]
-    static Differential dzero()
-    {
-        return matrix<T, R, C, L>(__slang_noop_cast<T>(T.dzero()));
-    }
-
-    [__unsafeForceInlineEarly]
-    [BackwardDifferentiable]
-    static Differential dadd(Differential a, Differential b)
-    {
-        return a + b;
-    }
-    
-    __generic<U : __BuiltinRealType>
-    [__unsafeForceInlineEarly]
-    [BackwardDifferentiable]
-    static Differential dmul(U a, Differential b)
-    {
-        return __realCast<T, U>(a) * b;
-    }
-}
 
 //@ public:
 
@@ -1333,17 +1522,20 @@ for (auto op : intrinsicUnaryOps)
     {
         char const* resultType = "T";
         if (op.flags & BOOL_RESULT) resultType = "bool";
-
+        
         // scalar version
         sb << "__generic<T : " << op.interface << ">\n";
+        sb << "[OverloadRank(10)]";
         sb << "__prefix __intrinsic_op(" << int(op.opCode) << ") " << resultType << " operator" << op.opName << "(" << "T value);\n";
 
         // vector version
         sb << "__generic<T : " << op.interface << ", let N : int> ";
+        sb << "[OverloadRank(10)]";
         sb << "__prefix __intrinsic_op(" << int(op.opCode) << ") vector<" << resultType << ",N> operator" << op.opName << "(vector<T,N> value);\n";
 
         // matrix version
         sb << "__generic<T : " << op.interface << ", let N : int, let M : int> ";
+        sb << "[OverloadRank(10)]";
         sb << "__prefix __intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(matrix<T,N,M> value);\n";
     }
 }
@@ -1369,7 +1561,7 @@ Ptr<T> operator-(Ptr<T> value, int64_t offset)
     return __getElementPtr(value, -offset);
 }
 
-__generic<T : __BuiltinArithmeticType>
+__generic<T : IArithmetic>
 [__unsafeForceInlineEarly]
 __prefix T operator+(T value)
 { return value; }
@@ -1532,28 +1724,35 @@ for (auto op : intrinsicBinaryOps)
 
         // scalar version
         sb << "__generic<T : " << op.interface << ">\n";
+        sb << "[OverloadRank(10)]";
         sb << "__intrinsic_op(" << int(op.opCode) << ") " << resultType << " operator" << op.opName << "(" << leftType << " left, " << rightType << " right);\n";
 
         // vector version
         sb << "__generic<T : " << op.interface << ", let N : int> ";
+        sb << "[OverloadRank(10)]";
         sb << "__intrinsic_op(" << int(op.opCode) << ") vector<" << resultType << ",N> operator" << op.opName << "(vector<" << leftType << ",N> left, vector<" << rightType << ",N> right);\n";
 
         // matrix version
         sb << "__generic<T : " << op.interface << ", let N : int, let M : int> ";
+        sb << "[OverloadRank(10)]";
         sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(matrix<" << leftType << ",N,M> left, matrix<" << rightType << ",N,M> right);\n";
 
         // scalar-vector and scalar-matrix
         sb << "__generic<T : " << op.interface << ", let N : int> ";
+        sb << "[OverloadRank(10)]";
         sb << "__intrinsic_op(" << int(op.opCode) << ") vector<" << resultType << ",N> operator" << op.opName << "(" << leftType << " left, vector<" << rightType << ",N> right);\n";
 
         sb << "__generic<T : " << op.interface << ", let N : int, let M : int> ";
+        sb << "[OverloadRank(10)]";
         sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" <<  leftType << " left, matrix<" << rightType << ",N,M> right);\n";
 
         // vector-scalar and matrix-scalar
         sb << "__generic<T : " << op.interface << ", let N : int> ";
+        sb << "[OverloadRank(10)]";
         sb << "__intrinsic_op(" << int(op.opCode) << ") vector<" << resultType << ",N> operator" << op.opName << "(vector<" << leftType << ",N> left, " << rightType << " right);\n";
 
         sb << "__generic<T : " << op.interface << ", let N : int, let M : int> ";
+        sb << "[OverloadRank(10)]";
         sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(matrix<" << leftType << ",N,M> left, " << rightType << " right);\n";
     }
 }
@@ -1848,151 +2047,163 @@ bool operator!=(E left, E right);
 
 // public interfaces for generic arithmetic types.
 
-interface IComparable
-{
-    bool equals(This other);
-    bool lessThan(This other);
-    bool lessThanOrEquals(This other);
-}
-
-__attributeTarget(DeclBase)
-attribute_syntax [TreatAsDifferentiable] : TreatAsDifferentiableAttribute;
-
-[TreatAsDifferentiable]
-interface IArithmetic : IComparable
-{
-    This add(This other);
-    This sub(This other);
-    This mul(This other);
-    This div(This other);
-    This mod(This other);
-    This neg();
-    __init(int val);
-    static const This maxValue;
-    static const This minValue;
-}
-
-interface IInteger : IArithmetic
-{
-    This shl(int value);
-    This shr(int value);
-    This bitAnd(This other);
-    This bitOr(This other);
-    This bitXor(This other);
-    This bitNot();
-    int toInt();
-    int64_t toInt64();
-    uint toUInt();
-    uint64_t toUInt64();
-}
-
-interface IFloat : IArithmetic
-{
-    __init(float value);
-    float toFloat();
-}
-
 __generic<T : IComparable>
 [__unsafeForceInlineEarly]
+[OverloadRank(-10)]
 bool operator<(T v0, T v1)
 {
     return v0.lessThan(v1);
 }
 __generic<T : IComparable>
 [__unsafeForceInlineEarly]
+[OverloadRank(-10)]
 bool operator>(T v0, T v1)
 {
     return v1.lessThan(v0);
 }
 __generic<T : IComparable>
 [__unsafeForceInlineEarly]
+[OverloadRank(-10)]
 bool operator ==(T v0, T v1)
 {
     return v0.equals(v1);
 }
 __generic<T : IComparable>
 [__unsafeForceInlineEarly]
+[OverloadRank(-10)]
 bool operator >=(T v0, T v1)
 {
     return v1.lessThan(v1);
 }
 __generic<T : IComparable>
 [__unsafeForceInlineEarly]
+[OverloadRank(-10)]
 bool operator <=(T v0, T v1)
 {
     return v0.lessThanOrEquals(v1);
 }
 __generic<T : IComparable>
 [__unsafeForceInlineEarly]
+[OverloadRank(-10)]
 bool operator !=(T v0, T v1)
 {
     return !v0.equals(v1);
 }
 
-__generic<T : IArithmetic>
+${{{{
+const char* arithmeticInterfaces[] = {"IArithmetic", "IFloat"};
+const char* attribs[] = {"", "[TreatAsDifferentiable]"};
+for (Index i = 0; i < 2; i++) {
+    const auto interfaceName = arithmeticInterfaces[i];
+    const auto attrib = attribs[i];
+    Index overloadRank = i - 3;
+}}}}
+$(attrib)
+__generic<T : $(interfaceName)>
 [__unsafeForceInlineEarly]
+[OverloadRank($(overloadRank))]
 T operator +(T v0, T v1)
 {
     return v0.add(v1);
 }
 
-__generic<T : IArithmetic>
+$(attrib)
+__generic<T : $(interfaceName)>
 [__unsafeForceInlineEarly]
+[OverloadRank($(overloadRank))]
 T operator -(T v0, T v1)
 {
     return v0.sub(v1);
 }
 
-__generic<T : IArithmetic>
+$(attrib)
+__generic<T : $(interfaceName)>
 [__unsafeForceInlineEarly]
+[OverloadRank($(overloadRank))]
 T operator *(T v0, T v1)
 {
     return v0.mul(v1);
 }
 
-__generic<T : IArithmetic>
+$(attrib)
+__generic<T : $(interfaceName)>
 [__unsafeForceInlineEarly]
+[OverloadRank($(overloadRank))]
 T operator /(T v0, T v1)
 {
     return v0.div(v1);
 }
 
-__generic<T : IArithmetic>
+$(attrib)
+__generic<T : $(interfaceName)>
 [__unsafeForceInlineEarly]
+[OverloadRank($(overloadRank))]
 T operator %(T v0, T v1)
 {
     return v0.mod(v1);
 }
 
-__generic<T : IArithmetic>
+$(attrib)
+__generic<T : $(interfaceName)>
 [__unsafeForceInlineEarly]
+[OverloadRank($(overloadRank))]
 __prefix T operator -(T v0)
 {
     return v0.neg();
 }
-__generic<T : IInteger>
+
+${{{{
+    } // foreach ["IArithmetic", "IFloat"]
+}}}}
+
+__generic<T : ILogical>
 [__unsafeForceInlineEarly]
+[OverloadRank(-10)]
 T operator &(T v0, T v1)
 {
     return v0.bitAnd(v1);
 }
-__generic<T : IInteger>
+__generic<T : ILogical>
 [__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+T operator &&(T v0, T v1)
+{
+    return v0.and(v1);
+}
+__generic<T : ILogical>
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
 T operator |(T v0, T v1)
 {
     return v0.bitOr(v1);
 }
-__generic<T : IInteger>
+__generic<T : ILogical>
 [__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+T operator ||(T v0, T v1)
+{
+    return v0.or(v1);
+}
+__generic<T : ILogical>
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
 T operator ^(T v0, T v1)
 {
     return v0.bitXor(v1);
 }
-__generic<T : IInteger>
+__generic<T : ILogical>
 [__unsafeForceInlineEarly]
+[OverloadRank(-10)]
 __prefix T operator ~(T v0)
 {
     return v0.bitNot();
+}
+__generic<T : ILogical>
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+__prefix T operator !(T v0)
+{
+    return v0.not();
 }
 
 // IR level type traits.
@@ -2089,61 +2300,6 @@ bool __isVector()
     return __isVector_impl(__declVal<T>());
 }
 
-// Provide implementations to public generic arithmetic interfaces for builtin types.
-
-${{{{
-// Code gen integer type implementations.
-
-for (int tt = 0; tt < kBaseTypeCount; ++tt)
-{
-    if (kBaseTypes[tt].flags & (SINT_MASK | UINT_MASK))
-    {
-}}}}
-extension $(kBaseTypes[tt].name) : IInteger
-{
-    [__unsafeForceInlineEarly] bool equals(This other){return this==other;}
-    [__unsafeForceInlineEarly] bool lessThan(This other){return this<other;}
-    [__unsafeForceInlineEarly] bool lessThanOrEquals(This other){return this<=other;}
-    [__unsafeForceInlineEarly] This add(This other) { return __add(this, other); }
-    [__unsafeForceInlineEarly] This sub(This other) { return __sub(this, other); }
-    [__unsafeForceInlineEarly] This mul(This other) { return __mul(this, other); }
-    [__unsafeForceInlineEarly] This div(This other) { return __div(this, other); }
-    [__unsafeForceInlineEarly] This mod(This other) { return __irem(this, other); }
-    [__unsafeForceInlineEarly] This neg() { return __neg(this); }
-    [__unsafeForceInlineEarly] This shl(int other) { return __shl(this, other); }
-    [__unsafeForceInlineEarly] This shr(int other) { return __shr(this, other); }
-    [__unsafeForceInlineEarly] This bitAnd(This other) { return __add(this, other); }
-    [__unsafeForceInlineEarly] This bitOr(This other) { return __or(this, other); }
-    [__unsafeForceInlineEarly] This bitXor(This other) { return __xor(this, other); }
-    [__unsafeForceInlineEarly] This bitNot() { return __not(this); }
-    [__unsafeForceInlineEarly] int toInt() { return int(this); }
-    [__unsafeForceInlineEarly] int64_t toInt64() { return int64_t(this); }
-    [__unsafeForceInlineEarly] uint toUInt() { return uint(this); }
-    [__unsafeForceInlineEarly] uint64_t toUInt64() { return uint64_t(this); }
-}
-${{{{
-    }
-    else if (kBaseTypes[tt].flags & FLOAT_MASK)
-    {
-}}}}
-
-extension $(kBaseTypes[tt].name) : IFloat
-{
-    [__unsafeForceInlineEarly] bool lessThan(This other) { return this < other; }
-    [__unsafeForceInlineEarly] bool lessThanOrEquals(This other) { return this <= other; }
-    [__unsafeForceInlineEarly] bool equals(This other) { return this == other; }
-    [__unsafeForceInlineEarly] This add(This other) { return __add(this, other); }
-    [__unsafeForceInlineEarly] This sub(This other) { return __sub(this, other); }
-    [__unsafeForceInlineEarly] This mul(This other) { return __mul(this, other); }
-    [__unsafeForceInlineEarly] This div(This other) { return __div(this, other); }
-    [__unsafeForceInlineEarly] This mod(This other) { return __frem(this, other); }
-    [__unsafeForceInlineEarly] This neg() { return __neg(this); }
-    [__unsafeForceInlineEarly] float toFloat() { return float(this); }
-}
-${{{{
-    }
-}
-}}}}
 
 // Binding Attributes
 
@@ -2308,6 +2464,9 @@ attribute_syntax [__unsafeForceInlineEarly] : UnsafeForceInlineEarlyAttribute;
 
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [ForceInline] : ForceInlineAttribute;
+
+__attributeTarget(FunctionDeclBase)
+attribute_syntax [OverloadRank] : OverloadRankAttribute;
 
 __attributeTarget(FuncDecl)
 attribute_syntax [DllImport(modulePath: String)] : DllImportAttribute;

@@ -1075,6 +1075,18 @@ class AnyValueSizeAttribute : public Attribute
     int32_t size;
 };
 
+    /// This is a stop-gap solution to break overload ambiguity in stdlib.
+    /// When there is a function overload ambiguity, the compiler will pick the one with higher rank
+    /// specified by this attribute. An overload without this attribute will have a rank of 0.
+    /// In the future, we should enhance our type system to take into account the "specialized"-ness
+    /// of an overload, such that `T overload1<T:IDerived>()` is more specialized than `T overload2<T:IBase>()`
+    /// and preferred during overload resolution.
+class OverloadRankAttribute : public Attribute
+{
+    SLANG_AST_CLASS(OverloadRankAttribute)
+    int32_t rank;
+};
+
     /// An attribute that marks an interface for specialization use only. Any operation that triggers dynamic
     /// dispatch through the interface is a compile-time error.
 class SpecializeAttribute : public Attribute

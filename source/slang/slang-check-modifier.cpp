@@ -349,6 +349,19 @@ namespace Slang
 
             anyValueSizeAttr->size = int32_t(value->getValue());
         }
+        else if (auto overloadRankAttr = as<OverloadRankAttribute>(attr))
+        {
+            if (attr->args.getCount() != 1)
+            {
+                return false;
+            }
+            auto rank = checkConstantIntVal(attr->args[0]);
+            if (rank == nullptr)
+            {
+                return false;
+            }
+            overloadRankAttr->rank = int32_t(rank->getValue());
+        }
         else if (auto bindingAttr = as<GLSLBindingAttribute>(attr))
         {
             // This must be vk::binding or gl::binding (as specified in core.meta.slang under vk_binding/gl_binding)
