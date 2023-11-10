@@ -274,3 +274,49 @@ in int gl_SampleID : SV_SampleIndex;
 in int gl_VertexIndex : SV_VertexID;
 in int gl_ViewIndex : SV_ViewID;
 in int gl_ViewportIndex : SV_ViewportArrayIndex;
+
+
+// Override operator* behavior to compute algebric product of matrices and vectors.
+
+[OverloadRank(15)]
+[ForceInline]
+matrix<float, N, N> operator*<let N : int>(matrix<float, N, N> m1, matrix<float, N, N> m2)
+{
+    return mul(m2, m1);
+}
+
+[OverloadRank(15)]
+[ForceInline]
+matrix<half, N, N> operator*<let N : int>(matrix<half, N, N> m1, matrix<half, N, N> m2)
+{
+    return mul(m2, m1);
+}
+
+[OverloadRank(15)]
+[ForceInline]
+matrix<double, N, N> operator*<let N : int>(matrix<double, N, N> m1, matrix<double, N, N> m2)
+{
+    return mul(m2, m1);
+}
+
+[ForceInline]
+[OverloadRank(15)]
+matrix<T, R, L> operator*<T:__BuiltinFloatingPointType, let L : int, let C : int, let R : int>(matrix<T, C, L> m1, matrix<T, R, C> m2)
+{
+    return mul(m2, m1);
+}
+
+[ForceInline]
+[OverloadRank(15)]
+vector<T, R> operator*<T:__BuiltinFloatingPointType, let C : int, let R : int>(vector<T, C> v, matrix<T, R, C> m)
+{
+    return mul(m, v);
+}
+
+[ForceInline]
+[OverloadRank(15)]
+vector<T, C> operator*<T:__BuiltinFloatingPointType, let C : int, let R : int>(matrix<T, R, C> m, vector<T, R> v)
+{
+    return mul(v, m);
+}
+
