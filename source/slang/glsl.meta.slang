@@ -320,3 +320,5 @@ vector<T, C> operator*<T:__BuiltinFloatingPointType, let C : int, let R : int>(m
     return mul(v, m);
 }
 
+__intrinsic_op(mul)
+matrix<T, N, M> matrixCompMult<T:__BuiltinFloatingPointType, let N : int, let M : int>(matrix<T,N,M> left, matrix<T,N,M> right);
