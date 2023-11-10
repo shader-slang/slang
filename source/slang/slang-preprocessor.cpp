@@ -3635,6 +3635,11 @@ static void HandlePragmaDirective(PreprocessorDirectiveContext* context)
     (subDirective->callback)(context, subDirectiveToken);
 }
 
+static void HandleExtensionDirective(PreprocessorDirectiveContext* context)
+{
+    SkipToEndOfLine(context);
+}
+
 static void HandleVersionDirective(PreprocessorDirectiveContext* context)
 {
     [[maybe_unused]]
@@ -3709,6 +3714,8 @@ static const PreprocessorDirective kDirectives[] =
 
     // GLSL
     { "version",    &HandleVersionDirective,    0 },
+    { "extension",  &HandleExtensionDirective,    0 },
+
 
     { nullptr, nullptr, 0 },
 };
