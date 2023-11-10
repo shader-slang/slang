@@ -4109,8 +4109,7 @@ namespace Slang
 
         if (decl)
         {
-            layoutModifier->next = decl->modifiers.first;
-            decl->modifiers.first = layoutModifier;
+            addModifier(decl, layoutModifier);
             return true;
         }
         return false;

@@ -364,6 +364,12 @@ IR_SIMPLE_DECORATION(HLSLMeshPayloadDecoration)
 IR_SIMPLE_DECORATION(GlobalInputDecoration)
 IR_SIMPLE_DECORATION(GlobalOutputDecoration)
 
+struct IRGLSLLocationDecoration : IRDecoration
+{
+    IR_LEAF_ISA(GLSLLocationDecoration)
+    IRIntLit* getLocation() { return cast<IRIntLit>(getOperand(0)); }
+};
+
 struct IRNVAPIMagicDecoration : IRDecoration
 {
     enum { kOp = kIROp_NVAPIMagicDecoration };

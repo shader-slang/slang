@@ -2162,6 +2162,15 @@ void addVarDecorations(
         {
             builder->addSimpleDecoration<IRGlobalInputDecoration>(inst);
         }
+        else if (auto glslLocationMod = as<GLSLLocationLayoutModifier>(mod))
+        {
+            builder->addDecoration(inst, kIROp_GLSLLocationDecoration,
+                builder->getIntValue(builder->getIntType(), stringToInt(glslLocationMod->valToken.getContent())));
+        }
+        else if (auto hlslSemantic = as< HLSLSimpleSemantic>(mod))
+        {
+            builder->addSemanticDecoration(inst, hlslSemantic->name.getContent());
+        }
         // TODO: what are other modifiers we need to propagate through?
     }
     if(auto t = composeGetters<IRMeshOutputType>(inst->getFullType(), &IROutTypeBase::getValueType))

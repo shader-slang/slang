@@ -53,3 +53,14 @@ typealias dmat3x4 = matrix<double, 4, 3>;
 typealias dmat4x2 = matrix<double, 2, 4>;
 typealias dmat4x3 = matrix<double, 3, 4>;
 typealias dmat4x4 = matrix<double, 4, 4>;
+
+typealias usampler2D = Sampler2D<uint4>;
+typealias sampler2D = Sampler2D<float4>;
+
+[ForceInline]
+uvec4 texelFetch(usampler2D sampler, ivec2 p, int lod)
+{
+    return sampler.Load(int3(p, lod));
+}
+
+out float4 gl_Position : SV_Position;

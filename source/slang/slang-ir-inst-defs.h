@@ -825,7 +825,7 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
 
     INST(GlobalOutputDecoration, output, 0, 0)
     INST(GlobalInputDecoration, output, 0, 0)
-
+    INST(GLSLLocationDecoration, glslLocation, 1, 0)
     INST(PayloadDecoration, payload, 0, 0)
 
     /* Mesh Shader outputs */

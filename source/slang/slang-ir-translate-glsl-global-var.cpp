@@ -32,10 +32,13 @@ namespace Slang
             // Replace all uses of the input with a `load` of the global var.
             for (auto input : inputVars)
             {
+                // Introduce a global var for the parameter.
                 auto type = input->getDataType();
                 builder.setInsertBefore(input);
                 auto globalVar = builder.createGlobalVar(type);
                 mapInputToGlobalVar.add(input, globalVar);
+
+                // Replace all uses of the input with a `load` of the global var.
                 traverseUses(input, [&](IRUse* use)
                     {
                         if (as<IRAttr>(use->getUser()))
@@ -61,6 +64,67 @@ namespace Slang
                 IRVarLayout* resultVarLayout = nullptr;
                 IRVarLayout* paramLayout = nullptr;
                 IRType* resultType = entryPointFunc->getResultType();
+
+                // Create a struct type to receive all inputs.
+                builder.setInsertBefore(entryPointFunc);
+                auto inputStructType = builder.createStructType();
+                IRStructTypeLayout::Builder inputStructTypeLayoutBuilder(&builder);
+                UInt inputVarIndex = 0;
+                List<IRStructKey*> inputKeys;
+                for (auto input : inputVars)
+                {
+                    auto inputType = input->getDataType();
+                    auto key = builder.createStructKey();
+                    inputKeys.add(key);
+                    if (auto nameHint = input->findDecoration<IRNameHintDecoration>())
+                    {
+                        builder.addNameHintDecoration(key, nameHint->getName());
+                    }
+                    builder.createStructField(inputStructType, key, inputType);
+                    IRTypeLayout::Builder fieldTypeLayout(&builder);
+                    fieldTypeLayout.addResourceUsage(LayoutResourceKind::VaryingInput, LayoutSize(1));
+                    IRVarLayout::Builder varLayoutBuilder(&builder, fieldTypeLayout.build());
+                    if (auto locationDecoration = input->findDecoration<IRGLSLLocationDecoration>())
+                    {
+                        varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::VaryingInput)->offset = getIntVal(locationDecoration->getLocation());
+                    }
+                    if (auto semanticDecor = input->findDecoration<IRSemanticDecoration>())
+                    {
+                        varLayoutBuilder.setSystemValueSemantic(semanticDecor->getSemanticName(), semanticDecor->getSemanticIndex());
+                    }
+                    else
+                    {
+                        if (entryPointDecor->getProfile().getStage() == Stage::Fragment)
+                        {
+                            varLayoutBuilder.setUserSemantic("COLOR", inputVarIndex);
+                        }
+                        else if (entryPointDecor->getProfile().getStage() == Stage::Vertex)
+                        {
+                            varLayoutBuilder.setUserSemantic("VERTEX_IN_", inputVarIndex);
+                        }
+                        inputVarIndex++;
+                    }
+                    inputStructTypeLayoutBuilder.addField(key, varLayoutBuilder.build());
+                }
+                auto paramTypeLayout = inputStructTypeLayoutBuilder.build();
+                IRVarLayout::Builder paramVarLayoutBuilder(&builder, paramTypeLayout);
+                paramLayout = paramVarLayoutBuilder.build();
+
+                // Add an entry point parameter for all the inputs.
+                auto firstBlock = entryPointFunc->getFirstBlock();
+                builder.setInsertInto(firstBlock);
+                auto inputParam = builder.emitParam(inputStructType);
+                builder.addLayoutDecoration(inputParam, paramLayout);
+
+                // Initialize all global variables.
+                for (Index i = 0; i < inputVars.getCount(); i++)
+                {
+                    auto input = inputVars[i];
+                    auto globalVar = mapInputToGlobalVar[input];
+                    setInsertBeforeOrdinaryInst(&builder, firstBlock->getFirstOrdinaryInst());
+                    builder.emitStore(globalVar,
+                        builder.emitFieldExtract(input->getDataType(), inputParam, inputKeys[i]));
+                }
 
                 // For each entry point, introduce a new parameter to represent each input parameter,
                 // and return all outputs via a struct value.
@@ -88,11 +152,26 @@ namespace Slang
                         IRTypeLayout::Builder fieldTypeLayout(&builder);
                         fieldTypeLayout.addResourceUsage(LayoutResourceKind::VaryingOutput, LayoutSize(1));
                         IRVarLayout::Builder varLayoutBuilder(&builder, fieldTypeLayout.build());
-                        if (entryPointDecor->getProfile().getStage() == Stage::Fragment)
+                        if (auto semanticDecor = output->findDecoration<IRSemanticDecoration>())
                         {
-                            varLayoutBuilder.setSystemValueSemantic("SV_TARGET", outputVarIndex);
+                            varLayoutBuilder.setSystemValueSemantic(semanticDecor->getSemanticName(), semanticDecor->getSemanticIndex());
                         }
-                        outputVarIndex++;
+                        else
+                        {
+                            if (auto locationDecoration = output->findDecoration<IRGLSLLocationDecoration>())
+                            {
+                                varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::VaryingInput)->offset = getIntVal(locationDecoration->getLocation());
+                            }
+                            if (entryPointDecor->getProfile().getStage() == Stage::Fragment)
+                            {
+                                varLayoutBuilder.setSystemValueSemantic("SV_TARGET", outputVarIndex);
+                            }
+                            else if (entryPointDecor->getProfile().getStage() == Stage::Vertex)
+                            {
+                                varLayoutBuilder.setUserSemantic("COLOR", outputVarIndex);
+                            }
+                            outputVarIndex++;
+                        }
                         typeLayoutBuilder.addField(key, varLayoutBuilder.build());
                     }
                     auto resultTypeLayout = typeLayoutBuilder.build();
