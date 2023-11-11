@@ -22,6 +22,30 @@ typealias uvec2 = vector<uint, 2>;
 typealias uvec3 = vector<uint, 3>;
 typealias uvec4 = vector<uint, 4>;
 
+typealias i8vec2 = vector<int8_t, 2>;
+typealias i8vec3 = vector<int8_t, 3>;
+typealias i8vec4 = vector<int8_t, 4>;
+
+typealias u8vec2 = vector<uint8_t, 2>;
+typealias u8vec3 = vector<uint8_t, 3>;
+typealias u8vec4 = vector<uint8_t, 4>;
+
+typealias i16vec2 = vector<int16_t, 2>;
+typealias i16vec3 = vector<int16_t, 3>;
+typealias i16vec4 = vector<int16_t, 4>;
+
+typealias u16vec2 = vector<uint16_t, 2>;
+typealias u16vec3 = vector<uint16_t, 3>;
+typealias u16vec4 = vector<uint16_t, 4>;
+
+typealias i64vec2 = vector<int64_t, 2>;
+typealias i64vec3 = vector<int64_t, 3>;
+typealias i64vec4 = vector<int64_t, 4>;
+
+typealias u64vec2 = vector<uint64_t, 2>;
+typealias u64vec3 = vector<uint64_t, 3>;
+typealias u64vec4 = vector<uint64_t, 4>;
+
 typealias mat2 = matrix<float, 2, 2>;
 typealias mat3 = matrix<float, 3, 3>;
 typealias mat4 = matrix<float, 4, 4>;
@@ -322,3 +346,104 @@ vector<T, C> operator*<T:__BuiltinFloatingPointType, let C : int, let R : int>(m
 
 __intrinsic_op(mul)
 matrix<T, N, M> matrixCompMult<T:__BuiltinFloatingPointType, let N : int, let M : int>(matrix<T,N,M> left, matrix<T,N,M> right);
+
+__intrinsic_op(cmpLE)
+vector<bool, N> lessThanEqual<T, let N:int>(vector<T, N> x, vector<T, N> y);
+__intrinsic_op(cmpLT)
+vector<bool, N> lessThan<T, let N:int>(vector<T, N> x, vector<T, N> y);
+__intrinsic_op(cmpGT)
+vector<bool, N> greaterThan<T, let N:int>(vector<T, N> x, vector<T, N> y);
+__intrinsic_op(cmpGE)
+vector<bool, N> greaterThanEqual<T, let N:int>(vector<T, N> x, vector<T, N> y);
+__intrinsic_op(cmpEQ)
+vector<bool, N> equal<T, let N:int>(vector<T, N> x, vector<T, N> y);
+__intrinsic_op(cmpNE)
+vector<bool, N> notEqual<T, let N:int>(vector<T, N> x, vector<T, N> y);
+
+__generic<T>
+extension vector<T, 2>
+{
+    [ForceInline] __init(vector<T, 3> bigger) { this = bigger.xy; }
+    [ForceInline] __init(vector<T, 4> bigger) { this = bigger.xy; }
+}
+
+__generic<T>
+extension vector<T, 3>
+{
+    [ForceInline] __init(vector<T, 4> bigger) { this = bigger.xyz; }
+}
+
+[ForceInline]
+[OverloadRank(15)]
+bool operator==<T:__BuiltinArithmeticType, let N : int>(vector<T, N> left, vector<T, N> right)
+{
+    return all(equal(left, right));
+}
+
+[ForceInline]
+[OverloadRank(15)]
+bool operator!=<T:__BuiltinArithmeticType, let N : int>(vector<T, N> left, vector<T, N> right)
+{
+    return any(notEqual(left, right));
+}
+
+[ForceInline]
+[OverloadRank(14)]
+bool operator==<T:__BuiltinFloatingPointType, let N : int>(vector<T, N> left, vector<T, N> right)
+{
+    return all(equal(left, right));
+}
+
+[ForceInline]
+[OverloadRank(14)]
+bool operator!=<T:__BuiltinFloatingPointType, let N : int>(vector<T, N> left, vector<T, N> right)
+{
+    return any(notEqual(left, right));
+}
+
+[ForceInline]
+[OverloadRank(14)]
+bool operator==<T:__BuiltinLogicalType, let N : int>(vector<T, N> left, vector<T, N> right)
+{
+    return all(equal(left, right));
+}
+
+[ForceInline]
+[OverloadRank(14)]
+bool operator!=<T:__BuiltinLogicalType, let N : int>(vector<T, N> left, vector<T, N> right)
+{
+    return any(notEqual(left, right));
+}
+
+${{{{
+for (auto type : kBaseTypes) {
+    char const* typeName = type.name;
+    if (!type.flags) continue;
+}}}}
+[ForceInline]
+[OverloadRank(15)]
+bool operator==<let N : int>(vector<$(typeName), N> left, vector<$(typeName), N> right)
+{
+    return all(equal(left, right));
+}
+
+[ForceInline]
+[OverloadRank(15)]
+bool operator!=<let N : int>(vector<$(typeName), N> left, vector<$(typeName), N> right)
+{
+    return any(notEqual(left, right));
+}
+${{{{
+}
+}}}}
+
+[ForceInline] int findLSB(int v) { return firstbitlow(v); }
+[ForceInline] uint findLSB(uint v) { return firstbitlow(v); }
+[ForceInline] vector<int,N> findLSB<let N:int>(vector<int,N> value)
+{
+    return firstbitlow(value);
+}
+[ForceInline] vector<uint,N> findLSB<let N:int>(vector<uint,N> value)
+{
+    return firstbitlow(value);
+}

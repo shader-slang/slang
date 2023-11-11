@@ -64,6 +64,7 @@ namespace Slang
                     IRTypeLayout::Builder fieldTypeLayout(&builder);
                     fieldTypeLayout.addResourceUsage(LayoutResourceKind::VaryingInput, LayoutSize(1));
                     IRVarLayout::Builder varLayoutBuilder(&builder, fieldTypeLayout.build());
+                    varLayoutBuilder.setStage(entryPointDecor->getProfile().getStage());
                     if (auto locationDecoration = input->findDecoration<IRGLSLLocationDecoration>())
                     {
                         varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::VaryingInput)->offset = (UInt)getIntVal(locationDecoration->getLocation());
@@ -132,6 +133,7 @@ namespace Slang
                         IRTypeLayout::Builder fieldTypeLayout(&builder);
                         fieldTypeLayout.addResourceUsage(LayoutResourceKind::VaryingOutput, LayoutSize(1));
                         IRVarLayout::Builder varLayoutBuilder(&builder, fieldTypeLayout.build());
+                        varLayoutBuilder.setStage(entryPointDecor->getProfile().getStage());
                         if (auto semanticDecor = output->findDecoration<IRSemanticDecoration>())
                         {
                             varLayoutBuilder.setSystemValueSemantic(semanticDecor->getSemanticName(), semanticDecor->getSemanticIndex());
