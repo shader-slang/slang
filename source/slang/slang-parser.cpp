@@ -2147,8 +2147,34 @@ namespace Slang
         memberExpr->name = expectIdentifier(parser).name;
         return memberExpr;
     }
+    
+    // Parse optional `[]` braces after a type expression, that indicate an array type
+    static Expr* parseBracketTypeSuffix(Parser* parser, Expr* inTypeExpr)
+    {
+        auto typeExpr = inTypeExpr;
+        for (;;)
+        {
+            Token token;
+            if (parser->LookAheadToken(TokenType::LBracket))
+            {
+                IndexExpr* arrType = parser->astBuilder->create<IndexExpr>();
+                arrType->loc = typeExpr->loc;
+                arrType->baseExpression = typeExpr;
+                parser->ReadToken(TokenType::LBracket);
+                if (!parser->LookAheadToken(TokenType::RBracket))
+                {
+                    arrType->indexExprs.add(parser->ParseExpression());
+                }
+                parser->ReadToken(TokenType::RBracket);
+                typeExpr = arrType;
+            }
+            else
+                break;
+        }
+        return typeExpr;
+    }
 
-    // Parse option `[]` braces after a type expression, that indicate an array type
+    // Parse option `[]` or `*` braces after a type expression, that indicate an array or pointer type
     static Expr* parsePostfixTypeSuffix(
         Parser* parser,
         Expr* inTypeExpr)
@@ -2577,6 +2603,7 @@ namespace Slang
 
         Modifiers modifiers = inModifiers;
         auto typeSpec = _parseTypeSpec(parser, modifiers);
+        typeSpec.expr = parseBracketTypeSuffix(parser, typeSpec.expr);
 
         if (typeSpec.expr == nullptr && typeSpec.decl == nullptr)
         {
