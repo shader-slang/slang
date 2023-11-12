@@ -2603,12 +2603,12 @@ namespace Slang
 
         Modifiers modifiers = inModifiers;
         auto typeSpec = _parseTypeSpec(parser, modifiers);
-        typeSpec.expr = parseBracketTypeSuffix(parser, typeSpec.expr);
 
         if (typeSpec.expr == nullptr && typeSpec.decl == nullptr)
         {
             return nullptr;
         }
+
 
         // We may need to build up multiple declarations in a group,
         // but the common case will be when we have just a single
@@ -2621,6 +2621,11 @@ namespace Slang
         // it might declare a `struct` type.
         if(typeSpec.decl)
             declGroupBuilder.addDecl(typeSpec.decl);
+        else
+        {
+            // Allow using brackets directly after type name to declare an array typed variable.
+            typeSpec.expr = parseBracketTypeSuffix(parser, typeSpec.expr);
+        }
 
         if( AdvanceIf(parser, TokenType::Semicolon) )
         {
