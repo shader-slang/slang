@@ -176,7 +176,7 @@ slang_add_target(
     OUTPUT_DIR generators
     TARGET_NAME slang-bootstrap
     EXCLUDE_FROM_ALL
-    LINK_WITH_PRIVATE core prelude slang-no-embedded-stdlib Threads::Threads
+    LINK_WITH_PRIVATE core slang-no-embedded-stdlib Threads::Threads
     REQUIRED_BY generators
 )
 
