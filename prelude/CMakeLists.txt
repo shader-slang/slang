@@ -1,3 +1,8 @@
+#
+# Use the slang-embed tool to generate a source file for each prelude header.
+# Construct a library called 'prelude' to be linked with by slang
+#
+
 glob_append(SLANG_PRELUDE_HEADERS "*-prelude.h")
 
 set(SLANG_PRELUDE_SOURCE)
@@ -15,4 +20,4 @@ endforeach()
 
 add_library(prelude OBJECT EXCLUDE_FROM_ALL ${SLANG_PRELUDE_SOURCE})
 set_default_compile_options(prelude)
-target_include_directories(prelude PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(prelude PRIVATE ${CMAKE_CURRENT_LIST_DIR})

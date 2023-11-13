@@ -95,9 +95,9 @@ slang_add_target(
 slang_add_target(
     source/slang-rt
     SHARED
-    USE_EXTRA_WARNINGS
     # This compiles 'core' again with the SLANG_RT_DYNAMIC_EXPORT macro defined
     EXTRA_SOURCE_DIRS source/core
+    USE_EXTRA_WARNINGS
     LINK_WITH_PRIVATE miniz lz4_static Threads::Threads
     EXPORT_MACRO_PREFIX SLANG_RT
 )
@@ -184,6 +184,8 @@ slang_add_target(
 # The compiler itself
 #
 
+# keep these non-trivial targets in their own directories so as not to clutter
+# this file
 add_subdirectory(prelude)
 add_subdirectory(source/slang)
 
@@ -355,9 +357,10 @@ function(example dir)
     slang_add_target(
         ${dir}
         EXECUTABLE
+        ${ARGN}
         EXCLUDE_FROM_ALL
         USE_FEWER_WARNINGS
-        LINK_WITH_PRIVATE core example-base slang gfx gfx-util platform ${ARGN}
+        LINK_WITH_PRIVATE core example-base slang gfx gfx-util platform
         REQUIRED_BY examples
     )
 endfunction()
