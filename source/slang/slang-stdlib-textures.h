@@ -60,11 +60,12 @@ struct TextureTypeInfo
 
     void emitTypeDecl();
 
-private:
+public:
     //
     // Functions for writing specific parts of a definition
     //
     void writeQueryFunctions();
+    void writeGetDimensionFunctions();
     void writeSubscriptFunctions();
     void writeSampleFunctions();
     void writeGatherExtensions();

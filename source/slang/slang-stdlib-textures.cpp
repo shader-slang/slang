@@ -159,6 +159,7 @@ void TextureTypeInfo::writeFunc(
 
 void TextureTypeInfo::emitTypeDecl()
 {
+#if 0
     char const* baseName = prefixInfo.name;
     char const* baseShapeName = base.shapeName;
     TextureFlavor::Shape baseShape = base.baseShape;
@@ -223,42 +224,18 @@ void TextureTypeInfo::emitTypeDecl()
     }
 
     writeGatherExtensions();
+#endif
 } // TextureTypeInfo::emitTypeDecl
 
-void TextureTypeInfo::writeQueryFunctions()
+void TextureTypeInfo::writeGetDimensionFunctions()
 {
     static const char* kComponentNames[]{ "x", "y", "z", "w" };
 
     TextureFlavor::Shape baseShape = base.baseShape;
-
-    char const* samplerStateParam = prefixInfo.combined ? "" : "SamplerState s, ";
     auto access = accessInfo.access;
 
-    if( !isMultisample )
-    {
-        writeFunc(
-            "float",
-            "CalculateLevelOfDetail",
-            cat(samplerStateParam, "float", base.coordCount, " location"),
-            cat("textureQueryLod($p, $2).x"),
-            "",
-            "",
-            ReadNoneMode::Never
-        );
-
-        writeFunc(
-            "float",
-            "CalculateLevelOfDetailUnclamped",
-            cat(samplerStateParam, "float", base.coordCount, " location"),
-            cat("textureQueryLod($p, $2).y"),
-            "",
-            "",
-            ReadNoneMode::Never
-        );
-    }
-
     // `GetDimensions`
-    const char* dimParamTypes[] = {"out float ", "out int ", "out uint "};
+    const char* dimParamTypes[] = { "out float ", "out int ", "out uint " };
     const char* dimParamTypesInner[] = { "float", "int", "uint" };
     for (int tid = 0; tid < 3; tid++)
     {
@@ -485,6 +462,40 @@ void TextureTypeInfo::writeQueryFunctions()
                 ReadNoneMode::Always);
         }
     }
+}
+
+void TextureTypeInfo::writeQueryFunctions()
+{
+    static const char* kComponentNames[]{ "x", "y", "z", "w" };
+
+    TextureFlavor::Shape baseShape = base.baseShape;
+
+    char const* samplerStateParam = prefixInfo.combined ? "" : "SamplerState s, ";
+    auto access = accessInfo.access;
+
+    if( !isMultisample )
+    {
+        writeFunc(
+            "float",
+            "CalculateLevelOfDetail",
+            cat(samplerStateParam, "float", base.coordCount, " location"),
+            cat("textureQueryLod($p, $2).x"),
+            "",
+            "",
+            ReadNoneMode::Never
+        );
+
+        writeFunc(
+            "float",
+            "CalculateLevelOfDetailUnclamped",
+            cat(samplerStateParam, "float", base.coordCount, " location"),
+            cat("textureQueryLod($p, $2).y"),
+            "",
+            "",
+            ReadNoneMode::Never
+        );
+    }
+
 
     // `GetSamplePosition()`
     if( isMultisample )

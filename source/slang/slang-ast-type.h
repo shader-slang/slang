@@ -118,21 +118,42 @@ class FeedbackType : public BuiltinType
     Kind getKind() const;
 };
 
+class TextureShapeType : public BuiltinType
+{
+    SLANG_ABSTRACT_AST_CLASS(TextureShapeType)
+};
+
+class TextureShape1DType : public TextureShapeType
+{
+    SLANG_AST_CLASS(TextureShape1DType)
+};
+class TextureShape2DType : public TextureShapeType
+{
+    SLANG_AST_CLASS(TextureShape2DType)
+};
+class TextureShape3DType : public TextureShapeType
+{
+    SLANG_AST_CLASS(TextureShape3DType)
+};
+class TextureShapeCubeType : public TextureShapeType
+{
+    SLANG_AST_CLASS(TextureShapeCubeType)
+};
+class TextureShapeBufferType : public TextureShapeType
+{
+    SLANG_AST_CLASS(TextureShapeBufferType)
+};
+
 // Resources that contain "elements" that can be fetched
 class ResourceType : public BuiltinType 
 {
     SLANG_ABSTRACT_AST_CLASS(ResourceType)
 
-    TextureFlavor getFlavor() const;
-
-    TextureFlavor::Shape getBaseShape()
-    {
-        return getFlavor().getBaseShape();
-    }
-    bool isMultisample() { return getFlavor().isMultisample(); }
-    bool isArray() { return getFlavor().isArray(); }
-    SlangResourceShape getShape() const { return getFlavor().getShape(); }
-    SlangResourceAccess getAccess() { return getFlavor().getAccess(); }
+    bool isMultisample();
+    bool isArray();
+    TextureFlavor::Shape getBaseShape();
+    SlangResourceShape getShape();
+    SlangResourceAccess getAccess();
     Type* getElementType();
 };
 
@@ -142,8 +163,6 @@ class TextureTypeBase : public ResourceType
 
     Val* getSampleCount();
 };
-
-
 
 class TextureType : public TextureTypeBase 
 {

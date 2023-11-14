@@ -133,22 +133,24 @@ INST(Nop, nop, 0, 0)
         INST(SamplerComparisonStateType, SamplerComparisonState, 0, HOISTABLE)
     INST_RANGE(SamplerStateTypeBase, SamplerStateType, SamplerComparisonStateType)
 
+    INST(TextureShape1DType, TextureShape1DType, 0, HOISTABLE)
+    INST(TextureShape2DType, TextureShape1DType, 0, HOISTABLE)
+    INST(TextureShape3DType, TextureShape1DType, 0, HOISTABLE)
+    INST(TextureShapeCubeType, TextureShape1DType, 0, HOISTABLE)
+    INST(TextureShapeBufferType, TextureShapeBufferType, 0, HOISTABLE)
+
     // TODO: Why do we have all this hierarchy here, when everything
     // that actually matters is currently nested under `TextureTypeBase`?
     /* ResourceTypeBase */
         /* ResourceType */
             /* TextureTypeBase */
-                // NOTE! TextureFlavor::Flavor is stored in 'other' bits for these types.
                 /* TextureType */
-                INST(TextureType, TextureType, 0, USE_OTHER | HOISTABLE)
-                /* TextureSamplerType */
-                INST(TextureSamplerType, TextureSamplerType, 0, USE_OTHER | HOISTABLE)
+                INST(TextureType, TextureType, 8, HOISTABLE)
                 /* GLSLImageType */
                 INST(GLSLImageType, GLSLImageType, 0, USE_OTHER | HOISTABLE)
             INST_RANGE(TextureTypeBase, TextureType, GLSLImageType)
         INST_RANGE(ResourceType, TextureType, GLSLImageType)
     INST_RANGE(ResourceTypeBase, TextureType, GLSLImageType)
-
 
     /* UntypedBufferResourceType */
         /* ByteAddressBufferTypeBase */

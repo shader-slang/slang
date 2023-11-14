@@ -2355,6 +2355,11 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
     // each of these IR opcodes.
     if (auto texType = as<IRTextureType>(type))
     {
+        if (texType->isCombined())
+        {
+            _emitGLSLTextureOrTextureSamplerType(texType, "sampler");
+            return;
+        }
         switch (texType->getAccess())
         {
             case SLANG_RESOURCE_ACCESS_READ_WRITE:
@@ -2366,11 +2371,6 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
                 _emitGLSLTextureOrTextureSamplerType(texType, "texture");
                 break;
         }
-        return;
-    }
-    else if (auto textureSamplerType = as<IRTextureSamplerType>(type))
-    {
-        _emitGLSLTextureOrTextureSamplerType(textureSamplerType, "sampler");
         return;
     }
     else if (auto imageType = as<IRGLSLImageType>(type))

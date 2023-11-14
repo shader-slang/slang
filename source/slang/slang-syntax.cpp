@@ -470,6 +470,12 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
             return astBuilder->getOrCreate<ThisType>(declRef.declRefBase);
         }
+        else if (auto typedefDecl = as<TypeDefDecl>(declRef.getDecl()))
+        {
+            if (typedefDecl->type.type)
+                return as<Type>(typedefDecl->type.type->substitute(astBuilder, SubstitutionSet(declRef)));
+            return astBuilder->getErrorType();
+        }
         else
         {
             declRef = createDefaultSubstitutionsIfNeeded(astBuilder, nullptr, declRef);

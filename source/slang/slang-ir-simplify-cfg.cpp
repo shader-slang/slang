@@ -943,6 +943,11 @@ bool simplifyCFG(IRModule* module, CFGSimplificationOptions options)
 
 bool simplifyCFG(IRGlobalValueWithCode* func, CFGSimplificationOptions options)
 {
+    if (auto genericFunc = as<IRGeneric>(func))
+    {
+        if (auto inner = as<IRFunc>(findGenericReturnVal(genericFunc)))
+            processFunc(inner, options);
+    }
     return processFunc(func, options);
 }
 

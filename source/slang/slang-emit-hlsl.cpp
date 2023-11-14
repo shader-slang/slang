@@ -954,11 +954,6 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         _emitHLSLTextureType(texType);
         return;
     }
-    else if (const auto textureSamplerType = as<IRTextureSamplerType>(type))
-    {
-        SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "this target should see combined texture-sampler types");
-        return;
-    }
     else if (auto imageType = as<IRGLSLImageType>(type))
     {
         _emitHLSLTextureType(imageType);

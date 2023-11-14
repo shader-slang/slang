@@ -546,7 +546,7 @@
         </Expand>
     </Type>
     <Type Name="Slang::ValNodeOperand">
-        <DisplayString Condition="kind==Slang::ValNodeOperandKind::ConstantValue">Const({values.intOperand})</DisplayString>
+        <DisplayString Optional="true" Condition="kind==Slang::ValNodeOperandKind::ConstantValue">Const({values.intOperand})#{_debugUID}</DisplayString>
         <DisplayString Condition="kind==Slang::ValNodeOperandKind::ValNode">{*(Val*)values.nodeOperand}</DisplayString>
         <DisplayString>{values.nodeOperand}</DisplayString>
         <Expand>
@@ -561,6 +561,8 @@
         <DisplayString Condition="astNodeType == Slang::ASTNodeType::GenericAppDeclRef">{*(Slang::GenericAppDeclRef*)this}</DisplayString>
         <DisplayString Condition="astNodeType == Slang::ASTNodeType::ConstantIntVal">{*(Slang::ConstantIntVal*)this}</DisplayString>
         <DisplayString Condition="astNodeType == Slang::ASTNodeType::PolynomialIntVal">{*(Slang::PolynomialIntVal*)this}</DisplayString>
+        <DisplayString Condition="astNodeType == Slang::ASTNodeType::PolynomialIntValTerm">{*(Slang::PolynomialIntValTerm*)this}</DisplayString>
+        <DisplayString Condition="astNodeType == Slang::ASTNodeType::PolynomialIntValFactor">{*(Slang::PolynomialIntValFactor*)this}</DisplayString>
         <DisplayString Condition="astNodeType == Slang::ASTNodeType::GenericParamIntVal">{*(Slang::GenericParamIntVal*)this}</DisplayString>
         <DisplayString Condition="astNodeType == Slang::ASTNodeType::DeclaredSubtypeWitness">{*(Slang::DeclaredSubtypeWitness*)this}</DisplayString>
         <DisplayString Condition="astNodeType == Slang::ASTNodeType::TransitiveSubtypeWitness">{*(Slang::TransitiveSubtypeWitness*)this}</DisplayString>
@@ -644,6 +646,8 @@
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::GenericAppDeclRef">(Slang::GenericAppDeclRef*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ConstantIntVal">(Slang::ConstantIntVal*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::PolynomialIntVal">(Slang::PolynomialIntVal*)&amp;astNodeType</ExpandedItem>
+            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::PolynomialIntValTerm">(Slang::PolynomialIntValTerm*)&amp;astNodeType</ExpandedItem>
+            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::PolynomialIntValFactor">(Slang::PolynomialIntValFactor*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::GenericParamIntVal">(Slang::GenericParamIntVal*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::DeclaredSubtypeWitness">(Slang::DeclaredSubtypeWitness*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::TransitiveSubtypeWitness">(Slang::TransitiveSubtypeWitness*)&amp;astNodeType</ExpandedItem>
@@ -794,11 +798,41 @@
   </Type>
 
     <Type Name="Slang::ConstantIntVal">
+        <DisplayString Optional="true">{astNodeType,en}#{_debugUID} ({m_operands.m_buffer[1].values.intOperand} : {*(Type*)m_operands.m_buffer[0].values.nodeOperand}) </DisplayString>
         <DisplayString>ConstantIntVal ({m_operands.m_buffer[1].values.intOperand} : {*(Type*)m_operands.m_buffer[0].values.nodeOperand})</DisplayString>
     </Type>
 
-    <Type Name="Slang::GenericParamIntVal">
-        <DisplayString>GenericParamIntVal ({*(DeclRefBase*)m_operands.m_buffer[1].values.nodeOperand})</DisplayString>
+    <Type Name="Slang::PolynomialIntVal">
+        <DisplayString Optional="true">{astNodeType,en}#{_debugUID} </DisplayString>
+        <DisplayString>{astNodeType,en}</DisplayString>
+        <Expand>
+            <ArrayItems>
+                <Size>m_operands.m_count</Size>
+                <ValuePointer>m_operands.m_buffer</ValuePointer>
+            </ArrayItems>
+        </Expand>
+    </Type>
+
+    <Type Name="Slang::PolynomialIntValTerm">
+        <DisplayString Optional="true">{astNodeType,en}#{_debugUID} </DisplayString>
+        <DisplayString>{astNodeType,en}</DisplayString>
+        <Expand>
+            <ArrayItems>
+                <Size>m_operands.m_count</Size>
+                <ValuePointer>m_operands.m_buffer</ValuePointer>
+            </ArrayItems>
+        </Expand>
+    </Type>
+
+    <Type Name="Slang::PolynomialIntValFactor">
+        <DisplayString Optional="true">{astNodeType,en}#{_debugUID} </DisplayString>
+        <DisplayString>{astNodeType,en}</DisplayString>
+        <Expand>
+            <ArrayItems>
+                <Size>m_operands.m_count</Size>
+                <ValuePointer>m_operands.m_buffer</ValuePointer>
+            </ArrayItems>
+        </Expand>
     </Type>
 
     <Type Name="Slang::BasicExpressionType">

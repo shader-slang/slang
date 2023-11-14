@@ -1362,11 +1362,6 @@ struct SPIRVEmitContext
             return ensureTextureType(inst, cast<IRTextureType>(inst));
         case kIROp_SamplerStateType:
             return emitOpTypeSampler(inst);
-        case kIROp_TextureSamplerType:
-            return emitOpTypeSampledImage(
-                inst,
-                ensureTextureType(nullptr, cast<IRTextureTypeBase>(inst))
-            );
 
         case kIROp_RaytracingAccelerationStructureType:
             requireSPIRVCapability(SpvCapabilityRayTracingKHR);
@@ -1717,6 +1712,24 @@ struct SPIRVEmitContext
         //
         // The op itself
         //
+        
+        if (inst->isCombined())
+        {
+            auto imageType = emitOpTypeImage(
+                nullptr,
+                dropVector(sampledType),
+                dim,
+                SpvLiteralInteger::from32(depth),
+                SpvLiteralInteger::from32(arrayed),
+                SpvLiteralInteger::from32(ms),
+                SpvLiteralInteger::from32(sampled),
+                format
+            );
+            return emitOpTypeSampledImage(
+                assignee,
+                imageType);
+        }
+
         return emitOpTypeImage(
             assignee,
             dropVector(sampledType),

@@ -7011,13 +7011,6 @@ namespace Slang
             // 
             // We may want to care about decorations.
 
-            // If it's a resource type - special case the handling of the resource flavor 
-            if (IRResourceTypeBase::isaImpl(opA) &&
-                static_cast<const IRResourceTypeBase*>(a)->getFlavor() != static_cast<const IRResourceTypeBase*>(b)->getFlavor())
-            {
-                return false;
-            }
-
             // TODO(JS): There is a question here about what to do about decorations.
             // For now we ignore decorations. Are two types potentially different if there decorations different?
             // If decorations play a part in difference in types - the order of decorations presumably is not important.
@@ -7940,13 +7933,13 @@ namespace Slang
         auto func = as<IRGlobalValueWithCode>(callee);
         if (!func)
             return false;
-        auto block = func->getFirstBlock();
-        if (!block)
-            return false;
-        if (auto genAsm = as<IRGenericAsm>(block->getTerminator()))
+        for (auto block : func->getBlocks())
         {
-            outDefinition = genAsm->getAsm();
-            return true;
+            if (auto genAsm = as<IRGenericAsm>(block->getTerminator()))
+            {
+                outDefinition = genAsm->getAsm();
+                return true;
+            }
         }
         return false;
     }

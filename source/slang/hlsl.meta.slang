@@ -112,6 +112,1144 @@ struct ByteAddressBuffer
     }
 };
 
+// Texture
+[sealed]
+[builtin]
+interface __ITextureShape
+{
+    static const int flavor;
+    static const int dimensions;
+    static const int planeDimensions;
+}
+__magic_type(TextureShape1DType)
+__intrinsic_type($(kIROp_TextureShape1DType))
+struct __Shape1D : __ITextureShape
+{
+    static const int flavor = $(SLANG_TEXTURE_1D);
+    static const int dimensions = 1;
+    static const int planeDimensions = 1;
+}
+__magic_type(TextureShape2DType)
+__intrinsic_type($(kIROp_TextureShape2DType))
+struct __Shape2D : __ITextureShape
+{
+    static const int flavor = $(SLANG_TEXTURE_2D);
+    static const int dimensions = 2;
+    static const int planeDimensions = 2;
+}
+__magic_type(TextureShape3DType)
+__intrinsic_type($(kIROp_TextureShape3DType))
+struct __Shape3D : __ITextureShape
+{
+    static const int flavor = $(SLANG_TEXTURE_3D);
+    static const int dimensions = 3;
+    static const int planeDimensions = 3;
+}
+__magic_type(TextureShapeCubeType)
+__intrinsic_type($(kIROp_TextureShapeCubeType))
+struct __ShapeCube : __ITextureShape
+{
+    static const int flavor = $(SLANG_TEXTURE_CUBE);
+    static const int dimensions = 3;
+    static const int planeDimensions = 2;
+}
+__magic_type(TextureShapeBufferType)
+__intrinsic_type($(kIROp_TextureShapeBufferType))
+struct __ShapeBuffer : __ITextureShape
+{
+    static const int flavor = $(SLANG_TEXTURE_BUFFER);
+    static const int dimensions = 1;
+    static const int planeDimensions = 1;
+}
+__intrinsic_op(vectorReshape)
+vector<T,N> __vectorReshape<let N : int, T, let M : int>(vector<T,M> vin);
+
+__intrinsic_op(makeVector)
+__generic<T, let N:int>
+vector<T,N+1> __makeVector(vector<T,N> vec, T scalar);
+
+static const int __kTextureAccessNone = 0;
+static const int __kTextureAccessRW = 1;
+static const int __kTextureAccessRasterizerOrdered = 2;
+static const int __kTextureAccessFeedback = 3;
+
+__magic_type(TextureType)
+__intrinsic_type($(kIROp_TextureType))
+struct __TextureImpl<T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int>
+{
+}
+
+// Combined texture sampler specific functions
+__generic<T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let isShadow:int>
+extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1>
+{
+    static const int access = 0;
+
+    typealias TextureCoord = vector<float, Shape.dimensions>;
+    typealias ImageType = __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0>;
+
+    __target_intrinsic(glsl, "textureQueryLod($p, $1).x")
+    float CalculateLevelOfDetail(TextureCoord location);
+
+    __target_intrinsic(glsl, "textureQueryLod($p, $1).y")
+    float CalculateLevelOfDetailUnclamped(TextureCoord location);
+
+    [__readNone]
+    T Sample(vector<float, Shape.dimensions+isArray> location)
+    {
+        __target_switch
+        {
+            case cpp:
+            case hlsl:
+                __intrinsic_asm ".Sample";
+            case glsl:
+                __intrinsic_asm "$ctexture($p, $1)$z";
+            case cuda:
+                if (isArray != 0)
+                {
+                    switch(Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_1D):
+                        __intrinsic_asm "tex1DLayered<$T0>($0, ($1).x, int(($1).y))";
+                    case $(SLANG_TEXTURE_2D):
+                        __intrinsic_asm "tex2DLayered<$T0>($0, ($1).x, ($1).y, int(($1).z))";
+                    default:
+                        __intrinsic_asm "<invalid intrinsic>";
+                    }
+                }
+                else
+                {
+                    switch(Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_1D):
+                        __intrinsic_asm "tex1D<$T0>($0, ($1).x)";
+                    case $(SLANG_TEXTURE_2D):
+                        __intrinsic_asm "tex2D<$T0>($0, ($1).x, ($1).y)";
+                    case $(SLANG_TEXTURE_3D):
+                        __intrinsic_asm "tex3D<$T0>($0, ($1).x, ($1).y, ($1).z)";
+                    case $(SLANG_TEXTURE_CUBE):
+                        __intrinsic_asm "texCubemap<$T0>($0, ($1).x, ($1).y, ($1).z)";
+                    }
+                }
+            case spirv:
+                return spirv_asm
+                {
+                    %sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location None;
+                    __truncate $$T result __sampledType(T) %sampled;
+                };
+        }
+    }
+
+    [__readNone]
+    T Sample(vector<float, Shape.dimensions+isArray> location, vector<int, Shape.planeDimensions> offset, float clamp)
+    {
+        __target_switch
+        {
+            case cpp:
+            case hlsl:
+                __intrinsic_asm ".Sample";
+            case glsl:
+                __intrinsic_asm "$ctexture($p, $1)$z";
+            case spirv:
+                return spirv_asm
+                {
+                    OpCapability MinLod;
+                    %sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location None|ConstOffset|MinLod $offset $clamp;
+                    __truncate $$T result __sampledType(T) %sampled;
+                };
+        }
+    }
+
+    [__readNone]
+    __target_intrinsic(hlsl)
+    T Sample(vector<float, Shape.dimensions+isArray> location, vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
+    {
+        status = 0;
+        return Sample(location, offset, clamp);
+    }
+
+    [__readNone]
+    T SampleBias(vector<float, Shape.dimensions+isArray> location, float bias)
+    {
+        __target_switch
+        {
+            case cpp:
+            case hlsl:
+                __intrinsic_asm ".SampleBias";
+            case glsl:
+                __intrinsic_asm "$ctexture($p, $1, $2)$z";
+            case spirv:
+                return spirv_asm
+                {
+                    %sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location None|Bias $bias;
+                    __truncate $$T result __sampledType(T) %sampled;
+
+                };
+        }
+    }
+
+    [__readNone]
+    T SampleBias(vector<float, Shape.dimensions+isArray> location, float bias, constexpr vector<int, Shape.planeDimensions> offset)
+    {
+        __target_switch
+        {
+            case cpp:
+            case hlsl:
+            __intrinsic_asm ".SampleBias";
+            case glsl:
+            __intrinsic_asm "$ctextureOffset($p, $1, $2, $3)$z";
+            case spirv:
+            return spirv_asm
+            {
+                %sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location None|Bias|ConstOffset $bias $offset;
+                __truncate $$T result __sampledType(T) %sampled;
+            };
+        }
+    }
+
+    __target_intrinsic(glsl, "texture($p, vec3($1, $2))")
+    [__readNone]
+    float SampleCmp(vector<float, Shape.dimensions+isArray> location, float compareValue);
+
+    __glsl_extension(GL_EXT_texture_shadow_lod)
+    __target_intrinsic(glsl, "textureLod($p, vec3($1, $2), 0)")
+    [__readNone]
+    float SampleCmpLevelZero(vector<float, Shape.dimensions+isArray> location, float compareValue);
+
+    __target_intrinsic(glsl, "textureOffset($p, vec3($1, $2), $3)")
+    [__readNone]
+    float SampleCmp(vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset);
+
+    __glsl_extension(GL_EXT_texture_shadow_lod)
+    __target_intrinsic(glsl, "textureLodOffset($p, vec3($1, $2), 0, $3)")
+    [__readNone]
+    float SampleCmpLevelZero(vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset);
+
+    [__readNone]
+    T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY)
+    {
+        __target_switch
+        {
+            case cpp:
+            case hlsl:
+            __intrinsic_asm ".SampleGrad";
+            case glsl:
+            __intrinsic_asm "$ctextureGrad($p, $1, $2, $3)$z";
+            case spirv:
+                return spirv_asm
+                {
+                    %sampled : __sampledType(T) = OpImageSampleExplicitLod $this $location None|Grad $gradX $gradY;
+                    __truncate $$T result __sampledType(T) %sampled;
+                };
+        }
+    }
+
+    [__readNone]
+    T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset)
+    {
+        __target_switch
+        {
+            case cpp:
+            case hlsl:
+            __intrinsic_asm ".SampleGrad";
+            case glsl:
+            __intrinsic_asm "$ctextureGradOffset($p, $1, $2, $3, $4)$z";
+            case spirv:
+                return spirv_asm
+                {
+                    %sampled : __sampledType(T) = OpImageSampleExplicitLod $this $location None|Grad|ConstOffset $gradX $gradY $offset;
+                    __truncate $$T result __sampledType(T) %sampled;
+
+                };
+        }
+    }
+
+    __glsl_extension(GL_ARB_sparse_texture_clamp)
+    [__readNone]
+    T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset, float lodClamp)
+    {
+        __target_switch
+        {
+            case cpp:
+            case hlsl:
+            __intrinsic_asm ".SampleGrad";
+            case glsl:
+            __intrinsic_asm "$ctextureGradOffsetClampARB($p, $1, $2, $3, $4, $5)$z";
+            case spirv:
+                return spirv_asm
+                {
+                    OpCapability MinLod;
+                    %sampled : __sampledType(T) = OpImageSampleExplicitLod $this $location None|Grad|ConstOffset|MinLod $gradX $gradY $offset $lodClamp;
+                    __truncate $$T result __sampledType(T) %sampled;
+
+                };
+        }
+    }
+
+    [__readNone]
+    T SampleLevel(vector<float, Shape.dimensions+isArray> location, float level)
+    {
+        __target_switch
+        {
+            case cpp:
+            case hlsl:
+                __intrinsic_asm ".SampleLevel";
+            case glsl:
+                __intrinsic_asm "$ctextureLod($p, $1, $2)$z";
+            case cuda:
+                if (isArray != 0)
+                {
+                    switch(Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_1D):
+                        __intrinsic_asm "tex1DLayeredLod<$T0>($0, ($1).x, int(($1).y), ($2))";
+                    case $(SLANG_TEXTURE_2D):
+                        __intrinsic_asm "tex2DLayeredLod<$T0>($0, ($1).x, ($1).y, int(($1).z), ($2))";
+                    default:
+                        __intrinsic_asm "<invalid intrinsic>";
+                    }
+                }
+                else
+                {
+                    switch(Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_1D):
+                        __intrinsic_asm "tex1DLod<$T0>($0, ($1).x, ($2))";
+                    case $(SLANG_TEXTURE_2D):
+                        __intrinsic_asm "tex2DLod<$T0>($0, ($1).x, ($1).y, ($2))";
+                    case $(SLANG_TEXTURE_3D):
+                        __intrinsic_asm "tex3DLod<$T0>($0, ($1).x, ($1).y, ($1).z, ($2))";
+                    case $(SLANG_TEXTURE_CUBE):
+                        __intrinsic_asm "texCubemapLod<$T0>($0, ($1).x, ($1).y, ($1).z, ($2))";
+                    }
+                }
+            case spirv:
+                return spirv_asm
+                {
+                    %sampled : __sampledType(T) = OpImageSampleExplicitLod $this $location None|Lod $level;
+                    __truncate $$T result __sampledType(T) %sampled;
+                };
+        }
+    }
+
+    [__readNone]
+    T SampleLevel(vector<float, Shape.dimensions+isArray> location, float level, constexpr vector<int, Shape.planeDimensions> offset)
+    {
+        __target_switch
+        {
+            case cpp:
+            case hlsl:
+                __intrinsic_asm ".SampleLevel";
+            case glsl:
+                __intrinsic_asm "$ctextureLodOffset($p, $1, $2, $3)$z";
+            case spirv:
+                return spirv_asm
+                {
+                    %sampled : __sampledType(T) = OpImageSampleExplicitLod $this $location None|Lod|ConstOffset $level $offset;
+                    __truncate $$T result __sampledType(T) %sampled;
+                };
+        }
+    }
+}
+
+// Non-combined texture types specific functions
+__generic<T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int>
+extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0>
+{
+    typealias TextureCoord = vector<float, Shape.dimensions>;
+
+    __target_intrinsic(glsl, "textureQueryLod($p, $2).x")
+    float CalculateLevelOfDetail(SamplerState s, TextureCoord location);
+
+    __target_intrinsic(glsl, "textureQueryLod($p, $2).y")
+    float CalculateLevelOfDetailUnclamped(SamplerState s, TextureCoord location);
+
+    [__readNone]
+    T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location)
+    {
+        __target_switch
+        {
+            case cpp:
+            case hlsl:
+                __intrinsic_asm ".Sample";
+            case glsl:
+                __intrinsic_asm "$ctexture($p, $2)$z";
+            case cuda:
+                if (isArray != 0)
+                {
+                    switch(Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_1D):
+                        __intrinsic_asm "tex1DLayered<$T0>($0, ($2).x, int(($2).y))";
+                    case $(SLANG_TEXTURE_2D):
+                        __intrinsic_asm "tex2DLayered<$T0>($0, ($2).x, ($2).y, int(($2).z))";
+                    default:
+                        __intrinsic_asm "<invalid intrinsic>";
+                    }
+                }
+                else
+                {
+                    switch(Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_1D):
+                        __intrinsic_asm "tex1D<$T0>($0, ($2).x)";
+                    case $(SLANG_TEXTURE_2D):
+                        __intrinsic_asm "tex2D<$T0>($0, ($2).x, ($2).y)";
+                    case $(SLANG_TEXTURE_3D):
+                        __intrinsic_asm "tex3D<$T0>($0, ($2).x, ($2).y, ($2).z)";
+                    case $(SLANG_TEXTURE_CUBE):
+                        __intrinsic_asm "texCubemap<$T0>($0, ($2).x, ($2).y, ($2).z)";
+                    }
+                }
+            case spirv:
+                return spirv_asm
+                {
+                    %sampledImageType = OpTypeSampledImage $$This;
+                    %sampledImage : %sampledImageType = OpSampledImage $this $s;
+                    %sampled : __sampledType(T) = OpImageSampleImplicitLod %sampledImage $location None;
+                    __truncate $$T result __sampledType(T) %sampled;
+                };
+        }
+    }
+
+    [__readNone]
+    T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset)
+    {
+        __target_switch
+        {
+            case cpp:
+            case hlsl:
+                __intrinsic_asm ".Sample";
+            case glsl:
+                __intrinsic_asm "$ctextureOffset($p, $2, $3)$z";
+            case spirv:
+            return spirv_asm
+            {
+                %sampledImageType = OpTypeSampledImage $$This;
+                %sampledImage : %sampledImageType = OpSampledImage $this $s;
+                %sampled : __sampledType(T) = OpImageSampleImplicitLod %sampledImage $location None|ConstOffset $offset;
+                __truncate $$T result __sampledType(T) %sampled;
+            };
+        }
+    }
+
+    [__readNone]
+    T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset, float clamp)
+    {
+        __target_switch
+        {
+            case cpp:
+            case hlsl:
+                __intrinsic_asm ".Sample";
+            case spirv:
+                return spirv_asm
+                {
+                    OpCapability MinLod;
+                    %sampledImageType = OpTypeSampledImage $$This;
+                    %sampledImage : %sampledImageType = OpSampledImage $this $s;
+                    %sampled : __sampledType(T) = OpImageSampleImplicitLod %sampledImage $location None|ConstOffset|MinLod $offset $clamp;
+                    __truncate $$T result __sampledType(T) %sampled;
+                };
+        }
+    }
+
+    [__readNone]
+    __target_intrinsic(hlsl)
+    T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
+    {
+        status = 0;
+        return Sample(s, location, offset, clamp);
+    }
+
+    [__readNone]
+    T SampleBias(SamplerState s, vector<float, Shape.dimensions+isArray> location, float bias)
+    {
+        __target_switch
+        {
+            case cpp:
+            case hlsl:
+            __intrinsic_asm ".SampleBias";
+            case glsl:
+            __intrinsic_asm "$ctexture($p, $2, $3)$z";
+            case spirv:
+            return spirv_asm
+            {
+                %sampledImageType = OpTypeSampledImage $$This;
+                %sampledImage : %sampledImageType = OpSampledImage $this $s;
+                %sampled : __sampledType(T) = OpImageSampleImplicitLod %sampledImage $location None|Bias $bias;
+                __truncate $$T result __sampledType(T) %sampled;
+
+            };
+        }
+    }
+
+    [__readNone]
+    T SampleBias(SamplerState s, vector<float, Shape.dimensions+isArray> location, float bias, constexpr vector<int, Shape.planeDimensions> offset)
+    {
+        __target_switch
+        {
+            case cpp:
+            case hlsl:
+            __intrinsic_asm ".SampleBias";
+            case glsl:
+            __intrinsic_asm "$ctextureOffset($p, $2, $3, $4)$z";
+            case spirv:
+            return spirv_asm
+            {
+                %sampledImageType = OpTypeSampledImage $$This;
+                %sampledImage : %sampledImageType = OpSampledImage $this $s;
+                %sampled : __sampledType(T) = OpImageSampleImplicitLod %sampledImage $location None|Bias|ConstOffset $bias $offset;
+                __truncate $$T result __sampledType(T) %sampled;
+            };
+        }
+    }
+
+    __target_intrinsic(glsl, "texture($p, vec3($2, $3))")
+    [__readNone]
+    float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue);
+
+    __glsl_extension(GL_EXT_texture_shadow_lod)
+    __target_intrinsic(glsl, "textureLod($p, vec3($2, $3), 0)")
+    [__readNone]
+    float SampleCmpLevelZero(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue);
+
+    __target_intrinsic(glsl, "textureOffset($p, vec3($2, $3), $4)")
+    [__readNone]
+    float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset);
+
+    __glsl_extension(GL_EXT_texture_shadow_lod)
+    __target_intrinsic(glsl, "textureLodOffset($p, vec3($2, $3), 0, $4)")
+    [__readNone]
+    float SampleCmpLevelZero(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset);
+
+    [__readNone]
+    T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY)
+    {
+        __target_switch
+        {
+            case cpp:
+            case hlsl:
+            __intrinsic_asm ".SampleGrad";
+            case glsl:
+            __intrinsic_asm "$ctextureGrad($p, $2, $3, $4)$z";
+            case spirv:
+                return spirv_asm
+                {
+                    %sampledImageType = OpTypeSampledImage $$This;
+                    %sampledImage : %sampledImageType = OpSampledImage $this $s;
+                    %sampled : __sampledType(T) = OpImageSampleExplicitLod %sampledImage $location None|Grad $gradX $gradY;
+                    __truncate $$T result __sampledType(T) %sampled;
+
+                };
+        }
+    }
+
+    [__readNone]
+    T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset)
+    {
+        __target_switch
+        {
+            case cpp:
+            case hlsl:
+            __intrinsic_asm ".SampleGrad";
+            case glsl:
+            __intrinsic_asm "$ctextureGradOffset($p, $2, $3, $4, $5)$z";
+            case spirv:
+                return spirv_asm
+                {
+                    %sampledImageType = OpTypeSampledImage $$This;
+                    %sampledImage : %sampledImageType = OpSampledImage $this $s;
+                    %sampled : __sampledType(T) = OpImageSampleExplicitLod %sampledImage $location None|Grad|ConstOffset $gradX $gradY $offset;
+                    __truncate $$T result __sampledType(T) %sampled;
+
+                };
+        }
+    }
+
+    __glsl_extension(GL_ARB_sparse_texture_clamp)
+    [__readNone]
+    T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset, float lodClamp)
+    {
+        __target_switch
+        {
+            case cpp:
+            case hlsl:
+            __intrinsic_asm ".SampleGrad";
+            case glsl:
+            __intrinsic_asm "$ctextureGradOffsetClampARB($p, $2, $3, $4, $5, $6)$z";
+            case spirv:
+                return spirv_asm
+                {
+                    OpCapability MinLod;
+                    %sampledImageType = OpTypeSampledImage $$This;
+                    %sampledImage : %sampledImageType = OpSampledImage $this $s;
+                    %sampled : __sampledType(T) = OpImageSampleExplicitLod %sampledImage $location None|Grad|ConstOffset|MinLod $gradX $gradY $offset $lodClamp;
+                    __truncate $$T result __sampledType(T) %sampled;
+
+                };
+        }
+    }
+
+    [__readNone]
+    T SampleLevel(SamplerState s, vector<float, Shape.dimensions+isArray> location, float level)
+    {
+        __target_switch
+        {
+            case cpp:
+            case hlsl:
+                __intrinsic_asm ".SampleLevel";
+            case glsl:
+                __intrinsic_asm "$ctextureLod($p, $2, $3)$z";
+            case cuda:
+                if (isArray != 0)
+                {
+                    switch(Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_1D):
+                        __intrinsic_asm "tex1DLayeredLod<$T0>($0, ($2).x, int(($2).y), ($3))";
+                    case $(SLANG_TEXTURE_2D):
+                        __intrinsic_asm "tex2DLayeredLod<$T0>($0, ($2).x, ($2).y, int(($2).z), ($3))";
+                    default:
+                        __intrinsic_asm "<invalid intrinsic>";
+                    }
+                }
+                else
+                {
+                    switch(Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_1D):
+                        __intrinsic_asm "tex1DLod<$T0>($0, ($2).x, ($3))";
+                    case $(SLANG_TEXTURE_2D):
+                        __intrinsic_asm "tex2DLod<$T0>($0, ($2).x, ($2).y, ($3))";
+                    case $(SLANG_TEXTURE_3D):
+                        __intrinsic_asm "tex3DLod<$T0>($0, ($2).x, ($2).y, ($2).z, ($3))";
+                    case $(SLANG_TEXTURE_CUBE):
+                        __intrinsic_asm "texCubemapLod<$T0>($0, ($2).x, ($2).y, ($2).z, ($3))";
+                    }
+                }
+            case spirv:
+            return spirv_asm
+            {
+                %sampledImageType = OpTypeSampledImage $$This;
+                %sampledImage : %sampledImageType = OpSampledImage $this $s;
+                %sampled : __sampledType(T) = OpImageSampleExplicitLod %sampledImage $location None|Lod $level;
+                __truncate $$T result __sampledType(T) %sampled;
+
+            };
+        }
+    }
+
+    [__readNone]
+    T SampleLevel(SamplerState s, vector<float, Shape.dimensions+isArray> location, float level, constexpr vector<int, Shape.planeDimensions> offset)
+    {
+        __target_switch
+        {
+            case cpp:
+            case hlsl:
+                __intrinsic_asm ".SampleLevel";
+            case glsl:
+                __intrinsic_asm "$ctextureLodOffset($p, $2, $3, $4)$z";
+            case spirv:
+                return spirv_asm
+                {
+                    %sampledImageType = OpTypeSampledImage $$This;
+                    %sampledImage : %sampledImageType = OpSampledImage $this $s;
+                    %sampled : __sampledType(T) = OpImageSampleExplicitLod %sampledImage $location None|Lod|ConstOffset $level $offset;
+                    __truncate $$T result __sampledType(T) %sampled;
+                };
+        }
+    }
+}
+
+// Texture.GetDimensions
+${{{{
+struct TextureShapeInfo
+{
+    int flavor;
+    const char* shapeTypeName;
+    List<const char*> params;
+};
+const TextureShapeInfo kTextureShapes[] = {
+    {SLANG_TEXTURE_1D, "__Shape1D", {"width"}},
+    {SLANG_TEXTURE_2D, "__Shape2D", {"width", "height"}},
+    {SLANG_TEXTURE_3D, "__Shape3D", {"width", "height", "depth"}},
+    {SLANG_TEXTURE_CUBE, "__ShapeCube", {"width", "height"}},
+};
+const char* kGetDimensionResultTypes[] = {"float", "uint"};
+for (int shapeIndex = 0; shapeIndex < 4; shapeIndex++)
+for (int isArray = 0; isArray <= 1; isArray++)
+for (int isMS = 0; isMS <= 1; isMS++) {
+    if (isMS)
+    {
+        if (shapeIndex != 1)
+            continue;
+    }
+    if (isArray)
+    {
+        if (shapeIndex == 2)
+            continue;
+    }
+    auto shape = kTextureShapes[shapeIndex];
+    TextureTypeInfo textureTypeInfo(kTexturePrefixes[0], kBaseTextureShapes[shapeIndex], isArray, isMS, 0, kBaseTextureAccessLevels[0], sb, path);
+}}}}
+
+__generic<T, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int>
+extension __TextureImpl<T,$(shape.shapeTypeName),$(isArray),$(isMS),sampleCount,access,isShadow,isCombined>
+{
+    ${{{{
+    textureTypeInfo.writeGetDimensionFunctions();
+    }}}}
+}
+
+${{{{
+}
+}}}}
+
+// Texture.GetSamplePosition(int s);
+__generic<T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int>
+extension __TextureImpl<T,Shape,isArray,1,sampleCount,access,isShadow,isCombined>
+{
+    float2 GetSamplePosition(int s);
+}
+
+// Load/Subscript for readonly, no MS textures
+
+__generic<T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let isCombined:int>
+extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined>
+{
+    static const int isMS = 0;
+    static const int access = 0;
+    typealias ImageType = __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,0>;
+    __glsl_extension(GL_EXT_samplerless_texture_functions)
+    [__readNone]
+    [ForceInline]
+    T Load(vector<int, Shape.dimensions+isArray+1> location)
+    {
+        __target_switch
+        {
+        case cpp:
+        case hlsl:
+        __intrinsic_asm ".Load";
+        case glsl:
+        __intrinsic_asm "$ctexelFetch($0, ($1).$w1b, ($1).$w1e)$z";
+        case spirv:
+            const int lodLoc = Shape.dimensions+isArray;
+            let coord = __vectorReshape<Shape.dimensions+isArray>(location);
+            let lod = location[lodLoc];
+            if (isCombined != 0)
+            {
+                return spirv_asm
+                {
+                    %image:$$ImageType = OpImage $this;
+                    %sampled:__sampledType(T) = OpImageFetch %image $coord Lod $lod;
+                    __truncate $$T result __sampledType(T) %sampled;
+                };
+            }
+            else
+            {
+                return spirv_asm
+                {
+                    %sampled:__sampledType(T) = OpImageFetch $this $coord Lod $lod;
+                    __truncate $$T result __sampledType(T) %sampled;
+                };
+            }
+        }
+    }
+
+    __glsl_extension(GL_EXT_samplerless_texture_functions)
+    [__readNone]
+    [ForceInline]
+    T Load(vector<int, Shape.dimensions+isArray+1> location, constexpr vector<int, Shape.planeDimensions> offset)
+    {
+        __target_switch
+        {
+            case cpp:
+            case hlsl:
+            __intrinsic_asm ".Load";
+            case glsl:
+            __intrinsic_asm "$ctexelFetchOffset($0, ($1).$w1b, ($1).$w1e, ($2))$z";
+            case spirv:
+                const int lodLoc = Shape.dimensions+isArray;
+                let coord = __vectorReshape<Shape.dimensions+isArray>(location);
+                let lod = location[lodLoc];
+                if (isCombined != 0)
+                {
+                    return spirv_asm
+                    {
+                        %image:$$ImageType = OpImage $this;
+                        %sampled:__sampledType(T) = OpImageFetch %image $coord Lod|ConstOffset $lod $offset;
+                        __truncate $$T result __sampledType(T) %sampled;
+                    };
+                }
+                else
+                {
+                    return spirv_asm
+                    {
+                        %sampled:__sampledType(T) = OpImageFetch $this $coord Lod|ConstOffset $lod $offset;
+                        __truncate $$T result __sampledType(T) %sampled;
+                    };
+                }
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    __target_intrinsic(hlsl)
+    T Load(vector<int, Shape.dimensions+isArray+1> location, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
+    {
+        status = 0;
+        return Load(location, offset);
+    }
+
+    __subscript(vector<uint, Shape.dimensions+isArray> location) -> T
+    {
+        __glsl_extension(GL_EXT_samplerless_texture_functions)
+        [__readNone]
+        [ForceInline]
+        get
+        {
+            __target_switch
+            {
+                case cpp:
+                case hlsl:
+                    __intrinsic_asm ".operator[]";
+                case glsl:
+                case spirv:
+                    return Load(__makeVector(location, 0u));
+            }
+        }
+    }
+}
+
+// Texture Load/Subscript for readonly, MS textures
+
+__generic<T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let isCombined:int>
+extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined>
+{
+    static const int access = 0;
+    static const int isMS = 1;
+    typealias ImageType = __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,0>;
+
+    __glsl_extension(GL_EXT_samplerless_texture_functions)
+    [__readNone]
+    [ForceInline]
+    T Load(vector<int, Shape.dimensions+isArray+1> location, int sampleIndex)
+    {
+        __target_switch
+        {
+            case cpp:
+            case hlsl:
+            __intrinsic_asm ".Load";
+            case glsl:
+            __intrinsic_asm "$ctexelFetch($0, ($1).$w1b, ($1).$w1e, ($2))$z";
+            case spirv:
+                const int lodLoc = Shape.dimensions+isArray;
+                let coord = __vectorReshape<Shape.dimensions+isArray>(location);
+                let lod = location[lodLoc];
+                if (isCombined != 0)
+                {
+                    return spirv_asm
+                    {
+                        %image:$$ImageType = OpImage $this;
+                        %sampled:__sampledType(T) = OpImageFetch %image $coord Lod|Sample $lod $sampleIndex;
+                        __truncate $$T result __sampledType(T) %sampled;
+                    };
+                }
+                else
+                {
+                    return spirv_asm
+                    {
+                        %sampled:__sampledType(T) = OpImageFetch $this $coord Lod|Sample $lod $sampleIndex;
+                        __truncate $$T result __sampledType(T) %sampled;
+                    };
+                }
+        }
+    }
+
+    __glsl_extension(GL_EXT_samplerless_texture_functions)
+    [__readNone]
+    [ForceInline]
+    T Load(vector<int, Shape.dimensions+isArray+1> location, int sampleIndex, constexpr vector<int, Shape.planeDimensions> offset)
+    {
+        __target_switch
+        {
+            case cpp:
+            case hlsl:
+            __intrinsic_asm ".Load";
+            case glsl:
+            __intrinsic_asm "$ctexelFetchOffset($0, ($1).$w1b, ($1).$w1e, ($2), ($3))$z";
+            case spirv:
+                const int lodLoc = Shape.dimensions+isArray;
+                let coord = __vectorReshape<Shape.dimensions+isArray>(location);
+                let lod = location[lodLoc];
+                if (isCombined != 0)
+                {
+                    return spirv_asm
+                    {
+                        %image:$$ImageType = OpImage $this;
+                        %sampled:__sampledType(T) = OpImageFetch %image $coord Lod|ConstOffset|Sample $lod $offset $sampleIndex;
+                        __truncate $$T result __sampledType(T) %sampled;
+                    };
+                }
+                else
+                {
+                    return spirv_asm
+                    {
+                        %sampled:__sampledType(T) = OpImageFetch $this $coord Lod|ConstOffset|Sample $lod $offset  $sampleIndex;
+                        __truncate $$T result __sampledType(T) %sampled;
+                    };
+                }
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    __target_intrinsic(hlsl)
+    T Load(vector<int, Shape.dimensions+isArray+1> location, int sampleIndex, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
+    {
+        status = 0;
+        return Load(location, sampleIndex, offset);
+    }
+
+    __subscript(vector<uint, Shape.dimensions+isArray> location, int sampleIndex) -> T
+    {
+        __glsl_extension(GL_EXT_samplerless_texture_functions)
+        [__readNone]
+        [ForceInline]
+        get
+        {
+            __target_switch
+            {
+                case cpp:
+                case hlsl:
+                    __intrinsic_asm "($0).sample[$2][$1]";
+                case glsl:
+                case spirv:
+                    return Load(__makeVector(location, 0u), sampleIndex);
+            }
+        }
+    }
+}
+
+// Load/Subscript for readwrite textures
+${{{{
+    for (int access = 1; access<=2; access++) {
+        const char* glslIntrinsic = "cimageLoad($0, $1)$z";
+        const char* glslIntrinsicOffset = "cimageLoad($0, ($1)+($2))$z";
+
+}}}}
+__generic<T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int>
+extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0>
+{
+    __glsl_extension(GL_EXT_samplerless_texture_functions)
+    [__readNone]
+    [ForceInline]
+    T Load(vector<int, Shape.dimensions+isArray> location)
+    {
+        __target_switch
+        {
+            case cpp:
+            case hlsl:
+                __intrinsic_asm ".Load";
+            case glsl:
+                __intrinsic_asm "$(glslIntrinsic)";
+            case cuda:
+                if (isArray != 0)
+                {
+                    switch(Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_1D):
+                        __intrinsic_asm "surf1DLayeredread<$T0>($0, ($1).x * $E, ($1).y, SLANG_CUDA_BOUNDARY_MODE)";
+                    case $(SLANG_TEXTURE_2D):
+                        __intrinsic_asm "surf2DLayeredread<$T0>($0, ($1).x * $E, ($1).y, ($1).z, SLANG_CUDA_BOUNDARY_MODE)";
+                    case $(SLANG_TEXTURE_3D):
+                        __intrinsic_asm "surf3DLayeredread<$T0>($0, ($1).x * $E, ($1).y, ($1).z, ($1).w, SLANG_CUDA_BOUNDARY_MODE)";
+                    default:
+                        __intrinsic_asm "<invalid intrinsic>";
+                    }
+                }
+                else
+                {
+                    switch(Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_1D):
+                        __intrinsic_asm "surf1Dread<$T0>($0, ($1) * $E, SLANG_CUDA_BOUNDARY_MODE)";
+                    case $(SLANG_TEXTURE_2D):
+                        __intrinsic_asm "surf2Dread<$T0>($0, ($1).x * $E, ($1).y, SLANG_CUDA_BOUNDARY_MODE)";
+                    case $(SLANG_TEXTURE_3D):
+                        __intrinsic_asm "surf3Dread<$T0>($0, ($1).x * $E, ($1).y, ($1).z, SLANG_CUDA_BOUNDARY_MODE)";
+                    default:
+                        __intrinsic_asm "<invalid intrinsic>";
+                    }
+                }
+            case spirv:
+                return spirv_asm
+                {
+                    %sampled:__sampledType(T) = OpImageRead $this $location;
+                    __truncate $$T result __sampledType(T) %sampled;
+                };
+        }
+    }
+
+    __glsl_extension(GL_EXT_samplerless_texture_functions)
+    [__readNone]
+    [ForceInline]
+    T Load(vector<int, Shape.dimensions+isArray> location, vector<int, Shape.dimensions+isArray> offset)
+    {
+        __target_switch
+        {
+            case cpp:
+            case hlsl:
+                __intrinsic_asm ".Load";
+            case glsl:
+                __intrinsic_asm "$(glslIntrinsicOffset)";
+            case spirv:
+                return spirv_asm
+                {
+                    %sampled:__sampledType(T) = OpImageRead $this $location ConstOffset $offset;
+                    __truncate $$T result __sampledType(T) %sampled;
+                };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    T Load(vector<int, Shape.dimensions+isArray> location, vector<int, Shape.dimensions+isArray> offset, out uint status)
+    {
+        __target_switch
+        {
+        case hlsl:
+        case cpp:
+            __intrinsic_asm ".Load";
+        default:
+            status = 0;
+            return Load(location, offset);
+        }
+    }
+
+    void __glslImageStore(vector<int, Shape.dimensions+isArray> location, T value)
+    {
+        __intrinsic_asm "imageStore($0, $1, $V2)";
+    }
+
+    __subscript(vector<uint, Shape.dimensions+isArray> location) -> T
+    {
+        __glsl_extension(GL_EXT_samplerless_texture_functions)
+        [__readNone]
+        [ForceInline]
+        get
+        {
+            __target_switch
+            {
+                case cpp:
+                case hlsl:
+                    __intrinsic_asm ".operator[]";
+                case glsl:
+                case spirv:
+                case cuda:
+                    return Load(location);
+            }
+        }
+
+        [nonmutating]
+        [ForceInline]
+        set(T newValue)
+        {
+            __target_switch
+            {
+                case cpp:
+                case hlsl:
+                __intrinsic_asm ".operator[]";
+                case glsl:
+                    __glslImageStore(location, newValue);
+                case cuda:
+                    if (isArray != 0)
+                    {
+                        switch(Shape.flavor)
+                        {
+                        case $(SLANG_TEXTURE_1D):
+                            __intrinsic_asm "surf1DLayeredwrite$C<$T0>($2, $0, ($1).x * $E, ($1).y, SLANG_CUDA_BOUNDARY_MODE)";
+                        case $(SLANG_TEXTURE_2D):
+                            __intrinsic_asm "surf2DLayeredwrite$C<$T0>($2, $0, ($1).x * $E, ($1).y, ($1).z, SLANG_CUDA_BOUNDARY_MODE)";
+                        case $(SLANG_TEXTURE_3D):
+                            __intrinsic_asm "surf3DLayeredwrite$C<$T0>($2, $0, ($1).x * $E, ($1).y, ($1).z, ($1).w, SLANG_CUDA_BOUNDARY_MODE)";
+                        default:
+                            __intrinsic_asm "<invalid intrinsic>";
+                        }
+                    }
+                    else
+                    {
+                        switch(Shape.flavor)
+                        {
+                        case $(SLANG_TEXTURE_1D):
+                            __intrinsic_asm "surf1Dwrite$C<$T0>($2, $0, ($1) * $E, SLANG_CUDA_BOUNDARY_MODE)";
+                        case $(SLANG_TEXTURE_2D):
+                            __intrinsic_asm "surf2Dwrite$C<$T0>($2, $0, ($1).x * $E, ($1).y, SLANG_CUDA_BOUNDARY_MODE)";
+                        case $(SLANG_TEXTURE_3D):
+                            __intrinsic_asm "surf3Dwrite$C<$T0>($2, $0, ($1).x * $E, ($1).y, ($1).z, SLANG_CUDA_BOUNDARY_MODE)";
+                        default:
+                            __intrinsic_asm "<invalid intrinsic>";
+                        }
+                    }
+                case spirv:
+                    return spirv_asm
+                    {
+                        OpImageWrite $this $location $newValue;
+                    };
+            }
+        }
+
+        __intrinsic_op($(kIROp_ImageSubscript)) ref;
+    }
+}
+
+${{{{
+    }
+}}}}
+
+// Texture type aliases.
+// T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int
+${{{{
+    const char* shapeTypeNames[] = {"1D", "2D", "3D", "Cube"};
+    const char* accessPrefix[] = {"", "RW", "RasterizerOrdered", "Feedback"};
+    const char* arrayPostFix[] = {"", "Array"};
+    const char* msPostFix[] = {"", "MS"};
+    for (int shape = 0; shape < 4; shape++)
+    for (int isArray = 0; isArray<=1; isArray++)
+    for (int isMS = 0; isMS<=1; isMS++)
+    for (int isCombined = 0; isCombined<=1; isCombined++)
+    for (int access = 0; access<=3; access++) {
+        if (access != 0)
+        {
+            // No RWMS.
+            if (isMS) continue;
+
+            // No RW Cube.
+            if (shape == 3) continue;
+        }
+        if (access == 3)
+        {
+            // Feedback only defined for Texture2D and Texture2DArray.
+            if (shape != 1) continue;
+            if (isMS) continue;
+            if (isCombined) continue;
+        }
+        if (isMS)
+        {
+            // Only Texture2DMS.
+            if (shape != 1)
+                continue;
+        }
+        // No 3D Array.
+        if (shape == 2 && isArray == 1)
+            continue;
+        const char* textureTypeName = isCombined ? "Sampler" : "Texture";
+}}}}
+typealias $(accessPrefix[access])$(textureTypeName)$(shapeTypeNames[shape])$(arrayPostFix[isArray])$(msPostFix[isMS])<T=float4, let sampleCount:int=0> = __TextureImpl<T, __Shape$(shapeTypeNames[shape]), $(isArray), $(isMS), sampleCount, $(access), 0, $(isCombined)>;
+${{{{
+}
+}}}}
+
 // AtomicAdd
 
 // Make the GLSL atomicAdd available.
@@ -7289,8 +8427,6 @@ matrix<T,N,M> WaveMultiPrefixSum(matrix<T,N,M> value, uint4 mask);
 // `typedef`s to help with the fact that HLSL has been sorta-kinda case insensitive at various points
 typedef Texture2D texture2D;
 
-
-
 ${{{{
 
 // Buffer types
@@ -7308,19 +8444,21 @@ static const int kBaseBufferAccessLevelCount = sizeof(kBaseBufferAccessLevels) /
 for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
 {
     auto access = kBaseBufferAccessLevels[aa].access;
-    bool isReadOnly = (access == SLANG_RESOURCE_ACCESS_READ);
-    auto flavor = TextureFlavor::create(TextureFlavor::Shape::ShapeBuffer, access).flavor;
     sb << "__generic<T>\n";
-    sb << "__magic_type(TextureType," << int(flavor) << ")\n";
-    sb << "__intrinsic_type(" << (kIROp_TextureType + (int(flavor) << kIROpMeta_OtherShift)) << ")\n";
-    sb << "struct ";
+    sb << "typealias ";
     sb << kBaseBufferAccessLevels[aa].name;
-    sb << "Buffer {\n";
+    sb << "Buffer = __TextureImpl<T, __ShapeBuffer, 0, 0, 0, " << aa << ", 0, 0>;\n";
+    
+    bool isReadOnly = aa == 0;
 
-    char const* glslTextureSizeFunc = (access == SLANG_RESOURCE_ACCESS_READ) ? "textureSize" : "imageSize";
-    char const* glslLoadFuncName = (access == SLANG_RESOURCE_ACCESS_READ) ? "texelFetch" : "imageLoad";
-    char const* spvLoadInstName = (access == SLANG_RESOURCE_ACCESS_READ) ? "OpImageFetch" : "OpImageRead";
+    char const* glslTextureSizeFunc = (isReadOnly) ? "textureSize" : "imageSize";
+    char const* glslLoadFuncName = (isReadOnly) ? "texelFetch" : "imageLoad";
+    char const* spvLoadInstName = (isReadOnly) ? "OpImageFetch" : "OpImageRead";
 }}}}
+
+__generic<T>
+extension __TextureImpl<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0>
+{
     [__readNone]
     void GetDimensions(out uint dim)
     {
@@ -7380,10 +8518,10 @@ ${{{{
         } // access != SLANG_RESOURCE_ACCESS_READ
 }}}}
 
-    }
+        }
     
 
-    };
+    };  // end extension
 ${{{{
 }
 }}}}
@@ -8164,29 +9302,9 @@ __target_intrinsic(hlsl, SAMPLER_FEEDBACK_MIP_REGION_USED)
 struct SAMPLER_FEEDBACK_MIP_REGION_USED : __BuiltinSamplerFeedbackType {};
 
 // All of these objects are write-only resources that point to a special kind of unordered access view meant for sampler feedback.
-
-// Calculate the flavor constants
-${{{{
-static const int feedbackTexture2DFlavor = int(TextureFlavor::create(TextureFlavor::Shape::Shape2D, SLANG_RESOURCE_ACCESS_WRITE, SLANG_TEXTURE_FEEDBACK_FLAG).flavor);
-static const int feedbackTexture2DArrayFlavor = int(TextureFlavor::create(TextureFlavor::Shape::Shape2D, SLANG_RESOURCE_ACCESS_WRITE, SLANG_TEXTURE_FEEDBACK_FLAG | SLANG_TEXTURE_ARRAY_FLAG).flavor);
-}}}}
-
-__magic_type(TextureType, $(feedbackTexture2DFlavor))
-__intrinsic_type($(kIROp_TextureType + (feedbackTexture2DFlavor << kIROpMeta_OtherShift)))
-struct FeedbackTexture2D<T : __BuiltinSamplerFeedbackType>
+__generic<T:__BuiltinSamplerFeedbackType>
+extension __TextureImpl<T,__Shape2D, 0, 0, 0, __kTextureAccessFeedback, 0, 0>
 {
-    __target_intrinsic
-    void GetDimensions(out uint width, out uint height);
-
-    __target_intrinsic
-    void GetDimensions(uint mipLevel, out uint width, out uint height, out uint numberOfLevels);
-
-    __target_intrinsic
-    void GetDimensions(out float width,out float height);
-
-    __target_intrinsic
-    void GetDimensions(uint mipLevel, out float width,out float height, out float numberOfLevels);
-
     // With Clamp
 
     __target_intrinsic(hlsl, "($0).WriteSamplerFeedback($1, $2, $3, $4)")
@@ -8222,24 +9340,9 @@ struct FeedbackTexture2D<T : __BuiltinSamplerFeedbackType>
     void WriteSamplerFeedbackGrad<S>(Texture2D<S> tex, SamplerState samp, float2 location, float2 ddx, float2 ddy);
 };
 
-
-
-__magic_type(TextureType, $(feedbackTexture2DArrayFlavor))
-__intrinsic_type($(kIROp_TextureType + (feedbackTexture2DArrayFlavor << kIROpMeta_OtherShift)))
-struct FeedbackTexture2DArray<T : __BuiltinSamplerFeedbackType>
+__generic<T:__BuiltinSamplerFeedbackType>
+extension __TextureImpl<T,__Shape2D, 1, 0, 0, __kTextureAccessFeedback, 0, 0>
 {
-    __target_intrinsic
-    void GetDimensions(out uint width,out uint height, out uint elements);
-
-    __target_intrinsic
-    void GetDimensions(uint mipLevel, out uint width,out uint height, out uint elements, out uint numberOfLevels);
-
-    __target_intrinsic
-    void GetDimensions(out float width,out float height, out float elements);
-
-    __target_intrinsic
-    void GetDimensions(uint mipLevel, out float width,out float height, out float elements, out float numberOfLevels);
-
     // With Clamp
 
     __target_intrinsic(hlsl, "($0).WriteSamplerFeedback($1, $2, $3, $4)")

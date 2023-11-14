@@ -1366,21 +1366,56 @@ SIMPLE_IR_TYPE(BasicBlockType, Type)
 
 struct IRResourceTypeBase : IRType
 {
-    TextureFlavor getFlavor() const
-    {
-        return TextureFlavor((getOp() >> kIROpMeta_OtherShift) & 0xFFFF);
-    }
+    static const int kTextureAcessDefault = 0;
+    static const int kTextureAcessRW = 1;
+    static const int kTextureAcessRasterizerOrdered = 2;
+    static const int kTextureAcessFeedback = 3;
 
-    TextureFlavor::Shape GetBaseShape() const
+    TextureFlavor::Shape GetBaseShape()
     {
-        return getFlavor().getBaseShape();
+        switch (getOperand(1)->getOp())
+        {
+        case kIROp_TextureShape1DType:
+            return TextureFlavor::Shape1D;
+        case kIROp_TextureShape2DType:
+            return TextureFlavor::Shape2D;
+        case kIROp_TextureShape3DType:
+            return TextureFlavor::Shape3D;
+        case kIROp_TextureShapeCubeType:
+            return TextureFlavor::ShapeCube;
+        case kIROp_TextureShapeBufferType:
+            return TextureFlavor::ShapeBuffer;
+        default:
+            return TextureFlavor::Shape2D;
+        }
     }
-    bool isFeedback() const { return getFlavor().isFeedback(); }
-    bool isMultisample() const { return getFlavor().isMultisample(); }
-    bool isArray() const { return getFlavor().isArray(); }
-    bool isShadow() const { return getFlavor().isShadow(); }
-    SlangResourceShape getShape() const { return getFlavor().getShape(); }
-    SlangResourceAccess getAccess() const { return getFlavor().getAccess(); }
+    bool isFeedback() { return getIntVal(getOperand(5)) == 3; }
+    bool isMultisample() { return getIntVal(getOperand(3)) != 0; }
+    bool isArray() { return getIntVal(getOperand(2)) != 0; }
+    bool isShadow() { return getIntVal(getOperand(6)) != 0; }
+    bool isCombined() { return getIntVal(getOperand(7)) != 0; }
+    SlangResourceShape getShape() { return (SlangResourceShape)((uint32_t)GetBaseShape() | (isArray() ? SLANG_TEXTURE_ARRAY_FLAG : 0)); }
+    SlangResourceAccess getAccess()
+    {
+        auto constVal = as<IRIntLit>(getOperand(5));
+        if (constVal)
+        {
+            switch (getIntVal(constVal))
+            {
+            case kTextureAcessDefault:
+                return SLANG_RESOURCE_ACCESS_READ;
+            case kTextureAcessRW:
+                return SLANG_RESOURCE_ACCESS_READ_WRITE;
+            case kTextureAcessRasterizerOrdered:
+                return SLANG_RESOURCE_ACCESS_RASTER_ORDERED;
+            case kTextureAcessFeedback:
+                return SLANG_RESOURCE_ACCESS_WRITE;
+            default:
+                break;
+            }
+        }
+        return SLANG_RESOURCE_ACCESS_UNKNOWN;
+    }
 
     IR_PARENT_ISA(ResourceTypeBase);
 };
@@ -1403,11 +1438,6 @@ struct IRTextureTypeBase : IRResourceType
 struct IRTextureType : IRTextureTypeBase
 {
     IR_LEAF_ISA(TextureType)
-};
-
-struct IRTextureSamplerType : IRTextureTypeBase
-{
-    IR_LEAF_ISA(TextureSamplerType)
 };
 
 struct IRGLSLImageType : IRTextureTypeBase

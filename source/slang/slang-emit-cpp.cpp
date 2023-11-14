@@ -332,11 +332,7 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
 
             if (auto texType = as<IRTextureTypeBase>(type))
             {
-                // We don't support TextureSampler, so ignore that
-                if (texType->getOp() != kIROp_TextureSamplerType)
-                {
-                    return _calcCPPTextureTypeName(texType, out);   
-                }
+                return _calcCPPTextureTypeName(texType, out);
             }
 
             // If _getResourceTypePrefix returns something, we assume can output any specialization after it in order.

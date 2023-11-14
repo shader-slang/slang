@@ -1,3 +1,4 @@
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage vertex -entry main -allow-glsl -emit-spirv-directly
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -stage vertex -entry main -allow-glsl
 
 #version 450 core

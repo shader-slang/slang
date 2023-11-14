@@ -406,6 +406,7 @@ static void _lookUpMembersInSuperTypeDeclImpl(
     else
     {
         auto selfType = DeclRefType::create(astBuilder, declRef);
+        selfType = selfType->getCanonicalType();
         inheritanceInfo = semantics->getShared()->getInheritanceInfo(selfType);
     }
         

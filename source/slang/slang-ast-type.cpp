@@ -770,10 +770,67 @@ FeedbackType::Kind FeedbackType::getKind() const
     return FeedbackType::Kind(magicMod->tag);
 }
 
-TextureFlavor ResourceType::getFlavor() const
+TextureFlavor::Shape ResourceType::getBaseShape()
 {
-    auto magicMod = getDeclRef().getDecl()->findModifier<MagicTypeModifier>();
-    return TextureFlavor(magicMod->tag);
+    auto shape = _getGenericTypeArg(getDeclRefBase(), 1);
+    if (as<TextureShape1DType>(shape))
+        return TextureFlavor::Shape1D;
+    else if (as<TextureShape2DType>(shape))
+        return TextureFlavor::Shape2D;
+    else if (as<TextureShape3DType>(shape))
+        return TextureFlavor::Shape3D;
+    else if (as<TextureShapeCubeType>(shape))
+        return TextureFlavor::ShapeCube;
+    else if (as<TextureShapeBufferType>(shape))
+        return TextureFlavor::ShapeBuffer;
+
+    return TextureFlavor::Shape2D;
+}
+
+SlangResourceShape ResourceType::getShape()
+{
+    auto baseShape = (SlangResourceShape)getBaseShape();
+    if (isArray())
+        baseShape = (SlangResourceShape)((uint32_t)baseShape | TextureFlavor::ArrayFlag);
+    return baseShape;
+}
+
+bool ResourceType::isArray()
+{
+    auto isArray = _getGenericTypeArg(this, 2);
+    if (auto constIntVal = as<ConstantIntVal>(isArray))
+        return constIntVal->getValue() != 0;
+    return false;
+}
+
+bool ResourceType::isMultisample()
+{
+    auto isMS = _getGenericTypeArg(this, 3);
+    if (auto constIntVal = as<ConstantIntVal>(isMS))
+        return constIntVal->getValue() != 0;
+    return false;
+}
+
+SlangResourceAccess ResourceType::getAccess()
+{
+    auto access = _getGenericTypeArg(this, 5);
+    if (auto constIntVal = as<ConstantIntVal>(access))
+    {
+        switch (constIntVal->getValue())
+        {
+        case 0:
+            return SLANG_RESOURCE_ACCESS_READ;
+        case 1:
+            return SLANG_RESOURCE_ACCESS_READ_WRITE;
+        case 2:
+            return SLANG_RESOURCE_ACCESS_RASTER_ORDERED;
+        case 3:
+            return SLANG_RESOURCE_ACCESS_WRITE;
+        default:
+            break;
+        }
+    }
+    return SLANG_RESOURCE_ACCESS_NONE;
 }
 
 SamplerStateFlavor SamplerStateType::getFlavor() const
@@ -794,7 +851,7 @@ Type* ResourceType::getElementType()
 
 Val* TextureTypeBase::getSampleCount()
 {
-    return as<Type>(_getGenericTypeArg(this, 1));
+    return as<Type>(_getGenericTypeArg(this, 4));
 }
 
 Type* removeParamDirType(Type* type)

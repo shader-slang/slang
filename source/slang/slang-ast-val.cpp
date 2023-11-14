@@ -810,6 +810,7 @@ Val* PolynomialIntVal::_substituteImplOverride(ASTBuilder* astBuilder, Substitut
 {
     int diff = 0;
     PolynomialIntValBuilder builder(astBuilder);
+    builder.constantTerm = getConstantTerm();
     for (auto& term : getTerms())
     {
         IntegerLiteralValue evaluatedTermConstFactor;
@@ -835,6 +836,14 @@ Val* PolynomialIntVal::_substituteImplOverride(ASTBuilder* astBuilder, Substitut
         }
         else
         {
+            if (evaluatedTermParamFactors.getCount() == 1 && evaluatedTermParamFactors[0]->getPower() == 1)
+            {
+                if (auto polyTerm = as<PolynomialIntVal>(evaluatedTermParamFactors[0]->getParam()))
+                {
+                    builder.addToPolynomialTerm(polyTerm, evaluatedTermConstFactor);
+                    continue;
+                }
+            }
             auto newTerm = astBuilder->getOrCreate<PolynomialIntValTerm>(
                 evaluatedTermConstFactor, evaluatedTermParamFactors.getArrayView());
             builder.terms.add(newTerm);
