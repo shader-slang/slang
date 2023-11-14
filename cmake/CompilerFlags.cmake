@@ -2,7 +2,18 @@
 # Given a list of flags, add those which the C++ compiler supports to the target
 #
 function(add_supported_cxx_flags target)
-    set(flags ${ARGN})
+    cmake_parse_arguments(ARG "PRIVATE;PUBLIC;INTERFACE" "" "" ${ARGN})
+    set(flags ${ARG_UNPARSED_ARGUMENTS})
+    if(ARG_PRIVATE)
+        set(private PRIVATE)
+    endif()
+    if(ARG_PUBLIC)
+        set(public PUBLIC)
+    endif()
+    if(ARG_INTERFACE)
+        set(interface INTERFACE)
+    endif()
+
     foreach(flag ${flags})
         # remove the `no-` prefix from warnings because gcc doesn't treat it as an
         # error on its own
@@ -16,7 +27,7 @@ function(add_supported_cxx_flags target)
         )
         check_cxx_compiler_flag("${flag_to_test}" ${test_name})
         if(${test_name})
-            target_compile_options(${target} PRIVATE ${flag})
+            target_compile_options(${target} ${private} ${public} ${interface} ${flag})
         endif()
     endforeach()
 endfunction()
@@ -27,32 +38,37 @@ endfunction()
 #
 include(CheckLinkerFlag)
 function(add_supported_cxx_linker_flags target)
-    cmake_parse_arguments(ARG "PRIVATE;PUBLIC;BEFORE;AFTER" "" "FLAGS" ${ARGN})
-
+    cmake_parse_arguments(ARG "PRIVATE;PUBLIC;INTERFACE;BEFORE" "" "" ${ARGN})
+    set(flags ${ARG_UNPARSED_ARGUMENTS})
+    if(ARG_BEFORE)
+        set(before BEFORE)
+    endif()
     if(ARG_PRIVATE)
         set(private PRIVATE)
     endif()
     if(ARG_PUBLIC)
         set(public PUBLIC)
     endif()
-    if(ARG_BEFORE)
-        set(before BEFORE)
-    endif()
-    if(ARG_AFTER)
-        set(after AFTER)
+    if(ARG_INTERFACE)
+        set(interface INTERFACE)
     endif()
 
-    set(flags ARG_FLAGS)
     foreach(flag ${flags})
-        string(REGEX REPLACE "[^a-zA-Z0-9]+" "_" test_name "CXXLINKFLAG_${flag}")
+        string(
+            REGEX REPLACE
+            "[^a-zA-Z0-9]+"
+            "_"
+            test_name
+            "CXXLINKFLAG_${flag}"
+        )
         check_linker_flag(CXX "${flag}" ${test_name})
         if(${test_name})
-            target_compile_options(
+            target_link_options(
                 ${target}
+                ${before}
                 ${private}
                 ${public}
-                ${before}
-                ${after}
+                ${interface}
                 ${flag}
             )
         endif()
@@ -114,7 +130,7 @@ function(set_default_compile_options target)
         list(APPEND warning_flags -Wall /W2)
     endif()
 
-    add_supported_cxx_flags(${target} ${warning_flags})
+    add_supported_cxx_flags(${target} PRIVATE ${warning_flags})
 
     # Don't assume that symbols will be resolved at runtime
     add_supported_cxx_linker_flags(${target} PRIVATE "-Wl,--no-undefined")
@@ -167,7 +183,7 @@ function(set_default_compile_options target)
     endif()
 
     if(SLANG_ENABLE_ASAN)
-        add_supported_cxx_flags(${target} /fsanitize=address -fsanitize=address)
+        add_supported_cxx_flags(${target} PRIVATE /fsanitize=address -fsanitize=address)
         add_supported_cxx_linker_flags(
             ${target}
             BEFORE

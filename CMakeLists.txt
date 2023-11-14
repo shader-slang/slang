@@ -11,14 +11,22 @@ set(CMAKE_BUILD_RPATH_USE_ORIGIN TRUE)
 # Our module dir
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
+# Squash CMake dev warning
+if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.24.0")
+    cmake_policy(SET CMP0135 NEW)
+endif()
+
 #
 # Our utils
 #
 
 set(SLANG_ROOT_DIR ${CMAKE_CURRENT_LIST_DIR})
+include(CMakeDependentOption)
+include(FetchContent)
 include(CompilerFlags)
 include(Glob)
 include(SlangTarget)
+include(LLVM)
 
 #
 # Options
@@ -44,6 +52,20 @@ option(SLANG_EMBED_STDLIB_SOURCE "Embed stdlib source in the binary" ON)
 
 option(SLANG_ENABLE_FULL_IR_VALIDATION "Enable full IR validation (SLOW!)")
 option(SLANG_ENABLE_ASAN "Enable ASAN (address sanitizer)")
+
+option(
+    SLANG_USE_BINARY_SLANG_LLVM
+    "Use a binary distribution of the slang-llvm library instead of building or using LLVM"
+)
+# If we're not using a binary slang-llvm distribution, add an option for
+# building with the system's LLVM
+cmake_dependent_option(
+    SLANG_USE_SYSTEM_LLVM
+    "Use a system-provided LLVM and Clang distribution"
+    ON
+    "NOT SLANG_USE_BINARY_SLANG_LLVM"
+    OFF
+)
 
 #
 # Option validation
@@ -75,6 +97,10 @@ if(SLANG_ENABLE_OPTIX)
         REQUIRED
         PATHS ${SLANG_OPTIX_SDK_PATH}/include
     )
+endif()
+
+if(NOT SLANG_USE_BINARY_SLANG_LLVM)
+    find_llvm()
 endif()
 
 add_subdirectory(external)
@@ -109,6 +135,7 @@ slang_add_target(
     USE_EXTRA_WARNINGS
     LINK_WITH_PRIVATE core
     INCLUDE_DIRECTORIES_PUBLIC source
+    REQUIRES slang-llvm
 )
 if(NOT MSVC)
     # This is necessary to compile the DXC headers
@@ -202,6 +229,80 @@ slang_add_target(
 )
 
 #
+# Our wrappers for glslang and llvm
+#
+slang_add_target(
+    source/slang-glslang
+    MODULE
+    USE_EXTRA_WARNINGS
+    LINK_WITH_PRIVATE glslang
+)
+
+if(SLANG_USE_BINARY_SLANG_LLVM)
+    #
+    # Do some stupid little dance to put everything in the right shape with
+    # correct dependencies
+    #
+
+    # Download the binary
+    # TODO: correct versioning and platform handling
+    fetchcontent_declare(
+        slang-llvm
+        URL
+            https://github.com/shader-slang/slang-llvm/releases/download/v13.x-42/slang-llvm-v13.x-42-linux-x86_64-release.zip
+    )
+    fetchcontent_populate(slang-llvm)
+
+    # Copy it to the lib/ directory
+    set(slang_llvm_source_object
+        "${slang-llvm_SOURCE_DIR}/bin/linux-x64/release/libslang-llvm.so"
+    )
+    set(slang_llvm_object ${CMAKE_BINARY_DIR}/$<CONFIG>/lib/libslang-llvm.so)
+    add_custom_command(
+        OUTPUT ${slang_llvm_object}
+        COMMAND
+            ${CMAKE_COMMAND} -E copy_if_different ${slang_llvm_source_object}
+            ${slang_llvm_object}
+        DEPENDS ${slang_llvm_source_object}
+        VERBATIM
+    )
+    # Give this copying action a name
+    add_custom_target(copy-slang-llvm DEPENDS ${slang_llvm_object})
+
+    # Put this into a library
+    add_library(slang-llvm MODULE IMPORTED GLOBAL)
+    add_dependencies(slang-llvm copy-slang-llvm)
+    set_property(
+        TARGET slang-llvm
+        PROPERTY IMPORTED_LOCATION ${slang_llvm_object}
+    )
+else()
+    llvm_target_from_components(llvm-dep filecheck native orcjit)
+    clang_target_from_libs(
+        clang-dep
+        clangBasic
+        clangCodeGen
+        clangDriver
+        clangLex
+        clangFrontend
+        clangFrontendTool
+    )
+    slang_add_target(
+        source/slang-llvm
+        MODULE
+        LINK_WITH_PRIVATE core compiler-core llvm-dep clang-dep
+        # We include slang.h, but don't need to link with it
+        INCLUDE_FROM_PRIVATE slang
+        # This uses the SLANG_DLL_EXPORT macro from slang.h, so make sure to set
+        # SLANG_DYNAMIC and SLANG_DYNAMIC_EXPORT
+        EXPORT_MACRO_PREFIX SLANG
+    )
+    # If we don't include this, then the symbols in the LLVM linked here may
+    # conflict with those of other LLVMs linked at runtime, for instance in mesa.
+    add_supported_cxx_linker_flags(slang-llvm PRIVATE "-Wl,--exclude-libs,all")
+endif()
+
+#
 # `platform` contains all the platform abstractions for a GUI application.
 #
 slang_add_target(
@@ -272,6 +373,7 @@ slang_add_target(
         render-test
         slang-unit-test
         gfx-unit-test
+        slang-llvm
         # Used by some tests when they run
         slangd
         slang-rt
@@ -308,7 +410,7 @@ slang_add_target(
     tools/gfx-unit-test
     MODULE
     EXCLUDE_FROM_ALL
-    SHARED_LIBRARY_TOOL
+    EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_SHARED_LIBRARY_TOOL
     USE_FEWER_WARNINGS
     LINK_WITH_PRIVATE core slang unit-test gfx gfx-util platform
     OUTPUT_NAME gfx-unit-test-tool
@@ -317,7 +419,7 @@ slang_add_target(
     tools/slang-unit-test
     MODULE
     EXCLUDE_FROM_ALL
-    SHARED_LIBRARY_TOOL
+    EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_SHARED_LIBRARY_TOOL
     USE_FEWER_WARNINGS
     LINK_WITH_PRIVATE core compiler-core unit-test slang Threads::Threads
     OUTPUT_NAME slang-unit-test-tool
@@ -326,7 +428,7 @@ slang_add_target(
     tools/slang-reflection-test
     MODULE
     EXCLUDE_FROM_ALL
-    SHARED_LIBRARY_TOOL
+    EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_SHARED_LIBRARY_TOOL
     USE_FEWER_WARNINGS
     LINK_WITH_PRIVATE core slang
     OUTPUT_NAME slang-reflection-test-tool
@@ -335,7 +437,7 @@ slang_add_target(
     tools/render-test
     MODULE
     EXCLUDE_FROM_ALL
-    SHARED_LIBRARY_TOOL
+    EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_SHARED_LIBRARY_TOOL
     USE_FEWER_WARNINGS
     LINK_WITH_PRIVATE core compiler-core slang gfx gfx-util platform
     OUTPUT_NAME render-test-tool

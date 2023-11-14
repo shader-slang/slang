@@ -32,9 +32,11 @@ function(slang_add_target dir type)
     set(multi_value_args
         # Additional directories from which to glob source
         EXTRA_SOURCE_DIRS
+        # Additional compile definitions
+        EXTRA_COMPILE_DEFINITIONS_PRIVATE
         # Targets with which to link privately
         LINK_WITH_PRIVATE
-        # Targets whose headers we use, but don't link with
+        # Targets or directories whose headers we use, but don't link with
         INCLUDE_FROM_PRIVATE
         # Any include directories other targets need to use this target
         INCLUDE_DIRECTORIES_PUBLIC
@@ -125,11 +127,17 @@ function(slang_add_target dir type)
         # this tricky there.
         set(output_dir "${CMAKE_BINARY_DIR}/$<CONFIG>")
     endif()
+    if(type STREQUAL "MODULE")
+        # Put runtime-loaded libraries into the bin/ directory
+        set(library_subdir "bin")
+    else()
+        set(library_subdir "lib")
+    endif()
     set_target_properties(
         ${target}
         PROPERTIES
             ARCHIVE_OUTPUT_DIRECTORY "${output_dir}/lib"
-            LIBRARY_OUTPUT_DIRECTORY "${output_dir}/lib"
+            LIBRARY_OUTPUT_DIRECTORY "${output_dir}/${library_subdir}"
             RUNTIME_OUTPUT_DIRECTORY "${output_dir}/bin"
             PDB_OUTPUT_DIRECTORY "${output_dir}/bin"
     )
@@ -167,12 +175,16 @@ function(slang_add_target dir type)
     #
     target_link_libraries(${target} PRIVATE ${ARG_LINK_WITH_PRIVATE})
 
-    foreach(include_only_target ${ARG_INCLUDE_FROM_PRIVATE})
-        target_include_directories(
-            ${target}
-            PRIVATE
-                $<TARGET_PROPERTY:${include_only_target},INTERFACE_INCLUDE_DIRECTORIES>
-        )
+    foreach(include_from ${ARG_INCLUDE_FROM_PRIVATE})
+        if(TARGET ${include_from})
+            target_include_directories(
+                ${target}
+                PRIVATE
+                    $<TARGET_PROPERTY:${include_from},INTERFACE_INCLUDE_DIRECTORIES>
+            )
+        else()
+            target_include_directories(${target} PRIVATE ${include_from})
+        endif()
     endforeach()
 
     #
@@ -189,10 +201,6 @@ function(slang_add_target dir type)
     #
     # Set up export macros
     #
-    if(ARG_SHARED_LIBRARY_TOOL)
-        target_compile_definitions(${target} PRIVATE SLANG_SHARED_LIBRARY_TOOL)
-    endif()
-
     get_target_property(target_type ${target} TYPE)
     if(DEFINED ARG_EXPORT_MACRO_PREFIX)
         if(
@@ -216,6 +224,16 @@ function(slang_add_target dir type)
 
     if(DEFINED ARG_REQUIRES)
         add_dependencies(${target} ${ARG_REQUIRES})
+    endif()
+
+    #
+    # Other preprocessor defines
+    #
+    if(ARG_EXTRA_COMPILE_DEFINITIONS_PRIVATE)
+        target_compile_definitions(
+            ${target}
+            PRIVATE ${EXTRA_COMPILE_DEFINITIONS_PRIVATE}
+        )
     endif()
 
     #
