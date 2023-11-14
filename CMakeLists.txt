@@ -235,7 +235,7 @@ slang_add_target(
     source/slang-glslang
     MODULE
     USE_EXTRA_WARNINGS
-    LINK_WITH_PRIVATE glslang
+    LINK_WITH_PRIVATE glslang SPIRV SPIRV-Tools-opt
 )
 
 if(SLANG_USE_BINARY_SLANG_LLVM)
@@ -374,6 +374,7 @@ slang_add_target(
         slang-unit-test
         gfx-unit-test
         slang-llvm
+        slang-glslang
         # Used by some tests when they run
         slangd
         slang-rt

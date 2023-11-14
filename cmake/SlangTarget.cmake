@@ -36,7 +36,7 @@ function(slang_add_target dir type)
         EXTRA_COMPILE_DEFINITIONS_PRIVATE
         # Targets with which to link privately
         LINK_WITH_PRIVATE
-        # Targets or directories whose headers we use, but don't link with
+        # Targets whose headers we use, but don't link with
         INCLUDE_FROM_PRIVATE
         # Any include directories other targets need to use this target
         INCLUDE_DIRECTORIES_PUBLIC
@@ -127,11 +127,10 @@ function(slang_add_target dir type)
         # this tricky there.
         set(output_dir "${CMAKE_BINARY_DIR}/$<CONFIG>")
     endif()
-    if(type STREQUAL "MODULE")
-        # Put runtime-loaded libraries into the bin/ directory
-        set(library_subdir "bin")
+    if(CMAKE_SYSTEM_NAME STREQUAL "Windows" AND type STREQUAL "MODULE")
+        set(library_subdir bin)
     else()
-        set(library_subdir "lib")
+        set(library_subdir lib)
     endif()
     set_target_properties(
         ${target}
@@ -176,15 +175,11 @@ function(slang_add_target dir type)
     target_link_libraries(${target} PRIVATE ${ARG_LINK_WITH_PRIVATE})
 
     foreach(include_from ${ARG_INCLUDE_FROM_PRIVATE})
-        if(TARGET ${include_from})
-            target_include_directories(
-                ${target}
-                PRIVATE
-                    $<TARGET_PROPERTY:${include_from},INTERFACE_INCLUDE_DIRECTORIES>
-            )
-        else()
-            target_include_directories(${target} PRIVATE ${include_from})
-        endif()
+        target_include_directories(
+            ${target}
+            PRIVATE
+                $<TARGET_PROPERTY:${include_from},INTERFACE_INCLUDE_DIRECTORIES>
+        )
     endforeach()
 
     #
@@ -235,4 +230,18 @@ function(slang_add_target dir type)
             PRIVATE ${EXTRA_COMPILE_DEFINITIONS_PRIVATE}
         )
     endif()
+
+    #
+    # Since we do a lot of dynamic loading, unconditionally set the build rpath
+    # to find our libraries. Ordinarily CMake would sort this out, but we do
+    # have libraries which at build time don't depend on any other shared
+    # libraries of ours but which do load them at runtime, hence the need to do
+    # this explicitly here.
+    #
+    set_property(TARGET ${target} APPEND PROPERTY BUILD_RPATH "$ORIGIN/../lib")
+    set_property(
+        TARGET ${target}
+        APPEND
+        PROPERTY INSTALL_RPATH "$ORIGIN/../lib"
+    )
 endfunction()
