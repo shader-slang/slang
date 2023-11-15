@@ -269,6 +269,25 @@ namespace Slang
         }
     }
 
+    static bool isMutableGLSLBufferBlockVarExpr(Expr* expr)
+    {
+        if(const auto varExpr = as<VarExpr>(expr))
+        {
+            if(const auto declRefType = as<DeclRefType>(varExpr->type->getCanonicalType()))
+            {
+                if(declRefType->getDeclRef().getDecl()->isDerivedFrom(ASTNodeType::GLSLInterfaceBlockDecl))
+                {
+                    const auto d = varExpr->declRef.getDecl();
+                    if(d->hasModifier<GLSLBufferModifier>() && !d->hasModifier<GLSLReadOnlyModifier>())
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
     DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
         DeclRef<Decl>   declRef,
         Expr*    baseExpr,
@@ -370,7 +389,10 @@ namespace Slang
                 // l-value status of the base expression into account now.
                 if(!baseExpr->type.isLeftValue)
                 {
-                    expr->type.isLeftValue = false;
+                    // One exception to this is if we're reading the contents
+                    // of a GLSL buffer interface block which isn't marked as
+                    // read_only
+                    expr->type.isLeftValue = isMutableGLSLBufferBlockVarExpr(baseExpr);
                 }
                 else
                 {

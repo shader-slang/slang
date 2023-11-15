@@ -30,7 +30,6 @@
 #include "slang-ir-obfuscate-loc.h"
 #include "slang-ir-use-uninitialized-out-param.h"
 #include "slang-ir-peephole.h"
-
 #include "slang-mangle.h"
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
@@ -2155,7 +2154,23 @@ void addVarDecorations(
         {
             builder->addSimpleDecoration<IRHLSLMeshPayloadDecoration>(inst);
         }
-
+        else if (as<OutModifier>(mod))
+        {
+            builder->addSimpleDecoration<IRGlobalOutputDecoration>(inst);
+        }
+        else if (as<InModifier>(mod))
+        {
+            builder->addSimpleDecoration<IRGlobalInputDecoration>(inst);
+        }
+        else if (auto glslLocationMod = as<GLSLLocationLayoutModifier>(mod))
+        {
+            builder->addDecoration(inst, kIROp_GLSLLocationDecoration,
+                builder->getIntValue(builder->getIntType(), stringToInt(glslLocationMod->valToken.getContent())));
+        }
+        else if (auto hlslSemantic = as< HLSLSimpleSemantic>(mod))
+        {
+            builder->addSemanticDecoration(inst, hlslSemantic->name.getContent());
+        }
         // TODO: what are other modifiers we need to propagate through?
     }
     if(auto t = composeGetters<IRMeshOutputType>(inst->getFullType(), &IROutTypeBase::getValueType))
@@ -8023,6 +8038,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         else if (as<ClassDecl>(decl))
         {
             irAggType = subBuilder->createClassType();
+        }
+        else if (as<GLSLInterfaceBlockDecl>(decl))
+        {
+            return LoweredValInfo();
         }
         else
         {

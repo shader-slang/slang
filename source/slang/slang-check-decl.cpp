@@ -389,6 +389,11 @@ namespace Slang
         //
         if(decl->hasModifier<HLSLStaticModifier>()) return false;
 
+        // While not normally allowed, out variables are not constant
+        // parameters, this can happen for example in GLSL mode
+        if(decl->hasModifier<OutModifier>()) return false;
+        if(decl->hasModifier<InModifier>()) return false;
+
         // The `groupshared` modifier indicates that a variable cannot
         // be a shader parameters, but is instead transient storage
         // allocated for the duration of a thread-group's execution.
@@ -1217,6 +1222,22 @@ namespace Slang
                 if (varDecl->findModifier<PushConstantAttribute>())
                 {
                     varDecl->type.type = m_astBuilder->getConstantBufferType(varDecl->type);
+                }
+            }
+
+            if (getLinkage()->getAllowGLSLInput())
+            {
+                // If we are in GLSL compatiblity mode, we want to treat all global variables
+                // without any `uniform` modifiers as true global variables by default.
+                if (!varDecl->findModifier<HLSLUniformModifier>() &&
+                    !varDecl->findModifier<InModifier>() &&
+                    !varDecl->findModifier<OutModifier>())
+                {
+                    if (!as<ResourceType>(varDecl->type) && !as<PointerLikeType>(varDecl->type))
+                    {
+                        auto staticModifier = m_astBuilder->create<HLSLStaticModifier>();
+                        addModifier(varDecl, staticModifier);
+                    }
                 }
             }
         }

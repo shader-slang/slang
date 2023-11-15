@@ -2457,7 +2457,7 @@ T dot(vector<T, N> x, vector<T, N> y)
 
 __generic<T : __BuiltinFloatingPointType> vector<T,4> dst(vector<T,4> x, vector<T,4> y);
 
-// Given a RWByteAddressBuffer allow it to be interpretted as a RWStructuredBuffer
+// Given a RWByteAddressBuffer allow it to be interpreted as a RWStructuredBuffer
 __intrinsic_op($(kIROp_GetEquivalentStructuredBuffer))
 RWStructuredBuffer<T> __getEquivalentStructuredBuffer<T>(RWByteAddressBuffer b);
 

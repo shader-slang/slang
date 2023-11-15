@@ -66,7 +66,7 @@ DIAGNOSTIC(    8, Error, outputPathsImplyDifferentFormats,
     "the output paths '$0' and '$1' require different code-generation targets")
 
 DIAGNOSTIC(    10, Error, explicitOutputPathsAndMultipleTargets, "canot use both explicit output paths ('-o') and multiple targets ('-target')")
-DIAGNOSTIC(    11, Error, glslIsNotSupported, "the Slang compiler does not support GLSL as a source language")
+DIAGNOSTIC(    11, Error, glslIsNotSupported, "the Slang compiler does not support GLSL as a source language by default, please use -allow-glsl")
 DIAGNOSTIC(    12, Error, cannotDeduceSourceLanguage, "can't deduce language for input file '$0'")
 DIAGNOSTIC(    13, Error, unknownCodeGenerationTarget, "unknown code generation target '$0'")
 DIAGNOSTIC(    14, Error, unknownProfile, "unknown profile '$0'")
@@ -173,6 +173,7 @@ DIAGNOSTIC(15202, Error, divideByZeroInPreprocessorExpression, "division by zero
 DIAGNOSTIC(15203, Error, expectedTokenInDefinedExpression, "expected '$0' in 'defined' expression")
 DIAGNOSTIC(15204, Warning, directiveExpectsExpression, "'$0' directive requires an expression")
 DIAGNOSTIC(15205, Warning, undefinedIdentifierInPreprocessorExpression, "undefined identifier '$0' in preprocessor expression will evaluate to zero")
+DIAGNOSTIC(15206, Error, expectedIntegralVersionNumber, "Expected integer for #version number")
 
 DIAGNOSTIC(-1, Note, seeOpeningToken, "see opening '$0'")
 
@@ -741,6 +742,9 @@ DIAGNOSTIC(55102, Error, invalidTorchKernelParamType, "'$0' is not a valid param
 DIAGNOSTIC(56001, Error, unableToAutoMapCUDATypeToHostType, "Could not automatically map '$0' to a host type. Automatic binding generation failed for '$1'")
 
 DIAGNOSTIC(57001, Warning, spirvOptFailed, "spirv-opt failed. $0")
+
+// GLSL Compatibility
+DIAGNOSTIC(58001, Error, entryPointMustReturnVoidWhenGlobalOutputPresent, "entry point must return 'void' when global output variables are present.")
 //
 // 8xxxx - Issues specific to a particular library/technology/platform/etc.
 //

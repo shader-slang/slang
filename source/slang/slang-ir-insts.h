@@ -361,6 +361,14 @@ IR_SIMPLE_DECORATION(AlwaysFoldIntoUseSiteDecoration)
 IR_SIMPLE_DECORATION(StaticRequirementDecoration)
 IR_SIMPLE_DECORATION(NonCopyableTypeDecoration)
 IR_SIMPLE_DECORATION(HLSLMeshPayloadDecoration)
+IR_SIMPLE_DECORATION(GlobalInputDecoration)
+IR_SIMPLE_DECORATION(GlobalOutputDecoration)
+
+struct IRGLSLLocationDecoration : IRDecoration
+{
+    IR_LEAF_ISA(GLSLLocationDecoration)
+    IRIntLit* getLocation() { return cast<IRIntLit>(getOperand(0)); }
+};
 
 struct IRNVAPIMagicDecoration : IRDecoration
 {

@@ -30,7 +30,7 @@ class ExportedModifier : public Modifier { SLANG_AST_CLASS(ExportedModifier)};
 class ConstExprModifier : public Modifier { SLANG_AST_CLASS(ConstExprModifier)};
 class GloballyCoherentModifier : public Modifier { SLANG_AST_CLASS(GloballyCoherentModifier)};
 class ExternCppModifier : public Modifier { SLANG_AST_CLASS(ExternCppModifier)};
-
+class GLSLPrecisionModifier : public Modifier { SLANG_AST_CLASS(GLSLPrecisionModifier)};
 
 // Marks that the definition of a decl is not yet synthesized.
 class ToBeSynthesizedModifier : public Modifier {SLANG_AST_CLASS(ToBeSynthesizedModifier)};
@@ -763,6 +763,12 @@ class SPIRVTargetEnv13Attribute : public Attribute
 class DisableArrayFlatteningAttribute : public Attribute
 {
     SLANG_AST_CLASS(DisableArrayFlatteningAttribute);
+};
+
+// A GLSL layout(local_size_x = 64, ... attribute)
+class GLSLLayoutLocalSizeAttribute : public Attribute
+{
+    SLANG_AST_CLASS(GLSLLayoutLocalSizeAttribute)
 };
 
 // TODO: for attributes that take arguments, the syntax node

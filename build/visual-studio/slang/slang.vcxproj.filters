@@ -480,6 +480,9 @@
     <ClInclude Include="..\..\..\source\slang\slang-ir-synthesize-active-mask.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-ir-translate-glsl-global-var.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ir-use-uninitialized-out-param.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -1121,6 +1124,9 @@
     <ClCompile Include="..\..\..\source\slang\slang-ir-synthesize-active-mask.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-ir-translate-glsl-global-var.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-use-uninitialized-out-param.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -1274,6 +1280,9 @@
       <Filter>Source Files</Filter>
     </None>
     <None Include="..\..\..\source\slang\diff.meta.slang">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="..\..\..\source\slang\glsl.meta.slang">
       <Filter>Source Files</Filter>
     </None>
     <None Include="..\..\..\source\slang\hlsl.meta.slang">

@@ -50,6 +50,7 @@ TextureTypeInfo::TextureTypeInfo(
     BaseTextureShapeInfo const& base,
     bool isArray,
     bool isMultisample,
+    bool isShadow,
     BaseTextureAccessInfo const& accessInfo,
     StringBuilder& inSB,
     String const& inPath)
@@ -57,6 +58,7 @@ TextureTypeInfo::TextureTypeInfo(
     , base(base)
     , isArray(isArray)
     , isMultisample(isMultisample)
+    , isShadow(isShadow)
     , accessInfo(accessInfo)
     , sb(inSB)
     , path(inPath)
@@ -177,7 +179,7 @@ void TextureTypeInfo::emitTypeDecl()
     unsigned flavor = baseShape;
     if (isArray)		flavor |= TextureFlavor::ArrayFlag;
     if (isMultisample)	flavor |= TextureFlavor::MultisampleFlag;
-    // if (isShadow)		flavor |= TextureFlavor::ShadowFlag;
+    if (isShadow)		flavor |= TextureFlavor::ShadowFlag;
 
     flavor |= (access << 8);
 
@@ -204,7 +206,7 @@ void TextureTypeInfo::emitTypeDecl()
     sb << baseShapeName;
     if (isMultisample) sb << "MS";
     if (isArray) sb << "Array";
-    // if (isShadow) sb << "Shadow";
+    if (isShadow) sb << "Shadow";
     sb << "\n";
 
     // The struct body
@@ -988,7 +990,7 @@ void TextureTypeInfo::writeSampleFunctions()
 {
     TextureFlavor::Shape baseShape = base.baseShape;
     char const* samplerStateParam = prefixInfo.combined ? "" : "SamplerState s, ";
-
+    char const* comparisonSamplerStateParam = prefixInfo.combined ? "" : "SamplerComparisonState s, ";
     // `Sample()`
 
     writeFunc(
@@ -1081,7 +1083,7 @@ void TextureTypeInfo::writeSampleFunctions()
             "float",
             "SampleCmp",
             cat(
-                "SamplerComparisonState s, ",
+                comparisonSamplerStateParam,
                 "float", base.coordCount + isArray, " location, ",
                 "float compareValue"
             ),
@@ -1093,7 +1095,7 @@ void TextureTypeInfo::writeSampleFunctions()
             "float",
             "SampleCmpLevelZero",
             cat(
-                "SamplerComparisonState s, ",
+                comparisonSamplerStateParam,
                 "float", base.coordCount + isArray, " location, ",
                 "float compareValue"
             ),
@@ -1113,7 +1115,7 @@ void TextureTypeInfo::writeSampleFunctions()
             "float",
             "SampleCmp",
             cat(
-                "SamplerComparisonState s, ",
+                comparisonSamplerStateParam,
                 "float", base.coordCount + isArray, " location, ",
                 "float compareValue, "
                 "constexpr int", base.coordCount, " offset"
@@ -1126,7 +1128,7 @@ void TextureTypeInfo::writeSampleFunctions()
             "float",
             "SampleCmpLevelZero",
             cat(
-                "SamplerComparisonState s, ",
+                comparisonSamplerStateParam,
                 "float", base.coordCount + isArray, " location, ",
                 "float compareValue, "
                 "constexpr int", base.coordCount, " offset"

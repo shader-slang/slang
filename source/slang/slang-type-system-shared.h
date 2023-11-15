@@ -48,9 +48,7 @@ FOREACH_BASE_TYPE(DEFINE_BASE_TYPE)
             MultisampleFlag = SLANG_TEXTURE_MULTISAMPLE_FLAG,
 
             // Whether or not this is a shadow texture
-            //
-            // TODO(tfoley): is this even meaningful/used?
-            // ShadowFlag		= 0x80,
+            ShadowFlag		= SLANG_TEXTURE_SHADOW_FLAG,
 
             // For feedback texture
             FeedbackFlag = SLANG_TEXTURE_FEEDBACK_FLAG,
@@ -84,7 +82,7 @@ FOREACH_BASE_TYPE(DEFINE_BASE_TYPE)
         bool isArray() const { return (flavor & ArrayFlag) != 0; }
         bool isMultisample() const { return (flavor & MultisampleFlag) != 0; }
         bool isFeedback() const { return (flavor & FeedbackFlag) != 0; }
-        //            bool isShadow() const { return (flavor & ShadowFlag) != 0; }
+        bool isShadow() const { return (flavor & ShadowFlag) != 0; }
 
         SLANG_FORCE_INLINE bool operator==(const ThisType& rhs) const { return flavor == rhs.flavor; }
         SLANG_FORCE_INLINE bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }

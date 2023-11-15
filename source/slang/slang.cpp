@@ -2534,22 +2534,26 @@ SlangResult FrontEndCompileRequest::executeActionsInner()
 {
     SLANG_AST_BUILDER_RAII(getLinkage()->getASTBuilder());
 
-    // We currently allow GlSL files on the command line so that we can
-    // drive our "pass-through" mode, but we really want to issue an error
-    // message if the user is seriously asking us to compile them.
     for (TranslationUnitRequest* translationUnit : translationUnits)
     {
         // Make sure SourceFile representation is available for all translationUnits
         SLANG_RETURN_ON_FAIL(translationUnit->requireSourceFiles());
 
-        switch(translationUnit->sourceLanguage)
+        if(!getLinkage()->getAllowGLSLInput())
         {
-        default:
-            break;
+            // We currently allow GlSL files on the command line so that we can
+            // drive our "pass-through" mode, but we really want to issue an error
+            // message if the user is seriously asking us to compile them and
+            // doesn't explicitly opt into the glsl frontend
+            switch(translationUnit->sourceLanguage)
+            {
+            default:
+                break;
 
-        case SourceLanguage::GLSL:
-            getSink()->diagnose(SourceLoc(), Diagnostics::glslIsNotSupported);
-            return SLANG_FAIL;
+            case SourceLanguage::GLSL:
+                getSink()->diagnose(SourceLoc(), Diagnostics::glslIsNotSupported);
+                return SLANG_FAIL;
+            }
         }
     }
 
@@ -3230,12 +3234,23 @@ RefPtr<Module> Linkage::findOrImportModule(
     PathInfo pathIncludedFromInfo = getSourceManager()->getPathInfo(loc, SourceLocType::Actual);
     PathInfo filePathInfo;
 
+    ComPtr<ISlangBlob> fileContents;
+
     // We have to load via the found path - as that is how file was originally loaded
     if (SLANG_FAILED(includeSystem.findFile(fileName, pathIncludedFromInfo.foundPath, filePathInfo)))
     {
-        sink->diagnose(loc, Diagnostics::cannotFindFile, fileName);
-        mapNameToLoadedModules[name] = nullptr;
-        return nullptr;
+        if (name && name->text == "glsl")
+        {
+            // This is a builtin glsl module, just load it from embedded definition.
+            fileContents = getSessionImpl()->getGLSLLibraryCode();
+            filePathInfo = PathInfo::makeFromString("glsl");
+        }
+        else
+        {
+            sink->diagnose(loc, Diagnostics::cannotFindFile, fileName);
+            mapNameToLoadedModules[name] = nullptr;
+            return nullptr;
+        }
     }
 
     // Maybe this was loaded previously at a different relative name?
@@ -3243,8 +3258,7 @@ RefPtr<Module> Linkage::findOrImportModule(
         return loadedModule;
 
     // Try to load it
-    ComPtr<ISlangBlob> fileContents;
-    if(SLANG_FAILED(includeSystem.loadFile(filePathInfo, fileContents)))
+    if( !fileContents && SLANG_FAILED(includeSystem.loadFile(filePathInfo, fileContents)))
     {
         sink->diagnose(loc, Diagnostics::cannotOpenFile, fileName);
         mapNameToLoadedModules[name] = nullptr;
@@ -5265,6 +5279,11 @@ SlangResult EndToEndCompileRequest::setTypeNameForEntryPointExistentialTypeParam
         typeArgStrings.setCount(slotIndex + 1);
     typeArgStrings[slotIndex] = String(typeName);
     return SLANG_OK;
+}
+
+void EndToEndCompileRequest::setAllowGLSLInput(bool value)
+{
+    getLinkage()->setAllowGLSLInput(value);
 }
 
 SlangResult EndToEndCompileRequest::EndToEndCompileRequest::compile()

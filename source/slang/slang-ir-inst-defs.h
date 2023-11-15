@@ -823,6 +823,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// A call to the decorated function should always be folded into its use site.
     INST(AlwaysFoldIntoUseSiteDecoration, alwaysFold, 0, 0)
 
+    INST(GlobalOutputDecoration, output, 0, 0)
+    INST(GlobalInputDecoration, output, 0, 0)
+    INST(GLSLLocationDecoration, glslLocation, 1, 0)
     INST(PayloadDecoration, payload, 0, 0)
 
     /* Mesh Shader outputs */
@@ -832,7 +835,6 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST_RANGE(MeshOutputDecoration, VerticesDecoration, PrimitivesDecoration)
     INST(HLSLMeshPayloadDecoration, payload, 0, 0)
     INST(GLSLPrimitivesRateDecoration, perprimitive, 0, 0)
-
         // Marks an inst that represents the gl_Position output.
     INST(GLPositionOutputDecoration, PositionOutput, 0, 0)
 
