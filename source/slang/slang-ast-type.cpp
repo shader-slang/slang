@@ -792,6 +792,12 @@ SlangResourceShape ResourceType::getShape()
     auto baseShape = (SlangResourceShape)getBaseShape();
     if (isArray())
         baseShape = (SlangResourceShape)((uint32_t)baseShape | TextureFlavor::ArrayFlag);
+    if (isMultisample())
+        baseShape = (SlangResourceShape)((uint32_t)baseShape | TextureFlavor::MultisampleFlag);
+    if (isShadow())
+        baseShape = (SlangResourceShape)((uint32_t)baseShape | TextureFlavor::ShadowFlag);
+    if (isFeedback())
+        baseShape = (SlangResourceShape)((uint32_t)baseShape | TextureFlavor::FeedbackFlag);
     return baseShape;
 }
 
@@ -808,6 +814,23 @@ bool ResourceType::isMultisample()
     auto isMS = _getGenericTypeArg(this, 3);
     if (auto constIntVal = as<ConstantIntVal>(isMS))
         return constIntVal->getValue() != 0;
+    return false;
+}
+
+bool ResourceType::isShadow()
+{
+    auto isShadow = _getGenericTypeArg(this, 6);
+    if (auto constIntVal = as<ConstantIntVal>(isShadow))
+        return constIntVal->getValue() != 0;
+    return false;
+}
+
+bool ResourceType::isFeedback()
+{
+    static const int kResourceAccessFeedbackId = 3;
+    auto access = _getGenericTypeArg(this, 5);
+    if (auto constIntVal = as<ConstantIntVal>(access))
+        return constIntVal->getValue() == kResourceAccessFeedbackId;
     return false;
 }
 

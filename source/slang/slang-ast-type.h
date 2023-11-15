@@ -151,6 +151,8 @@ class ResourceType : public BuiltinType
 
     bool isMultisample();
     bool isArray();
+    bool isShadow();
+    bool isFeedback();
     TextureFlavor::Shape getBaseShape();
     SlangResourceShape getShape();
     SlangResourceAccess getAccess();
