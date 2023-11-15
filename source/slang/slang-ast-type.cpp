@@ -834,6 +834,14 @@ bool ResourceType::isFeedback()
     return false;
 }
 
+bool ResourceType::isCombined()
+{
+    auto combined = _getGenericTypeArg(this, 7);
+    if (auto constIntVal = as<ConstantIntVal>(combined))
+        return constIntVal->getValue() != 0;
+    return false;
+}
+
 SlangResourceAccess ResourceType::getAccess()
 {
     auto access = _getGenericTypeArg(this, 5);

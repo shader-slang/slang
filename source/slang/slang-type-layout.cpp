@@ -3813,15 +3813,31 @@ static TypeLayoutResult _createTypeLayout(
         // TODO: the logic here should really be defined by the rules,
         // and not at this top level...
         ShaderParameterKind kind;
-        switch( textureType->getAccess() )
+        if (textureType->isCombined())
         {
-        default:
-            kind = ShaderParameterKind::MutableTexture;
-            break;
+            switch (textureType->getAccess())
+            {
+            default:
+                kind = ShaderParameterKind::MutableTextureSampler;
+                break;
 
-        case SLANG_RESOURCE_ACCESS_READ:
-            kind = ShaderParameterKind::Texture;
-            break;
+            case SLANG_RESOURCE_ACCESS_READ:
+                kind = ShaderParameterKind::TextureSampler;
+                break;
+            }
+        }
+        else
+        {
+            switch( textureType->getAccess() )
+            {
+            default:
+                kind = ShaderParameterKind::MutableTexture;
+                break;
+
+            case SLANG_RESOURCE_ACCESS_READ:
+                kind = ShaderParameterKind::Texture;
+                break;
+            }
         }
 
         return createSimpleTypeLayout(
@@ -3842,27 +3858,6 @@ static TypeLayoutResult _createTypeLayout(
 
         case SLANG_RESOURCE_ACCESS_READ:
             kind = ShaderParameterKind::Image;
-            break;
-        }
-
-        return createSimpleTypeLayout(
-            rules->GetObjectLayout(kind, context.objectLayoutOptions),
-            type,
-            rules);
-    }
-    else if (auto textureSamplerType = as<TextureSamplerType>(type))
-    {
-        // TODO: the logic here should really be defined by the rules,
-        // and not at this top level...
-        ShaderParameterKind kind;
-        switch( textureSamplerType->getAccess() )
-        {
-        default:
-            kind = ShaderParameterKind::MutableTextureSampler;
-            break;
-
-        case SLANG_RESOURCE_ACCESS_READ:
-            kind = ShaderParameterKind::TextureSampler;
             break;
         }
 
