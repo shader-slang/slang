@@ -29,8 +29,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     half  h = halfTexture[pos2];
     half2 h2 = halfTexture2[pos2];
     half4 h4 = halfTexture4[pos2];
-#endif    
-    
+#endif
     // Store a results
     halfTexture[pos] = h2.x + h2.y;
     halfTexture2[pos] = h4.xy;

@@ -307,26 +307,75 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1>
         }
     }
 
-    __target_intrinsic(glsl, "texture($p, vec3($1, $2))")
-    [__readNone]
-    float SampleCmp(vector<float, Shape.dimensions+isArray> location, float compareValue);
+    __target_intrinsic(glsl, "texture($p, $1)")
+    float __glsl_texture(vector<float, Shape.dimensions+isArray+1> value);
 
     __glsl_extension(GL_EXT_texture_shadow_lod)
-    __target_intrinsic(glsl, "textureLod($p, vec3($1, $2), 0)")
-    [__readNone]
-    float SampleCmpLevelZero(vector<float, Shape.dimensions+isArray> location, float compareValue);
-
-    __target_intrinsic(glsl, "textureOffset($p, vec3($1, $2), $3)")
-    [__readNone]
-    float SampleCmp(vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset);
+    __target_intrinsic(glsl, "textureOffset($p, $1, $2)")
+    float __glsl_texture_offset(vector<float, Shape.dimensions+isArray+1> value, constexpr vector<int, Shape.planeDimensions> offset);
 
     __glsl_extension(GL_EXT_texture_shadow_lod)
-    __target_intrinsic(glsl, "textureLodOffset($p, vec3($1, $2), 0, $3)")
-    [__readNone]
-    float SampleCmpLevelZero(vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset);
+    __target_intrinsic(glsl, "textureLod($p, $1, 0)")
+    float __glsl_texture_level_zero(vector<float, Shape.dimensions+isArray+1> value);
+
+    __glsl_extension(GL_EXT_texture_shadow_lod)
+    __target_intrinsic(glsl, "textureLodOffset($p, $1, 0, $2)")
+    float __glsl_texture_offset_level_zero(vector<float, Shape.dimensions+isArray+1> value, constexpr vector<int, Shape.planeDimensions> offset);
 
     [__readNone]
-    T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY)
+    [ForceInline]
+    float SampleCmp(vector<float, Shape.dimensions+isArray> location, float compareValue)
+    {
+        __target_switch
+        {
+        case glsl:
+            __glsl_texture(__makeVector(location, compareValue));
+        case hlsl:
+            __intrinsic_asm ".SampleCmp";
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    float SampleCmpLevelZero(vector<float, Shape.dimensions+isArray> location, float compareValue)
+    {
+        __target_switch
+        {
+        case glsl:
+            __glsl_texture_level_zero(__makeVector(location, compareValue));
+        case hlsl:
+            __intrinsic_asm ".SampleCmpLevelZero";
+        }
+    }
+
+    [__readNone] 
+    [ForceInline]
+    float SampleCmp(vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
+    {
+        __target_switch
+        {
+        case glsl:
+            __glsl_texture_offset(__makeVector(location, compareValue), offset);
+        case hlsl:
+            __intrinsic_asm ".SampleCmp";
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    float SampleCmpLevelZero(vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
+    {
+        __target_switch
+        {
+        case glsl:
+            __glsl_texture_offset_level_zero(__makeVector(location, compareValue), offset);
+        case hlsl:
+            __intrinsic_asm ".SampleCmpLevelZero";
+        }
+    }
+
+    [__readNone]
+    T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.planeDimensions> gradX, vector<float, Shape.planeDimensions> gradY)
     {
         __target_switch
         {
@@ -345,7 +394,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1>
     }
 
     [__readNone]
-    T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset)
+    T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.planeDimensions> gradX, vector<float, Shape.planeDimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
         {
@@ -366,7 +415,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1>
 
     __glsl_extension(GL_ARB_sparse_texture_clamp)
     [__readNone]
-    T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset, float lodClamp)
+    T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.planeDimensions> gradX, vector<float, Shape.planeDimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset, float lodClamp)
     {
         __target_switch
         {
@@ -604,26 +653,71 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0>
         }
     }
 
-    __target_intrinsic(glsl, "texture($p, vec3($2, $3))")
-    [__readNone]
-    float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue);
+    __target_intrinsic(glsl, "texture($p, $2)")
+    float __glsl_texture(SamplerComparisonState s, vector<float, Shape.dimensions+isArray+1> value);
 
     __glsl_extension(GL_EXT_texture_shadow_lod)
-    __target_intrinsic(glsl, "textureLod($p, vec3($2, $3), 0)")
-    [__readNone]
-    float SampleCmpLevelZero(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue);
-
-    __target_intrinsic(glsl, "textureOffset($p, vec3($2, $3), $4)")
-    [__readNone]
-    float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset);
+    __target_intrinsic(glsl, "textureOffset($p, $2, $3)")
+    float __glsl_texture_offset(SamplerComparisonState s, vector<float, Shape.dimensions+isArray+1> value, constexpr vector<int, Shape.planeDimensions> offset);
 
     __glsl_extension(GL_EXT_texture_shadow_lod)
-    __target_intrinsic(glsl, "textureLodOffset($p, vec3($2, $3), 0, $4)")
-    [__readNone]
-    float SampleCmpLevelZero(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset);
+    __target_intrinsic(glsl, "textureLod($p, $2, 0)")
+    float __glsl_texture_level_zero(SamplerComparisonState s, vector<float, Shape.dimensions+isArray+1> value);
+
+    __glsl_extension(GL_EXT_texture_shadow_lod)
+    __target_intrinsic(glsl, "textureLodOffset($p, $2, 0, $3)")
+    float __glsl_texture_offset_level_zero(SamplerComparisonState s, vector<float, Shape.dimensions+isArray+1> value, constexpr vector<int, Shape.planeDimensions> offset);
+
+    [__readNone] [ForceInline]
+    float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue)
+    {
+        __target_switch
+        {
+        case glsl:
+            return __glsl_texture(s, __makeVector(location,compareValue));
+        case hlsl:
+            __intrinsic_asm ".SampleCmp";
+        }
+    }
+
+    [__readNone] [ForceInline]
+    float SampleCmpLevelZero(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue)
+    {
+        __target_switch
+        {
+        case glsl:
+            return __glsl_texture_level_zero(s, __makeVector(location,compareValue));
+        case hlsl:
+            __intrinsic_asm ".SampleCmpLevelZero";
+        }
+    }
+
+    [__readNone] [ForceInline]
+    float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
+    {
+        __target_switch
+        {
+        case glsl:
+            return __glsl_texture_offset(s, __makeVector(location,compareValue), offset);
+        case hlsl:
+            __intrinsic_asm ".SampleCmpLevelZero";
+        }
+    }
+
+    [__readNone] [ForceInline]
+    float SampleCmpLevelZero(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
+    {
+        __target_switch
+        {
+        case glsl:
+            return __glsl_texture_offset_level_zero(s, __makeVector(location,compareValue), offset);
+        case hlsl:
+            __intrinsic_asm ".SampleCmpLevelZero";
+        }
+    }
 
     [__readNone]
-    T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY)
+    T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.planeDimensions> gradX, vector<float, Shape.planeDimensions> gradY)
     {
         __target_switch
         {
@@ -645,7 +739,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0>
     }
 
     [__readNone]
-    T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset)
+    T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.planeDimensions> gradX, vector<float, Shape.planeDimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
         {
@@ -668,7 +762,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0>
 
     __glsl_extension(GL_ARB_sparse_texture_clamp)
     [__readNone]
-    T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset, float lodClamp)
+    T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.planeDimensions> gradX, vector<float, Shape.planeDimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset, float lodClamp)
     {
         __target_switch
         {
@@ -829,9 +923,9 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined>
         {
         case cpp:
         case hlsl:
-        __intrinsic_asm ".Load";
+            __intrinsic_asm ".Load";
         case glsl:
-        __intrinsic_asm "$ctexelFetch($0, ($1).$w1b, ($1).$w1e)$z";
+            __intrinsic_asm "$ctexelFetch($0, ($1).$w1b, ($1).$w1e)$z";
         case spirv:
             const int lodLoc = Shape.dimensions+isArray;
             let coord = __vectorReshape<Shape.dimensions+isArray>(location);
@@ -941,7 +1035,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined>
             case hlsl:
             __intrinsic_asm ".Load";
             case glsl:
-            __intrinsic_asm "$ctexelFetch($0, ($1).$w1b, ($1).$w1e, ($2))$z";
+                __intrinsic_asm "$ctexelFetch($0, ($1).$w1b, ($1).$w1e, ($2))$z";
             case spirv:
                 const int lodLoc = Shape.dimensions+isArray;
                 let coord = __vectorReshape<Shape.dimensions+isArray>(location);
@@ -1025,6 +1119,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined>
                     __intrinsic_asm "($0).sample[$2][$1]";
                 case glsl:
                 case spirv:
+                case cuda:
                     return Load(__makeVector(location, 0u), sampleIndex);
             }
         }
@@ -1034,14 +1129,13 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined>
 // Load/Subscript for readwrite textures
 ${{{{
     for (int access = 1; access<=2; access++) {
-        const char* glslIntrinsic = "cimageLoad($0, $1)$z";
-        const char* glslIntrinsicOffset = "cimageLoad($0, ($1)+($2))$z";
+        const char* glslIntrinsic = "$cimageLoad($0, $1)$z";
+        const char* glslIntrinsicOffset = "$cimageLoad($0, ($1)+($2))$z";
 
 }}}}
 __generic<T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int>
 extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0>
 {
-    __glsl_extension(GL_EXT_samplerless_texture_functions)
     [__readNone]
     [ForceInline]
     T Load(vector<int, Shape.dimensions+isArray> location)
@@ -1091,7 +1185,6 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0>
         }
     }
 
-    __glsl_extension(GL_EXT_samplerless_texture_functions)
     [__readNone]
     [ForceInline]
     T Load(vector<int, Shape.dimensions+isArray> location, vector<int, Shape.dimensions+isArray> offset)
@@ -1134,7 +1227,6 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0>
 
     __subscript(vector<uint, Shape.dimensions+isArray> location) -> T
     {
-        __glsl_extension(GL_EXT_samplerless_texture_functions)
         [__readNone]
         [ForceInline]
         get

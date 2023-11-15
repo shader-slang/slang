@@ -1,40 +1,16 @@
 //TEST_IGNORE_FILE:
-
 #version 450
 layout(row_major) uniform;
 layout(row_major) buffer;
 
-layout(rgba32f)
+layout(r32f)
 layout(binding = 0)
-uniform image2D t_0;
+uniform image2DArray gParams_tex_0;
 
-void writeColor_0(vec3 v_0)
-{
-    const uvec2 _S1 = uvec2(0U, 0U);
-
-    vec4 _S2 = (imageLoad((t_0), ivec2((_S1))));
-
-    vec3 _S3 = _S2.xyz + v_0;
-
-    ivec2 _S4 = ivec2(_S1);
-
-    vec4 _S5 = imageLoad(t_0,_S4);
-
-    vec4 _S6 = _S5;
-    _S6.xyz = _S3;
-
-    imageStore(t_0,_S4,_S6);
-    return;
-}
-
-
-layout(location = 0)
-out vec4 _S7;
-
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 void main()
 {
-    writeColor_0(vec3(1.00000000000000000000));
-    _S7 = vec4(0);
+    float f_0 = (imageLoad((gParams_tex_0), (ivec3(ivec2(gl_GlobalInvocationID.xy), int(gl_GlobalInvocationID.z)))).x);
+    imageStore((gParams_tex_0), (ivec3(gl_GlobalInvocationID)), vec4(f_0 + 1.0, float(0), float(0), float(0)));
     return;
 }
-
