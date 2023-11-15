@@ -3274,7 +3274,16 @@ public:
     IRConstRefType* getConstRefType(IRType* valueType);
     IRPtrTypeBase*  getPtrType(IROp op, IRType* valueType);
     IRPtrType* getPtrType(IROp op, IRType* valueType, IRIntegerValue addressSpace);
-
+    IRTextureTypeBase* getTextureType(
+        IRType* elementType,
+        IRInst* shape,
+        IRInst* isArray,
+        IRInst* isMS,
+        IRInst* sampleCount,
+        IRInst* access,
+        IRInst* isShadow,
+        IRInst* isCombined,
+        IRInst* format);
     IRComPtrType* getComPtrType(IRType* valueType);
 
         /// Get a 'SPIRV literal' 

@@ -1371,6 +1371,15 @@ struct IRResourceTypeBase : IRType
     static const int kTextureAcessRasterizerOrdered = 2;
     static const int kTextureAcessFeedback = 3;
 
+    IRInst* getShapeInst() { return getOperand(1); }
+    IRInst* getIsArrayInst() { return getOperand(2); }
+    IRInst* getIsMultisampleInst() { return getOperand(3); }
+    IRInst* getSampleCountInst() { return getOperand(4); }
+    IRInst* getAccessInst() { return getOperand(5); }
+    IRInst* getIsShadowInst() { return getOperand(6); }
+    IRInst* getIsCombinedInst() { return getOperand(7); }
+    IRInst* getFormatInst() { return getOperand(8); }
+
     TextureFlavor::Shape GetBaseShape()
     {
         switch (getOperand(1)->getOp())
@@ -1389,11 +1398,12 @@ struct IRResourceTypeBase : IRType
             return TextureFlavor::Shape2D;
         }
     }
-    bool isFeedback() { return getIntVal(getOperand(5)) == 3; }
-    bool isMultisample() { return getIntVal(getOperand(3)) != 0; }
-    bool isArray() { return getIntVal(getOperand(2)) != 0; }
-    bool isShadow() { return getIntVal(getOperand(6)) != 0; }
-    bool isCombined() { return getIntVal(getOperand(7)) != 0; }
+    bool isFeedback() { return getIntVal(getAccessInst()) == 3; }
+    bool isMultisample() { return getIntVal(getIsMultisampleInst()) != 0; }
+    bool isArray() { return getIntVal(getIsArrayInst()) != 0; }
+    bool isShadow() { return getIntVal(getIsShadowInst()) != 0; }
+    bool isCombined() { return getIntVal(getIsCombinedInst()) != 0; }
+    
     SlangResourceShape getShape() { return (SlangResourceShape)((uint32_t)GetBaseShape() | (isArray() ? SLANG_TEXTURE_ARRAY_FLAG : 0)); }
     SlangResourceAccess getAccess()
     {
@@ -1423,9 +1433,9 @@ struct IRResourceTypeBase : IRType
 struct IRResourceType : IRResourceTypeBase
 {
     IRType* getElementType() { return (IRType*)getOperand(0); }
-    IRType* getSampleCount() { return (IRType*)getOperand(1); }
-    bool hasFormat() { return getOperandCount() >= 2; }
-    IRIntegerValue getFormat() { return getIntVal(getOperand(2)); }
+    IRInst* getSampleCount() { return getSampleCountInst(); }
+    bool hasFormat() { return getOperandCount() >= 9; }
+    IRIntegerValue getFormat() { return getIntVal(getFormatInst()); }
 
     IR_PARENT_ISA(ResourceType)
 };

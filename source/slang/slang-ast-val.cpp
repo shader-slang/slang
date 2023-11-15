@@ -1344,14 +1344,19 @@ Val* WitnessLookupIntVal::_substituteImplOverride(ASTBuilder* astBuilder, Substi
 {
     int diff = 0;
     auto newWitness = getWitness()->substituteImpl(astBuilder, subst, &diff);
-    *ioDiff += diff;
     if (diff)
     {
+        *ioDiff += diff;
         auto witnessEntry = tryFoldOrNull(astBuilder, as<SubtypeWitness>(newWitness), getKey());
         if (witnessEntry)
+        {
             return witnessEntry;
+        }
+        else
+        {
+            return astBuilder->getOrCreate<WitnessLookupIntVal>(getType(), newWitness, getKey());
+        }
     }
-    // Nothing found: don't substitute.
     return this;
 }
 

@@ -258,15 +258,6 @@ namespace Slang
                 // All nested generic functions are supposed to be flattend before this pass.
                 // If they are not, they represent an intrinsic function that should not be
                 // modified in this pass.
-                auto innerMostFunc = findInnerMostSpecializingBase(static_cast<IRSpecialize*>(loweredFunc));
-                if (innerMostFunc && innerMostFunc->getOp() == kIROp_Generic)
-                {
-                    innerMostFunc =
-                        findInnerMostGenericReturnVal(static_cast<IRGeneric*>(innerMostFunc));
-                }
-                UnownedStringSlice intrinsicDef;
-                if (findTargetIntrinsicDefinition(innerMostFunc, sharedContext->targetReq->getTargetCaps(), intrinsicDef))
-                    return;
                 SLANG_UNEXPECTED("Nested generics specialization.");
             }
             else if (loweredFunc->getOp() == kIROp_LookupWitness)

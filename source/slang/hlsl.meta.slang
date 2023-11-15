@@ -175,18 +175,18 @@ static const int __kTextureAccessFeedback = 3;
 
 __magic_type(TextureType)
 __intrinsic_type($(kIROp_TextureType))
-struct __TextureImpl<T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int>
+struct __TextureImpl<T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
 {
 }
 
 // Combined texture sampler specific functions
-__generic<T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let isShadow:int>
-extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1>
+__generic<T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let isShadow:int, let format:int>
+extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 {
     static const int access = 0;
 
     typealias TextureCoord = vector<float, Shape.dimensions>;
-    typealias ImageType = __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0>;
+    typealias ImageType = __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>;
 
     __target_intrinsic(glsl, "textureQueryLod($p, $1).x")
     float CalculateLevelOfDetail(TextureCoord location);
@@ -502,8 +502,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1>
 }
 
 // Non-combined texture types specific functions
-__generic<T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int>
-extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0>
+__generic<T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
+extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,format>
 {
     typealias TextureCoord = vector<float, Shape.dimensions>;
 
@@ -887,8 +887,8 @@ for (int isMS = 0; isMS <= 1; isMS++) {
     TextureTypeInfo textureTypeInfo(kTexturePrefixes[0], kBaseTextureShapes[shapeIndex], isArray, isMS, 0, kBaseTextureAccessLevels[0], sb, path);
 }}}}
 
-__generic<T, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int>
-extension __TextureImpl<T,$(shape.shapeTypeName),$(isArray),$(isMS),sampleCount,access,isShadow,isCombined>
+__generic<T, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
+extension __TextureImpl<T,$(shape.shapeTypeName),$(isArray),$(isMS),sampleCount,access,isShadow,isCombined,format>
 {
     ${{{{
     textureTypeInfo.writeGetDimensionFunctions();
@@ -900,20 +900,28 @@ ${{{{
 }}}}
 
 // Texture.GetSamplePosition(int s);
-__generic<T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int>
-extension __TextureImpl<T,Shape,isArray,1,sampleCount,access,isShadow,isCombined>
+__generic<T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
+extension __TextureImpl<T,Shape,isArray,1,sampleCount,access,isShadow,isCombined,format>
 {
     float2 GetSamplePosition(int s);
 }
 
 // Load/Subscript for readonly, no MS textures
 
-__generic<T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let isCombined:int>
-extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined>
+__generic<T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let isCombined:int, let format:int>
+extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
 {
     static const int isMS = 0;
     static const int access = 0;
-    typealias ImageType = __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,0>;
+    typealias ImageType = __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,0,format>;
+
+    __glsl_extension(GL_EXT_samplerless_texture_functions)
+    [__readNone]
+    T __glsl_load(vector<int, Shape.dimensions+isArray> location)
+    {
+        __intrinsic_asm "$ctexelFetch($0, ($1), 0)$z";
+    }
+
     __glsl_extension(GL_EXT_samplerless_texture_functions)
     [__readNone]
     [ForceInline]
@@ -1008,8 +1016,25 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined>
                 case hlsl:
                     __intrinsic_asm ".operator[]";
                 case glsl:
+                    return __glsl_load(location);
                 case spirv:
-                    return Load(__makeVector(location, 0u));
+                    if (isCombined != 0)
+                    {
+                        return spirv_asm
+                        {
+                            %image:$$ImageType = OpImage $this;
+                            %sampled:__sampledType(T) = OpImageFetch %image $location;
+                            __truncate $$T result __sampledType(T) %sampled;
+                        };
+                    }
+                    else
+                    {
+                        return spirv_asm
+                        {
+                            %sampled:__sampledType(T) = OpImageFetch $this $location;
+                            __truncate $$T result __sampledType(T) %sampled;
+                        };
+                    }
             }
         }
     }
@@ -1017,17 +1042,17 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined>
 
 // Texture Load/Subscript for readonly, MS textures
 
-__generic<T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let isCombined:int>
-extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined>
+__generic<T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let isCombined:int, let format:int>
+extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
 {
     static const int access = 0;
     static const int isMS = 1;
-    typealias ImageType = __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,0>;
+    typealias ImageType = __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,0,format>;
 
     __glsl_extension(GL_EXT_samplerless_texture_functions)
     [__readNone]
     [ForceInline]
-    T Load(vector<int, Shape.dimensions+isArray+1> location, int sampleIndex)
+    T Load(vector<int, Shape.dimensions+isArray> location, int sampleIndex)
     {
         __target_switch
         {
@@ -1035,17 +1060,14 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined>
             case hlsl:
             __intrinsic_asm ".Load";
             case glsl:
-                __intrinsic_asm "$ctexelFetch($0, ($1).$w1b, ($1).$w1e, ($2))$z";
+                __intrinsic_asm "$ctexelFetch($0, $1, ($2))$z";
             case spirv:
-                const int lodLoc = Shape.dimensions+isArray;
-                let coord = __vectorReshape<Shape.dimensions+isArray>(location);
-                let lod = location[lodLoc];
                 if (isCombined != 0)
                 {
                     return spirv_asm
                     {
                         %image:$$ImageType = OpImage $this;
-                        %sampled:__sampledType(T) = OpImageFetch %image $coord Lod|Sample $lod $sampleIndex;
+                        %sampled:__sampledType(T) = OpImageFetch %image $location Sample $sampleIndex;
                         __truncate $$T result __sampledType(T) %sampled;
                     };
                 }
@@ -1053,7 +1075,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined>
                 {
                     return spirv_asm
                     {
-                        %sampled:__sampledType(T) = OpImageFetch $this $coord Lod|Sample $lod $sampleIndex;
+                        %sampled:__sampledType(T) = OpImageFetch $this $location Sample $sampleIndex;
                         __truncate $$T result __sampledType(T) %sampled;
                     };
                 }
@@ -1063,7 +1085,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined>
     __glsl_extension(GL_EXT_samplerless_texture_functions)
     [__readNone]
     [ForceInline]
-    T Load(vector<int, Shape.dimensions+isArray+1> location, int sampleIndex, constexpr vector<int, Shape.planeDimensions> offset)
+    T Load(vector<int, Shape.dimensions+isArray> location, int sampleIndex, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
         {
@@ -1071,17 +1093,14 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined>
             case hlsl:
             __intrinsic_asm ".Load";
             case glsl:
-            __intrinsic_asm "$ctexelFetchOffset($0, ($1).$w1b, ($1).$w1e, ($2), ($3))$z";
+            __intrinsic_asm "$ctexelFetchOffset($0, $1, ($2), ($3))$z";
             case spirv:
-                const int lodLoc = Shape.dimensions+isArray;
-                let coord = __vectorReshape<Shape.dimensions+isArray>(location);
-                let lod = location[lodLoc];
                 if (isCombined != 0)
                 {
                     return spirv_asm
                     {
                         %image:$$ImageType = OpImage $this;
-                        %sampled:__sampledType(T) = OpImageFetch %image $coord Lod|ConstOffset|Sample $lod $offset $sampleIndex;
+                        %sampled:__sampledType(T) = OpImageFetch %image $location ConstOffset|Sample $offset $sampleIndex;
                         __truncate $$T result __sampledType(T) %sampled;
                     };
                 }
@@ -1089,7 +1108,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined>
                 {
                     return spirv_asm
                     {
-                        %sampled:__sampledType(T) = OpImageFetch $this $coord Lod|ConstOffset|Sample $lod $offset  $sampleIndex;
+                        %sampled:__sampledType(T) = OpImageFetch $this $location ConstOffset|Sample $offset  $sampleIndex;
                         __truncate $$T result __sampledType(T) %sampled;
                     };
                 }
@@ -1099,7 +1118,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined>
     [__readNone]
     [ForceInline]
     __target_intrinsic(hlsl)
-    T Load(vector<int, Shape.dimensions+isArray+1> location, int sampleIndex, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
+    T Load(vector<int, Shape.dimensions+isArray> location, int sampleIndex, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
     {
         status = 0;
         return Load(location, sampleIndex, offset);
@@ -1120,7 +1139,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined>
                 case glsl:
                 case spirv:
                 case cuda:
-                    return Load(__makeVector(location, 0u), sampleIndex);
+                    return Load(location, sampleIndex);
             }
         }
     }
@@ -1133,8 +1152,8 @@ ${{{{
         const char* glslIntrinsicOffset = "$cimageLoad($0, ($1)+($2))$z";
 
 }}}}
-__generic<T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int>
-extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0>
+__generic<T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
+extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
 {
     [__readNone]
     [ForceInline]
@@ -1300,7 +1319,7 @@ ${{{{
 }}}}
 
 // Texture type aliases.
-// T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int
+// T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int
 ${{{{
     const char* shapeTypeNames[] = {"1D", "2D", "3D", "Cube"};
     const char* accessPrefix[] = {"", "RW", "RasterizerOrdered", "Feedback"};
@@ -1337,7 +1356,7 @@ ${{{{
             continue;
         const char* textureTypeName = isCombined ? "Sampler" : "Texture";
 }}}}
-typealias $(accessPrefix[access])$(textureTypeName)$(shapeTypeNames[shape])$(arrayPostFix[isArray])$(msPostFix[isMS])<T=float4, let sampleCount:int=0> = __TextureImpl<T, __Shape$(shapeTypeNames[shape]), $(isArray), $(isMS), sampleCount, $(access), 0, $(isCombined)>;
+typealias $(accessPrefix[access])$(textureTypeName)$(shapeTypeNames[shape])$(arrayPostFix[isArray])$(msPostFix[isMS])<T=float4, let sampleCount:int=0, let format:int=0> = __TextureImpl<T, __Shape$(shapeTypeNames[shape]), $(isArray), $(isMS), sampleCount, $(access), 0, $(isCombined), format>;
 ${{{{
 }
 }}}}
@@ -8536,10 +8555,10 @@ static const int kBaseBufferAccessLevelCount = sizeof(kBaseBufferAccessLevels) /
 for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
 {
     auto access = kBaseBufferAccessLevels[aa].access;
-    sb << "__generic<T>\n";
+    sb << "__generic<T,let format:int=0>\n";
     sb << "typealias ";
     sb << kBaseBufferAccessLevels[aa].name;
-    sb << "Buffer = __TextureImpl<T, __ShapeBuffer, 0, 0, 0, " << aa << ", 0, 0>;\n";
+    sb << "Buffer = __TextureImpl<T, __ShapeBuffer, 0, 0, 0, " << aa << ", 0, 0, format>;\n";
     
     bool isReadOnly = aa == 0;
 
@@ -8548,8 +8567,8 @@ for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
     char const* spvLoadInstName = (isReadOnly) ? "OpImageFetch" : "OpImageRead";
 }}}}
 
-__generic<T>
-extension __TextureImpl<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0>
+__generic<T, let format:int>
+extension __TextureImpl<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
 {
     [__readNone]
     void GetDimensions(out uint dim)
@@ -9395,7 +9414,7 @@ struct SAMPLER_FEEDBACK_MIP_REGION_USED : __BuiltinSamplerFeedbackType {};
 
 // All of these objects are write-only resources that point to a special kind of unordered access view meant for sampler feedback.
 __generic<T:__BuiltinSamplerFeedbackType>
-extension __TextureImpl<T,__Shape2D, 0, 0, 0, __kTextureAccessFeedback, 0, 0>
+extension __TextureImpl<T,__Shape2D, 0, 0, 0, __kTextureAccessFeedback, 0, 0, 0>
 {
     // With Clamp
 
@@ -9433,7 +9452,7 @@ extension __TextureImpl<T,__Shape2D, 0, 0, 0, __kTextureAccessFeedback, 0, 0>
 };
 
 __generic<T:__BuiltinSamplerFeedbackType>
-extension __TextureImpl<T,__Shape2D, 1, 0, 0, __kTextureAccessFeedback, 0, 0>
+extension __TextureImpl<T,__Shape2D, 1, 0, 0, __kTextureAccessFeedback, 0, 0, 0>
 {
     // With Clamp
 
