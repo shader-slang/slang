@@ -10296,9 +10296,6 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // TODO: give error messages if any `undefined` or
     // `unreachable` instructions remain.
 
-    // Check for using uninitialized out parameters.
-    checkForUsingUninitializedOutParams(module, compileRequest->getSink());
-
     checkForMissingReturns(module, compileRequest->getSink());
 
     // Check for invalid differentiable function body.
@@ -10369,6 +10366,9 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // from other modules potentially makes the IR we generate
     // "fragile" in that we'd now need to recompile when
     // a module we depend on changes.
+
+    // Check for using uninitialized out parameters.
+    checkForUsingUninitializedOutParams(module, compileRequest->getSink());
 
     validateIRModuleIfEnabled(compileRequest, module);
 
