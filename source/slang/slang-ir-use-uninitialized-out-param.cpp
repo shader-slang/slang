@@ -269,9 +269,10 @@ namespace Slang
                              Initialization::allUninitialized(numFlatMembers)
                             });
                     },
-                    [&](IRInst*)
+                    [&](IRInst* inst)
                     {
-                        SLANG_UNREACHABLE("Non-exhaustive patterns in walkAddressUses");
+                        // Be conservative and assume anything unknown as a store
+                        stores.add({inst, memberTree[addrMemberIndex].data.leafRange});
                     }
                 );
             }
