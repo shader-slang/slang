@@ -172,14 +172,6 @@ class TextureType : public TextureTypeBase
     SLANG_AST_CLASS(TextureType)
 };
 
-
-// This is a base type for texture/sampler pairs,
-// as they exist in, e.g., GLSL
-class TextureSamplerType : public TextureTypeBase 
-{
-    SLANG_AST_CLASS(TextureSamplerType)
-};
-
 // This is a base type for `image*` types, as they exist in GLSL
 class GLSLImageType : public TextureTypeBase 
 {
