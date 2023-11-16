@@ -4803,7 +4803,7 @@ struct SPIRVEmitContext
                 }
                 else
                 {
-                    emitInstCustomOperandFunc(
+                    last = emitInstCustomOperandFunc(
                         opParent,
                         assignedInst,
                         opcode,

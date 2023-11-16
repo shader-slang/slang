@@ -5895,6 +5895,7 @@ __generic<let N : int> float noise(vector<float, N> x)
 /// is more semantically "correct."
 __glsl_extension(GL_EXT_nonuniform_qualifier)
 [__readNone]
+[ForceInline]
 uint NonUniformResourceIndex(uint index)
 {
     __target_switch
