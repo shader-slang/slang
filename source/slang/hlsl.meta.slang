@@ -1366,11 +1366,11 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
                     switch(Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "surf1DLayeredread<$T0>($0, ($1).x * $E, ($1).y, SLANG_CUDA_BOUNDARY_MODE)";
+                        __intrinsic_asm "surf1DLayeredread$C<$T0>($0, ($1).x * $E, ($1).y, SLANG_CUDA_BOUNDARY_MODE)";
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "surf2DLayeredread<$T0>($0, ($1).x * $E, ($1).y, ($1).z, SLANG_CUDA_BOUNDARY_MODE)";
+                        __intrinsic_asm "surf2DLayeredread$C<$T0>($0, ($1).x * $E, ($1).y, ($1).z, SLANG_CUDA_BOUNDARY_MODE)";
                     case $(SLANG_TEXTURE_3D):
-                        __intrinsic_asm "surf3DLayeredread<$T0>($0, ($1).x * $E, ($1).y, ($1).z, ($1).w, SLANG_CUDA_BOUNDARY_MODE)";
+                        __intrinsic_asm "surf3DLayeredread$C<$T0>($0, ($1).x * $E, ($1).y, ($1).z, ($1).w, SLANG_CUDA_BOUNDARY_MODE)";
                     default:
                         __intrinsic_asm "<invalid intrinsic>";
                     }
@@ -1380,11 +1380,11 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
                     switch(Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "surf1Dread<$T0>($0, ($1) * $E, SLANG_CUDA_BOUNDARY_MODE)";
+                        __intrinsic_asm "surf1Dread$C<$T0>($0, ($1) * $E, SLANG_CUDA_BOUNDARY_MODE)";
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "surf2Dread<$T0>($0, ($1).x * $E, ($1).y, SLANG_CUDA_BOUNDARY_MODE)";
+                        __intrinsic_asm "surf2Dread$C<$T0>($0, ($1).x * $E, ($1).y, SLANG_CUDA_BOUNDARY_MODE)";
                     case $(SLANG_TEXTURE_3D):
-                        __intrinsic_asm "surf3Dread<$T0>($0, ($1).x * $E, ($1).y, ($1).z, SLANG_CUDA_BOUNDARY_MODE)";
+                        __intrinsic_asm "surf3Dread$C<$T0>($0, ($1).x * $E, ($1).y, ($1).z, SLANG_CUDA_BOUNDARY_MODE)";
                     default:
                         __intrinsic_asm "<invalid intrinsic>";
                     }
