@@ -168,10 +168,6 @@ __intrinsic_op(makeVector)
 __generic<T, let N:int>
 vector<T,N+1> __makeVector(vector<T,N> vec, T scalar);
 
-static const int __kTextureAccessNone = 0;
-static const int __kTextureAccessRW = 1;
-static const int __kTextureAccessRasterizerOrdered = 2;
-static const int __kTextureAccessFeedback = 3;
 
 __magic_type(TextureType)
 __intrinsic_type($(kIROp_TextureType))
@@ -240,6 +236,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     }
 
     [__readNone]
+    __glsl_extension(GL_ARB_sparse_texture_clamp)
     T Sample(vector<float, Shape.dimensions+isArray> location, vector<int, Shape.planeDimensions> offset, float clamp)
     {
         __target_switch
@@ -248,7 +245,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case hlsl:
                 __intrinsic_asm ".Sample";
             case glsl:
-                __intrinsic_asm "$ctexture($0, $1)$z";
+                __intrinsic_asm "$ctextureOffsetClampARB($0, $1, $2, $3)$z";
             case spirv:
                 return spirv_asm
                 {
@@ -296,7 +293,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case hlsl:
             __intrinsic_asm ".SampleBias";
             case glsl:
-            __intrinsic_asm "$ctextureOffset($0, $1, $2, $3)$z";
+            __intrinsic_asm "$ctextureOffset($0, $1, $3, $2)$z";
             case spirv:
             return spirv_asm
             {
@@ -584,6 +581,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
     }
 
     [__readNone]
+    __glsl_extension(GL_ARB_sparse_texture_clamp)
     T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset, float clamp)
     {
         __target_switch
@@ -591,6 +589,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
             case cpp:
             case hlsl:
                 __intrinsic_asm ".Sample";
+            case glsl:
+                __intrinsic_asm "$ctextureOffsetClampARB($p, $2, $3, $4)$z";
             case spirv:
                 return spirv_asm
                 {
@@ -640,7 +640,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
             case hlsl:
             __intrinsic_asm ".SampleBias";
             case glsl:
-            __intrinsic_asm "$ctextureOffset($p, $2, $3, $4)$z";
+            __intrinsic_asm "$ctextureOffset($p, $2, $4, $3)$z";
             case spirv:
             return spirv_asm
             {
@@ -9699,7 +9699,7 @@ struct SAMPLER_FEEDBACK_MIP_REGION_USED : __BuiltinSamplerFeedbackType {};
 
 // All of these objects are write-only resources that point to a special kind of unordered access view meant for sampler feedback.
 __generic<T:__BuiltinSamplerFeedbackType>
-extension __TextureImpl<T,__Shape2D, 0, 0, 0, __kTextureAccessFeedback, 0, 0, 0>
+extension __TextureImpl<T,__Shape2D, 0, 0, 0, $(kStdlibResourceAccessFeedback), 0, 0, 0>
 {
     // With Clamp
 
@@ -9737,7 +9737,7 @@ extension __TextureImpl<T,__Shape2D, 0, 0, 0, __kTextureAccessFeedback, 0, 0, 0>
 };
 
 __generic<T:__BuiltinSamplerFeedbackType>
-extension __TextureImpl<T,__Shape2D, 1, 0, 0, __kTextureAccessFeedback, 0, 0, 0>
+extension __TextureImpl<T,__Shape2D, 1, 0, 0, $(kStdlibResourceAccessFeedback), 0, 0, 0>
 {
     // With Clamp
 
