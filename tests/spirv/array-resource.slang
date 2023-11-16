@@ -12,16 +12,6 @@ RWStructuredBuffer<uint> inputBuffers[];
 
 RWStructuredBuffer<uint> resultBuffer;
 
-struct Data
-{
-    uint arr[4];
-}
-
-struct Data2
-{
-    uint arr[4u];
-}
-
 //TEST_INPUT: set inputBuffers = {ubuffer(data=[1 0 0 0], stride=4), ubuffer(data=[2 0 0 0], stride=4)}
 
 [numthreads(4,1,1)]
