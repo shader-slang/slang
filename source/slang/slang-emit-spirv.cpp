@@ -1361,6 +1361,7 @@ struct SPIRVEmitContext
         case kIROp_TextureType:
             return ensureTextureType(inst, cast<IRTextureType>(inst));
         case kIROp_SamplerStateType:
+        case kIROp_SamplerComparisonStateType:
             return emitOpTypeSampler(inst);
 
         case kIROp_RaytracingAccelerationStructureType:

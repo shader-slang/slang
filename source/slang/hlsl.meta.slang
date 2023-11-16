@@ -906,6 +906,182 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,access,isShadow,isCombined
     float2 GetSamplePosition(int s);
 }
 
+__intrinsic_op($(kIROp_MakeArray))
+Array<T,4> __makeArray<T>(T v0, T v1, T v2, T v3);
+
+// Gather for scalar textures.
+__generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
+[ForceInline]
+vector<TElement,4> __glsl_gather(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture, SamplerState s, vector<float, Shape.dimensions+isArray> location, int component)
+{
+    //typealias SampledImageType = __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format>;
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "textureGather($p, $2, $3)";
+    case spirv:
+        return spirv_asm {
+            %sampledImage : $$__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> = OpSampledImage $texture $s;
+            result:$$vector<TElement,4> = OpImageGather %sampledImage $location $component;
+        };
+    }
+}
+__generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
+[ForceInline]
+vector<TElement,4> __glsl_gather_offset(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture, SamplerState s, vector<float, Shape.dimensions+isArray> location, int component, vector<int, Shape.planeDimensions> offset)
+{
+    //typealias SampledImageType = __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format>;
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "textureGatherOffset($p, $2, $3, $4)";
+    case spirv:
+        return spirv_asm {
+            %sampledImage : $$__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> = OpSampledImage $texture $s;
+            result:$$vector<TElement,4> = OpImageGather %sampledImage $location $component ConstOffset $offset;
+        };
+    }
+}
+__generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
+[ForceInline]
+vector<TElement,4> __glsl_gather_offsets(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture, SamplerState s, vector<float, Shape.dimensions+isArray> location, int component,
+    vector<int, Shape.planeDimensions> offset1,
+    vector<int, Shape.planeDimensions> offset2,
+    vector<int, Shape.planeDimensions> offset3,
+    vector<int, Shape.planeDimensions> offset4)
+{
+    //typealias SampledImageType = __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format>;
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "textureGatherOffsets($p, $2, $3, $T4[]($4, $5, $6, $7))";
+    case spirv:
+        let offsets = __makeArray(offset1,offset2,offset3,offset4);
+        return spirv_asm {
+            OpCapability ImageGatherExtended;
+            %sampledImage : $$__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> = OpSampledImage $texture $s;
+            result:$$vector<TElement,4> = OpImageGather %sampledImage $location $component ConstOffsets $offsets;
+        };
+    }
+}
+__generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
+[ForceInline]
+vector<TElement,4> __glsl_gatherCmp_offset(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture, SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, int componentIndex, TElement compareValue, vector<int, Shape.planeDimensions> offset)
+{
+    //typealias SampledImageType = __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format>;
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "textureGatherOffset($p, $2, $4, $5)";
+    case spirv:
+        return spirv_asm {
+            %sampledImage : $$__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> = OpSampledImage $texture $s;
+            result:$$vector<TElement,4> = OpImageDrefGather %sampledImage $location $compareValue ConstOffset $offset;
+        };
+    }
+}
+__generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
+[ForceInline]
+vector<TElement,4> __glsl_gatherCmp_offsets(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture, SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, int componentIndex, TElement compareValue,
+    vector<int, Shape.planeDimensions> offset1,
+    vector<int, Shape.planeDimensions> offset2,
+    vector<int, Shape.planeDimensions> offset3,
+    vector<int, Shape.planeDimensions> offset4
+    )
+{
+    //typealias SampledImageType = __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format>;
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "textureGatherOffsets($p, $2, $4, $T5[]($5, $6, $7, $8))";
+    case spirv:
+        let offsets = __makeArray(offset1,offset2,offset3,offset4);
+        return spirv_asm {
+            OpCapability ImageGatherExtended;
+            %sampledImage : $$__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> = OpSampledImage $texture $s;
+            result:$$vector<TElement,4> = OpImageDrefGather %sampledImage $location $compareValue ConstOffsets $offsets;
+        };
+    }
+}
+
+${{{{
+for (int isScalarTexture = 0; isScalarTexture <= 1; isScalarTexture++) {
+    if (isScalarTexture == 0)
+    {
+        sb << "__generic<T:__BuiltinArithmeticType, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>\n";
+        sb << "extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,0,format>\n";
+    }
+    else
+    {
+        sb << "__generic<T:__BuiltinArithmeticType, let N:int, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>\n";
+        sb << "extension __TextureImpl<vector<T,N>,Shape,isArray,0,sampleCount,0,isShadow,0,format>\n";
+    }
+}}}}
+{ // begin extension for gather
+    [ForceInline]
+    vector<T,4> Gather(SamplerState s, vector<float, Shape.dimensions+isArray> location)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".Gather";
+        case spirv:
+        case glsl:
+            return __glsl_gather<T>(this, s, location, 0);
+        }
+    }
+    [ForceInline]
+    vector<T,4> GatherCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, T compareValue)
+    {
+        return GatherCmp(s, location, compareValue, vector<int, Shape.planeDimensions>(0));
+    }
+${{{{
+    // Gather component
+    for (int isCmp = 0; isCmp <= 1; ++isCmp) {
+        const char* cmp = isCmp ? "Cmp" : "";
+        const char* cmpParam = isCmp? "T compareValue, " : "";
+        const char* compareArg = isCmp ? "compareValue, " : "";
+        const char* samplerStateType = isCmp ? "SamplerComparisonState" : "SamplerState";
+        const char* componentNames[] = {"", "Red", "Green", "Blue", "Alpha"};
+        for (auto componentId = 0;  componentId < 4; componentId++) {
+            auto component = componentNames[componentId];
+            auto componentIndex = componentId == 0 ? 0 : componentId - 1;
+    }}}}
+    [ForceInline]
+    vector<T,4> Gather$(cmp)$(component)($(samplerStateType) s, vector<float, Shape.dimensions+isArray> location, $(cmpParam) vector<int, Shape.planeDimensions> offset)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".Gather$(cmp)$(component)";
+        case glsl:
+        case spirv:
+            return __glsl_gather$(cmp)_offset<T>(this, s, location, $(componentIndex), $(compareArg) offset);
+        }
+    }
+    [ForceInline]
+    vector<T,4> Gather$(cmp)$(component)($(samplerStateType) s, vector<float, Shape.dimensions+isArray> location, $(cmpParam)
+        vector<int, Shape.planeDimensions> offset1,
+        vector<int, Shape.planeDimensions> offset2,
+        vector<int, Shape.planeDimensions> offset3,
+        vector<int, Shape.planeDimensions> offset4)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".Gather$(cmp)$(component)";
+        case glsl:
+        case spirv:
+            return __glsl_gather$(cmp)_offsets<T>(this, s, location, $(componentIndex), $(compareArg) offset1,offset2,offset3,offset4);
+        }
+    }
+    ${{{{
+    } // for (component)
+    } // for (isCmp)
+    }}}}
+} // end extension for gather
+
+${{{{
+} // for (isScalarTexture)
+}}}}
+
 // Load/Subscript for readonly, no MS textures
 
 __generic<T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let isCombined:int, let format:int>
@@ -1150,7 +1326,8 @@ ${{{{
     for (int access = 1; access<=2; access++) {
         const char* glslIntrinsic = "$cimageLoad($0, $1)$z";
         const char* glslIntrinsicOffset = "$cimageLoad($0, ($1)+($2))$z";
-
+        const char* glslIntrinsicMS = "$cimageLoad($0, $1, $2)$z";
+        const char* glslIntrinsicMSOffset = "$cimageLoad($0, ($1)+($3), $2)$z";
 }}}}
 __generic<T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
 extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
@@ -1315,7 +1492,116 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
 }
 
 ${{{{
+if (access == 1) {
+}}}}
+// RW MS textures.
+__generic<T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
+extension __TextureImpl<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,format>
+{
+    [__readNone]
+    [ForceInline]
+    T Load(vector<int, Shape.dimensions+isArray> location, int sampleIndex)
+    {
+        __target_switch
+        {
+            case cpp:
+            case hlsl:
+                __intrinsic_asm ".Load";
+            case glsl:
+                __intrinsic_asm "$(glslIntrinsicMS)";
+            case spirv:
+                return spirv_asm
+                {
+                    %sampled:__sampledType(T) = OpImageRead $this $location Sample $sampleIndex;
+                    __truncate $$T result __sampledType(T) %sampled;
+                };
+        }
     }
+
+    [__readNone]
+    [ForceInline]
+    T Load(vector<int, Shape.dimensions+isArray> location, int sampleIndex, vector<int, Shape.dimensions+isArray> offset)
+    {
+        __target_switch
+        {
+            case cpp:
+            case hlsl:
+                __intrinsic_asm ".Load";
+            case glsl:
+                __intrinsic_asm "$(glslIntrinsicMSOffset)";
+            case spirv:
+                return spirv_asm
+                {
+                    %sampled:__sampledType(T) = OpImageRead $this $location ConstOffset|Sample $offset $sampleIndex;
+                    __truncate $$T result __sampledType(T) %sampled;
+                };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    T Load(vector<int, Shape.dimensions+isArray> location, int sampleIndex, vector<int, Shape.dimensions+isArray> offset, out uint status)
+    {
+        __target_switch
+        {
+        case hlsl:
+        case cpp:
+            __intrinsic_asm ".Load";
+        default:
+            status = 0;
+            return Load(location, sampleIndex, offset);
+        }
+    }
+
+    void __glslImageStore(vector<int, Shape.dimensions+isArray> location, int sampleIndex, T value)
+    {
+        __intrinsic_asm "imageStore($0, $1, $2, $V3)";
+    }
+
+    __subscript(vector<uint, Shape.dimensions+isArray> location, int sampleIndex) -> T
+    {
+        [__readNone]
+        [ForceInline]
+        get
+        {
+            __target_switch
+            {
+                case cpp:
+                case hlsl:
+                    __intrinsic_asm "$0.sample[$2][$1]";
+                case glsl:
+                case spirv:
+                case cuda:
+                    return Load(location, sampleIndex);
+            }
+        }
+
+        [nonmutating]
+        [ForceInline]
+        set(T newValue)
+        {
+            __target_switch
+            {
+                case cpp:
+                case hlsl:
+                __intrinsic_asm "$0.sample[$2][$1]";
+                case glsl:
+                    __glslImageStore(location, sampleIndex, newValue);
+                case spirv:
+                    return spirv_asm
+                    {
+                        OpImageWrite $this $location $newValue Sample $sampleIndex;
+                    };
+            }
+        }
+
+        __intrinsic_op($(kIROp_ImageSubscript)) ref;
+    }
+}
+
+${{{{
+} // if (access == 1) // for RW MS textures.
+} // for (access).
 }}}}
 
 // Texture type aliases.
@@ -1332,9 +1618,6 @@ ${{{{
     for (int access = 0; access<=3; access++) {
         if (access != 0)
         {
-            // No RWMS.
-            if (isMS) continue;
-
             // No RW Cube.
             if (shape == 3) continue;
         }
@@ -1349,6 +1632,9 @@ ${{{{
         {
             // Only Texture2DMS.
             if (shape != 1)
+                continue;
+            // Only Texture2DMS or RWTexture2DMS.
+            if (access >= 2)
                 continue;
         }
         // No 3D Array.
