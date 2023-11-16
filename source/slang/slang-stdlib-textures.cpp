@@ -206,18 +206,21 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 auto emitIntrinsic = [&](UnownedStringSlice funcName, bool useLodStr)
                     {
                         int aa = 1;
-                        String lodStr = ", 0";
-                        if (includeMipInfo)
-                        {
-                            int mipLevelArg = aa++;
-                            lodStr = ", int($";
-                            lodStr.append(mipLevelArg);
-                            lodStr.append(")");
-                        }
-                        String opStr = " = " + funcName + "($0";
+                        StringBuilder opStrSB;
+                        opStrSB << " = " << funcName << "($0";
                         if (useLodStr)
-                            opStr = opStr + lodStr;
-
+                        {
+                            String lodStr = ", 0";
+                            if (includeMipInfo)
+                            {
+                                int mipLevelArg = aa++;
+                                lodStr = ", int($";
+                                lodStr.append(mipLevelArg);
+                                lodStr.append(")");
+                            }
+                            opStrSB << lodStr;
+                        }
+                        auto opStr = opStrSB.produceString();
                         int cc = 0;
                         switch (baseShape)
                         {
@@ -264,9 +267,6 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                         {
                             glsl << ", ($" << aa++ << " = textureQueryLevels($0))";
                         }
-
-
-                        glsl << ")";
                     };
                 glsl << "if (access == " << kStdlibResourceAccessReadOnly << ") __intrinsic_asm \"";
                 emitIntrinsic(toSlice("textureSize"), true);
