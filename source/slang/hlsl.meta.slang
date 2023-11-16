@@ -1340,7 +1340,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,form
 
 // Load/Subscript for readwrite textures
 ${{{{
-    for (int access = $(kStdlibResourceAccessReadWrite); access<=$(kStdlibResourceAccessRasterizerOrdered); access++) {
+    for (int access = kStdlibResourceAccessReadWrite; access<=kStdlibResourceAccessRasterizerOrdered; access++) {
         const char* glslIntrinsic = "$cimageLoad($0, $1)$z";
         const char* glslIntrinsicOffset = "$cimageLoad($0, ($1)+($2))$z";
         const char* glslIntrinsicMS = "$cimageLoad($0, $1, $2)$z";
@@ -1509,7 +1509,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
 }
 
 ${{{{
-if (access == $(kStdlibResourceAccessReadWrite)) {
+if (access == kStdlibResourceAccessReadWrite) {
 }}}}
 // RW MS textures.
 __generic<T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
@@ -1617,7 +1617,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,form
 }
 
 ${{{{
-} // if (access == $(kStdlibResourceAccessReadWrite)) // for RW MS textures.
+} // if (access == kStdlibResourceAccessReadWrite) // for RW MS textures.
 } // for (access).
 }}}}
 
@@ -1632,13 +1632,13 @@ ${{{{
     for (int isArray = 0; isArray<=1; isArray++)
     for (int isMS = 0; isMS<=1; isMS++)
     for (int isCombined = 0; isCombined<=1; isCombined++)
-    for (int access = $(kStdlibResourceAccessReadOnly); access<=$(kStdlibResourceAccessFeedback); access++) {
-        if (access != $(kStdlibResourceAccessReadOnly))
+    for (int access = kStdlibResourceAccessReadOnly; access<=kStdlibResourceAccessFeedback; access++) {
+        if (access != kStdlibResourceAccessReadOnly)
         {
             // No RW Cube.
-            if (shape == $(kStdlibShapeIndexCube)) continue;
+            if (shape == kStdlibShapeIndexCube) continue;
         }
-        if (access == $(kStdlibResourceAccessFeedback))
+        if (access == kStdlibResourceAccessFeedback)
         {
             // Feedback only defined for Texture2D and Texture2DArray.
             if (shape != 1) continue;
@@ -1648,14 +1648,14 @@ ${{{{
         if (isMS)
         {
             // Only Texture2DMS.
-            if (shape != $(kStdlibShapeIndex2D))
+            if (shape != kStdlibShapeIndex2D)
                 continue;
             // Only Texture2DMS or RWTexture2DMS.
-            if (access >= $(kStdlibShapeIndex3D))
+            if (access >= kStdlibShapeIndex3D)
                 continue;
         }
         // No 3D Array.
-        if (shape == $(kStdlibShapeIndex3D) && isArray == 1)
+        if (shape == kStdlibShapeIndex3D && isArray == 1)
             continue;
         const char* textureTypeName = isCombined ? "Sampler" : "Texture";
 }}}}
