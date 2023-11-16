@@ -848,6 +848,7 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(SemanticDecoration, semantic, 2, 0)
     INST(PackOffsetDecoration, packoffset, 2, 0)
 
+    INST(RequireSPIRVDescriptorIndexingExtensionDecoration, RequireSPIRVDescriptorIndexingExtensionDecoration, 0, 0)
     INST(SPIRVOpDecoration, spirvOpDecoration, 1, 0)
 
         /// Decorated function is marked for the forward-mode differentiation pass.

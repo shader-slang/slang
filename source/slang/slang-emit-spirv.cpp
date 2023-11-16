@@ -1894,6 +1894,12 @@ struct SPIRVEmitContext
                     emitOpDecorate(getSection(SpvLogicalSectionID::Annotations), nullptr, varInst, SpvDecorationFlat);
             }
         }
+
+        if (var->findDecorationImpl(kIROp_RequireSPIRVDescriptorIndexingExtensionDecoration))
+        {
+            ensureExtensionDeclaration(UnownedStringSlice("SPV_EXT_descriptor_indexing"));
+            requireSPIRVCapability(SpvCapabilityRuntimeDescriptorArray);
+        }
     }
 
     void maybeEmitName(SpvInst* spvInst, IRInst* irInst)

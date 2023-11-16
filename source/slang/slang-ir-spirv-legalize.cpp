@@ -464,7 +464,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
             auto innerType = inst->getFullType();
 
-            auto arrayType = as<IRArrayType>(inst->getDataType());
+            auto arrayType = as<IRArrayTypeBase>(inst->getDataType());
             IRInst* arraySize = nullptr;
             if (arrayType)
             {
@@ -560,9 +560,17 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             }
 
             auto innerElementType = innerType;
-            if (arraySize)
+            if (arrayType)
             {
-                innerType = builder.getArrayType(innerType, arraySize);
+                Array<IRInst*, 2> arrayTypeArgs;
+                arrayTypeArgs.add(innerType);
+                if (arraySize)
+                    arrayTypeArgs.add(arraySize);
+                innerType = (IRType*)builder.emitIntrinsicInst(builder.getTypeKind(), arrayType->getOp(), (UInt)arrayTypeArgs.getCount(), arrayTypeArgs.getBuffer());
+                if (!arraySize)
+                {
+                    builder.addRequireSPIRVDescriptorIndexingExtensionDecoration(inst);
+                }
             }
 
             // Make a pointer type of storageClass.
@@ -577,7 +585,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                         insertLoadAtLatestLocation(inst, use);
                     });
             }
-            else if (arraySize)
+            else if (arrayType)
             {
                 traverseUses(inst, [&](IRUse* use)
                     {

@@ -4237,6 +4237,11 @@ public:
         addDecoration(value, kIROp_SemanticDecoration, getStringValue(text), getIntValue(getIntType(), index));
     }
 
+    void addRequireSPIRVDescriptorIndexingExtensionDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_RequireSPIRVDescriptorIndexingExtensionDecoration);
+    }
+
     void addTargetIntrinsicDecoration(IRInst* value, IRInst* caps, UnownedStringSlice const& definition, UnownedStringSlice const& predicate, IRInst* typeScrutinee)
     {
         typeScrutinee
