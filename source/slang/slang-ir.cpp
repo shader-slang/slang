@@ -5838,6 +5838,32 @@ namespace Slang
         return i;
     }
 
+    IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandImageType(IRInst* element)
+    {
+        SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
+        const auto i = createInst<IRSPIRVAsmOperand>(
+            this,
+            kIROp_SPIRVAsmOperandImageType,
+            getTypeType(),
+            element
+        );
+        addInst(i);
+        return i;
+    }
+
+    IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandSampledImageType(IRInst* element)
+    {
+        SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
+        const auto i = createInst<IRSPIRVAsmOperand>(
+            this,
+            kIROp_SPIRVAsmOperandSampledImageType,
+            getTypeType(),
+            element
+        );
+        addInst(i);
+        return i;
+    }
+
     IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandTruncate()
     {
         SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
@@ -6726,6 +6752,16 @@ namespace Slang
             return;
         case kIROp_SPIRVAsmOperandSampledType:
             dump(context, "__sampledType(");
+            dumpInstExpr(context, inst->getOperand(0));
+            dump(context, ")");
+            return;
+        case kIROp_SPIRVAsmOperandImageType:
+            dump(context, "__imageType(");
+            dumpInstExpr(context, inst->getOperand(0));
+            dump(context, ")");
+            return;
+        case kIROp_SPIRVAsmOperandSampledImageType:
+            dump(context, "__sampledImageType(");
             dumpInstExpr(context, inst->getOperand(0));
             dump(context, ")");
             return;

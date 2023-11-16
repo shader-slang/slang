@@ -3983,6 +3983,26 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                     }
                     return builder->emitSPIRVAsmOperandSampledType(i);
                 }
+            case SPIRVAsmOperand::ImageType:
+            {
+                IRInst* i;
+                {
+                    IRBuilderInsertLocScope insertScope(builder);
+                    builder->setInsertBefore(spirvAsmInst);
+                    i = getSimpleVal(context, lowerRValueExpr(context, operand.expr));
+                }
+                return builder->emitSPIRVAsmOperandImageType(i);
+            }
+            case SPIRVAsmOperand::SampledImageType:
+            {
+                IRInst* i;
+                {
+                    IRBuilderInsertLocScope insertScope(builder);
+                    builder->setInsertBefore(spirvAsmInst);
+                    i = getSimpleVal(context, lowerRValueExpr(context, operand.expr));
+                }
+                return builder->emitSPIRVAsmOperandSampledImageType(i);
+            }
             case SPIRVAsmOperand::TruncateMarker:
                 {
                     return builder->emitSPIRVAsmOperandTruncate();

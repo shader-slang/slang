@@ -186,7 +186,6 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     static const int access = 0;
 
     typealias TextureCoord = vector<float, Shape.dimensions>;
-    typealias ImageType = __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>;
 
     __target_intrinsic(glsl, "textureQueryLod($0, $1).x")
     float CalculateLevelOfDetail(TextureCoord location);
@@ -557,8 +556,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
             case spirv:
                 return spirv_asm
                 {
-                    %sampledImageType = OpTypeSampledImage $$This;
-                    %sampledImage : %sampledImageType = OpSampledImage $this $s;
+                    %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
                     %sampled : __sampledType(T) = OpImageSampleImplicitLod %sampledImage $location None;
                     __truncate $$T result __sampledType(T) %sampled;
                 };
@@ -578,8 +576,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
             case spirv:
             return spirv_asm
             {
-                %sampledImageType = OpTypeSampledImage $$This;
-                %sampledImage : %sampledImageType = OpSampledImage $this $s;
+                %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
                 %sampled : __sampledType(T) = OpImageSampleImplicitLod %sampledImage $location None|ConstOffset $offset;
                 __truncate $$T result __sampledType(T) %sampled;
             };
@@ -598,8 +595,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
                 return spirv_asm
                 {
                     OpCapability MinLod;
-                    %sampledImageType = OpTypeSampledImage $$This;
-                    %sampledImage : %sampledImageType = OpSampledImage $this $s;
+                    %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
                     %sampled : __sampledType(T) = OpImageSampleImplicitLod %sampledImage $location None|ConstOffset|MinLod $offset $clamp;
                     __truncate $$T result __sampledType(T) %sampled;
                 };
@@ -627,8 +623,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
             case spirv:
             return spirv_asm
             {
-                %sampledImageType = OpTypeSampledImage $$This;
-                %sampledImage : %sampledImageType = OpSampledImage $this $s;
+                %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
                 %sampled : __sampledType(T) = OpImageSampleImplicitLod %sampledImage $location None|Bias $bias;
                 __truncate $$T result __sampledType(T) %sampled;
 
@@ -649,8 +644,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
             case spirv:
             return spirv_asm
             {
-                %sampledImageType = OpTypeSampledImage $$This;
-                %sampledImage : %sampledImageType = OpSampledImage $this $s;
+                %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
                 %sampled : __sampledType(T) = OpImageSampleImplicitLod %sampledImage $location None|Bias|ConstOffset $bias $offset;
                 __truncate $$T result __sampledType(T) %sampled;
             };
@@ -733,8 +727,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
             case spirv:
                 return spirv_asm
                 {
-                    %sampledImageType = OpTypeSampledImage $$This;
-                    %sampledImage : %sampledImageType = OpSampledImage $this $s;
+                    %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
                     %sampled : __sampledType(T) = OpImageSampleExplicitLod %sampledImage $location None|Grad $gradX $gradY;
                     __truncate $$T result __sampledType(T) %sampled;
 
@@ -755,8 +748,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
             case spirv:
                 return spirv_asm
                 {
-                    %sampledImageType = OpTypeSampledImage $$This;
-                    %sampledImage : %sampledImageType = OpSampledImage $this $s;
+                    %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
                     %sampled : __sampledType(T) = OpImageSampleExplicitLod %sampledImage $location None|Grad|ConstOffset $gradX $gradY $offset;
                     __truncate $$T result __sampledType(T) %sampled;
 
@@ -779,8 +771,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
                 return spirv_asm
                 {
                     OpCapability MinLod;
-                    %sampledImageType = OpTypeSampledImage $$This;
-                    %sampledImage : %sampledImageType = OpSampledImage $this $s;
+                    %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
                     %sampled : __sampledType(T) = OpImageSampleExplicitLod %sampledImage $location None|Grad|ConstOffset|MinLod $gradX $gradY $offset $lodClamp;
                     __truncate $$T result __sampledType(T) %sampled;
 
@@ -830,8 +821,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
             case spirv:
             return spirv_asm
             {
-                %sampledImageType = OpTypeSampledImage $$This;
-                %sampledImage : %sampledImageType = OpSampledImage $this $s;
+                %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
                 %sampled : __sampledType(T) = OpImageSampleExplicitLod %sampledImage $location None|Lod $level;
                 __truncate $$T result __sampledType(T) %sampled;
 
@@ -852,8 +842,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
             case spirv:
                 return spirv_asm
                 {
-                    %sampledImageType = OpTypeSampledImage $$This;
-                    %sampledImage : %sampledImageType = OpSampledImage $this $s;
+                    %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
                     %sampled : __sampledType(T) = OpImageSampleExplicitLod %sampledImage $location None|Lod|ConstOffset $level $offset;
                     __truncate $$T result __sampledType(T) %sampled;
                 };
@@ -920,14 +909,13 @@ __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:
 [ForceInline]
 vector<TElement,4> __glsl_gather(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture, SamplerState s, vector<float, Shape.dimensions+isArray> location, int component)
 {
-    //typealias SampledImageType = __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format>;
     __target_switch
     {
     case glsl:
         __intrinsic_asm "textureGather($p, $2, $3)";
     case spirv:
         return spirv_asm {
-            %sampledImage : $$__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> = OpSampledImage $texture $s;
+            %sampledImage : __sampledImageType(texture) = OpSampledImage $texture $s;
             result:$$vector<TElement,4> = OpImageGather %sampledImage $location $component;
         };
     }
@@ -936,14 +924,13 @@ __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:
 [ForceInline]
 vector<TElement,4> __glsl_gather_offset(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture, SamplerState s, vector<float, Shape.dimensions+isArray> location, int component, vector<int, Shape.planeDimensions> offset)
 {
-    //typealias SampledImageType = __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format>;
     __target_switch
     {
     case glsl:
         __intrinsic_asm "textureGatherOffset($p, $2, $3, $4)";
     case spirv:
         return spirv_asm {
-            %sampledImage : $$__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> = OpSampledImage $texture $s;
+            %sampledImage : __sampledImageType(texture) = OpSampledImage $texture $s;
             result:$$vector<TElement,4> = OpImageGather %sampledImage $location $component ConstOffset $offset;
         };
     }
@@ -956,7 +943,6 @@ vector<TElement,4> __glsl_gather_offsets(__TextureImpl<T, Shape, isArray, 0, sam
     vector<int, Shape.planeDimensions> offset3,
     vector<int, Shape.planeDimensions> offset4)
 {
-    //typealias SampledImageType = __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format>;
     __target_switch
     {
     case glsl:
@@ -965,7 +951,7 @@ vector<TElement,4> __glsl_gather_offsets(__TextureImpl<T, Shape, isArray, 0, sam
         let offsets = __makeArray(offset1,offset2,offset3,offset4);
         return spirv_asm {
             OpCapability ImageGatherExtended;
-            %sampledImage : $$__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> = OpSampledImage $texture $s;
+            %sampledImage : __sampledImageType(texture) = OpSampledImage $texture $s;
             result:$$vector<TElement,4> = OpImageGather %sampledImage $location $component ConstOffsets $offsets;
         };
     }
@@ -974,14 +960,13 @@ __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:
 [ForceInline]
 vector<TElement,4> __glsl_gatherCmp(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture, SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, int componentIndex, TElement compareValue)
 {
-    //typealias SampledImageType = __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format>;
     __target_switch
     {
     case glsl:
         __intrinsic_asm "textureGather($p, $2, $4)";
     case spirv:
         return spirv_asm {
-            %sampledImage : $$__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> = OpSampledImage $texture $s;
+            %sampledImage : __sampledImageType(texture) = OpSampledImage $texture $s;
             result:$$vector<TElement,4> = OpImageDrefGather %sampledImage $location $compareValue;
         };
     }
@@ -990,14 +975,13 @@ __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:
 [ForceInline]
 vector<TElement,4> __glsl_gatherCmp_offset(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture, SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, int componentIndex, TElement compareValue, vector<int, Shape.planeDimensions> offset)
 {
-    //typealias SampledImageType = __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format>;
     __target_switch
     {
     case glsl:
         __intrinsic_asm "textureGatherOffset($p, $2, $4, $5)";
     case spirv:
         return spirv_asm {
-            %sampledImage : $$__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> = OpSampledImage $texture $s;
+            %sampledImage : __sampledImageType(texture) = OpSampledImage $texture $s;
             result:$$vector<TElement,4> = OpImageDrefGather %sampledImage $location $compareValue ConstOffset $offset;
         };
     }
@@ -1011,7 +995,6 @@ vector<TElement,4> __glsl_gatherCmp_offsets(__TextureImpl<T, Shape, isArray, 0, 
     vector<int, Shape.planeDimensions> offset4
     )
 {
-    //typealias SampledImageType = __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format>;
     __target_switch
     {
     case glsl:
@@ -1020,7 +1003,7 @@ vector<TElement,4> __glsl_gatherCmp_offsets(__TextureImpl<T, Shape, isArray, 0, 
         let offsets = __makeArray(offset1,offset2,offset3,offset4);
         return spirv_asm {
             OpCapability ImageGatherExtended;
-            %sampledImage : $$__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> = OpSampledImage $texture $s;
+            %sampledImage : __sampledImageType(texture) = OpSampledImage $texture $s;
             result:$$vector<TElement,4> = OpImageDrefGather %sampledImage $location $compareValue ConstOffsets $offsets;
         };
     }
@@ -1106,7 +1089,6 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,form
 {
     static const int isMS = 0;
     static const int access = $(kStdlibResourceAccessReadOnly);
-    typealias ImageType = __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,0,format>;
 
     __glsl_extension(GL_EXT_samplerless_texture_functions)
     [__readNone]
@@ -1135,7 +1117,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,form
             {
                 return spirv_asm
                 {
-                    %image:$$ImageType = OpImage $this;
+                    %image:__imageType(this) = OpImage $this;
                     %sampled:__sampledType(T) = OpImageFetch %image $coord Lod $lod;
                     __truncate $$T result __sampledType(T) %sampled;
                 };
@@ -1171,7 +1153,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,form
                 {
                     return spirv_asm
                     {
-                        %image:$$ImageType = OpImage $this;
+                        %image:__imageType(this) = OpImage $this;
                         %sampled:__sampledType(T) = OpImageFetch %image $coord Lod|ConstOffset $lod $offset;
                         __truncate $$T result __sampledType(T) %sampled;
                     };
@@ -1215,7 +1197,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,form
                     {
                         return spirv_asm
                         {
-                            %image:$$ImageType = OpImage $this;
+                            %image:__imageType(this) = OpImage $this;
                             %sampled:__sampledType(T) = OpImageFetch %image $location;
                             __truncate $$T result __sampledType(T) %sampled;
                         };
@@ -1240,7 +1222,6 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,form
 {
     static const int access = $(kStdlibResourceAccessReadOnly);
     static const int isMS = 1;
-    typealias ImageType = __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,0,format>;
 
     __glsl_extension(GL_EXT_samplerless_texture_functions)
     [__readNone]
@@ -1259,7 +1240,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,form
                 {
                     return spirv_asm
                     {
-                        %image:$$ImageType = OpImage $this;
+                        %image:__imageType(this) = OpImage $this;
                         %sampled:__sampledType(T) = OpImageFetch %image $location Sample $sampleIndex;
                         __truncate $$T result __sampledType(T) %sampled;
                     };
@@ -1292,7 +1273,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,form
                 {
                     return spirv_asm
                     {
-                        %image:$$ImageType = OpImage $this;
+                        %image:__imageType(this) = OpImage $this;
                         %sampled:__sampledType(T) = OpImageFetch %image $location ConstOffset|Sample $offset $sampleIndex;
                         __truncate $$T result __sampledType(T) %sampled;
                     };

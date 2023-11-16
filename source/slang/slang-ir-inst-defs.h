@@ -1126,6 +1126,13 @@ INST(SPIRVAsmInst, SPIRVAsmInst, 1, 0)
     // A type function which returns the result type of sampling an image of
     // this component type
     INST(SPIRVAsmOperandSampledType, __sampledType, 1, HOISTABLE)
+
+    // A type function which returns the equivalent OpTypeImage type of sampled image value
+    INST(SPIRVAsmOperandImageType, __imageType, 1, HOISTABLE)
+
+    // A type function which returns the equivalent OpTypeImage type of sampled image value
+    INST(SPIRVAsmOperandSampledImageType, __sampledImageType, 1, HOISTABLE)
+
 INST_RANGE(SPIRVAsmOperand, SPIRVAsmOperandLiteral, SPIRVAsmOperandSampledType)
 
 

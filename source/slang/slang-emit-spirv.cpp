@@ -4589,6 +4589,24 @@ struct SPIRVEmitContext
                     emitOperand(ensureInst(sampledType));
                     break;
                 }
+                case kIROp_SPIRVAsmOperandImageType:
+                case kIROp_SPIRVAsmOperandSampledImageType:
+                {
+                    IRBuilder builder(m_irModule);
+                    auto textureInst = as<IRTextureTypeBase>(operand->getValue()->getDataType());
+                    auto imageType = builder.getTextureType(
+                        textureInst->getElementType(),
+                        textureInst->getShapeInst(),
+                        textureInst->getIsArrayInst(),
+                        textureInst->getIsMultisampleInst(),
+                        textureInst->getSampleCountInst(),
+                        textureInst->getAccessInst(),
+                        textureInst->getIsShadowInst(),
+                        builder.getIntValue(builder.getIntType(), (operand->getOp() == kIROp_SPIRVAsmOperandSampledImageType ? 1 : 0)),
+                        textureInst->getFormatInst());
+                    emitOperand(ensureInst(imageType));
+                    break;
+                }
                 case kIROp_SPIRVAsmOperandBuiltinVar:
                 {
                     emitOperand(ensureInst(operand));

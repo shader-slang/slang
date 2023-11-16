@@ -4023,7 +4023,9 @@ namespace Slang
                         operand.expr = typeExpr.exp;
                     }
                     else if(operand.flavor == SPIRVAsmOperand::SlangValue
-                        || operand.flavor == SPIRVAsmOperand::SlangValueAddr)
+                        || operand.flavor == SPIRVAsmOperand::SlangValueAddr
+                        || operand.flavor == SPIRVAsmOperand::ImageType
+                        || operand.flavor == SPIRVAsmOperand::SampledImageType)
                     {
                         // This is a $expr operand, check the expr
                         operand.expr = dispatch(operand.expr);
