@@ -966,6 +966,22 @@ vector<TElement,4> __glsl_gather_offsets(__TextureImpl<T, Shape, isArray, 0, sam
 }
 __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
+vector<TElement,4> __glsl_gatherCmp(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture, SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, int componentIndex, TElement compareValue)
+{
+    //typealias SampledImageType = __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format>;
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "textureGather($p, $2, $4)";
+    case spirv:
+        return spirv_asm {
+            %sampledImage : $$__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> = OpSampledImage $texture $s;
+            result:$$vector<TElement,4> = OpImageDrefGather %sampledImage $location $compareValue;
+        };
+    }
+}
+__generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
+[ForceInline]
 vector<TElement,4> __glsl_gatherCmp_offset(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture, SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, int componentIndex, TElement compareValue, vector<int, Shape.planeDimensions> offset)
 {
     //typealias SampledImageType = __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format>;
@@ -1018,22 +1034,6 @@ for (int isScalarTexture = 0; isScalarTexture <= 1; isScalarTexture++) {
     }
 }}}}
 { // begin extension for gather
-    [ForceInline]
-    vector<T,4> Gather(SamplerState s, vector<float, Shape.dimensions+isArray> location)
-    {
-        __target_switch
-        {
-        case hlsl: __intrinsic_asm ".Gather";
-        case spirv:
-        case glsl:
-            return __glsl_gather<T>(this, s, location, 0);
-        }
-    }
-    [ForceInline]
-    vector<T,4> GatherCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, T compareValue)
-    {
-        return GatherCmp(s, location, compareValue, vector<int, Shape.planeDimensions>(0));
-    }
 ${{{{
     // Gather component
     for (int isCmp = 0; isCmp <= 1; ++isCmp) {
@@ -1046,6 +1046,17 @@ ${{{{
             auto component = componentNames[componentId];
             auto componentIndex = componentId == 0 ? 0 : componentId - 1;
     }}}}
+    [ForceInline]
+    vector<T,4> Gather$(cmp)$(component)($(samplerStateType) s, vector<float, Shape.dimensions+isArray> location, $(cmpParam))
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".Gather$(cmp)$(component)";
+        case glsl:
+        case spirv:
+            return __glsl_gather$(cmp)<T>(this, s, location, $(componentIndex), $(compareArg));
+        }
+    }
     [ForceInline]
     vector<T,4> Gather$(cmp)$(component)($(samplerStateType) s, vector<float, Shape.dimensions+isArray> location, $(cmpParam) vector<int, Shape.planeDimensions> offset)
     {
