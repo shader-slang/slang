@@ -1366,39 +1366,34 @@ SIMPLE_IR_TYPE(BasicBlockType, Type)
 
 struct IRResourceTypeBase : IRType
 {
-    static const int kTextureAcessDefault = 0;
-    static const int kTextureAcessRW = 1;
-    static const int kTextureAcessRasterizerOrdered = 2;
-    static const int kTextureAcessFeedback = 3;
+    IRInst* getShapeInst() { return getOperand(kStdlibTextureShapeParameterIndex); }
+    IRInst* getIsArrayInst() { return getOperand(kStdlibTextureIsArrayParameterIndex); }
+    IRInst* getIsMultisampleInst() { return getOperand(kStdlibTextureIsMultisampleParameterIndex); }
+    IRInst* getSampleCountInst() { return getOperand(kStdlibTextureSampleCountParameterIndex); }
+    IRInst* getAccessInst() { return getOperand(kStdlibTextureAccessParameterIndex); }
+    IRInst* getIsShadowInst() { return getOperand(kStdlibTextureIsShadowParameterIndex); }
+    IRInst* getIsCombinedInst() { return getOperand(kStdlibTextureIsCombinedParameterIndex); }
+    IRInst* getFormatInst() { return getOperand(kStdlibTextureFormatParameterIndex); }
 
-    IRInst* getShapeInst() { return getOperand(1); }
-    IRInst* getIsArrayInst() { return getOperand(2); }
-    IRInst* getIsMultisampleInst() { return getOperand(3); }
-    IRInst* getSampleCountInst() { return getOperand(4); }
-    IRInst* getAccessInst() { return getOperand(5); }
-    IRInst* getIsShadowInst() { return getOperand(6); }
-    IRInst* getIsCombinedInst() { return getOperand(7); }
-    IRInst* getFormatInst() { return getOperand(8); }
-
-    TextureFlavor::Shape GetBaseShape()
+    SlangResourceShape GetBaseShape()
     {
         switch (getOperand(1)->getOp())
         {
         case kIROp_TextureShape1DType:
-            return TextureFlavor::Shape1D;
+            return SLANG_TEXTURE_1D;
         case kIROp_TextureShape2DType:
-            return TextureFlavor::Shape2D;
+            return SLANG_TEXTURE_2D;
         case kIROp_TextureShape3DType:
-            return TextureFlavor::Shape3D;
+            return SLANG_TEXTURE_3D;
         case kIROp_TextureShapeCubeType:
-            return TextureFlavor::ShapeCube;
+            return SLANG_TEXTURE_CUBE;
         case kIROp_TextureShapeBufferType:
-            return TextureFlavor::ShapeBuffer;
+            return SLANG_TEXTURE_BUFFER;
         default:
-            return TextureFlavor::Shape2D;
+            return SLANG_RESOURCE_NONE;
         }
     }
-    bool isFeedback() { return getIntVal(getAccessInst()) == 3; }
+    bool isFeedback() { return getIntVal(getAccessInst()) == kStdlibResourceAccessFeedback; }
     bool isMultisample() { return getIntVal(getIsMultisampleInst()) != 0; }
     bool isArray() { return getIntVal(getIsArrayInst()) != 0; }
     bool isShadow() { return getIntVal(getIsShadowInst()) != 0; }
@@ -1407,19 +1402,19 @@ struct IRResourceTypeBase : IRType
     SlangResourceShape getShape() { return (SlangResourceShape)((uint32_t)GetBaseShape() | (isArray() ? SLANG_TEXTURE_ARRAY_FLAG : 0)); }
     SlangResourceAccess getAccess()
     {
-        auto constVal = as<IRIntLit>(getOperand(5));
+        auto constVal = as<IRIntLit>(getOperand(kStdlibTextureAccessParameterIndex));
         if (constVal)
         {
             switch (getIntVal(constVal))
             {
-            case kTextureAcessDefault:
+            case kStdlibResourceAccessReadOnly:
                 return SLANG_RESOURCE_ACCESS_READ;
-            case kTextureAcessRW:
+            case kStdlibResourceAccessReadWrite:
                 return SLANG_RESOURCE_ACCESS_READ_WRITE;
-            case kTextureAcessRasterizerOrdered:
+            case kStdlibResourceAccessRasterizerOrdered:
                 return SLANG_RESOURCE_ACCESS_RASTER_ORDERED;
-            case kTextureAcessFeedback:
-                return SLANG_RESOURCE_ACCESS_WRITE;
+            case kStdlibResourceAccessFeedback:
+                return SLANG_RESOURCE_ACCESS_FEEDBACK;
             default:
                 break;
             }

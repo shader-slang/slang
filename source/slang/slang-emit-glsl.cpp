@@ -714,11 +714,11 @@ void GLSLSourceEmitter::_emitGLSLTextureOrTextureSamplerType(IRTextureTypeBase* 
     m_writer->emit(baseName);
     switch (type->GetBaseShape())
     {
-        case TextureFlavor::Shape::Shape1D:		m_writer->emit("1D");		break;
-        case TextureFlavor::Shape::Shape2D:		m_writer->emit("2D");		break;
-        case TextureFlavor::Shape::Shape3D:		m_writer->emit("3D");		break;
-        case TextureFlavor::Shape::ShapeCube:	m_writer->emit("Cube");	break;
-        case TextureFlavor::Shape::ShapeBuffer:	m_writer->emit("Buffer");	break;
+        case SLANG_TEXTURE_1D:		m_writer->emit("1D");		break;
+        case SLANG_TEXTURE_2D:		m_writer->emit("2D");		break;
+        case SLANG_TEXTURE_3D:		m_writer->emit("3D");		break;
+        case SLANG_TEXTURE_CUBE:	m_writer->emit("Cube");	    break;
+        case SLANG_TEXTURE_BUFFER:	m_writer->emit("Buffer");	break;
         default:
             SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource shape");
             break;

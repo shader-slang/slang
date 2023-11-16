@@ -154,7 +154,7 @@ class ResourceType : public BuiltinType
     bool isShadow();
     bool isFeedback();
     bool isCombined();
-    TextureFlavor::Shape getBaseShape();
+    SlangResourceShape getBaseShape();
     SlangResourceShape getShape();
     SlangResourceAccess getAccess();
     Type* getElementType();

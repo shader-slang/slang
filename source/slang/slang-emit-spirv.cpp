@@ -1623,22 +1623,19 @@ struct SPIRVEmitContext
         SpvDim dim = SpvDim1D; // Silence uninitialized warnings from msvc...
         switch(inst->GetBaseShape())
         {
-            case TextureFlavor::Shape1D:
-            case TextureFlavor::Shape1DArray:
+            case SLANG_TEXTURE_1D:
                 dim = SpvDim1D;
                 break;
-            case TextureFlavor::Shape2D:
-            case TextureFlavor::Shape2DArray:
+            case SLANG_TEXTURE_2D:
                 dim = SpvDim2D;
                 break;
-            case TextureFlavor::Shape3D:
+            case SLANG_TEXTURE_3D:
                 dim = SpvDim3D;
                 break;
-            case TextureFlavor::ShapeCube:
-            case TextureFlavor::ShapeCubeArray:
+            case SLANG_TEXTURE_CUBE:
                 dim = SpvDimCube;
                 break;
-            case TextureFlavor::ShapeBuffer:
+            case SLANG_TEXTURE_BUFFER:
                 dim = SpvDimBuffer;
                 break;
         }

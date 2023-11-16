@@ -770,40 +770,40 @@ FeedbackType::Kind FeedbackType::getKind() const
     return FeedbackType::Kind(magicMod->tag);
 }
 
-TextureFlavor::Shape ResourceType::getBaseShape()
+SlangResourceShape ResourceType::getBaseShape()
 {
     auto shape = _getGenericTypeArg(getDeclRefBase(), 1);
     if (as<TextureShape1DType>(shape))
-        return TextureFlavor::Shape1D;
+        return SLANG_TEXTURE_1D;
     else if (as<TextureShape2DType>(shape))
-        return TextureFlavor::Shape2D;
+        return SLANG_TEXTURE_2D;
     else if (as<TextureShape3DType>(shape))
-        return TextureFlavor::Shape3D;
+        return SLANG_TEXTURE_3D;
     else if (as<TextureShapeCubeType>(shape))
-        return TextureFlavor::ShapeCube;
+        return SLANG_TEXTURE_CUBE;
     else if (as<TextureShapeBufferType>(shape))
-        return TextureFlavor::ShapeBuffer;
+        return SLANG_TEXTURE_BUFFER;
 
-    return TextureFlavor::Shape2D;
+    return SLANG_RESOURCE_NONE;
 }
 
 SlangResourceShape ResourceType::getShape()
 {
     auto baseShape = (SlangResourceShape)getBaseShape();
     if (isArray())
-        baseShape = (SlangResourceShape)((uint32_t)baseShape | TextureFlavor::ArrayFlag);
+        baseShape = (SlangResourceShape)((uint32_t)baseShape | SLANG_TEXTURE_ARRAY_FLAG);
     if (isMultisample())
-        baseShape = (SlangResourceShape)((uint32_t)baseShape | TextureFlavor::MultisampleFlag);
+        baseShape = (SlangResourceShape)((uint32_t)baseShape | SLANG_TEXTURE_MULTISAMPLE_FLAG);
     if (isShadow())
-        baseShape = (SlangResourceShape)((uint32_t)baseShape | TextureFlavor::ShadowFlag);
+        baseShape = (SlangResourceShape)((uint32_t)baseShape | SLANG_TEXTURE_SHADOW_FLAG);
     if (isFeedback())
-        baseShape = (SlangResourceShape)((uint32_t)baseShape | TextureFlavor::FeedbackFlag);
+        baseShape = (SlangResourceShape)((uint32_t)baseShape | SLANG_TEXTURE_FEEDBACK_FLAG);
     return baseShape;
 }
 
 bool ResourceType::isArray()
 {
-    auto isArray = _getGenericTypeArg(this, 2);
+    auto isArray = _getGenericTypeArg(this, kStdlibTextureIsArrayParameterIndex);
     if (auto constIntVal = as<ConstantIntVal>(isArray))
         return constIntVal->getValue() != 0;
     return false;
@@ -811,7 +811,7 @@ bool ResourceType::isArray()
 
 bool ResourceType::isMultisample()
 {
-    auto isMS = _getGenericTypeArg(this, 3);
+    auto isMS = _getGenericTypeArg(this, kStdlibTextureIsMultisampleParameterIndex);
     if (auto constIntVal = as<ConstantIntVal>(isMS))
         return constIntVal->getValue() != 0;
     return false;
@@ -819,7 +819,7 @@ bool ResourceType::isMultisample()
 
 bool ResourceType::isShadow()
 {
-    auto isShadow = _getGenericTypeArg(this, 6);
+    auto isShadow = _getGenericTypeArg(this, kStdlibTextureIsShadowParameterIndex);
     if (auto constIntVal = as<ConstantIntVal>(isShadow))
         return constIntVal->getValue() != 0;
     return false;
@@ -827,16 +827,15 @@ bool ResourceType::isShadow()
 
 bool ResourceType::isFeedback()
 {
-    static const int kResourceAccessFeedbackId = 3;
-    auto access = _getGenericTypeArg(this, 5);
+    auto access = _getGenericTypeArg(this, kStdlibTextureAccessParameterIndex);
     if (auto constIntVal = as<ConstantIntVal>(access))
-        return constIntVal->getValue() == kResourceAccessFeedbackId;
+        return constIntVal->getValue() == kStdlibResourceAccessFeedback;
     return false;
 }
 
 bool ResourceType::isCombined()
 {
-    auto combined = _getGenericTypeArg(this, 7);
+    auto combined = _getGenericTypeArg(this, kStdlibTextureIsCombinedParameterIndex);
     if (auto constIntVal = as<ConstantIntVal>(combined))
         return constIntVal->getValue() != 0;
     return false;
@@ -844,19 +843,19 @@ bool ResourceType::isCombined()
 
 SlangResourceAccess ResourceType::getAccess()
 {
-    auto access = _getGenericTypeArg(this, 5);
+    auto access = _getGenericTypeArg(this, kStdlibTextureAccessParameterIndex);
     if (auto constIntVal = as<ConstantIntVal>(access))
     {
         switch (constIntVal->getValue())
         {
-        case 0:
+        case kStdlibResourceAccessReadOnly:
             return SLANG_RESOURCE_ACCESS_READ;
-        case 1:
+        case kStdlibResourceAccessReadWrite:
             return SLANG_RESOURCE_ACCESS_READ_WRITE;
-        case 2:
+        case kStdlibResourceAccessRasterizerOrdered:
             return SLANG_RESOURCE_ACCESS_RASTER_ORDERED;
-        case 3:
-            return SLANG_RESOURCE_ACCESS_WRITE;
+        case kStdlibResourceAccessFeedback:
+            return SLANG_RESOURCE_ACCESS_FEEDBACK;
         default:
             break;
         }
@@ -896,7 +895,7 @@ void ResourceType::_toTextOverride(StringBuilder& out)
             case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
                 resultSB << "RasterizerOrdered";
                 break;
-            case SLANG_RESOURCE_ACCESS_WRITE:
+            case SLANG_RESOURCE_ACCESS_FEEDBACK:
                 resultSB << "Feedback";
                 break;
             default:
@@ -913,23 +912,23 @@ void ResourceType::_toTextOverride(StringBuilder& out)
                 resultSB << "Sampler";
             else
             {
-                if (shape == TextureFlavor::ShapeBuffer)
+                if (shape == SLANG_TEXTURE_BUFFER)
                     resultSB << "Buffer";
                 else
                     resultSB << "Texture";
             }
             switch (shape)
             {
-            case TextureFlavor::Shape1D:
+            case SLANG_TEXTURE_1D:
                 resultSB << "1D";
                 break;
-            case TextureFlavor::Shape2D:
+            case SLANG_TEXTURE_2D:
                 resultSB << "2D";
                 break;
-            case TextureFlavor::Shape3D:
+            case SLANG_TEXTURE_3D:
                 resultSB << "3D";
                 break;
-            case TextureFlavor::ShapeCube:
+            case SLANG_TEXTURE_CUBE:
                 resultSB << "Cube";
                 break;
             }

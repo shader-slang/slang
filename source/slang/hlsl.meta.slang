@@ -890,7 +890,7 @@ for (int isMS = 0; isMS <= 1; isMS++) {
             continue;
     }
     auto shape = kTextureShapes[shapeIndex];
-    TextureTypeInfo textureTypeInfo(kTexturePrefixes[0], kBaseTextureShapes[shapeIndex], isArray, isMS, 0, kBaseTextureAccessLevels[0], sb, path);
+    TextureTypeInfo textureTypeInfo(kBaseTextureShapes[shapeIndex], isArray, isMS, 0, kBaseTextureAccessLevels[0], sb, path);
 }}}}
 
 __generic<T, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
@@ -1105,7 +1105,7 @@ __generic<T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let i
 extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
 {
     static const int isMS = 0;
-    static const int access = 0;
+    static const int access = $(kStdlibResourceAccessReadOnly);
     typealias ImageType = __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,0,format>;
 
     __glsl_extension(GL_EXT_samplerless_texture_functions)
@@ -1238,7 +1238,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,form
 __generic<T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let isCombined:int, let format:int>
 extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
 {
-    static const int access = 0;
+    static const int access = $(kStdlibResourceAccessReadOnly);
     static const int isMS = 1;
     typealias ImageType = __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,0,format>;
 
@@ -1340,7 +1340,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,form
 
 // Load/Subscript for readwrite textures
 ${{{{
-    for (int access = 1; access<=2; access++) {
+    for (int access = $(kStdlibResourceAccessReadWrite); access<=$(kStdlibResourceAccessRasterizerOrdered); access++) {
         const char* glslIntrinsic = "$cimageLoad($0, $1)$z";
         const char* glslIntrinsicOffset = "$cimageLoad($0, ($1)+($2))$z";
         const char* glslIntrinsicMS = "$cimageLoad($0, $1, $2)$z";
@@ -1509,7 +1509,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
 }
 
 ${{{{
-if (access == 1) {
+if (access == $(kStdlibResourceAccessReadWrite)) {
 }}}}
 // RW MS textures.
 __generic<T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
@@ -1617,7 +1617,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,form
 }
 
 ${{{{
-} // if (access == 1) // for RW MS textures.
+} // if (access == $(kStdlibResourceAccessReadWrite)) // for RW MS textures.
 } // for (access).
 }}}}
 
@@ -1632,13 +1632,13 @@ ${{{{
     for (int isArray = 0; isArray<=1; isArray++)
     for (int isMS = 0; isMS<=1; isMS++)
     for (int isCombined = 0; isCombined<=1; isCombined++)
-    for (int access = 0; access<=3; access++) {
-        if (access != 0)
+    for (int access = $(kStdlibResourceAccessReadOnly); access<=$(kStdlibResourceAccessFeedback); access++) {
+        if (access != $(kStdlibResourceAccessReadOnly))
         {
             // No RW Cube.
-            if (shape == 3) continue;
+            if (shape == $(kStdlibShapeIndexCube)) continue;
         }
-        if (access == 3)
+        if (access == $(kStdlibResourceAccessFeedback))
         {
             // Feedback only defined for Texture2D and Texture2DArray.
             if (shape != 1) continue;
@@ -1648,14 +1648,14 @@ ${{{{
         if (isMS)
         {
             // Only Texture2DMS.
-            if (shape != 1)
+            if (shape != $(kStdlibShapeIndex2D))
                 continue;
             // Only Texture2DMS or RWTexture2DMS.
-            if (access >= 2)
+            if (access >= $(kStdlibShapeIndex3D))
                 continue;
         }
         // No 3D Array.
-        if (shape == 2 && isArray == 1)
+        if (shape == $(kStdlibShapeIndex3D) && isArray == 1)
             continue;
         const char* textureTypeName = isCombined ? "Sampler" : "Texture";
 }}}}
