@@ -654,7 +654,7 @@ SlangResult LanguageServer::hover(
     {
         if (auto declRefExpr = as<DeclRefExpr>(expr))
             return fillDeclRefHoverInfo(declRefExpr->declRef);
-        else if (auto thisExpr = as<ThisExpr>(expr))
+        else if (as<ThisExpr>(expr))
         {
             if (expr->type)
             {
