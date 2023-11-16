@@ -158,6 +158,7 @@ class ResourceType : public BuiltinType
     SlangResourceShape getShape();
     SlangResourceAccess getAccess();
     Type* getElementType();
+    void _toTextOverride(StringBuilder& out);
 };
 
 class TextureTypeBase : public ResourceType 
