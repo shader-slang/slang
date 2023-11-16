@@ -268,7 +268,7 @@ void TextureTypeInfo::writeGetDimensionFunctions()
 
                         glsl << ")";
                     };
-                glsl << "if (access == kStdlibResourceAccessReadOnly) __intrinsic_asm \"";
+                glsl << "if (access == " << kStdlibResourceAccessReadOnly << ") __intrinsic_asm \"";
                 emitIntrinsic(toSlice("textureSize"), true);
                 glsl << "\";\n";
                 glsl << "__intrinsic_asm \"";
