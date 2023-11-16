@@ -852,38 +852,27 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
 
 // Texture.GetDimensions
 ${{{{
-struct TextureShapeInfo
-{
-    int flavor;
-    const char* shapeTypeName;
-    List<const char*> params;
-};
-const TextureShapeInfo kTextureShapes[] = {
-    {SLANG_TEXTURE_1D, "__Shape1D", {"width"}},
-    {SLANG_TEXTURE_2D, "__Shape2D", {"width", "height"}},
-    {SLANG_TEXTURE_3D, "__Shape3D", {"width", "height", "depth"}},
-    {SLANG_TEXTURE_CUBE, "__ShapeCube", {"width", "height"}},
-};
-const char* kGetDimensionResultTypes[] = {"float", "uint"};
+const char* kTextureShapeTypeNames[] = {
+    "__Shape1D", "__Shape2D", "__Shape3D", "__ShapeCube"};
 for (int shapeIndex = 0; shapeIndex < 4; shapeIndex++)
 for (int isArray = 0; isArray <= 1; isArray++)
 for (int isMS = 0; isMS <= 1; isMS++) {
     if (isMS)
     {
-        if (shapeIndex != 1)
+        if (shapeIndex != kStdlibShapeIndex2D)
             continue;
     }
     if (isArray)
     {
-        if (shapeIndex == 2)
+        if (shapeIndex == kStdlibShapeIndex3D)
             continue;
     }
-    auto shape = kTextureShapes[shapeIndex];
-    TextureTypeInfo textureTypeInfo(kBaseTextureShapes[shapeIndex], isArray, isMS, 0, kBaseTextureAccessLevels[0], sb, path);
+    auto shapeTypeName = kTextureShapeTypeNames[shapeIndex];
+    TextureTypeInfo textureTypeInfo(kBaseTextureShapes[shapeIndex], isArray, isMS, 0, sb, path);
 }}}}
 
 __generic<T, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
-extension __TextureImpl<T,$(shape.shapeTypeName),$(isArray),$(isMS),sampleCount,access,isShadow,isCombined,format>
+extension __TextureImpl<T,$(shapeTypeName),$(isArray),$(isMS),sampleCount,access,isShadow,isCombined,format>
 {
     ${{{{
     textureTypeInfo.writeGetDimensionFunctions();

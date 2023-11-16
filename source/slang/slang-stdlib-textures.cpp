@@ -50,14 +50,12 @@ TextureTypeInfo::TextureTypeInfo(
     bool isArray,
     bool isMultisample,
     bool isShadow,
-    BaseTextureAccessInfo const& accessInfo,
     StringBuilder& inSB,
     String const& inPath)
     : base(base)
     , isArray(isArray)
     , isMultisample(isMultisample)
     , isShadow(isShadow)
-    , accessInfo(accessInfo)
     , sb(inSB)
     , path(inPath)
 {
@@ -108,12 +106,9 @@ void TextureTypeInfo::writeFuncWithSig(
     const String& cuda,
     const ReadNoneMode readNoneMode)
 {
-    const bool isReadOnly = (accessInfo.access == SLANG_RESOURCE_ACCESS_READ);
-    const bool rn =
-        readNoneMode == ReadNoneMode::Always
-        || readNoneMode == ReadNoneMode::IfReadOnly && isReadOnly;
-    if(rn)
+    if (readNoneMode == ReadNoneMode::Always)
         sb << i << "[__readNone]\n";
+    sb << i << "[__readNone]\n";
     sb << i << "[ForceInline]\n";
     sb << i << sig << "\n";
     writeFuncBody(funcName, glsl, cuda, spirv);

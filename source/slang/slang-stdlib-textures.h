@@ -35,7 +35,6 @@ struct TextureTypeInfo
         bool isArray,
         bool isMultisample,
         bool isShadow,
-        BaseTextureAccessInfo const& accessInfo,
         StringBuilder& inSB,
         String const& inPath);
 
@@ -43,7 +42,6 @@ struct TextureTypeInfo
     bool isArray;
     bool isMultisample;
     bool isShadow;
-    BaseTextureAccessInfo const& accessInfo;
     StringBuilder& sb;
     String path;
 
@@ -61,7 +59,6 @@ public:
     enum class ReadNoneMode
     {
         Never,
-        IfReadOnly,
         Always
     };
 
@@ -77,7 +74,7 @@ public:
         const String& glsl = String{},
         const String& spirv = String{},
         const String& cuda = String{},
-        const ReadNoneMode readNoneMode = ReadNoneMode::IfReadOnly
+        const ReadNoneMode readNoneMode = ReadNoneMode::Never
     );
     void writeFunc(
         const char* returnType,
@@ -86,7 +83,7 @@ public:
         const String& glsl = String{},
         const String& spirv = String{},
         const String& cuda = String{},
-        const ReadNoneMode readNoneMode = ReadNoneMode::IfReadOnly
+        const ReadNoneMode readNoneMode = ReadNoneMode::Never
     );
 
     // A pointer to a string representing the current level of indentation
