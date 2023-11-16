@@ -22,19 +22,6 @@ struct SerialTypeInfo<FeedbackType::Kind> : public SerialIdentityTypeInfo<Feedba
 template <>
 struct SerialTypeInfo<SamplerStateFlavor> : public SerialConvertTypeInfo<SamplerStateFlavor, uint8_t> {};
 
-// TextureFlavor
-
-template <>
-struct SerialTypeInfo<TextureFlavor>
-{
-    typedef TextureFlavor NativeType;
-    typedef uint16_t SerialType;
-    enum { SerialAlignment = sizeof(SerialType) };
-
-    static void toSerial(SerialWriter* writer, const void* native, void* serial) { SLANG_UNUSED(writer); *(SerialType*)serial = ((const NativeType*)native)->flavor; }
-    static void toNative(SerialReader* reader, const void* serial, void* native) { SLANG_UNUSED(reader); ((NativeType*)native)->flavor = *(const SerialType*)serial; }
-};
-
 // ImageFormat
 template <>
 struct SerialTypeInfo<ImageFormat> : public SerialConvertTypeInfo<ImageFormat, uint8_t> {};

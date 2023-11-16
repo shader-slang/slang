@@ -401,14 +401,16 @@ Result linkAndOptimizeIR(
     for (;;)
     {
         bool changed = false;
-
+        auto b1 = dumpIRToString(irModule->getModuleInst());
         dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-SPECIALIZE");
         if (!codeGenContext->isSpecializationDisabled())
             changed |= specializeModule(irModule, codeGenContext->getSink());
         if (codeGenContext->getSink()->getErrorCount() != 0)
             return SLANG_FAIL;
         dumpIRIfEnabled(codeGenContext, irModule, "AFTER-SPECIALIZE");
+        auto b2 = dumpIRToString(irModule->getModuleInst());
 
+        applySparseConditionalConstantPropagation(irModule, codeGenContext->getSink());
         eliminateDeadCode(irModule);
 
         validateIRModuleIfEnabled(codeGenContext, irModule);
@@ -420,9 +422,6 @@ Result linkAndOptimizeIR(
         // Unroll loops.
         if (codeGenContext->getSink()->getErrorCount() == 0)
         {
-            applySparseConditionalConstantPropagationForGlobalScope(
-                irModule, codeGenContext->getSink());
-
             if (!unrollLoopsInModule(irModule, codeGenContext->getSink()))
                 return SLANG_FAIL;
         }
@@ -587,11 +586,7 @@ Result linkAndOptimizeIR(
             sink);
     }
 
-    if(isKhronosTarget(targetRequest))
-    {
-        // SPIR-V doesn't support 1-vectors
-        legalizeVectorTypes(irModule, sink);
-    }
+    legalizeVectorTypes(irModule, sink);
 
     // Once specialization and type legalization have been performed,
     // we should perform some of our basic optimization steps again,

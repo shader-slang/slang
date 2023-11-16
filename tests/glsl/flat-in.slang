@@ -1,3 +1,4 @@
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage fragment -entry main -allow-glsl -emit-spirv-directly
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -stage fragment -entry main -allow-glsl
 
 #version 310 es

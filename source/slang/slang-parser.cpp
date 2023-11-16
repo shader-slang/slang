@@ -6494,6 +6494,21 @@ namespace Slang
             parser->ReadMatchingToken(TokenType::RParent);
             return SPIRVAsmOperand{SPIRVAsmOperand::SampledType, Token{}, typeExpr};
         }
+        // The __imageType function
+        if (AdvanceIf(parser, "__imageType"))
+        {
+            parser->ReadToken(TokenType::LParent);
+            const auto typeExpr = parser->ParseExpression();
+            parser->ReadMatchingToken(TokenType::RParent);
+            return SPIRVAsmOperand{ SPIRVAsmOperand::ImageType, Token{}, typeExpr };
+        }
+        if (AdvanceIf(parser, "__sampledImageType"))
+        {
+            parser->ReadToken(TokenType::LParent);
+            const auto typeExpr = parser->ParseExpression();
+            parser->ReadMatchingToken(TokenType::RParent);
+            return SPIRVAsmOperand{ SPIRVAsmOperand::SampledImageType, Token{}, typeExpr };
+        }
         // The pseudo-operand for component truncation
         else if(parser->LookAheadToken("__truncate"))
         {

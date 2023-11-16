@@ -94,17 +94,20 @@ typealias usamplerCube = SamplerCube<uint4>;
 typealias isamplerCube = SamplerCube<int4>;
 typealias samplerCube = SamplerCube<float4>;
 
-typealias usampler1DShadow = Sampler1DShadow<uint4>;
-typealias isampler1DShadow = Sampler1DShadow<int4>;
-typealias sampler1DShadow = Sampler1DShadow<float4>;
+typealias Sampler1DShadow<T=float> = __TextureImpl<T, __Shape1D, /*isArray:*/ 0, /*isMS:*/ 0, /*sampleCount:*/ 0, /*access:*/ 0, /*isShadow: */ 1, /*isCombined: */ 1, /*format*/ 0>;
+typealias usampler1DShadow = Sampler1DShadow<uint>;
+typealias isampler1DShadow = Sampler1DShadow<int>;
+typealias sampler1DShadow = Sampler1DShadow<float>;
 
-typealias usampler2DShadow = Sampler2DShadow<uint4>;
-typealias isampler2DShadow = Sampler2DShadow<int4>;
-typealias sampler2DShadow = Sampler2DShadow<float4>;
+typealias Sampler2DShadow<T=float> = __TextureImpl<T, __Shape2D, /*isArray:*/ 0, /*isMS:*/ 0, /*sampleCount:*/ 0, /*access:*/ 0, /*isShadow: */ 1, /*isCombined: */ 1, /*format*/ 0>;
+typealias usampler2DShadow = Sampler2DShadow<uint>;
+typealias isampler2DShadow = Sampler2DShadow<int>;
+typealias sampler2DShadow = Sampler2DShadow<float>;
 
-typealias usamplerCubeShadow = SamplerCubeShadow<uint4>;
-typealias isamplerCubeShadow = SamplerCubeShadow<int4>;
-typealias samplerCubeShadow = SamplerCubeShadow<float4>;
+typealias SamplerCubeShadow<T=float> = __TextureImpl<T, __ShapeCube, /*isArray:*/ 0, /*isMS:*/ 0, /*sampleCount:*/ 0, /*access:*/ 0, /*isShadow: */ 1, /*isCombined: */ 1, /*format*/ 0>;
+typealias usamplerCubeShadow = SamplerCubeShadow<uint>;
+typealias isamplerCubeShadow = SamplerCubeShadow<int>;
+typealias samplerCubeShadow = SamplerCubeShadow<float>;
 
 typealias usampler1DArray = Sampler1DArray<uint4>;
 typealias isampler1DArray = Sampler1DArray<int4>;
@@ -118,20 +121,20 @@ typealias usamplerCubeArray = SamplerCubeArray<uint4>;
 typealias isamplerCubeArray = SamplerCubeArray<int4>;
 typealias samplerCubeArray = SamplerCubeArray<float4>;
 
-typealias usampler1DArrayShadow = Sampler1DArrayShadow<uint4>;
-typealias isampler1DArrayShadow = Sampler1DArrayShadow<int4>;
-typealias sampler1DArrayShadow = Sampler1DArrayShadow<float4>;
+typealias Sampler1DArrayShadow<T=float> = __TextureImpl<T, __Shape1D, /*isArray:*/ 1, /*isMS:*/ 0, /*sampleCount:*/ 0, /*access:*/ 0, /*isShadow: */ 1, /*isCombined: */ 1, /*format*/ 0>;
+typealias usampler1DArrayShadow = Sampler1DArrayShadow<uint>;
+typealias isampler1DArrayShadow = Sampler1DArrayShadow<int>;
+typealias sampler1DArrayShadow = Sampler1DArrayShadow<float>;
 
-typealias usampler2DArrayShadow = Sampler2DArrayShadow<uint4>;
-typealias isampler2DArrayShadow = Sampler2DArrayShadow<int4>;
-typealias sampler2DArrayShadow = Sampler2DArrayShadow<float4>;
+typealias Sampler2DArrayShadow<T=float> = __TextureImpl<T, __Shape2D, /*isArray:*/ 1, /*isMS:*/ 0, /*sampleCount:*/ 0, /*access:*/ 0, /*isShadow: */ 1, /*isCombined: */ 1, /*format*/ 0>;
+typealias usampler2DArrayShadow = Sampler2DArrayShadow<uint>;
+typealias isampler2DArrayShadow = Sampler2DArrayShadow<int>;
+typealias sampler2DArrayShadow = Sampler2DArrayShadow<float>;
 
-typealias usamplerCubeArrayShadow = SamplerCubeArrayShadow<uint4>;
-typealias isamplerCubeArrayShadow = SamplerCubeArrayShadow<int4>;
-typealias samplerCubeArrayShadow = SamplerCubeArrayShadow<float4>;
-
-__intrinsic_op(vectorReshape)
-vector<T,N> __vectorReshape<let N : int, T, let M : int>(vector<T,M> vin);
+typealias SamplerCubeArrayShadow<T=float> = __TextureImpl<T, __ShapeCube, /*isArray:*/ 1, /*isMS:*/ 0, /*sampleCount:*/ 0, /*access:*/ 0, /*isShadow: */ 1, /*isCombined: */ 1, /*format*/ 0>;
+typealias usamplerCubeArrayShadow = SamplerCubeArrayShadow<uint>;
+typealias isamplerCubeArrayShadow = SamplerCubeArrayShadow<int>;
+typealias samplerCubeArrayShadow = SamplerCubeArrayShadow<float>;
 
 [ForceInline]
 vector<T,4> texelFetch<T:__BuiltinArithmeticType, let N : int> (Sampler1D<vector<T,N>> sampler, int p, int lod)
@@ -235,44 +238,11 @@ float texture<T:__BuiltinArithmeticType, let N : int> (Sampler2DArrayShadow<vect
     return sampler.SampleCmp(p.xyz, p.w);
 }
 
-// TODO: define `texture` for SamplerCubeArrayShadow.
-
-
-vector<T,4> textureGrad<T:__BuiltinArithmeticType, let N : int> (Sampler1D<vector<T,N>> sampler, float P, float dPdx, float dPdy)
+__generic<T:__BuiltinArithmeticType, let N : int, shape:__ITextureShape, let sampleCount: int, let isArray:int, let format:int>
+vector<T,4> textureGrad(__TextureImpl<vector<T,N>, shape, isArray, 0, sampleCount, 0, 1, 1, format> sampler, vector<float, shape.dimensions+isArray> P, vector<float,shape.planeDimensions> dPdx, vector<float,shape.planeDimensions> dPdy)
 {
     return __vectorReshape<4>(sampler.SampleGrad(P, dPdx, dPdy));
 }
-
-vector<T,4> textureGrad<T:__BuiltinArithmeticType, let N : int> (Sampler2D<vector<T,N>> sampler, vec2 P, vec2 dPdx, vec2 dPdy)
-{
-    return __vectorReshape<4>(sampler.SampleGrad(P, dPdx, dPdy));
-}
-
-vector<T,4> textureGrad<T:__BuiltinArithmeticType, let N : int> (Sampler3D<vector<T,N>> sampler, vec3 P, vec3 dPdx, vec3 dPdy)
-{
-    return __vectorReshape<4>(sampler.SampleGrad(P, dPdx, dPdy));
-}
-
-vector<T,4> textureGrad<T:__BuiltinArithmeticType, let N : int> (SamplerCube<vector<T,N>> sampler, vec3 P, vec3 dPdx, vec3 dPdy)
-{
-    return __vectorReshape<4>(sampler.SampleGrad(P, dPdx, dPdy));
-}
-
-vector<T,4> textureGrad<T:__BuiltinArithmeticType, let N : int> (Sampler1DArray<vector<T,N>> sampler, vec2 P, float dPdx, float dPdy)
-{
-    return __vectorReshape<4>(sampler.SampleGrad(P, dPdx, dPdy));
-}
-
-vector<T,4> textureGrad<T:__BuiltinArithmeticType, let N : int> (Sampler2DArray<vector<T,N>> sampler, vec3 P, vec2 dPdx, vec2 dPdy)
-{
-    return __vectorReshape<4>(sampler.SampleGrad(P, dPdx, dPdy));
-}
-
-vector<T,4> textureGrad<T:__BuiltinArithmeticType, let N : int> (SamplerCubeArray<vector<T,N>> sampler, vec4 P, vec3 dPdx, vec3 dPdy)
-{
-    return __vectorReshape<4>(sampler.SampleGrad(P, dPdx, dPdy));
-}
-
 
 out float4 gl_Position : SV_Position;
 out float gl_PointSize : SV_PointSize;

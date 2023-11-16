@@ -1,6 +1,7 @@
 // vk-texture-indexing.slang
 
-//TEST:CROSS_COMPILE:-target spirv-assembly -entry main -stage fragment
+//TEST:SIMPLE(filecheck=CHECK):-target spirv -entry main -stage fragment
+//TEST_DISABLED:SIMPLE(filecheck=CHECK):-target spirv -entry main -stage fragment -emit-spirv-directly
 
 struct Params
 {
@@ -19,6 +20,8 @@ float4 main(
 	uint3 uv : UV)
     : SV_Target
 {
+    // CHECK: OpDecorate %{{.*}} NonUniform
+    // CHECK: OpImageFetch
     float v = fetchData(uv.xy, uv.z);
     return v;
 }

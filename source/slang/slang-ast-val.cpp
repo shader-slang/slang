@@ -810,6 +810,7 @@ Val* PolynomialIntVal::_substituteImplOverride(ASTBuilder* astBuilder, Substitut
 {
     int diff = 0;
     PolynomialIntValBuilder builder(astBuilder);
+    builder.constantTerm = getConstantTerm();
     for (auto& term : getTerms())
     {
         IntegerLiteralValue evaluatedTermConstFactor;
@@ -835,6 +836,14 @@ Val* PolynomialIntVal::_substituteImplOverride(ASTBuilder* astBuilder, Substitut
         }
         else
         {
+            if (evaluatedTermParamFactors.getCount() == 1 && evaluatedTermParamFactors[0]->getPower() == 1)
+            {
+                if (auto polyTerm = as<PolynomialIntVal>(evaluatedTermParamFactors[0]->getParam()))
+                {
+                    builder.addToPolynomialTerm(polyTerm, evaluatedTermConstFactor);
+                    continue;
+                }
+            }
             auto newTerm = astBuilder->getOrCreate<PolynomialIntValTerm>(
                 evaluatedTermConstFactor, evaluatedTermParamFactors.getArrayView());
             builder.terms.add(newTerm);
@@ -1335,14 +1344,19 @@ Val* WitnessLookupIntVal::_substituteImplOverride(ASTBuilder* astBuilder, Substi
 {
     int diff = 0;
     auto newWitness = getWitness()->substituteImpl(astBuilder, subst, &diff);
-    *ioDiff += diff;
     if (diff)
     {
+        *ioDiff += diff;
         auto witnessEntry = tryFoldOrNull(astBuilder, as<SubtypeWitness>(newWitness), getKey());
         if (witnessEntry)
+        {
             return witnessEntry;
+        }
+        else
+        {
+            return astBuilder->getOrCreate<WitnessLookupIntVal>(getType(), newWitness, getKey());
+        }
     }
-    // Nothing found: don't substitute.
     return this;
 }
 

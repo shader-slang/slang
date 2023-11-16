@@ -1135,9 +1135,10 @@ static void addExplicitParameterBindings_GLSL(
     // We can't infer TextureSampler from HLSL (it's not an HLSL concept)
     // So use default layout
     auto varType = varDecl.getDecl()->getType();
-    if (as<TextureSamplerType>(varType))
+    if (auto textureType = as<TextureType>(varType))
     {
-        return;
+        if (textureType->isCombined())
+            return;
     }
     
     // Can we map to a Vulkan kind in principal?

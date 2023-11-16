@@ -770,10 +770,97 @@ FeedbackType::Kind FeedbackType::getKind() const
     return FeedbackType::Kind(magicMod->tag);
 }
 
-TextureFlavor ResourceType::getFlavor() const
+SlangResourceShape ResourceType::getBaseShape()
 {
-    auto magicMod = getDeclRef().getDecl()->findModifier<MagicTypeModifier>();
-    return TextureFlavor(magicMod->tag);
+    auto shape = _getGenericTypeArg(getDeclRefBase(), 1);
+    if (as<TextureShape1DType>(shape))
+        return SLANG_TEXTURE_1D;
+    else if (as<TextureShape2DType>(shape))
+        return SLANG_TEXTURE_2D;
+    else if (as<TextureShape3DType>(shape))
+        return SLANG_TEXTURE_3D;
+    else if (as<TextureShapeCubeType>(shape))
+        return SLANG_TEXTURE_CUBE;
+    else if (as<TextureShapeBufferType>(shape))
+        return SLANG_TEXTURE_BUFFER;
+
+    return SLANG_RESOURCE_NONE;
+}
+
+SlangResourceShape ResourceType::getShape()
+{
+    auto baseShape = (SlangResourceShape)getBaseShape();
+    if (isArray())
+        baseShape = (SlangResourceShape)((uint32_t)baseShape | SLANG_TEXTURE_ARRAY_FLAG);
+    if (isMultisample())
+        baseShape = (SlangResourceShape)((uint32_t)baseShape | SLANG_TEXTURE_MULTISAMPLE_FLAG);
+    if (isShadow())
+        baseShape = (SlangResourceShape)((uint32_t)baseShape | SLANG_TEXTURE_SHADOW_FLAG);
+    if (isFeedback())
+        baseShape = (SlangResourceShape)((uint32_t)baseShape | SLANG_TEXTURE_FEEDBACK_FLAG);
+    return baseShape;
+}
+
+bool ResourceType::isArray()
+{
+    auto isArray = _getGenericTypeArg(this, kStdlibTextureIsArrayParameterIndex);
+    if (auto constIntVal = as<ConstantIntVal>(isArray))
+        return constIntVal->getValue() != 0;
+    return false;
+}
+
+bool ResourceType::isMultisample()
+{
+    auto isMS = _getGenericTypeArg(this, kStdlibTextureIsMultisampleParameterIndex);
+    if (auto constIntVal = as<ConstantIntVal>(isMS))
+        return constIntVal->getValue() != 0;
+    return false;
+}
+
+bool ResourceType::isShadow()
+{
+    auto isShadow = _getGenericTypeArg(this, kStdlibTextureIsShadowParameterIndex);
+    if (auto constIntVal = as<ConstantIntVal>(isShadow))
+        return constIntVal->getValue() != 0;
+    return false;
+}
+
+bool ResourceType::isFeedback()
+{
+    auto access = _getGenericTypeArg(this, kStdlibTextureAccessParameterIndex);
+    if (auto constIntVal = as<ConstantIntVal>(access))
+        return constIntVal->getValue() == kStdlibResourceAccessFeedback;
+    return false;
+}
+
+bool ResourceType::isCombined()
+{
+    auto combined = _getGenericTypeArg(this, kStdlibTextureIsCombinedParameterIndex);
+    if (auto constIntVal = as<ConstantIntVal>(combined))
+        return constIntVal->getValue() != 0;
+    return false;
+}
+
+SlangResourceAccess ResourceType::getAccess()
+{
+    auto access = _getGenericTypeArg(this, kStdlibTextureAccessParameterIndex);
+    if (auto constIntVal = as<ConstantIntVal>(access))
+    {
+        switch (constIntVal->getValue())
+        {
+        case kStdlibResourceAccessReadOnly:
+            return SLANG_RESOURCE_ACCESS_READ;
+        case kStdlibResourceAccessReadWrite:
+            return SLANG_RESOURCE_ACCESS_READ_WRITE;
+        case kStdlibResourceAccessRasterizerOrdered:
+            return SLANG_RESOURCE_ACCESS_RASTER_ORDERED;
+        case kStdlibResourceAccessFeedback:
+            return SLANG_RESOURCE_ACCESS_FEEDBACK;
+        default:
+            break;
+        }
+    }
+    return SLANG_RESOURCE_ACCESS_NONE;
 }
 
 SamplerStateFlavor SamplerStateType::getFlavor() const
@@ -792,9 +879,106 @@ Type* ResourceType::getElementType()
     return as<Type>(_getGenericTypeArg(this, 0));
 }
 
+void ResourceType::_toTextOverride(StringBuilder& out)
+{
+    auto tryPrintSimpleName = [&](String& outString) -> bool
+        {
+            StringBuilder resultSB;
+            auto access = getAccess();
+            switch (access)
+            {
+            case SLANG_RESOURCE_ACCESS_READ:
+                break;
+            case SLANG_RESOURCE_ACCESS_READ_WRITE:
+                resultSB << "RW";;
+                break;
+            case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
+                resultSB << "RasterizerOrdered";
+                break;
+            case SLANG_RESOURCE_ACCESS_FEEDBACK:
+                resultSB << "Feedback";
+                break;
+            default:
+                return false;
+            }
+            auto combined = as<ConstantIntVal>(_getGenericTypeArg(this, 7));
+            auto shapeVal = _getGenericTypeArg(this, 1);
+            if (!as<TextureShapeType>(shapeVal))
+                return false;
+            auto shape = getBaseShape();
+            if (!combined)
+                return false;
+            if (combined->getValue() != 0)
+                resultSB << "Sampler";
+            else
+            {
+                if (shape == SLANG_TEXTURE_BUFFER)
+                    resultSB << "Buffer";
+                else
+                    resultSB << "Texture";
+            }
+            switch (shape)
+            {
+            case SLANG_TEXTURE_1D:
+                resultSB << "1D";
+                break;
+            case SLANG_TEXTURE_2D:
+                resultSB << "2D";
+                break;
+            case SLANG_TEXTURE_3D:
+                resultSB << "3D";
+                break;
+            case SLANG_TEXTURE_CUBE:
+                resultSB << "Cube";
+                break;
+            }
+            auto isArrayVal = as<ConstantIntVal>(_getGenericTypeArg(this, 2));
+            if (!isArrayVal)
+                return false;
+            if (isArray())
+                resultSB << "Array";
+            auto isMultisampleVal = as<ConstantIntVal>(_getGenericTypeArg(this, 3));
+            if (!isMultisampleVal)
+                return false;
+            if (isMultisample())
+                resultSB << "MS";
+            auto isShadowVal = as<ConstantIntVal>(_getGenericTypeArg(this, 6));
+            if (!isShadowVal)
+                return false;
+            if (isShadow())
+                return false;
+            auto elementType = getElementType();
+            if (elementType)
+            {
+                resultSB << "<";
+                resultSB << elementType->toString();
+                auto sampleCount = _getGenericTypeArg(this, 4);
+                if (auto constIntVal = as<ConstantIntVal>(sampleCount))
+                {
+                    if (constIntVal->getValue() != 0)
+                        resultSB << ", " << constIntVal->getValue();
+                }
+                else
+                {
+                    return false;
+                }
+                resultSB << ">";
+            }
+            outString = resultSB.toString();
+            return true;
+        };
+
+    String simpleName;
+
+    if (tryPrintSimpleName(simpleName))
+        out << simpleName;
+    else
+        DeclRefType::_toTextOverride(out);
+}
+
 Val* TextureTypeBase::getSampleCount()
 {
-    return as<Type>(_getGenericTypeArg(this, 1));
+    return as<Type>(_getGenericTypeArg(this, 4));
 }
 
 Type* removeParamDirType(Type* type)
