@@ -188,10 +188,10 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     typealias TextureCoord = vector<float, Shape.dimensions>;
     typealias ImageType = __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>;
 
-    __target_intrinsic(glsl, "textureQueryLod($p, $1).x")
+    __target_intrinsic(glsl, "textureQueryLod($0, $1).x")
     float CalculateLevelOfDetail(TextureCoord location);
 
-    __target_intrinsic(glsl, "textureQueryLod($p, $1).y")
+    __target_intrinsic(glsl, "textureQueryLod($0, $1).y")
     float CalculateLevelOfDetailUnclamped(TextureCoord location);
 
     [__readNone]
@@ -203,7 +203,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case hlsl:
                 __intrinsic_asm ".Sample";
             case glsl:
-                __intrinsic_asm "$ctexture($p, $1)$z";
+                __intrinsic_asm "$ctexture($0, $1)$z";
             case cuda:
                 if (isArray != 0)
                 {
@@ -213,8 +213,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                         __intrinsic_asm "tex1DLayered<$T0>($0, ($1).x, int(($1).y))";
                     case $(SLANG_TEXTURE_2D):
                         __intrinsic_asm "tex2DLayered<$T0>($0, ($1).x, ($1).y, int(($1).z))";
-                    default:
-                        __intrinsic_asm "<invalid intrinsic>";
+                    case $(SLANG_TEXTURE_CUBE):
+                        __intrinsic_asm "texCubemapLayered<$T0>($0, ($1).x, ($1).y, ($1).z, int(($1).w))";
                     }
                 }
                 else
@@ -222,7 +222,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                     switch(Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "tex1D<$T0>($0, ($1).x)";
+                        __intrinsic_asm "tex1D<$T0>($0, ($1))";
                     case $(SLANG_TEXTURE_2D):
                         __intrinsic_asm "tex2D<$T0>($0, ($1).x, ($1).y)";
                     case $(SLANG_TEXTURE_3D):
@@ -249,7 +249,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case hlsl:
                 __intrinsic_asm ".Sample";
             case glsl:
-                __intrinsic_asm "$ctexture($p, $1)$z";
+                __intrinsic_asm "$ctexture($0, $1)$z";
             case spirv:
                 return spirv_asm
                 {
@@ -277,7 +277,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case hlsl:
                 __intrinsic_asm ".SampleBias";
             case glsl:
-                __intrinsic_asm "$ctexture($p, $1, $2)$z";
+                __intrinsic_asm "$ctexture($0, $1, $2)$z";
             case spirv:
                 return spirv_asm
                 {
@@ -297,7 +297,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case hlsl:
             __intrinsic_asm ".SampleBias";
             case glsl:
-            __intrinsic_asm "$ctextureOffset($p, $1, $2, $3)$z";
+            __intrinsic_asm "$ctextureOffset($0, $1, $2, $3)$z";
             case spirv:
             return spirv_asm
             {
@@ -307,19 +307,19 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         }
     }
 
-    __target_intrinsic(glsl, "texture($p, $1)")
+    __target_intrinsic(glsl, "texture($0, $1)")
     float __glsl_texture(vector<float, Shape.dimensions+isArray+1> value);
 
     __glsl_extension(GL_EXT_texture_shadow_lod)
-    __target_intrinsic(glsl, "textureOffset($p, $1, $2)")
+    __target_intrinsic(glsl, "textureOffset($0, $1, $2)")
     float __glsl_texture_offset(vector<float, Shape.dimensions+isArray+1> value, constexpr vector<int, Shape.planeDimensions> offset);
 
     __glsl_extension(GL_EXT_texture_shadow_lod)
-    __target_intrinsic(glsl, "textureLod($p, $1, 0)")
+    __target_intrinsic(glsl, "textureLod($0, $1, 0)")
     float __glsl_texture_level_zero(vector<float, Shape.dimensions+isArray+1> value);
 
     __glsl_extension(GL_EXT_texture_shadow_lod)
-    __target_intrinsic(glsl, "textureLodOffset($p, $1, 0, $2)")
+    __target_intrinsic(glsl, "textureLodOffset($0, $1, 0, $2)")
     float __glsl_texture_offset_level_zero(vector<float, Shape.dimensions+isArray+1> value, constexpr vector<int, Shape.planeDimensions> offset);
 
     [__readNone]
@@ -383,7 +383,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case hlsl:
             __intrinsic_asm ".SampleGrad";
             case glsl:
-            __intrinsic_asm "$ctextureGrad($p, $1, $2, $3)$z";
+            __intrinsic_asm "$ctextureGrad($0, $1, $2, $3)$z";
             case spirv:
                 return spirv_asm
                 {
@@ -402,7 +402,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case hlsl:
             __intrinsic_asm ".SampleGrad";
             case glsl:
-            __intrinsic_asm "$ctextureGradOffset($p, $1, $2, $3, $4)$z";
+            __intrinsic_asm "$ctextureGradOffset($0, $1, $2, $3, $4)$z";
             case spirv:
                 return spirv_asm
                 {
@@ -423,7 +423,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case hlsl:
             __intrinsic_asm ".SampleGrad";
             case glsl:
-            __intrinsic_asm "$ctextureGradOffsetClampARB($p, $1, $2, $3, $4, $5)$z";
+            __intrinsic_asm "$ctextureGradOffsetClampARB($0, $1, $2, $3, $4, $5)$z";
             case spirv:
                 return spirv_asm
                 {
@@ -444,7 +444,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case hlsl:
                 __intrinsic_asm ".SampleLevel";
             case glsl:
-                __intrinsic_asm "$ctextureLod($p, $1, $2)$z";
+                __intrinsic_asm "$ctextureLod($0, $1, $2)$z";
             case cuda:
                 if (isArray != 0)
                 {
@@ -454,6 +454,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                         __intrinsic_asm "tex1DLayeredLod<$T0>($0, ($1).x, int(($1).y), ($2))";
                     case $(SLANG_TEXTURE_2D):
                         __intrinsic_asm "tex2DLayeredLod<$T0>($0, ($1).x, ($1).y, int(($1).z), ($2))";
+                    case $(SLANG_TEXTURE_CUBE):
+                        __intrinsic_asm "texCubemapLayeredLod<$T0>($0, ($1).x, ($1).y, ($1).z, int(($1).w), ($2))";
                     default:
                         __intrinsic_asm "<invalid intrinsic>";
                     }
@@ -463,7 +465,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                     switch(Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "tex1DLod<$T0>($0, ($1).x, ($2))";
+                        __intrinsic_asm "tex1DLod<$T0>($0, ($1), ($2))";
                     case $(SLANG_TEXTURE_2D):
                         __intrinsic_asm "tex2DLod<$T0>($0, ($1).x, ($1).y, ($2))";
                     case $(SLANG_TEXTURE_3D):
@@ -490,7 +492,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case hlsl:
                 __intrinsic_asm ".SampleLevel";
             case glsl:
-                __intrinsic_asm "$ctextureLodOffset($p, $1, $2, $3)$z";
+                __intrinsic_asm "$ctextureLodOffset($0, $1, $2, $3)$z";
             case spirv:
                 return spirv_asm
                 {
@@ -532,6 +534,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
                         __intrinsic_asm "tex1DLayered<$T0>($0, ($2).x, int(($2).y))";
                     case $(SLANG_TEXTURE_2D):
                         __intrinsic_asm "tex2DLayered<$T0>($0, ($2).x, ($2).y, int(($2).z))";
+                    case $(SLANG_TEXTURE_CUBE):
+                        __intrinsic_asm "texCubemapLayered<$T0>($0, ($2).x, ($2).y, ($2).z, int(($2).w))";
                     default:
                         __intrinsic_asm "<invalid intrinsic>";
                     }
@@ -541,7 +545,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
                     switch(Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "tex1D<$T0>($0, ($2).x)";
+                        __intrinsic_asm "tex1D<$T0>($0, ($2))";
                     case $(SLANG_TEXTURE_2D):
                         __intrinsic_asm "tex2D<$T0>($0, ($2).x, ($2).y)";
                     case $(SLANG_TEXTURE_3D):
@@ -803,6 +807,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
                         __intrinsic_asm "tex1DLayeredLod<$T0>($0, ($2).x, int(($2).y), ($3))";
                     case $(SLANG_TEXTURE_2D):
                         __intrinsic_asm "tex2DLayeredLod<$T0>($0, ($2).x, ($2).y, int(($2).z), ($3))";
+                    case $(SLANG_TEXTURE_CUBE):
+                        __intrinsic_asm "texCubemapLayeredLod<$T0>($0, ($2).x, ($2).y, ($2).z, int(($2).w), ($3))";
                     default:
                         __intrinsic_asm "<invalid intrinsic>";
                     }
@@ -812,7 +818,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
                     switch(Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "tex1DLod<$T0>($0, ($2).x, ($3))";
+                        __intrinsic_asm "tex1DLod<$T0>($0, ($2), ($3))";
                     case $(SLANG_TEXTURE_2D):
                         __intrinsic_asm "tex2DLod<$T0>($0, ($2).x, ($2).y, ($3))";
                     case $(SLANG_TEXTURE_3D):
