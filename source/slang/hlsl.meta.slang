@@ -5992,7 +5992,7 @@ for (int argCount = 0; argCount < 12; argCount++)
         genericParamList << "T" << i;
 
         paramList << ", T" << i << " v" << i;
-        argList << ", v" << i;
+        argList << ", $" << i+1;
         spirvArgList << " $v" << i;
     }
     if (argCount > 0)
@@ -6001,6 +6001,7 @@ for (int argCount = 0; argCount < 12; argCount++)
     auto args = argList.toString();
     auto spirvArgs = spirvArgList.toString();
 }}}}
+__glsl_extension(GL_EXT_debug_printf)
 void printf$(genericParamList.toString())(NativeString format $(paramList))
 {
     __target_switch

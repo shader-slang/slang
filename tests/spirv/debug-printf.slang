@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry main -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry main -emit-spirv-via-glsl
 
 void main()
 {
