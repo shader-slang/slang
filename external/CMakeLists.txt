@@ -20,6 +20,5 @@ add_subdirectory(spirv-tools EXCLUDE_FROM_ALL)
 
 # glslang
 set(SKIP_GLSLANG_INSTALL ON)
-set(ENABLE_GLSLANG_BINARIES OFF)
 set(ENABLE_OPT ON)
 add_subdirectory(glslang EXCLUDE_FROM_ALL)

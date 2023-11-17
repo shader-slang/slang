@@ -1,0 +1,17 @@
+function(auto_option name package description)
+    set(${name} "AUTO" CACHE STRING ${description})
+    set_property(CACHE ${name} PROPERTY STRINGS AUTO ON OFF)
+
+
+    if(${name})
+        if(${name} STREQUAL "AUTO")
+            set(req)
+        else()
+            set(req REQUIRED)
+        endif()
+        find_package(${package} ${req})
+        if(NOT ${${package}_FOUND})
+            set(${name} FALSE CACHE STRING ${description} FORCE)
+        endif()
+    endif()
+endfunction()

@@ -178,10 +178,6 @@ function(set_default_compile_options target)
         target_compile_definitions(${target} PRIVATE SLANG_CONFIG_DX_ON_VK)
     endif()
 
-    if(SLANG_ENABLE_XLIB)
-        target_compile_definitions(${target} PRIVATE SLANG_ENABLE_XLIB)
-    endif()
-
     if(SLANG_ENABLE_ASAN)
         add_supported_cxx_flags(${target} PRIVATE /fsanitize=address -fsanitize=address)
         add_supported_cxx_linker_flags(

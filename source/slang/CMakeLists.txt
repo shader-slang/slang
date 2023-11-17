@@ -163,8 +163,9 @@ slang_add_target(
         SPIRV-Headers
     # slang.h is in the project root, so include that directory in the interface
     # for slang
-    INCLUDE_DIRECTORIES_PUBLIC ${SLANG_ROOT_DIR}
+    INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}
     EXPORT_MACRO_PREFIX SLANG
+    INSTALL
 )
 
 if(SLANG_EMBED_STDLIB_SOURCE)

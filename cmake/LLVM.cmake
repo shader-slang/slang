@@ -4,7 +4,7 @@ macro(find_llvm)
         # Very easy if we get LLVM from the system
         #
         find_package(LLVM 13.0 REQUIRED CONFIG)
-        find_package(Clang 13.0 REQUIRED CONFIG)
+        find_package(Clang REQUIRED CONFIG)
     else()
         #
         # Otherwise, do this awkward dance of downloading and building LLVM at
@@ -46,15 +46,12 @@ macro(find_llvm)
             -DCMAKE_SYSTEM_NAME=${CMAKE_SYSTEM_NAME}
             -DCMAKE_INSTALL_PREFIX=${llvm_install_root}
             -DCMAKE_BUILD_TYPE=${llvm_config}
-            # Requirements for Slang
-            -DCMAKE_CXX_VISIBILITY_PRESET=hidden
-            -DLLVM_ENABLE_PROJECTS=clang
-            -DLLVM_TARGETS_TO_BUILD=X86\\\;ARM\\\;AArch64
+
+            # Don't build unnecessary things
             -DLLVM_BUILD_LLVM_C_DYLIB=0
             -DLLVM_INCLUDE_BENCHMARKS=0
             -DLLVM_INCLUDE_DOCS=0
             -DLLVM_INCLUDE_EXAMPLES=0
-            -DLLVM_BUILD_TOOLS=1
             -DLLVM_INCLUDE_TESTS=0
             -DLLVM_ENABLE_TERMINFO=0
             -DCLANG_BUILD_TOOLS=0
@@ -62,9 +59,15 @@ macro(find_llvm)
             -DCLANG_ENABLE_ARCMT=0
             -DCLANG_INCLUDE_DOCS=0
             -DCLANG_INCLUDE_TESTS=0
+
+            # Requirements for Slang
+            -DCMAKE_CXX_VISIBILITY_PRESET=hidden
+            -DLLVM_ENABLE_PROJECTS=clang
+            -DLLVM_TARGETS_TO_BUILD=X86\\\;ARM\\\;AArch64
+            -DLLVM_BUILD_TOOLS=1
         )
 
-        # Configure, build and install a cmake project
+        # Configure, build and install a CMake project
         execute_process(
             COMMAND
                 ${CMAKE_COMMAND} -S ${llvm-project_SOURCE_DIR}/llvm -B

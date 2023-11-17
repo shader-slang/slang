@@ -17,38 +17,51 @@ if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.24.0")
 endif()
 
 #
-# Our utils
+# CMake-supplied modules and our utils
 #
 
-set(SLANG_ROOT_DIR ${CMAKE_CURRENT_LIST_DIR})
 include(CMakeDependentOption)
 include(FetchContent)
+
 include(CompilerFlags)
 include(Glob)
-include(SlangTarget)
 include(LLVM)
+include(SlangTarget)
+include(AutoOption)
 
 #
 # Options
 #
 
-option(SLANG_ENABLE_CUDA "Enable CUDA tests using CUDA found in CUDA_PATH")
-option(SLANG_ENABLE_OPTIX "Enable OptiX build/tests, requires enable-cuda")
-set(SLANG_OPTIX_SDK_PATH CACHE STRING "Path to the OptiX SDK")
-option(SLANG_ENABLE_NVAPI "Use NVAPI as found in external/nvapi")
-option(
-    SLANG_ENABLE_XLIB
-    "Build gfx and platform with Xlib to support windowed apps on Linux"
-    ON
+auto_option(
+    SLANG_ENABLE_CUDA
+    CUDAToolkit
+    "Enable CUDA tests using CUDA found in CUDA_PATH"
 )
-option(
+auto_option(
+    SLANG_ENABLE_OPTIX
+    OptiX
+    "Enable OptiX build/tests, requires enable-cuda"
+)
+auto_option(
+    SLANG_ENABLE_NVAPI
+    NVAPI
+    "Enable NVAPI usage (Only available for builds targeting Windows)"
+)
+auto_option(
+    SLANG_ENABLE_XLIB
+    X11
+    "Build gfx and platform with Xlib to support windowed apps on Linux"
+)
+auto_option(
     SLANG_ENABLE_AFTERMATH
+    Aftermath
     "Enable Aftermath in GFX, and add aftermath crash example to project"
 )
 option(SLANG_ENABLE_DX_ON_VK "Use dxvk and vkd3d-proton for DirectX support")
 
-option(SLANG_EMBED_STDLIB "Build slang with an embedded version of the stdlib")
 option(SLANG_EMBED_STDLIB_SOURCE "Embed stdlib source in the binary" ON)
+option(SLANG_EMBED_STDLIB "Build slang with an embedded version of the stdlib")
 
 option(SLANG_ENABLE_FULL_IR_VALIDATION "Enable full IR validation (SLOW!)")
 option(SLANG_ENABLE_ASAN "Enable ASAN (address sanitizer)")
@@ -78,26 +91,18 @@ if(NOT SLANG_EMBED_STDLIB AND NOT SLANG_EMBED_STDLIB_SOURCE)
     )
 endif()
 
+if(SLANG_ENABLE_OPTIX AND NOT SLANG_ENABLE_CUDA)
+    message(
+        SEND_ERROR
+        "SLANG_ENABLE_OPTIX is not supported without SLANG_ENABLE_CUDA"
+    )
+endif()
+
 #
 # Dependencies
 #
 
 find_package(Threads REQUIRED)
-
-find_package(X11 REQUIRED)
-
-if(SLANG_ENABLE_CUDA)
-    find_package(CUDAToolkit REQUIRED)
-endif()
-
-if(SLANG_ENABLE_OPTIX)
-    find_path(
-        OPTIX_INCLUDE
-        optix.h
-        REQUIRED
-        PATHS ${SLANG_OPTIX_SDK_PATH}/include
-    )
-endif()
 
 if(NOT SLANG_USE_BINARY_SLANG_LLVM)
     find_llvm()
@@ -126,6 +131,7 @@ slang_add_target(
     USE_EXTRA_WARNINGS
     LINK_WITH_PRIVATE miniz lz4_static Threads::Threads
     EXPORT_MACRO_PREFIX SLANG_RT
+    INSTALL
 )
 
 slang_add_target(
@@ -135,14 +141,13 @@ slang_add_target(
     USE_EXTRA_WARNINGS
     LINK_WITH_PRIVATE core
     INCLUDE_DIRECTORIES_PUBLIC source
-    REQUIRES slang-llvm
 )
 if(NOT MSVC)
     # This is necessary to compile the DXC headers
     set_source_files_properties(
         source/compiler-core/slang-dxc-compiler.cpp
         PROPERTIES COMPILE_OPTIONS "-fms-extensions"
-        DIRECTORY ${SLANG_ROOT_DIR}
+        DIRECTORY ${slang_SOURCE_DIR}
     )
 endif()
 
@@ -220,12 +225,14 @@ slang_add_target(
     tools/slangd
     EXECUTABLE
     LINK_WITH_PRIVATE core slang slang-reflect-headers
+    INSTALL
 )
 slang_add_target(
     source/slangc
     EXECUTABLE
     USE_FEWER_WARNINGS
     LINK_WITH_PRIVATE core slang Threads::Threads
+    INSTALL
 )
 
 #
@@ -236,6 +243,7 @@ slang_add_target(
     MODULE
     USE_EXTRA_WARNINGS
     LINK_WITH_PRIVATE glslang SPIRV SPIRV-Tools-opt
+    INSTALL
 )
 
 if(SLANG_USE_BINARY_SLANG_LLVM)
@@ -276,6 +284,7 @@ if(SLANG_USE_BINARY_SLANG_LLVM)
         TARGET slang-llvm
         PROPERTY IMPORTED_LOCATION ${slang_llvm_object}
     )
+    install(PROGRAMS ${slang_llvm_object} DESTINATION module_subdir)
 else()
     llvm_target_from_components(llvm-dep filecheck native orcjit)
     clang_target_from_libs(
@@ -296,6 +305,7 @@ else()
         # This uses the SLANG_DLL_EXPORT macro from slang.h, so make sure to set
         # SLANG_DYNAMIC and SLANG_DYNAMIC_EXPORT
         EXPORT_MACRO_PREFIX SLANG
+        INSTALL
     )
     # If we don't include this, then the symbols in the LLVM linked here may
     # conflict with those of other LLVMs linked at runtime, for instance in mesa.
@@ -311,6 +321,8 @@ slang_add_target(
     EXCLUDE_FROM_ALL
     USE_FEWER_WARNINGS
     LINK_WITH_PRIVATE core $<$<BOOL:${SLANG_ENABLE_XLIB}>:X11::X11>
+    EXTRA_COMPILE_DEFINITIONS_PRIVATE
+        $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB>
     INCLUDE_FROM_PRIVATE gfx
     INCLUDE_DIRECTORIES_PUBLIC tools/platform
     EXPORT_MACRO_PREFIX SLANG_PLATFORM
@@ -328,6 +340,12 @@ slang_add_target(
         slang
         Vulkan-Headers
         $<$<BOOL:${SLANG_ENABLE_XLIB}>:X11::X11>
+        $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cudart;CUDA::cuda_driver>
+    EXTRA_COMPILE_DEFINITIONS_PRIVATE
+        $<$<BOOL:${SLANG_ENABLE_CUDA}>:GFX_ENABLE_CUDA>
+        $<$<BOOL:${SLANG_ENABLE_OPTIX}>:GFX_OPTIX>
+        $<$<BOOL:${SLANG_ENABLE_NVAPI}>:GFX_NVAPI>
+        $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB>
     # This is a shared library, so we need to set a preprocessor macro to mark
     # exported symbols
     EXPORT_MACRO_PREFIX SLANG_GFX
@@ -335,17 +353,19 @@ slang_add_target(
     # this
     INCLUDE_DIRECTORIES_PUBLIC .
     REQUIRES copy-gfx-slang-modules
+    INSTALL
 )
+set(modules_dest_dir $<TARGET_FILE_DIR:slang-test>)
 add_custom_target(
     copy-gfx-slang-modules
-    COMMAND
-        ${CMAKE_COMMAND} -E copy tools/gfx/gfx.slang
-        $<TARGET_FILE_DIR:slang-test>
-    COMMAND
-        ${CMAKE_COMMAND} -E copy tools/gfx/slang.slang
-        $<TARGET_FILE_DIR:slang-test>
-    WORKING_DIRECTORY ${SLANG_ROOT_DIR}
+    COMMAND ${CMAKE_COMMAND} -E copy tools/gfx/gfx.slang ${modules_dest_dir}
+    COMMAND ${CMAKE_COMMAND} -E copy tools/gfx/slang.slang ${modules_dest_dir}
+    WORKING_DIRECTORY ${slang_SOURCE_DIR}
     VERBATIM
+)
+install(
+    FILES ${modules_dest_dir}/gfx.slang ${modules_dest_dir}/slang.slang
+    DESTINATION bin
 )
 
 slang_add_target(
@@ -440,7 +460,17 @@ slang_add_target(
     EXCLUDE_FROM_ALL
     EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_SHARED_LIBRARY_TOOL
     USE_FEWER_WARNINGS
-    LINK_WITH_PRIVATE core compiler-core slang gfx gfx-util platform
+    LINK_WITH_PRIVATE
+        core
+        compiler-core
+        slang
+        gfx
+        gfx-util
+        platform
+        $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cudart;CUDA::cuda_driver>
+    EXTRA_COMPILE_DEFINITIONS_PRIVATE
+        $<$<BOOL:${SLANG_ENABLE_CUDA}>:RENDER_TEST_CUDA>
+        $<$<BOOL:${SLANG_ENABLE_OPTIX}>:RENDER_TEST_OPTIX>
     OUTPUT_NAME render-test-tool
 )
 
@@ -452,7 +482,12 @@ slang_add_target(
     examples/example-base
     STATIC
     EXCLUDE_FROM_ALL
-    LINK_WITH_PRIVATE core slang gfx platform
+    LINK_WITH_PRIVATE
+        core
+        slang
+        gfx
+        platform
+        $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cudart;CUDA::cuda_driver>
 )
 
 add_custom_target(examples COMMENT "meta target which depends on all examples")
@@ -463,7 +498,16 @@ function(example dir)
         ${ARGN}
         EXCLUDE_FROM_ALL
         USE_FEWER_WARNINGS
-        LINK_WITH_PRIVATE core example-base slang gfx gfx-util platform
+        LINK_WITH_PRIVATE
+            core
+            example-base
+            slang
+            gfx
+            gfx-util
+            platform
+            $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cudart;CUDA::cuda_driver>
+        EXTRA_COMPILE_DEFINITIONS_PRIVATE
+            $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB>
         REQUIRED_BY examples
     )
 endfunction()

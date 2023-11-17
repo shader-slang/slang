@@ -11,6 +11,8 @@ function(slang_add_target dir type)
         # Make this a Windows app, rather than a console app, only makes a
         # difference when compiling for Windows
         WIN32_EXECUTABLE
+        # Install this target
+        INSTALL
     )
     set(single_value_args
         # Set the target name, useful for multiple targets from the same
@@ -127,10 +129,10 @@ function(slang_add_target dir type)
         # this tricky there.
         set(output_dir "${CMAKE_BINARY_DIR}/$<CONFIG>")
     endif()
-    if(CMAKE_SYSTEM_NAME STREQUAL "Windows" AND type STREQUAL "MODULE")
-        set(library_subdir bin)
+    if(type STREQUAL "MODULE")
+      set(library_subdir ${module_subdir})
     else()
-        set(library_subdir lib)
+      set(library_subdir lib)
     endif()
     set_target_properties(
         ${target}
@@ -244,4 +246,32 @@ function(slang_add_target dir type)
         APPEND
         PROPERTY INSTALL_RPATH "$ORIGIN/../lib"
     )
+
+    #
+    # Mark for installation
+    #
+    if(ARG_INSTALL)
+        install(
+            TARGETS ${target}
+            EXPORT SlangTargets
+            ARCHIVE
+            DESTINATION lib
+            LIBRARY
+            DESTINATION ${library_subdir}
+            RUNTIME
+            DESTINATION bin
+        )
+    endif()
 endfunction()
+
+# On Windows, because there's no RPATH, place modules in bin, next to the
+# executables which load them (by deault, CMAKE will place them in lib and
+# expect the application to seek them out there)
+#
+# This variable is used in the above function as and elsewhere for installing
+# an imported module (slang-llvm from binary), hence why it's defined here.
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    set(module_subdir bin)
+else()
+    set(module_subdir lib)
+endif()
