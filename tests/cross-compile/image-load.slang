@@ -4,7 +4,8 @@
 // gets properly converted to a call to `imageLoad`
 // and not just `texelFetch` as it would for a `Texture*`.
 
-//TEST:CROSS_COMPILE:-target spirv-assembly -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -entry main -stage compute -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -entry main -stage compute
 
 struct Params
 {
@@ -15,5 +16,8 @@ ParameterBlock<Params> gParams;
 
 void main(uint3 tid : SV_DispatchThreadID)
 {
-	float f = gParams.tex.Load(int3(int2(tid.xy), int(tid.z)));
+    // CHECK: OpImageRead
+    // CHECK: OpImageWrite
+    float f = gParams.tex.Load(int3(int2(tid.xy), int(tid.z)));
+    gParams.tex[tid] = f + 1.0;
 }

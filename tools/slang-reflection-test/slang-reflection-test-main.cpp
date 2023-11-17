@@ -634,6 +634,7 @@ static void emitReflectionResourceTypeBaseInfoJSON(
         case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:  writer << "rasterOrdered"; break;
         case SLANG_RESOURCE_ACCESS_APPEND:          writer << "append"; break;
         case SLANG_RESOURCE_ACCESS_CONSUME:         writer << "consume"; break;
+        case SLANG_RESOURCE_ACCESS_FEEDBACK:        writer << "feedback"; break;
         }
         writer << "\"";
     }

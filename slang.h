@@ -2020,6 +2020,8 @@ extern "C"
         SLANG_RESOURCE_ACCESS_APPEND,
         SLANG_RESOURCE_ACCESS_CONSUME,
         SLANG_RESOURCE_ACCESS_WRITE,
+        SLANG_RESOURCE_ACCESS_FEEDBACK,
+        SLANG_RESOURCE_ACCESS_UNKNOWN = 0x7FFFFFFF,
     };
 
     typedef unsigned int SlangParameterCategoryIntegral;

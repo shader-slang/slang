@@ -1,9 +1,10 @@
-//TEST:CROSS_COMPILE(filecheck=CHECK): -profile ps_5_0 -entry main -target glsl
+//TEST:SIMPLE(filecheck=CHECK): -stage fragment -entry main -target spirv -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK): -stage fragment -entry main -target spirv
 
-// CHECK: textureGather(sampler2DShadow(t_0,sc_0), (loc_0), (3.0))
-// CHECK: textureGatherOffset(sampler2DShadow(t_0,sc_0), (loc_0), (3.0), (off_0))
-// CHECK: textureGatherOffsets(sampler2DShadow(t_0,sc_0), (loc_0), (3.0), ivec2[]((off_0), (off_0), (off_0), (off_0)))
-// CHECK: textureGatherOffsets(sampler2DShadow(t_0,sc_0), (loc_0), (3.0), ivec2[]((ivec2(6, 6)), (ivec2(7, 7)), (ivec2(8, 8)), (ivec2(9, 9))))
+// CHECK: OpImageDrefGather
+// CHECK: OpImageDrefGather
+// CHECK: OpImageDrefGather
+// CHECK: OpImageDrefGather
 
 Texture2D t;
 SamplerState s;

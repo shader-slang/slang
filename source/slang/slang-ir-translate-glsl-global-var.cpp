@@ -60,7 +60,7 @@ namespace Slang
                     {
                         builder.addNameHintDecoration(key, nameHint->getName());
                     }
-                    builder.createStructField(inputStructType, key, inputType);
+                    auto field = builder.createStructField(inputStructType, key, inputType);
                     IRTypeLayout::Builder fieldTypeLayout(&builder);
                     fieldTypeLayout.addResourceUsage(LayoutResourceKind::VaryingInput, LayoutSize(1));
                     IRVarLayout::Builder varLayoutBuilder(&builder, fieldTypeLayout.build());
@@ -86,6 +86,7 @@ namespace Slang
                         inputVarIndex++;
                     }
                     inputStructTypeLayoutBuilder.addField(key, varLayoutBuilder.build());
+                    input->transferDecorationsTo(field);
                 }
                 auto paramTypeLayout = inputStructTypeLayoutBuilder.build();
                 IRVarLayout::Builder paramVarLayoutBuilder(&builder, paramTypeLayout);

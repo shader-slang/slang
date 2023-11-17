@@ -239,6 +239,13 @@ namespace Slang
             // If we see a call(specialize(gFunc, Targs), args),
             // translate it into call(gFunc, args, Targs).
             auto loweredFunc = specializeInst->getBase();
+
+            // Don't process intrinsic functions.
+            UnownedStringSlice intrinsicDef;
+            if (findTargetIntrinsicDefinition(getResolvedInstForDecorations(loweredFunc),
+                sharedContext->targetReq->getTargetCaps(), intrinsicDef))
+                return;
+
             // All callees should have already been lowered in lower-generic-functions pass.
             // For intrinsic generic functions, they are left as is, and we also need to ignore
             // them here.
@@ -251,14 +258,6 @@ namespace Slang
                 // All nested generic functions are supposed to be flattend before this pass.
                 // If they are not, they represent an intrinsic function that should not be
                 // modified in this pass.
-                auto innerMostFunc = findInnerMostSpecializingBase(static_cast<IRSpecialize*>(loweredFunc));
-                if (innerMostFunc && innerMostFunc->getOp() == kIROp_Generic)
-                {
-                    innerMostFunc =
-                        findInnerMostGenericReturnVal(static_cast<IRGeneric*>(innerMostFunc));
-                }
-                if (innerMostFunc->findDecoration<IRTargetIntrinsicDecoration>())
-                    return;
                 SLANG_UNEXPECTED("Nested generics specialization.");
             }
             else if (loweredFunc->getOp() == kIROp_LookupWitness)

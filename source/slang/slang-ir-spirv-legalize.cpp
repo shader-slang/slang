@@ -298,7 +298,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
     static void inferTextureFormat(IRInst* textureInst, IRTextureTypeBase* textureType)
     {
-        ImageFormat format = ImageFormat::unknown;
+        ImageFormat format = (ImageFormat)(textureType->getFormat());
         if (auto decor = textureInst->findDecoration<IRFormatDecoration>())
         {
             format = decor->getFormat();
@@ -390,15 +390,19 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         {
             IRBuilder builder(textureInst->getModule());
             builder.setInsertBefore(textureInst);
-            List<IRInst*> args;
-            args.add(textureType->getOperand(0));
-            if (textureType->getOperandCount() >= 2)
-                args.add(textureType->getOperand(1));
-            else
-                args.add(builder.getIntValue(builder.getUIntType(), 0));
-            args.add(builder.getIntValue(builder.getUIntType(), IRIntegerValue(format)));
+            auto formatArg = builder.getIntValue(builder.getUIntType(), IRIntegerValue(format));
 
-            auto newType = (IRType*)builder.emitIntrinsicInst(builder.getTypeKind(), textureType->getOp(), 3, args.getBuffer());
+            auto newType = builder.getTextureType(
+                textureType->getElementType(),
+                textureType->getShapeInst(),
+                textureType->getIsArrayInst(),
+                textureType->getIsMultisampleInst(),
+                textureType->getSampleCountInst(),
+                textureType->getAccessInst(),
+                textureType->getIsShadowInst(),
+                textureType->getIsCombinedInst(),
+                formatArg);
+
             if (textureInst->getFullType() == textureType)
             {
                 // Simple texture typed global param.
@@ -460,7 +464,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
             auto innerType = inst->getFullType();
 
-            auto arrayType = as<IRArrayType>(inst->getDataType());
+            auto arrayType = as<IRArrayTypeBase>(inst->getDataType());
             IRInst* arraySize = nullptr;
             if (arrayType)
             {
@@ -556,9 +560,17 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             }
 
             auto innerElementType = innerType;
-            if (arraySize)
+            if (arrayType)
             {
-                innerType = builder.getArrayType(innerType, arraySize);
+                Array<IRInst*, 2> arrayTypeArgs;
+                arrayTypeArgs.add(innerType);
+                if (arraySize)
+                    arrayTypeArgs.add(arraySize);
+                innerType = (IRType*)builder.emitIntrinsicInst(builder.getTypeKind(), arrayType->getOp(), (UInt)arrayTypeArgs.getCount(), arrayTypeArgs.getBuffer());
+                if (!arraySize)
+                {
+                    builder.addRequireSPIRVDescriptorIndexingExtensionDecoration(inst);
+                }
             }
 
             // Make a pointer type of storageClass.
@@ -573,7 +585,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                         insertLoadAtLatestLocation(inst, use);
                     });
             }
-            else if (arraySize)
+            else if (arrayType)
             {
                 traverseUses(inst, [&](IRUse* use)
                     {

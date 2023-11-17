@@ -723,7 +723,11 @@ namespace Slang
                         expr->loc = loc;
                         if (auto declRefExpr = as<DeclRefExpr>(originalExpr))
                             expr->scope = declRefExpr->scope;
-
+                        else if (auto invokeExpr = as<InvokeExpr>(originalExpr))
+                        {
+                            if (auto calleeDeclRefExpr = as<DeclRefExpr>(invokeExpr->originalFunctionExpr))
+                                expr->scope = calleeDeclRefExpr->scope;
+                        }
                         // Whether or not the implicit `this` is mutable depends
                         // on the context in which it is used, and the lookup
                         // logic will have computed an appropriate "mode" based
@@ -2246,8 +2250,9 @@ namespace Slang
     Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
     {
         // check the base expression first
+        if (!expr->originalFunctionExpr)
+            expr->originalFunctionExpr = expr->functionExpr;
         expr->functionExpr = CheckTerm(expr->functionExpr);
-
         auto treatAsDifferentiableExpr = m_treatAsDifferentiableExpr;
         m_treatAsDifferentiableExpr = nullptr;
         // Next check the argument expressions
@@ -4018,7 +4023,9 @@ namespace Slang
                         operand.expr = typeExpr.exp;
                     }
                     else if(operand.flavor == SPIRVAsmOperand::SlangValue
-                        || operand.flavor == SPIRVAsmOperand::SlangValueAddr)
+                        || operand.flavor == SPIRVAsmOperand::SlangValueAddr
+                        || operand.flavor == SPIRVAsmOperand::ImageType
+                        || operand.flavor == SPIRVAsmOperand::SampledImageType)
                     {
                         // This is a $expr operand, check the expr
                         operand.expr = dispatch(operand.expr);

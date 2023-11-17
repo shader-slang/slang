@@ -1263,12 +1263,11 @@ namespace Slang
     SlangBindingType _calcResourceBindingType(
         Type* type)
     {
-        if(const auto combinedTextureSamplerType = as<TextureSamplerType>(type))
+        if( auto resourceType = as<ResourceType>(type) )
         {
-            return SLANG_BINDING_TYPE_COMBINED_TEXTURE_SAMPLER;
-        }
-        else if( auto resourceType = as<ResourceType>(type) )
-        {
+            if (resourceType->isCombined())
+                return SlangBindingType(SLANG_BINDING_TYPE_COMBINED_TEXTURE_SAMPLER);
+
             auto shape = resourceType->getBaseShape();
 
             auto access = resourceType->getAccess();

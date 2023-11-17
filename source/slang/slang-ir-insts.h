@@ -3274,7 +3274,16 @@ public:
     IRConstRefType* getConstRefType(IRType* valueType);
     IRPtrTypeBase*  getPtrType(IROp op, IRType* valueType);
     IRPtrType* getPtrType(IROp op, IRType* valueType, IRIntegerValue addressSpace);
-
+    IRTextureTypeBase* getTextureType(
+        IRType* elementType,
+        IRInst* shape,
+        IRInst* isArray,
+        IRInst* isMS,
+        IRInst* sampleCount,
+        IRInst* access,
+        IRInst* isShadow,
+        IRInst* isCombined,
+        IRInst* format);
     IRComPtrType* getComPtrType(IRType* valueType);
 
         /// Get a 'SPIRV literal' 
@@ -4063,6 +4072,8 @@ public:
     IRSPIRVAsmOperand* emitSPIRVAsmOperandBuiltinVar(IRInst* type, IRInst* builtinKind);
     IRSPIRVAsmOperand* emitSPIRVAsmOperandGLSL450Set();
     IRSPIRVAsmOperand* emitSPIRVAsmOperandSampledType(IRType* elementType);
+    IRSPIRVAsmOperand* emitSPIRVAsmOperandImageType(IRInst* element);
+    IRSPIRVAsmOperand* emitSPIRVAsmOperandSampledImageType(IRInst* element);
     IRSPIRVAsmOperand* emitSPIRVAsmOperandTruncate();
     IRSPIRVAsmOperand* emitSPIRVAsmOperandEntryPoint();
     IRSPIRVAsmInst* emitSPIRVAsmInst(IRInst* opcode, List<IRInst*> operands);
@@ -4224,6 +4235,11 @@ public:
     void addSemanticDecoration(IRInst* value, UnownedStringSlice const& text, int index = 0)
     {
         addDecoration(value, kIROp_SemanticDecoration, getStringValue(text), getIntValue(getIntType(), index));
+    }
+
+    void addRequireSPIRVDescriptorIndexingExtensionDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_RequireSPIRVDescriptorIndexingExtensionDecoration);
     }
 
     void addTargetIntrinsicDecoration(IRInst* value, IRInst* caps, UnownedStringSlice const& definition, UnownedStringSlice const& predicate, IRInst* typeScrutinee)

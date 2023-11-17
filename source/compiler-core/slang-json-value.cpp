@@ -572,6 +572,10 @@ UnownedStringSlice JSONContainer::getString(const JSONValue& in)
         {
             return StringRepresentation::asSlice(in.stringRep);
         }
+        case JSONValue::Type::Null:
+        {
+            return UnownedStringSlice();
+        }
         default: break;
     }
    
@@ -608,6 +612,10 @@ UnownedStringSlice JSONContainer::getTransientString(const JSONValue& in)
             {
                 return unquoted;
             }
+        }
+        case JSONValue::Type::Null:
+        {
+            return UnownedStringSlice();
         }
     }
 

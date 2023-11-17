@@ -304,7 +304,6 @@ namespace Slang
             coreLibraryCode = StringBlob::moveCreate(sb);
         }
 #endif
-
         return coreLibraryCode;
     }
 
@@ -316,6 +315,7 @@ namespace Slang
             const String path = getStdlibPath();
             StringBuilder sb;
             #include "hlsl.meta.slang.h"
+            File::writeAllText("d:\\stdlib1.txt", sb.toString());
             hlslLibraryCode = StringBlob::moveCreate(sb);
         }
 #endif

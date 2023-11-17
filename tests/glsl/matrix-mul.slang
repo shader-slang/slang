@@ -1,3 +1,4 @@
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage vertex -entry main -allow-glsl -emit-spirv-directly
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -stage vertex -entry main -allow-glsl
 #version 310 es
 layout(location = 0) in highp vec4 a_position;

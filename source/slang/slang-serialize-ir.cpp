@@ -10,12 +10,6 @@
 
 namespace Slang {
 
-static bool _isTextureTypeBase(IROp opIn)
-{
-    const int op = (kIROpMask_OpMask & opIn);
-    return op >= kIROp_FirstTextureTypeBase && op <= kIROp_LastTextureTypeBase;
-}
-
 static bool _isConstant(IROp opIn)
 {
     const int op = (kIROpMask_OpMask & opIn);
@@ -243,15 +237,6 @@ Result IRSerialWriter::write(IRModule* module, SerialSourceLocWriter* sourceLocW
                         return SLANG_FAIL;
                     }
                 }
-                continue;
-            }
-
-            IRTextureTypeBase* textureBase = as<IRTextureTypeBase>(srcInst);
-            if (textureBase)
-            {
-                dstInst.m_payloadType = PayloadType::OperandAndUInt32;
-                dstInst.m_payload.m_operandAndUInt32.m_uint32 = uint32_t(srcInst->getOp()) >> kIROpMeta_OtherShift;
-                dstInst.m_payload.m_operandAndUInt32.m_operand = getInstIndex(textureBase->getElementType());
                 continue;
             }
 
@@ -833,22 +818,6 @@ Result IRSerialReader::read(const IRSerialData& data, Session* session, SerialSo
             }
 
             insts[i] = irConst;
-        }
-        else if (_isTextureTypeBase(op))
-        {
-            // TODO: We should clean up the IR encoding of texture types so that
-            // they do not need to have special-case suport in the serialization layer.
-
-            // All IR texture types currently have a single operand
-            Int operandCount = 1;
-            IRTextureTypeBase* inst = module->_allocateInst<IRTextureTypeBase>(op, operandCount);
-            SLANG_ASSERT(srcInst.m_payloadType == PayloadType::OperandAndUInt32);
-
-            // Reintroduce the texture type bits into the the
-            const uint32_t other = srcInst.m_payload.m_operandAndUInt32.m_uint32;
-            inst->m_op = IROp(uint32_t(inst->getOp()) | (other << kIROpMeta_OtherShift));
-
-            insts[i] = inst;
         }
         else
         {

@@ -37,4 +37,3 @@ void main()
     _S7 = vec4(0);
     return;
 }
-
