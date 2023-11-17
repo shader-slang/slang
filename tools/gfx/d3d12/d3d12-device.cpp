@@ -1899,6 +1899,7 @@ Result DeviceImpl::createInputLayout(IInputLayout::Desc const& desc, IInputLayou
     char* textPos = layout->m_text.getBuffer();
 
     List<D3D12_INPUT_ELEMENT_DESC>& elements = layout->m_elements;
+    SLANG_ASSERT(inputElementCount > 0);
     elements.setCount(inputElementCount);
 
     for (Int i = 0; i < inputElementCount; ++i)

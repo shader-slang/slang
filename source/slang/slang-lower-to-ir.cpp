@@ -8038,8 +8038,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // Not clear what to do around HLSLExportModifier. 
         // The HLSL spec says it only applies to functions, so we ignore for now.
 
-        const bool isPublicType = decl->findModifier<PublicModifier>() != nullptr;
-
         // We are going to create nested IR building state
         // to use when emitting the members of the type.
         //
@@ -9761,7 +9759,7 @@ LoweredValInfo emitDeclRef(
     SLANG_UNUSED(initialSubst);
 
 
-    if (auto thisTypeDecl = as<ThisTypeDecl>(decl))
+    if (as<ThisTypeDecl>(decl))
     {
         // A declref to ThisType decl should be lowered differently
         // from other decls. In general, IFoo<T>.ThisType should lower to
