@@ -5976,68 +5976,51 @@ matrix<T,N,M> pow(matrix<T,N,M> x, matrix<T,N,M> y)
 // Output message
 // TODO: add check to ensure format is const literal.
 
-__target_intrinsic(hlsl)
-__target_intrinsic(cpp)
-__target_intrinsic(cuda)
-__glsl_extension(GL_EXT_debug_printf)
-__target_intrinsic(glsl, "debugPrintfEXT($0)")
-void printf(NativeString format);
+${{{{
+for (int argCount = 0; argCount < 12; argCount++)
+{
+    StringBuilder paramList;
+    StringBuilder argList;
+    StringBuilder spirvArgList;
+    StringBuilder genericParamList;
+    if (argCount > 0)
+        genericParamList << "<";
+    for (int i = 0; i < argCount; i++)
+    {
+        if (i > 0)
+            genericParamList << ", ";
+        genericParamList << "T" << i;
 
-__target_intrinsic(hlsl)
-__target_intrinsic(cpp)
-__target_intrinsic(cuda)
-__glsl_extension(GL_EXT_debug_printf)
-__target_intrinsic(glsl, "debugPrintfEXT($0, $1)")
-void printf<T0>(NativeString format, T0 arg0);
-
-__target_intrinsic(hlsl)
-__target_intrinsic(cpp)
-__target_intrinsic(cuda)
-__glsl_extension(GL_EXT_debug_printf)
-__target_intrinsic(glsl, "debugPrintfEXT($0, $1, $2)")
-void printf<T0, T1>(NativeString format, T0 arg0, T1 arg1);
-
-__target_intrinsic(hlsl)
-__target_intrinsic(cpp)
-__target_intrinsic(cuda)
-__glsl_extension(GL_EXT_debug_printf)
-__target_intrinsic(glsl, "debugPrintfEXT($0, $1, $2, $3)")
-void printf<T0, T1, T2>(NativeString format, T0 arg0, T1 arg1, T2 arg2);
-
-__target_intrinsic(hlsl)
-__target_intrinsic(cpp)
-__target_intrinsic(cuda)
-__glsl_extension(GL_EXT_debug_printf)
-__target_intrinsic(glsl, "debugPrintfEXT($0, $1, $2, $3, $4)")
-void printf<T0, T1, T2, T3>(NativeString format, T0 arg0, T1 arg1, T2 arg2, T3 arg3);
-
-__target_intrinsic(hlsl)
-__target_intrinsic(cpp)
-__target_intrinsic(cuda)
-__glsl_extension(GL_EXT_debug_printf)
-__target_intrinsic(glsl, "debugPrintfEXT($0, $1, $2, $3, $4, $5)")
-void printf<T0, T1, T2, T3, T4>(NativeString format, T0 arg0, T1 arg1, T2 arg2, T3 arg3, T4 arg4);
-
-__target_intrinsic(hlsl)
-__target_intrinsic(cpp)
-__target_intrinsic(cuda)
-__glsl_extension(GL_EXT_debug_printf)
-__target_intrinsic(glsl, "debugPrintfEXT($0, $1, $2, $3, $4, $5, $6)")
-void printf<T0, T1, T2, T3, T4, T5>(NativeString format, T0 arg0, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5);
-
-__target_intrinsic(hlsl)
-__target_intrinsic(cpp)
-__target_intrinsic(cuda)
-__glsl_extension(GL_EXT_debug_printf)
-__target_intrinsic(glsl, "debugPrintfEXT($0, $1, $2, $3, $4, $5, $6, $7)")
-void printf<T0, T1, T2, T3, T4, T5, T6>(NativeString format, T0 arg0, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6);
-
-__target_intrinsic(hlsl)
-__target_intrinsic(cpp)
-__target_intrinsic(cuda)
-__glsl_extension(GL_EXT_debug_printf)
-__target_intrinsic(glsl, "debugPrintfEXT($0, $1, $2, $3, $4, $5, $6, $7, $8)")
-void printf<T0, T1, T2, T3, T4, T5, T6, T7>(NativeString format, T0 arg0, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7);
+        paramList << ", T" << i << " v" << i;
+        argList << ", v" << i;
+        spirvArgList << " $v" << i;
+    }
+    if (argCount > 0)
+        genericParamList << ">";
+    auto params = paramList.toString();
+    auto args = argList.toString();
+    auto spirvArgs = spirvArgList.toString();
+}}}}
+void printf$(genericParamList.toString())(NativeString format $(paramList))
+{
+    __target_switch
+    {
+    case hlsl:
+    case cpp:
+    case cuda:
+        __intrinsic_asm "printf";
+    case glsl:
+        __intrinsic_asm "debugPrintfEXT($0 $(argList))";
+    case spirv:
+        spirv_asm {
+          OpExtension "SPV_KHR_non_semantic_info";
+          result:$$void = OpExtInst debugPrintf 1 $format $(spirvArgs);
+        };
+    }
+}
+${{{{
+}
+}}}}
 
 // Tessellation factor fixup routines
 

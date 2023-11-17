@@ -1144,6 +1144,21 @@ struct SPIRVEmitContext
         return m_NonSemanticDebugInfoExtInst;
     }
 
+    /// The SPIRV OpExtInstImport inst that represents the NonSemantic debug info
+    /// extended instruction set.
+    SpvInst* m_NonSemanticDebugPrintfExtInst = nullptr;
+
+    SpvInst* getNonSemanticDebugPrintfExtInst()
+    {
+        if (m_NonSemanticDebugPrintfExtInst)
+            return m_NonSemanticDebugPrintfExtInst;
+        m_NonSemanticDebugPrintfExtInst = emitOpExtInstImport(
+            getSection(SpvLogicalSectionID::ExtIntInstImports),
+            nullptr,
+            UnownedStringSlice("NonSemantic.DebugPrintf"));
+        return m_NonSemanticDebugPrintfExtInst;
+    }
+
     // Now that we've gotten the core infrastructure out of the way,
     // let's start looking at emitting some instructions that make
     // up a SPIR-V module.
@@ -4621,6 +4636,11 @@ struct SPIRVEmitContext
                 case kIROp_SPIRVAsmOperandGLSL450Set:
                 {
                     emitOperand(getGLSL450ExtInst());
+                    break;
+                }
+                case kIROp_SPIRVAsmOperandDebugPrintfSet:
+                {
+                    emitOperand(getNonSemanticDebugPrintfExtInst());
                     break;
                 }
                 default:

@@ -3932,6 +3932,10 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 {
                     return builder->emitSPIRVAsmOperandGLSL450Set();
                 }
+            case SPIRVAsmOperand::NonSemanticDebugPrintfExtSet:
+                {
+                    return builder->emitSPIRVAsmOperandDebugPrintfSet();
+                }
             case SPIRVAsmOperand::SlangValue:
                 {
                     IRInst* i;
