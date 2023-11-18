@@ -6534,6 +6534,10 @@ namespace Slang
         {
             return SPIRVAsmOperand{ SPIRVAsmOperand::GLSL450Set, parser->ReadToken() };
         }
+        else if (parser->LookAheadToken("debugPrintf"))
+        {
+            return SPIRVAsmOperand{ SPIRVAsmOperand::NonSemanticDebugPrintfExtSet, parser->ReadToken() };
+        }
         // A regular identifier
         else if(parser->LookAheadToken(TokenType::Identifier))
         {

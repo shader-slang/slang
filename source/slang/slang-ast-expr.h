@@ -664,6 +664,7 @@ public:
         EntryPoint, // __entryPoint, a placeholder for the id of a referencing entryPoint.
         BuiltinVar,
         GLSL450Set,
+        NonSemanticDebugPrintfExtSet,
     };
 
     // The flavour and token describes how this was parsed
