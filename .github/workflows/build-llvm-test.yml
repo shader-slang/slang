@@ -23,6 +23,7 @@ jobs:
             ;;
           windows*)
             choco install ninja
+            printf "CC=cl.exe\nCXX=cl.exe\n" >> "$GITHUB_ENV"
             ;;
           macos*) brew install ninja;;
         esac
@@ -36,6 +37,7 @@ jobs:
       with:
         key: ${{github.job}}-${{matrix.os}}
         variant: sccache
+    - uses: ilammy/msvc-dev-cmd@v1
     - name: configure
       run: >
         cmake -S . -B build -G "Ninja Multi-Config"
