@@ -15,6 +15,8 @@ jobs:
         configuration: ['release']
         platform: ['x64']
     steps:
+    - name: install Ninja
+      run: sudo apt-get install -y ninja-build
     - uses: actions/checkout@v3
       with:
         submodules: 'true'
@@ -26,8 +28,8 @@ jobs:
         mkdir -p build
         export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
         cmake -S . -B build \
+          -G "Ninja Multi-Config" \
           -DSLANG_USE_BINARY_SLANG_LLVM=0 -DSLANG_USE_SYSTEM_LLVM=0 \
-          -DCMAKE_BUILD_TYPE=Release
       env:
         CC: gcc-10
         CXX: g++-10
@@ -36,7 +38,7 @@ jobs:
     - name: build
       run: |
         export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
-        cmake --build build -j --target slang-llvm
+        cmake --build build -j $(nproc) --target slang-llvm --config Release
     - uses: actions/upload-artifact@v3
       with:
         name: slang-llvm-${{matrix.configuration}}-${{matrix.platform}}
