@@ -8,15 +8,21 @@ on:
 
 jobs:
   build:
-
-    runs-on: ubuntu-20.04
     strategy:
       matrix:
-        configuration: ['release']
-        platform: ['x64']
+        os: [ubuntu-20.04, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
-    - name: install Ninja
-      run: sudo apt-get install -y ninja-build
+    - name: Set up system dependencies
+      shell: bash
+      run: |
+        case "${{matrix.os}}" in
+          ubuntu*) sudo apt-get install -y ninja-build;;
+          macos*) brew install ninja;;
+          windows*) choco install ninja;;
+        esac
+        # If we're on an old ubuntu, make sure that we set CC and CXX to GCC-10
+        [ "${{matrix.os}}" != "ubuntu-20.04" ] || printf "CC=gcc-10\nCXX=g++-10\n" >> "$GITHUB_ENV"
     - uses: actions/checkout@v3
       with:
         submodules: 'true'
@@ -24,23 +30,21 @@ jobs:
     - name: ccache
       uses: hendrikmuhs/ccache-action@v1.2
     - name: configure
+      shell: bash
       run: |
         mkdir -p build
-        export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
         cmake -S . -B build \
           -G "Ninja Multi-Config" \
-          -DSLANG_USE_BINARY_SLANG_LLVM=0 -DSLANG_USE_SYSTEM_LLVM=0 \
-      env:
-        CC: gcc-10
-        CXX: g++-10
-        CMAKE_C_COMPILER_LAUNCHER: ccache
-        CMAKE_CXX_COMPILER_LAUNCHER: ccache
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+          -DSLANG_USE_BINARY_SLANG_LLVM=0 -DSLANG_USE_SYSTEM_LLVM=0
     - name: build
+      shell: bash
       run: |
-        export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
         cmake --build build -j $(nproc) --target slang-llvm --config Release
     - uses: actions/upload-artifact@v3
       with:
-        name: slang-llvm-${{matrix.configuration}}-${{matrix.platform}}
+        name: slang-llvm-${{matrix.os}}
         path: |
           build/Release/lib/libslang-llvm.so
+          build/Release/lib/libslang-llvm.dylib
+          build/Release/bin/slang-llvm.dll

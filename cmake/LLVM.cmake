@@ -42,6 +42,8 @@ macro(find_llvm)
             -G${CMAKE_GENERATOR}
             -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
             -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+            -DCMAKE_C_COMPILER_LAUNCHER=${CMAKE_C_COMPILER_LAUNCHER}
+            -DCMAKE_CXX_COMPILER_LAUNCHER=${CMAKE_CXX_COMPILER_LAUNCHER}
             -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
             -DCMAKE_SYSTEM_NAME=${CMAKE_SYSTEM_NAME}
             -DCMAKE_INSTALL_PREFIX=${llvm_install_root}
@@ -73,14 +75,9 @@ macro(find_llvm)
             WORKING_DIRECTORY ${llvm-project_SOURCE_DIR}
             COMMAND_ERROR_IS_FATAL ANY
         )
-        include(ProcessorCount)
-        ProcessorCount(nprocs)
-        if(nprocs EQUAL 0)
-            set(nprocs)
-        endif()
         execute_process(
             COMMAND
-                ${CMAKE_COMMAND} --build ${llvm-project_BINARY_DIR} -j ${nprocs}
+                ${CMAKE_COMMAND} --build ${llvm-project_BINARY_DIR} -j
                 --config=${llvm_config}
             WORKING_DIRECTORY ${llvm-project_SOURCE_DIR}
             COMMAND_ERROR_IS_FATAL ANY
