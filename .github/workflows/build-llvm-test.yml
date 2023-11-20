@@ -1,0 +1,36 @@
+name: Build slang-llvm
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        configuration: ['release']
+        platform: ['x64']
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: 'true'
+        fetch-depth: '0'
+    - name: configure
+      run: |
+        mkdir -p build
+        cmake -S . -B build -G "Ninja Multi-Config" -DSLANG_USE_BINARY_SLANG_LLVM=0 -DSLANG_USE_SYSTEM_LLVM=0
+      env:
+        CC: gcc-10
+        CXX: g++-10
+    - name: build
+      run: |
+        cmake --build build --config Release -j --target slang-llvm
+    - uses: actions/upload-artifact@v3
+      with:
+        name: slang-llvm-${{matrix.configuration}}-${{matrix.platform}}
+        path: |
+          build/Release/lib/libslang-llvm.so
