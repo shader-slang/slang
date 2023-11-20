@@ -22,13 +22,13 @@ jobs:
     - name: configure
       run: |
         mkdir -p build
-        cmake -S . -B build -G "Ninja Multi-Config" -DSLANG_USE_BINARY_SLANG_LLVM=0 -DSLANG_USE_SYSTEM_LLVM=0
+        cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSLANG_USE_BINARY_SLANG_LLVM=0 -DSLANG_USE_SYSTEM_LLVM=0
       env:
         CC: gcc-10
         CXX: g++-10
     - name: build
       run: |
-        cmake --build build --config Release -j --target slang-llvm
+        cmake --build build -j --target slang-llvm
     - uses: actions/upload-artifact@v3
       with:
         name: slang-llvm-${{matrix.configuration}}-${{matrix.platform}}
