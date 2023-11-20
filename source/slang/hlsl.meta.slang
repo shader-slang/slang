@@ -183,11 +183,41 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     typealias TextureCoord = vector<float, Shape.dimensions>;
 
-    __target_intrinsic(glsl, "textureQueryLod($0, $1).x")
-    float CalculateLevelOfDetail(TextureCoord location);
+    [ForceInline]
+    [__readNone]
+    float CalculateLevelOfDetail(TextureCoord location)
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm "CalculateLevelOfDetail";
+        case glsl:
+            __intrinsic_asm "textureQueryLod($0, $1).x";
+        case spirv:
+            return (spirv_asm
+            {
+                result:$$float2 = OpImageQueryLod $this $location
+            }).x;
+        }
+    }
 
-    __target_intrinsic(glsl, "textureQueryLod($0, $1).y")
-    float CalculateLevelOfDetailUnclamped(TextureCoord location);
+    [ForceInline]
+    [__readNone]
+    float CalculateLevelOfDetailUnclamped(TextureCoord location)
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm "CalculateLevelOfDetailUnclamped";
+        case glsl:
+            __intrinsic_asm "textureQueryLod($0, $1).y";
+        case spirv:
+            return (spirv_asm
+            {
+                result:$$float2 = OpImageQueryLod $this $location
+            }).y;
+        }
+    }
 
     [__readNone]
     T Sample(vector<float, Shape.dimensions+isArray> location)
@@ -328,6 +358,11 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             __glsl_texture(__makeVector(location, compareValue));
         case hlsl:
             __intrinsic_asm ".SampleCmp";
+        case spirv:
+            return spirv_asm
+            {
+                result:$$float = OpImageSampleDrefImplicitLod $this $location $compareValue;
+            };
         }
     }
 
@@ -341,6 +376,12 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             __glsl_texture_level_zero(__makeVector(location, compareValue));
         case hlsl:
             __intrinsic_asm ".SampleCmpLevelZero";
+        case spirv:
+            const float zeroFloat = 0.0f;
+            return spirv_asm
+            {
+                result:$$float = OpImageSampleDrefExplicitLod $this $location $compareValue Lod $zeroFloat;
+            };
         }
     }
 
@@ -354,6 +395,11 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             __glsl_texture_offset(__makeVector(location, compareValue), offset);
         case hlsl:
             __intrinsic_asm ".SampleCmp";
+        case spirv:
+            return spirv_asm
+            {
+                result:$$float = OpImageSampleDrefImplicitLod $this $location $compareValue ConstOffset $offset;
+            };
         }
     }
 
@@ -367,6 +413,12 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             __glsl_texture_offset_level_zero(__makeVector(location, compareValue), offset);
         case hlsl:
             __intrinsic_asm ".SampleCmpLevelZero";
+        case spirv:
+            const float zeroFloat = 0.0f;
+            return spirv_asm
+            {
+                result:$$float = OpImageSampleDrefExplicitLod $this $location $compareValue Lod|ConstOffset $zeroFloat $offset;
+            };
         }
     }
 
@@ -404,7 +456,6 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 {
                     %sampled : __sampledType(T) = OpImageSampleExplicitLod $this $location None|Grad|ConstOffset $gradX $gradY $offset;
                     __truncate $$T result __sampledType(T) %sampled;
-
                 };
         }
     }
@@ -426,7 +477,6 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                     OpCapability MinLod;
                     %sampled : __sampledType(T) = OpImageSampleExplicitLod $this $location None|Grad|ConstOffset|MinLod $gradX $gradY $offset $lodClamp;
                     __truncate $$T result __sampledType(T) %sampled;
-
                 };
         }
     }
@@ -505,11 +555,41 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
 {
     typealias TextureCoord = vector<float, Shape.dimensions>;
 
-    __target_intrinsic(glsl, "textureQueryLod($p, $2).x")
-    float CalculateLevelOfDetail(SamplerState s, TextureCoord location);
+    [__readNone]
+    [ForceInline]
+    float CalculateLevelOfDetail(SamplerState s, TextureCoord location)
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm "CalculateLevelOfDetail";
+        case glsl:
+            __intrinsic_asm "textureQueryLod($p, $2).x";
+        case spirv:
+            return (spirv_asm {
+                %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
+                result:$$float2 = OpImageQueryLod %sampledImage $location;
+            }).x;
+        }
+    }
 
-    __target_intrinsic(glsl, "textureQueryLod($p, $2).y")
-    float CalculateLevelOfDetailUnclamped(SamplerState s, TextureCoord location);
+    [__readNone]
+    [ForceInline]
+    float CalculateLevelOfDetailUnclamped(SamplerState s, TextureCoord location)
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm "CalculateLevelOfDetailUnclamped";
+        case glsl:
+            __intrinsic_asm "textureQueryLod($p, $2).y";
+        case spirv:
+            return (spirv_asm {
+                %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
+                result:$$float2 = OpImageQueryLod %sampledImage $location;
+            }).y;
+        }
+    }
 
     [__readNone]
     T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location)
@@ -626,7 +706,6 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
                 %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
                 %sampled : __sampledType(T) = OpImageSampleImplicitLod %sampledImage $location None|Bias $bias;
                 __truncate $$T result __sampledType(T) %sampled;
-
             };
         }
     }
@@ -675,6 +754,12 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
             return __glsl_texture(s, __makeVector(location,compareValue));
         case hlsl:
             __intrinsic_asm ".SampleCmp";
+        case spirv:
+            return spirv_asm
+            {
+                %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
+                result:$$float = OpImageSampleDrefImplicitLod %sampledImage $location $compareValue;
+            };
         }
     }
 
@@ -687,6 +772,13 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
             return __glsl_texture_level_zero(s, __makeVector(location,compareValue));
         case hlsl:
             __intrinsic_asm ".SampleCmpLevelZero";
+        case spirv:
+            const float zeroFloat = 0.0f;
+            return spirv_asm
+            {
+                %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
+                result:$$float = OpImageSampleDrefExplicitLod %sampledImage $location $compareValue Lod $zeroFloat;
+            };
         }
     }
 
@@ -698,7 +790,13 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
         case glsl:
             return __glsl_texture_offset(s, __makeVector(location,compareValue), offset);
         case hlsl:
-            __intrinsic_asm ".SampleCmpLevelZero";
+            __intrinsic_asm ".SampleCmp";
+        case spirv:
+            return spirv_asm
+            {
+                %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
+                result:$$float = OpImageSampleDrefImplicitLod %sampledImage $location $compareValue ConstOffset $offset;
+            };
         }
     }
 
@@ -711,6 +809,13 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
             return __glsl_texture_offset_level_zero(s, __makeVector(location,compareValue), offset);
         case hlsl:
             __intrinsic_asm ".SampleCmpLevelZero";
+        case spirv:
+            const float zeroFloat = 0.0f;
+            return spirv_asm
+            {
+                %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
+                result:$$float = OpImageSampleDrefExplicitLod %sampledImage $location $compareValue Lod|ConstOffset $zeroFloat $offset;
+            };
         }
     }
 
@@ -730,7 +835,6 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
                     %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
                     %sampled : __sampledType(T) = OpImageSampleExplicitLod %sampledImage $location None|Grad $gradX $gradY;
                     __truncate $$T result __sampledType(T) %sampled;
-
                 };
         }
     }
@@ -774,7 +878,6 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
                     %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
                     %sampled : __sampledType(T) = OpImageSampleExplicitLod %sampledImage $location None|Grad|ConstOffset|MinLod $gradX $gradY $offset $lodClamp;
                     __truncate $$T result __sampledType(T) %sampled;
-
                 };
         }
     }
@@ -824,7 +927,6 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
                 %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
                 %sampled : __sampledType(T) = OpImageSampleExplicitLod %sampledImage $location None|Lod $level;
                 __truncate $$T result __sampledType(T) %sampled;
-
             };
         }
     }
