@@ -78,7 +78,7 @@ macro(find_llvm)
         execute_process(
             COMMAND
                 ${CMAKE_COMMAND} --build ${llvm-project_BINARY_DIR} -j
-                --config=${llvm_config}
+                --config=${llvm_config} --verbose
             WORKING_DIRECTORY ${llvm-project_SOURCE_DIR}
             COMMAND_ERROR_IS_FATAL ANY
         )
