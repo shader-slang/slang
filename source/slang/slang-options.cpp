@@ -2945,6 +2945,8 @@ SlangResult OptionsParser::_parse(
         (m_rawTargets[0].format == CodeGenTarget::HostCPPSource ||
             m_rawTargets[0].format == CodeGenTarget::PyTorchCppBinding ||
             m_rawTargets[0].format == CodeGenTarget::CUDASource ||
+            m_rawTargets[0].format == CodeGenTarget::SPIRV ||
+            m_rawTargets[0].format == CodeGenTarget::SPIRVAssembly ||
             ArtifactDescUtil::makeDescForCompileTarget(asExternal(m_rawTargets[0].format)).kind == ArtifactKind::HostCallable))
     {
         RawOutput rawOutput;
@@ -3011,8 +3013,14 @@ SlangResult OptionsParser::_parse(
                     case CodeGenTarget::ShaderSharedLibrary:
                     case CodeGenTarget::PyTorchCppBinding:
                     case CodeGenTarget::DXIL:
-
                         rawOutput.isWholeProgram = true;
+                        break;
+                    case CodeGenTarget::SPIRV:
+                    case CodeGenTarget::SPIRVAssembly:
+                        if (getCurrentTarget()->targetFlags & SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY)
+                        {
+                            rawOutput.isWholeProgram = true;
+                        }
                         break;
                     default:
                         m_sink->diagnose(SourceLoc(), Diagnostics::cannotMatchOutputFileToEntryPoint, rawOutput.path);
