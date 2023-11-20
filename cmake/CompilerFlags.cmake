@@ -1,6 +1,7 @@
 #
 # Given a list of flags, add those which the C++ compiler supports to the target
 #
+include(CheckCXXCompilerFlag)
 function(add_supported_cxx_flags target)
     cmake_parse_arguments(ARG "PRIVATE;PUBLIC;INTERFACE" "" "" ${ARGN})
     set(flags ${ARG_UNPARSED_ARGUMENTS})
