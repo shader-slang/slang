@@ -42,11 +42,12 @@ macro(find_llvm)
             -G${CMAKE_GENERATOR}
             -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
             -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+            -DCMAKE_C_COMPILER_LAUNCHER=${CMAKE_C_COMPILER_LAUNCHER}
+            -DCMAKE_CXX_COMPILER_LAUNCHER=${CMAKE_CXX_COMPILER_LAUNCHER}
             -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
             -DCMAKE_SYSTEM_NAME=${CMAKE_SYSTEM_NAME}
             -DCMAKE_INSTALL_PREFIX=${llvm_install_root}
             -DCMAKE_BUILD_TYPE=${llvm_config}
-
             # Don't build unnecessary things
             -DLLVM_BUILD_LLVM_C_DYLIB=0
             -DLLVM_INCLUDE_BENCHMARKS=0
@@ -59,7 +60,6 @@ macro(find_llvm)
             -DCLANG_ENABLE_ARCMT=0
             -DCLANG_INCLUDE_DOCS=0
             -DCLANG_INCLUDE_TESTS=0
-
             # Requirements for Slang
             -DCMAKE_CXX_VISIBILITY_PRESET=hidden
             -DLLVM_ENABLE_PROJECTS=clang

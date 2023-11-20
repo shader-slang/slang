@@ -11,7 +11,7 @@ set(CMAKE_BUILD_RPATH_USE_ORIGIN TRUE)
 # Our module dir
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
-# Squash CMake dev warning
+# Squash CMake dev warnings
 if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.24.0")
     cmake_policy(SET CMP0135 NEW)
 endif()
@@ -99,7 +99,8 @@ if(SLANG_ENABLE_OPTIX AND NOT SLANG_ENABLE_CUDA)
 endif()
 
 #
-# Dependencies
+# Dependencies, most of these are however handled inside the "auto_option"
+# calls above
 #
 
 find_package(Threads REQUIRED)
