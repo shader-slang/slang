@@ -46,7 +46,6 @@ macro(find_llvm)
             -DCMAKE_SYSTEM_NAME=${CMAKE_SYSTEM_NAME}
             -DCMAKE_INSTALL_PREFIX=${llvm_install_root}
             -DCMAKE_BUILD_TYPE=${llvm_config}
-
             # Don't build unnecessary things
             -DLLVM_BUILD_LLVM_C_DYLIB=0
             -DLLVM_INCLUDE_BENCHMARKS=0
@@ -59,7 +58,6 @@ macro(find_llvm)
             -DCLANG_ENABLE_ARCMT=0
             -DCLANG_INCLUDE_DOCS=0
             -DCLANG_INCLUDE_TESTS=0
-
             # Requirements for Slang
             -DCMAKE_CXX_VISIBILITY_PRESET=hidden
             -DLLVM_ENABLE_PROJECTS=clang
@@ -75,9 +73,14 @@ macro(find_llvm)
             WORKING_DIRECTORY ${llvm-project_SOURCE_DIR}
             COMMAND_ERROR_IS_FATAL ANY
         )
+        include(ProcessorCount)
+        ProcessorCount(nprocs)
+        if(nprocs EQUAL 0)
+            set(nprocs)
+        endif()
         execute_process(
             COMMAND
-                ${CMAKE_COMMAND} --build ${llvm-project_BINARY_DIR} -j
+                ${CMAKE_COMMAND} --build ${llvm-project_BINARY_DIR} -j ${nprocs}
                 --config=${llvm_config}
             WORKING_DIRECTORY ${llvm-project_SOURCE_DIR}
             COMMAND_ERROR_IS_FATAL ANY
