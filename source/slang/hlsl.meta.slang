@@ -184,6 +184,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     typealias TextureCoord = vector<float, Shape.dimensions>;
 
     [ForceInline]
+    [__readNone]
     float CalculateLevelOfDetail(TextureCoord location)
     {
         __target_switch
@@ -201,6 +202,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     }
 
     [ForceInline]
+    [__readNone]
     float CalculateLevelOfDetailUnclamped(TextureCoord location)
     {
         __target_switch
@@ -553,6 +555,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
 {
     typealias TextureCoord = vector<float, Shape.dimensions>;
 
+    [__readNone]
+    [ForceInline]
     float CalculateLevelOfDetail(SamplerState s, TextureCoord location)
     {
         __target_switch
@@ -569,6 +573,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
         }
     }
 
+    [__readNone]
+    [ForceInline]
     float CalculateLevelOfDetailUnclamped(SamplerState s, TextureCoord location)
     {
         __target_switch
