@@ -195,8 +195,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         case spirv:
             return (spirv_asm
             {
-                result:$$ffloat2 = OpImageQueryLod $this $location
-                return %result;
+                result:$$float2 = OpImageQueryLod $this $location
             }).x;
         }
     }
@@ -213,8 +212,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         case spirv:
             return (spirv_asm
             {
-                result:$$ffloat2 = OpImageQueryLod $this $location
-                return %result;
+                result:$$float2 = OpImageQueryLod $this $location
             }).y;
         }
     }
@@ -566,7 +564,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
         case spirv:
             return (spirv_asm {
                 %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
-                result:$$ffloat2 = OpImageQueryLod %sampledImage $location;
+                result:$$float2 = OpImageQueryLod %sampledImage $location;
             }).x;
         }
     }
@@ -582,7 +580,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
         case spirv:
             return (spirv_asm {
                 %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
-                result:$$ffloat2 = OpImageQueryLod %sampledImage $location;
+                result:$$float2 = OpImageQueryLod %sampledImage $location;
             }).y;
         }
     }
