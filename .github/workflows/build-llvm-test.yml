@@ -23,11 +23,10 @@ jobs:
             ;;
           windows*)
             choco install ninja
-            printf "CC=cl\nCXX=cl\n" >> "$GITHUB_ENV"
             ;;
           macos*) brew install ninja;;
         esac
-        # If we're on an old ubuntu, make sure that we set CC and CXX to GCC-10
+        mkdir -p build
     - uses: actions/checkout@v3
       with:
         submodules: 'true'
@@ -36,14 +35,12 @@ jobs:
       uses: hendrikmuhs/ccache-action@v1.2
       with:
         key: ${{github.job}}-${{matrix.os}}
+        variant: sccache
     - name: configure
-      shell: bash
-      run: |
-        mkdir -p build
-        cmake -S . -B build \
-          -G "Ninja Multi-Config" \
-          -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-          -DSLANG_USE_BINARY_SLANG_LLVM=0 -DSLANG_USE_SYSTEM_LLVM=0
+      run: >
+        cmake -S . -B build -G "Ninja Multi-Config"
+        -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+        -DSLANG_USE_BINARY_SLANG_LLVM=0 -DSLANG_USE_SYSTEM_LLVM=0
     - name: build
       shell: bash
       run: |
