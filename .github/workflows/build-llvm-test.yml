@@ -17,12 +17,17 @@ jobs:
       shell: bash
       run: |
         case "${{matrix.os}}" in
-          ubuntu*) sudo apt-get install -y ninja-build;;
+          ubuntu*)
+            sudo apt-get install -y ninja-build
+            printf "CC=gcc-10\nCXX=g++-10\n" >> "$GITHUB_ENV"
+            ;;
+          windows*)
+            choco install ninja
+            printf "CC=cl\nCXX=cl\n" >> "$GITHUB_ENV"
+            ;;
           macos*) brew install ninja;;
-          windows*) choco install ninja;;
         esac
         # If we're on an old ubuntu, make sure that we set CC and CXX to GCC-10
-        [ "${{matrix.os}}" != "ubuntu-20.04" ] || printf "CC=gcc-10\nCXX=g++-10\n" >> "$GITHUB_ENV"
     - uses: actions/checkout@v3
       with:
         submodules: 'true'
