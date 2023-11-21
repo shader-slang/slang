@@ -11867,16 +11867,6 @@ vector<uint, ND> __textureFootprintGetOffset<let ND:int>(__TextureFootprintData<
     }
 }
 
-struct __SpvTextureFootprintData<let ND:int>
-{
-   bool isSingleLevel;
-   vector<uint, ND> anchor;
-   vector<uint, ND> offset;
-   uint2 mask;
-   uint lod;
-   uint granularity;
-}
-
 __intrinsic_type($(kIROp_TextureFootprintType))
 struct __TextureFootprintData<let ND:int>
 {
