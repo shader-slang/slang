@@ -77,8 +77,22 @@ enum_option(SLANG_LLVM_FLAVOR ${slang_llvm_flavor_def}
     FETCH_BINARY "Use a binary distribution of the slang-llvm library instead of building or using LLVM (default for Windows)"
     USE_SYSTEM_LLVM "Build slang-llvm using system-provided LLVM and Clang binaries (default for non-Windows hosts)"
     BUILD_LLVM "Immediately fetch and build a LLVM distribution suitable for compiling a redistributable slang-llvm"
-    IGNORE "Do not build llvm or fetch slang-llvm"
+    DISABLE "Do not build llvm or fetch slang-llvm"
 )
+macro(slang_llvm_binary_url_option version filename)
+    set(SLANG_LLVM_BINARY_URL
+        "https://github.com/shader-slang/slang-llvm/releases/download/${version}/${filename}"
+        CACHE STRING
+        "URL specifying the location of the slang-llvm prebuilt library"
+    )
+endmacro()
+if(CMAKE_SYSTEM_NAME MATCHES "Windows")
+    slang_llvm_binary_url_option("v13.x-42" "slang-llvm-13.x-42-win64.zip")
+elseif(CMAKE_SYSTEM_NAME MATCHES "Darwin")
+    slang_llvm_binary_url_option("v13.x-42" "slang-llvm-v13.x-42-macosx-x86_64-release.zip")
+else()
+    slang_llvm_binary_url_option("v13.x-42" "slang-llvm-v13.x-42-linux-x86_64-release.zip")
+endif()
 
 #
 # Option validation
@@ -256,40 +270,53 @@ if(SLANG_LLVM_FLAVOR STREQUAL "FETCH_BINARY")
     # correct dependencies
     #
 
-    # Download the binary
-    # TODO: correct versioning and platform handling
-    fetchcontent_declare(
-        slang-llvm
-        URL
-            https://github.com/shader-slang/slang-llvm/releases/download/v13.x-42/slang-llvm-v13.x-42-linux-x86_64-release.zip
-    )
-    fetchcontent_populate(slang-llvm)
+    set(slang_llvm_filename "${CMAKE_SHARED_LIBRARY_PREFIX}slang-llvm${CMAKE_SHARED_LIBRARY_SUFFIX}")
+    macro(from_glob dir)
+        # A little helper function
+        file(GLOB_RECURSE slang_llvm_source_object "${dir}/${slang_llvm_filename}")
+        list(LENGTH slang_llvm_source_object nmatches)
+        if(nmatches EQUAL 0)
+            message(SEND_ERROR "Unable to find ${slang_llvm_filename} in ${SLANG_LLVM_BINARY_URL}")
+        elseif(nmatches GREATER 1)
+            message(SEND_ERROR "Found multiple files named ${slang_llvm_filename} in ${SLANG_LLVM_BINARY_URL}")
+        endif()
+    endmacro()
 
-    # Copy it to the lib/ directory
-    set(slang_llvm_source_object
-        "${slang-llvm_SOURCE_DIR}/bin/linux-x64/release/libslang-llvm.so"
-    )
-    set(slang_llvm_object ${CMAKE_BINARY_DIR}/$<CONFIG>/lib/libslang-llvm.so)
+    if(IS_DIRECTORY "${SLANG_LLVM_BINARY_URL}")
+        # Just glob directly from a local directory
+        from_glob("${SLANG_LLVM_BINARY_URL}")
+    elseif(SLANG_LLVM_BINARY_URL MATCHES "${CMAKE_SHARED_LIBRARY_PREFIX}.+${CMAKE_SHARED_LIBRARY_SUFFIX}$"
+        AND EXISTS "${SLANG_LLVM_BINARY_URL}")
+        # Otherwise, if it's a direct path to a shared object, use that
+        set(slang_llvm_source_object "${SLANG_LLVM_BINARY_URL}")
+    else()
+        # Otherwise, download and extract from whatever URL we have
+        fetchcontent_declare(slang-llvm URL "${SLANG_LLVM_BINARY_URL}")
+        fetchcontent_populate(slang-llvm)
+        from_glob("${slang-llvm_SOURCE_DIR}")
+    endif()
+
+    set(slang_llvm_dest_object ${CMAKE_BINARY_DIR}/$<CONFIG>/lib/${slang_llvm_filename})
     add_custom_command(
-        OUTPUT ${slang_llvm_object}
+        OUTPUT ${slang_llvm_dest_object}
         COMMAND
             ${CMAKE_COMMAND} -E copy_if_different ${slang_llvm_source_object}
-            ${slang_llvm_object}
+            ${slang_llvm_dest_object}
         DEPENDS ${slang_llvm_source_object}
         VERBATIM
     )
     # Give this copying action a name
-    add_custom_target(copy-slang-llvm DEPENDS ${slang_llvm_object})
+    add_custom_target(copy-slang-llvm DEPENDS ${slang_llvm_dest_object})
 
     # Put this into a library target
     add_library(slang-llvm MODULE IMPORTED GLOBAL)
     add_dependencies(slang-llvm copy-slang-llvm)
     set_property(
         TARGET slang-llvm
-        PROPERTY IMPORTED_LOCATION ${slang_llvm_object}
+        PROPERTY IMPORTED_LOCATION ${slang_llvm_dest_object}
     )
-    install(PROGRAMS ${slang_llvm_object} DESTINATION module_subdir)
-elseif(NOT SLANG_LLVM_FLAVOR STREQUAL "IGNORE")
+    install(PROGRAMS ${slang_llvm_dest_object} DESTINATION module_subdir)
+elseif(SLANG_LLVM_FLAVOR STREQUAL "USE_SYSTEM_LLVM" OR SLANG_LLVM_FLAVOR STREQUAL "BUILD_LLVM")
     llvm_target_from_components(llvm-dep filecheck native orcjit)
     clang_target_from_libs(
         clang-dep

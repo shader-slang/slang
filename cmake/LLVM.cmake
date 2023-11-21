@@ -71,7 +71,6 @@ macro(build_llvm)
         -DLLVM_ENABLE_PROJECTS=clang
         "-DLLVM_TARGETS_TO_BUILD=X86\\\;ARM\\\;AArch64"
         -DLLVM_BUILD_TOOLS=1
-        "-DCMAKE_CXX_FLAGS=-ffunction-sections -fdata-sections -Wl,--gc-sections"
     )
 
     #
