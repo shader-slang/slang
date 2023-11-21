@@ -30,6 +30,7 @@ include(Glob)
 include(LLVM)
 include(SlangTarget)
 include(AutoOption)
+include(Nested)
 
 #
 # Options
@@ -68,18 +69,17 @@ option(SLANG_EMBED_STDLIB "Build slang with an embedded version of the stdlib")
 option(SLANG_ENABLE_FULL_IR_VALIDATION "Enable full IR validation (SLOW!)")
 option(SLANG_ENABLE_ASAN "Enable ASAN (address sanitizer)")
 
-option(
-    SLANG_USE_BINARY_SLANG_LLVM
-    "Use a binary distribution of the slang-llvm library instead of building or using LLVM"
-)
-# If we're not using a binary slang-llvm distribution, add an option for
-# building with the system's LLVM
-cmake_dependent_option(
-    SLANG_USE_SYSTEM_LLVM
-    "Use a system-provided LLVM and Clang distribution"
-    ON
-    "NOT SLANG_USE_BINARY_SLANG_LLVM"
-    OFF
+if (CMAKE_SYSTEM_NAME MATCHES "Windows")
+    set(slang_llvm_flavor_def FETCH_BINARY)
+else()
+    set(slang_llvm_flavor_def USE_SYSTEM_LLVM)
+endif()
+enum_option(SLANG_LLVM_FLAVOR ${slang_llvm_flavor_def}
+    "How to get or build slang-llvm:"
+    FETCH_BINARY "Use a binary distribution of the slang-llvm library instead of building or using LLVM (default for Windows)"
+    USE_SYSTEM_LLVM "Build slang-llvm using system-provided LLVM and Clang binaries (default for non-Windows hosts)"
+    BUILD_LLVM "Immediately fetch and build a LLVM distribution suitable for compiling a redistributable slang-llvm"
+    IGNORE "Do not build llvm or fetch slang-llvm"
 )
 
 #
@@ -107,8 +107,11 @@ endif()
 
 find_package(Threads REQUIRED)
 
-if(NOT SLANG_USE_BINARY_SLANG_LLVM)
-    find_llvm()
+if(SLANG_LLVM_FLAVOR STREQUAL "BUILD_LLVM")
+    build_llvm()
+elseif(SLANG_LLVM_FLAVOR STREQUAL "USE_SYSTEM_LLVM")
+    find_package(LLVM 13.0 REQUIRED CONFIG)
+    find_package(Clang REQUIRED CONFIG)
 endif()
 
 add_subdirectory(external)
@@ -249,7 +252,7 @@ slang_add_target(
     INSTALL
 )
 
-if(SLANG_USE_BINARY_SLANG_LLVM)
+if(SLANG_LLVM_FLAVOR STREQUAL "FETCH_BINARY")
     #
     # Do some stupid little dance to put everything in the right shape with
     # correct dependencies
@@ -280,7 +283,7 @@ if(SLANG_USE_BINARY_SLANG_LLVM)
     # Give this copying action a name
     add_custom_target(copy-slang-llvm DEPENDS ${slang_llvm_object})
 
-    # Put this into a library
+    # Put this into a library target
     add_library(slang-llvm MODULE IMPORTED GLOBAL)
     add_dependencies(slang-llvm copy-slang-llvm)
     set_property(
@@ -288,7 +291,7 @@ if(SLANG_USE_BINARY_SLANG_LLVM)
         PROPERTY IMPORTED_LOCATION ${slang_llvm_object}
     )
     install(PROGRAMS ${slang_llvm_object} DESTINATION module_subdir)
-else()
+elseif(NOT SLANG_LLVM_FLAVOR STREQUAL "IGNORE")
     llvm_target_from_components(llvm-dep filecheck native orcjit)
     clang_target_from_libs(
         clang-dep
@@ -396,13 +399,19 @@ slang_add_target(
         render-test
         slang-unit-test
         gfx-unit-test
-        slang-llvm
         slang-glslang
         # Used by some tests when they run
         slangd
         slang-rt
         gfx
 )
+if(TARGET slang-llvm)
+    # Only add a dependency here if slang-llvm exists
+    # Pending https://gitlab.kitware.com/cmake/cmake/-/issues/19467 to be able
+    # to use a generator expression in REQUIRES just above.
+    add_dependencies(slang-test slang-llvm)
+endif()
+
 slang_add_target(
     tools/test-server
     EXECUTABLE

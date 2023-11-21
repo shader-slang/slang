@@ -42,7 +42,7 @@ jobs:
       run: >
         cmake -S . -B build -G "Ninja Multi-Config"
         -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
-        -DSLANG_USE_BINARY_SLANG_LLVM=0 -DSLANG_USE_SYSTEM_LLVM=0
+        -DSLANG_LLVM_FLAVOR=BUILD_LLVM
     - name: build
       shell: bash
       run: |
