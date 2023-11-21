@@ -1,7 +1,10 @@
 # Miniz
-set(MINIZ_STANDALONE_PROJECT OFF)
-set(AMALGAMATE_SOURCES ON)
 add_subdirectory(miniz EXCLUDE_FROM_ALL)
+# Work around https://github.com/richgel999/miniz/pull/292
+get_target_property(miniz_c_launcher miniz C_COMPILER_LAUNCHER)
+if(miniz_c_launcher MATCHES "sccache")
+  set_property(TARGET miniz PROPERTY C_COMPILER_LAUNCHER)
+endif()
 
 # LZ4
 set(LZ4_BUNDLED_MODE ON)
