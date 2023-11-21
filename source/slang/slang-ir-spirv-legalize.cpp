@@ -41,6 +41,55 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     };
     Dictionary<IRType*, LoweredStructuredBufferTypeInfo> m_loweredStructuredBufferTypes;
 
+    IRInst* lowerTextureFootprintType(IRInst* footprintType)
+    {
+        // Lowers `IRTextureFootprintType` to a struct with the following definition:
+        /*
+            ```
+            struct __SpvTextureFootprintData<let ND : int>
+            {
+                bool isSingleLevel;
+                vector<uint, ND> anchor;
+                vector<uint, ND> offset;
+                uint2 mask;
+                uint lod;
+                uint granularity;
+            }
+            ```
+        */
+
+        auto ND = footprintType->getOperand(0);
+
+        IRBuilder builder(footprintType);
+        builder.setInsertBefore(footprintType);
+        auto structType = builder.createStructType();
+        auto isSingleLevel = builder.createStructKey();
+        builder.addNameHintDecoration(isSingleLevel, UnownedStringSlice("isSingleLevel"));
+        builder.createStructField(structType, isSingleLevel, builder.getBoolType());
+
+        auto anchor = builder.createStructKey();
+        builder.addNameHintDecoration(anchor, UnownedStringSlice("anchor"));
+        builder.createStructField(structType, anchor, builder.getVectorType(builder.getUIntType(), ND));
+
+        auto offset = builder.createStructKey();
+        builder.addNameHintDecoration(offset, UnownedStringSlice("offset"));
+        builder.createStructField(structType, offset, builder.getVectorType(builder.getUIntType(), ND));
+
+        auto mask = builder.createStructKey();
+        builder.addNameHintDecoration(mask, UnownedStringSlice("mask"));
+        builder.createStructField(structType, mask, builder.getVectorType(builder.getUIntType(), builder.getIntValue(builder.getIntType(), 2)));
+
+        auto lod = builder.createStructKey();
+        builder.addNameHintDecoration(lod, UnownedStringSlice("lod"));
+        builder.createStructField(structType, lod, builder.getUIntType());
+
+        auto granularity = builder.createStructKey();
+        builder.addNameHintDecoration(granularity, UnownedStringSlice("granularity"));
+        builder.createStructField(structType, granularity, builder.getUIntType());
+
+        return structType;
+    }
+
     LoweredStructuredBufferTypeInfo lowerStructuredBufferType(IRHLSLStructuredBufferTypeBase* inst)
     {
         LoweredStructuredBufferTypeInfo result;
@@ -1547,11 +1596,17 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
         // Translate types.
         List<IRHLSLStructuredBufferTypeBase*> instsToProcess;
+        List<IRInst*> textureFootprintTypes;
+
         for (auto globalInst : m_module->getGlobalInsts())
         {
             if (auto t = as<IRHLSLStructuredBufferTypeBase>(globalInst))
             {
                 instsToProcess.add(t);
+            }
+            else if (globalInst->getOp() == kIROp_TextureFootprintType)
+            {
+                textureFootprintTypes.add(globalInst);
             }
         }
         for (auto t : instsToProcess)
@@ -1560,6 +1615,13 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             IRBuilder builder(t);
             builder.setInsertBefore(t);
             t->replaceUsesWith(builder.getPtrType(kIROp_PtrType, lowered.structType, SpvStorageClassStorageBuffer));
+        }
+        for (auto t : textureFootprintTypes)
+        {
+            auto lowered = lowerTextureFootprintType(t);
+            IRBuilder builder(t);
+            builder.setInsertBefore(t);
+            t->replaceUsesWith(lowered);
         }
 
         List<IRUse*> globalInstUsesToInline;

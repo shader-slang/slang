@@ -4394,6 +4394,8 @@ namespace Slang
         Token closingBraceToken;
         while (!AdvanceIfMatch(parser, MatchedTokenType::CurlyBraces, &closingBraceToken))
         {
+            ScopeDecl* scopeDecl = parser->astBuilder->create<ScopeDecl>();
+            parser->pushScopeAndSetParent(scopeDecl);
             List<Token> caseNames;
             for (;;)
             {
@@ -4469,6 +4471,7 @@ namespace Slang
             }
         recover:;
             TryRecover(parser);
+            parser->PopScope();
         }
         return stmt;
     }

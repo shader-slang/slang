@@ -2347,6 +2347,18 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             m_writer->emit("hitObjectNV");
             return;
         }
+        case kIROp_TextureFootprintType:
+        {
+            m_glslExtensionTracker->requireExtension(UnownedStringSlice("GL_NV_shader_texture_footprint"));
+            m_glslExtensionTracker->requireVersion(ProfileVersion::GLSL_450);
+
+            m_writer->emit("gl_TextureFootprint");
+            auto intLit = as<IRIntLit>(type->getOperand(0));
+            if (intLit)
+                m_writer->emit(intLit->getValue());
+            m_writer->emit("DNV");
+            return;
+        }
         default: break;
     }
 

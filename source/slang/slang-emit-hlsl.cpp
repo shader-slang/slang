@@ -937,6 +937,11 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             m_writer->emit("NvHitObject");
             return;
         }
+        case kIROp_TextureFootprintType:
+        {
+            m_writer->emit("uint4");
+            return;
+        }
         default: break;
     }
 
