@@ -1,5 +1,6 @@
 # Miniz
 set(MINIZ_STANDALONE_PROJECT OFF)
+set(AMALGAMATE_SOURCES ON)
 add_subdirectory(miniz EXCLUDE_FROM_ALL)
 
 # LZ4
