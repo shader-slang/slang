@@ -12,11 +12,9 @@ set(CMAKE_BUILD_RPATH_USE_ORIGIN TRUE)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
 # Squash CMake dev warnings
-if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.24.0")
-    cmake_policy(SET CMP0135 NEW)
-    cmake_policy(SET CMP0077 NEW)
-    set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
-endif()
+cmake_policy(SET CMP0135 NEW)
+cmake_policy(SET CMP0077 NEW)
+set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 
 #
 # CMake-supplied modules and our utils
@@ -69,7 +67,7 @@ option(SLANG_EMBED_STDLIB "Build slang with an embedded version of the stdlib")
 option(SLANG_ENABLE_FULL_IR_VALIDATION "Enable full IR validation (SLOW!)")
 option(SLANG_ENABLE_ASAN "Enable ASAN (address sanitizer)")
 
-if (CMAKE_SYSTEM_NAME MATCHES "Windows")
+if(CMAKE_SYSTEM_NAME MATCHES "Windows")
     set(slang_llvm_flavor_def FETCH_BINARY)
 else()
     set(slang_llvm_flavor_def USE_SYSTEM_LLVM)
