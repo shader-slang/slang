@@ -69,7 +69,7 @@
   ],
   "packagePresets": [
     {
-      "name": "tarball",
+      "name": "release",
       "configurePreset": "default",
       "configurations": [
         "Release"
@@ -80,6 +80,27 @@
     }
   ],
   "workflowPresets": [
+    {
+      "name": "debug-dist",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "default"
+        },
+        {
+          "type": "build",
+          "name": "debug"
+        },
+        {
+          "type": "test",
+          "name": "debug"
+        },
+        {
+          "type": "package",
+          "name": "release"
+        }
+      ]
+    },
     {
       "name": "release-dist",
       "steps": [
@@ -97,7 +118,7 @@
         },
         {
           "type": "package",
-          "name": "tarball"
+          "name": "release"
         }
       ]
     }
