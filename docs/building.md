@@ -1,6 +1,24 @@
 # Building Slang From Source
 
-## Get the Source Code 
+## Prerequisites:
+
+Please install:
+
+- CMake
+- A C++ compiler with support for C++17. GCC, Clang and MSVC are supported
+- A CMake compatible backed, for example Visual Studio, Ninja or GNU Make
+
+Dependencies used for tests and examples are enabled if their requirements are
+detected at configure time. One can force them to be enabled (or disabled) by
+setting the options specified below.
+
+- CUDA, `-DSLANG_ENABLE_CUDA=1`
+- OptiX, `-DSLANG_ENABLE_OPTIX=1`
+- NVAPI, `-DSLANG_ENABLE_NVAPI=1`
+- Aftermath, `-DSLANG_ENABLE_NVAPI=1`
+- X11, `-DSLANG_ENABLE_XLIB=1`
+
+## Get the Source Code
 
 Clone [this](https://github.com/shader-slang/slang) repository, and then run:
 
@@ -8,7 +26,32 @@ Clone [this](https://github.com/shader-slang/slang) repository, and then run:
 % git submodule update --init
 ```
 
-The submodule update step is required to pull in dependencies used for testing infrastructure as well as the `glslang` compiler that we currently use for generating SPIR-V. 
+The submodule update step is required to pull in dependencies used for testing
+infrastructure as well as the `glslang` compiler that we currently use for
+generating SPIR-V.
+
+## LLVM Support
+
+There are several options for getting llvm-support:
+
+- Use a prebuilt binary slang-llvm library: `-DSLANG_SLANG_LLVM_FLAVOR=FETCH_BINARY`,
+  this is the default
+    - You can set `SLANG_SLANG_LLVM_BINARY_URL` to point to a local
+      `libslang-llvm.so/slang-llvm.dll` or set it to a URL of an zip/archive
+      containing such a file
+- Use a system supplied LLVM: `-DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM`, you
+  must have llvm-13.0 and a matching libclang installed.
+- Have the Slang build system build LLVM: `-DSLANG_SLANG_LLVM_FLAVOR=BUILD_LLVM`,
+  this will build a LLVM binaries at configure time and use that. This is only
+  intended to be used as part of the process of generating the portable binary
+  slang-llvm library. This always builds a `Release` LLVM, so is unsuitable to
+  use when building a `Debug` `slang-llvm` on Windows as the runtime libraries
+  are incompatible
+- Do not enable LLVM support: `-DSLANG_SLANG_LLVM_FLAVOR=DISABLE`
+
+# Building Slang with Premake
+
+The following instruction are deprecated, and Premake support will eventually be removed.
 
 ## Windows Using Visual Studio
 
