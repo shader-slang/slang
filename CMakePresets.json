@@ -1,0 +1,83 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 20,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "default",
+      "description": "Default build using Ninja Multi-Config generator",
+      "generator": "Ninja Multi-Config",
+      "binaryDir": "${sourceDir}/build"
+    },
+    {
+      "name": "msvc-base",
+      "hidden": true,
+      "inherits": "default",
+      "description": "Options specific for MSVC",
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "cl",
+        "CMAKE_CXX_COMPILER": "cl",
+        "CMAKE_C_FLAGS_INIT": "-D_ITERATOR_DEBUG_LEVEL=0",
+        "CMAKE_CXX_FLAGS_INIT": "-D_ITERATOR_DEBUG_LEVEL=0"
+      }
+    },
+    {
+      "name": "vs2022",
+      "inherits": "msvc-base",
+      "description": "Visual Studio 2022 project",
+      "generator": "Visual Studio 17 2022"
+    },
+    {
+      "name": "vs2019",
+      "inherits": "msvc-base",
+      "description": "Visual Studio 2019 project",
+      "generator": "Visual Studio 16 2019"
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "debug",
+      "configurePreset": "default",
+      "configuration": "Debug"
+    },
+    {
+      "name": "release",
+      "configurePreset": "default",
+      "configuration": "Release"
+    }
+  ],
+  "packagePresets": [
+    {
+      "name": "tarball",
+      "configurePreset": "default",
+      "configurations": [
+        "Release"
+      ],
+      "generators": [
+        "ZIP"
+      ]
+    }
+  ],
+  "workflowPresets": [
+    {
+      "name": "release-dist",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "default"
+        },
+        {
+          "type": "build",
+          "name": "release"
+        },
+        {
+          "type": "package",
+          "name": "tarball"
+        }
+      ]
+    }
+  ]
+}
