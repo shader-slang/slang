@@ -575,3 +575,5 @@ example(examples/triangle WIN32_EXECUTABLE)
 if(SLANG_ENABLE_AFTERMATH)
     example(examples/nv-aftermath-example WIN32_EXECUTABLE)
 endif()
+
+include(CPack)
