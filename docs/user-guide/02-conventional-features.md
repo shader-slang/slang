@@ -383,7 +383,7 @@ Global Variables and Shader Parameters
 --------------------------------------
 
 By default, global-scope variable declarations in Slang represent _shader parameters_ passed from host application code into GPU code.
-Programmers must explicitly mark a global-scope variable with `static` for it to be treated as a shader parameter, even if the variable is marked `const`:
+Programmers must explicitly mark a global-scope variable with `static` for it not to be treated as a shader parameter, even if the variable is marked `const`:
 
 ```hlsl
 // a shader parameter:
