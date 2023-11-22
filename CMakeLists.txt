@@ -141,7 +141,7 @@ slang_add_target(
     STATIC
     EXCLUDE_FROM_ALL
     USE_EXTRA_WARNINGS
-    LINK_WITH_PRIVATE miniz lz4_static
+    LINK_WITH_PRIVATE miniz lz4_static Threads::Threads ${CMAKE_DL_LIBS}
     INCLUDE_DIRECTORIES_PUBLIC source
 )
 
@@ -151,7 +151,7 @@ slang_add_target(
     # This compiles 'core' again with the SLANG_RT_DYNAMIC_EXPORT macro defined
     EXTRA_SOURCE_DIRS source/core
     USE_EXTRA_WARNINGS
-    LINK_WITH_PRIVATE miniz lz4_static Threads::Threads
+    LINK_WITH_PRIVATE miniz lz4_static Threads::Threads ${CMAKE_DL_LIBS}
     EXPORT_MACRO_PREFIX SLANG_RT
     INSTALL
 )
@@ -246,7 +246,7 @@ add_subdirectory(source/slang)
 slang_add_target(
     tools/slangd
     EXECUTABLE
-    LINK_WITH_PRIVATE core slang slang-reflect-headers
+    LINK_WITH_PRIVATE core slang slang-reflect-headers Threads::Threads
     INSTALL
 )
 slang_add_target(
@@ -496,7 +496,7 @@ slang_add_target(
     EXCLUDE_FROM_ALL
     EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_SHARED_LIBRARY_TOOL
     USE_FEWER_WARNINGS
-    LINK_WITH_PRIVATE core slang
+    LINK_WITH_PRIVATE core slang Threads::Threads
     OUTPUT_NAME slang-reflection-test-tool
 )
 slang_add_target(
