@@ -1,6 +1,12 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(slang VERSION 2023.4.0 LANGUAGES C CXX)
+# Our module dir, include that now so that we can get the version automatically
+# from git describe
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
+include(GitVersion)
+get_git_version(SLANG_VERSION "${CMAKE_CURRENT_LIST_DIR}")
+
+project(slang VERSION "${SLANG_VERSION}" LANGUAGES C CXX)
 
 #
 # Global CMake options, generally to be avoided
@@ -8,8 +14,6 @@ project(slang VERSION 2023.4.0 LANGUAGES C CXX)
 
 # Don't use absolute paths to the build tree in RPATH
 set(CMAKE_BUILD_RPATH_USE_ORIGIN TRUE)
-# Our module dir
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
 # Squash CMake dev warnings
 cmake_policy(SET CMP0135 NEW)
