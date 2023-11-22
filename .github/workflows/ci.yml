@@ -12,10 +12,12 @@ jobs:
       matrix:
         os: [ubuntu-20.04, macos-latest, windows-latest]
         configuration: ['Debug', 'Release']
-        compiler: ['clang', 'gcc']
+        compiler: ['cl', 'clang', 'gcc']
         platform: ['x64']
-        include:
-          - os: windows-latest
+        exclude:
+          - os: macos-latest
+            compiler: cl
+          - os: ubuntu-20.04
             compiler: cl
       fail-fast: false
     runs-on: ${{ matrix.os }}
