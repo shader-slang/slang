@@ -40,7 +40,15 @@ There are several options for getting llvm-support:
       `libslang-llvm.so/slang-llvm.dll` or set it to a URL of an zip/archive
       containing such a file
 - Use a system supplied LLVM: `-DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM`, you
-  must have llvm-13.0 and a matching libclang installed.
+  must have llvm-13.0 and a matching libclang installed. It's important that
+  either:
+    - You don't end up linking to a dynamic libllvm.so, this will almost
+      certainly cause multiple versions of LLVM to be loaded at runtime,
+      leading to errors like `opt: CommandLine Error: Option
+      'asm-macro-max-nesting-depth' registered more than once!`. Avoid this by
+      compiling LLVM without the dynamic library.
+    - Anything else which may be linked in (for example Mesa, also dynamically
+      loads the same llvm object)
 - Have the Slang build system build LLVM: `-DSLANG_SLANG_LLVM_FLAVOR=BUILD_LLVM`,
   this will build a LLVM binaries at configure time and use that. This is only
   intended to be used as part of the process of generating the portable binary
