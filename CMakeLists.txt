@@ -76,7 +76,7 @@ if(CMAKE_SYSTEM_NAME MATCHES "Windows")
 else()
     set(slang_llvm_flavor_def USE_SYSTEM_LLVM)
 endif()
-enum_option(SLANG_LLVM_FLAVOR ${slang_llvm_flavor_def}
+enum_option(SLANG_SLANG_LLVM_FLAVOR ${slang_llvm_flavor_def}
     "How to get or build slang-llvm:"
     FETCH_BINARY "Use a binary distribution of the slang-llvm library instead of building or using LLVM (default for Windows)"
     USE_SYSTEM_LLVM "Build slang-llvm using system-provided LLVM and Clang binaries (default for non-Windows hosts)"
@@ -84,7 +84,7 @@ enum_option(SLANG_LLVM_FLAVOR ${slang_llvm_flavor_def}
     DISABLE "Do not build llvm or fetch slang-llvm"
 )
 macro(slang_llvm_binary_url_option version filename)
-    set(SLANG_LLVM_BINARY_URL
+    set(SLANG_SLANG_LLVM_BINARY_URL
         "https://github.com/shader-slang/slang-llvm/releases/download/${version}/${filename}"
         CACHE STRING
         "URL specifying the location of the slang-llvm prebuilt library"
@@ -123,9 +123,9 @@ endif()
 
 find_package(Threads REQUIRED)
 
-if(SLANG_LLVM_FLAVOR STREQUAL "BUILD_LLVM")
+if(SLANG_SLANG_LLVM_FLAVOR STREQUAL "BUILD_LLVM")
     build_llvm()
-elseif(SLANG_LLVM_FLAVOR STREQUAL "USE_SYSTEM_LLVM")
+elseif(SLANG_SLANG_LLVM_FLAVOR STREQUAL "USE_SYSTEM_LLVM")
     find_package(LLVM 13.0 REQUIRED CONFIG)
     find_package(Clang REQUIRED CONFIG)
 endif()
@@ -268,7 +268,7 @@ slang_add_target(
     INSTALL
 )
 
-if(SLANG_LLVM_FLAVOR STREQUAL "FETCH_BINARY")
+if(SLANG_SLANG_LLVM_FLAVOR STREQUAL "FETCH_BINARY")
     #
     # Do some stupid little dance to put everything in the right shape with
     # correct dependencies
@@ -280,22 +280,22 @@ if(SLANG_LLVM_FLAVOR STREQUAL "FETCH_BINARY")
         file(GLOB_RECURSE slang_llvm_source_object "${dir}/${slang_llvm_filename}")
         list(LENGTH slang_llvm_source_object nmatches)
         if(nmatches EQUAL 0)
-            message(SEND_ERROR "Unable to find ${slang_llvm_filename} in ${SLANG_LLVM_BINARY_URL}")
+            message(SEND_ERROR "Unable to find ${slang_llvm_filename} in ${SLANG_SLANG_LLVM_BINARY_URL}")
         elseif(nmatches GREATER 1)
-            message(SEND_ERROR "Found multiple files named ${slang_llvm_filename} in ${SLANG_LLVM_BINARY_URL}")
+            message(SEND_ERROR "Found multiple files named ${slang_llvm_filename} in ${SLANG_SLANG_LLVM_BINARY_URL}")
         endif()
     endmacro()
 
-    if(IS_DIRECTORY "${SLANG_LLVM_BINARY_URL}")
+    if(IS_DIRECTORY "${SLANG_SLANG_LLVM_BINARY_URL}")
         # Just glob directly from a local directory
-        from_glob("${SLANG_LLVM_BINARY_URL}")
-    elseif(SLANG_LLVM_BINARY_URL MATCHES "${CMAKE_SHARED_LIBRARY_PREFIX}.+${CMAKE_SHARED_LIBRARY_SUFFIX}$"
-        AND EXISTS "${SLANG_LLVM_BINARY_URL}")
+        from_glob("${SLANG_SLANG_LLVM_BINARY_URL}")
+    elseif(SLANG_SLANG_LLVM_BINARY_URL MATCHES "${CMAKE_SHARED_LIBRARY_PREFIX}.+${CMAKE_SHARED_LIBRARY_SUFFIX}$"
+        AND EXISTS "${SLANG_SLANG_LLVM_BINARY_URL}")
         # Otherwise, if it's a direct path to a shared object, use that
-        set(slang_llvm_source_object "${SLANG_LLVM_BINARY_URL}")
+        set(slang_llvm_source_object "${SLANG_SLANG_LLVM_BINARY_URL}")
     else()
         # Otherwise, download and extract from whatever URL we have
-        fetchcontent_declare(slang-llvm URL "${SLANG_LLVM_BINARY_URL}")
+        fetchcontent_declare(slang-llvm URL "${SLANG_SLANG_LLVM_BINARY_URL}")
         fetchcontent_populate(slang-llvm)
         from_glob("${slang-llvm_SOURCE_DIR}")
     endif()
@@ -320,7 +320,7 @@ if(SLANG_LLVM_FLAVOR STREQUAL "FETCH_BINARY")
         PROPERTY IMPORTED_LOCATION ${slang_llvm_dest_object}
     )
     install(PROGRAMS ${slang_llvm_dest_object} DESTINATION module_subdir)
-elseif(SLANG_LLVM_FLAVOR STREQUAL "USE_SYSTEM_LLVM" OR SLANG_LLVM_FLAVOR STREQUAL "BUILD_LLVM")
+elseif(SLANG_SLANG_LLVM_FLAVOR STREQUAL "USE_SYSTEM_LLVM" OR SLANG_SLANG_LLVM_FLAVOR STREQUAL "BUILD_LLVM")
     llvm_target_from_components(llvm-dep filecheck native orcjit)
     clang_target_from_libs(
         clang-dep
