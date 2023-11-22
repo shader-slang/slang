@@ -160,8 +160,6 @@ function(set_default_compile_options target)
             WIN32_LEAN_AND_MEAN
             VC_EXTRALEAN
             NOMINMAX
-            # Disable slow stdlib debug functionality for MSVC
-            _ITERATOR_DEBUG_LEVEL=0
             # Use multi-byte character set on Windows
             UNICODE
             _UNICODE
