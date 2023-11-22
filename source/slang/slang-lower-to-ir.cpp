@@ -4561,7 +4561,9 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     {
         if( auto declaredSubtypeWitness = as<DeclaredSubtypeWitness>(subTypeWitness) )
         {
-            return extractField(superType, value, declaredSubtypeWitness->getDeclRef());
+            // Drop the specialization info on inheritance decl struct keys, as it makes no
+            // sense to specialize a key.
+            return extractField(superType, value, declaredSubtypeWitness->getDeclRef().getDecl());
         }
         else
         {

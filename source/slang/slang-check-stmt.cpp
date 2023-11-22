@@ -267,9 +267,14 @@ namespace Slang
     void SemanticsStmtVisitor::visitTargetSwitchStmt(TargetSwitchStmt* stmt)
     {
         WithOuterStmt subContext(this, stmt);
-
+        HashSet<Stmt*> checkedStmt;
         for (auto caseStmt : stmt->targetCases)
+        {
+            if (checkedStmt.contains(caseStmt->body))
+                continue;
             subContext.checkStmt(caseStmt);
+            checkedStmt.add(caseStmt->body);
+        }
     }
 
     void SemanticsStmtVisitor::visitTargetCaseStmt(TargetCaseStmt* stmt)

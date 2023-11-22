@@ -818,8 +818,28 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
                 if (vectorSize <= 4)
                     m_writer->emitChar(swizzleNames[vectorSize - 1]);
             }
+            break;
         }
-        break;
+        case '!':
+        {
+            // Emit a literal directly without any prefix/postfix/casts.
+            Index argIndex = parseNat() + m_argIndexOffset;
+            SLANG_RELEASE_ASSERT((0 <= argIndex) && (argIndex < m_argCount));
+            auto arg = m_args[argIndex];
+            if (auto intLit = as<IRIntLit>(arg.get()))
+            {
+                m_writer->emitInt64(intLit->getValue());
+            }
+            else if (auto stringLit = as<IRStringLit>(arg.get()))
+            {
+                m_writer->emit(stringLit->getStringSlice());
+            }
+            else
+            {
+                SLANG_UNEXPECTED("unexpected literal argument in intrinsic call.");
+            }
+            break;
+        }
 
         default:
             SLANG_UNEXPECTED("bad format in intrinsic definition");

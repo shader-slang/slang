@@ -133,6 +133,8 @@ INST(Nop, nop, 0, 0)
         INST(SamplerComparisonStateType, SamplerComparisonState, 0, HOISTABLE)
     INST_RANGE(SamplerStateTypeBase, SamplerStateType, SamplerComparisonStateType)
 
+    INST(TextureFootprintType, TextureFootprintType, 1, HOISTABLE)
+
     INST(TextureShape1DType, TextureShape1DType, 0, HOISTABLE)
     INST(TextureShape2DType, TextureShape1DType, 0, HOISTABLE)
     INST(TextureShape3DType, TextureShape1DType, 0, HOISTABLE)
