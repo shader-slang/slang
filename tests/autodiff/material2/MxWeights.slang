@@ -1,18 +1,18 @@
 //TEST_IGNORE_FILE:
 
-struct MxWeights<let TBsdfCount : int>
+public struct MxWeights<let TBsdfCount : int>
 {
-    float3 weights[TBsdfCount];
+    public float3 weights[TBsdfCount];
 }
 
-interface IMxLayeredMaterialData
+public interface IMxLayeredMaterialData
 {
-    int getBsdfCount();
-    int getLayerCount();
+    public int getBsdfCount();
+    public int getLayerCount();
 }
 
-interface IMxLayeredWeightCalculator
+public interface IMxLayeredWeightCalculator
 {
-    void calculateWeights<let TBsdfCount : int, let TLayerCount: int, TLayeredMaterialData : IMxLayeredMaterialData>(
+    public void calculateWeights<let TBsdfCount : int, let TLayerCount: int, TLayeredMaterialData : IMxLayeredMaterialData>(
         const TLayeredMaterialData data, out MxWeights<TBsdfCount> weights);
 }

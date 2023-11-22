@@ -26,25 +26,23 @@ void main()
 {
     ivec2 pos_0 = ivec2(gl_GlobalInvocationID.xy);
 
-    int _S2 = pos_0.y;
+    int _S1 = pos_0.y;
 
-    int _S3 = pos_0.x;
+    int _S2 = pos_0.x;
 
-    uvec2 _S4 = uvec2(ivec2(3 - _S2, 3 - _S3));
+    ivec2 _S3 = ivec2(uvec2(ivec2(3 - _S1, 3 - _S2)));
 
-    float16_t h_0 = (float16_t(imageLoad((halfTexture_0), ivec2((_S4))).x));
-    f16vec2 h2_0 = (f16vec2(imageLoad((halfTexture2_0), ivec2((_S4))).xy));
-    f16vec4 h4_0 = (f16vec4(imageLoad((halfTexture4_0), ivec2((_S4)))));
+    float16_t _S4 = (float16_t(imageLoad((halfTexture_0), (_S3)).x));
+    f16vec2 _S5 = (f16vec2(imageLoad((halfTexture2_0), (_S3)).xy));
+    f16vec4 _S6 = (f16vec4(imageLoad((halfTexture4_0), (_S3))));
 
+    ivec2 _S7 = ivec2(uvec2(pos_0));
 
+    imageStore((halfTexture_0), (_S7), f16vec4(_S5.x + _S5.y, float16_t(0), float16_t(0), float16_t(0)));
+    imageStore((halfTexture2_0), (_S7), f16vec4(_S6.xy, float16_t(0), float16_t(0)));
+    imageStore((halfTexture4_0), (_S7), f16vec4(_S5, _S4, _S4));
 
-    uvec2 _S5 = uvec2(pos_0);
-
-    imageStore((halfTexture_0), ivec2((_S5)), f16vec4(h2_0.x + h2_0.y, float16_t(0), float16_t(0), float16_t(0)));
-    imageStore((halfTexture2_0), ivec2((_S5)), f16vec4(h4_0.xy, float16_t(0), float16_t(0)));
-    imageStore((halfTexture4_0), ivec2((_S5)), f16vec4(h2_0, h_0, h_0));
-
-    int index_0 = _S3 + _S2 * 4;
-    ((outputBuffer_0)._data[(uint(index_0))]) = index_0;
+    int index_0 = _S2 + _S1 * 4;
+    outputBuffer_0._data[uint(index_0)] = index_0;
     return;
 }

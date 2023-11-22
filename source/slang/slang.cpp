@@ -1655,6 +1655,74 @@ SourceManager* TranslationUnitRequest::getSourceManager()
     return compileRequest->getSourceManager();
 }
 
+Scope* TranslationUnitRequest::getLanguageScope()
+{
+    Scope* languageScope = nullptr;
+    switch (sourceLanguage)
+    {
+    case SourceLanguage::HLSL:
+        languageScope = getSession()->hlslLanguageScope;
+        break;
+
+    case SourceLanguage::Slang:
+    default:
+        languageScope = getSession()->slangLanguageScope;
+        break;
+    }
+    return languageScope;
+}
+
+Dictionary<String, String> TranslationUnitRequest::getCombinedPreprocessorDefinitions()
+{
+    // TODO(JS):
+    // Note! that a adding a define twice will cause an exception in debug builds
+    // that may be desirable or not...
+    Dictionary<String, String> combinedPreprocessorDefinitions;
+    for (const auto& def : compileRequest->getLinkage()->preprocessorDefinitions)
+        combinedPreprocessorDefinitions.add(def);
+    for (const auto& def : compileRequest->preprocessorDefinitions)
+        combinedPreprocessorDefinitions.add(def);
+    for (const auto& def : preprocessorDefinitions)
+        combinedPreprocessorDefinitions.add(def);
+
+    // Define standard macros, if not already defined. This style assumes using `#if __SOME_VAR` style, as in
+    //
+    // ```
+    // #if __SLANG_COMPILER__
+    // ```
+    //
+    // This choice is made because slang outputs a warning on using a variable in an #if if not defined
+    //
+    // Of course this means using #ifndef/#ifdef/defined() is probably not appropraite with thes variables.
+    {
+        // Used to identify level of HLSL language compatibility
+        combinedPreprocessorDefinitions.addIfNotExists("__HLSL_VERSION", "2020");
+
+        // Indicates this is being compiled by the slang *compiler*
+        combinedPreprocessorDefinitions.addIfNotExists("__SLANG_COMPILER__", "1");
+
+        // Set macro depending on source type
+        switch (sourceLanguage)
+        {
+        case SourceLanguage::HLSL:
+            // Used to indicate compiled as HLSL language
+            combinedPreprocessorDefinitions.addIfNotExists("__HLSL__", "1");
+            break;
+        case SourceLanguage::Slang:
+            // Used to indicate compiled as Slang language
+            combinedPreprocessorDefinitions.addIfNotExists("__SLANG__", "1");
+            break;
+        default: break;
+        }
+
+        // If not set, define as 0.
+        combinedPreprocessorDefinitions.addIfNotExists("__HLSL__", "0");
+        combinedPreprocessorDefinitions.addIfNotExists("__SLANG__", "0");
+    }
+
+    return combinedPreprocessorDefinitions;
+}
+
 void TranslationUnitRequest::addSourceArtifact(IArtifact* sourceArtifact)
 {
     SLANG_ASSERT(sourceArtifact);
@@ -1762,7 +1830,11 @@ SlangResult TranslationUnitRequest::requireSourceFiles()
             // Create a new source file, using the pathInfo and blob
             sourceFile = sourceManager->createSourceFileWithBlob(pathInfo, blob);
         }
-  
+
+        auto uniqueIdentity = pathInfo.getMostUniqueIdentity();
+        if (uniqueIdentity.getLength())
+            sourceManager->addSourceFileIfNotExist(uniqueIdentity, sourceFile);
+
         // Finally add the source file
         _addSourceFile(sourceFile);
     }
@@ -1775,6 +1847,7 @@ void TranslationUnitRequest::_addSourceFile(SourceFile* sourceFile)
     m_sourceFiles.add(sourceFile);
 
     getModule()->addFileDependency(sourceFile);
+    getModule()->getIncludedSourceFileMap().add(sourceFile, nullptr);
 }
 
 List<SourceFile*> const& TranslationUnitRequest::getSourceFiles()
@@ -2256,52 +2329,8 @@ void FrontEndCompileRequest::parseTranslationUnit(
         break;
     }
 
-    // TODO(JS):
-    // Note! that a adding a define twice will cause an exception in debug builds
-    // that may be desirable or not...
-    Dictionary<String, String> combinedPreprocessorDefinitions;
-    for(const auto& def : getLinkage()->preprocessorDefinitions)
-        combinedPreprocessorDefinitions.add(def);
-    for(const auto& def : preprocessorDefinitions)
-        combinedPreprocessorDefinitions.add(def);
-    for(const auto& def : translationUnit->preprocessorDefinitions)
-        combinedPreprocessorDefinitions.add(def);
-
-    // Define standard macros, if not already defined. This style assumes using `#if __SOME_VAR` style, as in
-    //
-    // ```
-    // #if __SLANG_COMPILER__
-    // ```
-    //
-    // This choice is made because slang outputs a warning on using a variable in an #if if not defined
-    //
-    // Of course this means using #ifndef/#ifdef/defined() is probably not appropraite with thes variables.
-    {
-        // Used to identify level of HLSL language compatibility
-        combinedPreprocessorDefinitions.addIfNotExists("__HLSL_VERSION", "2020");
-
-        // Indicates this is being compiled by the slang *compiler*
-        combinedPreprocessorDefinitions.addIfNotExists("__SLANG_COMPILER__", "1");
-
-        // Set macro depending on source type
-        switch (translationUnit->sourceLanguage)
-        {
-            case SourceLanguage::HLSL:
-                // Used to indicate compiled as HLSL language
-                combinedPreprocessorDefinitions.addIfNotExists("__HLSL__", "1");
-                break;
-            case SourceLanguage::Slang:
-                // Used to indicate compiled as Slang language
-                combinedPreprocessorDefinitions.addIfNotExists("__SLANG__", "1");
-                break;
-            default: break;
-        }
-
-        // If not set, define as 0.
-        combinedPreprocessorDefinitions.addIfNotExists("__HLSL__", "0");
-        combinedPreprocessorDefinitions.addIfNotExists("__SLANG__", "0");
-    }
-
+    auto combinedPreprocessorDefinitions = translationUnit->getCombinedPreprocessorDefinitions();
+    
     auto module = translationUnit->getModule();
 
     ASTBuilder* astBuilder = module->getASTBuilder();
@@ -2339,6 +2368,11 @@ void FrontEndCompileRequest::parseTranslationUnit(
 
     for (auto sourceFile : translationUnit->getSourceFiles())
     {
+        module->getIncludedSourceFileMap().addIfNotExists(sourceFile, nullptr);
+    }
+
+    for (auto sourceFile : translationUnit->getSourceFiles())
+    {
         auto tokens = preprocessSource(
             sourceFile,
             getSink(),
@@ -2367,7 +2401,8 @@ void FrontEndCompileRequest::parseTranslationUnit(
             translationUnit,
             tokens,
             getSink(),
-            languageScope);
+            languageScope,
+            translationUnitSyntax);
 
         // Let's try dumping
 
@@ -2534,22 +2569,26 @@ SlangResult FrontEndCompileRequest::executeActionsInner()
 {
     SLANG_AST_BUILDER_RAII(getLinkage()->getASTBuilder());
 
-    // We currently allow GlSL files on the command line so that we can
-    // drive our "pass-through" mode, but we really want to issue an error
-    // message if the user is seriously asking us to compile them.
     for (TranslationUnitRequest* translationUnit : translationUnits)
     {
         // Make sure SourceFile representation is available for all translationUnits
         SLANG_RETURN_ON_FAIL(translationUnit->requireSourceFiles());
 
-        switch(translationUnit->sourceLanguage)
+        if(!getLinkage()->getAllowGLSLInput())
         {
-        default:
-            break;
+            // We currently allow GlSL files on the command line so that we can
+            // drive our "pass-through" mode, but we really want to issue an error
+            // message if the user is seriously asking us to compile them and
+            // doesn't explicitly opt into the glsl frontend
+            switch(translationUnit->sourceLanguage)
+            {
+            default:
+                break;
 
-        case SourceLanguage::GLSL:
-            getSink()->diagnose(SourceLoc(), Diagnostics::glslIsNotSupported);
-            return SLANG_FAIL;
+            case SourceLanguage::GLSL:
+                getSink()->diagnose(SourceLoc(), Diagnostics::glslIsNotSupported);
+                return SLANG_FAIL;
+            }
         }
     }
 
@@ -3111,7 +3150,6 @@ RefPtr<Module> Linkage::loadModule(
         // Some problem accessing source files
         return nullptr;
     }
-
     int errorCountBefore = sink->getErrorCount();
     frontEndReq->parseTranslationUnit(translationUnit);
     int errorCountAfter = sink->getErrorCount();
@@ -3152,6 +3190,34 @@ bool Linkage::isBeingImported(Module* module)
             return true;
     }
     return false;
+}
+
+    // Derive a file name for the module, by taking the given
+    // identifier, replacing all occurrences of `_` with `-`,
+    // and then appending `.slang`.
+    //
+    // For example, `foo_bar` becomes `foo-bar.slang`.
+String getFileNameFromModuleName(Name* name)
+{
+    String fileName;
+    if (!getText(name).getUnownedSlice().endsWithCaseInsensitive(".slang"))
+    {
+        StringBuilder sb;
+        for (auto c : getText(name))
+        {
+            if (c == '_')
+                c = '-';
+
+            sb.append(c);
+        }
+        sb.append(".slang");
+        fileName = sb.produceString();
+    }
+    else
+    {
+        fileName = getText(name);
+    }
+    return fileName;
 }
 
 RefPtr<Module> Linkage::findOrImportModule(
@@ -3196,30 +3262,7 @@ RefPtr<Module> Linkage::findOrImportModule(
         return previouslyLoadedModule;
     }
 
-    // Derive a file name for the module, by taking the given
-    // identifier, replacing all occurrences of `_` with `-`,
-    // and then appending `.slang`.
-    //
-    // For example, `foo_bar` becomes `foo-bar.slang`.
-
-    String fileName;
-    if (!getText(name).getUnownedSlice().endsWithCaseInsensitive(".slang"))
-    {
-        StringBuilder sb;
-        for (auto c : getText(name))
-        {
-            if (c == '_')
-                c = '-';
-
-            sb.append(c);
-        }
-        sb.append(".slang");
-        fileName = sb.produceString();
-    }
-    else
-    {
-        fileName = getText(name);
-    }
+    auto fileName = getFileNameFromModuleName(name);
 
     // Next, try to find the file of the given name,
     // using our ordinary include-handling logic.
@@ -3230,12 +3273,23 @@ RefPtr<Module> Linkage::findOrImportModule(
     PathInfo pathIncludedFromInfo = getSourceManager()->getPathInfo(loc, SourceLocType::Actual);
     PathInfo filePathInfo;
 
+    ComPtr<ISlangBlob> fileContents;
+
     // We have to load via the found path - as that is how file was originally loaded
     if (SLANG_FAILED(includeSystem.findFile(fileName, pathIncludedFromInfo.foundPath, filePathInfo)))
     {
-        sink->diagnose(loc, Diagnostics::cannotFindFile, fileName);
-        mapNameToLoadedModules[name] = nullptr;
-        return nullptr;
+        if (name && name->text == "glsl")
+        {
+            // This is a builtin glsl module, just load it from embedded definition.
+            fileContents = getSessionImpl()->getGLSLLibraryCode();
+            filePathInfo = PathInfo::makeFromString("glsl");
+        }
+        else
+        {
+            sink->diagnose(loc, Diagnostics::cannotFindFile, fileName);
+            mapNameToLoadedModules[name] = nullptr;
+            return nullptr;
+        }
     }
 
     // Maybe this was loaded previously at a different relative name?
@@ -3243,8 +3297,7 @@ RefPtr<Module> Linkage::findOrImportModule(
         return loadedModule;
 
     // Try to load it
-    ComPtr<ISlangBlob> fileContents;
-    if(SLANG_FAILED(includeSystem.loadFile(filePathInfo, fileContents)))
+    if( !fileContents && SLANG_FAILED(includeSystem.loadFile(filePathInfo, fileContents)))
     {
         sink->diagnose(loc, Diagnostics::cannotOpenFile, fileName);
         mapNameToLoadedModules[name] = nullptr;
@@ -3260,6 +3313,91 @@ RefPtr<Module> Linkage::findOrImportModule(
         loc,
         sink,
         loadedModules);
+}
+
+SourceFile* Linkage::findFile(Name* name, SourceLoc loc, IncludeSystem& outIncludeSystem)
+{
+    auto fileName = getFileNameFromModuleName(name);
+
+    // Next, try to find the file of the given name,
+    // using our ordinary include-handling logic.
+
+    outIncludeSystem = IncludeSystem(&searchDirectories, getFileSystemExt(), getSourceManager());
+
+    // Get the original path info
+    PathInfo pathIncludedFromInfo = getSourceManager()->getPathInfo(loc, SourceLocType::Actual);
+    PathInfo filePathInfo;
+
+    ComPtr<ISlangBlob> fileContents;
+
+    // We have to load via the found path - as that is how file was originally loaded
+    if (SLANG_FAILED(outIncludeSystem.findFile(fileName, pathIncludedFromInfo.foundPath, filePathInfo)))
+    {
+        return nullptr;
+    }
+    // Otherwise, try to load it.
+    SourceFile* sourceFile;
+    if (SLANG_FAILED(outIncludeSystem.loadFile(filePathInfo, fileContents, sourceFile)))
+    {
+        return nullptr;
+    }
+    return sourceFile;
+}
+
+Linkage::IncludeResult Linkage::findAndIncludeFile(Module* module, TranslationUnitRequest* translationUnit, Name* name, SourceLoc const& loc, DiagnosticSink* sink)
+{
+    IncludeResult result;
+    result.fileDecl = nullptr;
+    result.isNew = false;
+
+    IncludeSystem includeSystem;
+    auto sourceFile = findFile(name, loc, includeSystem);
+
+    if (!sourceFile)
+    {
+        sink->diagnose(loc, Diagnostics::cannotOpenFile, getText(name));
+        return result;
+    }
+
+    // If the file has already been included, don't need to do anything further.
+    if (auto existingFileDecl = module->getIncludedSourceFileMap().tryGetValue(sourceFile))
+    {
+        result.fileDecl = *existingFileDecl;
+        result.isNew = false;
+        return result;
+    }
+
+    module->addFileDependency(sourceFile);
+
+    // Create a transparent FileDecl to hold all children from the included file.
+    auto fileDecl = module->getASTBuilder()->create<FileDecl>();
+    fileDecl->nameAndLoc.name = name;
+    module->getIncludedSourceFileMap().add(sourceFile, fileDecl);
+
+    FrontEndPreprocessorHandler preprocessorHandler(module, module->getASTBuilder(), sink);
+    auto combinedPreprocessorDefinitions = translationUnit->getCombinedPreprocessorDefinitions();
+    auto tokens = preprocessSource(
+        sourceFile,
+        sink,
+        &includeSystem,
+        combinedPreprocessorDefinitions,
+        this,
+        &preprocessorHandler);
+
+    auto outerScope = module->getModuleDecl()->ownedScope;
+    parseSourceFile(
+        module->getASTBuilder(),
+        translationUnit,
+        tokens,
+        sink,
+        outerScope,
+        fileDecl);
+
+    module->getModuleDecl()->addMember(fileDecl);
+
+    result.fileDecl = fileDecl;
+    result.isNew = true;
+    return result;
 }
 
 //
@@ -5265,6 +5403,11 @@ SlangResult EndToEndCompileRequest::setTypeNameForEntryPointExistentialTypeParam
         typeArgStrings.setCount(slotIndex + 1);
     typeArgStrings[slotIndex] = String(typeName);
     return SLANG_OK;
+}
+
+void EndToEndCompileRequest::setAllowGLSLInput(bool value)
+{
+    getLinkage()->setAllowGLSLInput(value);
 }
 
 SlangResult EndToEndCompileRequest::EndToEndCompileRequest::compile()

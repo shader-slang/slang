@@ -1366,20 +1366,61 @@ SIMPLE_IR_TYPE(BasicBlockType, Type)
 
 struct IRResourceTypeBase : IRType
 {
-    TextureFlavor getFlavor() const
-    {
-        return TextureFlavor((getOp() >> kIROpMeta_OtherShift) & 0xFFFF);
-    }
+    IRInst* getShapeInst() { return getOperand(kStdlibTextureShapeParameterIndex); }
+    IRInst* getIsArrayInst() { return getOperand(kStdlibTextureIsArrayParameterIndex); }
+    IRInst* getIsMultisampleInst() { return getOperand(kStdlibTextureIsMultisampleParameterIndex); }
+    IRInst* getSampleCountInst() { return getOperand(kStdlibTextureSampleCountParameterIndex); }
+    IRInst* getAccessInst() { return getOperand(kStdlibTextureAccessParameterIndex); }
+    IRInst* getIsShadowInst() { return getOperand(kStdlibTextureIsShadowParameterIndex); }
+    IRInst* getIsCombinedInst() { return getOperand(kStdlibTextureIsCombinedParameterIndex); }
+    IRInst* getFormatInst() { return getOperand(kStdlibTextureFormatParameterIndex); }
 
-    TextureFlavor::Shape GetBaseShape() const
+    SlangResourceShape GetBaseShape()
     {
-        return getFlavor().getBaseShape();
+        switch (getOperand(1)->getOp())
+        {
+        case kIROp_TextureShape1DType:
+            return SLANG_TEXTURE_1D;
+        case kIROp_TextureShape2DType:
+            return SLANG_TEXTURE_2D;
+        case kIROp_TextureShape3DType:
+            return SLANG_TEXTURE_3D;
+        case kIROp_TextureShapeCubeType:
+            return SLANG_TEXTURE_CUBE;
+        case kIROp_TextureShapeBufferType:
+            return SLANG_TEXTURE_BUFFER;
+        default:
+            return SLANG_RESOURCE_NONE;
+        }
     }
-    bool isFeedback() const { return getFlavor().isFeedback(); }
-    bool isMultisample() const { return getFlavor().isMultisample(); }
-    bool isArray() const { return getFlavor().isArray(); }
-    SlangResourceShape getShape() const { return getFlavor().getShape(); }
-    SlangResourceAccess getAccess() const { return getFlavor().getAccess(); }
+    bool isFeedback() { return getIntVal(getAccessInst()) == kStdlibResourceAccessFeedback; }
+    bool isMultisample() { return getIntVal(getIsMultisampleInst()) != 0; }
+    bool isArray() { return getIntVal(getIsArrayInst()) != 0; }
+    bool isShadow() { return getIntVal(getIsShadowInst()) != 0; }
+    bool isCombined() { return getIntVal(getIsCombinedInst()) != 0; }
+    
+    SlangResourceShape getShape() { return (SlangResourceShape)((uint32_t)GetBaseShape() | (isArray() ? SLANG_TEXTURE_ARRAY_FLAG : SLANG_RESOURCE_NONE)); }
+    SlangResourceAccess getAccess()
+    {
+        auto constVal = as<IRIntLit>(getOperand(kStdlibTextureAccessParameterIndex));
+        if (constVal)
+        {
+            switch (getIntVal(constVal))
+            {
+            case kStdlibResourceAccessReadOnly:
+                return SLANG_RESOURCE_ACCESS_READ;
+            case kStdlibResourceAccessReadWrite:
+                return SLANG_RESOURCE_ACCESS_READ_WRITE;
+            case kStdlibResourceAccessRasterizerOrdered:
+                return SLANG_RESOURCE_ACCESS_RASTER_ORDERED;
+            case kStdlibResourceAccessFeedback:
+                return SLANG_RESOURCE_ACCESS_FEEDBACK;
+            default:
+                break;
+            }
+        }
+        return SLANG_RESOURCE_ACCESS_UNKNOWN;
+    }
 
     IR_PARENT_ISA(ResourceTypeBase);
 };
@@ -1387,9 +1428,9 @@ struct IRResourceTypeBase : IRType
 struct IRResourceType : IRResourceTypeBase
 {
     IRType* getElementType() { return (IRType*)getOperand(0); }
-    IRType* getSampleCount() { return (IRType*)getOperand(1); }
-    bool hasFormat() { return getOperandCount() >= 2; }
-    IRIntegerValue getFormat() { return getIntVal(getOperand(2)); }
+    IRInst* getSampleCount() { return getSampleCountInst(); }
+    bool hasFormat() { return getOperandCount() >= 9; }
+    IRIntegerValue getFormat() { return getIntVal(getFormatInst()); }
 
     IR_PARENT_ISA(ResourceType)
 };
@@ -1402,11 +1443,6 @@ struct IRTextureTypeBase : IRResourceType
 struct IRTextureType : IRTextureTypeBase
 {
     IR_LEAF_ISA(TextureType)
-};
-
-struct IRTextureSamplerType : IRTextureTypeBase
-{
-    IR_LEAF_ISA(TextureSamplerType)
 };
 
 struct IRGLSLImageType : IRTextureTypeBase

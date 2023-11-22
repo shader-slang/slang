@@ -16,10 +16,10 @@ namespace Slang
 
         IRInst* processInst(IRInst* inst)
         {
-            // Ensure public struct types has RTTI object defined.
+            // Ensure exported struct types has RTTI object defined.
             if (as<IRStructType>(inst))
             {
-                if (inst->findDecoration<IRPublicDecoration>())
+                if (inst->findDecoration<IRHLSLExportDecoration>())
                 {
                     sharedContext->maybeEmitRTTIObject(inst);
                 }

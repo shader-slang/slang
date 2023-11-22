@@ -2,13 +2,13 @@
 
 // Imported code used by `reflect-imported-code.hlsl`
 
-float4 use(float4 val) { return val; };
-float4 use(Texture2D t, SamplerState s) { return t.Sample(s, 0.0); }
+public float4 use(float4 val) { return val; };
+public float4 use(Texture2D t, SamplerState s) { return t.Sample(s, 0.0); }
 
-Texture2D 		t_i;
-SamplerState 	s_i;
+public Texture2D t_i;
+public SamplerState 	s_i;
 
-cbuffer C_i
+public cbuffer C_i
 {
-	float c_i;
+    public float c_i;
 }

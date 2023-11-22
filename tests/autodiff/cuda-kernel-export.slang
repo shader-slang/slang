@@ -35,7 +35,7 @@ void myKernel(TensorView<float> inValues, TensorView<float> outValues)
 // TORCH:      {{^SLANG_PRELUDE_EXPORT$}}
 // TORCH-NEXT: std::tuple<std::tuple<float, float>, std::tuple<std::tuple<std::tuple<torch::Tensor, torch::Tensor>>, std::tuple<std::tuple<torch::Tensor, torch::Tensor>>>> runCompute(std::tuple<torch::Tensor, float> input_[[#]])
 [TorchEntryPoint]
-public __extern_cpp MyType runCompute(MyInput input)
+export __extern_cpp MyType runCompute(MyInput input)
 {
     MyType rs;
     var outValues = TorchTensor<float>.alloc(1);

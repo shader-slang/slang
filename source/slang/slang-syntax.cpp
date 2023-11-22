@@ -2,7 +2,7 @@
 
 #include "slang-compiler.h"
 #include "slang-visitor.h"
-
+#include "slang-ast-print.h"
 #include <typeinfo>
 #include <assert.h>
 
@@ -53,6 +53,13 @@ void printDiagnosticArg(StringBuilder& sb, QualType const& type)
         type.type->toText(sb);
     else
         sb << "<null>";
+}
+
+void printDiagnosticArg(StringBuilder& sb, QualifiedDeclPath path)
+{
+    ASTPrinter printer(getCurrentASTBuilder());
+    printer.addDeclPath(path.declRef);
+    sb << printer.getString();
 }
 
 SourceLoc getDiagnosticPos(SyntaxNode const* syntax)
@@ -470,6 +477,12 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
             return astBuilder->getOrCreate<ThisType>(declRef.declRefBase);
         }
+        else if (auto typedefDecl = as<TypeDefDecl>(declRef.getDecl()))
+        {
+            if (typedefDecl->type.type)
+                return as<Type>(typedefDecl->type.type->substitute(astBuilder, SubstitutionSet(declRef)));
+            return astBuilder->getErrorType();
+        }
         else
         {
             declRef = createDefaultSubstitutionsIfNeeded(astBuilder, nullptr, declRef);
@@ -757,6 +770,17 @@ Module* getModule(Decl* decl)
         return nullptr;
 
     return moduleDecl->module;
+}
+
+ModuleDecl* getModuleDecl(Scope* scope)
+{
+    for (; scope; scope = scope->parent)
+    {
+        if (scope->containerDecl)
+            return getModuleDecl(scope->containerDecl);
+    }
+    return nullptr;
+
 }
 
 Decl* getParentDecl(Decl* decl)

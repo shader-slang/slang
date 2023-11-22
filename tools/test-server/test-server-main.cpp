@@ -117,7 +117,7 @@ SlangResult innerMain(StdWriters* stdWriters, slang::IGlobalSession* sharedSessi
     SLANG_RETURN_ON_FAIL(session->createCompileRequest(compileRequest.writeRef()));
 
     // Do any app specific configuration
-    for (int i = 0; i < SLANG_WRITER_CHANNEL_COUNT_OF; ++i)
+    for (int i = 0; i < int{SLANG_WRITER_CHANNEL_COUNT_OF}; ++i)
     {
         const auto channel = SlangWriterChannel(i);
         compileRequest->setWriter(channel, stdWriters->getWriter(channel));
@@ -504,6 +504,7 @@ SlangResult TestServer::execute()
     while (m_connection->isActive() && !m_quit)
     {
         // Failure doesn't make the execution terminate
+        [[maybe_unused]]
         const SlangResult res = _executeSingle();
     }
 

@@ -457,6 +457,9 @@ class SubtypeWitness : public Witness
 
     Type* getSub() { return as<Type>(getOperand(0)); }
     Type* getSup() { return as<Type>(getOperand(1)); }
+
+    ConversionCost _getOverloadResolutionCostOverride();
+    ConversionCost getOverloadResolutionCost();
 };
 
 class TypeEqualityWitness : public SubtypeWitness 
@@ -493,6 +496,8 @@ class DeclaredSubtypeWitness : public SubtypeWitness
     {
         setOperands(inSub, inSup, inDeclRef);
     }
+
+    ConversionCost _getOverloadResolutionCostOverride();
 };
 
 // A witness that `sub : sup` because `sub : mid` and `mid : sup`
@@ -520,6 +525,8 @@ class TransitiveSubtypeWitness : public SubtypeWitness
     {
         setOperands(subType, supType, inSubToMid, inMidToSup);
     }
+
+    ConversionCost _getOverloadResolutionCostOverride();
 };
 
 // A witness that `sub : sup` because `sub` was wrapped into
@@ -580,6 +587,8 @@ class ConjunctionSubtypeWitness : public SubtypeWitness
 
     void _toTextOverride(StringBuilder& out);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+
+    ConversionCost _getOverloadResolutionCostOverride();
 };
 
     /// A witness that `T <: L` or `T <: R` because `T <: L&R`
@@ -609,6 +618,8 @@ class ExtractFromConjunctionSubtypeWitness : public SubtypeWitness
 
     void _toTextOverride(StringBuilder& out);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+
+    ConversionCost _getOverloadResolutionCostOverride();
 };
 
     /// A value that represents a modifier attached to some other value

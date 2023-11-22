@@ -2784,6 +2784,12 @@ namespace Slang
         return (IRPtrType*)getType(op, 2, operands);
     }
 
+    IRTextureTypeBase* IRBuilder::getTextureType(IRType* elementType, IRInst* shape, IRInst* isArray, IRInst* isMS, IRInst* sampleCount, IRInst* access, IRInst* isShadow, IRInst* isCombined, IRInst* format)
+    {
+        IRInst* args[] = {(IRInst*)elementType, shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format};
+        return as<IRTextureTypeBase>(emitIntrinsicInst(getTypeKind(), kIROp_TextureType, (UInt)(sizeof(args)/sizeof(IRInst*)), args));
+    }
+
     IRComPtrType* IRBuilder::getComPtrType(IRType* valueType)
     {
         return (IRComPtrType*)getType(kIROp_ComPtrType, valueType);
@@ -5819,6 +5825,18 @@ namespace Slang
         return i;
     }
 
+    IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandDebugPrintfSet()
+    {
+        SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
+        const auto i = createInst<IRSPIRVAsmOperand>(
+            this,
+            kIROp_SPIRVAsmOperandDebugPrintfSet,
+            getVoidType()
+        );
+        addInst(i);
+        return i;
+    }
+
     IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandSampledType(IRType* elementType)
     {
         SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
@@ -5827,6 +5845,32 @@ namespace Slang
             kIROp_SPIRVAsmOperandSampledType,
             getTypeType(),
             elementType
+        );
+        addInst(i);
+        return i;
+    }
+
+    IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandImageType(IRInst* element)
+    {
+        SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
+        const auto i = createInst<IRSPIRVAsmOperand>(
+            this,
+            kIROp_SPIRVAsmOperandImageType,
+            getTypeType(),
+            element
+        );
+        addInst(i);
+        return i;
+    }
+
+    IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandSampledImageType(IRInst* element)
+    {
+        SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
+        const auto i = createInst<IRSPIRVAsmOperand>(
+            this,
+            kIROp_SPIRVAsmOperandSampledImageType,
+            getTypeType(),
+            element
         );
         addInst(i);
         return i;
@@ -6723,6 +6767,16 @@ namespace Slang
             dumpInstExpr(context, inst->getOperand(0));
             dump(context, ")");
             return;
+        case kIROp_SPIRVAsmOperandImageType:
+            dump(context, "__imageType(");
+            dumpInstExpr(context, inst->getOperand(0));
+            dump(context, ")");
+            return;
+        case kIROp_SPIRVAsmOperandSampledImageType:
+            dump(context, "__sampledImageType(");
+            dumpInstExpr(context, inst->getOperand(0));
+            dump(context, ")");
+            return;
         }
 
         dump(context, opInfo.name);
@@ -7010,13 +7064,6 @@ namespace Slang
             // We also don't care about 'type' - because these instructions are defining the type.
             // 
             // We may want to care about decorations.
-
-            // If it's a resource type - special case the handling of the resource flavor 
-            if (IRResourceTypeBase::isaImpl(opA) &&
-                static_cast<const IRResourceTypeBase*>(a)->getFlavor() != static_cast<const IRResourceTypeBase*>(b)->getFlavor())
-            {
-                return false;
-            }
 
             // TODO(JS): There is a question here about what to do about decorations.
             // For now we ignore decorations. Are two types potentially different if there decorations different?
@@ -7940,13 +7987,13 @@ namespace Slang
         auto func = as<IRGlobalValueWithCode>(callee);
         if (!func)
             return false;
-        auto block = func->getFirstBlock();
-        if (!block)
-            return false;
-        if (auto genAsm = as<IRGenericAsm>(block->getTerminator()))
+        for (auto block : func->getBlocks())
         {
-            outDefinition = genAsm->getAsm();
-            return true;
+            if (auto genAsm = as<IRGenericAsm>(block->getTerminator()))
+            {
+                outDefinition = genAsm->getAsm();
+                return true;
+            }
         }
         return false;
     }

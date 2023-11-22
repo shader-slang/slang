@@ -66,7 +66,7 @@ DIAGNOSTIC(    8, Error, outputPathsImplyDifferentFormats,
     "the output paths '$0' and '$1' require different code-generation targets")
 
 DIAGNOSTIC(    10, Error, explicitOutputPathsAndMultipleTargets, "canot use both explicit output paths ('-o') and multiple targets ('-target')")
-DIAGNOSTIC(    11, Error, glslIsNotSupported, "the Slang compiler does not support GLSL as a source language")
+DIAGNOSTIC(    11, Error, glslIsNotSupported, "the Slang compiler does not support GLSL as a source language by default, please use -allow-glsl")
 DIAGNOSTIC(    12, Error, cannotDeduceSourceLanguage, "can't deduce language for input file '$0'")
 DIAGNOSTIC(    13, Error, unknownCodeGenerationTarget, "unknown code generation target '$0'")
 DIAGNOSTIC(    14, Error, unknownProfile, "unknown profile '$0'")
@@ -173,6 +173,7 @@ DIAGNOSTIC(15202, Error, divideByZeroInPreprocessorExpression, "division by zero
 DIAGNOSTIC(15203, Error, expectedTokenInDefinedExpression, "expected '$0' in 'defined' expression")
 DIAGNOSTIC(15204, Warning, directiveExpectsExpression, "'$0' directive requires an expression")
 DIAGNOSTIC(15205, Warning, undefinedIdentifierInPreprocessorExpression, "undefined identifier '$0' in preprocessor expression will evaluate to zero")
+DIAGNOSTIC(15206, Error, expectedIntegralVersionNumber, "Expected integer for #version number")
 
 DIAGNOSTIC(-1, Note, seeOpeningToken, "see opening '$0'")
 
@@ -348,6 +349,21 @@ DIAGNOSTIC(30098, Error, nonStaticMemberFunctionNotAllowedAsDiffOperand, "non-st
 
 DIAGNOSTIC(30099, Error, sizeOfArgumentIsInvalid, "argument to sizeof is invalid")
 
+// Include
+DIAGNOSTIC(30500, Error, includedFileMissingImplementing, "missing 'implementing' declaration in the included source file '$0'.")
+DIAGNOSTIC(30501, Error, includedFileMissingImplementingDoYouMeanImport, "missing 'implementing' declaration in the included source file '$0'. The file declares that it defines module '$1', do you mean 'import' instead?")
+DIAGNOSTIC(30502, Error, includedFileDoesNotImplementCurrentModule, "the included source file is expected to implement module '$0', but it is implementing '$1' instead.")
+DIAGNOSTIC(30503, Error, primaryModuleFileCannotStartWithImplementingDecl, "a primary source file for a module cannot start with 'implementing'.")
+DIAGNOSTIC(30504, Warning, primaryModuleFileMustStartWithModuleDecl, "a primary source file for a module should start with 'module'.")
+DIAGNOSTIC(30505, Error, implementingMustReferencePrimaryModuleFile, "the source file referenced by 'implementing' must be a primary module file starting with a 'module' declaration.")
+
+// Visibilty
+DIAGNOSTIC(30600, Error, declIsNotVisible, "'$0' is not accessible from the current context.")
+DIAGNOSTIC(30601, Error, declCannotHaveHigherVisibility, "'$0' cannot have a higher visibility than '$1'.")
+DIAGNOSTIC(30602, Error, satisfyingDeclCannotHaveLowerVisibility, "'$0' is less visible than the interface requirement it satisfies.")
+DIAGNOSTIC(30603, Error, invalidUseOfPrivateVisibility, "'$0' cannot have private visibility.")
+DIAGNOSTIC(30604, Error, useOfLessVisibleType, "'$0' references less visible type '$1'.")
+
 // Attributes
 DIAGNOSTIC(31000, Error, unknownAttributeName, "unknown attribute '$0'")
 DIAGNOSTIC(31001, Error, attributeArgumentCountMismatch, "attribute '$0' expects $1 arguments ($2 provided)")
@@ -431,6 +447,7 @@ DIAGNOSTIC(30510, Error, loopInDiffFuncRequireUnrollOrMaxIters, "loops inside a 
 DIAGNOSTIC(39999, Fatal, cyclicReference, "cyclic reference '$0'.")
 DIAGNOSTIC(39999, Error, localVariableUsedBeforeDeclared, "local variable '$0' is being used before its declaration.")
 DIAGNOSTIC(39999, Error, variableUsedInItsOwnDefinition, "the initial-value expression for variable '$0' depends on the value of the variable itself")
+DIAGNOSTIC(39001, Fatal , cannotProcessInclude, "internal compiler error: cannot process '__include' in the current semantic checking context.")
 
 // 304xx: generics
 DIAGNOSTIC(30400, Error, genericTypeNeedsArgs, "generic type '$0' used without argument")
@@ -492,6 +509,8 @@ DIAGNOSTIC(39999, Error, ambiguousOverloadForNameWithArgs, "ambiguous call to '$
 DIAGNOSTIC(39999, Error, ambiguousOverloadWithArgs, "ambiguous call to overloaded operation with arguments of type $0")
 
 DIAGNOSTIC(39999, Note, overloadCandidate, "candidate: $0")
+DIAGNOSTIC(39999, Note, invisibleOverloadCandidate, "candidate (invisible): $0")
+
 DIAGNOSTIC(39999, Note, moreOverloadCandidates, "$0 more overload candidates")
 
 DIAGNOSTIC(39999, Error, caseOutsideSwitch, "'case' not allowed outside of a 'switch' statement")
@@ -741,6 +760,9 @@ DIAGNOSTIC(55102, Error, invalidTorchKernelParamType, "'$0' is not a valid param
 DIAGNOSTIC(56001, Error, unableToAutoMapCUDATypeToHostType, "Could not automatically map '$0' to a host type. Automatic binding generation failed for '$1'")
 
 DIAGNOSTIC(57001, Warning, spirvOptFailed, "spirv-opt failed. $0")
+
+// GLSL Compatibility
+DIAGNOSTIC(58001, Error, entryPointMustReturnVoidWhenGlobalOutputPresent, "entry point must return 'void' when global output variables are present.")
 //
 // 8xxxx - Issues specific to a particular library/technology/platform/etc.
 //

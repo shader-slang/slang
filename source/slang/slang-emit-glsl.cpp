@@ -714,11 +714,11 @@ void GLSLSourceEmitter::_emitGLSLTextureOrTextureSamplerType(IRTextureTypeBase* 
     m_writer->emit(baseName);
     switch (type->GetBaseShape())
     {
-        case TextureFlavor::Shape::Shape1D:		m_writer->emit("1D");		break;
-        case TextureFlavor::Shape::Shape2D:		m_writer->emit("2D");		break;
-        case TextureFlavor::Shape::Shape3D:		m_writer->emit("3D");		break;
-        case TextureFlavor::Shape::ShapeCube:	m_writer->emit("Cube");	break;
-        case TextureFlavor::Shape::ShapeBuffer:	m_writer->emit("Buffer");	break;
+        case SLANG_TEXTURE_1D:		m_writer->emit("1D");		break;
+        case SLANG_TEXTURE_2D:		m_writer->emit("2D");		break;
+        case SLANG_TEXTURE_3D:		m_writer->emit("3D");		break;
+        case SLANG_TEXTURE_CUBE:	m_writer->emit("Cube");	    break;
+        case SLANG_TEXTURE_BUFFER:	m_writer->emit("Buffer");	break;
         default:
             SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource shape");
             break;
@@ -731,6 +731,10 @@ void GLSLSourceEmitter::_emitGLSLTextureOrTextureSamplerType(IRTextureTypeBase* 
     if (type->isArray())
     {
         m_writer->emit("Array");
+    }
+    if (type->isShadow())
+    {
+        m_writer->emit("Shadow");
     }
 }
 
@@ -2343,6 +2347,18 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             m_writer->emit("hitObjectNV");
             return;
         }
+        case kIROp_TextureFootprintType:
+        {
+            m_glslExtensionTracker->requireExtension(UnownedStringSlice("GL_NV_shader_texture_footprint"));
+            m_glslExtensionTracker->requireVersion(ProfileVersion::GLSL_450);
+
+            m_writer->emit("gl_TextureFootprint");
+            auto intLit = as<IRIntLit>(type->getOperand(0));
+            if (intLit)
+                m_writer->emit(intLit->getValue());
+            m_writer->emit("DNV");
+            return;
+        }
         default: break;
     }
 
@@ -2351,6 +2367,11 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
     // each of these IR opcodes.
     if (auto texType = as<IRTextureType>(type))
     {
+        if (texType->isCombined())
+        {
+            _emitGLSLTextureOrTextureSamplerType(texType, "sampler");
+            return;
+        }
         switch (texType->getAccess())
         {
             case SLANG_RESOURCE_ACCESS_READ_WRITE:
@@ -2362,11 +2383,6 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
                 _emitGLSLTextureOrTextureSamplerType(texType, "texture");
                 break;
         }
-        return;
-    }
-    else if (auto textureSamplerType = as<IRTextureSamplerType>(type))
-    {
-        _emitGLSLTextureOrTextureSamplerType(textureSamplerType, "sampler");
         return;
     }
     else if (auto imageType = as<IRGLSLImageType>(type))

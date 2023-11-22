@@ -1,12 +1,12 @@
 //TEST_IGNORE_FILE:
 // struct-inheritance-imported.slang
 
-struct Base
+public struct Base
 {
-    int a;
+    public int a;
 }
 
-struct Derived : Base
+public struct Derived : Base
 {}
 
-int getA(Derived d) { return d.a; }
+public int getA(Derived d) { return d.a; }

@@ -66,6 +66,17 @@ namespace Slang
     void printDiagnosticArg(StringBuilder& sb, Val* val);
     void printDiagnosticArg(StringBuilder& sb, DeclRefBase* declRefBase);
 
+    struct QualifiedDeclPath
+    {
+        DeclRefBase* declRef;
+        QualifiedDeclPath() = default;
+        QualifiedDeclPath(DeclRefBase* declRef)
+            : declRef(declRef)
+        {}
+    };
+    // Prints the fully qualified decl name.
+    void printDiagnosticArg(StringBuilder& sb, QualifiedDeclPath path);
+
 
     class SyntaxNode;
     SourceLoc getDiagnosticPos(SyntaxNode const* syntax);
@@ -79,6 +90,9 @@ namespace Slang
     {
         // No conversion at all
         kConversionCost_None = 0,
+
+        kConversionCost_GenericParamUpcast = 1,
+        kConversionCost_UnconstraintGenericParam = 20,
 
         // Convert between matrices of different layout
         kConversionCost_MatrixLayout = 5,
@@ -1595,6 +1609,13 @@ namespace Slang
     /// Get the operator name from the higher order invoke expr.
     UnownedStringSlice getHigherOrderOperatorName(HigherOrderInvokeExpr* expr);
 
+    enum class DeclVisibility
+    {
+        Private,
+        Internal,
+        Public,
+        Default = Internal,
+    };
 
 } // namespace Slang
 

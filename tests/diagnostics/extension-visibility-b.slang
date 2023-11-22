@@ -2,7 +2,7 @@
 
 import extension_visibility_a;
 
-extension MyThing : IThing
+public extension MyThing : IThing
 {
-	int getValue() { return value; }	
+	public int getValue() { return value; }	
 }

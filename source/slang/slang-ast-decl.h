@@ -151,6 +151,10 @@ class ClassDecl : public AggTypeDecl
     SLANG_AST_CLASS(ClassDecl)
 };
 
+class GLSLInterfaceBlockDecl : public AggTypeDecl
+{
+    SLANG_AST_CLASS(GLSLInterfaceBlockDecl);
+};
 
 // TODO: Is it appropriate to treat an `enum` as an aggregate type?
 // Most code that looks for, e.g., conformances assumes user-defined
@@ -422,6 +426,15 @@ class ModuleDecl : public NamespaceDeclBase
         ///
     OrderedDictionary<Decl*, RefPtr<DeclAssociationList>> mapDeclToAssociatedDecls;
 
+        /// Whether the module is defined in legacy language.
+        /// The legacy Slang language does not have visibility modifiers and everything is treated as
+        /// `public`. Newer version of the language introduces visibility and makes `internal` as the
+        /// default. To prevent this from breaking existing code, we need to know whether a module is
+        /// written in the legacy language. We detect this by checking whether the module has any
+        /// visibility modifiers, or if the module uses new language constructs, e.g. `module`, `__include`,
+        /// `__implementing` etc.
+    bool isInLegacyLanguage = true;
+
     SLANG_UNREFLECTED
 
         /// Map a type to the list of extensions of that type (if any) declared in this module
@@ -430,6 +443,12 @@ class ModuleDecl : public NamespaceDeclBase
         ///
     Dictionary<AggTypeDecl*, RefPtr<CandidateExtensionList>> mapTypeToCandidateExtensions;
 
+};
+
+// Represents a transparent scope of declarations that are defined in a single source file.
+class FileDecl : public ContainerDecl
+{
+    SLANG_AST_CLASS(FileDecl);
 };
 
     /// A declaration that brings members of another declaration or namespace into scope
@@ -445,15 +464,12 @@ class UsingDecl : public Decl
     Scope* scope = nullptr;
 };
 
-class ImportDecl : public Decl
+class FileReferenceDeclBase : public Decl
 {
-    SLANG_AST_CLASS(ImportDecl)
+    SLANG_AST_CLASS(FileReferenceDeclBase)
 
     // The name of the module we are trying to import
     NameLoc moduleNameAndLoc;
-    
-    // The module that actually got imported
-    ModuleDecl* importedModuleDecl = nullptr;
 
     SourceLoc startLoc;
     SourceLoc endLoc;
@@ -461,6 +477,36 @@ class ImportDecl : public Decl
     SLANG_UNREFLECTED
     // The scope that we want to import into
     Scope* scope = nullptr;
+};
+
+class ImportDecl : public FileReferenceDeclBase
+{
+    SLANG_AST_CLASS(ImportDecl)
+
+    // The module that actually got imported
+    ModuleDecl* importedModuleDecl = nullptr;
+};
+
+class IncludeDeclBase : public FileReferenceDeclBase
+{
+    SLANG_AST_CLASS(IncludeDeclBase)
+
+    FileDecl* fileDecl = nullptr;
+};
+
+class IncludeDecl : public IncludeDeclBase
+{
+    SLANG_AST_CLASS(IncludeDecl)
+};
+
+class ImplementingDecl : public IncludeDeclBase
+{
+    SLANG_AST_CLASS(ImplementingDecl)
+};
+
+class ModuleDeclarationDecl : public Decl
+{
+    SLANG_AST_CLASS(ModuleDeclarationDecl);
 };
 
 // A generic declaration, parameterized on types/values

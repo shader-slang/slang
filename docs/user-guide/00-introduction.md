@@ -85,7 +85,7 @@ When services are introduced one after another, it may be hard to glimpse the bi
 
 Before we dive into actually _using_ Slang, let us step back and highlight some of the key design goals (and non-goals) that motivate the design:
 
-* **Performance**: Real-time graphics demands high performance, which motivates the use of GPUs. Whenever possible, the benefits of using Slang must not come at the cost of performance. When a choice involves a performance trade-off the *user* of the system should be able to mak that choice.
+* **Performance**: Real-time graphics demands high performance, which motivates the use of GPUs. Whenever possible, the benefits of using Slang must not come at the cost of performance. When a choice involves a performance trade-off the *user* of the system should be able to make that choice.
 
 * **Productivity**: Modern GPU codebases are large and growing. Productivity in a large codebase is less about _writing_ code quickly, and more about having code that is understandable, maintainable, reusable, and extensible. Language concepts like "modularity" or "separate compilation" are valuable if they foster greater developer productivity.
 

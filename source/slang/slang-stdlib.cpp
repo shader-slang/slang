@@ -304,7 +304,6 @@ namespace Slang
             coreLibraryCode = StringBlob::moveCreate(sb);
         }
 #endif
-
         return coreLibraryCode;
     }
 
@@ -316,6 +315,7 @@ namespace Slang
             const String path = getStdlibPath();
             StringBuilder sb;
             #include "hlsl.meta.slang.h"
+            File::writeAllText("d:\\stdlib1.txt", sb.toString());
             hlslLibraryCode = StringBlob::moveCreate(sb);
         }
 #endif
@@ -334,5 +334,17 @@ namespace Slang
         }
 #endif
         return autodiffLibraryCode;
+    }
+
+    ComPtr<ISlangBlob> Session::getGLSLLibraryCode()
+    {
+        if (!glslLibraryCode)
+        {
+            const String path = getStdlibPath();
+            StringBuilder sb;
+#include "glsl.meta.slang.h"
+            glslLibraryCode = StringBlob::moveCreate(sb);
+        }
+        return glslLibraryCode;
     }
 }

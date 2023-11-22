@@ -1476,20 +1476,6 @@ struct SamplerComparisonState
 {
 }
 
-${{{{
-
-for(auto& prefixInfo : kTexturePrefixes)
-for(auto& shapeInfo : kBaseTextureShapes)
-for(int isArray = 0; isArray < 2; ++isArray)
-for(int isMultisample = 0; isMultisample < 2; ++isMultisample)
-for(auto& accessInfo : kBaseTextureAccessLevels)
-{
-    TextureTypeInfo info(prefixInfo, shapeInfo, isArray, isMultisample, accessInfo, sb, path);
-    info.emitTypeDecl();
-}
-
-}}}}
-
 //@ hidden:
 
 ${{{{

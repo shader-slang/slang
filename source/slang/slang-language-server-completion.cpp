@@ -293,16 +293,24 @@ List<LanguageServerProtocol::TextEditCompletionItem> CompletionContext::gatherFi
 
 SlangResult CompletionContext::tryCompleteImport()
 {
-    static auto importStr = UnownedStringSlice("import ");
-    auto lineContent = doc->getLine(line);
-    Index pos = lineContent.indexOf(importStr);
-    if (pos == -1)
-        return SLANG_FAIL;
-    auto lineBeforeImportKeyword = lineContent.head(pos).trim();
-    if (lineBeforeImportKeyword.getLength() != 0 && lineBeforeImportKeyword != "__exported")
-        return SLANG_FAIL;
-
-    pos += importStr.getLength();
+    const char* prefixes[] = { "import ", "__include ", "implementing " };
+    UnownedStringSlice lineContent;
+    Index pos = -1;
+    for (auto prefix : prefixes)
+    {
+        auto importStr = UnownedStringSlice(prefix);
+        lineContent = doc->getLine(line);
+        pos = lineContent.indexOf(importStr);
+        if (pos == -1)
+            continue;
+        auto lineBeforeImportKeyword = lineContent.head(pos).trim();
+        if (lineBeforeImportKeyword.getLength() != 0 && lineBeforeImportKeyword != "__exported")
+            continue;
+        pos += importStr.getLength();
+        goto validLine;
+    }
+    return SLANG_FAIL;
+validLine:;
     while (pos < lineContent.getLength() && pos < col - 1 && CharUtil::isWhitespace(lineContent[pos]))
         pos++;
     if (pos < lineContent.getLength() && lineContent[pos] == '"')

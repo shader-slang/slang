@@ -217,6 +217,7 @@ namespace Slang
             FixityChecked,
             TypeChecked,
             DirectionChecked,
+            VisibilityChecked,
             Applicable,
         };
         Status status = Status::Unchecked;
@@ -551,6 +552,10 @@ namespace Slang
             /// `import` to use them instead of trying to find the files in file system.
         LoadedModuleDictionary* m_environmentModules = nullptr;
 
+            /// (optional) The translation unit that is being checked.
+            /// Needed for handling `__include`s.
+        TranslationUnitRequest* m_translationUnitRequest = nullptr;
+
         DiagnosticSink* getSink()
         {
             return m_sink;
@@ -568,11 +573,13 @@ namespace Slang
             Linkage*        linkage,
             Module*         module,
             DiagnosticSink* sink,
-            LoadedModuleDictionary* environmentModules = nullptr)
+            LoadedModuleDictionary* environmentModules = nullptr,
+            TranslationUnitRequest* translationUnit = nullptr)
             : m_linkage(linkage)
             , m_module(module)
             , m_sink(sink)
             , m_environmentModules(environmentModules)
+            , m_translationUnitRequest(translationUnit)
         {}
 
         Session* getSession()
@@ -588,6 +595,11 @@ namespace Slang
         Module* getModule()
         {
             return m_module;
+        }
+
+        TranslationUnitRequest* getTranslationUnitRequest()
+        {
+            return m_translationUnitRequest;
         }
 
         bool isInLanguageServer()
@@ -762,6 +774,8 @@ namespace Slang
     struct SemanticsContext
     {
     public:
+        friend struct OuterScopeContextRAII;
+
         explicit SemanticsContext(
             SharedSemanticsContext* shared)
             : m_shared(shared)
@@ -793,6 +807,8 @@ namespace Slang
             result.m_parentFunc = parentFunc;
             result.m_outerStmts = nullptr;
             result.m_parentDifferentiableAttr = parentFunc->findModifier<DifferentiableAttribute>();
+            if (parentFunc->ownedScope)
+                result.m_outerScope = parentFunc->ownedScope;
             return result;
         }
 
@@ -857,11 +873,19 @@ namespace Slang
         };
 
         ExprLocalScope* getExprLocalScope() { return m_exprLocalScope; }
+        Scope* getOuterScope() { return m_outerScope; }
 
         SemanticsContext withExprLocalScope(ExprLocalScope* exprLocalScope)
         {
             SemanticsContext result(*this);
             result.m_exprLocalScope = exprLocalScope;
+            return result;
+        }
+
+        SemanticsContext withOuterScope(Scope* scope)
+        {
+            SemanticsContext result(*this);
+            result.m_outerScope = scope;
             return result;
         }
 
@@ -910,7 +934,30 @@ namespace Slang
         TreatAsDifferentiableExpr* m_treatAsDifferentiableExpr = nullptr;
 
         ASTBuilder* m_astBuilder = nullptr;
+
+        Scope* m_outerScope = nullptr;
     };
+
+    struct OuterScopeContextRAII
+    {
+        SemanticsContext* m_context;
+        Scope* m_oldOuterScope;
+
+        OuterScopeContextRAII(SemanticsContext* context, Scope* outerScope)
+            : m_context(context)
+            , m_oldOuterScope(context->getOuterScope())
+        {
+            context->m_outerScope = outerScope;
+        }
+
+        ~OuterScopeContextRAII()
+        {
+            m_context->m_outerScope = m_oldOuterScope;
+        }
+    };
+
+#define SLANG_OUTER_SCOPE_CONTEXT_RAII(context, scope) OuterScopeContextRAII _outerScopeContextRAII(context, scope)
+#define SLANG_OUTER_SCOPE_CONTEXT_DECL_RAII(context, decl) OuterScopeContextRAII _outerScopeContextRAII(context, decl->ownedScope?decl->ownedScope:context->getOuterScope())
 
     struct SemanticsVisitor : public SemanticsContext
     {
@@ -999,6 +1046,8 @@ namespace Slang
             /// If `expr` has Ref<T> Type, convert it into an l-value expr that has T type.
         Expr* maybeOpenRef(Expr* expr);
 
+        Scope* getScope(SyntaxNode* node);
+
         void diagnoseDeprecatedDeclRefUsage(DeclRef<Decl> declRef, SourceLoc loc, Expr* originalExpr);
 
         DeclRef<Decl> getDefaultDeclRef(Decl* decl)
@@ -1045,6 +1094,11 @@ namespace Slang
             SourceLoc loc,
             Expr*    originalExpr);
 
+        DeclVisibility getDeclVisibility(Decl* decl);
+        DeclVisibility getTypeVisibility(Type* type);
+        bool isDeclVisibleFromScope(DeclRef<Decl> declRef, Scope* scope);
+        LookupResult filterLookupResultByVisibility(const LookupResult& lookupResult);
+        LookupResult filterLookupResultByVisibilityAndDiagnose(const LookupResult& lookupResult, SourceLoc loc, bool& outDiagnosed);
 
         Val* resolveVal(Val* val)
         {
@@ -1433,6 +1487,7 @@ namespace Slang
             ModifiableSyntaxNode*   syntaxNode);
 
         void checkModifiers(ModifiableSyntaxNode* syntaxNode);
+        void checkVisibility(Decl* decl);
 
         bool doesSignatureMatchRequirement(
             DeclRef<CallableDecl>   satisfyingMemberDeclRef,
@@ -1827,6 +1882,10 @@ namespace Slang
             Val*	val = nullptr; // the value to which we are constraining it
             bool isUsedAsLValue = false;   // If this constraint is for a type parameter, is the type used in an l-value parameter?
             bool satisfied = false; // Has this constraint been met?
+
+            // Is this constraint optional? An optional constraint provides a hint value to a parameter
+            // if it is otherwise unconstrained, but doesn't take precedence over a constraint that is not optional.
+            bool isOptional = false;
         };
 
         // A collection of constraints that will need to be satisfied (solved)
@@ -1944,7 +2003,8 @@ namespace Slang
         DeclRef<Decl> trySolveConstraintSystem(
             ConstraintSystem*       system,
             DeclRef<GenericDecl>    genericDeclRef,
-            ArrayView<Val*> knownGenericArgs);
+            ArrayView<Val*> knownGenericArgs,
+            ConversionCost& outBaseCost);
 
 
         // State related to overload resolution for a call
@@ -1968,6 +2028,9 @@ namespace Slang
 
             // Source location of the "function" part of the expression, if any
             SourceLoc       funcLoc;
+
+            // The source scope of the lookup for performing visibiliity tests.
+            Scope* sourceScope = nullptr;
 
             // The original arguments to the call
             Index argCount = 0;
@@ -2031,6 +2094,10 @@ namespace Slang
         bool TryCheckOverloadCandidateFixity(
             OverloadResolveContext&		context,
             OverloadCandidate const&	candidate);
+
+        bool TryCheckOverloadCandidateVisibility(
+            OverloadResolveContext& context,
+            OverloadCandidate const& candidate);
 
         bool TryCheckGenericOverloadCandidateTypes(
             OverloadResolveContext&	context,
@@ -2120,25 +2187,30 @@ namespace Slang
 
         void AddOverloadCandidate(
             OverloadResolveContext& context,
-            OverloadCandidate&		candidate);
+            OverloadCandidate&		candidate,
+            ConversionCost baseCost);
         
         void AddHigherOrderOverloadCandidates(
             Expr*                   funcExpr,
-            OverloadResolveContext& context);
+            OverloadResolveContext& context,
+            ConversionCost baseCost);
 
         void AddFuncOverloadCandidate(
             LookupResultItem			item,
             DeclRef<CallableDecl>             funcDeclRef,
-            OverloadResolveContext&		context);
+            OverloadResolveContext&		context,
+            ConversionCost baseCost);
 
         void AddFuncOverloadCandidate(
             FuncType*		/*funcType*/,
-            OverloadResolveContext&	/*context*/);
+            OverloadResolveContext&	/*context*/,
+            ConversionCost baseCost);
 
         void AddFuncExprOverloadCandidate(
             FuncType* funcType,
             OverloadResolveContext& context,
-            Expr* expr);
+            Expr* expr,
+            ConversionCost baseCost);
 
         // Add a candidate callee for overload resolution, based on
         // calling a particular `ConstructorDecl`.
@@ -2147,7 +2219,8 @@ namespace Slang
             Type*                type,
             DeclRef<ConstructorDecl>    ctorDeclRef,
             OverloadResolveContext&     context,
-            Type*                resultType);
+            Type*                resultType,
+            ConversionCost baseCost);
 
         // If the given declaration has generic parameters, then
         // return the corresponding `GenericDecl` that holds the
@@ -2216,6 +2289,12 @@ namespace Slang
             QualType            fst,
             QualType            snd);
 
+        void maybeUnifyUnconstraintIntParam(
+            ConstraintSystem& constraints,
+            IntVal* param,
+            IntVal* arg,
+            bool paramIsLVal);
+
         // Is the candidate extension declaration actually applicable to the given type
         DeclRef<ExtensionDecl> applyExtensionToType(
             ExtensionDecl*  extDecl,
@@ -2226,12 +2305,26 @@ namespace Slang
             // arguments to form a `DeclRef` to the inner declaration
             // that could be applicable in the context of the given
             // overloaded call.
+            // Also computes a `baseCost` for the inferred arguments,
+            // so that we can prefer a more specialized generic candidate
+            // when there is ambiguity. For example, given
+            // ```
+            //     interface IBase;
+            //     interface IDerived : IBase;
+            //     struct Derived : IDerived {}
+            //     void f1<T:IBase>(T b)
+            //     void f2<T:IDerived>(T b);
+            // ```
+            // We will prefer f2 when seeing f(Derived()), because it takes
+            // less steps to upcast `Derived` to  `IDerived` than it does
+            // to `IBase`.
             //
         DeclRef<Decl> inferGenericArguments(
             DeclRef<GenericDecl>    genericDeclRef,
             OverloadResolveContext& context,
             ArrayView<Val*>         knownGenericArgs,
-            List<QualType>             *innerParameterTypes = nullptr);
+            ConversionCost          &outBaseCost,
+            List<QualType>          *innerParameterTypes = nullptr);
 
         void AddTypeOverloadCandidates(
             Type*	        type,
@@ -2239,7 +2332,8 @@ namespace Slang
 
         void AddDeclRefOverloadCandidates(
             LookupResultItem		item,
-            OverloadResolveContext&	context);
+            OverloadResolveContext&	context,
+            ConversionCost          baseCost);
 
         void AddOverloadCandidates(
             LookupResult const&     result,
@@ -2328,7 +2422,8 @@ namespace Slang
 
         Expr* lookupMemberResultFailure(
             DeclRefExpr*     expr,
-            QualType const& baseType);
+            QualType const& baseType,
+            bool supressDiagnostic = false);
 
         SharedSemanticsContext& operator=(const SharedSemanticsContext &) = delete;
 
@@ -2336,6 +2431,8 @@ namespace Slang
         //
 
         void importModuleIntoScope(Scope* scope, ModuleDecl* moduleDecl);
+        void importFileDeclIntoScope(Scope* scope, FileDecl* fileDecl);
+
 
         void suggestCompletionItems(
             CompletionSuggestions::ScopeKind scopeKind, LookupResult const& lookupResult);

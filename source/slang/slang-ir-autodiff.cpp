@@ -2066,20 +2066,15 @@ void releaseNullDifferentialType(AutoDiffSharedContext* context)
 {
     if (auto nullStruct = context->nullDifferentialStructType)
     {
-        if (auto publicDecoration = nullStruct->findDecoration<IRPublicDecoration>())
-            publicDecoration->removeAndDeallocate();
         if (auto keepAliveDecoration = nullStruct->findDecoration<IRKeepAliveDecoration>())
             keepAliveDecoration->removeAndDeallocate();
     }
 
     if (auto nullWitness = context->nullDifferentialWitness)
     {
-        if (auto publicDecoration = nullWitness->findDecoration<IRPublicDecoration>())
-            publicDecoration->removeAndDeallocate();
         if (auto keepAliveDecoration = nullWitness->findDecoration<IRKeepAliveDecoration>())
             keepAliveDecoration->removeAndDeallocate();
     }
-
 }
 
 bool finalizeAutoDiffPass(IRModule* module)

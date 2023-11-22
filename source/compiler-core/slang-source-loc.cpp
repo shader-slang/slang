@@ -919,6 +919,13 @@ void SourceManager::addSourceFile(const String& uniqueIdentity, SourceFile* sour
     m_sourceFileMap.add(uniqueIdentity, sourceFile);
 }
 
+void SourceManager::addSourceFileIfNotExist(const String& uniqueIdentity, SourceFile* sourceFile)
+{
+    if (findSourceFileRecursively(uniqueIdentity))
+        return;
+    m_sourceFileMap.addIfNotExists(uniqueIdentity, sourceFile);
+}
+
 HumaneSourceLoc SourceManager::getHumaneLoc(SourceLoc loc, SourceLocType type)
 {
     SourceView* sourceView = findSourceViewRecursively(loc);

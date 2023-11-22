@@ -575,7 +575,7 @@ void generateReflectionFunc(IRBuilder* builder, IRFunc* kernelFunc, IRFunc* host
 
     builder->addExternCppDecoration(reflectionFunc, reflFuncExportName.getUnownedSlice());
     builder->addTorchEntryPointDecoration(reflectionFunc, reflFuncExportName.getUnownedSlice());
-    builder->addPublicDecoration(reflectionFunc);
+    builder->addHLSLExportDecoration(reflectionFunc);
     builder->addKeepAliveDecoration(reflectionFunc);
 }
 
@@ -760,7 +760,7 @@ void generateReflectionForType(IRType* type, DiagnosticSink* sink)
  
     builder.addTorchEntryPointDecoration(reflFunc, reflFuncExportName.getUnownedSlice());
     builder.addExternCppDecoration(reflFunc, reflFuncExportName.getUnownedSlice());
-    builder.addPublicDecoration(reflFunc);
+    builder.addHLSLExportDecoration(reflFunc);
     builder.addKeepAliveDecoration(reflFunc);
 }
 
@@ -842,7 +842,7 @@ IRFunc* generateCUDAWrapperForFunc(IRFunc* func, DiagnosticSink* sink)
         // Mark for host-side emit logic.
         builder.addCudaHostDecoration(hostFunc);
         // Keep alive. This method will be accessed externally.
-        builder.addPublicDecoration(hostFunc);
+        builder.addHLSLExportDecoration(hostFunc);
         builder.addKeepAliveDecoration(hostFunc);
     }
 
@@ -1047,7 +1047,7 @@ void generateDerivativeWrappers(IRModule* module, DiagnosticSink* sink)
                     builder.addExternCppDecoration(wrapperFunc, nameBuilder.getUnownedSlice());
                 }
 
-                builder.addPublicDecoration(wrapperFunc);
+                builder.addHLSLExportDecoration(wrapperFunc);
                 builder.addKeepAliveDecoration(wrapperFunc);
 
                 builder.addCudaKernelForwardDerivativeDecoration(func, wrapperFunc);
@@ -1106,7 +1106,7 @@ void generateDerivativeWrappers(IRModule* module, DiagnosticSink* sink)
                     builder.addExternCppDecoration(wrapperFunc, nameBuilder.getUnownedSlice());
                 }
 
-                builder.addPublicDecoration(wrapperFunc);
+                builder.addHLSLExportDecoration(wrapperFunc);
                 builder.addKeepAliveDecoration(wrapperFunc);
 
                 builder.addCudaKernelBackwardDerivativeDecoration(func, wrapperFunc);

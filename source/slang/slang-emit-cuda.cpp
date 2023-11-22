@@ -181,11 +181,7 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
 
             if (auto texType = as<IRTextureTypeBase>(type))
             {
-                // We don't support TextureSampler, so ignore that
-                if (texType->getOp() != kIROp_TextureSamplerType)
-                {
-                    return _calcCUDATextureTypeName(texType, out);
-                }
+                return _calcCUDATextureTypeName(texType, out);
             }
 
             switch (type->getOp())

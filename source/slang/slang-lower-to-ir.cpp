@@ -30,7 +30,6 @@
 #include "slang-ir-obfuscate-loc.h"
 #include "slang-ir-use-uninitialized-out-param.h"
 #include "slang-ir-peephole.h"
-
 #include "slang-mangle.h"
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
@@ -1328,7 +1327,6 @@ static void addLinkageDecoration(
         if (as<PublicModifier>(modifier))
         {
             builder->addPublicDecoration(inst);
-            builder->addKeepAliveDecoration(inst);
         }
         else if (as<HLSLExportModifier>(modifier))
         {
@@ -1350,43 +1348,50 @@ static void addLinkageDecoration(
         else if (as<DllExportAttribute>(modifier))
         {
             builder->addDllExportDecoration(inst, decl->getName()->text.getUnownedSlice());
-            builder->addPublicDecoration(inst);
+            builder->addHLSLExportDecoration(inst);
+            builder->addKeepAliveDecoration(inst);
         }
         else if (as<CudaDeviceExportAttribute>(modifier))
         {
             builder->addCudaDeviceExportDecoration(inst, decl->getName()->text.getUnownedSlice());
-            builder->addPublicDecoration(inst);
+            builder->addHLSLExportDecoration(inst);
             builder->addExternCppDecoration(inst, decl->getName()->text.getUnownedSlice());
+            builder->addKeepAliveDecoration(inst);
         }
         else if (as<CudaHostAttribute>(modifier))
         {
             builder->addCudaHostDecoration(inst);
             builder->addExternCppDecoration(inst, decl->getName()->text.getUnownedSlice());
+            builder->addKeepAliveDecoration(inst);
         }
         else if (as<CudaKernelAttribute>(modifier))
         {
             builder->addCudaKernelDecoration(inst);
             builder->addExternCppDecoration(inst, decl->getName()->text.getUnownedSlice());
-            builder->addPublicDecoration(inst);
+            builder->addHLSLExportDecoration(inst);
             builder->addKeepAliveDecoration(inst);
         }
         else if (as<TorchEntryPointAttribute>(modifier))
         {
             builder->addTorchEntryPointDecoration(inst, decl->getName()->text.getUnownedSlice());
             builder->addCudaHostDecoration(inst);
-            builder->addPublicDecoration(inst);
+            builder->addHLSLExportDecoration(inst);
+            builder->addKeepAliveDecoration(inst);
             builder->addExternCppDecoration(inst, decl->getName()->text.getUnownedSlice());
         }
         else if (as<AutoPyBindCudaAttribute>(modifier))
         {
             builder->addAutoPyBindCudaDecoration(inst, decl->getName()->text.getUnownedSlice());
             builder->addAutoPyBindExportInfoDecoration(inst);
+            builder->addKeepAliveDecoration(inst);
+            builder->addHLSLExportDecoration(inst);
         }
         else if (auto pyExportModifier = as<PyExportAttribute>(modifier))
         {
             builder->addPyExportDecoration(inst, pyExportModifier->name.getLength()
                 ? pyExportModifier->name.getUnownedSlice()
                 : decl->getName()->text.getUnownedSlice());
+            builder->addHLSLExportDecoration(inst);
         }
         else if (auto knownBuiltinModifier = as<KnownBuiltinAttribute>(modifier))
         {
@@ -2155,7 +2160,23 @@ void addVarDecorations(
         {
             builder->addSimpleDecoration<IRHLSLMeshPayloadDecoration>(inst);
         }
-
+        else if (as<OutModifier>(mod))
+        {
+            builder->addSimpleDecoration<IRGlobalOutputDecoration>(inst);
+        }
+        else if (as<InModifier>(mod))
+        {
+            builder->addSimpleDecoration<IRGlobalInputDecoration>(inst);
+        }
+        else if (auto glslLocationMod = as<GLSLLocationLayoutModifier>(mod))
+        {
+            builder->addDecoration(inst, kIROp_GLSLLocationDecoration,
+                builder->getIntValue(builder->getIntType(), stringToInt(glslLocationMod->valToken.getContent())));
+        }
+        else if (auto hlslSemantic = as< HLSLSimpleSemantic>(mod))
+        {
+            builder->addSemanticDecoration(inst, hlslSemantic->name.getContent());
+        }
         // TODO: what are other modifiers we need to propagate through?
     }
     if(auto t = composeGetters<IRMeshOutputType>(inst->getFullType(), &IROutTypeBase::getValueType))
@@ -3917,6 +3938,10 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 {
                     return builder->emitSPIRVAsmOperandGLSL450Set();
                 }
+            case SPIRVAsmOperand::NonSemanticDebugPrintfExtSet:
+                {
+                    return builder->emitSPIRVAsmOperandDebugPrintfSet();
+                }
             case SPIRVAsmOperand::SlangValue:
                 {
                     IRInst* i;
@@ -3968,6 +3993,26 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                     }
                     return builder->emitSPIRVAsmOperandSampledType(i);
                 }
+            case SPIRVAsmOperand::ImageType:
+            {
+                IRInst* i;
+                {
+                    IRBuilderInsertLocScope insertScope(builder);
+                    builder->setInsertBefore(spirvAsmInst);
+                    i = getSimpleVal(context, lowerRValueExpr(context, operand.expr));
+                }
+                return builder->emitSPIRVAsmOperandImageType(i);
+            }
+            case SPIRVAsmOperand::SampledImageType:
+            {
+                IRInst* i;
+                {
+                    IRBuilderInsertLocScope insertScope(builder);
+                    builder->setInsertBefore(spirvAsmInst);
+                    i = getSimpleVal(context, lowerRValueExpr(context, operand.expr));
+                }
+                return builder->emitSPIRVAsmOperandSampledImageType(i);
+            }
             case SPIRVAsmOperand::TruncateMarker:
                 {
                     return builder->emitSPIRVAsmOperandTruncate();
@@ -4522,7 +4567,9 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     {
         if( auto declaredSubtypeWitness = as<DeclaredSubtypeWitness>(subTypeWitness) )
         {
-            return extractField(superType, value, declaredSubtypeWitness->getDeclRef());
+            // Drop the specialization info on inheritance decl struct keys, as it makes no
+            // sense to specialize a key.
+            return extractField(superType, value, declaredSubtypeWitness->getDeclRef().getDecl());
         }
         else
         {
@@ -6855,11 +6902,15 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     LoweredValInfo visit##NAME(NAME*) { return LoweredValInfo(); }
 
     IGNORED_CASE(ImportDecl)
+    IGNORED_CASE(IncludeDecl)
+    IGNORED_CASE(ImplementingDecl)
     IGNORED_CASE(UsingDecl)
     IGNORED_CASE(EmptyDecl)
     IGNORED_CASE(SyntaxDecl)
     IGNORED_CASE(AttributeDecl)
     IGNORED_CASE(NamespaceDecl)
+    IGNORED_CASE(ModuleDeclarationDecl)
+    IGNORED_CASE(FileDecl)
 
 #undef IGNORED_CASE
 
@@ -6967,15 +7018,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return LoweredValInfo::simple(inst);
     }
 
-    bool isPublicType(Type* type)
+    bool isExportedType(Type* type)
     {
-        // TODO(JS):
-        // Not clear how should handle HLSLExportModifier here. 
-        // In the HLSL spec 'export' is only applicable to functions. So for now we ignore.
-
         if (auto declRefType = as<DeclRefType>(type))
         {
-            if (declRefType->getDeclRef().getDecl()->findModifier<PublicModifier>())
+            if (declRefType->getDeclRef().getDecl()->findModifier<HLSLExportModifier>())
                 return true;
         }
         return false;
@@ -7032,9 +7079,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                             astReqWitnessTable->witnessedType,
                             astReqWitnessTable->baseType);
                         subBuilder->addExportDecoration(irSatisfyingWitnessTable, mangledName.getUnownedSlice());
-                        if (isPublicType(astReqWitnessTable->witnessedType))
+                        if (isExportedType(astReqWitnessTable->witnessedType))
                         {
-                            subBuilder->addPublicDecoration(irSatisfyingWitnessTable);
+                            subBuilder->addHLSLExportDecoration(irSatisfyingWitnessTable);
                             subBuilder->addKeepAliveDecoration(irSatisfyingWitnessTable);
                         }
 
@@ -7174,16 +7221,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             subBuilder->addPublicDecoration(irWitnessTable);
         }
 
-        // TODO(JS):
-        // Not clear what to do here around HLSLExportModifier. 
-        // In HLSL it only (currently) applies to functions, so perhaps do nothing is reasonable.
-        
-        if (parentDecl->findModifier<PublicModifier>())
+        if (parentDecl->findModifier<HLSLExportModifier>())
         {
-            subBuilder->addPublicDecoration(irWitnessTable);
+            subBuilder->addHLSLExportDecoration(irWitnessTable);
             subBuilder->addKeepAliveDecoration(irWitnessTable);
         }
-
 
         // Make sure that all the entries in the witness table have been filled in,
         // including any cases where there are sub-witness-tables for conformances
@@ -8003,8 +8045,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // Not clear what to do around HLSLExportModifier. 
         // The HLSL spec says it only applies to functions, so we ignore for now.
 
-        const bool isPublicType = decl->findModifier<PublicModifier>() != nullptr;
-
         // We are going to create nested IR building state
         // to use when emitting the members of the type.
         //
@@ -8023,6 +8063,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         else if (as<ClassDecl>(decl))
         {
             irAggType = subBuilder->createClassType();
+        }
+        else if (as<GLSLInterfaceBlockDecl>(decl))
+        {
+            return LoweredValInfo();
         }
         else
         {
@@ -8926,6 +8970,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         IRFunc* irFunc = subBuilder->createFunc();
         addNameHint(subContext, irFunc, decl);
         addLinkageDecoration(subContext, irFunc, decl);
+        
+        // Register the value now, to avoid any possible infinite recursion when lowering the body or attributes.
+        context->setGlobalValue(decl, LoweredValInfo::simple(findOuterMostGeneric(irFunc)));
 
         // Always force inline diff setter accessor to prevent downstream compiler from complaining
         // fields are not fully initialized for the first `inout` parameter.
@@ -9206,9 +9253,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         addTargetIntrinsicDecorations(subContext, irFunc, decl);
 
         addCatchAllIntrinsicDecorationIfNeeded(irFunc, decl);
-
-        // Register the value now, to avoid any possible infinite recursion when lowering ForwardDerivativeAttribute
-        context->setGlobalValue(decl, LoweredValInfo::simple(findOuterMostGeneric(irFunc)));
 
         bool isInline = false;
 
@@ -9722,7 +9766,7 @@ LoweredValInfo emitDeclRef(
     SLANG_UNUSED(initialSubst);
 
 
-    if (auto thisTypeDecl = as<ThisTypeDecl>(decl))
+    if (as<ThisTypeDecl>(decl))
     {
         // A declref to ThisType decl should be lowered differently
         // from other decls. In general, IFoo<T>.ThisType should lower to
@@ -10560,7 +10604,9 @@ struct TypeConformanceIRGenContext
         context->irBuilder = builder;
 
         auto witness = lowerSimpleVal(context, typeConformance->getSubtypeWitness());
-        builder->addPublicDecoration(witness);
+        builder->addKeepAliveDecoration(witness);
+        builder->addHLSLExportDecoration(witness);
+
         if (conformanceIdOverride != -1)
         {
             builder->addSequentialIDDecoration(witness, conformanceIdOverride);

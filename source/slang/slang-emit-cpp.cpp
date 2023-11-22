@@ -137,11 +137,8 @@ SlangResult CPPSourceEmitter::_calcCPPTextureTypeName(IRTextureTypeBase* texType
         case SLANG_RESOURCE_ACCESS_CONSUME:
             outName << "Consume";
             break;
-        case SLANG_RESOURCE_ACCESS_WRITE:
-            if (texType->isFeedback())
-            {
-                outName << "Feedback";
-            }
+        case SLANG_RESOURCE_ACCESS_FEEDBACK:
+            outName << "Feedback";
             break;
         default:
             SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource access mode");
@@ -150,11 +147,11 @@ SlangResult CPPSourceEmitter::_calcCPPTextureTypeName(IRTextureTypeBase* texType
 
     switch (texType->GetBaseShape())
     {
-        case TextureFlavor::Shape::Shape1D:		outName << "Texture1D";		break;
-        case TextureFlavor::Shape::Shape2D:		outName << "Texture2D";		break;
-        case TextureFlavor::Shape::Shape3D:		outName << "Texture3D";		break;
-        case TextureFlavor::Shape::ShapeCube:	outName << "TextureCube";	break;
-        case TextureFlavor::Shape::ShapeBuffer: outName << "Buffer";         break;
+        case SLANG_TEXTURE_1D:		outName << "Texture1D";		break;
+        case SLANG_TEXTURE_2D:		outName << "Texture2D";		break;
+        case SLANG_TEXTURE_3D:		outName << "Texture3D";		break;
+        case SLANG_TEXTURE_CUBE:	outName << "TextureCube";	break;
+        case SLANG_TEXTURE_BUFFER:  outName << "Buffer";        break;
         default:
             SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource shape");
             return SLANG_FAIL;
@@ -332,11 +329,7 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
 
             if (auto texType = as<IRTextureTypeBase>(type))
             {
-                // We don't support TextureSampler, so ignore that
-                if (texType->getOp() != kIROp_TextureSamplerType)
-                {
-                    return _calcCPPTextureTypeName(texType, out);   
-                }
+                return _calcCPPTextureTypeName(texType, out);
             }
 
             // If _getResourceTypePrefix returns something, we assume can output any specialization after it in order.

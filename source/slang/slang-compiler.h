@@ -1414,6 +1414,9 @@ namespace Slang
         void _addEntryPoint(EntryPoint* entryPoint);
         void _processFindDeclsExportSymbolsRec(Decl* decl);
 
+        // Gets the files that has been included into the module.
+        Dictionary<SourceFile*, FileDecl*>& getIncludedSourceFileMap() { return m_mapSourceFileToFileDecl; }
+
     protected:
         void acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo) SLANG_OVERRIDE;
 
@@ -1468,6 +1471,9 @@ namespace Slang
         // and m_mangledExportSymbols holds the NodeBase* values for each index. 
         StringSlicePool m_mangledExportPool;
         List<NodeBase*> m_mangledExportSymbols;
+
+        // Source files that have been pulled into the module with `__include`.
+        Dictionary<SourceFile*, FileDecl*> m_mapSourceFileToFileDecl;
     };
     typedef Module LoadedModule;
 
@@ -1528,6 +1534,10 @@ namespace Slang
         Session* getSession();
         NamePool* getNamePool();
         SourceManager* getSourceManager();
+
+        Scope* getLanguageScope();
+
+        Dictionary<String, String> getCombinedPreprocessorDefinitions();
 
     protected:
         void _addSourceFile(SourceFile* sourceFile);
@@ -1812,6 +1822,14 @@ namespace Slang
         {
             m_enableEffectAnnotations = value;
         }
+        bool getAllowGLSLInput()
+        {
+            return m_allowGLSLInput;
+        }
+        void setAllowGLSLInput(bool value)
+        {
+            m_allowGLSLInput = value;
+        }
 
         // Information on the targets we are being asked to
         // generate code for.
@@ -1934,6 +1952,14 @@ namespace Slang
             DiagnosticSink*     sink,
             const LoadedModuleDictionary* loadedModules = nullptr);
 
+        SourceFile* findFile(Name* name, SourceLoc loc, IncludeSystem& outIncludeSystem);
+        struct IncludeResult
+        {
+            FileDecl* fileDecl;
+            bool isNew;
+        };
+        IncludeResult findAndIncludeFile(Module* module, TranslationUnitRequest* translationUnit, Name* name, SourceLoc const& loc, DiagnosticSink* sink);
+
         SourceManager* getSourceManager()
         {
             return m_sourceManager;
@@ -1972,6 +1998,7 @@ namespace Slang
         bool m_requireCacheFileSystem = false;
         bool m_useFalcorCustomSharedKeywordSemantics = false;
         bool m_enableEffectAnnotations = false;
+        bool m_allowGLSLInput = false;
 
         // Modules that have been read in with the -r option
         List<ComPtr<IArtifact>> m_libModules;
@@ -2641,6 +2668,7 @@ namespace Slang
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL setGlobalGenericArgs(int genericArgCount, char const** genericArgs) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL setTypeNameForGlobalExistentialTypeParam(int slotIndex, char const* typeName) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL setTypeNameForEntryPointExistentialTypeParam(int entryPointIndex, int slotIndex, char const* typeName) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setAllowGLSLInput(bool value) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL compile() SLANG_OVERRIDE;
         virtual SLANG_NO_THROW char const* SLANG_MCALL getDiagnosticOutput() SLANG_OVERRIDE;
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL getDiagnosticOutputBlob(ISlangBlob** outBlob) SLANG_OVERRIDE;
@@ -3055,7 +3083,7 @@ namespace Slang
         ComPtr<ISlangBlob> coreLibraryCode;
         //ComPtr<ISlangBlob> slangLibraryCode;
         ComPtr<ISlangBlob> hlslLibraryCode;
-        //ComPtr<ISlangBlob> glslLibraryCode;
+        ComPtr<ISlangBlob> glslLibraryCode;
         ComPtr<ISlangBlob> autodiffLibraryCode;
 
         String  getStdlibPath();
@@ -3063,6 +3091,7 @@ namespace Slang
         ComPtr<ISlangBlob> getCoreLibraryCode();
         ComPtr<ISlangBlob> getHLSLLibraryCode();
         ComPtr<ISlangBlob> getAutodiffLibraryCode();
+        ComPtr<ISlangBlob> getGLSLLibraryCode();
 
         RefPtr<SharedASTBuilder> m_sharedASTBuilder;
 

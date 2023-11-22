@@ -1063,7 +1063,7 @@ namespace Slang
         overloadContext.argCount = 1;
         overloadContext.argTypes = &fromType.type;
         overloadContext.args = &fromExpr;
-
+        overloadContext.sourceScope = m_outerScope;
         overloadContext.originalExpr = nullptr;
         if(fromExpr)
         {

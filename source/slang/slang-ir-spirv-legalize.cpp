@@ -41,6 +41,55 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     };
     Dictionary<IRType*, LoweredStructuredBufferTypeInfo> m_loweredStructuredBufferTypes;
 
+    IRInst* lowerTextureFootprintType(IRInst* footprintType)
+    {
+        // Lowers `IRTextureFootprintType` to a struct with the following definition:
+        /*
+            ```
+            struct __SpvTextureFootprintData<let ND : int>
+            {
+                bool isSingleLevel;
+                vector<uint, ND> anchor;
+                vector<uint, ND> offset;
+                uint2 mask;
+                uint lod;
+                uint granularity;
+            }
+            ```
+        */
+
+        auto ND = footprintType->getOperand(0);
+
+        IRBuilder builder(footprintType);
+        builder.setInsertBefore(footprintType);
+        auto structType = builder.createStructType();
+        auto isSingleLevel = builder.createStructKey();
+        builder.addNameHintDecoration(isSingleLevel, UnownedStringSlice("isSingleLevel"));
+        builder.createStructField(structType, isSingleLevel, builder.getBoolType());
+
+        auto anchor = builder.createStructKey();
+        builder.addNameHintDecoration(anchor, UnownedStringSlice("anchor"));
+        builder.createStructField(structType, anchor, builder.getVectorType(builder.getUIntType(), ND));
+
+        auto offset = builder.createStructKey();
+        builder.addNameHintDecoration(offset, UnownedStringSlice("offset"));
+        builder.createStructField(structType, offset, builder.getVectorType(builder.getUIntType(), ND));
+
+        auto mask = builder.createStructKey();
+        builder.addNameHintDecoration(mask, UnownedStringSlice("mask"));
+        builder.createStructField(structType, mask, builder.getVectorType(builder.getUIntType(), builder.getIntValue(builder.getIntType(), 2)));
+
+        auto lod = builder.createStructKey();
+        builder.addNameHintDecoration(lod, UnownedStringSlice("lod"));
+        builder.createStructField(structType, lod, builder.getUIntType());
+
+        auto granularity = builder.createStructKey();
+        builder.addNameHintDecoration(granularity, UnownedStringSlice("granularity"));
+        builder.createStructField(structType, granularity, builder.getUIntType());
+
+        return structType;
+    }
+
     LoweredStructuredBufferTypeInfo lowerStructuredBufferType(IRHLSLStructuredBufferTypeBase* inst)
     {
         LoweredStructuredBufferTypeInfo result;
@@ -298,7 +347,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
     static void inferTextureFormat(IRInst* textureInst, IRTextureTypeBase* textureType)
     {
-        ImageFormat format = ImageFormat::unknown;
+        ImageFormat format = (ImageFormat)(textureType->getFormat());
         if (auto decor = textureInst->findDecoration<IRFormatDecoration>())
         {
             format = decor->getFormat();
@@ -390,15 +439,19 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         {
             IRBuilder builder(textureInst->getModule());
             builder.setInsertBefore(textureInst);
-            List<IRInst*> args;
-            args.add(textureType->getOperand(0));
-            if (textureType->getOperandCount() >= 2)
-                args.add(textureType->getOperand(1));
-            else
-                args.add(builder.getIntValue(builder.getUIntType(), 0));
-            args.add(builder.getIntValue(builder.getUIntType(), IRIntegerValue(format)));
+            auto formatArg = builder.getIntValue(builder.getUIntType(), IRIntegerValue(format));
 
-            auto newType = (IRType*)builder.emitIntrinsicInst(builder.getTypeKind(), textureType->getOp(), 3, args.getBuffer());
+            auto newType = builder.getTextureType(
+                textureType->getElementType(),
+                textureType->getShapeInst(),
+                textureType->getIsArrayInst(),
+                textureType->getIsMultisampleInst(),
+                textureType->getSampleCountInst(),
+                textureType->getAccessInst(),
+                textureType->getIsShadowInst(),
+                textureType->getIsCombinedInst(),
+                formatArg);
+
             if (textureInst->getFullType() == textureType)
             {
                 // Simple texture typed global param.
@@ -460,7 +513,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
             auto innerType = inst->getFullType();
 
-            auto arrayType = as<IRArrayType>(inst->getDataType());
+            auto arrayType = as<IRArrayTypeBase>(inst->getDataType());
             IRInst* arraySize = nullptr;
             if (arrayType)
             {
@@ -556,9 +609,17 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             }
 
             auto innerElementType = innerType;
-            if (arraySize)
+            if (arrayType)
             {
-                innerType = builder.getArrayType(innerType, arraySize);
+                Array<IRInst*, 2> arrayTypeArgs;
+                arrayTypeArgs.add(innerType);
+                if (arraySize)
+                    arrayTypeArgs.add(arraySize);
+                innerType = (IRType*)builder.emitIntrinsicInst(builder.getTypeKind(), arrayType->getOp(), (UInt)arrayTypeArgs.getCount(), arrayTypeArgs.getBuffer());
+                if (!arraySize)
+                {
+                    builder.addRequireSPIRVDescriptorIndexingExtensionDecoration(inst);
+                }
             }
 
             // Make a pointer type of storageClass.
@@ -573,7 +634,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                         insertLoadAtLatestLocation(inst, use);
                     });
             }
-            else if (arraySize)
+            else if (arrayType)
             {
                 traverseUses(inst, [&](IRUse* use)
                     {
@@ -1535,11 +1596,17 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
         // Translate types.
         List<IRHLSLStructuredBufferTypeBase*> instsToProcess;
+        List<IRInst*> textureFootprintTypes;
+
         for (auto globalInst : m_module->getGlobalInsts())
         {
             if (auto t = as<IRHLSLStructuredBufferTypeBase>(globalInst))
             {
                 instsToProcess.add(t);
+            }
+            else if (globalInst->getOp() == kIROp_TextureFootprintType)
+            {
+                textureFootprintTypes.add(globalInst);
             }
         }
         for (auto t : instsToProcess)
@@ -1548,6 +1615,13 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             IRBuilder builder(t);
             builder.setInsertBefore(t);
             t->replaceUsesWith(builder.getPtrType(kIROp_PtrType, lowered.structType, SpvStorageClassStorageBuffer));
+        }
+        for (auto t : textureFootprintTypes)
+        {
+            auto lowered = lowerTextureFootprintType(t);
+            IRBuilder builder(t);
+            builder.setInsertBefore(t);
+            t->replaceUsesWith(lowered);
         }
 
         List<IRUse*> globalInstUsesToInline;

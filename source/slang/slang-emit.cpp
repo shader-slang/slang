@@ -64,6 +64,7 @@
 #include "slang-ir-wrap-structured-buffers.h"
 #include "slang-ir-liveness.h"
 #include "slang-ir-glsl-liveness.h"
+#include "slang-ir-translate-glsl-global-var.h"
 #include "slang-ir-legalize-uniform-buffer-load.h"
 #include "slang-ir-lower-buffer-element-type.h"
 #include "slang-ir-string-hash.h"
@@ -231,12 +232,15 @@ Result linkAndOptimizeIR(
     dumpIRIfEnabled(codeGenContext, irModule, "LINKED");
 #endif
 
+
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
     // If the user specified the flag that they want us to dump
     // IR, then do it here, for the target-specific, but
     // un-specialized IR.
     dumpIRIfEnabled(codeGenContext, irModule);
+
+    translateGLSLGlobalVar(codeGenContext, irModule);
 
     // Replace any global constants with their values.
     //
@@ -397,14 +401,16 @@ Result linkAndOptimizeIR(
     for (;;)
     {
         bool changed = false;
-
+        auto b1 = dumpIRToString(irModule->getModuleInst());
         dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-SPECIALIZE");
         if (!codeGenContext->isSpecializationDisabled())
             changed |= specializeModule(irModule, codeGenContext->getSink());
         if (codeGenContext->getSink()->getErrorCount() != 0)
             return SLANG_FAIL;
         dumpIRIfEnabled(codeGenContext, irModule, "AFTER-SPECIALIZE");
+        auto b2 = dumpIRToString(irModule->getModuleInst());
 
+        applySparseConditionalConstantPropagation(irModule, codeGenContext->getSink());
         eliminateDeadCode(irModule);
 
         validateIRModuleIfEnabled(codeGenContext, irModule);
@@ -416,9 +422,6 @@ Result linkAndOptimizeIR(
         // Unroll loops.
         if (codeGenContext->getSink()->getErrorCount() == 0)
         {
-            applySparseConditionalConstantPropagationForGlobalScope(
-                irModule, codeGenContext->getSink());
-
             if (!unrollLoopsInModule(irModule, codeGenContext->getSink()))
                 return SLANG_FAIL;
         }
@@ -583,11 +586,7 @@ Result linkAndOptimizeIR(
             sink);
     }
 
-    if(isKhronosTarget(targetRequest))
-    {
-        // SPIR-V doesn't support 1-vectors
-        legalizeVectorTypes(irModule, sink);
-    }
+    legalizeVectorTypes(irModule, sink);
 
     // Once specialization and type legalization have been performed,
     // we should perform some of our basic optimization steps again,

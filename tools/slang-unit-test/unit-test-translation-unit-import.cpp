@@ -18,7 +18,7 @@ SLANG_UNIT_TEST(translationUnitImport)
 {
     // Source for the first translation unit.
     const char* generatedSource =
-        "int f() {"
+        "public int f() {"
         "   return 5;"
         "};";
 
@@ -28,7 +28,7 @@ SLANG_UNIT_TEST(translationUnitImport)
         R"(
         import generatedUnit;
 
-        int g(){ return f(); }
+        public int g(){ return f(); }
         )";
 
     // Source for a module that transitively uses the generated source via a file.

@@ -85,6 +85,10 @@ namespace Slang
 
         void visitImportDecl(ImportDecl* decl);
 
+        void visitIncludeDecl(IncludeDecl* decl);
+
+        void visitImplementingDecl(ImplementingDecl* decl);
+
         void visitUsingDecl(UsingDecl* decl);
 
         void visitGenericTypeParamDecl(GenericTypeParamDecl* decl);
@@ -294,7 +298,9 @@ namespace Slang
     {
         // Things at the global scope are always "members" of their module.
         //
-        if(as<ModuleDecl>(parentDecl))
+        if(as<NamespaceDeclBase>(parentDecl))
+            return false;
+        if (as<FileDecl>(parentDecl))
             return false;
 
         // Anything explicitly marked `static` and not at module scope
@@ -369,7 +375,7 @@ namespace Slang
         auto parentDecl = decl->parentDecl;
         if (auto genericDecl = as<GenericDecl>(parentDecl))
             parentDecl = genericDecl->parentDecl;
-        return as<NamespaceDeclBase>(parentDecl) != nullptr;
+        return as<NamespaceDeclBase>(parentDecl) != nullptr || as<FileDecl>(parentDecl) != nullptr;
     }
 
         /// Is `decl` a global shader parameter declaration?
@@ -381,13 +387,18 @@ namespace Slang
         // A global shader parameter must be declared at global or namespace
         // scope, so that it has a single definition across the module.
         //
-        if(!as<NamespaceDeclBase>(decl->parentDecl)) return false;
+        if(!isGlobalDecl(decl)) return false;
 
         // A global variable marked `static` indicates a traditional
         // global variable (albeit one that is implicitly local to
         // the translation unit)
         //
         if(decl->hasModifier<HLSLStaticModifier>()) return false;
+
+        // While not normally allowed, out variables are not constant
+        // parameters, this can happen for example in GLSL mode
+        if(decl->hasModifier<OutModifier>()) return false;
+        if(decl->hasModifier<InModifier>()) return false;
 
         // The `groupshared` modifier indicates that a variable cannot
         // be a shader parameters, but is instead transient storage
@@ -724,6 +735,7 @@ namespace Slang
         // The coding of this loop is somewhat defensive to deal
         // with special cases that will be described along the way.
         //
+        auto outerScope = getScope(decl);
         for(;;)
         {
             // The first thing is to check what state the decl is
@@ -748,6 +760,8 @@ namespace Slang
             // cannot affect the state in which the declaration is *checked*.
             //
             SemanticsContext subContext = baseContext ? SemanticsContext(*baseContext) : SemanticsContext(getShared());
+            if (outerScope)
+                subContext = subContext.withOuterScope(outerScope);
             _dispatchDeclCheckingVisitor(decl, nextState, subContext);
 
             // In the common case, the visitor will have done the necessary
@@ -1219,7 +1233,25 @@ namespace Slang
                     varDecl->type.type = m_astBuilder->getConstantBufferType(varDecl->type);
                 }
             }
+
+            if (getLinkage()->getAllowGLSLInput())
+            {
+                // If we are in GLSL compatiblity mode, we want to treat all global variables
+                // without any `uniform` modifiers as true global variables by default.
+                if (!varDecl->findModifier<HLSLUniformModifier>() &&
+                    !varDecl->findModifier<InModifier>() &&
+                    !varDecl->findModifier<OutModifier>())
+                {
+                    if (!as<ResourceType>(varDecl->type) && !as<PointerLikeType>(varDecl->type))
+                    {
+                        auto staticModifier = m_astBuilder->create<HLSLStaticModifier>();
+                        addModifier(varDecl, staticModifier);
+                    }
+                }
+            }
         }
+
+        checkVisibility(varDecl);
     }
 
     void SemanticsDeclHeaderVisitor::visitStructDecl(StructDecl* structDecl)
@@ -1236,11 +1268,12 @@ namespace Slang
         {
             addModifier(structDecl, m_astBuilder->create<NVAPIMagicModifier>());
         }
+        checkVisibility(structDecl);
     }
 
     void SemanticsDeclHeaderVisitor::visitClassDecl(ClassDecl* classDecl)
     {
-        SLANG_UNUSED(classDecl);
+        checkVisibility(classDecl);
     }
 
     void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
@@ -1288,6 +1321,7 @@ namespace Slang
             OverloadResolveContext overloadContext;
             overloadContext.loc = varDecl->nameAndLoc.loc;
             overloadContext.mode = OverloadResolveContext::Mode::JustTrying;
+            overloadContext.sourceScope = m_outerScope;
             AddTypeOverloadCandidates(type, overloadContext);
 
             if(overloadContext.bestCandidates.getCount() != 0)
@@ -1340,6 +1374,24 @@ namespace Slang
                 if (as<TypeType>(typeExp.exp->type))
                     typeExp.exp->type = m_astBuilder->getTypeType(newType);
             }
+        }
+    }
+
+    void addVisibilityModifier(ASTBuilder* builder, Decl* decl, DeclVisibility vis)
+    {
+        switch (vis)
+        {
+        case DeclVisibility::Public:
+            addModifier(decl, builder->create<PublicModifier>());
+            break;
+        case DeclVisibility::Internal:
+            addModifier(decl, builder->create<InternalModifier>());
+            break;
+        case DeclVisibility::Private:
+            addModifier(decl, builder->create<PrivateModifier>());
+            break;
+        default:
+            break;
         }
     }
 
@@ -1409,6 +1461,10 @@ namespace Slang
             diffField->checkState = DeclCheckState::SignatureChecked;
             diffField->parentDecl = aggTypeDecl;
             aggTypeDecl->members.add(diffField);
+
+            auto visibility = getDeclVisibility(member);
+            addVisibilityModifier(m_astBuilder, diffField, visibility);
+
             aggTypeDecl->invalidateMemberDictionary();
 
             // Inject a `DerivativeMember` modifier on the differential field to point to itself.
@@ -1513,6 +1569,15 @@ namespace Slang
         }
 
         addModifier(aggTypeDecl, m_astBuilder->create<SynthesizedModifier>());
+
+        // The visibility of synthesized decl should be the min of the parent decl and the requirement.
+        if (auto visModifier = requirementDeclRef.getDecl()->findModifier<VisibilityModifier>())
+        {
+            auto requirementVisibility = getDeclVisibility(requirementDeclRef.getDecl());
+            auto thisVisibility = getDeclVisibility(context->parentDecl);
+            auto visibility = Math::Min(thisVisibility, requirementVisibility);
+            addVisibilityModifier(m_astBuilder, aggTypeDecl, visibility);
+        }
 
         // Synthesize the rest of IDifferential method conformances by recursively checking
         // conformance on the synthesized decl.
@@ -1752,6 +1817,27 @@ namespace Slang
             _registerBuiltinDeclsRec(getSession(), moduleDecl);
         }
 
+        if (moduleDecl->members.getCount() > 0)
+        {
+            auto firstMember = moduleDecl->members[0];
+            if (auto implDecl = as<ImplementingDecl>(firstMember))
+            {
+                if (!getShared()->isInLanguageServer())
+                {
+                    // A primary module file can't start with an "implementing" declaration.
+                    getSink()->diagnose(firstMember, Diagnostics::primaryModuleFileCannotStartWithImplementingDecl);
+                }
+            }
+            else if (!as<ModuleDeclarationDecl>(firstMember))
+            {
+                // A primary module file must start with a `module` declaration.
+                // TODO: this warning is disabled for now to free users from massive change for now.
+#if 0
+                getSink()->diagnose(firstMember, Diagnostics::primaryModuleFileMustStartWithModuleDecl);
+#endif
+            }
+        }
+
         // We need/want to visit any `import` declarations before
         // anything else, to make sure that scoping works.
         //
@@ -1761,6 +1847,30 @@ namespace Slang
         for(auto importDecl : moduleDecl->getMembersOfType<ImportDecl>())
         {
             ensureDecl(importDecl, DeclCheckState::Checked);
+        }
+
+        // Next, make sure all `__include` decls are processed and the referenced
+        // files are parsed.
+        auto visitIncludeDecls = [&](ContainerDecl* fileDecl)
+            {
+                for (Index i = 0; i < fileDecl->members.getCount(); i++)
+                {
+                    auto decl = fileDecl->members[i];
+                    if (auto includeDecl = as<IncludeDecl>(decl))
+                    {
+                        ensureDecl(includeDecl, DeclCheckState::Checked);
+                    }
+                    else if (auto implementingDecl = as<ImplementingDecl>(decl))
+                    {
+                        ensureDecl(implementingDecl, DeclCheckState::Checked);
+                    }
+                }
+            };
+        visitIncludeDecls(moduleDecl);
+        for (Index i = 0; i < moduleDecl->members.getCount(); i++)
+        {
+            if (auto fileDecl = as<FileDecl>(moduleDecl->members[i]))
+                visitIncludeDecls(fileDecl);
         }
 
         // The entire goal of semantic checking is to get all of the
@@ -1820,6 +1930,7 @@ namespace Slang
             DeclCheckState::ModifiersChecked,
             DeclCheckState::ReadyForReference,
             DeclCheckState::ReadyForLookup,
+            DeclCheckState::ReadyForConformances,
             DeclCheckState::Checked
         };
         for(auto s : states)
@@ -2740,6 +2851,7 @@ namespace Slang
         {
             synFuncDecl->nameAndLoc.name = getSession()->getNameObj("$__syn_" + synFuncDecl->nameAndLoc.name->text);
         }
+
         // The result type of our synthesized method will be the expected
         // result type from the interface requirement.
         //
@@ -2862,6 +2974,14 @@ namespace Slang
             {
                 auto attr = m_astBuilder->create<BackwardDifferentiableAttribute>();
                 addModifier(synFuncDecl, attr);
+            }
+            // The visibility of synthesized decl should be the min of the parent decl and the requirement.
+            if (auto visModifier = requiredMemberDeclRef.getDecl()->findModifier<VisibilityModifier>())
+            {
+                auto requirementVisibility = getDeclVisibility(requiredMemberDeclRef.getDecl());
+                auto thisVisibility = getDeclVisibility(context->parentDecl);
+                auto visibility = Math::Min(thisVisibility, requirementVisibility);
+                addVisibilityModifier(m_astBuilder, synFuncDecl, visibility);
             }
         }
 
@@ -3401,6 +3521,15 @@ namespace Slang
 
         synPropertyDecl->parentDecl = context->parentDecl;
 
+        // The visibility of synthesized decl should be the min of the parent decl and the requirement.
+        if (auto visModifier = requiredMemberDeclRef.getDecl()->findModifier<VisibilityModifier>())
+        {
+            auto requirementVisibility = getDeclVisibility(requiredMemberDeclRef.getDecl());
+            auto thisVisibility = getDeclVisibility(context->parentDecl);
+            auto visibility = Math::Min(thisVisibility, requirementVisibility);
+            addVisibilityModifier(m_astBuilder, synPropertyDecl, visibility);
+        }
+
         // Once our synthesized declaration is complete, we need
         // to install it as the witness that satifies the given
         // requirement.
@@ -3899,7 +4028,7 @@ namespace Slang
         // requests will be handled further down. For now we include
         // lookup results that might be usable, but not as-is.
         //
-        auto lookupResult = lookUpMember(m_astBuilder, this, name, subType, LookupMask::Default, LookupOptions::IgnoreBaseInterfaces);
+        auto lookupResult = lookUpMember(m_astBuilder, this, name, subType, nullptr, LookupMask::Default, LookupOptions::IgnoreBaseInterfaces);
 
         if(!lookupResult.isValid())
         {
@@ -3930,7 +4059,19 @@ namespace Slang
                 continue;
 
             if (doesMemberSatisfyRequirement(member.declRef, requiredMemberDeclRef, witnessTable))
+            {
+                // The member satisfies the requirement in every other way except that
+                // it may have a lower visibility than min(parentVisibility, requirementVisibilty),
+                // in that case we will treat it as an error.
+                auto minRequiredVisibility = Math::Min(getDeclVisibility(requiredMemberDeclRef.getDecl()), getTypeVisibility(subType));
+                if (getDeclVisibility(member.declRef.getDecl()) < minRequiredVisibility)
+                {
+                    getSink()->diagnose(member.declRef, Diagnostics::satisfyingDeclCannotHaveLowerVisibility, member.declRef);
+                    getSink()->diagnose(requiredMemberDeclRef, Diagnostics::seeDeclarationOf, QualifiedDeclPath(requiredMemberDeclRef));
+                    return false;
+                }
                 return true;
+            }
         }
 
         // If we reach this point then there were no members suitable
@@ -4432,6 +4573,8 @@ namespace Slang
 
     void SemanticsDeclBasesVisitor::visitInterfaceDecl(InterfaceDecl* decl)
     {
+        SLANG_OUTER_SCOPE_CONTEXT_DECL_RAII(this, decl);
+        checkVisibility(decl);
         for( auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>() )
         {
             ensureDecl(inheritanceDecl, DeclCheckState::CanUseBaseOfInheritanceDecl);
@@ -4497,6 +4640,8 @@ namespace Slang
         // Furthermore, only the first inheritance clause (in source
         // order) is allowed to declare a base `struct` type.
         //
+        SLANG_OUTER_SCOPE_CONTEXT_DECL_RAII(this, decl);
+
         Index inheritanceClauseCounter = 0;
         for( auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>() )
         {
@@ -4566,6 +4711,7 @@ namespace Slang
         // Furthermore, only the first inheritance clause (in source
         // order) is allowed to declare a base `class` type.
         //
+        SLANG_OUTER_SCOPE_CONTEXT_DECL_RAII(this, decl);
         Index inheritanceClauseCounter = 0;
         for (auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
         {
@@ -4698,6 +4844,9 @@ namespace Slang
 
     void SemanticsDeclBasesVisitor::visitEnumDecl(EnumDecl* decl)
     {
+        SLANG_OUTER_SCOPE_CONTEXT_DECL_RAII(this, decl);
+        checkVisibility(decl);
+
         // An `enum` type can inherit from interfaces, and also
         // from a single "tag" type that must:
         //
@@ -4705,7 +4854,6 @@ namespace Slang
         // * come first in the list of base types
         //
         Index inheritanceClauseCounter = 0;
-
         Type* tagType = nullptr;
         InheritanceDecl* tagTypeInheritanceDecl = nullptr;
         for(auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
@@ -4868,6 +5016,8 @@ namespace Slang
 
     void SemanticsDeclBodyVisitor::visitEnumDecl(EnumDecl* decl)
     {
+        SLANG_OUTER_SCOPE_CONTEXT_DECL_RAII(this, decl);
+
         auto enumType = DeclRefType::create(m_astBuilder, makeDeclRef(decl));
 
         auto tagType = decl->tagType;
@@ -4993,6 +5143,7 @@ namespace Slang
     void SemanticsDeclHeaderVisitor::visitTypeDefDecl(TypeDefDecl* decl)
     {
         decl->type = CheckProperType(decl->type);
+        checkVisibility(decl);
     }
 
     void SemanticsDeclHeaderVisitor::visitGlobalGenericParamDecl(GlobalGenericParamDecl* decl)
@@ -5009,6 +5160,7 @@ namespace Slang
         auto interfaceDecl = as<InterfaceDecl>(decl->parentDecl);
         if (!interfaceDecl)
             getSink()->diagnose(decl, Slang::Diagnostics::assocTypeInInterfaceOnly);
+        checkVisibility(decl);
     }
 
     void SemanticsDeclBodyVisitor::visitFunctionDeclBase(FunctionDeclBase* decl)
@@ -6084,6 +6236,7 @@ namespace Slang
                 }
             }
         }
+        checkVisibility(decl);
     }
 
     void SemanticsDeclHeaderVisitor::visitFuncDecl(FuncDecl* funcDecl)
@@ -6394,6 +6547,7 @@ namespace Slang
     {
         decl->type = CheckUsableType(decl->type);
         visitAbstractStorageDeclCommon(decl);
+        checkVisibility(decl);
     }
 
     Type* SemanticsDeclHeaderVisitor::_getAccessorStorageType(AccessorDecl* decl)
@@ -6609,7 +6763,9 @@ namespace Slang
 
             if (!TryUnifyTypes(constraints, extDecl->targetType.Ptr(), type))
                 return DeclRef<ExtensionDecl>();
-            auto solvedDeclRef = trySolveConstraintSystem(&constraints, makeDeclRef(extGenericDecl), ArrayView<Val*>());
+
+            ConversionCost baseCost;
+            auto solvedDeclRef = trySolveConstraintSystem(&constraints, makeDeclRef(extGenericDecl), ArrayView<Val*>(), baseCost);
             if (!solvedDeclRef)
             {
                 return DeclRef<ExtensionDecl>();
@@ -6671,6 +6827,18 @@ namespace Slang
             loc);
     }
 
+    void SemanticsVisitor::importFileDeclIntoScope(Scope* scope, FileDecl* fileDecl)
+    {
+        // Create a new sub-scope to wire the module
+       // into our lookup chain.
+        auto subScope = getASTBuilder()->create<Scope>();
+        subScope->containerDecl = fileDecl;
+
+        subScope->nextSibling = scope->nextSibling;
+        scope->nextSibling = subScope;
+    }
+
+
     void SemanticsVisitor::importModuleIntoScope(Scope* scope, ModuleDecl* moduleDecl)
     {
         // If we've imported this one already, then
@@ -6684,13 +6852,19 @@ namespace Slang
         importedModulesList.add(moduleDecl);
         importedModulesSet.add(moduleDecl);
 
-        // Create a new sub-scope to wire the module
+        // Create a new sub-scope to wire the module's scope and its nested FileDecl's scopes
         // into our lookup chain.
-        auto subScope = getASTBuilder()->create<Scope>();
-        subScope->containerDecl = moduleDecl;
+        for (auto moduleScope = moduleDecl->ownedScope; moduleScope; moduleScope = moduleScope->nextSibling)
+        {
+            if (moduleScope->containerDecl != moduleDecl && moduleScope->containerDecl->parentDecl != moduleDecl)
+                continue;
 
-        subScope->nextSibling = scope->nextSibling;
-        scope->nextSibling = subScope;
+            auto subScope = getASTBuilder()->create<Scope>();
+            subScope->containerDecl = moduleScope->containerDecl;
+
+            subScope->nextSibling = scope->nextSibling;
+            scope->nextSibling = subScope;
+        }
 
         // Also import any modules from nested `import` declarations
         // with the `__exported` modifier
@@ -6741,6 +6915,146 @@ namespace Slang
         {
             module->addModuleDependency(importedModule);
         }
+    }
+
+    String getSimpleModuleName(Name* name)
+    {
+        auto text = getText(name);
+        auto dirPos = Math::Max(text.indexOf('/'), text.indexOf('\\'));
+        if (dirPos < 0)
+            return text;
+        auto slice = text.getUnownedSlice().tail(dirPos + 1);
+        auto dotPos = slice.indexOf('.');
+        if (dotPos < 0)
+            return slice;
+        return String(slice.head(dotPos));
+    }
+
+    ModuleDeclarationDecl* findExistingModuleDeclarationDecl(ModuleDecl* decl)
+    {
+        if (decl->members.getCount() == 0)
+            return nullptr;
+        if (auto rs = as<ModuleDeclarationDecl>(decl->members[0]))
+            return rs;
+        for (auto fileDecl : decl->getMembersOfType<FileDecl>())
+        {
+            if (fileDecl->members.getCount() == 0)
+                continue;
+            if (auto rs = as<ModuleDeclarationDecl>(fileDecl->members[0]))
+                return rs;
+        }
+        return nullptr;
+    }
+
+    void SemanticsDeclHeaderVisitor::visitIncludeDecl(IncludeDecl* decl)
+    {
+        auto name = decl->moduleNameAndLoc.name;
+
+        if (!getShared()->getTranslationUnitRequest())
+            getSink()->diagnose(decl->moduleNameAndLoc.loc, Diagnostics::cannotProcessInclude);
+
+        auto parentModule = getModule(decl);
+        auto moduleDecl = parentModule->getModuleDecl();
+
+        auto [fileDecl, isNew] = getLinkage()->findAndIncludeFile(getModule(decl), getShared()->getTranslationUnitRequest(), name, decl->moduleNameAndLoc.loc, getSink());
+
+        if (!fileDecl)
+            return;
+
+        decl->fileDecl = fileDecl;
+
+        if (!isNew)
+            return;
+
+        if (fileDecl->members.getCount() == 0)
+            return;
+        auto firstMember = fileDecl->members[0];
+        if (auto moduleDeclaration = as<ModuleDeclarationDecl>(firstMember))
+        {
+            // We are trying to include a file that defines a module, the user could mean "import" instead.
+            getSink()->diagnose(decl->moduleNameAndLoc.loc, Diagnostics::includedFileMissingImplementingDoYouMeanImport, name, moduleDeclaration->getName());
+            return;
+        }
+
+        importFileDeclIntoScope(moduleDecl->ownedScope, fileDecl);
+
+        if (auto implementing = as<ImplementingDecl>(firstMember))
+        {
+            // The file we are including must be implementing the current module.
+            auto moduleName = getSimpleModuleName(implementing->moduleNameAndLoc.name);
+            auto expectedModuleName = moduleDecl->getName();
+            bool shouldSkipDiagnostic = false;
+            if (moduleDecl->members.getCount())
+            {
+                if (auto moduleDeclarationDecl = as<ModuleDeclarationDecl>(moduleDecl->members[0]))
+                {
+                    expectedModuleName = moduleDeclarationDecl->getName();
+                }
+                else if (getShared()->isInLanguageServer())
+                {
+                    auto moduleDeclarationDecls = findExistingModuleDeclarationDecl(moduleDecl);
+                    if (moduleDeclarationDecls)
+                    {
+                        expectedModuleName = moduleDeclarationDecls->getName();
+                    }
+                    else
+                    {
+                        shouldSkipDiagnostic = true;
+                    }
+                }
+            }
+            if (!shouldSkipDiagnostic && !moduleName.getUnownedSlice().caseInsensitiveEquals(getText(expectedModuleName).getUnownedSlice()))
+            {
+                getSink()->diagnose(decl->moduleNameAndLoc.loc, Diagnostics::includedFileDoesNotImplementCurrentModule, expectedModuleName, moduleName);
+                return;
+            }
+            return;
+        }
+
+        getSink()->diagnose(decl->moduleNameAndLoc.loc, Diagnostics::includedFileMissingImplementing, name);
+    }
+
+    void SemanticsDeclHeaderVisitor::visitImplementingDecl(ImplementingDecl* decl)
+    {
+        // Don't need to do anything unless we are in a language server context.
+        if (!getShared()->isInLanguageServer())
+            return;
+
+        // Treat an `implementing` declaration as an `include` declaration when
+        // we are in a language server context.
+
+        auto name = decl->moduleNameAndLoc.name;
+
+        if (!getShared()->getTranslationUnitRequest())
+            getSink()->diagnose(decl->moduleNameAndLoc.loc, Diagnostics::cannotProcessInclude);
+
+        auto [fileDecl, isNew] = getLinkage()->findAndIncludeFile(getModule(decl), getShared()->getTranslationUnitRequest(), name, decl->moduleNameAndLoc.loc, getSink());
+
+        decl->fileDecl = fileDecl;
+
+        if (!isNew)
+            return;
+
+        if (!fileDecl || fileDecl->members.getCount() == 0)
+        {
+            return;
+        }
+
+        auto firstMember = fileDecl->members[0];
+        if (auto moduleDeclaration = as<ModuleDeclarationDecl>(firstMember))
+        {
+            // We are trying to implement a file that defines a module, this is expected.
+            return;
+        }
+
+        if (auto implementing = as<ImplementingDecl>(firstMember))
+        {
+            getSink()->diagnose(decl->moduleNameAndLoc.loc, Diagnostics::implementingMustReferencePrimaryModuleFile);
+            return;
+        }
+
+        if (auto moduleDecl = getModuleDecl(decl))
+            importFileDeclIntoScope(moduleDecl->ownedScope, fileDecl);
     }
 
     void SemanticsDeclHeaderVisitor::visitUsingDecl(UsingDecl* decl)
@@ -7325,6 +7639,10 @@ namespace Slang
                     visitor->getSink()->diagnose(attr, Diagnostics::cannotUseInterfaceRequirementAsDerivative);
                     return;
                 }
+                if (funcType->getParamCount() != imaginaryArguments.getCount())
+                {
+                    goto error;
+                }
                 for (Index ii = 0; ii < imaginaryArguments.getCount(); ++ii)
                 {
                     // Check if the resolved invoke argument type is an error type.
@@ -7382,7 +7700,7 @@ namespace Slang
                 return;
             }
         }
-
+    error:;
         // Build the expected signature from imaginary args to diagnose
         // when no matching function is found (this excludes the case handled above)
         // 

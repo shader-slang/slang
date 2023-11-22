@@ -1144,6 +1144,21 @@ struct SPIRVEmitContext
         return m_NonSemanticDebugInfoExtInst;
     }
 
+    /// The SPIRV OpExtInstImport inst that represents the NonSemantic debug info
+    /// extended instruction set.
+    SpvInst* m_NonSemanticDebugPrintfExtInst = nullptr;
+
+    SpvInst* getNonSemanticDebugPrintfExtInst()
+    {
+        if (m_NonSemanticDebugPrintfExtInst)
+            return m_NonSemanticDebugPrintfExtInst;
+        m_NonSemanticDebugPrintfExtInst = emitOpExtInstImport(
+            getSection(SpvLogicalSectionID::ExtIntInstImports),
+            nullptr,
+            UnownedStringSlice("NonSemantic.DebugPrintf"));
+        return m_NonSemanticDebugPrintfExtInst;
+    }
+
     // Now that we've gotten the core infrastructure out of the way,
     // let's start looking at emitting some instructions that make
     // up a SPIR-V module.
@@ -1361,12 +1376,8 @@ struct SPIRVEmitContext
         case kIROp_TextureType:
             return ensureTextureType(inst, cast<IRTextureType>(inst));
         case kIROp_SamplerStateType:
+        case kIROp_SamplerComparisonStateType:
             return emitOpTypeSampler(inst);
-        case kIROp_TextureSamplerType:
-            return emitOpTypeSampledImage(
-                inst,
-                ensureTextureType(nullptr, cast<IRTextureTypeBase>(inst))
-            );
 
         case kIROp_RaytracingAccelerationStructureType:
             requireSPIRVCapability(SpvCapabilityRayTracingKHR);
@@ -1627,22 +1638,19 @@ struct SPIRVEmitContext
         SpvDim dim = SpvDim1D; // Silence uninitialized warnings from msvc...
         switch(inst->GetBaseShape())
         {
-            case TextureFlavor::Shape1D:
-            case TextureFlavor::Shape1DArray:
+            case SLANG_TEXTURE_1D:
                 dim = SpvDim1D;
                 break;
-            case TextureFlavor::Shape2D:
-            case TextureFlavor::Shape2DArray:
+            case SLANG_TEXTURE_2D:
                 dim = SpvDim2D;
                 break;
-            case TextureFlavor::Shape3D:
+            case SLANG_TEXTURE_3D:
                 dim = SpvDim3D;
                 break;
-            case TextureFlavor::ShapeCube:
-            case TextureFlavor::ShapeCubeArray:
+            case SLANG_TEXTURE_CUBE:
                 dim = SpvDimCube;
                 break;
-            case TextureFlavor::ShapeBuffer:
+            case SLANG_TEXTURE_BUFFER:
                 dim = SpvDimBuffer;
                 break;
         }
@@ -1717,6 +1725,24 @@ struct SPIRVEmitContext
         //
         // The op itself
         //
+        
+        if (inst->isCombined())
+        {
+            auto imageType = emitOpTypeImage(
+                nullptr,
+                dropVector(sampledType),
+                dim,
+                SpvLiteralInteger::from32(depth),
+                SpvLiteralInteger::from32(arrayed),
+                SpvLiteralInteger::from32(ms),
+                SpvLiteralInteger::from32(sampled),
+                format
+            );
+            return emitOpTypeSampledImage(
+                assignee,
+                imageType);
+        }
+
         return emitOpTypeImage(
             assignee,
             dropVector(sampledType),
@@ -1882,6 +1908,12 @@ struct SPIRVEmitContext
                 if (ptrType && isIntegralScalarOrCompositeType(ptrType->getValueType()))
                     emitOpDecorate(getSection(SpvLogicalSectionID::Annotations), nullptr, varInst, SpvDecorationFlat);
             }
+        }
+
+        if (var->findDecorationImpl(kIROp_RequireSPIRVDescriptorIndexingExtensionDecoration))
+        {
+            ensureExtensionDeclaration(UnownedStringSlice("SPV_EXT_descriptor_indexing"));
+            requireSPIRVCapability(SpvCapabilityRuntimeDescriptorArray);
         }
     }
 
@@ -4578,6 +4610,24 @@ struct SPIRVEmitContext
                     emitOperand(ensureInst(sampledType));
                     break;
                 }
+                case kIROp_SPIRVAsmOperandImageType:
+                case kIROp_SPIRVAsmOperandSampledImageType:
+                {
+                    IRBuilder builder(m_irModule);
+                    auto textureInst = as<IRTextureTypeBase>(operand->getValue()->getDataType());
+                    auto imageType = builder.getTextureType(
+                        textureInst->getElementType(),
+                        textureInst->getShapeInst(),
+                        textureInst->getIsArrayInst(),
+                        textureInst->getIsMultisampleInst(),
+                        textureInst->getSampleCountInst(),
+                        textureInst->getAccessInst(),
+                        textureInst->getIsShadowInst(),
+                        builder.getIntValue(builder.getIntType(), (operand->getOp() == kIROp_SPIRVAsmOperandSampledImageType ? 1 : 0)),
+                        textureInst->getFormatInst());
+                    emitOperand(ensureInst(imageType));
+                    break;
+                }
                 case kIROp_SPIRVAsmOperandBuiltinVar:
                 {
                     emitOperand(ensureInst(operand));
@@ -4586,6 +4636,11 @@ struct SPIRVEmitContext
                 case kIROp_SPIRVAsmOperandGLSL450Set:
                 {
                     emitOperand(getGLSL450ExtInst());
+                    break;
+                }
+                case kIROp_SPIRVAsmOperandDebugPrintfSet:
+                {
+                    emitOperand(getNonSemanticDebugPrintfExtInst());
                     break;
                 }
                 default:
@@ -4774,7 +4829,7 @@ struct SPIRVEmitContext
                 }
                 else
                 {
-                    emitInstCustomOperandFunc(
+                    last = emitInstCustomOperandFunc(
                         opParent,
                         assignedInst,
                         opcode,

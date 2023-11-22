@@ -1,6 +1,6 @@
 //TEST_IGNORE_FILE:
 
-int doSomethingElse()
+public int doSomethingElse()
 {
     return getStringHash("Try another");
 }

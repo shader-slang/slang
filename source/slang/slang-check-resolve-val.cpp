@@ -45,4 +45,14 @@ Val* SubtypeWitness::_resolveImplOverride()
     return as<SubtypeWitness>(defaultResolveImpl());
 }
 
+ConversionCost SubtypeWitness::_getOverloadResolutionCostOverride()
+{
+    return kConversionCost_None;
+}
+
+ConversionCost SubtypeWitness::getOverloadResolutionCost()
+{
+    SLANG_AST_NODE_VIRTUAL_CALL(SubtypeWitness, getOverloadResolutionCost, ());
+}
+
 }

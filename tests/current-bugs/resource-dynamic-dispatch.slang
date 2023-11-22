@@ -26,13 +26,13 @@ interface IInterface
 };
 
 // Need public to make these conformances available
-public struct A : IInterface
+export struct A : IInterface
 {
     typedef SomeData Type;
     IGetTexture getType() { Type t = { gTexA }; return t; }
 };
 
-public struct B : IInterface
+export struct B : IInterface
 {
     typedef SomeData Type;
     IGetTexture getType() { Type t = { gTexB }; return t; }

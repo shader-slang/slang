@@ -253,11 +253,8 @@ void HLSLSourceEmitter::_emitHLSLTextureType(IRTextureTypeBase* texType)
             m_writer->emit("Consume");
             break;
 
-        case SLANG_RESOURCE_ACCESS_WRITE:
-            if (texType->isFeedback())
-            {
-                m_writer->emit("Feedback");
-            }
+        case SLANG_RESOURCE_ACCESS_FEEDBACK:
+            m_writer->emit("Feedback");
             break;
 
         default:
@@ -267,11 +264,11 @@ void HLSLSourceEmitter::_emitHLSLTextureType(IRTextureTypeBase* texType)
 
     switch (texType->GetBaseShape())
     {
-        case TextureFlavor::Shape::Shape1D:		m_writer->emit("Texture1D");		break;
-        case TextureFlavor::Shape::Shape2D:		m_writer->emit("Texture2D");		break;
-        case TextureFlavor::Shape::Shape3D:		m_writer->emit("Texture3D");		break;
-        case TextureFlavor::Shape::ShapeCube:	m_writer->emit("TextureCube");	break;
-        case TextureFlavor::Shape::ShapeBuffer:  m_writer->emit("Buffer");         break;
+        case SLANG_TEXTURE_1D:		m_writer->emit("Texture1D");		break;
+        case SLANG_TEXTURE_2D:		m_writer->emit("Texture2D");		break;
+        case SLANG_TEXTURE_3D:		m_writer->emit("Texture3D");		break;
+        case SLANG_TEXTURE_CUBE:	m_writer->emit("TextureCube");	    break;
+        case SLANG_TEXTURE_BUFFER:  m_writer->emit("Buffer");           break;
         default:
             SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource shape");
             break;
@@ -287,14 +284,11 @@ void HLSLSourceEmitter::_emitHLSLTextureType(IRTextureTypeBase* texType)
     }
     m_writer->emit("<");
     emitType(texType->getElementType());
-    if (texType->getOperandCount() == 2)
+    auto sampleCount = as<IRIntLit>(texType->getSampleCount());
+    if (sampleCount->getValue() != 0)
     {
-        auto sampleCount = as<IRIntLit>(texType->getSampleCount());
-        if (sampleCount->getValue() != 0)
-        {
-            m_writer->emit(", ");
-            m_writer->emit(sampleCount->getValue());
-        }
+        m_writer->emit(", ");
+        m_writer->emit(sampleCount->getValue());
     }
     m_writer->emit(" >");
 }
@@ -943,6 +937,11 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             m_writer->emit("NvHitObject");
             return;
         }
+        case kIROp_TextureFootprintType:
+        {
+            m_writer->emit("uint4");
+            return;
+        }
         default: break;
     }
 
@@ -952,11 +951,6 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
     if (auto texType = as<IRTextureType>(type))
     {
         _emitHLSLTextureType(texType);
-        return;
-    }
-    else if (const auto textureSamplerType = as<IRTextureSamplerType>(type))
-    {
-        SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "this target should see combined texture-sampler types");
         return;
     }
     else if (auto imageType = as<IRGLSLImageType>(type))

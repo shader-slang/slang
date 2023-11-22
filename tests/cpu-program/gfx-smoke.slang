@@ -2,7 +2,7 @@
 import gfx;
 import slang;
 
-public __extern_cpp int main()
+export __extern_cpp int main()
 {
     gfx.DeviceDesc deviceDesc = {};
     deviceDesc.deviceType = gfx.DeviceType.CPU;

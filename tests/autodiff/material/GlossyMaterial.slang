@@ -3,13 +3,13 @@
 __exported import IMaterial;
 __exported import GlossyMaterialInstance;
 
-struct GlossyMaterial : IMaterial
+public struct GlossyMaterial : IMaterial
 {
-    float3 baseColor;
+    public float3 baseColor;
 
-    typedef GlossyMaterialInstance MaterialInstance;
+    public typedef GlossyMaterialInstance MaterialInstance;
 
-    GlossyMaterialInstance setupMaterialInstance()
+    public GlossyMaterialInstance setupMaterialInstance()
     {
         GlossyMaterialInstance mi = { { baseColor } };
         return mi;

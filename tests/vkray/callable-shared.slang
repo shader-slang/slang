@@ -1,8 +1,8 @@
 // callable-shared.slang
 //TEST_IGNORE_FILE:
 
-struct MaterialPayload
+public struct MaterialPayload
 {
-	float4 albedo;
-	float2 uv;
+	public float4 albedo;
+	public float2 uv;
 };

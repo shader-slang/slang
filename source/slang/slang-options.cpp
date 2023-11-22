@@ -141,6 +141,7 @@ enum class OptionKind
     FileSystem,
     Heterogeneous,
     NoMangle,
+    AllowGLSL,
 
     // Internal
 
@@ -621,7 +622,8 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::FileSystem, "-file-system", "-file-system <file-system-type>", 
         "Set the filesystem hook to use for a compile request."},
         { OptionKind::Heterogeneous, "-heterogeneous", nullptr, "Output heterogeneity-related code." },
-        { OptionKind::NoMangle, "-no-mangle", nullptr, "Do as little mangling of names as possible." }
+        { OptionKind::NoMangle, "-no-mangle", nullptr, "Do as little mangling of names as possible." },
+        { OptionKind::AllowGLSL, "-allow-glsl", nullptr, "Enable GLSL as an input language." },
     };
     _addOptions(makeConstArrayView(experimentalOpts), options);
 
@@ -911,6 +913,8 @@ struct OptionsParser
     bool m_hasLoadedRepro = false;
 
     String m_spirvCoreGrammarJSONPath;
+
+    bool m_allowGLSLInput = false;
 
     CommandLineReader m_reader;
 
@@ -1812,6 +1816,7 @@ SlangResult OptionsParser::_parse(
         switch (optionKind)
         {
             case OptionKind::NoMangle: m_flags |= SLANG_COMPILE_FLAG_NO_MANGLING; break;
+            case OptionKind::AllowGLSL: m_allowGLSLInput = true; break;
             case OptionKind::EmitIr: m_requestImpl->m_emitIr = true; break;
             case OptionKind::LoadStdLib:
             {
@@ -2152,7 +2157,7 @@ SlangResult OptionsParser::_parse(
                 m_compileRequest->setEnableEffectAnnotations(true);
                 break;
             }
-            
+
             case OptionKind::EntryPointName:
             {
                 CommandLineArg name;
@@ -2481,6 +2486,8 @@ SlangResult OptionsParser::_parse(
     }
 
     m_compileRequest->setCompileFlags(m_flags);
+
+    m_compileRequest->setAllowGLSLInput(m_allowGLSLInput);
 
     // As a compatability feature, if the user didn't list any explicit entry
     // point names, *and* they are compiling a single translation unit, *and* they
@@ -2938,6 +2945,8 @@ SlangResult OptionsParser::_parse(
         (m_rawTargets[0].format == CodeGenTarget::HostCPPSource ||
             m_rawTargets[0].format == CodeGenTarget::PyTorchCppBinding ||
             m_rawTargets[0].format == CodeGenTarget::CUDASource ||
+            m_rawTargets[0].format == CodeGenTarget::SPIRV ||
+            m_rawTargets[0].format == CodeGenTarget::SPIRVAssembly ||
             ArtifactDescUtil::makeDescForCompileTarget(asExternal(m_rawTargets[0].format)).kind == ArtifactKind::HostCallable))
     {
         RawOutput rawOutput;
@@ -3004,8 +3013,14 @@ SlangResult OptionsParser::_parse(
                     case CodeGenTarget::ShaderSharedLibrary:
                     case CodeGenTarget::PyTorchCppBinding:
                     case CodeGenTarget::DXIL:
-
                         rawOutput.isWholeProgram = true;
+                        break;
+                    case CodeGenTarget::SPIRV:
+                    case CodeGenTarget::SPIRVAssembly:
+                        if (getCurrentTarget()->targetFlags & SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY)
+                        {
+                            rawOutput.isWholeProgram = true;
+                        }
                         break;
                     default:
                         m_sink->diagnose(SourceLoc(), Diagnostics::cannotMatchOutputFileToEntryPoint, rawOutput.path);

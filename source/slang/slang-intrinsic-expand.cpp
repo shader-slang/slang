@@ -351,47 +351,50 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             SLANG_RELEASE_ASSERT(m_argCount >= 1);
 
             auto textureArg = m_args[0].get();
-
-            if (const auto baseTextureSamplerType = as<IRTextureSamplerType>(textureArg->getDataType()))
+            
+            if (auto baseTextureType = as<IRTextureType>(textureArg->getDataType()))
             {
-                // If the base object (first argument) has a combined texture-sampler type,
-                // then we can simply use that argument as-is.
-                //
-                m_emitter->emitOperand(textureArg, getInfo(EmitOp::General));
-
-                // HACK: Because the target intrinsic strings are using indices based on the
-                // parameter list with the `SamplerState` parameter in place, seeing this opcode
-                // and this type tells us that we are about to have an off-by-one sort of
-                // situation. We quietly patch it up by offseting the index-based access for
-                // all the other operands.
-                //
-                m_argIndexOffset -= 1;
-            }
-            else if (auto baseTextureType = as<IRTextureType>(textureArg->getDataType()))
-            {
-                // If the base object (first argument) has a texture type, then we expect
-                // the next argument to be a sampler to pair with it.
-                //
-                SLANG_RELEASE_ASSERT(m_argCount >= 2);
-                auto samplerArg = m_args[1].get();
-
-                // We will emit GLSL code to construct the corresponding combined texture/sampler
-                // type from the separate pieces.
-                //
-                m_emitter->emitTextureOrTextureSamplerType(baseTextureType, "sampler");
-                if (auto samplerType = as<IRSamplerStateTypeBase>(samplerArg->getDataType()))
+                if (baseTextureType->isCombined())
                 {
-                    if (as<IRSamplerComparisonStateType>(samplerType))
-                    {
-                        m_writer->emit("Shadow");
-                    }
-                }
+                    // If the base object (first argument) has a combined texture-sampler type,
+                    // then we can simply use that argument as-is.
+                    //
+                        m_emitter->emitOperand(textureArg, getInfo(EmitOp::General));
 
-                m_writer->emit("(");
-                m_emitter->emitOperand(textureArg, getInfo(EmitOp::General));
-                m_writer->emit(",");
-                m_emitter->emitOperand(samplerArg, getInfo(EmitOp::General));
-                m_writer->emit(")");
+                        // HACK: Because the target intrinsic strings are using indices based on the
+                        // parameter list with the `SamplerState` parameter in place, seeing this opcode
+                        // and this type tells us that we are about to have an off-by-one sort of
+                        // situation. We quietly patch it up by offseting the index-based access for
+                        // all the other operands.
+                        //
+                        m_argIndexOffset -= 1;
+                }
+                else
+                {
+                    // If the base object (first argument) has a texture type, then we expect
+                    // the next argument to be a sampler to pair with it.
+                    //
+                    SLANG_RELEASE_ASSERT(m_argCount >= 2);
+                    auto samplerArg = m_args[1].get();
+
+                    // We will emit GLSL code to construct the corresponding combined texture/sampler
+                    // type from the separate pieces.
+                    //
+                    m_emitter->emitTextureOrTextureSamplerType(baseTextureType, "sampler");
+                    if (auto samplerType = as<IRSamplerStateTypeBase>(samplerArg->getDataType()))
+                    {
+                        if (as<IRSamplerComparisonStateType>(samplerType))
+                        {
+                            m_writer->emit("Shadow");
+                        }
+                    }
+
+                    m_writer->emit("(");
+                    m_emitter->emitOperand(textureArg, getInfo(EmitOp::General));
+                    m_writer->emit(",");
+                    m_emitter->emitOperand(samplerArg, getInfo(EmitOp::General));
+                    m_writer->emit(")");
+                }
             }
             else
             {
@@ -516,13 +519,9 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             auto textureArg = m_args[0].get();
             IRType* elementType  = nullptr;
 
-            if (auto baseTextureType = as<IRTextureType>(textureArg->getDataType()))
+            if (auto baseTextureType = as<IRTextureTypeBase>(textureArg->getDataType()))
             {
                 elementType = baseTextureType->getElementType();
-            }
-            else if(auto baseTextureSamplerType = as<IRTextureSamplerType>(textureArg->getDataType()))
-            {
-                elementType = baseTextureSamplerType->getElementType();
             }
             else
             {
@@ -796,6 +795,51 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             }
         }
         break;
+
+        case 'w':
+        {
+            // Emit a swizzle of the argument.
+            Index argIndex = parseNat() + m_argIndexOffset;
+            SLANG_RELEASE_ASSERT((0 <= argIndex) && (argIndex < m_argCount));
+            auto arg = m_args[argIndex];
+            d = *cursor++;
+            auto vectorType = as<IRVectorType>(arg.get()->getDataType());
+            auto vectorSize = as<IRIntLit>(vectorType->getElementCount())->getValue();
+            const char swizzleNames[] = { 'x', 'y', 'z', 'w' };
+            if (d == 'b')
+            {
+                // Emit the first half the vector up to the n-1'th element.
+                for (int i = 0; i < Math::Min(4, (int)vectorSize - 1); i++)
+                    m_writer->emitChar(swizzleNames[i]);
+            }
+            else if (d == 'e')
+            {
+                // Emit the swizzle to get the last element.
+                if (vectorSize <= 4)
+                    m_writer->emitChar(swizzleNames[vectorSize - 1]);
+            }
+            break;
+        }
+        case '!':
+        {
+            // Emit a literal directly without any prefix/postfix/casts.
+            Index argIndex = parseNat() + m_argIndexOffset;
+            SLANG_RELEASE_ASSERT((0 <= argIndex) && (argIndex < m_argCount));
+            auto arg = m_args[argIndex];
+            if (auto intLit = as<IRIntLit>(arg.get()))
+            {
+                m_writer->emitInt64(intLit->getValue());
+            }
+            else if (auto stringLit = as<IRStringLit>(arg.get()))
+            {
+                m_writer->emit(stringLit->getStringSlice());
+            }
+            else
+            {
+                SLANG_UNEXPECTED("unexpected literal argument in intrinsic call.");
+            }
+            break;
+        }
 
         default:
             SLANG_UNEXPECTED("bad format in intrinsic definition");

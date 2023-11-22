@@ -1893,10 +1893,11 @@ void CLikeSourceEmitter::emitCallExpr(IRCall* inst, EmitOpInfo outerPrec)
     // We want to detect any call to an intrinsic operation,
     // that we can emit it directly without mangling, etc.
     UnownedStringSlice intrinsicDefinition;
-    if (findTargetIntrinsicDefinition(funcValue, intrinsicDefinition))
+    auto resolvedFunc = getResolvedInstForDecorations(funcValue);
+    if (findTargetIntrinsicDefinition(resolvedFunc, intrinsicDefinition))
     {
         // Make sure we register all required preludes for emit.
-        if (auto func = as<IRFunc>(getResolvedInstForDecorations(funcValue)))
+        if (auto func = as<IRFunc>(resolvedFunc))
         {
             for (auto block : func->getBlocks())
             {
@@ -4121,8 +4122,8 @@ void CLikeSourceEmitter::computeEmitActions(IRModule* module, List<EmitAction>& 
     {
         if( as<IRType>(inst) )
         {
-            // Don't emit a type unless it is actually used or is marked public.
-            if (!inst->findDecoration<IRPublicDecoration>())
+            // Don't emit a type unless it is actually used or is marked exported.
+            if (!inst->findDecoration<IRHLSLExportDecoration>())
                 continue;
         }
 

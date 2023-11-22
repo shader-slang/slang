@@ -225,6 +225,20 @@ namespace Slang
         return expr;
     }
 
+    Scope* SemanticsVisitor::getScope(SyntaxNode* node)
+    {
+        while (auto declBase = as<Decl>(node))
+        {
+            if (auto container = as<ContainerDecl>(node))
+            {
+                if (container->ownedScope)
+                    return container->ownedScope;
+            }
+            node = declBase->parentDecl;
+        }
+        return nullptr;
+    }
+
     static SourceLoc _getMemberOpLoc(Expr* expr)
     {
         if (auto m = as<MemberExpr>(expr))
@@ -267,6 +281,25 @@ namespace Slang
                 declRef.getName(),
                 deprecatedAttr->message);
         }
+    }
+
+    static bool isMutableGLSLBufferBlockVarExpr(Expr* expr)
+    {
+        if(const auto varExpr = as<VarExpr>(expr))
+        {
+            if(const auto declRefType = as<DeclRefType>(varExpr->type->getCanonicalType()))
+            {
+                if(declRefType->getDeclRef().getDecl()->isDerivedFrom(ASTNodeType::GLSLInterfaceBlockDecl))
+                {
+                    const auto d = varExpr->declRef.getDecl();
+                    if(d->hasModifier<GLSLBufferModifier>() && !d->hasModifier<GLSLReadOnlyModifier>())
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
@@ -370,7 +403,10 @@ namespace Slang
                 // l-value status of the base expression into account now.
                 if(!baseExpr->type.isLeftValue)
                 {
-                    expr->type.isLeftValue = false;
+                    // One exception to this is if we're reading the contents
+                    // of a GLSL buffer interface block which isn't marked as
+                    // read_only
+                    expr->type.isLeftValue = isMutableGLSLBufferBlockVarExpr(baseExpr);
                 }
                 else
                 {
@@ -701,7 +737,11 @@ namespace Slang
                         expr->loc = loc;
                         if (auto declRefExpr = as<DeclRefExpr>(originalExpr))
                             expr->scope = declRefExpr->scope;
-
+                        else if (auto invokeExpr = as<InvokeExpr>(originalExpr))
+                        {
+                            if (auto calleeDeclRefExpr = as<DeclRefExpr>(invokeExpr->originalFunctionExpr))
+                                expr->scope = calleeDeclRefExpr->scope;
+                        }
                         // Whether or not the implicit `this` is mutable depends
                         // on the context in which it is used, and the lookup
                         // logic will have computed an appropriate "mode" based
@@ -766,6 +806,134 @@ namespace Slang
         {
             return ConstructLookupResultExpr(lookupResult.item, baseExpr, loc, originalExpr);
         }
+    }
+
+    DeclVisibility SemanticsVisitor::getDeclVisibility(Decl* decl)
+    {
+        if (as<GenericTypeParamDecl>(decl) || as<GenericValueParamDecl>(decl) || as<GenericTypeConstraintDecl>(decl))
+        {
+            auto genericDecl = as<GenericDecl>(decl->parentDecl);
+            if (!genericDecl)
+                return DeclVisibility::Default;
+            if (genericDecl->inner)
+                return getDeclVisibility(genericDecl->inner);
+            return DeclVisibility::Default;
+        }
+        if (auto genericDecl = as<GenericDecl>(decl))
+            decl = genericDecl->inner;
+        for (; decl; decl = getParentDecl(decl))
+        {
+            if (as<AccessorDecl>(decl))
+                continue;
+            if (as<EnumCaseDecl>(decl))
+                continue;
+            break;
+        }
+        if (!decl)
+            return DeclVisibility::Public;
+
+        for (auto modifier : decl->modifiers)
+        {
+            if (as<PublicModifier>(modifier))
+                return DeclVisibility::Public;
+            else if (as<InternalModifier>(modifier))
+                return DeclVisibility::Internal;
+            else if (as<PrivateModifier>(modifier))
+                return DeclVisibility::Private;
+        }
+        
+        // Interface members will always have the same visibility as the interface itself.
+        if (auto interfaceDecl = findParentInterfaceDecl(decl))
+        {
+            return getDeclVisibility(interfaceDecl);
+        }
+
+        if (auto parentModule = getModuleDecl(decl))
+            return parentModule->isInLegacyLanguage ? DeclVisibility::Public : DeclVisibility::Internal;
+
+        return DeclVisibility::Default;
+    }
+
+    DeclVisibility SemanticsVisitor::getTypeVisibility(Type* type)
+    {
+        if (auto declRefType = as<DeclRefType>(type))
+        {
+            auto v = getDeclVisibility(declRefType->getDeclRef().getDecl());
+            auto args = findInnerMostGenericArgs(SubstitutionSet(declRefType->getDeclRef()));
+            for (auto arg : args)
+            {
+                if (auto typeArg = as<DeclRefType>(arg))
+                    v = Math::Min(v, getTypeVisibility(typeArg));
+            }
+            return v;
+        }
+        return DeclVisibility::Public;
+    }
+
+    bool SemanticsVisitor::isDeclVisibleFromScope(DeclRef<Decl> declRef, Scope* scope)
+    {
+        auto visibility = getDeclVisibility(declRef.getDecl());
+        if (visibility == DeclVisibility::Public)
+            return true;
+        if (visibility == DeclVisibility::Internal)
+        {
+            // Check that the decl is in the same module as the scope.
+            auto declModule = getModuleDecl(declRef.getDecl());
+            if (declModule == getModuleDecl(scope))
+                return true;
+        }
+        if (visibility == DeclVisibility::Private)
+        {
+            // Check that the decl is in the same or parent container decl as scope.
+            Decl* parentContainer = declRef.getDecl();
+            for (;parentContainer; parentContainer = parentContainer->parentDecl)
+            {
+                if (as<AggTypeDeclBase>(parentContainer))
+                    break;
+                if (as<NamespaceDeclBase>(parentContainer))
+                    break;
+            }
+
+            for (auto s = scope; s; s = s->parent)
+            {
+                if (s->containerDecl == parentContainer)
+                    return true;
+            }
+            return false;
+        }
+        return false;
+    }
+
+    LookupResult SemanticsVisitor::filterLookupResultByVisibility(const LookupResult& lookupResult)
+    {
+        if (!m_outerScope)
+            return lookupResult;
+        LookupResult filteredResult;
+        for (auto item : lookupResult)
+        {
+            if (isDeclVisibleFromScope(item.declRef, m_outerScope))
+                AddToLookupResult(filteredResult, item);
+        }
+        return filteredResult;
+    }
+
+    LookupResult SemanticsVisitor::filterLookupResultByVisibilityAndDiagnose(const LookupResult& lookupResult, SourceLoc loc, bool& outDiagnosed)
+    {
+        outDiagnosed = false;
+        auto result = filterLookupResultByVisibility(lookupResult);
+        if (lookupResult.isValid() && !result.isValid())
+        {
+            getSink()->diagnose(loc, Diagnostics::declIsNotVisible, lookupResult.item.declRef);
+            outDiagnosed = true;
+
+            if (getShared()->isInLanguageServer())
+            {
+                // When in language server mode, return the unfiltered result so we can still
+                // provide language service around it.
+                return lookupResult;
+            }
+        }
+        return result;
     }
 
     LookupResult SemanticsVisitor::resolveOverloadedLookup(LookupResult const& inResult)
@@ -961,6 +1129,7 @@ namespace Slang
                     this,
                     getName("Differential"),
                     type,
+                    nullptr,
                     Slang::LookupMask::type,
                     Slang::LookupOptions::None);
 
@@ -1115,7 +1284,7 @@ namespace Slang
         // a scope in place. If we do, we will re-use it for any sub-expressions.
         // If not, we need to create one.
         //
-        if(getExprLocalScope())
+        if (getExprLocalScope())
         {
             return dispatchExpr(term, *this);
         }
@@ -1834,11 +2003,15 @@ namespace Slang
             this,
             operatorName,
             baseType,
+            m_outerScope,
             LookupMask::Default,
             LookupOptions::NoDeref);
+        bool diagnosed = false;
+        lookupResult = filterLookupResultByVisibilityAndDiagnose(lookupResult, subscriptExpr->loc, diagnosed);
         if (!lookupResult.isValid())
         {
-            getSink()->diagnose(subscriptExpr, Diagnostics::subscriptNonArray, baseType);
+            if (!diagnosed)
+                getSink()->diagnose(subscriptExpr, Diagnostics::subscriptNonArray, baseType);
             return CreateErrorExpr(subscriptExpr);
         }
         auto subscriptFuncExpr = createLookupResultExpr(
@@ -2224,8 +2397,9 @@ namespace Slang
     Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
     {
         // check the base expression first
+        if (!expr->originalFunctionExpr)
+            expr->originalFunctionExpr = expr->functionExpr;
         expr->functionExpr = CheckTerm(expr->functionExpr);
-
         auto treatAsDifferentiableExpr = m_treatAsDifferentiableExpr;
         m_treatAsDifferentiableExpr = nullptr;
         // Next check the argument expressions
@@ -2306,6 +2480,9 @@ namespace Slang
         auto lookupResult = lookUp(
             m_astBuilder,
             this, expr->name, expr->scope);
+        
+        bool diagnosed = false;
+        lookupResult = filterLookupResultByVisibilityAndDiagnose(lookupResult, expr->loc, diagnosed);
 
         if (expr->name == getSession()->getCompletionRequestTokenName())
         {
@@ -2326,7 +2503,8 @@ namespace Slang
                 expr);
         }
 
-        getSink()->diagnose(expr, Diagnostics::undefinedIdentifier2, expr->name);
+        if (!diagnosed)
+            getSink()->diagnose(expr, Diagnostics::undefinedIdentifier2, expr->name);
 
         return expr;
     }
@@ -3360,161 +3538,183 @@ namespace Slang
 
     Expr* SemanticsVisitor::_lookupStaticMember(DeclRefExpr* expr, Expr* baseExpression)
     {
+        LookupResult globalLookupResult;
+        bool hasErrors = false;
+        Expr* base = nullptr;
+        auto handleLeafCase = [&](DeclRef<Decl> baseDeclRef, Type* type)
+            {
+                auto aggTypeDeclRef = as<AggTypeDeclBase>(baseDeclRef);
+
+                if (auto namespaceDeclRef = as<NamespaceDeclBase>(baseDeclRef))
+                {
+                    // We are looking up a namespace member.
+                    //
+                    // This ought to be the easy case, because
+                    // there are no restrictions on whether
+                    // we can reference the declaration here.
+                    //
+                    LookupResult nsLookupResult = lookUpDirectAndTransparentMembers(
+                        m_astBuilder,
+                        this,
+                        expr->name,
+                        namespaceDeclRef.getDecl(),
+                        namespaceDeclRef);
+                    AddToLookupResult(globalLookupResult, nsLookupResult);
+
+                }
+                else if (aggTypeDeclRef || type)
+                {
+                    // We are looking up a member inside a type.
+                    // We want to be careful here because we should only find members
+                    // that are implicitly or explicitly `static`.
+                    //
+                    if (type == nullptr)
+                        type = DeclRefType::create(m_astBuilder, aggTypeDeclRef);
+
+                    if (as<ErrorType>(type))
+                    {
+                        return;
+                    }
+
+                    LookupResult lookupResult = lookUpMember(
+                        m_astBuilder,
+                        this,
+                        expr->name,
+                        type,
+                        m_outerScope);
+
+                    // We need to confirm that whatever member we
+                    // are trying to refer to is usable via static reference.
+                    //
+                    // TODO: eventually we might allow a non-static
+                    // member to be adapted by turning it into something
+                    // like a closure that takes the missing `this` parameter.
+                    //
+                    // E.g., a static reference to a method could be treated
+                    // as a value with a function type, where the first parameter
+                    // is `type`.
+                    //
+                    // The biggest challenge there is that we'd need to arrange
+                    // to generate "dispatcher" functions that could be used
+                    // to implement that function, in the case where we are
+                    // making a static reference to some kind of polymorphic declaration.
+                    //
+                    // (Also, static references to fields/properties would get even
+                    // harder, because you'd have to know whether a getter/setter/ref-er
+                    // is needed).
+                    //
+                    // For now let's just be expedient and disallow all of that, because
+                    // we can always add it back in later.
+
+                    // If the lookup result is valid, then we want to filter
+                    // it to just those candidates that can be referenced statically,
+                    // and ignore any that would only be allowed as instance members.
+                    //
+                    if (lookupResult.isValid())
+                    {
+                        // We track both the usable items, and whether or
+                        // not there were any non-static items that need
+                        // to be ignored.
+                        //
+                        bool anyNonStatic = false;
+                        List<LookupResultItem> staticItems;
+                        for (auto item : lookupResult)
+                        {
+                            // Is this item usable as a static member?
+                            if (isUsableAsStaticMember(item))
+                            {
+                                // If yes, then it will be part of the output.
+                                staticItems.add(item);
+                            }
+                            else
+                            {
+                                // If no, then we might need to output an error.
+                                anyNonStatic = true;
+                            }
+                        }
+
+                        // Was there anything non-static in the list?
+                        if (anyNonStatic)
+                        {
+                            // If we had some static items, then that's okay,
+                            // we just want to use our newly-filtered list.
+                            if (staticItems.getCount())
+                            {
+                                lookupResult.items = staticItems;
+                                lookupResult.item = staticItems[0];
+                            }
+                            else
+                            {
+                                // Otherwise, it is time to report an error.
+                                getSink()->diagnose(
+                                    expr->loc,
+                                    Diagnostics::staticRefToNonStaticMember,
+                                    type,
+                                    expr->name);
+                                hasErrors = true;
+                                return;
+                            }
+                        }
+                        // If there were no non-static items, then the `items`
+                        // array already represents what we'd get by filtering...
+
+                        AddToLookupResult(globalLookupResult, lookupResult);
+                        base = baseExpression;
+                    }
+                }
+            };
+
+        auto handleLeafExpr = [&](Expr* e)
+            {
+                if (auto nsType = as<NamespaceType>(e->type))
+                    handleLeafCase(nsType->getDeclRef(), nsType);
+                else if (auto aggType = as<DeclRefType>(e->type))
+                    handleLeafCase(aggType->getDeclRef(), aggType);
+                else if (auto typetype = as<TypeType>(e->type))
+                    handleLeafCase(DeclRef<Decl>(), typetype->getType());
+            };
+
         auto& baseType = baseExpression->type;
-
-        // TODO: Need to handle overloaded case (in case we
-        // have multiple visible types and/or namespaces
-        // with the same name).
-
-        if (auto namespaceType = as<NamespaceType>(baseType))
-        {
-            // We are looking up a namespace member.
-            //
-            auto namespaceDeclRef = namespaceType->getDeclRef();
-
-            // This ought to be the easy case, because
-            // there are no restrictions on whether
-            // we can reference the declaration here.
-            //
-            LookupResult lookupResult = lookUpDirectAndTransparentMembers(
-                m_astBuilder,
-                this,
-                expr->name,
-                namespaceDeclRef.getDecl(),
-                namespaceDeclRef);
-            if (!lookupResult.isValid())
-            {
-                return lookupMemberResultFailure(expr, baseType);
-            }
-
-            if (expr->name == getSession()->getCompletionRequestTokenName())
-            {
-                suggestCompletionItems(CompletionSuggestions::ScopeKind::Member, lookupResult);
-            }
-            return createLookupResultExpr(
-                expr->name,
-                lookupResult,
-                nullptr,
-                expr->loc,
-                expr);
-        }
-        else if (auto typeType = as<TypeType>(baseType))
-        {
-            // We are looking up a member inside a type.
-            // We want to be careful here because we should only find members
-            // that are implicitly or explicitly `static`.
-            //
-            // TODO: this duplicates a *lot* of logic with the case below.
-            // We need to fix that.
-            auto type = typeType->getType();
-
-            if (as<ErrorType>(type))
-            {
-                return CreateErrorExpr(expr);
-            }
-
-            LookupResult lookupResult = lookUpMember(
-                m_astBuilder,
-                this,
-                expr->name,
-                type);
-            if (!lookupResult.isValid())
-            {
-                return lookupMemberResultFailure(expr, baseType);
-            }
-
-            // We need to confirm that whatever member we
-            // are trying to refer to is usable via static reference.
-            //
-            // TODO: eventually we might allow a non-static
-            // member to be adapted by turning it into something
-            // like a closure that takes the missing `this` parameter.
-            //
-            // E.g., a static reference to a method could be treated
-            // as a value with a function type, where the first parameter
-            // is `type`.
-            //
-            // The biggest challenge there is that we'd need to arrange
-            // to generate "dispatcher" functions that could be used
-            // to implement that function, in the case where we are
-            // making a static reference to some kind of polymorphic declaration.
-            //
-            // (Also, static references to fields/properties would get even
-            // harder, because you'd have to know whether a getter/setter/ref-er
-            // is needed).
-            //
-            // For now let's just be expedient and disallow all of that, because
-            // we can always add it back in later.
-
-            // If the lookup result is valid, then we want to filter
-            // it to just those candidates that can be referenced statically,
-            // and ignore any that would only be allowed as instance members.
-            //
-            if(lookupResult.isValid())
-            {
-                // We track both the usable items, and whether or
-                // not there were any non-static items that need
-                // to be ignored.
-                //
-                bool anyNonStatic = false;
-                List<LookupResultItem> staticItems;
-                for (auto item : lookupResult)
-                {
-                    // Is this item usable as a static member?
-                    if (isUsableAsStaticMember(item))
-                    {
-                        // If yes, then it will be part of the output.
-                        staticItems.add(item);
-                    }
-                    else
-                    {
-                        // If no, then we might need to output an error.
-                        anyNonStatic = true;
-                    }
-                }
-
-                // Was there anything non-static in the list?
-                if (anyNonStatic)
-                {
-                    // If we had some static items, then that's okay,
-                    // we just want to use our newly-filtered list.
-                    if (staticItems.getCount())
-                    {
-                        lookupResult.items = staticItems;
-                        lookupResult.item = staticItems[0];
-                    }
-                    else
-                    {
-                        // Otherwise, it is time to report an error.
-                        getSink()->diagnose(
-                            expr->loc,
-                            Diagnostics::staticRefToNonStaticMember,
-                            type,
-                            expr->name);
-                        return CreateErrorExpr(expr);
-                    }
-                }
-                // If there were no non-static items, then the `items`
-                // array already represents what we'd get by filtering...
-            }
-            if (expr->name == getSession()->getCompletionRequestTokenName())
-            {
-                suggestCompletionItems(CompletionSuggestions::ScopeKind::Member, lookupResult);
-            }
-            return createLookupResultExpr(
-                expr->name,
-                lookupResult,
-                baseExpression,
-                expr->loc,
-                expr);
-        }
-        else if (as<ErrorType>(baseType))
+        if (as<ErrorType>(baseType))
         {
             return CreateErrorExpr(expr);
         }
 
-        // Failure
-        return lookupMemberResultFailure(expr, baseType);
+        if (auto overloaded = as<OverloadedExpr>(baseExpression))
+        {
+            for (auto candidate : overloaded->lookupResult2.items)
+                handleLeafCase(candidate.declRef, nullptr);
+        }
+        else if (auto overloaded2 = as<OverloadedExpr2>(baseExpression))
+        {
+            for (auto candidate : overloaded2->candidiateExprs)
+            {
+                handleLeafExpr(candidate);
+            }
+        }
+        else
+        {
+            handleLeafExpr(baseExpression);
+        }
+
+        bool diagnosed = false;
+        globalLookupResult = filterLookupResultByVisibilityAndDiagnose(globalLookupResult, expr->loc, diagnosed);
+        diagnosed |= hasErrors;
+        if (!globalLookupResult.isValid())
+        {
+            return lookupMemberResultFailure(expr, baseType, diagnosed);
+        }
+
+        if (expr->name == getSession()->getCompletionRequestTokenName())
+        {
+            suggestCompletionItems(CompletionSuggestions::ScopeKind::Member, globalLookupResult);
+        }
+        return createLookupResultExpr(
+            expr->name,
+            globalLookupResult,
+            base,
+            expr->loc,
+            expr);
     }
 
     Expr* SemanticsExprVisitor::visitStaticMemberExpr(StaticMemberExpr* expr)
@@ -3538,12 +3738,14 @@ namespace Slang
 
     Expr* SemanticsVisitor::lookupMemberResultFailure(
         DeclRefExpr*     expr,
-        QualType const& baseType)
+        QualType const& baseType,
+        bool supressDiagnostic)
     {
         // Check it's a member expression
         SLANG_ASSERT(as<StaticMemberExpr>(expr) || as<MemberExpr>(expr));
 
-        getSink()->diagnose(expr, Diagnostics::noMemberOfNameInType, expr->name, baseType);
+        if (!supressDiagnostic)
+            getSink()->diagnose(expr, Diagnostics::noMemberOfNameInType, expr->name, baseType);
         expr->type = QualType(m_astBuilder->getErrorType());
         return expr;
     }
@@ -3651,6 +3853,14 @@ namespace Slang
         {
             return _lookupStaticMember(expr, expr->baseExpression);
         }
+        else if (as<OverloadedExpr>(expr->baseExpression))
+        {
+            return _lookupStaticMember(expr, expr->baseExpression);
+        }
+        else if (as<OverloadedExpr2>(expr->baseExpression))
+        {
+            return _lookupStaticMember(expr, expr->baseExpression);
+        }
         else if (as<ErrorType>(baseType))
         {
             return CreateErrorExpr(expr);
@@ -3661,10 +3871,13 @@ namespace Slang
                 m_astBuilder,
                 this,
                 expr->name,
-                baseType.Ptr());
+                baseType.Ptr(),
+                m_outerScope);
+            bool diagnosed = false;
+            lookupResult = filterLookupResultByVisibilityAndDiagnose(lookupResult, expr->loc, diagnosed);
             if (!lookupResult.isValid())
             {
-                return lookupMemberResultFailure(expr, baseType);
+                return lookupMemberResultFailure(expr, baseType, diagnosed);
             }
             if (expr->name == getSession()->getCompletionRequestTokenName())
             {
@@ -3996,7 +4209,9 @@ namespace Slang
                         operand.expr = typeExpr.exp;
                     }
                     else if(operand.flavor == SPIRVAsmOperand::SlangValue
-                        || operand.flavor == SPIRVAsmOperand::SlangValueAddr)
+                        || operand.flavor == SPIRVAsmOperand::SlangValueAddr
+                        || operand.flavor == SPIRVAsmOperand::ImageType
+                        || operand.flavor == SPIRVAsmOperand::SampledImageType)
                     {
                         // This is a $expr operand, check the expr
                         operand.expr = dispatch(operand.expr);

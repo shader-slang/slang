@@ -1420,7 +1420,7 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
                 fieldBindingIndex,
                 fieldBindingSpace,
                 declarator,
-                field->getKey());
+                field);
             if (fieldVal.flavor != ScalarizedVal::Flavor::none)
             {
                 ScalarizedTupleValImpl::Element element;

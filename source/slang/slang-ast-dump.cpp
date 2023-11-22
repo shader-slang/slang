@@ -435,13 +435,6 @@ struct ASTDumpContext
         ScopeWrite(this).getBuf() << "DeclCheckStateExt{" << extState.isBeingChecked() << ", " << Index(state) << "}";
     }
 
-    void dump(TextureFlavor texFlavor)
-    {
-        m_buf.clear();
-        m_buf << "TextureFlavor{" << Index(texFlavor.flavor) << "}";
-        m_writer->emit(m_buf);
-    }
-
     void dump(FeedbackType::Kind kind)
     {
         m_buf.clear();

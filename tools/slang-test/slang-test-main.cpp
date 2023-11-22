@@ -1974,27 +1974,36 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
 
     actualOutput = redactedSB.produceString().trim();
 
-    if (!_areResultsEqual(input.testOptions->type, expectedOutput, actualOutput))
+    String fileCheckPrefix;
+    const bool isFileCheckTest = input.testOptions->getFileCheckPrefix(fileCheckPrefix);
+    if (isFileCheckTest)
     {
-        if (expectedOutput.startsWith("CONTAINS"))
+        result = _fileCheckTest(*context, input.filePath, fileCheckPrefix, actualOutput);
+    }
+    else
+    {
+        if (!_areResultsEqual(input.testOptions->type, expectedOutput, actualOutput))
         {
-            List<UnownedStringSlice> words;
-            List<UnownedStringSlice> expectedLines;
-            StringUtil::calcLines(expectedOutput.getUnownedSlice(), expectedLines);
-            if (expectedLines.getCount() >= 1)
+            if (expectedOutput.startsWith("CONTAINS"))
             {
-                StringUtil::split(expectedLines[0], ' ', words);
-                if (words.getCount() >= 2)
+                List<UnownedStringSlice> words;
+                List<UnownedStringSlice> expectedLines;
+                StringUtil::calcLines(expectedOutput.getUnownedSlice(), expectedLines);
+                if (expectedLines.getCount() >= 1)
                 {
-                    if (actualOutput.contains(words[1].trim()))
+                    StringUtil::split(expectedLines[0], ' ', words);
+                    if (words.getCount() >= 2)
                     {
-                        return result;
+                        if (actualOutput.contains(words[1].trim()))
+                        {
+                            return result;
+                        }
                     }
                 }
             }
+            context->getTestReporter()->dumpOutputDifference(expectedOutput, actualOutput);
+            result = TestResult::Fail;
         }
-        context->getTestReporter()->dumpOutputDifference(expectedOutput, actualOutput);
-        result = TestResult::Fail;
     }
 
     // If the test failed, then we write the actual output to a file

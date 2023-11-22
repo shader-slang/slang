@@ -4,6 +4,7 @@
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-marshal-native-call.h"
+#include "slang-ir-util.h"
 
 namespace Slang
 {
@@ -26,10 +27,7 @@ struct DllExportContext
         builder.addPublicDecoration(wrapper);
         builder.addKeepAliveDecoration(wrapper);
         builder.addHLSLExportDecoration(wrapper);
-        if (auto oldPublicDecoration = func->findDecoration<IRPublicDecoration>())
-        {
-            oldPublicDecoration->removeFromParent();
-        }
+        removeLinkageDecorations(func);
     }
 
     void processModule()

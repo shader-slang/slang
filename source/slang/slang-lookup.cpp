@@ -98,6 +98,19 @@ void AddToLookupResult(
     }
 }
 
+void AddToLookupResult(LookupResult& result, const LookupResult& items)
+{
+    if (items.isOverloaded())
+    {
+        for (auto item : items.items)
+            AddToLookupResult(result, item);
+    }
+    else if (items.isValid())
+    {
+        AddToLookupResult(result, items.item);
+    }
+}
+
 LookupResult refineLookup(LookupResult const& inResult, LookupMask mask)
 {
     if (!inResult.isValid()) return inResult;
@@ -406,6 +419,7 @@ static void _lookUpMembersInSuperTypeDeclImpl(
     else
     {
         auto selfType = DeclRefType::create(astBuilder, declRef);
+        selfType = selfType->getCanonicalType();
         inheritanceInfo = semantics->getShared()->getInheritanceInfo(selfType);
     }
         
@@ -674,6 +688,10 @@ static void _lookUpInScopes(
     auto scope      = request.scope;
 
     auto endScope   = request.endScope;
+
+    // The file decl that this scope is in.
+    FileDecl* thisFileDecl = nullptr;
+
     for (;scope != endScope; scope = scope->parent)
     {
         // Note that we consider all "peer" scopes together,
@@ -691,6 +709,18 @@ static void _lookUpInScopes(
             //
             if (!containerDecl)
                 continue;
+
+            if (auto fileDecl = as<FileDecl>(containerDecl))
+            {
+                if (!thisFileDecl)
+                    thisFileDecl = fileDecl;
+                else if (fileDecl == thisFileDecl)
+                {
+                    // If we have already looked up in this file decl,
+                    // we don't want to do so again.
+                    continue;
+                }
+            }
 
             // TODO: If we need default substitutions to be applied to
             // the `containerDecl`, then it might make sense to have
@@ -877,11 +907,12 @@ LookupResult lookUpMember(
     SemanticsVisitor*   semantics,
     Name*               name,
     Type*               type,
+    Scope*              sourceScope,
     LookupMask          mask,
     LookupOptions       options)
 {
     LookupResult result;
-    LookupRequest request = initLookupRequest(semantics, name, mask, options, nullptr);
+    LookupRequest request = initLookupRequest(semantics, name, mask, options, sourceScope);
     _lookUpMembersInType(astBuilder, name, type, request, result, nullptr);
     return result;
 }

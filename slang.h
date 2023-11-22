@@ -1998,6 +1998,7 @@ extern "C"
         SLANG_RESOURCE_EXT_SHAPE_MASK       = 0xF0,
 
         SLANG_TEXTURE_FEEDBACK_FLAG         = 0x10,
+        SLANG_TEXTURE_SHADOW_FLAG           = 0x20,
         SLANG_TEXTURE_ARRAY_FLAG            = 0x40,
         SLANG_TEXTURE_MULTISAMPLE_FLAG      = 0x80,
 
@@ -2019,6 +2020,8 @@ extern "C"
         SLANG_RESOURCE_ACCESS_APPEND,
         SLANG_RESOURCE_ACCESS_CONSUME,
         SLANG_RESOURCE_ACCESS_WRITE,
+        SLANG_RESOURCE_ACCESS_FEEDBACK,
+        SLANG_RESOURCE_ACCESS_UNKNOWN = 0x7FFFFFFF,
     };
 
     typedef unsigned int SlangParameterCategoryIntegral;
@@ -3881,6 +3884,11 @@ namespace slang
             int                     slotIndex,
             char const*             typeName) = 0;
 
+            /** Enable or disable an experimental, best-effort GLSL frontend
+             */
+        virtual SLANG_NO_THROW void SLANG_MCALL setAllowGLSLInput(
+            bool                    value) = 0;
+
             /** Execute the compilation request.
 
             @returns  SlangResult, SLANG_OK on success. Use SLANG_SUCCEEDED() and SLANG_FAILED() to test SlangResult.
@@ -4259,6 +4267,7 @@ namespace slang
         ISlangFileSystem* fileSystem = nullptr;
 
         bool enableEffectAnnotations = false;
+        bool allowGLSLSyntax = false;
     };
 
     enum class ContainerType

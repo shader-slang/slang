@@ -133,22 +133,26 @@ INST(Nop, nop, 0, 0)
         INST(SamplerComparisonStateType, SamplerComparisonState, 0, HOISTABLE)
     INST_RANGE(SamplerStateTypeBase, SamplerStateType, SamplerComparisonStateType)
 
+    INST(TextureFootprintType, TextureFootprintType, 1, HOISTABLE)
+
+    INST(TextureShape1DType, TextureShape1DType, 0, HOISTABLE)
+    INST(TextureShape2DType, TextureShape1DType, 0, HOISTABLE)
+    INST(TextureShape3DType, TextureShape1DType, 0, HOISTABLE)
+    INST(TextureShapeCubeType, TextureShape1DType, 0, HOISTABLE)
+    INST(TextureShapeBufferType, TextureShapeBufferType, 0, HOISTABLE)
+
     // TODO: Why do we have all this hierarchy here, when everything
     // that actually matters is currently nested under `TextureTypeBase`?
     /* ResourceTypeBase */
         /* ResourceType */
             /* TextureTypeBase */
-                // NOTE! TextureFlavor::Flavor is stored in 'other' bits for these types.
                 /* TextureType */
-                INST(TextureType, TextureType, 0, USE_OTHER | HOISTABLE)
-                /* TextureSamplerType */
-                INST(TextureSamplerType, TextureSamplerType, 0, USE_OTHER | HOISTABLE)
+                INST(TextureType, TextureType, 8, HOISTABLE)
                 /* GLSLImageType */
                 INST(GLSLImageType, GLSLImageType, 0, USE_OTHER | HOISTABLE)
             INST_RANGE(TextureTypeBase, TextureType, GLSLImageType)
         INST_RANGE(ResourceType, TextureType, GLSLImageType)
     INST_RANGE(ResourceTypeBase, TextureType, GLSLImageType)
-
 
     /* UntypedBufferResourceType */
         /* ByteAddressBufferTypeBase */
@@ -823,6 +827,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// A call to the decorated function should always be folded into its use site.
     INST(AlwaysFoldIntoUseSiteDecoration, alwaysFold, 0, 0)
 
+    INST(GlobalOutputDecoration, output, 0, 0)
+    INST(GlobalInputDecoration, output, 0, 0)
+    INST(GLSLLocationDecoration, glslLocation, 1, 0)
     INST(PayloadDecoration, payload, 0, 0)
 
     /* Mesh Shader outputs */
@@ -832,7 +839,6 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST_RANGE(MeshOutputDecoration, VerticesDecoration, PrimitivesDecoration)
     INST(HLSLMeshPayloadDecoration, payload, 0, 0)
     INST(GLSLPrimitivesRateDecoration, perprimitive, 0, 0)
-
         // Marks an inst that represents the gl_Position output.
     INST(GLPositionOutputDecoration, PositionOutput, 0, 0)
 
@@ -844,6 +850,7 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(SemanticDecoration, semantic, 2, 0)
     INST(PackOffsetDecoration, packoffset, 2, 0)
 
+    INST(RequireSPIRVDescriptorIndexingExtensionDecoration, RequireSPIRVDescriptorIndexingExtensionDecoration, 0, 0)
     INST(SPIRVOpDecoration, spirvOpDecoration, 1, 0)
 
         /// Decorated function is marked for the forward-mode differentiation pass.
@@ -1106,6 +1113,8 @@ INST(SPIRVAsmInst, SPIRVAsmInst, 1, 0)
     INST(SPIRVAsmOperandBuiltinVar, SPIRVAsmOperandBuiltinVar, 1, HOISTABLE)
     // A reference to the glsl450 instruction set.
     INST(SPIRVAsmOperandGLSL450Set, SPIRVAsmOperandGLSL450Set, 0, HOISTABLE)
+    INST(SPIRVAsmOperandDebugPrintfSet, SPIRVAsmOperandDebugPrintfSet, 0, HOISTABLE)
+
     // A string which is given a unique ID in the backend, used to refer to
     // results of other instrucions in the same asm block
     INST(SPIRVAsmOperandId, SPIRVAsmOperandId, 1, HOISTABLE)
@@ -1122,7 +1131,14 @@ INST(SPIRVAsmInst, SPIRVAsmInst, 1, 0)
     // A type function which returns the result type of sampling an image of
     // this component type
     INST(SPIRVAsmOperandSampledType, __sampledType, 1, HOISTABLE)
-INST_RANGE(SPIRVAsmOperand, SPIRVAsmOperandLiteral, SPIRVAsmOperandSampledType)
+
+    // A type function which returns the equivalent OpTypeImage type of sampled image value
+    INST(SPIRVAsmOperandImageType, __imageType, 1, HOISTABLE)
+
+    // A type function which returns the equivalent OpTypeImage type of sampled image value
+    INST(SPIRVAsmOperandSampledImageType, __sampledImageType, 1, HOISTABLE)
+
+INST_RANGE(SPIRVAsmOperand, SPIRVAsmOperandLiteral, SPIRVAsmOperandSampledImageType)
 
 
 #undef PARENT

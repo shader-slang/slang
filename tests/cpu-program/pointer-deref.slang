@@ -11,7 +11,7 @@ struct Record
     SubRecord sub;
 }
 
-public __extern_cpp int main()
+export __extern_cpp int main()
 {
     Record rec;
     Record *pRec = &rec;
