@@ -1,0 +1,52 @@
+name: Build CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-20.04, macos-latest, windows-latest]
+        configuration: ['Debug', 'Release']
+        compiler: ['clang', 'gcc']
+        platform: ['x64']
+        include:
+          - os: windows-latest
+            compiler: cl
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: 'true'
+          fetch-depth: '0'
+      - name: Setup
+        uses: ./.github/actions/common-setup
+        with:
+          os: ${{matrix.os}}
+          compiler: ${{matrix.compiler}}
+          platform: ${{matrix.platform}}
+          configuration: ${{matrix.configuration}}
+      - name: configure
+        run: |
+          mkdir -p build
+          cmake -S . -B build -G "Ninja Multi-Config" -DSLANG_SLANG_LLVM_FLAVOR=FETCH_BINARY
+      - name: build
+        run: cmake --build build -j --config ${{matrix.configuration}}
+      - name: install
+        run: |
+          mkdir -p install
+          cmake --install build --prefix install --config ${{matrix.configuration}}
+      - uses: actions/upload-artifact@v3
+        with:
+          name: slang-build-${{matrix.os}}-${{matrix.platform}}-${{matrix.compiler}}-${{matrix.configuration}}
+          path: install

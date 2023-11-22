@@ -2,55 +2,53 @@ name: Build slang-llvm
 
 on:
   push:
-    branches: [ master ]
+    branches: [master]
   pull_request:
-    branches: [ master ]
+    branches: [master]
 
 jobs:
-  build:
+  build-slang-llvm:
     strategy:
       matrix:
         os: [ubuntu-20.04, macos-latest, windows-latest]
+        platform: ['x64']
+        configuration: ['Release']
+        include:
+          - os: windows-latest
+            compiler: cl
+          - os: macos-latest
+            compiler: clang
+          - os: ubuntu-20.04
+            compiler: gcc
+
     runs-on: ${{ matrix.os }}
     steps:
-    - name: Set up system dependencies
-      shell: bash
-      run: |
-        case "${{matrix.os}}" in
-          ubuntu*)
-            sudo apt-get install -y ninja-build
-            printf "CC=gcc-10\nCXX=g++-10\n" >> "$GITHUB_ENV"
-            ;;
-          windows*)
-            choco install ninja
-            printf "CC=cl.exe\nCXX=cl.exe\n" >> "$GITHUB_ENV"
-            ;;
-          macos*) brew install ninja;;
-        esac
-        mkdir -p build
-    - uses: actions/checkout@v3
-      with:
-        submodules: 'true'
-        fetch-depth: '0'
-    - name: ccache
-      uses: hendrikmuhs/ccache-action@v1.2
-      with:
-        key: ${{github.job}}-${{matrix.os}}
-        variant: sccache
-    - uses: ilammy/msvc-dev-cmd@v1
-    - name: configure
-      run: >
-        cmake -S . -B build -G "Ninja Multi-Config"
-        -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
-        -DSLANG_LLVM_FLAVOR=BUILD_LLVM
-    - name: build
-      shell: bash
-      run: |
-        cmake --build build -j $(nproc) --target slang-llvm --config Release
-    - uses: actions/upload-artifact@v3
-      with:
-        name: slang-llvm-${{matrix.os}}
-        path: |
-          build/Release/lib/libslang-llvm.so
-          build/Release/lib/libslang-llvm.dylib
-          build/Release/bin/slang-llvm.dll
+      - uses: actions/checkout@v3
+        with:
+          submodules: 'true'
+          fetch-depth: '0'
+      - name: Setup
+        uses: ./.github/actions/common-setup
+        with:
+          os: ${{matrix.os}}
+          compiler: ${{matrix.compiler}}
+          platform: ${{matrix.platform}}
+          configuration: ${{matrix.configuration}}
+      - name: configure
+        run: |
+          cmake -S . -B build -G "Ninja Multi-Config" -DSLANG_SLANG_LLVM_FLAVOR=BUILD_LLVM
+      - name: build
+        shell: bash
+        run: |
+          cmake --build build -j --target slang-llvm --config ${{matrix.configuration}}
+      - name: test
+        shell: bash
+        run: |
+          cmake --build build -j --target slang-llvm --config ${{matrix.configuration}}
+      - uses: actions/upload-artifact@v3
+        with:
+          name: slang-llvm-${{matrix.os}}
+          path: |
+            build/${{matrix.configuration}}/lib/libslang-llvm.so
+            build/${{matrix.configuration}}/lib/libslang-llvm.dylib
+            build/${{matrix.configuration}}/bin/slang-llvm.dll

@@ -1,0 +1,57 @@
+name: Common setup
+
+description: Performs setup common to all our actions
+
+inputs:
+  os:
+    required: true
+  compiler:
+    required: true
+  platform:
+    required: true
+  configuration:
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Set up MSVC dev tools on Windows
+      uses: ilammy/msvc-dev-cmd@v1
+    - name: Set up sccache
+      uses: hendrikmuhs/ccache-action@v1.2
+      with:
+        key: ${{github.job}}-${{inputs.os}}-${{inputs.platform}}-${{inputs.configuration}}
+        variant: sccache
+    - name: Download SwiftShader
+      uses: robinraju/release-downloader@v1.7
+      with:
+        latest: true
+        repository: "shader-slang/swiftshader"
+        fileName: "vk_swiftshader_linux_${{inputs.platform}}.zip"
+    - name: Set up system dependencies
+      shell: bash
+      run: |
+        # Install Ninja
+        case "${{inputs.os}}" in
+          ubuntu*) sudo apt-get install -y ninja-build;;
+          windows*) choco install ninja;;
+          macos*) brew install ninja;;
+        esac
+
+        # Set compiler
+        CC=${{inputs.compiler}}
+        CXX=${{inputs.compiler}}
+        # infer C++ compiler
+        CXX=${CXX/gcc/g++}
+        CXX=${CXX/clang/clang++}
+        # Correct version on older ubuntu
+        if [[ "${{inputs.os}}" == ubuntu-20.04 ]]; then
+          CC=${CC/gcc/gcc-10}
+          CXX=${CXX/g++/g++-10}
+        fi
+        # Export
+        echo "CC=$CC" >> "$GITHUB_ENV"
+        echo "CXX=$CXX" >> "$GITHUB_ENV"
+
+        # Set CMake to use sccache
+        echo "CMAKE_CXX_COMPILER_LAUNCHER=sccache" >> "$GITHUB_ENV"
+        echo "CMAKE_C_COMPILER_LAUNCHER=sccache" >> "$GITHUB_ENV"
