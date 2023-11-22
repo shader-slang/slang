@@ -19,14 +19,6 @@ jobs:
             compiler: cl
           - os: macos-latest
             compiler: cl
-          # simpler testing
-          - configuration: Release
-          - os: macos-latest
-            compiler: gcc
-          - os: windows-latest
-            compiler: gcc
-          - os: windows-latest
-            compiler: clang
       fail-fast: false
     runs-on: ${{ matrix.os }}
 
