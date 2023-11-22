@@ -37,10 +37,6 @@ jobs:
         shell: bash
         run: |
           cmake --build build -j --target slang-llvm --config ${{matrix.configuration}}
-      - name: test
-        shell: bash
-        run: |
-          cmake --build build -j --target slang-llvm --config ${{matrix.configuration}}
       - uses: actions/upload-artifact@v3
         with:
           name: slang-llvm-${{matrix.os}}
