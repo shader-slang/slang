@@ -445,12 +445,6 @@ slang_add_target(
     EXCLUDE_FROM_ALL
     LINK_WITH_PRIVATE core compiler-core
 )
-slang_add_target(
-    tools/slang-profile
-    EXECUTABLE
-    EXCLUDE_FROM_ALL
-    LINK_WITH_PRIVATE core slang
-)
 
 slang_add_target(
     tools/slang-test
@@ -531,6 +525,13 @@ slang_add_target(
         $<$<BOOL:${SLANG_ENABLE_CUDA}>:RENDER_TEST_CUDA>
         $<$<BOOL:${SLANG_ENABLE_OPTIX}>:RENDER_TEST_OPTIX>
     OUTPUT_NAME render-test-tool
+)
+
+slang_add_target(
+    tools/slang-profile
+    EXECUTABLE
+    EXCLUDE_FROM_ALL
+    LINK_WITH_PRIVATE core slang
 )
 
 #
