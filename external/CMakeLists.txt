@@ -26,3 +26,7 @@ add_subdirectory(spirv-tools EXCLUDE_FROM_ALL)
 set(SKIP_GLSLANG_INSTALL ON)
 set(ENABLE_OPT ON)
 add_subdirectory(glslang EXCLUDE_FROM_ALL)
+
+# imgui
+add_library(imgui INTERFACE)
+target_include_directories(imgui INTERFACE "${CMAKE_CURRENT_LIST_DIR}/imgui")
