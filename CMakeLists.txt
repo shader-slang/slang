@@ -1,11 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
 
-# Squash some warnings and turn on some non-legacy behavior
-cmake_policy(SET CMP0135 NEW)
-cmake_policy(SET CMP0077 NEW)
-cmake_policy(SET CMP0141 NEW)
-set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
-
 # Our module dir, include that now so that we can get the version automatically
 # from git describe
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
@@ -15,18 +9,27 @@ get_git_version(SLANG_VERSION "${CMAKE_CURRENT_LIST_DIR}")
 #
 # And our project
 #
-project(slang VERSION "${SLANG_VERSION}" LANGUAGES C CXX)
+project(slang VERSION "${SLANG_VERSION}" LANGUAGES)
 
 #
-# Global CMake options, generally to be avoided
+# Global CMake options
 #
 
-# Don't use absolute paths to the build tree in RPATH
+cmake_policy(SET CMP0135 OLD)
+cmake_policy(SET CMP0077 NEW)
+set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+
+# Don't use absolute paths to the build tree in RPATH, this makes the build
+# tree relocatable
 set(CMAKE_BUILD_RPATH_USE_ORIGIN TRUE)
+
+include(CCacheDebugInfoWorkaround)
 
 #
 # CMake-supplied modules and our utils
 #
+
+enable_language(C CXX)
 
 include(CMakeDependentOption)
 include(FetchContent)
