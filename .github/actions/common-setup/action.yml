@@ -21,15 +21,10 @@ runs:
       with:
         key: ${{github.job}}-${{inputs.os}}-${{inputs.platform}}-${{inputs.configuration}}
         variant: sccache
-    - name: Download SwiftShader
-      uses: robinraju/release-downloader@v1.7
-      with:
-        latest: true
-        repository: "shader-slang/swiftshader"
-        fileName: "vk_swiftshader_linux_${{inputs.platform}}.zip"
-    - name: Set up system dependencies
-      shell: bash
+    - shell: bash
       run: |
+        # Set up system dependencies
+
         # Install Ninja
         case "${{inputs.os}}" in
           ubuntu*) sudo apt-get install -y ninja-build;;
