@@ -434,30 +434,6 @@ slang_add_target(
 #
 
 slang_add_target(
-    tools/slang-test
-    EXECUTABLE
-    USE_FEWER_WARNINGS
-    LINK_WITH_PRIVATE core compiler-core slang ${CMAKE_DL_LIBS} Threads::Threads
-    REQUIRES
-        # Shared libraries dlopened by slang-test
-        slang-reflection-test
-        render-test
-        slang-unit-test
-        gfx-unit-test
-        slang-glslang
-        # Used by some tests when they run
-        slangd
-        slang-rt
-        gfx
-)
-if(TARGET slang-llvm)
-    # Only add a dependency here if slang-llvm exists
-    # Pending https://gitlab.kitware.com/cmake/cmake/-/issues/19467 to be able
-    # to use a generator expression in REQUIRES just above.
-    add_dependencies(slang-test slang-llvm)
-endif()
-
-slang_add_target(
     tools/test-server
     EXECUTABLE
     EXCLUDE_FROM_ALL
@@ -475,6 +451,32 @@ slang_add_target(
     EXCLUDE_FROM_ALL
     LINK_WITH_PRIVATE core slang
 )
+
+slang_add_target(
+    tools/slang-test
+    EXECUTABLE
+    USE_FEWER_WARNINGS
+    LINK_WITH_PRIVATE core compiler-core slang ${CMAKE_DL_LIBS} Threads::Threads
+    REQUIRES
+        # Shared libraries dlopened by slang-test
+        slang-reflection-test
+        render-test
+        slang-unit-test
+        gfx-unit-test
+        slang-glslang
+        # Used by some tests when they run
+        slangd
+        slang-rt
+        gfx
+        test-server
+        test-process
+)
+if(TARGET slang-llvm)
+    # Only add a dependency here if slang-llvm exists
+    # Pending https://gitlab.kitware.com/cmake/cmake/-/issues/19467 to be able
+    # to use a generator expression in REQUIRES just above.
+    add_dependencies(slang-test slang-llvm)
+endif()
 
 slang_add_target(
     tools/unit-test
