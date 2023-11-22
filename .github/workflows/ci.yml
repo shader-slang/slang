@@ -49,7 +49,11 @@ jobs:
       - name: configure
         run: |
           mkdir -p build
-          cmake -S . -B build -G "Ninja Multi-Config" -DSLANG_SLANG_LLVM_FLAVOR=FETCH_BINARY
+          cmake -S . -B build -G "Ninja Multi-Config" \
+            -DSLANG_SLANG_LLVM_FLAVOR=FETCH_BINARY \
+            -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT="$<$<CONFIG:Debug,RelWithDebInfo>:Embedded>"
+          # Use embedded debug info rather than accumulate a single database
+          # (ProgramDatabase), the latter prevents compilation caching
       - name: build
         run: cmake --build build -j --config ${{matrix.configuration}}
       - name: install
