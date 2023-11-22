@@ -229,7 +229,7 @@ function(slang_add_target dir type)
     if(ARG_EXTRA_COMPILE_DEFINITIONS_PRIVATE)
         target_compile_definitions(
             ${target}
-            PRIVATE ${EXTRA_COMPILE_DEFINITIONS_PRIVATE}
+            PRIVATE ${ARG_EXTRA_COMPILE_DEFINITIONS_PRIVATE}
         )
     endif()
 
