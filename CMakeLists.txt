@@ -584,4 +584,21 @@ if(SLANG_ENABLE_AFTERMATH)
     example(examples/nv-aftermath-example WIN32_EXECUTABLE)
 endif()
 
+#
+# Testing
+#
+include(CTest)
+add_test(
+    NAME slang-test
+    COMMAND
+        slang-test
+        -bindir ${slang_SOURCE_DIR}/build/Release/bin
+        -expected-failure-list ${slang_SOURCE_DIR}/tests/expected-failure.txt
+        -expected-failure-list ${slang_SOURCE_DIR}/tests/expected-failure-github.txt
+    WORKING_DIRECTORY ${slang_SOURCE_DIR}
+)
+
+#
+# Packaging
+#
 include(CPack)
