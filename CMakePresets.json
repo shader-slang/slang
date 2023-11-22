@@ -51,9 +51,9 @@
   ],
   "testPresets": [
     {
-      "name": "release",
+      "name": "base",
+      "hidden": true,
       "configurePreset": "default",
-      "configuration": "Release",
       "environment": {
         "SLANG_RUN_SPIRV_VALIDATION": "1"
       },
@@ -65,6 +65,16 @@
         "timeout": 999999999,
         "noTestsAction": "error"
       }
+    },
+    {
+      "name": "debug",
+      "inherits": "base",
+      "configuration": "Debug"
+    },
+    {
+      "name": "release",
+      "inherits": "base",
+      "configuration": "Release"
     }
   ],
   "packagePresets": [
