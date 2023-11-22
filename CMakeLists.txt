@@ -353,9 +353,10 @@ elseif(SLANG_SLANG_LLVM_FLAVOR STREQUAL "USE_SYSTEM_LLVM" OR SLANG_SLANG_LLVM_FL
     # conflict with those of other LLVMs linked at runtime, for instance in mesa.
     add_supported_cxx_linker_flags(slang-llvm PRIVATE "-Wl,--exclude-libs,ALL")
 
-    # TODO: Put a check here that libslang-llvm.so doesn't 'NEEDED'
-    # libLLVM-13.so, it's almost certainly going to break at runtime in
-    # surprising ways when linked alongside Mesa
+    # TODO: Put a check here that libslang-llvm.so doesn't have a 'NEEDED'
+    # directive for libLLVM-13.so, it's almost certainly going to break at
+    # runtime in surprising ways when linked alongside Mesa (or anything else
+    # pulling in libLLVM.so)
 endif()
 
 #
