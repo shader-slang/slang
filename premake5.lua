@@ -924,6 +924,8 @@ standardProject("core", "source/core")
     --
     warnings "Extra"
 
+    includedirs { "external/miniz" }
+
     if targetInfo.isWindows then
         addSourceDir "source/core/windows"
     else
