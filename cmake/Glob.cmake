@@ -24,12 +24,27 @@ endfunction()
 
 function(slang_glob_sources var)
     file(GLOB_RECURSE files CONFIGURE_DEPENDS ${ARGN})
+
     if(NOT WIN32)
         list(FILTER files EXCLUDE REGEX "(^|/)windows/.*")
     endif()
+
     if(NOT UNIX)
         list(FILTER files EXCLUDE REGEX "(^|/)unix/.*")
     endif()
+
+    if(NOT CMAKE_SYSTEM_NAME MATCHES "Windows" AND NOT SLANG_ENABLE_DX_ON_VK)
+        list(FILTER files EXCLUDE REGEX "(^|/)d3d.*/.*")
+    endif()
+
+    if(NOT CMAKE_SYSTEM_NAME MATCHES "Windows|Linux")
+        list(FILTER files EXCLUDE REGEX "(^|/)vulkan/.*")
+    endif()
+
+    if(NOT CMAKE_SYSTEM_NAME MATCHES "Windows")
+        list(FILTER files EXCLUDE REGEX "(^|/)open-gl/.*")
+    endif()
+
     list(APPEND ${var} ${files})
     set(${var} ${${var}} PARENT_SCOPE)
 endfunction()
