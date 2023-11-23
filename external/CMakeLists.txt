@@ -1,3 +1,13 @@
+# Don't let all these packages spam up with status messages, filter to only the
+# important stuff.
+# Don't change things however if the user has explicitly set
+# CMAKE_MESSAGE_LOG_LEVEL
+set(set_cmake_log_level FALSE)
+if(NOT CMAKE_MESSAGE_LOG_LEVEL)
+  set(set_cmake_log_level TRUE)
+  set(CMAKE_MESSAGE_LOG_LEVEL NOTICE)
+endif()
+
 # Miniz
 add_subdirectory(miniz EXCLUDE_FROM_ALL)
 set_property(TARGET miniz PROPERTY POSITION_INDEPENDENT_CODE ON)
@@ -32,7 +42,14 @@ add_subdirectory(glslang EXCLUDE_FROM_ALL)
 add_library(imgui INTERFACE)
 target_include_directories(imgui INTERFACE "${CMAKE_CURRENT_LIST_DIR}/imgui")
 
-# Tidy things up, for this directory and all subdirectories, prepend
+# Tidy things up:
+
+# Restore log level if we set it
+if(set_cmake_log_level)
+  unset(CMAKE_MESSAGE_LOG_LEVEL)
+endif()
+
+# for this directory and all subdirectories, prepend
 # `external/` to the IDE FOLDER property to every target
 function(make_external dir)
   get_property(external_targets DIRECTORY ${dir} PROPERTY BUILDSYSTEM_TARGETS)
