@@ -31,6 +31,7 @@ add_subdirectory(spirv-headers EXCLUDE_FROM_ALL)
 set(SPIRV_TOOLS_BUILD_STATIC ON)
 set(SPIRV_WERROR OFF)
 set(SPIRV_HEADER_DIR "${CMAKE_CURRENT_LIST_DIR}/spirv-headers/")
+set(SPIRV_SKIP_TESTS ON)
 add_subdirectory(spirv-tools EXCLUDE_FROM_ALL)
 
 # glslang
