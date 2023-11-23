@@ -404,7 +404,7 @@ add_custom_target(
     WORKING_DIRECTORY ${slang_SOURCE_DIR}
     VERBATIM
 )
-set_target_properties(copy-gfx-slang-modules PROPERTIES FOLDER gfx)
+set_target_properties(copy-gfx-slang-modules PROPERTIES FOLDER generators)
 install(
     FILES ${modules_dest_dir}/gfx.slang ${modules_dest_dir}/slang.slang
     DESTINATION ${runtime_subdir}
