@@ -196,20 +196,20 @@ endif()
 #
 
 add_custom_target(
-    generators
+    all-generators
     COMMENT "meta target which depends on all generators"
 )
 function(generator dir)
     slang_add_target(
         ${dir}
         EXECUTABLE
-        ${ARGN}
         EXCLUDE_FROM_ALL
         USE_FEWER_WARNINGS
         LINK_WITH_PRIVATE core
         OUTPUT_DIR generators
-        REQUIRED_BY generators
+        REQUIRED_BY all-generators
         FOLDER generators
+        ${ARGN}
     )
 endfunction()
 generator(tools/slang-cpp-extractor USE_FEWER_WARNINGS LINK_WITH_PRIVATE compiler-core)
@@ -554,12 +554,11 @@ slang_add_target(
         $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cudart;CUDA::cuda_driver>
 )
 
-add_custom_target(examples COMMENT "meta target which depends on all examples")
+add_custom_target(all-examples COMMENT "meta target which depends on all examples")
 function(example dir)
     slang_add_target(
         ${dir}
         EXECUTABLE
-        ${ARGN}
         EXCLUDE_FROM_ALL
         USE_FEWER_WARNINGS
         LINK_WITH_PRIVATE
@@ -572,8 +571,9 @@ function(example dir)
             $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cudart;CUDA::cuda_driver>
         EXTRA_COMPILE_DEFINITIONS_PRIVATE
             $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB>
-        REQUIRED_BY examples
+        REQUIRED_BY all-examples
         FOLDER examples
+        ${ARGN}
     )
 endfunction()
 
