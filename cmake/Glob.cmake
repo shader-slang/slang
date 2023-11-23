@@ -11,17 +11,9 @@ function(glob_append dest)
 endfunction()
 
 #
-# Append a glob to a variable conditionally
+# Perform a recursive glob, and exclude any files appropriately according to
+# the host system and build options
 #
-# Example usage: glob_append_if(WIN32 MY_VAR "windows/*.cpp")
-#
-function(glob_append_if cond dest)
-    if(${cond})
-        glob_append(${dest} ${ARGN})
-        set(${dest} ${${dest}} PARENT_SCOPE)
-    endif()
-endfunction()
-
 function(slang_glob_sources var)
     file(GLOB_RECURSE files CONFIGURE_DEPENDS ${ARGN})
 

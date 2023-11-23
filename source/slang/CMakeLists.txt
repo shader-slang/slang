@@ -176,6 +176,7 @@ slang_add_target(
     INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}
     EXPORT_MACRO_PREFIX SLANG
     INSTALL
+    PUBLIC_HEADERS ${slang_SOURCE_DIR}/slang*.h ${slang_SOURCE_DIR}/prelude/*.h
 )
 
 if(SLANG_EMBED_STDLIB_SOURCE)

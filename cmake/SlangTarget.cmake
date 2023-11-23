@@ -46,7 +46,7 @@ function(slang_add_target dir type)
         REQUIRED_BY
         # Add a dependency to the new target on the specified targets
         REQUIRES
-        # Any headers to install
+        # Globs for any headers to install
         PUBLIC_HEADERS
     )
     cmake_parse_arguments(
@@ -256,7 +256,13 @@ function(slang_add_target dir type)
         if(NOT ARG_INSTALL)
             message(WARNING "${target} was declared with PUBLIC_HEADERS but without INSTALL, the former will do nothing")
         endif()
-        set_target_properties(${target} PROPERTIES PUBLIC_HEADER "${ARG_PUBLIC_HEADERS}")
+
+        glob_append(public_headers ${ARG_PUBLIC_HEADERS})
+        if(NOT public_headers)
+            message(WARNING "${target}'s PUBLIC_HEADER globs found no matches")
+        else()
+            set_target_properties(${target} PROPERTIES PUBLIC_HEADER "${public_headers}")
+        endif()
     endif()
 
     #
