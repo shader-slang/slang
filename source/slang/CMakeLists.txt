@@ -50,6 +50,7 @@ add_library(
     EXCLUDE_FROM_ALL
     ${SLANG_STDLIB_META_GENERATED_HEADERS}
 )
+set_target_properties(slang-meta-headers PROPERTIES FOLDER generated)
 target_include_directories(
     slang-meta-headers
     INTERFACE ${SLANG_STDLIB_META_OUTPUT_DIR}
@@ -103,6 +104,7 @@ add_library(
     EXCLUDE_FROM_ALL
     ${SLANG_REFLECT_GENERATED_HEADERS}
 )
+set_target_properties(slang-reflect-headers PROPERTIES FOLDER generated)
 target_include_directories(
     slang-reflect-headers
     INTERFACE ${SLANG_REFLECT_OUTPUT_DIR}
@@ -128,6 +130,7 @@ slang_add_target(
         slang-meta-headers
         slang-reflect-headers
         SPIRV-Headers
+    FOLDER generators
 )
 target_compile_definitions(
     slang-no-embedded-stdlib
@@ -154,6 +157,7 @@ add_library(
     EXCLUDE_FROM_ALL
     ${SLANG_STDLIB_GENERATED_HEADER}
 )
+set_target_properties(slang-stdlib-embed-headers PROPERTIES FOLDER generated)
 target_include_directories(
     slang-stdlib-embed-headers
     INTERFACE ${CMAKE_CURRENT_BINARY_DIR}

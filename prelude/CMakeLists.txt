@@ -28,4 +28,5 @@ slang_add_target(
     PUBLIC_HEADERS ${CMAKE_CURRENT_LIST_DIR}/slang*.h
     # It's an object library, so the install step only installs the headers
     INSTALL
+    FOLDER generated
 )

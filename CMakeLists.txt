@@ -199,6 +199,7 @@ add_custom_target(
     all-generators
     COMMENT "meta target which depends on all generators"
 )
+set_target_properties(all-generators PROPERTIES FOLDER generators)
 function(generator dir)
     slang_add_target(
         ${dir}
@@ -301,6 +302,7 @@ if(SLANG_SLANG_LLVM_FLAVOR STREQUAL "FETCH_BINARY")
     )
     # Give this copying action a name
     add_custom_target(copy-slang-llvm DEPENDS ${slang_llvm_dest_object})
+    set_target_properties(copy-slang-llvm PROPERTIES FOLDER generated)
 
     # Put this into a library target
     add_library(slang-llvm MODULE IMPORTED GLOBAL)
@@ -552,9 +554,11 @@ slang_add_target(
         gfx
         platform
         $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cudart;CUDA::cuda_driver>
+    FOLDER examples
 )
 
 add_custom_target(all-examples COMMENT "meta target which depends on all examples")
+set_target_properties(all-examples PROPERTIES FOLDER examples)
 function(example dir)
     slang_add_target(
         ${dir}
