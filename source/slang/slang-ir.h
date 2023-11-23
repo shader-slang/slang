@@ -1399,7 +1399,7 @@ struct IRResourceTypeBase : IRType
     bool isShadow() { return getIntVal(getIsShadowInst()) != 0; }
     bool isCombined() { return getIntVal(getIsCombinedInst()) != 0; }
     
-    SlangResourceShape getShape() { return (SlangResourceShape)((uint32_t)GetBaseShape() | (isArray() ? SLANG_TEXTURE_ARRAY_FLAG : 0)); }
+    SlangResourceShape getShape() { return (SlangResourceShape)((uint32_t)GetBaseShape() | (isArray() ? SLANG_TEXTURE_ARRAY_FLAG : SLANG_RESOURCE_NONE)); }
     SlangResourceAccess getAccess()
     {
         auto constVal = as<IRIntLit>(getOperand(kStdlibTextureAccessParameterIndex));
