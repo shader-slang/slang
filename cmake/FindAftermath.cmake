@@ -1,5 +1,3 @@
-include(FindPackageHandleStandardArgs)
-
 set(Aftermath_ROOT_DIR "" CACHE PATH "Path to an installed Aftermath SDK")
 
 if(Aftermath_ROOT_DIR)

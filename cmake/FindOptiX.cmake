@@ -1,5 +1,3 @@
-include(FindPackageHandleStandardArgs)
-
 set(Optix_ROOT_DIR "" CACHE PATH "Path to an installed OptiX SDK")
 
 if(Optix_ROOT_DIR)

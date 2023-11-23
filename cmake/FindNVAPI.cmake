@@ -1,5 +1,3 @@
-include(FindPackageHandleStandardArgs)
-
 set(NVAPI_ROOT_DIR "" CACHE PATH "Path to an installed NVAPI SDK")
 
 if(NVAPI_ROOT_DIR)

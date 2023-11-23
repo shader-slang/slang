@@ -7,7 +7,7 @@ include(GitVersion)
 get_git_version(SLANG_VERSION "${CMAKE_CURRENT_LIST_DIR}")
 
 #
-# And our project
+# Our project
 #
 project(slang VERSION "${SLANG_VERSION}" LANGUAGES)
 
@@ -23,6 +23,7 @@ set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 # tree relocatable
 set(CMAKE_BUILD_RPATH_USE_ORIGIN TRUE)
 
+# Set a necessary workaround for ccache before enable_language
 include(CCacheDebugInfoWorkaround)
 
 #
@@ -31,6 +32,7 @@ include(CCacheDebugInfoWorkaround)
 
 enable_language(C CXX)
 
+include(FindPackageHandleStandardArgs)
 include(CMakeDependentOption)
 include(FetchContent)
 include(GNUInstallDirs)
@@ -54,7 +56,7 @@ auto_option(
 auto_option(
     SLANG_ENABLE_OPTIX
     OptiX
-    "Enable OptiX build/tests, requires enable-cuda"
+    "Enable OptiX build/tests, requires SLANG_ENABLE_CUDA"
 )
 auto_option(
     SLANG_ENABLE_NVAPI
@@ -72,6 +74,7 @@ auto_option(
     "Enable Aftermath in GFX, and add aftermath crash example to project"
 )
 option(SLANG_ENABLE_DX_ON_VK "Use dxvk and vkd3d-proton for DirectX support")
+mark_as_advanced(SLANG_ENABLE_DX_ON_VK)
 
 option(SLANG_EMBED_STDLIB_SOURCE "Embed stdlib source in the binary" ON)
 option(SLANG_EMBED_STDLIB "Build slang with an embedded version of the stdlib")
@@ -122,6 +125,10 @@ if(SLANG_ENABLE_OPTIX AND NOT SLANG_ENABLE_CUDA)
         SEND_ERROR
         "SLANG_ENABLE_OPTIX is not supported without SLANG_ENABLE_CUDA"
     )
+endif()
+
+if(SLANG_ENABLE_NVAPI AND NOT CMAKE_SYSTEM_NAME MATCHES "Windows")
+    message(SEND_ERROR "SLANG_ENABLE_NVAPI is only supported on Windows")
 endif()
 
 #
