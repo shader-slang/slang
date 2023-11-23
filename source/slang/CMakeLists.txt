@@ -1,14 +1,4 @@
 #
-# Clean files from premake
-#
-# The premake builds places generated files in the source tree, make sure these
-# aren't present
-glob_append(premake_generated_files "*.meta.slang.h" "*-generated-*.h")
-if(premake_generated_files)
-    file(REMOVE ${premake_generated_files})
-endif()
-
-#
 # Compiling the meta.slang files
 #
 

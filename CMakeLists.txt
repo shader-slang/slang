@@ -130,6 +130,17 @@ if(SLANG_ENABLE_NVAPI AND NOT CMAKE_SYSTEM_NAME MATCHES "Windows")
 endif()
 
 #
+# Clean files from premake
+#
+# The premake builds places generated files in the source tree, make sure these
+# aren't present
+glob_append(premake_generated_files "source/slang/*.meta.slang.h" "source/slang/*-generated-*.h")
+if(premake_generated_files)
+    file(REMOVE ${premake_generated_files})
+endif()
+file(REMOVE external/miniz/miniz_export.h)
+
+#
 # Dependencies, most of these are however handled inside the "auto_option"
 # calls above
 #
