@@ -23,6 +23,9 @@ set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 # tree relocatable
 set(CMAKE_BUILD_RPATH_USE_ORIGIN TRUE)
 
+# Enable placing targets into a hierarchy for IDE generators
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+
 # Set a necessary workaround for ccache before enable_language
 include(CCacheDebugInfoWorkaround)
 
@@ -196,57 +199,29 @@ add_custom_target(
     generators
     COMMENT "meta target which depends on all generators"
 )
-slang_add_target(
-    tools/slang-cpp-extractor
-    EXECUTABLE
-    EXCLUDE_FROM_ALL
-    USE_FEWER_WARNINGS
-    OUTPUT_DIR generators
-    LINK_WITH_PRIVATE core compiler-core
-    REQUIRED_BY generators
-)
-slang_add_target(
-    tools/slang-embed
-    EXECUTABLE
-    EXCLUDE_FROM_ALL
-    OUTPUT_DIR generators
-    LINK_WITH_PRIVATE core
-    REQUIRED_BY generators
-)
-slang_add_target(
-    tools/slang-generate
-    EXECUTABLE
-    EXCLUDE_FROM_ALL
-    OUTPUT_DIR generators
-    USE_FEWER_WARNINGS
-    LINK_WITH_PRIVATE core
-    REQUIRED_BY generators
-)
-slang_add_target(
-    tools/slang-lookup-generator
-    EXECUTABLE
-    EXCLUDE_FROM_ALL
-    OUTPUT_DIR generators
-    LINK_WITH_PRIVATE core compiler-core
-    REQUIRED_BY generators
-)
-slang_add_target(
-    tools/slang-spirv-embed-generator
-    EXECUTABLE
-    EXCLUDE_FROM_ALL
-    OUTPUT_DIR generators
-    LINK_WITH_PRIVATE core compiler-core
-    REQUIRED_BY generators
-)
-slang_add_target(
+function(generator dir)
+    slang_add_target(
+        ${dir}
+        EXECUTABLE
+        ${ARGN}
+        EXCLUDE_FROM_ALL
+        USE_FEWER_WARNINGS
+        LINK_WITH_PRIVATE core
+        OUTPUT_DIR generators
+        REQUIRED_BY generators
+        FOLDER generators
+    )
+endfunction()
+generator(tools/slang-cpp-extractor USE_FEWER_WARNINGS LINK_WITH_PRIVATE compiler-core)
+generator(tools/slang-embed)
+generator(tools/slang-generate USE_FEWER_WARNINGS)
+generator(tools/slang-lookup-generator LINK_WITH_PRIVATE compiler-core)
+generator(tools/slang-spirv-embed-generator LINK_WITH_PRIVATE compiler-core)
+generator(
     source/slangc
-    EXECUTABLE
-    USE_FEWER_WARNINGS
-    OUTPUT_DIR generators
     TARGET_NAME slang-bootstrap
-    EXCLUDE_FROM_ALL
-    LINK_WITH_PRIVATE core slang-no-embedded-stdlib Threads::Threads
-    REQUIRED_BY generators
+    USE_FEWER_WARNINGS
+    LINK_WITH_PRIVATE prelude slang-no-embedded-stdlib Threads::Threads
 )
 
 #
@@ -413,6 +388,7 @@ slang_add_target(
     INCLUDE_DIRECTORIES_PUBLIC .
     REQUIRES copy-gfx-slang-modules
     INSTALL
+    FOLDER gfx
 )
 set(modules_dest_dir $<TARGET_FILE_DIR:slang-test>)
 add_custom_target(
@@ -422,6 +398,7 @@ add_custom_target(
     WORKING_DIRECTORY ${slang_SOURCE_DIR}
     VERBATIM
 )
+set_target_properties(copy-gfx-slang-modules PROPERTIES FOLDER gfx)
 install(
     FILES ${modules_dest_dir}/gfx.slang ${modules_dest_dir}/slang.slang
     DESTINATION ${runtime_subdir}
@@ -435,6 +412,7 @@ slang_add_target(
     # The headers are included with 'include "gfx-util/blah.h"' which is found
     # in the tools directory
     INCLUDE_DIRECTORIES_PUBLIC tools
+    FOLDER gfx
 )
 
 #
@@ -455,12 +433,14 @@ slang_add_target(
     EXECUTABLE
     EXCLUDE_FROM_ALL
     LINK_WITH_PRIVATE core compiler-core slang
+    FOLDER test
 )
 slang_add_target(
     tools/test-process
     EXECUTABLE
     EXCLUDE_FROM_ALL
     LINK_WITH_PRIVATE core compiler-core
+    FOLDER test
 )
 
 slang_add_target(
@@ -481,6 +461,7 @@ slang_add_target(
         gfx
         test-server
         test-process
+    FOLDER test
 )
 if(TARGET slang-llvm)
     # Only add a dependency here if slang-llvm exists
@@ -494,6 +475,7 @@ slang_add_target(
     OBJECT
     EXCLUDE_FROM_ALL
     INCLUDE_FROM_PRIVATE slang
+    FOLDER test
 )
 
 # These are libraries loaded at runtime from the test executable:
@@ -505,6 +487,7 @@ slang_add_target(
     USE_FEWER_WARNINGS
     LINK_WITH_PRIVATE core slang unit-test gfx gfx-util platform
     OUTPUT_NAME gfx-unit-test-tool
+    FOLDER test/tools
 )
 slang_add_target(
     tools/slang-unit-test
@@ -514,6 +497,7 @@ slang_add_target(
     USE_FEWER_WARNINGS
     LINK_WITH_PRIVATE core compiler-core unit-test slang Threads::Threads
     OUTPUT_NAME slang-unit-test-tool
+    FOLDER test/tools
 )
 slang_add_target(
     tools/slang-reflection-test
@@ -523,6 +507,7 @@ slang_add_target(
     USE_FEWER_WARNINGS
     LINK_WITH_PRIVATE core slang Threads::Threads
     OUTPUT_NAME slang-reflection-test-tool
+    FOLDER test/tools
 )
 slang_add_target(
     tools/render-test
@@ -542,6 +527,7 @@ slang_add_target(
         $<$<BOOL:${SLANG_ENABLE_CUDA}>:RENDER_TEST_CUDA>
         $<$<BOOL:${SLANG_ENABLE_OPTIX}>:RENDER_TEST_OPTIX>
     OUTPUT_NAME render-test-tool
+    FOLDER test/tools
 )
 
 slang_add_target(
@@ -549,6 +535,7 @@ slang_add_target(
     EXECUTABLE
     EXCLUDE_FROM_ALL
     LINK_WITH_PRIVATE core slang
+    FOLDER test
 )
 
 #
@@ -586,6 +573,7 @@ function(example dir)
         EXTRA_COMPILE_DEFINITIONS_PRIVATE
             $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB>
         REQUIRED_BY examples
+        FOLDER examples
     )
 endfunction()
 

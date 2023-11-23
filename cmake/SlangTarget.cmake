@@ -35,6 +35,9 @@ function(slang_add_target dir type)
         # ${EXPORT_MACRO_PREFIX}_DYNAMIC_EXPORT macros are set for using and
         # building respectively
         EXPORT_MACRO_PREFIX
+        # The folder in which to place this target for IDE-based generators (VS
+        # and XCode)
+        FOLDER
     )
     set(multi_value_args
         # Use exactly these sources, instead of globbing from the directory
@@ -182,6 +185,10 @@ function(slang_add_target dir type)
             ${target}
             PROPERTIES OUTPUT_NAME ${ARG_OUTPUT_NAME}
         )
+    endif()
+
+    if(DEFINED ARG_FOLDER)
+        set_target_properties(${target} PROPERTIES FOLDER ${ARG_FOLDER})
     endif()
 
     #
