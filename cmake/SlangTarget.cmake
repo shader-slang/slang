@@ -1,3 +1,8 @@
+#
+# A function to make target creation a little more declarative
+#
+# See the comments on the options below for usage
+#
 function(slang_add_target dir type)
     set(no_value_args
         # Don't include in the 'all' target
