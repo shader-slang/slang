@@ -475,6 +475,7 @@ if(TARGET slang-llvm)
     # to use a generator expression in REQUIRES just above.
     add_dependencies(slang-test slang-llvm)
 endif()
+set_property(DIRECTORY ${slang_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT slang-test)
 
 slang_add_target(
     tools/unit-test
