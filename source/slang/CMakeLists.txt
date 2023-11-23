@@ -113,7 +113,7 @@ slang_add_target(
     OBJECT
     TARGET_NAME slang-no-embedded-stdlib
     EXCLUDE_FROM_ALL
-    EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_STATIC
+    EXTRA_COMPILE_DEFINITIONS_PUBLIC SLANG_STATIC
     LINK_WITH_PRIVATE
         core
         compiler-core

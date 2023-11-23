@@ -49,6 +49,7 @@ function(slang_add_target dir type)
         EXTRA_SOURCE_DIRS
         # Additional compile definitions
         EXTRA_COMPILE_DEFINITIONS_PRIVATE
+        EXTRA_COMPILE_DEFINITIONS_PUBLIC
         # Targets with which to link privately
         LINK_WITH_PRIVATE
         # Targets whose headers we use, but don't link with
@@ -256,6 +257,12 @@ function(slang_add_target dir type)
         target_compile_definitions(
             ${target}
             PRIVATE ${ARG_EXTRA_COMPILE_DEFINITIONS_PRIVATE}
+        )
+    endif()
+    if(ARG_EXTRA_COMPILE_DEFINITIONS_PUBLIC)
+        target_compile_definitions(
+            ${target}
+            PUBLIC ${ARG_EXTRA_COMPILE_DEFINITIONS_PUBLIC}
         )
     endif()
 
