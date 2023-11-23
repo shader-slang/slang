@@ -398,8 +398,9 @@ slang_add_target(
 set(modules_dest_dir $<TARGET_FILE_DIR:slang-test>)
 add_custom_target(
     copy-gfx-slang-modules
-    COMMAND ${CMAKE_COMMAND} -E copy tools/gfx/gfx.slang ${modules_dest_dir}
-    COMMAND ${CMAKE_COMMAND} -E copy tools/gfx/slang.slang ${modules_dest_dir}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${modules_dest_dir}
+    COMMAND ${CMAKE_COMMAND} -E copy tools/gfx/gfx.slang ${modules_dest_dir}/gfx.slang
+    COMMAND ${CMAKE_COMMAND} -E copy tools/gfx/slang.slang ${modules_dest_dir}/slang.slang
     WORKING_DIRECTORY ${slang_SOURCE_DIR}
     VERBATIM
 )
