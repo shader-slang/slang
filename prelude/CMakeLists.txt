@@ -18,6 +18,14 @@ foreach(input ${SLANG_PRELUDE_HEADERS})
     list(APPEND SLANG_PRELUDE_SOURCE ${output})
 endforeach()
 
-add_library(prelude OBJECT EXCLUDE_FROM_ALL ${SLANG_PRELUDE_SOURCE})
-set_default_compile_options(prelude)
-target_include_directories(prelude PRIVATE ${CMAKE_CURRENT_LIST_DIR})
+slang_add_target(
+    .
+    OBJECT
+    EXPLICIT_SOURCE ${SLANG_PRELUDE_SOURCE}
+    EXCLUDE_FROM_ALL
+    TARGET_NAME prelude
+    INCLUDE_DIRECTORIES_PUBLIC ${CMAKE_CURRENT_LIST_DIR}
+    PUBLIC_HEADERS ${CMAKE_CURRENT_LIST_DIR}/slang*.h
+    # It's an object library, so the install step only installs the headers
+    INSTALL
+)
