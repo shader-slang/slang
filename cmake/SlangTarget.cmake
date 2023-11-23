@@ -46,6 +46,8 @@ function(slang_add_target dir type)
         REQUIRED_BY
         # Add a dependency to the new target on the specified targets
         REQUIRES
+        # Any headers to install
+        PUBLIC_HEADERS
     )
     cmake_parse_arguments(
         ARG
@@ -248,6 +250,16 @@ function(slang_add_target dir type)
     )
 
     #
+    # Mark headers for installation
+    #
+    if(ARG_PUBLIC_HEADERS)
+        if(NOT ARG_INSTALL)
+            message(WARNING "${target} was declared with PUBLIC_HEADERS but without INSTALL, the former will do nothing")
+        endif()
+        set_target_properties(${target} PROPERTIES PUBLIC_HEADER "${ARG_PUBLIC_HEADERS}")
+    endif()
+
+    #
     # Mark for installation
     #
     if(ARG_INSTALL)
@@ -260,6 +272,8 @@ function(slang_add_target dir type)
             DESTINATION ${library_subdir}
             RUNTIME
             DESTINATION bin
+            PUBLIC_HEADER
+            DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
         )
     endif()
 endfunction()
