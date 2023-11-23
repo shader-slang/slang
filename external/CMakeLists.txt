@@ -37,6 +37,7 @@ add_subdirectory(spirv-tools EXCLUDE_FROM_ALL)
 # glslang
 set(SKIP_GLSLANG_INSTALL ON)
 set(ENABLE_OPT ON)
+set(ENABLE_PCH OFF)
 add_subdirectory(glslang EXCLUDE_FROM_ALL)
 
 # imgui
