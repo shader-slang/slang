@@ -102,10 +102,10 @@ function(slang_add_target dir type)
     if(ARG_EXPLICIT_SOURCE)
         list(APPEND source ${ARG_EXPLICIT_SOURCE})
     else()
-        slang_glob_sources(source "${dir}/*.cpp")
+        slang_glob_sources(source ${dir})
     endif()
     foreach(extra_dir ${ARG_EXTRA_SOURCE_DIRS})
-        slang_glob_sources(source "${extra_dir}/*.cpp")
+        slang_glob_sources(source ${extra_dir})
     endforeach()
 
     #

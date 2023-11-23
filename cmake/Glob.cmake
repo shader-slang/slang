@@ -14,8 +14,11 @@ endfunction()
 # Perform a recursive glob, and exclude any files appropriately according to
 # the host system and build options
 #
-function(slang_glob_sources var)
-    file(GLOB_RECURSE files CONFIGURE_DEPENDS ${ARGN})
+function(slang_glob_sources var dir)
+    set(patterns "*.cpp" "*.h" "*.natvis" "*.natstepfilter" "*.natjmc")
+    list(TRANSFORM patterns PREPEND "${dir}/")
+
+    file(GLOB_RECURSE files CONFIGURE_DEPENDS ${patterns})
 
     if(NOT WIN32)
         list(FILTER files EXCLUDE REGEX "(^|/)windows/.*")
