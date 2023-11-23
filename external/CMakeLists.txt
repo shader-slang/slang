@@ -31,3 +31,19 @@ add_subdirectory(glslang EXCLUDE_FROM_ALL)
 # imgui
 add_library(imgui INTERFACE)
 target_include_directories(imgui INTERFACE "${CMAKE_CURRENT_LIST_DIR}/imgui")
+
+# Tidy things up, for this directory and all subdirectories, prepend
+# `external/` to the IDE FOLDER property to every target
+function(make_external dir)
+  get_property(external_targets DIRECTORY ${dir} PROPERTY BUILDSYSTEM_TARGETS)
+  foreach(external_target ${external_targets})
+    get_property(folder TARGET ${external_target} PROPERTY FOLDER)
+    set_property(TARGET ${external_target} PROPERTY FOLDER "external/${folder}")
+  endforeach()
+
+  get_property(subdirs DIRECTORY ${dir} PROPERTY SUBDIRECTORIES)
+  foreach(subdir ${subdirs})
+    make_external(${subdir})
+  endforeach()
+endfunction()
+make_external(.)
