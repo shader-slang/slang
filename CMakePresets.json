@@ -79,14 +79,31 @@
   ],
   "packagePresets": [
     {
-      "name": "release",
+      "name": "base",
+      "hidden": true,
       "configurePreset": "default",
+      "generators": [
+        "ZIP"
+      ],
+      "variables": {
+        "CPACK_PACKAGE_FILE_NAME": "slang"
+      }
+    },
+    {
+      "name": "release",
+      "inherits": "base",
       "configurations": [
         "Release"
       ],
-      "generators": [
-        "ZIP"
-      ]
+      "packageDirectory": "dist-release"
+    },
+    {
+      "name": "debug",
+      "inherits": "base",
+      "configurations": [
+        "Debug"
+      ],
+      "packageDirectory": "dist-debug"
     }
   ],
   "workflowPresets": [
@@ -107,7 +124,7 @@
         },
         {
           "type": "package",
-          "name": "release"
+          "name": "debug"
         }
       ]
     },
@@ -120,10 +137,6 @@
         },
         {
           "type": "build",
-          "name": "release"
-        },
-        {
-          "type": "test",
           "name": "release"
         },
         {
