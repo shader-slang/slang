@@ -8,7 +8,7 @@ jobs:
       matrix:
         os: [ubuntu-20.04, macos-latest, windows-latest]
         platform: ['x64']
-        configuration: ['Release']
+        config: ['Release']
         include:
           - os: windows-latest
             compiler: cl
@@ -29,18 +29,18 @@ jobs:
           os: ${{matrix.os}}
           compiler: ${{matrix.compiler}}
           platform: ${{matrix.platform}}
-          configuration: ${{matrix.configuration}}
+          config: ${{matrix.config}}
       - name: configure
         run: |
           cmake -S . -B build -G "Ninja Multi-Config" -DSLANG_SLANG_LLVM_FLAVOR=BUILD_LLVM
       - name: build
         shell: bash
         run: |
-          cmake --build build -j --target slang-llvm --config ${{matrix.configuration}}
+          cmake --build build -j --target slang-llvm --config ${{matrix.config}}
       - uses: actions/upload-artifact@v3
         with:
           name: slang-llvm-${{matrix.os}}
           path: |
-            build/${{matrix.configuration}}/lib/libslang-llvm.so
-            build/${{matrix.configuration}}/lib/libslang-llvm.dylib
-            build/${{matrix.configuration}}/bin/slang-llvm.dll
+            build/${{matrix.config}}/lib/libslang-llvm.so
+            build/${{matrix.config}}/lib/libslang-llvm.dylib
+            build/${{matrix.config}}/bin/slang-llvm.dll

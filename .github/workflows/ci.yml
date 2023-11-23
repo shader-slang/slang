@@ -11,7 +11,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-20.04, macos-latest, windows-latest]
-        configuration: ['Debug', 'Release']
+        config: ['debug', 'release']
         compiler: ['cl', 'clang', 'gcc']
         platform: ['x64']
         exclude:
@@ -37,18 +37,9 @@ jobs:
           os: ${{matrix.os}}
           compiler: ${{matrix.compiler}}
           platform: ${{matrix.platform}}
-          configuration: ${{matrix.configuration}}
-      - name: configure
-        run: |
-          mkdir -p build
-          cmake -S . -B build -G "Ninja Multi-Config"
-      - name: build
-        run: cmake --build build -j --config ${{matrix.configuration}}
-      - name: install
-        run: |
-          mkdir -p install
-          cmake --install build --prefix install --config ${{matrix.configuration}}
+          config: ${{matrix.config}}
+      - run: cmake --workflow --preset "${{matrix.config}}-dist"
       - uses: actions/upload-artifact@v3
         with:
-          name: slang-build-${{matrix.os}}-${{matrix.platform}}-${{matrix.compiler}}-${{matrix.configuration}}
-          path: install
+          name: slang-build-${{matrix.os}}-${{matrix.platform}}-${{matrix.compiler}}-${{matrix.config}}
+          path: build/dist-${{matrix.config}}/**/slang/*

@@ -9,7 +9,7 @@ inputs:
     required: true
   platform:
     required: true
-  configuration:
+  config:
     required: true
 runs:
   using: composite
@@ -19,7 +19,7 @@ runs:
     - name: Set up sccache
       uses: hendrikmuhs/ccache-action@v1.2
       with:
-        key: ${{github.job}}-${{inputs.os}}-${{inputs.platform}}-${{inputs.configuration}}
+        key: ${{github.job}}-${{inputs.os}}-${{inputs.platform}}-${{inputs.config}}
         variant: sccache
     - shell: bash
       run: |
