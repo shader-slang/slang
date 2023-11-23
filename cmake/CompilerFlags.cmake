@@ -90,45 +90,55 @@ function(set_default_compile_options target)
         ${ARGN}
     )
 
-    set(warning_flags
-        # Disabled warnings:
-        -Wno-switch
-        -Wno-parentheses
-        -Wno-unused-local-typedefs
-        -Wno-class-memaccess
-        -Wno-assume
-        -Wno-reorder
-        -Wno-invalid-offsetof
-        # Enabled warnings: If a function returns an address/reference to a local,
-        # we want it to produce an error, because it probably means something very
-        # bad.
-        -Werror=return-local-addr
-        # This approximates the default in MSVC
-        -Wnarrowing
-    )
-
-    if(ARG_USE_EXTRA_WARNINGS)
-        list(APPEND warning_flags -Wall -Wextra /W3)
-    elseif(ARG_USE_FEWER_WARNINGS)
-        list(
-            APPEND
-            warning_flags
-            /W1
+    set(warning_flags)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang" )
+        list(APPEND warning_flags
             -Wall
+            # Disabled warnings:
+            -Wno-switch
+            -Wno-parentheses
+            -Wno-unused-local-typedefs
             -Wno-class-memaccess
-            -Wno-unused-variable
-            -Wno-unused-parameter
-            -Wno-sign-compare
-            -Wno-unused-function
-            -Wno-unused-value
-            -Wno-unused-but-set-variable
-            -Wno-implicit-fallthrough
-            -Wno-missing-field-initializers
-            -Wno-strict-aliasing
-            -Wno-maybe-uninitialized
+            -Wno-assume
+            -Wno-reorder
+            -Wno-invalid-offsetof
+            -Wno-newline-eof
+            -Wno-return-std-move
+            # Enabled warnings:
+            # If a function returns an address/reference to a local, we want it to
+            # produce an error, because it probably means something very bad.
+            -Werror=return-local-addr
+            # Some warnings which are on by default in MSVC
+            -Wnarrowing
         )
-    else()
-        list(APPEND warning_flags -Wall /W2)
+        if(ARG_USE_EXTRA_WARNINGS)
+            list(APPEND warning_flags -Wextra)
+        endif()
+        if(ARG_USE_FEWER_WARNINGS)
+            list(
+                APPEND
+                warning_flags
+                -Wno-class-memaccess
+                -Wno-unused-variable
+                -Wno-unused-parameter
+                -Wno-sign-compare
+                -Wno-unused-function
+                -Wno-unused-value
+                -Wno-unused-but-set-variable
+                -Wno-implicit-fallthrough
+                -Wno-missing-field-initializers
+                -Wno-strict-aliasing
+                -Wno-maybe-uninitialized
+            )
+        endif()
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+        list(APPEND warning_flags /W1)
+        if(ARG_USE_EXTRA_WARNINGS)
+            list(APPEND warning_flags /W4)
+        endif()
+        if(ARG_USE_FEWER_WARNINGS)
+            list(APPEND warning_flags /W0)
+        endif()
     endif()
 
     add_supported_cxx_flags(${target} PRIVATE ${warning_flags})
