@@ -85,12 +85,7 @@ option(SLANG_EMBED_STDLIB "Build slang with an embedded version of the stdlib")
 option(SLANG_ENABLE_FULL_IR_VALIDATION "Enable full IR validation (SLOW!)")
 option(SLANG_ENABLE_ASAN "Enable ASAN (address sanitizer)")
 
-if(CMAKE_SYSTEM_NAME MATCHES "Windows")
-    set(slang_llvm_flavor_def FETCH_BINARY)
-else()
-    set(slang_llvm_flavor_def USE_SYSTEM_LLVM)
-endif()
-enum_option(SLANG_SLANG_LLVM_FLAVOR ${slang_llvm_flavor_def}
+enum_option(SLANG_SLANG_LLVM_FLAVOR FETCH_BINARY
     "How to get or build slang-llvm:"
     FETCH_BINARY "Use a binary distribution of the slang-llvm library instead of building or using LLVM (default for Windows)"
     USE_SYSTEM_LLVM "Build slang-llvm using system-provided LLVM and Clang binaries (default for non-Windows hosts)"
