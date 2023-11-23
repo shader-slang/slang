@@ -33,6 +33,7 @@ enable_language(C CXX)
 
 include(CMakeDependentOption)
 include(FetchContent)
+include(GNUInstallDirs)
 
 include(CompilerFlags)
 include(Glob)
@@ -428,6 +429,15 @@ slang_add_target(
     # in the tools directory
     INCLUDE_DIRECTORIES_PUBLIC tools
 )
+
+#
+# Installing any documentation
+#
+
+file(GLOB_RECURSE docs CONFIGURE_DEPENDS docs/*.md)
+if(docs)
+    install(FILES ${docs} DESTINATION ${CMAKE_INSTALL_DOCDIR})
+endif()
 
 #
 # The test executables and runtime-loaded modules
