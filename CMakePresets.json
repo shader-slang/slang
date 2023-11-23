@@ -18,8 +18,8 @@
       "inherits": "default",
       "description": "Options specific for MSVC",
       "cacheVariables": {
-        "CMAKE_C_FLAGS_INIT": "-D_ITERATOR_DEBUG_LEVEL=0",
-        "CMAKE_CXX_FLAGS_INIT": "-D_ITERATOR_DEBUG_LEVEL=0"
+        "CMAKE_C_FLAGS_INIT": "-D_ITERATOR_DEBUG_LEVEL=0 /MP",
+        "CMAKE_CXX_FLAGS_INIT": "-D_ITERATOR_DEBUG_LEVEL=0 /MP"
       }
     },
     {
