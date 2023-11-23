@@ -463,6 +463,7 @@ slang_add_target(
         test-server
         test-process
     FOLDER test
+    DEBUG_DIR ${slang_SOURCE_DIR}
 )
 if(TARGET slang-llvm)
     # Only add a dependency here if slang-llvm exists
@@ -577,6 +578,7 @@ function(example dir)
             $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB>
         REQUIRED_BY all-examples
         FOLDER examples
+        DEBUG_DIR ${dir}
         ${ARGN}
     )
 endfunction()

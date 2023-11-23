@@ -38,6 +38,8 @@ function(slang_add_target dir type)
         # The folder in which to place this target for IDE-based generators (VS
         # and XCode)
         FOLDER
+        # The working directory for debugging
+        DEBUG_DIR
     )
     set(multi_value_args
         # Use exactly these sources, instead of globbing from the directory
@@ -189,6 +191,10 @@ function(slang_add_target dir type)
 
     if(DEFINED ARG_FOLDER)
         set_target_properties(${target} PROPERTIES FOLDER ${ARG_FOLDER})
+    endif()
+
+    if(DEFINED ARG_DEBUG_DIR)
+        set_target_properties(${target} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY ${ARG_DEBUG_DIR})
     endif()
 
     #
