@@ -23,37 +23,31 @@ Optional dependencies include
 
 ## Get the Source Code
 
-Clone [this](https://github.com/shader-slang/slang) repository, and then run:
+Clone [this](https://github.com/shader-slang/slang) repository. Make sure to
+fetch the submodules also.
 
+```bash
+git clone https://github.com/shader-slang/slang --recursive
 ```
-% git submodule update --init
-```
 
-The submodule update step is required to pull in dependencies used for testing
-infrastructure as well as the `glslang` compiler that we currently use for
-generating SPIR-V.
-
-## Configure
+## Configure and build
 
 For a Ninja based build system (all platforms) run:
-```
+```bash
 cmake --preset default
+cmake --build --preset release # or --preset debug
 ```
 
 For Visual Studio run:
-```
+```bash
 cmake --preset vs2022 # or --preset vs2019
-```
-
-## Build
-
-```
-cmake --build --preset release # or --preset debug
+start devenv .\build\slang.sln # to optionally open the project in Visual Studio
+cmake --build --preset release # to build from the CLI
 ```
 
 ## Testing
 
-```
+```bash
 build/Debug/bin/slang-test
 ```
 
