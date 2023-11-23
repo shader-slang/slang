@@ -327,7 +327,7 @@ if(SLANG_SLANG_LLVM_FLAVOR STREQUAL "FETCH_BINARY")
         TARGET slang-llvm
         PROPERTY IMPORTED_LOCATION ${slang_llvm_dest_object}
     )
-    install(PROGRAMS ${slang_llvm_dest_object} DESTINATION module_subdir)
+    install(PROGRAMS ${slang_llvm_dest_object} DESTINATION ${module_subdir})
 elseif(SLANG_SLANG_LLVM_FLAVOR STREQUAL "USE_SYSTEM_LLVM" OR SLANG_SLANG_LLVM_FLAVOR STREQUAL "BUILD_LLVM")
     llvm_target_from_components(llvm-dep filecheck native orcjit)
     clang_target_from_libs(
