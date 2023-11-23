@@ -117,10 +117,6 @@
           "name": "debug"
         },
         {
-          "type": "test",
-          "name": "debug"
-        },
-        {
           "type": "package",
           "name": "debug"
         }
