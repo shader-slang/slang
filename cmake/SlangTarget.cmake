@@ -143,13 +143,14 @@ function(slang_add_target dir type)
         # this tricky there.
         set(output_dir "${CMAKE_BINARY_DIR}/$<CONFIG>")
     endif()
+    set(archive_subdir ${library_subdir})
     if(type STREQUAL "MODULE")
       set(library_subdir ${module_subdir})
     endif()
     set_target_properties(
         ${target}
         PROPERTIES
-            ARCHIVE_OUTPUT_DIRECTORY "${output_dir}/${library_subdir}"
+            ARCHIVE_OUTPUT_DIRECTORY "${output_dir}/${archive_subdir}"
             LIBRARY_OUTPUT_DIRECTORY "${output_dir}/${library_subdir}"
             RUNTIME_OUTPUT_DIRECTORY "${output_dir}/${runtime_subdir}"
             PDB_OUTPUT_DIRECTORY "${output_dir}/${runtime_subdir}"
@@ -283,7 +284,7 @@ function(slang_add_target dir type)
             TARGETS ${target}
             EXPORT SlangTargets
             ARCHIVE
-            DESTINATION ${library_subdir}
+            DESTINATION ${archive_subdir}
             LIBRARY
             DESTINATION ${library_subdir}
             RUNTIME
