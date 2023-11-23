@@ -37,6 +37,9 @@ function(slang_add_target dir type)
         EXPORT_MACRO_PREFIX
     )
     set(multi_value_args
+        # Use exactly these sources, instead of globbing from the directory
+        # argument
+        EXPLICIT_SOURCE
         # Additional directories from which to glob source
         EXTRA_SOURCE_DIRS
         # Additional compile definitions
@@ -91,7 +94,11 @@ function(slang_add_target dir type)
     #
     # Find the source for this target
     #
-    slang_glob_sources(source "${dir}/*.cpp")
+    if(ARG_EXPLICIT_SOURCE)
+        list(APPEND source ${ARG_EXPLICIT_SOURCE})
+    else()
+        slang_glob_sources(source "${dir}/*.cpp")
+    endif()
     foreach(extra_dir ${ARG_EXTRA_SOURCE_DIRS})
         slang_glob_sources(source "${extra_dir}/*.cpp")
     endforeach()
