@@ -1,22 +1,25 @@
 # Building Slang From Source
 
+### TLDR
+
+`cmake --workflow --preset release-dist` to configure, build and package a
+release version of Slang.
+
 ## Prerequisites:
 
 Please install:
 
 - CMake
 - A C++ compiler with support for C++17. GCC, Clang and MSVC are supported
-- A CMake compatible backed, for example Visual Studio, Ninja or GNU Make
+- A CMake compatible backend, for example Visual Studio, Ninja or GNU Make
 
-Dependencies used for tests and examples are enabled if their requirements are
-detected at configure time. One can force them to be enabled (or disabled) by
-setting the options specified below.
+Optional dependencies include
 
-- CUDA, `-DSLANG_ENABLE_CUDA=1`
-- OptiX, `-DSLANG_ENABLE_OPTIX=1`
-- NVAPI, `-DSLANG_ENABLE_NVAPI=1`
-- Aftermath, `-DSLANG_ENABLE_NVAPI=1`
-- X11, `-DSLANG_ENABLE_XLIB=1`
+- CUDA
+- OptiX
+- NVAPI
+- Aftermath
+- X11
 
 ## Get the Source Code
 
@@ -30,7 +33,60 @@ The submodule update step is required to pull in dependencies used for testing
 infrastructure as well as the `glslang` compiler that we currently use for
 generating SPIR-V.
 
-## LLVM Support
+## Configure
+
+For a Ninja based build system (all platforms) run:
+```
+cmake --preset default
+```
+
+For Visual Studio run:
+```
+cmake --preset vs2022 # or --preset vs2019
+```
+
+## Build
+
+```
+cmake --build --preset release # or --preset debug
+```
+
+## Testing
+
+```
+build/Debug/bin/slang-test
+```
+
+See the [documentation on testing](../tools/slang-test/README.md) for more information.
+
+## More niche topics
+
+### CMake options
+
+| Option                            | Default          | Description                                                    |
+|-----------------------------------|------------------|----------------------------------------------------------------|
+| `SLANG_VERSION`                   | Latest `v*` tag  | The project version, detected using git if available           |
+| `SLANG_EMBED_STDLIB`              | `FALSE`          | Build slang with an embedded version of the stdlib             |
+| `SLANG_EMBED_STDLIB_SOURCE`       | `TRUE`           | Embed stdlib source in the binary                              |
+| `SLANG_ENABLE_ASAN`               | `FALSE`          | Enable ASAN (address sanitizer)                                |
+| `SLANG_ENABLE_FULL_IR_VALIDATION` | `FALSE`          | Enable full IR validation (SLOW!)                              |
+| `SLANG_SLANG_LLVM_FLAVOR`         | `FETCH_BINARY`   | How to set up llvm support                                     |
+| `SLANG_SLANG_LLVM_BINARY_URL`     | System dependent | URL specifying the location of the slang-llvm prebuilt library |
+
+The following options relate to optional dependencies for additional backends
+and running additional tests. Left unchanged they are auto detected, however
+they can be set to `OFF` to prevent their usage, or set to `ON` to make it an
+error if they can't be found.
+
+| Option                   | CMake hints                    | Notes                                                               |
+|--------------------------|--------------------------------|---------------------------------------------------------------------|
+| `SLANG_ENABLE_CUDA`      | `CUDAToolkit_ROOT` `CUDA_PATH` |                                                                     |
+| `SLANG_ENABLE_OPTIX`     | `Optix_ROOT_DIR`               | Requires CUDA                                                       |
+| `SLANG_ENABLE_NVAPI`     | `NVAPI_ROOT_DIR`               | Only available for builds targeting Windows                         |
+| `SLANG_ENABLE_AFTERMATH` | `Aftermath_ROOT_DIR`           | Enable Aftermath in GFX, and add aftermath crash example to project |
+| `SLANG_ENABLE_XLIB`      |                                |                                                                     |
+
+### LLVM Support
 
 There are several options for getting llvm-support:
 
@@ -49,12 +105,12 @@ There are several options for getting llvm-support:
       compiling LLVM without the dynamic library.
     - Anything else which may be linked in (for example Mesa, also dynamically
       loads the same llvm object)
-- Have the Slang build system build LLVM: `-DSLANG_SLANG_LLVM_FLAVOR=BUILD_LLVM`,
-  this will build a LLVM binaries at configure time and use that. This is only
-  intended to be used as part of the process of generating the portable binary
-  slang-llvm library. This always builds a `Release` LLVM, so is unsuitable to
-  use when building a `Debug` `slang-llvm` on Windows as the runtime libraries
-  are incompatible
+- Have the Slang build system build LLVM:
+  `-DSLANG_SLANG_LLVM_FLAVOR=BUILD_LLVM`, this will build LLVM binaries at
+  configure time and use that. This is only intended to be used as part of the
+  process of generating the portable binary slang-llvm library. This always
+  builds a `Release` LLVM, so is unsuitable to use when building a `Debug`
+  `slang-llvm` on Windows as the runtime libraries will be incompatible.
 - Do not enable LLVM support: `-DSLANG_SLANG_LLVM_FLAVOR=DISABLE`
 
 # Building Slang with Premake
