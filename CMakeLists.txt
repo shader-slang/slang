@@ -258,6 +258,9 @@ slang_add_target(
     LINK_WITH_PRIVATE glslang SPIRV SPIRV-Tools-opt
     INSTALL
 )
+# Our only interface is through what we define in source/slang-glslang, in the
+# interests of hygiene, hide anything else we link in.
+add_supported_cxx_linker_flags(slang-glslang PRIVATE "-Wl,--exclude-libs,ALL")
 
 if(SLANG_SLANG_LLVM_FLAVOR STREQUAL "FETCH_BINARY")
     #
