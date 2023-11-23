@@ -315,7 +315,7 @@ if(SLANG_SLANG_LLVM_FLAVOR STREQUAL "FETCH_BINARY")
         from_glob("${slang-llvm_SOURCE_DIR}")
     endif()
 
-    set(slang_llvm_dest_object ${CMAKE_BINARY_DIR}/$<CONFIG>/lib/${slang_llvm_filename})
+    set(slang_llvm_dest_object ${CMAKE_BINARY_DIR}/$<CONFIG>/${library_subdir}/${slang_llvm_filename})
     add_custom_command(
         OUTPUT ${slang_llvm_dest_object}
         COMMAND
@@ -424,7 +424,7 @@ add_custom_target(
 )
 install(
     FILES ${modules_dest_dir}/gfx.slang ${modules_dest_dir}/slang.slang
-    DESTINATION bin
+    DESTINATION ${runtime_subdir}
 )
 
 slang_add_target(
@@ -612,7 +612,7 @@ add_test(
     NAME slang-test
     COMMAND
         slang-test
-        -bindir ${slang_SOURCE_DIR}/build/Release/bin
+        -bindir ${slang_SOURCE_DIR}/build/$<CONFIG>/${runtime_subdir}
         -expected-failure-list ${slang_SOURCE_DIR}/tests/expected-failure.txt
         -expected-failure-list ${slang_SOURCE_DIR}/tests/expected-failure-github.txt
     WORKING_DIRECTORY ${slang_SOURCE_DIR}

@@ -133,16 +133,14 @@ function(slang_add_target dir type)
     endif()
     if(type STREQUAL "MODULE")
       set(library_subdir ${module_subdir})
-    else()
-      set(library_subdir lib)
     endif()
     set_target_properties(
         ${target}
         PROPERTIES
-            ARCHIVE_OUTPUT_DIRECTORY "${output_dir}/lib"
+            ARCHIVE_OUTPUT_DIRECTORY "${output_dir}/${library_subdir}"
             LIBRARY_OUTPUT_DIRECTORY "${output_dir}/${library_subdir}"
-            RUNTIME_OUTPUT_DIRECTORY "${output_dir}/bin"
-            PDB_OUTPUT_DIRECTORY "${output_dir}/bin"
+            RUNTIME_OUTPUT_DIRECTORY "${output_dir}/${runtime_subdir}"
+            PDB_OUTPUT_DIRECTORY "${output_dir}/${runtime_subdir}"
     )
 
     #
@@ -242,11 +240,11 @@ function(slang_add_target dir type)
     # libraries of ours but which do load them at runtime, hence the need to do
     # this explicitly here.
     #
-    set_property(TARGET ${target} APPEND PROPERTY BUILD_RPATH "$ORIGIN/../lib")
+    set_property(TARGET ${target} APPEND PROPERTY BUILD_RPATH "$ORIGIN/../${library_subdir}")
     set_property(
         TARGET ${target}
         APPEND
-        PROPERTY INSTALL_RPATH "$ORIGIN/../lib"
+        PROPERTY INSTALL_RPATH "$ORIGIN/../${library_subdir}"
     )
 
     #
@@ -273,16 +271,24 @@ function(slang_add_target dir type)
             TARGETS ${target}
             EXPORT SlangTargets
             ARCHIVE
-            DESTINATION lib
+            DESTINATION ${library_subdir}
             LIBRARY
             DESTINATION ${library_subdir}
             RUNTIME
-            DESTINATION bin
+            DESTINATION ${runtime_subdir}
             PUBLIC_HEADER
             DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
         )
     endif()
 endfunction()
+
+# Ideally we'd use CMAKE_INSTALL_LIBDIR and CMAKE_INSTALL_RUNTIMEDIR here,
+# however some Slang functionality (specifically generating executables on
+# Linux systems) relies on runtime libraries being at "$ORIGIN/../lib". This
+# could be improved by setting at configure-time that path to be the relative
+# path from CM_I_RD to CM_I_LD.
+set(library_subdir lib)
+set(runtime_subdir bin)
 
 # On Windows, because there's no RPATH, place modules in bin, next to the
 # executables which load them (by deault, CMAKE will place them in lib and
@@ -291,7 +297,7 @@ endfunction()
 # This variable is used in the above function as and elsewhere for installing
 # an imported module (slang-llvm from binary), hence why it's defined here.
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-    set(module_subdir bin)
+    set(module_subdir ${runtime_subdir})
 else()
-    set(module_subdir lib)
+    set(module_subdir ${library_subdir})
 endif()
