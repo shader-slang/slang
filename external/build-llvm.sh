@@ -8,7 +8,8 @@ help() {
 $me: Fetch, build and install LLVM for Slang
 
 Options:
-  --source-url: Where to find the source tar.xz archive, default: $source_url
+  --repo: The source git repo, default: $repo
+  --branch: The branch (or tag) to fetch, default: $branch
   --source-dir: Unpack and build in this directory: default $source_dir
   --config: The configuration to build, default $config
   --install-prefix: Install under this prefix
@@ -28,7 +29,7 @@ fail() {
   exit 1
 }
 
-for prog in "curl" "cmake" "ninja" "tar"; do
+for prog in "cmake" "ninja" "git"; do
   if ! command -v "$prog" &>/dev/null; then
     msg "This script needs $prog, but it isn't in \$PATH"
     missing_bin=1
@@ -52,9 +53,8 @@ trap cleanup EXIT SIGHUP SIGINT SIGTERM
 #
 # Options and parsing
 #
-repo_url=https://github.com/llvm/llvm-project
-version=13.0.1
-source_url=$repo_url/releases/download/llvmorg-$version/llvm-project-$version.src.tar.xz
+repo=https://github.com/llvm/llvm-project
+branch=llvmorg-13.0.1
 source_dir=$temp_dir
 install_prefix=
 config=Release
@@ -63,7 +63,8 @@ extra_arguments=()
 while [[ "$#" -gt 0 ]]; do
   case $1 in
   -h | --help) help; exit ;;
-  --source-url) source_url=$2; shift;;
+  --repo) repo=$2; shift;;
+  --branch) branch=$2; shift;;
   --source-dir) source_dir=$2; shift;;
   --config) config=$2; shift;;
   --install-prefix) install_prefix=$2; shift;;
@@ -77,16 +78,16 @@ while [[ "$#" -gt 0 ]]; do
   shift
 done
 
-[ -n "$source_url" ] || fail "please set --source-url"
+[ -n "$repo" ] || fail "please set --repo"
+[ -n "$branch" ] || fail "please set --branch"
 [ -n "$source_dir" ] || fail "please set --source-dir"
 [ -n "$config" ] || fail "please set --config"
 [ -n "$install_prefix" ] || fail "please set --install-prefix"
 
 msg "##########################################################"
-msg "# Fetching LLVM from $source_url"
+msg "# Fetching LLVM from $repo at $branch"
 msg "##########################################################"
-mkdir -p "$source_dir"
-curl -L "$source_url" | tar xJ --strip-components 1 -C "$source_dir"
+git -c advice.detachedHead=false clone "$repo" --branch "$branch" "$source_dir" --depth 1
 
 msg "##########################################################"
 msg "# Configuring LLVM in $source_dir"
