@@ -38,11 +38,12 @@ jobs:
           compiler: ${{matrix.compiler}}
           platform: ${{matrix.platform}}
           config: ${{matrix.config}}
-      # Doing a debug build will try to link against a release built llvm, this
-      # is a problem on Windows, so make slang-llvm in release build and use
-      # that as though it's a fetched binary via these presets.
-      - run: |
+      - name: Build Slang
+        run: |
           if [[ "${{ matrix.os }}" =~ "windows" && "${{ matrix.config }}" != "release" ]]; then
+            # Doing a debug build will try to link against a release built llvm, this
+            # is a problem on Windows, so make slang-llvm in release build and use
+            # that as though it's a fetched binary via these presets.
             cmake --workflow --preset slang-llvm
             cmake --workflow --preset "dist-${{matrix.config}}-prebuilt-slang-llvm"
           else
