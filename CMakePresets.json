@@ -33,6 +33,22 @@
       "inherits": "msvc-base",
       "description": "Visual Studio 2019 project",
       "generator": "Visual Studio 16 2019"
+    },
+    {
+      "name": "single-component",
+      "inherits": "default",
+      "description": "build a single component",
+      "cacheVariables": {
+        "CPACK_ARCHIVE_COMPONENT_INSTALL": "ON"
+      }
+    },
+    {
+      "name": "slang-llvm",
+      "inherits": "single-component",
+      "description": "build slang-llvm",
+      "cacheVariables": {
+        "SLANG_SLANG_LLVM_FLAVOR": "USE_SYSTEM_LLVM"
+      }
     }
   ],
   "buildPresets": [
@@ -45,6 +61,22 @@
       "name": "release",
       "configurePreset": "default",
       "configuration": "Release"
+    },
+    {
+      "name": "generators",
+      "inherits": "release",
+      "configurePreset": "single-component",
+      "targets": [
+        "all-generators"
+      ]
+    },
+    {
+      "name": "slang-llvm",
+      "inherits": "release",
+      "configurePreset": "slang-llvm",
+      "targets": [
+        "slang-llvm"
+      ]
     }
   ],
   "testPresets": [
@@ -102,6 +134,22 @@
         "Debug"
       ],
       "packageDirectory": "dist-debug"
+    },
+    {
+      "name": "generators",
+      "inherits": "release",
+      "configurePreset": "single-component",
+      "variables": {
+        "CPACK_COMPONENTS_ALL": "generators"
+      }
+    },
+    {
+      "name": "slang-llvm",
+      "inherits": "release",
+      "configurePreset": "slang-llvm",
+      "variables": {
+        "CPACK_COMPONENTS_ALL": "slang-llvm"
+      }
     }
   ],
   "workflowPresets": [
@@ -136,6 +184,40 @@
         {
           "type": "package",
           "name": "release"
+        }
+      ]
+    },
+    {
+      "name": "generators",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "single-component"
+        },
+        {
+          "type": "build",
+          "name": "generators"
+        },
+        {
+          "type": "package",
+          "name": "generators"
+        }
+      ]
+    },
+    {
+      "name": "slang-llvm",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "slang-llvm"
+        },
+        {
+          "type": "build",
+          "name": "slang-llvm"
+        },
+        {
+          "type": "package",
+          "name": "slang-llvm"
         }
       ]
     }

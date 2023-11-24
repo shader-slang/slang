@@ -216,6 +216,7 @@ function(generator dir)
         OUTPUT_DIR generators
         REQUIRED_BY all-generators
         FOLDER generators
+        INSTALL_COMPONENT generators
         ${ARGN}
     )
 endfunction()
@@ -342,6 +343,7 @@ elseif(SLANG_SLANG_LLVM_FLAVOR STREQUAL "USE_SYSTEM_LLVM" OR SLANG_SLANG_LLVM_FL
         # SLANG_DYNAMIC and SLANG_DYNAMIC_EXPORT
         EXPORT_MACRO_PREFIX SLANG
         INSTALL
+        INSTALL_COMPONENT slang-llvm
     )
     # If we don't include this, then the symbols in the LLVM linked here may
     # conflict with those of other LLVMs linked at runtime, for instance in mesa.

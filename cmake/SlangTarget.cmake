@@ -16,7 +16,7 @@ function(slang_add_target dir type)
         # Make this a Windows app, rather than a console app, only makes a
         # difference when compiling for Windows
         WIN32_EXECUTABLE
-        # Install this target
+        # Install this target for a non-component install
         INSTALL
     )
     set(single_value_args
@@ -40,6 +40,8 @@ function(slang_add_target dir type)
         FOLDER
         # The working directory for debugging
         DEBUG_DIR
+        # Install this target as part of a component
+        INSTALL_COMPONENT
     )
     set(multi_value_args
         # Use exactly these sources, instead of globbing from the directory
@@ -299,18 +301,34 @@ function(slang_add_target dir type)
     #
     # Mark for installation
     #
-    if(ARG_INSTALL)
+    if(ARG_INSTALL OR ARG_INSTALL_COMPONENT)
+        set(component_args)
+        if(ARG_INSTALL_COMPONENT)
+            set(component_args COMPONENT ${ARG_INSTALL_COMPONENT})
+        endif()
+        set(exclude_arg)
+        if(NOT ARG_INSTALL)
+            set(exclude_arg EXCLUDE_FROM_ALL)
+        endif()
         install(
             TARGETS ${target}
             EXPORT SlangTargets
             ARCHIVE
             DESTINATION ${archive_subdir}
+            ${component_args}
+            ${exclude_arg}
             LIBRARY
             DESTINATION ${library_subdir}
+            ${component_args}
+            ${exclude_arg}
             RUNTIME
             DESTINATION ${runtime_subdir}
+            ${component_args}
+            ${exclude_arg}
             PUBLIC_HEADER
             DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+            ${component_args}
+            ${exclude_arg}
         )
     endif()
 endfunction()
