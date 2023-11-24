@@ -19,6 +19,10 @@ jobs:
             compiler: cl
           - os: macos-latest
             compiler: cl
+          - os: windows-latest
+            compiler: clang
+          - os: windows-latest
+            compiler: gcc
       fail-fast: false
     runs-on: ${{ matrix.os }}
 
