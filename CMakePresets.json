@@ -213,7 +213,7 @@
   ],
   "workflowPresets": [
     {
-      "name": "dist-debug",
+      "name": "ci-dist-debug",
       "steps": [
         {
           "type": "configure",
@@ -247,7 +247,7 @@
       ]
     },
     {
-      "name": "dist-release",
+      "name": "ci-dist-release",
       "steps": [
         {
           "type": "configure",

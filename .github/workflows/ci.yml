@@ -51,7 +51,7 @@ jobs:
             cmake --workflow --preset slang-llvm
             cmake --workflow --preset "dist-${{matrix.config}}-prebuilt-slang-llvm"
           else
-            cmake --workflow --preset "dist-${{matrix.config}}"
+            cmake --workflow --preset "ci-dist-${{matrix.config}}"
           fi
       - uses: actions/upload-artifact@v3
         with:
