@@ -13,17 +13,6 @@
       "binaryDir": "${sourceDir}/build"
     },
     {
-      "name": "prebuilt-slang-llvm",
-      "description": "Get slang-llvm from a prior build of the slang-llvm workflow",
-      "generator": "Ninja Multi-Config",
-      "binaryDir": "${sourceDir}/build",
-      "cacheVariables": {
-        "SLANG_SLANG_LLVM_FLAVOR": "FETCH_BINARY",
-        "SLANG_SLANG_LLVM_BINARY_URL": "${sourceDir}/build/dist-release/slang-slang-llvm.zip",
-        "CPACK_ARCHIVE_COMPONENT_INSTALL": "OFF"
-      }
-    },
-    {
       "name": "msvc-base",
       "hidden": true,
       "inherits": "default",
@@ -60,6 +49,25 @@
       "cacheVariables": {
         "SLANG_SLANG_LLVM_FLAVOR": "USE_SYSTEM_LLVM"
       }
+    },
+    {
+      "name": "prebuilt-slang-llvm",
+      "description": "Get slang-llvm from a prior build of the slang-llvm workflow",
+      "generator": "Ninja Multi-Config",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "SLANG_SLANG_LLVM_FLAVOR": "FETCH_BINARY",
+        "SLANG_SLANG_LLVM_BINARY_URL": "${sourceDir}/build/dist-release/slang-slang-llvm.zip",
+        "CPACK_ARCHIVE_COMPONENT_INSTALL": "OFF"
+      }
+    },
+    {
+      "name": "dist",
+      "inherits": "default",
+      "description": "Config for CI binary dist generation, uses the system LLVM",
+      "cacheVariables": {
+        "SLANG_SLANG_LLVM_FLAVOR": "USE_SYSTEM_LLVM"
+      }
     }
   ],
   "buildPresets": [
@@ -72,6 +80,16 @@
       "name": "release",
       "configurePreset": "default",
       "configuration": "Release"
+    },
+    {
+      "name": "dist-debug",
+      "configurePreset": "dist",
+      "inherits": "debug"
+    },
+    {
+      "name": "dist-release",
+      "configurePreset": "dist",
+      "inherits": "release"
     },
     {
       "name": "release-prebuilt-slang-llvm",
@@ -157,6 +175,16 @@
       "packageDirectory": "dist-debug"
     },
     {
+      "name": "dist-release",
+      "inherits": "release",
+      "configurePreset": "dist"
+    },
+    {
+      "name": "dist-debug",
+      "inherits": "debug",
+      "configurePreset": "dist"
+    },
+    {
       "name": "release-prebuilt-slang-llvm",
       "inherits": "release",
       "configurePreset": "prebuilt-slang-llvm"
@@ -189,15 +217,15 @@
       "steps": [
         {
           "type": "configure",
-          "name": "default"
+          "name": "dist"
         },
         {
           "type": "build",
-          "name": "debug"
+          "name": "dist-debug"
         },
         {
           "type": "package",
-          "name": "debug"
+          "name": "dist-debug"
         }
       ]
     },
@@ -223,15 +251,15 @@
       "steps": [
         {
           "type": "configure",
-          "name": "default"
+          "name": "dist"
         },
         {
           "type": "build",
-          "name": "release"
+          "name": "dist-release"
         },
         {
           "type": "package",
-          "name": "release"
+          "name": "dist-release"
         }
       ]
     },
