@@ -13,7 +13,7 @@ add_subdirectory(miniz EXCLUDE_FROM_ALL)
 set_property(TARGET miniz PROPERTY POSITION_INDEPENDENT_CODE ON)
 # Work around https://github.com/richgel999/miniz/pull/292
 get_target_property(miniz_c_launcher miniz C_COMPILER_LAUNCHER)
-if(MSVC AND miniz_c_launcher MATCHES "sccache")
+if(MSVC AND miniz_c_launcher MATCHES "ccache")
   set_property(TARGET miniz PROPERTY C_COMPILER_LAUNCHER)
 endif()
 
