@@ -67,6 +67,7 @@ runs:
         path: ${{ github.workspace }}/build/llvm-project-install
         key: ${{ steps.restore-cache.outputs.cache-primary-key }}
     - name: Set environment variable for CMake
+      shell: bash
       run: |
         echo "LLVM_DIR=${{ github.workspace }}/build/llvm-project-install" >> "$GITHUB_ENV"
         echo "Clang_DIR=${{ github.workspace }}/build/llvm-project-install" >> "$GITHUB_ENV"

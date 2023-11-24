@@ -13,6 +13,17 @@
       "binaryDir": "${sourceDir}/build"
     },
     {
+      "name": "prebuilt-slang-llvm",
+      "description": "Get slang-llvm from a prior build of the slang-llvm workflow",
+      "generator": "Ninja Multi-Config",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "SLANG_SLANG_LLVM_FLAVOR": "FETCH_BINARY",
+        "SLANG_SLANG_LLVM_BINARY_URL": "${sourceDir}/build/dist-release/slang-slang-llvm.zip",
+        "CPACK_ARCHIVE_COMPONENT_INSTALL": "OFF"
+      }
+    },
+    {
       "name": "msvc-base",
       "hidden": true,
       "inherits": "default",
@@ -61,6 +72,16 @@
       "name": "release",
       "configurePreset": "default",
       "configuration": "Release"
+    },
+    {
+      "name": "release-prebuilt-slang-llvm",
+      "inherits": "release",
+      "configurePreset": "prebuilt-slang-llvm"
+    },
+    {
+      "name": "debug-prebuilt-slang-llvm",
+      "inherits": "debug",
+      "configurePreset": "prebuilt-slang-llvm"
     },
     {
       "name": "generators",
@@ -136,6 +157,16 @@
       "packageDirectory": "dist-debug"
     },
     {
+      "name": "release-prebuilt-slang-llvm",
+      "inherits": "release",
+      "configurePreset": "prebuilt-slang-llvm"
+    },
+    {
+      "name": "debug-prebuilt-slang-llvm",
+      "inherits": "debug",
+      "configurePreset": "prebuilt-slang-llvm"
+    },
+    {
       "name": "generators",
       "inherits": "release",
       "configurePreset": "single-component",
@@ -154,7 +185,7 @@
   ],
   "workflowPresets": [
     {
-      "name": "debug-dist",
+      "name": "dist-debug",
       "steps": [
         {
           "type": "configure",
@@ -171,7 +202,24 @@
       ]
     },
     {
-      "name": "release-dist",
+      "name": "dist-debug-prebuilt-slang-llvm",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "prebuilt-slang-llvm"
+        },
+        {
+          "type": "build",
+          "name": "debug-prebuilt-slang-llvm"
+        },
+        {
+          "type": "package",
+          "name": "debug-prebuilt-slang-llvm"
+        }
+      ]
+    },
+    {
+      "name": "dist-release",
       "steps": [
         {
           "type": "configure",
@@ -184,6 +232,23 @@
         {
           "type": "package",
           "name": "release"
+        }
+      ]
+    },
+    {
+      "name": "dist-release-prebuilt-slang-llvm",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "prebuilt-slang-llvm"
+        },
+        {
+          "type": "build",
+          "name": "release-prebuilt-slang-llvm"
+        },
+        {
+          "type": "package",
+          "name": "release-prebuilt-slang-llvm"
         }
       ]
     },
