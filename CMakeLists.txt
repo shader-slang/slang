@@ -14,7 +14,6 @@ project(slang VERSION "${SLANG_VERSION}" LANGUAGES)
 #
 # Global CMake options
 #
-
 cmake_policy(SET CMP0135 OLD)
 cmake_policy(SET CMP0077 NEW)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
