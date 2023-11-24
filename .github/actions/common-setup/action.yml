@@ -50,3 +50,23 @@ runs:
         # Set CMake to use sccache
         echo "CMAKE_CXX_COMPILER_LAUNCHER=sccache" >> "$GITHUB_ENV"
         echo "CMAKE_C_COMPILER_LAUNCHER=sccache" >> "$GITHUB_ENV"
+
+    # Try to restore a LLVM install, and build it otherwise
+    - uses: actions/cache/restore@v3
+      id: cache-llvm
+      with:
+        path: ${{ github.workspace }}/build/llvm-project-install
+        key: ${{ inputs.os }}-${{ hashFiles('external/build-llvm.sh') }}
+    - name: Build LLVM
+      if: steps.cache-llvm.outputs.cache-hit != 'true'
+      shell: bash
+      run: ./external/build-llvm.sh --install-prefix "${{ github.workspace }}/build/llvm-project-install"
+    - uses: actions/cache/save@v3
+      if: steps.cache-llvm.outputs.cache-hit != 'true'
+      with:
+        path: ${{ github.workspace }}/build/llvm-project-install
+        key: ${{ steps.restore-cache.outputs.cache-primary-key }}
+    - name: Set environment variable for CMake
+      run: |
+        echo "LLVM_DIR=${{ github.workspace }}/build/llvm-project-install" >> "$GITHUB_ENV"
+        echo "Clang_DIR=${{ github.workspace }}/build/llvm-project-install" >> "$GITHUB_ENV"
