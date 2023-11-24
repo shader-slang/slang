@@ -213,6 +213,23 @@
   ],
   "workflowPresets": [
     {
+      "name": "dist-debug",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "default"
+        },
+        {
+          "type": "build",
+          "name": "debug"
+        },
+        {
+          "type": "package",
+          "name": "debug"
+        }
+      ]
+    },
+    {
       "name": "ci-dist-debug",
       "steps": [
         {
@@ -243,6 +260,23 @@
         {
           "type": "package",
           "name": "debug-prebuilt-slang-llvm"
+        }
+      ]
+    },
+    {
+      "name": "dist-release",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "default"
+        },
+        {
+          "type": "build",
+          "name": "release"
+        },
+        {
+          "type": "package",
+          "name": "release"
         }
       ]
     },
