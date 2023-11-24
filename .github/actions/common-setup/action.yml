@@ -19,7 +19,8 @@ runs:
     - name: Set up sccache
       uses: hendrikmuhs/ccache-action@v1.2
       with:
-        key: ${{github.job}}-${{inputs.os}}-${{inputs.platform}}-${{inputs.config}}
+        key: ${{github.job}}-${{inputs.os}}-${{inputs.compiler}}-${{inputs.platform}}-${{inputs.config}}
+        restore-keys: ${{github.job}}-${{inputs.os}}-${{inputs.platform}}-${{inputs.config}}
         variant: sccache
     - shell: bash
       run: |
@@ -66,7 +67,7 @@ runs:
       if: steps.cache-llvm.outputs.cache-hit != 'true'
       with:
         path: ${{ github.workspace }}/build/llvm-project-install
-        key: ${{ steps.restore-cache.outputs.cache-primary-key }}
+        key: ${{ steps.cache-llvm.outputs.cache-primary-key }}
     - name: Set environment variable for CMake
       shell: bash
       run: |
