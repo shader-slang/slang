@@ -153,7 +153,7 @@ function(slang_add_target dir type)
     endif()
     set(archive_subdir ${library_subdir})
     if(type STREQUAL "MODULE")
-      set(library_subdir ${module_subdir})
+        set(library_subdir ${module_subdir})
     endif()
     set_target_properties(
         ${target}
@@ -197,7 +197,10 @@ function(slang_add_target dir type)
     endif()
 
     if(DEFINED ARG_DEBUG_DIR)
-        set_target_properties(${target} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY ${ARG_DEBUG_DIR})
+        set_target_properties(
+            ${target}
+            PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY ${ARG_DEBUG_DIR}
+        )
     endif()
 
     #
@@ -275,7 +278,11 @@ function(slang_add_target dir type)
     # libraries of ours but which do load them at runtime, hence the need to do
     # this explicitly here.
     #
-    set_property(TARGET ${target} APPEND PROPERTY BUILD_RPATH "$ORIGIN/../${library_subdir}")
+    set_property(
+        TARGET ${target}
+        APPEND
+        PROPERTY BUILD_RPATH "$ORIGIN/../${library_subdir}"
+    )
     set_property(
         TARGET ${target}
         APPEND
@@ -287,14 +294,20 @@ function(slang_add_target dir type)
     #
     if(ARG_PUBLIC_HEADERS)
         if(NOT ARG_INSTALL)
-            message(WARNING "${target} was declared with PUBLIC_HEADERS but without INSTALL, the former will do nothing")
+            message(
+                WARNING
+                "${target} was declared with PUBLIC_HEADERS but without INSTALL, the former will do nothing"
+            )
         endif()
 
         glob_append(public_headers ${ARG_PUBLIC_HEADERS})
         if(NOT public_headers)
             message(WARNING "${target}'s PUBLIC_HEADER globs found no matches")
         else()
-            set_target_properties(${target} PROPERTIES PUBLIC_HEADER "${public_headers}")
+            set_target_properties(
+                ${target}
+                PROPERTIES PUBLIC_HEADER "${public_headers}"
+            )
         endif()
     endif()
 

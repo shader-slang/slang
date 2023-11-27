@@ -84,12 +84,18 @@ option(SLANG_EMBED_STDLIB "Build slang with an embedded version of the stdlib")
 option(SLANG_ENABLE_FULL_IR_VALIDATION "Enable full IR validation (SLOW!)")
 option(SLANG_ENABLE_ASAN "Enable ASAN (address sanitizer)")
 
-enum_option(SLANG_SLANG_LLVM_FLAVOR FETCH_BINARY
+enum_option(
+    SLANG_SLANG_LLVM_FLAVOR
+    FETCH_BINARY
     "How to get or build slang-llvm:"
-    FETCH_BINARY "Use a binary distribution of the slang-llvm library instead of building or using LLVM (default for Windows)"
-    USE_SYSTEM_LLVM "Build slang-llvm using system-provided LLVM and Clang binaries (default for non-Windows hosts)"
-    BUILD_LLVM "Immediately fetch and build a LLVM distribution suitable for compiling a redistributable slang-llvm"
-    DISABLE "Do not build llvm or fetch slang-llvm"
+    FETCH_BINARY
+    "Use a binary distribution of the slang-llvm library instead of building or using LLVM (default for Windows)"
+    USE_SYSTEM_LLVM
+    "Build slang-llvm using system-provided LLVM and Clang binaries (default for non-Windows hosts)"
+    BUILD_LLVM
+    "Immediately fetch and build a LLVM distribution suitable for compiling a redistributable slang-llvm"
+    DISABLE
+    "Do not build llvm or fetch slang-llvm"
 )
 macro(slang_llvm_binary_url_option version filename)
     set(SLANG_SLANG_LLVM_BINARY_URL
@@ -133,7 +139,11 @@ endif()
 #
 # The premake builds places generated files in the source tree, make sure these
 # aren't present
-glob_append(premake_generated_files "source/slang/*.meta.slang.h" "source/slang/*-generated-*.h")
+glob_append(
+    premake_generated_files
+    "source/slang/*.meta.slang.h"
+    "source/slang/*-generated-*.h"
+)
 if(premake_generated_files)
     file(REMOVE ${premake_generated_files})
 endif()
@@ -274,23 +284,38 @@ if(SLANG_SLANG_LLVM_FLAVOR STREQUAL "FETCH_BINARY")
     # correct dependencies
     #
 
-    set(slang_llvm_filename "${CMAKE_SHARED_LIBRARY_PREFIX}slang-llvm${CMAKE_SHARED_LIBRARY_SUFFIX}")
+    set(slang_llvm_filename
+        "${CMAKE_SHARED_LIBRARY_PREFIX}slang-llvm${CMAKE_SHARED_LIBRARY_SUFFIX}"
+    )
     macro(from_glob dir)
         # A little helper function
-        file(GLOB_RECURSE slang_llvm_source_object "${dir}/${slang_llvm_filename}")
+        file(
+            GLOB_RECURSE slang_llvm_source_object
+            "${dir}/${slang_llvm_filename}"
+        )
         list(LENGTH slang_llvm_source_object nmatches)
         if(nmatches EQUAL 0)
-            message(SEND_ERROR "Unable to find ${slang_llvm_filename} in ${SLANG_SLANG_LLVM_BINARY_URL}")
+            message(
+                SEND_ERROR
+                "Unable to find ${slang_llvm_filename} in ${SLANG_SLANG_LLVM_BINARY_URL}"
+            )
         elseif(nmatches GREATER 1)
-            message(SEND_ERROR "Found multiple files named ${slang_llvm_filename} in ${SLANG_SLANG_LLVM_BINARY_URL}")
+            message(
+                SEND_ERROR
+                "Found multiple files named ${slang_llvm_filename} in ${SLANG_SLANG_LLVM_BINARY_URL}"
+            )
         endif()
     endmacro()
 
     if(IS_DIRECTORY "${SLANG_SLANG_LLVM_BINARY_URL}")
         # Just glob directly from a local directory
         from_glob("${SLANG_SLANG_LLVM_BINARY_URL}")
-    elseif(SLANG_SLANG_LLVM_BINARY_URL MATCHES "${CMAKE_SHARED_LIBRARY_PREFIX}.+${CMAKE_SHARED_LIBRARY_SUFFIX}$"
-        AND EXISTS "${SLANG_SLANG_LLVM_BINARY_URL}")
+    elseif(
+        SLANG_SLANG_LLVM_BINARY_URL
+            MATCHES
+            "${CMAKE_SHARED_LIBRARY_PREFIX}.+${CMAKE_SHARED_LIBRARY_SUFFIX}$"
+        AND EXISTS "${SLANG_SLANG_LLVM_BINARY_URL}"
+    )
         # Otherwise, if it's a direct path to a shared object, use that
         set(slang_llvm_source_object "${SLANG_SLANG_LLVM_BINARY_URL}")
     else()
@@ -300,7 +325,9 @@ if(SLANG_SLANG_LLVM_FLAVOR STREQUAL "FETCH_BINARY")
         from_glob("${slang-llvm_SOURCE_DIR}")
     endif()
 
-    set(slang_llvm_dest_object ${CMAKE_BINARY_DIR}/$<CONFIG>/${library_subdir}/${slang_llvm_filename})
+    set(slang_llvm_dest_object
+        ${CMAKE_BINARY_DIR}/$<CONFIG>/${library_subdir}/${slang_llvm_filename}
+    )
     add_custom_command(
         OUTPUT ${slang_llvm_dest_object}
         COMMAND
@@ -321,7 +348,10 @@ if(SLANG_SLANG_LLVM_FLAVOR STREQUAL "FETCH_BINARY")
         PROPERTY IMPORTED_LOCATION ${slang_llvm_dest_object}
     )
     install(PROGRAMS ${slang_llvm_dest_object} DESTINATION ${module_subdir})
-elseif(SLANG_SLANG_LLVM_FLAVOR STREQUAL "USE_SYSTEM_LLVM" OR SLANG_SLANG_LLVM_FLAVOR STREQUAL "BUILD_LLVM")
+elseif(
+    SLANG_SLANG_LLVM_FLAVOR STREQUAL "USE_SYSTEM_LLVM"
+    OR SLANG_SLANG_LLVM_FLAVOR STREQUAL "BUILD_LLVM"
+)
     llvm_target_from_components(llvm-dep filecheck native orcjit)
     clang_target_from_libs(
         clang-dep
@@ -406,8 +436,12 @@ set(modules_dest_dir $<TARGET_FILE_DIR:slang-test>)
 add_custom_target(
     copy-gfx-slang-modules
     COMMAND ${CMAKE_COMMAND} -E make_directory ${modules_dest_dir}
-    COMMAND ${CMAKE_COMMAND} -E copy tools/gfx/gfx.slang ${modules_dest_dir}/gfx.slang
-    COMMAND ${CMAKE_COMMAND} -E copy tools/gfx/slang.slang ${modules_dest_dir}/slang.slang
+    COMMAND
+        ${CMAKE_COMMAND} -E copy tools/gfx/gfx.slang
+        ${modules_dest_dir}/gfx.slang
+    COMMAND
+        ${CMAKE_COMMAND} -E copy tools/gfx/slang.slang
+        ${modules_dest_dir}/slang.slang
     WORKING_DIRECTORY ${slang_SOURCE_DIR}
     VERBATIM
 )
@@ -483,7 +517,10 @@ if(TARGET slang-llvm)
     # to use a generator expression in REQUIRES just above.
     add_dependencies(slang-test slang-llvm)
 endif()
-set_property(DIRECTORY ${slang_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT slang-test)
+set_property(
+    DIRECTORY ${slang_SOURCE_DIR}
+    PROPERTY VS_STARTUP_PROJECT slang-test
+)
 
 slang_add_target(
     tools/unit-test
@@ -570,7 +607,10 @@ slang_add_target(
     FOLDER examples
 )
 
-add_custom_target(all-examples COMMENT "meta target which depends on all examples")
+add_custom_target(
+    all-examples
+    COMMENT "meta target which depends on all examples"
+)
 set_target_properties(all-examples PROPERTIES FOLDER examples)
 function(example dir)
     slang_add_target(
@@ -617,10 +657,10 @@ include(CTest)
 add_test(
     NAME slang-test
     COMMAND
-        slang-test
-        -bindir ${slang_SOURCE_DIR}/build/$<CONFIG>/${runtime_subdir}
+        slang-test -bindir ${slang_SOURCE_DIR}/build/$<CONFIG>/${runtime_subdir}
         -expected-failure-list ${slang_SOURCE_DIR}/tests/expected-failure.txt
-        -expected-failure-list ${slang_SOURCE_DIR}/tests/expected-failure-github.txt
+        -expected-failure-list
+        ${slang_SOURCE_DIR}/tests/expected-failure-github.txt
     WORKING_DIRECTORY ${slang_SOURCE_DIR}
 )
 

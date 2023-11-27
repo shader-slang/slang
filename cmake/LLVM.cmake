@@ -21,7 +21,10 @@ macro(build_llvm)
             "Cross building LLVM isn't supported here, please enhance find_llvm() or use set SLANG_USE_SYSTEM_LLVM"
         )
     endif()
-    if (CMAKE_SYSTEM_NAME MATCHES "Windows" AND NOT CMAKE_BUILD_TYPE MATCHES "^Release.*")
+    if(
+        CMAKE_SYSTEM_NAME MATCHES "Windows"
+        AND NOT CMAKE_BUILD_TYPE MATCHES "^Release.*"
+    )
         message(
             WARNING
             "Building LLVM in a Release configuration for a debug or multi-config Slang build "
@@ -48,29 +51,29 @@ macro(build_llvm)
     #
     # Configure, build and install a CMake project
     #
-    BuildNestedCMakeProject(
-      SOURCE_DIR "${llvm-project_SOURCE_DIR}/llvm"
-      BINARY_DIR "${llvm-project_BINARY_DIR}"
-      BUILD_TYPE ${llvm_config}
-      INSTALL_PREFIX ${llvm_install_root}
-      EXTRA_CMAKE_ARGS
-        # Don't build unnecessary things
-        -DLLVM_BUILD_LLVM_C_DYLIB=0
-        -DLLVM_INCLUDE_BENCHMARKS=0
-        -DLLVM_INCLUDE_DOCS=0
-        -DLLVM_INCLUDE_EXAMPLES=0
-        -DLLVM_INCLUDE_TESTS=0
-        -DLLVM_ENABLE_TERMINFO=0
-        -DCLANG_BUILD_TOOLS=0
-        -DCLANG_ENABLE_STATIC_ANALYZER=0
-        -DCLANG_ENABLE_ARCMT=0
-        -DCLANG_INCLUDE_DOCS=0
-        -DCLANG_INCLUDE_TESTS=0
-        # Requirements for Slang
-        -DCMAKE_CXX_VISIBILITY_PRESET=hidden
-        -DLLVM_ENABLE_PROJECTS=clang
-        "-DLLVM_TARGETS_TO_BUILD=X86\\\;ARM\\\;AArch64"
-        -DLLVM_BUILD_TOOLS=1
+    build_nested_cmake_project(
+        SOURCE_DIR "${llvm-project_SOURCE_DIR}/llvm"
+        BINARY_DIR "${llvm-project_BINARY_DIR}"
+        BUILD_TYPE ${llvm_config}
+        INSTALL_PREFIX ${llvm_install_root}
+        EXTRA_CMAKE_ARGS
+            # Don't build unnecessary things
+            -DLLVM_BUILD_LLVM_C_DYLIB=0
+            -DLLVM_INCLUDE_BENCHMARKS=0
+            -DLLVM_INCLUDE_DOCS=0
+            -DLLVM_INCLUDE_EXAMPLES=0
+            -DLLVM_INCLUDE_TESTS=0
+            -DLLVM_ENABLE_TERMINFO=0
+            -DCLANG_BUILD_TOOLS=0
+            -DCLANG_ENABLE_STATIC_ANALYZER=0
+            -DCLANG_ENABLE_ARCMT=0
+            -DCLANG_INCLUDE_DOCS=0
+            -DCLANG_INCLUDE_TESTS=0
+            # Requirements for Slang
+            -DCMAKE_CXX_VISIBILITY_PRESET=hidden
+            -DLLVM_ENABLE_PROJECTS=clang
+            "-DLLVM_TARGETS_TO_BUILD=X86\\\;ARM\\\;AArch64"
+            -DLLVM_BUILD_TOOLS=1
     )
 
     #

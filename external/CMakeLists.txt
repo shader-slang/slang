@@ -4,8 +4,8 @@
 # CMAKE_MESSAGE_LOG_LEVEL
 set(set_cmake_log_level FALSE)
 if(NOT CMAKE_MESSAGE_LOG_LEVEL)
-  set(set_cmake_log_level TRUE)
-  set(CMAKE_MESSAGE_LOG_LEVEL NOTICE)
+    set(set_cmake_log_level TRUE)
+    set(CMAKE_MESSAGE_LOG_LEVEL NOTICE)
 endif()
 
 # Miniz
@@ -14,14 +14,17 @@ set_property(TARGET miniz PROPERTY POSITION_INDEPENDENT_CODE ON)
 # Work around https://github.com/richgel999/miniz/pull/292
 get_target_property(miniz_c_launcher miniz C_COMPILER_LAUNCHER)
 if(MSVC AND miniz_c_launcher MATCHES "ccache")
-  set_property(TARGET miniz PROPERTY C_COMPILER_LAUNCHER)
+    set_property(TARGET miniz PROPERTY C_COMPILER_LAUNCHER)
 endif()
 
 # LZ4
 set(LZ4_BUNDLED_MODE ON)
 add_subdirectory(lz4/build/cmake EXCLUDE_FROM_ALL)
 if(MSVC)
-  target_compile_options(lz4_static PRIVATE /wd5045 /wd4820 /wd4711 /wd6385 /wd6262)
+    target_compile_options(
+        lz4_static
+        PRIVATE /wd5045 /wd4820 /wd4711 /wd6385 /wd6262
+    )
 endif()
 
 # Vulkan headers
@@ -51,21 +54,24 @@ target_include_directories(imgui INTERFACE "${CMAKE_CURRENT_LIST_DIR}/imgui")
 
 # Restore log level if we set it
 if(set_cmake_log_level)
-  unset(CMAKE_MESSAGE_LOG_LEVEL)
+    unset(CMAKE_MESSAGE_LOG_LEVEL)
 endif()
 
 # for this directory and all subdirectories, prepend
 # `external/` to the IDE FOLDER property to every target
 function(make_external dir)
-  get_property(external_targets DIRECTORY ${dir} PROPERTY BUILDSYSTEM_TARGETS)
-  foreach(external_target ${external_targets})
-    get_property(folder TARGET ${external_target} PROPERTY FOLDER)
-    set_property(TARGET ${external_target} PROPERTY FOLDER "external/${folder}")
-  endforeach()
+    get_property(external_targets DIRECTORY ${dir} PROPERTY BUILDSYSTEM_TARGETS)
+    foreach(external_target ${external_targets})
+        get_property(folder TARGET ${external_target} PROPERTY FOLDER)
+        set_property(
+            TARGET ${external_target}
+            PROPERTY FOLDER "external/${folder}"
+        )
+    endforeach()
 
-  get_property(subdirs DIRECTORY ${dir} PROPERTY SUBDIRECTORIES)
-  foreach(subdir ${subdirs})
-    make_external(${subdir})
-  endforeach()
+    get_property(subdirs DIRECTORY ${dir} PROPERTY SUBDIRECTORIES)
+    foreach(subdir ${subdirs})
+        make_external(${subdir})
+    endforeach()
 endfunction()
 make_external(.)

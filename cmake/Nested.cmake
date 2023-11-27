@@ -4,7 +4,7 @@
 # For example, LLVM, or Slang itself (for building native generators in a cross
 # build)
 #
-function(BuildNestedCMakeProject)
+function(build_nested_cmake_project)
     set(no_value_args)
     set(single_value_args
         # The directory in which to find the project's top level CMakeLists.txt
@@ -44,9 +44,7 @@ function(BuildNestedCMakeProject)
     # Configure, build and install a CMake project
     execute_process(
         COMMAND
-            ${CMAKE_COMMAND} 
-            -S ${ARG_SOURCE_DIR} 
-            -B ${ARG_BINARY_DIR} 
+            ${CMAKE_COMMAND} -S ${ARG_SOURCE_DIR} -B ${ARG_BINARY_DIR}
             ${nested_cmake_args}
         WORKING_DIRECTORY ${ARG_SOURCE_DIR}
         COMMAND_ERROR_IS_FATAL ANY
@@ -60,10 +58,8 @@ function(BuildNestedCMakeProject)
     )
     execute_process(
         COMMAND
-            ${CMAKE_COMMAND} 
-            --install ${ARG_BINARY_DIR}
-            --prefix ${ARG_INSTALL_PREFIX}
-            --config ${ARG_BUILD_TYPE}
+            ${CMAKE_COMMAND} --install ${ARG_BINARY_DIR} --prefix
+            ${ARG_INSTALL_PREFIX} --config ${ARG_BUILD_TYPE}
         WORKING_DIRECTORY ${ARG_SOURCE_DIR}
         COMMAND_ERROR_IS_FATAL ANY
     )

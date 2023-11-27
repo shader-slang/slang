@@ -15,7 +15,13 @@ endfunction()
 # the host system and build options
 #
 function(slang_glob_sources var dir)
-    set(patterns "*.cpp" "*.h" "*.natvis" "*.natstepfilter" "*.natjmc")
+    set(patterns
+        "*.cpp"
+        "*.h"
+        "*.natvis"
+        "*.natstepfilter"
+        "*.natjmc"
+    )
     list(TRANSFORM patterns PREPEND "${dir}/")
 
     file(GLOB_RECURSE files CONFIGURE_DEPENDS ${patterns})

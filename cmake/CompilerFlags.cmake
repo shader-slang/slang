@@ -28,7 +28,13 @@ function(add_supported_cxx_flags target)
         )
         check_cxx_compiler_flag("${flag_to_test}" ${test_name})
         if(${test_name})
-            target_compile_options(${target} ${private} ${public} ${interface} ${flag})
+            target_compile_options(
+                ${target}
+                ${private}
+                ${public}
+                ${interface}
+                ${flag}
+            )
         endif()
     endforeach()
 endfunction()
@@ -91,8 +97,10 @@ function(set_default_compile_options target)
     )
 
     set(warning_flags)
-    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang" )
-        list(APPEND warning_flags
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        list(
+            APPEND
+            warning_flags
             -Wall
             # Disabled warnings:
             -Wno-switch
@@ -192,7 +200,12 @@ function(set_default_compile_options target)
     endif()
 
     if(SLANG_ENABLE_ASAN)
-        add_supported_cxx_flags(${target} PRIVATE /fsanitize=address -fsanitize=address)
+        add_supported_cxx_flags(
+            ${target}
+            PRIVATE
+            /fsanitize=address
+            -fsanitize=address
+        )
         add_supported_cxx_linker_flags(
             ${target}
             BEFORE
