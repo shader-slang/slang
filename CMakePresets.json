@@ -23,21 +23,21 @@
       }
     },
     {
-      "name": "vs2022",
-      "inherits": "msvc-base",
-      "description": "Visual Studio 2022 project",
-      "generator": "Visual Studio 17 2022"
-    },
-    {
       "name": "vs2019",
       "inherits": "msvc-base",
       "description": "Visual Studio 2019 project",
       "generator": "Visual Studio 16 2019"
     },
     {
+      "name": "vs2022",
+      "inherits": "msvc-base",
+      "description": "Visual Studio 2022 project",
+      "generator": "Visual Studio 17 2022"
+    },
+    {
       "name": "single-component",
       "inherits": "default",
-      "description": "build a single component",
+      "description": "configure to package a single component",
       "cacheVariables": {
         "CPACK_ARCHIVE_COMPONENT_INSTALL": "ON"
       }
@@ -45,26 +45,7 @@
     {
       "name": "slang-llvm",
       "inherits": "single-component",
-      "description": "build slang-llvm",
-      "cacheVariables": {
-        "SLANG_SLANG_LLVM_FLAVOR": "USE_SYSTEM_LLVM"
-      }
-    },
-    {
-      "name": "prebuilt-slang-llvm",
-      "description": "Get slang-llvm from a prior build of the slang-llvm workflow",
-      "generator": "Ninja Multi-Config",
-      "binaryDir": "${sourceDir}/build",
-      "cacheVariables": {
-        "SLANG_SLANG_LLVM_FLAVOR": "FETCH_BINARY",
-        "SLANG_SLANG_LLVM_BINARY_URL": "${sourceDir}/build/dist-release/slang-slang-llvm.zip",
-        "CPACK_ARCHIVE_COMPONENT_INSTALL": "OFF"
-      }
-    },
-    {
-      "name": "dist",
-      "inherits": "default",
-      "description": "Config for CI binary dist generation, uses the system LLVM",
+      "description": "Build slang-llvm from the system LLVM",
       "cacheVariables": {
         "SLANG_SLANG_LLVM_FLAVOR": "USE_SYSTEM_LLVM"
       }
@@ -82,26 +63,6 @@
       "configuration": "Release"
     },
     {
-      "name": "dist-debug",
-      "configurePreset": "dist",
-      "inherits": "debug"
-    },
-    {
-      "name": "dist-release",
-      "configurePreset": "dist",
-      "inherits": "release"
-    },
-    {
-      "name": "release-prebuilt-slang-llvm",
-      "inherits": "release",
-      "configurePreset": "prebuilt-slang-llvm"
-    },
-    {
-      "name": "debug-prebuilt-slang-llvm",
-      "inherits": "debug",
-      "configurePreset": "prebuilt-slang-llvm"
-    },
-    {
       "name": "generators",
       "inherits": "release",
       "configurePreset": "single-component",
@@ -116,34 +77,6 @@
       "targets": [
         "slang-llvm"
       ]
-    }
-  ],
-  "testPresets": [
-    {
-      "name": "base",
-      "hidden": true,
-      "configurePreset": "default",
-      "environment": {
-        "SLANG_RUN_SPIRV_VALIDATION": "1"
-      },
-      "output": {
-        "verbosity": "verbose",
-        "maxTestNameWidth": 999
-      },
-      "execution": {
-        "timeout": 999999999,
-        "noTestsAction": "error"
-      }
-    },
-    {
-      "name": "debug",
-      "inherits": "base",
-      "configuration": "Debug"
-    },
-    {
-      "name": "release",
-      "inherits": "base",
-      "configuration": "Release"
     }
   ],
   "packagePresets": [
@@ -175,26 +108,6 @@
       "packageDirectory": "dist-debug"
     },
     {
-      "name": "dist-release",
-      "inherits": "release",
-      "configurePreset": "dist"
-    },
-    {
-      "name": "dist-debug",
-      "inherits": "debug",
-      "configurePreset": "dist"
-    },
-    {
-      "name": "release-prebuilt-slang-llvm",
-      "inherits": "release",
-      "configurePreset": "prebuilt-slang-llvm"
-    },
-    {
-      "name": "debug-prebuilt-slang-llvm",
-      "inherits": "debug",
-      "configurePreset": "prebuilt-slang-llvm"
-    },
-    {
       "name": "generators",
       "inherits": "release",
       "configurePreset": "single-component",
@@ -213,7 +126,7 @@
   ],
   "workflowPresets": [
     {
-      "name": "dist-debug",
+      "name": "debug",
       "steps": [
         {
           "type": "configure",
@@ -230,41 +143,7 @@
       ]
     },
     {
-      "name": "ci-dist-debug",
-      "steps": [
-        {
-          "type": "configure",
-          "name": "dist"
-        },
-        {
-          "type": "build",
-          "name": "dist-debug"
-        },
-        {
-          "type": "package",
-          "name": "dist-debug"
-        }
-      ]
-    },
-    {
-      "name": "dist-debug-prebuilt-slang-llvm",
-      "steps": [
-        {
-          "type": "configure",
-          "name": "prebuilt-slang-llvm"
-        },
-        {
-          "type": "build",
-          "name": "debug-prebuilt-slang-llvm"
-        },
-        {
-          "type": "package",
-          "name": "debug-prebuilt-slang-llvm"
-        }
-      ]
-    },
-    {
-      "name": "dist-release",
+      "name": "release",
       "steps": [
         {
           "type": "configure",
@@ -277,40 +156,6 @@
         {
           "type": "package",
           "name": "release"
-        }
-      ]
-    },
-    {
-      "name": "ci-dist-release",
-      "steps": [
-        {
-          "type": "configure",
-          "name": "dist"
-        },
-        {
-          "type": "build",
-          "name": "dist-release"
-        },
-        {
-          "type": "package",
-          "name": "dist-release"
-        }
-      ]
-    },
-    {
-      "name": "dist-release-prebuilt-slang-llvm",
-      "steps": [
-        {
-          "type": "configure",
-          "name": "prebuilt-slang-llvm"
-        },
-        {
-          "type": "build",
-          "name": "release-prebuilt-slang-llvm"
-        },
-        {
-          "type": "package",
-          "name": "release-prebuilt-slang-llvm"
         }
       ]
     },

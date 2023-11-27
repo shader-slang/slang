@@ -52,6 +52,16 @@ runs:
         echo "CMAKE_CXX_COMPILER_LAUNCHER=sccache" >> "$GITHUB_ENV"
         echo "CMAKE_C_COMPILER_LAUNCHER=sccache" >> "$GITHUB_ENV"
 
+        # Some useful variables
+        config=${{inputs.config}}
+        Config=${config^}
+        bin_dir=$(pwd)/build/$Config/bin
+        lib_dir=$(pwd)/build/$Config/lib
+        echo "config=$config" >> "$GITHUB_ENV"
+        echo "Config=$Config" >> "$GITHUB_ENV"
+        echo "bin_dir=$bin_dir" >> "$GITHUB_ENV"
+        echo "lib_dir=$lib_dir" >> "$GITHUB_ENV"
+
     # Try to restore a LLVM install, and build it otherwise
     - uses: actions/cache/restore@v3
       id: cache-llvm
@@ -73,3 +83,13 @@ runs:
       run: |
         echo "LLVM_DIR=${{ github.workspace }}/build/llvm-project-install" >> "$GITHUB_ENV"
         echo "Clang_DIR=${{ github.workspace }}/build/llvm-project-install" >> "$GITHUB_ENV"
+
+    # Install swiftshader
+    - uses: robinraju/release-downloader@v1.7
+      continue-on-error: true
+      with:
+        latest: true
+        repository: "shader-slang/swiftshader"
+        out-file-path: "swiftshader"
+        extract: true
+        fileName: "vk_swiftshader_${{runner.os}}_${{inputs.platform}}.zip"
