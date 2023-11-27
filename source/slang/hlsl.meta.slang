@@ -3811,149 +3811,123 @@ int4 D3DCOLORtoUBYTE4(float4 color)
 }
 
 // Partial-difference derivatives
+${{{{
+const char* diffDimensions[2] = {"x", "y"};
+for (auto xOrY : diffDimensions) {
+}}}}
 __generic<T : __BuiltinFloatingPointType>
-__target_intrinsic(glsl, dFdx)
 [__readNone]
-T ddx(T x);
+T dd$(xOrY)(T x)
+{
+    __target_switch
+    {
+    case hlsl:
+    case cpp:
+    case cuda:
+        __intrinsic_asm "dd$(xOrY)";
+    case glsl:
+        __intrinsic_asm "dFd$(xOrY)";
+    case spirv:
+        return spirv_asm {OpDPd$(xOrY) $$T result $x};
+    }
+}
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl, dFdx)
 [__readNone]
-vector<T, N> ddx(vector<T, N> x)
+vector<T, N> dd$(xOrY)(vector<T, N> x)
 {
-    VECTOR_MAP_UNARY(T, N, ddx, x);
+    __target_switch
+    {
+    case hlsl:
+    case cpp:
+    case cuda:
+        __intrinsic_asm "dd$(xOrY)";
+    case glsl:
+        __intrinsic_asm "dFd$(xOrY)";
+    case spirv:
+        return spirv_asm {OpDPd$(xOrY) $$vector<T, N> result $x};
+    }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
-matrix<T, N, M> ddx(matrix<T, N, M> x)
+matrix<T, N, M> dd$(xOrY)(matrix<T, N, M> x)
 {
-    MATRIX_MAP_UNARY(T, N, M, ddx, x);
+    MATRIX_MAP_UNARY(T, N, M, dd$(xOrY), x);
 }
 
 __generic<T : __BuiltinFloatingPointType>
-__target_intrinsic(hlsl)
 __glsl_extension(GL_ARB_derivative_control)
-__target_intrinsic(glsl, dFdxCoarse)
 [__readNone]
-T ddx_coarse(T x);
+T dd$(xOrY)_coarse(T x)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "dd$(xOrY)_coarse";
+    case glsl: __intrinsic_asm "dFd$(xOrY)Coarse";
+    case spirv: return spirv_asm {OpCapability DerivativeControl; result:$$T = OpDPd$(xOrY)Coarse $x};
+    }
+}
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
-__target_intrinsic(hlsl)
 __glsl_extension(GL_ARB_derivative_control)
-__target_intrinsic(glsl, dFdxCoarse)
 [__readNone]
-vector<T, N> ddx_coarse(vector<T, N> x)
+vector<T, N> dd$(xOrY)_coarse(vector<T, N> x)
 {
-    VECTOR_MAP_UNARY(T, N, ddx_coarse, x);
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "dd$(xOrY)_coarse";
+    case glsl: __intrinsic_asm "dFd$(xOrY)Coarse";
+    case spirv: return spirv_asm {OpCapability DerivativeControl; result:$$vector<T,N> = OpDPd$(xOrY)Coarse $x};
+    }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
-matrix<T, N, M> ddx_coarse(matrix<T, N, M> x)
+matrix<T, N, M> dd$(xOrY)_coarse(matrix<T, N, M> x)
 {
-    MATRIX_MAP_UNARY(T, N, M, ddx_coarse, x);
+    MATRIX_MAP_UNARY(T, N, M, dd$(xOrY)_coarse, x);
 }
 
 __generic<T : __BuiltinFloatingPointType>
-__target_intrinsic(hlsl)
 __glsl_extension(GL_ARB_derivative_control)
-__target_intrinsic(glsl, dFdxFine)
 [__readNone]
-T ddx_fine(T x);
+T dd$(xOrY)_fine(T x)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "dd$(xOrY)_fine";
+    case glsl: __intrinsic_asm "dFd$(xOrY)Fine";
+    case spirv: return spirv_asm {OpCapability DerivativeControl; result:$$T = OpDPd$(xOrY)Fine $x};
+    }
+}
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
-__target_intrinsic(hlsl)
 __glsl_extension(GL_ARB_derivative_control)
-__target_intrinsic(glsl, dFdxFine)
 [__readNone]
-vector<T, N> ddx_fine(vector<T, N> x)
+vector<T, N> dd$(xOrY)_fine(vector<T, N> x)
 {
-    VECTOR_MAP_UNARY(T, N, ddx_fine, x);
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "dd$(xOrY)_fine";
+    case glsl: __intrinsic_asm "dFd$(xOrY)Fine";
+    case spirv: return spirv_asm {OpCapability DerivativeControl; result:$$vector<T,N> = OpDPd$(xOrY)Fine $x};
+    }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
-matrix<T, N, M> ddx_fine(matrix<T, N, M> x)
+matrix<T, N, M> dd$(xOrY)_fine(matrix<T, N, M> x)
 {
-    MATRIX_MAP_UNARY(T, N, M, ddx_fine, x);
+    MATRIX_MAP_UNARY(T, N, M, dd$(xOrY)_fine, x);
 }
 
-__generic<T : __BuiltinFloatingPointType>
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl, dFdy)
-[__readNone]
-T ddy(T x);
-
-__generic<T : __BuiltinFloatingPointType, let N : int>
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl, dFdy)
-[__readNone]
-vector<T, N> ddy(vector<T, N> x)
-{
-    VECTOR_MAP_UNARY(T, N, ddy, x);
-}
-
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
-__target_intrinsic(hlsl)
-[__readNone]
-matrix<T, N, M> ddy(matrix<T, N, M> x)
-{
-    MATRIX_MAP_UNARY(T, N, M, ddy, x);
-}
-
-__generic<T : __BuiltinFloatingPointType>
-__glsl_extension(GL_ARB_derivative_control)
-__target_intrinsic(glsl, dFdyCoarse)
-[__readNone]
-T ddy_coarse(T x);
-
-__generic<T : __BuiltinFloatingPointType, let N : int>
-__target_intrinsic(hlsl)
-__glsl_extension(GL_ARB_derivative_control)
-__target_intrinsic(glsl, dFdyCoarse)
-[__readNone]
-vector<T, N> ddy_coarse(vector<T, N> x)
-{
-    VECTOR_MAP_UNARY(T, N, ddy_coarse, x);
-}
-
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
-__target_intrinsic(hlsl)
-[__readNone]
-matrix<T, N, M> ddy_coarse(matrix<T, N, M> x)
-{
-    MATRIX_MAP_UNARY(T, N, M, ddy_coarse, x);
-}
-
-__generic<T : __BuiltinFloatingPointType>
-__target_intrinsic(hlsl)
-__glsl_extension(GL_ARB_derivative_control)
-__target_intrinsic(glsl, dFdyFine)
-[__readNone]
-T ddy_fine(T x);
-
-__generic<T : __BuiltinFloatingPointType, let N : int>
-__target_intrinsic(hlsl)
-__glsl_extension(GL_ARB_derivative_control)
-__target_intrinsic(glsl, dFdyFine)
-[__readNone]
-vector<T, N> ddy_fine(vector<T, N> x)
-{
-    VECTOR_MAP_UNARY(T, N, ddy_fine, x);
-}
-
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
-__target_intrinsic(hlsl)
-[__readNone]
-matrix<T, N, M> ddy_fine(matrix<T, N, M> x)
-{
-    MATRIX_MAP_UNARY(T, N, M, ddy_fine, x);
-}
+${{{{
+} // for (xOrY)
+}}}}
 
 
 // Radians to degrees
@@ -4541,13 +4515,13 @@ __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv, "OpFWidth resultType resultId _0")
+__target_intrinsic(spirv, "OpFwidth resultType resultId _0")
 T fwidth(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-__target_intrinsic(spirv, "OpFWidth resultType resultId _0")
+__target_intrinsic(spirv, "OpFwidth resultType resultId _0")
 [__readNone]
 vector<T, N> fwidth(vector<T, N> x)
 {
