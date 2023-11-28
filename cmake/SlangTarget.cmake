@@ -278,15 +278,20 @@ function(slang_add_target dir type)
     # libraries of ours but which do load them at runtime, hence the need to do
     # this explicitly here.
     #
+    if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
+        set(ORIGIN "@loader_path")
+    else()
+        set(ORIGIN "$ORIGIN")
+    endif()
     set_property(
         TARGET ${target}
         APPEND
-        PROPERTY BUILD_RPATH "$ORIGIN/../${library_subdir}"
+        PROPERTY BUILD_RPATH "${ORIGIN}/../${library_subdir}"
     )
     set_property(
         TARGET ${target}
         APPEND
-        PROPERTY INSTALL_RPATH "$ORIGIN/../${library_subdir}"
+        PROPERTY INSTALL_RPATH "${ORIGIN}/../${library_subdir}"
     )
 
     #

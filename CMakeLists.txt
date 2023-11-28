@@ -25,14 +25,13 @@ set(CMAKE_BUILD_RPATH_USE_ORIGIN TRUE)
 # Enable placing targets into a hierarchy for IDE generators
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
-# Set a necessary workaround for ccache before enable_language
-include(CCacheDebugInfoWorkaround)
-
 #
 # CMake-supplied modules and our utils
 #
 
 enable_language(C CXX)
+
+include(CCacheDebugInfoWorkaround)
 
 include(FindPackageHandleStandardArgs)
 include(CMakeDependentOption)

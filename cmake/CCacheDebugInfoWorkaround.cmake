@@ -29,4 +29,5 @@ if(
     set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT
         "$<$<CONFIG:Debug,RelWithDebInfo>:Embedded>"
     )
+    enable_language(C CXX)
 endif()
