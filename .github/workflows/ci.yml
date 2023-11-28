@@ -73,11 +73,6 @@ jobs:
           cp swiftshader/*.so swiftshader/*.dylib "$lib_dir" || :
           cp swiftshader/*.dll "$bin_dir" || :
           export SLANG_RUN_SPIRV_VALIDATION=1
-          find . || :
-          DYLD_PRINT_LIBRARIES=1 $bin_dir/slang-test \
-              -travis \
-              tests/compute/simple.slang \
-              -api cpu
           $bin_dir/slang-test \
             -travis \
             -category ${{ matrix.test-category }} \
