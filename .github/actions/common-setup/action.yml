@@ -85,11 +85,21 @@ runs:
         echo "Clang_DIR=${{ github.workspace }}/build/llvm-project-install" >> "$GITHUB_ENV"
 
     # Install swiftshader
-    - uses: robinraju/release-downloader@v1.7
+    - id: get-swiftshader-os
+      shell: bash
+      run: |
+        case "${{inputs.os}}" in
+          ubuntu*) echo "name=Linux" >> "$GITHUB_OUTPUT";;
+          windows*) echo "name=Windows" >> "$GITHUB_OUTPUT";;
+          *) echo "name=" >> "$GITHUB_OUTPUT";;
+        esac
+
+    - uses: robinraju/release-downloader@v1.8
+      if: steps.get-swiftshader-os.outputs.name != ""
       continue-on-error: true
       with:
         latest: true
         repository: "shader-slang/swiftshader"
         out-file-path: "swiftshader"
         extract: true
-        fileName: "vk_swiftshader_${{runner.os}}_${{inputs.platform}}.zip"
+        fileName: "vk_swiftshader_${{steps.get-swiftshader-os.outputs.name}}_${{inputs.platform}}.zip"
