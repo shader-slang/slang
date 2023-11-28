@@ -214,10 +214,8 @@ ISlangSharedLibrary* TestServer::loadSharedLibrary(const String& name, Diagnosti
 
     auto loader = DefaultSharedLibraryLoader::getSingleton();
 
-    auto toolPath = Path::combine(m_exeDirectory, name);
-
     ComPtr<ISlangSharedLibrary> sharedLibrary;
-    if (SLANG_FAILED(loader->loadSharedLibrary(toolPath.getBuffer(), sharedLibrary.writeRef())))
+    if (SLANG_FAILED(loader->loadSharedLibrary(name.getBuffer(), sharedLibrary.writeRef())))
     {
         if (sink)
         {
