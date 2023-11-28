@@ -27,8 +27,7 @@ jobs:
           # quick or full conditionally otherwise
           - test-category: smoke
           - { os: windows-latest, test-category: quick }
-          - { os: windows-latest, config: release, test-category: full }
-          - { os: ubuntu-20.04, config: release, test-category: full }
+          - { config: release, test-category: full }
       fail-fast: false
     runs-on: ${{ matrix.os }}
 
