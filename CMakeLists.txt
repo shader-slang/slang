@@ -17,6 +17,9 @@ project(slang VERSION "${SLANG_VERSION}" LANGUAGES)
 cmake_policy(SET CMP0135 OLD)
 cmake_policy(SET CMP0077 NEW)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+if(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.25")
+    cmake_policy(SET CMP0141 NEW)
+endif()
 
 # Don't use absolute paths to the build tree in RPATH, this makes the build
 # tree relocatable
@@ -28,16 +31,14 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 #
 # CMake-supplied modules and our utils
 #
-
 enable_language(C CXX)
-
-include(CCacheDebugInfoWorkaround)
 
 include(FindPackageHandleStandardArgs)
 include(CMakeDependentOption)
 include(FetchContent)
 include(GNUInstallDirs)
 
+include(CCacheDebugInfoWorkaround)
 include(CompilerFlags)
 include(Glob)
 include(LLVM)
