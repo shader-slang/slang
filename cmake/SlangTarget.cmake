@@ -294,6 +294,11 @@ function(slang_add_target dir type)
         PROPERTY INSTALL_RPATH "${ORIGIN}/../${library_subdir}"
     )
 
+    # On the same topic, give everything a dylib suffix on Mac OS
+    if(CMAKE_SYSTEM_NAME MATCHES "Darwin" AND type STREQUAL "MODULE")
+        set_property(TARGET ${target} PROPERTY SUFFIX ".dylib")
+    endif()
+
     #
     # Mark headers for installation
     #
