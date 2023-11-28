@@ -11,34 +11,23 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-20.04, macos-latest, windows-latest]
+        compiler: ['gcc', 'clang', 'cl']
         config: ['debug', 'release']
         platform: ['x64']
         exclude:
-          - os: macos-latest
-            config: debug
+          # Exclude invalid or undesired os/compiler or os/config combinations
+          - { os: ubuntu-20.04, compiler: cl }
+          - { os: macos-latest, compiler: cl }
+          - { os: macos-latest, compiler: gcc }
+          - { os: windows-latest, config: gcc }
+          - { os: windows-latest, config: clang }
+          - { os: macos-latest, config: debug }
         include:
-          - os: ubuntu-20.04
-            compiler: gcc
-          - os: ubuntu-20.04
-            compiler: clang
-          - os: macos-latest
-            compiler: clang
-          - os: windows-latest
-            compiler: cl
-          # Smoke by default, overwrite with full tests on release*gcc*x64
+          # Set a test category depending on the config, smoke by default,
+          # quick or full conditionally otherwise
           - test-category: smoke
-          - compiler: gcc
-            config: release
-            platform: x64
-            test-category: full
-          # On Windows release, quick by default and full on x64
-          - os: windows-latest
-            config: release
-            test-category: quick
-          - os: windows-latest
-            config: release
-            platform: x64
-            test-category: full
+          - { os: windows-latest, test-category: quick }
+          - { config: release, test-category: full }
       fail-fast: false
     runs-on: ${{ matrix.os }}
 
