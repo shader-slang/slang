@@ -365,6 +365,20 @@ void ASTPrinter::addDeclKindPrefix(Decl* decl)
                     continue;
                 if (as<AttributeTargetModifier>(modifier))
                     continue;
+                if (as<RequiredCUDASMVersionModifier>(modifier))
+                    continue;
+                if (as<RequiredSPIRVVersionModifier>(modifier))
+                    continue;
+                if (as<RequiredGLSLVersionModifier>(modifier))
+                    continue;
+                if (as<RequiredGLSLExtensionModifier>(modifier))
+                    continue;
+                if (as<GLSLLayoutModifier>(modifier))
+                    continue;
+                if (as<GLSLLayoutModifierGroupMarker>(modifier))
+                    continue;
+                if (as<HLSLLayoutSemantic>(modifier))
+                    continue;
             }
             // Don't print out attributes.
             if (as<AttributeBase>(modifier))

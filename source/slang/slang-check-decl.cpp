@@ -7346,6 +7346,10 @@ namespace Slang
                     visitor->getSink()->diagnose(attr, Diagnostics::cannotUseInterfaceRequirementAsDerivative);
                     return;
                 }
+                if (funcType->getParamCount() != imaginaryArguments.getCount())
+                {
+                    goto error;
+                }
                 for (Index ii = 0; ii < imaginaryArguments.getCount(); ++ii)
                 {
                     // Check if the resolved invoke argument type is an error type.
@@ -7403,7 +7407,7 @@ namespace Slang
                 return;
             }
         }
-
+    error:;
         // Build the expected signature from imaginary args to diagnose
         // when no matching function is found (this excludes the case handled above)
         // 

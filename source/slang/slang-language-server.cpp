@@ -1255,8 +1255,20 @@ SlangResult LanguageServer::signatureHelp(
         return SLANG_OK;
     }
 
-    auto funcExpr =
-        appExpr->originalFunctionExpr ? appExpr->originalFunctionExpr : appExpr->functionExpr;
+    auto funcExpr = appExpr->functionExpr;
+    if (appExpr->originalFunctionExpr)
+    {
+        bool useOriginalExpr = true;
+        if (auto originalDeclRefExpr = as<DeclRefExpr>(appExpr->originalFunctionExpr))
+        {
+            if (!originalDeclRefExpr->declRef)
+            {
+                useOriginalExpr = false;
+            }
+        }
+        if (useOriginalExpr)
+            funcExpr = appExpr->originalFunctionExpr;
+    }
     if (!funcExpr)
     {
         m_connection->sendResult(NullResponse::get(), responseId);
