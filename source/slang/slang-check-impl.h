@@ -1827,6 +1827,10 @@ namespace Slang
             Val*	val = nullptr; // the value to which we are constraining it
             bool isUsedAsLValue = false;   // If this constraint is for a type parameter, is the type used in an l-value parameter?
             bool satisfied = false; // Has this constraint been met?
+
+            // Is this constraint optional? An optional constraint provides a hint value to a parameter
+            // if it is otherwise unconstrained, but doesn't take precedence over a constraint that is not optional.
+            bool isOptional = false;
         };
 
         // A collection of constraints that will need to be satisfied (solved)

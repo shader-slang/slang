@@ -343,6 +343,8 @@ namespace Slang
                 }
 
                 QualType type;
+                bool typeConstraintOptional = true;
+
                 for (auto& c : system->constraints)
                 {
                     if (c.decl != typeParam.getDecl())
@@ -351,9 +353,10 @@ namespace Slang
                     auto cType = QualType(as<Type>(c.val), c.isUsedAsLValue);
                     SLANG_RELEASE_ASSERT(cType);
 
-                    if (!type)
+                    if (!type || (typeConstraintOptional && !c.isOptional))
                     {
                         type = cType;
+                        typeConstraintOptional = c.isOptional;
                     }
                     else
                     {
@@ -400,6 +403,7 @@ namespace Slang
                 // TODO(tfoley): figure out how this needs to interact with
                 // compile-time integers that aren't just constants...
                 IntVal* val = nullptr;
+                bool valOptional = true;
                 for (auto& c : system->constraints)
                 {
                     if (c.decl != valParam.getDecl())
@@ -408,9 +412,10 @@ namespace Slang
                     auto cVal = as<IntVal>(c.val);
                     SLANG_RELEASE_ASSERT(cVal);
 
-                    if (!val)
+                    if (!val || (valOptional && !c.isOptional))
                     {
                         val = cVal;
+                        valOptional = c.isOptional;
                     }
                     else
                     {
@@ -846,6 +851,7 @@ namespace Slang
         c.decl = intParam->getDeclRef().getDecl();
         c.isUsedAsLValue = paramIsLVal;
         c.val = arg;
+        c.isOptional = true;
         constraints.constraints.add(c);
     }
 
