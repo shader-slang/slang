@@ -632,16 +632,10 @@ static SlangResult _parseGCCFamilyLine(SliceAllocator& allocator, const UnownedS
 
     if (options.libraryPaths.count && options.targetType == SLANG_HOST_EXECUTABLE)
     {
-        switch(options.platform)
-        {
-            case PlatformKind::OSX:
-            case PlatformKind::IOS:
-                cmdLine.addArg("-Wl,-rpath,@loader_path:@loader_path/../lib");
-                break;
-            default:
-                cmdLine.addArg("-Wl,-rpath,$ORIGIN:$ORIGIN/../lib");
-                break;
-        }
+        if(PlatformUtil::isFamily(PlatformFamily::Apple, platformKind))
+            cmdLine.addArg("-Wl,-rpath,@loader_path:@loader_path/../lib");
+        else
+            cmdLine.addArg("-Wl,-rpath,$ORIGIN:$ORIGIN/../lib");
     }
 
     StringSlicePool libPathPool(StringSlicePool::Style::Default);
