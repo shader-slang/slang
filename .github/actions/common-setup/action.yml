@@ -89,13 +89,12 @@ runs:
       shell: bash
       run: |
         case "${{inputs.os}}" in
-          ubuntu*) echo "name=Linux" >> "$GITHUB_OUTPUT";;
-          windows*) echo "name=Windows" >> "$GITHUB_OUTPUT";;
-          *) echo "name=" >> "$GITHUB_OUTPUT";;
+          ubuntu*) echo "name=linux" >> "$GITHUB_OUTPUT";;
+          windows*) echo "name=windows" >> "$GITHUB_OUTPUT";;
         esac
 
     - uses: robinraju/release-downloader@v1.8
-      if: steps.get-swiftshader-os.outputs.name != ""
+      if: ${{steps.get-swiftshader-os.outputs.name}} != ''
       continue-on-error: true
       with:
         latest: true
