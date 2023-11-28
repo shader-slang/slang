@@ -19,8 +19,8 @@ jobs:
           - { os: ubuntu-20.04, compiler: cl }
           - { os: macos-latest, compiler: cl }
           - { os: macos-latest, compiler: gcc }
-          - { os: windows-latest, config: gcc }
-          - { os: windows-latest, config: clang }
+          - { os: windows-latest, compiler: gcc }
+          - { os: windows-latest, compiler: clang }
           - { os: macos-latest, config: debug }
         include:
           # Set a test category depending on the config, smoke by default,
