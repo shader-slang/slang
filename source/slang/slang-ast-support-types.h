@@ -80,6 +80,9 @@ namespace Slang
         // No conversion at all
         kConversionCost_None = 0,
 
+        kConversionCost_GenericParamUpcast = 1,
+        kConversionCost_UnconstraintGenericParam = 20,
+
         // Convert between matrices of different layout
         kConversionCost_MatrixLayout = 5,
 

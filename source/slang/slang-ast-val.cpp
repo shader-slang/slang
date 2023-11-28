@@ -286,6 +286,11 @@ Val* DeclaredSubtypeWitness::_resolveImplOverride()
     return this;
 }
 
+ConversionCost DeclaredSubtypeWitness::_getOverloadResolutionCostOverride()
+{
+    return kConversionCost_GenericParamUpcast;
+}
+
 Val* DeclaredSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int * ioDiff)
 {
     if (auto genConstraintDeclRef = getDeclRef().as<GenericTypeConstraintDecl>())
@@ -431,6 +436,11 @@ Val* TransitiveSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, S
     return astBuilder->getTransitiveSubtypeWitness(substSubToMid, substMidToSup);
 }
 
+ConversionCost TransitiveSubtypeWitness::_getOverloadResolutionCostOverride()
+{
+    return getSubToMid()->getOverloadResolutionCost() + getMidToSup()->getOverloadResolutionCost();
+}
+
 void TransitiveSubtypeWitness::_toTextOverride(StringBuilder& out)
 {
     // Note: we only print the constituent
@@ -469,6 +479,17 @@ Val* ExtractFromConjunctionSubtypeWitness::_substituteImplOverride(ASTBuilder* a
     //
     return astBuilder->getExtractFromConjunctionSubtypeWitness(
         substSub, substSup, substWitness, getIndexInConjunction());
+}
+
+ConversionCost ExtractFromConjunctionSubtypeWitness::_getOverloadResolutionCostOverride()
+{
+    auto witness = as<ConjunctionSubtypeWitness>(getConjunctionWitness());
+    if (!witness)
+        return kConversionCost_None;
+    auto index = getIndexInConjunction();
+    if (index < witness->getComponentCount())
+        return witness->getComponentWitness(index)->getOverloadResolutionCost();
+    return kConversionCost_None;
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ExtractExistentialSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -538,6 +559,14 @@ Val* ConjunctionSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, 
         substSup,
         as<SubtypeWitness>(substComponentWitnesses[0]),
         as<SubtypeWitness>(substComponentWitnesses[1]));
+    return result;
+}
+
+ConversionCost ConjunctionSubtypeWitness::_getOverloadResolutionCostOverride()
+{
+    ConversionCost result = kConversionCost_None;
+    for (Index i = 0; i < getComponentCount(); i++)
+        result += getComponentWitness(i)->getOverloadResolutionCost();
     return result;
 }
 

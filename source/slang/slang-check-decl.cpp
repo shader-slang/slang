@@ -6630,7 +6630,9 @@ namespace Slang
 
             if (!TryUnifyTypes(constraints, extDecl->targetType.Ptr(), type))
                 return DeclRef<ExtensionDecl>();
-            auto solvedDeclRef = trySolveConstraintSystem(&constraints, makeDeclRef(extGenericDecl), ArrayView<Val*>());
+
+            ConversionCost baseCost;
+            auto solvedDeclRef = trySolveConstraintSystem(&constraints, makeDeclRef(extGenericDecl), ArrayView<Val*>(), baseCost);
             if (!solvedDeclRef)
             {
                 return DeclRef<ExtensionDecl>();

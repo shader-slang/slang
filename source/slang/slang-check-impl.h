@@ -1944,7 +1944,8 @@ namespace Slang
         DeclRef<Decl> trySolveConstraintSystem(
             ConstraintSystem*       system,
             DeclRef<GenericDecl>    genericDeclRef,
-            ArrayView<Val*> knownGenericArgs);
+            ArrayView<Val*> knownGenericArgs,
+            ConversionCost& outBaseCost);
 
 
         // State related to overload resolution for a call
@@ -2120,25 +2121,30 @@ namespace Slang
 
         void AddOverloadCandidate(
             OverloadResolveContext& context,
-            OverloadCandidate&		candidate);
+            OverloadCandidate&		candidate,
+            ConversionCost baseCost);
         
         void AddHigherOrderOverloadCandidates(
             Expr*                   funcExpr,
-            OverloadResolveContext& context);
+            OverloadResolveContext& context,
+            ConversionCost baseCost);
 
         void AddFuncOverloadCandidate(
             LookupResultItem			item,
             DeclRef<CallableDecl>             funcDeclRef,
-            OverloadResolveContext&		context);
+            OverloadResolveContext&		context,
+            ConversionCost baseCost);
 
         void AddFuncOverloadCandidate(
             FuncType*		/*funcType*/,
-            OverloadResolveContext&	/*context*/);
+            OverloadResolveContext&	/*context*/,
+            ConversionCost baseCost);
 
         void AddFuncExprOverloadCandidate(
             FuncType* funcType,
             OverloadResolveContext& context,
-            Expr* expr);
+            Expr* expr,
+            ConversionCost baseCost);
 
         // Add a candidate callee for overload resolution, based on
         // calling a particular `ConstructorDecl`.
@@ -2147,7 +2153,8 @@ namespace Slang
             Type*                type,
             DeclRef<ConstructorDecl>    ctorDeclRef,
             OverloadResolveContext&     context,
-            Type*                resultType);
+            Type*                resultType,
+            ConversionCost baseCost);
 
         // If the given declaration has generic parameters, then
         // return the corresponding `GenericDecl` that holds the
@@ -2216,6 +2223,12 @@ namespace Slang
             QualType            fst,
             QualType            snd);
 
+        void maybeUnifyUnconstraintIntParam(
+            ConstraintSystem& constraints,
+            IntVal* param,
+            IntVal* arg,
+            bool paramIsLVal);
+
         // Is the candidate extension declaration actually applicable to the given type
         DeclRef<ExtensionDecl> applyExtensionToType(
             ExtensionDecl*  extDecl,
@@ -2226,12 +2239,26 @@ namespace Slang
             // arguments to form a `DeclRef` to the inner declaration
             // that could be applicable in the context of the given
             // overloaded call.
+            // Also computes a `baseCost` for the inferred arguments,
+            // so that we can prefer a more specialized generic candidate
+            // when there is ambiguity. For example, given
+            // ```
+            //     interface IBase;
+            //     interface IDerived : IBase;
+            //     struct Derived : IDerived {}
+            //     void f1<T:IBase>(T b)
+            //     void f2<T:IDerived>(T b);
+            // ```
+            // We will prefer f2 when seeing f(Derived()), because it takes
+            // less steps to upcast `Derived` to  `IDerived` than it does
+            // to `IBase`.
             //
         DeclRef<Decl> inferGenericArguments(
             DeclRef<GenericDecl>    genericDeclRef,
             OverloadResolveContext& context,
             ArrayView<Val*>         knownGenericArgs,
-            List<QualType>             *innerParameterTypes = nullptr);
+            ConversionCost          &outBaseCost,
+            List<QualType>          *innerParameterTypes = nullptr);
 
         void AddTypeOverloadCandidates(
             Type*	        type,
@@ -2239,7 +2266,8 @@ namespace Slang
 
         void AddDeclRefOverloadCandidates(
             LookupResultItem		item,
-            OverloadResolveContext&	context);
+            OverloadResolveContext&	context,
+            ConversionCost          baseCost);
 
         void AddOverloadCandidates(
             LookupResult const&     result,
