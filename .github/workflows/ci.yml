@@ -141,6 +141,7 @@ jobs:
             -server-count 8 \
             -emit-spirv-directly \
             -api vk \
+            -category ${{ matrix.test-category }} \
             -expected-failure-list tests/expected-failure.txt
       - name: Test
         # Run even if the previous step fails
@@ -149,4 +150,5 @@ jobs:
           $bin_dir/slang-test \
             -use-test-server \
             -server-count 8 \
+            -category ${{ matrix.test-category }} \
             -api all-cpu
