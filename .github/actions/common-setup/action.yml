@@ -108,3 +108,11 @@ runs:
           windows*) echo "${{github.workspace}}/swiftshader/" >> "$GITHUB_PATH";;
           *) echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH:+${LD_LIBRARY_PATH}:}${{github.workspace}}/swiftshader" >> "$GITHUB_ENV";;
         esac
+
+    # Put spirv-tools in path
+    - shell: bash
+      run: |
+        case "${{inputs.os}}" in
+          windows*) echo "${{github.workspace}}/external/slang-binaries/spirv-tools/windows-${{inputs.platform}}/bin" >> "$GITHUB_PATH";;
+          ubuntu*) echo "${{github.workspace}}/external/slang-binaries/spirv-tools/$(uname -m)-linux/bin" >> "$GITHUB_PATH";;
+        esac
