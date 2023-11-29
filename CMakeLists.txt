@@ -44,7 +44,6 @@ include(Glob)
 include(LLVM)
 include(SlangTarget)
 include(AutoOption)
-include(Nested)
 
 #
 # Options

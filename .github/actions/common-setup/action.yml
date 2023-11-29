@@ -20,7 +20,6 @@ runs:
       uses: hendrikmuhs/ccache-action@v1.2
       with:
         key: ${{github.job}}-${{inputs.os}}-${{inputs.compiler}}-${{inputs.platform}}-${{inputs.config}}
-        restore-keys: ${{github.job}}-${{inputs.os}}-${{inputs.platform}}-${{inputs.config}}
         variant: sccache
     - shell: bash
       run: |
@@ -94,7 +93,6 @@ runs:
         esac
 
     - uses: robinraju/release-downloader@v1.8
-      if: ${{steps.get-swiftshader-os.outputs.name}} != ''
       continue-on-error: true
       with:
         latest: true
