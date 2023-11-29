@@ -102,3 +102,11 @@ runs:
         out-file-path: "swiftshader"
         extract: true
         fileName: "vk_swiftshader_${{steps.get-swiftshader-os.outputs.name}}_${{inputs.platform}}.zip"
+
+    - name: Install SwiftShader
+      shell: bash
+      run: |
+        case "${{inputs.os}}" in
+          windows*) echo "$(pwd)/swiftshader/" >> "$GITHUB_PATH";;
+          *) echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH:+${LD_LIBRARY_PATH}:}$(pwd)/swiftshader" >> "$GITHUB_ENV";;
+        esac
