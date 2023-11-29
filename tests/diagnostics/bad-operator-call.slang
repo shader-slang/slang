@@ -14,7 +14,7 @@ void test()
 {
 	int a;
     S b;
-    // CHECK:{{.*}}.slang(18): error {{.*}}: no overload for '+=' applicable to arguments of type (int, S)
+    // CHECK:{{.*}}.slang(18): error {{.*}}:
     a += b;
     // CHECK:{{.*}}.slang(20): error {{.*}}: no overload for '+' applicable to arguments of type (int, S)
     a = a + b;

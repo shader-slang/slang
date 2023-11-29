@@ -358,7 +358,7 @@ namespace Slang
                         type = cType;
                         typeConstraintOptional = c.isOptional;
                     }
-                    else
+                    else if (!typeConstraintOptional)
                     {
                         auto joinType = TryJoinTypes(type, cType);
                         if (!joinType)
@@ -419,7 +419,7 @@ namespace Slang
                     }
                     else
                     {
-                        if(!val->equals(cVal))
+                        if(!valOptional && !val->equals(cVal))
                         {
                             // failure!
                             return DeclRef<Decl>();
