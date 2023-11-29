@@ -83,6 +83,12 @@ option(SLANG_EMBED_STDLIB "Build slang with an embedded version of the stdlib")
 option(SLANG_ENABLE_FULL_IR_VALIDATION "Enable full IR validation (SLOW!)")
 option(SLANG_ENABLE_ASAN "Enable ASAN (address sanitizer)")
 
+set(SLANG_GENERATORS_PATH
+    ""
+    CACHE PATH
+    "An optional path to the outputs of the all-generators target compiled for the build platform, used when cross-compiling"
+)
+
 enum_option(
     SLANG_SLANG_LLVM_FLAVOR
     # Default
@@ -213,18 +219,25 @@ add_custom_target(
 )
 set_target_properties(all-generators PROPERTIES FOLDER generators)
 function(generator dir)
-    slang_add_target(
-        ${dir}
-        EXECUTABLE
-        EXCLUDE_FROM_ALL
-        USE_FEWER_WARNINGS
-        LINK_WITH_PRIVATE core
-        OUTPUT_DIR generators
-        REQUIRED_BY all-generators
-        FOLDER generators
-        INSTALL_COMPONENT generators
-        ${ARGN}
-    )
+    if(SLANG_GENERATORS_PATH)
+        get_filename_component(target ${dir_absolute} NAME)
+        add_executable(${target} IMPORTED)
+        set_property(TARGET ${target} PROPERTY
+            IMPORTED_LOCATION "${SLANG_GENERATORS_PATH}/${target}${CMAKE_EXECUTABLE_SUFFIX}")
+    else()
+        slang_add_target(
+            ${dir}
+            EXECUTABLE
+            EXCLUDE_FROM_ALL
+            USE_FEWER_WARNINGS
+            LINK_WITH_PRIVATE core
+            OUTPUT_DIR generators
+            REQUIRED_BY all-generators
+            FOLDER generators
+            INSTALL_COMPONENT generators
+            ${ARGN}
+        )
+    endif()
 endfunction()
 generator(tools/slang-cpp-extractor USE_FEWER_WARNINGS LINK_WITH_PRIVATE compiler-core)
 generator(tools/slang-embed)
