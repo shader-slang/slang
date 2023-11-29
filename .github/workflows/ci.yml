@@ -15,12 +15,13 @@ jobs:
         config: ['debug', 'release']
         platform: ['x64']
         exclude:
-          # Exclude invalid or undesired os/compiler or os/config combinations
+          # Exclude invalid or undesired os/compiler
           - { os: ubuntu-20.04, compiler: cl }
           - { os: macos-latest, compiler: cl }
           - { os: macos-latest, compiler: gcc }
           - { os: windows-latest, compiler: gcc }
           - { os: windows-latest, compiler: clang }
+          # or os/config combinations
           - { os: macos-latest, config: debug }
         include:
           # Set a test category depending on the config, smoke by default,

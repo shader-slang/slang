@@ -107,6 +107,6 @@ runs:
       shell: bash
       run: |
         case "${{inputs.os}}" in
-          windows*) echo "$(pwd)/swiftshader/" >> "$GITHUB_PATH";;
-          *) echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH:+${LD_LIBRARY_PATH}:}$(pwd)/swiftshader" >> "$GITHUB_ENV";;
+          windows*) echo "${{github.workspace}}/swiftshader/" >> "$GITHUB_PATH";;
+          *) echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH:+${LD_LIBRARY_PATH}:}${{github.workspace}}/swiftshader" >> "$GITHUB_ENV";;
         esac
