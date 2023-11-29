@@ -15,9 +15,7 @@ set_property(TARGET miniz PROPERTY POSITION_INDEPENDENT_CODE ON)
 get_target_property(miniz_c_launcher miniz C_COMPILER_LAUNCHER)
 if(MSVC AND miniz_c_launcher MATCHES "ccache")
     set_property(TARGET miniz PROPERTY C_COMPILER_LAUNCHER)
-endif()
-if(MSVC)
-    target_compile_options(miniz PRIVATE /wd9025)
+    set_property(TARGET miniz PROPERTY MSVC_DEBUG_INFORMATION_FORMAT "")
 endif()
 
 # LZ4

@@ -373,6 +373,11 @@ elseif(SLANG_SLANG_LLVM_FLAVOR STREQUAL "USE_SYSTEM_LLVM")
     # conflict with those of other LLVMs linked at runtime, for instance in mesa.
     add_supported_cxx_linker_flags(slang-llvm PRIVATE "-Wl,--exclude-libs,ALL")
 
+    # The LLVM headers need a warning disabling, which somehow slips through \external
+    if(MSVC)
+        target_compile_options(slang-llvm PRIVATE -wd4244)
+    endif()
+
     # TODO: Put a check here that libslang-llvm.so doesn't have a 'NEEDED'
     # directive for libLLVM-13.so, it's almost certainly going to break at
     # runtime in surprising ways when linked alongside Mesa (or anything else
