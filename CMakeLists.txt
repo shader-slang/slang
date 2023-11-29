@@ -220,10 +220,19 @@ add_custom_target(
 set_target_properties(all-generators PROPERTIES FOLDER generators)
 function(generator dir)
     if(SLANG_GENERATORS_PATH)
-        get_filename_component(target ${dir_absolute} NAME)
+        cmake_parse_arguments(ARG "" "TARGET_NAME" "" ${ARGN})
+        if(ARG_TARGET_NAME)
+            set(target ${ARG_TARGET_NAME})
+        else()
+            get_filename_component(target ${dir} NAME)
+        endif()
         add_executable(${target} IMPORTED)
-        set_property(TARGET ${target} PROPERTY
-            IMPORTED_LOCATION "${SLANG_GENERATORS_PATH}/${target}${CMAKE_EXECUTABLE_SUFFIX}")
+        set_property(
+            TARGET ${target}
+            PROPERTY
+                IMPORTED_LOCATION
+                    "${SLANG_GENERATORS_PATH}/${target}${CMAKE_EXECUTABLE_SUFFIX}"
+        )
     else()
         slang_add_target(
             ${dir}
