@@ -86,14 +86,14 @@ option(SLANG_ENABLE_ASAN "Enable ASAN (address sanitizer)")
 
 enum_option(
     SLANG_SLANG_LLVM_FLAVOR
+    # Default
     FETCH_BINARY
     "How to get or build slang-llvm:"
+    # Options
     FETCH_BINARY
     "Use a binary distribution of the slang-llvm library instead of building or using LLVM (default for Windows)"
     USE_SYSTEM_LLVM
     "Build slang-llvm using system-provided LLVM and Clang binaries (default for non-Windows hosts)"
-    BUILD_LLVM
-    "Immediately fetch and build a LLVM distribution suitable for compiling a redistributable slang-llvm"
     DISABLE
     "Do not build llvm or fetch slang-llvm"
 )
@@ -156,9 +156,7 @@ file(REMOVE external/miniz/miniz_export.h)
 
 find_package(Threads REQUIRED)
 
-if(SLANG_SLANG_LLVM_FLAVOR STREQUAL "BUILD_LLVM")
-    build_llvm()
-elseif(SLANG_SLANG_LLVM_FLAVOR STREQUAL "USE_SYSTEM_LLVM")
+if(SLANG_SLANG_LLVM_FLAVOR STREQUAL "USE_SYSTEM_LLVM")
     find_package(LLVM 13.0 REQUIRED CONFIG)
     find_package(Clang REQUIRED CONFIG)
 endif()
@@ -348,10 +346,7 @@ if(SLANG_SLANG_LLVM_FLAVOR STREQUAL "FETCH_BINARY")
         PROPERTY IMPORTED_LOCATION ${slang_llvm_dest_object}
     )
     install(PROGRAMS ${slang_llvm_dest_object} DESTINATION ${module_subdir})
-elseif(
-    SLANG_SLANG_LLVM_FLAVOR STREQUAL "USE_SYSTEM_LLVM"
-    OR SLANG_SLANG_LLVM_FLAVOR STREQUAL "BUILD_LLVM"
-)
+elseif(SLANG_SLANG_LLVM_FLAVOR STREQUAL "USE_SYSTEM_LLVM")
     llvm_target_from_components(llvm-dep filecheck native orcjit)
     clang_target_from_libs(
         clang-dep
