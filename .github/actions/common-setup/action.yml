@@ -5,6 +5,8 @@ description: Performs setup common to all our actions
 inputs:
   os:
     required: true
+  runs-on:
+    required: true
   compiler:
     required: true
   platform:
@@ -27,7 +29,7 @@ runs:
 
         # Install Ninja
         case "${{inputs.os}}" in
-          ubuntu*) sudo apt-get install -y ninja-build;;
+          linux*) sudo apt-get install -y ninja-build;;
           windows*) choco install ninja;;
           macos*) brew install ninja;;
         esac
@@ -39,7 +41,7 @@ runs:
         CXX=${CXX/gcc/g++}
         CXX=${CXX/clang/clang++}
         # Correct version on older ubuntu
-        if [[ "${{inputs.os}}" == ubuntu-20.04 ]]; then
+        if [[ "${{inputs.runs-on}}" == ubuntu-20.04 ]]; then
           CC=${CC/gcc/gcc-10}
           CXX=${CXX/g++/g++-10}
         fi
@@ -84,14 +86,6 @@ runs:
         echo "Clang_DIR=${{ github.workspace }}/build/llvm-project-install" >> "$GITHUB_ENV"
 
     # Install swiftshader
-    - id: get-swiftshader-os
-      shell: bash
-      run: |
-        case "${{inputs.os}}" in
-          ubuntu*) echo "name=linux" >> "$GITHUB_OUTPUT";;
-          windows*) echo "name=windows" >> "$GITHUB_OUTPUT";;
-        esac
-
     - uses: robinraju/release-downloader@v1.8
       continue-on-error: true
       with:
@@ -99,7 +93,7 @@ runs:
         repository: "shader-slang/swiftshader"
         out-file-path: "swiftshader"
         extract: true
-        fileName: "vk_swiftshader_${{steps.get-swiftshader-os.outputs.name}}_${{inputs.platform}}.zip"
+        fileName: "vk_swiftshader_${{inputs.os}}_${{inputs.platform}}.zip"
 
     - name: Install SwiftShader
       shell: bash
@@ -114,5 +108,5 @@ runs:
       run: |
         case "${{inputs.os}}" in
           windows*) echo "${{github.workspace}}/external/slang-binaries/spirv-tools/windows-${{inputs.platform}}/bin" >> "$GITHUB_PATH";;
-          ubuntu*) echo "${{github.workspace}}/external/slang-binaries/spirv-tools/$(uname -m)-linux/bin" >> "$GITHUB_PATH";;
+          linux*) echo "${{github.workspace}}/external/slang-binaries/spirv-tools/$(uname -m)-linux/bin" >> "$GITHUB_PATH";;
         esac
