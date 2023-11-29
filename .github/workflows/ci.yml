@@ -75,7 +75,8 @@ jobs:
               -DCMAKE_COMPILE_WARNING_AS_ERROR=${{matrix.warnings-as-errors}}
             cmake --workflow --preset "${{matrix.config}}"
           fi
-      - name: Test Slang
+      - &test
+        name: Test Slang
         run: |
           export SLANG_RUN_SPIRV_VALIDATION=1
           $bin_dir/slang-test \
@@ -83,17 +84,38 @@ jobs:
             -api all-dx12 \
             -category ${{ matrix.test-category }} \
             -expected-failure-list tests/expected-failure-github.txt
-      - uses: actions/upload-artifact@v3
+      - &upload
+        uses: actions/upload-artifact@v3
         with:
           name: slang-build-${{matrix.os}}-${{matrix.platform}}-${{matrix.compiler}}-${{matrix.config}}
           # The install directory used in the packaging step
           path: build/dist-${{matrix.config}}/**/slang/*
 
+  aarch64-build:
+    runs-on: [self-hosted, Linux, ARM64]
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu
+            compiler: gcc
+            platform: aarch64
+            config: release
+            warnings-as-errors: false
+            test-category: smoke
+    timeout-minutes: 100
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - *checkout
+      - *setup
+      - *build
+      - *test
+      - *upload
+
   full-gpu-tests:
     runs-on: [Windows, self-hosted]
-    timeout-minutes: 100
     strategy:
-      fail-fast: false
       matrix:
         include:
           - os: windows-latest
@@ -105,6 +127,7 @@ jobs:
     defaults:
       run:
         shell: bash
+    timeout-minutes: 100
     steps:
       - *checkout
       - *setup
