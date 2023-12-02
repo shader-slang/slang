@@ -91,6 +91,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     
     ft += sqrt(f);
     ft += rsqrt(makeFloatMatrix(1.0f) + f);
+
+    ft += cbrt(makeFloatMatrix(idx)) * 10;
+    ft += rcbrt(makeFloatMatrix(idx)) * 10;
     
     ft += exp2(f);
     ft += exp(f);

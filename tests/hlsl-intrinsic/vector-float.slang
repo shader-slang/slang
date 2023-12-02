@@ -100,6 +100,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     
     ft += sqrt(f);
     ft += rsqrt(1.0f + f);
+
+    ft += cbrt(float3(idx)) * 10;
+    ft += rcbrt(float3(idx)) * 10;
     
     ft += exp2(f);
     ft += exp(f);

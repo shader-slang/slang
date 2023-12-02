@@ -6597,6 +6597,94 @@ matrix<T, N, M> sqrt(matrix<T, N, M> x)
     MATRIX_MAP_UNARY(T, N, M, sqrt, x);
 }
 
+// The following cbrt(float) and rcbrt(float) algorithms are based upon:
+//
+// Moroz L, Samotyy V, Walczyk CJ, Cieśliński JL.
+// Fast Calculation of Cube and Inverse Cube Roots Using a Magic Constant and Its Implementation on Microcontrollers.
+// Energies. 2021; 14(4):1058.
+// https://doi.org/10.3390/en14041058
+//
+// Published under the CC BY 4.0 license.
+//
+// They use no lookup tables, which makes them vectorizable in theory.
+
+[__readNone]
+float cbrt(float x)
+{
+    // 0 is inaccurate unless special-cased.
+    if (x == 0)
+       return 0;
+
+    constexpr float constant1 = 1.752319676f;
+    constexpr float constant2 = 1.2509524245f;
+    constexpr float constant3 = 0.5093818292f;
+
+    int xint = reinterpret<int>(x);
+    int i = 0x548c2b4b - xint / 3;
+    float ifloat = reinterpret<float>(i);
+
+    // Modification of Householder method:
+    float c = x * pow(ifloat, 3);
+    float y = ifloat * (constant1 - c * (constant2 - constant3 * c));
+
+    float d = x * y * y;
+    c = 1.0f - d * y;
+    y = mad(d, 1.0f, 0.333333333333f * c);
+    return y;
+}
+
+__generic<let N : int>
+[__readNone]
+vector<float, N> cbrt(vector<float, N> x)
+{
+    VECTOR_MAP_UNARY(float, N, cbrt, x);
+}
+
+__generic<let N : int, let M : int>
+[__readNone]
+matrix<float, N, M> cbrt(matrix<float, N, M> x)
+{
+    MATRIX_MAP_UNARY(float, N, M, cbrt, x);
+}
+
+[__readNone]
+float rcbrt(float x)
+{
+    // 0 is inaccurate unless special-cased.
+    if (x == 0)
+       return 0;
+
+    constexpr float constant1 = 1.752319676f;
+    constexpr float constant2 = 1.2509524245f;
+    constexpr float constant3 = 0.5093818292f;
+
+    int xint = reinterpret<int>(x);
+    int i = 0x548c2b4b - xint / 3;
+    float ifloat = reinterpret<float>(i);
+
+    // Modification of Householder method:
+    float c = x * pow(ifloat, 3);
+    float y = ifloat * (constant1 - c * (constant2 - constant3 * c));
+
+    c = 1.0f - x * y * y * y;
+    y = mad(y, 1.0f, 0.333333333333f * c);
+    return y;
+}
+
+__generic<let N : int>
+[__readNone]
+vector<float, N> rcbrt(vector<float, N> x)
+{
+    VECTOR_MAP_UNARY(float, N, rcbrt, x);
+}
+
+__generic<let N : int, let M : int>
+[__readNone]
+matrix<float, N, M> rcbrt(matrix<float, N, M> x)
+{
+    MATRIX_MAP_UNARY(float, N, M, rcbrt, x);
+}
+
 // Step function
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)

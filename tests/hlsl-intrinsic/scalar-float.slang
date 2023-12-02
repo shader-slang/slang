@@ -88,8 +88,11 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     ft += ldexp(23.2, f);
 
+    ft += cbrt(float(idx)) * 10;
+    ft += rcbrt(float(idx)) * 10;
+
     uint vu = asuint(f);
     ft += asfloat(vu);
-    
+
     outputBuffer[idx] = int(ft * 16);
 }
