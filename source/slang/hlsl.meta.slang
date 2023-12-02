@@ -6666,7 +6666,7 @@ float rcbrt(float x)
     float c = x * pow(ifloat, 3);
     float y = ifloat * (constant1 - c * (constant2 - constant3 * c));
 
-    c = 1.0f - x * y * y * y;
+    c = 1.0f - x * pow(y, 3);
     y = mad(y, 1.0f, 0.333333333333f * c);
     return y;
 }
