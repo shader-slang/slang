@@ -436,6 +436,12 @@ class ModuleDecl : public NamespaceDeclBase
 
 };
 
+// Represents a transparent scope of declarations that are defined in a single source file.
+class FileDecl : public ContainerDecl
+{
+    SLANG_AST_CLASS(FileDecl);
+};
+
     /// A declaration that brings members of another declaration or namespace into scope
 class UsingDecl : public Decl
 {
@@ -449,15 +455,12 @@ class UsingDecl : public Decl
     Scope* scope = nullptr;
 };
 
-class ImportDecl : public Decl
+class FileReferenceDeclBase : public Decl
 {
-    SLANG_AST_CLASS(ImportDecl)
+    SLANG_AST_CLASS(FileReferenceDeclBase)
 
     // The name of the module we are trying to import
     NameLoc moduleNameAndLoc;
-    
-    // The module that actually got imported
-    ModuleDecl* importedModuleDecl = nullptr;
 
     SourceLoc startLoc;
     SourceLoc endLoc;
@@ -465,6 +468,29 @@ class ImportDecl : public Decl
     SLANG_UNREFLECTED
     // The scope that we want to import into
     Scope* scope = nullptr;
+};
+
+class ImportDecl : public FileReferenceDeclBase
+{
+    SLANG_AST_CLASS(ImportDecl)
+
+    // The module that actually got imported
+    ModuleDecl* importedModuleDecl = nullptr;
+};
+
+class IncludeDecl : public FileReferenceDeclBase
+{
+    SLANG_AST_CLASS(IncludeDecl)
+};
+
+class ImplementingDecl : public FileReferenceDeclBase
+{
+    SLANG_AST_CLASS(ImplementingDecl)
+};
+
+class ModuleDeclarationDecl : public Decl
+{
+    SLANG_AST_CLASS(ModuleDeclarationDecl);
 };
 
 // A generic declaration, parameterized on types/values

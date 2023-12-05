@@ -6896,11 +6896,15 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     LoweredValInfo visit##NAME(NAME*) { return LoweredValInfo(); }
 
     IGNORED_CASE(ImportDecl)
+    IGNORED_CASE(IncludeDecl)
+    IGNORED_CASE(ImplementingDecl)
     IGNORED_CASE(UsingDecl)
     IGNORED_CASE(EmptyDecl)
     IGNORED_CASE(SyntaxDecl)
     IGNORED_CASE(AttributeDecl)
     IGNORED_CASE(NamespaceDecl)
+    IGNORED_CASE(ModuleDeclarationDecl)
+    IGNORED_CASE(FileDecl)
 
 #undef IGNORED_CASE
 

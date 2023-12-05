@@ -794,6 +794,17 @@ namespace Slang
     }
 #endif
 
+    bool Path::equals(String path1, String path2)
+    {
+        Path::getCanonical(path1, path1);
+        Path::getCanonical(path2, path2);
+#if SLANG_WINDOWS_FAMILY
+        return path1.getUnownedSlice().caseInsensitiveEquals(path2.getUnownedSlice());
+#else
+        return path1 == path2;
+#endif
+    }
+
     /// Gets the path to the executable that was invoked that led to the current threads execution
     /// If run from a shared library/dll will be the path of the executable that loaded said library
     /// @param outPath Pointer to buffer to hold the path.

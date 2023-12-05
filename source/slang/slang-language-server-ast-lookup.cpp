@@ -722,7 +722,7 @@ bool _findAstNodeImpl(ASTLookupContext& context, SyntaxNode* node)
             {}
             else if (container->closingSourceLoc.getRaw() >= container->loc.getRaw())
             {
-                if (!_isLocInRange(&context, container->loc, container->closingSourceLoc))
+                if (!_isLocInRange(&context, container->loc, container->closingSourceLoc) && !as<NamespaceDeclBase>(container))
                 {
                     shouldInspectChildren = false;
                 }

@@ -551,6 +551,10 @@ namespace Slang
             /// `import` to use them instead of trying to find the files in file system.
         LoadedModuleDictionary* m_environmentModules = nullptr;
 
+            /// (optional) The translation unit that is being checked.
+            /// Needed for handling `__include`s.
+        TranslationUnitRequest* m_translationUnitRequest = nullptr;
+
         DiagnosticSink* getSink()
         {
             return m_sink;
@@ -568,11 +572,13 @@ namespace Slang
             Linkage*        linkage,
             Module*         module,
             DiagnosticSink* sink,
-            LoadedModuleDictionary* environmentModules = nullptr)
+            LoadedModuleDictionary* environmentModules = nullptr,
+            TranslationUnitRequest* translationUnit = nullptr)
             : m_linkage(linkage)
             , m_module(module)
             , m_sink(sink)
             , m_environmentModules(environmentModules)
+            , m_translationUnitRequest(translationUnit)
         {}
 
         Session* getSession()
@@ -588,6 +594,11 @@ namespace Slang
         Module* getModule()
         {
             return m_module;
+        }
+
+        TranslationUnitRequest* getTranslationUnitRequest()
+        {
+            return m_translationUnitRequest;
         }
 
         bool isInLanguageServer()
@@ -2368,6 +2379,8 @@ namespace Slang
         //
 
         void importModuleIntoScope(Scope* scope, ModuleDecl* moduleDecl);
+        void importFileDeclIntoScope(Scope* scope, FileDecl* fileDecl);
+
 
         void suggestCompletionItems(
             CompletionSuggestions::ScopeKind scopeKind, LookupResult const& lookupResult);
