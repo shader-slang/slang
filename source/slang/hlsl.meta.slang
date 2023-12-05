@@ -6608,6 +6608,7 @@ matrix<T, N, M> sqrt(matrix<T, N, M> x)
 //
 // They use no lookup tables, which makes them vectorizable in theory.
 
+__target_intrinsic(cuda, "$P_cbrt($0)")
 [__readNone]
 float cbrt(float x)
 {
@@ -6633,7 +6634,12 @@ float cbrt(float x)
     return y;
 }
 
+__target_intrinsic(cuda, "$P_cbrt($0)")
+[__readNone]
+double cbrt(double x);
+
 __generic<let N : int>
+__target_intrinsic(hlsl)
 [__readNone]
 vector<float, N> cbrt(vector<float, N> x)
 {
@@ -6641,12 +6647,14 @@ vector<float, N> cbrt(vector<float, N> x)
 }
 
 __generic<let N : int, let M : int>
+__target_intrinsic(hlsl)
 [__readNone]
 matrix<float, N, M> cbrt(matrix<float, N, M> x)
 {
     MATRIX_MAP_UNARY(float, N, M, cbrt, x);
 }
 
+__target_intrinsic(cuda, "$P_rcbrt($0)")
 [__readNone]
 float rcbrt(float x)
 {
@@ -6671,7 +6679,12 @@ float rcbrt(float x)
     return y;
 }
 
+__target_intrinsic(cuda, "$P_rcbrt($0)")
+[__readNone]
+double rcbrt(double x);
+
 __generic<let N : int>
+__target_intrinsic(hlsl)
 [__readNone]
 vector<float, N> rcbrt(vector<float, N> x)
 {
@@ -6679,6 +6692,7 @@ vector<float, N> rcbrt(vector<float, N> x)
 }
 
 __generic<let N : int, let M : int>
+__target_intrinsic(hlsl)
 [__readNone]
 matrix<float, N, M> rcbrt(matrix<float, N, M> x)
 {
