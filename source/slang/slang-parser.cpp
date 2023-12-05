@@ -115,11 +115,6 @@ namespace Slang
 
         int genericDepth = 0;
 
-        // Have we seen any `import` declarations? If so, we need
-        // to parse function bodies completely, even if we are in
-        // "rewrite" mode.
-        bool haveSeenAnyImportDecls = false;
-
         // Is the parser in a "recovering" state?
         // During recovery we don't emit additional errors, until we find
         // a token that we expected, when we exit recovery.
@@ -155,6 +150,17 @@ namespace Slang
         {
             currentScope = currentScope->parent;
         }
+
+        ModuleDecl* getCurrentModuleDecl()
+        {
+            for (auto scope = currentScope; scope; scope = scope->parent)
+            {
+                if (auto moduleDecl = as<ModuleDecl>(scope->containerDecl))
+                    return moduleDecl;
+            }
+            return nullptr;
+        }
+
         Parser(
             ASTBuilder* inAstBuilder,
             TokenSpan const& _tokens,
@@ -184,7 +190,7 @@ namespace Slang
         bool LookAheadToken(TokenType type, int offset);
         bool LookAheadToken(const char* string, int offset);
 
-        void parseSourceFile(ModuleDecl* program);
+        void parseSourceFile(ContainerDecl* parentDecl);
         Decl* ParseStruct();
         ClassDecl* ParseClass();
         GLSLInterfaceBlockDecl* ParseGLSLInterfaceBlock();
@@ -1206,12 +1212,8 @@ namespace Slang
         return NameLoc(parser->ReadToken(TokenType::Identifier));
     }
 
-    static NodeBase* parseImportDecl(
-        Parser* parser, void* /*userData*/)
+    static void parseFileReferenceDeclBase(Parser* parser, FileReferenceDeclBase* decl)
     {
-        parser->haveSeenAnyImportDecls = true;
-
-        auto decl = parser->astBuilder->create<ImportDecl>();
         decl->scope = parser->currentScope;
         decl->startLoc = parser->tokenReader.peekLoc();
 
@@ -1245,7 +1247,55 @@ namespace Slang
         }
         decl->endLoc = parser->tokenReader.peekLoc();
         parser->ReadToken(TokenType::Semicolon);
+    }
 
+    static NodeBase* parseImportDecl(
+        Parser* parser, void* /*userData*/)
+    {
+        auto decl = parser->astBuilder->create<ImportDecl>();
+        parseFileReferenceDeclBase(parser, decl);
+        return decl;
+    }
+
+    static NodeBase* parseIncludeDecl(
+        Parser* parser, void* /*userData*/)
+    {
+        auto decl = parser->astBuilder->create<IncludeDecl>();
+        parseFileReferenceDeclBase(parser, decl);
+        return decl;
+    }
+
+    static NodeBase* parseImplementingDecl(
+        Parser* parser, void* /*userData*/)
+    {
+        auto decl = parser->astBuilder->create<ImplementingDecl>();
+        parseFileReferenceDeclBase(parser, decl);
+        return decl;
+    }
+
+    static NodeBase* parseModuleDeclarationDecl(
+        Parser* parser, void* /*userData*/)
+    {
+        auto decl = parser->astBuilder->create<ModuleDeclarationDecl>();
+        if (parser->LookAheadToken(TokenType::Identifier))
+        {
+            auto nameToken = parser->ReadToken(TokenType::Identifier);
+            decl->nameAndLoc.name = parser->getNamePool()->getName(nameToken.getContent());
+            decl->nameAndLoc.loc = nameToken.loc;
+        }
+        else if (parser->LookAheadToken(TokenType::StringLiteral))
+        {
+            auto nameToken = parser->ReadToken(TokenType::StringLiteral);
+            decl->nameAndLoc.name = parser->getNamePool()->getName(getStringLiteralTokenValue(nameToken));
+            decl->nameAndLoc.loc = nameToken.loc;
+        }
+        else
+        {
+            if (auto moduleDecl = parser->getCurrentModuleDecl())
+                decl->nameAndLoc.name = moduleDecl->getName();
+            decl->nameAndLoc.loc = parser->tokenReader.peekLoc();
+        }
+        parser->ReadToken(TokenType::Semicolon);
         return decl;
     }
 
@@ -4179,7 +4229,7 @@ namespace Slang
     }
 
 
-    void Parser::parseSourceFile(ModuleDecl* program)
+    void Parser::parseSourceFile(ContainerDecl* program)
     {
         SLANG_AST_BUILDER_RAII(astBuilder);
 
@@ -6916,7 +6966,8 @@ namespace Slang
         TranslationUnitRequest*         translationUnit,
         TokenSpan const&                tokens,
         DiagnosticSink*                 sink,
-        Scope*                          outerScope)
+        Scope*                          outerScope,
+        ContainerDecl*                  parentDecl)
     {
         ParserOptions options = {};
         options.enableEffectAnnotations = translationUnit->compileRequest->getLinkage()->getEnableEffectAnnotations();
@@ -6926,7 +6977,7 @@ namespace Slang
         parser.namePool = translationUnit->getNamePool();
         parser.sourceLanguage = translationUnit->sourceLanguage;
 
-        return parser.parseSourceFile(translationUnit->getModuleDecl());
+        return parser.parseSourceFile(parentDecl);
     }
 
     static void addBuiltinSyntaxImpl(
@@ -7424,6 +7475,9 @@ namespace Slang
         _makeParseDecl("attribute_syntax",  parseAttributeSyntaxDecl ),
         _makeParseDecl("__import",          parseImportDecl ),
         _makeParseDecl("import",            parseImportDecl ),
+        _makeParseDecl("__include",         parseIncludeDecl ),
+        _makeParseDecl("module",            parseModuleDeclarationDecl),
+        _makeParseDecl("implementing",      parseImplementingDecl),
         _makeParseDecl("let",               parseLetDecl ),
         _makeParseDecl("var",               parseVarDecl ),
         _makeParseDecl("func",              parseFuncDecl ),

@@ -113,15 +113,15 @@ SlangResult IncludeSystem::findFile(String const& pathToInclude, String const& p
     return SLANG_E_NOT_FOUND;
 }
 
-SlangResult IncludeSystem::loadFile(const PathInfo& pathInfo, ComPtr<ISlangBlob>& outBlob)
+SlangResult IncludeSystem::loadFile(const PathInfo& pathInfo, ComPtr<ISlangBlob>& outBlob, SourceFile*& outSourceFile)
 {
     if (m_sourceManager)
     {
         // See if this an already loaded source file
-        SourceFile* sourceFile = m_sourceManager->findSourceFileRecursively(pathInfo.uniqueIdentity);
+        outSourceFile = m_sourceManager->findSourceFileRecursively(pathInfo.uniqueIdentity);
 
         // If not create a new one, and add to the list of known source files
-        if (!sourceFile)
+        if (!outSourceFile)
         {
             ComPtr<ISlangBlob> foundSourceBlob;
             if (SLANG_FAILED(m_fileSystemExt->loadFile(pathInfo.foundPath.getBuffer(), foundSourceBlob.writeRef())))
@@ -129,17 +129,17 @@ SlangResult IncludeSystem::loadFile(const PathInfo& pathInfo, ComPtr<ISlangBlob>
                 return SLANG_E_CANNOT_OPEN;
             }
 
-            sourceFile = m_sourceManager->createSourceFileWithBlob(pathInfo, foundSourceBlob);
-            m_sourceManager->addSourceFile(pathInfo.uniqueIdentity, sourceFile);
+            outSourceFile = m_sourceManager->createSourceFileWithBlob(pathInfo, foundSourceBlob);
+            m_sourceManager->addSourceFile(pathInfo.uniqueIdentity, outSourceFile);
 
             outBlob = foundSourceBlob;
             return SLANG_OK;
         }
         else
         {
-            if (sourceFile->getContentBlob())
+            if (outSourceFile->getContentBlob())
             {
-                outBlob = sourceFile->getContentBlob();
+                outBlob = outSourceFile->getContentBlob();
                 return SLANG_OK;
             }
 
@@ -149,7 +149,7 @@ SlangResult IncludeSystem::loadFile(const PathInfo& pathInfo, ComPtr<ISlangBlob>
                 return SLANG_E_CANNOT_OPEN;
             }
 
-            sourceFile->setContents(foundSourceBlob);
+            outSourceFile->setContents(foundSourceBlob);
 
             outBlob = foundSourceBlob;
             return SLANG_OK;
@@ -158,6 +158,7 @@ SlangResult IncludeSystem::loadFile(const PathInfo& pathInfo, ComPtr<ISlangBlob>
     else
     {
         // If we don't have the source manager, just load
+        outSourceFile = nullptr;
         return m_fileSystemExt->loadFile(pathInfo.foundPath.getBuffer(), outBlob.writeRef());
     }
 }

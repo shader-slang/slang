@@ -36,7 +36,12 @@ struct IncludeSystem
     SlangResult findFile(const String& pathToInclude, const String& pathIncludedFrom, PathInfo& outPathInfo);
     SlangResult findFile(SlangPathType fromPathType, const String& fromPath, const String& path, PathInfo& outPathInfo);
     String simplifyPath(const String& path);
-    SlangResult loadFile(const PathInfo& pathInfo, ComPtr<ISlangBlob>& outBlob);
+    SlangResult loadFile(const PathInfo& pathInfo, ComPtr<ISlangBlob>& outBlob, SourceFile*& outSourceFile);
+    inline SlangResult loadFile(const PathInfo& pathInfo, ComPtr<ISlangBlob>& outBlob)
+    {
+        SourceFile* sourceFile;
+        return loadFile(pathInfo, outBlob, sourceFile);
+    }
 
     SlangResult findAndLoadFile(const String& pathToInclude, const String& pathIncludedFrom, PathInfo& outPathInfo, ComPtr<ISlangBlob>& outBlob);
 
@@ -45,6 +50,7 @@ struct IncludeSystem
     SourceManager* getSourceManager() const { return m_sourceManager; }
 
         /// Ctor
+    IncludeSystem() = default;
     IncludeSystem(SearchDirectoryList* searchDirectories, ISlangFileSystemExt* fileSystemExt, SourceManager* sourceManager = nullptr);
 
 protected:

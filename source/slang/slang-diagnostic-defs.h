@@ -349,6 +349,14 @@ DIAGNOSTIC(30098, Error, nonStaticMemberFunctionNotAllowedAsDiffOperand, "non-st
 
 DIAGNOSTIC(30099, Error, sizeOfArgumentIsInvalid, "argument to sizeof is invalid")
 
+// Include
+DIAGNOSTIC(30500, Error, includedFileMissingImplementing, "missing 'implementing' declaration in the included source file '$0'.")
+DIAGNOSTIC(30501, Error, includedFileMissingImplementingDoYouMeanImport, "missing 'implementing' declaration in the included source file '$0'. The file declares that it defines module '$1', do you mean 'import' instead?")
+DIAGNOSTIC(30502, Error, includedFileDoesNotImplementCurrentModule, "the included source file is expected to implement module '$0', but it is implementing '$1' instead.")
+DIAGNOSTIC(30503, Error, primaryModuleFileCannotStartWithImplementingDecl, "a primary source file for a module cannot start with 'implementing'.")
+DIAGNOSTIC(30504, Warning, primaryModuleFileMustStartWithModuleDecl, "a primary source file for a module should start with 'module'.")
+DIAGNOSTIC(30505, Error, implementingMustReferencePrimaryModuleFile, "the source file referenced by 'implementing' must be a primary module file starting with a 'module' declaration.")
+
 // Attributes
 DIAGNOSTIC(31000, Error, unknownAttributeName, "unknown attribute '$0'")
 DIAGNOSTIC(31001, Error, attributeArgumentCountMismatch, "attribute '$0' expects $1 arguments ($2 provided)")
@@ -432,6 +440,7 @@ DIAGNOSTIC(30510, Error, loopInDiffFuncRequireUnrollOrMaxIters, "loops inside a 
 DIAGNOSTIC(39999, Fatal, cyclicReference, "cyclic reference '$0'.")
 DIAGNOSTIC(39999, Error, localVariableUsedBeforeDeclared, "local variable '$0' is being used before its declaration.")
 DIAGNOSTIC(39999, Error, variableUsedInItsOwnDefinition, "the initial-value expression for variable '$0' depends on the value of the variable itself")
+DIAGNOSTIC(39001, Fatal , cannotProcessInclude, "internal compiler error: cannot process '__include' in the current semantic checking context.")
 
 // 304xx: generics
 DIAGNOSTIC(30400, Error, genericTypeNeedsArgs, "generic type '$0' used without argument")
