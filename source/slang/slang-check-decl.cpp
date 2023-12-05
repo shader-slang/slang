@@ -1791,7 +1791,10 @@ namespace Slang
             else if (!as<ModuleDeclarationDecl>(firstMember))
             {
                 // A primary module file must start with a `module` declaration.
+                // TODO: this warning is disabled for now to free users from massive change for now.
+#if 0
                 getSink()->diagnose(firstMember, Diagnostics::primaryModuleFileMustStartWithModuleDecl);
+#endif
             }
         }
 
