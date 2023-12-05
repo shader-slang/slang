@@ -6609,33 +6609,14 @@ matrix<T, N, M> sqrt(matrix<T, N, M> x)
 // They use no lookup tables, which makes them vectorizable in theory.
 
 __target_intrinsic(cuda, "$P_cbrt($0)")
-[__readNone]
+[__readNone, Differentiable]
 float cbrt(float x)
 {
-    // 0 is inaccurate unless special-cased.
-    if (x == 0)
-       return 0;
-
-    constexpr float constant1 = 1.752319676f;
-    constexpr float constant2 = 1.2509524245f;
-    constexpr float constant3 = 0.5093818292f;
-
-    int xint = reinterpret<int>(x);
-    int i = 0x548c2b4b - xint / 3;
-    float ifloat = reinterpret<float>(i);
-
-    // Modification of Householder method:
-    float c = x * pow(ifloat, 3);
-    float y = ifloat * (constant1 - c * (constant2 - constant3 * c));
-
-    float d = x * y * y;
-    c = 1.0f - d * y;
-    y = mad(d, 1.0f, 0.333333333333f * c);
-    return y;
+    return pow<float>(x, 0.3333333333f);
 }
 
 __target_intrinsic(cuda, "$P_cbrt($0)")
-[__readNone]
+[__readNone, Differentiable]
 double cbrt(double x);
 
 __generic<let N : int>
@@ -6655,32 +6636,18 @@ matrix<float, N, M> cbrt(matrix<float, N, M> x)
 }
 
 __target_intrinsic(cuda, "$P_rcbrt($0)")
-[__readNone]
+[__readNone, Differentiable]
 float rcbrt(float x)
 {
     // 0 is inaccurate unless special-cased.
     if (x == 0)
        return 0;
 
-    constexpr float constant1 = 1.752319676f;
-    constexpr float constant2 = 1.2509524245f;
-    constexpr float constant3 = 0.5093818292f;
-
-    int xint = reinterpret<int>(x);
-    int i = 0x548c2b4b - xint / 3;
-    float ifloat = reinterpret<float>(i);
-
-    // Modification of Householder method:
-    float c = x * pow(ifloat, 3);
-    float y = ifloat * (constant1 - c * (constant2 - constant3 * c));
-
-    c = 1.0f - x * pow(y, 3);
-    y = mad(y, 1.0f, 0.333333333333f * c);
-    return y;
+    return 1.f / pow<float>(x, 0.3333333333f);
 }
 
 __target_intrinsic(cuda, "$P_rcbrt($0)")
-[__readNone]
+[__readNone, Differentiable]
 double rcbrt(double x);
 
 __generic<let N : int>
