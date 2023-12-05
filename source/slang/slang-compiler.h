@@ -1415,7 +1415,7 @@ namespace Slang
         void _processFindDeclsExportSymbolsRec(Decl* decl);
 
         // Gets the files that has been included into the module.
-        HashSet<SourceFile*>& getIncludedSourceFileSet() { return m_includedSourceFiles; }
+        Dictionary<SourceFile*, FileDecl*>& getIncludedSourceFileMap() { return m_mapSourceFileToFileDecl; }
 
     protected:
         void acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo) SLANG_OVERRIDE;
@@ -1473,7 +1473,7 @@ namespace Slang
         List<NodeBase*> m_mangledExportSymbols;
 
         // Source files that have been pulled into the module with `__include`.
-        HashSet<SourceFile*> m_includedSourceFiles;
+        Dictionary<SourceFile*, FileDecl*> m_mapSourceFileToFileDecl;
     };
     typedef Module LoadedModule;
 
@@ -1953,7 +1953,12 @@ namespace Slang
             const LoadedModuleDictionary* loadedModules = nullptr);
 
         SourceFile* findFile(Name* name, SourceLoc loc, IncludeSystem& outIncludeSystem);
-        FileDecl* findAndIncludeFile(Module* module, TranslationUnitRequest* translationUnit, Name* name, SourceLoc const& loc, DiagnosticSink* sink);
+        struct IncludeResult
+        {
+            FileDecl* fileDecl;
+            bool isNew;
+        };
+        IncludeResult findAndIncludeFile(Module* module, TranslationUnitRequest* translationUnit, Name* name, SourceLoc const& loc, DiagnosticSink* sink);
 
         SourceManager* getSourceManager()
         {

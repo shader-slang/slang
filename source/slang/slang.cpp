@@ -1853,7 +1853,7 @@ void TranslationUnitRequest::_addSourceFile(SourceFile* sourceFile)
     m_sourceFiles.add(sourceFile);
 
     getModule()->addFileDependency(sourceFile);
-    getModule()->getIncludedSourceFileSet().add(sourceFile);
+    getModule()->getIncludedSourceFileMap().add(sourceFile, nullptr);
 }
 
 List<SourceFile*> const& TranslationUnitRequest::getSourceFiles()
@@ -2374,7 +2374,7 @@ void FrontEndCompileRequest::parseTranslationUnit(
 
     for (auto sourceFile : translationUnit->getSourceFiles())
     {
-        module->getIncludedSourceFileSet().add(sourceFile);
+        module->getIncludedSourceFileMap().addIfNotExists(sourceFile, nullptr);
     }
 
     for (auto sourceFile : translationUnit->getSourceFiles())
@@ -3350,26 +3350,35 @@ SourceFile* Linkage::findFile(Name* name, SourceLoc loc, IncludeSystem& outInclu
     return sourceFile;
 }
 
-FileDecl* Linkage::findAndIncludeFile(Module* module, TranslationUnitRequest* translationUnit, Name* name, SourceLoc const& loc, DiagnosticSink* sink)
+Linkage::IncludeResult Linkage::findAndIncludeFile(Module* module, TranslationUnitRequest* translationUnit, Name* name, SourceLoc const& loc, DiagnosticSink* sink)
 {
+    IncludeResult result;
+    result.fileDecl = nullptr;
+    result.isNew = false;
+
     IncludeSystem includeSystem;
     auto sourceFile = findFile(name, loc, includeSystem);
 
     if (!sourceFile)
     {
         sink->diagnose(loc, Diagnostics::cannotOpenFile, getText(name));
-        return nullptr;
+        return result;
     }
 
     // If the file has already been included, don't need to do anything further.
-    if (!module->getIncludedSourceFileSet().add(sourceFile))
-        return nullptr;
+    if (auto existingFileDecl = module->getIncludedSourceFileMap().tryGetValue(sourceFile))
+    {
+        result.fileDecl = *existingFileDecl;
+        result.isNew = false;
+        return result;
+    }
 
     module->addFileDependency(sourceFile);
 
     // Create a transparent FileDecl to hold all children from the included file.
     auto fileDecl = module->getASTBuilder()->create<FileDecl>();
     fileDecl->nameAndLoc.name = name;
+    module->getIncludedSourceFileMap().add(sourceFile, fileDecl);
 
     FrontEndPreprocessorHandler preprocessorHandler(module, module->getASTBuilder(), sink);
     auto combinedPreprocessorDefinitions = translationUnit->getCombinedPreprocessorDefinitions();
@@ -3391,8 +3400,10 @@ FileDecl* Linkage::findAndIncludeFile(Module* module, TranslationUnitRequest* tr
         fileDecl);
 
     module->getModuleDecl()->addMember(fileDecl);
-    
-    return fileDecl;
+
+    result.fileDecl = fileDecl;
+    result.isNew = true;
+    return result;
 }
 
 //

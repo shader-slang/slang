@@ -478,12 +478,19 @@ class ImportDecl : public FileReferenceDeclBase
     ModuleDecl* importedModuleDecl = nullptr;
 };
 
-class IncludeDecl : public FileReferenceDeclBase
+class IncludeDeclBase : public FileReferenceDeclBase
+{
+    SLANG_AST_CLASS(IncludeDeclBase)
+
+    FileDecl* fileDecl = nullptr;
+};
+
+class IncludeDecl : public IncludeDeclBase
 {
     SLANG_AST_CLASS(IncludeDecl)
 };
 
-class ImplementingDecl : public FileReferenceDeclBase
+class ImplementingDecl : public IncludeDeclBase
 {
     SLANG_AST_CLASS(ImplementingDecl)
 };

@@ -6863,13 +6863,18 @@ namespace Slang
         auto parentModule = getModule(decl);
         auto moduleDecl = parentModule->getModuleDecl();
 
-        auto fileDecl = getLinkage()->findAndIncludeFile(getModule(decl), getShared()->getTranslationUnitRequest(), name, decl->moduleNameAndLoc.loc, getSink());
+        auto [fileDecl, isNew] = getLinkage()->findAndIncludeFile(getModule(decl), getShared()->getTranslationUnitRequest(), name, decl->moduleNameAndLoc.loc, getSink());
 
         if (!fileDecl)
             return;
-        if (fileDecl->members.getCount() == 0)
+
+        decl->fileDecl = fileDecl;
+
+        if (!isNew)
             return;
 
+        if (fileDecl->members.getCount() == 0)
+            return;
         auto firstMember = fileDecl->members[0];
         if (auto moduleDeclaration = as<ModuleDeclarationDecl>(firstMember))
         {
@@ -6930,7 +6935,12 @@ namespace Slang
         if (!getShared()->getTranslationUnitRequest())
             getSink()->diagnose(decl->moduleNameAndLoc.loc, Diagnostics::cannotProcessInclude);
 
-        auto fileDecl = getLinkage()->findAndIncludeFile(getModule(decl), getShared()->getTranslationUnitRequest(), name, decl->moduleNameAndLoc.loc, getSink());
+        auto [fileDecl, isNew] = getLinkage()->findAndIncludeFile(getModule(decl), getShared()->getTranslationUnitRequest(), name, decl->moduleNameAndLoc.loc, getSink());
+
+        decl->fileDecl = fileDecl;
+
+        if (!isNew)
+            return;
 
         if (!fileDecl || fileDecl->members.getCount() == 0)
         {
