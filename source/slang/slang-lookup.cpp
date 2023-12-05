@@ -675,6 +675,10 @@ static void _lookUpInScopes(
     auto scope      = request.scope;
 
     auto endScope   = request.endScope;
+
+    // The file decl that this scope is in.
+    FileDecl* thisFileDecl = nullptr;
+
     for (;scope != endScope; scope = scope->parent)
     {
         // Note that we consider all "peer" scopes together,
@@ -692,6 +696,18 @@ static void _lookUpInScopes(
             //
             if (!containerDecl)
                 continue;
+
+            if (auto fileDecl = as<FileDecl>(containerDecl))
+            {
+                if (!thisFileDecl)
+                    thisFileDecl = fileDecl;
+                else if (fileDecl == thisFileDecl)
+                {
+                    // If we have already looked up in this file decl,
+                    // we don't want to do so again.
+                    continue;
+                }
+            }
 
             // TODO: If we need default substitutions to be applied to
             // the `containerDecl`, then it might make sense to have

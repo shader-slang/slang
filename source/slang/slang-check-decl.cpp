@@ -85,6 +85,10 @@ namespace Slang
 
         void visitImportDecl(ImportDecl* decl);
 
+        void visitIncludeDecl(IncludeDecl* decl);
+
+        void visitImplementingDecl(ImplementingDecl* decl);
+
         void visitUsingDecl(UsingDecl* decl);
 
         void visitGenericTypeParamDecl(GenericTypeParamDecl* decl);
@@ -1773,6 +1777,27 @@ namespace Slang
             _registerBuiltinDeclsRec(getSession(), moduleDecl);
         }
 
+        if (moduleDecl->members.getCount() > 0)
+        {
+            auto firstMember = moduleDecl->members[0];
+            if (auto implDecl = as<ImplementingDecl>(firstMember))
+            {
+                if (!getShared()->isInLanguageServer())
+                {
+                    // A primary module file can't start with an "implementing" declaration.
+                    getSink()->diagnose(firstMember, Diagnostics::primaryModuleFileCannotStartWithImplementingDecl);
+                }
+            }
+            else if (!as<ModuleDeclarationDecl>(firstMember))
+            {
+                // A primary module file must start with a `module` declaration.
+                // TODO: this warning is disabled for now to free users from massive change for now.
+#if 0
+                getSink()->diagnose(firstMember, Diagnostics::primaryModuleFileMustStartWithModuleDecl);
+#endif
+            }
+        }
+
         // We need/want to visit any `import` declarations before
         // anything else, to make sure that scoping works.
         //
@@ -1782,6 +1807,30 @@ namespace Slang
         for(auto importDecl : moduleDecl->getMembersOfType<ImportDecl>())
         {
             ensureDecl(importDecl, DeclCheckState::Checked);
+        }
+
+        // Next, make sure all `__include` decls are processed and the referenced
+        // files are parsed.
+        auto visitIncludeDecls = [&](ContainerDecl* fileDecl)
+            {
+                for (Index i = 0; i < fileDecl->members.getCount(); i++)
+                {
+                    auto decl = fileDecl->members[i];
+                    if (auto includeDecl = as<IncludeDecl>(decl))
+                    {
+                        ensureDecl(includeDecl, DeclCheckState::Checked);
+                    }
+                    else if (auto implementingDecl = as<ImplementingDecl>(decl))
+                    {
+                        ensureDecl(implementingDecl, DeclCheckState::Checked);
+                    }
+                }
+            };
+        visitIncludeDecls(moduleDecl);
+        for (Index i = 0; i < moduleDecl->members.getCount(); i++)
+        {
+            if (auto fileDecl = as<FileDecl>(moduleDecl->members[i]))
+                visitIncludeDecls(fileDecl);
         }
 
         // The entire goal of semantic checking is to get all of the
@@ -6694,6 +6743,18 @@ namespace Slang
             loc);
     }
 
+    void SemanticsVisitor::importFileDeclIntoScope(Scope* scope, FileDecl* fileDecl)
+    {
+        // Create a new sub-scope to wire the module
+       // into our lookup chain.
+        auto subScope = getASTBuilder()->create<Scope>();
+        subScope->containerDecl = fileDecl;
+
+        subScope->nextSibling = scope->nextSibling;
+        scope->nextSibling = subScope;
+    }
+
+
     void SemanticsVisitor::importModuleIntoScope(Scope* scope, ModuleDecl* moduleDecl)
     {
         // If we've imported this one already, then
@@ -6764,6 +6825,146 @@ namespace Slang
         {
             module->addModuleDependency(importedModule);
         }
+    }
+
+    String getSimpleModuleName(Name* name)
+    {
+        auto text = getText(name);
+        auto dirPos = Math::Max(text.indexOf('/'), text.indexOf('\\'));
+        if (dirPos < 0)
+            return text;
+        auto slice = text.getUnownedSlice().tail(dirPos + 1);
+        auto dotPos = slice.indexOf('.');
+        if (dotPos < 0)
+            return slice;
+        return String(slice.head(dotPos));
+    }
+
+    ModuleDeclarationDecl* findExistingModuleDeclarationDecl(ModuleDecl* decl)
+    {
+        if (decl->members.getCount() == 0)
+            return nullptr;
+        if (auto rs = as<ModuleDeclarationDecl>(decl->members[0]))
+            return rs;
+        for (auto fileDecl : decl->getMembersOfType<FileDecl>())
+        {
+            if (fileDecl->members.getCount() == 0)
+                continue;
+            if (auto rs = as<ModuleDeclarationDecl>(fileDecl->members[0]))
+                return rs;
+        }
+        return nullptr;
+    }
+
+    void SemanticsDeclHeaderVisitor::visitIncludeDecl(IncludeDecl* decl)
+    {
+        auto name = decl->moduleNameAndLoc.name;
+
+        if (!getShared()->getTranslationUnitRequest())
+            getSink()->diagnose(decl->moduleNameAndLoc.loc, Diagnostics::cannotProcessInclude);
+
+        auto parentModule = getModule(decl);
+        auto moduleDecl = parentModule->getModuleDecl();
+
+        auto [fileDecl, isNew] = getLinkage()->findAndIncludeFile(getModule(decl), getShared()->getTranslationUnitRequest(), name, decl->moduleNameAndLoc.loc, getSink());
+
+        if (!fileDecl)
+            return;
+
+        decl->fileDecl = fileDecl;
+
+        if (!isNew)
+            return;
+
+        if (fileDecl->members.getCount() == 0)
+            return;
+        auto firstMember = fileDecl->members[0];
+        if (auto moduleDeclaration = as<ModuleDeclarationDecl>(firstMember))
+        {
+            // We are trying to include a file that defines a module, the user could mean "import" instead.
+            getSink()->diagnose(decl->moduleNameAndLoc.loc, Diagnostics::includedFileMissingImplementingDoYouMeanImport, name, moduleDeclaration->getName());
+            return;
+        }
+
+        importFileDeclIntoScope(moduleDecl->ownedScope, fileDecl);
+
+        if (auto implementing = as<ImplementingDecl>(firstMember))
+        {
+            // The file we are including must be implementing the current module.
+            auto moduleName = getSimpleModuleName(implementing->moduleNameAndLoc.name);
+            auto expectedModuleName = moduleDecl->getName();
+            bool shouldSkipDiagnostic = false;
+            if (moduleDecl->members.getCount())
+            {
+                if (auto moduleDeclarationDecl = as<ModuleDeclarationDecl>(moduleDecl->members[0]))
+                {
+                    expectedModuleName = moduleDeclarationDecl->getName();
+                }
+                else if (getShared()->isInLanguageServer())
+                {
+                    auto moduleDeclarationDecls = findExistingModuleDeclarationDecl(moduleDecl);
+                    if (moduleDeclarationDecls)
+                    {
+                        expectedModuleName = moduleDeclarationDecls->getName();
+                    }
+                    else
+                    {
+                        shouldSkipDiagnostic = true;
+                    }
+                }
+            }
+            if (!shouldSkipDiagnostic && !moduleName.getUnownedSlice().caseInsensitiveEquals(getText(expectedModuleName).getUnownedSlice()))
+            {
+                getSink()->diagnose(decl->moduleNameAndLoc.loc, Diagnostics::includedFileDoesNotImplementCurrentModule, expectedModuleName, moduleName);
+                return;
+            }
+            return;
+        }
+
+        getSink()->diagnose(decl->moduleNameAndLoc.loc, Diagnostics::includedFileMissingImplementing, name);
+    }
+
+    void SemanticsDeclHeaderVisitor::visitImplementingDecl(ImplementingDecl* decl)
+    {
+        // Don't need to do anything unless we are in a language server context.
+        if (!getShared()->isInLanguageServer())
+            return;
+
+        // Treat an `implementing` declaration as an `include` declaration when
+        // we are in a language server context.
+
+        auto name = decl->moduleNameAndLoc.name;
+
+        if (!getShared()->getTranslationUnitRequest())
+            getSink()->diagnose(decl->moduleNameAndLoc.loc, Diagnostics::cannotProcessInclude);
+
+        auto [fileDecl, isNew] = getLinkage()->findAndIncludeFile(getModule(decl), getShared()->getTranslationUnitRequest(), name, decl->moduleNameAndLoc.loc, getSink());
+
+        decl->fileDecl = fileDecl;
+
+        if (!isNew)
+            return;
+
+        if (!fileDecl || fileDecl->members.getCount() == 0)
+        {
+            return;
+        }
+
+        auto firstMember = fileDecl->members[0];
+        if (auto moduleDeclaration = as<ModuleDeclarationDecl>(firstMember))
+        {
+            // We are trying to implement a file that defines a module, this is expected.
+            return;
+        }
+
+        if (auto implementing = as<ImplementingDecl>(firstMember))
+        {
+            getSink()->diagnose(decl->moduleNameAndLoc.loc, Diagnostics::implementingMustReferencePrimaryModuleFile);
+            return;
+        }
+
+        if (auto moduleDecl = getModuleDecl(decl))
+            importFileDeclIntoScope(moduleDecl->ownedScope, fileDecl);
     }
 
     void SemanticsDeclHeaderVisitor::visitUsingDecl(UsingDecl* decl)

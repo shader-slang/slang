@@ -170,7 +170,8 @@ namespace Slang
             translationUnit->compileRequest->getLinkage(),
             translationUnit->getModule(),
             translationUnit->compileRequest->getSink(),
-            &loadedModules);
+            &loadedModules,
+            translationUnit);
 
         SemanticsDeclVisitorBase visitor( (SemanticsContext(&sharedSemanticsContext)) );
 

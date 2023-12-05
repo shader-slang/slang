@@ -211,6 +211,8 @@ namespace Slang
             /// @param path
             /// @return SLANG_OK if file or directory is removed
         static SlangResult remove(const String& path);
+
+        static bool equals(String path1, String path2);
     };
 
     struct URI

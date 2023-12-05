@@ -458,7 +458,7 @@ void appendDefinitionLocation(StringBuilder& sb, Workspace* workspace, const Hum
     sb << "Defined in " << pathSlice << "(" << loc.line << ")\n";
 }
 
-HumaneSourceLoc getModuleLoc(SourceManager* manager, ModuleDecl* moduleDecl)
+HumaneSourceLoc getModuleLoc(SourceManager* manager, ContainerDecl* moduleDecl)
 {
     if (moduleDecl)
     {
@@ -722,6 +722,27 @@ SlangResult LanguageServer::hover(
             hover.range.end.character = (int)utf16Col;
         }
     }
+    else if (auto includeDeclBase = as<IncludeDeclBase>(leafNode))
+    {
+        auto moduleLoc = getModuleLoc(version->linkage->getSourceManager(), includeDeclBase->fileDecl);
+        if (moduleLoc.pathInfo.hasFoundPath())
+        {
+            String path = moduleLoc.pathInfo.foundPath;
+            Path::getCanonical(path, path);
+            sb << path;
+            auto humaneLoc = version->linkage->getSourceManager()->getHumaneLoc(
+                includeDeclBase->startLoc, SourceLocType::Actual);
+            Index utf16Line, utf16Col;
+            doc->oneBasedUTF8LocToZeroBasedUTF16Loc(humaneLoc.line, humaneLoc.column, utf16Line, utf16Col);
+            hover.range.start.line = (int)utf16Line;
+            hover.range.start.character = (int)utf16Col;
+            humaneLoc = version->linkage->getSourceManager()->getHumaneLoc(
+                includeDeclBase->endLoc, SourceLocType::Actual);
+            doc->oneBasedUTF8LocToZeroBasedUTF16Loc(humaneLoc.line, humaneLoc.column, utf16Line, utf16Col);
+            hover.range.end.line = (int)utf16Line;
+            hover.range.end.character = (int)utf16Col;
+        }
+    }
     else if (auto decl = as<Decl>(leafNode))
     {
         fillDeclRefHoverInfo(makeDeclRef(decl));
@@ -830,6 +851,14 @@ SlangResult LanguageServer::gotoDefinition(
     else if (auto importDecl = as<ImportDecl>(leafNode))
     {
         auto location = getModuleLoc(version->linkage->getSourceManager(), importDecl->importedModuleDecl);
+        if (location.pathInfo.hasFoundPath())
+        {
+            locations.add(LocationResult{ location, 0 });
+        }
+    }
+    else if (auto includeDeclBase = as<IncludeDeclBase>(leafNode))
+    {
+        auto location = getModuleLoc(version->linkage->getSourceManager(), includeDeclBase->fileDecl);
         if (location.pathInfo.hasFoundPath())
         {
             locations.add(LocationResult{ location, 0 });

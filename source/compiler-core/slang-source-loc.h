@@ -482,6 +482,7 @@ struct SourceManager
 
         /// Add a source file, uniqueIdentity must be unique for this manager AND any parents
     void addSourceFile(const String& uniqueIdentity, SourceFile* sourceFile);
+    void addSourceFileIfNotExist(const String& uniqueIdentity, SourceFile* sourceFile);
 
         /// Get the slice pool
     StringSlicePool& getStringSlicePool() { return m_slicePool; }

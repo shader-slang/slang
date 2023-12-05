@@ -669,7 +669,7 @@ bool _findAstNodeImpl(ASTLookupContext& context, SyntaxNode* node)
             if (visitor.dispatchIfNotNull(extDecl->targetType.exp))
                 return true;
         }
-        else if (auto importDecl = as<ImportDecl>(node))
+        else if (auto importDecl = as<FileReferenceDeclBase>(node))
         {
             if (_isLocInRange(&context, importDecl->startLoc, importDecl->endLoc))
             {
@@ -679,6 +679,7 @@ bool _findAstNodeImpl(ASTLookupContext& context, SyntaxNode* node)
                 return true;
             }
         }
+
         for (auto modifier : decl->modifiers)
         {
             if (auto hlslSemantic = as<HLSLSemantic>(modifier))
@@ -722,7 +723,7 @@ bool _findAstNodeImpl(ASTLookupContext& context, SyntaxNode* node)
             {}
             else if (container->closingSourceLoc.getRaw() >= container->loc.getRaw())
             {
-                if (!_isLocInRange(&context, container->loc, container->closingSourceLoc))
+                if (!_isLocInRange(&context, container->loc, container->closingSourceLoc) && !as<NamespaceDeclBase>(container))
                 {
                     shouldInspectChildren = false;
                 }
