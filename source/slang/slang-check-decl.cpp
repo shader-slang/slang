@@ -4059,7 +4059,19 @@ namespace Slang
                 continue;
 
             if (doesMemberSatisfyRequirement(member.declRef, requiredMemberDeclRef, witnessTable))
+            {
+                // The member satisfies the requirement in every other way except that
+                // it may have a lower visibility than min(parentVisibility, requirementVisibilty),
+                // in that case we will treat it as an error.
+                auto minRequiredVisibility = Math::Min(getDeclVisibility(requiredMemberDeclRef.getDecl()), getTypeVisibility(subType));
+                if (getDeclVisibility(member.declRef.getDecl()) < minRequiredVisibility)
+                {
+                    getSink()->diagnose(member.declRef, Diagnostics::satisfyingDeclCannotHaveLowerVisibility, member.declRef);
+                    getSink()->diagnose(requiredMemberDeclRef, Diagnostics::seeDeclarationOf, QualifiedDeclPath(requiredMemberDeclRef));
+                    return false;
+                }
                 return true;
+            }
         }
 
         // If we reach this point then there were no members suitable

@@ -841,6 +841,12 @@ namespace Slang
             else if (as<PrivateModifier>(modifier))
                 return DeclVisibility::Private;
         }
+        
+        // Interface members will always have the same visibility as the interface itself.
+        if (auto interfaceDecl = findParentInterfaceDecl(decl))
+        {
+            return getDeclVisibility(interfaceDecl);
+        }
 
         if (auto parentModule = getModuleDecl(decl))
             return parentModule->isInLegacyLanguage ? DeclVisibility::Public : DeclVisibility::Internal;
@@ -919,6 +925,13 @@ namespace Slang
         {
             getSink()->diagnose(loc, Diagnostics::declIsNotVisible, lookupResult.item.declRef);
             outDiagnosed = true;
+
+            if (getShared()->isInLanguageServer())
+            {
+                // When in language server mode, return the unfiltered result so we can still
+                // provide language service around it.
+                return lookupResult;
+            }
         }
         return result;
     }

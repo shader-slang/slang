@@ -6,10 +6,10 @@ layout: user-guide
 Modules and Access Control
 ===========================
 
-While the preprocessor `#include`s is still supported, Slang provides a _module_ system for software engineering benefits such as clean expression of sub-component boundaries and dependencies, hiding implementation details, and providing a path towards true separate compilation.
+While the preprocessor `#include`s is still supported, Slang provides a _module_ system for software engineering benefits such as clean expression of sub component boundaries and dependencies, hiding implementation details, and providing a path towards true separate compilation.
 
 
-### Defining a Module
+## Defining a Module
 
 A module in Slang comprises one or more files. A module must have one and only one primary file that is used as the source-of-truth to uniquely identify the module. The primary file must start with `module` declaration. For example, the following code defines a module named `scene`:
 
@@ -83,7 +83,7 @@ __include "dir/file-name";
 > #### Note ####
 > When using the identifier token syntax, Slang will translate any underscores(`_`) to hyphenators("-") to obtain the file name.
 
-### Importing a Module
+## Importing a Module
 
 At the global scope of a Slang file, you can use the `import` keyword to import another module by name:
 
@@ -114,7 +114,7 @@ Note that preprocessor definitions in the current file will not affect the compi
 > Future versions of the Slang system will support loading of modules from pre-compiled binaries instead of source code.
 > The same `import` keyword will continue to work in that case.
 
-### Access Control
+## Access Control
 
 Slang supports access control modifiers: `public`, `internal` and `private`. The module boundary plays an important role in access control.
 
@@ -149,6 +149,11 @@ void outerFunc(MyType t)
 // a.slang
 module a;
 __include b;
+public struct PS
+{
+    int internalMember;
+    public int publicMember;
+}
 internal void f() { f_b(); } // OK, f_b defined in the same module.
 
 // b.slang
@@ -163,7 +168,31 @@ void main()
 {
     f(); // Error, f is not visible here.
     publicFunc(); // OK.
+    PS p; // OK.
+    p.internalMember = 1; // Error, internalMember is not visible.
+    p.publicMember = 1; // OK.
 }
 ```
 
-`internal` is the default visibility if no other access modifiers are specified.
+`internal` is the default visibility if no other access modifiers are specified, an exception is for `interface` members, where the default visibility is the visibility of the interface.
+
+### Additional Validation Rules
+
+The Slang compiler enforces the following rules regarding access control:
+- A more visible entity should not expose less visible entities through its signature. For example, a `public` function cannot have a return type that is `internal`.
+- A member of a `struct`, `interface` and other aggregate types cannot have a higher visibility than its parent.
+- If a `struct` type has visibility `Vs`, and one of its member has visibility `Vm`, and the member is used to satisfy an interface requirement that has visibility `Vr`, then `Vm` must not be lower (less visible) than `min(Vs, Vr)`.
+- Type definitions themselves cannot be `private`, for example, `private struct S {}` is not valid code.
+- `interface` requirements cannot be `private`.
+
+
+## Legacy Modules
+
+Slang used to not have support for access control, and all symbols were treated as having `public` visibility. To provide compatibility with existing code, the Slang compiler will detect if the module is written in the legacy language, and treat all symbols as `public` if so.
+
+A module is determined to be written in legacy language if all the following conditions are met:
+- The module is lacking `module` declaration at the begining.
+- There is no use of `__include`.
+- There is no use of any visibility modifiers -- `public`, `private` or `internal`.
+
+The user is advised that this legacy mode is for compatibility only. This mode may be deprecated in the future, and it is strongly recommended that new code should not rely on this compiler behavior.

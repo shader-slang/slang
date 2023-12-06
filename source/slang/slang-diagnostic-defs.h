@@ -360,7 +360,7 @@ DIAGNOSTIC(30505, Error, implementingMustReferencePrimaryModuleFile, "the source
 // Visibilty
 DIAGNOSTIC(30600, Error, declIsNotVisible, "'$0' is not accessible from the current context.")
 DIAGNOSTIC(30601, Error, declCannotHaveHigherVisibility, "'$0' cannot have a higher visibility than '$1'.")
-DIAGNOSTIC(30602, Error, declCannotHaveLowerVisibility, "'$0' cannot have a lower visibility than '$1'.")
+DIAGNOSTIC(30602, Error, satisfyingDeclCannotHaveLowerVisibility, "'$0' is less visible than the interface requirement it satisfies.")
 DIAGNOSTIC(30603, Error, invalidUseOfPrivateVisibility, "'$0' cannot have private visibility.")
 DIAGNOSTIC(30604, Error, useOfLessVisibleType, "'$0' references less visible type '$1'.")
 

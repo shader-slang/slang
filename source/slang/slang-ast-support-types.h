@@ -66,6 +66,17 @@ namespace Slang
     void printDiagnosticArg(StringBuilder& sb, Val* val);
     void printDiagnosticArg(StringBuilder& sb, DeclRefBase* declRefBase);
 
+    struct QualifiedDeclPath
+    {
+        DeclRefBase* declRef;
+        QualifiedDeclPath() = default;
+        QualifiedDeclPath(DeclRefBase* declRef)
+            : declRef(declRef)
+        {}
+    };
+    // Prints the fully qualified decl name.
+    void printDiagnosticArg(StringBuilder& sb, QualifiedDeclPath path);
+
 
     class SyntaxNode;
     SourceLoc getDiagnosticPos(SyntaxNode const* syntax);
@@ -1605,6 +1616,7 @@ namespace Slang
         Public,
         Default = Internal,
     };
+
 } // namespace Slang
 
 #endif
