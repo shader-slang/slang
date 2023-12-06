@@ -6597,73 +6597,56 @@ matrix<T, N, M> sqrt(matrix<T, N, M> x)
     MATRIX_MAP_UNARY(T, N, M, sqrt, x);
 }
 
-// The following cbrt(float) and rcbrt(float) algorithms are based upon:
-//
-// Moroz L, Samotyy V, Walczyk CJ, Cieśliński JL.
-// Fast Calculation of Cube and Inverse Cube Roots Using a Magic Constant and Its Implementation on Microcontrollers.
-// Energies. 2021; 14(4):1058.
-// https://doi.org/10.3390/en14041058
-//
-// Published under the CC BY 4.0 license.
-//
-// They use no lookup tables, which makes them vectorizable in theory.
-
+__generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(cuda, "$P_cbrt($0)")
 [__readNone, Differentiable]
-float cbrt(float x)
+T cbrt(T x)
 {
-    return pow<float>(x, 0.3333333333f);
+    return pow(x, T(1) / T(3));
 }
 
-__target_intrinsic(cuda, "$P_cbrt($0)")
-[__readNone, Differentiable]
-double cbrt(double x);
-
-__generic<let N : int>
+__generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 [__readNone]
-vector<float, N> cbrt(vector<float, N> x)
+vector<T, N> cbrt(vector<T, N> x)
 {
-    VECTOR_MAP_UNARY(float, N, cbrt, x);
+    VECTOR_MAP_UNARY(T, N, cbrt, x);
 }
 
-__generic<let N : int, let M : int>
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
-matrix<float, N, M> cbrt(matrix<float, N, M> x)
+matrix<T, N, M> cbrt(matrix<T, N, M> x)
 {
-    MATRIX_MAP_UNARY(float, N, M, cbrt, x);
+    MATRIX_MAP_UNARY(T, N, M, cbrt, x);
 }
 
+__generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(cuda, "$P_rcbrt($0)")
 [__readNone, Differentiable]
-float rcbrt(float x)
+T rcbrt(T x)
 {
     // 0 is inaccurate unless special-cased.
-    if (x == 0)
-       return 0;
+    if (x == T(0))
+        return T(0);
 
-    return 1.f / pow<float>(x, 0.3333333333f);
+    return T(1.0) / pow(x, T(1) / T(3));
 }
 
-__target_intrinsic(cuda, "$P_rcbrt($0)")
-[__readNone, Differentiable]
-double rcbrt(double x);
-
-__generic<let N : int>
+__generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 [__readNone]
-vector<float, N> rcbrt(vector<float, N> x)
+vector<T, N> rcbrt(vector<T, N> x)
 {
-    VECTOR_MAP_UNARY(float, N, rcbrt, x);
+    VECTOR_MAP_UNARY(T, N, rcbrt, x);
 }
 
-__generic<let N : int, let M : int>
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
-matrix<float, N, M> rcbrt(matrix<float, N, M> x)
+matrix<T, N, M> rcbrt(matrix<T, N, M> x)
 {
-    MATRIX_MAP_UNARY(float, N, M, rcbrt, x);
+    MATRIX_MAP_UNARY(T, N, M, rcbrt, x);
 }
 
 // Step function

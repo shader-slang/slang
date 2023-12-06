@@ -90,6 +90,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     }
     
     ft += ldexp(23.2, f);
+
+    ft += cbrt(double(idx)) * 10;
+    ft += rcbrt(double(idx)) * 10;
     
     outputBuffer[idx] = int(ft * 16);
 }
