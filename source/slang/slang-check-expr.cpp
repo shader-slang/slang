@@ -825,18 +825,9 @@ namespace Slang
         {
             if (as<AccessorDecl>(decl))
                 continue;
-            if (as<AggTypeDeclBase>(decl))
-                break;
-            if (as<NamespaceDeclBase>(decl))
-                break;
-            if (as<CallableDecl>(decl))
-                break;
-            if (as<VarDeclBase>(decl))
-                break;
-            if (as<SimpleTypeDecl>(decl))
-                break;
-            if (as<PropertyDecl>(decl))
-                break;
+            if (as<EnumCaseDecl>(decl))
+                continue;
+            break;
         }
         if (!decl)
             return DeclVisibility::Public;
