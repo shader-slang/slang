@@ -2,10 +2,10 @@
 
 __exported import IMaterialInstance;
 
-interface IMaterial
+public interface IMaterial
 {
-    associatedtype MaterialInstance : IMaterialInstance;
+    public associatedtype MaterialInstance : IMaterialInstance;
 
     [BackwardDifferentiable]
-    MaterialInstance setupMaterialInstance(out MaterialInstanceData miData);
+    public MaterialInstance setupMaterialInstance(out MaterialInstanceData miData);
 }

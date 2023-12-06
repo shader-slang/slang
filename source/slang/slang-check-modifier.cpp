@@ -1048,6 +1048,14 @@ namespace Slang
             {
                 getSink()->diagnose(m, Diagnostics::invalidUseOfPrivateVisibility, as<Decl>(syntaxNode));
             }
+            else if (auto decl = as<Decl>(syntaxNode))
+            {
+                // Interface requirements can't be private.
+                if (isInterfaceRequirement(decl))
+                {
+                    getSink()->diagnose(m, Diagnostics::invalidUseOfPrivateVisibility, as<Decl>(syntaxNode));
+                }
+            }
         }
 
 

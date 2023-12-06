@@ -810,6 +810,18 @@ namespace Slang
 
     DeclVisibility SemanticsVisitor::getDeclVisibility(Decl* decl)
     {
+        if (as<GenericTypeParamDecl>(decl) || as<GenericValueParamDecl>(decl) || as<GenericTypeConstraintDecl>(decl))
+        {
+            auto genericDecl = as<GenericDecl>(decl->parentDecl);
+            if (!genericDecl)
+                return DeclVisibility::Default;
+            if (genericDecl->inner)
+                return getDeclVisibility(genericDecl->inner);
+            return DeclVisibility::Default;
+        }
+        if (auto genericDecl = as<GenericDecl>(decl))
+            decl = genericDecl->inner;
+
         for (auto modifier : decl->modifiers)
         {
             if (as<PublicModifier>(modifier))
@@ -849,7 +861,7 @@ namespace Slang
         {
             // Check that the decl is in the same module as the scope.
             auto declModule = getModuleDecl(declRef.getDecl());
-            if (declModule == getModuleDecl(scope->containerDecl))
+            if (declModule == getModuleDecl(scope))
                 return true;
         }
         if (visibility == DeclVisibility::Private)
@@ -3503,6 +3515,7 @@ namespace Slang
     {
         LookupResult globalLookupResult;
         bool hasErrors = false;
+        Expr* base = nullptr;
         auto handleLeafCase = [&](DeclRef<Decl> baseDeclRef, Type* type)
             {
                 auto aggTypeDeclRef = as<AggTypeDeclBase>(baseDeclRef);
@@ -3621,6 +3634,7 @@ namespace Slang
                         // array already represents what we'd get by filtering...
 
                         AddToLookupResult(globalLookupResult, lookupResult);
+                        base = baseExpression;
                     }
                 }
             };
@@ -3673,7 +3687,7 @@ namespace Slang
         return createLookupResultExpr(
             expr->name,
             globalLookupResult,
-            nullptr,
+            base,
             expr->loc,
             expr);
     }

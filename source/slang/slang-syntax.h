@@ -330,6 +330,7 @@ namespace Slang
 
         /// Get the module dclaration that a declaration is associated with, if any.
     ModuleDecl* getModuleDecl(Decl* decl);
+    ModuleDecl* getModuleDecl(Scope* scope);
 
         /// Get the module that a declaration is associated with, if any.
     Module* getModule(Decl* decl);

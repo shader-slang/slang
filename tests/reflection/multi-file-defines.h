@@ -5,12 +5,13 @@
 #define BEGIN_CBUFFER(NAME) cbuffer NAME
 #define END_CBUFFER(NAME, REG) /**/
 #define CBUFFER_REF(NAME, FIELD) FIELD
+#define PUBLIC public
 #else
 #define R(X) /*X*/
 #define BEGIN_CBUFFER(NAME) struct SLANG_ParameterGroup_##NAME
 #define END_CBUFFER(NAME, REG) ; cbuffer NAME /*REG*/ { SLANG_ParameterGroup_##NAME NAME; }
 #define CBUFFER_REF(NAME, FIELD) NAME.FIELD
-
+#define PUBLIC
 #define sharedC     sharedC_0
 #define sharedCA    sharedCA_0
 #define sharedCB    sharedCB_0

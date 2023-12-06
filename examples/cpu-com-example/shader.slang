@@ -2,9 +2,9 @@
 
 // Example using 'NativeString' and COM interface
 
-public __global __extern_cpp IDoThings globalDoThings;
+export __global __extern_cpp IDoThings globalDoThings;
 
-public __extern_cpp NativeString getString(NativeString in)
+export __extern_cpp NativeString getString(NativeString in)
 {
     return in;
 }
@@ -17,12 +17,12 @@ interface IDoThings
     void printMessage(NativeString nativeString);
 }
 
-public __extern_cpp int calcHash(NativeString text)
+export __extern_cpp int calcHash(NativeString text)
 {
     return globalDoThings.calcHash(text);
 }
 
-public __extern_cpp void printMessage(NativeString text)
+export __extern_cpp void printMessage(NativeString text)
 {
     return globalDoThings.printMessage(text);
 }

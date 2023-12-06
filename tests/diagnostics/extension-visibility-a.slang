@@ -1,17 +1,17 @@
 // extension-visibility-a.slang
 
-interface IThing
+public interface IThing
 {
-	int getValue();
+	public int getValue();
 }
 
 // Note: not implementing the interface here!
-struct MyThing
+public struct MyThing
 {
-	int value;
+	public int value;
 }
 
-int helper<T : IThing>(T thing)
+public int helper<T : IThing>(T thing)
 {
 	return thing.getValue();
 }

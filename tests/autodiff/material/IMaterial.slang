@@ -2,9 +2,9 @@
 
 __exported import IMaterialInstance;
 
-interface IMaterial
+public interface IMaterial
 {
-    associatedtype MaterialInstance : IMaterialInstance;
+    public associatedtype MaterialInstance : IMaterialInstance;
 
-    MaterialInstance setupMaterialInstance();
+    public MaterialInstance setupMaterialInstance();
 }

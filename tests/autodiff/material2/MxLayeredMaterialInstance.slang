@@ -5,17 +5,17 @@ __exported import IBSDF;
 
 import MxWeights;
 
-struct MxLayeredMaterialInstance<
+public struct MxLayeredMaterialInstance<
     let TBsdfCount : int,
     let TLayerCount : int,
     TLayeredMaterialData : IMxLayeredMaterialData,
     TWeightsCalc : IMxLayeredWeightCalculator> : IMaterialInstance
 {
-    TLayeredMaterialData data;
-    TWeightsCalc calculator;
-    typealias Weights = MxWeights<TBsdfCount>;
+    public TLayeredMaterialData data;
+    public TWeightsCalc calculator;
+    public typealias Weights = MxWeights<TBsdfCount>;
 
-    Weights calculateWeights()
+    public Weights calculateWeights()
     {
         Weights result;
         calculator.calculateWeights<TBsdfCount, TLayerCount, TLayeredMaterialData>(data, result);
@@ -23,7 +23,7 @@ struct MxLayeredMaterialInstance<
     }
 
     [Differentiable]
-    float3 eval(const MaterialInstanceData miData, const float3 wi, const float3 wo)
+    public float3 eval(const MaterialInstanceData miData, const float3 wi, const float3 wo)
     {
         float3 albedo;
         for (uint i = 0; i < 3; i++) albedo[i] = miData.data[i];

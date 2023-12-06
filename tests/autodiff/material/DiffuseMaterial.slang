@@ -3,13 +3,13 @@
 __exported import IMaterial;
 __exported import DiffuseMaterialInstance;
 
-struct DiffuseMaterial : IMaterial
+public struct DiffuseMaterial : IMaterial
 {
-    float3 baseColor;
+    public float3 baseColor;
 
-    typedef DiffuseMaterialInstance MaterialInstance;
+    public typedef DiffuseMaterialInstance MaterialInstance;
 
-    DiffuseMaterialInstance setupMaterialInstance()
+    public DiffuseMaterialInstance setupMaterialInstance()
     {
         DiffuseMaterialInstance mi = { {baseColor} };
         return mi;

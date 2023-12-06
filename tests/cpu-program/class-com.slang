@@ -30,7 +30,7 @@ IFoo createFoo()
 [DllImport("", "createFoo")]
 IFoo createFooImported();
 
-public __extern_cpp int main()
+export __extern_cpp int main()
 {
     var obj = createFooImported();
     return obj.method();

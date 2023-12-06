@@ -298,7 +298,9 @@ namespace Slang
     {
         // Things at the global scope are always "members" of their module.
         //
-        if(as<ModuleDecl>(parentDecl))
+        if(as<NamespaceDeclBase>(parentDecl))
+            return false;
+        if (as<FileDecl>(parentDecl))
             return false;
 
         // Anything explicitly marked `static` and not at module scope
@@ -373,7 +375,7 @@ namespace Slang
         auto parentDecl = decl->parentDecl;
         if (auto genericDecl = as<GenericDecl>(parentDecl))
             parentDecl = genericDecl->parentDecl;
-        return as<NamespaceDeclBase>(parentDecl) != nullptr;
+        return as<NamespaceDeclBase>(parentDecl) != nullptr || as<FileDecl>(parentDecl) != nullptr;
     }
 
         /// Is `decl` a global shader parameter declaration?
@@ -385,7 +387,7 @@ namespace Slang
         // A global shader parameter must be declared at global or namespace
         // scope, so that it has a single definition across the module.
         //
-        if(!as<NamespaceDeclBase>(decl->parentDecl)) return false;
+        if(!isGlobalDecl(decl)) return false;
 
         // A global variable marked `static` indicates a traditional
         // global variable (albeit one that is implicitly local to
@@ -1375,6 +1377,24 @@ namespace Slang
         }
     }
 
+    void addVisibilityModifier(ASTBuilder* builder, Decl* decl, DeclVisibility vis)
+    {
+        switch (vis)
+        {
+        case DeclVisibility::Public:
+            addModifier(decl, builder->create<PublicModifier>());
+            break;
+        case DeclVisibility::Internal:
+            addModifier(decl, builder->create<InternalModifier>());
+            break;
+        case DeclVisibility::Private:
+            addModifier(decl, builder->create<PrivateModifier>());
+            break;
+        default:
+            break;
+        }
+    }
+
     bool SemanticsVisitor::trySynthesizeDifferentialAssociatedTypeRequirementWitness(
         ConformanceCheckingContext* context,
         DeclRef<AssocTypeDecl> requirementDeclRef,
@@ -1441,6 +1461,10 @@ namespace Slang
             diffField->checkState = DeclCheckState::SignatureChecked;
             diffField->parentDecl = aggTypeDecl;
             aggTypeDecl->members.add(diffField);
+
+            auto visibility = getDeclVisibility(member);
+            addVisibilityModifier(m_astBuilder, diffField, visibility);
+
             aggTypeDecl->invalidateMemberDictionary();
 
             // Inject a `DerivativeMember` modifier on the differential field to point to itself.
@@ -1545,6 +1569,15 @@ namespace Slang
         }
 
         addModifier(aggTypeDecl, m_astBuilder->create<SynthesizedModifier>());
+
+        // The visibility of synthesized decl should be the min of the parent decl and the requirement.
+        if (auto visModifier = requirementDeclRef.getDecl()->findModifier<VisibilityModifier>())
+        {
+            auto requirementVisibility = getDeclVisibility(requirementDeclRef.getDecl());
+            auto thisVisibility = getDeclVisibility(context->parentDecl);
+            auto visibility = Math::Min(thisVisibility, requirementVisibility);
+            addVisibilityModifier(m_astBuilder, aggTypeDecl, visibility);
+        }
 
         // Synthesize the rest of IDifferential method conformances by recursively checking
         // conformance on the synthesized decl.
@@ -2817,6 +2850,7 @@ namespace Slang
         {
             synFuncDecl->nameAndLoc.name = getSession()->getNameObj("$__syn_" + synFuncDecl->nameAndLoc.name->text);
         }
+
         // The result type of our synthesized method will be the expected
         // result type from the interface requirement.
         //
@@ -2939,6 +2973,14 @@ namespace Slang
             {
                 auto attr = m_astBuilder->create<BackwardDifferentiableAttribute>();
                 addModifier(synFuncDecl, attr);
+            }
+            // The visibility of synthesized decl should be the min of the parent decl and the requirement.
+            if (auto visModifier = requiredMemberDeclRef.getDecl()->findModifier<VisibilityModifier>())
+            {
+                auto requirementVisibility = getDeclVisibility(requiredMemberDeclRef.getDecl());
+                auto thisVisibility = getDeclVisibility(context->parentDecl);
+                auto visibility = Math::Min(thisVisibility, requirementVisibility);
+                addVisibilityModifier(m_astBuilder, synFuncDecl, visibility);
             }
         }
 
@@ -3477,6 +3519,15 @@ namespace Slang
         }
 
         synPropertyDecl->parentDecl = context->parentDecl;
+
+        // The visibility of synthesized decl should be the min of the parent decl and the requirement.
+        if (auto visModifier = requiredMemberDeclRef.getDecl()->findModifier<VisibilityModifier>())
+        {
+            auto requirementVisibility = getDeclVisibility(requiredMemberDeclRef.getDecl());
+            auto thisVisibility = getDeclVisibility(context->parentDecl);
+            auto visibility = Math::Min(thisVisibility, requirementVisibility);
+            addVisibilityModifier(m_astBuilder, synPropertyDecl, visibility);
+        }
 
         // Once our synthesized declaration is complete, we need
         // to install it as the witness that satifies the given
@@ -6788,10 +6839,13 @@ namespace Slang
         importedModulesList.add(moduleDecl);
         importedModulesSet.add(moduleDecl);
 
-        // Create a new sub-scope to wire the module's sibling scopes
+        // Create a new sub-scope to wire the module's scope and its nested FileDecl's scopes
         // into our lookup chain.
         for (auto moduleScope = moduleDecl->ownedScope; moduleScope; moduleScope = moduleScope->nextSibling)
         {
+            if (moduleScope->containerDecl != moduleDecl && moduleScope->containerDecl->parentDecl != moduleDecl)
+                continue;
+
             auto subScope = getASTBuilder()->create<Scope>();
             subScope->containerDecl = moduleScope->containerDecl;
 

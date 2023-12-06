@@ -430,7 +430,7 @@ namespace gfx_test
     {
         String importedContentsA = String(
             R"(
-            void processElement(RWStructuredBuffer<float> buffer, uint index)
+            public void processElement(RWStructuredBuffer<float> buffer, uint index)
             {
                 var input = buffer[index];
                 buffer[index] = input + 1.0f;
@@ -439,7 +439,7 @@ namespace gfx_test
 
         String importedContentsB = String(
             R"(
-            void processElement(RWStructuredBuffer<float> buffer, uint index)
+            public void processElement(RWStructuredBuffer<float> buffer, uint index)
             {
                 var input = buffer[index];
                 buffer[index] = input + 2.0f;
