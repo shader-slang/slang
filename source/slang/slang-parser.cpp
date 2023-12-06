@@ -105,6 +105,7 @@ namespace Slang
 
         Scope* outerScope = nullptr;
         Scope* currentScope = nullptr;
+        ModuleDecl* currentModule = nullptr;
 
         bool hasSeenCompletionToken = false;
 
@@ -153,12 +154,7 @@ namespace Slang
 
         ModuleDecl* getCurrentModuleDecl()
         {
-            for (auto scope = currentScope; scope; scope = scope->parent)
-            {
-                if (auto moduleDecl = as<ModuleDecl>(scope->containerDecl))
-                    return moduleDecl;
-            }
-            return nullptr;
+            return currentModule;
         }
 
         Parser(
@@ -1157,7 +1153,11 @@ namespace Slang
                         {
                             parsedModifier->loc = nameToken.loc;
                         }
-
+                        if (as<VisibilityModifier>(parsedModifier))
+                        {
+                            if (auto currentModule = parser->getCurrentModuleDecl())
+                                currentModule->isInLegacyLanguage = false;
+                        }
                         AddModifier(&modifierLink, parsedModifier);
                         continue;
                     }
@@ -1262,6 +1262,8 @@ namespace Slang
     {
         auto decl = parser->astBuilder->create<IncludeDecl>();
         parseFileReferenceDeclBase(parser, decl);
+        if (auto currentModule = parser->getCurrentModuleDecl())
+            currentModule->isInLegacyLanguage = false;
         return decl;
     }
 
@@ -1296,6 +1298,8 @@ namespace Slang
             decl->nameAndLoc.loc = parser->tokenReader.peekLoc();
         }
         parser->ReadToken(TokenType::Semicolon);
+        if (auto currentModule = parser->getCurrentModuleDecl())
+            currentModule->isInLegacyLanguage = false;
         return decl;
     }
 
@@ -4241,6 +4245,8 @@ namespace Slang
         {
             currentScope = outerScope;
         }
+
+        currentModule = getModuleDecl(program);
 
         PushScope(program);
 

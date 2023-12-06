@@ -841,8 +841,10 @@ namespace Slang
             else if (as<PrivateModifier>(modifier))
                 return DeclVisibility::Private;
         }
-        if (isFromStdLib(decl))
-            return DeclVisibility::Public;
+
+        if (auto parentModule = getModuleDecl(decl))
+            return parentModule->isInLegacyLanguage ? DeclVisibility::Public : DeclVisibility::Internal;
+
         return DeclVisibility::Default;
     }
 
