@@ -2,7 +2,7 @@
 
 #include "slang-compiler.h"
 #include "slang-visitor.h"
-
+#include "slang-ast-print.h"
 #include <typeinfo>
 #include <assert.h>
 
@@ -53,6 +53,13 @@ void printDiagnosticArg(StringBuilder& sb, QualType const& type)
         type.type->toText(sb);
     else
         sb << "<null>";
+}
+
+void printDiagnosticArg(StringBuilder& sb, QualifiedDeclPath path)
+{
+    ASTPrinter printer(getCurrentASTBuilder());
+    printer.addDeclPath(path.declRef);
+    sb << printer.getString();
 }
 
 SourceLoc getDiagnosticPos(SyntaxNode const* syntax)

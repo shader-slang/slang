@@ -1117,12 +1117,6 @@ SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModuleFromSource(
             if (SLANG_SUCCEEDED(Path::getCanonical(pathStr, cannonicalPath)))
             {
                 pathInfo = PathInfo::makeNormal(pathStr, cannonicalPath);
-                ComPtr<ISlangBlob> uniqueIdentity;
-                getFileSystemExt()->getFileUniqueIdentity(cannonicalPath.getBuffer(), uniqueIdentity.writeRef());
-                if (uniqueIdentity && uniqueIdentity->getBufferSize() != 0)
-                {
-                    pathInfo.uniqueIdentity = (char*)uniqueIdentity->getBufferPointer();
-                }
             }
         }
         auto module = loadModule(
