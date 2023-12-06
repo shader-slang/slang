@@ -342,7 +342,7 @@ struct ExtendedShaderObjectTypeList
     void add(const ExtendedShaderObjectType& component)
     {
         componentIDs.add(component.componentID);
-        components.add(slang::SpecializationArg{ slang::SpecializationArg::Kind::Type, component.slangType });
+        components.add(slang::SpecializationArg{ slang::SpecializationArg::Kind::Type, {component.slangType} });
     }
     void addRange(const ExtendedShaderObjectTypeList& list)
     {
