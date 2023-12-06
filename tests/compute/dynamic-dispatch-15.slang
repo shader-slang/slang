@@ -46,7 +46,7 @@ void computeMain(uint3       dispatchThreadID : SV_DispatchThreadID)
 }
 
 // Type must be marked `public` to ensure it is visible in the generated DLL.
-public struct FloatVal : IInterface
+export struct FloatVal : IInterface
 {
     float val;
     float run()
@@ -56,7 +56,7 @@ public struct FloatVal : IInterface
 };
 interface ISomething{void g();}
 struct Float4Struct : ISomething { float4 val; void g() {} }
-public struct Float4Val : IInterface
+export struct Float4Val : IInterface
 {
     Float4Struct val;
     float run()
@@ -64,7 +64,7 @@ public struct Float4Val : IInterface
         return val.val.x;
     }
 };
-public struct IntVal : IInterface
+export struct IntVal : IInterface
 {
     int val;
     float run()
@@ -72,7 +72,7 @@ public struct IntVal : IInterface
         return val;
     }
 };
-public struct Int4Val : IInterface
+export struct Int4Val : IInterface
 {
     int4 val;
     float run()

@@ -20,7 +20,7 @@ class MyClass : IFoo
 };
 
 [DllExport]
-IFoo createFoo()
+export IFoo createFoo()
 {
     IFoo result = new MyClass();
     return result;
@@ -30,7 +30,7 @@ IFoo createFoo()
 [DllImport("", "createFoo")]
 IFoo createFooImported();
 
-public __extern_cpp int main()
+export __extern_cpp int main()
 {
     var obj = createFooImported();
     return obj.method();

@@ -1,8 +1,8 @@
 //TEST_IGNORE_FILE:
 
-struct MaterialInstanceData : IDifferentiable
+public struct MaterialInstanceData : IDifferentiable
 {
-    float data[5];
+    public float data[5];
 }
 
 /*
@@ -13,8 +13,8 @@ struct MaterialInstanceSetupResult : IDifferentiable
 }
 */
 
-interface IMaterialInstance
+public interface IMaterialInstance
 {
     [BackwardDifferentiable]
-    float3 eval(const MaterialInstanceData miData, const float3 wi, const float3 wo);
+    public float3 eval(const MaterialInstanceData miData, const float3 wi, const float3 wo);
 }

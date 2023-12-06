@@ -46,10 +46,10 @@ void computeMain(int3       dispatchThreadID : SV_DispatchThreadID)
 }
 
 // Type must be marked `public` to ensure it is visible in the generated DLL.
-public struct MyImpl : IInterface
+export struct MyImpl : IInterface
 {
     int val;
-    public struct TAssoc : IAssoc
+    export struct TAssoc : IAssoc
     {
         int val;
         int eval() { return val; }
@@ -62,10 +62,10 @@ public struct MyImpl : IInterface
     }
 };
 
-public struct MyImpl2 : IInterface
+export struct MyImpl2 : IInterface
 {
     int val;
-    public struct TAssoc : IAssoc
+    export struct TAssoc : IAssoc
     {
         int val;
         int eval() { return val; }

@@ -2,12 +2,12 @@
 
 //TEST_IGNORE_FILE:
 
-interface IThing
+public interface IThing
 {
-	float getValue();
+	public float getValue();
 }
 
-extension float : IThing
+public extension float : IThing
 {
-	float getValue() { return this; }
+	public float getValue() { return this; }
 }

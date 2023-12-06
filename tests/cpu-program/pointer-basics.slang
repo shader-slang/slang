@@ -1,5 +1,5 @@
 //TEST:EXECUTABLE:
-public __extern_cpp int main()
+export __extern_cpp int main()
 {
     uint2 value;
     int *pValue = (int*)&value;

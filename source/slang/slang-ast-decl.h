@@ -426,6 +426,15 @@ class ModuleDecl : public NamespaceDeclBase
         ///
     OrderedDictionary<Decl*, RefPtr<DeclAssociationList>> mapDeclToAssociatedDecls;
 
+        /// Whether the module is defined in legacy language.
+        /// The legacy Slang language does not have visibility modifiers and everything is treated as
+        /// `public`. Newer version of the language introduces visibility and makes `internal` as the
+        /// default. To prevent this from breaking existing code, we need to know whether a module is
+        /// written in the legacy language. We detect this by checking whether the module has any
+        /// visibility modifiers, or if the module uses new language constructs, e.g. `module`, `__include`,
+        /// `__implementing` etc.
+    bool isInLegacyLanguage = true;
+
     SLANG_UNREFLECTED
 
         /// Map a type to the list of extensions of that type (if any) declared in this module

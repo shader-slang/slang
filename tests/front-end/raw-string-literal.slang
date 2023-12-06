@@ -17,7 +17,7 @@ void printLines(NativeString text)
     }
 }
 
-public __extern_cpp int main()
+export __extern_cpp int main()
 {
     printLines(
         R"(This is line 1.

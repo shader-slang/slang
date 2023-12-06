@@ -105,6 +105,7 @@ namespace Slang
 
         Scope* outerScope = nullptr;
         Scope* currentScope = nullptr;
+        ModuleDecl* currentModule = nullptr;
 
         bool hasSeenCompletionToken = false;
 
@@ -153,12 +154,7 @@ namespace Slang
 
         ModuleDecl* getCurrentModuleDecl()
         {
-            for (auto scope = currentScope; scope; scope = scope->parent)
-            {
-                if (auto moduleDecl = as<ModuleDecl>(scope->containerDecl))
-                    return moduleDecl;
-            }
-            return nullptr;
+            return currentModule;
         }
 
         Parser(
@@ -1157,7 +1153,11 @@ namespace Slang
                         {
                             parsedModifier->loc = nameToken.loc;
                         }
-
+                        if (as<VisibilityModifier>(parsedModifier))
+                        {
+                            if (auto currentModule = parser->getCurrentModuleDecl())
+                                currentModule->isInLegacyLanguage = false;
+                        }
                         AddModifier(&modifierLink, parsedModifier);
                         continue;
                     }
@@ -1262,6 +1262,8 @@ namespace Slang
     {
         auto decl = parser->astBuilder->create<IncludeDecl>();
         parseFileReferenceDeclBase(parser, decl);
+        if (auto currentModule = parser->getCurrentModuleDecl())
+            currentModule->isInLegacyLanguage = false;
         return decl;
     }
 
@@ -1296,6 +1298,8 @@ namespace Slang
             decl->nameAndLoc.loc = parser->tokenReader.peekLoc();
         }
         parser->ReadToken(TokenType::Semicolon);
+        if (auto currentModule = parser->getCurrentModuleDecl())
+            currentModule->isInLegacyLanguage = false;
         return decl;
     }
 
@@ -3063,6 +3067,9 @@ namespace Slang
         // The first is a type declaration that holds all the members, while
         // the second is a variable declaration that uses the buffer type.
         StructDecl* bufferDataTypeDecl = parser->astBuilder->create<StructDecl>();
+
+        addModifier(bufferDataTypeDecl, parser->astBuilder->create<PublicModifier>());
+
         VarDecl* bufferVarDecl = parser->astBuilder->create<VarDecl>();
 
         // Both declarations will have a location that points to the name
@@ -3646,6 +3653,7 @@ namespace Slang
 
             decl->nameAndLoc = declaratorInfo.nameAndLoc;
             decl->type = TypeExp(declaratorInfo.typeSpec);
+            decl->loc = decl->nameAndLoc.loc;
         }
 
         parseStorageDeclBody(parser, decl);
@@ -4237,6 +4245,8 @@ namespace Slang
         {
             currentScope = outerScope;
         }
+
+        currentModule = getModuleDecl(program);
 
         PushScope(program);
 
@@ -6997,7 +7007,7 @@ namespace Slang
         syntaxDecl->syntaxClass = syntaxClass;
         syntaxDecl->parseCallback = callback;
         syntaxDecl->parseUserData = userData;
-
+        addModifier(syntaxDecl, globalASTBuilder->create<PublicModifier>());
         AddMember(scope, syntaxDecl);
     }
 
@@ -7511,6 +7521,9 @@ namespace Slang
 
         _makeParseModifier("inline",        InlineModifier::kReflectClassInfo),
         _makeParseModifier("public",        PublicModifier::kReflectClassInfo),
+        _makeParseModifier("private",       PrivateModifier::kReflectClassInfo),
+        _makeParseModifier("internal",      InternalModifier::kReflectClassInfo),
+
         _makeParseModifier("require",       RequireModifier::kReflectClassInfo),
         _makeParseModifier("param",         ParamModifier::kReflectClassInfo),
         _makeParseModifier("extern",        ExternModifier::kReflectClassInfo),

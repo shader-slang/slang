@@ -3,20 +3,20 @@
 __exported import IMaterial;
 __exported import DiffuseMaterialInstance;
 
-struct DiffuseMaterial : IMaterial
+public struct DiffuseMaterial : IMaterial
 {
-    float3 baseColor;
+    public float3 baseColor;
 
-    typedef DiffuseMaterialInstance MaterialInstance;
+    public typedef DiffuseMaterialInstance MaterialInstance;
 
     [TreatAsDifferentiable]
-    float3 getAlbedo(float3 albedo)
+    public float3 getAlbedo(float3 albedo)
     {
         return albedo;
     }
 
     [BackwardDifferentiable]
-    DiffuseMaterialInstance setupMaterialInstance(out MaterialInstanceData miData)
+    public DiffuseMaterialInstance setupMaterialInstance(out MaterialInstanceData miData)
     {
         float3 albedo = getAlbedo(baseColor);
         DiffuseMaterialInstance mi = { baseColor };

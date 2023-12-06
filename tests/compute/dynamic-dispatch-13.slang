@@ -35,7 +35,7 @@ void computeMain(int3       dispatchThreadID : SV_DispatchThreadID)
 }
 
 // Type must be marked `public` to ensure it is visible in the generated DLL.
-public struct MyImpl : IInterface
+export struct MyImpl : IInterface
 {
     int val;
     int run(int input)
@@ -43,7 +43,7 @@ public struct MyImpl : IInterface
         return input + val;
     }
 };
-public struct MyImpl2 : IInterface
+export struct MyImpl2 : IInterface
 {
     int val;
     int run(int input)

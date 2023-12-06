@@ -1,14 +1,14 @@
 //TEST_IGNORE_FILE:
 
-struct A { int x; };
+public struct A { public int x; };
 
-struct B { float y; };
+public struct B { public float y; };
 
-struct CC { Texture2D t; SamplerState s; };
+public struct CC { public Texture2D t; public SamplerState s; };
 
-struct M
+public struct M
 {
-	A a;
-	B b;
-	CC c;
+    public A a;
+    public B b;
+    public CC c;
 };

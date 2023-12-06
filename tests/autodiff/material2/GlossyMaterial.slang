@@ -3,34 +3,34 @@
 __exported import IMaterial;
 __exported import GlossyMaterialInstance;
 
-struct GlossyMaterial : IMaterial
+public struct GlossyMaterial : IMaterial
 {
-    float3 baseColor;
+    public float3 baseColor;
 
-    typedef GlossyMaterialInstance MaterialInstance;
+    public typedef GlossyMaterialInstance MaterialInstance;
 
-    float3 getAlbedo(float3 albedo)
+    public float3 getAlbedo(float3 albedo)
     {
         return albedo;
     }
 
     [ForwardDerivativeOf(getAlbedo)]
     [TreatAsDifferentiable]
-    DifferentialPair<float3> __fwd_d_getAlbedo(DifferentialPair<float3> dpAlbedo)
+    public DifferentialPair<float3> __fwd_d_getAlbedo(DifferentialPair<float3> dpAlbedo)
     {
         return diffPair(dpAlbedo.p, float3(1.f));
     }
 
     [BackwardDerivativeOf(getAlbedo)]
     [TreatAsDifferentiable]
-    void __bwd_d_getAlbedo(inout DifferentialPair<float3> dpAlbedo, float3 dOut)
+    public void __bwd_d_getAlbedo(inout DifferentialPair<float3> dpAlbedo, float3 dOut)
     {
         [unroll]
         for (int j = 0; j < 3; j++) outputBuffer[j + 3] += dOut[j];
     }
 
     [BackwardDifferentiable]
-    GlossyMaterialInstance setupMaterialInstance(out MaterialInstanceData miData)
+    public GlossyMaterialInstance setupMaterialInstance(out MaterialInstanceData miData)
     {
         float3 albedo = getAlbedo(baseColor);
         GlossyMaterialInstance mi = { baseColor };

@@ -1412,13 +1412,12 @@ struct IRSpecializationState
     }
 };
 
-static bool _isPublicOrHLSLExported(IRInst* inst)
+static bool _isHLSLExported(IRInst* inst)
 {
     for (auto decoration : inst->getDecorations())
     {
         const auto op = decoration->getOp();
-        if (op == kIROp_PublicDecoration ||
-            op == kIROp_HLSLExportDecoration)
+        if (op == kIROp_HLSLExportDecoration)
         {
             return true;
         }
@@ -1582,8 +1581,8 @@ LinkedIR linkIR(
     {
         for (auto inst : irModule->getGlobalInsts())
         {
-            // Is it `public` or (HLSL) `export` clone
-            if (_isPublicOrHLSLExported(inst))
+            // Is it (HLSL) `export` clone
+            if (_isHLSLExported(inst))
             {
                 auto cloned = cloneValue(context, inst);
                 if (!cloned->findDecorationImpl(kIROp_KeepAliveDecoration))

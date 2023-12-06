@@ -3,23 +3,23 @@
 __exported import IMaterialInstance;
 __exported import IBSDF;
 
-struct DiffuseBSDF : IBSDF
+public struct DiffuseBSDF : IBSDF
 {
-    float3 albedo;
+    public float3 albedo;
 
     [TreatAsDifferentiable]
-    float3 eval(const float3 wiLocal, const float3 woLocal)
+    public float3 eval(const float3 wiLocal, const float3 woLocal)
     {
         return albedo;
     }
 };
 
-struct DiffuseMaterialInstance : IMaterialInstance
+public struct DiffuseMaterialInstance : IMaterialInstance
 {
-    DiffuseBSDF bsdf;
+    public DiffuseBSDF bsdf;
 
     [TreatAsDifferentiable]
-    float3 eval(const float3 wi, const float3 wo)
+    public float3 eval(const float3 wi, const float3 wo)
     {
         return bsdf.eval(wi, wo);
     }

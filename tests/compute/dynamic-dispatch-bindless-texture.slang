@@ -28,7 +28,7 @@ void computeMain(int3       dispatchThreadID : SV_DispatchThreadID)
 //TEST_INPUT: globalExistentialType __Dynamic
 
 // Type must be marked `public` to ensure it is visible in the generated DLL.
-public struct MyImpl : IInterface
+export struct MyImpl : IInterface
 {
     Texture2D tex;
     SamplerState sampler;

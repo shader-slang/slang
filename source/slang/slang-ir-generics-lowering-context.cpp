@@ -60,7 +60,7 @@ namespace Slang
             return result;
         IRBuilder builderStorage(module);
         auto builder = &builderStorage;
-        builder->setInsertBefore(typeInst->next);
+        builder->setInsertAfter(typeInst);
 
         result = builder->emitMakeRTTIObject(typeInst);
 
@@ -75,10 +75,11 @@ namespace Slang
             String rttiObjName = exportDecoration->getMangledName();
             builder->addExportDecoration(result, rttiObjName.getUnownedSlice());
         }
-        // Make sure the RTTI object for a public struct type has public visiblity.
-        if (typeInst->findDecoration<IRPublicDecoration>())
+
+        // Make sure the RTTI object for an exported struct type is marked as export if the type is.
+        if (typeInst->findDecoration<IRHLSLExportDecoration>())
         {
-            builder->addPublicDecoration(result);
+            builder->addHLSLExportDecoration(result);
             builder->addKeepAliveDecoration(result);
         }
         mapTypeToRTTIObject[typeInst] = result;

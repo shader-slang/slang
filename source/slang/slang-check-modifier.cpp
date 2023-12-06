@@ -950,7 +950,7 @@ namespace Slang
             {
                 if (auto parentExtension = as<ExtensionDecl>(varDecl->parentDecl))
                 {
-                    auto originalMemberLookup = lookUpMember(m_astBuilder, this, varDecl->getName(), parentExtension->targetType);
+                    auto originalMemberLookup = lookUpMember(m_astBuilder, this, varDecl->getName(), parentExtension->targetType, parentExtension->ownedScope);
                     LookupResult filteredResult;
                     for (auto item : originalMemberLookup.items)
                     {
@@ -1042,6 +1042,23 @@ namespace Slang
             }
         }
 
+        if (as<PrivateModifier>(m))
+        {
+            if (as<AggTypeDeclBase>(syntaxNode) || as<NamespaceDeclBase>(syntaxNode))
+            {
+                getSink()->diagnose(m, Diagnostics::invalidUseOfPrivateVisibility, as<Decl>(syntaxNode));
+            }
+            else if (auto decl = as<Decl>(syntaxNode))
+            {
+                // Interface requirements can't be private.
+                if (isInterfaceRequirement(decl))
+                {
+                    getSink()->diagnose(m, Diagnostics::invalidUseOfPrivateVisibility, as<Decl>(syntaxNode));
+                }
+            }
+        }
+
+
         // Default behavior is to leave things as they are,
         // and assume that modifiers are mostly already checked.
         //
@@ -1054,6 +1071,71 @@ namespace Slang
         return m;
     }
 
+    void SemanticsVisitor::checkVisibility(Decl* decl)
+    {
+        if (as<AccessorDecl>(decl))
+        {
+            return;
+        }
+        ShortList<Type*> typesToVerify;
+        if (auto varDecl = as<VarDeclBase>(decl))
+        {
+            typesToVerify.add(varDecl->type);
+        }
+        else if (auto callable = as<CallableDecl>(decl))
+        {
+            typesToVerify.add(callable->returnType);
+            typesToVerify.add(callable->errorType);
+            for (auto param : callable->getParameters())
+            {
+                typesToVerify.add(param->type);
+            }
+        }
+        else if (auto propertyDecl = as<PropertyDecl>(decl))
+        {
+            typesToVerify.add(propertyDecl->type);
+        }
+        else if (as<AggTypeDeclBase>(decl))
+        {
+        }
+        else if (auto typeDecl = as<TypeDefDecl>(decl))
+        {
+            typesToVerify.add(typeDecl->type);
+        }
+        else
+        {
+            return;
+        }
+        auto thisVisibility = getDeclVisibility(decl);
+
+        // First, we check that the decl's type does not have lower visibility.
+        for (auto type : typesToVerify)
+        {
+            if (!type)
+                continue;
+            DeclVisibility typeVisibility = getTypeVisibility(type);
+            if (typeVisibility < thisVisibility)
+            {
+                getSink()->diagnose(decl, Diagnostics::useOfLessVisibleType, decl, type);
+                break;
+            }
+        }
+
+        // Next, we check that the decl does not have higher visiblity than its parent.
+        Decl* parentDecl = decl;
+        for (; parentDecl; parentDecl = parentDecl->parentDecl)
+        {
+            if (as<AggTypeDeclBase>(parentDecl))
+                break;
+        }
+        if (!parentDecl)
+            return;
+        auto parentVisibility = getDeclVisibility(parentDecl);
+        if (thisVisibility > parentVisibility)
+        {
+            getSink()->diagnose(decl, Diagnostics::declCannotHaveHigherVisibility, decl, parentDecl);
+        }
+    }
 
     void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
     {

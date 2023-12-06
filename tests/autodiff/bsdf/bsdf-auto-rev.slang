@@ -1,4 +1,5 @@
 //TEST_IGNORE_FILE:
+implementing "bsdf-sample";
 
 struct ShadingData
 {

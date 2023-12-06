@@ -13,7 +13,7 @@ class MyClass
     }
 }
 
-public __extern_cpp int main()
+export __extern_cpp int main()
 {
     MyClass obj = new MyClass();
     return obj.method();

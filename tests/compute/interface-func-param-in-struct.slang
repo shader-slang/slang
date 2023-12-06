@@ -9,7 +9,7 @@ interface IInterface
     uint eval();
 }
 
-public struct Impl : IInterface
+export struct Impl : IInterface
 {
     uint val;
     uint eval()

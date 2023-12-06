@@ -26,7 +26,7 @@ __attributeTarget(FunctionDeclBase)
 attribute_syntax [NoDiffThis] : NoDiffThisAttribute;
 
 // A 'none-type' that acts as a run-time sentinel for zero differentials.
-public struct NullDifferential : IDifferentiable
+export struct NullDifferential : IDifferentiable
 { 
     // for now, we'll use at least one field to make sure the type is non-empty
     uint dummy;

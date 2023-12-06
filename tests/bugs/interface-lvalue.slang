@@ -23,7 +23,7 @@ void createFoo(out IFoo val)
     val = resuult;
 }
 
-public __extern_cpp int main()
+export __extern_cpp int main()
 {
     IFoo v;
     createFoo(v);

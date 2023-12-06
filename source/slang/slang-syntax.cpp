@@ -765,6 +765,17 @@ Module* getModule(Decl* decl)
     return moduleDecl->module;
 }
 
+ModuleDecl* getModuleDecl(Scope* scope)
+{
+    for (; scope; scope = scope->parent)
+    {
+        if (scope->containerDecl)
+            return getModuleDecl(scope->containerDecl);
+    }
+    return nullptr;
+
+}
+
 Decl* getParentDecl(Decl* decl)
 {
     decl = decl->parentDecl;

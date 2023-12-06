@@ -357,6 +357,13 @@ DIAGNOSTIC(30503, Error, primaryModuleFileCannotStartWithImplementingDecl, "a pr
 DIAGNOSTIC(30504, Warning, primaryModuleFileMustStartWithModuleDecl, "a primary source file for a module should start with 'module'.")
 DIAGNOSTIC(30505, Error, implementingMustReferencePrimaryModuleFile, "the source file referenced by 'implementing' must be a primary module file starting with a 'module' declaration.")
 
+// Visibilty
+DIAGNOSTIC(30600, Error, declIsNotVisible, "'$0' is not accessible from the current context.")
+DIAGNOSTIC(30601, Error, declCannotHaveHigherVisibility, "'$0' cannot have a higher visibility than '$1'.")
+DIAGNOSTIC(30602, Error, declCannotHaveLowerVisibility, "'$0' cannot have a lower visibility than '$1'.")
+DIAGNOSTIC(30603, Error, invalidUseOfPrivateVisibility, "'$0' cannot have private visibility.")
+DIAGNOSTIC(30604, Error, useOfLessVisibleType, "'$0' references less visible type '$1'.")
+
 // Attributes
 DIAGNOSTIC(31000, Error, unknownAttributeName, "unknown attribute '$0'")
 DIAGNOSTIC(31001, Error, attributeArgumentCountMismatch, "attribute '$0' expects $1 arguments ($2 provided)")
@@ -502,6 +509,8 @@ DIAGNOSTIC(39999, Error, ambiguousOverloadForNameWithArgs, "ambiguous call to '$
 DIAGNOSTIC(39999, Error, ambiguousOverloadWithArgs, "ambiguous call to overloaded operation with arguments of type $0")
 
 DIAGNOSTIC(39999, Note, overloadCandidate, "candidate: $0")
+DIAGNOSTIC(39999, Note, invisibleOverloadCandidate, "candidate (invisible): $0")
+
 DIAGNOSTIC(39999, Note, moreOverloadCandidates, "$0 more overload candidates")
 
 DIAGNOSTIC(39999, Error, caseOutsideSwitch, "'case' not allowed outside of a 'switch' statement")

@@ -2,4 +2,4 @@
 
 // This file defines the code that will be (transitively) imported into `import-exported.slang`
 
-float foo(float x) { return x; }
+public float foo(float x) { return x; }

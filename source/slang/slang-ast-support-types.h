@@ -1598,7 +1598,13 @@ namespace Slang
     /// Get the operator name from the higher order invoke expr.
     UnownedStringSlice getHigherOrderOperatorName(HigherOrderInvokeExpr* expr);
 
-
+    enum class DeclVisibility
+    {
+        Private,
+        Internal,
+        Public,
+        Default = Internal,
+    };
 } // namespace Slang
 
 #endif

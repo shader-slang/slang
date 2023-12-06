@@ -190,6 +190,33 @@ namespace Slang
         }
     }
 
+    bool SemanticsVisitor::TryCheckOverloadCandidateVisibility(OverloadResolveContext& context, OverloadCandidate const& candidate)
+    {
+        // Always succeeds when we are trying out constructors.
+        if (context.mode == OverloadResolveContext::Mode::JustTrying)
+        {
+            if (as<ConstructorDecl>(candidate.item.declRef))
+                return true;
+        }
+
+        if (!context.sourceScope)
+            return true;
+
+        if (!candidate.item.declRef)
+            return true;
+
+        if (!isDeclVisibleFromScope(candidate.item.declRef, context.sourceScope))
+        {
+            if (context.mode == OverloadResolveContext::Mode::ForReal)
+            {
+                getSink()->diagnose(context.loc, Diagnostics::declIsNotVisible, candidate.item.declRef);
+            }
+            return false;
+        }
+
+        return true;
+    }
+
     bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
         OverloadResolveContext&	context,
         OverloadCandidate&		candidate)
@@ -704,6 +731,10 @@ namespace Slang
         if (!TryCheckOverloadCandidateConstraints(context, candidate))
             return;
 
+        candidate.status = OverloadCandidate::Status::VisibilityChecked;
+        if (!TryCheckOverloadCandidateVisibility(context, candidate))
+            return;
+
         candidate.status = OverloadCandidate::Status::Applicable;
     }
 
@@ -775,6 +806,9 @@ namespace Slang
             goto error;
 
         if (!TryCheckOverloadCandidateConstraints(context, candidate))
+            goto error;
+
+        if (!TryCheckOverloadCandidateVisibility(context, candidate))
             goto error;
 
         {
@@ -887,7 +921,6 @@ namespace Slang
         }
         else
         {
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), context.loc, "no original expression for overload result");
             return nullptr;
         }
     }
@@ -1511,6 +1544,7 @@ namespace Slang
             this,
             getName("$init"),
             type,
+            context.sourceScope,
             LookupMask::Default,
             LookupOptions::NoDeref);
 
@@ -1885,7 +1919,7 @@ namespace Slang
         context.argCount = expr->arguments.getCount();
         context.args = expr->arguments.getBuffer();
         context.loc = expr->loc;
-
+        context.sourceScope = m_outerScope;
         context.baseExpr = GetBaseExpr(funcExpr);
 
         // TODO: We should have a special case here where an `InvokeExpr`
@@ -1975,26 +2009,16 @@ namespace Slang
                 Index candidateCount = context.bestCandidates.getCount();
                 Index maxCandidatesToPrint = 10; // don't show too many candidates at once...
                 Index candidateIndex = 0;
+                context.bestCandidates.sort([](const OverloadCandidate& c1, const OverloadCandidate& c2) { return c1.status < c2.status; });
+
                 for (auto candidate : context.bestCandidates)
                 {
                     String declString = ASTPrinter::getDeclSignatureString(candidate.item, m_astBuilder);
 
-//                        declString = declString + "[" + String(candidate.conversionCostSum) + "]";
-
-#if 0
-                    // Debugging: ensure that we don't consider multiple declarations of the same operation
-                    if (auto decl = as<CallableDecl>(candidate.item.declRef.decl))
-                    {
-                        char buffer[1024];
-                        sprintf_s(buffer, sizeof(buffer), "[this:%p, primary:%p, next:%p]",
-                            decl,
-                            decl->primaryDecl,
-                            decl->nextDecl);
-                        declString.append(buffer);
-                    }
-#endif
-
-                    getSink()->diagnose(candidate.item.declRef, Diagnostics::overloadCandidate, declString);
+                    if (candidate.status == OverloadCandidate::Status::VisibilityChecked)
+                        getSink()->diagnose(candidate.item.declRef, Diagnostics::invisibleOverloadCandidate, declString);
+                    else
+                        getSink()->diagnose(candidate.item.declRef, Diagnostics::overloadCandidate, declString);
 
                     candidateIndex++;
                     if (candidateIndex == maxCandidatesToPrint)
@@ -2126,7 +2150,7 @@ namespace Slang
         context.argCount = args.getCount();
         context.args = args.getBuffer();
         context.loc = genericAppExpr->loc;
-
+        context.sourceScope = m_outerScope;
         context.baseExpr = GetBaseExpr(baseExpr);
 
         AddGenericOverloadCandidates(baseExpr, context);
