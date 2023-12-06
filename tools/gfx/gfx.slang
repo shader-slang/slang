@@ -102,22 +102,22 @@ public enum class ShaderModuleSourceType
 
 public struct ShaderProgramDesc2
 {
-    ShaderModuleSourceType sourceType;
-    void *sourceData;
-    Size sourceDataSize;
+    public ShaderModuleSourceType sourceType;
+    public void *sourceData;
+    public Size sourceDataSize;
 
     // Number of entry points to include in the shader program. 0 means include all entry points
     // defined in the module.
-    GfxCount entryPointCount = 0;
+    public GfxCount entryPointCount = 0;
     // Names of entry points to include in the shader program. The size of the array must be
     // `entryPointCount`.
-    NativeString* entryPointNames = nullptr;
+    public NativeString* entryPointNames = nullptr;
 };
 
 [COM("9d32d0ad-915c-4ffd-91e2-508554a04a76")]
-interface IShaderProgram
+public interface IShaderProgram
 {
-    slang::TypeReflection* findTypeByName(NativeString name);
+    public slang::TypeReflection* findTypeByName(NativeString name);
 };
 
 public enum class Format
@@ -737,7 +737,7 @@ public struct ProceduralAABBDesc
 public struct GeometryDesc
 {
     public GeometryType type;
-    public GeometryFlags::public enum flags;
+    public GeometryFlags::Enum flags;
     public TriangleDesc triangles;
     public property ProceduralAABBDesc proceduralAABBs
     {
@@ -1255,12 +1255,12 @@ public enum class TargetStoreOp
 };
 public struct TargetAccessDesc
 {
-    public argetLoadOp loadOp;
-    public argetLoadOp stencilLoadOp;
-    public argetStoreOp storeOp;
-    public argetStoreOp stencilStoreOp;
-    public esourceState initialState;
-    public esourceState finalState;
+    public TargetLoadOp loadOp;
+    public TargetLoadOp stencilLoadOp;
+    public TargetStoreOp storeOp;
+    public TargetStoreOp stencilStoreOp;
+    public ResourceState initialState;
+    public ResourceState finalState;
 };
 public struct RenderPassLayoutDesc
 {
@@ -1559,7 +1559,7 @@ public enum class QueueType
 };
 public struct CommandQueueDesc
 {
-    QueueType type;
+    public QueueType type;
 };
 
 [COM("14e2bed0-0ad0-4dc8-b341-06-3f-e7-2d-bf-0e")]

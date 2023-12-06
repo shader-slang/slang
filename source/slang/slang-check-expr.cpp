@@ -821,6 +821,25 @@ namespace Slang
         }
         if (auto genericDecl = as<GenericDecl>(decl))
             decl = genericDecl->inner;
+        for (; decl; decl = getParentDecl(decl))
+        {
+            if (as<AccessorDecl>(decl))
+                continue;
+            if (as<AggTypeDeclBase>(decl))
+                break;
+            if (as<NamespaceDeclBase>(decl))
+                break;
+            if (as<CallableDecl>(decl))
+                break;
+            if (as<VarDeclBase>(decl))
+                break;
+            if (as<SimpleTypeDecl>(decl))
+                break;
+            if (as<PropertyDecl>(decl))
+                break;
+        }
+        if (!decl)
+            return DeclVisibility::Public;
 
         for (auto modifier : decl->modifiers)
         {

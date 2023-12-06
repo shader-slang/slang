@@ -20,7 +20,7 @@ class MyClass : IFoo
 };
 
 [DllExport]
-IFoo createFoo()
+export IFoo createFoo()
 {
     IFoo result = new MyClass();
     return result;

@@ -1930,6 +1930,7 @@ namespace Slang
             DeclCheckState::ModifiersChecked,
             DeclCheckState::ReadyForReference,
             DeclCheckState::ReadyForLookup,
+            DeclCheckState::ReadyForConformances,
             DeclCheckState::Checked
         };
         for(auto s : states)

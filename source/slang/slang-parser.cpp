@@ -7001,7 +7001,7 @@ namespace Slang
         syntaxDecl->syntaxClass = syntaxClass;
         syntaxDecl->parseCallback = callback;
         syntaxDecl->parseUserData = userData;
-
+        addModifier(syntaxDecl, globalASTBuilder->create<PublicModifier>());
         AddMember(scope, syntaxDecl);
     }
 
