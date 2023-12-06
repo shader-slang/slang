@@ -298,7 +298,7 @@ SlangResult CompletionContext::tryCompleteImport()
     Index pos = -1;
     for (auto prefix : prefixes)
     {
-        static auto importStr = UnownedStringSlice(prefix);
+        auto importStr = UnownedStringSlice(prefix);
         lineContent = doc->getLine(line);
         pos = lineContent.indexOf(importStr);
         if (pos == -1)

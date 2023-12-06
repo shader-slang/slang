@@ -34,7 +34,7 @@ void computeMain(uint3       dispatchThreadID : SV_DispatchThreadID)
 
 // No type input for dynamic dispatch //TEST_INPUT: globalExistentialType MyImpl
 // Type must be marked `public` to ensure it is visible in the generated DLL.
-public struct MyImpl : IInterface
+export struct MyImpl : IInterface
 {
     int val;
     int run(int input)

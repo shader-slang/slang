@@ -4122,8 +4122,8 @@ void CLikeSourceEmitter::computeEmitActions(IRModule* module, List<EmitAction>& 
     {
         if( as<IRType>(inst) )
         {
-            // Don't emit a type unless it is actually used or is marked public.
-            if (!inst->findDecoration<IRPublicDecoration>())
+            // Don't emit a type unless it is actually used or is marked exported.
+            if (!inst->findDecoration<IRHLSLExportDecoration>())
                 continue;
         }
 

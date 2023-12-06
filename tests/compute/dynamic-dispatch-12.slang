@@ -37,10 +37,10 @@ void computeMain(uint3       dispatchThreadID : SV_DispatchThreadID)
 }
 
 // Specialize gCb1, but not gCb2
-//TEST_INPUT: globalExistentialType MyImpl
-//TEST_INPUT: globalExistentialType __Dynamic
+// TEST_INPUT: globalExistentialType MyImpl
+// TEST_INPUT: globalExistentialType __Dynamic
 // Type must be marked `public` to ensure it is visible in the generated DLL.
-public struct MyImpl : IInterface
+export struct MyImpl : IInterface
 {
     int val;
     int run(int input)

@@ -27,6 +27,7 @@ LookupResult lookUpMember(
     SemanticsVisitor*   semantics,
     Name*               name,
     Type*               type,
+    Scope*              sourceScope,
     LookupMask          mask = LookupMask::Default,
     LookupOptions       options = LookupOptions::None);
 
@@ -58,7 +59,9 @@ QualType getTypeForDeclRef(
 void AddToLookupResult(
     LookupResult&		result,
     LookupResultItem	item);
-
+void AddToLookupResult(
+    LookupResult& result,
+    const LookupResult& items);
 }
 
 #endif

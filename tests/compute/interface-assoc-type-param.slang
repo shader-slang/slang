@@ -16,7 +16,7 @@ interface IEval
     uint eval();
 }
 
-public struct Impl : IInterface
+export struct Impl : IInterface
 {
     uint val;
     struct TEval : IEval

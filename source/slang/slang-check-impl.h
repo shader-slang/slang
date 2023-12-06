@@ -217,6 +217,7 @@ namespace Slang
             FixityChecked,
             TypeChecked,
             DirectionChecked,
+            VisibilityChecked,
             Applicable,
         };
         Status status = Status::Unchecked;
@@ -773,6 +774,8 @@ namespace Slang
     struct SemanticsContext
     {
     public:
+        friend struct OuterScopeContextRAII;
+
         explicit SemanticsContext(
             SharedSemanticsContext* shared)
             : m_shared(shared)
@@ -804,6 +807,8 @@ namespace Slang
             result.m_parentFunc = parentFunc;
             result.m_outerStmts = nullptr;
             result.m_parentDifferentiableAttr = parentFunc->findModifier<DifferentiableAttribute>();
+            if (parentFunc->ownedScope)
+                result.m_outerScope = parentFunc->ownedScope;
             return result;
         }
 
@@ -868,11 +873,19 @@ namespace Slang
         };
 
         ExprLocalScope* getExprLocalScope() { return m_exprLocalScope; }
+        Scope* getOuterScope() { return m_outerScope; }
 
         SemanticsContext withExprLocalScope(ExprLocalScope* exprLocalScope)
         {
             SemanticsContext result(*this);
             result.m_exprLocalScope = exprLocalScope;
+            return result;
+        }
+
+        SemanticsContext withOuterScope(Scope* scope)
+        {
+            SemanticsContext result(*this);
+            result.m_outerScope = scope;
             return result;
         }
 
@@ -921,7 +934,30 @@ namespace Slang
         TreatAsDifferentiableExpr* m_treatAsDifferentiableExpr = nullptr;
 
         ASTBuilder* m_astBuilder = nullptr;
+
+        Scope* m_outerScope = nullptr;
     };
+
+    struct OuterScopeContextRAII
+    {
+        SemanticsContext* m_context;
+        Scope* m_oldOuterScope;
+
+        OuterScopeContextRAII(SemanticsContext* context, Scope* outerScope)
+            : m_context(context)
+            , m_oldOuterScope(context->getOuterScope())
+        {
+            context->m_outerScope = outerScope;
+        }
+
+        ~OuterScopeContextRAII()
+        {
+            m_context->m_outerScope = m_oldOuterScope;
+        }
+    };
+
+#define SLANG_OUTER_SCOPE_CONTEXT_RAII(context, scope) OuterScopeContextRAII _outerScopeContextRAII(context, scope)
+#define SLANG_OUTER_SCOPE_CONTEXT_DECL_RAII(context, decl) OuterScopeContextRAII _outerScopeContextRAII(context, decl->ownedScope?decl->ownedScope:context->getOuterScope())
 
     struct SemanticsVisitor : public SemanticsContext
     {
@@ -1010,6 +1046,8 @@ namespace Slang
             /// If `expr` has Ref<T> Type, convert it into an l-value expr that has T type.
         Expr* maybeOpenRef(Expr* expr);
 
+        Scope* getScope(SyntaxNode* node);
+
         void diagnoseDeprecatedDeclRefUsage(DeclRef<Decl> declRef, SourceLoc loc, Expr* originalExpr);
 
         DeclRef<Decl> getDefaultDeclRef(Decl* decl)
@@ -1056,6 +1094,11 @@ namespace Slang
             SourceLoc loc,
             Expr*    originalExpr);
 
+        DeclVisibility getDeclVisibility(Decl* decl);
+        DeclVisibility getTypeVisibility(Type* type);
+        bool isDeclVisibleFromScope(DeclRef<Decl> declRef, Scope* scope);
+        LookupResult filterLookupResultByVisibility(const LookupResult& lookupResult);
+        LookupResult filterLookupResultByVisibilityAndDiagnose(const LookupResult& lookupResult, SourceLoc loc, bool& outDiagnosed);
 
         Val* resolveVal(Val* val)
         {
@@ -1444,6 +1487,7 @@ namespace Slang
             ModifiableSyntaxNode*   syntaxNode);
 
         void checkModifiers(ModifiableSyntaxNode* syntaxNode);
+        void checkVisibility(Decl* decl);
 
         bool doesSignatureMatchRequirement(
             DeclRef<CallableDecl>   satisfyingMemberDeclRef,
@@ -1985,6 +2029,9 @@ namespace Slang
             // Source location of the "function" part of the expression, if any
             SourceLoc       funcLoc;
 
+            // The source scope of the lookup for performing visibiliity tests.
+            Scope* sourceScope = nullptr;
+
             // The original arguments to the call
             Index argCount = 0;
             Expr** args = nullptr;
@@ -2047,6 +2094,10 @@ namespace Slang
         bool TryCheckOverloadCandidateFixity(
             OverloadResolveContext&		context,
             OverloadCandidate const&	candidate);
+
+        bool TryCheckOverloadCandidateVisibility(
+            OverloadResolveContext& context,
+            OverloadCandidate const& candidate);
 
         bool TryCheckGenericOverloadCandidateTypes(
             OverloadResolveContext&	context,
@@ -2371,7 +2422,8 @@ namespace Slang
 
         Expr* lookupMemberResultFailure(
             DeclRefExpr*     expr,
-            QualType const& baseType);
+            QualType const& baseType,
+            bool supressDiagnostic = false);
 
         SharedSemanticsContext& operator=(const SharedSemanticsContext &) = delete;
 

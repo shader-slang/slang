@@ -1327,7 +1327,6 @@ static void addLinkageDecoration(
         if (as<PublicModifier>(modifier))
         {
             builder->addPublicDecoration(inst);
-            builder->addKeepAliveDecoration(inst);
         }
         else if (as<HLSLExportModifier>(modifier))
         {
@@ -1349,43 +1348,50 @@ static void addLinkageDecoration(
         else if (as<DllExportAttribute>(modifier))
         {
             builder->addDllExportDecoration(inst, decl->getName()->text.getUnownedSlice());
-            builder->addPublicDecoration(inst);
+            builder->addHLSLExportDecoration(inst);
+            builder->addKeepAliveDecoration(inst);
         }
         else if (as<CudaDeviceExportAttribute>(modifier))
         {
             builder->addCudaDeviceExportDecoration(inst, decl->getName()->text.getUnownedSlice());
-            builder->addPublicDecoration(inst);
+            builder->addHLSLExportDecoration(inst);
             builder->addExternCppDecoration(inst, decl->getName()->text.getUnownedSlice());
+            builder->addKeepAliveDecoration(inst);
         }
         else if (as<CudaHostAttribute>(modifier))
         {
             builder->addCudaHostDecoration(inst);
             builder->addExternCppDecoration(inst, decl->getName()->text.getUnownedSlice());
+            builder->addKeepAliveDecoration(inst);
         }
         else if (as<CudaKernelAttribute>(modifier))
         {
             builder->addCudaKernelDecoration(inst);
             builder->addExternCppDecoration(inst, decl->getName()->text.getUnownedSlice());
-            builder->addPublicDecoration(inst);
+            builder->addHLSLExportDecoration(inst);
             builder->addKeepAliveDecoration(inst);
         }
         else if (as<TorchEntryPointAttribute>(modifier))
         {
             builder->addTorchEntryPointDecoration(inst, decl->getName()->text.getUnownedSlice());
             builder->addCudaHostDecoration(inst);
-            builder->addPublicDecoration(inst);
+            builder->addHLSLExportDecoration(inst);
+            builder->addKeepAliveDecoration(inst);
             builder->addExternCppDecoration(inst, decl->getName()->text.getUnownedSlice());
         }
         else if (as<AutoPyBindCudaAttribute>(modifier))
         {
             builder->addAutoPyBindCudaDecoration(inst, decl->getName()->text.getUnownedSlice());
             builder->addAutoPyBindExportInfoDecoration(inst);
+            builder->addKeepAliveDecoration(inst);
+            builder->addHLSLExportDecoration(inst);
         }
         else if (auto pyExportModifier = as<PyExportAttribute>(modifier))
         {
             builder->addPyExportDecoration(inst, pyExportModifier->name.getLength()
                 ? pyExportModifier->name.getUnownedSlice()
                 : decl->getName()->text.getUnownedSlice());
+            builder->addHLSLExportDecoration(inst);
         }
         else if (auto knownBuiltinModifier = as<KnownBuiltinAttribute>(modifier))
         {
@@ -7012,15 +7018,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return LoweredValInfo::simple(inst);
     }
 
-    bool isPublicType(Type* type)
+    bool isExportedType(Type* type)
     {
-        // TODO(JS):
-        // Not clear how should handle HLSLExportModifier here. 
-        // In the HLSL spec 'export' is only applicable to functions. So for now we ignore.
-
         if (auto declRefType = as<DeclRefType>(type))
         {
-            if (declRefType->getDeclRef().getDecl()->findModifier<PublicModifier>())
+            if (declRefType->getDeclRef().getDecl()->findModifier<HLSLExportModifier>())
                 return true;
         }
         return false;
@@ -7077,9 +7079,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                             astReqWitnessTable->witnessedType,
                             astReqWitnessTable->baseType);
                         subBuilder->addExportDecoration(irSatisfyingWitnessTable, mangledName.getUnownedSlice());
-                        if (isPublicType(astReqWitnessTable->witnessedType))
+                        if (isExportedType(astReqWitnessTable->witnessedType))
                         {
-                            subBuilder->addPublicDecoration(irSatisfyingWitnessTable);
+                            subBuilder->addHLSLExportDecoration(irSatisfyingWitnessTable);
                             subBuilder->addKeepAliveDecoration(irSatisfyingWitnessTable);
                         }
 
@@ -7219,16 +7221,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             subBuilder->addPublicDecoration(irWitnessTable);
         }
 
-        // TODO(JS):
-        // Not clear what to do here around HLSLExportModifier. 
-        // In HLSL it only (currently) applies to functions, so perhaps do nothing is reasonable.
-        
-        if (parentDecl->findModifier<PublicModifier>())
+        if (parentDecl->findModifier<HLSLExportModifier>())
         {
-            subBuilder->addPublicDecoration(irWitnessTable);
+            subBuilder->addHLSLExportDecoration(irWitnessTable);
             subBuilder->addKeepAliveDecoration(irWitnessTable);
         }
-
 
         // Make sure that all the entries in the witness table have been filled in,
         // including any cases where there are sub-witness-tables for conformances
@@ -10607,7 +10604,9 @@ struct TypeConformanceIRGenContext
         context->irBuilder = builder;
 
         auto witness = lowerSimpleVal(context, typeConformance->getSubtypeWitness());
-        builder->addPublicDecoration(witness);
+        builder->addKeepAliveDecoration(witness);
+        builder->addHLSLExportDecoration(witness);
+
         if (conformanceIdOverride != -1)
         {
             builder->addSequentialIDDecoration(witness, conformanceIdOverride);

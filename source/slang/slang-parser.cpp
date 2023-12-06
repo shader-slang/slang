@@ -3646,6 +3646,7 @@ namespace Slang
 
             decl->nameAndLoc = declaratorInfo.nameAndLoc;
             decl->type = TypeExp(declaratorInfo.typeSpec);
+            decl->loc = decl->nameAndLoc.loc;
         }
 
         parseStorageDeclBody(parser, decl);
@@ -7511,6 +7512,9 @@ namespace Slang
 
         _makeParseModifier("inline",        InlineModifier::kReflectClassInfo),
         _makeParseModifier("public",        PublicModifier::kReflectClassInfo),
+        _makeParseModifier("private",       PrivateModifier::kReflectClassInfo),
+        _makeParseModifier("internal",      InternalModifier::kReflectClassInfo),
+
         _makeParseModifier("require",       RequireModifier::kReflectClassInfo),
         _makeParseModifier("param",         ParamModifier::kReflectClassInfo),
         _makeParseModifier("extern",        ExternModifier::kReflectClassInfo),

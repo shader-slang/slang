@@ -98,6 +98,19 @@ void AddToLookupResult(
     }
 }
 
+void AddToLookupResult(LookupResult& result, const LookupResult& items)
+{
+    if (items.isOverloaded())
+    {
+        for (auto item : items.items)
+            AddToLookupResult(result, item);
+    }
+    else if (items.isValid())
+    {
+        AddToLookupResult(result, items.item);
+    }
+}
+
 LookupResult refineLookup(LookupResult const& inResult, LookupMask mask)
 {
     if (!inResult.isValid()) return inResult;
@@ -894,11 +907,12 @@ LookupResult lookUpMember(
     SemanticsVisitor*   semantics,
     Name*               name,
     Type*               type,
+    Scope*              sourceScope,
     LookupMask          mask,
     LookupOptions       options)
 {
     LookupResult result;
-    LookupRequest request = initLookupRequest(semantics, name, mask, options, nullptr);
+    LookupRequest request = initLookupRequest(semantics, name, mask, options, sourceScope);
     _lookUpMembersInType(astBuilder, name, type, request, result, nullptr);
     return result;
 }

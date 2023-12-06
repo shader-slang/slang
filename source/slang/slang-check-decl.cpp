@@ -733,6 +733,7 @@ namespace Slang
         // The coding of this loop is somewhat defensive to deal
         // with special cases that will be described along the way.
         //
+        auto outerScope = getScope(decl);
         for(;;)
         {
             // The first thing is to check what state the decl is
@@ -757,6 +758,8 @@ namespace Slang
             // cannot affect the state in which the declaration is *checked*.
             //
             SemanticsContext subContext = baseContext ? SemanticsContext(*baseContext) : SemanticsContext(getShared());
+            if (outerScope)
+                subContext = subContext.withOuterScope(outerScope);
             _dispatchDeclCheckingVisitor(decl, nextState, subContext);
 
             // In the common case, the visitor will have done the necessary
@@ -1245,6 +1248,8 @@ namespace Slang
                 }
             }
         }
+
+        checkVisibility(varDecl);
     }
 
     void SemanticsDeclHeaderVisitor::visitStructDecl(StructDecl* structDecl)
@@ -1261,11 +1266,12 @@ namespace Slang
         {
             addModifier(structDecl, m_astBuilder->create<NVAPIMagicModifier>());
         }
+        checkVisibility(structDecl);
     }
 
     void SemanticsDeclHeaderVisitor::visitClassDecl(ClassDecl* classDecl)
     {
-        SLANG_UNUSED(classDecl);
+        checkVisibility(classDecl);
     }
 
     void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
@@ -1313,6 +1319,7 @@ namespace Slang
             OverloadResolveContext overloadContext;
             overloadContext.loc = varDecl->nameAndLoc.loc;
             overloadContext.mode = OverloadResolveContext::Mode::JustTrying;
+            overloadContext.sourceScope = m_outerScope;
             AddTypeOverloadCandidates(type, overloadContext);
 
             if(overloadContext.bestCandidates.getCount() != 0)
@@ -3969,7 +3976,7 @@ namespace Slang
         // requests will be handled further down. For now we include
         // lookup results that might be usable, but not as-is.
         //
-        auto lookupResult = lookUpMember(m_astBuilder, this, name, subType, LookupMask::Default, LookupOptions::IgnoreBaseInterfaces);
+        auto lookupResult = lookUpMember(m_astBuilder, this, name, subType, nullptr, LookupMask::Default, LookupOptions::IgnoreBaseInterfaces);
 
         if(!lookupResult.isValid())
         {
@@ -4502,6 +4509,8 @@ namespace Slang
 
     void SemanticsDeclBasesVisitor::visitInterfaceDecl(InterfaceDecl* decl)
     {
+        SLANG_OUTER_SCOPE_CONTEXT_DECL_RAII(this, decl);
+        checkVisibility(decl);
         for( auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>() )
         {
             ensureDecl(inheritanceDecl, DeclCheckState::CanUseBaseOfInheritanceDecl);
@@ -4567,6 +4576,8 @@ namespace Slang
         // Furthermore, only the first inheritance clause (in source
         // order) is allowed to declare a base `struct` type.
         //
+        SLANG_OUTER_SCOPE_CONTEXT_DECL_RAII(this, decl);
+
         Index inheritanceClauseCounter = 0;
         for( auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>() )
         {
@@ -4636,6 +4647,7 @@ namespace Slang
         // Furthermore, only the first inheritance clause (in source
         // order) is allowed to declare a base `class` type.
         //
+        SLANG_OUTER_SCOPE_CONTEXT_DECL_RAII(this, decl);
         Index inheritanceClauseCounter = 0;
         for (auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
         {
@@ -4768,6 +4780,9 @@ namespace Slang
 
     void SemanticsDeclBasesVisitor::visitEnumDecl(EnumDecl* decl)
     {
+        SLANG_OUTER_SCOPE_CONTEXT_DECL_RAII(this, decl);
+        checkVisibility(decl);
+
         // An `enum` type can inherit from interfaces, and also
         // from a single "tag" type that must:
         //
@@ -4775,7 +4790,6 @@ namespace Slang
         // * come first in the list of base types
         //
         Index inheritanceClauseCounter = 0;
-
         Type* tagType = nullptr;
         InheritanceDecl* tagTypeInheritanceDecl = nullptr;
         for(auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
@@ -4938,6 +4952,8 @@ namespace Slang
 
     void SemanticsDeclBodyVisitor::visitEnumDecl(EnumDecl* decl)
     {
+        SLANG_OUTER_SCOPE_CONTEXT_DECL_RAII(this, decl);
+
         auto enumType = DeclRefType::create(m_astBuilder, makeDeclRef(decl));
 
         auto tagType = decl->tagType;
@@ -5063,6 +5079,7 @@ namespace Slang
     void SemanticsDeclHeaderVisitor::visitTypeDefDecl(TypeDefDecl* decl)
     {
         decl->type = CheckProperType(decl->type);
+        checkVisibility(decl);
     }
 
     void SemanticsDeclHeaderVisitor::visitGlobalGenericParamDecl(GlobalGenericParamDecl* decl)
@@ -5079,6 +5096,7 @@ namespace Slang
         auto interfaceDecl = as<InterfaceDecl>(decl->parentDecl);
         if (!interfaceDecl)
             getSink()->diagnose(decl, Slang::Diagnostics::assocTypeInInterfaceOnly);
+        checkVisibility(decl);
     }
 
     void SemanticsDeclBodyVisitor::visitFunctionDeclBase(FunctionDeclBase* decl)
@@ -6154,6 +6172,7 @@ namespace Slang
                 }
             }
         }
+        checkVisibility(decl);
     }
 
     void SemanticsDeclHeaderVisitor::visitFuncDecl(FuncDecl* funcDecl)
@@ -6464,6 +6483,7 @@ namespace Slang
     {
         decl->type = CheckUsableType(decl->type);
         visitAbstractStorageDeclCommon(decl);
+        checkVisibility(decl);
     }
 
     Type* SemanticsDeclHeaderVisitor::_getAccessorStorageType(AccessorDecl* decl)
@@ -6768,13 +6788,16 @@ namespace Slang
         importedModulesList.add(moduleDecl);
         importedModulesSet.add(moduleDecl);
 
-        // Create a new sub-scope to wire the module
+        // Create a new sub-scope to wire the module's sibling scopes
         // into our lookup chain.
-        auto subScope = getASTBuilder()->create<Scope>();
-        subScope->containerDecl = moduleDecl;
+        for (auto moduleScope = moduleDecl->ownedScope; moduleScope; moduleScope = moduleScope->nextSibling)
+        {
+            auto subScope = getASTBuilder()->create<Scope>();
+            subScope->containerDecl = moduleScope->containerDecl;
 
-        subScope->nextSibling = scope->nextSibling;
-        scope->nextSibling = subScope;
+            subScope->nextSibling = scope->nextSibling;
+            scope->nextSibling = subScope;
+        }
 
         // Also import any modules from nested `import` declarations
         // with the `__exported` modifier
