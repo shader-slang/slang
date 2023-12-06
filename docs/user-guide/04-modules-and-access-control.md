@@ -1,4 +1,3 @@
-
 ---
 layout: user-guide
 ---
