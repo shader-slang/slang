@@ -153,7 +153,7 @@ print(output_grad)
 
 `slangpy` also binds the forward-mode version of your kernel (propagate derivatives of inputs to the output) which can be invoked the same way using `module.square.fwd()`
 
-You can refer to [this documentation](07-autodiff.md) for a detailed reference of Slang's automatic differentiation feature.
+You can refer to [this documentation](08-autodiff.md) for a detailed reference of Slang's automatic differentiation feature.
 
 ### Wrapping your kernels as pytorch functions
 
@@ -452,7 +452,7 @@ in the `inputGradToPropagateTo` tensor. Therefore, after running `boxFilter_bwd`
 back propagated derivative values.
 
 Again, to understand all the details of the automatic differentiation system, please refer to the 
-[Automatic Differentiation](07-autodiff.md) chapter for a detailed explanation.
+[Automatic Differentiation](08-autodiff.md) chapter for a detailed explanation.
 
 ## Manually binding kernels
 `[AutoPyBindCUDA]` works for most use cases, but in certain situations, it may be necessary to write the *host* function by hand. The host function can also be written in Slang, and `slangpy` handles its compilation to C++.
