@@ -1792,6 +1792,8 @@ standardProject("miniz", nil)
         "external/miniz/miniz_zip.c"
     }
 
+    io.writefile("external/miniz/miniz_export.h", "#define MINIZ_EXPORT")
+
     filter { "system:linux" }
         defines { "_LARGEFILE64_SOURCE" }
 

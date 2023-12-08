@@ -22,6 +22,7 @@
 [submodule "external/miniz"]
 	path = external/miniz
 	url = https://github.com/richgel999/miniz
+  ignore = untracked
 [submodule "external/lz4"]
 	path = external/lz4
 	url = https://github.com/lz4/lz4
