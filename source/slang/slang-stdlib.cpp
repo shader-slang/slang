@@ -284,6 +284,7 @@ namespace Slang
     };
 
     // Integer types that can be used in atomic operations in CUDA.
+    [[maybe_unused]]
     static const char* kCudaAtomicIntegerTypes[] = { "int", "uint", "uint64_t", "int64_t" };
 
     // Both the following functions use these macros.
@@ -315,7 +316,6 @@ namespace Slang
             const String path = getStdlibPath();
             StringBuilder sb;
             #include "hlsl.meta.slang.h"
-            File::writeAllText("d:\\stdlib1.txt", sb.toString());
             hlslLibraryCode = StringBlob::moveCreate(sb);
         }
 #endif
