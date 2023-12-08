@@ -1,5 +1,7 @@
 # Building Slang From Source
 
+We support building with both Premake and CMake. Both systems are described below.
+
 # Building Slang with Premake
 
 ## Windows Using Visual Studio
