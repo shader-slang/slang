@@ -1,12 +1,12 @@
 #include <cstdio>
 
-#include "source/core/slang-dictionary.h"
-#include "source/core/slang-io.h"
-#include "source/compiler-core/slang-diagnostic-sink.h"
-#include "source/compiler-core/slang-perfect-hash.h"
-#include "source/core/slang-writer.h"
-#include "source/compiler-core/slang-spirv-core-grammar.h"
-#include "source/compiler-core/slang-lexer.h"
+#include "../../source/core/slang-dictionary.h"
+#include "../../source/core/slang-io.h"
+#include "../../source/core/slang-writer.h"
+#include "../../source/compiler-core/slang-diagnostic-sink.h"
+#include "../../source/compiler-core/slang-perfect-hash.h"
+#include "../../source/compiler-core/slang-spirv-core-grammar.h"
+#include "../../source/compiler-core/slang-lexer.h"
 
 using namespace Slang;
 

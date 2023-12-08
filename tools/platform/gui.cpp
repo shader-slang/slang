@@ -3,7 +3,7 @@
 
 #ifdef _WIN32
 #include <windows.h>
-#include "external/imgui/examples/imgui_impl_win32.h"
+#include <examples/imgui_impl_win32.h>
 IMGUI_IMPL_API LRESULT  ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 #endif
 
@@ -350,12 +350,13 @@ GUI::~GUI()
 
 } // gfx
 
-#include "external/imgui/imgui.cpp"
-#include "external/imgui/imgui_draw.cpp"
+#include <imgui.cpp>
+#include <imgui_draw.cpp>
+#include <imgui_widgets.cpp>
 #ifdef _WIN32
 // imgui_impl_win32 defines these, so make sure it doesn't error because
 // they're already there
 #undef WIN32_LEAN_AND_MEAN
 #undef NOMINMAX
-#include "external/imgui/examples/imgui_impl_win32.cpp"
+#include <examples/imgui_impl_win32.cpp>
 #endif

@@ -1,0 +1,197 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 20,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "default",
+      "description": "Default build using Ninja Multi-Config generator",
+      "generator": "Ninja Multi-Config",
+      "binaryDir": "${sourceDir}/build"
+    },
+    {
+      "name": "msvc-base",
+      "hidden": true,
+      "inherits": "default",
+      "description": "Options specific for MSVC",
+      "cacheVariables": {
+        "CMAKE_C_FLAGS_INIT": "-D_ITERATOR_DEBUG_LEVEL=0 /MP",
+        "CMAKE_CXX_FLAGS_INIT": "-D_ITERATOR_DEBUG_LEVEL=0 /MP"
+      }
+    },
+    {
+      "name": "vs2019",
+      "inherits": "msvc-base",
+      "description": "Visual Studio 2019 project",
+      "generator": "Visual Studio 16 2019"
+    },
+    {
+      "name": "vs2022",
+      "inherits": "msvc-base",
+      "description": "Visual Studio 2022 project",
+      "generator": "Visual Studio 17 2022"
+    },
+    {
+      "name": "single-component",
+      "inherits": "default",
+      "description": "configure to package a single component",
+      "cacheVariables": {
+        "CPACK_ARCHIVE_COMPONENT_INSTALL": "ON"
+      }
+    },
+    {
+      "name": "slang-llvm",
+      "inherits": "single-component",
+      "description": "Build slang-llvm from the system LLVM",
+      "cacheVariables": {
+        "SLANG_SLANG_LLVM_FLAVOR": "USE_SYSTEM_LLVM"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "debug",
+      "configurePreset": "default",
+      "configuration": "Debug"
+    },
+    {
+      "name": "release",
+      "configurePreset": "default",
+      "configuration": "Release"
+    },
+    {
+      "name": "generators",
+      "inherits": "release",
+      "configurePreset": "single-component",
+      "targets": [
+        "all-generators"
+      ]
+    },
+    {
+      "name": "slang-llvm",
+      "inherits": "release",
+      "configurePreset": "slang-llvm",
+      "targets": [
+        "slang-llvm"
+      ]
+    }
+  ],
+  "packagePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "configurePreset": "default",
+      "generators": [
+        "ZIP"
+      ],
+      "variables": {
+        "CPACK_PACKAGE_FILE_NAME": "slang"
+      }
+    },
+    {
+      "name": "release",
+      "inherits": "base",
+      "configurations": [
+        "Release"
+      ],
+      "packageDirectory": "dist-release"
+    },
+    {
+      "name": "debug",
+      "inherits": "base",
+      "configurations": [
+        "Debug"
+      ],
+      "packageDirectory": "dist-debug"
+    },
+    {
+      "name": "generators",
+      "inherits": "release",
+      "configurePreset": "single-component",
+      "variables": {
+        "CPACK_COMPONENTS_ALL": "generators"
+      }
+    },
+    {
+      "name": "slang-llvm",
+      "inherits": "release",
+      "configurePreset": "slang-llvm",
+      "variables": {
+        "CPACK_COMPONENTS_ALL": "slang-llvm"
+      }
+    }
+  ],
+  "workflowPresets": [
+    {
+      "name": "debug",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "default"
+        },
+        {
+          "type": "build",
+          "name": "debug"
+        },
+        {
+          "type": "package",
+          "name": "debug"
+        }
+      ]
+    },
+    {
+      "name": "release",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "default"
+        },
+        {
+          "type": "build",
+          "name": "release"
+        },
+        {
+          "type": "package",
+          "name": "release"
+        }
+      ]
+    },
+    {
+      "name": "generators",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "single-component"
+        },
+        {
+          "type": "build",
+          "name": "generators"
+        },
+        {
+          "type": "package",
+          "name": "generators"
+        }
+      ]
+    },
+    {
+      "name": "slang-llvm",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "slang-llvm"
+        },
+        {
+          "type": "build",
+          "name": "slang-llvm"
+        },
+        {
+          "type": "package",
+          "name": "slang-llvm"
+        }
+      ]
+    }
+  ]
+}

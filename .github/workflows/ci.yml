@@ -1,0 +1,141 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        # Until we switch to CMake fully, just run something minimal
+        include:
+          - os: linux
+            compiler: gcc
+            platform: x64
+            config: debug
+            warnings-as-errors: false
+            test-category: smoke
+            full-gpu-tests: false
+            runs-on: ubuntu-20.04
+        # os: [linux, macos, windows]
+        # compiler: ['gcc', 'clang', 'cl']
+        # config: ['debug', 'release']
+        # platform: ['x64']
+        # full-gpu-tests: [false]
+        # exclude:
+        #   # Exclude invalid or undesired os/compiler
+        #   - { os: linux, compiler: cl }
+        #   - { os: macos, compiler: cl }
+        #   - { os: macos, compiler: gcc }
+        #   - { os: windows, compiler: gcc }
+        #   - { os: windows, compiler: clang }
+        #   # or os/config combinations
+        #   - { os: macos, config: debug }
+        # include:
+        #   - { os: linux, runs-on: ubuntu-20.04 }
+        #   - { os: windows, runs-on: windows-latest }
+        #   - { os: macos, runs-on: macos-latest }
+        #   # Set a test category depending on the config, smoke by default,
+        #   # quick or full conditionally otherwise
+        #   - test-category: smoke
+        #   - { os: windows, test-category: quick }
+        #   - { config: release, test-category: full }
+        #   # Only CL has werror
+        #   - warnings-as-errors: false
+        #   - { compiler: cl, warnings-as-errors: true }
+        #   # Self-hosted aarch64 build
+        #   - os: linux
+        #     compiler: gcc
+        #     platform: aarch64
+        #     config: release
+        #     warnings-as-errors: false
+        #     test-category: smoke
+        #     full-gpu-tests: false
+        #     runs-on: [self-hosted, Linux, ARM64]
+        #   # Self-hosted full gpu build
+        #   - os: windows
+        #     compiler: cl
+        #     platform: x64
+        #     config: release
+        #     warnings-as-errors: false
+        #     test-category: full
+        #     full-gpu-tests: true
+        #     runs-on: [Windows, self-hosted]
+      fail-fast: false
+    runs-on: ${{ matrix.runs-on }}
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: 'true'
+          fetch-depth: '0'
+      - name: Setup
+        uses: ./.github/actions/common-setup
+        with:
+          os: ${{matrix.os}}
+          runs-on: ${{matrix.runs-on}}
+          compiler: ${{matrix.compiler}}
+          platform: ${{matrix.platform}}
+          config: ${{matrix.config}}
+      - name: Build Slang
+        run: |
+          if [[ "${{ matrix.os }}" =~ "windows" && "${{ matrix.config }}" != "release" ]]; then
+            # Doing a debug build will try to link against a release built llvm, this
+            # is a problem on Windows, so make slang-llvm in release build and use
+            # that as though it's a fetched binary via these presets.
+            cmake --workflow --preset slang-llvm
+            # Configure, pointing to our just-generated slang-llvm archive
+            cmake --preset default --fresh \
+              -DSLANG_SLANG_LLVM_FLAVOR=FETCH_BINARY \
+              -DSLANG_SLANG_LLVM_BINARY_URL=$(pwd)/build/dist-release/slang-slang-llvm.zip \
+              -DCMAKE_COMPILE_WARNING_AS_ERROR=${{matrix.warnings-as-errors}}
+            cmake --workflow --preset "${{matrix.config}}"
+          else
+            # Otherwise, use the system llvm we have just build or got from the
+            # cache in the setup phase
+            cmake --preset default --fresh \
+              -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
+              -DCMAKE_COMPILE_WARNING_AS_ERROR=${{matrix.warnings-as-errors}}
+            cmake --workflow --preset "${{matrix.config}}"
+          fi
+      - name: Test Slang
+        run: |
+          export SLANG_RUN_SPIRV_VALIDATION=1
+          failed=0
+          if [[ "${{matrix.full-gpu-tests}}" == "true" ]]; then
+            $bin_dir/slang-test \
+              -use-test-server \
+              -server-count 8 \
+              -category ${{ matrix.test-category }} \
+              -api all-cpu ||
+              failed=1
+            $bin_dir/slang-test \
+              -use-test-server \
+              -server-count 8 \
+              -emit-spirv-directly \
+              -api vk \
+              -category ${{ matrix.test-category }} \
+              -expected-failure-list tests/expected-failure.txt ||
+              failed=1
+          else
+            $bin_dir/slang-test \
+              -use-test-server \
+              -api all-dx12 \
+              -category ${{ matrix.test-category }} \
+              -expected-failure-list tests/expected-failure-github.txt ||
+              failed=1
+          fi
+          exit $failed
+      - uses: actions/upload-artifact@v3
+        if: ${{ ! matrix.full-gpu-tests }}
+        with:
+          name: slang-build-${{matrix.os}}-${{matrix.platform}}-${{matrix.compiler}}-${{matrix.config}}
+          # The install directory used in the packaging step
+          path: build/dist-${{matrix.config}}/**/slang/*

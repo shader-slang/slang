@@ -924,6 +924,8 @@ standardProject("core", "source/core")
     --
     warnings "Extra"
 
+    includedirs { "external/miniz" }
+
     if targetInfo.isWindows then
         addSourceDir "source/core/windows"
     else
@@ -957,6 +959,7 @@ standardProject("slang-rt", "source/slang-rt")
     pic "On"
     warnings "Extra"
     links {"miniz", "lz4"}
+    includedirs { "external/miniz" }
     defines { "SLANG_RT_DYNAMIC", "SLANG_RT_DYNAMIC_EXPORT" }
     addSourceDir "source/core"
     if targetInfo.isWindows then
@@ -1788,6 +1791,12 @@ standardProject("miniz", nil)
         "external/miniz/miniz_tinfl.c",
         "external/miniz/miniz_zip.c"
     }
+
+    -- A file usually created by miniz's build system
+    io.writefile("external/miniz/miniz_export.h", "#define MINIZ_EXPORT")
+    -- Miniz redefines this, so remove it for this project
+    removedefines "WIN32_LEAN_AND_MEAN"
+
     filter { "system:linux" }
         defines { "_LARGEFILE64_SOURCE" }
 

@@ -6,10 +6,7 @@
 // We don't want compress #define to clash 
 #define MINIZ_NO_ZLIB_COMPATIBLE_NAMES 1
 
-#include "../../external/miniz/miniz.h"
-#include "../../external/miniz/miniz_common.h"
-#include "../../external/miniz/miniz_tdef.h"
-#include "../../external/miniz/miniz_tinfl.h"
+#include <miniz.h>
 
 #include "slang-blob.h"
 

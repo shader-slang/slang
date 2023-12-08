@@ -12,11 +12,7 @@
 
 #include "slang-implicit-directory-collector.h"
 
-#include "../../external/miniz/miniz.h"
-#include "../../external/miniz/miniz_common.h"
-#include "../../external/miniz/miniz_tdef.h"
-#include "../../external/miniz/miniz_tinfl.h"
-#include "../../external/miniz/miniz_zip.h"
+#include <miniz.h>
 
 namespace Slang
 {

@@ -1354,6 +1354,7 @@ namespace Slang
             if (_isCPUHostTarget(target))
             {
                 libraryPaths.add(Path::getParentDirectory(Path::getExecutablePath()));
+                libraryPaths.add(Path::combine(Path::getParentDirectory(Path::getExecutablePath()), "../lib"));
 
                 // Set up the library artifact
                 auto artifact = Artifact::create(ArtifactDesc::make(ArtifactKind::Library, Artifact::Payload::HostCPU), toSlice("slang-rt"));

@@ -9,7 +9,7 @@ Most command line options are prefixed by - for both switches and parameter opti
 An example command line:
 
 ```
-slang-test -bindir E:\slang\bin\windows-x64\Debug\\ -category full tests/compute/array-param
+slang-test -bindir E:\slang\build\Debug\bin -category full tests/compute/array-param
 ```
 
 * The -bindir value means that the tools slang-test will use the binaries found in this directory. 
@@ -24,8 +24,8 @@ Most types of test use 'test tools' to implement actual tests. There are current
 
 These are typically implemeted as dlls/shared libraries that are loaded when a test is needed. Sometimes it is necessary or useful to just call one of these test tools directly with the parameters the tool takes. This can be achieved by giving the tool as a 'sub command' name on the command line. All of the parameters after the tool name will be passed directly to the tool. For example
 
- ```
-slang-test -bindir E:\slang\bin\windows-x64\Debug\\ slangc tests/compute/array-param.slang
+```
+slang-test -bindir E:\slang\build\Debug\bin slangc tests/compute/array-param.slang
 ```
 
 Will run the 'slangc' tool with the parameters listed after 'slangc' on the command line. Any parameters before the sub command will be parsed as usual by slang-test, and if not applicable to invoking the tool will be ignored. bindir will be used for finding the tool directory. This is by design so that the sub command invocation can just be placed after the normal slang-test commands, and removed when no longer needed. 
@@ -79,7 +79,7 @@ A test may be in one or more categories. The categories are specified in the tes
 
 Specifies the directory where executables will be found. 
 
-Eg -bindir "windows-x64\Debug\\"
+Eg -bindir "path/to/slang/output/directory/bin"
 
 ### category 
 
