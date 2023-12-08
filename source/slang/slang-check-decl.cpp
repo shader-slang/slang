@@ -6830,7 +6830,7 @@ namespace Slang
     void SemanticsVisitor::importFileDeclIntoScope(Scope* scope, FileDecl* fileDecl)
     {
         // Create a new sub-scope to wire the module
-       // into our lookup chain.
+        // into our lookup chain.
         auto subScope = getASTBuilder()->create<Scope>();
         subScope->containerDecl = fileDecl;
 
@@ -6882,10 +6882,10 @@ namespace Slang
         // We need to look for a module with the specified name
         // (whether it has already been loaded, or needs to
         // be loaded), and then put its declarations into
-        // the current scope.
+        // the module's scope.
 
         auto name = decl->moduleNameAndLoc.name;
-        auto scope = decl->scope;
+        auto scope = getModuleDecl(decl)->ownedScope;
 
         // Try to load a module matching the name
         auto importedModule = findOrImportModule(

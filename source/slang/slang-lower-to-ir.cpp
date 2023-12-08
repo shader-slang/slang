@@ -7304,6 +7304,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // Variable declared at global/namespace scope? -> Global.
             return true;
         }
+        else if (as<FileDecl>(parent))
+        {
+            // Variable declared at file scope? -> Global.
+            return true;
+        }
         else if(as<AggTypeDeclBase>(parent))
         {
             if(decl->hasModifier<HLSLStaticModifier>())
