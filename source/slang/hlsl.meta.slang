@@ -4046,6 +4046,156 @@ T dot(vector<T, N> x, vector<T, N> y)
     return result;
 }
 
+struct quaternion<T : __BuiltinFloatingPointType>
+{
+    __init(quaternion<T> q)
+    {
+        data = q.data;
+    }
+
+    __init(vector<T, 4> q)
+    {
+        data.xyzw = q;
+    }
+
+    __init(vector<T, 3> imaginary, T real)
+    {
+        data.xyz = imaginary;
+        data.w = real;
+    }
+
+    T real()
+    {
+      return data.w;
+    }
+
+    vector<T, 3> imag()
+    {
+        return data.xyz;
+    }
+
+    quaternion<T> conjugate()
+    {
+        return quaternion<T>(vector<T, 4>(-data.x, -data.y, -data.z, data.w));
+    }
+
+    quaternion<T> inverse()
+    {
+        vector<T, 4> conj = conjugate().data;
+        return quaternion<T>(conj / pow(conj, T(2)));
+    }
+
+    matrix<T, 4, 4> toMat()
+    {
+        typedef matrix<T, 4, 4> M;
+
+        // The fourth row and column are 0, except for result[3][3].
+        M result = M(T(0));
+
+        T x = data.x;
+        T y = data.y;
+        T z = data.z;
+        T w = data.w;
+
+        T x2 = x + x;
+        T y2 = y + y;
+        T z2 = z + z;
+
+        T xx = x * x2;
+        T xy = x * y2;
+        T xz = x * z2;
+
+        T yy = y * y2;
+        T yz = y * z2;
+        T zz = z * z2;
+
+        T wx = w * x2;
+        T wy = w * y2;
+        T wz = w * z2;
+
+        result[0][0] = T(1) - (yy + zz);
+        result[0][1] = xy - wz;
+        result[0][2] = xz + wy;
+
+        result[1][0] = xy + wz;
+        result[1][1] = T(1) - (xx + zz);
+        result[1][2] = yz - wx;
+
+        result[2][0] = xz - wy;
+        result[2][1] = yz + wx;
+        result[2][2] = T(1) - (xx + yy);
+
+        result[3][3] = T(1);
+
+        return result;
+    }
+
+    // <i, j, k> angle components followed by a |w| scalar.
+    vector<T, 4> data;
+}
+
+typedef quaternion<half> hquat;
+typedef quaternion<float> fquat
+typedef quaternion<double> dquat;
+
+// Multiply two quaternions together. This operation is not commutative.
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+quaternion<T> mul(quaternion<T> q1, quaternion<T> q2)
+{
+    vector<T, 3> vec = cross(q1.imag(), q2.imag())
+        + q1.real() * q2.imag()
+        + q1.imag() * q2.real();
+
+    T scalar = q1.real() * q2.real() - dot(q1.imag(), q2.imag());
+
+    return quaternion<T>(vec, scalar);
+}
+
+// Multiply two quaternions together. This operation is not commutative.
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+quaternion<T> operator*(quaternion<T> q1, quaternion<T> q2)
+{
+    return mul(q1, q2);
+}
+
+// Rotate a vector by a quaternion.
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+vector<T, 3> rotateVector(vector<T, 3> initialVector, quaternion<T> rotation)
+{
+    return mul(rotation, mul(
+        quaternion<T>(initialVector, T(0)), rotation.conjugate()))
+        .imag();
+}
+
+// Return a `quaternion<T>` that can transform `angleFrom` into `angleTo`.
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+quaternion<T> rotationBetween(vector<T, 3> angleFrom, vector<T, 3> angleTo)
+{
+    T angleFromMagSquare = dot(angleFrom, angleFrom);
+    T angleToMagSquare = dot(angleTo, angleTo);
+    T squares = sqrt(angleFromMagSquare * angleToMagSquare);
+
+    vector<T, 3> anglesCross = cross(angleFrom, angleTo);
+    T real = squares + dot(angleFrom, angleTo);
+
+    return quaternion<T>(anglesCross, real);
+}
+
+// Return a `quaternion<T>` that can transform `angleFrom` into `angleTo`,
+// assuming that both vector arguments have been normalized.
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+quaternion<T> rotationBetweenNormalized(vector<T, 3> angleFrom, vector<T, 3> angleTo)
+{
+    vector<T, 3> anglesCross = cross(angleFrom, angleTo);
+    T real = dot(angleFrom, angleTo) + T(1);
+
+    return quaternion<T>(anglesCross, real);
+}
 
 // Helper for computing distance terms for lighting (obsolete)
 
