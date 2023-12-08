@@ -1792,7 +1792,10 @@ standardProject("miniz", nil)
         "external/miniz/miniz_zip.c"
     }
 
+    -- A file usually created by miniz's build system
     io.writefile("external/miniz/miniz_export.h", "#define MINIZ_EXPORT")
+    -- Miniz redefines this, so remove it for this project
+    removedefines "WIN32_LEAN_AND_MEAN"
 
     filter { "system:linux" }
         defines { "_LARGEFILE64_SOURCE" }
