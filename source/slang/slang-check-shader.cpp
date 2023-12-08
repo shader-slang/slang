@@ -1339,11 +1339,17 @@ namespace Slang
         //
         for( auto module : getModuleDependencies() )
         {
-            Scope* moduleScope = astBuilder->create<Scope>();
-            moduleScope->containerDecl = module->getModuleDecl();
+            for (auto srcScope = module->getModuleDecl()->ownedScope; srcScope; srcScope = srcScope->nextSibling)
+            {
+                if (srcScope->containerDecl != module->getModuleDecl() && srcScope->containerDecl->parentDecl != module->getModuleDecl())
+                    continue; // Skip scopes that is not part of current module.
 
-            moduleScope->nextSibling = scope->nextSibling;
-            scope->nextSibling = moduleScope;
+                Scope* moduleScope = astBuilder->create<Scope>();
+                moduleScope->containerDecl = srcScope->containerDecl;
+
+                moduleScope->nextSibling = scope->nextSibling;
+                scope->nextSibling = moduleScope;
+            }
         }
 
         return scope;
