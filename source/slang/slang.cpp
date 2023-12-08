@@ -3367,6 +3367,25 @@ Linkage::IncludeResult Linkage::findAndIncludeFile(Module* module, TranslationUn
         return result;
     }
 
+    if (isInLanguageServer())
+    {
+        // HACK: When in language server mode, we will always load the currently opend file as a fresh module
+        // even if some previously opened file already references the current file via `import` or `include`.
+        // see comments in `WorkspaceVersion::getOrLoadModule()` for the reason behind this.
+        // An undesired outcome of this decision is that we could endup including the currently opened file itself
+        // via chain of `__include`s because the currently opened file will not have a true unique file system
+        // identity that allows it to be deduplicated correct. Therefore we insert a hack logic here to detect
+        // re-inclusion by just the file path.
+        // We can clean up this hack by making the language server truly support incremental checking so we can
+        // reuse the previously loaded module instead of needing to always start with a fresh copy.
+        //
+        for (auto file : translationUnit->getSourceFiles())
+        {
+            if (file->getPathInfo().hasFoundPath() && Path::equals(file->getPathInfo().foundPath, sourceFile->getPathInfo().foundPath))
+                return result;
+        }
+    }
+
     module->addFileDependency(sourceFile);
 
     // Create a transparent FileDecl to hold all children from the included file.
