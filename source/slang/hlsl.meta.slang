@@ -6597,13 +6597,28 @@ matrix<T, N, M> sqrt(matrix<T, N, M> x)
     MATRIX_MAP_UNARY(T, N, M, sqrt, x);
 }
 
+// Cube root
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(cuda, "$P_cbrt($0)")
-[__readNone, Differentiable]
+[__readNone]
 T cbrt(T x)
 {
     return pow(x, T(1) / T(3));
 }
+
+// // Derivative of cube root
+// // __generic<T : __BuiltinFloatingPointType>
+// [__readNone, Differentiable, ForwardDerivativeOf(cbrt<float>)]
+// DifferentialPair<float> cbrtFwdDiff(DifferentialPair<float> x)
+// {
+//     printf("ae");
+//     return diffPair(
+//         // Primal is the output of cbrt(x.p)
+//         cbrt<float>(x.p),
+//         // Derivative is the output of cbrt'(x.p)
+//         float(1) / float(3) * pow(x.p, float(-1))
+//     );
+// }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
@@ -6626,11 +6641,7 @@ __target_intrinsic(cuda, "$P_rcbrt($0)")
 [__readNone, Differentiable]
 T rcbrt(T x)
 {
-    // 0 is inaccurate unless special-cased.
-    if (x == T(0))
-        return T(0);
-
-    return T(1.0) / pow(x, T(1) / T(3));
+    return pow(x, T(-1) / T(3));
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
