@@ -65,6 +65,7 @@ namespace Slang
     void printDiagnosticArg(StringBuilder& sb, QualType const& type);
     void printDiagnosticArg(StringBuilder& sb, Val* val);
     void printDiagnosticArg(StringBuilder& sb, DeclRefBase* declRefBase);
+    void printDiagnosticArg(StringBuilder& sb, ASTNodeType nodeType);
 
     struct QualifiedDeclPath
     {

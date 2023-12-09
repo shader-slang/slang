@@ -3929,6 +3929,221 @@ namespace Slang
         return paramDecl;
     }
 
+    static bool shouldDeclBeCheckedForNestingValidity(ASTNodeType declType)
+    {
+        switch (declType)
+        {
+        case ASTNodeType::ExtensionDecl:
+        case ASTNodeType::StructDecl:
+        case ASTNodeType::ClassDecl:
+        case ASTNodeType::GLSLInterfaceBlockDecl:
+        case ASTNodeType::EnumDecl:
+        case ASTNodeType::InterfaceDecl:
+        case ASTNodeType::ConstructorDecl:
+        case ASTNodeType::AccessorDecl:
+        case ASTNodeType::GetterDecl:
+        case ASTNodeType::SetterDecl:
+        case ASTNodeType::RefAccessorDecl:
+        case ASTNodeType::FuncDecl:
+        case ASTNodeType::SubscriptDecl:
+        case ASTNodeType::PropertyDecl:
+        case ASTNodeType::NamespaceDecl:
+        case ASTNodeType::ModuleDecl:
+        case ASTNodeType::FileDecl:
+        case ASTNodeType::GenericDecl:
+        case ASTNodeType::VarDecl:
+        case ASTNodeType::LetDecl:
+        case ASTNodeType::TypeDefDecl:
+        case ASTNodeType::TypeAliasDecl:
+        case ASTNodeType::UsingDecl:
+        case ASTNodeType::ImportDecl:
+        case ASTNodeType::IncludeDeclBase:
+        case ASTNodeType::IncludeDecl:
+        case ASTNodeType::ImplementingDecl:
+        case ASTNodeType::ModuleDeclarationDecl:
+        case ASTNodeType::AssocTypeDecl:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    // Can a decl of `declType` be allowed as a children of `parentType`?
+    static bool isDeclAllowed(ASTNodeType parentType, ASTNodeType declType)
+    {
+        // If decl is not known as a decl that can be written by the user (e.g. a synthesized decl type),
+        // then we just allow it.
+        if (!shouldDeclBeCheckedForNestingValidity(declType))
+            return true;
+
+        switch (parentType)
+        {
+        case ASTNodeType::ExtensionDecl:
+            switch (declType)
+            {
+            case ASTNodeType::FuncDecl:
+            case ASTNodeType::SubscriptDecl:
+            case ASTNodeType::PropertyDecl:
+            case ASTNodeType::TypeAliasDecl:
+            case ASTNodeType::TypeDefDecl:
+            case ASTNodeType::VarDecl:
+            case ASTNodeType::LetDecl:
+            case ASTNodeType::StructDecl:
+            case ASTNodeType::ClassDecl:
+            case ASTNodeType::EnumDecl:
+            case ASTNodeType::GenericDecl:
+            case ASTNodeType::ConstructorDecl:
+                return true;
+            default:
+                return false;
+            }
+        case ASTNodeType::StructDecl:
+        case ASTNodeType::ClassDecl:
+        case ASTNodeType::EnumDecl:
+            switch (declType)
+            {
+            case ASTNodeType::FuncDecl:
+            case ASTNodeType::SubscriptDecl:
+            case ASTNodeType::PropertyDecl:
+            case ASTNodeType::TypeAliasDecl:
+            case ASTNodeType::TypeDefDecl:
+            case ASTNodeType::VarDecl:
+            case ASTNodeType::LetDecl:
+            case ASTNodeType::StructDecl:
+            case ASTNodeType::ClassDecl:
+            case ASTNodeType::EnumDecl:
+            case ASTNodeType::EnumCaseDecl:
+            case ASTNodeType::GenericDecl:
+            case ASTNodeType::ConstructorDecl:
+                return true;
+            default:
+                return false;
+            }
+        case ASTNodeType::InterfaceDecl:
+            switch (declType)
+            {
+            case ASTNodeType::FuncDecl:
+            case ASTNodeType::SubscriptDecl:
+            case ASTNodeType::PropertyDecl:
+            case ASTNodeType::AssocTypeDecl:
+            case ASTNodeType::TypeAliasDecl:
+            case ASTNodeType::TypeDefDecl:
+            case ASTNodeType::VarDecl:
+            case ASTNodeType::LetDecl:
+            case ASTNodeType::StructDecl:
+            case ASTNodeType::ClassDecl:
+            case ASTNodeType::EnumDecl:
+            case ASTNodeType::GenericDecl:
+            case ASTNodeType::ConstructorDecl:
+                return true;
+            default:
+                return false;
+            }
+        case ASTNodeType::GLSLInterfaceBlockDecl:
+            switch (declType)
+            {
+            case ASTNodeType::VarDecl:
+            case ASTNodeType::LetDecl:
+                return true;
+            default:
+                return false;
+            }
+        case ASTNodeType::ConstructorDecl:
+        case ASTNodeType::AccessorDecl:
+        case ASTNodeType::GetterDecl:
+        case ASTNodeType::SetterDecl:
+        case ASTNodeType::RefAccessorDecl:
+        case ASTNodeType::FuncDecl:
+            switch (declType)
+            {
+            case ASTNodeType::TypeAliasDecl:
+            case ASTNodeType::TypeDefDecl:
+            case ASTNodeType::VarDecl:
+            case ASTNodeType::LetDecl:
+            case ASTNodeType::StructDecl:
+            case ASTNodeType::ClassDecl:
+            case ASTNodeType::EnumDecl:
+            case ASTNodeType::GenericDecl:
+                return true;
+            default:
+                return false;
+            }
+        case ASTNodeType::SubscriptDecl:
+        case ASTNodeType::PropertyDecl:
+            switch (declType)
+            {
+            case ASTNodeType::AccessorDecl:
+            case ASTNodeType::GetterDecl:
+            case ASTNodeType::SetterDecl:
+            case ASTNodeType::RefAccessorDecl:
+                return true;
+            default:
+                return false;
+            }
+        case ASTNodeType::ModuleDecl:
+        case ASTNodeType::FileDecl:
+        case ASTNodeType::NamespaceDecl:
+            switch (declType)
+            {
+            case ASTNodeType::ImplementingDecl:
+                return parentType == ASTNodeType::FileDecl;
+            case ASTNodeType::ModuleDeclarationDecl:
+                return parentType == ASTNodeType::ModuleDecl;
+            case ASTNodeType::NamespaceDecl:
+            case ASTNodeType::FileDecl:
+            case ASTNodeType::UsingDecl:
+            case ASTNodeType::ImportDecl:
+            case ASTNodeType::IncludeDecl:
+            case ASTNodeType::GenericDecl:
+            case ASTNodeType::VarDecl:
+            case ASTNodeType::LetDecl:
+            case ASTNodeType::TypeDefDecl:
+            case ASTNodeType::TypeAliasDecl:
+            case ASTNodeType::FuncDecl:
+            case ASTNodeType::SubscriptDecl:
+            case ASTNodeType::PropertyDecl:
+            case ASTNodeType::StructDecl:
+            case ASTNodeType::ClassDecl:
+            case ASTNodeType::EnumDecl:
+            case ASTNodeType::InterfaceDecl:
+            case ASTNodeType::GLSLInterfaceBlockDecl:
+            case ASTNodeType::ExtensionDecl:
+                return true;
+            default:
+                return false;
+            }
+        case ASTNodeType::GenericDecl:
+            switch (declType)
+            {
+            case ASTNodeType::StructDecl:
+            case ASTNodeType::ClassDecl:
+            case ASTNodeType::EnumDecl:
+            case ASTNodeType::InterfaceDecl:
+            case ASTNodeType::FuncDecl:
+            case ASTNodeType::ConstructorDecl:
+            case ASTNodeType::TypeAliasDecl:
+            case ASTNodeType::TypeDefDecl:
+            case ASTNodeType::ExtensionDecl:
+                return true;
+            default:
+                return false;
+            }
+        case ASTNodeType::VarDecl:
+        case ASTNodeType::LetDecl:
+        case ASTNodeType::TypeDefDecl:
+        case ASTNodeType::TypeAliasDecl:
+        case ASTNodeType::UsingDecl:
+        case ASTNodeType::ImportDecl:
+        case ASTNodeType::IncludeDecl:
+        case ASTNodeType::ImplementingDecl:
+        case ASTNodeType::ModuleDeclarationDecl:
+        case ASTNodeType::AssocTypeDecl:
+            return true;
+        default:
+            return true;
+        }
+    }
+
     // Parse declaration of a name to be used for resolving `[attribute(...)]` style modifiers.
     //
     // These are distinct from `syntax` declarations, because their names don't get added
@@ -4008,7 +4223,7 @@ namespace Slang
 
     // Finish up work on a declaration that was parsed
     static void CompleteDecl(
-        Parser*				/*parser*/,
+        Parser*				parser,
         Decl*		decl,
         ContainerDecl*		containerDecl,
         Modifiers			modifiers)
@@ -4034,10 +4249,19 @@ namespace Slang
             declToModify = genericDecl->inner;
         _addModifiers(declToModify, modifiers);
 
-        if (containerDecl && !as<GenericDecl>(containerDecl))
+        if (containerDecl)
         {
-            // Make sure the decl is properly nested inside its lexical parent
-            AddMember(containerDecl, decl);
+            // Check that the declaration is actually allowed to be nested inside container.
+            if (!isDeclAllowed(containerDecl->astNodeType, decl->astNodeType))
+            {
+                parser->sink->diagnose(decl->loc, Diagnostics::declNotAllowed, decl->astNodeType);
+            }
+
+            if (!as<GenericDecl>(containerDecl))
+            {
+                // Make sure the decl is properly nested inside its lexical parent
+                AddMember(containerDecl, decl);
+            }
         }
     }
 

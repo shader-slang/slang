@@ -240,6 +240,8 @@ DIAGNOSTIC(20015, Error, unknownSPIRVCapability, "unknown SPIR-V capability '$0'
 
 DIAGNOSTIC(20101, Warning, unintendedEmptyStatement, "potentially unintended empty statement at this location; use {} instead.")
 
+DIAGNOSTIC(30102, Error, declNotAllowed, "$0 is not allowed here.")
+
 // 29xxx - Snippet parsing and inline asm
 DIAGNOSTIC(29000, Error, snippetParsingFailed, "unable to parse target intrinsic snippet: $0")
 
