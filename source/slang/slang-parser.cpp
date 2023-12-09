@@ -4256,6 +4256,18 @@ namespace Slang
             {
                 parser->sink->diagnose(decl->loc, Diagnostics::declNotAllowed, decl->astNodeType);
             }
+            else
+            {
+                // For generic decls, we also need to check if the inner decl type is allowed to be
+                // nested here.
+                if (declToModify && declToModify != decl)
+                {
+                    if (!isDeclAllowed(containerDecl->astNodeType, declToModify->astNodeType))
+                    {
+                        parser->sink->diagnose(decl->loc, Diagnostics::declNotAllowed, declToModify->astNodeType);
+                    }
+                }
+            }
 
             if (!as<GenericDecl>(containerDecl))
             {
