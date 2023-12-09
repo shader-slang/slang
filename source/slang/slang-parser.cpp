@@ -4015,7 +4015,6 @@ namespace Slang
             case ASTNodeType::EnumCaseDecl:
             case ASTNodeType::GenericDecl:
             case ASTNodeType::ConstructorDecl:
-            case ASTNodeType::ExtensionDecl:
                 return true;
             default:
                 return false;
