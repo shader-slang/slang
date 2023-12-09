@@ -236,67 +236,73 @@ namespace Slang
         DiagnosticSink*         sink)
     {
         auto translationUnitSyntax = translationUnit->getModuleDecl();
-
-        // We will look up any global-scope declarations in the translation
-        // unit that match the name of our entry point.
-        Decl* firstDeclWithName = nullptr;
-        if (!translationUnitSyntax->getMemberDictionary().tryGetValue(name, firstDeclWithName))
-        {
-            // If there doesn't appear to be any such declaration, then we are done.
-
-            sink->diagnose(translationUnitSyntax, Diagnostics::entryPointFunctionNotFound, name);
-
-            return nullptr;
-        }
-
-        // We found at least one global-scope declaration with the right name,
-        // but (1) it might not be a function, and (2) there might be
-        // more than one function.
-        //
-        // We'll walk the linked list of declarations with the same name,
-        // to see what we find. Along the way we'll keep track of the
-        // first function declaration we find, if any:
         FuncDecl* entryPointFuncDecl = nullptr;
-        for (auto ee = firstDeclWithName; ee; ee = ee->nextInContainerWithSameName)
+
+        for (auto globalScope = translationUnit->getModuleDecl()->ownedScope; globalScope; globalScope = globalScope->nextSibling)
         {
-            // Is this declaration a function?
-            if (auto funcDecl = as<FuncDecl>(ee))
+            if (globalScope->containerDecl != translationUnitSyntax && globalScope->containerDecl->parentDecl != translationUnitSyntax)
+                continue; // Skip scopes that aren't part of the current module.
+
+            // We will look up any global-scope declarations in the translation
+            // unit that match the name of our entry point.
+            Decl* firstDeclWithName = nullptr;
+            if (!globalScope->containerDecl->getMemberDictionary().tryGetValue(name, firstDeclWithName))
             {
-                // Skip non-primary declarations, so that
-                // we don't give an error when an entry
-                // point is forward-declared.
-                if (!isPrimaryDecl(funcDecl))
-                    continue;
+                // If there doesn't appear to be any such declaration, then we are done with this scope.
+                continue;
+            }
 
-                // is this the first one we've seen?
-                if (!entryPointFuncDecl)
+            // We found at least one global-scope declaration with the right name,
+            // but (1) it might not be a function, and (2) there might be
+            // more than one function.
+            //
+            // We'll walk the linked list of declarations with the same name,
+            // to see what we find. Along the way we'll keep track of the
+            // first function declaration we find, if any:
+            for (auto ee = firstDeclWithName; ee; ee = ee->nextInContainerWithSameName)
+            {
+                // Is this declaration a function?
+                if (auto funcDecl = as<FuncDecl>(ee))
                 {
-                    // If so, this is a candidate to be
-                    // the entry point function.
-                    entryPointFuncDecl = funcDecl;
-                }
-                else
-                {
-                    // Uh-oh! We've already seen a function declaration with this
-                    // name before, so the whole thing is ambiguous. We need
-                    // to diagnose and bail out.
+                    // Skip non-primary declarations, so that
+                    // we don't give an error when an entry
+                    // point is forward-declared.
+                    if (!isPrimaryDecl(funcDecl))
+                        continue;
 
-                    sink->diagnose(translationUnitSyntax, Diagnostics::ambiguousEntryPoint, name);
-
-                    // List all of the declarations that the user *might* mean
-                    for (auto ff = firstDeclWithName; ff; ff = ff->nextInContainerWithSameName)
+                    // is this the first one we've seen?
+                    if (!entryPointFuncDecl)
                     {
-                        if (auto candidate = as<FuncDecl>(ff))
-                        {
-                            sink->diagnose(candidate, Diagnostics::entryPointCandidate, candidate->getName());
-                        }
+                        // If so, this is a candidate to be
+                        // the entry point function.
+                        entryPointFuncDecl = funcDecl;
                     }
+                    else
+                    {
+                        // Uh-oh! We've already seen a function declaration with this
+                        // name before, so the whole thing is ambiguous. We need
+                        // to diagnose and bail out.
 
-                    // Bail out.
-                    return nullptr;
+                        sink->diagnose(translationUnitSyntax, Diagnostics::ambiguousEntryPoint, name);
+
+                        // List all of the declarations that the user *might* mean
+                        for (auto ff = firstDeclWithName; ff; ff = ff->nextInContainerWithSameName)
+                        {
+                            if (auto candidate = as<FuncDecl>(ff))
+                            {
+                                sink->diagnose(candidate, Diagnostics::entryPointCandidate, candidate->getName());
+                            }
+                        }
+
+                        // Bail out.
+                        return nullptr;
+                    }
                 }
             }
         }
+
+        if (!entryPointFuncDecl)
+            sink->diagnose(translationUnitSyntax, Diagnostics::entryPointFunctionNotFound, name);
 
         return entryPointFuncDecl;
     }
@@ -524,86 +530,13 @@ namespace Slang
         auto translationUnit = entryPointReq->getTranslationUnit();
         auto linkage = compileRequest->getLinkage();
         auto sink = compileRequest->getSink();
-        auto translationUnitSyntax = translationUnit->getModuleDecl();
 
         auto entryPointName = entryPointReq->getName();
-
-        // We will look up any global-scope declarations in the translation
-        // unit that match the name of our entry point.
-        Decl* firstDeclWithName = nullptr;
-        if( !translationUnitSyntax->getMemberDictionary().tryGetValue(entryPointName, firstDeclWithName))
-        {
-            // If there doesn't appear to be any such declaration, then
-            // we need to diagnose it as an error, and then bail out.
-            sink->diagnose(translationUnitSyntax, Diagnostics::entryPointFunctionNotFound, entryPointName);
-            return nullptr;
-        }
-
-        // We found at least one global-scope declaration with the right name,
-        // but (1) it might not be a function, and (2) there might be
-        // more than one function.
-        //
-        // We'll walk the linked list of declarations with the same name,
-        // to see what we find. Along the way we'll keep track of the
-        // first function declaration we find, if any:
-        //
-        FuncDecl* entryPointFuncDecl = nullptr;
-        for(auto ee = firstDeclWithName; ee; ee = ee->nextInContainerWithSameName)
-        {
-            // We want to support the case where the declaration is
-            // a generic function, so we will automatically
-            // unwrap any outer `GenericDecl` we find here.
-            //
-            auto decl = ee;
-            if(auto genericDecl = as<GenericDecl>(decl))
-                decl = genericDecl->inner;
-
-            // Is this declaration a function?
-            if (auto funcDecl = as<FuncDecl>(decl))
-            {
-                // Skip non-primary declarations, so that
-                // we don't give an error when an entry
-                // point is forward-declared.
-                if (!isPrimaryDecl(funcDecl))
-                    continue;
-
-                // is this the first one we've seen?
-                if (!entryPointFuncDecl)
-                {
-                    // If so, this is a candidate to be
-                    // the entry point function.
-                    entryPointFuncDecl = funcDecl;
-                }
-                else
-                {
-                    // Uh-oh! We've already seen a function declaration with this
-                    // name before, so the whole thing is ambiguous. We need
-                    // to diagnose and bail out.
-
-                    sink->diagnose(translationUnitSyntax, Diagnostics::ambiguousEntryPoint, entryPointName);
-
-                    // List all of the declarations that the user *might* mean
-                    for (auto ff = firstDeclWithName; ff; ff = ff->nextInContainerWithSameName)
-                    {
-                        if (auto candidate = as<FuncDecl>(ff))
-                        {
-                            sink->diagnose(candidate, Diagnostics::entryPointCandidate, candidate->getName());
-                        }
-                    }
-
-                    // Bail out.
-                    return nullptr;
-                }
-            }
-        }
+        FuncDecl* entryPointFuncDecl = findFunctionDeclByName(translationUnit->getModule(), entryPointName, sink);
 
         // Did we find a function declaration in our search?
         if(!entryPointFuncDecl)
         {
-            // If not, then we need to diagnose the error.
-            // For convenience, we will point to the first
-            // declaration with the right name, that wasn't a function.
-            sink->diagnose(firstDeclWithName, Diagnostics::entryPointSymbolNotAFunction, entryPointName);
             return nullptr;
         }
 
@@ -673,8 +606,6 @@ namespace Slang
 
     void Module::_collectShaderParams()
     {
-        auto moduleDecl = m_moduleDecl;
-
         // We are going to walk the global declarations in the body of the
         // module, and use those to build up our lists of:
         //
@@ -688,70 +619,86 @@ namespace Slang
         // will keep a set of the modules we've already
         // seen and processed.
         //
+
+        // We need to use a work list to traverse through all global scopes,
+        // including the top level `moduleDecl` and all the included `FileDecl`s.
+
+        List<ContainerDecl*> workList;
+        workList.add(m_moduleDecl);
+
         HashSet<Module*> requiredModuleSet;
-
-        for( auto globalDecl : moduleDecl->members )
+        for (Index i = 0; i < workList.getCount(); i++)
         {
-            if(auto globalVar = as<VarDecl>(globalDecl))
+            auto moduleDecl = workList[i];
+            for (auto globalDecl : moduleDecl->members)
             {
-                // We do not want to consider global variable declarations
-                // that don't represents shader parameters. This includes
-                // things like `static` globals and `groupshared` variables.
-                //
-                if(!isGlobalShaderParameter(globalVar))
-                    continue;
-
-                // At this point we know we have a global shader parameter.
-
-                ShaderParamInfo shaderParamInfo;
-                shaderParamInfo.paramDeclRef = makeDeclRef(globalVar);
-
-                // We need to consider what specialization parameters
-                // are introduced by this shader parameter. This step
-                // fills in fields on `shaderParamInfo` so that we
-                // can assocaite specialization arguments supplied later
-                // with the correct parameter.
-                //
-                _collectExistentialSpecializationParamsForShaderParam(
-                    getLinkage()->getASTBuilder(),
-                    shaderParamInfo,
-                    m_specializationParams,
-                    makeDeclRef(globalVar));
-
-                m_shaderParams.add(shaderParamInfo);
-            }
-            else if( auto globalGenericParam = as<GlobalGenericParamDecl>(globalDecl) )
-            {
-                // A global generic type parameter declaration introduces
-                // a suitable specialization parameter.
-                //
-                SpecializationParam specializationParam;
-                specializationParam.flavor = SpecializationParam::Flavor::GenericType;
-                specializationParam.loc = globalGenericParam->loc;
-                specializationParam.object = globalGenericParam;
-                m_specializationParams.add(specializationParam);
-            }
-            else if( auto globalGenericValueParam = as<GlobalGenericValueParamDecl>(globalDecl) )
-            {
-                // A global generic type parameter declaration introduces
-                // a suitable specialization parameter.
-                //
-                SpecializationParam specializationParam;
-                specializationParam.flavor = SpecializationParam::Flavor::GenericValue;
-                specializationParam.loc = globalGenericValueParam->loc;
-                specializationParam.object = globalGenericValueParam;
-                m_specializationParams.add(specializationParam);
-            }
-            else if( auto importDecl = as<ImportDecl>(globalDecl) )
-            {
-                // An `import` declaration creates a requirement dependency
-                // from this module to another module.
-                //
-                auto importedModule = getModule(importDecl->importedModuleDecl);
-                if(!requiredModuleSet.contains(importedModule))
+                if (auto globalVar = as<VarDecl>(globalDecl))
                 {
-                    requiredModuleSet.add(importedModule);
-                    m_requirements.add(importedModule);
+                    // We do not want to consider global variable declarations
+                    // that don't represents shader parameters. This includes
+                    // things like `static` globals and `groupshared` variables.
+                    //
+                    if (!isGlobalShaderParameter(globalVar))
+                        continue;
+
+                    // At this point we know we have a global shader parameter.
+
+                    ShaderParamInfo shaderParamInfo;
+                    shaderParamInfo.paramDeclRef = makeDeclRef(globalVar);
+
+                    // We need to consider what specialization parameters
+                    // are introduced by this shader parameter. This step
+                    // fills in fields on `shaderParamInfo` so that we
+                    // can assocaite specialization arguments supplied later
+                    // with the correct parameter.
+                    //
+                    _collectExistentialSpecializationParamsForShaderParam(
+                        getLinkage()->getASTBuilder(),
+                        shaderParamInfo,
+                        m_specializationParams,
+                        makeDeclRef(globalVar));
+
+                    m_shaderParams.add(shaderParamInfo);
+                }
+                else if (auto globalGenericParam = as<GlobalGenericParamDecl>(globalDecl))
+                {
+                    // A global generic type parameter declaration introduces
+                    // a suitable specialization parameter.
+                    //
+                    SpecializationParam specializationParam;
+                    specializationParam.flavor = SpecializationParam::Flavor::GenericType;
+                    specializationParam.loc = globalGenericParam->loc;
+                    specializationParam.object = globalGenericParam;
+                    m_specializationParams.add(specializationParam);
+                }
+                else if (auto globalGenericValueParam = as<GlobalGenericValueParamDecl>(globalDecl))
+                {
+                    // A global generic type parameter declaration introduces
+                    // a suitable specialization parameter.
+                    //
+                    SpecializationParam specializationParam;
+                    specializationParam.flavor = SpecializationParam::Flavor::GenericValue;
+                    specializationParam.loc = globalGenericValueParam->loc;
+                    specializationParam.object = globalGenericValueParam;
+                    m_specializationParams.add(specializationParam);
+                }
+                else if (auto importDecl = as<ImportDecl>(globalDecl))
+                {
+                    // An `import` declaration creates a requirement dependency
+                    // from this module to another module.
+                    //
+                    auto importedModule = getModule(importDecl->importedModuleDecl);
+                    if (!requiredModuleSet.contains(importedModule))
+                    {
+                        requiredModuleSet.add(importedModule);
+                        m_requirements.add(importedModule);
+                    }
+                }
+                else if (auto fileDecl = as<FileDecl>(globalDecl))
+                {
+                    // If we see a `FileDecl`, we need to recursively look into its
+                    // scope.
+                    workList.add(fileDecl);
                 }
             }
         }
@@ -1392,11 +1339,17 @@ namespace Slang
         //
         for( auto module : getModuleDependencies() )
         {
-            Scope* moduleScope = astBuilder->create<Scope>();
-            moduleScope->containerDecl = module->getModuleDecl();
+            for (auto srcScope = module->getModuleDecl()->ownedScope; srcScope; srcScope = srcScope->nextSibling)
+            {
+                if (srcScope->containerDecl != module->getModuleDecl() && srcScope->containerDecl->parentDecl != module->getModuleDecl())
+                    continue; // Skip scopes that is not part of current module.
 
-            moduleScope->nextSibling = scope->nextSibling;
-            scope->nextSibling = moduleScope;
+                Scope* moduleScope = astBuilder->create<Scope>();
+                moduleScope->containerDecl = srcScope->containerDecl;
+
+                moduleScope->nextSibling = scope->nextSibling;
+                scope->nextSibling = moduleScope;
+            }
         }
 
         return scope;
