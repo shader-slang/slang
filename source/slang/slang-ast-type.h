@@ -384,7 +384,7 @@ class GLSLOutputParameterGroupType : public VaryingParameterGroupType
 
 
 // type for GLLSL `buffer` blocks
-class GLSLShaderStorageBufferType : public UniformParameterGroupType 
+class GLSLShaderStorageBufferType : public PointerLikeType
 {
     SLANG_AST_CLASS(GLSLShaderStorageBufferType)
 };
