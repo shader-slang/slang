@@ -8077,7 +8077,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             if(decl->findModifier<GLSLBufferModifier>())
             {
-                // irAggType = subBuilder->createGLSLShaderStorableBufferType();
                 irAggType = subBuilder->createStructType();
             }
             else
