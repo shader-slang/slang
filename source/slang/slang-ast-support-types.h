@@ -392,6 +392,10 @@ namespace Slang
             ///
         ModifiersChecked,
 
+            /// Wiring up scopes of namespaces with their siblings defined in different
+            /// files/modules, and other namespaces imported via `using`.
+        ScopesWired,
+
             /// The type/signature of the declaration has been checked.
             ///
             /// For a value declaration like a variable or function, this means that

@@ -36,6 +36,21 @@ namespace Slang
         }
     };
 
+    struct SemanticsDeclScopeWiringVisitor : public SemanticsDeclVisitorBase, public DeclVisitor<SemanticsDeclScopeWiringVisitor>
+    {
+        SemanticsDeclScopeWiringVisitor(SemanticsContext const& outer)
+            : SemanticsDeclVisitorBase(outer)
+        {}
+
+        void visitDeclGroup(DeclGroup*) {}
+
+        void visitDecl(Decl*) {}
+
+        void visitUsingDecl(UsingDecl* decl);
+
+        void visitNamespaceDecl(NamespaceDecl* decl);
+    };
+
     struct SemanticsDeclAttributesVisitor
         : public SemanticsDeclVisitorBase
         , public DeclVisitor<SemanticsDeclAttributesVisitor>
@@ -88,8 +103,6 @@ namespace Slang
         void visitIncludeDecl(IncludeDecl* decl);
 
         void visitImplementingDecl(ImplementingDecl* decl);
-
-        void visitUsingDecl(UsingDecl* decl);
 
         void visitGenericTypeParamDecl(GenericTypeParamDecl* decl);
 
@@ -1864,6 +1877,10 @@ namespace Slang
                     {
                         ensureDecl(implementingDecl, DeclCheckState::Checked);
                     }
+                    else if (auto importDecl = as<ImportDecl>(decl))
+                    {
+                        ensureDecl(importDecl, DeclCheckState::Checked);
+                    }
                 }
             };
         visitIncludeDecls(moduleDecl);
@@ -1927,7 +1944,7 @@ namespace Slang
         //
         DeclCheckState states[] =
         {
-            DeclCheckState::ModifiersChecked,
+            DeclCheckState::ScopesWired,
             DeclCheckState::ReadyForReference,
             DeclCheckState::ReadyForLookup,
             DeclCheckState::ReadyForConformances,
@@ -6831,13 +6848,8 @@ namespace Slang
     {
         // Create a new sub-scope to wire the module
         // into our lookup chain.
-        auto subScope = getASTBuilder()->create<Scope>();
-        subScope->containerDecl = fileDecl;
-
-        subScope->nextSibling = scope->nextSibling;
-        scope->nextSibling = subScope;
+        addSiblingScopeForContainerDecl(scope, fileDecl);
     }
-
 
     void SemanticsVisitor::importModuleIntoScope(Scope* scope, ModuleDecl* moduleDecl)
     {
@@ -6859,11 +6871,7 @@ namespace Slang
             if (moduleScope->containerDecl != moduleDecl && moduleScope->containerDecl->parentDecl != moduleDecl)
                 continue;
 
-            auto subScope = getASTBuilder()->create<Scope>();
-            subScope->containerDecl = moduleScope->containerDecl;
-
-            subScope->nextSibling = scope->nextSibling;
-            scope->nextSibling = subScope;
+            addSiblingScopeForContainerDecl(scope, moduleScope->containerDecl);
         }
 
         // Also import any modules from nested `import` declarations
@@ -7057,7 +7065,7 @@ namespace Slang
             importFileDeclIntoScope(moduleDecl->ownedScope, fileDecl);
     }
 
-    void SemanticsDeclHeaderVisitor::visitUsingDecl(UsingDecl* decl)
+    void SemanticsDeclScopeWiringVisitor::visitUsingDecl(UsingDecl* decl)
     {
         // First, we need to look up whatever the argument of the `using`
         // declaration names.
@@ -7067,45 +7075,98 @@ namespace Slang
         // Next, we want to ensure that whatever is being named by `decl->arg`
         // is a namespace (or a module, since modules are namespace-like).
         //
-        // TODO: The logic here assumes that we can't have multiple `NamespaceDecl`s
-        // with the same name in scope, but that assumption is only valid in the
-        // context of a single module (where we deduplicate `namespace`s during
-        // parsing). If a user `import`s multiple modules that all have namespaces
+        // If a user `import`s multiple modules that all have namespaces
         // of the same name, it would be possible for `decl->arg` to be overloaded.
-        // In that case we should really iterate over all the entities that are
+        // To handle that case, we will iterate over all the entities that are
         // named and import any that are namespace-like.
         //
-        NamespaceDeclBase* namespaceDecl = nullptr;
-        if( auto declRefExpr = as<DeclRefExpr>(decl->arg) )
-        {
-            if( auto namespaceDeclRef = declRefExpr->declRef.as<NamespaceDeclBase>() )
+        bool scopesAdded = false;
+        bool hasValidNamespace = false;
+
+        // TODO: consider caching the scope set in NamespaceDecl.
+        HashSet<ContainerDecl*> addedScopes;
+        for (auto s = decl->scope; s; s = s->nextSibling)
+            addedScopes.add(s->containerDecl);
+
+        auto addAllSiblingScopesFromDecl = [&](Scope* scope, ContainerDecl* containerDecl)
             {
-                namespaceDecl = namespaceDeclRef.getDecl();
+                for (auto s = containerDecl->ownedScope; s; s = s->nextSibling)
+                {
+                    if (addedScopes.add(s->containerDecl))
+                    {
+                        scopesAdded = true;
+                        addSiblingScopeForContainerDecl(scope, s->containerDecl);
+                    }
+                }
+            };
+
+        if (auto declRefExpr = as<DeclRefExpr>(decl->arg))
+        {
+            if (auto namespaceDeclRef = declRefExpr->declRef.as<NamespaceDeclBase>())
+            {
+                auto namespaceDecl = namespaceDeclRef.getDecl();
+                addAllSiblingScopesFromDecl(decl->scope, namespaceDecl);
+                hasValidNamespace = true;
             }
         }
-        if( !namespaceDecl )
+        else if (auto overloadedExpr = as<OverloadedExpr>(decl->arg))
         {
-            getSink()->diagnose(decl->arg, Diagnostics::expectedANamespace, decl->arg->type);
-            return;
+            for (auto item : overloadedExpr->lookupResult2)
+            {
+                if (auto namespaceDeclRef = item.declRef.as<NamespaceDeclBase>())
+                {
+                    addAllSiblingScopesFromDecl(decl->scope, namespaceDeclRef.getDecl());
+                    hasValidNamespace = true;
+                }
+            }
         }
 
-        // Once we have identified the namespace to bring into scope,
-        // we need to create a new sibling sub-scope to add to the
-        // lookup scope that was in place when the `using` was parsed.
-        //
-        // Subsequent lookup in that scope will walk through our new
-        // sub-scope and see the namespace.
-        //
-        // TODO: If we update the `containerDecl` in a scope to allow
-        // for a more general `DeclRef`, or even a full `DeclRefExpr`,
-        // then it would be possible for `using` to apply to more kinds
-        // of entities than just namespaces.
-        //
-        auto scope = decl->scope;
-        auto subScope = getASTBuilder()->create<Scope>();
-        subScope->containerDecl = namespaceDecl;
-        subScope->nextSibling = scope->nextSibling;
-        scope->nextSibling = subScope;
+        if (!scopesAdded)
+        {
+            if (!hasValidNamespace)
+                getSink()->diagnose(decl->arg, Diagnostics::expectedANamespace, decl->arg->type);
+            return;
+        }
+    }
+
+    void SemanticsDeclScopeWiringVisitor::visitNamespaceDecl(NamespaceDecl* decl)
+    {
+        // We need to wire up the scope of namespaces with other namespace decls of the same name
+        // that is accessible from the current context.
+        auto parent = as<ContainerDecl>(getParentDecl(decl));
+        if (!parent)
+            return;
+        for (auto parentScope = parent->ownedScope; parentScope; parentScope = parentScope->parent)
+        {
+            for (auto scope = parentScope; scope; scope = scope->nextSibling)
+            {
+                auto container = scope->containerDecl;
+                auto nsDeclPtr = container->getMemberDictionary().tryGetValue(decl->getName());
+                if (!nsDeclPtr) continue;
+                auto nsDecl = *nsDeclPtr;
+                for (auto ns = nsDecl; ns; ns = ns->nextInContainerWithSameName)
+                {
+                    if (ns == decl)
+                        continue;
+                    auto otherNamespace = as<NamespaceDeclBase>(ns);
+                    if (!otherNamespace)
+                        continue;
+
+                    if (!ns->checkState.isBeingChecked())
+                    {
+                        ensureDecl(ns, DeclCheckState::ScopesWired);
+                    }
+                    addSiblingScopeForContainerDecl(decl, otherNamespace);
+                }
+            }
+            // For file decls, we need to continue searching up in the parent module scope.
+            if (!as<FileDecl>(parentScope->containerDecl))
+                break;
+        }
+        for (auto usingDecl : decl->getMembersOfType<UsingDecl>())
+        {
+            ensureDecl(usingDecl, DeclCheckState::ScopesWired);
+        }
     }
 
         /// Get a reference to the candidate extension list for `typeDecl` in the given dictionary
@@ -7469,6 +7530,9 @@ namespace Slang
         {
         case DeclCheckState::ModifiersChecked:
             SemanticsDeclModifiersVisitor(shared).dispatch(decl);
+            break;
+        case DeclCheckState::ScopesWired:
+            SemanticsDeclScopeWiringVisitor(shared).dispatch(decl);
             break;
 
         case DeclCheckState::SignatureChecked:

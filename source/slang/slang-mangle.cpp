@@ -40,7 +40,6 @@ namespace Slang
     void emitNameImpl(ManglingContext* context, UnownedStringSlice str)
     {
         Index length = str.getLength();
-
         // If the name consists of only traditional "identifer characters"
         // (`[a-zA-Z_]`), then we want to emit it more or less directly.
         //
@@ -360,6 +359,9 @@ namespace Slang
         DeclRef<Decl>       declRef)
     {
         auto parentDeclRef = declRef.getParent();
+        if (as<FileDecl>(parentDeclRef))
+            parentDeclRef = parentDeclRef.getParent();
+
         auto parentGenericDeclRef = parentDeclRef.as<GenericDecl>();
         if( parentDeclRef )
         {

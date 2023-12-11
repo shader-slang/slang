@@ -1044,9 +1044,18 @@ namespace Slang
 
         if (as<PrivateModifier>(m))
         {
-            if (as<AggTypeDeclBase>(syntaxNode) || as<NamespaceDeclBase>(syntaxNode))
+            if (auto decl = as<Decl>(syntaxNode))
             {
-                getSink()->diagnose(m, Diagnostics::invalidUseOfPrivateVisibility, as<Decl>(syntaxNode));
+                if (isGlobalDecl(decl))
+                {
+                    getSink()->diagnose(m, Diagnostics::invalidUseOfPrivateVisibility, as<Decl>(syntaxNode));
+                    return m;
+                }
+            }
+            if (as<NamespaceDeclBase>(syntaxNode))
+            {
+                getSink()->diagnose(m, Diagnostics::invalidVisibilityModifierOnTypeOfDecl, syntaxNode->astNodeType);
+                return m;
             }
             else if (auto decl = as<Decl>(syntaxNode))
             {
@@ -1057,7 +1066,14 @@ namespace Slang
                 }
             }
         }
-
+        else if (as<InternalModifier>(m))
+        {
+            if (as<NamespaceDeclBase>(syntaxNode))
+            {
+                getSink()->diagnose(m, Diagnostics::invalidVisibilityModifierOnTypeOfDecl, syntaxNode->astNodeType);
+                return m;
+            }
+        }
 
         // Default behavior is to leave things as they are,
         // and assume that modifiers are mostly already checked.

@@ -363,8 +363,9 @@ DIAGNOSTIC(30505, Error, implementingMustReferencePrimaryModuleFile, "the source
 DIAGNOSTIC(30600, Error, declIsNotVisible, "'$0' is not accessible from the current context.")
 DIAGNOSTIC(30601, Error, declCannotHaveHigherVisibility, "'$0' cannot have a higher visibility than '$1'.")
 DIAGNOSTIC(30602, Error, satisfyingDeclCannotHaveLowerVisibility, "'$0' is less visible than the interface requirement it satisfies.")
-DIAGNOSTIC(30603, Error, invalidUseOfPrivateVisibility, "'$0' cannot have private visibility.")
+DIAGNOSTIC(30603, Error, invalidUseOfPrivateVisibility, "'$0' cannot have private visibility because it is not a member of a type.")
 DIAGNOSTIC(30604, Error, useOfLessVisibleType, "'$0' references less visible type '$1'.")
+DIAGNOSTIC(36005, Error, invalidVisibilityModifierOnTypeOfDecl, "visibility modifier is not allowed on '$0'.")
 
 // Attributes
 DIAGNOSTIC(31000, Error, unknownAttributeName, "unknown attribute '$0'")

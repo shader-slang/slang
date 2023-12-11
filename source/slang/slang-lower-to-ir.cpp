@@ -2267,6 +2267,10 @@ static String getNameForNameHint(
     if(auto genericParentDecl = as<GenericDecl>(parentDecl))
         parentDecl = genericParentDecl->parentDecl;
 
+    // Skip past a FileDecl parent.
+    if (auto fileParentDecl = as<FileDecl>(parentDecl))
+        parentDecl = fileParentDecl->parentDecl;
+
     // A `ModuleDecl` can have a name too, but in the common case
     // we don't want to generate name hints that include the module
     // name, simply because they would lead to every global symbol
@@ -10144,6 +10148,13 @@ static void ensureAllDeclsRec(
     else if (auto namespaceDecl = as<NamespaceDecl>(decl))
     {
         for (auto memberDecl : namespaceDecl->members)
+        {
+            ensureAllDeclsRec(context, memberDecl);
+        }
+    }
+    else if (auto fileDecl = as<FileDecl>(decl))
+    {
+        for (auto memberDecl : fileDecl->members)
         {
             ensureAllDeclsRec(context, memberDecl);
         }
