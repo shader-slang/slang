@@ -5942,6 +5942,22 @@ namespace Slang
         return emitIntrinsicInst(nullptr, kIROp_GenericAsm, 1, &arg);
     }
 
+    IRInst* IRBuilder::emitRWStructuredBufferGetElementPtr(IRInst* structuredBuffer, IRInst* index)
+    {
+        const auto sbt = cast<IRHLSLRWStructuredBufferType>(structuredBuffer->getDataType());
+        const auto t = getPtrType(sbt->getElementType());
+        IRInst* const operands[2] = {structuredBuffer, index};
+        const auto i = createInst<IRRWStructuredBufferGetElementPtr>(
+            this,
+            kIROp_RWStructuredBufferGetElementPtr,
+            t,
+            2,
+            operands
+        );
+        addInst(i);
+        return i;
+    }
+
     //
     // Decorations
     //
