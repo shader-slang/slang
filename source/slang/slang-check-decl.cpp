@@ -1253,7 +1253,8 @@ namespace Slang
                 // without any `uniform` modifiers as true global variables by default.
                 if (!varDecl->findModifier<HLSLUniformModifier>() &&
                     !varDecl->findModifier<InModifier>() &&
-                    !varDecl->findModifier<OutModifier>())
+                    !varDecl->findModifier<OutModifier>() &&
+                    !varDecl->findModifier<GLSLBufferModifier>())
                 {
                     if (!as<ResourceType>(varDecl->type) && !as<PointerLikeType>(varDecl->type))
                     {
