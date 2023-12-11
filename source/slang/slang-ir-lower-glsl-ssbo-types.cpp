@@ -4,180 +4,187 @@
 
 namespace Slang
 {
-    struct SSBOLoweringContext
+    template<typename F>
+    static void overAllInsts(IRModule* module, F f)
     {
-        IRModule* module;
-        DiagnosticSink* sink;
+        InstWorkList workList{module};
+        InstHashSet workListSet{module};
 
-        InstWorkList workList;
-        InstHashSet workListSet;
-
-        SSBOLoweringContext (IRModule* inModule)
-            :module(inModule), workList(inModule), workListSet(inModule)
-        {}
-
-        struct LoweredTupleInfo : public RefObject
+        workList.add(module->getModuleInst());
+        workListSet.add(module->getModuleInst());
+        while(workList.getCount())
         {
-            IRType* tupleType;
-            IRStructType* structType;
-            List<IRStructField*> fields;
-        };
-        Dictionary<IRInst*, RefPtr<LoweredTupleInfo>> mapLoweredStructToTupleInfo;
-        Dictionary<IRInst*, RefPtr<LoweredTupleInfo>> loweredTuples;
+            const auto inst = workList.getLast();
+            workList.removeLast();
+            workListSet.remove(inst);
 
-        IRType* maybeLowerTupleType(IRBuilder* builder, IRType* type)
-        {
-            if (auto info = getLoweredTupleType(builder, type))
-                return info->structType;
-            else
-                return type;
-        }
+            f(inst);
 
-        LoweredTupleInfo* getLoweredTupleType(IRBuilder* builder, IRInst* type)
-        {
-            if (auto loweredInfo = loweredTuples.tryGetValue(type))
-                return loweredInfo->Ptr();
-            if (auto loweredInfo = mapLoweredStructToTupleInfo.tryGetValue(type))
-                return loweredInfo->Ptr();
-
-            if (!type)
-                return nullptr;
-            if (type->getOp() != kIROp_TupleType)
-                return nullptr;
-
-            RefPtr<LoweredTupleInfo> info = new LoweredTupleInfo();
-            info->tupleType = (IRType*)type;
-            auto structType = builder->createStructType();
-            info->structType = structType;
-            builder->addNameHintDecoration(structType, UnownedStringSlice("Tuple"));
-
-            StringBuilder fieldNameSb;
-            for (UInt i = 0; i < type->getOperandCount(); i++)
+            for(auto child = inst->getLastChild(); child; child = child->getPrevInst())
             {
-                auto elementType = maybeLowerTupleType(builder, (IRType*)(type->getOperand(i)));
-                auto key = builder->createStructKey();
-                fieldNameSb.clear();
-                fieldNameSb << "value" << i;
-                builder->addNameHintDecoration(key, fieldNameSb.getUnownedSlice());
-                auto field = builder->createStructField(structType, key, (IRType*)elementType);
-                info->fields.add(field);
-            }
-            mapLoweredStructToTupleInfo[structType] = info;
-            loweredTuples[type] = info;
-            return info.Ptr();
-        }
-
-        void addToWorkList(
-            IRInst* inst)
-        {
-            for (auto ii = inst->getParent(); ii; ii = ii->getParent())
-            {
-                if (as<IRGeneric>(ii))
-                    return;
-            }
-
-            if (workListSet.contains(inst))
-                return;
-
-            workList.add(inst);
-            workListSet.add(inst);
-        }
-
-        void processMakeTuple(IRMakeTuple* inst)
-        {
-            IRBuilder builderStorage(module);
-            auto builder = &builderStorage;
-            builder->setInsertBefore(inst);
-
-            auto info = getLoweredTupleType(builder, inst->getDataType());
-            List<IRInst*> operands;
-            for (Index i = 0; i < info->fields.getCount(); i++)
-            {
-                SLANG_ASSERT(i < (Index)inst->getOperandCount());
-                operands.add(inst->getOperand(i));
-            }
-            auto makeStruct = builder->emitMakeStruct(info->structType, operands);
-            inst->replaceUsesWith(makeStruct);
-            inst->removeAndDeallocate();
-        }
-
-        void processGetTupleElement(IRGetTupleElement* inst)
-        {
-            IRBuilder builderStorage(module);
-            auto builder = &builderStorage;
-            builder->setInsertBefore(inst);
-
-            auto base = inst->getTuple();
-            auto loweredTupleInfo = getLoweredTupleType(builder, base->getDataType());
-            SLANG_ASSERT(loweredTupleInfo);
-            auto elementIndex = getIntVal(inst->getElementIndex());
-            SLANG_ASSERT((Index)elementIndex < loweredTupleInfo->fields.getCount());
-
-            auto field = loweredTupleInfo->fields[(Index)elementIndex];
-            auto getElement = builder->emitFieldExtract(field->getFieldType(), base, field->getKey());
-            inst->replaceUsesWith(getElement);
-            inst->removeAndDeallocate();
-        }
-
-        void processSSBOType(IRGLSLShaderStorageBufferType* inst)
-        {
-            IRBuilder builderStorage(module);
-            auto builder = &builderStorage;
-            builder->setInsertBefore(inst);
-
-            auto loweredTupleInfo = getLoweredTupleType(builder, inst);
-            SLANG_ASSERT(loweredTupleInfo);
-            SLANG_UNUSED(loweredTupleInfo);
-        }
-
-        void processInst(IRInst* inst)
-        {
-            switch (inst->getOp())
-            {
-            // case kIROp_MakeTuple:
-            //     processMakeTuple((IRMakeTuple*)inst);
-            //     break;
-            // case kIROp_GetTupleElement:
-            //     processGetTupleElement((IRGetTupleElement*)inst);
-            //     break;
-            case kIROp_TupleType:
-                processSSBOType(cast<IRGLSLShaderStorageBufferType>(inst));
-                break;
-            default:
-                break;
+                if(workListSet.contains(child))
+                    continue;
+                workList.add(child);
+                workListSet.add(child);
             }
         }
+    }
 
-        void processModule()
-        {
-            addToWorkList(module->getModuleInst());
+    struct ArrayLikeSSBOInfo
+    {
+        IRType* backingStruct;
+        IRType* elementType;
+        IRStructKey* elementsKey;
+    };
 
-            while (workList.getCount() != 0)
+    struct StructLikeSSBOInfo
+    {
+        IRType* backingStruct;
+    };
+
+    struct SSBOIndexInfo
+    {
+        IRInst* ssboVar;
+        IRInst* index;
+    };
+
+    static void lowerArrayLikeSSBOs(IRModule* module, DiagnosticSink* sink)
+    {
+        // Here we will:
+        // - Identify SSBO types which comprise a single array field with
+        //   element type T
+        // - Create a (RW)StructuredBuffer<T> type
+        // - Replace all uses of the SSBO with the StructuredBuffer type
+
+        Dictionary<IRGLSLShaderStorageBufferType*, ArrayLikeSSBOInfo> arrayLikeSSBOTypes;
+        overAllInsts(module, [&](IRInst* inst){
+            if(const auto ssbo = as<IRGLSLShaderStorageBufferType>(inst))
             {
-                IRInst* inst = workList.getLast();
-
-                workList.removeLast();
-                workListSet.remove(inst);
-
-                processInst(inst);
-
-                for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
+                if(const auto backingStruct = as<IRStructType>(ssbo->getElementType()))
                 {
-                    addToWorkList(child);
+                    auto members = backingStruct->getFields();
+                    if(members.getFirst() != members.getLast())
+                        return;
+                    const auto onlyMember = members.getFirst();
+                    if(!onlyMember)
+                        return;
+                    const auto onlyArrayMember = as<IRUnsizedArrayType>(onlyMember->getFieldType());
+                    if(!onlyArrayMember)
+                        return;
+                    const auto elemType = onlyArrayMember->getElementType();
+                    arrayLikeSSBOTypes.add(ssbo, {backingStruct, elemType, onlyMember->getKey()});
                 }
             }
+        });
 
-            // Replace all SSBO types with a struct type and all values with
-            // equivalent RWByteAddressBuffer values
-            for (const auto& [key, value] : loweredTuples)
-                key->replaceUsesWith(value->structType);
+        IRBuilder builder{module};
+        for(const auto& [ssbo, info] : arrayLikeSSBOTypes)
+        {
+            builder.setInsertAfter(ssbo);
+            IRInst* operands = info.elementType;
+            const auto sb = builder.getType(
+                kIROp_HLSLRWStructuredBufferType,
+                1,
+                &operands
+            );
+            ssbo->replaceUsesWith(sb);
+            ssbo->removeAndDeallocate();
+
+            Dictionary<IRInst*, SSBOIndexInfo> indexes;
+            traverseUses(info.elementsKey, [&](IRUse* use){
+                if(const auto fieldAddress = as<IRFieldAddress>(use->getUser()))
+                {
+                    traverseUses(use->user, [&](IRUse* arrayUse){
+                        if(const auto gep = as<IRGetElementPtr>(arrayUse->user))
+                        {
+                            SLANG_ASSERT(gep->getBase() == use->user);
+                            indexes.add(gep, {fieldAddress->getBase(), gep->getIndex()});
+                        }
+                        else
+                        {
+                            SLANG_UNIMPLEMENTED_X("Unhandled use of array-like SSBO");
+                        }
+                    });
+                }
+                else if(as<IRStructField>(use->getUser()))
+                {
+                    // We expect and can ignore the use when declaring a struct field
+                }
+                else
+                {
+                    SLANG_UNIMPLEMENTED_X("Unhandled use of array-like SSBO");
+                }
+            });
+            for(const auto& [elemPtr, index] : indexes)
+            {
+                builder.setInsertBefore(elemPtr);
+                const auto sbp = builder.emitRWStructuredBufferGetElementPtr(index.ssboVar, index.index);
+                elemPtr->replaceUsesWith(sbp);
+                elemPtr->removeAndDeallocate();
+            }
         }
-    };
+    }
+
+    static void lowerStructLikeSSBOs(IRModule* module, DiagnosticSink* sink)
+    {
+        // Here we will:
+        // - Identify SSBO types without an unsized array member in the backing
+        //   struct, T
+        // - Create a (RW)StructuredBuffer<T> type
+        // - Replace all uses of the SSBO with the StructuredBuffer type
+
+        Dictionary<IRGLSLShaderStorageBufferType*, StructLikeSSBOInfo> structLikeSSBOTypes;
+        overAllInsts(module, [&](IRInst* inst){
+            if(const auto ssbo = as<IRGLSLShaderStorageBufferType>(inst))
+            {
+                if(const auto backingStruct = as<IRStructType>(ssbo->getElementType()))
+                {
+                    auto members = backingStruct->getFields();
+                    const auto lastMember = members.getLast();
+                    if(lastMember && as<IRUnsizedArrayType>(lastMember->getFieldType()))
+                        return;
+                    structLikeSSBOTypes.add(ssbo, {backingStruct});
+                }
+            }
+        });
+
+        // Collect the uses of these ssbos
+        InstHashSet ssboUses(module);
+        overAllInsts(module, [&](IRInst* inst){
+            StructLikeSSBOInfo slsi;
+            if(const auto ssboType = as<IRGLSLShaderStorageBufferType>(inst->getDataType()))
+                if(structLikeSSBOTypes.tryGetValue(ssboType, slsi))
+                    ssboUses.add(inst);
+        });
+
+        IRBuilder builder{module};
+        for(const auto& [ssbo, info] : structLikeSSBOTypes)
+        {
+            builder.setInsertAfter(ssbo);
+            IRInst* operands = info.backingStruct;
+            const auto sb = builder.getType(
+                kIROp_HLSLRWStructuredBufferType,
+                1,
+                &operands
+            );
+
+            ssbo->replaceUsesWith(sb);
+            ssbo->removeAndDeallocate();
+        }
+
+        for(const auto& var : *ssboUses.set)
+        {
+            traverseUses(var, [&](IRUse* use){
+                builder.setInsertBefore(use->getUser());
+                const auto sbp = builder.emitRWStructuredBufferGetElementPtr(var, builder.getIntValue(builder.getIntType(), 0));
+                use->set(sbp);
+            });
+        }
+    }
 
     void lowerGLSLShaderStorageBufferObjects(IRModule* module, DiagnosticSink* sink)
     {
-        SSBOLoweringContext context(module);
-        context.sink = sink;
-        context.processModule();
+        lowerArrayLikeSSBOs(module, sink);
+        lowerStructLikeSSBOs(module, sink);
     }
 }
