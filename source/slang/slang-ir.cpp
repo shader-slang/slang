@@ -6442,6 +6442,8 @@ namespace Slang
         switch( inst->getOp() )
         {
         case kIROp_StructType:
+        case kIROp_ClassType:
+        case kIROp_GLSLShaderStorageBufferType:
         case kIROp_InterfaceType:
             return false;
 
@@ -6838,6 +6840,8 @@ namespace Slang
 
         case kIROp_WitnessTable:
         case kIROp_StructType:
+        case kIROp_ClassType:
+        case kIROp_GLSLShaderStorageBufferType:
         case kIROp_SPIRVAsm:
             dumpIRParentInst(context, inst);
             return;
@@ -7038,6 +7042,7 @@ namespace Slang
         {
             case kIROp_StructType:
             case kIROp_ClassType:
+            case kIROp_GLSLShaderStorageBufferType:
             case kIROp_InterfaceType:
             case kIROp_Generic:
             case kIROp_Param:
@@ -7763,6 +7768,7 @@ namespace Slang
             // All of the cases for "global values" are side-effect-free.
         case kIROp_StructType:
         case kIROp_StructField:
+        case kIROp_GLSLShaderStorageBufferType:
         case kIROp_RTTIPointerType:
         case kIROp_RTTIObject:
         case kIROp_RTTIType:
