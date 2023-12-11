@@ -36,6 +36,7 @@
 
 // Natural layout 
 #include "slang-ast-natural-layout.h"
+#include "slang/slang-ir-lower-glsl-ssbo-types.h"
 
 namespace Slang
 {
@@ -10337,6 +10338,10 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     //   huge gobs of code in the conditional expression in loops however.
 
     invertLoops(module);
+
+    // TODO: Debug why moving this later causes IR validation errors and perfom
+    // this pass later
+    lowerGLSLShaderStorageBufferObjects(module, compileRequest->getSink());
 
     // Next, attempt to promote local variables to SSA
     // temporaries and do basic simplifications.
