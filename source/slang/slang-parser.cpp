@@ -190,7 +190,7 @@ namespace Slang
         void parseSourceFile(ContainerDecl* parentDecl);
         Decl* ParseStruct();
         ClassDecl* ParseClass();
-        GLSLInterfaceBlockDecl* ParseGLSLInterfaceBlock();
+        Decl* ParseGLSLInterfaceBlock();
         Stmt* ParseStatement(Stmt* parentStmt = nullptr);
         Stmt* parseBlockStatement();
         Stmt* parseLabelStatement();
@@ -2533,9 +2533,36 @@ namespace Slang
                 && parser->LookAheadToken(TokenType::Identifier)
                 && parser->LookAheadToken(TokenType::LBrace,1) )
         {
-            auto decl = parser->ParseGLSLInterfaceBlock();
-            typeSpec.decl = decl;
-            typeSpec.expr = createDeclRefType(parser, decl);
+            // This case is slightly more complicated.
+            // The interface block is parsed into a struct decl, however the
+            // type *expression* we return is actually the application of the
+            // GLSLStructuredBuffer wrapper to this struct
+
+            // Parse the struct
+            auto innerStructDecl = parser->ParseGLSLInterfaceBlock();
+            typeSpec.decl = innerStructDecl;
+
+            // Conjure up the generic wrapper type
+            // The scope is the outer scope, to thwart users calling their
+            // types GLSLShaderStorageBuffer
+            auto bufferWrapperTypeExpr = parser->astBuilder->create<VarExpr>();
+            bufferWrapperTypeExpr->loc = innerStructDecl->getNameLoc();
+            bufferWrapperTypeExpr->name = getName(parser, "GLSLShaderStorageBuffer");
+            bufferWrapperTypeExpr->scope = parser->outerScope;
+
+            // Construct a type expression to reference the buffer data type
+            auto bufferDataTypeExpr = parser->astBuilder->create<VarExpr>();
+            bufferDataTypeExpr->loc = innerStructDecl->loc;
+            bufferDataTypeExpr->name = innerStructDecl->nameAndLoc.name;
+            bufferDataTypeExpr->scope = parser->currentScope;
+
+            // Apply the wrapper
+            auto bufferPointerTypeExpr = parser->astBuilder->create<GenericAppExpr>();
+            bufferPointerTypeExpr->loc = innerStructDecl->loc;
+            bufferPointerTypeExpr->functionExpr = bufferWrapperTypeExpr;
+            bufferPointerTypeExpr->arguments.add(bufferDataTypeExpr);
+
+            typeSpec.expr = bufferPointerTypeExpr;
             return typeSpec;
         }
         else if(parser->LookAheadToken("enum"))
@@ -4588,13 +4615,14 @@ namespace Slang
         return rs;
     }
 
-    GLSLInterfaceBlockDecl* Parser::ParseGLSLInterfaceBlock()
+    Decl* Parser::ParseGLSLInterfaceBlock()
     {
         //
         // MyBlockName { float myData[]; } myBufferName;
         //
+        // This returns a struct decl representing the fields
 
-        auto* rs = astBuilder->create<GLSLInterfaceBlockDecl>();
+        auto* rs = astBuilder->create<StructDecl>();
         FillPosition(rs);
 
         // As for struct, skip completion request token to prevent producing a
