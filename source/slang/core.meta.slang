@@ -1091,12 +1091,15 @@ struct matrix : IArray<vector<T,C>>
     __subscript(int index) -> vector<T,C> { __intrinsic_op($(kIROp_GetElement)) get; }
 }
 
+__intrinsic_op($(kIROp_Eql))
+vector<bool, N> __vectorEql<T, let N:int>(vector<T, N> left, vector<T,N> right);
+
 __generic<T:__BuiltinFloatingPointType, let N : int>
 extension vector<T,N> : IFloat
 {
-    [__unsafeForceInlineEarly] bool lessThan(This other) { return this < other; }
-    [__unsafeForceInlineEarly] bool lessThanOrEquals(This other) { return this <= other; }
-    [__unsafeForceInlineEarly] bool equals(This other) { return all(this == other); }
+    [__unsafeForceInlineEarly] bool lessThan(This other) { return this[0] < other[0]; }
+    [__unsafeForceInlineEarly] bool lessThanOrEquals(This other) { return this[0] <= other[0]; }
+    [__unsafeForceInlineEarly] bool equals(This other) { return all(__vectorEql(this, other)); }
     __intrinsic_op($(kIROp_Add)) This add(This other);
     __intrinsic_op($(kIROp_Sub)) This sub(This other);
     __intrinsic_op($(kIROp_Mul)) This mul(This other);

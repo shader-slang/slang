@@ -214,6 +214,21 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             }).y;
         }
     }
+    
+    __target_intrinsic(glsl, "texture($0, $1)")
+    float __glsl_texture(vector<float, Shape.dimensions+isArray+1> value);
+
+    __glsl_extension(GL_EXT_texture_shadow_lod)
+    __target_intrinsic(glsl, "textureOffset($0, $1, $2)")
+    float __glsl_texture_offset(vector<float, Shape.dimensions+isArray+1> value, constexpr vector<int, Shape.planeDimensions> offset);
+
+    __glsl_extension(GL_EXT_texture_shadow_lod)
+    __target_intrinsic(glsl, "textureLod($0, $1, 0)")
+    float __glsl_texture_level_zero(vector<float, Shape.dimensions+isArray+1> value);
+
+    __glsl_extension(GL_EXT_texture_shadow_lod)
+    __target_intrinsic(glsl, "textureLodOffset($0, $1, 0, $2)")
+    float __glsl_texture_offset_level_zero(vector<float, Shape.dimensions+isArray+1> value, constexpr vector<int, Shape.planeDimensions> offset);
 }
 
 __generic<T:IFloat, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let isShadow:int, let format:int>
@@ -332,21 +347,6 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             };
         }
     }
-
-    __target_intrinsic(glsl, "texture($0, $1)")
-    float __glsl_texture(vector<float, Shape.dimensions+isArray+1> value);
-
-    __glsl_extension(GL_EXT_texture_shadow_lod)
-    __target_intrinsic(glsl, "textureOffset($0, $1, $2)")
-    float __glsl_texture_offset(vector<float, Shape.dimensions+isArray+1> value, constexpr vector<int, Shape.planeDimensions> offset);
-
-    __glsl_extension(GL_EXT_texture_shadow_lod)
-    __target_intrinsic(glsl, "textureLod($0, $1, 0)")
-    float __glsl_texture_level_zero(vector<float, Shape.dimensions+isArray+1> value);
-
-    __glsl_extension(GL_EXT_texture_shadow_lod)
-    __target_intrinsic(glsl, "textureLodOffset($0, $1, 0, $2)")
-    float __glsl_texture_offset_level_zero(vector<float, Shape.dimensions+isArray+1> value, constexpr vector<int, Shape.planeDimensions> offset);
 
     [__readNone]
     [ForceInline]
@@ -590,6 +590,22 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
             }).y;
         }
     }
+    
+    __target_intrinsic(glsl, "texture($p, $2)")
+    float __glsl_texture(SamplerComparisonState s, vector<float, Shape.dimensions+isArray+1> value);
+
+    __glsl_extension(GL_EXT_texture_shadow_lod)
+    __target_intrinsic(glsl, "textureOffset($p, $2, $3)")
+    float __glsl_texture_offset(SamplerComparisonState s, vector<float, Shape.dimensions+isArray+1> value, constexpr vector<int, Shape.planeDimensions> offset);
+
+    __glsl_extension(GL_EXT_texture_shadow_lod)
+    __target_intrinsic(glsl, "textureLod($p, $2, 0)")
+    float __glsl_texture_level_zero(SamplerComparisonState s, vector<float, Shape.dimensions+isArray+1> value);
+
+    __glsl_extension(GL_EXT_texture_shadow_lod)
+    __target_intrinsic(glsl, "textureLodOffset($p, $2, 0, $3)")
+    float __glsl_texture_offset_level_zero(SamplerComparisonState s, vector<float, Shape.dimensions+isArray+1> value, constexpr vector<int, Shape.planeDimensions> offset);
+
 }
 
 __generic<T:IFloat, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let isShadow:int, let format:int>
@@ -733,21 +749,6 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             };
         }
     }
-
-    __target_intrinsic(glsl, "texture($p, $2)")
-    float __glsl_texture(SamplerComparisonState s, vector<float, Shape.dimensions+isArray+1> value);
-
-    __glsl_extension(GL_EXT_texture_shadow_lod)
-    __target_intrinsic(glsl, "textureOffset($p, $2, $3)")
-    float __glsl_texture_offset(SamplerComparisonState s, vector<float, Shape.dimensions+isArray+1> value, constexpr vector<int, Shape.planeDimensions> offset);
-
-    __glsl_extension(GL_EXT_texture_shadow_lod)
-    __target_intrinsic(glsl, "textureLod($p, $2, 0)")
-    float __glsl_texture_level_zero(SamplerComparisonState s, vector<float, Shape.dimensions+isArray+1> value);
-
-    __glsl_extension(GL_EXT_texture_shadow_lod)
-    __target_intrinsic(glsl, "textureLodOffset($p, $2, 0, $3)")
-    float __glsl_texture_offset_level_zero(SamplerComparisonState s, vector<float, Shape.dimensions+isArray+1> value, constexpr vector<int, Shape.planeDimensions> offset);
 
     [__readNone] [ForceInline]
     float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue)
