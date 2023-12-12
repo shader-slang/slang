@@ -3905,6 +3905,8 @@ static TypeLayoutResult _createTypeLayout(
     // This case is mostly to allow users to add new resource types...
     CASE(UntypedBufferResourceType,         RawBuffer);
 
+    CASE(GLSLShaderStorageBufferType,       MutableBuffer);
+
 #undef CASE
 
     else if(auto basicType = as<BasicExpressionType>(type))
