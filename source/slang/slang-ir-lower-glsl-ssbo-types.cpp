@@ -48,7 +48,7 @@ namespace Slang
         IRInst* index;
     };
 
-    static void lowerArrayLikeSSBOs(IRModule* module, DiagnosticSink* sink)
+    static void lowerArrayLikeSSBOs(IRModule* module)
     {
         // Here we will:
         // - Identify SSBO types which comprise a single array field with
@@ -125,7 +125,7 @@ namespace Slang
         }
     }
 
-    static void lowerStructLikeSSBOs(IRModule* module, DiagnosticSink* sink)
+    static void lowerStructLikeSSBOs(IRModule* module)
     {
         // Here we will:
         // - Identify SSBO types without an unsized array member in the backing
@@ -137,6 +137,7 @@ namespace Slang
         overAllInsts(module, [&](IRInst* inst){
             if(const auto ssbo = as<IRGLSLShaderStorageBufferType>(inst))
             {
+                // Storage buffers are always backed by a struct
                 if(const auto backingStruct = as<IRStructType>(ssbo->getElementType()))
                 {
                     auto members = backingStruct->getFields();
@@ -187,9 +188,20 @@ namespace Slang
         }
     }
 
+    static void diagnoseRemainingSSBOs(IRModule* module, DiagnosticSink* sink)
+    {
+        overAllInsts(module, [&](IRInst* inst){
+            if(const auto ssbo = as<IRGLSLShaderStorageBufferType>(inst))
+            {
+                sink->diagnose(ssbo, Diagnostics::unhandledGLSLSSBOType);
+            }
+        });
+    }
+
     void lowerGLSLShaderStorageBufferObjects(IRModule* module, DiagnosticSink* sink)
     {
-        lowerArrayLikeSSBOs(module, sink);
-        lowerStructLikeSSBOs(module, sink);
+        lowerArrayLikeSSBOs(module);
+        lowerStructLikeSSBOs(module);
+        diagnoseRemainingSSBOs(module, sink);
     }
 }

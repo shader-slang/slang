@@ -767,6 +767,8 @@ DIAGNOSTIC(57001, Warning, spirvOptFailed, "spirv-opt failed. $0")
 
 // GLSL Compatibility
 DIAGNOSTIC(58001, Error, entryPointMustReturnVoidWhenGlobalOutputPresent, "entry point must return 'void' when global output variables are present.")
+DIAGNOSTIC(58002, Error, unhandledGLSLSSBOType, "Unhandled GLSL Shader Storage Buffer Object contents, unsized arrays as a final parameter must be the only parameter")
+
 //
 // 8xxxx - Issues specific to a particular library/technology/platform/etc.
 //
