@@ -13,7 +13,6 @@ namespace Slang {
 class InModifier : public Modifier { SLANG_AST_CLASS(InModifier)};
 class OutModifier : public Modifier { SLANG_AST_CLASS(OutModifier)};
 class ConstModifier : public Modifier { SLANG_AST_CLASS(ConstModifier)};
-class InstanceModifier : public Modifier { SLANG_AST_CLASS(InstanceModifier)};
 class BuiltinModifier : public Modifier { SLANG_AST_CLASS(BuiltinModifier)};
 class InlineModifier : public Modifier { SLANG_AST_CLASS(InlineModifier)};
 class VisibilityModifier : public Modifier {SLANG_AST_CLASS(VisibilityModifier)};
@@ -24,7 +23,6 @@ class RequireModifier : public Modifier { SLANG_AST_CLASS(RequireModifier)};
 class ParamModifier : public Modifier { SLANG_AST_CLASS(ParamModifier)};
 class ExternModifier : public Modifier { SLANG_AST_CLASS(ExternModifier)};
 class HLSLExportModifier : public Modifier { SLANG_AST_CLASS(HLSLExportModifier) };
-class InputModifier : public Modifier { SLANG_AST_CLASS(InputModifier)};
 class TransparentModifier : public Modifier { SLANG_AST_CLASS(TransparentModifier)};
 class FromStdLibModifier : public Modifier { SLANG_AST_CLASS(FromStdLibModifier)};
 class PrefixModifier : public Modifier { SLANG_AST_CLASS(PrefixModifier)};

@@ -102,6 +102,9 @@ void printDiagnosticArg(StringBuilder& sb, Token const& token);
 
 struct IRInst;
 void printDiagnosticArg(StringBuilder& sb, IRInst* irObject);
+
+class Modifier;
+void printDiagnosticArg(StringBuilder& sb, Modifier* modifier);
     
 template<typename T>
 void printDiagnosticArg(StringBuilder& sb, RefPtr<T> ptr)

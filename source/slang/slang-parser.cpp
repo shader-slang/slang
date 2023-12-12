@@ -7756,13 +7756,11 @@ namespace Slang
         // a new AST node of the corresponding type.
         
         _makeParseModifier("in",            InModifier::kReflectClassInfo),
-        _makeParseModifier("input",         InputModifier::kReflectClassInfo),
         _makeParseModifier("out",           OutModifier::kReflectClassInfo),
         _makeParseModifier("inout",         InOutModifier::kReflectClassInfo),
         _makeParseModifier("__ref",         RefModifier::kReflectClassInfo),
         _makeParseModifier("__constref",    ConstRefModifier::kReflectClassInfo),
         _makeParseModifier("const",         ConstModifier::kReflectClassInfo),
-        _makeParseModifier("instance",      InstanceModifier::kReflectClassInfo),
         _makeParseModifier("__builtin",     BuiltinModifier::kReflectClassInfo),
         _makeParseModifier("highp",         GLSLPrecisionModifier::kReflectClassInfo),
         _makeParseModifier("lowp",          GLSLPrecisionModifier::kReflectClassInfo),
