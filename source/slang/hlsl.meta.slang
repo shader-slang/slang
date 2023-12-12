@@ -214,7 +214,11 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             }).y;
         }
     }
+}
 
+__generic<T:IFloat, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let isShadow:int, let format:int>
+extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
+{
     [__readNone]
     T Sample(vector<float, Shape.dimensions+isArray> location)
     {
@@ -586,7 +590,11 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
             }).y;
         }
     }
+}
 
+__generic<T:IFloat, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let isShadow:int, let format:int>
+extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
+{
     [__readNone]
     T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location)
     {
