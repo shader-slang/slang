@@ -48,6 +48,8 @@ namespace Slang
 
         void visitUsingDecl(UsingDecl* decl);
 
+        void visitImplementingDecl(ImplementingDecl* decl);
+
         void visitNamespaceDecl(NamespaceDecl* decl);
     };
 
@@ -101,8 +103,6 @@ namespace Slang
         void visitImportDecl(ImportDecl* decl);
 
         void visitIncludeDecl(IncludeDecl* decl);
-
-        void visitImplementingDecl(ImplementingDecl* decl);
 
         void visitGenericTypeParamDecl(GenericTypeParamDecl* decl);
 
@@ -7022,7 +7022,7 @@ namespace Slang
         getSink()->diagnose(decl->moduleNameAndLoc.loc, Diagnostics::includedFileMissingImplementing, name);
     }
 
-    void SemanticsDeclHeaderVisitor::visitImplementingDecl(ImplementingDecl* decl)
+    void SemanticsDeclScopeWiringVisitor::visitImplementingDecl(ImplementingDecl* decl)
     {
         // Don't need to do anything unless we are in a language server context.
         if (!getShared()->isInLanguageServer())
@@ -7052,10 +7052,8 @@ namespace Slang
         if (auto moduleDeclaration = as<ModuleDeclarationDecl>(firstMember))
         {
             // We are trying to implement a file that defines a module, this is expected.
-            return;
         }
-
-        if (auto implementing = as<ImplementingDecl>(firstMember))
+        else if (auto implementing = as<ImplementingDecl>(firstMember))
         {
             getSink()->diagnose(decl->moduleNameAndLoc.loc, Diagnostics::implementingMustReferencePrimaryModuleFile);
             return;

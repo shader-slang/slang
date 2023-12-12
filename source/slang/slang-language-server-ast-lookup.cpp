@@ -669,6 +669,12 @@ bool _findAstNodeImpl(ASTLookupContext& context, SyntaxNode* node)
             if (visitor.dispatchIfNotNull(extDecl->targetType.exp))
                 return true;
         }
+        else if (auto usingDecl = as<UsingDecl>(node))
+        {
+            ASTLookupExprVisitor visitor(&context);
+            if (visitor.dispatchIfNotNull(usingDecl->arg))
+                return true;
+        }
         else if (auto importDecl = as<FileReferenceDeclBase>(node))
         {
             if (_isLocInRange(&context, importDecl->startLoc, importDecl->endLoc))

@@ -4,16 +4,13 @@ module test;
 
 import m;
 
-namespace ns1
-{
-namespace ns2
+namespace ns1.ns2
 {
     int f()
     {
         // Should be able to access g() from m.
         return g();
     }
-}
 }
 
 using ns1.ns2;
