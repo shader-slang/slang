@@ -966,9 +966,9 @@ namespace Slang
         case ASTNodeType::HLSLColumnMajorLayoutModifier:
         case ASTNodeType::GLSLRowMajorLayoutModifier:
         case ASTNodeType::HLSLEffectSharedModifier:
-        case ASTNodeType::HLSLGroupSharedModifier:
         case ASTNodeType::HLSLVolatileModifier:
         case ASTNodeType::GLSLPrecisionModifier:
+        case ASTNodeType::HLSLGroupSharedModifier:
             return modifierType;
 
         case ASTNodeType::HLSLStaticModifier:
@@ -1025,7 +1025,6 @@ namespace Slang
         case ASTNodeType::RayPayloadReadSemantic:
         case ASTNodeType::RayPayloadWriteSemantic:
         case ASTNodeType::GloballyCoherentModifier:
-        case ASTNodeType::HLSLGroupSharedModifier:
             return (as<VarDeclBase>(decl) && isGlobalDecl(decl)) || as<ParamDecl>(decl) || as<GLSLInterfaceBlockDecl>(decl);
 
             // Allowed only on parameters, struct fields and global variables.
@@ -1087,6 +1086,11 @@ namespace Slang
 
         case ASTNodeType::GLSLPrecisionModifier:
             return as<VarDeclBase>(decl) || as<GLSLInterfaceBlockDecl>(decl) || as<CallableDecl>(decl);
+        case ASTNodeType::HLSLGroupSharedModifier:
+            // groupshared must be global or static.
+            if (!as<VarDeclBase>(decl))
+                return false;
+            return isGlobalDecl(decl) || isEffectivelyStatic(decl);
         default:
             return true;
         }
