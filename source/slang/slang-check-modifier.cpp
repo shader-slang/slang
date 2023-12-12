@@ -1025,6 +1025,7 @@ namespace Slang
         case ASTNodeType::RayPayloadReadSemantic:
         case ASTNodeType::RayPayloadWriteSemantic:
         case ASTNodeType::GloballyCoherentModifier:
+        case ASTNodeType::HLSLGroupSharedModifier:
             return (as<VarDeclBase>(decl) && isGlobalDecl(decl)) || as<ParamDecl>(decl) || as<GLSLInterfaceBlockDecl>(decl);
 
             // Allowed only on parameters, struct fields and global variables.
@@ -1081,7 +1082,6 @@ namespace Slang
         case ASTNodeType::HLSLColumnMajorLayoutModifier:
         case ASTNodeType::GLSLRowMajorLayoutModifier:
         case ASTNodeType::HLSLEffectSharedModifier:
-        case ASTNodeType::HLSLGroupSharedModifier:
         case ASTNodeType::HLSLVolatileModifier:
             return as<VarDeclBase>(decl) || as<GLSLInterfaceBlockDecl>(decl);
 
