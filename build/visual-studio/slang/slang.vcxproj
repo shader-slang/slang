@@ -421,6 +421,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-generic-function.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-generic-type.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-generics.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-lower-glsl-ssbo-types.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-l-value-cast.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-optional-type.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-reinterpret.h" />
@@ -637,6 +638,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-generic-function.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-generic-type.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-generics.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-lower-glsl-ssbo-types.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-l-value-cast.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-optional-type.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-reinterpret.cpp" />
