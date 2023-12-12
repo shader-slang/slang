@@ -303,11 +303,11 @@ namespace Slang
         if(!derefExpr)
             return false;
         const auto varExpr = as<VarExpr>(derefExpr->base);
-        const auto varExprType = varExpr->type->getCanonicalType();
-
         // Check the declaration type
         if(!varExpr)
             return false;
+
+        const auto varExprType = varExpr->type->getCanonicalType();
         const auto ssbt = as<GLSLShaderStorageBufferType>(varExprType);
         if(!ssbt)
             return false;
