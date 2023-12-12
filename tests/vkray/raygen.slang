@@ -22,7 +22,7 @@ struct Uniforms
 ConstantBuffer<Uniforms> ubo;
 
 
-layout(rgba8);
+layout(rgba8)
 RWTexture2D<float4> outputImage;
 
 RaytracingAccelerationStructure as;

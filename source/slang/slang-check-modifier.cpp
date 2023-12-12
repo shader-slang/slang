@@ -1007,7 +1007,6 @@ namespace Slang
         case ASTNodeType::InModifier:
         case ASTNodeType::OutModifier:
         case ASTNodeType::InOutModifier:
-        case ASTNodeType::HLSLUniformModifier:
         case ASTNodeType::RefModifier:
         case ASTNodeType::ConstRefModifier:
         case ASTNodeType::GLSLLayoutModifier:
@@ -1036,7 +1035,7 @@ namespace Slang
         case ASTNodeType::HLSLSampleModifier:
         case ASTNodeType::HLSLCentroidModifier:
         case ASTNodeType::PerVertexModifier:
-        case ASTNodeType::PreciseModifier:
+        case ASTNodeType::HLSLUniformModifier:
             return (as<VarDeclBase>(decl) && (isGlobalDecl(decl) || as<StructDecl>(getParentDecl(decl)))) || as<ParamDecl>(decl);
 
         case ASTNodeType::HLSLSemantic:
@@ -1061,7 +1060,8 @@ namespace Slang
         case ASTNodeType::ExternModifier:
         case ASTNodeType::HLSLExportModifier:
         case ASTNodeType::ExternCppModifier:
-            return as<VarDeclBase>(decl) || as<AggTypeDeclBase>(decl) || as<NamespaceDeclBase>(decl) || as<CallableDecl>(decl) || as<TypeDefDecl>(decl) || as<PropertyDecl>(decl);
+            return as<VarDeclBase>(decl) || as<AggTypeDeclBase>(decl) || as<NamespaceDeclBase>(decl) || as<CallableDecl>(decl)
+                || as<TypeDefDecl>(decl) || as<PropertyDecl>(decl) || as<SyntaxDecl>(decl) || as<AttributeDecl>(decl);
 
         case ASTNodeType::ExportedModifier:
             return as<ImportDecl>(decl);
@@ -1069,6 +1069,7 @@ namespace Slang
         case ASTNodeType::ConstModifier:
         case ASTNodeType::HLSLStaticModifier:
         case ASTNodeType::ConstExprModifier:
+        case ASTNodeType::PreciseModifier:
             return as<VarDeclBase>(decl) || as<CallableDecl>(decl);
 
         case ASTNodeType::ActualGlobalModifier:
@@ -1082,9 +1083,10 @@ namespace Slang
         case ASTNodeType::HLSLEffectSharedModifier:
         case ASTNodeType::HLSLGroupSharedModifier:
         case ASTNodeType::HLSLVolatileModifier:
-        case ASTNodeType::GLSLPrecisionModifier:
             return as<VarDeclBase>(decl) || as<GLSLInterfaceBlockDecl>(decl);
 
+        case ASTNodeType::GLSLPrecisionModifier:
+            return as<VarDeclBase>(decl) || as<GLSLInterfaceBlockDecl>(decl) || as<CallableDecl>(decl);
         default:
             return true;
         }
