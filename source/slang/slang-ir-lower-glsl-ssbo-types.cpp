@@ -175,6 +175,11 @@ namespace Slang
         for(const auto& var : *ssboUses.set)
         {
             traverseUses(var, [&](IRUse* use){
+                // We only want to insert this access into blocks, anything
+                // else we assume is just using the identity of the ssbo (for
+                // instance IRStructFieldLayoutAttr)
+                if(!as<IRBlock>(use->getUser()->getParent()))
+                    return;
                 builder.setInsertBefore(use->getUser());
                 const auto sbp = builder.emitRWStructuredBufferGetElementPtr(var, builder.getIntValue(builder.getIntType(), 0));
                 use->set(sbp);
