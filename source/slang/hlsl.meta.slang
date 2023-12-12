@@ -10599,9 +10599,7 @@ struct HitObject
         case glsl:
             {
                 // Save the attributes
-                __ref attr_t attr = __hitObjectAttributes<attr_t>();
-
-                attr = attributes;
+                __hitObjectAttributes<attr_t>() = attributes;
 
                 __glslMakeHit(
                     __return_val,
@@ -10670,9 +10668,7 @@ struct HitObject
         case glsl:
         {
             // Save the attributes
-            __ref attr_t attr = __hitObjectAttributes<attr_t>();
-
-            attr = attributes;
+            __hitObjectAttributes<attr_t>() = attributes;
 
             __glslMakeMotionHit(
                 __return_val,
@@ -10760,8 +10756,7 @@ struct HitObject
         case glsl:
         {
             // Save the attributes
-            __ref attr_t attr = __hitObjectAttributes<attr_t>();
-            attr = attributes;
+            __hitObjectAttributes<attr_t>() = attributes;
 
             __glslMakeHitWithIndex(
                 __return_val,
@@ -10824,8 +10819,7 @@ struct HitObject
         case glsl:
         {
             // Save the attributes
-            __ref attr_t attr = __hitObjectAttributes<attr_t>();
-            attr = attributes;
+            __hitObjectAttributes<attr_t>() = attributes;
 
             __glslMakeMotionHitWithIndex(
                 __return_val,

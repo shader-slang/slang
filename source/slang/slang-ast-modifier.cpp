@@ -10,4 +10,16 @@ const OrderedDictionary<DeclRefBase*, SubtypeWitness*>& DifferentiableAttribute:
         m_mapToIDifferentiableWitness.add(m_typeToIDifferentiableWitnessMappings[i].key, m_typeToIDifferentiableWitnessMappings[i].value);
     return m_mapToIDifferentiableWitness;
 }
+
+void printDiagnosticArg(StringBuilder& sb, Modifier* modifier)
+{
+    if (!modifier)
+        return;
+    if (modifier->keywordName && modifier->keywordName->text.getLength())
+        sb << modifier->keywordName->text;
+    if (auto hlslSemantic = as<HLSLSemantic>(modifier))
+        sb << hlslSemantic->name.getContent();
+    return;
+}
+
 } // namespace Slang

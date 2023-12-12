@@ -919,6 +919,179 @@ namespace Slang
         return attr;
     }
 
+    ASTNodeType getModifierConflictGroupKind(ASTNodeType modifierType)
+    {
+        switch (modifierType)
+        {
+            // Allowed only on parameters and global variables.
+        case ASTNodeType::InModifier:
+            return modifierType;
+        case ASTNodeType::OutModifier:
+        case ASTNodeType::RefModifier:
+        case ASTNodeType::ConstRefModifier:
+        case ASTNodeType::InOutModifier:
+            return ASTNodeType::OutModifier;
+
+            // Modifiers that are their own exclusive group.
+        case ASTNodeType::GLSLLayoutModifier:
+        case ASTNodeType::GLSLParsedLayoutModifier:
+        case ASTNodeType::GLSLConstantIDLayoutModifier:
+        case ASTNodeType::GLSLLocationLayoutModifier:
+        case ASTNodeType::GLSLUnparsedLayoutModifier:
+        case ASTNodeType::GLSLLayoutModifierGroupMarker:
+        case ASTNodeType::GLSLLayoutModifierGroupBegin:
+        case ASTNodeType::GLSLLayoutModifierGroupEnd:
+        case ASTNodeType::GLSLBufferModifier:
+        case ASTNodeType::GLSLWriteOnlyModifier:
+        case ASTNodeType::GLSLReadOnlyModifier:
+        case ASTNodeType::GLSLPatchModifier:
+        case ASTNodeType::RayPayloadAccessSemantic:
+        case ASTNodeType::RayPayloadReadSemantic:
+        case ASTNodeType::RayPayloadWriteSemantic:
+        case ASTNodeType::GloballyCoherentModifier:
+        case ASTNodeType::PreciseModifier:
+        case ASTNodeType::IntrinsicOpModifier:
+        case ASTNodeType::InlineModifier:
+        case ASTNodeType::ExternModifier:
+        case ASTNodeType::HLSLExportModifier:
+        case ASTNodeType::ExternCppModifier:
+        case ASTNodeType::ExportedModifier:
+        case ASTNodeType::ConstModifier:
+        case ASTNodeType::ConstExprModifier:
+        case ASTNodeType::MatrixLayoutModifier:
+        case ASTNodeType::RowMajorLayoutModifier:
+        case ASTNodeType::HLSLRowMajorLayoutModifier:
+        case ASTNodeType::GLSLColumnMajorLayoutModifier:
+        case ASTNodeType::ColumnMajorLayoutModifier:
+        case ASTNodeType::HLSLColumnMajorLayoutModifier:
+        case ASTNodeType::GLSLRowMajorLayoutModifier:
+        case ASTNodeType::HLSLEffectSharedModifier:
+        case ASTNodeType::HLSLGroupSharedModifier:
+        case ASTNodeType::HLSLVolatileModifier:
+        case ASTNodeType::GLSLPrecisionModifier:
+            return modifierType;
+
+        case ASTNodeType::HLSLStaticModifier:
+        case ASTNodeType::ActualGlobalModifier:
+        case ASTNodeType::HLSLUniformModifier:
+            return ASTNodeType::HLSLStaticModifier;
+
+        case ASTNodeType::HLSLNoInterpolationModifier:
+        case ASTNodeType::HLSLNoPerspectiveModifier:
+        case ASTNodeType::HLSLLinearModifier:
+        case ASTNodeType::HLSLSampleModifier:
+        case ASTNodeType::HLSLCentroidModifier:
+        case ASTNodeType::PerVertexModifier:
+            return ASTNodeType::InterpolationModeModifier;
+
+        case ASTNodeType::PrefixModifier:
+        case ASTNodeType::PostfixModifier:
+            return ASTNodeType::PrefixModifier;
+
+        case ASTNodeType::BuiltinModifier:
+        case ASTNodeType::PublicModifier:
+        case ASTNodeType::PrivateModifier:
+        case ASTNodeType::InternalModifier:
+            return ASTNodeType::VisibilityModifier;
+
+        default:
+            return ASTNodeType::NodeBase;
+        }
+    }
+
+    bool isModifierAllowedOnDecl(ASTNodeType modifierType, Decl* decl)
+    {
+        switch (modifierType)
+        {
+            // Allowed only on parameters and global variables.
+        case ASTNodeType::InModifier:
+        case ASTNodeType::OutModifier:
+        case ASTNodeType::InOutModifier:
+        case ASTNodeType::RefModifier:
+        case ASTNodeType::ConstRefModifier:
+        case ASTNodeType::GLSLLayoutModifier:
+        case ASTNodeType::GLSLParsedLayoutModifier:
+        case ASTNodeType::GLSLConstantIDLayoutModifier:
+        case ASTNodeType::GLSLLocationLayoutModifier:
+        case ASTNodeType::GLSLUnparsedLayoutModifier:
+        case ASTNodeType::GLSLLayoutModifierGroupMarker:
+        case ASTNodeType::GLSLLayoutModifierGroupBegin:
+        case ASTNodeType::GLSLLayoutModifierGroupEnd:
+        case ASTNodeType::GLSLBufferModifier:
+        case ASTNodeType::GLSLWriteOnlyModifier:
+        case ASTNodeType::GLSLReadOnlyModifier:
+        case ASTNodeType::GLSLPatchModifier:
+        case ASTNodeType::RayPayloadAccessSemantic:
+        case ASTNodeType::RayPayloadReadSemantic:
+        case ASTNodeType::RayPayloadWriteSemantic:
+        case ASTNodeType::GloballyCoherentModifier:
+            return (as<VarDeclBase>(decl) && isGlobalDecl(decl)) || as<ParamDecl>(decl) || as<GLSLInterfaceBlockDecl>(decl);
+
+            // Allowed only on parameters, struct fields and global variables.
+        case ASTNodeType::InterpolationModeModifier:
+        case ASTNodeType::HLSLNoInterpolationModifier:
+        case ASTNodeType::HLSLNoPerspectiveModifier:
+        case ASTNodeType::HLSLLinearModifier:
+        case ASTNodeType::HLSLSampleModifier:
+        case ASTNodeType::HLSLCentroidModifier:
+        case ASTNodeType::PerVertexModifier:
+        case ASTNodeType::HLSLUniformModifier:
+            return (as<VarDeclBase>(decl) && (isGlobalDecl(decl) || as<StructDecl>(getParentDecl(decl)))) || as<ParamDecl>(decl);
+
+        case ASTNodeType::HLSLSemantic:
+        case ASTNodeType::HLSLLayoutSemantic:
+        case ASTNodeType::HLSLRegisterSemantic:
+        case ASTNodeType::HLSLPackOffsetSemantic:
+        case ASTNodeType::HLSLSimpleSemantic:
+            return (as<VarDeclBase>(decl) && (isGlobalDecl(decl) || as<StructDecl>(getParentDecl(decl)))) || as<ParamDecl>(decl) || as<FuncDecl>(decl);
+
+            // Allowed only on functions
+        case ASTNodeType::IntrinsicOpModifier:
+        case ASTNodeType::SpecializedForTargetModifier:
+        case ASTNodeType::InlineModifier:
+        case ASTNodeType::PrefixModifier:
+        case ASTNodeType::PostfixModifier:
+            return as<CallableDecl>(decl);
+
+        case ASTNodeType::BuiltinModifier:
+        case ASTNodeType::PublicModifier:
+        case ASTNodeType::PrivateModifier:
+        case ASTNodeType::InternalModifier:
+        case ASTNodeType::ExternModifier:
+        case ASTNodeType::HLSLExportModifier:
+        case ASTNodeType::ExternCppModifier:
+            return as<VarDeclBase>(decl) || as<AggTypeDeclBase>(decl) || as<NamespaceDeclBase>(decl) || as<CallableDecl>(decl)
+                || as<TypeDefDecl>(decl) || as<PropertyDecl>(decl) || as<SyntaxDecl>(decl) || as<AttributeDecl>(decl);
+
+        case ASTNodeType::ExportedModifier:
+            return as<ImportDecl>(decl);
+
+        case ASTNodeType::ConstModifier:
+        case ASTNodeType::HLSLStaticModifier:
+        case ASTNodeType::ConstExprModifier:
+        case ASTNodeType::PreciseModifier:
+            return as<VarDeclBase>(decl) || as<CallableDecl>(decl);
+
+        case ASTNodeType::ActualGlobalModifier:
+        case ASTNodeType::MatrixLayoutModifier:
+        case ASTNodeType::RowMajorLayoutModifier:
+        case ASTNodeType::HLSLRowMajorLayoutModifier:
+        case ASTNodeType::GLSLColumnMajorLayoutModifier:
+        case ASTNodeType::ColumnMajorLayoutModifier:
+        case ASTNodeType::HLSLColumnMajorLayoutModifier:
+        case ASTNodeType::GLSLRowMajorLayoutModifier:
+        case ASTNodeType::HLSLEffectSharedModifier:
+        case ASTNodeType::HLSLGroupSharedModifier:
+        case ASTNodeType::HLSLVolatileModifier:
+            return as<VarDeclBase>(decl) || as<GLSLInterfaceBlockDecl>(decl);
+
+        case ASTNodeType::GLSLPrecisionModifier:
+            return as<VarDeclBase>(decl) || as<GLSLInterfaceBlockDecl>(decl) || as<CallableDecl>(decl);
+        default:
+            return true;
+        }
+    }
+
     Modifier* SemanticsVisitor::checkModifier(
         Modifier*        m,
         ModifiableSyntaxNode*   syntaxNode)
@@ -933,6 +1106,15 @@ namespace Slang
             //
 
             return checkAttribute(hlslUncheckedAttribute, syntaxNode);
+        }
+
+        if (auto decl = as<Decl>(syntaxNode))
+        {
+            if (!isModifierAllowedOnDecl(m->astNodeType, decl))
+            {
+                getSink()->diagnose(m, Diagnostics::modifierNotAllowed, m);
+                return m;
+            }
         }
 
         if (auto hlslSemantic = as<HLSLSimpleSemantic>(m))
@@ -1164,9 +1346,25 @@ namespace Slang
         Modifier* resultModifiers = nullptr;
         Modifier** resultModifierLink = &resultModifiers;
 
+        // We will keep track of the modifiers for each conflict group.
+        Dictionary<ASTNodeType, Modifier*> mapExclusiveGroupToModifier;
+
         Modifier* modifier = syntaxNode->modifiers.first;
-        while(modifier)
+        while (modifier)
         {
+            // Check if a modifier belonging to the same conflict group is already
+            // defined.
+            Modifier* existingModifier = nullptr;
+            auto conflictGroup = getModifierConflictGroupKind(modifier->astNodeType);
+            if (conflictGroup != ASTNodeType::NodeBase)
+            {
+                if (mapExclusiveGroupToModifier.tryGetValue(conflictGroup, existingModifier))
+                {
+                    getSink()->diagnose(modifier->loc, Diagnostics::duplicateModifier, modifier, existingModifier);
+                }
+                mapExclusiveGroupToModifier[conflictGroup] = modifier;
+            }
+
             // Because we are rewriting the list in place, we need to extract
             // the next modifier here (not at the end of the loop).
             auto next = modifier->next;
@@ -1177,6 +1375,7 @@ namespace Slang
             modifier->next = nullptr;
 
             auto checkedModifier = checkModifier(modifier, syntaxNode);
+
             if(checkedModifier)
             {
                 // If checking gave us a modifier to add, then we
