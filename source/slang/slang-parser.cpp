@@ -83,6 +83,7 @@ namespace Slang
     {
         bool enableEffectAnnotations = false;
         bool allowGLSLInput = false;
+        bool isInLanguageServer = false;
     };
 
     // TODO: implement two pass parsing for file reference and struct type recognition
@@ -3294,8 +3295,7 @@ namespace Slang
     {
         // We start by parsing the name of the namespace that is being opened.
         //
-        // TODO: We should eventually support a qualified name for
-        // a namespace declaration:
+        // We support a qualified name for a namespace declaration:
         //
         //      namespace A.B { ... }
         //
@@ -3304,86 +3304,94 @@ namespace Slang
         //
         //      namespace A { namespace B { ... } }
         //
-        // TODO: Support we also support the degenerate case of
-        // a namesapce without a name? Should that be treated as
-        // an anonymous (and implicitly imported) namespace, or
-        // something else?
-        //
-        // TODO: Should we support a shorthand syntax for putting
-        // the rest of the current scope/file into a namespace:
-        //
-        //      namespace A.B;
-        //
-        //      ...
-        //
-        NameLoc nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
-
-        // Once we have the name for the namespace, we face a challenge:
-        // either the namespace hasn't been seen before (in which case
-        // we need to create it and start filling it in), or we've seen
-        // the same namespace before inside the same module, such that
-        // we should be adding the declarations we parse to the existing
-        // declarations (so that they share a common scope/parent).
-        //
-        // In each case we will find a namespace that we want to fill in,
-        // but depending on the case we may or may not want to return
-        // a declaration to the caller (since they will try to add
-        // any non-null pointer we return to the AST).
-        //
+        auto parentDecl = parser->currentScope->containerDecl;
+        SLANG_ASSERT(parentDecl);
+        NamespaceDecl* result = nullptr;
         NamespaceDecl* namespaceDecl = nullptr;
-
-        // In order to find out what case we are in, we start by looking
-        // for a namespace declaration of the same name in the parent
-        // declaration.
-        //
+        List<NamespaceDecl*> nestedNamespaceDecls;
+        do
         {
-            auto parentDecl = parser->currentScope->containerDecl;
-            SLANG_ASSERT(parentDecl);
+            namespaceDecl = nullptr;
+            NameLoc nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
+            // Once we have the name for the namespace, we face a challenge:
+            // either the namespace hasn't been seen before (in which case
+            // we need to create it and start filling it in), or we've seen
+            // the same namespace before inside the same module, such that
+            // we should be adding the declarations we parse to the existing
+            // declarations (so that they share a common scope/parent).
+            //
+            // In each case we will find a namespace that we want to fill in,
+            // but depending on the case we may or may not want to return
+            // a declaration to the caller (since they will try to add
+            // any non-null pointer we return to the AST).
+            //
 
-            // We meed to make sure that the member dictionary of
-            // the parent declaration has been built/rebuilt so that
-            // lookup by name will work.
+            // In order to find out what case we are in, we start by looking
+            // for a namespace declaration of the same name in the parent
+            // declaration.
             //
-            // TODO: The current way we rebuild the member dictionary
-            // would make for O(N^2) parsing time in a file that
-            // consisted of N back-to-back `namespace`s, since each
-            // would trigger a rebuild of the member dictionary that
-            // would take O(N) time.
-            //
-
-            // There might be multiple members of the same name
-            // (if we define a namespace `foo` after an overloaded
-            // function `foo` has been defined), and direct member
-            // lookup will only give us the first.
-            //
-            Decl* firstDecl = nullptr;
-            parentDecl->getMemberDictionary().tryGetValue(nameAndLoc.name, firstDecl);
-            //
-            // We will search through the declarations of the name
-            // and find the first that is a namespace (if any).
-            //
-            // Note: we do not issue diagnostics here based on
-            // the potential conflicts between these declarations,
-            // because we want to do as little semantic analysis
-            // as possible in the parser, and we'd rather be
-            // as permissive as possible right now.
-            //
-            for(Decl* d = firstDecl; d; d = d->nextInContainerWithSameName)
             {
-                namespaceDecl = as<NamespaceDecl>(d);
-                if(namespaceDecl)
-                    break;
+
+                // We meed to make sure that the member dictionary of
+                // the parent declaration has been built/rebuilt so that
+                // lookup by name will work.
+                //
+                // TODO: The current way we rebuild the member dictionary
+                // would make for O(N^2) parsing time in a file that
+                // consisted of N back-to-back `namespace`s, since each
+                // would trigger a rebuild of the member dictionary that
+                // would take O(N) time.
+                //
+
+                // There might be multiple members of the same name
+                // (if we define a namespace `foo` after an overloaded
+                // function `foo` has been defined), and direct member
+                // lookup will only give us the first.
+                //
+                Decl* firstDecl = nullptr;
+                parentDecl->getMemberDictionary().tryGetValue(nameAndLoc.name, firstDecl);
+                //
+                // We will search through the declarations of the name
+                // and find the first that is a namespace (if any).
+                //
+                // Note: we do not issue diagnostics here based on
+                // the potential conflicts between these declarations,
+                // because we want to do as little semantic analysis
+                // as possible in the parser, and we'd rather be
+                // as permissive as possible right now.
+                //
+                for (Decl* d = firstDecl; d; d = d->nextInContainerWithSameName)
+                {
+                    namespaceDecl = as<NamespaceDecl>(d);
+                    if (namespaceDecl)
+                        break;
+                }
+
+                // If we didn't find a pre-existing namespace, then
+                // we will go ahead and create one now.
+                //
+                if (!namespaceDecl)
+                {
+                    namespaceDecl = parser->astBuilder->create<NamespaceDecl>();
+                    namespaceDecl->nameAndLoc = nameAndLoc;
+                }
+            }
+            if (!result)
+            {
+                result = namespaceDecl;
+            }
+            else if (parentDecl)
+            {
+                if (auto parentNamespace = as<NamespaceDecl>(parentDecl))
+                {
+                    parser->PushScope(parentDecl);
+                    nestedNamespaceDecls.add(parentNamespace);
+                }
+                AddMember(parentDecl, namespaceDecl);
             }
 
-            // If we didn't find a pre-existing namespace, then
-            // we will go ahead and create one now.
-            //
-            if( !namespaceDecl )
-            {
-                namespaceDecl = parser->astBuilder->create<NamespaceDecl>();
-                namespaceDecl->nameAndLoc = nameAndLoc;
-            }
-        }
+            parentDecl = namespaceDecl;
+        } while (AdvanceIf(parser, TokenType::Dot) || AdvanceIf(parser, TokenType::Scope));
 
         // Now that we have a namespace declaration to fill in
         // (whether a new or existing one), we can parse the
@@ -3392,7 +3400,13 @@ namespace Slang
         //
         parseDeclBody(parser, namespaceDecl);
 
-        return namespaceDecl;
+        for (auto ns : nestedNamespaceDecls)
+        {
+            ns->loc = ns->nameAndLoc.loc;
+            ns->closingSourceLoc = namespaceDecl->closingSourceLoc;
+            parser->PopScope();
+        }
+        return result;
     }
 
     static NodeBase* parseUsingDecl(Parser* parser, void* /*userData*/)
@@ -3929,6 +3943,221 @@ namespace Slang
         return paramDecl;
     }
 
+    static bool shouldDeclBeCheckedForNestingValidity(ASTNodeType declType)
+    {
+        switch (declType)
+        {
+        case ASTNodeType::ExtensionDecl:
+        case ASTNodeType::StructDecl:
+        case ASTNodeType::ClassDecl:
+        case ASTNodeType::GLSLInterfaceBlockDecl:
+        case ASTNodeType::EnumDecl:
+        case ASTNodeType::InterfaceDecl:
+        case ASTNodeType::ConstructorDecl:
+        case ASTNodeType::AccessorDecl:
+        case ASTNodeType::GetterDecl:
+        case ASTNodeType::SetterDecl:
+        case ASTNodeType::RefAccessorDecl:
+        case ASTNodeType::FuncDecl:
+        case ASTNodeType::SubscriptDecl:
+        case ASTNodeType::PropertyDecl:
+        case ASTNodeType::NamespaceDecl:
+        case ASTNodeType::ModuleDecl:
+        case ASTNodeType::FileDecl:
+        case ASTNodeType::GenericDecl:
+        case ASTNodeType::VarDecl:
+        case ASTNodeType::LetDecl:
+        case ASTNodeType::TypeDefDecl:
+        case ASTNodeType::TypeAliasDecl:
+        case ASTNodeType::UsingDecl:
+        case ASTNodeType::ImportDecl:
+        case ASTNodeType::IncludeDeclBase:
+        case ASTNodeType::IncludeDecl:
+        case ASTNodeType::ImplementingDecl:
+        case ASTNodeType::ModuleDeclarationDecl:
+        case ASTNodeType::AssocTypeDecl:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    // Can a decl of `declType` be allowed as a children of `parentType`?
+    static bool isDeclAllowed(bool languageServer, ASTNodeType parentType, ASTNodeType declType)
+    {
+        // If decl is not known as a decl that can be written by the user (e.g. a synthesized decl type),
+        // then we just allow it.
+        if (!shouldDeclBeCheckedForNestingValidity(declType))
+            return true;
+
+        switch (parentType)
+        {
+        case ASTNodeType::ExtensionDecl:
+            switch (declType)
+            {
+            case ASTNodeType::FuncDecl:
+            case ASTNodeType::SubscriptDecl:
+            case ASTNodeType::PropertyDecl:
+            case ASTNodeType::TypeAliasDecl:
+            case ASTNodeType::TypeDefDecl:
+            case ASTNodeType::VarDecl:
+            case ASTNodeType::LetDecl:
+            case ASTNodeType::StructDecl:
+            case ASTNodeType::ClassDecl:
+            case ASTNodeType::EnumDecl:
+            case ASTNodeType::GenericDecl:
+            case ASTNodeType::ConstructorDecl:
+                return true;
+            default:
+                return false;
+            }
+        case ASTNodeType::StructDecl:
+        case ASTNodeType::ClassDecl:
+        case ASTNodeType::EnumDecl:
+            switch (declType)
+            {
+            case ASTNodeType::FuncDecl:
+            case ASTNodeType::SubscriptDecl:
+            case ASTNodeType::PropertyDecl:
+            case ASTNodeType::TypeAliasDecl:
+            case ASTNodeType::TypeDefDecl:
+            case ASTNodeType::VarDecl:
+            case ASTNodeType::LetDecl:
+            case ASTNodeType::StructDecl:
+            case ASTNodeType::ClassDecl:
+            case ASTNodeType::EnumDecl:
+            case ASTNodeType::EnumCaseDecl:
+            case ASTNodeType::GenericDecl:
+            case ASTNodeType::ConstructorDecl:
+                return true;
+            default:
+                return false;
+            }
+        case ASTNodeType::InterfaceDecl:
+            switch (declType)
+            {
+            case ASTNodeType::FuncDecl:
+            case ASTNodeType::SubscriptDecl:
+            case ASTNodeType::PropertyDecl:
+            case ASTNodeType::AssocTypeDecl:
+            case ASTNodeType::TypeAliasDecl:
+            case ASTNodeType::TypeDefDecl:
+            case ASTNodeType::VarDecl:
+            case ASTNodeType::LetDecl:
+            case ASTNodeType::StructDecl:
+            case ASTNodeType::ClassDecl:
+            case ASTNodeType::EnumDecl:
+            case ASTNodeType::GenericDecl:
+            case ASTNodeType::ConstructorDecl:
+                return true;
+            default:
+                return false;
+            }
+        case ASTNodeType::GLSLInterfaceBlockDecl:
+            switch (declType)
+            {
+            case ASTNodeType::VarDecl:
+            case ASTNodeType::LetDecl:
+                return true;
+            default:
+                return false;
+            }
+        case ASTNodeType::ConstructorDecl:
+        case ASTNodeType::AccessorDecl:
+        case ASTNodeType::GetterDecl:
+        case ASTNodeType::SetterDecl:
+        case ASTNodeType::RefAccessorDecl:
+        case ASTNodeType::FuncDecl:
+            switch (declType)
+            {
+            case ASTNodeType::TypeAliasDecl:
+            case ASTNodeType::TypeDefDecl:
+            case ASTNodeType::VarDecl:
+            case ASTNodeType::LetDecl:
+            case ASTNodeType::StructDecl:
+            case ASTNodeType::ClassDecl:
+            case ASTNodeType::EnumDecl:
+            case ASTNodeType::GenericDecl:
+                return true;
+            default:
+                return false;
+            }
+        case ASTNodeType::SubscriptDecl:
+        case ASTNodeType::PropertyDecl:
+            switch (declType)
+            {
+            case ASTNodeType::AccessorDecl:
+            case ASTNodeType::GetterDecl:
+            case ASTNodeType::SetterDecl:
+            case ASTNodeType::RefAccessorDecl:
+                return true;
+            default:
+                return false;
+            }
+        case ASTNodeType::ModuleDecl:
+        case ASTNodeType::FileDecl:
+        case ASTNodeType::NamespaceDecl:
+            switch (declType)
+            {
+            case ASTNodeType::ImplementingDecl:
+                return parentType == ASTNodeType::FileDecl || languageServer && parentType == ASTNodeType::ModuleDecl;
+            case ASTNodeType::ModuleDeclarationDecl:
+                return parentType == ASTNodeType::ModuleDecl || languageServer && parentType == ASTNodeType::FileDecl;
+            case ASTNodeType::NamespaceDecl:
+            case ASTNodeType::FileDecl:
+            case ASTNodeType::UsingDecl:
+            case ASTNodeType::ImportDecl:
+            case ASTNodeType::IncludeDecl:
+            case ASTNodeType::GenericDecl:
+            case ASTNodeType::VarDecl:
+            case ASTNodeType::LetDecl:
+            case ASTNodeType::TypeDefDecl:
+            case ASTNodeType::TypeAliasDecl:
+            case ASTNodeType::FuncDecl:
+            case ASTNodeType::SubscriptDecl:
+            case ASTNodeType::PropertyDecl:
+            case ASTNodeType::StructDecl:
+            case ASTNodeType::ClassDecl:
+            case ASTNodeType::EnumDecl:
+            case ASTNodeType::InterfaceDecl:
+            case ASTNodeType::GLSLInterfaceBlockDecl:
+            case ASTNodeType::ExtensionDecl:
+                return true;
+            default:
+                return false;
+            }
+        case ASTNodeType::GenericDecl:
+            switch (declType)
+            {
+            case ASTNodeType::StructDecl:
+            case ASTNodeType::ClassDecl:
+            case ASTNodeType::EnumDecl:
+            case ASTNodeType::InterfaceDecl:
+            case ASTNodeType::FuncDecl:
+            case ASTNodeType::ConstructorDecl:
+            case ASTNodeType::TypeAliasDecl:
+            case ASTNodeType::TypeDefDecl:
+            case ASTNodeType::ExtensionDecl:
+                return true;
+            default:
+                return false;
+            }
+        case ASTNodeType::VarDecl:
+        case ASTNodeType::LetDecl:
+        case ASTNodeType::TypeDefDecl:
+        case ASTNodeType::TypeAliasDecl:
+        case ASTNodeType::UsingDecl:
+        case ASTNodeType::ImportDecl:
+        case ASTNodeType::IncludeDecl:
+        case ASTNodeType::ImplementingDecl:
+        case ASTNodeType::ModuleDeclarationDecl:
+        case ASTNodeType::AssocTypeDecl:
+            return true;
+        default:
+            return true;
+        }
+    }
+
     // Parse declaration of a name to be used for resolving `[attribute(...)]` style modifiers.
     //
     // These are distinct from `syntax` declarations, because their names don't get added
@@ -4008,7 +4237,7 @@ namespace Slang
 
     // Finish up work on a declaration that was parsed
     static void CompleteDecl(
-        Parser*				/*parser*/,
+        Parser*				parser,
         Decl*		decl,
         ContainerDecl*		containerDecl,
         Modifiers			modifiers)
@@ -4034,10 +4263,31 @@ namespace Slang
             declToModify = genericDecl->inner;
         _addModifiers(declToModify, modifiers);
 
-        if (containerDecl && !as<GenericDecl>(containerDecl))
+        if (containerDecl)
         {
-            // Make sure the decl is properly nested inside its lexical parent
-            AddMember(containerDecl, decl);
+            // Check that the declaration is actually allowed to be nested inside container.
+            if (!isDeclAllowed(parser->options.isInLanguageServer, containerDecl->astNodeType, decl->astNodeType))
+            {
+                parser->sink->diagnose(decl->loc, Diagnostics::declNotAllowed, decl->astNodeType);
+            }
+            else
+            {
+                // For generic decls, we also need to check if the inner decl type is allowed to be
+                // nested here.
+                if (declToModify && declToModify != decl)
+                {
+                    if (!isDeclAllowed(parser->options.isInLanguageServer, containerDecl->astNodeType, declToModify->astNodeType))
+                    {
+                        parser->sink->diagnose(decl->loc, Diagnostics::declNotAllowed, declToModify->astNodeType);
+                    }
+                }
+            }
+
+            if (!as<GenericDecl>(containerDecl))
+            {
+                // Make sure the decl is properly nested inside its lexical parent
+                AddMember(containerDecl, decl);
+            }
         }
     }
 
@@ -6982,6 +7232,7 @@ namespace Slang
         ParserOptions options = {};
         options.enableEffectAnnotations = translationUnit->compileRequest->getLinkage()->getEnableEffectAnnotations();
         options.allowGLSLInput = translationUnit->compileRequest->getLinkage()->getAllowGLSLInput();
+        options.isInLanguageServer = translationUnit->compileRequest->getLinkage()->isInLanguageServer();
 
         Parser parser(astBuilder, tokens, sink, outerScope, options);
         parser.namePool = translationUnit->getNamePool();

@@ -65,6 +65,7 @@ namespace Slang
     void printDiagnosticArg(StringBuilder& sb, QualType const& type);
     void printDiagnosticArg(StringBuilder& sb, Val* val);
     void printDiagnosticArg(StringBuilder& sb, DeclRefBase* declRefBase);
+    void printDiagnosticArg(StringBuilder& sb, ASTNodeType nodeType);
 
     struct QualifiedDeclPath
     {
@@ -390,6 +391,10 @@ namespace Slang
             /// form (in which it has the appropriate C++ subclass) happens here.
             ///
         ModifiersChecked,
+
+            /// Wiring up scopes of namespaces with their siblings defined in different
+            /// files/modules, and other namespaces imported via `using`.
+        ScopesWired,
 
             /// The type/signature of the declaration has been checked.
             ///

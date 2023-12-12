@@ -1048,6 +1048,11 @@ namespace Slang
 
         Scope* getScope(SyntaxNode* node);
 
+        // Add a sibling lookup scope for `dest` to refer to `source`.
+        void addSiblingScopeForContainerDecl(ContainerDecl* dest, ContainerDecl* source);
+        void addSiblingScopeForContainerDecl(Scope* destScope, ContainerDecl* source);
+
+
         void diagnoseDeprecatedDeclRefUsage(DeclRef<Decl> declRef, SourceLoc loc, Expr* originalExpr);
 
         DeclRef<Decl> getDefaultDeclRef(Decl* decl)

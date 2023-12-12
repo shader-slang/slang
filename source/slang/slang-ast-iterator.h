@@ -432,7 +432,7 @@ template <typename CallbackFunc>
 void ASTIterator<CallbackFunc>::visitDecl(DeclBase* decl)
 {
     // Don't look at the decl if it is defined in a different file.
-    if (!as<ModuleDecl>(decl) && !sourceManager->getHumaneLoc(decl->loc, SourceLocType::Actual)
+    if (!as<NamespaceDeclBase>(decl) && !sourceManager->getHumaneLoc(decl->loc, SourceLocType::Actual)
                                       .pathInfo.foundPath.getUnownedSlice()
                                       .endsWithCaseInsensitive(fileName))
         return;
@@ -467,6 +467,10 @@ void ASTIterator<CallbackFunc>::visitDecl(DeclBase* decl)
     else if (auto extDecl = as<ExtensionDecl>(decl))
     {
         visitExpr(extDecl->targetType.exp);
+    }
+    else if (auto usingDecl = as<UsingDecl>(decl))
+    {
+        visitExpr(usingDecl->arg);
     }
     if (auto container = as<ContainerDecl>(decl))
     {

@@ -248,6 +248,20 @@ namespace Slang
         return SourceLoc();
     }
 
+    void SemanticsVisitor::addSiblingScopeForContainerDecl(ContainerDecl* dest, ContainerDecl* source)
+    {
+        addSiblingScopeForContainerDecl(dest->ownedScope, source);
+    }
+
+    void SemanticsVisitor::addSiblingScopeForContainerDecl(Scope* destScope, ContainerDecl* source)
+    {
+        auto subScope = getASTBuilder()->create<Scope>();
+        subScope->containerDecl = source;
+
+        subScope->nextSibling = destScope->nextSibling;
+        destScope->nextSibling = subScope;
+    }
+
     void SemanticsVisitor::diagnoseDeprecatedDeclRefUsage(
         DeclRef<Decl> declRef,
         SourceLoc loc,
@@ -847,7 +861,10 @@ namespace Slang
         {
             return getDeclVisibility(interfaceDecl);
         }
-
+        else if (as<NamespaceDecl>(decl))
+        {
+            return DeclVisibility::Public;
+        }
         if (auto parentModule = getModuleDecl(decl))
             return parentModule->isInLegacyLanguage ? DeclVisibility::Public : DeclVisibility::Internal;
 
@@ -3541,6 +3558,11 @@ namespace Slang
         LookupResult globalLookupResult;
         bool hasErrors = false;
         Expr* base = nullptr;
+
+        // Keep track of namespace scopes we've already looked up in to avoid producing
+        // duplicates.
+        HashSet<ContainerDecl*> processedNamespaceScopes;
+
         auto handleLeafCase = [&](DeclRef<Decl> baseDeclRef, Type* type)
             {
                 auto aggTypeDeclRef = as<AggTypeDeclBase>(baseDeclRef);
@@ -3549,18 +3571,44 @@ namespace Slang
                 {
                     // We are looking up a namespace member.
                     //
-                    // This ought to be the easy case, because
-                    // there are no restrictions on whether
-                    // we can reference the declaration here.
+                    // We should lookup in all sibling scopes of the namespace.
+                    // Another detail here is that we need to skip scopes that are transitively imported.
+                    // For example, given:
+                    // ```
+                    //     module a;
+                    //     namespace ns { int f_a(); }
+                    // 
+                    //     module b;
+                    //     namespace ns { int f_b(); } // will have a sibling scope that refers to a::ns.
+                    // 
+                    //     module c;
+                    //     import b;
+                    //     void test() {ns.f_a(); // should not be valid, because c does not import a. }
+                    // ```
+                    // Note that this logic doesn't work nicely with __exported import, but we should consider
+                    // deprecate this feature anyway.
                     //
-                    LookupResult nsLookupResult = lookUpDirectAndTransparentMembers(
-                        m_astBuilder,
-                        this,
-                        expr->name,
-                        namespaceDeclRef.getDecl(),
-                        namespaceDeclRef);
-                    AddToLookupResult(globalLookupResult, nsLookupResult);
+                    auto namespaceModule = getModuleDecl(namespaceDeclRef.getDecl());
+                    auto thisModule = m_outerScope ? getModuleDecl(m_outerScope->containerDecl) : namespaceModule;
 
+                    for (auto scope = namespaceDeclRef.getDecl()->ownedScope; scope; scope = scope->nextSibling)
+                    {
+                        auto namespaceDecl = as<NamespaceDeclBase>(scope->containerDecl);
+                        if (!namespaceDecl)
+                            continue;
+                        if (thisModule != namespaceModule && namespaceModule != getModuleDecl(namespaceDecl))
+                            continue;
+                        if (processedNamespaceScopes.add(scope->containerDecl))
+                        {
+                            LookupResult nsLookupResult = lookUpDirectAndTransparentMembers(
+                                m_astBuilder,
+                                this,
+                                expr->name,
+                                namespaceDecl,
+                                DeclRef(namespaceDecl));
+                            AddToLookupResult(globalLookupResult, nsLookupResult);
+                        }
+                    }
                 }
                 else if (aggTypeDeclRef || type)
                 {

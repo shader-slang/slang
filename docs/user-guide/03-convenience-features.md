@@ -35,6 +35,68 @@ let a = 5;
 a = 6; // Error, `a` is immutable.
 ```
 
+
+## Namespaces
+
+You can use the `namespace` syntax to define symbols in a namespace:
+```csharp
+namespace ns
+{
+    int f();
+}
+```
+
+Slang also supports the abbreviated syntax for defining nested namespaces:
+```csharp
+namespace ns1.ns2
+{
+    int f();
+}
+// equivalent to:
+namespace ns1::ns2
+{
+    int f();
+}
+// equivalent to:
+namespace ns1
+{
+    namespace ns2
+    {
+        int f();
+    }
+}
+```
+
+To access symbols defined in a namespace, you can use its qualified name with namespace prefixes:
+```csharp
+void test()
+{
+    ns1.ns2.f();
+    ns1::ns2::f(); // equivalent syntax.
+}
+```
+
+Symbols defined in the same namespace can access each other without a qualified name, this is true even if the referenced symbol is defined in a different file or module:
+```csharp
+namespace ns
+{
+    int f();
+    int g() { f(); } // OK.
+}
+```
+
+You can also use the `using` keyword to pull symbols defined in a different namespace to
+the current scope, removing the requirement for using fully qualified names.
+```csharp
+namespace ns1.ns2
+{
+    int f();
+}
+
+using ns1.ns2;
+void test() { f(); } // OK.
+```
+
 ## Member functions
 
 Slang supports defining member functions in `struct`s. For example, it is allowed to write:
