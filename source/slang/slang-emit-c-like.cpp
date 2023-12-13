@@ -3719,31 +3719,80 @@ void CLikeSourceEmitter::_emitInstAsVarInitializerImpl(IRInst* inst)
     emitOperand(inst, getInfo(EmitOp::General));
 }
 
+bool _isFoldableValue(IRInst* val)
+{
+    if (val->getParent() && val->getParent()->getOp() == kIROp_Module)
+        return true;
+
+    switch (val->getOp())
+    {
+    case kIROp_MakeArray:
+    case kIROp_MakeVector:
+    case kIROp_MakeMatrix:
+    case kIROp_MakeStruct:
+    case kIROp_MakeVectorFromScalar:
+    case kIROp_MakeArrayFromElement:
+    case kIROp_MakeMatrixFromScalar:
+    case kIROp_CastIntToFloat:
+    case kIROp_CastFloatToInt:
+    case kIROp_IntCast:
+    case kIROp_FloatCast:
+    {
+        for (UInt i = 0; i < val->getOperandCount(); i++)
+            if (!_isFoldableValue(val->getOperand(i)))
+                return false;
+        return true;
+    }
+    default:
+        return false;
+    }
+}
+
 void CLikeSourceEmitter::emitGlobalVar(IRGlobalVar* varDecl)
 {
     auto allocatedType = varDecl->getDataType();
     auto varType = allocatedType->getValueType();
 
     String initFuncName;
-    if (varDecl->getFirstBlock())
+    IRInst* initVal = nullptr;
+
+    if (auto firstBlock = varDecl->getFirstBlock())
     {
-        emitFunctionPreambleImpl(varDecl);
-
         // A global variable with code means it has an initializer
-        // associated with it. Eventually we'd like to emit that
-        // initializer directly as an expression here, but for
-        // now we'll emit it as a separate function.
+        // associated with it.
 
-        initFuncName = getName(varDecl);
-        initFuncName.append("_init");
+        if (auto returnInst = as<IRReturn>(firstBlock->getTerminator()))
+        {
+            // If the initializer can be conveniently emitted as an
+            // expression, we will do that.
+            if (_isFoldableValue(returnInst->getVal()))
+            {
+                initVal = returnInst->getVal();
+            }
+        }
+        if (!initVal)
+        {
+            emitFunctionPreambleImpl(varDecl);
 
-        m_writer->emit("\n");
-        emitType(varType, initFuncName);
-        m_writer->emit("()\n{\n");
-        m_writer->indent();
-        emitFunctionBody(varDecl);
-        m_writer->dedent();
-        m_writer->emit("}\n");
+            // If we can't emit the initializer as an expression,
+            // we will emit it as a separate function.
+            // 
+            // TODO: the C language does not allow defining
+            // functions that return arrays, so if we have an
+            // array type here, we are going to generate invalid
+            // code.
+
+            initFuncName = getName(varDecl);
+            initFuncName.append("_init");
+
+            m_writer->emit("\n");
+            emitType(varType, initFuncName);
+            m_writer->emit("()\n{\n");
+            m_writer->indent();
+            emitFunctionBody(varDecl);
+            m_writer->dedent();
+            m_writer->emit("}\n");
+        }
     }
 
     // An ordinary global variable won't have a layout
@@ -3784,10 +3833,16 @@ void CLikeSourceEmitter::emitGlobalVar(IRGlobalVar* varDecl)
     if (varDecl->getFirstBlock())
     {
         m_writer->emit(" = ");
-        m_writer->emit(initFuncName);
-        m_writer->emit("()");
+        if (initVal)
+        {
+            emitInstExpr(initVal, EmitOpInfo());
+        }
+        else
+        {
+            m_writer->emit(initFuncName);
+            m_writer->emit("()");
+        }
     }
-
     m_writer->emit(";\n\n");
 }
 
