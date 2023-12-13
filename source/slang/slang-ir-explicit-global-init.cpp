@@ -187,11 +187,28 @@ struct MoveGlobalVarInitializationToEntryPointsPass
             //
             auto valType = globalVar->getDataType()->getValueType();
 
-            // We compute the initial value for the variable by calling
-            // the initial-value function with no arguments, and then
-            // we store that value into the corresponding global.
-            //
-            auto initVal = builder.emitCallInst(valType, initFunc, 0, nullptr);
+            // To simplify the resulting code a bit, if we see the
+            // initFunc just returns a constant value, then we just
+            // use that inline.
+            IRInst* initVal = nullptr;
+            if (auto initFirstBlock = initFunc->getFirstBlock())
+            {
+                if (auto returnInst = as<IRReturn>(initFirstBlock->getTerminator()))
+                {
+                    if (returnInst->getVal() && returnInst->getVal()->getParent() == m_module->getModuleInst())
+                    {
+                        initVal = returnInst->getVal();
+                    }
+                }
+            }
+            if (!initVal)
+            {
+                // We compute the initial value for the variable by calling
+                // the initial-value function with no arguments, and then
+                // we store that value into the corresponding global.
+                //
+                initVal = builder.emitCallInst(valType, initFunc, 0, nullptr);
+            }
             builder.emitStore(globalVar, initVal);
         }
     }
