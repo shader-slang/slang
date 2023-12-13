@@ -8081,7 +8081,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
             else
             {
-                SLANG_UNIMPLEMENTED_X("Unimplemented flavor of GLSL interface block");
+                return LoweredValInfo();
             }
         }
         else
