@@ -11,5 +11,4 @@ namespace Slang
     void lowerGLSLShaderStorageBufferObjects(
         IRModule* module,
         DiagnosticSink* sink);
-
 }
