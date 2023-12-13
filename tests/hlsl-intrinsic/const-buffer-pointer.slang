@@ -1,8 +1,10 @@
 //TEST:SIMPLE(filecheck=CHECK):-target glsl -profile glsl_450 -entry main -stage compute
 //TEST:SIMPLE(filecheck=SPV):-target spirv -profile glsl_450 -entry main -stage compute
-
+//TEST:SIMPLE(filecheck=SPV):-target spirv -profile glsl_450 -entry main -stage compute -emit-spirv-directly
+// SPV: OpMemoryModel PhysicalStorageBuffer64
 // SPV: OpEntryPoint GLCompute {{.*}} "main" {{.*}}
-
+// SPV: OpTypePointer PhysicalStorageBuffer
+// SPV: OpINotEqual
 struct MyStruct
 {
     float4 position;
@@ -34,6 +36,9 @@ RWStructuredBuffer<uint> outputBuffer;
 [numthreads(1,1,1)]
 void main(int3 tid: SV_DispatchThreadID)
 {
-    MyStruct s = gGlobals.pStruct.get();
-    outputBuffer[tid.x] = uint(s.position.x);
+    if (gGlobals.pStruct.isValid())
+    {
+        MyStruct s = gGlobals.pStruct.get();
+        outputBuffer[tid.x] = uint(s.position.x);
+    }
 }

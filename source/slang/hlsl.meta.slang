@@ -12546,7 +12546,37 @@ struct ConstBufferPointer
 {
     __glsl_version(450)
     __glsl_extension(GL_EXT_buffer_reference)
-    __target_intrinsic(glsl, "$0._data")
     [__NoSideEffect]
-    T get();
+    T get()
+    {
+        __target_switch
+        {
+        case glsl:
+            __intrinsic_asm "$0._data";
+        case spirv:
+            return spirv_asm {
+                result:$$T = OpLoad $this Aligned $Alignment;
+            };
+        }
+    }
+
+    __glsl_version(450)
+    __glsl_extension(GL_EXT_shader_explicit_arithmetic_types_int64)
+    __glsl_extension(GL_EXT_buffer_reference)
+    [__NoSideEffect]
+    [ForceInline]
+    bool isValid()
+    {
+        __target_switch
+        {
+        case glsl:
+            __intrinsic_asm "(uint64_t($0) != 0)";
+        case spirv:
+            uint64_t zero = 0ULL;
+            return spirv_asm {
+                %ptrval:$$uint64_t = OpConvertPtrToU $this;
+                result:$$bool = OpINotEqual %ptrval $zero;
+            };
+        }
+    }
 }

@@ -429,6 +429,8 @@ struct SPIRVEmitContext
         /// The next destination `<id>` to allocate.
     SpvWord m_nextID = 1;
 
+    SpvAddressingModel m_addressingMode = SpvAddressingModelLogical;
+
     // We will store the logical sections of the SPIR-V module
     // in a single array so that we can easily look up a
     // section by its `SpvLogicalSectionID`.
@@ -1200,7 +1202,7 @@ struct SPIRVEmitContext
         emitOpMemoryModel(
             getSection(SpvLogicalSectionID::MemoryModel),
             nullptr,
-            SpvAddressingModelLogical,
+            m_addressingMode,
             SpvMemoryModelGLSL450
         );
     }
@@ -1393,6 +1395,14 @@ struct SPIRVEmitContext
             ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_shader_invocation_reorder"));
             requireSPIRVCapability(SpvCapabilityShaderInvocationReorderNV);
             return emitOpTypeHitObject(inst);
+
+        case kIROp_HLSLConstBufferPointerType:
+            ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_variable_pointers"));
+            requireSPIRVCapability(SpvCapabilityVariablePointers);
+            ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_physical_storage_buffer"));
+            requireSPIRVCapability(SpvCapabilityPhysicalStorageBufferAddresses);
+            m_addressingMode = SpvAddressingModelPhysicalStorageBuffer64;
+            return emitOpTypePointer(inst, SpvStorageClassPhysicalStorageBuffer, inst->getOperand(0));
 
         case kIROp_FuncType:
             // > OpTypeFunction
@@ -4908,7 +4918,6 @@ SlangResult emitSPIRVFromIR(
     }
 #endif
 
-    context.emitFrontMatter();
     for (auto inst : irModule->getGlobalInsts())
     {
         if (as<IRDebugSource>(inst))
@@ -4925,6 +4934,8 @@ SlangResult emitSPIRVFromIR(
     {
         context.ensureInst(irEntryPoint);
     }
+    context.emitFrontMatter();
+
     context.emitPhysicalLayout();
 
     spirvOut.addRange(
