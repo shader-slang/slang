@@ -7661,11 +7661,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             //
             //      if(!isInitialized) { <globalVal> = <initExpr>; isInitialized = true; }
             //
-            // TODO: we could conceivably optimize this by detecting
-            // when the `initExpr` lowers to just a reference to a constant,
-            // and then either deleting the extra code structure there,
-            // or not generating it in the first place. That is a bit
-            // more complexity than I'm ready for at the moment.
+            // This will generate a lot of boilterplate code, but we optimize out the
+            // boilerplate functions later during `moveGlobalVarInitializationToEntryPoints`
+            // if we see the init function is just returning a global constant.
             //
             auto boolBuilder = subBuilder;
 
