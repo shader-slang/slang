@@ -834,7 +834,7 @@ Result linkAndOptimizeIR(
     {
     default:
         break;
-
+    case CodeGenTarget::GLSL:
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
         moveGlobalVarInitializationToEntryPoints(irModule);

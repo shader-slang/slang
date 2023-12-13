@@ -7672,11 +7672,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             auto irBoolType = boolBuilder->getBoolType();
             auto irBool = boolBuilder->createGlobalVar(irBoolType);
             boolBuilder->setInsertInto(irBool);
-            boolBuilder->setInsertInto(boolBuilder->createBlock());
+            boolBuilder->emitBlock();
             boolBuilder->emitReturn(boolBuilder->getBoolValue(false));
 
             auto boolVal = LoweredValInfo::ptr(irBool);
-
 
             // Okay, with our global Boolean created, we can move on to
             // generating the code we actually care about, back in the original function.
