@@ -167,78 +167,78 @@ public vector<T,4> texelFetch<T:__BuiltinArithmeticType, let N : int> (Sampler2D
 }
 
 [ForceInline]
-public vector<T,4> texture<T:__BuiltinArithmeticType, let N : int> (Sampler1D<vector<T,N>> sampler, float p, float bias = 0.0)
+public vector<T,4> texture<T:__BuiltinFloatingPointType, let N : int> (Sampler1D<vector<T,N>> sampler, float p, float bias = 0.0)
 {
     return __vectorReshape<4>(sampler.SampleBias(p, bias));
 }
 
 [ForceInline]
-public vector<T,4> texture<T:__BuiltinArithmeticType, let N : int> (Sampler2D<vector<T,N>> sampler, float2 p, float bias = 0.0)
+public vector<T,4> texture<T:__BuiltinFloatingPointType, let N : int> (Sampler2D<vector<T,N>> sampler, float2 p, float bias = 0.0)
 {
     return __vectorReshape<4>(sampler.SampleBias(p, bias));
 }
 
 [ForceInline]
-public vector<T,4> texture<T:__BuiltinArithmeticType, let N : int> (Sampler3D<vector<T,N>> sampler, float3 p, float bias = 0.0)
+public vector<T,4> texture<T:__BuiltinFloatingPointType, let N : int> (Sampler3D<vector<T,N>> sampler, float3 p, float bias = 0.0)
 {
     return __vectorReshape<4>(sampler.SampleBias(p, bias));
 }
 
 [ForceInline]
-public vector<T,4> texture<T:__BuiltinArithmeticType, let N : int> (SamplerCube<vector<T,N>> sampler, float3 p, float bias = 0.0)
+public vector<T,4> texture<T:__BuiltinFloatingPointType, let N : int> (SamplerCube<vector<T,N>> sampler, float3 p, float bias = 0.0)
 {
     return __vectorReshape<4>(sampler.SampleBias(p, bias));
 }
 
 [ForceInline]
-public float texture<T:__BuiltinArithmeticType, let N : int> (Sampler1DShadow<vector<T,N>> sampler, float2 p)
+public float texture<T:__BuiltinFloatingPointType, let N : int> (Sampler1DShadow<vector<T,N>> sampler, float2 p)
 {
     return sampler.SampleCmp(p.x, p.y);
 }
 
 [ForceInline]
-public float texture<T:__BuiltinArithmeticType, let N : int> (Sampler2DShadow<vector<T,N>> sampler, float3 p)
+public float texture<T:__BuiltinFloatingPointType, let N : int> (Sampler2DShadow<vector<T,N>> sampler, float3 p)
 {
     return sampler.SampleCmp(p.xy, p.z);
 }
 
 [ForceInline]
-public float texture<T:__BuiltinArithmeticType, let N : int> (SamplerCubeShadow<vector<T,N>> sampler, float4 p)
+public float texture<T:__BuiltinFloatingPointType, let N : int> (SamplerCubeShadow<vector<T,N>> sampler, float4 p)
 {
     return sampler.SampleCmp(p.xyz, p.w);
 }
 
 [ForceInline]
-public vector<T,4> texture<T:__BuiltinArithmeticType, let N : int> (Sampler1DArray<vector<T,N>> sampler, float2 p, float bias = 0.0)
+public vector<T,4> texture<T:__BuiltinFloatingPointType, let N : int> (Sampler1DArray<vector<T,N>> sampler, float2 p, float bias = 0.0)
 {
     return __vectorReshape<4>(sampler.SampleBias(p, bias));
 }
 
 [ForceInline]
-public vector<T,4> texture<T:__BuiltinArithmeticType, let N : int> (Sampler2DArray<vector<T,N>> sampler, float3 p, float bias = 0.0)
+public vector<T,4> texture<T:__BuiltinFloatingPointType, let N : int> (Sampler2DArray<vector<T,N>> sampler, float3 p, float bias = 0.0)
 {
     return __vectorReshape<4>(sampler.SampleBias(p, bias));
 }
 
 [ForceInline]
-public vector<T,4> texture<T:__BuiltinArithmeticType, let N : int> (SamplerCubeArray<vector<T,N>> sampler, float4 p, float bias = 0.0)
+public vector<T,4> texture<T:__BuiltinFloatingPointType, let N : int> (SamplerCubeArray<vector<T,N>> sampler, float4 p, float bias = 0.0)
 {
     return __vectorReshape<4>(sampler.SampleBias(p, bias));
 }
 
 [ForceInline]
-public float texture<T:__BuiltinArithmeticType, let N : int> (Sampler1DArrayShadow<vector<T,N>> sampler, float3 p)
+public float texture<T:__BuiltinFloatingPointType, let N : int> (Sampler1DArrayShadow<vector<T,N>> sampler, float3 p)
 {
     return sampler.SampleCmp(p.xy, p.z);
 }
 
 [ForceInline]
-public float texture<T:__BuiltinArithmeticType, let N : int> (Sampler2DArrayShadow<vector<T,N>> sampler, float4 p)
+public float texture<T:__BuiltinFloatingPointType, let N : int> (Sampler2DArrayShadow<vector<T,N>> sampler, float4 p)
 {
     return sampler.SampleCmp(p.xyz, p.w);
 }
 
-__generic<T:__BuiltinArithmeticType, let N : int, shape:__ITextureShape, let sampleCount: int, let isArray:int, let format:int>
+__generic<T:__BuiltinFloatingPointType, let N : int, shape:__ITextureShape, let sampleCount: int, let isArray:int, let format:int>
 public vector<T,4> textureGrad(__TextureImpl<vector<T,N>, shape, isArray, 0, sampleCount, 0, 1, 1, format> sampler, vector<float, shape.dimensions+isArray> P, vector<float,shape.planeDimensions> dPdx, vector<float,shape.planeDimensions> dPdy)
 {
     return __vectorReshape<4>(sampler.SampleGrad(P, dPdx, dPdy));
