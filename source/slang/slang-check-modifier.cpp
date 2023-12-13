@@ -1004,19 +1004,9 @@ namespace Slang
         switch (modifierType)
         {
             // Allowed only on parameters and global variables.
-        case ASTNodeType::InModifier:
         case ASTNodeType::OutModifier:
-        case ASTNodeType::InOutModifier:
         case ASTNodeType::RefModifier:
         case ASTNodeType::ConstRefModifier:
-        case ASTNodeType::GLSLLayoutModifier:
-        case ASTNodeType::GLSLParsedLayoutModifier:
-        case ASTNodeType::GLSLConstantIDLayoutModifier:
-        case ASTNodeType::GLSLLocationLayoutModifier:
-        case ASTNodeType::GLSLUnparsedLayoutModifier:
-        case ASTNodeType::GLSLLayoutModifierGroupMarker:
-        case ASTNodeType::GLSLLayoutModifierGroupBegin:
-        case ASTNodeType::GLSLLayoutModifierGroupEnd:
         case ASTNodeType::GLSLBufferModifier:
         case ASTNodeType::GLSLWriteOnlyModifier:
         case ASTNodeType::GLSLReadOnlyModifier:
@@ -1026,6 +1016,24 @@ namespace Slang
         case ASTNodeType::RayPayloadWriteSemantic:
         case ASTNodeType::GloballyCoherentModifier:
             return (as<VarDeclBase>(decl) && isGlobalDecl(decl)) || as<ParamDecl>(decl) || as<GLSLInterfaceBlockDecl>(decl);
+
+            // In addition to the above cases, these are also present on empty
+            // global declarations, for instance
+            // layout(local_size_x=1) in;
+        case ASTNodeType::InModifier:
+        case ASTNodeType::InOutModifier:
+        case ASTNodeType::GLSLLayoutModifier:
+        case ASTNodeType::GLSLParsedLayoutModifier:
+        case ASTNodeType::GLSLConstantIDLayoutModifier:
+        case ASTNodeType::GLSLLocationLayoutModifier:
+        case ASTNodeType::GLSLUnparsedLayoutModifier:
+        case ASTNodeType::GLSLLayoutModifierGroupMarker:
+        case ASTNodeType::GLSLLayoutModifierGroupBegin:
+        case ASTNodeType::GLSLLayoutModifierGroupEnd:
+            return (as<VarDeclBase>(decl) && isGlobalDecl(decl))
+                || (as<EmptyDecl>(decl) && isGlobalDecl(decl))
+                || as<ParamDecl>(decl)
+                || as<GLSLInterfaceBlockDecl>(decl);
 
             // Allowed only on parameters, struct fields and global variables.
         case ASTNodeType::InterpolationModeModifier:
