@@ -2379,6 +2379,15 @@ namespace Slang
         }
     }
 
+    static String _wrappingModifierType(const WrappingTypeModifier* mod)
+    {
+        if(as<GLSLBufferModifier>(mod))
+        {
+            return "GLSLStructuredBuffer";
+        }
+        SLANG_UNREACHABLE("unhandled wrapping type modifier");
+    }
+
         /// Apply any type modifier in `ioBaseModifiers` to the given `typeExpr`.
         ///
         /// If any type modifiers were present, `ioBaseModifiers` will be updated
@@ -2423,6 +2432,30 @@ namespace Slang
                 // of "base" modifiers), and advance to the next one in order.
                 //
                 baseModifierLink = &baseModifier->next;
+            }
+            else if(const auto wrappingTypeModifier = as<WrappingTypeModifier>(typeModifier))
+            {
+                // This is where we match things which are modifiers in the
+                // syntax, but we match conceptually as wrappers around a type
+                // expression
+
+                // Firstly, disptach the modifier, we don't need it again
+                baseModifierLink = &baseModifier->next;
+
+                // Conjure up the generic wrapper type
+                // Make sure to use the outer scope, to avoid user name shadowing
+                auto bufferWrapperTypeExpr = parser->astBuilder->create<VarExpr>();
+                bufferWrapperTypeExpr->loc = wrappingTypeModifier->loc;
+                bufferWrapperTypeExpr->name = getName(parser, _wrappingModifierType(wrappingTypeModifier));
+                bufferWrapperTypeExpr->scope = parser->outerScope;
+
+                // Apply the wrapper
+                auto bufferPointerTypeExpr = parser->astBuilder->create<GenericAppExpr>();
+                bufferPointerTypeExpr->loc = wrappingTypeModifier->loc;
+                bufferPointerTypeExpr->functionExpr = bufferWrapperTypeExpr;
+                bufferPointerTypeExpr->arguments.add(typeExpr);
+
+                typeExpr = bufferPointerTypeExpr;
             }
             else
             {
@@ -2533,36 +2566,10 @@ namespace Slang
                 && parser->LookAheadToken(TokenType::Identifier)
                 && parser->LookAheadToken(TokenType::LBrace,1) )
         {
-            // This case is slightly more complicated.
-            // The interface block is parsed into a struct decl, however the
-            // type *expression* we return is actually the application of the
-            // GLSLStructuredBuffer wrapper to this struct
-
-            // Parse the struct
+            // Parse the struct-like part
             auto innerStructDecl = parser->ParseGLSLInterfaceBlock();
             typeSpec.decl = innerStructDecl;
-
-            // Conjure up the generic wrapper type
-            // The scope is the outer scope, to thwart users calling their
-            // types GLSLShaderStorageBuffer
-            auto bufferWrapperTypeExpr = parser->astBuilder->create<VarExpr>();
-            bufferWrapperTypeExpr->loc = innerStructDecl->getNameLoc();
-            bufferWrapperTypeExpr->name = getName(parser, "GLSLShaderStorageBuffer");
-            bufferWrapperTypeExpr->scope = parser->outerScope;
-
-            // Construct a type expression to reference the buffer data type
-            auto bufferDataTypeExpr = parser->astBuilder->create<VarExpr>();
-            bufferDataTypeExpr->loc = innerStructDecl->loc;
-            bufferDataTypeExpr->name = innerStructDecl->nameAndLoc.name;
-            bufferDataTypeExpr->scope = parser->currentScope;
-
-            // Apply the wrapper
-            auto bufferPointerTypeExpr = parser->astBuilder->create<GenericAppExpr>();
-            bufferPointerTypeExpr->loc = innerStructDecl->loc;
-            bufferPointerTypeExpr->functionExpr = bufferWrapperTypeExpr;
-            bufferPointerTypeExpr->arguments.add(bufferDataTypeExpr);
-
-            typeSpec.expr = bufferPointerTypeExpr;
+            typeSpec.expr = createDeclRefType(parser, typeSpec.decl);
             return typeSpec;
         }
         else if(parser->LookAheadToken("enum"))
@@ -4622,7 +4629,7 @@ namespace Slang
         //
         // This returns a struct decl representing the fields
 
-        auto* rs = astBuilder->create<StructDecl>();
+        auto* rs = astBuilder->create<GLSLInterfaceBlockDecl>();
         FillPosition(rs);
 
         // As for struct, skip completion request token to prevent producing a

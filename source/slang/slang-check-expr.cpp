@@ -316,8 +316,6 @@ namespace Slang
         const auto d = varExpr->declRef.getDecl();
         if(d->hasModifier<GLSLReadOnlyModifier>())
             return false;
-        if(!d->hasModifier<GLSLBufferModifier>())
-            return false;
 
         return true;
     }
