@@ -150,6 +150,7 @@ struct ASTIterator
         {
             iterator->maybeDispatchCallback(expr);
             dispatchIfNotNull(expr->base);
+            dispatchIfNotNull(expr->originalExpr);
         }
         void visitOverloadedExpr2(OverloadedExpr2* expr)
         {

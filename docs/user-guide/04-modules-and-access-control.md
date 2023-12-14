@@ -59,9 +59,13 @@ void f_b() { f_a(); }
 
 // c.slang
 implementing "m.slang"; // alternate syntax.
-// OK to use f_a and f_b because they are part of module `m`, even
-// if we are not including `a` and `b` here.
-void f_c() { f_a(); f_b(); }
+
+void f_c()
+{
+    // OK, `c.slang` is part of module `m` because it is `__include`'d by
+    // `m.slang`.
+    f_a(); f_b();
+}
 
 // m.slang
 module m;
@@ -79,8 +83,14 @@ __include "dir/file-name.slang";
 __include "dir/file-name";
 ```
 
+Also note that a file is considered a part of a module only if the file can be discovered
+via transitive `__include`s from the primary module file. It is possible to have a dangling
+file with the `implementing` declaration that is not `__include`'d by any other files in
+the module. Such dangling files will not be considered as part of the module and will not
+be compiled. The `implementing` declaration is for the purpose of verification and language server code assisting, and does not carry any other semantics that affect compilation.
+
 > #### Note ####
-> When using the identifier token syntax, Slang will translate any underscores(`_`) to hyphenators("-") to obtain the file name.
+> When using the identifier token syntax, Slang will translate any underscores(`_`) to hyphens("-") to obtain the file name.
 
 ## Importing a Module
 
@@ -150,14 +160,14 @@ module a;
 __include b;
 public struct PS
 {
-    int internalMember;
+    internal int internalMember;
     public int publicMember;
 }
 internal void f() { f_b(); } // OK, f_b defined in the same module.
 
 // b.slang
 implementing a;
-internal void f_b(); // Defines f_b in module a so they can within the module.
+internal void f_b(); // Defines f_b in module `a`.
 public void publicFunc();
 
 // m.slang
@@ -190,7 +200,7 @@ The Slang compiler enforces the following rules regarding access control:
 Slang used to not have support for access control, and all symbols were treated as having `public` visibility. To provide compatibility with existing code, the Slang compiler will detect if the module is written in the legacy language, and treat all symbols as `public` if so.
 
 A module is determined to be written in legacy language if all the following conditions are met:
-- The module is lacking `module` declaration at the begining.
+- The module is lacking `module` declaration at the beginning.
 - There is no use of `__include`.
 - There is no use of any visibility modifiers -- `public`, `private` or `internal`.
 

@@ -53,6 +53,8 @@ class OverloadedExpr : public Expr
     // arose from a member-reference expression.
     Expr* base = nullptr;
 
+    Expr* originalExpr = nullptr;
+
     // The lookup result that was ambiguous
     LookupResult lookupResult2;
 };
