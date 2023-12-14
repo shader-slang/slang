@@ -2383,7 +2383,7 @@ namespace Slang
     {
         if(as<GLSLBufferModifier>(mod))
         {
-            return "GLSLStructuredBuffer";
+            return "GLSLShaderStorageBuffer";
         }
         SLANG_UNREACHABLE("unhandled wrapping type modifier");
     }
