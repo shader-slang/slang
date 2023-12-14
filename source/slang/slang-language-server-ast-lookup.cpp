@@ -187,7 +187,7 @@ public:
                 declLength = _getDeclNameLength(expr->name, expr->declRef.getDecl());
             }
             if (_isLocInRange(
-                    context, expr->loc, declLength))
+                context, expr->loc, declLength))
             {
                 ASTLookupResult result;
                 result.path = context->nodePath;
@@ -196,7 +196,7 @@ public:
                 return true;
             }
         }
-        
+
         return dispatchIfNotNull(expr->originalExpr);
     }
 
@@ -240,6 +240,11 @@ public:
         {
             PushNode pushNode(context, expr);
             if (dispatchIfNotNull(expr->base))
+                return true;
+        }
+        {
+            PushNode pushNode(context, expr);
+            if (dispatchIfNotNull(expr->originalExpr))
                 return true;
         }
         if (expr->lookupResult2.getName() &&

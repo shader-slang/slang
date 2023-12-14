@@ -814,6 +814,7 @@ namespace Slang
                 m_astBuilder->getOverloadedType());
             overloadedExpr->base = baseExpr;
             overloadedExpr->lookupResult2 = lookupResult;
+            overloadedExpr->originalExpr = originalExpr;
             return overloadedExpr;
         }
         else

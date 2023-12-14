@@ -3374,6 +3374,7 @@ namespace Slang
                 {
                     namespaceDecl = parser->astBuilder->create<NamespaceDecl>();
                     namespaceDecl->nameAndLoc = nameAndLoc;
+                    namespaceDecl->loc = nameAndLoc.loc;
                 }
             }
             if (!result)

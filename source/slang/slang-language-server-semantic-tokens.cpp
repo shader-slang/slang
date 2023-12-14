@@ -48,6 +48,78 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
             token.type != SemanticTokenType::NormalText)
             result.add(token);
     };
+    auto handleDeclRef = [&](DeclRef<Decl> declRef, Expr* originalExpr, SourceLoc loc)
+    {
+        if (!declRef)
+            return;
+        auto decl = declRef.getDecl();
+        if (auto genDecl = as<GenericDecl>(decl))
+            decl = genDecl->inner;
+        if (!decl)
+            return;
+        auto name = declRef.getDecl()->getName();
+        if (!name)
+            return;
+        // Don't look at the expr if it is defined in a different file.
+        if (!manager->getHumaneLoc(loc, SourceLocType::Actual)
+            .pathInfo.foundPath.getUnownedSlice()
+            .endsWithCaseInsensitive(fileName))
+            return;
+        SemanticToken token =
+            _createSemanticToken(manager, loc, name);
+        auto target = decl;
+        if (as<AggTypeDecl>(target))
+        {
+            if (target->hasModifier<BuiltinTypeModifier>())
+                return;
+            token.type = SemanticTokenType::Type;
+        }
+        else if (as<ConstructorDecl>(target))
+        {
+            token.type = SemanticTokenType::Type;
+            token.length = doc->getTokenLength(token.line, token.col);
+        }
+        else if (as<SimpleTypeDecl>(target))
+        {
+            token.type = SemanticTokenType::Type;
+        }
+        else if (as<PropertyDecl>(target))
+        {
+            token.type = SemanticTokenType::Property;
+        }
+        else if (as<ParamDecl>(target))
+        {
+            token.type = SemanticTokenType::Parameter;
+        }
+        else if (as<VarDecl>(target))
+        {
+            if (as<MemberExpr>(originalExpr) ||
+                as<StaticMemberExpr>(originalExpr))
+            {
+                return;
+            }
+            token.type = SemanticTokenType::Variable;
+        }
+        else if (as<FunctionDeclBase>(target))
+        {
+            token.type = SemanticTokenType::Function;
+        }
+        else if (as<EnumCaseDecl>(target))
+        {
+            token.type = SemanticTokenType::EnumMember;
+        }
+        else if (as<NamespaceDecl>(target))
+        {
+            token.type = SemanticTokenType::Namespace;
+        }
+
+        if (as<CallableDecl>(target))
+        {
+            if (target->hasModifier<ImplicitConversionModifier>())
+                return;
+        }
+        maybeInsertToken(token);
+    };
     iterateAST(
         fileName,
         manager,
@@ -56,77 +128,14 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
         {
             if (auto declRefExpr = as<DeclRefExpr>(node))
             {
-                auto declRef = declRefExpr->declRef;
-                auto loc = declRefExpr->loc;
-                if (!declRef)
-                    return;
-                auto decl = declRef.getDecl();
-                if (auto genDecl = as<GenericDecl>(decl))
-                    decl = genDecl->inner;
-                if (!decl)
-                    return;
-                auto name = declRef.getDecl()->getName();
-                if (!name)
-                    return;
-                // Don't look at the expr if it is defined in a different file.
-                if (!manager->getHumaneLoc(loc, SourceLocType::Actual)
-                    .pathInfo.foundPath.getUnownedSlice()
-                    .endsWithCaseInsensitive(fileName))
-                    return;
-                SemanticToken token =
-                    _createSemanticToken(manager, loc, name);
-                auto target = decl;
-                if (as<AggTypeDecl>(target))
+                handleDeclRef(declRefExpr->declRef, declRefExpr->originalExpr, declRefExpr->loc);
+            }
+            else if (auto overloadedExpr = as<OverloadedExpr>(node))
+            {
+                if (overloadedExpr->lookupResult2.items.getCount())
                 {
-                    if (target->hasModifier<BuiltinTypeModifier>())
-                        return;
-                    token.type = SemanticTokenType::Type;
+                    handleDeclRef(overloadedExpr->lookupResult2.items[0].declRef, overloadedExpr->originalExpr, overloadedExpr->loc);
                 }
-                else if (as<ConstructorDecl>(target))
-                {
-                    token.type = SemanticTokenType::Type;
-                    token.length = doc->getTokenLength(token.line, token.col);
-                }
-                else if (as<SimpleTypeDecl>(target))
-                {
-                    token.type = SemanticTokenType::Type;
-                }
-                else if (as<PropertyDecl>(target))
-                {
-                    token.type = SemanticTokenType::Property;
-                }
-                else if (as<ParamDecl>(target))
-                {
-                    token.type = SemanticTokenType::Parameter;
-                }
-                else if (as<VarDecl>(target))
-                {
-                    if (as<MemberExpr>(declRefExpr->originalExpr) ||
-                        as<StaticMemberExpr>(declRefExpr->originalExpr))
-                    {
-                        return;
-                    }
-                    token.type = SemanticTokenType::Variable;
-                }
-                else if (as<FunctionDeclBase>(target))
-                {
-                    token.type = SemanticTokenType::Function;
-                }
-                else if (as<EnumCaseDecl>(target))
-                {
-                    token.type = SemanticTokenType::EnumMember;
-                }
-                else if (as<NamespaceDecl>(target))
-                {
-                    token.type = SemanticTokenType::Namespace;
-                }
-
-                if (as<CallableDecl>(target))
-                {
-                    if (target->hasModifier<ImplicitConversionModifier>())
-                        return;
-                }
-                maybeInsertToken(token);
             }
             else if (auto accessorDecl = as<AccessorDecl>(node))
             {

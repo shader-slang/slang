@@ -87,13 +87,16 @@ namespace ns
 
 You can also use the `using` keyword to pull symbols defined in a different namespace to
 the current scope, removing the requirement for using fully qualified names.
-```csharp
+```cpp
 namespace ns1.ns2
 {
     int f();
 }
 
 using ns1.ns2;
+// or:
+using namespace ns1.ns2; // alternative syntax.
+
 void test() { f(); } // OK.
 ```
 
