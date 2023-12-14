@@ -999,24 +999,10 @@ namespace Slang
         }
     }
 
-    bool isModifierAllowedOnDecl(ASTNodeType modifierType, Decl* decl)
+    bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* decl)
     {
         switch (modifierType)
         {
-            // Allowed only on parameters and global variables.
-        case ASTNodeType::OutModifier:
-        case ASTNodeType::RefModifier:
-        case ASTNodeType::ConstRefModifier:
-        case ASTNodeType::GLSLBufferModifier:
-        case ASTNodeType::GLSLWriteOnlyModifier:
-        case ASTNodeType::GLSLReadOnlyModifier:
-        case ASTNodeType::GLSLPatchModifier:
-        case ASTNodeType::RayPayloadAccessSemantic:
-        case ASTNodeType::RayPayloadReadSemantic:
-        case ASTNodeType::RayPayloadWriteSemantic:
-        case ASTNodeType::GloballyCoherentModifier:
-            return (as<VarDeclBase>(decl) && isGlobalDecl(decl)) || as<ParamDecl>(decl) || as<GLSLInterfaceBlockDecl>(decl);
-
             // In addition to the above cases, these are also present on empty
             // global declarations, for instance
             // layout(local_size_x=1) in;
@@ -1030,10 +1016,25 @@ namespace Slang
         case ASTNodeType::GLSLLayoutModifierGroupMarker:
         case ASTNodeType::GLSLLayoutModifierGroupBegin:
         case ASTNodeType::GLSLLayoutModifierGroupEnd:
-            return (as<VarDeclBase>(decl) && isGlobalDecl(decl))
-                || (as<EmptyDecl>(decl) && isGlobalDecl(decl))
-                || as<ParamDecl>(decl)
-                || as<GLSLInterfaceBlockDecl>(decl);
+            // If we are in GLSL mode, also allow these but otherwise fall to
+            // the regular check
+            if(isGLSLInput && as<EmptyDecl>(decl) && isGlobalDecl(decl))
+                return true;
+            [[fallthrough]];
+
+            // Allowed only on parameters and global variables.
+        case ASTNodeType::OutModifier:
+        case ASTNodeType::RefModifier:
+        case ASTNodeType::ConstRefModifier:
+        case ASTNodeType::GLSLBufferModifier:
+        case ASTNodeType::GLSLWriteOnlyModifier:
+        case ASTNodeType::GLSLReadOnlyModifier:
+        case ASTNodeType::GLSLPatchModifier:
+        case ASTNodeType::RayPayloadAccessSemantic:
+        case ASTNodeType::RayPayloadReadSemantic:
+        case ASTNodeType::RayPayloadWriteSemantic:
+        case ASTNodeType::GloballyCoherentModifier:
+            return (as<VarDeclBase>(decl) && isGlobalDecl(decl)) || as<ParamDecl>(decl) || as<GLSLInterfaceBlockDecl>(decl);
 
             // Allowed only on parameters, struct fields and global variables.
         case ASTNodeType::InterpolationModeModifier:
@@ -1122,7 +1123,7 @@ namespace Slang
 
         if (auto decl = as<Decl>(syntaxNode))
         {
-            if (!isModifierAllowedOnDecl(m->astNodeType, decl))
+            if (!isModifierAllowedOnDecl(getLinkage()->getAllowGLSLInput(), m->astNodeType, decl))
             {
                 getSink()->diagnose(m, Diagnostics::modifierNotAllowed, m);
                 return m;
