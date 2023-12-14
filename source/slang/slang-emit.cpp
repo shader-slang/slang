@@ -401,14 +401,14 @@ Result linkAndOptimizeIR(
     for (;;)
     {
         bool changed = false;
-        auto b1 = dumpIRToString(irModule->getModuleInst());
+        //auto b1 = dumpIRToString(irModule->getModuleInst());
         dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-SPECIALIZE");
         if (!codeGenContext->isSpecializationDisabled())
             changed |= specializeModule(irModule, codeGenContext->getSink());
         if (codeGenContext->getSink()->getErrorCount() != 0)
             return SLANG_FAIL;
         dumpIRIfEnabled(codeGenContext, irModule, "AFTER-SPECIALIZE");
-        auto b2 = dumpIRToString(irModule->getModuleInst());
+        //auto b2 = dumpIRToString(irModule->getModuleInst());
 
         applySparseConditionalConstantPropagation(irModule, codeGenContext->getSink());
         eliminateDeadCode(irModule);
