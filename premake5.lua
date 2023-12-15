@@ -503,15 +503,17 @@ function addSourceDir(path)
     files
     {
         path .. "/*.cpp",       -- C++ source files
+        path .. "/*.mm",        -- Objective-C++ source files
         path .. "/*.slang",     -- Slang files (for our stdlib)
         path .. "/*.h",         -- Header files
         path .. "/*.hpp",       -- C++ style headers (for glslang)
         path .. "/*.natvis",    -- Visual Studio debugger visualization files
         path .. "/*.natstepfilter", -- Visual Studio debugger step filter files
         path .. "/*.natjmc", -- Visual Studio debugger step filter files
-
-
     }
+    filter { "files:**.mm" }
+        compileas "Objective-C++"
+    filter {}
     removefiles
     {
         "**/*.meta.slang.h",
@@ -1182,7 +1184,7 @@ tool "gfx"
     elseif targetInfo.os == "mingw" or targetInfo.os == "cygwin" then
         -- Don't support any render techs...
     elseif os.target() == "macosx" then
-        --addSourceDir "tools/gfx/open-gl"
+        addSourceDir "tools/gfx/vulkan"
     else
         -- Linux like
         addSourceDir "tools/gfx/vulkan"
@@ -1247,10 +1249,13 @@ tool "platform"
     addSourceDir "tools/platform"
     addSourceDir "tools/platform/linux"
     addSourceDir "tools/platform/windows"
+    addSourceDir "tools/platform/apple"
     addSourceDir "tools/platform/placeholder"
     -- Include windowing support on Windows.
     if targetInfo.isWindows then
         systemversion "latest"
+    elseif os.target() == "macosx" then
+        links { "Cocoa.framework", "QuartzCore.framework" }
     else
         if enableXlib then
             defines { "SLANG_ENABLE_XLIB" }
