@@ -1122,6 +1122,7 @@ tool "gfx"
     files {"slang-gfx.h"}
 
     -- Will compile across targets
+    addSourceDir "tools/gfx/apple"
     addSourceDir "tools/gfx/cpu"
     addSourceDir "tools/gfx/nvapi"
     addSourceDir "tools/gfx/cuda"
@@ -1194,6 +1195,10 @@ tool "gfx"
             addSourceDir "tools/gfx/d3d12"
         end
         --addSourceDir "tools/gfx/open-gl"
+    end
+
+    if os.target() == "macosx" then
+        links { "Cocoa.framework" }
     end
 
     if enableXlib then

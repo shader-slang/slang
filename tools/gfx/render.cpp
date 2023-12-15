@@ -324,7 +324,7 @@ extern "C"
                 return SLANG_FAIL;
             }
             break;
-#elif SLANG_LINUX_FAMILY && !defined(__CYGWIN__)
+#elif (SLANG_LINUX_FAMILY || SLANG_APPLE_FAMILY) && !defined(__CYGWIN__)
         case DeviceType::Default:
         case DeviceType::Vulkan:
         {

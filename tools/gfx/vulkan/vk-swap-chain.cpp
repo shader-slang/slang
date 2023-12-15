@@ -2,6 +2,7 @@
 #include "vk-swap-chain.h"
 
 #include "vk-util.h"
+#include "../apple/cocoa-util.h"
 
 namespace gfx
 {
@@ -38,6 +39,8 @@ void SwapchainImpl::getWindowSize(int* widthOut, int* heightOut) const
     ::GetClientRect((HWND)m_windowHandle.handleValues[0], &rc);
     *widthOut = rc.right - rc.left;
     *heightOut = rc.bottom - rc.top;
+#elif SLANG_APPLE_FAMILY
+    CocoaUtil::getNSViewRectSize((void*)m_windowHandle.handleValues[0], widthOut, heightOut);
 #elif defined(SLANG_ENABLE_XLIB)
     XWindowAttributes winAttr = {};
     XGetWindowAttributes(
@@ -221,6 +224,12 @@ Result SwapchainImpl::init(DeviceImpl* renderer, const ISwapchain::Desc& desc, W
     surfaceCreateInfo.hwnd = (HWND)window.handleValues[0];
     SLANG_VK_RETURN_ON_FAIL(
         m_api->vkCreateWin32SurfaceKHR(m_api->m_instance, &surfaceCreateInfo, nullptr, &m_surface));
+#elif SLANG_APPLE_FAMILY
+    VkMacOSSurfaceCreateInfoMVK surfaceCreateInfo = {};
+    surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_MACOS_SURFACE_CREATE_INFO_MVK;
+    surfaceCreateInfo.pView = (void*)window.handleValues[0];
+    SLANG_VK_RETURN_ON_FAIL(
+        m_api->vkCreateMacOSSurfaceMVK(m_api->m_instance, &surfaceCreateInfo, nullptr, &m_surface));
 #elif SLANG_ENABLE_XLIB
     VkXlibSurfaceCreateInfoKHR surfaceCreateInfo = {};
     surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR;
@@ -347,7 +356,12 @@ int SwapchainImpl::acquireNextImage()
         VK_NULL_HANDLE,
         (uint32_t*)&m_currentImageIndex);
 
-    if (result != VK_SUCCESS)
+    if (
+        result != VK_SUCCESS
+#if SLANG_APPLE_FAMILY
+        && result != VK_SUBOPTIMAL_KHR
+#endif
+    )
     {
         m_currentImageIndex = -1;
         destroySwapchainAndImages();

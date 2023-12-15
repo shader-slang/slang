@@ -23,23 +23,6 @@ public:
     ISwapchain* getInterface(const Guid& guid);
 
 public:
-    struct PlatformDesc
-    {};
-
-#if SLANG_WINDOWS_FAMILY
-    struct WinPlatformDesc : public PlatformDesc
-    {
-        HINSTANCE m_hinstance;
-        HWND m_hwnd;
-    };
-#else
-    struct XPlatformDesc : public PlatformDesc
-    {
-        Display* m_display;
-        Window m_window;
-    };
-#endif
-public:
     VkSwapchainKHR m_swapChain;
     VkSurfaceKHR m_surface;
     VkSemaphore m_nextImageSemaphore; // Semaphore to signal after `acquireNextImage`.
