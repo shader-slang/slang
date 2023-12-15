@@ -108,6 +108,12 @@ namespace Slang
         String originalOutput;
     };
 
+    enum class WorkspaceFlavor
+    {
+        Standard,
+        VFX,
+    };
+
     class WorkspaceVersion : public RefObject
     {
     private:
@@ -117,10 +123,12 @@ namespace Slang
         void parseDiagnostics(String compilerOutput);
     public:
         Workspace* workspace;
+        WorkspaceFlavor flavor = WorkspaceFlavor::Standard;
         RefPtr<Linkage> linkage;
         Dictionary<String, DocumentDiagnostics> diagnostics;
         ASTMarkup* getOrCreateMarkupAST(ModuleDecl* module);
         Module* getOrLoadModule(String path);
+        void ensureWorkspaceFlavor(UnownedStringSlice path);
         MacroDefinitionContentAssistInfo* tryGetMacroDefinition(UnownedStringSlice name);
     };
 

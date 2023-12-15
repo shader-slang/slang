@@ -3046,6 +3046,22 @@ namespace Slang
                 link = &semantic->next;
             }
 
+            // If we see a '<', ignore the remaining.
+            if (AdvanceIf(parser, TokenType::OpLess))
+            {
+                for (;;)
+                {
+                    auto token = parser->tokenReader.peekToken();
+                    if (token.type == TokenType::EndOfFile)
+                        break;
+                    else if (token.type == TokenType::OpGreater)
+                        break;
+                    else
+                        parser->tokenReader.advanceToken();
+                }
+                parser->ReadToken(TokenType::OpGreater);
+            }
+
             // If we see another `:`, then that means there
             // is yet another semantic to be processed.
             // Otherwise we assume we are at the end of the list.
@@ -3480,6 +3496,54 @@ namespace Slang
         expect(parser, TokenType::Semicolon);
 
         return decl;
+    }
+
+    static NodeBase* parseIgnoredBlockDecl(Parser* parser, void*)
+    {
+        parser->ReadToken(TokenType::LBrace);
+        int remaingingBraceToClose = 1;
+        for (;;)
+        {
+            auto token = parser->ReadToken();
+            if (token.type == TokenType::RBrace)
+            {
+                remaingingBraceToClose--;
+                if (remaingingBraceToClose == 0)
+                    break;
+            }
+            else if (token.type == TokenType::LBrace)
+            {
+                remaingingBraceToClose++;
+            }
+            else if (token.type == TokenType::EndOfFile)
+            {
+                break;
+            }
+        }
+        auto decl = parser->astBuilder->create<EmptyDecl>();
+        parser->FillPosition(decl);
+        return decl;
+    }
+
+    static NodeBase* parseTransparentBlockDecl(Parser* parser, void*)
+    {
+        if (parser->currentScope && parser->currentScope->containerDecl)
+        {
+            parseDeclBody(parser, parser->currentScope->containerDecl);
+            return nullptr;
+        }
+        else
+        {
+            SLANG_UNEXPECTED("parseTransparentBlock should be called with a valid scope.");
+        }
+    }
+
+    static NodeBase* parseFileDecl(Parser* parser, void*)
+    {
+        auto fileDecl = parser->astBuilder->create<FileDecl>();
+        parser->FillPosition(fileDecl);
+        parseDeclBody(parser, fileDecl);
+        return fileDecl;
     }
 
     static NodeBase* parseConstructorDecl(Parser* parser, void* /*userData*/)
@@ -7782,6 +7846,10 @@ namespace Slang
         _makeParseDecl("__generic_value_param", parseGlobalGenericValueParamDecl ),
         _makeParseDecl("namespace",         parseNamespaceDecl ),
         _makeParseDecl("using",             parseUsingDecl ),
+        _makeParseDecl("__ignored_block",   parseIgnoredBlockDecl ),
+        _makeParseDecl("__transparent_block", parseTransparentBlockDecl),
+        _makeParseDecl("__file_decl",         parseFileDecl),
+
 
         // !!!!!!!!!!!!!!!!!!!!!! Modifer !!!!!!!!!!!!!!!!!!!!!!
 
