@@ -1519,7 +1519,7 @@ SIMPLE_IR_TYPE(ConstantBufferType, UniformParameterGroupType)
 SIMPLE_IR_TYPE(TextureBufferType, UniformParameterGroupType)
 SIMPLE_IR_TYPE(GLSLInputParameterGroupType, VaryingParameterGroupType)
 SIMPLE_IR_TYPE(GLSLOutputParameterGroupType, VaryingParameterGroupType)
-SIMPLE_IR_TYPE(GLSLShaderStorageBufferType, UniformParameterGroupType)
+SIMPLE_IR_TYPE(GLSLShaderStorageBufferType, ParameterGroupType)
 SIMPLE_IR_TYPE(ParameterBlockType, UniformParameterGroupType)
 
 struct IRArrayTypeBase : IRType

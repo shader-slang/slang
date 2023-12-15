@@ -299,21 +299,25 @@ namespace Slang
 
     static bool isMutableGLSLBufferBlockVarExpr(Expr* expr)
     {
-        if(const auto varExpr = as<VarExpr>(expr))
-        {
-            if(const auto declRefType = as<DeclRefType>(varExpr->type->getCanonicalType()))
-            {
-                if(declRefType->getDeclRef().getDecl()->isDerivedFrom(ASTNodeType::GLSLInterfaceBlockDecl))
-                {
-                    const auto d = varExpr->declRef.getDecl();
-                    if(d->hasModifier<GLSLBufferModifier>() && !d->hasModifier<GLSLReadOnlyModifier>())
-                    {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
+        const auto derefExpr = as<DerefExpr>(expr);
+        if(!derefExpr)
+            return false;
+        const auto varExpr = as<VarExpr>(derefExpr->base);
+        // Check the declaration type
+        if(!varExpr)
+            return false;
+
+        const auto varExprType = varExpr->type->getCanonicalType();
+        const auto ssbt = as<GLSLShaderStorageBufferType>(varExprType);
+        if(!ssbt)
+            return false;
+
+        // Check the modifiers on the declaration
+        const auto d = varExpr->declRef.getDecl();
+        if(d->hasModifier<GLSLReadOnlyModifier>())
+            return false;
+
+        return true;
     }
 
     DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(

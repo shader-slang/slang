@@ -35,6 +35,7 @@
 #include "slang-ir-lower-append-consume-structured-buffer.h"
 #include "slang-ir-lower-binding-query.h"
 #include "slang-ir-lower-generics.h"
+#include "slang-ir-lower-glsl-ssbo-types.h"
 #include "slang-ir-lower-tuple-types.h"
 #include "slang-ir-lower-result-type.h"
 #include "slang-ir-lower-optional-type.h"
@@ -239,6 +240,8 @@ Result linkAndOptimizeIR(
     // IR, then do it here, for the target-specific, but
     // un-specialized IR.
     dumpIRIfEnabled(codeGenContext, irModule);
+
+    lowerGLSLShaderStorageBufferObjects(irModule, sink);
 
     translateGLSLGlobalVar(codeGenContext, irModule);
 

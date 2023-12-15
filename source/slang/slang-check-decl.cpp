@@ -1253,7 +1253,8 @@ namespace Slang
                 // without any `uniform` modifiers as true global variables by default.
                 if (!varDecl->findModifier<HLSLUniformModifier>() &&
                     !varDecl->findModifier<InModifier>() &&
-                    !varDecl->findModifier<OutModifier>())
+                    !varDecl->findModifier<OutModifier>() &&
+                    !varDecl->findModifier<GLSLBufferModifier>())
                 {
                     if (!as<ResourceType>(varDecl->type) && !as<PointerLikeType>(varDecl->type))
                     {
@@ -1584,7 +1585,7 @@ namespace Slang
         addModifier(aggTypeDecl, m_astBuilder->create<SynthesizedModifier>());
 
         // The visibility of synthesized decl should be the min of the parent decl and the requirement.
-        if (auto visModifier = requirementDeclRef.getDecl()->findModifier<VisibilityModifier>())
+        if (requirementDeclRef.getDecl()->findModifier<VisibilityModifier>())
         {
             auto requirementVisibility = getDeclVisibility(requirementDeclRef.getDecl());
             auto thisVisibility = getDeclVisibility(context->parentDecl);
@@ -1833,7 +1834,7 @@ namespace Slang
         if (moduleDecl->members.getCount() > 0)
         {
             auto firstMember = moduleDecl->members[0];
-            if (auto implDecl = as<ImplementingDecl>(firstMember))
+            if (as<ImplementingDecl>(firstMember))
             {
                 if (!getShared()->isInLanguageServer())
                 {
@@ -2993,7 +2994,7 @@ namespace Slang
                 addModifier(synFuncDecl, attr);
             }
             // The visibility of synthesized decl should be the min of the parent decl and the requirement.
-            if (auto visModifier = requiredMemberDeclRef.getDecl()->findModifier<VisibilityModifier>())
+            if (requiredMemberDeclRef.getDecl()->findModifier<VisibilityModifier>())
             {
                 auto requirementVisibility = getDeclVisibility(requiredMemberDeclRef.getDecl());
                 auto thisVisibility = getDeclVisibility(context->parentDecl);
@@ -3539,7 +3540,7 @@ namespace Slang
         synPropertyDecl->parentDecl = context->parentDecl;
 
         // The visibility of synthesized decl should be the min of the parent decl and the requirement.
-        if (auto visModifier = requiredMemberDeclRef.getDecl()->findModifier<VisibilityModifier>())
+        if (requiredMemberDeclRef.getDecl()->findModifier<VisibilityModifier>())
         {
             auto requirementVisibility = getDeclVisibility(requiredMemberDeclRef.getDecl());
             auto thisVisibility = getDeclVisibility(context->parentDecl);
@@ -7049,11 +7050,11 @@ namespace Slang
         }
 
         auto firstMember = fileDecl->members[0];
-        if (auto moduleDeclaration = as<ModuleDeclarationDecl>(firstMember))
+        if (as<ModuleDeclarationDecl>(firstMember))
         {
             // We are trying to implement a file that defines a module, this is expected.
         }
-        else if (auto implementing = as<ImplementingDecl>(firstMember))
+        else if (as<ImplementingDecl>(firstMember))
         {
             getSink()->diagnose(decl->moduleNameAndLoc.loc, Diagnostics::implementingMustReferencePrimaryModuleFile);
             return;

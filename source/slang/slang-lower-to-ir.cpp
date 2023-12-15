@@ -8072,7 +8072,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
         else if (as<GLSLInterfaceBlockDecl>(decl))
         {
-            return LoweredValInfo();
+            if(decl->findModifier<GLSLBufferModifier>())
+            {
+                irAggType = subBuilder->createStructType();
+            }
+            else
+            {
+                return LoweredValInfo();
+            }
         }
         else
         {
@@ -8115,7 +8122,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             if(auto superDeclRefType = as<DeclRefType>(superType))
             {
                 if (superDeclRefType->getDeclRef().as<StructDecl>() ||
-                    superDeclRefType->getDeclRef().as<ClassDecl>())
+                    superDeclRefType->getDeclRef().as<ClassDecl>() ||
+                    superDeclRefType->getDeclRef().as<GLSLInterfaceBlockDecl>())
                 {
                     auto superKey = (IRStructKey*) getSimpleVal(context, ensureDecl(context, inheritanceDecl));
                     auto irSuperType = lowerType(subContext, superType.type);

@@ -197,20 +197,19 @@ INST(Nop, nop, 0, 0)
                     INST(ConstantBufferType, ConstantBuffer, 1, HOISTABLE)
                     INST(TextureBufferType, TextureBuffer, 1, HOISTABLE)
                     INST(ParameterBlockType, ParameterBlock, 1, HOISTABLE)
-                    INST(GLSLShaderStorageBufferType, GLSLShaderStorageBuffer, 0, HOISTABLE)
-                INST_RANGE(UniformParameterGroupType, ConstantBufferType, GLSLShaderStorageBufferType)
+                INST_RANGE(UniformParameterGroupType, ConstantBufferType, ParameterBlockType)
             
                 /* VaryingParameterGroupType */
                     INST(GLSLInputParameterGroupType, GLSLInputParameterGroup, 0, HOISTABLE)
                     INST(GLSLOutputParameterGroupType, GLSLOutputParameterGroup, 0, HOISTABLE)
                 INST_RANGE(VaryingParameterGroupType, GLSLInputParameterGroupType, GLSLOutputParameterGroupType)
-            INST_RANGE(ParameterGroupType, ConstantBufferType, GLSLOutputParameterGroupType)
-        INST_RANGE(PointerLikeType, ConstantBufferType, GLSLOutputParameterGroupType)
-    INST_RANGE(BuiltinGenericType, HLSLPointStreamType, GLSLOutputParameterGroupType)
+                INST(GLSLShaderStorageBufferType, GLSLShaderStorageBuffer, 1, HOISTABLE)
+            INST_RANGE(ParameterGroupType, ConstantBufferType, GLSLShaderStorageBufferType)
+        INST_RANGE(PointerLikeType, ConstantBufferType, GLSLShaderStorageBufferType)
+    INST_RANGE(BuiltinGenericType, HLSLPointStreamType, GLSLShaderStorageBufferType)
 
 INST(RayQueryType, RayQuery, 1, HOISTABLE)
 INST(HitObjectType, HitObject, 0, HOISTABLE)
-
 
 // A user-defined structure declaration at the IR level.
 // Unlike in the AST where there is a distinction between

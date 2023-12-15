@@ -999,16 +999,15 @@ namespace Slang
         }
     }
 
-    bool isModifierAllowedOnDecl(ASTNodeType modifierType, Decl* decl)
+    bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* decl)
     {
         switch (modifierType)
         {
-            // Allowed only on parameters and global variables.
+            // In addition to the above cases, these are also present on empty
+            // global declarations, for instance
+            // layout(local_size_x=1) in;
         case ASTNodeType::InModifier:
-        case ASTNodeType::OutModifier:
         case ASTNodeType::InOutModifier:
-        case ASTNodeType::RefModifier:
-        case ASTNodeType::ConstRefModifier:
         case ASTNodeType::GLSLLayoutModifier:
         case ASTNodeType::GLSLParsedLayoutModifier:
         case ASTNodeType::GLSLConstantIDLayoutModifier:
@@ -1017,6 +1016,16 @@ namespace Slang
         case ASTNodeType::GLSLLayoutModifierGroupMarker:
         case ASTNodeType::GLSLLayoutModifierGroupBegin:
         case ASTNodeType::GLSLLayoutModifierGroupEnd:
+            // If we are in GLSL mode, also allow these but otherwise fall to
+            // the regular check
+            if(isGLSLInput && as<EmptyDecl>(decl) && isGlobalDecl(decl))
+                return true;
+            [[fallthrough]];
+
+            // Allowed only on parameters and global variables.
+        case ASTNodeType::OutModifier:
+        case ASTNodeType::RefModifier:
+        case ASTNodeType::ConstRefModifier:
         case ASTNodeType::GLSLBufferModifier:
         case ASTNodeType::GLSLWriteOnlyModifier:
         case ASTNodeType::GLSLReadOnlyModifier:
@@ -1114,7 +1123,7 @@ namespace Slang
 
         if (auto decl = as<Decl>(syntaxNode))
         {
-            if (!isModifierAllowedOnDecl(m->astNodeType, decl))
+            if (!isModifierAllowedOnDecl(getLinkage()->getAllowGLSLInput(), m->astNodeType, decl))
             {
                 getSink()->diagnose(m, Diagnostics::modifierNotAllowed, m);
                 return m;

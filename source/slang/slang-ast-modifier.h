@@ -251,28 +251,6 @@ class SimpleModifier : public Modifier
 };
 
 
-// Some GLSL-specific modifiers
-class GLSLBufferModifier : public SimpleModifier 
-{
-    SLANG_AST_CLASS(GLSLBufferModifier)
-};
-
-class GLSLWriteOnlyModifier : public SimpleModifier 
-{
-    SLANG_AST_CLASS(GLSLWriteOnlyModifier)
-};
-
-class GLSLReadOnlyModifier : public SimpleModifier 
-{
-    SLANG_AST_CLASS(GLSLReadOnlyModifier)
-};
-
-class GLSLPatchModifier : public SimpleModifier 
-{
-    SLANG_AST_CLASS(GLSLPatchModifier)
-};
-
-
 // Indicates that this is a variable declaration that corresponds to
 // a parameter block declaration in the source program.
 class ImplicitParameterGroupVariableModifier : public Modifier 
@@ -1413,6 +1391,13 @@ class TypeModifier : public Modifier
     SLANG_AST_CLASS(TypeModifier)
 };
 
+    /// A kind of syntax element which appears as a modifier in the syntax, but
+    /// we represent as a function over type expressions
+class WrappingTypeModifier : public TypeModifier
+{
+    SLANG_AST_CLASS(WrappingTypeModifier)
+};
+
     /// A modifier that applies to a type and implies information about the
     /// underlying format of a resource that uses that type as its element type.
     ///
@@ -1438,5 +1423,25 @@ class NoDiffModifier : public TypeModifier
     SLANG_AST_CLASS(NoDiffModifier)
 };
 
+// Some GLSL-specific modifiers
+class GLSLBufferModifier : public WrappingTypeModifier
+{
+    SLANG_AST_CLASS(GLSLBufferModifier)
+};
+
+class GLSLWriteOnlyModifier : public SimpleModifier
+{
+    SLANG_AST_CLASS(GLSLWriteOnlyModifier)
+};
+
+class GLSLReadOnlyModifier : public SimpleModifier
+{
+    SLANG_AST_CLASS(GLSLReadOnlyModifier)
+};
+
+class GLSLPatchModifier : public SimpleModifier
+{
+    SLANG_AST_CLASS(GLSLPatchModifier)
+};
 
 } // namespace Slang

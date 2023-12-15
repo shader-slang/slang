@@ -4418,6 +4418,16 @@ namespace Slang
         return classType;
     }
 
+    IRGLSLShaderStorageBufferType* IRBuilder::createGLSLShaderStorableBufferType()
+    {
+        IRGLSLShaderStorageBufferType* ssboType = createInst<IRGLSLShaderStorageBufferType>(
+            this,
+            kIROp_GLSLShaderStorageBufferType,
+            getTypeKind());
+        addGlobalValue(this, ssboType);
+        return ssboType;
+    }
+
     IRInterfaceType* IRBuilder::createInterfaceType(UInt operandCount, IRInst* const* operands)
     {
         IRInterfaceType* interfaceType = createInst<IRInterfaceType>(
@@ -5932,6 +5942,22 @@ namespace Slang
         return emitIntrinsicInst(nullptr, kIROp_GenericAsm, 1, &arg);
     }
 
+    IRInst* IRBuilder::emitRWStructuredBufferGetElementPtr(IRInst* structuredBuffer, IRInst* index)
+    {
+        const auto sbt = cast<IRHLSLRWStructuredBufferType>(structuredBuffer->getDataType());
+        const auto t = getPtrType(sbt->getElementType());
+        IRInst* const operands[2] = {structuredBuffer, index};
+        const auto i = createInst<IRRWStructuredBufferGetElementPtr>(
+            this,
+            kIROp_RWStructuredBufferGetElementPtr,
+            t,
+            2,
+            operands
+        );
+        addInst(i);
+        return i;
+    }
+
     //
     // Decorations
     //
@@ -6416,6 +6442,8 @@ namespace Slang
         switch( inst->getOp() )
         {
         case kIROp_StructType:
+        case kIROp_ClassType:
+        case kIROp_GLSLShaderStorageBufferType:
         case kIROp_InterfaceType:
             return false;
 
@@ -6812,6 +6840,8 @@ namespace Slang
 
         case kIROp_WitnessTable:
         case kIROp_StructType:
+        case kIROp_ClassType:
+        case kIROp_GLSLShaderStorageBufferType:
         case kIROp_SPIRVAsm:
             dumpIRParentInst(context, inst);
             return;
@@ -7012,6 +7042,7 @@ namespace Slang
         {
             case kIROp_StructType:
             case kIROp_ClassType:
+            case kIROp_GLSLShaderStorageBufferType:
             case kIROp_InterfaceType:
             case kIROp_Generic:
             case kIROp_Param:
@@ -7737,6 +7768,7 @@ namespace Slang
             // All of the cases for "global values" are side-effect-free.
         case kIROp_StructType:
         case kIROp_StructField:
+        case kIROp_GLSLShaderStorageBufferType:
         case kIROp_RTTIPointerType:
         case kIROp_RTTIObject:
         case kIROp_RTTIType:

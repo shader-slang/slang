@@ -3732,6 +3732,9 @@ public:
     // Create an initially empty `class` type.
     IRClassType* createClassType();
 
+    // Create an initially empty `GLSLShaderStorageBufferType` type.
+    IRGLSLShaderStorageBufferType* createGLSLShaderStorableBufferType();
+
     // Create an empty `interface` type.
     IRInterfaceType* createInterfaceType(UInt operandCount, IRInst* const* operands);
 
@@ -4080,6 +4083,8 @@ public:
     IRSPIRVAsmInst* emitSPIRVAsmInst(IRInst* opcode, List<IRInst*> operands);
     IRSPIRVAsm* emitSPIRVAsm(IRType* type);
     IRInst* emitGenericAsm(UnownedStringSlice asmText);
+
+    IRInst* emitRWStructuredBufferGetElementPtr(IRInst* structuredBuffer, IRInst* index);
     //
     // Decorations
     //
