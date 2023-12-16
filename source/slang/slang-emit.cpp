@@ -367,7 +367,7 @@ Result linkAndOptimizeIR(
     // Lower all the LValue implict casts (used for out/inout/ref scenarios)
     lowerLValueCast(targetRequest, irModule);
 
-    simplifyIR(irModule, IRSimplificationOptions::getDefault(), sink);
+    simplifyIR(targetRequest, irModule, IRSimplificationOptions::getDefault(), sink);
 
     // Fill in default matrix layout into matrix types that left layout unspecified.
     specializeMatrixLayout(codeGenContext->getTargetReq(), irModule);
@@ -407,7 +407,7 @@ Result linkAndOptimizeIR(
         //auto b1 = dumpIRToString(irModule->getModuleInst());
         dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-SPECIALIZE");
         if (!codeGenContext->isSpecializationDisabled())
-            changed |= specializeModule(irModule, codeGenContext->getSink());
+            changed |= specializeModule(codeGenContext->getTargetReq(), irModule, codeGenContext->getSink());
         if (codeGenContext->getSink()->getErrorCount() != 0)
             return SLANG_FAIL;
         dumpIRIfEnabled(codeGenContext, irModule, "AFTER-SPECIALIZE");
@@ -425,7 +425,7 @@ Result linkAndOptimizeIR(
         // Unroll loops.
         if (codeGenContext->getSink()->getErrorCount() == 0)
         {
-            if (!unrollLoopsInModule(irModule, codeGenContext->getSink()))
+            if (!unrollLoopsInModule(targetRequest, irModule, codeGenContext->getSink()))
                 return SLANG_FAIL;
         }
 
@@ -438,7 +438,7 @@ Result linkAndOptimizeIR(
 
         dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-AUTODIFF");
         enableIRValidationAtInsert();
-        changed |= processAutodiffCalls(irModule, sink);
+        changed |= processAutodiffCalls(targetRequest, irModule, sink);
         disableIRValidationAtInsert();
         dumpIRIfEnabled(codeGenContext, irModule, "AFTER-AUTODIFF");
 
@@ -446,7 +446,7 @@ Result linkAndOptimizeIR(
             break;
     }
 
-    finalizeAutoDiffPass(irModule);
+    finalizeAutoDiffPass(targetRequest, irModule);
 
     finalizeSpecialization(irModule);
 
@@ -481,7 +481,7 @@ Result linkAndOptimizeIR(
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
-    simplifyIR(irModule, IRSimplificationOptions::getFast(), sink);
+    simplifyIR(targetRequest, irModule, IRSimplificationOptions::getFast(), sink);
 
     if (!ArtifactDescUtil::isCpuLikeTarget(artifactDesc))
     {
@@ -510,7 +510,7 @@ Result linkAndOptimizeIR(
     // up downstream passes like type legalization, so we
     // will run a DCE pass to clean up after the specialization.
     //
-    simplifyIR(irModule, IRSimplificationOptions::getDefault(), sink);
+    simplifyIR(targetRequest, irModule, IRSimplificationOptions::getDefault(), sink);
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
@@ -596,7 +596,7 @@ Result linkAndOptimizeIR(
     // to see if we can clean up any temporaries created by legalization.
     // (e.g., things that used to be aggregated might now be split up,
     // so that we can work with the individual fields).
-    simplifyIR(irModule, IRSimplificationOptions::getFast(), sink);
+    simplifyIR(targetRequest, irModule, IRSimplificationOptions::getFast(), sink);
 
 #if 0
     dumpIRIfEnabled(codeGenContext, irModule, "AFTER SSA");
@@ -940,7 +940,7 @@ Result linkAndOptimizeIR(
     {
         IRSimplificationOptions simplificationOptions = IRSimplificationOptions::getFast();
         simplificationOptions.cfgOptions.removeTrivialSingleIterationLoops = true;
-        simplifyIR(irModule, simplificationOptions, sink);
+        simplifyIR(targetRequest, irModule, simplificationOptions, sink);
     }
 
     // As a late step, we need to take the SSA-form IR and move things *out*
@@ -1018,7 +1018,7 @@ Result linkAndOptimizeIR(
     }
 
     // Run a final round of simplifications to clean up unused things after phi-elimination.
-    simplifyNonSSAIR(irModule, IRSimplificationOptions::getFast());
+    simplifyNonSSAIR(targetRequest, irModule, IRSimplificationOptions::getFast());
 
     // We include one final step to (optionally) dump the IR and validate
     // it after all of the optimization passes are complete. This should

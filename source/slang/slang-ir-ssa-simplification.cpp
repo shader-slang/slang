@@ -17,7 +17,7 @@ namespace Slang
 {
     // Run a combination of SSA, SCCP, SimplifyCFG, and DeadCodeElimination pass
     // until no more changes are possible.
-    void simplifyIR(IRModule* module, IRSimplificationOptions options, DiagnosticSink* sink)
+    void simplifyIR(TargetRequest* target, IRModule* module, IRSimplificationOptions options, DiagnosticSink* sink)
     {
         SLANG_PROFILE;
         bool changed = true;
@@ -36,7 +36,7 @@ namespace Slang
             changed |= propagateFuncProperties(module);
             changed |= removeUnusedGenericParam(module);
             changed |= applySparseConditionalConstantPropagationForGlobalScope(module, sink);
-            changed |= peepholeOptimizeGlobalScope(module);
+            changed |= peepholeOptimizeGlobalScope(target, module);
 
             for (auto inst : module->getGlobalInsts())
             {
@@ -49,7 +49,7 @@ namespace Slang
                 {
                     funcChanged = false;
                     funcChanged |= applySparseConditionalConstantPropagation(func, sink);
-                    funcChanged |= peepholeOptimize(func);
+                    funcChanged |= peepholeOptimize(target, func);
                     funcChanged |= removeRedundancyInFunc(func);
                     funcChanged |= simplifyCFG(func, options.cfgOptions);
                     eliminateDeadCode(func);
@@ -68,7 +68,7 @@ namespace Slang
         }
     }
 
-    void simplifyNonSSAIR(IRModule* module, IRSimplificationOptions options)
+    void simplifyNonSSAIR(TargetRequest* target, IRModule* module, IRSimplificationOptions options)
     {
         bool changed = true;
         const int kMaxIterations = 8;
@@ -76,7 +76,7 @@ namespace Slang
         while (changed && iterationCounter < kMaxIterations)
         {
             changed = false;
-            changed |= peepholeOptimize(module);
+            changed |= peepholeOptimize(target, module);
 
             changed |= removeRedundancy(module);
             changed |= simplifyCFG(module, options.cfgOptions);
@@ -90,7 +90,7 @@ namespace Slang
     }
 
 
-    void simplifyFunc(IRGlobalValueWithCode* func, IRSimplificationOptions options, DiagnosticSink* sink)
+    void simplifyFunc(TargetRequest* target, IRGlobalValueWithCode* func, IRSimplificationOptions options, DiagnosticSink* sink)
     {
         bool changed = true;
         const int kMaxIterations = 8;
@@ -102,7 +102,7 @@ namespace Slang
 
             changed = false;
             changed |= applySparseConditionalConstantPropagation(func, sink);
-            changed |= peepholeOptimize(func);
+            changed |= peepholeOptimize(target, func);
             changed |= removeRedundancyInFunc(func);
             changed |= simplifyCFG(func, options.cfgOptions);
 

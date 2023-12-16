@@ -339,8 +339,8 @@ IRInst* DifferentialPairTypeBuilder::lowerDiffPairType(
     return result;
 }
 
-AutoDiffSharedContext::AutoDiffSharedContext(IRModuleInst* inModuleInst)
-    : moduleInst(inModuleInst)
+AutoDiffSharedContext::AutoDiffSharedContext(TargetRequest* target, IRModuleInst* inModuleInst)
+    : moduleInst(inModuleInst), targetRequest(target)
 {
     differentiableInterfaceType = as<IRInterfaceType>(findDifferentiableInterface());
     if (differentiableInterfaceType)
@@ -1979,6 +1979,7 @@ protected:
 };
 
 bool processAutodiffCalls(
+    TargetRequest* target,
     IRModule*                           module,
     DiagnosticSink*                     sink,
     IRAutodiffPassOptions const&)
@@ -1987,7 +1988,7 @@ bool processAutodiffCalls(
     bool modified = false;
 
     // Create shared context for all auto-diff related passes
-    AutoDiffSharedContext autodiffContext(module->getModuleInst());
+    AutoDiffSharedContext autodiffContext(target, module->getModuleInst());
 
     AutoDiffPass pass(&autodiffContext, sink);
 
@@ -2077,12 +2078,12 @@ void releaseNullDifferentialType(AutoDiffSharedContext* context)
     }
 }
 
-bool finalizeAutoDiffPass(IRModule* module)
+bool finalizeAutoDiffPass(TargetRequest* target, IRModule* module)
 {
     bool modified = false;
 
     // Create shared context for all auto-diff related passes
-    AutoDiffSharedContext autodiffContext(module->getModuleInst());
+    AutoDiffSharedContext autodiffContext(target, module->getModuleInst());
 
     // Replaces IRDifferentialPairType with an auto-generated struct,
     // IRDifferentialPairGetDifferential with 'differential' field access,

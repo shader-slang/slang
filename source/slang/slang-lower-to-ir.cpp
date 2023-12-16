@@ -3956,6 +3956,16 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                     }
                     return builder->emitSPIRVAsmOperandInst(i);
                 }
+            case SPIRVAsmOperand::SlangImmediateValue:
+            {
+                IRInst* i;
+                {
+                    IRBuilderInsertLocScope insertScope(builder);
+                    builder->setInsertBefore(spirvAsmInst);
+                    i = getSimpleVal(context, lowerRValueExpr(context, operand.expr));
+                }
+                return builder->emitSPIRVAsmOperandEnum(i);
+            }
             case SPIRVAsmOperand::SlangValueAddr:
                 {
                     IRInst* i;
@@ -10295,7 +10305,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     constructSSA(module);
     simplifyCFG(module, CFGSimplificationOptions::getDefault());
     applySparseConditionalConstantPropagation(module, compileRequest->getSink());
-    peepholeOptimize(module);
+    peepholeOptimize(nullptr, module);
 
     for (auto inst : module->getGlobalInsts())
     {
@@ -10344,7 +10354,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         changed |= constructSSA(module);
         simplifyCFG(module, CFGSimplificationOptions::getDefault());
         changed |= applySparseConditionalConstantPropagation(module, compileRequest->getSink());
-        changed |= peepholeOptimize(module);
+        changed |= peepholeOptimize(nullptr, module);
         for (auto inst : module->getGlobalInsts())
         {
             if (auto func = as<IRGlobalValueWithCode>(inst))

@@ -12555,7 +12555,45 @@ struct ConstBufferPointer
             __intrinsic_asm "$0._data";
         case spirv:
             return spirv_asm {
-                result:$$T = OpLoad $this Aligned $Alignment;
+                result:$$T = OpLoad $this Aligned !Alignment;
+            };
+        }
+    }
+
+    __subscript(int index) -> T
+    {
+        [ForceInline]
+        get {return ConstBufferPointer<T>.fromUInt(toUInt() + __naturalStrideOf<T>() * index).get(); }
+    }
+
+    __glsl_version(450)
+    __glsl_extension(GL_EXT_shader_explicit_arithmetic_types_int64)
+    __glsl_extension(GL_EXT_buffer_reference)
+    static ConstBufferPointer<T> fromUInt(uint64_t val)
+    {
+        __target_switch
+        {
+        case glsl:
+            __intrinsic_asm "$TR($0)";
+        case spirv:
+            return spirv_asm {
+                result:$$ConstBufferPointer<T> = OpConvertUToPtr $val;
+            };
+        }
+    }
+
+    __glsl_version(450)
+    __glsl_extension(GL_EXT_shader_explicit_arithmetic_types_int64)
+    __glsl_extension(GL_EXT_buffer_reference)
+    uint64_t toUInt()
+    {
+        __target_switch
+        {
+        case glsl:
+            __intrinsic_asm "uint64_t($0)";
+        case spirv:
+            return spirv_asm {
+                result:$$uint64_t = OpConvertPtrToU $this;
             };
         }
     }

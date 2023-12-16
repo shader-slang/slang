@@ -6,10 +6,11 @@ namespace Slang
     struct IRModule;
     struct IRCall;
     struct IRInst;
+    class TargetRequest;
 
         /// Apply peephole optimizations.
-    bool peepholeOptimize(IRModule* module);
-    bool peepholeOptimize(IRInst* func);
-    bool peepholeOptimizeGlobalScope(IRModule* module);
-    bool tryReplaceInstUsesWithSimplifiedValue(IRModule* module, IRInst* inst);
+    bool peepholeOptimize(TargetRequest* target, IRModule* module);
+    bool peepholeOptimize(TargetRequest* target, IRInst* func);
+    bool peepholeOptimizeGlobalScope(TargetRequest* target, IRModule* module);
+    bool tryReplaceInstUsesWithSimplifiedValue(TargetRequest* target, IRModule* module, IRInst* inst);
 }

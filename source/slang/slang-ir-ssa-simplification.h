@@ -8,6 +8,7 @@ namespace Slang
     struct IRModule;
     struct IRGlobalValueWithCode;
     class DiagnosticSink;
+    class TargetRequest;
 
     struct IRSimplificationOptions
     {
@@ -28,10 +29,10 @@ namespace Slang
 
     // Run a combination of SSA, SCCP, SimplifyCFG, and DeadCodeElimination pass
     // until no more changes are possible.
-    void simplifyIR(IRModule* module, IRSimplificationOptions options, DiagnosticSink* sink = nullptr);
+    void simplifyIR(TargetRequest* target, IRModule* module, IRSimplificationOptions options, DiagnosticSink* sink = nullptr);
 
     // Run simplifications on IR that is out of SSA form.
-    void simplifyNonSSAIR(IRModule* module, IRSimplificationOptions options);
+    void simplifyNonSSAIR(TargetRequest* target, IRModule* module, IRSimplificationOptions options);
 
-    void simplifyFunc(IRGlobalValueWithCode* func, IRSimplificationOptions options, DiagnosticSink* sink = nullptr);
+    void simplifyFunc(TargetRequest* target, IRGlobalValueWithCode* func, IRSimplificationOptions options, DiagnosticSink* sink = nullptr);
 }

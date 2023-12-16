@@ -59,6 +59,8 @@ struct DiffTranscriberSet
 
 struct AutoDiffSharedContext
 {
+    TargetRequest* targetRequest = nullptr;
+
     IRModuleInst* moduleInst = nullptr;
 
     // A reference to the builtin IDifferentiable interface type.
@@ -113,7 +115,7 @@ struct AutoDiffSharedContext
 
     DiffTranscriberSet transcriberSet;
 
-    AutoDiffSharedContext(IRModuleInst* inModuleInst);
+    AutoDiffSharedContext(TargetRequest* target, IRModuleInst* inModuleInst);
 
 private:
 
@@ -357,11 +359,12 @@ struct IRAutodiffPassOptions
 };
 
 bool processAutodiffCalls(
+    TargetRequest* target,
     IRModule*                           module,
     DiagnosticSink*                     sink,
     IRAutodiffPassOptions const&   options = IRAutodiffPassOptions());
 
-bool finalizeAutoDiffPass(IRModule* module);
+bool finalizeAutoDiffPass(TargetRequest* target, IRModule* module);
 
 // Utility methods
 

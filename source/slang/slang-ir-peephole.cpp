@@ -3,6 +3,7 @@
 #include "slang-ir-sccp.h"
 #include "slang-ir-dominators.h"
 #include "slang-ir-util.h"
+#include "slang-ir-layout.h"
 
 namespace Slang
 {
@@ -15,6 +16,9 @@ struct PeepholeContext : InstPassBase
     bool changed = false;
     FloatingPointMode floatingPointMode = FloatingPointMode::Precise;
     bool removeOldInst = true;
+    bool isInGeneric = false;
+
+    TargetRequest* targetRequest;
 
     void maybeRemoveOldInst(IRInst* inst)
     {
@@ -959,6 +963,24 @@ struct PeepholeContext : InstPassBase
                 }
                 break;
             }
+        case kIROp_GetNaturalStride:
+        {
+            if (targetRequest)
+            {
+                if (isInGeneric)
+                    break;
+                auto type = inst->getOperand(0)->getDataType();
+                IRSizeAndAlignment sizeAlignment;
+                getNaturalSizeAndAlignment(targetRequest, type, &sizeAlignment);
+                IRBuilder builder(module);
+                builder.setInsertBefore(inst);
+                auto stride = builder.getIntValue(inst->getDataType(), sizeAlignment.getStride());
+                inst->replaceUsesWith(stride);
+                maybeRemoveOldInst(inst);
+                changed = true;
+            }
+            break;
+        }
         case kIROp_IsInt:
         case kIROp_IsFloat:
         case kIROp_IsUnsignedInt:
@@ -1017,6 +1039,10 @@ struct PeepholeContext : InstPassBase
     {
         func->getModule()->invalidateAllAnalysis();
 
+        bool lastIsInGeneric = isInGeneric;
+        if (!isInGeneric)
+            isInGeneric = as<IRGeneric>(func) != nullptr;
+
         bool result = false;
         for (;;)
         {
@@ -1027,6 +1053,9 @@ struct PeepholeContext : InstPassBase
             else
                 break;
         }
+
+        isInGeneric = lastIsInGeneric;
+
         return result;
     }
 
@@ -1036,21 +1065,25 @@ struct PeepholeContext : InstPassBase
     }
 };
 
-bool peepholeOptimize(IRModule* module)
+bool peepholeOptimize(TargetRequest* target, IRModule* module)
 {
     PeepholeContext context = PeepholeContext(module);
+    context.targetRequest = target;
     return context.processModule();
 }
 
-bool peepholeOptimize(IRInst* func)
+bool peepholeOptimize(TargetRequest* target, IRInst* func)
 {
     PeepholeContext context = PeepholeContext(func->getModule());
+    context.targetRequest = target;
     return context.processFunc(func);
 }
 
-bool peepholeOptimizeGlobalScope(IRModule* module)
+bool peepholeOptimizeGlobalScope(TargetRequest* target, IRModule* module)
 {
     PeepholeContext context = PeepholeContext(module);
+    context.targetRequest = target;
+
     bool result = false;
     for (;;)
     {
@@ -1064,12 +1097,13 @@ bool peepholeOptimizeGlobalScope(IRModule* module)
     return result;
 }
 
-bool tryReplaceInstUsesWithSimplifiedValue(IRModule* module, IRInst* inst)
+bool tryReplaceInstUsesWithSimplifiedValue(TargetRequest* target, IRModule* module, IRInst* inst)
 {
     if (inst != tryConstantFoldInst(module, inst))
         return true;
 
     PeepholeContext context = PeepholeContext(inst->getModule());
+    context.targetRequest = target;
     context.removeOldInst = false;
     context.processInst(inst);
     return context.changed;

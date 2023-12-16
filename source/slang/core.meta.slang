@@ -2294,6 +2294,18 @@ bool __isVector()
     return __isVector_impl(__declVal<T>());
 }
 
+__generic<T>
+__intrinsic_op($(kIROp_GetNaturalStride))
+int __naturalStrideOf_impl(T v);
+
+__generic<T>
+[__unsafeForceInlineEarly]
+int __naturalStrideOf()
+{
+    return __naturalStrideOf_impl(__declVal<T>());
+}
+
+
 
 // Binding Attributes
 

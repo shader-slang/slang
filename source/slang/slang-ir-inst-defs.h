@@ -464,6 +464,8 @@ INST(StructuredBufferGetDimensions, StructuredBufferGetDimensions, 1, 0)
 INST(AtomicCounterIncrement, AtomicCounterIncrement, 1, 0)
 INST(AtomicCounterDecrement, AtomicCounterDecrement, 1, 0)
 
+INST(GetNaturalStride, getNaturalStride, 1, 0)
+
 INST(MeshOutputRef, meshOutputRef, 2, 0)
 
 // Construct a vector from a scalar

@@ -4262,6 +4262,7 @@ namespace Slang
                         operand.expr = typeExpr.exp;
                     }
                     else if(operand.flavor == SPIRVAsmOperand::SlangValue
+                        || operand.flavor == SPIRVAsmOperand::SlangImmediateValue
                         || operand.flavor == SPIRVAsmOperand::SlangValueAddr
                         || operand.flavor == SPIRVAsmOperand::ImageType
                         || operand.flavor == SPIRVAsmOperand::SampledImageType)
