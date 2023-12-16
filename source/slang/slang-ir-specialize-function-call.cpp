@@ -891,7 +891,7 @@ struct FunctionParameterSpecializationContext
         //
         addCallsToWorkListRec(newFunc);
 
-        simplifyFunc(newFunc, IRSimplificationOptions::getFast());
+        simplifyFunc(targetRequest, newFunc, IRSimplificationOptions::getFast());
 
         return newFunc;
     }

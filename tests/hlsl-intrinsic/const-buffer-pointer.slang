@@ -5,6 +5,10 @@
 // SPV: OpEntryPoint GLCompute {{.*}} "main" {{.*}}
 // SPV: OpTypePointer PhysicalStorageBuffer
 // SPV: OpINotEqual
+// SPV: OpConvertPtrToU
+// SPV: OpIAdd
+// SPV: OpConvertUToPtr
+// SPV: OpLoad
 struct MyStruct
 {
     float4 position;
@@ -40,5 +44,7 @@ void main(int3 tid: SV_DispatchThreadID)
     {
         MyStruct s = gGlobals.pStruct.get();
         outputBuffer[tid.x] = uint(s.position.x);
+        MyStruct s1 = gGlobals.pStruct[3];
+        outputBuffer[tid.x + 1] = uint(s1.position.x);
     }
 }

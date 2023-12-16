@@ -47,15 +47,17 @@ struct SpecializationContext
     // we are specializing.
     IRModule* module;
     DiagnosticSink* sink;
+    TargetRequest* targetRequest;
 
     bool changed = false;
 
 
-    SpecializationContext(IRModule* inModule)
+    SpecializationContext(IRModule* inModule, TargetRequest* target)
         : workList(*inModule->getContainerPool().getList<IRInst>())
         , workListSet(*inModule->getContainerPool().getHashSet<IRInst>())
         , cleanInsts(*module->getContainerPool().getHashSet<IRInst>())
         , module(inModule)
+        , targetRequest(target)
     {
     }
 
@@ -1511,7 +1513,7 @@ struct SpecializationContext
         //
         addToWorkList(newFunc);
 
-        simplifyFunc(newFunc, IRSimplificationOptions::getFast());
+        simplifyFunc(targetRequest, newFunc, IRSimplificationOptions::getFast());
 
         return newFunc;
     }
@@ -2230,11 +2232,12 @@ struct SpecializationContext
 };
 
 bool specializeModule(
+    TargetRequest* target,
     IRModule* module,
     DiagnosticSink* sink)
 {
     SLANG_PROFILE;
-    SpecializationContext context(module);
+    SpecializationContext context(module, target);
     context.sink = sink;
     context.processModule();
     return context.changed;
@@ -2369,7 +2372,7 @@ IRInst* specializeGenericImpl(
                 // the same thing.
                 if (auto func = as<IRFunc>(specializedVal))
                 {
-                    simplifyFunc(func, IRSimplificationOptions::getFast());
+                    simplifyFunc(context->targetRequest, func, IRSimplificationOptions::getFast());
                 }
 
                 return specializedVal;

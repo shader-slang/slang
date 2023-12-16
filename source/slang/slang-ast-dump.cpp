@@ -659,6 +659,9 @@ struct ASTDumpContext
         case SPIRVAsmOperand::SlangType:
             m_writer->emit("$$");
             break;
+        case SPIRVAsmOperand::SlangImmediateValue:
+            m_writer->emit("!");
+            break;
         default:
             SLANG_UNREACHABLE("Unhandled case in ast dump for SPIRVAsmOperand");
         }

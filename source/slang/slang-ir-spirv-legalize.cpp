@@ -1781,7 +1781,7 @@ void buildEntryPointReferenceGraph(SPIRVEmitSharedContext* context, IRModule* mo
         visit(workList[i].entryPoint, workList[i].inst);
 }
 
-void simplifyIRForSpirvLegalization(DiagnosticSink* sink, IRModule* module)
+void simplifyIRForSpirvLegalization(TargetRequest* target, DiagnosticSink* sink, IRModule* module)
 {
     bool changed = true;
     const int kMaxIterations = 8;
@@ -1796,7 +1796,7 @@ void simplifyIRForSpirvLegalization(DiagnosticSink* sink, IRModule* module)
         changed = false;
 
         changed |= applySparseConditionalConstantPropagationForGlobalScope(module, sink);
-        changed |= peepholeOptimizeGlobalScope(module);
+        changed |= peepholeOptimizeGlobalScope(target, module);
 
         for (auto inst : module->getGlobalInsts())
         {
@@ -1809,7 +1809,7 @@ void simplifyIRForSpirvLegalization(DiagnosticSink* sink, IRModule* module)
             {
                 funcChanged = false;
                 funcChanged |= applySparseConditionalConstantPropagation(func, sink);
-                funcChanged |= peepholeOptimize(func);
+                funcChanged |= peepholeOptimize(target, func);
                 funcChanged |= removeRedundancyInFunc(func);
                 funcChanged |= simplifyCFG(func, CFGSimplificationOptions::getFast());
                 eliminateDeadCode(func);
@@ -1826,7 +1826,7 @@ void legalizeIRForSPIRV(
 {
     SLANG_UNUSED(entryPoints);
     legalizeSPIRV(context, module);
-    simplifyIRForSpirvLegalization(codeGenContext->getSink(), module);
+    simplifyIRForSpirvLegalization(context->m_targetRequest, codeGenContext->getSink(), module);
     buildEntryPointReferenceGraph(context, module);
 }
 

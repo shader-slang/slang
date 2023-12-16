@@ -6995,7 +6995,12 @@ namespace Slang
         {
             return slangTypeExprOperand(SPIRVAsmOperand::SlangType);
         }
-
+        // A !immediateValue
+        else if (AdvanceIf(parser, TokenType::OpNot))
+        {
+            Expr* expr = parseAtomicExpr(parser);
+            return SPIRVAsmOperand{ SPIRVAsmOperand::SlangImmediateValue, Token{}, expr };
+        }
         Unexpected(parser);
         return std::nullopt;
     }

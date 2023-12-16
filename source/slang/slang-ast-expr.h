@@ -658,6 +658,7 @@ public:
         NamedValue, // Any other identifier
         SlangValue,
         SlangValueAddr,
+        SlangImmediateValue,
         SlangType,
         SampledType, // __sampledType(T), this becomes a 4 vector of the component type of T
         ImageType, // __imageType(texture), returns the equivalaent OpTypeImage of a given texture typed value.
