@@ -64,11 +64,15 @@ auto_option(
     NVAPI
     "Enable NVAPI usage (Only available for builds targeting Windows)"
 )
-auto_option(
-    SLANG_ENABLE_XLIB
-    X11
-    "Build gfx and platform with Xlib to support windowed apps on Linux"
-)
+if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+    auto_option(
+        SLANG_ENABLE_XLIB
+        X11
+        "Build gfx and platform with Xlib to support windowed apps on Linux"
+    )
+else()
+    set(SLANG_ENABLE_XLIB OFF)
+endif()
 auto_option(
     SLANG_ENABLE_AFTERMATH
     Aftermath
@@ -417,6 +421,8 @@ slang_add_target(
         core
         imgui
         $<$<BOOL:${SLANG_ENABLE_XLIB}>:X11::X11>
+        "-framework Cocoa"
+        "-framework QuartzCore"
         ${CMAKE_DL_LIBS}
     EXTRA_COMPILE_DEFINITIONS_PRIVATE
         $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB>

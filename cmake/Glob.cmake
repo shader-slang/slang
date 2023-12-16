@@ -18,6 +18,7 @@ function(slang_glob_sources var dir)
     set(patterns
         "*.cpp"
         "*.h"
+        "*.mm"
         "*.natvis"
         "*.natstepfilter"
         "*.natjmc"
@@ -38,7 +39,7 @@ function(slang_glob_sources var dir)
         list(FILTER files EXCLUDE REGEX "(^|/)d3d.*/.*")
     endif()
 
-    if(NOT CMAKE_SYSTEM_NAME MATCHES "Windows|Linux")
+    if(NOT CMAKE_SYSTEM_NAME MATCHES "Windows|Linux|Darwin")
         list(FILTER files EXCLUDE REGEX "(^|/)vulkan/.*")
     endif()
 
