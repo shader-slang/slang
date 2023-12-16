@@ -496,6 +496,35 @@ ASTMarkup* WorkspaceVersion::getOrCreateMarkupAST(ModuleDecl* module)
     return astMarkup.Ptr();
 }
 
+void WorkspaceVersion::ensureWorkspaceFlavor(UnownedStringSlice path)
+{
+    if (flavor != WorkspaceFlavor::Standard)
+        return;
+
+    if (path.endsWithCaseInsensitive(".vfx"))
+    {
+        // Setup linkage for vfx files.
+        // TODO: consider supporting this as an external config file.
+        flavor = WorkspaceFlavor::VFX;
+        linkage->setEnableEffectAnnotations(true);
+        linkage->addPreprocessorDefine("VS", "__file_decl");
+        linkage->addPreprocessorDefine("CS", "__file_decl");
+        linkage->addPreprocessorDefine("GS", "__file_decl");
+        linkage->addPreprocessorDefine("PS", "__file_decl");
+        linkage->addPreprocessorDefine("RTX", "__file_decl");
+        linkage->addPreprocessorDefine("PS_RTX", "__file_decl");
+        linkage->addPreprocessorDefine("VS_RTX", "__file_decl");
+        linkage->addPreprocessorDefine("FRAGMENT_ANNOTATION", "");
+        linkage->addPreprocessorDefine("DynamicCombo", "//");
+        linkage->addPreprocessorDefine("DynamicComboRule", "//");
+        linkage->addPreprocessorDefine("HEADER", "__ignored_block");
+        linkage->addPreprocessorDefine("MODES", "__ignored_block");
+        linkage->addPreprocessorDefine("PS_RENDER_STATE", "__ignored_block");
+        linkage->addPreprocessorDefine("FEATURES", "__ignored_block");
+        linkage->addPreprocessorDefine("COMMON", "__transparent_block");
+    }
+}
+
 Module* WorkspaceVersion::getOrLoadModule(String path)
 {
     Module* module;
@@ -512,6 +541,9 @@ Module* WorkspaceVersion::getOrLoadModule(String path)
     auto moduleName = getMangledNameFromNameString(path.getUnownedSlice());
     linkage->contentAssistInfo.primaryModuleName = linkage->getNamePool()->getName(moduleName);
     linkage->contentAssistInfo.primaryModulePath = path;
+
+    ensureWorkspaceFlavor(path.getUnownedSlice());
+
     // Note: 
     // The module at `path` may have already been loaded into the linkage previously
     // due to an `import`. However that module won't get fully checked in when the checker
