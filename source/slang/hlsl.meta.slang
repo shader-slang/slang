@@ -5963,6 +5963,18 @@ __generic<let N : int> float noise(vector<float, N> x)
 /// to this function as necessary in output code, rather than make this
 /// the user's responsibility, so that the default behavior of the language
 /// is more semantically "correct."
+[ForceInline]
+T __copyObject<T>(T v)
+{
+    __target_switch {
+    case spirv:
+        return spirv_asm {
+           result:$$T = OpCopyObject $v;
+        };
+   }
+}
+
+
 __glsl_extension(GL_EXT_nonuniform_qualifier)
 [__readNone]
 [ForceInline]
@@ -5975,12 +5987,13 @@ uint NonUniformResourceIndex(uint index)
     case glsl:
         __intrinsic_asm "nonuniformEXT";
     case spirv:
+        var indexCopy = __copyObject(index);
         spirv_asm
         {
             OpCapability ShaderNonUniform;
-            OpDecorate $index NonUniform;
+            OpDecorate $indexCopy NonUniform;
         };
-        return index;
+        return indexCopy;
     default:
         return index;
     }
@@ -5988,6 +6001,7 @@ uint NonUniformResourceIndex(uint index)
 
 __glsl_extension(GL_EXT_nonuniform_qualifier)
 [__readNone]
+[ForceInline]
 int NonUniformResourceIndex(int index)
 {
     __target_switch
@@ -5997,12 +6011,13 @@ int NonUniformResourceIndex(int index)
     case glsl:
         __intrinsic_asm "nonuniformEXT";
     case spirv:
+        var indexCopy = __copyObject(index);
         spirv_asm
         {
             OpCapability ShaderNonUniform;
-            OpDecorate $index NonUniform;
+            OpDecorate $indexCopy NonUniform;
         };
-        return index;
+        return indexCopy;
     default:
         return index;
     }

@@ -1,7 +1,7 @@
 // vk-texture-indexing.slang
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv -entry main -stage fragment
-//TEST_DISABLED:SIMPLE(filecheck=CHECK):-target spirv -entry main -stage fragment -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK):-target spirv -entry main -stage fragment -emit-spirv-directly
 
 struct Params
 {
