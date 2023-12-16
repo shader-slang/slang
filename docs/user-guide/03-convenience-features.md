@@ -460,3 +460,59 @@ by using the `[ForceInline]` decoration:
 [ForceInline]
 int f(int x) { return x + 1; }
 ```
+
+
+Special Scoping Syntax
+-------------------
+Slang supports three special scoping syntax to allow users to mix in custom decorators and content in the shader code. These constructs allow a rendering engine to define custom meta-data in the shader, or map engine-specific block syntax to a meaningful block that is understood by the compiler via proper `#define`s.
+
+### `__ignored_block`
+An ignored block will be parsed and ignored by the compiler:
+```
+__ignored_block
+{
+    arbitrary content in the source file,
+    will be ignored by the compiler as if it is a comment.
+    Can have nested {} here.
+}
+```
+
+### `__transparent_block`
+Symbols defined in a transparent block will be treated as if they are defined
+in the parent scope:
+```csharp
+struct MyType
+{
+    __transparent_block
+    {
+        int myFunc() { return 0; }
+    }
+}
+```
+Is equivalent to:
+```csharp
+struct MyType
+{
+    int myFunc() { return 0; }
+}
+```
+
+### `__file_decl`
+Symbols defined in a `__file_decl` will be treated as if they are defined in
+the global scope. However, symbols defined in different `__file_decl`s is not visible
+to each other. For example:
+```csharp
+__file_decl
+{
+    void f1()
+    {
+    }
+}
+__file_decl
+{
+    void f2()
+    {
+        f1(); // error: f1 is not visible from here.
+    }
+}
+```
