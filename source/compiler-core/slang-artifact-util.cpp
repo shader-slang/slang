@@ -177,7 +177,7 @@ static SlangResult _calcInferred(IArtifact* artifact, const UnownedStringSlice& 
 
 /* static */SlangResult ArtifactUtil::calcPath(IArtifact* artifact, const UnownedStringSlice& basePath, StringBuilder& outPath)
 {
-    if (ArtifactDescUtil::hasDefinedNameForDesc(artifact->getDesc()))
+    if (SLANG_SUCCEEDED(ArtifactDescUtil::hasDefinedNameForDesc(artifact->getDesc())))
     {
         return ArtifactDescUtil::calcPathForDesc(artifact->getDesc(), basePath, outPath);
     }
@@ -189,7 +189,7 @@ static SlangResult _calcInferred(IArtifact* artifact, const UnownedStringSlice& 
 
 /* static */SlangResult ArtifactUtil::calcName(IArtifact* artifact, const UnownedStringSlice& baseName, StringBuilder& outName)
 {
-    if (ArtifactDescUtil::hasDefinedNameForDesc(artifact->getDesc()))
+    if (SLANG_SUCCEEDED(ArtifactDescUtil::hasDefinedNameForDesc(artifact->getDesc())))
     {
         return ArtifactDescUtil::calcNameForDesc(artifact->getDesc(), baseName, outName);
     }

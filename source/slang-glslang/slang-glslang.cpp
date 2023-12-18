@@ -436,7 +436,7 @@ static int spirv_Optimize_1_2(const glslang_CompileRequest_1_2& request)
                 request.diagnosticUserData);
         }
     }
-    return SLANG_OK;
+    return 0;
 }
 
 static glslang::EShTargetLanguageVersion _makeTargetLanguageVersion(int majorVersion, int minorVersion)

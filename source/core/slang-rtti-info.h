@@ -289,6 +289,7 @@ template <> struct GetRttiInfo<float> { static const RttiInfo* get() { return &R
 template <> struct GetRttiInfo<double> { static const RttiInfo* get() { return &RttiInfo::g_basicTypes[Index(RttiInfo::Kind::F64)]; } };
 template <> struct GetRttiInfo<String> { static const RttiInfo* get() { return &RttiInfo::g_basicTypes[Index(RttiInfo::Kind::String)]; } };
 template <> struct GetRttiInfo<UnownedStringSlice> { static const RttiInfo* get() { return &RttiInfo::g_basicTypes[Index(RttiInfo::Kind::UnownedStringSlice)]; } };
+template <> struct GetRttiInfo<SlangResult> { static const RttiInfo* get() { return &RttiInfo::g_basicTypes[Index(RttiInfo::Kind::I32)]; } };
 
 template <typename T>
 struct GetRttiInfo<List<T>>

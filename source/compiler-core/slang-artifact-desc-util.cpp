@@ -827,7 +827,7 @@ SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, S
 /* static */SlangResult ArtifactDescUtil::hasDefinedNameForDesc(const ArtifactDesc& desc)
 {
     StringBuilder buf;
-    return SLANG_SUCCEEDED(appendDefaultExtension(desc, buf));
+    return appendDefaultExtension(desc, buf);
 }
 
 /* static */SlangResult ArtifactDescUtil::calcNameForDesc(const ArtifactDesc& desc, const UnownedStringSlice& inBaseName, StringBuilder& outName)

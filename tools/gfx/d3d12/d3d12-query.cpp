@@ -32,7 +32,7 @@ Result QueryPoolImpl::init(const IQueryPool::Desc& desc, DeviceImpl* device)
 
     // Create query heap.
     auto d3dDevice = device->m_device;
-    SLANG_RETURN_ON_FAIL(
+    SLANG_RETURN_ON_FAIL_HRESULT(
         d3dDevice->CreateQueryHeap(&heapDesc, IID_PPV_ARGS(m_queryHeap.writeRef())));
 
     // Create readback buffer.
@@ -53,11 +53,11 @@ Result QueryPoolImpl::init(const IQueryPool::Desc& desc, DeviceImpl* device)
         nullptr));
 
     // Create command allocator.
-    SLANG_RETURN_ON_FAIL(d3dDevice->CreateCommandAllocator(
+    SLANG_RETURN_ON_FAIL_HRESULT(d3dDevice->CreateCommandAllocator(
         D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(m_commandAllocator.writeRef())));
 
     // Create command list.
-    SLANG_RETURN_ON_FAIL(d3dDevice->CreateCommandList(
+    SLANG_RETURN_ON_FAIL_HRESULT(d3dDevice->CreateCommandList(
         0,
         D3D12_COMMAND_LIST_TYPE_DIRECT,
         m_commandAllocator,
@@ -66,7 +66,7 @@ Result QueryPoolImpl::init(const IQueryPool::Desc& desc, DeviceImpl* device)
     m_commandList->Close();
 
     // Create fence.
-    SLANG_RETURN_ON_FAIL(
+    SLANG_RETURN_ON_FAIL_HRESULT(
         d3dDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(m_fence.writeRef())));
 
     // Get command queue from device.

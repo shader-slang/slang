@@ -458,7 +458,8 @@ int main(int argc, const char* const* argv)
     sink.writer = writer;
 
     String contents;
-    SLANG_RETURN_ON_FAIL(File::readAllText(inPath, contents));
+    if(SLANG_FAILED(File::readAllText(inPath, contents)))
+        return -1;
     PathInfo    pathInfo = PathInfo::makeFromString(inPath);
     SourceFile* sourceFile = sourceManager.createSourceFileWithString(pathInfo, contents);
     SourceView* sourceView = sourceManager.createSourceView(sourceFile, nullptr, SourceLoc());

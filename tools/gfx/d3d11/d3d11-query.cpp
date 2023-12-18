@@ -47,7 +47,7 @@ SLANG_NO_THROW Result SLANG_MCALL QueryPoolImpl::getResult(
 
     for (SlangInt i = 0; i < count; i++)
     {
-        SLANG_RETURN_ON_FAIL(m_device->m_immediateContext->GetData(
+        SLANG_RETURN_ON_FAIL_HRESULT(m_device->m_immediateContext->GetData(
             m_queries[queryIndex + i], data + i, sizeof(uint64_t), 0));
     }
     return SLANG_OK;

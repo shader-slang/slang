@@ -275,7 +275,7 @@ SLANG_API SlangResult spReflectionUserAttribute_GetArgumentValueInt(SlangReflect
         if (intVal)
         {
             *rs = (int)intVal->getValue();
-            return 0;
+            return SLANG_OK;
         }
     }
     return SLANG_E_INVALID_ARG;
@@ -288,7 +288,7 @@ SLANG_API SlangResult spReflectionUserAttribute_GetArgumentValueFloat(SlangRefle
     if (auto cexpr = as<FloatingPointLiteralExpr>(userAttr->args[index]))
     {
         *rs = (float)cexpr->value;
-        return 0;
+        return SLANG_OK;
     }
     return SLANG_E_INVALID_ARG;
 }

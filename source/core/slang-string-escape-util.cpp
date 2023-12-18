@@ -1020,7 +1020,7 @@ StringEscapeUtil::Handler* StringEscapeUtil::getHandler(Style style)
     }
 }
 
-/* static */SlangResult StringEscapeUtil::isUnescapeShellLikeNeeded(Handler* handler, const UnownedStringSlice& slice)
+/* static */bool StringEscapeUtil::isUnescapeShellLikeNeeded(Handler* handler, const UnownedStringSlice& slice)
 {
     return slice.indexOf(handler->getQuoteChar()) >= 0;
 }

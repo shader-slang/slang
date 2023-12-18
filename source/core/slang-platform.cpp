@@ -132,7 +132,7 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
             default: break;
         }
         // Turn to Result, if not one of the well known errors
-        return HRESULT_FROM_WIN32(lastError);
+        return SlangResult(HRESULT_FROM_WIN32(lastError));
     }
     handleOut = (Handle)h;
     return SLANG_OK;

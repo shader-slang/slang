@@ -298,7 +298,7 @@ SlangResult FXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
     auto diagnostics = ArtifactDiagnostics::create();
 
     // HRESULT is compatible with SlangResult
-    diagnostics->setResult(hr);
+    diagnostics->setResult(SlangResult(hr));
 
     SliceAllocator allocator;
 
@@ -349,7 +349,7 @@ SlangResult FXCDownstreamCompiler::convert(IArtifact* from, const ArtifactDesc& 
     SLANG_RETURN_ON_FAIL(from->loadBlob(ArtifactKeep::No, dxbcBlob.writeRef()));
 
     ComPtr<ID3DBlob> disassemblyBlob;
-    SLANG_RETURN_ON_FAIL(m_disassemble(dxbcBlob->getBufferPointer(), dxbcBlob->getBufferSize(), 0, nullptr, disassemblyBlob.writeRef()));
+    SLANG_RETURN_ON_FAIL_HRESULT(m_disassemble(dxbcBlob->getBufferPointer(), dxbcBlob->getBufferSize(), 0, nullptr, disassemblyBlob.writeRef()));
 
     auto artifact = ArtifactUtil::createArtifact(to);
     // ISlangBlob is compatible with ID3DBlob

@@ -958,7 +958,7 @@ Result RootShaderObjectLayoutImpl::createRootSignatureFromSlang(
         return SLANG_FAIL;
     }
 
-    SLANG_RETURN_ON_FAIL(device->m_device->CreateRootSignature(
+    SLANG_RETURN_ON_FAIL_HRESULT(device->m_device->CreateRootSignature(
         0,
         signature->GetBufferPointer(),
         signature->GetBufferSize(),

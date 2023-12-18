@@ -129,7 +129,7 @@ Result loadShaderProgram(
 }
 
 // Main body of the example.
-int main()
+Result resultMain()
 {
     // Creates a `gfx` renderer, which provides the main interface for
     // interacting with the graphics API.
@@ -246,4 +246,11 @@ int main()
         printf("%f\n", result[i]);
 
     return SLANG_OK;
+}
+
+int main()
+{
+    if(SLANG_FAILED(resultMain()))
+        return -1;
+    return 0;
 }

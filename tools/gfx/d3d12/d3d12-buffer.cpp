@@ -49,7 +49,7 @@ Result BufferResourceImpl::getSharedHandle(InteropHandle* outHandle)
     ComPtr<ID3D12Device> pDevice;
     auto pResource = m_resource.getResource();
     pResource->GetDevice(IID_PPV_ARGS(pDevice.writeRef()));
-    SLANG_RETURN_ON_FAIL(pDevice->CreateSharedHandle(
+    SLANG_RETURN_ON_FAIL_HRESULT(pDevice->CreateSharedHandle(
         pResource, NULL, GENERIC_ALL, nullptr, (HANDLE*)&outHandle->handleValue));
     outHandle->api = InteropHandleAPI::D3D12;
     sharedHandle = *outHandle;
@@ -65,7 +65,7 @@ Result BufferResourceImpl::map(MemoryRange* rangeToRead, void** outPointer)
         range.Begin = (SIZE_T)rangeToRead->offset;
         range.End = (SIZE_T)(rangeToRead->offset + rangeToRead->size);
     }
-    SLANG_RETURN_ON_FAIL(
+    SLANG_RETURN_ON_FAIL_HRESULT(
         m_resource.getResource()->Map(0, rangeToRead ? &range : nullptr, outPointer));
     return SLANG_OK;
 }

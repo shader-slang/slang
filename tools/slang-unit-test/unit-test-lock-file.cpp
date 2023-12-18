@@ -47,11 +47,11 @@ SLANG_UNIT_TEST(lockFileSync)
             std::promise<void> startPromise;
             std::future<void> startFuture;
             LockFile lockFile;
-            SlangResult openResult = false;
-            SlangResult tryLockSharedResult = false;
-            SlangResult tryLockExclusiveResult = false;
-            SlangResult lockResult = false;
-            SlangResult unlockResult = false;
+            SlangResult openResult = SLANG_FAIL;
+            SlangResult tryLockSharedResult = SLANG_FAIL;
+            SlangResult tryLockExclusiveResult = SLANG_FAIL;
+            SlangResult lockResult = SLANG_FAIL;
+            SlangResult unlockResult = SLANG_FAIL;
             uint32_t lockIteration = 0;
             uint32_t unlockIteration = 0;
 

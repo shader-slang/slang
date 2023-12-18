@@ -158,7 +158,7 @@ Result DeviceImpl::createBuffer(
 
         ID3D12Resource* dxUploadResource = uploadResourceRef.getResource();
 
-        SLANG_RETURN_ON_FAIL(
+        SLANG_RETURN_ON_FAIL_HRESULT(
             dxUploadResource->Map(0, &readRange, reinterpret_cast<void**>(&dstData)));
         ::memcpy(dstData, srcData, srcDataSize);
         dxUploadResource->Unmap(0, nullptr);
@@ -271,7 +271,7 @@ Result DeviceImpl::captureTextureToSurface(
         UINT8* data;
         D3D12_RANGE readRange = { 0, bufferSize };
 
-        SLANG_RETURN_ON_FAIL(dxResource->Map(0, &readRange, reinterpret_cast<void**>(&data)));
+        SLANG_RETURN_ON_FAIL_HRESULT(dxResource->Map(0, &readRange, reinterpret_cast<void**>(&data)));
 
         List<uint8_t> blobData;
 
@@ -926,7 +926,7 @@ Result DeviceImpl::initialize(const Desc& desc)
         desc.pArgumentDescs = &args;
         desc.NodeMask = 0;
 
-        SLANG_RETURN_ON_FAIL(m_device->CreateCommandSignature(
+        SLANG_RETURN_ON_FAIL_HRESULT(m_device->CreateCommandSignature(
             &desc, nullptr, IID_PPV_ARGS(drawIndirectCmdSignature.writeRef())));
     }
 
@@ -942,7 +942,7 @@ Result DeviceImpl::initialize(const Desc& desc)
         desc.pArgumentDescs = &args;
         desc.NodeMask = 0;
 
-        SLANG_RETURN_ON_FAIL(m_device->CreateCommandSignature(
+        SLANG_RETURN_ON_FAIL_HRESULT(m_device->CreateCommandSignature(
             &desc, nullptr, IID_PPV_ARGS(drawIndexedIndirectCmdSignature.writeRef())));
     }
 
@@ -958,7 +958,7 @@ Result DeviceImpl::initialize(const Desc& desc)
         desc.pArgumentDescs = &args;
         desc.NodeMask = 0;
 
-        SLANG_RETURN_ON_FAIL(m_device->CreateCommandSignature(
+        SLANG_RETURN_ON_FAIL_HRESULT(m_device->CreateCommandSignature(
             &desc, nullptr, IID_PPV_ARGS(dispatchIndirectCmdSignature.writeRef())));
     }
     m_isInitialized = true;
@@ -1614,7 +1614,7 @@ Result DeviceImpl::getFormatSupportedResourceStates(Format format, ResourceState
 {
     D3D12_FEATURE_DATA_FORMAT_SUPPORT support;
     support.Format = D3DUtil::getMapFormat(format);
-    SLANG_RETURN_ON_FAIL(
+    SLANG_RETURN_ON_FAIL_HRESULT(
         m_device->CheckFeatureSupport(D3D12_FEATURE_FORMAT_SUPPORT, &support, sizeof(support)));
 
     ResourceStateSet allowedStates;
@@ -1992,7 +1992,7 @@ Result DeviceImpl::readBufferResource(
         UINT8* data;
         D3D12_RANGE readRange = { 0, size };
 
-        SLANG_RETURN_ON_FAIL(
+        SLANG_RETURN_ON_FAIL_HRESULT(
             stageBufRef.getResource()->Map(0, &readRange, reinterpret_cast<void**>(&data)));
 
         // Copy to memory buffer
@@ -2191,7 +2191,7 @@ Result DeviceImpl::waitForFences(
     {
         auto fenceImpl = static_cast<FenceImpl*>(fences[i]);
         waitHandles.add(fenceImpl->getWaitEvent());
-        SLANG_RETURN_ON_FAIL(
+        SLANG_RETURN_ON_FAIL_HRESULT(
             fenceImpl->m_fence->SetEventOnCompletion(fenceValues[i], fenceImpl->getWaitEvent()));
     }
     auto result = WaitForMultipleObjects(
