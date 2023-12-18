@@ -73,13 +73,6 @@ Slang::Result initialize()
     gWindow->events.mouseUp = [this](const platform::MouseEventArgs& e) { onMouseUp(e); };
     gWindow->events.mouseWheel = [this](const platform::MouseEventArgs& e) { onMouseWheel(e); };
 
-    platform::WindowDesc windowDesc{
-        "Second Window",
-        300,
-        300,
-    };
-    platform::Application::createWindow(windowDesc);
-
     return SLANG_OK;
 }
 
