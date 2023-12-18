@@ -12,6 +12,9 @@
     <ClInclude Include="..\..\..\slang-gfx.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\apple\cocoa-util.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\tools\gfx\command-encoder-com-forward.h">
       <Filter>Header Files</Filter>
     </ClInclude>

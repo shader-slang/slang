@@ -315,6 +315,7 @@ IF EXIST "$(SolutionDir)tools\gfx\slang.slang"\ (xcopy /Q /E /Y /I "$(SolutionDi
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\slang-gfx.h" />
+    <ClInclude Include="..\..\..\tools\gfx\apple\cocoa-util.h" />
     <ClInclude Include="..\..\..\tools\gfx\command-encoder-com-forward.h" />
     <ClInclude Include="..\..\..\tools\gfx\command-writer.h" />
     <ClInclude Include="..\..\..\tools\gfx\cpu\cpu-base.h" />
