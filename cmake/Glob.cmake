@@ -18,11 +18,13 @@ function(slang_glob_sources var dir)
     set(patterns
         "*.cpp"
         "*.h"
-        "*.mm"
         "*.natvis"
         "*.natstepfilter"
         "*.natjmc"
     )
+    if (CMAKE_SYSTEM_NAME MATCHES "Darwin")
+        list(APPEND patterns "*.mm")
+    endif()        
     list(TRANSFORM patterns PREPEND "${dir}/")
 
     file(GLOB_RECURSE files CONFIGURE_DEPENDS ${patterns})
