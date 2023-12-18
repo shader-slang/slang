@@ -510,7 +510,7 @@ function addSourceDir(path)
         path .. "/*.natstepfilter", -- Visual Studio debugger step filter files
         path .. "/*.natjmc", -- Visual Studio debugger step filter files
     }
-    if os.target() == "macos" then
+    if os.target() == "macosx" then
         files { path .. "/*.mm" } -- Objective-C++ files
         filter { "files:**.mm" }
             compileas "Objective-C++"
