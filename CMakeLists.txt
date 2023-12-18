@@ -421,8 +421,8 @@ slang_add_target(
         core
         imgui
         $<$<BOOL:${SLANG_ENABLE_XLIB}>:X11::X11>
-        "-framework Cocoa"
-        "-framework QuartzCore"
+        $<$<PLATFORM_ID:Darwin>:-framework Cocoa>
+        $<$<PLATFORM_ID:Darwin>:-framework QuartzCore>
         ${CMAKE_DL_LIBS}
     EXTRA_COMPILE_DEFINITIONS_PRIVATE
         $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB>
