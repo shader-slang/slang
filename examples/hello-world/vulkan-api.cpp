@@ -41,6 +41,10 @@ int initializeVulkanDevice(VulkanAPI& api)
     HMODULE module = ::LoadLibraryA(dynamicLibraryName);
     api.vulkanLibraryHandle = (void*)module;
 #define VK_API_GET_GLOBAL_PROC(x) api.x = (PFN_##x)GetProcAddress(module, #x);
+#elif SLANG_APPLE_FAMILY
+    dynamicLibraryName = "libvulkan.dylib";
+    api.vulkanLibraryHandle = dlopen(dynamicLibraryName, RTLD_NOW);
+#define VK_API_GET_GLOBAL_PROC(x) api.x = (PFN_##x)dlsym(api.vulkanLibraryHandle, #x);
 #else
     dynamicLibraryName = "libvulkan.so.1";
     api.vulkanLibraryHandle = dlopen(dynamicLibraryName, RTLD_NOW);
@@ -78,10 +82,16 @@ int initializeVulkanDevice(VulkanAPI& api)
     applicationInfo.engineVersion = 1;
     applicationInfo.applicationVersion = 1;
     const char* instanceExtensions[] = {
+#if SLANG_APPLE_FAMILY
+        VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME,
+#endif
         VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
         VK_EXT_DEBUG_REPORT_EXTENSION_NAME,
     };
     VkInstanceCreateInfo instanceCreateInfo = {VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO};
+#if SLANG_APPLE_FAMILY
+    instanceCreateInfo.flags = VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+#endif
     instanceCreateInfo.pApplicationInfo = &applicationInfo;
     instanceCreateInfo.enabledExtensionCount = SLANG_COUNT_OF(instanceExtensions);
     instanceCreateInfo.ppEnabledExtensionNames = &instanceExtensions[0];
@@ -150,14 +160,22 @@ int initializeVulkanDevice(VulkanAPI& api)
     if (api.queueFamilyIndex == -1)
         return -1;
 
+#if SLANG_APPLE_FAMILY
+    const char* deviceExtensions[] = {
+        "VK_KHR_portability_subset",
+    };
+#endif
+
     VkDeviceQueueCreateInfo queueCreateInfo = {VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO};
     float queuePriority = 0.0f;
     queueCreateInfo.queueFamilyIndex = api.queueFamilyIndex;
     queueCreateInfo.queueCount = 1;
     queueCreateInfo.pQueuePriorities = &queuePriority;
     deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
-    deviceCreateInfo.enabledExtensionCount = 0;
-    deviceCreateInfo.ppEnabledExtensionNames = nullptr;
+#if SLANG_APPLE_FAMILY
+    deviceCreateInfo.enabledExtensionCount = SLANG_COUNT_OF(deviceExtensions);
+    deviceCreateInfo.ppEnabledExtensionNames = &deviceExtensions[0];
+#endif
     RETURN_ON_FAIL(api.vkCreateDevice(api.physicalDevice, &deviceCreateInfo, nullptr, &api.device));
 
     // Load device functions.

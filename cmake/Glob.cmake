@@ -22,6 +22,9 @@ function(slang_glob_sources var dir)
         "*.natstepfilter"
         "*.natjmc"
     )
+    if (CMAKE_SYSTEM_NAME MATCHES "Darwin")
+        list(APPEND patterns "*.mm")
+    endif()        
     list(TRANSFORM patterns PREPEND "${dir}/")
 
     file(GLOB_RECURSE files CONFIGURE_DEPENDS ${patterns})
@@ -38,7 +41,7 @@ function(slang_glob_sources var dir)
         list(FILTER files EXCLUDE REGEX "(^|/)d3d.*/.*")
     endif()
 
-    if(NOT CMAKE_SYSTEM_NAME MATCHES "Windows|Linux")
+    if(NOT CMAKE_SYSTEM_NAME MATCHES "Windows|Linux|Darwin")
         list(FILTER files EXCLUDE REGEX "(^|/)vulkan/.*")
     endif()
 

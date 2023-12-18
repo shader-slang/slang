@@ -509,9 +509,13 @@ function addSourceDir(path)
         path .. "/*.natvis",    -- Visual Studio debugger visualization files
         path .. "/*.natstepfilter", -- Visual Studio debugger step filter files
         path .. "/*.natjmc", -- Visual Studio debugger step filter files
-
-
     }
+    if os.target() == "macosx" then
+        files { path .. "/*.mm" } -- Objective-C++ files
+        filter { "files:**.mm" }
+            compileas "Objective-C++"
+        filter {}
+    end
     removefiles
     {
         "**/*.meta.slang.h",
@@ -846,6 +850,8 @@ example "hello-world"
 --
 
 -- Let's go ahead and set up the projects for our other example now.
+example "platform-test"
+
 example "triangle"
 
 example "ray-tracing"
@@ -1120,6 +1126,7 @@ tool "gfx"
     files {"slang-gfx.h"}
 
     -- Will compile across targets
+    addSourceDir "tools/gfx/apple"
     addSourceDir "tools/gfx/cpu"
     addSourceDir "tools/gfx/nvapi"
     addSourceDir "tools/gfx/cuda"
@@ -1182,7 +1189,7 @@ tool "gfx"
     elseif targetInfo.os == "mingw" or targetInfo.os == "cygwin" then
         -- Don't support any render techs...
     elseif os.target() == "macosx" then
-        --addSourceDir "tools/gfx/open-gl"
+        addSourceDir "tools/gfx/vulkan"
     else
         -- Linux like
         addSourceDir "tools/gfx/vulkan"
@@ -1192,6 +1199,10 @@ tool "gfx"
             addSourceDir "tools/gfx/d3d12"
         end
         --addSourceDir "tools/gfx/open-gl"
+    end
+
+    if os.target() == "macosx" then
+        links { "Cocoa.framework" }
     end
 
     if enableXlib then
@@ -1247,10 +1258,13 @@ tool "platform"
     addSourceDir "tools/platform"
     addSourceDir "tools/platform/linux"
     addSourceDir "tools/platform/windows"
+    addSourceDir "tools/platform/apple"
     addSourceDir "tools/platform/placeholder"
     -- Include windowing support on Windows.
     if targetInfo.isWindows then
         systemversion "latest"
+    elseif os.target() == "macosx" then
+        links { "Cocoa.framework", "QuartzCore.framework" }
     else
         if enableXlib then
             defines { "SLANG_ENABLE_XLIB" }

@@ -141,6 +141,10 @@ namespace gfx {
 #   define VK_API_INSTANCE_PLATFORM_KHR_PROCS(x)          \
     x(vkCreateWin32SurfaceKHR) \
     /* */
+#elif SLANG_APPLE_FAMILY
+#   define VK_API_INSTANCE_PLATFORM_KHR_PROCS(x)          \
+    x(vkCreateMacOSSurfaceMVK) \
+    /* */
 #elif SLANG_ENABLE_XLIB
 #   define VK_API_INSTANCE_PLATFORM_KHR_PROCS(x)          \
     x(vkCreateXlibSurfaceKHR) \

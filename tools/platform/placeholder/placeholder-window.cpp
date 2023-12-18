@@ -1,4 +1,4 @@
-#if !defined(_WIN32) && !defined(SLANG_ENABLE_XLIB)
+#if !defined(_WIN32) && !defined(__APPLE__) && !defined(SLANG_ENABLE_XLIB)
 
 #include "../window.h"
 

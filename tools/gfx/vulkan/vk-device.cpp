@@ -171,8 +171,11 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         applicationInfo.engineVersion = 1;
         applicationInfo.applicationVersion = 1;
 
-        Array<const char*, 6> instanceExtensions;
+        Array<const char*, 7> instanceExtensions;
 
+#if SLANG_APPLE_FAMILY
+        instanceExtensions.add(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+#endif
         instanceExtensions.add(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
         instanceExtensions.add(VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME);
 
@@ -185,6 +188,8 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
             // instanceExtensions.add("VK_GOOGLE_surfaceless_query");
 #if SLANG_WINDOWS_FAMILY
             instanceExtensions.add(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
+#elif SLANG_APPLE_FAMILY
+            instanceExtensions.add(VK_MVK_MACOS_SURFACE_EXTENSION_NAME);
 #elif defined(SLANG_ENABLE_XLIB)
 
             instanceExtensions.add(VK_KHR_XLIB_SURFACE_EXTENSION_NAME);
@@ -195,6 +200,9 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
             instanceExtensions.add(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
 
         VkInstanceCreateInfo instanceCreateInfo = { VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };
+#if SLANG_APPLE_FAMILY
+        instanceCreateInfo.flags = VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+#endif
         instanceCreateInfo.pApplicationInfo = &applicationInfo;
         instanceCreateInfo.enabledExtensionCount = (uint32_t)instanceExtensions.getCount();
         instanceCreateInfo.ppEnabledExtensionNames = &instanceExtensions[0];
@@ -352,6 +360,9 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
 
     List<const char*> deviceExtensions;
     deviceExtensions.add(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+#if SLANG_APPLE_FAMILY
+    deviceExtensions.add("VK_KHR_portability_subset");
+#endif
 
     VkDeviceCreateInfo deviceCreateInfo = { VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
     deviceCreateInfo.queueCreateInfoCount = 1;

@@ -64,11 +64,15 @@ auto_option(
     NVAPI
     "Enable NVAPI usage (Only available for builds targeting Windows)"
 )
-auto_option(
-    SLANG_ENABLE_XLIB
-    X11
-    "Build gfx and platform with Xlib to support windowed apps on Linux"
-)
+if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+    auto_option(
+        SLANG_ENABLE_XLIB
+        X11
+        "Build gfx and platform with Xlib to support windowed apps on Linux"
+    )
+else()
+    set(SLANG_ENABLE_XLIB OFF)
+endif()
 auto_option(
     SLANG_ENABLE_AFTERMATH
     Aftermath
@@ -417,6 +421,8 @@ slang_add_target(
         core
         imgui
         $<$<BOOL:${SLANG_ENABLE_XLIB}>:X11::X11>
+        $<$<PLATFORM_ID:Darwin>:-framework Cocoa>
+        $<$<PLATFORM_ID:Darwin>:-framework QuartzCore>
         ${CMAKE_DL_LIBS}
     EXTRA_COMPILE_DEFINITIONS_PRIVATE
         $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB>
@@ -662,6 +668,7 @@ example(examples/cpu-hello-world )
 example(examples/gpu-printing )
 example(examples/hello-world LINK_WITH_PRIVATE Vulkan-Headers)
 example(examples/model-viewer WIN32_EXECUTABLE)
+example(examples/platform-test WIN32_EXECUTABLE)
 example(examples/ray-tracing WIN32_EXECUTABLE)
 example(examples/ray-tracing-pipeline WIN32_EXECUTABLE)
 example(examples/shader-object )
