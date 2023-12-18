@@ -70,6 +70,14 @@ public:
     virtual int getCurrentDpi() override;
 };
 
+void getMousePosition(NSEvent* event, NSView* view, int& x, int& y)
+{
+    const NSRect contentRect = [view frame];
+    const NSPoint pos = [event locationInWindow];
+    x = (int)pos.x;
+    y = (int)(contentRect.size.height - pos.y);
+}
+
 ButtonState::Enum _addButtonState(ButtonState::Enum val, ButtonState::Enum newState)
 {
     return (ButtonState::Enum)((int)val | (int)newState);
@@ -211,6 +219,7 @@ static KeyCode getKeyCode(NSUInteger keyCode)
 
 - (void)mouseDown:(NSEvent*)event
 {
+    getMousePosition(event, self, mouseX, mouseY);
     ButtonState::Enum buttons = ButtonState::LeftButton;
     buttons = _addButtonState(buttons, getModifierState([event modifierFlags]));
     window->events.mouseDown(MouseEventArgs{mouseX, mouseY, 0, buttons});
@@ -218,6 +227,7 @@ static KeyCode getKeyCode(NSUInteger keyCode)
 
 - (void)mouseUp:(NSEvent*)event
 {
+    getMousePosition(event, self, mouseX, mouseY);
     ButtonState::Enum buttons = ButtonState::LeftButton;
     buttons = _addButtonState(buttons, getModifierState([event modifierFlags]));
     window->events.mouseUp(MouseEventArgs{mouseX, mouseY, 0, buttons});
@@ -225,6 +235,7 @@ static KeyCode getKeyCode(NSUInteger keyCode)
 
 - (void)rightMouseDown:(NSEvent*)event
 {
+    getMousePosition(event, self, mouseX, mouseY);
     ButtonState::Enum buttons = ButtonState::RightButton;
     buttons = _addButtonState(buttons, getModifierState([event modifierFlags]));
     window->events.mouseDown(MouseEventArgs{mouseX, mouseY, 0, buttons});
@@ -232,6 +243,7 @@ static KeyCode getKeyCode(NSUInteger keyCode)
 
 - (void)rightMouseUp:(NSEvent*)event
 {
+    getMousePosition(event, self, mouseX, mouseY);
     ButtonState::Enum buttons = ButtonState::RightButton;
     buttons = _addButtonState(buttons, getModifierState([event modifierFlags]));
     window->events.mouseUp(MouseEventArgs{mouseX, mouseY, 0, buttons});
@@ -241,6 +253,7 @@ static KeyCode getKeyCode(NSUInteger keyCode)
 {
     if ([event buttonNumber] == 2)
     {
+        getMousePosition(event, self, mouseX, mouseY);
         ButtonState::Enum buttons = ButtonState::MiddleButton;
         buttons = _addButtonState(buttons, getModifierState([event modifierFlags]));
         window->events.mouseDown(MouseEventArgs{mouseX, mouseY, 0, buttons});
@@ -251,6 +264,7 @@ static KeyCode getKeyCode(NSUInteger keyCode)
 {
     if ([event buttonNumber] == 2)
     {
+        getMousePosition(event, self, mouseX, mouseY);
         ButtonState::Enum buttons = ButtonState::MiddleButton;
         buttons = _addButtonState(buttons, getModifierState([event modifierFlags]));
         window->events.mouseUp(MouseEventArgs{mouseX, mouseY, 0, buttons});
@@ -274,12 +288,7 @@ static KeyCode getKeyCode(NSUInteger keyCode)
 
 - (void)mouseMoved:(NSEvent*)event
 {
-    const NSRect contentRect = [self frame];
-    const NSPoint pos = [event locationInWindow];
-
-    mouseX = (int)pos.x;
-    mouseY = (int)(contentRect.size.height - pos.y);
-
+    getMousePosition(event, self, mouseX, mouseY);
     window->events.mouseMove(MouseEventArgs{mouseX, mouseY, 0, getModifierState([event modifierFlags])});
 }
 
