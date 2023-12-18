@@ -848,6 +848,8 @@ example "hello-world"
 --
 
 -- Let's go ahead and set up the projects for our other example now.
+example "platform-test"
+
 example "triangle"
 
 example "ray-tracing"
