@@ -503,7 +503,6 @@ function addSourceDir(path)
     files
     {
         path .. "/*.cpp",       -- C++ source files
-        path .. "/*.mm",        -- Objective-C++ source files
         path .. "/*.slang",     -- Slang files (for our stdlib)
         path .. "/*.h",         -- Header files
         path .. "/*.hpp",       -- C++ style headers (for glslang)
@@ -511,9 +510,12 @@ function addSourceDir(path)
         path .. "/*.natstepfilter", -- Visual Studio debugger step filter files
         path .. "/*.natjmc", -- Visual Studio debugger step filter files
     }
-    filter { "files:**.mm" }
-        compileas "Objective-C++"
-    filter {}
+    if os.target() == "macos" then
+        files { path .. "/*.mm" } -- Objective-C++ files
+        filter { "files:**.mm" }
+            compileas "Objective-C++"
+        filter {}
+    end
     removefiles
     {
         "**/*.meta.slang.h",
