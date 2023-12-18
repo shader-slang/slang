@@ -6,37 +6,183 @@
 #import <QuartzCore/CAMetalLayer.h>
 
 using namespace Slang;
+using namespace platform;
 
-static bool g_should_close = false;
+namespace platform {
+class CocoaPlatformWindow;
+static KeyCode keyCodes[256];
+
+class CocoaAppContext
+{
+public:
+    static Window* mainWindow;
+    static bool isTerminated;
+};
+
+Window* CocoaAppContext::mainWindow;
+bool CocoaAppContext::isTerminated = false;
+}
 
 @interface WindowDelegate : NSObject <NSWindowDelegate>
+{
+    CocoaPlatformWindow* window;
+}
+
+- (instancetype)initWithPlatformWindow:(CocoaPlatformWindow*)platformWindow;
+
 @end
 
+@interface ContentView : NSView
+{
+    CocoaPlatformWindow* window;
+    NSTrackingArea* trackingArea;
+    int mouseX, mouseY;
+}
+
+- (instancetype)initWithPlatformWindow:(CocoaPlatformWindow*)platformWindow;
+
+@end
+
+namespace platform {
+
+class CocoaPlatformWindow : public Window
+{
+public:
+    NSWindow* window;
+    WindowDelegate* delegate;
+    ContentView* view;
+    CAMetalLayer* layer;
+    bool shouldClose = false;
+
+    CocoaPlatformWindow(const WindowDesc& desc);
+    ~CocoaPlatformWindow();
+
+    virtual void setClientSize(uint32_t width, uint32_t height) override;
+    virtual Rect getClientRect() override;
+    virtual void centerScreen() override;
+    virtual void close() override;
+    virtual bool getFocused() override;
+    virtual bool getVisible() override;
+    virtual WindowHandle getNativeHandle() override;
+    virtual void setText(Slang::String text) override;
+    virtual void show() override;
+    virtual void hide() override;
+    virtual int getCurrentDpi() override;
+};
+
+ButtonState::Enum _addButtonState(ButtonState::Enum val, ButtonState::Enum newState)
+{
+    return (ButtonState::Enum)((int)val | (int)newState);
+}
+
+static ButtonState::Enum getModifierState(NSUInteger flags)
+{
+    ButtonState::Enum result = ButtonState::None;
+
+    if (flags & NSEventModifierFlagShift)
+        result = _addButtonState(result, ButtonState::Shift);
+    if (flags & NSEventModifierFlagControl)
+        result = _addButtonState(result, ButtonState::Control);
+    if (flags & NSEventModifierFlagOption)
+        result = _addButtonState(result, ButtonState::Alt);
+    return result;
+}
+
+static KeyCode getKeyCode(NSUInteger keyCode)
+{
+    return keyCode < 256 ? keyCodes[keyCode] : KeyCode::None;
+}
+
+}
+
+
 @implementation WindowDelegate
+
+- (instancetype)initWithPlatformWindow:(CocoaPlatformWindow*)platformWindow
+{
+    self = [super init];
+    if (self)
+    {
+        window = platformWindow;
+    }
+    return self;
+}
 
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender
 {
     return YES;
 }
 
-- (BOOL)windowShouldClose:(id)window
+- (BOOL)windowShouldClose:(id)window_
 {
-    g_should_close = true;
+    window->shouldClose = true;
+    if (CocoaAppContext::mainWindow == window)
+        CocoaAppContext::isTerminated = true;
     return YES;
 }
 
 - (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)sender
 {
-    g_should_close = true;
+    printf("applicationShouldTerminate\n");
     return NSTerminateCancel;
+}
+
+- (void)windowDidResize:(NSNotification*)notification
+{
+    window->events.sizeChanged();
+}
+
+- (void)windowDidBecomeKey:(NSNotification*)notification
+{
+    window->events.focus();
+}
+
+- (void)windowDidResignKey:(NSNotification*)notification
+{
+    window->events.lostFocus();
 }
 
 @end
 
-@interface ContentView : NSView
-@end
-
 @implementation ContentView
+
+- (instancetype)initWithPlatformWindow:(CocoaPlatformWindow*)platformWindow
+{
+    self = [super init];
+    if (self)
+    {
+        window = platformWindow;
+        mouseX = 0;
+        mouseY = 0;
+        [self updateTrackingAreas];
+    }
+    return self;
+}
+
+- (void)updateTrackingAreas
+{
+    if (trackingArea != nil)
+    {
+        [self removeTrackingArea:trackingArea];
+        [trackingArea release];
+    }
+
+    const NSTrackingAreaOptions options = NSTrackingMouseEnteredAndExited |
+                                          NSTrackingMouseMoved |
+                                          NSTrackingActiveInKeyWindow |
+                                          NSTrackingEnabledDuringMouseDrag |
+                                          NSTrackingCursorUpdate |
+                                          NSTrackingInVisibleRect |
+                                          NSTrackingAssumeInside;
+
+    trackingArea = [[NSTrackingArea alloc] initWithRect:[self bounds]
+                                                options:options
+                                                  owner:self
+                                               userInfo:nil];
+
+    [self addTrackingArea:trackingArea];
+    [super updateTrackingAreas];
+}
 
 - (BOOL)isOpaque
 {
@@ -53,202 +199,409 @@ static bool g_should_close = false;
     return YES;
 }
 
+- (BOOL)acceptsFirstMouse:(NSEvent*)event
+{
+    return YES;
+}
+
+- (BOOL)wantsUpdateLayer
+{
+    return YES;
+}
+
+- (void)mouseDown:(NSEvent*)event
+{
+    ButtonState::Enum buttons = ButtonState::LeftButton;
+    buttons = _addButtonState(buttons, getModifierState([event modifierFlags]));
+    window->events.mouseDown(MouseEventArgs{mouseX, mouseY, 0, buttons});
+}
+
+- (void)mouseUp:(NSEvent*)event
+{
+    ButtonState::Enum buttons = ButtonState::LeftButton;
+    buttons = _addButtonState(buttons, getModifierState([event modifierFlags]));
+    window->events.mouseUp(MouseEventArgs{mouseX, mouseY, 0, buttons});
+}
+
+- (void)rightMouseDown:(NSEvent*)event
+{
+    ButtonState::Enum buttons = ButtonState::RightButton;
+    buttons = _addButtonState(buttons, getModifierState([event modifierFlags]));
+    window->events.mouseDown(MouseEventArgs{mouseX, mouseY, 0, buttons});
+}
+
+- (void)rightMouseUp:(NSEvent*)event
+{
+    ButtonState::Enum buttons = ButtonState::RightButton;
+    buttons = _addButtonState(buttons, getModifierState([event modifierFlags]));
+    window->events.mouseUp(MouseEventArgs{mouseX, mouseY, 0, buttons});
+}
+
+- (void)otherMouseDown:(NSEvent *)event
+{
+    if ([event buttonNumber] == 2)
+    {
+        ButtonState::Enum buttons = ButtonState::MiddleButton;
+        buttons = _addButtonState(buttons, getModifierState([event modifierFlags]));
+        window->events.mouseDown(MouseEventArgs{mouseX, mouseY, 0, buttons});
+    }
+}
+
+- (void)otherMouseUp:(NSEvent *)event
+{
+    if ([event buttonNumber] == 2)
+    {
+        ButtonState::Enum buttons = ButtonState::MiddleButton;
+        buttons = _addButtonState(buttons, getModifierState([event modifierFlags]));
+        window->events.mouseUp(MouseEventArgs{mouseX, mouseY, 0, buttons});
+    }
+}
+
+- (void)mouseDragged:(NSEvent*)event
+{
+    [self mouseMoved:event];
+}
+
+- (void)rightMouseDragged:(NSEvent*)event
+{
+    [self mouseMoved:event];
+}
+
+- (void)otherMouseDragged:(NSEvent*)event
+{
+    [self mouseMoved:event];
+}
+
+- (void)mouseMoved:(NSEvent*)event
+{
+    const NSRect contentRect = [self frame];
+    const NSPoint pos = [event locationInWindow];
+
+    mouseX = (int)pos.x;
+    mouseY = (int)(contentRect.size.height - pos.y);
+
+    window->events.mouseMove(MouseEventArgs{mouseX, mouseY, 0, getModifierState([event modifierFlags])});
+}
+
+- (void)scrollWheel:(NSEvent *)event
+{
+    double deltaX = [event scrollingDeltaX];
+    double deltaY = [event scrollingDeltaY];
+    if ([event hasPreciseScrollingDeltas])
+    {
+        deltaX *= 0.1;
+        deltaY *= 0.1;
+    }
+
+    int delta = (int)deltaY;
+
+    window->events.mouseWheel(MouseEventArgs{0, 0, delta, getModifierState([event modifierFlags])});
+}
+
 - (void)keyDown:(NSEvent *)event
 {
-    if ([event keyCode] == 53)
-    {
-        g_should_close = true;
+    KeyCode key = getKeyCode([event keyCode]);
+    if (key == KeyCode::None)
+        return;
+    KeyEventArgs keyEventArgs = {key, 0, getModifierState([event modifierFlags]), false};
+    window->events.keyDown(keyEventArgs);
+    // if (!keyEventArgs.cancelEvent)
+    //     [self interpretKeyEvents:@[event]];
+}
+
+- (void)keyUp:(NSEvent *)event
+{
+    KeyCode key = getKeyCode([event keyCode]);
+    if (key == KeyCode::None)
+        return;
+    KeyEventArgs keyEventArgs = {key, 0, getModifierState([event modifierFlags]), false};
+    window->events.keyUp(keyEventArgs);
+    // if (!keyEventArgs.cancelEvent)
+    //     [self interpretKeyEvents:@[event]];
+}
+
+- (void)flagsChanged:(NSEvent *)event
+{
+    KeyCode key = getKeyCode([event keyCode]);
+    ButtonState::Enum buttons = getModifierState([event modifierFlags]);
+    ButtonState::Enum button = ButtonState::None;
+    if (key == KeyCode::Shift)
+        button = ButtonState::Shift;
+    else if (key == KeyCode::Ctrl)
+        button = ButtonState::Control;
+    else if (key == KeyCode::Alt)
+        button = ButtonState::Alt;
+    
+    KeyEventArgs keyEventArgs = {key, 0, buttons, false};
+    if (button & buttons) {
+        window->events.keyDown(keyEventArgs);
+    } else {
+        window->events.keyUp(keyEventArgs);
     }
 }
 
 @end
 
-namespace platform
-{
 
 static NSApplication *_application;
 
+
+namespace platform {
 
 void Application::init()
 {
     _application = [NSApplication sharedApplication];
     [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
     [NSApp activateIgnoringOtherApps:YES];
+
+    // Setup key translation table.
+    ::memset(keyCodes, (int)KeyCode::None, sizeof(keyCodes));
+
+    keyCodes[0x1D] = KeyCode::Key0;
+    keyCodes[0x12] = KeyCode::Key1;
+    keyCodes[0x13] = KeyCode::Key2;
+    keyCodes[0x14] = KeyCode::Key3;
+    keyCodes[0x15] = KeyCode::Key4;
+    keyCodes[0x17] = KeyCode::Key5;
+    keyCodes[0x16] = KeyCode::Key6;
+    keyCodes[0x1A] = KeyCode::Key7;
+    keyCodes[0x1C] = KeyCode::Key8;
+    keyCodes[0x19] = KeyCode::Key9;
+    keyCodes[0x00] = KeyCode::A;
+    keyCodes[0x0B] = KeyCode::B;
+    keyCodes[0x08] = KeyCode::C;
+    keyCodes[0x02] = KeyCode::D;
+    keyCodes[0x0E] = KeyCode::E;
+    keyCodes[0x03] = KeyCode::F;
+    keyCodes[0x05] = KeyCode::G;
+    keyCodes[0x04] = KeyCode::H;
+    keyCodes[0x22] = KeyCode::I;
+    keyCodes[0x26] = KeyCode::J;
+    keyCodes[0x28] = KeyCode::K;
+    keyCodes[0x25] = KeyCode::L;
+    keyCodes[0x2E] = KeyCode::M;
+    keyCodes[0x2D] = KeyCode::N;
+    keyCodes[0x1F] = KeyCode::O;
+    keyCodes[0x23] = KeyCode::P;
+    keyCodes[0x0C] = KeyCode::Q;
+    keyCodes[0x0F] = KeyCode::R;
+    keyCodes[0x01] = KeyCode::S;
+    keyCodes[0x11] = KeyCode::T;
+    keyCodes[0x20] = KeyCode::U;
+    keyCodes[0x09] = KeyCode::V;
+    keyCodes[0x0D] = KeyCode::W;
+    keyCodes[0x07] = KeyCode::X;
+    keyCodes[0x10] = KeyCode::Y;
+    keyCodes[0x06] = KeyCode::Z;
+
+    keyCodes[0x27] = KeyCode::Quote;
+    keyCodes[0x2A] = KeyCode::Backslash;
+    keyCodes[0x2B] = KeyCode::Comma;
+    keyCodes[0x18] = KeyCode::Plus;
+    keyCodes[0x32] = KeyCode::Tilde;
+    keyCodes[0x21] = KeyCode::LBracket;
+    keyCodes[0x1B] = KeyCode::Minus;
+    keyCodes[0x2F] = KeyCode::Dot;
+    keyCodes[0x1E] = KeyCode::RBracket;
+    keyCodes[0x29] = KeyCode::Semicolon;
+    keyCodes[0x2C] = KeyCode::Slash;
+
+    keyCodes[0x33] = KeyCode::Backspace;
+    keyCodes[0x75] = KeyCode::Delete;
+    keyCodes[0x7D] = KeyCode::Down;
+    keyCodes[0x77] = KeyCode::End;
+    keyCodes[0x24] = KeyCode::Return;
+    keyCodes[0x35] = KeyCode::Escape;
+    keyCodes[0x7A] = KeyCode::F1;
+    keyCodes[0x78] = KeyCode::F2;
+    keyCodes[0x63] = KeyCode::F3;
+    keyCodes[0x76] = KeyCode::F4;
+    keyCodes[0x60] = KeyCode::F5;
+    keyCodes[0x61] = KeyCode::F6;
+    keyCodes[0x62] = KeyCode::F7;
+    keyCodes[0x64] = KeyCode::F8;
+    keyCodes[0x65] = KeyCode::F9;
+    keyCodes[0x6D] = KeyCode::F10;
+    keyCodes[0x67] = KeyCode::F11;
+    keyCodes[0x6F] = KeyCode::F12;
+    keyCodes[0x73] = KeyCode::Home;
+    keyCodes[0x72] = KeyCode::Insert;
+    keyCodes[0x7B] = KeyCode::Left;
+    keyCodes[0x79] = KeyCode::PageDown;
+    keyCodes[0x74] = KeyCode::PageUp;
+    keyCodes[0x7C] = KeyCode::Right;
+    keyCodes[0x31] = KeyCode::Space;
+    keyCodes[0x30] = KeyCode::Tab;
+    keyCodes[0x7E] = KeyCode::Up;
+
+    keyCodes[0x38] = KeyCode::Shift;
+    keyCodes[0x3B] = KeyCode::Ctrl;
+    keyCodes[0x3A] = KeyCode::Alt;
 }
 
-void Application::doEvents() {
+void doEventsImpl(bool waitForEvents)
+{
     NSEvent *event;
     do {
         event = [NSApp nextEventMatchingMask:NSEventMaskAny
-                                   untilDate:[NSDate distantPast]
+                                   untilDate:waitForEvents ? [NSDate distantFuture] : [NSDate distantPast]
                                       inMode:NSDefaultRunLoopMode
                                      dequeue:YES];
         if (event) {
             [NSApp sendEvent:event];
         }
-    } while (event);    
+    } while (!CocoaAppContext::isTerminated && event);
 }
 
-void Application::quit() { }
+void Application::doEvents()
+{
+    doEventsImpl(false);
+}
+
+void Application::quit()
+{
+    CocoaAppContext::isTerminated = true;
+}
 
 void Application::dispose()
 {
+    CocoaAppContext::mainWindow = nullptr;
 }
 
 void Application::run(Window* mainWindow, bool waitForEvents)
 {
-    do {
-        NSEvent *event;
-        do {
-            event = [NSApp nextEventMatchingMask:NSEventMaskAny
-                                    untilDate:[NSDate distantPast]
-                                        inMode:NSDefaultRunLoopMode
-                                        dequeue:YES];
-            if (event) {
-                [NSApp sendEvent:event];
-            }
-        } while (event);    
+    if (mainWindow)
+    {
+        CocoaAppContext::mainWindow = mainWindow;
+        mainWindow->show();
+    }
+    while (!CocoaAppContext::isTerminated)
+    {
+        doEventsImpl(waitForEvents);
+        if (CocoaAppContext::isTerminated)
+            break;
         if (mainWindow)
         {
             mainWindow->events.mainLoop();
         }
-    } while (!g_should_close);
-
-    // doEvents();
-    // if (mainWindow)
-    // {
-    //     Win32AppContext::mainWindow = mainWindow;
-    //     Win32AppContext::mainWindowHandle = (HWND)mainWindow->getNativeHandle().handleValues[0];
-    //     ShowWindow(Win32AppContext::mainWindowHandle, SW_SHOW);
-    //     UpdateWindow(Win32AppContext::mainWindowHandle);
-    // }
-    // while (!Win32AppContext::isTerminated)
-    // {
-    //     doEventsImpl(waitForEvents);
-    //     if (Win32AppContext::isTerminated)
-    //         break;
-    //     if (mainWindow)
-    //     {
-    //         mainWindow->events.mainLoop();
-    //     }
-    // }
+    }
 }
 
-class ApplePlatformWindow : public Window
+CocoaPlatformWindow::CocoaPlatformWindow(const WindowDesc& desc)
 {
-public:
-    NSWindow* window;
-    ContentView* view;
-    CAMetalLayer* layer;
+    // Create a reference rectangle
+    NSRect rect = NSMakeRect(0.0f, 0.0f, desc.width, desc.height);
 
-    ApplePlatformWindow(const WindowDesc& desc)
-    {
-        // Create a reference rectangle
-        NSRect rect = NSMakeRect(0.0f, 0.0f, desc.width, desc.height);
+    // Allocate window
+    window = [[NSWindow alloc] initWithContentRect:rect
+                                         styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable
+                                           backing:NSBackingStoreBuffered
+                                             defer:NO];
 
-        // Allocate window
-        window = [[NSWindow alloc] initWithContentRect:rect
-                                              styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable
-                                                backing:NSBackingStoreBuffered
-                                                   defer:NO];
+    const NSWindowCollectionBehavior behavior
+        = NSWindowCollectionBehaviorFullScreenPrimary | NSWindowCollectionBehaviorManaged;
+    [window setCollectionBehavior:behavior];
 
-        const NSWindowCollectionBehavior behavior
-            = NSWindowCollectionBehaviorFullScreenPrimary | NSWindowCollectionBehaviorManaged;
-        [window setCollectionBehavior:behavior];
+    if (desc.style == WindowStyle::Default)
+        [window setStyleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable];
+    else if (desc.style == WindowStyle::FixedSize)
+        [window setStyleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable];
 
-        if (desc.style == WindowStyle::Default)
-        {
-            [window setStyleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable];
-        }
-        else if (desc.style == WindowStyle::FixedSize)
-        {
-            [window setStyleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable];
-        }
+    // Allocate view
+    rect = [window backingAlignedRect:rect options:NSAlignAllEdgesOutward];
+    view = [[ContentView alloc] initWithPlatformWindow:this];
+    [view setHidden:NO];
+    [view setNeedsDisplay:YES];
+    [view setWantsLayer:YES];
 
-        // Allocate view
-        rect = [window backingAlignedRect:rect options:NSAlignAllEdgesOutward];
-        view = [[ContentView alloc] initWithFrame:rect];
-        [view setHidden:NO];
-        [view setNeedsDisplay:YES];
-        [view setWantsLayer:YES];
+    delegate = [[WindowDelegate alloc] initWithPlatformWindow:this];
+    [window setDelegate:delegate];
+    [window setContentView:view];
 
-        // [window setDelegate:[WindowDelegate alloc]];
-        [window setDelegate:(id<NSWindowDelegate>)[NSApp delegate]];
-        [window setContentView:view];
+    NSString* title = [NSString stringWithUTF8String:desc.title];
+    [window setTitle:title];
 
-        NSString* title = [NSString stringWithUTF8String:desc.title];
-        [window setTitle:title];
+    [window center];
+    [window makeKeyAndOrderFront:nil];
 
-        [window center];
-        [window makeKeyAndOrderFront:nil];
+    // Setup layer
+    layer = [[CAMetalLayer alloc] init];
+    [view setLayer:layer];
+}
 
-        // Setup layer
-        layer = [[CAMetalLayer alloc] init];
-        [view setLayer:layer];        
-    }
+CocoaPlatformWindow::~CocoaPlatformWindow()
+{
+    close();
+}
 
-    ~ApplePlatformWindow() { close(); }
+void CocoaPlatformWindow::setClientSize(uint32_t width, uint32_t height)
+{
+    NSSize size = NSMakeSize(width, height);
+    [window setContentSize:size];
+}
 
-    virtual void setClientSize(uint32_t width, uint32_t height) override
-    {
-        NSSize size = NSMakeSize(width, height);
-        [window setContentSize:size];
-    }
+Rect CocoaPlatformWindow::getClientRect()
+{
+    NSRect rect = [window contentRectForFrameRect:[window frame]];
+    return { (int)rect.origin.x, (int)rect.origin.y, (int)rect.size.width, (int)rect.size.height };
+}
 
-    virtual Rect getClientRect() override
-    {
-        NSRect rect = [window contentRectForFrameRect:[window frame]];
-        return { (int)rect.origin.x, (int)rect.origin.y, (int)rect.size.width, (int)rect.size.height };
-    }
+void CocoaPlatformWindow::centerScreen()
+{
+    [window center];
+}
 
-    virtual void centerScreen() override
-    {
-        [window center];
-    }
+void CocoaPlatformWindow::close()
+{
+    [window release];
+    [delegate release];
+    [view release];
+    [layer release];
 
-    virtual void close() override
-    {
-        [window release];
-        [view release];
-        [layer release];
+    window = nil;
+    delegate = nil;
+    view = nil;
+    layer = nil;
+}
 
-        window = nullptr;
-        view = nullptr;
-        layer = nullptr;
-    }
+bool CocoaPlatformWindow::getFocused()
+{
+    return [window isKeyWindow];
+}
 
-    virtual bool getFocused() override { return [window isKeyWindow]; }
-    virtual bool getVisible() override { return [window isVisible]; }
+bool CocoaPlatformWindow::getVisible()
+{
+    return [window isVisible];
+}
 
-    virtual WindowHandle getNativeHandle() override
-    {
-        return WindowHandle::fromNSView(view);
-    }
+WindowHandle CocoaPlatformWindow::getNativeHandle()
+{
+    return WindowHandle::fromNSView(view);
+}
 
-    virtual void setText(Slang::String text) override
-    {
-        NSString* title = [NSString stringWithUTF8String:text.begin()];
-        [window setTitle:title];
-    }
+void CocoaPlatformWindow::setText(Slang::String text)
+{
+    NSString* title = [NSString stringWithUTF8String:text.begin()];
+    [window setTitle:title];
+}
 
-    virtual void show() override
-    {
-        [window setIsVisible:YES];
-    }
+void CocoaPlatformWindow::show()
+{
+    [window setIsVisible:YES];
+}
 
-    virtual void hide() override
-    {
-        [window setIsVisible:NO];
-    }
+void CocoaPlatformWindow::hide()
+{
+    [window setIsVisible:NO];
+}
 
-    virtual int getCurrentDpi() override
-    {
-        // There seems to be no API to get the actual DPI of the screen.
-        return 0;
-    }
-};
+int CocoaPlatformWindow::getCurrentDpi()
+{
+    // There seems to be no API to get the actual DPI of the screen.
+    return 0;
+}
 
-Window* Application::createWindow(const WindowDesc& desc) { return new ApplePlatformWindow(desc); }
+Window* Application::createWindow(const WindowDesc& desc) { return new CocoaPlatformWindow(desc); }
 
 
 } // namespace platform
