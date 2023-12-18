@@ -160,11 +160,11 @@ int initializeVulkanDevice(VulkanAPI& api)
     if (api.queueFamilyIndex == -1)
         return -1;
 
-    const char* deviceExtensions[] = {
 #if SLANG_APPLE_FAMILY
+    const char* deviceExtensions[] = {
         "VK_KHR_portability_subset",
-#endif
     };
+#endif
 
     VkDeviceQueueCreateInfo queueCreateInfo = {VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO};
     float queuePriority = 0.0f;
@@ -172,8 +172,10 @@ int initializeVulkanDevice(VulkanAPI& api)
     queueCreateInfo.queueCount = 1;
     queueCreateInfo.pQueuePriorities = &queuePriority;
     deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
+#if SLANG_APPLE_FAMILY
     deviceCreateInfo.enabledExtensionCount = SLANG_COUNT_OF(deviceExtensions);
     deviceCreateInfo.ppEnabledExtensionNames = &deviceExtensions[0];
+#endif
     RETURN_ON_FAIL(api.vkCreateDevice(api.physicalDevice, &deviceCreateInfo, nullptr, &api.device));
 
     // Load device functions.
