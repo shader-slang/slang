@@ -3137,7 +3137,7 @@ struct SPIRVEmitContext
                 }
                 else if (semanticName == "sv_vertexid")
                 {
-                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInVertexId);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInVertexIndex);
                 }
                 else if (semanticName == "sv_viewid")
                 {
