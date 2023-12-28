@@ -66,7 +66,8 @@ void TextureTypeInfo::writeFuncBody(
     const char* funcName,
     const String& glsl,
     const String& cuda,
-    const String& spirv)
+    const String& spirvDefault,
+    const String& spirvCombined)
 {
     BraceScope funcScope{i, sb};
     {
@@ -88,12 +89,25 @@ void TextureTypeInfo::writeFuncBody(
             sb << i << "case cuda:\n";
             sb << i << "__intrinsic_asm \"" << cuda << "\";\n";
         }
-        if(spirv.getLength())
+        if(spirvDefault.getLength() && spirvCombined.getLength())
         {
             sb << i << "case spirv:\n";
-            sb << i << "return spirv_asm\n";
-            BraceScope spirvScope{i, sb, ";\n"};
-            sb << spirv << "\n";
+            sb << i << "if (isCombined != 0)\n";
+            sb << i << "{\n";
+            {
+                sb << i << "return spirv_asm\n";
+                BraceScope spirvCombinedScope{i, sb, ";\n"};
+                sb << spirvCombined << "\n";
+            }
+            sb << i << "}\n";
+            sb << i << "else\n";
+            sb << i << "{\n";
+            {
+                sb << i << "return spirv_asm\n";
+                BraceScope spirvDefaultScope{i, sb, ";\n"};
+                sb << spirvDefault << "\n";
+            }
+            sb << i << "}\n";
         }
     }
 }
@@ -102,7 +116,8 @@ void TextureTypeInfo::writeFuncWithSig(
     const char* funcName,
     const String& sig,
     const String& glsl,
-    const String& spirv,
+    const String& spirvDefault,
+    const String& spirvCombined,
     const String& cuda,
     const ReadNoneMode readNoneMode)
 {
@@ -111,7 +126,7 @@ void TextureTypeInfo::writeFuncWithSig(
     sb << i << "[__readNone]\n";
     sb << i << "[ForceInline]\n";
     sb << i << sig << "\n";
-    writeFuncBody(funcName, glsl, cuda, spirv);
+    writeFuncBody(funcName, glsl, cuda, spirvDefault, spirvCombined);
     sb << "\n";
 }
 
@@ -120,7 +135,8 @@ void TextureTypeInfo::writeFunc(
     const char* funcName,
     const String& params,
     const String& glsl,
-    const String& spirv,
+    const String& spirvDefault,
+    const String& spirvCombined,
     const String& cuda,
     const ReadNoneMode readNoneMode)
 {
@@ -128,7 +144,8 @@ void TextureTypeInfo::writeFunc(
         funcName,
         cat(returnType, " ", funcName, "(", params, ")"),
         glsl,
-        spirv,
+        spirvDefault,
+        spirvCombined,
         cuda,
         readNoneMode
     );
@@ -271,16 +288,17 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 glsl << "\";\n";
             }
 
-            StringBuilder spirv;
+            // SPIRV ASM generation
+            auto generateSpirvAsm = [&](StringBuilder& spirv, UnownedStringSlice imageVar) 
             {
-                spirv << "OpCapability ImageQuery; ";
                 spirv << "%vecSize:$$uint";
                 if (sizeDimCount > 1) spirv << sizeDimCount;
                 spirv << " = ";
                 if (isMultisample)
-                    spirv << "OpImageQuerySize $this;";
+                    spirv << "OpImageQuerySize " << imageVar << ";";
                 else
-                    spirv << "OpImageQuerySizeLod $this $0;";
+                    spirv << "OpImageQuerySizeLod " << imageVar <<" $0;";
+
                 auto convertAndStore = [&](UnownedStringSlice uintSourceVal, const char* destParam)
                     {
                         if (UnownedStringSlice(rawT) == "uint")
@@ -343,17 +361,28 @@ void TextureTypeInfo::writeGetDimensionFunctions()
 
                 if (isMultisample)
                 {
-                    spirv << "%_sampleCount : $$uint = OpImageQuerySamples $this;";
+                    spirv << "%_sampleCount : $$uint = OpImageQuerySamples" << imageVar << ";";
                     convertAndStore(UnownedStringSlice("_sampleCount"), "sampleCount");
                 }
 
                 if (includeMipInfo)
                 {
-                    spirv << "%_levelCount : $$uint = OpImageQueryLevels $this;";
+                    spirv << "%_levelCount : $$uint = OpImageQueryLevels" << imageVar << ";";
                     convertAndStore(UnownedStringSlice("_levelCount"), "numberOfLevels");
                 }
+            };
+            StringBuilder spirvCombined;
+            {
+                spirvCombined << "OpCapability ImageQuery; ";
+                spirvCombined << "%image:__imageType(this) = OpImage $this; ";
+                generateSpirvAsm(spirvCombined, toSlice("%image"));
             }
 
+            StringBuilder spirvDefault;
+            {
+                spirvDefault << "OpCapability ImageQuery; ";
+                generateSpirvAsm(spirvDefault, toSlice("$this"));
+            }
             sb << "    __glsl_version(450)\n";
             sb << "    __glsl_extension(GL_EXT_samplerless_texture_functions)\n";
             writeFunc(
@@ -361,7 +390,8 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 "GetDimensions",
                 params,
                 glsl,
-                spirv,
+                spirvDefault,
+                spirvCombined,
                 "",
                 ReadNoneMode::Always);
         }
