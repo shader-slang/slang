@@ -91,6 +91,7 @@
 #include "slang-emit-cuda.h"
 #include "slang-emit-torch.h"
 
+#include "slang-spirv-val.h"
 #include "../compiler-core/slang-artifact-desc-util.h"
 #include "../compiler-core/slang-artifact-util.h"
 #include "../compiler-core/slang-artifact-impl.h"
@@ -1291,6 +1292,13 @@ SlangResult emitSPIRVForEntryPointsDirectly(
 #endif
     auto artifact = ArtifactUtil::createArtifactForCompileTarget(asExternal(codeGenContext->getTargetFormat()));
     artifact->addRepresentationUnknown(ListBlob::moveCreate(spirv));
+
+#if 0
+    // Dump the unoptimized SPIRV after lowering from slang IR -> SPIRV
+    String err; String dis;
+    disassembleSPIRV(spirv, err, dis);
+    printf("%s", dis.begin());
+#endif
 
     IDownstreamCompiler* compiler = codeGenContext->getSession()->getOrLoadDownstreamCompiler(
         PassThroughMode::SpirvOpt, codeGenContext->getSink());

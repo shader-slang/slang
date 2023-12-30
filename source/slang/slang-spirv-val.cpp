@@ -3,7 +3,7 @@
 namespace Slang
 {
 
-static SlangResult disassembleSPIRV(const List<uint8_t>& spirv, String& outErr, String& outDis)
+SlangResult disassembleSPIRV(const List<uint8_t>& spirv, String& outErr, String& outDis)
 {
     // Set up our process
     CommandLine commandLine;
