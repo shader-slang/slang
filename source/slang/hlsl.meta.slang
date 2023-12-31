@@ -9569,7 +9569,7 @@ float3x4 ObjectToWorld3x4()
     case GL_NV_ray_tracing:  __intrinsic_asm "transpose(gl_ObjectToWorldNV)";
     case spirv:
         return spirv_asm {
-            %mat = OpLoad builtin(ObjectToWorldKHR:float4x3);
+            %mat:$$float4x3 = OpLoad builtin(ObjectToWorldKHR:float4x3);
             result:$$float3x4 = OpTranspose %mat;
         };
     }
@@ -9584,7 +9584,7 @@ float3x4 WorldToObject3x4()
     case GL_NV_ray_tracing:  __intrinsic_asm "transpose(gl_WorldToObjectNV)";
     case spirv:
         return spirv_asm {
-            %mat = OpLoad builtin(WorldToObjectKHR:float4x3);
+            %mat:$$float4x3 = OpLoad builtin(WorldToObjectKHR:float4x3);
             result:$$float3x4 = OpTranspose %mat;
         };
     }
