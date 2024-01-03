@@ -5620,7 +5620,12 @@ static SlangResult _getEntryPointResult(
     }
     auto targetReq = linkage->targets[targetIndex];
 
-    Index entryPointCount = req->m_entryPoints.getCount();
+    // Get the entry point count on the program, rather than (say) req->m_entryPoints.getCount()
+    // because
+    // 1) The entry point is fetched from the program anyway so must be consistent
+    // 2) The req may not have all entry points (for example when an entry point is in a module)
+    const Index entryPointCount = program->getEntryPointCount();
+
     if ((entryPointIndex < 0) || (entryPointIndex >= entryPointCount))
     {
         return SLANG_E_INVALID_ARG;
