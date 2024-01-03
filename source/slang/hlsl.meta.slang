@@ -957,7 +957,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     }
 }
 
-// Texture.GetDimensions
+// Texture.GetDimensions and Sampler.GetDimensions
 ${{{{
 const char* kTextureShapeTypeNames[] = {
     "__Shape1D", "__Shape2D", "__Shape3D", "__ShapeCube"};
