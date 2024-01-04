@@ -29,6 +29,7 @@ At the time of writing in `external/spirv-tools` the following were needed
 ```
 git clone https://github.com/google/effcee.git external/effcee
 git clone https://github.com/google/re2.git external/re2
+git clone https://github.com/abseil/abseil-cpp external/abseil_cpp
 ```
 
 Next run the cmake gui. Set the source path to be `external/spirv-tools` (in the slang directory), and then set the 'where to build binaries' to `external/spirv-tools/build.vs` (or however you named that file. Then click `configure` and once that is done 'generate'. 
