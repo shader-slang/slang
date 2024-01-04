@@ -14,6 +14,7 @@
 .clang-format
 .gdb_history
 .vimspector
+.vimspector.json
 
 bin/
 intermediate/
@@ -80,5 +81,6 @@ build/**/*.log
 
 .cache
 vkd3d-proton.cache
+vkd3d-proton.cache.write
 *_d3d11.log
 *_dxgi.log
