@@ -201,7 +201,7 @@ class MySquareFunc(torch.autograd.Function):
 Now we can use the autograd function `MySquareFunc` in our python script:
 
 ```python
-x = torch.tensor([[3.0, 4.0],[0.0, 1.0]], requires_grad=True, device='cuda')
+x = torch.tensor((3.0, 4.0), requires_grad=True, device='cuda')
 print(f"X = {x}")
 y_pred = MySquareFunc.apply(x)
 loss = y_pred.sum()
@@ -211,10 +211,9 @@ print(f"dX = {x.grad.cpu()}")
 
 Output:
 ```
-X = tensor([[3., 4.],
-        [0., 1.]], device='cuda:0', requires_grad=True)
-dX = tensor([[6., 8.],
-        [0., 2.]])
+X = tensor([3., 4.],
+           device='cuda:0', requires_grad=True)
+dX = tensor([6., 8.])
 ```
 
 And that's it! `slangpy.loadModule` uses JIT compilation to compile your Slang source into CUDA binary.
