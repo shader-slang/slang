@@ -1420,6 +1420,12 @@ void Linkage::buildHash(DigestBuilder<SHA1>& builder, SlangInt targetIndex)
         builder.append(defVal);
     }
 
+    // Add compiler settings to hash
+    builder.append(defaultMatrixLayoutMode);
+    builder.append(debugInfoLevel);
+    builder.append(debugInfoFormat);
+    builder.append(optimizationLevel);
+
     // Add the target specified by targetIndex
     auto targetReq = targets[targetIndex];
     builder.append(targetReq->getTarget());
