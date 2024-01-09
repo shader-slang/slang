@@ -1,0 +1,124 @@
+// This file is the single source of truth for all capabilities
+// supported by the Slang language.
+//
+// This file will be parsed and processed by the slang-capability-generator
+// tool during the build process to produce slang-generated-capability-defs.h
+// and slang-generated-capability-defs-impl.h files that constitute the final
+// C++ source of the compiler. New capabilties should be added by editing
+// this file instead of the generated .h files.
+//
+// A capability atom represent a basic unit that characterizes a single code-gen target or
+// a platform-specific API/feature, e.g. _GL_EXT_ray_tracing represents the GLSL ray tracing
+// extension, and `glsl` represents the GLSL code gen target.
+//
+// A capability name is defined by a unique disjunction of conjunction of capability atoms.
+// For example, `raytracing` is a name that expands to
+// glsl + _GL_EXT_ray_tracing | spirv_1_4 + _GL_EXT_ray_tracing | hlsl + _sm_6_4
+// which means it requires the `_GL_EXT_ray_tracing` extension when generating code for glsl
+// or spirv, and requires sm_6_4 when generating hlsl.
+//
+// There are three types of capability definitions:
+// - `def`: this will introduce an new capability atom. If there is an inheritance clause,
+//    the capability name will expand to all inherited atoms plus the newly introduced atom.
+// - `abstract`: an abstract capability does not introduce an actual atom, but it defines
+//   an implicit conflict group such that two capabilities inheriting the same abstract
+//   capability cannot be satisfied simultaneously. When used in an expression, `abstract`
+//   capability also expands into a disjunction (or) of all inherited capabilities.
+// - `alias`: this defines an alias and does not introduce actual atoms.
+
+// Several capabilities represent the target formats in which we generate code.
+// Because we can only generate code in one format at a time, all of these are
+// marked as conflicting with one another along the `TargetFormat` axis.
+//
+// Note: We are only including here the source code formats we initially generate
+// code in and not the formats that code might be translated into "downstream."
+// Trying to figure out how to integrate both kinds of formats into our capability
+// system will be an interesting challenge (e.g., can we compile code for `hlsl+spirv`
+// and for `glsl+spirv` or even just for `spirv`, and how should all of those impact
+// overloading).
+//
+def textualTarget;
+
+abstract target;
+def hlsl : target + textualTarget;
+def glsl : target + textualTarget;
+def c : target + textualTarget;
+def cpp : target + textualTarget;
+def cuda : target + textualTarget;
+
+// We have multiple capabilities for the various SPIR-V versions,
+// arranged so that they inherit from one another to represent which versions
+// provide a super-set of the features of earlier ones (e.g., SPIR-V 1.4 is
+// expressed as inheriting from SPIR-V 1.3).
+//
+def spirv_1_0 : target;
+def spirv_1_1 : spirv_1_0;
+def spirv_1_2 : spirv_1_1;
+def spirv_1_3 : spirv_1_2;
+def spirv_1_4 : spirv_1_3;
+def spirv_1_5 : spirv_1_4;
+def spirv_1_6 : spirv_1_5;
+alias spirv = spirv_1_0;
+
+abstract stage;
+def vertex : stage;
+def fragment : stage;
+alias pixel = fragment;
+def compute : stage;
+def hull : stage;
+def domain : stage;
+def geometry : stage;
+def raygen : stage;
+def intersection : stage;
+def anyhit : stage;
+def closesthit: stage;
+def miss : stage;
+def mesh : stage;
+
+def _sm_5_1 : hlsl;
+def _sm_6_0 : _sm_5_1;
+def _sm_6_1 : _sm_6_0;
+def _sm_6_2 : _sm_6_1;
+def _sm_6_3 : _sm_6_2;
+def _sm_6_4 : _sm_6_3;
+def _sm_6_5 : _sm_6_4;
+def _sm_6_6 : _sm_6_5;
+def _sm_6_7 : _sm_6_6;
+
+// The following capabilities all pertain to how ray tracing shaders are translated
+// to GLSL, where there are two different extensions that can provide the core
+// functionality of `TraceRay` and the related operations.
+//
+// The two extensions are expressed as distinct capabilities that both are marked
+// as conflicting on the `RayTracingExtension` axis, so that a compilation target
+// cannot have both enabled at once.
+//
+// The `GL_EXT_ray_tracing` extension should be favored, so it has a rank of `1`
+// instead of `0`, which means that when comparing overloads that require these
+// extensions, the `EXT` extension will be favored over the `NV` extension, if
+// all other factors are equal.
+//
+def _GL_EXT_ray_tracing : glsl = 1;
+def _GL_NV_ray_tracing : _GL_EXT_ray_tracing;
+def _SPV_KHR_ray_tracing : spirv_1_4;
+alias GL_NV_ray_tracing = _GL_NV_ray_tracing | _SPV_KHR_ray_tracing | _sm_6_4 | cuda;
+alias GL_EXT_ray_tracing = _GL_EXT_ray_tracing | _SPV_KHR_ray_tracing | _sm_6_4 | cuda;
+alias raytracing = GL_EXT_ray_tracing;
+
+def _GL_EXT_fragment_shader_barycentric : glsl + fragment;
+def _GL_NV_fragment_shader_barycentric : _GL_EXT_fragment_shader_barycentric;
+def _SPV_KHR_fragment_shader_barycentric : spirv_1_0 + fragment;
+alias GL_NV_fragment_shader_barycentric = _GL_NV_fragment_shader_barycentric | _SPV_KHR_fragment_shader_barycentric | hlsl + fragment;
+alias GL_EXT_fragment_shader_barycentric = _GL_EXT_fragment_shader_barycentric | _SPV_KHR_fragment_shader_barycentric | hlsl + fragment;
+
+// TODO: define what SM means for all supported targets.
+
+alias sm_5_1 = _sm_5_1;
+alias sm_6_0 = _sm_6_0;
+alias sm_6_1 = _sm_6_1;
+alias sm_6_2 = _sm_6_2;
+alias sm_6_3 = _sm_6_3;
+alias sm_6_4 = _sm_6_4 | raytracing;
+alias sm_6_5 = _sm_6_5;
+alias sm_6_6 = _sm_6_6;
+alias sm_6_7 = _sm_6_7;

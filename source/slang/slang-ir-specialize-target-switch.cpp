@@ -18,11 +18,11 @@ namespace Slang
                 IRBlock* targetBlock = nullptr;
                 for (UInt i = 0; i < targetSwitch->getCaseCount(); i++)
                 {
-                    auto cap = (CapabilityAtom)getIntVal(targetSwitch->getCaseValue(i));
+                    auto cap = (CapabilityName)getIntVal(targetSwitch->getCaseValue(i));
                     if (target->getTargetCaps().isIncompatibleWith(cap))
                         continue;
                     CapabilitySet capSet;
-                    if (cap == CapabilityAtom::Invalid)
+                    if (cap == CapabilityName::Invalid)
                         capSet = CapabilitySet::makeEmpty();
                     else
                         capSet = CapabilitySet(cap);

@@ -8724,7 +8724,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // target, and we need to reflect that at the IR level.
 
             auto targetName = targetMod->targetToken.getContent();
-            auto targetCap = findCapabilityAtom(targetName);
+            auto targetCap = findCapabilityName(targetName);
 
             getBuilder()->addTargetDecoration(inst, CapabilitySet(targetCap));
         }
@@ -8777,8 +8777,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
             else
             {
-                CapabilityAtom targetCap = findCapabilityAtom(targetName);
-                SLANG_ASSERT(targetCap != CapabilityAtom::Invalid);
+                CapabilityName targetCap = findCapabilityName(targetName);
+                SLANG_ASSERT(targetCap != CapabilityName::Invalid);
                 targetCaps = CapabilitySet(targetCap);
             }
 
@@ -8923,7 +8923,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         getBuilder()->addTargetIntrinsicDecoration(
             irInst,
-            CapabilitySet(CapabilityAtom::TEXTUAL_SOURCE),
+            CapabilitySet(CapabilityName::textualTarget),
             definition.getUnownedSlice()
         );
     }

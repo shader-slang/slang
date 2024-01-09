@@ -999,6 +999,12 @@ tool "slang-lookup-generator"
 
     links { "compiler-core", "core" }
 
+tool "slang-capability-generator"
+    uuid "FD16CA29-C66A-430A-822C-C09655088611"
+    includedirs { "." }
+
+    links { "compiler-core", "core" }
+
 tool "test-process"
     uuid "BE412850-4BB9-429A-877C-BFBC4B34186C"
     includedirs { "." }
@@ -1522,6 +1528,30 @@ generatorProject("generate-lookup-tables")
 
     filter { }
 
+generatorProject("generate-capabilities")
+    local inputFile = "source/slang/slang-capabilities.capdef"
+    files
+    {
+        inputFile
+    }
+
+    dependson { "slang-capability-generator" }
+
+    local builddir = getBuildDir()
+    local outputHeaderFile = "%{wks.location}/source/slang/slang-generated-capability-defs.h"
+    local outputCppFile = "%{wks.location}/source/slang/slang-generated-capability-defs-impl.h"
+    local outputLookupFile = "%{wks.location}/source/slang/slang-lookup-capability-defs.cpp"
+    if executeBinary then
+        filter("files:" .. inputFile)
+        buildmessage ("slang-capability-generator for " .. inputFile)
+        local buildcmd = '"' .. builddir .. '/slang-capability-generator" "%{file.abspath}"'
+        buildcommands { buildcmd }
+        buildinputs { "%{file.abspath}", builddir .. "/slang-capability-generator" .. getExecutableSuffix() }
+        buildoutputs (outputHeaderFile, outputCppFile, outputLookupFile)
+    end
+
+    filter { }
+
 if enableEmbedStdLib then
     standardProject("slangc-bootstrap", "source/slangc")
         uuid "6339BF31-AC99-4819-B719-679B63451EF0"
@@ -1684,6 +1714,9 @@ standardProject("slang", "source/slang")
     -- Similarly for any generated lookup tables
     files {
         "source/slang/slang-lookup-glslstd450.cpp",
+        "source/slang/slang-lookup-capability-defs.cpp",
+        "source/slang/slang-generated-capability-defs.h",
+        "source/slang/slang-generated-capability-defs-impl.h",
     }
 
     --
@@ -1695,6 +1728,7 @@ standardProject("slang", "source/slang")
     if not skipSourceGeneration then
         dependson { "run-generators" }
         dependson { "generate-lookup-tables" }
+        dependson { "generate-capabilities" }
         dependson { "generate-spirv-embed" }
     end
 

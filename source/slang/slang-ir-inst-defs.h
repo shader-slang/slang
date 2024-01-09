@@ -282,7 +282,9 @@ INST(Block, block, 0, PARENT)
     INST(VoidLit, void_constant, 0, 0)
 INST_RANGE(Constant, BoolLit, VoidLit)
 
-INST(CapabilitySet, capabilitySet, 0, HOISTABLE)
+INST(CapabilityConjunction, capabilityConjunction, 0, HOISTABLE)
+INST(CapabilityDisjunction, capabilityDisjunction, 0, HOISTABLE)
+INST_RANGE(CapabilitySet, CapabilityConjunction, CapabilityDisjunction)
 
 INST(undefined, undefined, 0, 0)
 

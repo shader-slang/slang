@@ -584,19 +584,23 @@ namespace Slang
         GLSLExtensionTracker*   extensionTracker,
         CapabilitySet const&    caps)
     {
-        for( auto atom : caps.getExpandedAtoms() )
+        for( auto conjunctions : caps.getExpandedAtoms() )
         {
-            switch( atom )
+            for (auto atom : conjunctions.getExpandedAtoms())
             {
-            default:
-                break;
+                switch (atom)
+                {
+                default:
+                    break;
 
-            case CapabilityAtom::SPIRV_1_0: extensionTracker->requireSPIRVVersion(SemanticVersion(1, 0)); break;
-            case CapabilityAtom::SPIRV_1_1: extensionTracker->requireSPIRVVersion(SemanticVersion(1, 1)); break;
-            case CapabilityAtom::SPIRV_1_2: extensionTracker->requireSPIRVVersion(SemanticVersion(1, 2)); break;
-            case CapabilityAtom::SPIRV_1_3: extensionTracker->requireSPIRVVersion(SemanticVersion(1, 3)); break;
-            case CapabilityAtom::SPIRV_1_4: extensionTracker->requireSPIRVVersion(SemanticVersion(1, 4)); break;
-            case CapabilityAtom::SPIRV_1_5: extensionTracker->requireSPIRVVersion(SemanticVersion(1, 5)); break;
+                case CapabilityAtom::spirv_1_0: extensionTracker->requireSPIRVVersion(SemanticVersion(1, 0)); break;
+                case CapabilityAtom::spirv_1_1: extensionTracker->requireSPIRVVersion(SemanticVersion(1, 1)); break;
+                case CapabilityAtom::spirv_1_2: extensionTracker->requireSPIRVVersion(SemanticVersion(1, 2)); break;
+                case CapabilityAtom::spirv_1_3: extensionTracker->requireSPIRVVersion(SemanticVersion(1, 3)); break;
+                case CapabilityAtom::spirv_1_4: extensionTracker->requireSPIRVVersion(SemanticVersion(1, 4)); break;
+                case CapabilityAtom::spirv_1_5: extensionTracker->requireSPIRVVersion(SemanticVersion(1, 5)); break;
+                case CapabilityAtom::spirv_1_6: extensionTracker->requireSPIRVVersion(SemanticVersion(1, 6)); break;
+                }
             }
         }
     }
