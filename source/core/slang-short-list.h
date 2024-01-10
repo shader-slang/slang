@@ -71,6 +71,22 @@ namespace Slang
             return *this;
         }
 
+        bool operator!=(const ThisType& other) const
+        {
+            return !(*this == other);
+        }
+        bool operator==(const ThisType& other) const
+        {
+            if(getCount() != other.getCount())
+                return false;
+            for(Index i = 0; i < getCount(); ++i)
+            {
+                if((*this)[i] != other[i])
+                    return false;
+            }
+            return true;
+        }
+
         struct Iterator
         {
             ThisType* container = nullptr;
