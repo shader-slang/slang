@@ -9867,7 +9867,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_EXT_ray_tracing_position_fetch)
 __glsl_version(460)
 [ForceInline]
-float3 HitTriangleVertexPositions(uint index)
+float3 HitTriangleVertexPosition(uint index)
 {
     __target_switch
     {
@@ -9880,7 +9880,7 @@ float3 HitTriangleVertexPositions(uint index)
                 OpExtension "SPV_KHR_ray_tracing";
                 OpExtension "SPV_KHR_ray_tracing_position_fetch";
                 %_ptr_Input_v3float = OpTypePointer Input $$float3;
-                %addr = OpAccessChain %_ptr_Input_v3float builtin(HitTriangleVertexPositionsKHR:float3[3]) $index;
+                %addr : %_ptr_Input_v3float = OpAccessChain builtin(HitTriangleVertexPositionsKHR:float3[3]) $index;
                 result:$$float3 = OpLoad %addr;
             };
     }
