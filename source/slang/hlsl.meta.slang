@@ -9861,6 +9861,31 @@ uint GeometryIndex()
     }
 }
 
+// Get the vertex positions of the currently hit triangle in any-hit or closest-hit shader.
+// https://github.com/KhronosGroup/GLSL/blob/master/extensions/ext/GLSL_EXT_ray_tracing_position_fetch.txt
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_EXT_ray_tracing_position_fetch)
+__glsl_version(460)
+[ForceInline]
+float3 HitTriangleVertexPosition(uint index)
+{
+    __target_switch
+    {
+        case glsl:
+            __intrinsic_asm "gl_HitTriangleVertexPositionsEXT[$0]";
+        case spirv:
+            return spirv_asm {
+                OpCapability RayTracingKHR;
+                OpCapability RayTracingPositionFetchKHR;
+                OpExtension "SPV_KHR_ray_tracing";
+                OpExtension "SPV_KHR_ray_tracing_position_fetch";
+                %_ptr_Input_v3float = OpTypePointer Input $$float3;
+                %addr : %_ptr_Input_v3float = OpAccessChain builtin(HitTriangleVertexPositionsKHR:float3[3]) $index;
+                result:$$float3 = OpLoad %addr;
+            };
+    }
+}
+
 // Status of whether a (closest) hit has been committed in a `RayQuery`.
 typedef uint COMMITTED_STATUS;
 

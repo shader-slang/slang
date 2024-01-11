@@ -87,7 +87,7 @@ Currently `HLSL` has a special handling in that it is *assumed* if a declaration
 
 The target can also be a capability atom. The atoms are listed in "slang-capability-defs.h".
 
-What is perhaps of importance here is that for some features for a specific target can have multiple ways of achieving the same effect - for example "GL_NV_ray_tracing" or "GL_NV_ray_tracing" are two different ray tracing extensions available for Vulkan through GLSL. The `-profile` option can disambiguate which extension is actually desired, and the capability with that name on the `target_intrinsic` specifies how to implement that feature for that specific extension.
+What is perhaps of importance here is that for some features for a specific target can have multiple ways of achieving the same effect - for example "GL_NV_ray_tracing" and "GL_EXT_ray_tracing" are two different ray tracing extensions available for Vulkan through GLSL. The `-profile` option can disambiguate which extension is actually desired, and the capability with that name on the `target_intrinsic` specifies how to implement that feature for that specific extension.
 
 The expansion mechanism is implemented in "slang-intrinsic-expand.cpp" which will be most up to date.
 
