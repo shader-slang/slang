@@ -29,6 +29,7 @@
 
 #include "slang-emit-source-writer.h"
 #include "slang-mangled-lexer.h"
+#include "slang/slang-ir.h"
 #include <assert.h>
 
 namespace Slang {
@@ -3394,7 +3395,6 @@ void CLikeSourceEmitter::emitFuncDecorationsImpl(IRFunc* func)
         emitFuncDecorationImpl(decoration);
     }
 }
-
 
 void CLikeSourceEmitter::emitStruct(IRStructType* structType)
 {
