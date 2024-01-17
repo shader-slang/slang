@@ -44,12 +44,26 @@ void main(
             IgnoreHit();
         }
     }
+
+    uint index = 0U;
+	HitTriangleVertexPosition(index);
+
+	index = 1U;
+	HitTriangleVertexPosition(index);
+
+	index = 2U;
+	HitTriangleVertexPosition(index);
 }
 
 // CHECK: OpCapability RayTracing
+// CHECK: OpCapability RayTracingPositionFetchKHR
 // CHECK: OpEntryPoint AnyHitNV %main "main"
+// CHECK: OpDecorate %{{.*}} BuiltIn HitTriangleVertexPositionsKHR
 // CHECK: %_ptr_HitAttributeNV_SphereHitAttributes_0 = OpTypePointer HitAttributeNV %SphereHitAttributes_0
 // CHECK: %_S{{.*}} = OpVariable %_ptr_HitAttributeNV_SphereHitAttributes_0 HitAttributeNV
 // CHECK: %{{.*}} = OpAccessChain %_ptr_HitAttributeNV_v3float %_S{{.*}} %int_0
 // CHECK: OpTerminateRayKHR
 // CHECK: OpIgnoreIntersectionKHR
+// CHECK: %{{.*}} = OpAccessChain %_ptr_Input_v3float %{{.*}} %{{u?}}int_0
+// CHECK: %{{.*}} = OpAccessChain %_ptr_Input_v3float %{{.*}} %{{u?}}int_1
+// CHECK: %{{.*}} = OpAccessChain %_ptr_Input_v3float %{{.*}} %{{u?}}int_2
