@@ -54,7 +54,19 @@ All targets support the 32-bit `float`, but support for the other types depends 
 
 ### Boolean Type
 
-The type `bool` is used to represent Boolean truth value: `true` and `false`.
+The type `bool` is used to represent Boolean truth value: `true` and `false`. 
+
+For compatibility reasons, the `sizeof(bool)` depends on the target. 
+
+| Target |      sizeof(bool)      |
+|--------| ---------------------- |
+| GLSL   | 4 bytes / 32-bit value |
+| HLSL   | 4 bytes / 32-bit value |
+| CUDA   | 1 bytes /  8-bit value |
+
+> #### Note ####
+> When storing bool types in structures, make sure to either pad host-side data structures accordingly, or store booleans as, eg, `uint8_t`, to guarantee
+> consistency with the host language's boolean type.
 
 #### The Void Type
 
