@@ -101,6 +101,39 @@ target_include_directories(
 )
 
 #
+# generated lookup tables
+#
+
+set(SLANG_LOOKUP_GENERATOR_INPUT_JSON
+    "${slang_SOURCE_DIR}/external/spirv-headers/include/spirv/unified1/extinst.glsl.std.450.grammar.json"
+)
+set(SLANG_LOOKUP_GENERATOR_OUTPUT_DIR
+    "${CMAKE_CURRENT_BINARY_DIR}/slang-lookup-tables/"
+)
+set(SLANG_LOOKUP_GENERATED_SOURCE
+    "${SLANG_LOOKUP_GENERATOR_OUTPUT_DIR}/slang-lookup-GLSLstd450.cpp"
+)
+add_custom_command(
+    OUTPUT ${SLANG_LOOKUP_GENERATED_SOURCE}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${SLANG_LOOKUP_GENERATOR_OUTPUT_DIR}
+    COMMAND
+        slang-lookup-generator ${SLANG_LOOKUP_GENERATOR_INPUT_JSON}
+        ${SLANG_LOOKUP_GENERATED_SOURCE} "GLSLstd450" "GLSLstd450"
+        "spirv/unified1/GLSL.std.450.h"
+    DEPENDS ${SLANG_LOOKUP_GENERATOR_INPUT_JSON} slang-lookup-generator
+    VERBATIM
+)
+
+add_library(
+    slang-lookup-tables
+    OBJECT
+    EXCLUDE_FROM_ALL
+    ${SLANG_LOOKUP_GENERATED_SOURCE}
+)
+target_link_libraries(slang-lookup-tables PRIVATE core SPIRV-Headers)
+set_target_properties(slang-lookup-tables PROPERTIES FOLDER generated)
+
+#
 # Slang static
 #
 
@@ -120,6 +153,7 @@ slang_add_target(
         # Bundle the source unconditionally
         slang-meta-headers
         slang-reflect-headers
+        slang-lookup-tables
         SPIRV-Headers
     FOLDER generators
 )

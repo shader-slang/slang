@@ -195,7 +195,7 @@ int main(int argc, const char* const* argv)
         outCppPath,
         enumName,
         enumerantPrefix,
-        { "../core/slang-common.h", "../core/slang-string.h", enumHeader },
+        { "core/slang-common.h", "core/slang-string.h", enumHeader },
         hashParams,
         values);
 

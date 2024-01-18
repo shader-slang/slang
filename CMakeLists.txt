@@ -152,6 +152,7 @@ glob_append(
     premake_generated_files
     "source/slang/*.meta.slang.h"
     "source/slang/*-generated-*.h"
+    "source/slang/slang-lookup-*.cpp"
 )
 if(premake_generated_files)
     file(REMOVE ${premake_generated_files})
