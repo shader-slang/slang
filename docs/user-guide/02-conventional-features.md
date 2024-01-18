@@ -620,10 +620,13 @@ Like with the previous `vertexMain` example, mixed entry point setups also suppo
 
 However, because of certain systematic differences between entry point types, a uniform being _global_ or _local_ will have very important consequences on the underlying layout and behavior.
 
-For most all entry point types, D3D12 and Vulkan use one common root signature to define both global and local uniform parameters. For these cases, Slang maps uniforms to this common root signature. 
+For most all entry point types, D3D12 will use one common root signature to define both global and local uniform parameters. 
+Likewise, Vulkan descriptors will bind to a common pipeline layout. For both of these cases, Slang maps uniforms to the common root signature / pipeline layout. 
 
-However, for ray tracing entry points, these parameters map to either _global_ root signatures or to _local_ root signatures, with the latter being stored in the shader binding table.
-When entry points match a "ray tracing" type, we bind uniforms which are in the _global_ scope to the _global_ root signature, while uniforms which are _local_ are bound to the _local_ root signature.
+However, for ray tracing entry points and D3D12, these parameters map to either _global_ root signatures or to _local_ root signatures, with the latter being stored in the shader binding table.
+In Vulkan, D3D12's global root signatures translate to a shared ray tracing pipeline layout, while local root signatures map again to shader binding table records. 
+
+When entry points match a "ray tracing" type, we bind uniforms which are in the _global_ scope to the _global_ root signature (or ray tracing pipeline layout), while uniforms which are _local_ are bound to shader binding table records, which depend on the underlying runtime record indexing. 
 
 Consider the following:
 
@@ -647,7 +650,7 @@ void closestHitMain(uniform float3 localUniform4)
 { /* ... */ }
 ```
 
-In this example, `globalUniform` is appended to the global root signature for _both_ compute _and_ ray generation stages for all four entry points. 
-Compute entry points lack "local root signatures", so `localUniform1` is "pushed" to the stack of reserved global uniform parameters for use in `computeMain1`. 
+In this example, `globalUniform` is appended to the global root signature / pipeline layouts for _both_ compute _and_ ray generation stages for all four entry points. 
+Compute entry points lack "local root signatures" in D3D12, and likewise Vulkan has no concept of "local" vs "global" compute pipeline layouts, so `localUniform1` is "pushed" to the stack of reserved global uniform parameters for use in `computeMain1`. 
 Leaving that entry point scope "pops" that global uniform parameter such that `localUniform2` can reuse the same binding location for `computeMain2`.
-However, local uniforms for ray tracing shaders map to the corresponding local root signatures found in the shader binding table, and so no "push" or "pop" to the global root signature occurs for these parameters. 
+However, local uniforms for ray tracing shaders map to the corresponding "local" hit records in the shader binding table, and so no "push" or "pop" to the global root signature / pipeline layouts occurs for these parameters. 
