@@ -6,7 +6,6 @@ namespace Slang
     SlangResult writeHashFile(
         String outCppPath,
         String valueType,
-        String valuePrefix,
         const List<String> includes,
         const HashParams& hashParams,
         const List<String> values)
@@ -74,7 +73,6 @@ namespace Slang
         return writeHashFile(
             fileName,
             enumName,
-            enumerantPrefix,
             { "../core/slang-common.h", "../core/slang-string.h", enumHeaderFile },
             hashParams,
             values);
