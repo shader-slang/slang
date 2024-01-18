@@ -29,7 +29,7 @@ add_custom_command(
     COMMAND
         slang-generate ${SLANG_STDLIB_META_SOURCE} --target-directory
         ${SLANG_STDLIB_META_OUTPUT_DIR}
-    DEPENDS ${SLANG_STDLIB_META_SOURCE}
+    DEPENDS ${SLANG_STDLIB_META_SOURCE} slang-generate
     WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
     VERBATIM
 )
@@ -84,7 +84,7 @@ add_custom_command(
         slang-cpp-extractor ${SLANG_REFLECT_INPUT} -strip-prefix slang- -o
         ${SLANG_REFLECT_OUTPUT_DIR}/slang-generated -output-fields -mark-suffix
         _CLASS
-    DEPENDS ${SLANG_REFLECT_INPUT}
+    DEPENDS ${SLANG_REFLECT_INPUT} slang-cpp-extractor
     VERBATIM
 )
 
@@ -174,6 +174,7 @@ add_custom_command(
     COMMAND
         slang-bootstrap -archive-type riff-lz4 -save-stdlib-bin-source
         ${SLANG_STDLIB_GENERATED_HEADER}
+    DEPENDS slang-bootstrap
     VERBATIM
 )
 add_library(
@@ -199,6 +200,7 @@ slang_add_target(
         compiler-core
         prelude
         slang-reflect-headers
+        slang-lookup-tables
         SPIRV-Headers
     # slang.h is in the project root, so include that directory in the interface
     # for slang
