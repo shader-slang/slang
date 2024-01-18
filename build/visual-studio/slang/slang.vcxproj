@@ -308,6 +308,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\slang.h" />
+    <ClInclude Include="..\..\..\source\slang\hlsl.meta.slang.temp.h" />
     <ClInclude Include="..\..\..\source\slang\slang-artifact-output-util.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ast-all.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ast-base.h" />

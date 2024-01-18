@@ -1406,6 +1406,26 @@ function preludeGenerator()
     buildinputs { builddir .. "/slang-embed" .. getExecutableSuffix() }
 end
 
+function capabilityGenerator()
+    filter("files:source/slang/*.capdef")
+
+    dependson { "slang-capability-generator" }
+    local inputFile = "%{file.abspath}"
+    local builddir = getBuildDir()
+    local outputHeaderFile = "%{wks.location}/source/slang/slang-generated-capability-defs.h"
+    local outputCppFile = "%{wks.location}/source/slang/slang-generated-capability-defs-impl.h"
+    local outputLookupFile = "%{wks.location}/source/slang/slang-lookup-capability-defs.cpp"
+    if executeBinary then
+        buildmessage ("slang-capability-generator %{file.relpath}")
+        local buildcmd = '"' .. builddir .. '/slang-capability-generator" "%{file.abspath}"'
+        buildcommands { buildcmd }
+        buildinputs { "%{file.abspath}", builddir .. "/slang-capability-generator" .. getExecutableSuffix() }
+        buildoutputs (outputHeaderFile, outputCppFile, outputLookupFile)
+    end
+
+    filter { }
+end
+
 if not skipSourceGeneration then
 
 generatorProject("run-generators", nil)
@@ -1421,6 +1441,7 @@ generatorProject("run-generators", nil)
         "source/slang/*.meta.slang",                -- The stdlib files
         "source/slang/slang-ast-reflect.h",         -- C++ reflection
         "prelude/*.h",                              -- The prelude files
+        "source/slang/*.capdef",
 
         --
         -- To build we need to have some source! It has to be a source file that
@@ -1434,7 +1455,7 @@ generatorProject("run-generators", nil)
     -- First, we need to ensure that various source-generation tools
     -- get built before `slang`, so we declare a non-linking dependency between
     -- the projects here:
-    dependson { "slang-cpp-extractor", "slang-generate", "slang-embed" }
+    dependson { "slang-cpp-extractor", "slang-generate", "slang-embed", "slang-capability-generator" }
 
     local executableSuffix = getExecutableSuffix()
 
@@ -1452,6 +1473,7 @@ generatorProject("run-generators", nil)
     if executeBinary then
         metaSlangGenerator()
         preludeGenerator()
+        capabilityGenerator()
     end
 
     filter { }
@@ -1524,30 +1546,6 @@ generatorProject("generate-lookup-tables")
             buildinputs { inJson, builddir .. "/slang-lookup-generator" .. getExecutableSuffix() }
             buildoutputs (cppPath)
         end
-    end
-
-    filter { }
-
-generatorProject("generate-capabilities")
-    local inputFile = "source/slang/slang-capabilities.capdef"
-    files
-    {
-        inputFile
-    }
-
-    dependson { "slang-capability-generator" }
-
-    local builddir = getBuildDir()
-    local outputHeaderFile = "%{wks.location}/source/slang/slang-generated-capability-defs.h"
-    local outputCppFile = "%{wks.location}/source/slang/slang-generated-capability-defs-impl.h"
-    local outputLookupFile = "%{wks.location}/source/slang/slang-lookup-capability-defs.cpp"
-    if executeBinary then
-        filter("files:" .. inputFile)
-        buildmessage ("slang-capability-generator for " .. inputFile)
-        local buildcmd = '"' .. builddir .. '/slang-capability-generator" "%{file.abspath}"'
-        buildcommands { buildcmd }
-        buildinputs { "%{file.abspath}", builddir .. "/slang-capability-generator" .. getExecutableSuffix() }
-        buildoutputs (outputHeaderFile, outputCppFile, outputLookupFile)
     end
 
     filter { }

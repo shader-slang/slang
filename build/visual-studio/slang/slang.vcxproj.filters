@@ -12,6 +12,9 @@
     <ClInclude Include="..\..\..\slang.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\hlsl.meta.slang.temp.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-artifact-output-util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
