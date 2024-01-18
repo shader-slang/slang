@@ -1557,11 +1557,13 @@ CapabilitySet TargetRequest::getTargetCaps()
     // are available where can be directly encoded on the declarations.
 
     List<CapabilityName> atoms;
+    bool isGLSLTarget = false;
     switch(format)
     {
     case CodeGenTarget::GLSL:
     case CodeGenTarget::GLSL_Vulkan:
     case CodeGenTarget::GLSL_Vulkan_OneDesc:
+        isGLSLTarget = true;
         atoms.add(CapabilityName::glsl);
         break;
     case CodeGenTarget::SPIRV:
@@ -1572,6 +1574,7 @@ CapabilitySet TargetRequest::getTargetCaps()
         }
         else
         {
+            isGLSLTarget = true;
             atoms.add(CapabilityName::glsl);
         }
         break;
@@ -1605,8 +1608,24 @@ CapabilitySet TargetRequest::getTargetCaps()
     default:
         break;
     }
-    for(auto atom : rawCapabilities)
+
+    CapabilitySet latestSpirvCapSet = CapabilitySet(CapabilityName::spirv_latest);
+    CapabilityName latestSpirvAtom = (CapabilityName)latestSpirvCapSet.getExpandedAtoms()[0].getExpandedAtoms().getLast();
+    for (auto atom : rawCapabilities)
+    {
+        if (isGLSLTarget)
+        {
+            // If we are emitting GLSL code, we need to
+            // translate all spirv_*_* capabilities to
+            // glsl_spirv_*_* instead.
+            //
+            if (atom >= CapabilityName::spirv_1_0 && atom <= latestSpirvAtom)
+            {
+                atom = (CapabilityName)((Int)CapabilityName::glsl_spirv_1_0 + ((Int)atom - (Int)CapabilityName::spirv_1_0));
+            }
+        }
         atoms.add(atom);
+    }
 
     cookedCapabilities = CapabilitySet(atoms);
     return cookedCapabilities;

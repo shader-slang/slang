@@ -655,14 +655,12 @@ bool CapabilityConjunctionSet::isBetterForTarget(
     // All preceding factors being equal, we prefer
     // a candidate that is strictly more specialized than the other.
     //
-    // TODO: This logic has the negative effect of always preferring
-    // to enable optional features even if they aren't necessary.
-    // It would prefer the set {glsl, optionalFeature} over the set
-    // {glsl}, even though we might argue that a default implementaton
-    // that works without any optional features is "obviously" what
-    // the user means if they didn't enable those features.
+    // We want to avoid choosing the candidate that uses
+    // optional features if they aren't necessary.
+    // For example, the set {glsl, optionalFeature} should not be preferred
+    // over the set {glsl}, if optionalFeature isn't requested explictly.
     //
-    // TODO: The right answer is possibly that we want to partition
+    // The solution here is that we want to partition
     // `candidateCaps` and `existingCaps` into two parts: their
     // intersection with `targetCaps` and their difference with it.
     //
@@ -671,8 +669,28 @@ bool CapabilityConjunctionSet::isBetterForTarget(
     // part we'd actually wnat to favor a definition that is less
     // specialized.
     //
-    if(candidateCaps.implies(existingCaps)) return true;
-    if(existingCaps.implies(candidateCaps)) return true;
+    CapabilityConjunctionSet candidateCapsIntersection;
+    CapabilityConjunctionSet candidateCapsDifference;
+    for (auto atom : candidateCaps.m_expandedAtoms)
+    {
+        if (targetCaps.implies(atom))
+            candidateCapsIntersection.m_expandedAtoms.add(atom);
+        else
+            candidateCapsDifference.m_expandedAtoms.add(atom);
+    }
+    CapabilityConjunctionSet existingCapsIntersection;
+    CapabilityConjunctionSet existingCapsDifference;
+    for (auto atom : existingCaps.m_expandedAtoms)
+    {
+        if (targetCaps.implies(atom))
+            existingCapsIntersection.m_expandedAtoms.add(atom);
+        else
+            existingCapsDifference.m_expandedAtoms.add(atom);
+    }
+    auto scoreCandidate = candidateCapsIntersection.m_expandedAtoms.getCount() - candidateCapsDifference.m_expandedAtoms.getCount();
+    auto scoreExisting = existingCapsIntersection.m_expandedAtoms.getCount() - existingCapsDifference.m_expandedAtoms.getCount();
+    if (scoreCandidate != scoreExisting)
+        return scoreCandidate > scoreExisting;
 
     // At this point we have the problem that neither candidate
     // appears to be "obviously" better for the target, but we
@@ -682,11 +700,8 @@ bool CapabilityConjunctionSet::isBetterForTarget(
     // different from the other, and see if anything in either case
     // has a ranking that should make it be preferred.
     //
-    // TODO: This should probably *not* be considering anything that
-    // is implied/supported by the target.
-    //
-    auto candidateScore = candidateCaps._calcDifferenceScoreWith(existingCaps);
-    auto existingScore = existingCaps._calcDifferenceScoreWith(candidateCaps);
+    auto candidateScore = candidateCapsDifference._calcDifferenceScoreWith(existingCapsDifference);
+    auto existingScore = existingCapsDifference._calcDifferenceScoreWith(candidateCapsDifference);
     if(candidateScore != existingScore)
         return candidateScore > existingScore;
 
@@ -923,7 +938,10 @@ void CapabilitySet::calcCompactedAtoms(List<List<CapabilityAtom>>& outAtoms) con
 void CapabilitySet::join(const CapabilitySet& other)
 {
     if (isEmpty() || other.isInvalid())
+    {
         *this = other;
+        return;
+    }
     if (isInvalid())
         return;
     if (other.isEmpty())

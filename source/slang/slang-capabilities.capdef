@@ -59,6 +59,17 @@ def spirv_1_4 : spirv_1_3;
 def spirv_1_5 : spirv_1_4;
 def spirv_1_6 : spirv_1_5;
 alias spirv = spirv_1_0;
+alias spirv_latest = spirv_1_6;
+
+// Capabilities that stand for target spirv version for GLSL backend.
+// These are not compilation targets.
+def glsl_spirv_1_0;
+def glsl_spirv_1_1 : glsl_spirv_1_0;
+def glsl_spirv_1_2 : glsl_spirv_1_1;
+def glsl_spirv_1_3 : glsl_spirv_1_2;
+def glsl_spirv_1_4 : glsl_spirv_1_3;
+def glsl_spirv_1_5 : glsl_spirv_1_4;
+def glsl_spirv_1_6 : glsl_spirv_1_5;
 
 abstract stage;
 def vertex : stage;
