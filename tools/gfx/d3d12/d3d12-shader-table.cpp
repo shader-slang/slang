@@ -20,11 +20,14 @@ RefPtr<BufferResource> ShaderTableImpl::createDeviceBuffer(
     uint32_t raygenTableSize = m_rayGenShaderCount * kRayGenRecordSize;
     uint32_t missTableSize = m_missShaderCount * D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
     uint32_t hitgroupTableSize = m_hitGroupCount * D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+    uint32_t callableTableSize = m_callableShaderCount * D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
     m_rayGenTableOffset = 0;
     m_missTableOffset = raygenTableSize;
     m_hitGroupTableOffset = (uint32_t)D3DUtil::calcAligned(
         m_missTableOffset + missTableSize, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
-    uint32_t tableSize = m_hitGroupTableOffset + hitgroupTableSize;
+    m_callableTableOffset = (uint32_t)D3DUtil::calcAligned(
+        m_hitGroupTableOffset + hitgroupTableSize, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
+    uint32_t tableSize = m_callableTableOffset + callableTableSize;
 
     auto pipelineImpl = static_cast<RayTracingPipelineStateImpl*>(pipeline);
     ComPtr<IBufferResource> bufferResource;
@@ -87,6 +90,13 @@ RefPtr<BufferResource> ShaderTableImpl::createDeviceBuffer(
             stagingBufferPtr + m_hitGroupTableOffset + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES * i,
             m_shaderGroupNames[m_rayGenShaderCount + m_missShaderCount + i],
             m_recordOverwrites[m_rayGenShaderCount + m_missShaderCount + i]);
+    }
+    for (uint32_t i = 0; i < m_callableShaderCount; i++)
+    {
+        copyShaderIdInto(
+            stagingBufferPtr + m_callableTableOffset + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES * i,
+            m_shaderGroupNames[m_rayGenShaderCount + m_missShaderCount + m_hitGroupCount + i],
+            m_recordOverwrites[m_rayGenShaderCount + m_missShaderCount + m_hitGroupCount + i]);
     }
 
     stagingBuffer->unmap(nullptr);
