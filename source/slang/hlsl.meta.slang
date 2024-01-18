@@ -9848,7 +9848,7 @@ extension __TextureImpl<T,__Shape2D, 1, 0, 0, $(kStdlibResourceAccessFeedback), 
 //
 
 // Get the index of the geometry that was hit in an intersection, any-hit, or closest-hit shader
-__target_intrinsic(GL_EXT_ray_tracing, "(gl_GeometryIndexEXT)")
+__glsl_extension(GL_EXT_ray_tracing)
 uint GeometryIndex()
 {
     __target_switch
