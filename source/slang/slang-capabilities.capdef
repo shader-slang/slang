@@ -109,7 +109,7 @@ def _sm_6_7 : _sm_6_6;
 // extensions, the `EXT` extension will be favored over the `NV` extension, if
 // all other factors are equal.
 //
-def _GL_EXT_ray_tracing : glsl = 1;
+def _GL_EXT_ray_tracing : glsl + glsl_spirv_1_4 = 1;
 def _GL_NV_ray_tracing : _GL_EXT_ray_tracing;
 def _SPV_KHR_ray_tracing : spirv_1_4;
 alias GL_NV_ray_tracing = _GL_NV_ray_tracing | _SPV_KHR_ray_tracing | _sm_6_4 | cuda;
