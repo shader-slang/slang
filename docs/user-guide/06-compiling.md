@@ -64,7 +64,7 @@ Slang supports two models for identifying entry points when compiling.
 #### Entry Point Attributes
 
 By default, the compiler wll scan a translation unit for function declarations marked with the `[shader(...)]` attribute; each such function will be identified as an entry point in the module.
-Developers are encouraged to use this model because it makes directly documents intention and makes source code less dependent on external compiler configuration options.
+Developers are encouraged to use this model because it directly documents intention and makes source code less dependent on external compiler configuration options.
 
 #### Explicit Entry Point Options
 

@@ -581,3 +581,73 @@ Entry-point uniform parameters are semantically similar to global-scope shader p
 > #### Note ####
 > GLSL does not support entry-point `uniform` parameters; all shader parameters must be declared at the global scope.
 > Historically, HLSL has supported entry-point `uniform` parameters, but this feature was dropped by recent compilers.
+
+Mixed Shader Entry Points
+--------------------------
+
+Through the `[shader(...)]` syntax, users of slang can freely combine multiple entry points into the same file. This can be especially convenient for reuse between entry points which have a logical connection.
+
+For example, mixed entry points offer a convenient way for ray tracing applications to concisely define a complete pipeline in one source file, while also providing users with additional opportunities to improve type safety of 
+shared structure definitions:
+
+```hlsl
+struct Payload { float3 color; };
+
+[shader("raygeneration")]
+void rayGenerationProgram() {
+    Payload payload;
+    TraceRay(/*...*/, payload);
+    /* ... */ 
+}
+
+[shader("closesthit")]
+void closestHitProgram(out Payload payload) { 
+    payload.color = {1.0};
+}
+
+[shader("miss")]
+void missProgram(out Payload payload) { 
+    payload.color = {1.0};
+}
+```
+
+> #### Note ####
+> GLSL does not support multiple entry-points; however, SPIR-V does. Vulkan users wanting to take advantage of Slang mixed entry points must pass `-fvk-use-entrypoint-name` and `-emit-spirv-directly` as compiler arguments.
+
+### Mixed Entry-Point Uniform Parameters
+
+Like with the previous `vertexMain` example, mixed entry point setups also support _entry-point uniform parameters_.
+
+However, because of certain systematic differences between entry point types, a uniform being _global_ or _local_ will have very important consequences on the underlying layout and behavior.
+
+For most all entry point types, D3D12 and Vulkan use one common root signature to define both global and local uniform parameters. For these cases, Slang maps uniforms to this common root signature. 
+
+However, for ray tracing entry points, these parameters map to either _global_ root signatures or to _local_ root signatures, with the latter being stored in the shader binding table.
+When entry points match a "ray tracing" type, we bind uniforms which are in the _global_ scope to the _global_ root signature, while uniforms which are _local_ are bound to the _local_ root signature.
+
+Consider the following:
+
+```hlsl
+uniform float3 globalUniform;
+
+[shader("compute")][numThreads(1,2,3)]
+void computeMain1(uniform float3 localUniform1) 
+{ /* ... */ }
+
+[shader("compute")][numThreads(1,2,3)]
+void computeMain2(uniform float3 localUniform2) 
+{ /* ... */ }
+
+[shader("raygeneration")]
+void rayGenerationMain(uniform float3 localUniform3) 
+{ /* ... */ }
+
+[shader("closesthit")]
+void closestHitMain(uniform float3 localUniform4) 
+{ /* ... */ }
+```
+
+In this example, `globalUniform` is appended to the global root signature for _both_ compute _and_ ray generation stages for all four entry points. 
+Compute entry points lack "local root signatures", so `localUniform1` is "pushed" to the stack of reserved global uniform parameters for use in `computeMain1`. 
+Leaving that entry point scope "pops" that global uniform parameter such that `localUniform2` can reuse the same binding location for `computeMain2`.
+However, local uniforms for ray tracing shaders map to the corresponding local root signatures found in the shader binding table, and so no "push" or "pop" to the global root signature occurs for these parameters. 
