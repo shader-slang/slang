@@ -208,7 +208,7 @@ String perfectHashToEmbeddableCpp(
     line("}");
     line("");
 
-    return sb;
+    return sb.produceString();
 }
 
 }
