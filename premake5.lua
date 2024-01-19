@@ -1568,7 +1568,7 @@ if enableEmbedStdLib then
             "SLANG_WITHOUT_EMBEDDED_STD_LIB"
         }
 
-        includedirs { "external/spirv-headers/include" }
+        includedirs { "external/spirv-headers/include", "source" }
 
         -- Add all of the slang source
         addSourceDir "source/slang"
@@ -1686,7 +1686,7 @@ standardProject("slang", "source/slang")
         defines { "SLANG_WITHOUT_EMBEDDED_STD_LIB" }
     end
 
-    includedirs { "external/spirv-headers/include" }
+    includedirs { "external/spirv-headers/include", "source" }
 
     -- On some tests with MSBuild disabling these made build work.
     -- flags { "NoIncrementalLink", "NoPCH", "NoMinimalRebuild" }

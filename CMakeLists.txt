@@ -278,7 +278,12 @@ add_subdirectory(source/slang)
 slang_add_target(
     tools/slangd
     EXECUTABLE
-    LINK_WITH_PRIVATE core slang slang-reflect-headers slang-capability-defs Threads::Threads
+    LINK_WITH_PRIVATE
+        core
+        slang
+        slang-reflect-headers
+        slang-capability-defs
+        Threads::Threads
     INSTALL
 )
 slang_add_target(
