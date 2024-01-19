@@ -307,7 +307,7 @@ void initCommandOptions(CommandOptions& options)
             "code accordingly.");
 
         List<UnownedStringSlice> names;
-        getCapabilityAtomNames(names);
+        getCapabilityNames(names);
 
         // We'll just add to keep the list more simple...
         options.addValue("spirv_1_{ 0,1,2,3,4,5 }", "minimum supported SPIR - V version");
@@ -315,11 +315,12 @@ void initCommandOptions(CommandOptions& options)
         for (auto name : names)
         {
             if (name.startsWith("__") || 
-                name.startsWith("spirv_1_"))
+                name.startsWith("spirv_1_") ||
+                name.startsWith("_"))
             {
                 continue;
             }
-            else if (name.startsWith("GL_"))
+            else if (name.startsWith("GL_") || name.startsWith("SPV_") || name.startsWith("GLSL_"))
             {
                 // We'll assume it is an extension..
                 StringBuilder buf;
@@ -764,7 +765,7 @@ struct OptionsParser
         int                 targetID = -1;
         FloatingPointMode   floatingPointMode = FloatingPointMode::Default;
         bool                forceGLSLScalarLayout = false;
-        List<CapabilityAtom> capabilityAtoms;
+        List<CapabilityName> capabilityAtoms;
 
         // State for tracking command-line errors
         bool conflictingProfilesSet = false;
@@ -796,7 +797,7 @@ struct OptionsParser
 
     RawTarget* getCurrentTarget();
     void setProfileVersion(RawTarget* rawTarget, ProfileVersion profileVersion);
-    void addCapabilityAtom(RawTarget* rawTarget, CapabilityAtom atom);
+    void addCapabilityAtom(RawTarget* rawTarget, CapabilityName atom);
     
     void setFloatingPointMode(RawTarget* rawTarget, FloatingPointMode mode);
     
@@ -1161,7 +1162,7 @@ void OptionsParser::setProfileVersion(RawTarget* rawTarget, ProfileVersion profi
     rawTarget->profileVersion = profileVersion;
 }
 
-void OptionsParser::addCapabilityAtom(RawTarget* rawTarget, CapabilityAtom atom)
+void OptionsParser::addCapabilityAtom(RawTarget* rawTarget, CapabilityName atom)
 {
     rawTarget->capabilityAtoms.add(atom);
 }
@@ -1755,8 +1756,8 @@ SlangResult OptionsParser::_parseProfile(const CommandLineArg& arg)
     for (Index i = 1; i < sliceCount; ++i)
     {
         UnownedStringSlice atomName = slices[i];
-        CapabilityAtom atom = findCapabilityAtom(atomName);
-        if (atom == CapabilityAtom::Invalid)
+        CapabilityName atom = findCapabilityName(atomName);
+        if (atom == CapabilityName::Invalid)
         {
             m_sink->diagnose(operand.loc, Diagnostics::unknownProfile, atomName);
             return SLANG_FAIL;
@@ -2119,8 +2120,8 @@ SlangResult OptionsParser::_parse(
                 for (Index i = 0; i < sliceCount; ++i)
                 {
                     UnownedStringSlice atomName = slices[i];
-                    CapabilityAtom atom = findCapabilityAtom(atomName);
-                    if (atom == CapabilityAtom::Invalid)
+                    CapabilityName atom = findCapabilityName(atomName);
+                    if (atom == CapabilityName::Invalid)
                     {
                         m_sink->diagnose(operand.loc, Diagnostics::unknownProfile, atomName);
                         return SLANG_FAIL;

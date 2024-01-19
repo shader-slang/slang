@@ -432,20 +432,21 @@ static DocMarkdownWriter::Requirement _getRequirementFromTargetToken(const Token
         return Requirement{CodeGenTarget::SPIRV, UnownedStringSlice("")};
     }
 
-    const CapabilityAtom targetCap = findCapabilityAtom(targetName);
+    const CapabilityAtom targetCap = (CapabilityAtom)findCapabilityName(targetName);
 
     if (targetCap == CapabilityAtom::Invalid)
     {
         return Requirement{ CodeGenTarget::None, String() };
     }
+    SLANG_ASSERT(targetCap < CapabilityAtom::Count);
 
     static const CapabilityAtom rootAtoms[] =
     {
-        CapabilityAtom::GLSL,
-        CapabilityAtom::HLSL,
-        CapabilityAtom::CUDA,
-        CapabilityAtom::CPP,
-        CapabilityAtom::C,
+        CapabilityAtom::glsl,
+        CapabilityAtom::hlsl,
+        CapabilityAtom::cuda,
+        CapabilityAtom::cpp,
+        CapabilityAtom::c,
     };
 
     for (auto rootAtom : rootAtoms)
@@ -458,23 +459,23 @@ static DocMarkdownWriter::Requirement _getRequirementFromTargetToken(const Token
         }
     }
 
-    if (isCapabilityDerivedFrom(targetCap, CapabilityAtom::GLSL))
+    if (isCapabilityDerivedFrom(targetCap, CapabilityAtom::glsl))
     {
         return Requirement{CodeGenTarget::GLSL, targetName};
     }
-    else if (isCapabilityDerivedFrom(targetCap, CapabilityAtom::HLSL))
+    else if (isCapabilityDerivedFrom(targetCap, CapabilityAtom::hlsl))
     {
         return Requirement{ CodeGenTarget::HLSL, targetName };
     }
-    else if (isCapabilityDerivedFrom(targetCap, CapabilityAtom::CUDA))
+    else if (isCapabilityDerivedFrom(targetCap, CapabilityAtom::cuda))
     {
         return Requirement{ CodeGenTarget::CUDASource, targetName };
     }
-    else if (isCapabilityDerivedFrom(targetCap, CapabilityAtom::CPP))
+    else if (isCapabilityDerivedFrom(targetCap, CapabilityAtom::cpp))
     {
         return Requirement{ CodeGenTarget::CPPSource, targetName };
     }
-    else if (isCapabilityDerivedFrom(targetCap, CapabilityAtom::C))
+    else if (isCapabilityDerivedFrom(targetCap, CapabilityAtom::c))
     {
         return Requirement{ CodeGenTarget::CSource, targetName };
     }

@@ -3161,7 +3161,7 @@ struct SPIRVEmitContext
                 }
                 else if (semanticName == "sv_barycentrics")
                 {
-                    if (m_targetRequest->getTargetCaps().implies(CapabilityAtom::GL_NV_fragment_shader_barycentric))
+                    if (m_targetRequest->getTargetCaps().implies(CapabilityAtom::_GL_NV_fragment_shader_barycentric))
                     {
                         requireSPIRVCapability(SpvCapabilityFragmentBarycentricNV);
                         ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_fragment_shader_barycentric"));

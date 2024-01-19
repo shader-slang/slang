@@ -661,7 +661,7 @@ SLANG_NO_THROW SlangProfileID SLANG_MCALL Session::findProfile(
 SLANG_NO_THROW SlangCapabilityID SLANG_MCALL Session::findCapability(
     char const* name)
 {
-    return SlangCapabilityID(Slang::findCapabilityAtom(UnownedTerminatedStringSlice(name)));
+    return SlangCapabilityID(Slang::findCapabilityName(UnownedTerminatedStringSlice(name)));
 }
 
 SLANG_NO_THROW void SLANG_MCALL Session::setDownstreamCompilerPath(
@@ -1439,9 +1439,12 @@ void Linkage::buildHash(DigestBuilder<SHA1>& builder, SlangInt targetIndex)
     builder.append(targetReq->shouldTrackLiveness());
 
     auto cookedCapabilities = targetReq->getTargetCaps().getExpandedAtoms();
-    for (auto& capability : cookedCapabilities)
+    builder.append(cookedCapabilities.getCount());
+    for (auto& capabilityConjunction : cookedCapabilities)
     {
-        builder.append(capability);
+        builder.append(capabilityConjunction.getExpandedAtoms().getCount());
+        for (auto atom : capabilityConjunction.getExpandedAtoms())
+            builder.append(atom);
     }
 
     const PassThroughMode passThroughMode = getDownstreamCompilerRequiredForTarget(targetReq->getTarget());
@@ -1523,7 +1526,7 @@ void TargetRequest::setHLSLToVulkanLayoutOptions(HLSLToVulkanLayoutOptions* opts
     }
 }
 
-void TargetRequest::addCapability(CapabilityAtom capability)
+void TargetRequest::addCapability(CapabilityName capability)
 {
     rawCapabilities.add(capability);
     cookedCapabilities = CapabilitySet::makeEmpty();
@@ -1553,23 +1556,26 @@ CapabilitySet TargetRequest::getTargetCaps()
     // atoms, so that most of the information about what operations
     // are available where can be directly encoded on the declarations.
 
-    List<CapabilityAtom> atoms;
+    List<CapabilityName> atoms;
+    bool isGLSLTarget = false;
     switch(format)
     {
     case CodeGenTarget::GLSL:
     case CodeGenTarget::GLSL_Vulkan:
     case CodeGenTarget::GLSL_Vulkan_OneDesc:
-        atoms.add(CapabilityAtom::GLSL);
+        isGLSLTarget = true;
+        atoms.add(CapabilityName::glsl);
         break;
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
         if (targetFlags & SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY)
         {
-            atoms.add(CapabilityAtom::SPIRV_DIRECT);
+            atoms.add(CapabilityName::spirv_1_5);
         }
         else
         {
-            atoms.add(CapabilityAtom::GLSL);
+            isGLSLTarget = true;
+            atoms.add(CapabilityName::glsl);
         }
         break;
 
@@ -1578,11 +1584,11 @@ CapabilitySet TargetRequest::getTargetCaps()
     case CodeGenTarget::DXBytecodeAssembly:
     case CodeGenTarget::DXIL:
     case CodeGenTarget::DXILAssembly:
-        atoms.add(CapabilityAtom::HLSL);
+        atoms.add(CapabilityName::hlsl);
         break;
 
     case CodeGenTarget::CSource:
-        atoms.add(CapabilityAtom::C);
+        atoms.add(CapabilityName::c);
         break;
 
     case CodeGenTarget::CPPSource:
@@ -1591,19 +1597,35 @@ CapabilitySet TargetRequest::getTargetCaps()
     case CodeGenTarget::ShaderSharedLibrary:
     case CodeGenTarget::HostHostCallable:
     case CodeGenTarget::ShaderHostCallable:
-        atoms.add(CapabilityAtom::CPP);
+        atoms.add(CapabilityName::cpp);
         break;
 
     case CodeGenTarget::CUDASource:
     case CodeGenTarget::PTX:
-        atoms.add(CapabilityAtom::CUDA);
+        atoms.add(CapabilityName::cuda);
         break;
 
     default:
         break;
     }
-    for(auto atom : rawCapabilities)
+
+    CapabilitySet latestSpirvCapSet = CapabilitySet(CapabilityName::spirv_latest);
+    CapabilityName latestSpirvAtom = (CapabilityName)latestSpirvCapSet.getExpandedAtoms()[0].getExpandedAtoms().getLast();
+    for (auto atom : rawCapabilities)
+    {
+        if (isGLSLTarget)
+        {
+            // If we are emitting GLSL code, we need to
+            // translate all spirv_*_* capabilities to
+            // glsl_spirv_*_* instead.
+            //
+            if (atom >= CapabilityName::spirv_1_0 && atom <= latestSpirvAtom)
+            {
+                atom = (CapabilityName)((Int)CapabilityName::glsl_spirv_1_0 + ((Int)atom - (Int)CapabilityName::spirv_1_0));
+            }
+        }
         atoms.add(atom);
+    }
 
     cookedCapabilities = CapabilitySet(atoms);
     return cookedCapabilities;
@@ -5088,7 +5110,7 @@ SlangResult EndToEndCompileRequest::addTargetCapability(SlangInt targetIndex, Sl
     auto& targets = getLinkage()->targets;
     if(targetIndex < 0 || targetIndex >= targets.getCount())
         return SLANG_E_INVALID_ARG;
-    targets[targetIndex]->addCapability(CapabilityAtom(capability));
+    targets[targetIndex]->addCapability(CapabilityName(capability));
     return SLANG_OK;
 }
 
