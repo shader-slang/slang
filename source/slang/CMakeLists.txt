@@ -124,14 +124,15 @@ add_custom_command(
     VERBATIM
 )
 
-add_library(
+
+slang_add_target(
     slang-lookup-tables
     OBJECT
+    EXPLICIT_SOURCE ${SLANG_LOOKUP_GENERATED_SOURCE}
+    LINK_WITH_PRIVATE core SPIRV-Headers
     EXCLUDE_FROM_ALL
-    ${SLANG_LOOKUP_GENERATED_SOURCE}
+    FOLDER generated
 )
-target_link_libraries(slang-lookup-tables PRIVATE core SPIRV-Headers)
-set_target_properties(slang-lookup-tables PROPERTIES FOLDER generated)
 
 #
 # Slang static
