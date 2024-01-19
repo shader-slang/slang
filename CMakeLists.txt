@@ -257,12 +257,13 @@ generator(tools/slang-cpp-extractor USE_FEWER_WARNINGS LINK_WITH_PRIVATE compile
 generator(tools/slang-embed)
 generator(tools/slang-generate USE_FEWER_WARNINGS)
 generator(tools/slang-lookup-generator LINK_WITH_PRIVATE compiler-core)
+generator(tools/slang-capability-generator LINK_WITH_PRIVATE compiler-core)
 generator(tools/slang-spirv-embed-generator LINK_WITH_PRIVATE compiler-core)
 generator(
     source/slangc
     TARGET_NAME slang-bootstrap
     USE_FEWER_WARNINGS
-    LINK_WITH_PRIVATE prelude slang-no-embedded-stdlib Threads::Threads
+    LINK_WITH_PRIVATE prelude slang-no-embedded-stdlib slang-capability-lookup Threads::Threads
 )
 
 #
@@ -277,7 +278,7 @@ add_subdirectory(source/slang)
 slang_add_target(
     tools/slangd
     EXECUTABLE
-    LINK_WITH_PRIVATE core slang slang-reflect-headers Threads::Threads
+    LINK_WITH_PRIVATE core slang slang-reflect-headers slang-capability-defs Threads::Threads
     INSTALL
 )
 slang_add_target(

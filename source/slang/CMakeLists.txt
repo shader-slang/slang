@@ -47,6 +47,54 @@ target_include_directories(
 )
 
 #
+# generate capability files
+#
+glob_append(SLANG_CAPABILITY_SOURCE "*.capdef")
+
+set(SLANG_CAPABILITY_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/capability")
+
+# Generate the output file list
+set(SLANG_CAPABILITY_GENERATED_FILES
+    "${SLANG_CAPABILITY_OUTPUT_DIR}/slang-generated-capability-defs.h"
+    "${SLANG_CAPABILITY_OUTPUT_DIR}/slang-generated-capability-defs-impl.h"
+    "${SLANG_CAPABILITY_OUTPUT_DIR}/slang-lookup-capability-defs.cpp"
+)
+add_custom_command(
+    OUTPUT ${SLANG_CAPABILITY_GENERATED_FILES}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${SLANG_CAPABILITY_OUTPUT_DIR}
+    COMMAND
+        slang-capability-generator ${SLANG_CAPABILITY_SOURCE} --target-directory ${SLANG_CAPABILITY_OUTPUT_DIR}
+    DEPENDS ${SLANG_CAPABILITY_SOURCE}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
+    VERBATIM
+)
+add_library(
+    slang-capability-defs
+    INTERFACE
+    EXCLUDE_FROM_ALL
+    ${SLANG_CAPABILITY_GENERATED_FILES}
+)
+set_target_properties(slang-capability-defs PROPERTIES FOLDER generated)
+target_include_directories(
+    slang-capability-defs
+    INTERFACE ${SLANG_CAPABILITY_OUTPUT_DIR}
+    INTERFACE ${slang_SOURCE_DIR}/source/slang
+)
+
+add_library(
+    slang-capability-lookup
+    INTERFACE
+    EXCLUDE_FROM_ALL
+    ${SLANG_CAPABILITY_GENERATED_FILES}
+)
+set_target_properties(slang-capability-lookup PROPERTIES FOLDER generated)
+target_sources(
+    slang-capability-lookup
+    INTERFACE
+    "${SLANG_CAPABILITY_OUTPUT_DIR}/slang-lookup-capability-defs.cpp"
+)
+
+#
 # generated headers for reflection
 #
 
@@ -152,6 +200,8 @@ slang_add_target(
         core
         compiler-core
         # Bundle the source unconditionally
+        slang-capability-defs
+        slang-capability-lookup
         slang-meta-headers
         slang-reflect-headers
         slang-lookup-tables
@@ -200,6 +250,8 @@ slang_add_target(
         core
         compiler-core
         prelude
+        slang-capability-defs
+        slang-capability-lookup
         slang-reflect-headers
         slang-lookup-tables
         SPIRV-Headers

@@ -325,7 +325,6 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ast-synthesis.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ast-type.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ast-val.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-capability-defs.h" />
     <ClInclude Include="..\..\..\source\slang\slang-capability.h" />
     <ClInclude Include="..\..\..\source\slang\slang-check-impl.h" />
     <ClInclude Include="..\..\..\source\slang\slang-check.h" />
@@ -347,6 +346,8 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-emit-spirv-ops-debug-info-ext.h" />
     <ClInclude Include="..\..\..\source\slang\slang-emit-spirv-ops.h" />
     <ClInclude Include="..\..\..\source\slang\slang-emit-torch.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-generated-capability-defs-impl.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-generated-capability-defs.h" />
     <ClInclude Include="..\..\..\source\slang\slang-glsl-extension-tracker.h" />
     <ClInclude Include="..\..\..\source\slang\slang-hlsl-to-vulkan-layout-options.h" />
     <ClInclude Include="..\..\..\source\slang\slang-image-format-defs.h" />
@@ -698,6 +699,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-language-server-semantic-tokens.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-language-server.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-legalize-types.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-lookup-capability-defs.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-lookup-glslstd450.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-lookup.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-lower-to-ir.cpp" />
