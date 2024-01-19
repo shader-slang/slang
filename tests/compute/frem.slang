@@ -2,12 +2,12 @@
 
 //TEST(compute):COMPARE_COMPUTE: -shaderobj
 //TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-vk -shaderobj
+//TEST(compute):COMPARE_COMPUTE:-vk -shaderobj -emit-spirv-directly
 
 // Test uses of floating-point `%` operator.
 
 RWStructuredBuffer<float> gInput;
-//TEST_INPUT:ubuffer(data=[2.0 1.0 5.0 2.0 2.0 -4.0 -5.0 2.0], stride=4):name=gInput
+//TEST_INPUT:ubuffer(data=[2.0 1.0 5.0 2.0 1.0 -4.0 -5.0 4.0], stride=4):name=gInput
 
 int test(int inVal)
 {
