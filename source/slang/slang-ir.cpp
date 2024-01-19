@@ -287,16 +287,36 @@ namespace Slang
 
     CapabilitySet IRCapabilitySet::getCaps()
     {
-        List<CapabilityAtom> atoms;
-
-        Index count = (Index) getOperandCount();
-        for(Index i = 0; i < count; ++i)
+        switch (getOp())
         {
-            auto operand = cast<IRIntLit>(getOperand(i));
-            atoms.add(CapabilityAtom(operand->getValue()));
-        }
+        case kIROp_CapabilityConjunction:
+            {
+                List<CapabilityName> atoms;
 
-        return CapabilitySet(atoms.getCount(), atoms.getBuffer());
+                Index count = (Index)getOperandCount();
+                for (Index i = 0; i < count; ++i)
+                {
+                    auto operand = cast<IRIntLit>(getOperand(i));
+                    atoms.add(CapabilityName(operand->getValue()));
+                }
+
+                return CapabilitySet(atoms.getCount(), atoms.getBuffer());
+            }
+            break;
+        case kIROp_CapabilityDisjunction:
+            {
+                CapabilitySet result;
+                Index count = (Index) getOperandCount();
+                for (Index i = 0; i < count; ++i)
+                {
+                    auto operand = cast<IRCapabilitySet>(getOperand(i));
+                    result.getExpandedAtoms().addRange(operand->getCaps().getExpandedAtoms());
+                }
+                return result;
+            }
+            break;
+        }
+        return CapabilitySet();
     }
 
 
@@ -2396,17 +2416,21 @@ namespace Slang
         // be a minimal list of atoms such that they will produce
         // the same `CapabilitySet` when expanded.
 
-        List<CapabilityAtom> compactedAtoms;
+        List<List<CapabilityAtom>> compactedAtoms;
         caps.calcCompactedAtoms(compactedAtoms);
-
-        List<IRInst*> args;
-        for( auto atom : compactedAtoms )
+        List<IRInst*> conjunctions;
+        for( auto atomConjunction : compactedAtoms )
         {
-            args.add(getIntValue(capabilityAtomType, Int(atom)));
+            List<IRInst*> args;
+            for (auto atom : atomConjunction)
+                args.add(getIntValue(capabilityAtomType, Int(atom)));
+            auto conjunctionInst = createIntrinsicInst(
+                capabilitySetType, kIROp_CapabilityConjunction, args.getCount(), args.getBuffer());
+            conjunctions.add(conjunctionInst);
         }
-
-        return createIntrinsicInst(
-            capabilitySetType, kIROp_CapabilitySet, args.getCount(), args.getBuffer());
+        if (conjunctions.getCount() == 1)
+            return conjunctions[0];
+        return createIntrinsicInst(capabilitySetType, kIROp_CapabilityDisjunction, conjunctions.getCount(), conjunctions.getBuffer());
     }
 
     static void canonicalizeInstOperands(IRBuilder& builder, IROp op, ArrayView<IRInst*> operands)
@@ -8004,7 +8028,7 @@ namespace Slang
 
     IRTargetSpecificDecoration* findBestTargetDecoration(
             IRInst*         val,
-            CapabilityAtom  targetCapabilityAtom)
+            CapabilityName  targetCapabilityAtom)
     {
         return findBestTargetDecoration(val, CapabilitySet(targetCapabilityAtom));
     }

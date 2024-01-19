@@ -999,6 +999,12 @@ tool "slang-lookup-generator"
 
     links { "compiler-core", "core" }
 
+tool "slang-capability-generator"
+    uuid "FD16CA29-C66A-430A-822C-C09655088611"
+    includedirs { "." }
+
+    links { "compiler-core", "core" }
+
 tool "test-process"
     uuid "BE412850-4BB9-429A-877C-BFBC4B34186C"
     includedirs { "." }
@@ -1400,6 +1406,26 @@ function preludeGenerator()
     buildinputs { builddir .. "/slang-embed" .. getExecutableSuffix() }
 end
 
+function capabilityGenerator()
+    filter("files:source/slang/*.capdef")
+
+    dependson { "slang-capability-generator" }
+    local inputFile = "%{file.abspath}"
+    local builddir = getBuildDir()
+    local outputHeaderFile = "%{wks.location}/source/slang/slang-generated-capability-defs.h"
+    local outputCppFile = "%{wks.location}/source/slang/slang-generated-capability-defs-impl.h"
+    local outputLookupFile = "%{wks.location}/source/slang/slang-lookup-capability-defs.cpp"
+    if executeBinary then
+        buildmessage ("slang-capability-generator %{file.relpath}")
+        local buildcmd = '"' .. builddir .. '/slang-capability-generator" "%{file.abspath}"'
+        buildcommands { buildcmd }
+        buildinputs { "%{file.abspath}", builddir .. "/slang-capability-generator" .. getExecutableSuffix() }
+        buildoutputs (outputHeaderFile, outputCppFile, outputLookupFile)
+    end
+
+    filter { }
+end
+
 if not skipSourceGeneration then
 
 generatorProject("run-generators", nil)
@@ -1415,6 +1441,7 @@ generatorProject("run-generators", nil)
         "source/slang/*.meta.slang",                -- The stdlib files
         "source/slang/slang-ast-reflect.h",         -- C++ reflection
         "prelude/*.h",                              -- The prelude files
+        "source/slang/*.capdef",
 
         --
         -- To build we need to have some source! It has to be a source file that
@@ -1428,7 +1455,7 @@ generatorProject("run-generators", nil)
     -- First, we need to ensure that various source-generation tools
     -- get built before `slang`, so we declare a non-linking dependency between
     -- the projects here:
-    dependson { "slang-cpp-extractor", "slang-generate", "slang-embed" }
+    dependson { "slang-cpp-extractor", "slang-generate", "slang-embed", "slang-capability-generator" }
 
     local executableSuffix = getExecutableSuffix()
 
@@ -1446,6 +1473,7 @@ generatorProject("run-generators", nil)
     if executeBinary then
         metaSlangGenerator()
         preludeGenerator()
+        capabilityGenerator()
     end
 
     filter { }
@@ -1564,7 +1592,8 @@ if enableEmbedStdLib then
             "prelude/slang-hlsl-prelude.h.cpp",
             "prelude/slang-cpp-prelude.h.cpp",
             "prelude/slang-cpp-host-prelude.h.cpp",
-            "prelude/slang-torch-prelude.h.cpp"
+            "prelude/slang-torch-prelude.h.cpp",
+            "source/slang/slang-lookup-capability-defs.cpp"
         }
         if not targetInfo.isWindows then
             links { "pthread" }
@@ -1684,6 +1713,9 @@ standardProject("slang", "source/slang")
     -- Similarly for any generated lookup tables
     files {
         "source/slang/slang-lookup-glslstd450.cpp",
+        "source/slang/slang-lookup-capability-defs.cpp",
+        "source/slang/slang-generated-capability-defs.h",
+        "source/slang/slang-generated-capability-defs-impl.h",
     }
 
     --
@@ -1695,6 +1727,7 @@ standardProject("slang", "source/slang")
     if not skipSourceGeneration then
         dependson { "run-generators" }
         dependson { "generate-lookup-tables" }
+        dependson { "generate-capabilities" }
         dependson { "generate-spirv-embed" }
     end
 

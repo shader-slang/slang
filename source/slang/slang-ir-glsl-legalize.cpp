@@ -914,7 +914,7 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     else if (semanticName == "sv_barycentrics")
     {
         context->requireGLSLVersion(ProfileVersion::GLSL_450);
-        if (codeGenContext->getTargetCaps().implies(CapabilityAtom::GL_NV_fragment_shader_barycentric))
+        if (codeGenContext->getTargetCaps().implies(CapabilityAtom::_GL_NV_fragment_shader_barycentric))
         {
             context->requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_NV_fragment_shader_barycentric"));
             name = "gl_BaryCoordNV";
@@ -2281,7 +2281,7 @@ static void legalizeMeshOutputParam(
         auto arrayName = isPerPrimitive ? "gl_MeshPrimitivesEXT" : "gl_MeshVerticesEXT";
         builder->addTargetIntrinsicDecoration(
             meshOutputBlockType,
-            CapabilitySet(CapabilityAtom::GLSL),
+            CapabilitySet(CapabilityName::glsl),
             UnownedStringSlice(typeName));
         builder->addImportDecoration(blockParam, UnownedStringSlice(arrayName));
         if(isPerPrimitive)

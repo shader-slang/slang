@@ -1620,7 +1620,7 @@ namespace Slang
             forceGLSLScalarBufferLayout = value;
         }
 
-        void addCapability(CapabilityAtom capability);
+        void addCapability(CapabilityName capability);
 
         bool shouldEmitSPIRVDirectly()
         {
@@ -1666,7 +1666,7 @@ namespace Slang
         SlangTargetFlags        targetFlags = kDefaultTargetFlags;
         Slang::Profile          targetProfile = Slang::Profile();
         FloatingPointMode       floatingPointMode = FloatingPointMode::Default;
-        List<CapabilityAtom>    rawCapabilities;
+        List<CapabilityName>    rawCapabilities;
         CapabilitySet           cookedCapabilities;
         LineDirectiveMode       lineDirectiveMode = LineDirectiveMode::Default;
         bool                    dumpIntermediates = false;

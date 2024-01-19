@@ -20,7 +20,7 @@ class Decl;
 
 struct IRCapabilitySet : IRInst
 {
-    IR_LEAF_ISA(CapabilitySet);
+    IR_PARENT_ISA(CapabilitySet);
 
     CapabilitySet getCaps();
 };
@@ -4688,7 +4688,7 @@ IRTargetSpecificDecoration* findBestTargetDecoration(
 
 IRTargetSpecificDecoration* findBestTargetDecoration(
         IRInst*         val,
-        CapabilityAtom  targetCapabilityAtom);
+        CapabilityName  targetCapabilityAtom);
 
 bool findTargetIntrinsicDefinition(IRInst* callee, CapabilitySet const& targetCaps, UnownedStringSlice& outDefinition);
 

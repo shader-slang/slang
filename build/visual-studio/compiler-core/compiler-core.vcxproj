@@ -306,6 +306,7 @@
     <ClInclude Include="..\..\..\source\compiler-core\slang-name-convention-util.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-name.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-nvrtc-compiler.h" />
+    <ClInclude Include="..\..\..\source\compiler-core\slang-perfect-hash-codegen.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-perfect-hash.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-slice-allocator.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-source-embed-util.h" />
@@ -354,6 +355,7 @@
     <ClCompile Include="..\..\..\source\compiler-core\slang-name-convention-util.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-name.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-nvrtc-compiler.cpp" />
+    <ClCompile Include="..\..\..\source\compiler-core\slang-perfect-hash-codegen.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-perfect-hash.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-slice-allocator.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-source-embed-util.cpp" />

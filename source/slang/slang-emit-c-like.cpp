@@ -1214,7 +1214,8 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     case kIROp_IntLit:
     case kIROp_FloatLit:
     case kIROp_BoolLit:
-    case kIROp_CapabilitySet:
+    case kIROp_CapabilityConjunction:
+    case kIROp_CapabilityDisjunction:
         return true;
 
     // Always fold these in, because their results
