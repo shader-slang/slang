@@ -2839,8 +2839,6 @@ struct SPIRVEmitContext
                 dstID,
                 SpvLiteralInteger::from32(int32_t(getIntVal(decoration->getOperand(0)))));
             break;
-
-       
         // ...
         }
 

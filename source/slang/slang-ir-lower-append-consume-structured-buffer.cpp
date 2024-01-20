@@ -16,7 +16,6 @@ namespace Slang
 
         // Type.
         auto structType = builder.createStructType();
-
         StringBuilder nameSb;
         if (type->getOp() == kIROp_HLSLAppendStructuredBufferType)
             nameSb << "AppendStructuredBuffer_";
