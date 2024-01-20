@@ -17,7 +17,6 @@ void computeMain()
     myAppendBuffer.Append(color.x + myBuffer[0].x);
 }
 
-// SPIRV-DAG: OpExtension "SPV_GOOGLE_hlsl_functionality1"
 // SPIRV-DAG: OpExtension "SPV_GOOGLE_user_type"
 
 // SPIRV-DAG: OpDecorate %mTexture UserTypeGOOGLE "Texture2D"

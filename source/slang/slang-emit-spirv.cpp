@@ -2852,11 +2852,10 @@ struct SPIRVEmitContext
                 break;
             case kIROp_SemanticDecoration:
                 {
-                    ensureExtensionDeclaration(toSlice("SPV_GOOGLE_hlsl_funtionality1"));
                     emitOpDecorateString(getSection(SpvLogicalSectionID::Annotations),
                                                decoration,
                                                dstID,
-                                               SpvDecorationHlslSemanticGOOGLE,
+                                               SpvDecorationUserSemantic,
                                                cast<IRSemanticDecoration>(decoration)->getSemanticName());
                 }
                 break;
@@ -2872,7 +2871,6 @@ struct SPIRVEmitContext
                 break;
             case kIROp_CounterBufferDecoration:
                 {
-                    ensureExtensionDeclaration(toSlice("SPV_GOOGLE_hlsl_functionality1"));
                     emitOpDecorateCounterBuffer(getSection(SpvLogicalSectionID::Annotations),
                                                decoration,
                                                dstID,
@@ -3005,7 +3003,7 @@ struct SPIRVEmitContext
                         nullptr,
                         spvStructID,
                         SpvLiteralInteger::from32(id),
-                        SpvDecorationHlslSemanticGOOGLE,
+                        SpvDecorationUserSemantic,
                         semanticDecor->getSemanticName());
                 }
             }
