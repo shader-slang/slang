@@ -1268,6 +1268,26 @@ struct IRPackOffsetDecoration : IRDecoration
     IRIntLit* getComponentOffset() { return cast<IRIntLit>(getOperand(1)); }
 };
 
+struct IRUserTypeNameDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_UserTypeNameDecoration
+    };
+    IR_LEAF_ISA(UserTypeNameDecoration)
+    IRStringLit* getUserTypeName() { return cast<IRStringLit>(getOperand(0)); }
+};
+
+struct IRCounterBufferDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_CounterBufferDecoration
+    };
+    IR_LEAF_ISA(CounterBufferDecoration)
+    IRInst* getCounterBuffer() { return getOperand(0); }
+};
+
 struct IRStageAccessDecoration : public IRDecoration
 {
     IR_PARENT_ISA(StageAccessDecoration)

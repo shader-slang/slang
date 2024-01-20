@@ -95,6 +95,7 @@ enum class OptionKind
     VulkanInvertY,
     VulkanUseEntryPointName,
     VulkanUseGLLayout,
+    VulkanEmitReflection,
 
     GLSLForceScalarLayout,
     EnableEffectAnnotations,
@@ -512,6 +513,7 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::VulkanInvertY, "-fvk-invert-y", nullptr, "Negates (additively inverts) SV_Position.y before writing to stage output."},
         { OptionKind::VulkanUseEntryPointName, "-fvk-use-entrypoint-name", nullptr, "Uses the entrypoint name from the source instead of 'main' in the spirv output."},
         { OptionKind::VulkanUseGLLayout, "-fvk-use-gl-layout", nullptr, "Use std430 layout instead of D3D buffer layout for raw buffer load/stores."},
+        { OptionKind::VulkanEmitReflection, "-fspv-reflect", nullptr, "Include reflection decorations in the resulting SPIRV for shader parameters."},
         { OptionKind::EnableEffectAnnotations,
          "-enable-effect-annotations", nullptr, 
          "Enables support for legacy effect annotation syntax."},
@@ -2098,6 +2100,12 @@ SlangResult OptionsParser::_parse(
             {
                 // -fvk-use-gl-layout
                 m_hlslToVulkanLayoutOptions->setUseGLLayout(true);
+                break;
+            }
+            case OptionKind::VulkanEmitReflection:
+            {
+                // -fvk-invert-y
+                m_hlslToVulkanLayoutOptions->setEmitSPIRVReflectionInfo(true);
                 break;
             }
             case OptionKind::Profile: SLANG_RETURN_ON_FAIL(_parseProfile(arg)); break;
