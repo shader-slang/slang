@@ -16,6 +16,7 @@ namespace Slang
 
         // Type.
         auto structType = builder.createStructType();
+
         StringBuilder nameSb;
         if (type->getOp() == kIROp_HLSLAppendStructuredBufferType)
             nameSb << "AppendStructuredBuffer_";
@@ -30,6 +31,8 @@ namespace Slang
 
         auto counterBufferKey = builder.createStructKey();
         builder.addNameHintDecoration(counterBufferKey, UnownedStringSlice("counter"));
+
+        builder.addDecoration(elementBufferKey, kIROp_CounterBufferDecoration, counterBufferKey);
 
         auto elementBufferType = builder.getType(kIROp_HLSLRWStructuredBufferType, elementType);
         auto counterBufferType = builder.getType(kIROp_HLSLRWStructuredBufferType, builder.getIntType());

@@ -1958,6 +1958,7 @@ struct SPIRVEmitContext
         if (auto layout = getVarLayout(param))
             emitVarLayout(param, varInst, layout);
         maybeEmitName(varInst, param);
+        emitDecorations(param, getID(varInst));
         return varInst;
     }
 
@@ -2831,7 +2832,47 @@ struct SPIRVEmitContext
                 dstID,
                 SpvLiteralInteger::from32(int32_t(getIntVal(decoration->getOperand(0)))));
             break;
+
+       
         // ...
+        }
+
+        if (m_targetRequest->getHLSLToVulkanLayoutOptions()->shouldEmitSPIRVReflectionInfo())
+        {
+            switch (decoration->getOp())
+            {
+            default:
+                break;
+            case kIROp_SemanticDecoration:
+                {
+                    ensureExtensionDeclaration(toSlice("SPV_GOOGLE_hlsl_funtionality1"));
+                    emitOpDecorateString(getSection(SpvLogicalSectionID::Annotations),
+                                               decoration,
+                                               dstID,
+                                               SpvDecorationHlslSemanticGOOGLE,
+                                               cast<IRSemanticDecoration>(decoration)->getSemanticName());
+                }
+                break;
+            case kIROp_UserTypeNameDecoration:
+                {
+                    ensureExtensionDeclaration(toSlice("SPV_GOOGLE_user_type"));
+                    emitOpDecorateString(getSection(SpvLogicalSectionID::Annotations),
+                        decoration,
+                        dstID,
+                        SpvDecorationUserTypeGOOGLE,
+                        cast<IRUserTypeNameDecoration>(decoration)->getUserTypeName()->getStringSlice());
+                }
+                break;
+            case kIROp_CounterBufferDecoration:
+                {
+                    ensureExtensionDeclaration(toSlice("SPV_GOOGLE_hlsl_functionality1"));
+                    emitOpDecorateCounterBuffer(getSection(SpvLogicalSectionID::Annotations),
+                                               decoration,
+                                               dstID,
+                                               as<IRCounterBufferDecoration>(decoration)->getCounterBuffer());
+                }
+                break;
+            }
         }
     }
 
@@ -2947,6 +2988,19 @@ struct SPIRVEmitContext
                     spvStructID,
                     SpvLiteralInteger::from32(id),
                     SpvLiteralInteger::from32((int32_t)matrixStride));
+            }
+            if (m_targetRequest->getHLSLToVulkanLayoutOptions()->shouldEmitSPIRVReflectionInfo())
+            {
+                if (auto semanticDecor = field->getKey()->findDecoration<IRSemanticDecoration>())
+                {
+                    emitOpMemberDecorateString(
+                        getSection(SpvLogicalSectionID::Annotations),
+                        nullptr,
+                        spvStructID,
+                        SpvLiteralInteger::from32(id),
+                        SpvDecorationHlslSemanticGOOGLE,
+                        semanticDecor->getSemanticName());
+                }
             }
             id++;
         }
