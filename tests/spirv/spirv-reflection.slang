@@ -30,4 +30,4 @@ void computeMain()
 
 // SPIRV-DAG: OpDecorate %myAppendBuffer_elements UserTypeGOOGLE "RWStructuredBuffer<float>"
 // SPIRV-DAG: OpDecorate %myAppendBuffer_elements UserSemantic "MY_HLSL_SEMANTIC2"
-// SPIRV-DAG: OpDecorate %myAppendBuffer_elements CounterBuffer %myAppendBuffer_counter
+// SPIRV-DAG: OpDecorateId %myAppendBuffer_elements CounterBuffer %myAppendBuffer_counter
