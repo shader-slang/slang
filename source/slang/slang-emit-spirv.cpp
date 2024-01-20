@@ -1237,6 +1237,13 @@ struct SPIRVEmitContext
 
     Dictionary<SpvTypeInstKey, SpvInst*> m_spvTypeInsts;
 
+    bool shouldEmitSPIRVReflectionInfo()
+    {
+        if (!m_targetRequest->getHLSLToVulkanLayoutOptions())
+            return false;
+        return m_targetRequest->getHLSLToVulkanLayoutOptions()->shouldEmitSPIRVReflectionInfo();
+    }
+
     // Next, let's look at emitting some of the instructions
     // that can occur at global scope.
 
@@ -2837,7 +2844,7 @@ struct SPIRVEmitContext
         // ...
         }
 
-        if (m_targetRequest->getHLSLToVulkanLayoutOptions()->shouldEmitSPIRVReflectionInfo())
+        if (shouldEmitSPIRVReflectionInfo())
         {
             switch (decoration->getOp())
             {
@@ -2989,7 +2996,7 @@ struct SPIRVEmitContext
                     SpvLiteralInteger::from32(id),
                     SpvLiteralInteger::from32((int32_t)matrixStride));
             }
-            if (m_targetRequest->getHLSLToVulkanLayoutOptions()->shouldEmitSPIRVReflectionInfo())
+            if (shouldEmitSPIRVReflectionInfo())
             {
                 if (auto semanticDecor = field->getKey()->findDecoration<IRSemanticDecoration>())
                 {

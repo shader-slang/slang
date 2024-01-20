@@ -1236,7 +1236,7 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
     String finalResult = sourceWriter.getContentAndClear();
 
     // Append the modules output code
-    finalResult.append(code);
+0    finalResult.append(code);
 
     // Write out the result
 
