@@ -480,7 +480,7 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
         sb << ">";
         break;
     case kIROp_HLSLRasterizerOrderedStructuredBufferType:
-        sb << "ConsumeStructuredBuffer<";
+        sb << "RasterizerOrderedStructuredBuffer<";
         getTypeNameHint(sb, as<IRHLSLStructuredBufferTypeBase>(type)->getElementType());
         sb << ">";
         break;

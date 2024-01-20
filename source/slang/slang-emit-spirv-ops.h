@@ -837,7 +837,7 @@ SpvInst* emitOpDecorateCounterBuffer(
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
-    return emitInst(parent, inst, SpvOpDecorate, target, SpvDecorationCounterBuffer, counterBuffer);
+    return emitInst(parent, inst, SpvOpDecorateId, target, SpvDecorationCounterBuffer, counterBuffer);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpDecorate
