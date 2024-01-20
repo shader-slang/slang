@@ -425,12 +425,12 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
         sb << ">";
         break;
     case kIROp_ConstantBufferType:
-        sb << "ConstantBuffer<";
+        sb << "cbuffer<";
         getTypeNameHint(sb, as<IRConstantBufferType>(type)->getElementType());
         sb << ">";
         break;
     case kIROp_TextureBufferType:
-        sb << "TextureBuffer<";
+        sb << "tbuffer<";
         getTypeNameHint(sb, as<IRTextureBufferType>(type)->getElementType());
         sb << ">";
         break;
