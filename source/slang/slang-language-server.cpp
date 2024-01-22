@@ -1974,7 +1974,7 @@ SlangResult LanguageServer::queueJSONCall(JSONRPCCall call)
     else if (call.method == SemanticTokensParams::methodName)
     {
         SemanticTokensParams args;
-        SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
+        SLANG_RETURN_ON_FAIL(m_connection->checkArrayObjectWrap( call.params, GetRttiInfo<SemanticTokensParams>::get(), &args, call.id ));
         cmd.semanticTokenArgs = args;
     }
     else if (call.method == SignatureHelpParams::methodName)
@@ -1995,7 +1995,7 @@ SlangResult LanguageServer::queueJSONCall(JSONRPCCall call)
     else if (call.method == DocumentSymbolParams::methodName)
     {
         DocumentSymbolParams args;
-        SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
+        SLANG_RETURN_ON_FAIL(m_connection->checkArrayObjectWrap( call.params, GetRttiInfo<DocumentSymbolParams>::get(), &args, call.id ));
         cmd.documentSymbolArgs = args;
     }
     else if (call.method == DocumentFormattingParams::methodName)
