@@ -157,6 +157,8 @@ Request a pull from "shader-slang" repository.
 
 For the Pull Request, you will need to write a PR message. This message is for a set of commits you are requesting to pull. Try to make it brief because the actual details should be in the commit messages of each commit.
  
+The PR requires an approval from people who have permissions. They will review the changes before approve the Pull. During this step, you will get feedbacks from other people and they may request you to make some changes. When you need to make adjustments, you can commit new changes to the branch in your forlked repository that already has the changes in PR process. When new commits are added to the branch, they will automatically appear in the PR.
+
 ## Update your Repository
 After your pull request is submitted, you can update your repository for your next changes.
 
