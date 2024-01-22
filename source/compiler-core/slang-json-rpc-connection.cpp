@@ -136,6 +136,24 @@ SlangResult JSONRPCConnection::sendError(JSONRPC::ErrorCode errorCode, const Uno
     return sendRPC(&errorResponse);
 }
 
+SlangResult JSONRPCConnection::checkArrayObjectWrap( const JSONValue& srcArgs, const RttiInfo* dstArgsRttiInfo, void* dstArgs, const JSONValue& id )
+{
+    if ( dstArgsRttiInfo->m_kind == RttiInfo::Kind::Struct &&
+        srcArgs.getKind() == JSONValue::Kind::Array )
+    {
+        auto array = m_container.getArray( srcArgs );
+        if ( array.getCount() == 1 )
+        {
+            return toNativeOrSendError( array[0], dstArgsRttiInfo, dstArgs, id );
+        }
+        return SLANG_OK;
+    }
+    else
+    {
+        return toNativeOrSendError( srcArgs, dstArgsRttiInfo, dstArgs, id );
+    }
+}
+
 SlangResult JSONRPCConnection::toNativeArgsOrSendError(const JSONValue& srcArgs, const RttiInfo* dstArgsRttiInfo, void* dstArgs, const JSONValue& id)
 {
     if (dstArgsRttiInfo->m_kind == RttiInfo::Kind::Struct &&
