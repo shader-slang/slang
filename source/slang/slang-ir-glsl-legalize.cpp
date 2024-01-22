@@ -1599,7 +1599,10 @@ void assign(
             auto arrayIndexInst = builder->getIntValue(builder->getIntType(), arrayIndex);
 
             // Store to the index
-            auto address = builder->emitElementAddress(right.irValue->getFullType(), left.irValue, arrayIndexInst);
+            auto address = builder->emitElementAddress(
+                builder->getPtrType(right.irValue->getFullType()),
+                left.irValue,
+                arrayIndexInst);
             builder->emitStore(address, rhs);
 
             break;
@@ -1613,7 +1616,10 @@ void assign(
                     auto address = left.irValue;
                     if(index)
                     {
-                        address = builder->emitElementAddress(right.irValue->getFullType(), left.irValue, index);
+                        address = builder->emitElementAddress(
+                            builder->getPtrType(right.irValue->getFullType()),
+                            left.irValue,
+                            index);
                     }
                     builder->emitStore(address, right.irValue);
                     break;

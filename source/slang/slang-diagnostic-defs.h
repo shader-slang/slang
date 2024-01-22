@@ -451,7 +451,7 @@ DIAGNOSTIC(30510, Error, loopInDiffFuncRequireUnrollOrMaxIters, "loops inside a 
 DIAGNOSTIC(39999, Fatal, cyclicReference, "cyclic reference '$0'.")
 DIAGNOSTIC(39999, Error, localVariableUsedBeforeDeclared, "local variable '$0' is being used before its declaration.")
 DIAGNOSTIC(39999, Error, variableUsedInItsOwnDefinition, "the initial-value expression for variable '$0' depends on the value of the variable itself")
-DIAGNOSTIC(39001, Fatal , cannotProcessInclude, "internal compiler error: cannot process '__include' in the current semantic checking context.")
+DIAGNOSTIC(39901, Fatal , cannotProcessInclude, "internal compiler error: cannot process '__include' in the current semantic checking context.")
 
 // 304xx: generics
 DIAGNOSTIC(30400, Error, genericTypeNeedsArgs, "generic type '$0' used without argument")
