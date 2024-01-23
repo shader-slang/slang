@@ -1719,11 +1719,16 @@ void LanguageServer::updateFormattingOptions(const JSONValue& clangFormatLoc, co
 {
     auto container = m_connection->getContainer();
     JSONToNativeConverter converter(container, &m_typeMap, m_connection->getSink());
-    converter.convert(clangFormatLoc, &m_formatOptions.clangFormatLocation);
-    converter.convert(clangFormatStyle, &m_formatOptions.style);
-    converter.convert(clangFormatFallbackStyle, &m_formatOptions.fallbackStyle);
-    converter.convert(allowLineBreakOnType, &m_formatOptions.allowLineBreakInOnTypeFormatting);
-    converter.convert(allowLineBreakInRange, &m_formatOptions.allowLineBreakInRangeFormatting);
+    if (clangFormatLoc.isValid())
+        converter.convert(clangFormatLoc, &m_formatOptions.clangFormatLocation);
+    if (clangFormatStyle.isValid())
+        converter.convert(clangFormatStyle, &m_formatOptions.style);
+    if (clangFormatFallbackStyle.isValid())
+        converter.convert(clangFormatFallbackStyle, &m_formatOptions.fallbackStyle);
+    if (allowLineBreakOnType.isValid())
+        converter.convert(allowLineBreakOnType, &m_formatOptions.allowLineBreakInOnTypeFormatting);
+    if (allowLineBreakInRange.isValid())
+        converter.convert(allowLineBreakInRange, &m_formatOptions.allowLineBreakInRangeFormatting);
     if (m_formatOptions.style.getLength() == 0)
         m_formatOptions.style = Slang::FormatOptions().style;
 }
@@ -1974,7 +1979,7 @@ SlangResult LanguageServer::queueJSONCall(JSONRPCCall call)
     else if (call.method == SemanticTokensParams::methodName)
     {
         SemanticTokensParams args;
-        SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
+        SLANG_RETURN_ON_FAIL(m_connection->checkArrayObjectWrap( call.params, GetRttiInfo<SemanticTokensParams>::get(), &args, call.id ));
         cmd.semanticTokenArgs = args;
     }
     else if (call.method == SignatureHelpParams::methodName)
@@ -1995,7 +2000,7 @@ SlangResult LanguageServer::queueJSONCall(JSONRPCCall call)
     else if (call.method == DocumentSymbolParams::methodName)
     {
         DocumentSymbolParams args;
-        SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
+        SLANG_RETURN_ON_FAIL(m_connection->checkArrayObjectWrap( call.params, GetRttiInfo<DocumentSymbolParams>::get(), &args, call.id ));
         cmd.documentSymbolArgs = args;
     }
     else if (call.method == DocumentFormattingParams::methodName)
@@ -2176,8 +2181,14 @@ SlangResult LanguageServer::didChangeTextDocument(const DidChangeTextDocumentPar
 SlangResult LanguageServer::didChangeConfiguration(
     const LanguageServerProtocol::DidChangeConfigurationParams& args)
 {
-    SLANG_UNUSED(args);
-    sendConfigRequest();
+    if (args.settings.isValid())
+    {
+        updateConfigFromJSON(args.settings);
+    }
+    else
+    {
+        sendConfigRequest();
+    }
     return SLANG_OK;
 }
 
@@ -2186,6 +2197,64 @@ void LanguageServer::update()
     if (!m_workspace)
         return;
     publishDiagnostics();
+}
+
+void LanguageServer::updateConfigFromJSON(const JSONValue& jsonVal)
+{
+    if (!jsonVal.isObjectLike())
+        return;
+    auto obj = m_connection->getContainer()->getObject(jsonVal);
+    if (obj.getCount() == 1 &&
+        (m_connection->getContainer()->getStringFromKey(obj[0].key) == "settings"
+            || m_connection->getContainer()->getStringFromKey(obj[0].key) == "RootElement"))
+    {
+        updateConfigFromJSON(obj[0].value);
+        return;
+    }
+    for (auto kv : obj)
+    {
+        auto key = m_connection->getContainer()->getStringFromKey(kv.key);
+        if (key == "slang.predefinedMacros")
+        {
+            updatePredefinedMacros(kv.value);
+        }
+        else if (key == "slang.additionalSearchPaths")
+        {
+            updateSearchPaths(kv.value);
+        }
+        else if (key == "slang.enableCommitCharactersInAutoCompletion")
+        {
+            updateCommitCharacters(kv.value);
+        }
+        else if (key == "slang.format.clangFormatLocation")
+        {
+            updateFormattingOptions(kv.value, JSONValue(), JSONValue(), JSONValue(), JSONValue());
+        }
+        else if (key == "slang.format.clangFormatStyle")
+        {
+            updateFormattingOptions(JSONValue(), kv.value, JSONValue(), JSONValue(), JSONValue());
+        }
+        else if (key == "slang.format.clangFormatFallbackStyle")
+        {
+            updateFormattingOptions(JSONValue(), JSONValue(), kv.value, JSONValue(), JSONValue());
+        }
+        else if (key == "slang.format.allowLineBreakChangesInOnTypeFormatting")
+        {
+            updateFormattingOptions(JSONValue(), JSONValue(),  JSONValue(), kv.value, JSONValue());
+        }
+        else if (key == "slang.format.allowLineBreakChangesInRangeFormatting")
+        {
+            updateFormattingOptions(JSONValue(), JSONValue(), JSONValue(), JSONValue(), kv.value);
+        }
+        else if (key == "slang.inlayHints.deducedTypes")
+        {
+            updateInlayHintOptions(kv.value, JSONValue());
+        }
+        else if (key == "slang.inlayHints.parameterNames")
+        {
+            updateInlayHintOptions(JSONValue(), kv.value);
+        }
+    }
 }
 
 SlangResult LanguageServer::execute()

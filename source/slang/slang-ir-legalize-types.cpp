@@ -2518,6 +2518,24 @@ static LegalVal legalizeFunc(
     return builder.build(irFunc);
 }
 
+static void cloneDecorationToVar(IRInst* srcInst, IRInst* varInst)
+{
+    for (auto decoration : srcInst->getDecorations())
+    {
+        switch (decoration->getOp())
+        {
+        case kIROp_FormatDecoration:
+        case kIROp_UserTypeNameDecoration:
+        case kIROp_SemanticDecoration:
+            cloneDecoration(decoration, varInst);
+            break;
+
+        default:
+            break;
+        }
+    }
+}
+
 static LegalVal declareSimpleVar(
     IRTypeLegalizationContext*  context,
     IROp                        op,
@@ -2601,16 +2619,17 @@ static LegalVal declareSimpleVar(
 
         if( leafVar )
         {
-            for( auto decoration : leafVar->getDecorations() )
+            cloneDecorationToVar(leafVar, irVar);
+            if (as<IRStructKey>(leafVar))
             {
-                switch( decoration->getOp() )
+                // Find the struct field and clone any decorations on the field over.
+                for (auto use = leafVar->firstUse; use; use = use->nextUse)
                 {
-                case kIROp_FormatDecoration:
-                    cloneDecoration(decoration, irVar);
-                    break;
-
-                default:
-                    break;
+                    if (auto field = as<IRStructField>(use->getUser()))
+                    {
+                        cloneDecorationToVar(field, irVar);
+                        break;
+                    }
                 }
             }
         }
@@ -3328,6 +3347,28 @@ static LegalVal declareVars(
                 element.key = ee.key;
                 element.val = fieldVal;
                 tupleVal->elements.add(element);
+            }
+
+            if (tupleVal->elements.getCount() == 2 &&
+                tupleVal->elements[0].key &&
+                tupleVal->elements[0].key->findDecorationImpl(kIROp_CounterBufferDecoration))
+            {
+                // If this is a lowered struct from a structured buffer type that has an atomic counter,
+                // insert decorations to each element var to associate the element buffer with the atomic buffer.
+                // This decoration is inserted to all lowered structs in the slang-ir-lower-append-consume-structured-buffer
+                // pass.
+                //
+                if (tupleVal->elements[0].val.flavor == LegalVal::Flavor::simple &&
+                    tupleVal->elements[1].val.flavor == LegalVal::Flavor::simple)
+                {
+                    auto simpleElementVar = tupleVal->elements[0].val.getSimple();
+                    auto simpleCounterVar = tupleVal->elements[1].val.getSimple();
+                    IRBuilder builder(simpleElementVar);
+                    builder.addDecoration(simpleElementVar, kIROp_CounterBufferDecoration, simpleCounterVar);
+                    // Clone decorations from leafVar to both element and counter var.
+                    cloneDecorationToVar(leafVar, simpleElementVar);
+                    cloneDecorationToVar(leafVar, simpleCounterVar);
+                }
             }
 
             return LegalVal::tuple(tupleVal);

@@ -121,6 +121,8 @@ public:
 
     bool shouldUseGLLayout() const { return m_useGLLayout; }
 
+    bool shouldEmitSPIRVReflectionInfo() const { return m_emitSPIRVReflectionInfo; }
+
     bool getUseOriginalEntryPointName() const { return m_useOriginalEntryPointName; }
 
         /// Given an kind and a binding infer the vulkan binding.
@@ -152,6 +154,8 @@ public:
     void setUseOriginalEntryPointName(bool value) { m_useOriginalEntryPointName = value; }
 
     void setUseGLLayout(bool value) { m_useGLLayout = value; }
+
+    void setEmitSPIRVReflectionInfo(bool value) { m_emitSPIRVReflectionInfo = value; }
 
         /// Ctor
     HLSLToVulkanLayoutOptions();
@@ -185,6 +189,9 @@ protected:
 
         /// If set, raw buffer load/stores will follow std430 layout.
     bool m_useGLLayout = false;
+
+        /// If set, will emit SPIR-V reflection info.
+    bool m_emitSPIRVReflectionInfo = false;
 };
 
 } // namespace Slang

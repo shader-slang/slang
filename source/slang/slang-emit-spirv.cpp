@@ -1237,6 +1237,13 @@ struct SPIRVEmitContext
 
     Dictionary<SpvTypeInstKey, SpvInst*> m_spvTypeInsts;
 
+    bool shouldEmitSPIRVReflectionInfo()
+    {
+        if (!m_targetRequest->getHLSLToVulkanLayoutOptions())
+            return false;
+        return m_targetRequest->getHLSLToVulkanLayoutOptions()->shouldEmitSPIRVReflectionInfo();
+    }
+
     // Next, let's look at emitting some of the instructions
     // that can occur at global scope.
 
@@ -1958,6 +1965,7 @@ struct SPIRVEmitContext
         if (auto layout = getVarLayout(param))
             emitVarLayout(param, varInst, layout);
         maybeEmitName(varInst, param);
+        emitDecorations(param, getID(varInst));
         return varInst;
     }
 
@@ -2833,6 +2841,42 @@ struct SPIRVEmitContext
             break;
         // ...
         }
+
+        if (shouldEmitSPIRVReflectionInfo())
+        {
+            switch (decoration->getOp())
+            {
+            default:
+                break;
+            case kIROp_SemanticDecoration:
+                {
+                    emitOpDecorateString(getSection(SpvLogicalSectionID::Annotations),
+                                               decoration,
+                                               dstID,
+                                               SpvDecorationUserSemantic,
+                                               cast<IRSemanticDecoration>(decoration)->getSemanticName());
+                }
+                break;
+            case kIROp_UserTypeNameDecoration:
+                {
+                    ensureExtensionDeclaration(toSlice("SPV_GOOGLE_user_type"));
+                    emitOpDecorateString(getSection(SpvLogicalSectionID::Annotations),
+                        decoration,
+                        dstID,
+                        SpvDecorationUserTypeGOOGLE,
+                        cast<IRUserTypeNameDecoration>(decoration)->getUserTypeName()->getStringSlice());
+                }
+                break;
+            case kIROp_CounterBufferDecoration:
+                {
+                    emitOpDecorateCounterBuffer(getSection(SpvLogicalSectionID::Annotations),
+                                               decoration,
+                                               dstID,
+                                               as<IRCounterBufferDecoration>(decoration)->getCounterBuffer());
+                }
+                break;
+            }
+        }
     }
 
     void emitLayoutDecorations(IRStructType* structType, SpvWord spvStructID)
@@ -2947,6 +2991,19 @@ struct SPIRVEmitContext
                     spvStructID,
                     SpvLiteralInteger::from32(id),
                     SpvLiteralInteger::from32((int32_t)matrixStride));
+            }
+            if (shouldEmitSPIRVReflectionInfo())
+            {
+                if (auto semanticDecor = field->getKey()->findDecoration<IRSemanticDecoration>())
+                {
+                    emitOpMemberDecorateString(
+                        getSection(SpvLogicalSectionID::Annotations),
+                        nullptr,
+                        spvStructID,
+                        SpvLiteralInteger::from32(id),
+                        SpvDecorationUserSemantic,
+                        semanticDecor->getSemanticName());
+                }
             }
             id++;
         }

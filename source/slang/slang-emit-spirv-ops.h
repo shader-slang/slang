@@ -691,6 +691,35 @@ SpvInst* emitOpDecorateBuiltIn(
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpDecorate
+template<typename T>
+SpvInst* emitOpMemberDecorateString(
+    SpvInstParent* parent,
+    IRInst* inst,
+    const T& target,
+    const SpvLiteralInteger& index,
+    SpvDecoration decoration,
+    UnownedStringSlice text
+)
+{
+    static_assert(isSingular<T>);
+    return emitInst(parent, inst, SpvOpDecorate, target, index, decoration, text);
+}
+
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpDecorate
+template<typename T>
+SpvInst* emitOpDecorateString(
+    SpvInstParent* parent,
+    IRInst* inst,
+    const T& target,
+    SpvDecoration decoration,
+    UnownedStringSlice text
+)
+{
+    static_assert(isSingular<T>);
+    return emitInst(parent, inst, SpvOpDecorate, target, decoration, text);
+}
+
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpDecorate
 template<typename T1, typename T2>
 SpvInst* emitOpDecorateUniformId(
     SpvInstParent* parent,
@@ -808,7 +837,7 @@ SpvInst* emitOpDecorateCounterBuffer(
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
-    return emitInst(parent, inst, SpvOpDecorate, target, SpvDecorationCounterBuffer, counterBuffer);
+    return emitInst(parent, inst, SpvOpDecorateId, target, SpvDecorationCounterBuffer, counterBuffer);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpDecorate

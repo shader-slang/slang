@@ -461,9 +461,10 @@ struct Std140LayoutRules : IRTypeLayoutRules
     }
     virtual IRSizeAndAlignment getVectorSizeAndAlignment(IRSizeAndAlignment element, IRIntegerValue count)
     {
+        IRIntegerValue alignmentCount = count;
         if (count == 3)
-            count = 4;
-        return IRSizeAndAlignment((int)(element.size * count), (int)(element.size * count));
+            alignmentCount = 4;
+        return IRSizeAndAlignment((int)(element.size * count), (int)(element.size * alignmentCount));
     }
 };
 

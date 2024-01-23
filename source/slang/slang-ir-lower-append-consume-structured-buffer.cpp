@@ -31,6 +31,8 @@ namespace Slang
         auto counterBufferKey = builder.createStructKey();
         builder.addNameHintDecoration(counterBufferKey, UnownedStringSlice("counter"));
 
+        builder.addDecoration(elementBufferKey, kIROp_CounterBufferDecoration, counterBufferKey);
+
         auto elementBufferType = builder.getType(kIROp_HLSLRWStructuredBufferType, elementType);
         auto counterBufferType = builder.getType(kIROp_HLSLRWStructuredBufferType, builder.getIntType());
 
