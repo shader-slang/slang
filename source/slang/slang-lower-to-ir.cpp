@@ -5698,10 +5698,28 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
             // Now we want to `break` if the loop condition is false,
             // otherwise we will jump back to the head of the loop.
-            builder->emitLoopTest(
+            // 
+            // We need to make sure not to reuse the break block of the loop as
+            // the break/merge block of the ifelse test.
+            // Therefore, we introduce a separate merge block for the loop test.
+            // 
+            // Emit the following structure:
+            // 
+            // [merge(mergeBlock)]
+            // if (cond) goto loopHead;
+            // else goto mergeBlock;
+            // 
+            // mergeBlock:
+            //   goto breakLabel;
+            auto mergeBlock = builder->emitBlock();
+            builder->emitBranch(breakLabel);
+
+            builder->setInsertInto(testLabel);
+            builder->emitIfElse(
                 irCondition,
                 loopHead,
-                breakLabel);
+                mergeBlock,
+                mergeBlock);
         }
 
         // Finally we insert the label that a `break` will jump to
