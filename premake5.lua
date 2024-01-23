@@ -1593,6 +1593,7 @@ if enableEmbedStdLib then
             "prelude/slang-cpp-prelude.h.cpp",
             "prelude/slang-cpp-host-prelude.h.cpp",
             "prelude/slang-torch-prelude.h.cpp",
+            "source/slang/slang-lookup-glslstd450.cpp",
             "source/slang/slang-lookup-capability-defs.cpp"
         }
         if not targetInfo.isWindows then
