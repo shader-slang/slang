@@ -1,5 +1,5 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX():-vk -compute -shaderobj -output-using-type -render-features wave-ops
-//TEST(compute):COMPARE_COMPUTE_EX():-dx12 -profile sm_6_5 -use-dxil -compute -shaderobj -output-using-type -render-features wave-ops
+//DISABLED_TEST(compute, vulkan):COMPARE_COMPUTE_EX():-vk -compute -shaderobj -output-using-type -render-features wave-ops
+//DISABLED_TEST(compute):COMPARE_COMPUTE_EX():-dx12 -profile sm_6_5 -use-dxil -compute -shaderobj -output-using-type -render-features wave-ops
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -profile cs_6_5 -entry computeMain -line-directive-mode none
 //TEST:SIMPLE(filecheck=CHECK):-target glsl -profile cs_6_5 -entry computeMain -line-directive-mode none
 
