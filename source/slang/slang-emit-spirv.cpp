@@ -4398,7 +4398,7 @@ struct SPIRVEmitContext
             opCode = isSigned ? SpvOpSRem : SpvOpUMod;
             break;
         case kIROp_FRem:
-            opCode = SpvOpFMod;
+            opCode = SpvOpFRem;
             break;
         case kIROp_Less:
             opCode = isFloatingPoint ? SpvOpFOrdLessThan
