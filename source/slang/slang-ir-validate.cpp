@@ -4,6 +4,7 @@
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-dominators.h"
+#include "slang-ir-util.h"
 
 namespace Slang
 {
@@ -144,13 +145,7 @@ namespace Slang
 
         auto operandParent = operandValue->getParent();
 
-        auto instParentBlock = as<IRBlock>(instParent);
-        if (!instParentBlock && as<IRDecoration>(inst))
-        {
-            instParent = instParent->getParent();
-            instParentBlock = as<IRBlock>(instParent);
-        }
-
+        auto instParentBlock = getBlock(inst);
         if (instParentBlock)
         {
             if (auto operandParentBlock = as<IRBlock>(operandParent))

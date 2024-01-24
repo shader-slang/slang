@@ -217,7 +217,7 @@ IRInst* findWitnessTableEntry(IRWitnessTable* table, IRInst* key);
 
 IRInst* getVulkanPayloadLocation(IRInst* payloadGlobalVar);
 
-void moveParams(IRBlock* dest, IRBlock* src);
+IRInst* getInstInBlock(IRInst* inst);
 
 void removePhiArgs(IRInst* phiParam);
 
@@ -233,6 +233,10 @@ IRPtrTypeBase* isMutablePointerType(IRInst* inst);
 
 void initializeScratchData(IRInst* inst);
 void resetScratchDataBit(IRInst* inst, int bitIndex);
+///
+/// IRBlock related common helper methods 
+///
+void moveParams(IRBlock* dest, IRBlock* src);
 
 List<IRBlock*> collectBlocksInRegion(
     IRDominatorTree* dom,
@@ -264,6 +268,12 @@ List<IRBlock*> collectBlocksInRegion(IRGlobalValueWithCode* func,  IRLoop* loopI
 List<IRBlock*> collectBlocksInRegion(IRGlobalValueWithCode* func,  IRLoop* loopInst);
 
 HashSet<IRBlock*> getParentBreakBlockSet(IRDominatorTree* dom, IRBlock* block);
+
+IRBlock* getBlock(IRInst* inst);
+
+///
+/// End of IRBlock utility methods
+///
 
 IRVarLayout* findVarLayout(IRInst* value);
 
