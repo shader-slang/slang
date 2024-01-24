@@ -1836,6 +1836,14 @@ struct SPIRVEmitContext
                     varInst,
                     SpvLiteralInteger::from32(int32_t(index))
                 );
+                if (space != 0)
+                {
+                    emitOpDecorateIndex(
+                        getSection(SpvLogicalSectionID::Annotations),
+                        nullptr,
+                        varInst,
+                        SpvLiteralInteger::from32(int32_t(space)));
+                }
                 break;
             case LayoutResourceKind::VaryingOutput:
                 emitOpDecorateLocation(
@@ -1844,6 +1852,14 @@ struct SPIRVEmitContext
                     varInst,
                     SpvLiteralInteger::from32(int32_t(index))
                 );
+                if (space != 0)
+                {
+                    emitOpDecorateIndex(
+                        getSection(SpvLogicalSectionID::Annotations),
+                        nullptr,
+                        varInst,
+                        SpvLiteralInteger::from32(int32_t(space)));
+                }
                 break;
 
             case LayoutResourceKind::SpecializationConstant:
@@ -1988,6 +2004,7 @@ struct SPIRVEmitContext
         if(layout)
             emitVarLayout(globalVar, varInst, layout);
         maybeEmitName(varInst, globalVar);
+        emitDecorations(globalVar, getID(varInst));
         return varInst;
     }
 
@@ -2743,10 +2760,6 @@ struct SPIRVEmitContext
                     default:
                         break;
                     }
-                    if (entryPointDecor->getProfile().getStage() == Stage::Fragment)
-                    {
-                        maybeEmitEntryPointDepthReplacingExecutionMode(entryPoint, referencedBuiltinIRVars);
-                    }
                 }
                 // Add remaining builtin variables that does not have a corresponding IR global var/param.
                 // These variables could be added from SPIRV ASM blocks.
@@ -2769,7 +2782,19 @@ struct SPIRVEmitContext
                 {
                 case Stage::Fragment:
                     //OpExecutionMode %main OriginUpperLeft
-                    emitInst(getSection(SpvLogicalSectionID::ExecutionModes), nullptr, SpvOpExecutionMode, dstID, SpvExecutionModeOriginUpperLeft);
+                    emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), nullptr, dstID, SpvExecutionModeOriginUpperLeft);
+                    maybeEmitEntryPointDepthReplacingExecutionMode(entryPoint, referencedBuiltinIRVars);
+                    for (auto decor : entryPoint->getDecorations())
+                    {
+                        switch (decor->getOp())
+                        {
+                        case kIROp_EarlyDepthStencilDecoration:
+                            emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), nullptr, dstID, SpvExecutionModeEarlyFragmentTests);
+                            break;
+                        default:
+                            break;
+                        }
+                    }
                     break;
                 case Stage::Geometry:
                     requireSPIRVCapability(SpvCapabilityGeometry);
@@ -2787,7 +2812,6 @@ struct SPIRVEmitContext
                 }
             }
             break;
-
         // > OpExecutionMode
 
         // [3.6. Execution Mode]: LocalSize
@@ -2937,6 +2961,12 @@ struct SPIRVEmitContext
                 dstID,
                 SpvLiteralInteger::from32(int32_t(getIntVal(decoration->getOperand(0)))));
             break;
+        case kIROp_GloballyCoherentDecoration:
+            emitOpDecorate(getSection(SpvLogicalSectionID::Annotations),
+                               decoration,
+                               dstID,
+                               SpvDecorationCoherent);
+            break;
         // ...
         }
 
@@ -3007,14 +3037,40 @@ struct SPIRVEmitContext
         int32_t id = 0;
         for (auto field : structType->getFields())
         {
-            if (auto fieldNameDecor = field->getKey()->findDecoration<IRNameHintDecoration>())
+            for (auto decor : field->getKey()->getDecorations())
             {
-                emitOpMemberName(
-                    getSection(SpvLogicalSectionID::DebugNames),
-                    nullptr,
-                    spvStructID,
-                    id,
-                    fieldNameDecor->getName());
+                if (auto fieldNameDecor = as<IRNameHintDecoration>(decor))
+                {
+                    emitOpMemberName(
+                        getSection(SpvLogicalSectionID::DebugNames),
+                        nullptr,
+                        spvStructID,
+                        id,
+                        fieldNameDecor->getName());
+                }
+                else if (as<IRGloballyCoherentDecoration>(decor))
+                {
+                    emitOpMemberDecorate(
+                        getSection(SpvLogicalSectionID::Annotations),
+                        decor,
+                        spvStructID,
+                        SpvLiteralInteger::from32(id),
+                        SpvDecorationCoherent
+                    );
+                }
+                else if (auto semanticDecor = field->getKey()->findDecoration<IRSemanticDecoration>())
+                {
+                    if (shouldEmitSPIRVReflectionInfo())
+                    {
+                        emitOpMemberDecorateString(
+                            getSection(SpvLogicalSectionID::Annotations),
+                            nullptr,
+                            spvStructID,
+                            SpvLiteralInteger::from32(id),
+                            SpvDecorationUserSemantic,
+                            semanticDecor->getSemanticName());
+                    }
+                }
             }
 
             IRIntegerValue offset = 0;
@@ -3089,19 +3145,6 @@ struct SPIRVEmitContext
                     spvStructID,
                     SpvLiteralInteger::from32(id),
                     SpvLiteralInteger::from32((int32_t)matrixStride));
-            }
-            if (shouldEmitSPIRVReflectionInfo())
-            {
-                if (auto semanticDecor = field->getKey()->findDecoration<IRSemanticDecoration>())
-                {
-                    emitOpMemberDecorateString(
-                        getSection(SpvLogicalSectionID::Annotations),
-                        nullptr,
-                        spvStructID,
-                        SpvLiteralInteger::from32(id),
-                        SpvDecorationUserSemantic,
-                        semanticDecor->getSemanticName());
-                }
             }
             id++;
         }

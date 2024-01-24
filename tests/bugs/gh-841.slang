@@ -1,6 +1,5 @@
 // gh-841.slang
 
-//TEST:CROSS_COMPILE: -profile ps_5_0 -entry main -target spirv-assembly
 //TEST:CROSS_COMPILE(filecheck=SPV): -profile ps_5_0 -entry main -target spirv-assembly
 //TEST:CROSS_COMPILE(filecheck=GLSL): -profile ps_5_0 -entry main -target glsl
 

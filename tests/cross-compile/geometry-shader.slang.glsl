@@ -5,11 +5,11 @@
 #define RasterVertex RasterVertex_0
 #define CoarseVertex CoarseVertex_0
 
-#define input_position  _S1
-#define input_color     _S2
-#define input_id        _S3
-#define output_position _S4
-#define output_color    _S5
+#define input_position  coarseVertices_position_0
+#define input_color     coarseVertices_color_0
+#define input_id        coarseVertices_id_0
+#define output_position outputStream_position_0
+#define output_color    outputStream_color_0
 
 layout(row_major) uniform;
 layout(row_major) buffer;

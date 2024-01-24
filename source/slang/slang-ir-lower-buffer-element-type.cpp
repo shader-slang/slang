@@ -515,7 +515,7 @@ namespace Slang
                     elementType = constBuffer->getElementType();
                 if (as<IRTextureBufferType>(globalInst))
                     continue;
-                if (!as<IRStructType>(elementType) && !as<IRMatrixType>(elementType) && !as<IRArrayType>(elementType))
+                if (!as<IRStructType>(elementType) && !as<IRMatrixType>(elementType) && !as<IRArrayType>(elementType) && !as<IRBoolType>(elementType))
                     continue;
                 bufferTypeInsts.add(BufferTypeInfo{ (IRType*)globalInst, elementType });
             }
