@@ -12,7 +12,7 @@ foreach(input ${SLANG_PRELUDE_HEADERS})
     add_custom_command(
         OUTPUT ${output}
         COMMAND slang-embed "${input}" ${output}
-        DEPENDS ${input}
+        DEPENDS ${input} slang-embed
         VERBATIM
     )
     list(APPEND SLANG_PRELUDE_SOURCE ${output})
