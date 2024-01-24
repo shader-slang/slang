@@ -1836,6 +1836,14 @@ struct SPIRVEmitContext
                     varInst,
                     SpvLiteralInteger::from32(int32_t(index))
                 );
+                if (space != 0)
+                {
+                    emitOpDecorateIndex(
+                        getSection(SpvLogicalSectionID::Annotations),
+                        nullptr,
+                        varInst,
+                        SpvLiteralInteger::from32(int32_t(space)));
+                }
                 break;
             case LayoutResourceKind::VaryingOutput:
                 emitOpDecorateLocation(
@@ -1844,6 +1852,14 @@ struct SPIRVEmitContext
                     varInst,
                     SpvLiteralInteger::from32(int32_t(index))
                 );
+                if (space != 0)
+                {
+                    emitOpDecorateIndex(
+                        getSection(SpvLogicalSectionID::Annotations),
+                        nullptr,
+                        varInst,
+                        SpvLiteralInteger::from32(int32_t(space)));
+                }
                 break;
 
             case LayoutResourceKind::SpecializationConstant:
@@ -2744,10 +2760,10 @@ struct SPIRVEmitContext
                     default:
                         break;
                     }
-                    if (entryPointDecor->getProfile().getStage() == Stage::Fragment)
-                    {
-                        maybeEmitEntryPointDepthReplacingExecutionMode(entryPoint, referencedBuiltinIRVars);
-                    }
+                }
+                if (entryPointDecor->getProfile().getStage() == Stage::Fragment)
+                {
+                    maybeEmitEntryPointDepthReplacingExecutionMode(entryPoint, referencedBuiltinIRVars);
                 }
                 // Add remaining builtin variables that does not have a corresponding IR global var/param.
                 // These variables could be added from SPIRV ASM blocks.

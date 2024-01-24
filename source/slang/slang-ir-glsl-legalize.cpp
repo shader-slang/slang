@@ -1023,7 +1023,8 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     UInt                        bindingIndex,
     UInt                        bindingSpace,
     GlobalVaryingDeclarator*    declarator,
-    IRInst*                     leafVar)
+    IRInst*                     leafVar,
+    StringBuilder&              nameHintSB)
 {
     // Check if we have a system value on our hands.
     GLSLSystemValueInfo systemValueInfoStorage;
@@ -1199,6 +1200,10 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
 
     auto globalParam = addGlobalParam(builder->getModule(), paramType);
     moveValueBefore(globalParam, builder->getFunc());
+    if (nameHintSB.getLength())
+    {
+        builder->addNameHintDecoration(globalParam, nameHintSB.getUnownedSlice());
+    }
 
     ScalarizedVal val = isOutput ? ScalarizedVal::address(globalParam) : ScalarizedVal::value(globalParam);
 
@@ -1239,7 +1244,8 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
     UInt                        bindingIndex,
     UInt                        bindingSpace,
     GlobalVaryingDeclarator*    declarator,
-    IRInst*                     leafVar)
+    IRInst*                     leafVar,
+    StringBuilder&              nameHintSB)
 {
     if (as<IRVoidType>(type))
     {
@@ -1250,14 +1256,14 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
         return createSimpleGLSLGlobalVarying(
             context,
             codeGenContext,
-            builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator, leafVar);
+            builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator, leafVar, nameHintSB);
     }
     else if( as<IRVectorType>(type) )
     {
         return createSimpleGLSLGlobalVarying(
             context,
             codeGenContext,
-            builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator, leafVar);
+            builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator, leafVar, nameHintSB);
     }
     else if( as<IRMatrixType>(type) )
     {
@@ -1265,7 +1271,7 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
         return createSimpleGLSLGlobalVarying(
             context,
             codeGenContext,
-            builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator, leafVar);
+            builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator, leafVar, nameHintSB);
     }
     else if( auto arrayType = as<IRArrayType>(type) )
     {
@@ -1294,7 +1300,8 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
             bindingIndex,
             bindingSpace,
             &arrayDeclarator,
-            leafVar);
+            leafVar,
+            nameHintSB);
     }
     else if( auto meshOutputType = as<IRMeshOutputType>(type))
     {
@@ -1337,7 +1344,8 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
             bindingIndex,
             bindingSpace,
             &arrayDeclarator,
-            leafVar);
+            leafVar,
+            nameHintSB);
     }
     else if( auto streamType = as<IRHLSLStreamOutputType>(type))
     {
@@ -1358,7 +1366,8 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
             bindingIndex,
             bindingSpace,
             declarator,
-            leafVar);
+            leafVar,
+            nameHintSB);
     }
     else if(auto structType = as<IRStructType>(type))
     {
@@ -1394,6 +1403,8 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
         // Okay, we want to walk through the fields here, and
         // generate one variable for each.
         UInt fieldCounter = 0;
+        auto nameSBLength = nameHintSB.getLength();
+
         for(auto field : structType->getFields())
         {
             UInt fieldIndex = fieldCounter++;
@@ -1407,7 +1418,13 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
                 fieldBindingIndex += fieldResInfo->getOffset();
                 fieldBindingSpace += fieldResInfo->getSpace();
             }
-
+            nameHintSB.reduceLength(nameSBLength);
+            if (auto fieldNameHint = field->getKey()->findDecoration<IRNameHintDecoration>())
+            {
+                if (nameHintSB.getLength() != 0)
+                    nameHintSB << ".";
+                nameHintSB << fieldNameHint->getName();
+            }
             auto fieldVal = createGLSLGlobalVaryingsImpl(
                 context,
                 codeGenContext,
@@ -1420,7 +1437,8 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
                 fieldBindingIndex,
                 fieldBindingSpace,
                 declarator,
-                field);
+                field,
+                nameHintSB);
             if (fieldVal.flavor != ScalarizedVal::Flavor::none)
             {
                 ScalarizedTupleValImpl::Element element;
@@ -1438,7 +1456,7 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
     return createSimpleGLSLGlobalVarying(
         context,
         codeGenContext,
-        builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator, leafVar);
+        builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator, leafVar, nameHintSB);
 }
 
 ScalarizedVal createGLSLGlobalVaryings(
@@ -1458,10 +1476,15 @@ ScalarizedVal createGLSLGlobalVaryings(
         bindingIndex = rr->getOffset();
         bindingSpace = rr->getSpace();
     }
+    StringBuilder namehintSB;
+    if (auto nameHint = leafVar->findDecoration<IRNameHintDecoration>())
+    {
+        namehintSB << nameHint->getName();
+    }
     return createGLSLGlobalVaryingsImpl(
         context,
         codeGenContext,
-        builder, type, layout, layout->getTypeLayout(), kind, stage, bindingIndex, bindingSpace, nullptr, leafVar);
+        builder, type, layout, layout->getTypeLayout(), kind, stage, bindingIndex, bindingSpace, nullptr, leafVar, namehintSB);
 }
 
 ScalarizedVal extractField(
