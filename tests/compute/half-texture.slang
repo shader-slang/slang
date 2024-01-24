@@ -26,14 +26,14 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     half2 h2 = halfTexture2.Sample(s, uv);
     half4 h4 = halfTexture4.Sample(s, uv);
 #else
-    // CHECK: OpImageRead
-    // CHECK: OpFConvert %half
+    // CHECK: {{.*}} = OpImageRead
+    // CHECK: {{.*}} = OpFConvert %half
     half h = halfTexture[pos2];
-    // CHECK: OpImageRead
-    // CHECK: OpFConvert %half
+    // CHECK: {{.*}} = OpImageRead
+    // CHECK: {{.*}} = OpFConvert %v2half
     half2 h2 = halfTexture2[pos2];
-    // CHECK: OpImageRead
-    // CHECK: OpFConvert %half
+    // CHECK: {{.*}} = OpImageRead
+    // CHECK: {{.*}} = OpFConvert %v4half
     half4 h4 = halfTexture4[pos2];
 #endif
     // Store a results
