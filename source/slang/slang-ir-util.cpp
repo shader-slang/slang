@@ -1020,21 +1020,14 @@ IRInst* getVulkanPayloadLocation(IRInst* payloadGlobalVar)
     return location;
 }
 
-void moveParams(IRBlock* dest, IRBlock* src)
+IRInst* getInstInBlock(IRInst* inst)
 {
-    for (auto param = src->getFirstChild(); param;)
-    {
-        auto nextInst = param->getNextInst();
-        if (as<IRDecoration>(param) || as<IRParam, IRDynamicCastBehavior::NoUnwrap>(param))
-        {
-            param->insertAtEnd(dest);
-        }
-        else
-        {
-            break;
-        }
-        param = nextInst;
-    }
+    SLANG_RELEASE_ASSERT(inst);
+
+    if (const auto block = as<IRBlock>(inst->getParent()))
+        return inst;
+
+    return getInstInBlock(inst->getParent());
 }
 
 void removePhiArgs(IRInst* phiParam)
@@ -1216,6 +1209,26 @@ void resetScratchDataBit(IRInst* inst, int bitIndex)
     }
 }
 
+///
+/// IRBlock related common helper methods 
+///
+void moveParams(IRBlock* dest, IRBlock* src)
+{
+    for (auto param = src->getFirstChild(); param;)
+    {
+        auto nextInst = param->getNextInst();
+        if (as<IRDecoration>(param) || as<IRParam, IRDynamicCastBehavior::NoUnwrap>(param))
+        {
+            param->insertAtEnd(dest);
+        }
+        else
+        {
+            break;
+        }
+        param = nextInst;
+    }
+}
+
 List<IRBlock*> collectBlocksInRegion(
     IRDominatorTree* dom,
     IRLoop* loop,
@@ -1338,6 +1351,23 @@ List<IRBlock*> collectBlocksInRegion(IRGlobalValueWithCode* func, IRLoop* loopIn
     return collectBlocksInRegion(dom, loopInst, &hasMultiLevelBreaks);
 }
 
+IRBlock* getBlock(IRInst* inst)
+{
+    if (!inst)
+        return nullptr;
+
+    while (inst)
+    {
+        if (auto block = as<IRBlock>(inst))
+            return block;
+        inst = inst->getParent();
+    }
+    return nullptr;
+}
+
+///
+/// End of IRBlock utility methods
+///
 IRVarLayout* findVarLayout(IRInst* value)
 {
     if (auto layoutDecoration = value->findDecoration<IRLayoutDecoration>())
@@ -1548,5 +1578,6 @@ IRType* dropNormAttributes(IRType* const t)
     }
     return t;
 }
+
 
 }
