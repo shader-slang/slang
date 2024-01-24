@@ -5695,6 +5695,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         {
             auto irCondition = getSimpleVal(context,
                 lowerRValueExpr(context, condExpr));
+            auto invCondition = builder->emitNot(irCondition->getDataType(), irCondition);
 
             // Now we want to `break` if the loop condition is false,
             // otherwise we will jump back to the head of the loop.
@@ -5712,12 +5713,12 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             // mergeBlock:
             //   goto breakLabel;
             auto mergeBlock = builder->emitBlock();
-            builder->emitBranch(breakLabel);
+            builder->emitBranch(loopHead);
 
             builder->setInsertInto(testLabel);
             builder->emitIfElse(
-                irCondition,
-                loopHead,
+                invCondition,
+                breakLabel,
                 mergeBlock,
                 mergeBlock);
         }
