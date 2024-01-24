@@ -2761,10 +2761,6 @@ struct SPIRVEmitContext
                         break;
                     }
                 }
-                if (entryPointDecor->getProfile().getStage() == Stage::Fragment)
-                {
-                    maybeEmitEntryPointDepthReplacingExecutionMode(entryPoint, referencedBuiltinIRVars);
-                }
                 // Add remaining builtin variables that does not have a corresponding IR global var/param.
                 // These variables could be added from SPIRV ASM blocks.
                 for (auto builtinVar : m_builtinGlobalVars)
@@ -2786,7 +2782,19 @@ struct SPIRVEmitContext
                 {
                 case Stage::Fragment:
                     //OpExecutionMode %main OriginUpperLeft
-                    emitInst(getSection(SpvLogicalSectionID::ExecutionModes), nullptr, SpvOpExecutionMode, dstID, SpvExecutionModeOriginUpperLeft);
+                    emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), nullptr, dstID, SpvExecutionModeOriginUpperLeft);
+                    maybeEmitEntryPointDepthReplacingExecutionMode(entryPoint, referencedBuiltinIRVars);
+                    for (auto decor : entryPoint->getDecorations())
+                    {
+                        switch (decor->getOp())
+                        {
+                        case kIROp_EarlyDepthStencilDecoration:
+                            emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), nullptr, dstID, SpvExecutionModeEarlyFragmentTests);
+                            break;
+                        default:
+                            break;
+                        }
+                    }
                     break;
                 case Stage::Geometry:
                     requireSPIRVCapability(SpvCapabilityGeometry);
@@ -2804,7 +2812,6 @@ struct SPIRVEmitContext
                 }
             }
             break;
-
         // > OpExecutionMode
 
         // [3.6. Execution Mode]: LocalSize
