@@ -2123,6 +2123,10 @@ SlangResult LanguageServer::runCommand(Command& call)
         {
             return formatting(call.formattingArgs.get(), call.id);
         }
+        else if (call.method == "NotificationReceived")
+        {
+            return SLANG_OK;
+        }
     }
     catch (...)
     {
