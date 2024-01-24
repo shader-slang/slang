@@ -152,6 +152,7 @@ glob_append(
     premake_generated_files
     "source/slang/*.meta.slang.h"
     "source/slang/*-generated-*.h"
+    "source/slang/slang-lookup-*.cpp"
 )
 if(premake_generated_files)
     file(REMOVE ${premake_generated_files})
@@ -277,7 +278,12 @@ add_subdirectory(source/slang)
 slang_add_target(
     tools/slangd
     EXECUTABLE
-    LINK_WITH_PRIVATE core slang slang-reflect-headers slang-capability-defs Threads::Threads
+    LINK_WITH_PRIVATE
+        core
+        slang
+        slang-reflect-headers
+        slang-capability-defs
+        Threads::Threads
     INSTALL
 )
 slang_add_target(
