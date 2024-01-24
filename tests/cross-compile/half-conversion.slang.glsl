@@ -31,10 +31,10 @@ vec4 f16tof32_0(uvec4 value_0)
 }
 
 layout(location = 0)
-out vec4 _S2;
+out vec4 main_0;
 
 void main()
 {
-    _S2 = f16tof32_0(C_0.u_0);
+    main_0 = f16tof32_0(C_0.u_0);
     return;
 }

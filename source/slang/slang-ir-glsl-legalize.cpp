@@ -1200,10 +1200,6 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
 
     auto globalParam = addGlobalParam(builder->getModule(), paramType);
     moveValueBefore(globalParam, builder->getFunc());
-    if (nameHintSB.getLength())
-    {
-        builder->addNameHintDecoration(globalParam, nameHintSB.getUnownedSlice());
-    }
 
     ScalarizedVal val = isOutput ? ScalarizedVal::address(globalParam) : ScalarizedVal::value(globalParam);
 
@@ -1224,6 +1220,13 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
 
                 val = ScalarizedVal::typeAdapter(typeAdapter);
             }
+        }
+    }
+    else
+    {
+        if (nameHintSB.getLength())
+        {
+            builder->addNameHintDecoration(globalParam, nameHintSB.getUnownedSlice());
         }
     }
 

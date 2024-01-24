@@ -21,11 +21,11 @@ layout(binding = 1)
 uniform sampler s_0;
 
 layout(location = 0)
-out vec4 _S2;
+out vec4 main_0;
 
 void main()
 {
-    _S2 = (texture(sampler2D(t_0[C_0.index_0],s_0), (C_0.uv_0)));
+    main_0 = (texture(sampler2D(t_0[C_0.index_0],s_0), (C_0.uv_0)));
     return;
 }
 
