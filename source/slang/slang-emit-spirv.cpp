@@ -2557,6 +2557,99 @@ struct SPIRVEmitContext
         }
     }
 
+
+    SpvExecutionMode isDepthOutput(IRInst* builtinVar)
+    {
+        SpvExecutionMode result = SpvExecutionModeMax;
+        bool isDepthVar = false;
+        if (auto layout = getVarLayout(builtinVar))
+        {
+            if (auto systemValueAttr = layout->findAttr<IRSystemValueSemanticAttr>())
+            {
+                String semanticName = systemValueAttr->getName();
+                semanticName = semanticName.toLower();
+                if (semanticName == "sv_position")
+                {
+                    auto importDecor = builtinVar->findDecoration<IRImportDecoration>();
+                    if (importDecor->getMangledName() == "gl_FragCoord")
+                    {
+                        isDepthVar = true;
+                        result = SpvExecutionModeDepthReplacing;
+                    }
+                }
+                else if (semanticName == "sv_depth")
+                {
+                    isDepthVar = true;
+                    result = SpvExecutionModeDepthReplacing;
+                }
+                else if (semanticName == "sv_depthgreaterequal")
+                {
+                    isDepthVar = true;
+                    result = SpvExecutionModeDepthGreater;
+                }
+                else if (semanticName == "sv_depthlessequal")
+                {
+                    isDepthVar = true;
+                    result = SpvExecutionModeDepthLess;
+                }
+            }
+        }
+        if (!isDepthVar)
+            return result;
+        for (auto use = builtinVar->firstUse; use; use = use->nextUse)
+        {
+            auto user = use->getUser();
+            if (user->getOp() == kIROp_Load)
+                continue;
+            if (as<IRDecoration>(user))
+                continue;
+            switch (user->getOp())
+            {
+            case kIROp_SwizzledStore:
+            case kIROp_Store:
+                return result;
+            }
+        }
+        return result;
+    }
+
+    void maybeEmitEntryPointDepthReplacingExecutionMode(
+        IRFunc* entryPoint,
+        const List<IRInst*>& referencedBuiltinIRVars)
+    {
+        // Check if the entrypoint uses any depth output builtin variables,
+        // if so, we need to emit a DepthReplacing execution mode for the
+        // fragment entrypoint.
+        bool needDepthReplacingMode = false;
+        SpvExecutionMode mode = SpvExecutionModeMax;
+        for (auto globalInst : referencedBuiltinIRVars)
+        {
+            if (auto thisMode = isDepthOutput(globalInst))
+            {
+                needDepthReplacingMode = true;
+                if (mode == SpvExecutionModeMax)
+                    mode = thisMode;
+                else if (mode != thisMode)
+                    mode = SpvExecutionModeDepthReplacing;
+                break;
+            }
+        }
+        if (!needDepthReplacingMode)
+            return;
+        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes),
+            nullptr,
+            entryPoint,
+            SpvExecutionModeDepthReplacing);
+        if (mode != SpvExecutionModeDepthReplacing &&
+            mode != SpvExecutionModeMax)
+        {
+            emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes),
+                nullptr,
+                entryPoint,
+                mode);
+        }
+    }
+
         /// Emit an appropriate SPIR-V decoration for the given IR `decoration`, if necessary and possible.
         ///
         /// The given `dstID` should be the `<id>` of the SPIR-V instruction being decorated,
@@ -2624,6 +2717,7 @@ struct SPIRVEmitContext
                 auto name = entryPointDecor->getName()->getStringSlice();
                 List<SpvInst*> params;
                 HashSet<SpvInst*> paramsSet;
+                List<IRInst*> referencedBuiltinIRVars;
                 // `interface` part: reference all global variables that are used by this entrypoint.
                 for (auto globalInst : m_irModule->getModuleInst()->getChildren())
                 {
@@ -2641,6 +2735,7 @@ struct SPIRVEmitContext
                             {
                                 paramsSet.add(spvGlobalInst);
                                 params.add(spvGlobalInst);
+                                referencedBuiltinIRVars.add(globalInst);
                             }
                         }
                         break;
@@ -2648,8 +2743,11 @@ struct SPIRVEmitContext
                     default:
                         break;
                     }
+                    if (entryPointDecor->getProfile().getStage() == Stage::Fragment)
+                    {
+                        maybeEmitEntryPointDepthReplacingExecutionMode(entryPoint, referencedBuiltinIRVars);
+                    }
                 }
-
                 // Add remaining builtin variables that does not have a corresponding IR global var/param.
                 // These variables could be added from SPIRV ASM blocks.
                 for (auto builtinVar : m_builtinGlobalVars)
@@ -4398,7 +4496,7 @@ struct SPIRVEmitContext
             opCode = isSigned ? SpvOpSRem : SpvOpUMod;
             break;
         case kIROp_FRem:
-            opCode = SpvOpFMod;
+            opCode = SpvOpFRem;
             break;
         case kIROp_Less:
             opCode = isFloatingPoint ? SpvOpFOrdLessThan

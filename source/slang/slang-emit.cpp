@@ -933,7 +933,7 @@ Result linkAndOptimizeIR(
 
     if (isKhronosTarget(targetRequest) && targetRequest->shouldEmitSPIRVDirectly())
     {
-        performIntrinsicFunctionFunctionInlining(irModule);
+        performIntrinsicFunctionInlining(irModule);
         eliminateDeadCode(irModule);
     }
     eliminateMultiLevelBreak(irModule);

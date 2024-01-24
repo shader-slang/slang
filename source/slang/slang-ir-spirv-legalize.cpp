@@ -19,6 +19,7 @@
 #include "slang-ir-simplify-cfg.h"
 #include "slang-ir-peephole.h"
 #include "slang-ir-redundancy-removal.h"
+#include "slang-ir-loop-unroll.h"
 
 namespace Slang
 {
@@ -1125,23 +1126,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         //       - the back-edge block must structurally post dominate the
         //         Continue Target
 
-        // If the continue block has only a single predecessor, pretend like it
-        // is just ordinary control flow
-        //
-        // TODO: could this fail in cases like this, where it had a single
-        // predecessor, but it's still nested inside a region?
-        // do{
-        //   if(x)
-        //     continue;
-        //   unreachable
-        // } while(foo)
+        // By this point, we should have already eliminated all continue jumps and
+        // turned them into a break jump. So all loop insts should satisfy
+        // continueBlock == targetBlock.
         const auto t = loop->getTargetBlock();
         auto c = loop->getContinueBlock();
-        if(c->getPredecessors().getCount() <= 1)
-        {
-            c = t;
-            loop->continueBlock.set(c);
-        }
 
         // Our IR allows multiple back-edges to a loop header if this is also
         // the loop continue block. SPIR-V does not so replace them with a
@@ -1565,6 +1554,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             case kIROp_SPIRVAsm:
                 processSPIRVAsm(as<IRSPIRVAsm>(inst));
                 break;
+            case kIROp_Func:
+                eliminateContinueBlocksInFunc(m_module, as<IRFunc>(inst));
+                [[fallthrough]];
             default:
                 for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
                 {
@@ -1826,7 +1818,10 @@ void simplifyIRForSpirvLegalization(TargetRequest* target, DiagnosticSink* sink,
                 funcChanged |= applySparseConditionalConstantPropagation(func, sink);
                 funcChanged |= peepholeOptimize(target, func);
                 funcChanged |= removeRedundancyInFunc(func);
-                funcChanged |= simplifyCFG(func, CFGSimplificationOptions::getFast());
+                CFGSimplificationOptions options;
+                options.removeTrivialSingleIterationLoops = true;
+                options.removeSideEffectFreeLoops = false;
+                funcChanged |= simplifyCFG(func, options);
                 eliminateDeadCode(func);
             }
         }
