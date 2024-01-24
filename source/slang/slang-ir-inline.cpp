@@ -988,7 +988,7 @@ struct IntrinsicFunctionInliningPass : InliningPassBase
     }
 };
 
-void performIntrinsicFunctionFunctionInlining(IRModule* module)
+void performIntrinsicFunctionInlining(IRModule* module)
 {
     IntrinsicFunctionInliningPass pass(module);
     bool changed = true;
