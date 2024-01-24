@@ -1988,6 +1988,7 @@ struct SPIRVEmitContext
         if(layout)
             emitVarLayout(globalVar, varInst, layout);
         maybeEmitName(varInst, globalVar);
+        emitDecorations(globalVar, getID(varInst));
         return varInst;
     }
 
@@ -2937,6 +2938,12 @@ struct SPIRVEmitContext
                 dstID,
                 SpvLiteralInteger::from32(int32_t(getIntVal(decoration->getOperand(0)))));
             break;
+        case kIROp_GloballyCoherentDecoration:
+            emitOpDecorate(getSection(SpvLogicalSectionID::Annotations),
+                               decoration,
+                               dstID,
+                               SpvDecorationCoherent);
+            break;
         // ...
         }
 
@@ -3007,14 +3014,40 @@ struct SPIRVEmitContext
         int32_t id = 0;
         for (auto field : structType->getFields())
         {
-            if (auto fieldNameDecor = field->getKey()->findDecoration<IRNameHintDecoration>())
+            for (auto decor : field->getKey()->getDecorations())
             {
-                emitOpMemberName(
-                    getSection(SpvLogicalSectionID::DebugNames),
-                    nullptr,
-                    spvStructID,
-                    id,
-                    fieldNameDecor->getName());
+                if (auto fieldNameDecor = as<IRNameHintDecoration>(decor))
+                {
+                    emitOpMemberName(
+                        getSection(SpvLogicalSectionID::DebugNames),
+                        nullptr,
+                        spvStructID,
+                        id,
+                        fieldNameDecor->getName());
+                }
+                else if (as<IRGloballyCoherentDecoration>(decor))
+                {
+                    emitOpMemberDecorate(
+                        getSection(SpvLogicalSectionID::Annotations),
+                        decor,
+                        spvStructID,
+                        SpvLiteralInteger::from32(id),
+                        SpvDecorationCoherent
+                    );
+                }
+                else if (auto semanticDecor = field->getKey()->findDecoration<IRSemanticDecoration>())
+                {
+                    if (shouldEmitSPIRVReflectionInfo())
+                    {
+                        emitOpMemberDecorateString(
+                            getSection(SpvLogicalSectionID::Annotations),
+                            nullptr,
+                            spvStructID,
+                            SpvLiteralInteger::from32(id),
+                            SpvDecorationUserSemantic,
+                            semanticDecor->getSemanticName());
+                    }
+                }
             }
 
             IRIntegerValue offset = 0;
@@ -3089,19 +3122,6 @@ struct SPIRVEmitContext
                     spvStructID,
                     SpvLiteralInteger::from32(id),
                     SpvLiteralInteger::from32((int32_t)matrixStride));
-            }
-            if (shouldEmitSPIRVReflectionInfo())
-            {
-                if (auto semanticDecor = field->getKey()->findDecoration<IRSemanticDecoration>())
-                {
-                    emitOpMemberDecorateString(
-                        getSection(SpvLogicalSectionID::Annotations),
-                        nullptr,
-                        spvStructID,
-                        SpvLiteralInteger::from32(id),
-                        SpvDecorationUserSemantic,
-                        semanticDecor->getSemanticName());
-                }
             }
             id++;
         }
