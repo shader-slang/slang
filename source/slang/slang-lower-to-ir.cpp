@@ -5695,13 +5695,32 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         {
             auto irCondition = getSimpleVal(context,
                 lowerRValueExpr(context, condExpr));
+            auto invCondition = builder->emitNot(irCondition->getDataType(), irCondition);
 
             // Now we want to `break` if the loop condition is false,
             // otherwise we will jump back to the head of the loop.
-            builder->emitLoopTest(
-                irCondition,
-                loopHead,
-                breakLabel);
+            // 
+            // We need to make sure not to reuse the break block of the loop as
+            // the break/merge block of the ifelse test.
+            // Therefore, we introduce a separate merge block for the loop test.
+            // 
+            // Emit the following structure:
+            // 
+            // [merge(mergeBlock)]
+            // if (cond) goto loopHead;
+            // else goto mergeBlock;
+            // 
+            // mergeBlock:
+            //   goto breakLabel;
+            auto mergeBlock = builder->emitBlock();
+            builder->emitBranch(loopHead);
+
+            builder->setInsertInto(testLabel);
+            builder->emitIfElse(
+                invCondition,
+                breakLabel,
+                mergeBlock,
+                mergeBlock);
         }
 
         // Finally we insert the label that a `break` will jump to
@@ -8724,7 +8743,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // target, and we need to reflect that at the IR level.
 
             auto targetName = targetMod->targetToken.getContent();
-            auto targetCap = findCapabilityAtom(targetName);
+            auto targetCap = findCapabilityName(targetName);
 
             getBuilder()->addTargetDecoration(inst, CapabilitySet(targetCap));
         }
@@ -8777,8 +8796,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
             else
             {
-                CapabilityAtom targetCap = findCapabilityAtom(targetName);
-                SLANG_ASSERT(targetCap != CapabilityAtom::Invalid);
+                CapabilityName targetCap = findCapabilityName(targetName);
+                SLANG_ASSERT(targetCap != CapabilityName::Invalid);
                 targetCaps = CapabilitySet(targetCap);
             }
 
@@ -8923,7 +8942,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         getBuilder()->addTargetIntrinsicDecoration(
             irInst,
-            CapabilitySet(CapabilityAtom::TEXTUAL_SOURCE),
+            CapabilitySet(CapabilityName::textualTarget),
             definition.getUnownedSlice()
         );
     }

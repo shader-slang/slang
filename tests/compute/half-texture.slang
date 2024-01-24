@@ -1,4 +1,4 @@
-//TEST:CROSS_COMPILE: -target spirv -entry computeMain -profile cs_6_2
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -entry computeMain -profile cs_6_2
 //TEST:CROSS_COMPILE: -target dxil-assembly -entry computeMain -profile cs_6_2
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=16):out
@@ -26,8 +26,14 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     half2 h2 = halfTexture2.Sample(s, uv);
     half4 h4 = halfTexture4.Sample(s, uv);
 #else
-    half  h = halfTexture[pos2];
+    // CHECK: {{.*}} = OpImageRead
+    // CHECK: {{.*}} = OpFConvert %half
+    half h = halfTexture[pos2];
+    // CHECK: {{.*}} = OpImageRead
+    // CHECK: {{.*}} = OpFConvert %v2half
     half2 h2 = halfTexture2[pos2];
+    // CHECK: {{.*}} = OpImageRead
+    // CHECK: {{.*}} = OpFConvert %v4half
     half4 h4 = halfTexture4[pos2];
 #endif
     // Store a results

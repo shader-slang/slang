@@ -14,10 +14,10 @@ layout(std140) uniform _S1
     vec4 param_0;
 } pblock_0;
 layout(location = 0)
-out vec4 _S2;
+out vec4 main_0;
 
 void main()
 {
-    _S2 = pblock_0.param_0;
+    main_0 = pblock_0.param_0;
     return;
 }

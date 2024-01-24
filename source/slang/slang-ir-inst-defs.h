@@ -282,7 +282,9 @@ INST(Block, block, 0, PARENT)
     INST(VoidLit, void_constant, 0, 0)
 INST_RANGE(Constant, BoolLit, VoidLit)
 
-INST(CapabilitySet, capabilitySet, 0, HOISTABLE)
+INST(CapabilityConjunction, capabilityConjunction, 0, HOISTABLE)
+INST(CapabilityDisjunction, capabilityDisjunction, 0, HOISTABLE)
+INST_RANGE(CapabilitySet, CapabilityConjunction, CapabilityDisjunction)
 
 INST(undefined, undefined, 0, 0)
 
@@ -850,6 +852,11 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
 
     INST(SemanticDecoration, semantic, 2, 0)
     INST(PackOffsetDecoration, packoffset, 2, 0)
+
+        // Reflection metadata for a shader parameter that provides the original type name.
+    INST(UserTypeNameDecoration, UserTypeName, 1, 0)
+        // Reflection metadata for a shader parameter that refers to the associated counter buffer of a UAV.
+    INST(CounterBufferDecoration, CounterBuffer, 1, 0)
 
     INST(RequireSPIRVDescriptorIndexingExtensionDecoration, RequireSPIRVDescriptorIndexingExtensionDecoration, 0, 0)
     INST(SPIRVOpDecoration, spirvOpDecoration, 1, 0)

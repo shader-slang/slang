@@ -3,10 +3,10 @@
 #extension GL_EXT_fragment_shader_barycentric : enable
 
 layout(location = 0)
-out vec4 _S1;
+out vec4 main_0;
 
 void main()
 {
-    _S1 = vec4(gl_BaryCoordEXT, float(0));
+    main_0 = vec4(gl_BaryCoordEXT, float(0));
     return;
 }

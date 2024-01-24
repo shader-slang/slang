@@ -28,7 +28,7 @@ struct DllImportContext
         auto funcType = builder.getFuncType(paramCount, paramTypes, resultType);
         builder.setDataType(result, funcType);
         builder.addTargetIntrinsicDecoration(
-            result, CapabilitySet(CapabilityAtom::CPP), targetIntrinsic);
+            result, CapabilitySet(CapabilityName::cpp), targetIntrinsic);
         return result;
     }
 

@@ -18,14 +18,14 @@ layout(binding = 2)
 uniform sampler gTest_s_0;
 
 layout(location = 0)
-out vec4 _S2;
+out vec4 main_0;
 
 layout(location = 0)
-in vec2 _S3;
+in vec2 uv_0;
 
 void main()
 {
-    _S2 = gTest_0.a_0 + (texture(sampler2D(gTest_t_0,gTest_s_0), (_S3)));
+    main_0 = gTest_0.a_0 + (texture(sampler2D(gTest_t_0,gTest_s_0), (uv_0)));
     return;
 }
 

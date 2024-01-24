@@ -9,14 +9,14 @@ layout(binding = 1)
 uniform sampler s_0;
 
 layout(location = 0)
-out vec4 _S1;
+out vec4 main_0;
 
 layout(location = 0)
-in vec3 _S2;
+in vec3 uv_0;
 
 void main()
 {
-    _S1 = (texture(sampler2D(t_0[nonuniformEXT(int(_S2.z))],s_0), (_S2.xy)));
+    main_0 = (texture(sampler2D(t_0[nonuniformEXT(int(uv_0.z))],s_0), (uv_0.xy)));
     return;
 }
 

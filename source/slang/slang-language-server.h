@@ -105,6 +105,7 @@ public:
     SlangResult init(const LanguageServerProtocol::InitializeParams& args);
     SlangResult execute();
     void update();
+    void updateConfigFromJSON(const JSONValue& jsonVal);
     SlangResult didOpenTextDocument(const LanguageServerProtocol::DidOpenTextDocumentParams& args);
     SlangResult didCloseTextDocument(
         const LanguageServerProtocol::DidCloseTextDocumentParams& args);

@@ -1,6 +1,7 @@
 // geometry-shader.slang
 
-//TEST:CROSS_COMPILE: -profile sm_5_0 -stage geometry -entry main -target spirv-assembly
+//TEST:SIMPLE(filecheck=CHECK): -profile sm_5_0 -stage geometry -entry main -target glsl
+//TEST:SIMPLE(filecheck=SPIRV): -profile sm_5_0 -stage geometry -entry main -target spirv
 
 struct CoarseVertex
 {
@@ -15,6 +16,11 @@ struct RasterVertex
     float3 color    : COLOR;
     uint   id       : SV_RenderTargetArrayIndex;
 }
+
+// SPIRV: OpEntryPoint
+// CHECK: void main()
+// CHECK: gl_Layer =
+// CHECK: EmitVertex();
 
 [maxvertexcount(3)]
 void main(

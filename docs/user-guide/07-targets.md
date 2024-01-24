@@ -114,7 +114,7 @@ The only supported way to generate DXBC is by compiling HLSL using the fxc compi
 
 D3D11 exposes two pipelines: rasterization and compute.
 
-The D3D11 rasterization pipeline can include up to five programmable stages, although some of them are optional:
+The D3D11 rasterization pipeline can include up to five programmable stages, although most of them are optional:
 
 * The `vertex` stage (VS) transforms vertex data loaded from memory
 
@@ -124,7 +124,7 @@ The D3D11 rasterization pipeline can include up to five programmable stages, alt
 
 * The optional `geometry` stage  (GS) receives as input a primitive and can produce zero or more new primitives as output
 
-* The `fragment` stage transforms fragments produced by the fixed-function rasterizer, determining the values for those fragments that will be merged with values in zero or more render targets. The fragment stage is sometimes called a "pixel" stage (PS), even when it does not process pixels.
+* The optional `fragment` stage transforms fragments produced by the fixed-function rasterizer, determining the values for those fragments that will be merged with values in zero or more render targets. The fragment stage is sometimes called a "pixel" stage (PS), even when it does not process pixels.
 
 ### Parameter Passing
 

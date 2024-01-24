@@ -25,22 +25,7 @@ namespace Slang
 // the `CapabilityAtom` enumeration, which is generated from declarations
 // in the `slang-capability-defs.h` file.
 //
-enum class CapabilityAtom : int32_t
-{
-    // The "invalid" capability represents an atomic feature that no
-    // platform can/will ever support. If we ever determine that a
-    // function needs the invalid capability, it would be reasonable
-    // to report that situation as an error.
-    //
-    Invalid = 0,
-
-#define SLANG_CAPABILITY_ATOM(ENUMERATOR, NAME, FLAVOR, CONFLICT, RANK, BASE0, BASE1, BASE2, BASE3) \
-    ENUMERATOR,
-
-#include "slang-capability-defs.h"
-
-    Count,
-};
+#include "slang-generated-capability-defs.h"
 
 // Once we have a universe of suitable capability atoms, we can define
 // the capabilities of a target as simply the set of all atomic capabilities
@@ -62,26 +47,31 @@ enum class CapabilityAtom : int32_t
 // In all cases, we represent a set of capabilities with `CapabilitySet`.
 
     /// A set of capabilities, representing features that are either supported or required
-struct CapabilitySet
+struct CapabilityConjunctionSet
 {
 public:
         /// Default-construct an empty capability set
-    CapabilitySet();
+    CapabilityConjunctionSet();
+
+    CapabilityConjunctionSet(CapabilityConjunctionSet const& other) = default;
+    CapabilityConjunctionSet& operator=(CapabilityConjunctionSet const& other) = default;
+    CapabilityConjunctionSet(CapabilityConjunctionSet&& other) = default;
+    CapabilityConjunctionSet& operator=(CapabilityConjunctionSet&& other) = default;
 
         /// Construct a capability set from an explicit list of atomic capabilities
-    CapabilitySet(Int atomCount, CapabilityAtom const* atoms);
+    CapabilityConjunctionSet(Int atomCount, CapabilityAtom const* atoms);
 
         /// Construct a capability set from an explicit list of atomic capabilities
-    explicit CapabilitySet(List<CapabilityAtom> const& atoms);
+    explicit CapabilityConjunctionSet(List<CapabilityAtom> const& atoms);
 
         /// Construct a singleton set from a single atomic capability
-    explicit CapabilitySet(CapabilityAtom atom);
+    explicit CapabilityConjunctionSet(CapabilityAtom atom);
 
         /// Make an empty capability set
-    static CapabilitySet makeEmpty();
+    static CapabilityConjunctionSet makeEmpty();
 
         /// Make an invalid capability set (such that no target could ever support it)
-    static CapabilitySet makeInvalid();
+    static CapabilityConjunctionSet makeInvalid();
 
         /// Is this capability set empty (such that any target supports it)?
     bool isEmpty() const;
@@ -105,7 +95,7 @@ public:
     bool isIncompatibleWith(CapabilityAtom other) const;
 
         /// Is this capability set incompatible with the given `other` atomic capability.
-    bool isIncompatibleWith(CapabilitySet const& other) const;
+    bool isIncompatibleWith(CapabilityConjunctionSet const& other) const;
 
     // One capability set A "implies" another set B if a target that
     // supports A must also support all of B.
@@ -116,7 +106,7 @@ public:
     // and not get hung up on the set theory.
 
         /// Does this capability set imply all the capabilities in `other`?
-    bool implies(CapabilitySet const& other) const;
+    bool implies(CapabilityConjunctionSet const& other) const;
 
         /// Does this capability set imply the atomic capability `other`?
     bool implies(CapabilityAtom other) const;
@@ -124,23 +114,24 @@ public:
     // A capability set is equal to another if each implies the other.
 
         /// Are these two capability sets equal?
-    bool operator==(CapabilitySet const& that) const;
+    bool operator==(CapabilityConjunctionSet const& that) const;
+    bool operator<(CapabilityConjunctionSet const& that) const;
 
         /// Get access to the raw atomic capabilities that define this set.
     List<CapabilityAtom> const& getExpandedAtoms() const { return m_expandedAtoms; }
+    List<CapabilityAtom>& getExpandedAtoms() { return m_expandedAtoms; }
 
         /// Calculate a list of "compacted" atoms, which excludes any atoms from the expanded list that are implies by another item in the list.
     void calcCompactedAtoms(List<CapabilityAtom>& outAtoms) const;
 
-    Int countIntersectionWith(CapabilitySet const& that) const;
+    Int countIntersectionWith(CapabilityConjunctionSet const& that) const;
 
-    bool isBetterForTarget(CapabilitySet const& that, CapabilitySet const& targetCaps);
+    bool isBetterForTarget(CapabilityConjunctionSet const& that, CapabilityConjunctionSet const& targetCaps) const;
 
 private:
     void _init(Int atomCount, CapabilityAtom const* atoms);
 
-    uint32_t _calcConflictMask() const;
-    uint32_t _calcDifferenceScoreWith(CapabilitySet const& other) const;
+    uint32_t _calcDifferenceScoreWith(CapabilityConjunctionSet const& other) const;
 
     // The underlying representation we use is a sorted and deduplicated
     // list of all the (non-alias) atoms that are present in the set.
@@ -151,6 +142,92 @@ private:
 };
 
     /// Are the `left` and `right` capability sets unequal?
+inline bool operator!=(CapabilityConjunctionSet const& left, CapabilityConjunctionSet const& right)
+{
+    return !(left == right);
+}
+
+struct CapabilitySet
+{
+public:
+    /// Default-construct an empty capability set
+    CapabilitySet();
+
+    CapabilitySet(CapabilitySet const& other) = default;
+    CapabilitySet& operator=(CapabilitySet const& other) = default;
+    CapabilitySet(CapabilitySet&& other) = default;
+    CapabilitySet& operator=(CapabilitySet&& other) = default;
+
+    /// Construct a capability set from an explicit list of atomic capabilities
+    CapabilitySet(Int atomCount, CapabilityName const* atoms);
+
+    /// Construct a capability set from an explicit list of atomic capabilities
+    explicit CapabilitySet(List<CapabilityName> const& atoms);
+
+    /// Construct a singleton set from a single atomic capability
+    explicit CapabilitySet(CapabilityName atom);
+
+    /// Construct a singleton set from conjunctions
+    explicit CapabilitySet(const List<CapabilityConjunctionSet>& conjunctions);
+
+    /// Make an empty capability set
+    static CapabilitySet makeEmpty();
+
+    /// Make an invalid capability set (such that no target could ever support it)
+    static CapabilitySet makeInvalid();
+
+    /// Is this capability set empty (such that any target supports it)?
+    bool isEmpty() const;
+
+    /// Is this capability set invalid (such that no target could support it)?
+    bool isInvalid() const;
+
+    /// Is this capability set incompatible with the given `other` set.
+    bool isIncompatibleWith(CapabilityAtom other) const;
+
+    /// Is this capability set incompatible with the given `other` set.
+    bool isIncompatibleWith(CapabilityName other) const;
+
+    /// Is this capability set incompatible with the given `other` atomic capability.
+    bool isIncompatibleWith(CapabilityConjunctionSet const& other) const;
+
+    /// Is this capability set incompatible with the given `other` atomic capability.
+    bool isIncompatibleWith(CapabilitySet const& other) const;
+
+    /// Does this capability set imply all the capabilities in `other`?
+    bool implies(CapabilitySet const& other) const;
+
+    /// Does this capability set imply all the capabilities in `other`?
+    bool implies(CapabilityConjunctionSet const& other) const;
+
+    /// Does this capability set imply the atomic capability `other`?
+    bool implies(CapabilityAtom other) const;
+
+    /// Join two capability sets to form (this & other).
+    void join(const CapabilitySet& other);
+
+        /// Are these two capability sets equal?
+    bool operator==(CapabilitySet const& that) const;
+
+    /// Get access to the raw atomic capabilities that define this set.
+    List<CapabilityConjunctionSet>& getExpandedAtoms() { return m_conjunctions; }
+    const List<CapabilityConjunctionSet>& getExpandedAtoms() const { return m_conjunctions; }
+
+
+    /// Calculate a list of "compacted" atoms, which excludes any atoms from the expanded list that are implies by another item in the list.
+    void calcCompactedAtoms(List<List<CapabilityAtom>>& outAtoms) const;
+
+    bool isBetterForTarget(CapabilitySet const& that, CapabilitySet const& targetCaps) const;
+
+private:
+    // The underlying representation we use is a list of conjunctions.
+    //
+    List<CapabilityConjunctionSet> m_conjunctions;
+
+    void addCapability(CapabilityName name);
+};
+
+/// Are the `left` and `right` capability sets unequal?
 inline bool operator!=(CapabilitySet const& left, CapabilitySet const& right)
 {
     return !(left == right);
@@ -160,9 +237,9 @@ inline bool operator!=(CapabilitySet const& left, CapabilitySet const& right)
 bool isCapabilityDerivedFrom(CapabilityAtom atom, CapabilityAtom base);
 
     /// Find a capability atom with the given `name`, or return CapabilityAtom::Invalid.
-CapabilityAtom findCapabilityAtom(UnownedStringSlice const& name);
+CapabilityName findCapabilityName(UnownedStringSlice const& name);
 
     /// Gets the capability names.
-void getCapabilityAtomNames(List<UnownedStringSlice>& ioNames);
+void getCapabilityNames(List<UnownedStringSlice>& ioNames);
 
 }

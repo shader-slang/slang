@@ -328,8 +328,196 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
         sb << "string";
         break;
     case kIROp_ArrayType:
-        sb << "array_";
+        sb << "array<";
         getTypeNameHint(sb, type->getOperand(0));
+        sb << ",";
+        getTypeNameHint(sb, as<IRArrayType>(type)->getElementCount());
+        sb << ">";
+        break;
+    case kIROp_UnsizedArrayType:
+        sb << "runtime_array<";
+        getTypeNameHint(sb, type->getOperand(0));
+        sb << ">";
+        break;
+    case kIROp_TextureType:
+    case kIROp_GLSLImageType:
+        {
+            auto textureType = as<IRResourceTypeBase>(type);
+            switch (textureType->getAccess())
+            {
+            case SLANG_RESOURCE_ACCESS_APPEND:
+                sb << "Append";
+                break;
+            case SLANG_RESOURCE_ACCESS_CONSUME:
+                sb << "Consume";
+                break;
+            case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
+                sb << "RasterizerOrdered";
+                break;
+            case SLANG_RESOURCE_ACCESS_WRITE:
+                sb << "RW";
+                break;
+            case SLANG_RESOURCE_ACCESS_FEEDBACK:
+                sb << "Feedback";
+                break;
+            case SLANG_RESOURCE_ACCESS_READ:
+                break;
+            }
+            if (textureType->isCombined())
+            {
+                switch (textureType->GetBaseShape())
+                {
+                case SLANG_TEXTURE_1D:
+                    sb << "Sampler1D";
+                    break;
+                case SLANG_TEXTURE_2D:
+                    sb << "Sampler2D";
+                    break;
+                case SLANG_TEXTURE_3D:
+                    sb << "Sampler3D";
+                    break;
+                case SLANG_TEXTURE_CUBE:
+                    sb << "SamplerCube";
+                    break;
+                case SLANG_TEXTURE_BUFFER:
+                    sb << "SamplerBuffer";
+                    break;
+                }
+            }
+            else
+            {
+                switch (textureType->GetBaseShape())
+                {
+                case SLANG_TEXTURE_1D:
+                    sb << "Texture1D";
+                    break;
+                case SLANG_TEXTURE_2D:
+                    sb << "Texture2D";
+                    break;
+                case SLANG_TEXTURE_3D:
+                    sb << "Texture3D";
+                    break;
+                case SLANG_TEXTURE_CUBE:
+                    sb << "TextureCube";
+                    break;
+                case SLANG_TEXTURE_BUFFER:
+                    sb << "Buffer";
+                    break;
+                }
+            }
+            if (textureType->isMultisample())
+            {
+                sb << "MS";
+            }
+            if (textureType->isArray())
+            {
+                sb << "Array";
+            }
+            if (textureType->isShadow())
+            {
+                sb << "Shadow";
+            }
+        }
+        break;
+    case kIROp_ParameterBlockType:
+        sb << "ParameterBlock<";
+        getTypeNameHint(sb, as<IRParameterBlockType>(type)->getElementType());
+        sb << ">";
+        break;
+    case kIROp_ConstantBufferType:
+        sb << "cbuffer<";
+        getTypeNameHint(sb, as<IRConstantBufferType>(type)->getElementType());
+        sb << ">";
+        break;
+    case kIROp_TextureBufferType:
+        sb << "tbuffer<";
+        getTypeNameHint(sb, as<IRTextureBufferType>(type)->getElementType());
+        sb << ">";
+        break;
+    case kIROp_GLSLShaderStorageBufferType:
+        sb << "StorageBuffer<";
+        getTypeNameHint(sb, as<IRGLSLShaderStorageBufferType>(type)->getElementType());
+        sb << ">";
+        break;
+    case kIROp_HLSLByteAddressBufferType:
+        sb << "ByteAddressBuffer";
+        break;
+    case kIROp_HLSLRWByteAddressBufferType:
+        sb << "RWByteAddressBuffer";
+        break;
+    case kIROp_HLSLRasterizerOrderedByteAddressBufferType:
+        sb << "RasterizerOrderedByteAddressBuffer";
+        break;
+    case kIROp_RaytracingAccelerationStructureType:
+        sb << "RayTracingAccelerationStructure";
+        break;
+    case kIROp_HitObjectType:
+        sb << "HitObject";
+        break;
+    case kIROp_HLSLConstBufferPointerType:
+        sb << "ConstantBufferPointer<";
+        getTypeNameHint(sb, as<IRHLSLConstBufferPointerType>(type)->getValueType());
+        sb << ">";
+        break;
+    case kIROp_HLSLStructuredBufferType:
+        sb << "StructuredBuffer<";
+        getTypeNameHint(sb, as<IRHLSLStructuredBufferTypeBase>(type)->getElementType());
+        sb << ">";
+        break;
+    case kIROp_HLSLRWStructuredBufferType:
+        sb << "RWStructuredBuffer<";
+        getTypeNameHint(sb, as<IRHLSLStructuredBufferTypeBase>(type)->getElementType());
+        sb << ">";
+        break;
+    case kIROp_HLSLAppendStructuredBufferType:
+        sb << "AppendStructuredBuffer<";
+        getTypeNameHint(sb, as<IRHLSLStructuredBufferTypeBase>(type)->getElementType());
+        sb << ">";
+        break;
+    case kIROp_HLSLConsumeStructuredBufferType:
+        sb << "ConsumeStructuredBuffer<";
+        getTypeNameHint(sb, as<IRHLSLStructuredBufferTypeBase>(type)->getElementType());
+        sb << ">";
+        break;
+    case kIROp_HLSLRasterizerOrderedStructuredBufferType:
+        sb << "RasterizerOrderedStructuredBuffer<";
+        getTypeNameHint(sb, as<IRHLSLStructuredBufferTypeBase>(type)->getElementType());
+        sb << ">";
+        break;
+    case kIROp_SamplerStateType:
+        sb << "SamplerState";
+        break;
+    case kIROp_SamplerComparisonStateType:
+        sb << "SamplerComparisonState";
+        break;
+    case kIROp_TextureFootprintType:
+        sb << "TextureFootprint";
+        break;
+    case kIROp_Specialize:
+        {
+            auto specialize = as<IRSpecialize>(type);
+            getTypeNameHint(sb, specialize->getBase());
+            sb << "<";
+            bool isFirst = true;
+            for (UInt i = 0; i < specialize->getArgCount(); i++)
+            {
+                auto arg = specialize->getArg(i);
+                if (!arg->getDataType())
+                    continue;
+                if (arg->getDataType()->getOp() == kIROp_WitnessTableType)
+                    continue;
+                if (!isFirst) sb << ",";
+                getTypeNameHint(sb, arg);
+                isFirst = false;
+            }
+            sb << ">";
+        }
+        break;
+    case kIROp_AttributedType:
+        getTypeNameHint(sb, as<IRAttributedType>(type)->getBaseType());
+        break;
+    case kIROp_RateQualifiedType:
+        getTypeNameHint(sb, as<IRRateQualifiedType>(type)->getValueType());
         break;
     case kIROp_VectorType:
         getTypeNameHint(sb, type->getOperand(0));
@@ -832,21 +1020,14 @@ IRInst* getVulkanPayloadLocation(IRInst* payloadGlobalVar)
     return location;
 }
 
-void moveParams(IRBlock* dest, IRBlock* src)
+IRInst* getInstInBlock(IRInst* inst)
 {
-    for (auto param = src->getFirstChild(); param;)
-    {
-        auto nextInst = param->getNextInst();
-        if (as<IRDecoration>(param) || as<IRParam, IRDynamicCastBehavior::NoUnwrap>(param))
-        {
-            param->insertAtEnd(dest);
-        }
-        else
-        {
-            break;
-        }
-        param = nextInst;
-    }
+    SLANG_RELEASE_ASSERT(inst);
+
+    if (const auto block = as<IRBlock>(inst->getParent()))
+        return inst;
+
+    return getInstInBlock(inst->getParent());
 }
 
 void removePhiArgs(IRInst* phiParam)
@@ -1028,6 +1209,26 @@ void resetScratchDataBit(IRInst* inst, int bitIndex)
     }
 }
 
+///
+/// IRBlock related common helper methods 
+///
+void moveParams(IRBlock* dest, IRBlock* src)
+{
+    for (auto param = src->getFirstChild(); param;)
+    {
+        auto nextInst = param->getNextInst();
+        if (as<IRDecoration>(param) || as<IRParam, IRDynamicCastBehavior::NoUnwrap>(param))
+        {
+            param->insertAtEnd(dest);
+        }
+        else
+        {
+            break;
+        }
+        param = nextInst;
+    }
+}
+
 List<IRBlock*> collectBlocksInRegion(
     IRDominatorTree* dom,
     IRLoop* loop,
@@ -1150,6 +1351,23 @@ List<IRBlock*> collectBlocksInRegion(IRGlobalValueWithCode* func, IRLoop* loopIn
     return collectBlocksInRegion(dom, loopInst, &hasMultiLevelBreaks);
 }
 
+IRBlock* getBlock(IRInst* inst)
+{
+    if (!inst)
+        return nullptr;
+
+    while (inst)
+    {
+        if (auto block = as<IRBlock>(inst))
+            return block;
+        inst = inst->getParent();
+    }
+    return nullptr;
+}
+
+///
+/// End of IRBlock utility methods
+///
 IRVarLayout* findVarLayout(IRInst* value)
 {
     if (auto layoutDecoration = value->findDecoration<IRLayoutDecoration>())
@@ -1360,5 +1578,6 @@ IRType* dropNormAttributes(IRType* const t)
     }
     return t;
 }
+
 
 }

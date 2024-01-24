@@ -7,13 +7,13 @@ layout(row_major) uniform;
 layout(row_major) buffer;
 
 pervertexNV layout(location = 0)
-in vec4  _S1[3];
+in vec4  color_0[3];
 
 layout(location = 0)
-out vec4 _S2;
+out vec4 result_0;
 
 void main()
 {
-    _S2 = gl_BaryCoordNV.x * ((_S1)[(0U)]) + gl_BaryCoordNV.y * ((_S1)[(1U)]) + gl_BaryCoordNV.z * ((_S1)[(2U)]);
+    result_0 = gl_BaryCoordNV.x * ((color_0)[(0U)]) + gl_BaryCoordNV.y * ((color_0)[(1U)]) + gl_BaryCoordNV.z * ((color_0)[(2U)]);
     return;
 }

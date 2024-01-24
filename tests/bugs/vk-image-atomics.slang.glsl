@@ -5,12 +5,12 @@ layout(binding = 0)
 uniform uimage2D t_0;
 
 layout(location = 0)
-out vec4 _S1;
+out vec4 main_0;
 
 void main()
 {
     uint u_0;
     u_0 = imageAtomicAdd(t_0, ivec2(uvec2(0)), 1);
-    _S1 = vec4(u_0);
+    main_0 = vec4(u_0);
     return;
 }

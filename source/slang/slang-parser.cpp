@@ -4868,8 +4868,8 @@ namespace Slang
                 for (auto caseName : caseNames)
                 {
                     TargetCaseStmt* targetCase = parser->astBuilder->create<TargetCaseStmt>();
-                    auto cap = findCapabilityAtom(caseName.getContent());
-                    if (caseName.getContent().getLength() && cap == CapabilityAtom::Invalid)
+                    auto cap = findCapabilityName(caseName.getContent());
+                    if (caseName.getContent().getLength() && cap == CapabilityName::Invalid)
                     {
                         parser->sink->diagnose(caseName.loc, Diagnostics::unknownTargetName, caseName.getContent());
                     }

@@ -32,7 +32,7 @@ namespace Slang
     void performGLSLResourceReturnFunctionInlining(IRModule* module);
 
         /// Inline simple intrinsic functions whose definition is a single asm block.
-    void performIntrinsicFunctionFunctionInlining(IRModule* module);
+    void performIntrinsicFunctionInlining(IRModule* module);
 
         /// Inline a specific call.
     bool inlineCall(IRCall* call);

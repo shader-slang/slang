@@ -319,6 +319,23 @@
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">../../../bin/windows-x64/release/slang-cpp-extractor.exe;../../../source/slang/slang-ast-support-types.h;../../../source/slang/slang-ast-base.h;../../../source/slang/slang-ast-decl.h;../../../source/slang/slang-ast-expr.h;../../../source/slang/slang-ast-modifier.h;../../../source/slang/slang-ast-stmt.h;../../../source/slang/slang-ast-type.h;../../../source/slang/slang-ast-val.h</AdditionalInputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release aarch64|ARM64'">../../../bin/windows-aarch64/release/slang-cpp-extractor.exe;../../../source/slang/slang-ast-support-types.h;../../../source/slang/slang-ast-base.h;../../../source/slang/slang-ast-decl.h;../../../source/slang/slang-ast-expr.h;../../../source/slang/slang-ast-modifier.h;../../../source/slang/slang-ast-stmt.h;../../../source/slang/slang-ast-type.h;../../../source/slang/slang-ast-val.h</AdditionalInputs>
     </CustomBuild>
+    <CustomBuild Include="..\..\..\source\slang\slang-capabilities.capdef">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">"../../../bin/windows-x86/debug/slang-capability-generator" "%(FullPath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">"../../../bin/windows-x64/debug/slang-capability-generator" "%(FullPath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug aarch64|ARM64'">"../../../bin/windows-aarch64/debug/slang-capability-generator" "%(FullPath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"../../../bin/windows-x86/release/slang-capability-generator" "%(FullPath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">"../../../bin/windows-x64/release/slang-capability-generator" "%(FullPath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release aarch64|ARM64'">"../../../bin/windows-aarch64/release/slang-capability-generator" "%(FullPath)"</Command>
+      <Outputs>../../../source/slang/slang-generated-capability-defs.h</Outputs>
+      <Message>slang-capability-generator %(Identity)</Message>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">../../../source/slang/slang-capabilities.capdef;../../../bin/windows-x86/debug/slang-capability-generator.exe</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">../../../source/slang/slang-capabilities.capdef;../../../bin/windows-x64/debug/slang-capability-generator.exe</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug aarch64|ARM64'">../../../source/slang/slang-capabilities.capdef;../../../bin/windows-aarch64/debug/slang-capability-generator.exe</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">../../../source/slang/slang-capabilities.capdef;../../../bin/windows-x86/release/slang-capability-generator.exe</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">../../../source/slang/slang-capabilities.capdef;../../../bin/windows-x64/release/slang-capability-generator.exe</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release aarch64|ARM64'">../../../source/slang/slang-capabilities.capdef;../../../bin/windows-aarch64/release/slang-capability-generator.exe</AdditionalInputs>
+    </CustomBuild>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

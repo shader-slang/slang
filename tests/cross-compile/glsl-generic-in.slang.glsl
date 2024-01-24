@@ -18,10 +18,10 @@ float E_get_0()
 }
 
 layout(location = 0)
-in vec3 _S1;
+in vec3 vIn_p0_0;
 
 layout(location = 1)
-in vec4 _S2;
+in vec4 vIn_field_v0_0;
 
 layout(location = 2)
 in vec2 _S3;
@@ -32,9 +32,9 @@ struct VOut_0
 };
 void main()
 {
-    F_0 _S4 = { _S2, _S3 };
+    F_0 _S4 = { vIn_field_v0_0, _S3 };
     VOut_0 vout_0;
-    vout_0.projPos_0 = vec4(_S1, F_get_0(_S4) + E_get_0());
+    vout_0.projPos_0 = vec4(vIn_p0_0, F_get_0(_S4) + E_get_0());
     gl_Position = vout_0.projPos_0;
     return;
 }

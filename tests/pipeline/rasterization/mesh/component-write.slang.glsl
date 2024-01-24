@@ -5,7 +5,7 @@ layout(row_major) buffer;
 const vec2  positions_0[3] = { vec2(0.0, -0.5), vec2(0.5, 0.5), vec2(-0.5, 0.5) };
 const vec3  colors_0[3] = { vec3(1.0, 1.0, 0.0), vec3(0.0, 1.0, 1.0), vec3(1.0, 0.0, 1.0) };
 layout(location = 0)
-out vec3  _S1[3];
+out vec3  verts_color_0[3];
 
 
 out gl_MeshPerVertexEXT
@@ -26,7 +26,7 @@ void main()
     if(gl_LocalInvocationIndex < 3U)
     {
         gl_MeshVerticesEXT[gl_LocalInvocationIndex].gl_Position = vec4(positions_0[gl_LocalInvocationIndex], 0.0, 1.0);
-        _S1[gl_LocalInvocationIndex] = colors_0[gl_LocalInvocationIndex];
+        verts_color_0[gl_LocalInvocationIndex] = colors_0[gl_LocalInvocationIndex];
     }
     else
     {

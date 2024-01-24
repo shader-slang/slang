@@ -39,7 +39,7 @@ layout(binding = 4)
 uniform image2D entryPointParams_explicitFormat_0;
 
 layout(location = 0)
-out vec4 _S2;
+out vec4 main_0;
 
 void main()
 {
@@ -60,7 +60,7 @@ void main()
     vec4 result_3 = result_2 + _S8;
 
     vec4 _S9 = (imageLoad((entryPointParams_explicitFormat_0), ivec2((C_0.index_0))));
-    _S2 = result_3 + _S9;
+    main_0 = result_3 + _S9;
 
     return;
 }

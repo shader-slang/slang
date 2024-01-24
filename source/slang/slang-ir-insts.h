@@ -20,7 +20,7 @@ class Decl;
 
 struct IRCapabilitySet : IRInst
 {
-    IR_LEAF_ISA(CapabilitySet);
+    IR_PARENT_ISA(CapabilitySet);
 
     CapabilitySet getCaps();
 };
@@ -1266,6 +1266,26 @@ struct IRPackOffsetDecoration : IRDecoration
 
     IRIntLit* getRegisterOffset() { return cast<IRIntLit>(getOperand(0)); }
     IRIntLit* getComponentOffset() { return cast<IRIntLit>(getOperand(1)); }
+};
+
+struct IRUserTypeNameDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_UserTypeNameDecoration
+    };
+    IR_LEAF_ISA(UserTypeNameDecoration)
+    IRStringLit* getUserTypeName() { return cast<IRStringLit>(getOperand(0)); }
+};
+
+struct IRCounterBufferDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_CounterBufferDecoration
+    };
+    IR_LEAF_ISA(CounterBufferDecoration)
+    IRInst* getCounterBuffer() { return getOperand(0); }
 };
 
 struct IRStageAccessDecoration : public IRDecoration
@@ -4688,7 +4708,7 @@ IRTargetSpecificDecoration* findBestTargetDecoration(
 
 IRTargetSpecificDecoration* findBestTargetDecoration(
         IRInst*         val,
-        CapabilityAtom  targetCapabilityAtom);
+        CapabilityName  targetCapabilityAtom);
 
 bool findTargetIntrinsicDefinition(IRInst* callee, CapabilitySet const& targetCaps, UnownedStringSlice& outDefinition);
 

@@ -30,10 +30,10 @@ layout(std430, binding = 4) readonly buffer StructuredBuffer_uint_t_0 {
     uint _data[];
 } bb_0[6];
 layout(location = 0)
-out vec4 _S3;
+out vec4 main_0;
 
 void main()
 {
-    _S3 = cb_0[C_0.index_0].f_0 + sb1_0[C_0.index_0]._data[C_0.index_0].f_0 + sb2_0[C_0.index_0]._data[C_0.index_0] + vec4(float(bb_0[C_0.index_0]._data[int(C_0.index_0 * 4U) / 4]));
+    main_0 = cb_0[C_0.index_0].f_0 + sb1_0[C_0.index_0]._data[C_0.index_0].f_0 + sb2_0[C_0.index_0]._data[C_0.index_0] + vec4(float(bb_0[C_0.index_0]._data[int(C_0.index_0 * 4U) / 4]));
     return;
 }

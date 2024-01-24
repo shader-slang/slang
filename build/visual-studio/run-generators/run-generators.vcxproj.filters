@@ -7,6 +7,12 @@
     <Filter Include="Source Files">
       <UniqueIdentifier>{E9C7FDCE-D52A-8D73-7EB0-C5296AF258F6}</UniqueIdentifier>
     </Filter>
+    <Filter Include="source">
+      <UniqueIdentifier>{76FF3A1C-62A1-65F2-4B5C-7946379DEC42}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="source\slang">
+      <UniqueIdentifier>{9A9B9613-86FE-25B8-2F84-5E6E1BC6F13A}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\prelude\slang-cpp-scalar-intrinsics.h">
@@ -57,6 +63,9 @@
     </CustomBuild>
     <CustomBuild Include="..\..\..\source\slang\slang-ast-reflect.h">
       <Filter>Header Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\source\slang\slang-capabilities.capdef">
+      <Filter>source\slang</Filter>
     </CustomBuild>
   </ItemGroup>
 </Project>

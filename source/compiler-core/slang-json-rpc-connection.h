@@ -48,6 +48,8 @@ public:
         /// Disconnect. May block while server shuts down
     void disconnect();
 
+    SlangResult checkArrayObjectWrap( const JSONValue& srcArgs, const RttiInfo* dstArgsRttiInfo, void* dstArgs, const JSONValue& id );
+    
         /// Convert value to dst. Will write response on fails
     SlangResult toNativeOrSendError(const JSONValue& value, const RttiInfo* info, void* dst, const JSONValue& id);
 

@@ -394,10 +394,6 @@ inline bool isRelevantDifferentialPair(IRType* type)
     return false;
 }
 
-IRBlock* getBlock(IRInst* inst);
-
-IRInst* getInstInBlock(IRInst* inst);
-
 UIndex addPhiOutputArg(IRBuilder* builder, IRBlock* block, IRInst*& inoutTerminatorInst, IRInst* arg);
 
 IRUse* findUniqueStoredVal(IRVar* var);

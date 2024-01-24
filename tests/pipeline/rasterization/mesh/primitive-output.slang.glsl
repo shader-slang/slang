@@ -7,7 +7,7 @@ const vec3  colors_0[3] = { vec3(1.0, 1.0, 0.0), vec3(0.0, 1.0, 1.0), vec3(1.0, 
 out uvec3  gl_PrimitiveTriangleIndicesEXT[1];
 
 layout(location = 0)
-out vec3  _S1[3];
+out vec3  verts_color_0[3];
 
 out gl_MeshPerVertexEXT
 {
@@ -15,7 +15,7 @@ out gl_MeshPerVertexEXT
 } gl_MeshVerticesEXT[3];
 
 perprimitiveEXT layout(location = 1)
-out vec3  _S2[1];
+out vec3  primitives_triangleNormal_0[1];
 
 perprimitiveEXT out gl_MeshPerPrimitiveEXT
 {
@@ -34,7 +34,7 @@ void main()
     if(gl_LocalInvocationIndex < 3U)
     {
         gl_MeshVerticesEXT[gl_LocalInvocationIndex].gl_Position = vec4(positions_0[gl_LocalInvocationIndex], 0.0, 1.0);
-        _S1[gl_LocalInvocationIndex] = colors_0[gl_LocalInvocationIndex];
+        verts_color_0[gl_LocalInvocationIndex] = colors_0[gl_LocalInvocationIndex];
     }
     else
     {
@@ -43,7 +43,7 @@ void main()
     if(gl_LocalInvocationIndex < 1U)
     {
         gl_PrimitiveTriangleIndicesEXT[gl_LocalInvocationIndex] = uvec3(0U, 1U, 2U);
-        _S2[gl_LocalInvocationIndex] = vec3(0.0, 0.0, 1.0);
+        primitives_triangleNormal_0[gl_LocalInvocationIndex] = vec3(0.0, 0.0, 1.0);
         gl_MeshPrimitivesEXT[gl_LocalInvocationIndex].gl_PrimitiveID = int(gl_LocalInvocationIndex);
         gl_MeshPrimitivesEXT[gl_LocalInvocationIndex].gl_CullPrimitiveEXT = false;
     }

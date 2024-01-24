@@ -29,7 +29,7 @@ add_custom_command(
     COMMAND
         slang-generate ${SLANG_STDLIB_META_SOURCE} --target-directory
         ${SLANG_STDLIB_META_OUTPUT_DIR}
-    DEPENDS ${SLANG_STDLIB_META_SOURCE}
+    DEPENDS ${SLANG_STDLIB_META_SOURCE} slang-generate
     WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
     VERBATIM
 )
@@ -44,6 +44,52 @@ set_target_properties(slang-meta-headers PROPERTIES FOLDER generated)
 target_include_directories(
     slang-meta-headers
     INTERFACE ${SLANG_STDLIB_META_OUTPUT_DIR}
+)
+
+#
+# generate capability files
+#
+glob_append(SLANG_CAPABILITY_SOURCE "*.capdef")
+
+set(SLANG_CAPABILITY_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/capability")
+
+# Generate the output file list
+set(SLANG_CAPABILITY_GENERATED_HEADERS
+    "${SLANG_CAPABILITY_OUTPUT_DIR}/slang-generated-capability-defs.h"
+    "${SLANG_CAPABILITY_OUTPUT_DIR}/slang-generated-capability-defs-impl.h"
+)
+set(SLANG_CAPABILITY_GENERATED_SOURCE
+    ${SLANG_CAPABILITY_GENERATED_HEADERS}
+    "${SLANG_CAPABILITY_OUTPUT_DIR}/slang-lookup-capability-defs.cpp"
+)
+add_custom_command(
+    OUTPUT ${SLANG_CAPABILITY_GENERATED_SOURCE}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${SLANG_CAPABILITY_OUTPUT_DIR}
+    COMMAND
+        slang-capability-generator ${SLANG_CAPABILITY_SOURCE} --target-directory
+        ${SLANG_CAPABILITY_OUTPUT_DIR}
+    DEPENDS ${SLANG_CAPABILITY_SOURCE} slang-capability-generator
+    WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
+    VERBATIM
+)
+slang_add_target(
+    slang-capability-defs
+    OBJECT
+    EXPLICIT_SOURCE ${SLANG_CAPABILITY_GENERATED_HEADERS}
+    LINK_WITH_PRIVATE core
+    INCLUDE_DIRECTORIES_PUBLIC
+        "${SLANG_CAPABILITY_OUTPUT_DIR}"
+        "${slang_SOURCE_DIR}/source/slang"
+    EXCLUDE_FROM_ALL
+    FOLDER generated
+)
+slang_add_target(
+    slang-capability-lookup
+    OBJECT
+    EXPLICIT_SOURCE ${SLANG_CAPABILITY_GENERATED_SOURCE}
+    LINK_WITH_PRIVATE core slang-capability-defs
+    EXCLUDE_FROM_ALL
+    FOLDER generated
 )
 
 #
@@ -84,7 +130,7 @@ add_custom_command(
         slang-cpp-extractor ${SLANG_REFLECT_INPUT} -strip-prefix slang- -o
         ${SLANG_REFLECT_OUTPUT_DIR}/slang-generated -output-fields -mark-suffix
         _CLASS
-    DEPENDS ${SLANG_REFLECT_INPUT}
+    DEPENDS ${SLANG_REFLECT_INPUT} slang-cpp-extractor
     VERBATIM
 )
 
@@ -98,6 +144,40 @@ set_target_properties(slang-reflect-headers PROPERTIES FOLDER generated)
 target_include_directories(
     slang-reflect-headers
     INTERFACE ${SLANG_REFLECT_OUTPUT_DIR}
+)
+
+#
+# generated lookup tables
+#
+
+set(SLANG_LOOKUP_GENERATOR_INPUT_JSON
+    "${slang_SOURCE_DIR}/external/spirv-headers/include/spirv/unified1/extinst.glsl.std.450.grammar.json"
+)
+set(SLANG_LOOKUP_GENERATOR_OUTPUT_DIR
+    "${CMAKE_CURRENT_BINARY_DIR}/slang-lookup-tables/"
+)
+set(SLANG_LOOKUP_GENERATED_SOURCE
+    "${SLANG_LOOKUP_GENERATOR_OUTPUT_DIR}/slang-lookup-GLSLstd450.cpp"
+)
+add_custom_command(
+    OUTPUT ${SLANG_LOOKUP_GENERATED_SOURCE}
+    COMMAND
+        ${CMAKE_COMMAND} -E make_directory ${SLANG_LOOKUP_GENERATOR_OUTPUT_DIR}
+    COMMAND
+        slang-lookup-generator ${SLANG_LOOKUP_GENERATOR_INPUT_JSON}
+        ${SLANG_LOOKUP_GENERATED_SOURCE} "GLSLstd450" "GLSLstd450"
+        "spirv/unified1/GLSL.std.450.h"
+    DEPENDS ${SLANG_LOOKUP_GENERATOR_INPUT_JSON} slang-lookup-generator
+    VERBATIM
+)
+
+slang_add_target(
+    slang-lookup-tables
+    OBJECT
+    EXPLICIT_SOURCE ${SLANG_LOOKUP_GENERATED_SOURCE}
+    LINK_WITH_PRIVATE core SPIRV-Headers
+    EXCLUDE_FROM_ALL
+    FOLDER generated
 )
 
 #
@@ -118,8 +198,11 @@ slang_add_target(
         core
         compiler-core
         # Bundle the source unconditionally
+        slang-capability-defs
+        slang-capability-lookup
         slang-meta-headers
         slang-reflect-headers
+        slang-lookup-tables
         SPIRV-Headers
     FOLDER generators
 )
@@ -140,6 +223,7 @@ add_custom_command(
     COMMAND
         slang-bootstrap -archive-type riff-lz4 -save-stdlib-bin-source
         ${SLANG_STDLIB_GENERATED_HEADER}
+    DEPENDS slang-bootstrap
     VERBATIM
 )
 add_library(
@@ -164,7 +248,10 @@ slang_add_target(
         core
         compiler-core
         prelude
+        slang-capability-defs
+        slang-capability-lookup
         slang-reflect-headers
+        slang-lookup-tables
         SPIRV-Headers
     # slang.h is in the project root, so include that directory in the interface
     # for slang

@@ -70,7 +70,7 @@ void GLSLSourceEmitter::_requireRayTracing()
     // the user has explicitly opted in to the `GL_NV_ray_tracing` extension
     // we will use that one instead.
     //
-    if( getTargetCaps().implies(CapabilityAtom::GL_NV_ray_tracing) )
+    if( getTargetCaps().implies(CapabilityAtom::_GL_NV_ray_tracing) )
     {
         m_glslExtensionTracker->requireExtension(UnownedStringSlice::fromLiteral("GL_NV_ray_tracing"));
     }
@@ -92,7 +92,7 @@ void GLSLSourceEmitter::_requireFragmentShaderBarycentric()
     // the user has explicitly opted in to the `GL_NV_fragment_shader_barycentric` extension 
     // we will use that one instead.
     
-    if( getTargetCaps().implies(CapabilityAtom::GL_NV_fragment_shader_barycentric) )
+    if( getTargetCaps().implies(CapabilityAtom::_GL_NV_fragment_shader_barycentric) )
     {
         m_glslExtensionTracker->requireExtension(UnownedStringSlice::fromLiteral("GL_NV_fragment_shader_barycentric"));
     }
@@ -179,7 +179,7 @@ void GLSLSourceEmitter::_emitGLSLStructuredBuffer(IRGlobalParam* varDecl, IRHLSL
             m_writer->emit(space);
         }
     }
-
+    
     m_writer->emit(") ");
 
     /*
@@ -194,7 +194,10 @@ void GLSLSourceEmitter::_emitGLSLStructuredBuffer(IRGlobalParam* varDecl, IRHLSL
     HLSLAppendStructuredBufferType                  - Write
     HLSLConsumeStructuredBufferType                 - TODO (JS): Its possible that this can be readonly, but we currently don't support on GLSL
     */
-
+    if (varDecl->findDecoration<IRGloballyCoherentDecoration>())
+    {
+        m_writer->emit("coherent ");
+    }
     if (as<IRHLSLStructuredBufferType>(structuredBufferType))
     {
         m_writer->emit("readonly ");
@@ -264,8 +267,12 @@ void GLSLSourceEmitter::_emitGLSLByteAddressBuffer(IRGlobalParam* varDecl, IRByt
             m_writer->emit(space);
         }
     }
-
     m_writer->emit(") ");
+
+    if (varDecl->findDecoration<IRGloballyCoherentDecoration>())
+    {
+        m_writer->emit("coherent ");
+    }
 
     /*
     If the output type is a buffer, and we can determine it is only readonly we can prefix before
@@ -657,7 +664,7 @@ bool GLSLSourceEmitter::_emitGLSLLayoutQualifierWithBindingKinds(LayoutResourceK
             m_writer->emit("layout(push_constant)\n");
             break;
         case LayoutResourceKind::ShaderRecord:
-            if (getTargetCaps().implies(CapabilityAtom::GL_NV_ray_tracing))
+            if (getTargetCaps().implies(CapabilityAtom::_GL_NV_ray_tracing))
             {
                 m_writer->emit("layout(shaderRecordNV)\n");
             }
@@ -1398,7 +1405,7 @@ void GLSLSourceEmitter::emitLayoutQualifiersImpl(IRVarLayout* layout)
 
             case LayoutResourceKind::RayPayload:
             {
-                if( getTargetCaps().implies(CapabilityAtom::GL_NV_ray_tracing) )
+                if( getTargetCaps().implies(CapabilityAtom::_GL_NV_ray_tracing) )
                 {
                     m_writer->emit("rayPayloadInNV ");
                 }
@@ -1411,7 +1418,7 @@ void GLSLSourceEmitter::emitLayoutQualifiersImpl(IRVarLayout* layout)
 
             case LayoutResourceKind::CallablePayload:
             {
-                if( getTargetCaps().implies(CapabilityAtom::GL_NV_ray_tracing) )
+                if( getTargetCaps().implies(CapabilityAtom::_GL_NV_ray_tracing) )
                 {
                     m_writer->emit("callableDataInNV ");
                 }
@@ -1424,7 +1431,7 @@ void GLSLSourceEmitter::emitLayoutQualifiersImpl(IRVarLayout* layout)
 
             case LayoutResourceKind::HitAttributes:
             {
-                if( getTargetCaps().implies(CapabilityAtom::GL_NV_ray_tracing) )
+                if( getTargetCaps().implies(CapabilityAtom::_GL_NV_ray_tracing) )
                 {
                     m_writer->emit("hitAttributeNV ");
                 }
@@ -2421,7 +2428,7 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
                 // `GL_NV_ray_tracing` using target capabilities, and will always default
                 // to `GL_EXT_ray_tracing` otherwise.
                 //
-                if( getTargetCaps().implies(CapabilityAtom::GL_NV_ray_tracing) )
+                if( getTargetCaps().implies(CapabilityAtom::_GL_NV_ray_tracing) )
                 {
                     // If the user has explicitly opted in to `GL_NV_ray_tracing`,
                     // then we don't need to explicitly request the extentsion again.
@@ -2509,7 +2516,7 @@ bool GLSLSourceEmitter::_maybeEmitInterpolationModifierText(IRInterpolationMode 
             if( stage == Stage::Fragment && isInput)
             {
                 _requireFragmentShaderBarycentric();
-                if (getTargetCaps().implies(CapabilityAtom::GL_NV_fragment_shader_barycentric))
+                if (getTargetCaps().implies(CapabilityAtom::_GL_NV_fragment_shader_barycentric))
                 {
                     m_writer->emit("pervertexNV ");    
                 }
@@ -2657,7 +2664,7 @@ void GLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
 
         // Special case  hitObjectAttribute as is only NV currently 
         if (decoration->getOp() == kIROp_VulkanHitObjectAttributesDecoration ||
-            getTargetCaps().implies(CapabilityAtom::GL_NV_ray_tracing))
+            getTargetCaps().implies(CapabilityAtom::_GL_NV_ray_tracing))
         {
             m_writer->emit(toSlice("NV"));
         }
