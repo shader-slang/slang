@@ -6,7 +6,7 @@ struct S
 {
     globallycoherent int member;
 }
-RWStructuredBuffer<S> buffer;
+globallycoherent RWStructuredBuffer<S> buffer;
 
 RWStructuredBuffer<float> output;
 [numthreads(4,1,1)]
@@ -15,5 +15,6 @@ void main(int tid : SV_DispatchThreadID)
     InterlockedAdd(buffer[0].member, 1);
     AllMemoryBarrier();
     output[tid] = buffer[0].member;
-    // CHECK: OpMemberDecorate {{.*}} 0 Coherent
+    // CHECK-DAG: OpMemberDecorate {{.*}} 0 Coherent
+    // CHECK-DAG: OpDecorate %buffer Coherent
 }

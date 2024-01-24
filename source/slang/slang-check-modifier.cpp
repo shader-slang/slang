@@ -1037,7 +1037,7 @@ namespace Slang
 
         case ASTNodeType::GloballyCoherentModifier:
         case ASTNodeType::HLSLVolatileModifier:
-            return as<VarDecl>(decl) && (as<StructDecl>(getParentDecl(decl)) || as<GLSLInterfaceBlockDecl>(decl));
+            return as<VarDecl>(decl) && (isGlobalDecl(decl) || as<StructDecl>(getParentDecl(decl)) || as<GLSLInterfaceBlockDecl>(decl));
 
             // Allowed only on parameters, struct fields and global variables.
         case ASTNodeType::InterpolationModeModifier:
