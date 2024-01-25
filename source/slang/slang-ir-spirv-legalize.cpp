@@ -627,11 +627,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             auto innerElementType = innerType;
             if (arrayType)
             {
-                Array<IRInst*, 2> arrayTypeArgs;
-                arrayTypeArgs.add(innerType);
-                if (arraySize)
-                    arrayTypeArgs.add(arraySize);
-                innerType = (IRType*)builder.emitIntrinsicInst(builder.getTypeKind(), arrayType->getOp(), (UInt)arrayTypeArgs.getCount(), arrayTypeArgs.getBuffer());
+                innerType = (IRType*)builder.getArrayTypeBase(arrayType->getOp(), innerType, arraySize);
                 if (!arraySize)
                 {
                     builder.addRequireSPIRVDescriptorIndexingExtensionDecoration(inst);
