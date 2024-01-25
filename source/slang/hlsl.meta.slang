@@ -3040,7 +3040,7 @@ bool all(vector<T,N> x)
         }
         else
         {
-            let zero = __default<T>();
+            let zero = __default<vector<T,N>>();
             return spirv_asm
             {
                 OpFUnordNotEqual $$vector<bool,N> %castResult $x $zero;
@@ -3154,7 +3154,7 @@ bool any(vector<T, N> x)
         }
         else
         {
-            let zero = __default<T>();
+            let zero = __default<vector<T,N>>();
             return spirv_asm
             {
                 OpFUnordNotEqual $$vector<bool,N> %castResult $x $zero;
