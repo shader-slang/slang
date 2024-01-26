@@ -224,7 +224,8 @@ void SourceWriter::emit(UInt64 value)
     emit(buffer);
 }
 
-void SourceWriter::emit(double value)
+template<typename FloatOrDouble>
+static void TSourceWriter_emit(SourceWriter *This, FloatOrDouble value)
 {
     // There are a few different requirements here that we need to deal with:
     //
@@ -251,7 +252,13 @@ void SourceWriter::emit(double value)
     std::ostringstream stream;
     stream.imbue(std::locale::classic());
     stream.setf(std::ios::fixed, std::ios::floatfield);
-    stream.precision(20);
+
+    // Deducting one bit from Mantissa because it brings unexpected noise due to the lack of precision
+    const int mantissaBits = std::numeric_limits<FloatOrDouble>::digits - 1;
+    const int maxMantissaDigits = static_cast<int>(std::ceil(std::log10(std::pow(2, mantissaBits))));
+    const int expDigits = static_cast<int>((value < 1.0) ? std::ceil(std::log10(1.0 / value)) : 0);
+    stream.precision(expDigits + maxMantissaDigits);
+
     stream << value;
     auto str = stream.str();
     auto slice = UnownedStringSlice(str.c_str());
@@ -267,7 +274,17 @@ void SourceWriter::emit(double value)
             lastChar = slice.end() - 1;
         slice = slice.subString(0, lastChar - slice.begin() + 1);
     }
-    emit(slice);
+    This->emit(slice);
+}
+
+void SourceWriter::emit(float value)
+{
+    TSourceWriter_emit(this, value);
+}
+
+void SourceWriter::emit(double value)
+{
+    TSourceWriter_emit(this, value);
 }
 
 void SourceWriter::advanceToSourceLocationIfValid(const SourceLoc& sourceLocation)

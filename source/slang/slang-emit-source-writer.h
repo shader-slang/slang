@@ -41,6 +41,7 @@ public:
     void emit(Int64 value);
     void emit(UInt64 value);
 
+    void emit(float value);
     void emit(double value);
 
     void emitChar(char c);
