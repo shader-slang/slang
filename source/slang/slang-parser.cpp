@@ -114,7 +114,7 @@ namespace Slang
         DiagnosticSink* sink;
         SourceLoc lastErrorLoc;
         ParserOptions options;
-
+        Modifiers* pendingModifiers = nullptr;
         int genericDepth = 0;
 
         // Is the parser in a "recovering" state?
@@ -3095,7 +3095,7 @@ namespace Slang
     }
 
     static Decl* ParseHLSLBufferDecl(
-        Parser*	parser,
+        Parser* parser,
         String  bufferWrapperTypeName)
     {
         // An HLSL declaration of a constant buffer like this:
@@ -3118,6 +3118,20 @@ namespace Slang
         // The first is a type declaration that holds all the members, while
         // the second is a variable declaration that uses the buffer type.
         StructDecl* bufferDataTypeDecl = parser->astBuilder->create<StructDecl>();
+
+        if (parser->pendingModifiers)
+        {
+            // Clone visibility modifier from cbuffer decl to the internal struct type decl.
+            // For example, if cbuffer is public, we want the element buffer type to also be
+            // public.
+            if (auto visModifier = parser->pendingModifiers->findModifier<VisibilityModifier>())
+            {
+                auto cloneVisModifier = (VisibilityModifier*)parser->astBuilder->createByNodeType(visModifier->astNodeType);
+                cloneVisModifier->keywordName = visModifier->keywordName;
+                cloneVisModifier->loc = visModifier->loc;
+                addModifier(bufferDataTypeDecl, cloneVisModifier);
+            }
+        }
 
         VarDecl* bufferVarDecl = parser->astBuilder->create<VarDecl>();
 
@@ -4394,6 +4408,18 @@ namespace Slang
         Modifiers           modifiers )
     {
         DeclBase* decl = nullptr;
+        
+        parser->pendingModifiers = &modifiers;
+        struct RestorePendingModifiersRAII
+        {
+            Modifiers* oldValue;
+            Parser* parser;
+            ~RestorePendingModifiersRAII()
+            {
+                parser->pendingModifiers = oldValue;
+            }
+        };
+        RestorePendingModifiersRAII restorePendingModifiersRAII{ parser->pendingModifiers, parser };
 
         auto loc = parser->tokenReader.peekLoc();
 
