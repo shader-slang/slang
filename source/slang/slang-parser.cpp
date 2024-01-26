@@ -3119,8 +3119,6 @@ namespace Slang
         // the second is a variable declaration that uses the buffer type.
         StructDecl* bufferDataTypeDecl = parser->astBuilder->create<StructDecl>();
 
-        addModifier(bufferDataTypeDecl, parser->astBuilder->create<PublicModifier>());
-
         VarDecl* bufferVarDecl = parser->astBuilder->create<VarDecl>();
 
         // Both declarations will have a location that points to the name
