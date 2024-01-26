@@ -5855,6 +5855,13 @@ namespace Slang
             }
         }
 
+        if (as<ModuleDeclarationDecl>(oldDecl) || as<ModuleDeclarationDecl>(newDecl))
+        {
+            // It is allowed to have a decl whose name is the same as the module.
+            return SLANG_OK;
+        }
+
+
         // For all other flavors of declaration, we do not
         // allow duplicate declarations with the same name.
         //
