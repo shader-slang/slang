@@ -274,11 +274,9 @@ inline static void SourceWriter_emit(SourceWriter *This, double value, int maxFr
     }
     else
     {
-        // Rounding
-        const double rounding = std::pow(10, -maxFracDigits) / 2;
-
         int exponent = 0;
         double mantissa = valueAbs;
+        const double rounding = std::pow(10, -maxFracDigits) / 2;
 
         // Normalize the mantissa
         while (mantissa >= 10.0) {
@@ -297,6 +295,7 @@ inline static void SourceWriter_emit(SourceWriter *This, double value, int maxFr
         const bool useScientificFormat = (std::abs(exponent) > 6);
         if (useScientificFormat)
         {
+            // Apply rounding on matissa and normalize again
             mantissa += rounding;
             if (mantissa >= 10.0) {
                 const double nextMantissa = mantissa / 10.0;
@@ -333,6 +332,10 @@ inline static void SourceWriter_emit(SourceWriter *This, double value, int maxFr
                 while (*(next - 1) == '0')
                 {
                     next--;
+                }
+                if (*(next - 1) == '.')
+                {
+                    *next++ = '0';
                 }
             }
 
@@ -403,6 +406,10 @@ inline static void SourceWriter_emit(SourceWriter *This, double value, int maxFr
                 while (*(next - 1) == '0')
                 {
                     next--;
+                }
+                if (*(next - 1) == '.')
+                {
+                    *next++ = '0';
                 }
             }
         }
