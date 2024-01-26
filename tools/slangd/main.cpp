@@ -21,5 +21,7 @@ int main(int argc, const char* const* argv)
     {
         std::this_thread::sleep_for(std::chrono::seconds(10));
     }
-    return Slang::runLanguageServer();
+    Slang::LanguageServerStartupOptions options;
+    options.parse(argc, argv);
+    return Slang::runLanguageServer(options);
 }
