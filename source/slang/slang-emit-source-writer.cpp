@@ -224,8 +224,7 @@ void SourceWriter::emit(UInt64 value)
     emit(buffer);
 }
 
-template<typename FloatOrDouble>
-static void TSourceWriter_emit(SourceWriter *This, FloatOrDouble value)
+inline static void SourceWriter_emit(SourceWriter *This, double value, int maxFracDigits)
 {
     // There are a few different requirements here that we need to deal with:
     //
@@ -240,51 +239,190 @@ static void TSourceWriter_emit(SourceWriter *This, FloatOrDouble value)
     // 3) We need to be sure that floating-point literals specified by the user will
     //    "round-trip" and turn into the same value when parsed back in. This means
     //    that we need to print a reasonable number of digits of precision.
-    //
-    // For right now, the easiest option that can balance these is to use
-    // the C++ standard library `iostream`s, because they support an explicit locale,
-    // and can (hopefully) print floating-point numbers accurately.
-    //
-    // Eventually, the right move here would be to implement proper floating-point
-    // number formatting ourselves, but that would require extensive testing to
-    // make sure we get it right.
 
-    std::ostringstream stream;
-    stream.imbue(std::locale::classic());
-    stream.setf(std::ios::fixed, std::ios::floatfield);
+    char result[30];
+    char *next = result;
+    double valueAbs = value;
 
-    // Deducting one bit from Mantissa because it brings unexpected noise due to the lack of precision
-    const int mantissaBits = std::numeric_limits<FloatOrDouble>::digits - 1;
-    const int maxMantissaDigits = static_cast<int>(std::ceil(std::log10(std::pow(2, mantissaBits))));
-    const int expDigits = static_cast<int>((value < 1.0) ? std::ceil(std::log10(1.0 / value)) : 0);
-    stream.precision(expDigits + maxMantissaDigits);
-
-    stream << value;
-    auto str = stream.str();
-    auto slice = UnownedStringSlice(str.c_str());
-    // Remove redundant trailing 0s.
-    if (slice.end() > slice.begin())
+    // Handle negative sign
+    const long long* d2l = reinterpret_cast<long long*>(&value);
+    const bool negative = (*d2l < 0);
+    if (negative)
     {
-        auto lastChar = slice.end() - 1;
-        while (lastChar > slice.begin() && *lastChar == '0')
-            lastChar--;
-        if (*lastChar == '.')
-            lastChar++;
-        if (lastChar > slice.end() - 1)
-            lastChar = slice.end() - 1;
-        slice = slice.subString(0, lastChar - slice.begin() + 1);
+        *next++ = '-';
+        valueAbs = -valueAbs;
     }
+
+    // Handle one of five cases
+    if (std::isnan(value))
+    {
+        *next++ = 'n';
+        *next++ = 'a';
+        *next++ = 'n';
+    }
+    else if (std::isinf(value))
+    {
+        *next++ = 'i';
+        *next++ = 'n';
+        *next++ = 'f';
+    }
+    else if (value == 0)
+    {
+        *next++ = '0';
+        *next++ = '.';
+        *next++ = '0';
+    }
+    else
+    {
+        // Rounding
+        const double rounding = std::pow(10, -maxFracDigits) / 2;
+
+        int exponent = 0;
+        double mantissa = valueAbs;
+
+        // Normalize the mantissa
+        while (mantissa >= 10.0) {
+            const double nextMantissa = mantissa / 10.0;
+            assert(nextMantissa != mantissa);
+            mantissa = nextMantissa;
+            exponent++;
+        }
+        while (mantissa < 1.0) {
+            const double nextMantissa = mantissa * 10.0;
+            assert(nextMantissa != mantissa);
+            mantissa = nextMantissa;
+            exponent--;
+        }
+
+        const bool useScientificFormat = (std::abs(exponent) > 6);
+        if (useScientificFormat)
+        {
+            mantissa += rounding;
+            if (mantissa >= 10.0) {
+                const double nextMantissa = mantissa / 10.0;
+                assert(nextMantissa != mantissa);
+                mantissa = nextMantissa;
+                exponent++;
+            }
+
+            const unsigned char intPart = static_cast<unsigned char>(mantissa);
+            assert(intPart >= 0 && intPart < 10);
+
+            *next++ = '0' + intPart;
+            *next++ = '.';
+
+            if (mantissa == intPart)
+            {
+                *next++ = '0';
+            }
+            else
+            {
+                double fracPart = mantissa - intPart;
+                assert(fracPart < 1 && fracPart > 0);
+
+                int fracDigits = 0;
+                for (fracDigits = 0; fracDigits < maxFracDigits && fracPart > 0; fracDigits++)
+                {
+                    fracPart *= 10;
+                    const unsigned char digit = static_cast<unsigned char>(fracPart);
+                    fracPart -= digit;
+                    *next++ = '0' + digit;
+                }
+
+                // Remove trailing zeros
+                while (*(next - 1) == '0')
+                {
+                    next--;
+                }
+            }
+
+            *next++ = 'e';
+
+            if (exponent == 0)
+            {
+                *next++ = '0';
+            }
+            else
+            {
+                if (exponent < 0)
+                {
+                    *next++ = '-';
+                    exponent *= -1;
+                }
+
+                const int expDigits = static_cast<int>(std::log10(exponent) + 1);
+                for (int i = 0; i < expDigits; i++)
+                {
+                    const unsigned char digit = static_cast<unsigned char>(exponent % 10);
+                    next[expDigits - i - 1] = '0' + digit;
+                    exponent /= 10;
+                }
+                next += expDigits;
+            }
+        }
+        else
+        {
+            valueAbs += rounding;
+
+            double intPart = std::floor(valueAbs);
+            double fracPart = valueAbs - intPart;
+            assert(intPart >= 0 && fracPart >= 0 && fracPart < 1);
+
+            if (intPart == 0)
+            {
+                *next++ = '0';
+            }
+            else
+            {
+                const int intDigits = static_cast<int>(std::log10(intPart) + 1);
+                for (int i = 0; i < intDigits; i++)
+                {
+                    const unsigned char digit = static_cast<unsigned char>(std::fmod(intPart, 10));
+                    next[intDigits - i - 1] = '0' + digit;
+                    intPart /= 10;
+                }
+                next += intDigits;
+            }
+            *next++ = '.';
+
+            if (fracPart == 0)
+            {
+                *next++ = '0';
+            }
+            else
+            {
+                for (int i = 0; i < maxFracDigits && fracPart > 0; i++)
+                {
+                    fracPart *= 10;
+                    const unsigned char digit = static_cast<unsigned char>(fracPart);
+                    fracPart -= digit;
+                    *next++ = '0' + digit;
+                }
+
+                // Remove trailing zeros
+                while (*(next - 1) == '0')
+                {
+                    next--;
+                }
+            }
+        }
+    }
+    *next++ = 0;
+
+    auto slice = UnownedStringSlice(result);
     This->emit(slice);
 }
 
 void SourceWriter::emit(float value)
 {
-    TSourceWriter_emit(this, value);
+    constexpr const int maxDigits = std::numeric_limits<float>::digits10;
+    SourceWriter_emit(this, value, maxDigits);
 }
 
 void SourceWriter::emit(double value)
 {
-    TSourceWriter_emit(this, value);
+    constexpr const int maxDigits = std::numeric_limits<double>::digits10;
+    SourceWriter_emit(this, value, maxDigits);
 }
 
 void SourceWriter::advanceToSourceLocationIfValid(const SourceLoc& sourceLocation)

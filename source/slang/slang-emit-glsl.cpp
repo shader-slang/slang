@@ -1043,8 +1043,16 @@ void GLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                 }
                 default:
                 {
-                    m_writer->emit(((IRConstant*) inst)->value.floatVal);
-                    switch( type->getOp() )
+                    switch (type->getOp())
+                    {
+                    case kIROp_DoubleType:
+                        m_writer->emit(double(((IRConstant*)inst)->value.floatVal));
+                        break;
+                    default:
+                        m_writer->emit(float(((IRConstant*)inst)->value.floatVal));
+                        break;
+                    }
+                    switch (type->getOp())
                     {
                     case kIROp_HalfType:
                         m_writer->emit("HF");
