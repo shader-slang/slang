@@ -76,6 +76,14 @@ struct Command
     Optional<LanguageServerProtocol::CancelParams> cancelArgs;
 };
 
+struct LanguageServerStartupOptions
+{
+    // Are we working with Visual Studio client?
+    bool isVisualStudio = false;
+
+    SLANG_API void parse(int argc, const char* const* argv);
+};
+
 class LanguageServer
 {
 private:
@@ -101,7 +109,12 @@ public:
     bool m_quit = false;
     List<LanguageServerProtocol::WorkspaceFolder> m_workspaceFolders;
     RttiTypeFuncsMap m_typeMap;
-    
+    LanguageServerStartupOptions m_options;
+
+    LanguageServer(LanguageServerStartupOptions options)
+        : m_options(options)
+    {}
+
     SlangResult init(const LanguageServerProtocol::InitializeParams& args);
     SlangResult execute();
     void update();
@@ -182,5 +195,5 @@ inline bool _isIdentifierChar(char ch)
     return ch >= '0' && ch <= '9' || ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch == '_';
 }
 
-SLANG_API SlangResult runLanguageServer();
+SLANG_API SlangResult runLanguageServer(LanguageServerStartupOptions options);
 } // namespace Slang

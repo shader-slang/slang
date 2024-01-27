@@ -243,11 +243,11 @@ void WorkspaceVersion::parseDiagnostics(String compilerOutput)
         pos = line.indexOf(' ');
         diagnostic.code = StringUtil::parseIntAndAdvancePos(line, pos);
         diagnostic.message = line.tail(colonIndex + 2);
-        if (lineIndex + 1 < lines.getCount() && lines[lineIndex].startsWith("^+"))
+        if (lineIndex + 1 < lines.getCount() && lines[lineIndex+1].startsWith("^+"))
         {
             lineIndex++;
             pos = 2;
-            auto tokenLength = StringUtil::parseIntAndAdvancePos(line, pos);
+            auto tokenLength = StringUtil::parseIntAndAdvancePos(lines[lineIndex], pos);
             diagnostic.range.end.character += tokenLength;
         }
 

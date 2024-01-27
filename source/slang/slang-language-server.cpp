@@ -106,42 +106,58 @@ SlangResult LanguageServer::parseNextMessage()
             {
                 InitializeParams args;
                 m_connection->toNativeArgsOrSendError(call.params, &args, call.id);
-
                 init(args);
+                auto fillCapability = [&](ServerCapabilities& caps)
+                {
+                    caps.positionEncoding = "utf-16";
+                    caps.textDocumentSync.openClose = true;
+                    caps.textDocumentSync.change = (int)TextDocumentSyncKind::Incremental;
+                    caps.workspace.workspaceFolders.supported = true;
+                    caps.workspace.workspaceFolders.changeNotifications = false;
+                    caps.hoverProvider = true;
+                    caps.definitionProvider = true;
+                    caps.documentSymbolProvider = true;
+                    caps.inlayHintProvider.resolveProvider = false;
+                    caps.documentFormattingProvider = true;
+                    caps.documentOnTypeFormattingProvider.firstTriggerCharacter = "}";
+                    caps.documentOnTypeFormattingProvider.moreTriggerCharacter.add(";");
+                    caps.documentOnTypeFormattingProvider.moreTriggerCharacter.add(":");
+                    caps.documentOnTypeFormattingProvider.moreTriggerCharacter.add("{");
+                    caps.documentRangeFormattingProvider = true;
+                    caps.completionProvider.triggerCharacters.add(".");
+                    caps.completionProvider.triggerCharacters.add(":");
+                    caps.completionProvider.triggerCharacters.add("[");
+                    caps.completionProvider.triggerCharacters.add("\"");
+                    caps.completionProvider.triggerCharacters.add("/");
+                    caps.completionProvider.resolveProvider = true;
+                    caps.completionProvider.workDoneToken = "";
+                    caps.semanticTokensProvider.full = true;
+                    caps.semanticTokensProvider.range = false;
+                    caps.signatureHelpProvider.triggerCharacters.add("(");
+                    caps.signatureHelpProvider.triggerCharacters.add(",");
+                    caps.signatureHelpProvider.retriggerCharacters.add(",");
+                    for (auto tokenType : kSemanticTokenTypes)
+                        caps.semanticTokensProvider.legend.tokenTypes.add(tokenType);
+                };
+                ServerInfo serverInfo;
+                serverInfo.name = "SlangLanguageServer";
+                serverInfo.version = "1.8";
 
-                InitializeResult result;
-                result.serverInfo.name = "SlangLanguageServer";
-                result.serverInfo.version = "1.3";
-                result.capabilities.positionEncoding = "utf-16";
-                result.capabilities.textDocumentSync.openClose = true;
-                result.capabilities.textDocumentSync.change = (int)TextDocumentSyncKind::Incremental;
-                result.capabilities.workspace.workspaceFolders.supported = true;
-                result.capabilities.workspace.workspaceFolders.changeNotifications = false;
-                result.capabilities.hoverProvider = true;
-                result.capabilities.definitionProvider = true;
-                result.capabilities.documentSymbolProvider = true;
-                result.capabilities.inlayHintProvider.resolveProvider = false;
-                result.capabilities.documentFormattingProvider = true;
-                result.capabilities.documentOnTypeFormattingProvider.firstTriggerCharacter = "}";
-                result.capabilities.documentOnTypeFormattingProvider.moreTriggerCharacter.add(";");
-                result.capabilities.documentOnTypeFormattingProvider.moreTriggerCharacter.add(":");
-                result.capabilities.documentOnTypeFormattingProvider.moreTriggerCharacter.add("{");
-                result.capabilities.documentRangeFormattingProvider = true;
-                result.capabilities.completionProvider.triggerCharacters.add(".");
-                result.capabilities.completionProvider.triggerCharacters.add(":");
-                result.capabilities.completionProvider.triggerCharacters.add("[");
-                result.capabilities.completionProvider.triggerCharacters.add("\"");
-                result.capabilities.completionProvider.triggerCharacters.add("/");
-                result.capabilities.completionProvider.resolveProvider = true;
-                result.capabilities.completionProvider.workDoneToken = "";
-                result.capabilities.semanticTokensProvider.full = true;
-                result.capabilities.semanticTokensProvider.range = false;
-                result.capabilities.signatureHelpProvider.triggerCharacters.add("(");
-                result.capabilities.signatureHelpProvider.triggerCharacters.add(",");
-                result.capabilities.signatureHelpProvider.retriggerCharacters.add(",");
-                for (auto tokenType : kSemanticTokenTypes)
-                    result.capabilities.semanticTokensProvider.legend.tokenTypes.add(tokenType);
-                m_connection->sendResult(&result, call.id);
+                if (m_options.isVisualStudio)
+                {
+                    VSInitializeResult vsResult;
+                    vsResult.serverInfo = serverInfo;
+                    fillCapability(vsResult.capabilities);
+                    vsResult.capabilities._vs_projectContextProvider = true;
+                    m_connection->sendResult(&vsResult, call.id);
+                }
+                else
+                {
+                    InitializeResult result;
+                    result.serverInfo = serverInfo;
+                    fillCapability(result.capabilities);
+                    m_connection->sendResult(&result, call.id);
+                }
                 return SLANG_OK;
             }
             else if (call.method == "initialized")
@@ -2301,9 +2317,18 @@ SlangResult LanguageServer::execute()
     return SLANG_OK;
 }
 
-SLANG_API SlangResult runLanguageServer()
+SLANG_API void LanguageServerStartupOptions::parse(int argc, const char* const* argv)
 {
-    Slang::LanguageServer server;
+    for (int i = 1; i < argc; i++)
+    {
+        if (strcmp(argv[i], "-vs") == 0)
+            isVisualStudio = true;
+    }
+}
+
+SLANG_API SlangResult runLanguageServer(Slang::LanguageServerStartupOptions options)
+{
+    Slang::LanguageServer server(options);
     SLANG_RETURN_ON_FAIL(server.execute());
     return SLANG_OK;
 }
