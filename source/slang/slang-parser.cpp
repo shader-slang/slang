@@ -4409,7 +4409,6 @@ namespace Slang
     {
         DeclBase* decl = nullptr;
         
-        parser->pendingModifiers = &modifiers;
         struct RestorePendingModifiersRAII
         {
             Modifiers* oldValue;
@@ -4420,6 +4419,7 @@ namespace Slang
             }
         };
         RestorePendingModifiersRAII restorePendingModifiersRAII{ parser->pendingModifiers, parser };
+        parser->pendingModifiers = &modifiers;
 
         auto loc = parser->tokenReader.peekLoc();
 
