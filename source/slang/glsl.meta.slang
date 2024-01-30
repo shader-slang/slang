@@ -429,6 +429,7 @@ ${{{{
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(glsl)
 [__readNone]
+[ForceInline]
 public T atan(T y, T x)
 {
     return atan2(y, x);
@@ -437,6 +438,7 @@ public T atan(T y, T x)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(glsl)
 [__readNone]
+[ForceInline]
 public vector<T,N> atan(vector<T,N> y, vector<T,N> x)
 {
     return atan2(y, x);
@@ -447,6 +449,7 @@ __target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_asinh($0)")
 __target_intrinsic(cpp, "$P_asinh($0)")
 [__readNone]
+[ForceInline]
 public T asinh(T x)
 {
     return log(x + sqrt(x * x + T(1)));
@@ -455,6 +458,7 @@ public T asinh(T x)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(glsl)
 [__readNone]
+[ForceInline]
 public vector<T,N> asinh(vector<T,N> x)
 {
     VECTOR_MAP_UNARY(T, N, asinh, x);
@@ -465,6 +469,7 @@ __target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_acosh($0)")
 __target_intrinsic(cpp, "$P_acosh($0)")
 [__readNone]
+[ForceInline]
 public T acosh(T x)
 {
     return log(x + sqrt( x * x - T(1)));
@@ -473,6 +478,7 @@ public T acosh(T x)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(glsl)
 [__readNone]
+[ForceInline]
 public vector<T,N> acosh(vector<T,N> x)
 {
     VECTOR_MAP_UNARY(T, N, acosh, x);
@@ -483,6 +489,7 @@ __target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_atanh($0)")
 __target_intrinsic(cpp, "$P_atanh($0)")
 [__readNone]
+[ForceInline]
 public T atanh(T x)
 {
     return T(0.5) * log((T(1) + x) / (T(1) - x));
@@ -491,6 +498,7 @@ public T atanh(T x)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(glsl)
 [__readNone]
+[ForceInline]
 public vector<T,N> atanh(vector<T,N> x)
 {
     VECTOR_MAP_UNARY(T, N, atanh, x);
@@ -503,6 +511,7 @@ public vector<T,N> atanh(vector<T,N> x)
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(glsl)
 [__readNone]
+[ForceInline]
 public T inversesqrt(T x)
 {
     return rsqrt(x);
@@ -511,6 +520,7 @@ public T inversesqrt(T x)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(glsl)
 [__readNone]
+[ForceInline]
 public vector<T, N> inversesqrt(vector<T, N> x)
 {
     return rsqrt(x);
@@ -523,6 +533,7 @@ public vector<T, N> inversesqrt(vector<T, N> x)
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(glsl)
 [__readNone]
+[ForceInline]
 public T fract(T x)
 {
     return frac(x);
@@ -531,6 +542,7 @@ public T fract(T x)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(glsl)
 [__readNone]
+[ForceInline]
 public vector<T, N> fract(vector<T, N> x)
 {
     return frac(x);
@@ -539,6 +551,7 @@ public vector<T, N> fract(vector<T, N> x)
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(glsl)
 [__readNone]
+[ForceInline]
 public T mod(T x, T y)
 {
     return fmod(x, y);
@@ -547,6 +560,7 @@ public T mod(T x, T y)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(glsl)
 [__readNone]
+[ForceInline]
 public vector<T, N> mod(vector<T, N> x, T y)
 {
     return fmod(x, vector<T, N>(y));
@@ -555,6 +569,7 @@ public vector<T, N> mod(vector<T, N> x, T y)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(glsl)
 [__readNone]
+[ForceInline]
 public vector<T, N> mod(vector<T, N> x, vector<T, N> y)
 {
     return fmod(x, y);
@@ -563,6 +578,7 @@ public vector<T, N> mod(vector<T, N> x, vector<T, N> y)
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(glsl)
 [__readNone]
+[ForceInline]
 public T mix(T x, T y, T a)
 {
     return lerp(x, y, a);
@@ -571,6 +587,7 @@ public T mix(T x, T y, T a)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(glsl)
 [__readNone]
+[ForceInline]
 public vector<T, N> mix(vector<T, N> x, vector<T, N> y, T a)
 {
     return lerp(x, y, vector<T, N>(a));
@@ -579,6 +596,7 @@ public vector<T, N> mix(vector<T, N> x, vector<T, N> y, T a)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(glsl)
 [__readNone]
+[ForceInline]
 public vector<T, N> mix(vector<T, N> x, vector<T, N> y, vector<T, N> a)
 {
     return lerp(x, y, a);
@@ -587,6 +605,7 @@ public vector<T, N> mix(vector<T, N> x, vector<T, N> y, vector<T, N> a)
 __generic<T>
 __target_intrinsic(glsl)
 [__readNone]
+[ForceInline]
 public T mix(T x, T y, bool a)
 {
     return (a ? y : x);
@@ -595,6 +614,7 @@ public T mix(T x, T y, bool a)
 __generic<T, let N : int>
 __target_intrinsic(glsl)
 [__readNone]
+[ForceInline]
 public vector<T, N> mix(vector<T, N> x, vector<T, N> y, vector<bool, N> a)
 {
     vector<T, N> result;
@@ -607,6 +627,7 @@ public vector<T, N> mix(vector<T, N> x, vector<T, N> y, vector<bool, N> a)
 
 __target_intrinsic(glsl)
 [__readNone]
+[ForceInline]
 public int floatBitsToInt(highp float x)
 {
     return asint(x);
@@ -615,6 +636,7 @@ public int floatBitsToInt(highp float x)
 __generic<let N : int>
 __target_intrinsic(glsl)
 [__readNone]
+[ForceInline]
 public vector<int, N> floatBitsToInt(highp vector<float, N> x)
 {
     return asint(x);
@@ -622,6 +644,7 @@ public vector<int, N> floatBitsToInt(highp vector<float, N> x)
 
 __target_intrinsic(glsl)
 [__readNone]
+[ForceInline]
 public uint floatBitsToUint(highp float x)
 {
     return asuint(x);
@@ -630,6 +653,7 @@ public uint floatBitsToUint(highp float x)
 __generic<let N : int>
 __target_intrinsic(glsl)
 [__readNone]
+[ForceInline]
 public vector<uint, N> floatBitsToUint(highp vector<float, N> x)
 {
     return asuint(x);
@@ -637,6 +661,7 @@ public vector<uint, N> floatBitsToUint(highp vector<float, N> x)
 
 __target_intrinsic(glsl)
 [__readNone]
+[ForceInline]
 public float intBitsToFloat(highp int x)
 {
     return asfloat(x);
@@ -645,6 +670,7 @@ public float intBitsToFloat(highp int x)
 __generic<let N : int>
 __target_intrinsic(glsl)
 [__readNone]
+[ForceInline]
 public vector<float, N> intBitsToFloat(highp vector<int, N> x)
 {
     return asfloat(x);
@@ -652,6 +678,7 @@ public vector<float, N> intBitsToFloat(highp vector<int, N> x)
 
 __target_intrinsic(glsl)
 [__readNone]
+[ForceInline]
 public float uintBitsToFloat(highp uint x)
 {
     return asfloat(x);
@@ -660,38 +687,15 @@ public float uintBitsToFloat(highp uint x)
 __generic<let N : int>
 __target_intrinsic(glsl)
 [__readNone]
+[ForceInline]
 public vector<float, N> uintBitsToFloat(highp vector<uint, N> x)
 {
     return asfloat(x);
 }
 
-__target_intrinsic(glsl)
-[__readNone]
-public float fma(float a, float b, float c)
-{
-    return mad(a, b, c);
-}
-
-__generic<let N : int>
-__target_intrinsic(glsl)
-[__readNone]
-public vector<float, N> fma(vector<float, N> a, vector<float, N> b, vector<float, N> c)
-{
-    return mad(a, b, c);
-}
-
 //
 // Section 8.5. Geometric Functions
 //
-
-__generic<T : __BuiltinFloatingPointType>
-__target_intrinsic(glsl)
-[__readNone]
-[ForceInline]
-public T dot(T x, T y)
-{
-    return x * y;
-}
 
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(glsl)
@@ -705,14 +709,7 @@ public T faceforward(T n, T i, T ng)
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(glsl)
 [__readNone]
-public T reflect(T i, T n)
-{
-    return i - T(2) * dot(n,i) * n;
-}
-
-__generic<T : __BuiltinFloatingPointType>
-__target_intrinsic(glsl)
-[__readNone]
+[ForceInline]
 public T refract(T i, T n, T eta)
 {
     let dotNI = dot(n,i);
@@ -731,6 +728,7 @@ public T refract(T i, T n, T eta)
 
 __target_intrinsic(glsl)
 [__readNone]
+[ForceInline]
 public uint uaddCarry(highp uint x, highp uint y, out lowp uint carry)
 {
     let result = x * y;
@@ -741,20 +739,14 @@ public uint uaddCarry(highp uint x, highp uint y, out lowp uint carry)
 __generic<let N : int>
 __target_intrinsic(glsl)
 [__readNone]
+[ForceInline]
 public vector<uint,N> uaddCarry(highp vector<uint,N> x, highp vector<uint,N> y, out lowp vector<uint,N> carry)
 {
     VECTOR_MAP_TRINARY(uint, N, uaddCarry, x, y, carry);
 }
 
-__generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(glsl)
-[ForceInline]
-public T normalize(T x)
-{
-    return x;
-}
-
-__target_intrinsic(glsl)
+[__readNone]
 [ForceInline]
 public uint usubBorrow(highp uint x, highp uint y, out lowp uint borrow)
 {
@@ -764,6 +756,7 @@ public uint usubBorrow(highp uint x, highp uint y, out lowp uint borrow)
 
 __generic<let N : int>
 __target_intrinsic(glsl)
+[__readNone]
 [ForceInline]
 public vector<uint,N> usubBorrow(highp vector<uint,N> x, highp vector<uint,N> y, out lowp vector<uint,N> borrow)
 {
@@ -771,6 +764,7 @@ public vector<uint,N> usubBorrow(highp vector<uint,N> x, highp vector<uint,N> y,
 }
 
 __target_intrinsic(glsl)
+[__readNone]
 [ForceInline]
 public void umulExtended(highp uint x, highp uint y, out highp uint msb, out highp uint lsb)
 {
@@ -792,6 +786,7 @@ public void umulExtended(highp uint x, highp uint y, out highp uint msb, out hig
 
 __generic<let N : int>
 __target_intrinsic(glsl)
+[__readNone]
 [ForceInline]
 public void umulExtended(highp vector<uint,N> x, highp vector<uint,N> y, out highp vector<uint,N> msb, out highp vector<uint,N> lsb)
 {
@@ -802,6 +797,7 @@ public void umulExtended(highp vector<uint,N> x, highp vector<uint,N> y, out hig
 }
 
 __target_intrinsic(glsl)
+[__readNone]
 [ForceInline]
 public void imulExtended(highp int x, highp int y, out highp int msb, out highp int lsb)
 {
@@ -825,6 +821,7 @@ public void imulExtended(highp int x, highp int y, out highp int msb, out highp 
 
 __generic<let N : int>
 __target_intrinsic(glsl)
+[__readNone]
 [ForceInline]
 public void imulExtended(highp vector<int,N> x, highp vector<int,N> y, out highp vector<int,N> msb, out highp vector<int,N> lsb)
 {
@@ -835,6 +832,7 @@ public void imulExtended(highp vector<int,N> x, highp vector<int,N> y, out highp
 }
 
 __target_intrinsic(glsl)
+[__readNone]
 [ForceInline]
 public int bitfieldExtract(int value, int offset, int bits)
 {
@@ -843,6 +841,7 @@ public int bitfieldExtract(int value, int offset, int bits)
 
 __generic<let N : int>
 __target_intrinsic(glsl)
+[__readNone]
 [ForceInline]
 public vector<int,N> bitfieldExtract(vector<int,N> value, int offset, int bits)
 {
@@ -855,6 +854,7 @@ public vector<int,N> bitfieldExtract(vector<int,N> value, int offset, int bits)
 }
 
 __target_intrinsic(glsl)
+[__readNone]
 [ForceInline]
 public uint bitfieldExtract(uint value, int offset, int bits)
 {
@@ -863,6 +863,7 @@ public uint bitfieldExtract(uint value, int offset, int bits)
 
 __generic<let N : int>
 __target_intrinsic(glsl)
+[__readNone]
 [ForceInline]
 public vector<uint,N> bitfieldExtract(vector<uint,N> value, int offset, int bits)
 {
@@ -875,6 +876,7 @@ public vector<uint,N> bitfieldExtract(vector<uint,N> value, int offset, int bits
 }
 
 __target_intrinsic(glsl)
+[__readNone]
 [ForceInline]
 public uint bitfieldInsert(uint base, uint insert, int offset, int bits)
 {
@@ -886,6 +888,7 @@ public uint bitfieldInsert(uint base, uint insert, int offset, int bits)
 
 __generic<let N : int>
 __target_intrinsic(glsl)
+[__readNone]
 [ForceInline]
 public vector<uint,N> bitfieldInsert(vector<uint,N> base, vector<uint,N> insert, int offset, int bits)
 {
@@ -898,6 +901,7 @@ public vector<uint,N> bitfieldInsert(vector<uint,N> base, vector<uint,N> insert,
 }
 
 __target_intrinsic(glsl)
+[__readNone]
 [ForceInline]
 public int bitfieldInsert(int base, int insert, int offset, int bits)
 {
@@ -909,6 +913,7 @@ public int bitfieldInsert(int base, int insert, int offset, int bits)
 
 __generic<let N : int>
 __target_intrinsic(glsl)
+[__readNone]
 [ForceInline]
 public vector<int,N> bitfieldInsert(vector<int,N> base, vector<int,N> insert, int offset, int bits)
 {
@@ -921,6 +926,7 @@ public vector<int,N> bitfieldInsert(vector<int,N> base, vector<int,N> insert, in
 }
 
 __target_intrinsic(glsl)
+[__readNone]
 [ForceInline]
 public int bitfieldReverse(highp int value)
 {
@@ -934,6 +940,7 @@ public int bitfieldReverse(highp int value)
 
 __generic<let N : int>
 __target_intrinsic(glsl)
+[__readNone]
 [ForceInline]
 public vector<int,N> bitfieldReverse(highp vector<int,N> value)
 {
@@ -941,6 +948,7 @@ public vector<int,N> bitfieldReverse(highp vector<int,N> value)
 }
 
 __target_intrinsic(glsl)
+[__readNone]
 [ForceInline]
 public uint bitfieldReverse(highp uint value)
 {
@@ -954,6 +962,7 @@ public uint bitfieldReverse(highp uint value)
 
 __generic<let N : int>
 __target_intrinsic(glsl)
+[__readNone]
 [ForceInline]
 public vector<uint,N> bitfieldReverse(highp vector<uint,N> value)
 {
@@ -962,16 +971,16 @@ public vector<uint,N> bitfieldReverse(highp vector<uint,N> value)
 
 
 __target_intrinsic(glsl)
+[__readNone]
+[ForceInline]
 public uint bitCount(uint value)
 {
-    value = value - ((value >> 1) & 0x55555555);
-    value = (value & 0x33333333) + ((value >> 2) & 0x33333333);
-    value = ((value + (value >> 4) & 0xF0F0F0F) * 0x1010101) >> 24;
-    return value;
+    return countbits(value);
 }
 
 __generic<let N : int>
 __target_intrinsic(glsl)
+[__readNone]
 [ForceInline]
 public vector<uint,N> bitCount(vector<uint,N> value)
 {
@@ -979,6 +988,8 @@ public vector<uint,N> bitCount(vector<uint,N> value)
 }
 
 __target_intrinsic(glsl)
+[__readNone]
+[ForceInline]
 public int bitCount(int value)
 {
     return ((value >= 0) ? bitCount(uint(value)) : 1 + bitCount(uint(-value)));
@@ -986,6 +997,7 @@ public int bitCount(int value)
     
 __generic<let N : int>
 __target_intrinsic(glsl)
+[__readNone]
 [ForceInline]
 public vector<int,N> bitCount(vector<int,N> value)
 {
@@ -993,6 +1005,7 @@ public vector<int,N> bitCount(vector<int,N> value)
 }
 
 __target_intrinsic(glsl)
+[__readNone]
 [ForceInline]
 public int findLSB(int v)
 {
@@ -1001,6 +1014,7 @@ public int findLSB(int v)
 
 __generic<let N : int>
 __target_intrinsic(glsl)
+[__readNone]
 [ForceInline]
 public vector<int,N> findLSB(vector<int,N> value)
 {
@@ -1008,6 +1022,7 @@ public vector<int,N> findLSB(vector<int,N> value)
 }
 
 __target_intrinsic(glsl)
+[__readNone]
 [ForceInline]
 public uint findLSB(uint v)
 {
@@ -1016,6 +1031,7 @@ public uint findLSB(uint v)
 
 __generic<let N : int>
 __target_intrinsic(glsl)
+[__readNone]
 [ForceInline]
 public vector<uint,N> findLSB(vector<uint,N> value)
 {
@@ -1023,6 +1039,7 @@ public vector<uint,N> findLSB(vector<uint,N> value)
 }
 
 __target_intrinsic(glsl)
+[__readNone]
 [ForceInline]
 public int findMSB(int value)
 {
@@ -1031,6 +1048,7 @@ public int findMSB(int value)
 
 __generic<let N : int>
 __target_intrinsic(glsl)
+[__readNone]
 [ForceInline]
 public vector<int,N> findMSB(vector<int,N> value)
 {
@@ -1038,6 +1056,7 @@ public vector<int,N> findMSB(vector<int,N> value)
 }
 
 __target_intrinsic(glsl)
+[__readNone]
 [ForceInline]
 public uint findMSB(uint value)
 {
@@ -1046,6 +1065,7 @@ public uint findMSB(uint value)
 
 __generic<let N : int>
 __target_intrinsic(glsl)
+[__readNone]
 [ForceInline]
 public vector<uint,N> findMSB(vector<uint,N> value)
 {
@@ -1054,15 +1074,11 @@ public vector<uint,N> findMSB(vector<uint,N> value)
 
 __generic<let N : int>
 __target_intrinsic(glsl)
+[__readNone]
 [ForceInline]
 public vector<bool,N> not(vector<bool,N> x)
 {
-    vector<bool,N> result;
-    for (int i = 0; i < N; ++i)
-    {
-        result[i] = !x[i];
-    }
-    return result;
+    return !x;
 }
 
 //

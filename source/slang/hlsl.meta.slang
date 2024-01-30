@@ -4174,6 +4174,16 @@ T distance(T x, T y)
 
 // Vector dot product
 
+__generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+[__readNone]
+[ForceInline]
+T dot(T x, T y)
+{
+    return x * y;
+}
+
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
@@ -4552,31 +4562,32 @@ matrix<T, N, M> floor(matrix<T, N, M> x)
     MATRIX_MAP_UNARY(T, N, M, floor, x);
 }
 
-// Fused multiply-add for doubles
+// Fused multiply-add
+__generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_fma($0, $1, $2)")
 __target_intrinsic(cpp, "$P_fma($0, $1, $2)")
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Fma _0 _1 _2")
 [__readNone]
-double fma(double a, double b, double c);
+T fma(T a, T b, T c);
 
-__generic<let N : int>
+__generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Fma _0 _1 _2")
 [__readNone]
-vector<double, N> fma(vector<double, N> a, vector<double, N> b, vector<double, N> c)
+vector<T, N> fma(vector<T, N> a, vector<T, N> b, vector<T, N> c)
 {
-    VECTOR_MAP_TRINARY(double, N, fma, a, b, c);
+    VECTOR_MAP_TRINARY(T, N, fma, a, b, c);
 }
 
-__generic<let N : int, let M : int>
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
-matrix<double, N, M> fma(matrix<double, N, M> a, matrix<double, N, M> b, matrix<double, N, M> c)
+matrix<T, N, M> fma(matrix<T, N, M> a, matrix<T, N, M> b, matrix<T, N, M> c)
 {
-    MATRIX_MAP_TRINARY(double, N, M, fma, a, b, c);
+    MATRIX_MAP_TRINARY(T, N, M, fma, a, b, c);
 }
 
 // Floating point remainder of x/y
@@ -6183,6 +6194,16 @@ vector<T,N> normalize(vector<T,N> x)
     return x / length(x);
 }
 
+__generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Normalize _0")
+[__readNone]
+T normalize(T x)
+{
+    return x;
+}
+
 // Raise to a power
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
@@ -6387,6 +6408,16 @@ matrix<T, N, M> rcp(matrix<T, N, M> x)
 }
 
 // Reflect incident vector across plane with given normal
+__generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Reflect _0 _1")
+[__readNone]
+T reflect(T i, T n)
+{
+    return i - T(2) * dot(n,i) * n;
+}
+
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
