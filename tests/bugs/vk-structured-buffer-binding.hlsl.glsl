@@ -10,14 +10,14 @@ layout(std430, binding = 3, set = 4) buffer StructuredBuffer_uint_t_0 {
 } gDoneGroups_0;
 
 layout(location = 0)
-out vec4 _S1;
+out vec4 main_0;
 
 layout(location = 0)
-in vec3 _S2;
+in vec3 uv_0;
 
 void main()
 {
-    _S1 = vec4(float(gDoneGroups_0._data[uint(int(_S2.z))]));
+    main_0 = vec4(float(gDoneGroups_0._data[uint(int(uv_0.z))]));
     return;
 }
 

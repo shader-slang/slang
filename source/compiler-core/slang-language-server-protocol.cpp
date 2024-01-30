@@ -257,6 +257,29 @@ static const StructRttiInfo _makeServerCapabilitiesRtti()
 }
 const StructRttiInfo ServerCapabilities::g_rttiInfo = _makeServerCapabilitiesRtti();
 
+static const StructRttiInfo _makeVSServerCapabilitiesRtti()
+{
+    VSServerCapabilities obj;
+    StructRttiBuilder builder(&obj, "LanguageServerProtocol::ServerCapabilities", nullptr);
+    builder.addField("positionEncoding", &obj.positionEncoding);
+    builder.addField("textDocumentSync", &obj.textDocumentSync);
+    builder.addField("workspace", &obj.workspace);
+    builder.addField("hoverProvider", &obj.hoverProvider);
+    builder.addField("inlayHintProvider", &obj.inlayHintProvider);
+    builder.addField("documentOnTypeFormattingProvider", &obj.documentOnTypeFormattingProvider);
+    builder.addField("documentFormattingProvider", &obj.documentFormattingProvider);
+    builder.addField("documentRangeFormattingProvider", &obj.documentRangeFormattingProvider);
+    builder.addField("definitionProvider", &obj.definitionProvider);
+    builder.addField("completionProvider", &obj.completionProvider);
+    builder.addField("semanticTokensProvider", &obj.semanticTokensProvider);
+    builder.addField("signatureHelpProvider", &obj.signatureHelpProvider);
+    builder.addField("documentSymbolProvider", &obj.documentSymbolProvider);
+    builder.addField("_vs_projectContextProvider", &obj._vs_projectContextProvider);
+    builder.ignoreUnknownFields();
+    return builder.make();
+}
+const StructRttiInfo VSServerCapabilities::g_rttiInfo = _makeVSServerCapabilitiesRtti();
+
 static const StructRttiInfo _makeServerInfoRtti()
 {
     ServerInfo obj;
@@ -279,6 +302,17 @@ static const StructRttiInfo _makeInitializeResultRtti()
     return builder.make();
 }
 const StructRttiInfo InitializeResult::g_rttiInfo = _makeInitializeResultRtti();
+
+static const StructRttiInfo _makeVSInitializeResultRtti()
+{
+    VSInitializeResult obj;
+    StructRttiBuilder builder(&obj, "LanguageServerProtocol::VSInitializeResult", nullptr);
+    builder.addField("capabilities", &obj.capabilities);
+    builder.addField("serverInfo", &obj.serverInfo);
+    builder.ignoreUnknownFields();
+    return builder.make();
+}
+const StructRttiInfo VSInitializeResult::g_rttiInfo = _makeVSInitializeResultRtti();
 
 const UnownedStringSlice InitializeParams::methodName =
     UnownedStringSlice::fromLiteral("initialize");

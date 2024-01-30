@@ -277,7 +277,7 @@ Some key Slang interfaces are binary-compatible with existing COM interfaces.
 However, the Slang API does not depend on any runtime aspects of the COM system, even on Windows; the Slang system can be seen as a "COM-lite" API.
 
 The `ISlangUnknown` interface is equivalent to (and binary-compatible with) the standard COM `IUnknown`.
-Application code is expected to correctly maintain the reference counts of `ISlangUnknown` objects returned from API calls; the `SlangComPtr<T>` "smart pointer" type is provided as an optional convenience for applications that want to use it.
+Application code is expected to correctly maintain the reference counts of `ISlangUnknown` objects returned from API calls; the `Slang::ComPtr<T>` "smart pointer" type is provided as an optional convenience for applications that want to use it.
 
 Many Slang API calls return `SlangResult` values; this type is equivalent to (and binary-compatible with) the standard COM `HRESULT` type.
 As a matter of convention, Slang API calls return a zero value (`SLANG_OK`) on success, and a negative value on errors.
@@ -288,7 +288,7 @@ A Slang _global session_ uses the interface `slang::IGlobalSession` and it repre
 A global session is created using the function `slang::createGlobalSession()`:
 
 ```c++
-SlangComPtr<IGlobalSession> globalSession;
+Slang::ComPtr<IGlobalSession> globalSession;
 slang::createGlobalSession(globalSession.writeRef());
 ```
 
@@ -318,7 +318,7 @@ To create a session, use the `IGlobalSession::createSession()` method:
 ```c++
 SessionDesc sessionDesc;
 /* ... fill in `sessionDesc` ... */
-SlangComPtr<ISession> session;
+Slang::ComPtr<ISession> session;
 globalSession->createSession(sessionDesc, session.writeRef());
 ```
 
@@ -380,7 +380,7 @@ sessionDesc.preprocessorMacroCount = 1;
 The simplest way to load code into a session is with `ISession::loadModule()`:
 
 ```c++
-SlangComPtr<IModule> module = session->loadModule("MyShaders");
+Slang::ComPtr<IModule> module = session->loadModule("MyShaders");
 ```
 
 Executing `loadModule("MyShaders")` in host C++ code is similar to using `import MyShaders` in Slang code.
@@ -398,8 +398,8 @@ Many operations in Slang, such as `ISession::loadModule()` can optionally produc
 For example:
 
 ```c++
-SlangComPtr<IBlob> diagnostics;
-SlangComPtr<IModule> module = session->loadModule("MyShaders", diagnostics.writeRef());
+Slang::ComPtr<IBlob> diagnostics;
+Slang::ComPtr<IModule> module = session->loadModule("MyShaders", diagnostics.writeRef());
 ```
 
 In this example, if any diagnostic messages were produced when loading `MyShaders`, then the `diagnostics` pointer will be set to a blob that contains the textual content of those diagnostics.
@@ -432,7 +432,7 @@ then the Slang system will automatically detect and validate this entry point as
 After a module has been loaded, the application can look up entry points in that module using `IModule::findEntryPointByName()`:
 
 ```c++
-SlangComPtr<IEntryPoint> computeEntryPoint;
+Slang::ComPtr<IEntryPoint> computeEntryPoint;
 module->findEntryPointByName("myComputeMain", computeEntryPoint.writeRef());
 ```
 
@@ -446,7 +446,7 @@ A composition can be created with `ISession::createCompositeComponentType()`:
 
 ```c++
 IComponentType* components[] = { module, entryPoint };
-SlangComPtr<IComponentType> program;
+Slang::ComPtr<IComponentType> program;
 session->createCompositeComponentType(components, 2, program.writeRef());
 ```
 
@@ -484,7 +484,7 @@ Given a composed `IComponentType`, an application can extract kernel code for on
 ```c++
 int entryPointIndex = 0; // only one entry point
 int targetIndex = 0; // only one target
-SlangComPtr<IBlob> kernelBlob;
+Slang::ComPtr<IBlob> kernelBlob;
 program->getEntryPointCode(
     entryPointIndex,
     targetIndex,

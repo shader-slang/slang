@@ -180,7 +180,7 @@ void GLSLSourceEmitter::_emitGLSLStructuredBuffer(IRGlobalParam* varDecl, IRHLSL
             m_writer->emit(space);
         }
     }
-
+    
     m_writer->emit(") ");
 
     /*
@@ -195,7 +195,10 @@ void GLSLSourceEmitter::_emitGLSLStructuredBuffer(IRGlobalParam* varDecl, IRHLSL
     HLSLAppendStructuredBufferType                  - Write
     HLSLConsumeStructuredBufferType                 - TODO (JS): Its possible that this can be readonly, but we currently don't support on GLSL
     */
-
+    if (varDecl->findDecoration<IRGloballyCoherentDecoration>())
+    {
+        m_writer->emit("coherent ");
+    }
     if (as<IRHLSLStructuredBufferType>(structuredBufferType))
     {
         m_writer->emit("readonly ");
@@ -264,8 +267,12 @@ void GLSLSourceEmitter::emitSSBOHeader(IRGlobalParam* varDecl, IRType* bufferTyp
             m_writer->emit(space);
         }
     }
-
     m_writer->emit(") ");
+
+    if (varDecl->findDecoration<IRGloballyCoherentDecoration>())
+    {
+        m_writer->emit("coherent ");
+    }
 
     /*
     If the output type is a buffer, and we can determine it is only readonly we can prefix before

@@ -3,7 +3,7 @@
 layout(row_major) uniform;
 layout(row_major) buffer;
 layout(location = 0)
-out vec3  _S1[3];
+out vec3  verts_foo_bar_baz_color_0[3];
 
 out gl_MeshPerVertexEXT
 {
@@ -20,7 +20,7 @@ void main()
     if(gl_LocalInvocationIndex < 3U)
     {
         gl_MeshVerticesEXT[gl_LocalInvocationIndex].gl_Position = vec4(0.00000000000000000000, 0.00000000000000000000, 0.00000000000000000000, 1.00000000000000000000);
-        _S1[gl_LocalInvocationIndex] = vec3(1.00000000000000000000, 2.00000000000000000000, 3.00000000000000000000);
+        verts_foo_bar_baz_color_0[gl_LocalInvocationIndex] = vec3(1.00000000000000000000, 2.00000000000000000000, 3.00000000000000000000);
     }
     else
     {

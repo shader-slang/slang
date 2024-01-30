@@ -19,10 +19,10 @@ layout(std140) uniform _S2
 } y_0;
 
 layout(location = 0)
-out vec4 _S3;
+out vec4 main_0;
 
 void main()
 {
-    _S3 = x_0.v_0 + y_0.v_0;
+    main_0 = x_0.v_0 + y_0.v_0;
     return;
 }

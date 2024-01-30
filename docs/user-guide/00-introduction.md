@@ -22,6 +22,8 @@ Some of the benefits of Slang include:
 
 * _Interfaces_ and _generics_ provide first-class alternative to hacky preprocessor-based or string-pasting shader specialization. Preprocessor hacks can be replaced with a well-understood language feature already used in Rust, Swift, C#, Java, and more.
 
+* _Automatic differentiation_ greatly simplifies the implementation of learning-based techniques in shaders. Slang supports automatically generating both forward derivative and backward derivative propagation functions from forward computation code.
+
 * Slang supports a first class _module_ system, which enables true separate compilation and semantic checking of shader code. 
 
 * Slang supports compute, rasterization, and ray-tracing shaders

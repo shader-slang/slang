@@ -73,7 +73,7 @@ namespace Slang
         return writeHashFile(
             fileName,
             enumName,
-            { "../core/slang-common.h", "../core/slang-string.h", enumHeaderFile },
+            { "core/slang-common.h", "core/slang-string.h", enumHeaderFile },
             hashParams,
             values);
     }

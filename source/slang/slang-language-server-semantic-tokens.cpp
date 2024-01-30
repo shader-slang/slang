@@ -40,6 +40,8 @@ SemanticToken _createSemanticToken(SourceManager* manager, SourceLoc loc, Name* 
 List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedStringSlice fileName, DocumentVersion* doc)
 {
     auto manager = linkage->getSourceManager();
+    
+    auto cbufferName = linkage->getNamePool()->getName(toSlice("ConstantBuffer"));
 
     List<SemanticToken> result;
     auto maybeInsertToken = [&](const SemanticToken& token)
@@ -73,6 +75,10 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
             if (target->hasModifier<BuiltinTypeModifier>())
                 return;
             token.type = SemanticTokenType::Type;
+            if (name == cbufferName)
+            {
+                token.length = doc->getTokenLength(token.line, token.col);
+            }
         }
         else if (as<ConstructorDecl>(target))
         {
@@ -156,7 +162,7 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
             }
             else if (auto aggTypeDecl = as<AggTypeDeclBase>(node))
             {
-                if (aggTypeDecl->getName())
+                if (aggTypeDecl->getName() && aggTypeDecl->findModifier<ImplicitParameterGroupElementTypeModifier>() == nullptr)
                 {
                     SemanticToken token = _createSemanticToken(
                         manager, aggTypeDecl->getNameLoc(), aggTypeDecl->getName());

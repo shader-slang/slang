@@ -717,6 +717,21 @@ struct ByteAddressBufferLegalizationContext
         return structuredBufferParam;
     }
 
+    void cloneBufferDecorations(IRBuilder& builder, IRInst* dest, IRInst* src)
+    {
+        for (auto decoration : src->getDecorations())
+        {
+            switch (decoration->getOp())
+            {
+            case kIROp_GloballyCoherentDecoration:
+                builder.addDecoration(dest, decoration->getOp());
+                break;
+            default:
+                break;
+            }
+        }
+    }
+
     IRGlobalParam* createEquivalentStructuredBufferParam(IRType* elementType, IRGlobalParam* byteAddressBufferParam)
     {
         // When we need to create a new structured buffer to stand in for
@@ -751,7 +766,7 @@ struct ByteAddressBufferLegalizationContext
         {
             paramBuilder.addLayoutDecoration(structuredBufferParam, layoutDecoration->getLayout());
         }
-
+        cloneBufferDecorations(paramBuilder, structuredBufferParam, byteAddressBufferParam);
         return structuredBufferParam;
     }
 

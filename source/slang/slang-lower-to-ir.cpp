@@ -5695,13 +5695,32 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         {
             auto irCondition = getSimpleVal(context,
                 lowerRValueExpr(context, condExpr));
+            auto invCondition = builder->emitNot(irCondition->getDataType(), irCondition);
 
             // Now we want to `break` if the loop condition is false,
             // otherwise we will jump back to the head of the loop.
-            builder->emitLoopTest(
-                irCondition,
-                loopHead,
-                breakLabel);
+            // 
+            // We need to make sure not to reuse the break block of the loop as
+            // the break/merge block of the ifelse test.
+            // Therefore, we introduce a separate merge block for the loop test.
+            // 
+            // Emit the following structure:
+            // 
+            // [merge(mergeBlock)]
+            // if (cond) goto loopHead;
+            // else goto mergeBlock;
+            // 
+            // mergeBlock:
+            //   goto breakLabel;
+            auto mergeBlock = builder->emitBlock();
+            builder->emitBranch(loopHead);
+
+            builder->setInsertInto(testLabel);
+            builder->emitIfElse(
+                invCondition,
+                breakLabel,
+                mergeBlock,
+                mergeBlock);
         }
 
         // Finally we insert the label that a `break` will jump to
@@ -6919,7 +6938,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     IGNORED_CASE(IncludeDecl)
     IGNORED_CASE(ImplementingDecl)
     IGNORED_CASE(UsingDecl)
-    IGNORED_CASE(EmptyDecl)
     IGNORED_CASE(SyntaxDecl)
     IGNORED_CASE(AttributeDecl)
     IGNORED_CASE(NamespaceDecl)
@@ -6927,6 +6945,29 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     IGNORED_CASE(FileDecl)
 
 #undef IGNORED_CASE
+
+    LoweredValInfo visitEmptyDecl(EmptyDecl* decl)
+    {
+        for(const auto modifier : decl->modifiers)
+        {
+            if(const auto layoutLocalSizeAttr = as<GLSLLayoutLocalSizeAttribute>(modifier))
+            {
+                for(const auto d : context->irBuilder->getModule()->getModuleInst()->getGlobalInsts())
+                {
+                    if(d->findDecoration<IREntryPointDecoration>())
+                    {
+                        getBuilder()->addNumThreadsDecoration(
+                            d,
+                            layoutLocalSizeAttr->x,
+                            layoutLocalSizeAttr->y,
+                            layoutLocalSizeAttr->z
+                        );
+                    }
+                }
+            }
+        }
+        return LoweredValInfo();
+    }
 
     void ensureInsertAtGlobalScope(IRBuilder* builder)
     {
@@ -9306,16 +9347,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
             else if (auto numThreadsAttr = as<NumThreadsAttribute>(modifier))
             {
-                auto builder = getBuilder();
-                IRType* intType = builder->getIntType();
-
-                IRInst* operands[3] = {
-                    builder->getIntValue(intType, numThreadsAttr->x),
-                    builder->getIntValue(intType, numThreadsAttr->y),
-                    builder->getIntValue(intType, numThreadsAttr->z)
-                };
-
-                builder->addDecoration(irFunc, kIROp_NumThreadsDecoration, operands, 3);
+                getBuilder()->addNumThreadsDecoration(
+                    irFunc,
+                    numThreadsAttr->x,
+                    numThreadsAttr->y,
+                    numThreadsAttr->z
+                );
             }
             else if (as<ReadNoneAttribute>(modifier))
             {

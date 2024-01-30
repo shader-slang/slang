@@ -3040,7 +3040,7 @@ bool all(vector<T,N> x)
         }
         else
         {
-            let zero = __default<T>();
+            let zero = __default<vector<T,N>>();
             return spirv_asm
             {
                 OpFUnordNotEqual $$vector<bool,N> %castResult $x $zero;
@@ -3154,7 +3154,7 @@ bool any(vector<T, N> x)
         }
         else
         {
-            let zero = __default<T>();
+            let zero = __default<vector<T,N>>();
             return spirv_asm
             {
                 OpFUnordNotEqual $$vector<bool,N> %castResult $x $zero;
@@ -10207,6 +10207,42 @@ ${{{{
         auto ccName = kCandidateCommitted[candidateOrCommitted];
         auto ccTF = candidateOrCommitted == 0 ? "false" : "true";
 }}}}
+
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_extension(GL_EXT_ray_tracing_position_fetch)
+    __glsl_version(460)
+    [__NoSideEffect]
+    void __glslGetIntersectionTriangleVertexPositions$(ccName)(out float3 arr[3])
+    {
+        __intrinsic_asm "rayQueryGetIntersectionTriangleVertexPositionsEXT($0, $(ccTF), $1)";
+    };
+
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_extension(GL_EXT_ray_tracing_position_fetch)
+    __glsl_version(460)
+    [__NoSideEffect]
+    float3[3] $(ccName)GetIntersectionTriangleVertexPositions()
+    {
+        typedef float3[3] float3Arr3;
+        __target_switch
+        {
+        case glsl:
+            float3 output[3];
+            __glslGetIntersectionTriangleVertexPositions$(ccName)(output);
+            return output;
+        case spirv:
+            uint iCandidateOrCommitted = $(candidateOrCommitted);
+            return spirv_asm
+            {
+                OpCapability RayQueryKHR;
+                OpCapability RayTracingPositionFetchKHR;
+                OpCapability RayQueryPositionFetchKHR;
+                OpExtension "SPV_KHR_ray_query";
+                OpExtension "SPV_KHR_ray_tracing_position_fetch";
+                result: $$float3Arr3 = OpRayQueryGetIntersectionTriangleVertexPositionsKHR &this $iCandidateOrCommitted;
+            };
+        }
+    };
 
     // CandidateObjectToWorld3x4, CandidateWorldToObject4x3
     // CommittedObjectToWorld3x4, CommittedObjectToWorld4x3
