@@ -4561,16 +4561,24 @@ matrix<T, N, M> exp(matrix<T, N, M> x)
 
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
-__target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_exp2($0)")
 __target_intrinsic(cpp, "$P_exp2($0)")
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Exp2 _0")
 [__readNone]
-T exp2(T x);
+T exp2(T x)
+{
+    __target_switch
+    {
+    case glsl:
+        if (__isHalf<T>() || __isFloat<T>())
+            __intrinsic_asm "exp2($0)";
+        else
+            __intrinsic_asm "exp2(float($0))";
+    }
+}
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
-__target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Exp2 _0")
 [__readNone]
 vector<T,N> exp2(vector<T,N> x)
