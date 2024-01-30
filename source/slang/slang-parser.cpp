@@ -7630,6 +7630,8 @@ namespace Slang
                 {
                     numThreadsAttrib = parser->astBuilder->create<GLSLLayoutLocalSizeAttribute>();
                     numThreadsAttrib->args.setCount(3);
+                    for (auto& i : numThreadsAttrib->args)
+                        i = nullptr;
 
                     // Just mark the loc and name from the first in the list
                     numThreadsAttrib->keywordName = getName(parser, "numthreads");

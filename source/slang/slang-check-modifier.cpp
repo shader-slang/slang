@@ -1272,6 +1272,39 @@ namespace Slang
             }
         }
 
+        if (auto attr = as<GLSLLayoutLocalSizeAttribute>(m))
+        {
+            SLANG_ASSERT(attr->args.getCount() == 3);
+
+            int32_t values[3];
+
+            for (int i = 0; i < 3; ++i)
+            {
+                int32_t value = 1;
+
+                auto arg = attr->args[i];
+                if (arg)
+                {
+                    auto intValue = checkConstantIntVal(arg);
+                    if (!intValue)
+                    {
+                        return nullptr;
+                    }
+                    if (intValue->getValue() < 1)
+                    {
+                        getSink()->diagnose(attr, Diagnostics::nonPositiveNumThreads, intValue->getValue());
+                        return nullptr;
+                    }
+                    value = int32_t(intValue->getValue());
+                }
+                values[i] = value;
+            }
+
+            attr->x = values[0];
+            attr->y = values[1];
+            attr->z = values[2];
+        }
+
         // Default behavior is to leave things as they are,
         // and assume that modifiers are mostly already checked.
         //
