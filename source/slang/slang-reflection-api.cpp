@@ -168,6 +168,11 @@ static SlangParameterCategory maybeRemapParameterCategory(
                     return SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT;
                 break;
 
+            case SLANG_TYPE_KIND_SHADER_STORAGE_BUFFER:
+                if (category == SLANG_PARAMETER_CATEGORY_UNIFORM)
+                    return SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT;
+                break;
+
                 // TODO: implement more helpers here
 
             default:
@@ -382,6 +387,7 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
     CASE(HLSLRWByteAddressBufferType);
     CASE(HLSLRasterizerOrderedByteAddressBufferType);
     CASE(UntypedBufferResourceType);
+    CASE(GLSLShaderStorageBufferType);
 #undef CASE
 
     else if (const auto arrayType = as<ArrayExpressionType>(type))
@@ -668,6 +674,7 @@ SLANG_API SlangResourceShape spReflectionType_GetResourceShape(SlangReflectionTy
     CASE(HLSLRasterizerOrderedByteAddressBufferType,    SLANG_BYTE_ADDRESS_BUFFER,      SLANG_RESOURCE_ACCESS_RASTER_ORDERED);
     CASE(RaytracingAccelerationStructureType,           SLANG_ACCELERATION_STRUCTURE,   SLANG_RESOURCE_ACCESS_READ);
     CASE(UntypedBufferResourceType,                     SLANG_BYTE_ADDRESS_BUFFER,      SLANG_RESOURCE_ACCESS_READ);
+    CASE(GLSLShaderStorageBufferType,                   SLANG_BYTE_ADDRESS_BUFFER,      SLANG_RESOURCE_ACCESS_READ_WRITE);
 #undef CASE
 
     return SLANG_RESOURCE_NONE;
@@ -703,9 +710,7 @@ SLANG_API SlangResourceAccess spReflectionType_GetResourceAccess(SlangReflection
     CASE(HLSLRWByteAddressBufferType,                   SLANG_BYTE_ADDRESS_BUFFER,  SLANG_RESOURCE_ACCESS_READ_WRITE);
     CASE(HLSLRasterizerOrderedByteAddressBufferType,    SLANG_BYTE_ADDRESS_BUFFER,  SLANG_RESOURCE_ACCESS_RASTER_ORDERED);
     CASE(UntypedBufferResourceType,                     SLANG_BYTE_ADDRESS_BUFFER,  SLANG_RESOURCE_ACCESS_READ);
-
-    // This isn't entirely accurate, but I can live with it for now
-    CASE(GLSLShaderStorageBufferType, SLANG_STRUCTURED_BUFFER, SLANG_RESOURCE_ACCESS_READ_WRITE);
+    CASE(GLSLShaderStorageBufferType,                   SLANG_BYTE_ADDRESS_BUFFER,  SLANG_RESOURCE_ACCESS_READ_WRITE);
 #undef CASE
 
     return SLANG_RESOURCE_ACCESS_NONE;
@@ -1309,6 +1314,11 @@ namespace Slang
             {
                 return SLANG_BINDING_TYPE_MUTABLE_RAW_BUFFER;
             }
+        }
+        else if( as<GLSLShaderStorageBufferType>(type) )
+        {
+            // TODO Immutable buffers
+            return SLANG_BINDING_TYPE_MUTABLE_RAW_BUFFER;
         }
         else if( as<ConstantBufferType>(type) )
         {
