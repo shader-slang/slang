@@ -1,0 +1,458 @@
+//TEST:SIMPLE(filecheck=CHECK_GLSL): -allow-glsl -stage fragment -entry computeMain -target glsl
+//TEST:SIMPLE(filecheck=CHECK_SPV):  -allow-glsl -stage fragment -entry computeMain -target spirv
+//TEST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage fragment -entry computeMain -target hlsl
+//TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage fragment -entry computeMain -target cuda
+//TEST:SIMPLE(filecheck=CHECK_CPP): -allow-glsl -stage fragment -entry computeMain -target cpp
+
+// TODO: These keywords are not recognized but they should be.
+#define highp
+#define mediump
+#define lowp
+
+RWStructuredBuffer<float> outputBuffer;
+
+bool dim1TypeFuncs()
+{
+    typealias genFType = float;
+    typealias genDType = double;
+    typealias genIType = int;
+    typealias genUType = uint;
+    typealias genBType = bool;
+
+    genFType outGenFType;
+    genDType outGenDType;
+    genIType outGenIType, outGenIType2;
+    genUType outGenUType, outGenUType2;
+
+    bool voidResults = true;
+
+    // 8.8. Integer Functions
+    umulExtended(genUType(0), genUType(0), outGenUType, outGenUType2);
+    voidResults = voidResults && (genUType(0) == outGenUType && genUType(0) == outGenUType2);
+
+    imulExtended(genIType(0), genIType(0), outGenIType, outGenIType);
+    voidResults = voidResults && (genIType(0) == outGenIType && genIType(0) == outGenIType2);
+
+    return voidResults
+        // 8.1. Angle and Trigonometry Functions
+        && genFType(0) == radians(genFType(0))
+        && genFType(0) == degrees(genFType(0))
+        && genFType(0) == sin(genFType(0))
+        && genFType(0) == cos(genFType(0))
+        && genFType(0) == tan(genFType(0))
+        && genFType(0) == asin(genFType(0))
+        && genFType(0) == acos(genFType(0))
+        && genFType(0) == atan(genFType(0), genFType(0))
+        && genFType(0) == atan(genFType(0))
+        && genFType(0) == sinh(genFType(0))
+        && genFType(0) == cosh(genFType(0))
+        && genFType(0) == tanh(genFType(0))
+        && genFType(0) == asinh(genFType(0))
+        && genFType(0) == acosh(genFType(0))
+        && genFType(0) == atanh(genFType(0))
+
+        // 8.2. Exponential Functions
+        && genFType(0) == pow(genFType(0), genFType(0))
+        && genFType(0) == exp(genFType(0))
+        && genFType(0) == log(genFType(0))
+        && genFType(0) == exp2(genFType(0))
+        && genDType(0) == exp2(genDType(0))
+        && genFType(0) == log2(genFType(0))
+        && genFType(0) == sqrt(genFType(0))
+        && genDType(0) == sqrt(genDType(0))
+        && genFType(0) == inversesqrt(genFType(0))
+        && genDType(0) == inversesqrt(genDType(0))
+
+        // 8.3. Common Functions
+        && genFType(0) == abs(genFType(0))
+        && genIType(0) == abs(genIType(0))
+        && genDType(0) == abs(genDType(0))
+        && genFType(0) == sign(genFType(0))
+        //&& genIType(0) == sign(genIType(0)) // CUDA error
+        && genDType(0) == sign(genDType(0))
+        && genFType(0) == floor(genFType(0))
+        && genDType(0) == floor(genDType(0))
+        && genFType(0) == trunc(genFType(0))
+        && genDType(0) == trunc(genDType(0))
+        && genFType(0) == round(genFType(0))
+        && genDType(0) == round(genDType(0))
+        //&& genFType(0) == roundEven(genFType(0))
+        //&& genDType(0) == roundEven(genDType(0))
+        && genFType(0) == ceil(genFType(0))
+        && genDType(0) == ceil(genDType(0))
+        && genFType(0) == fract(genFType(0))
+        && genDType(0) == fract(genDType(0))
+        && genFType(0) == mod(genFType(0), float(1))
+        && genFType(0) == mod(genFType(0), genFType(1))
+        && genDType(0) == mod(genDType(0), double(1))
+        && genDType(0) == mod(genDType(0), genDType(0))
+        && genFType(0) == modf(genFType(0), outGenFType) && 0 == outGenFType
+        && genDType(0) == modf(genDType(0), outGenDType) && 0 == outGenDType
+        && genFType(0) == min(genFType(0), genFType(0))
+        && genFType(0) == min(genFType(0), float(0))
+        && genDType(0) == min(genDType(0), genDType(0))
+        && genDType(0) == min(genDType(0), double(0))
+        && genIType(0) == min(genIType(0), genIType(0))
+        && genIType(0) == min(genIType(0), int(0))
+        && genUType(0) == min(genUType(0), genUType(0))
+        && genUType(0) == min(genUType(0), uint(0))
+        && genFType(0) == max(genFType(0), genFType(0))
+        && genFType(0) == max(genFType(0), float(0))
+        && genDType(0) == max(genDType(0), genDType(0))
+        && genDType(0) == max(genDType(0), double(0))
+        && genIType(0) == max(genIType(0), genIType(0))
+        && genIType(0) == max(genIType(0), int(0))
+        && genUType(0) == max(genUType(0), genUType(0))
+        && genUType(0) == max(genUType(0), uint(0))
+        && genFType(0) == clamp(genFType(0), genFType(0), genFType(0))
+        && genFType(0) == clamp(genFType(0), float(0), float(0))
+        && genDType(0) == clamp(genDType(0), genDType(0), genDType(0))
+        && genDType(0) == clamp(genDType(0), double(0), double(0))
+        && genIType(0) == clamp(genIType(0), genIType(0), genIType(0))
+        && genIType(0) == clamp(genIType(0), int(0), int(0))
+        && genUType(0) == clamp(genUType(0), genUType(0), genUType(0))
+        && genUType(0) == clamp(genUType(0), uint(0), uint(0))
+        && genFType(0) == mix(genFType(0), genFType(0), genFType(0))
+        && genFType(0) == mix(genFType(0), genFType(0), float(0))
+        && genDType(0) == mix(genDType(0), genDType(0), genDType(0))
+        && genDType(0) == mix(genDType(0), genDType(0), double(0))
+        && genFType(0) == mix(genFType(0), genFType(0), genBType(0))
+        && genDType(0) == mix(genDType(0), genDType(0), genBType(0))
+        && genIType(0) == mix(genIType(0), genIType(0), genBType(0))
+        && genUType(0) == mix(genUType(0), genUType(0), genBType(0))
+        && genBType(0) == mix(genBType(0), genBType(0), genBType(0))
+        && genFType(0) == step(genFType(1), genFType(0))
+        && genFType(0) == step(float(1), genFType(0))
+        && genDType(0) == step(genDType(1), genDType(0))
+        && genDType(0) == step(double(1), genDType(0))
+        && genFType(0) == smoothstep(genFType(0), genFType(1), genFType(0))
+        && genFType(0) == smoothstep(float(0), float(1), genFType(0))
+        && genDType(0) == smoothstep(genDType(0), genDType(1), genDType(0))
+        && genDType(0) == smoothstep(double(0), double(1), genDType(0))
+        && genBType(0) == isnan(genFType(0))
+        && genBType(0) == isnan(genDType(0))
+        && genBType(0) == isinf(genFType(0))
+        && genBType(0) == isinf(genDType(0))
+        && genIType(0) == floatBitsToInt(genFType(0))
+        && genUType(0) == floatBitsToUint(genFType(0))
+        && genFType(0) == intBitsToFloat(genIType(0))
+        && genFType(0) == uintBitsToFloat(genUType(0))
+        && genFType(0) == fma(genFType(0), genFType(0), genFType(0))
+        && genDType(0) == fma(genDType(0), genDType(0), genDType(0))
+        && genFType(0) == frexp(genFType(0), outGenIType) && genIType(0) == outGenIType
+        && genDType(0) == frexp(genDType(0), outGenIType) && genIType(0) == outGenIType
+        && genFType(0) == ldexp(genFType(0), genIType(0))
+        && genDType(0) == ldexp(genDType(0), genIType(0))
+
+        // 8.5. Geometric Functions
+        && float(0) == length(genFType(0))
+        && double(0) == length(genDType(0))
+        && float(0) == distance(genFType(0), genFType(0))
+        && double(0) == distance(genDType(0), genDType(0))
+        && float(0) == dot(genFType(0), genFType(0))
+        && double(0) == dot(genDType(0), genDType(0))
+        && genFType(0) == normalize(genFType(1))
+        && genDType(0) == normalize(genDType(1))
+        && genFType(0) == faceforward(genFType(0), genFType(0), genFType(0))
+        && genDType(0) == faceforward(genDType(0), genDType(0), genDType(0))
+        && genFType(0) == reflect(genFType(0), genFType(0))
+        && genDType(0) == reflect(genDType(0), genDType(0))
+        && genFType(0) == refract(genFType(0), genFType(0), float(0))
+        && genDType(0) == refract(genDType(0), genDType(0), double(0))
+
+        // 8.6. Matrix Functions
+        //&& mat2x2(0) == matrixCompMult(mat2x2(0), mat2x2(0))
+        //&& mat2x3(0) == matrixCompMult(mat2x3(0), mat2x3(0))
+        //&& mat2x4(0) == matrixCompMult(mat2x4(0), mat2x4(0))
+        //&& mat3x2(0) == matrixCompMult(mat3x2(0), mat3x2(0))
+        //&& mat3x3(0) == matrixCompMult(mat3x3(0), mat3x3(0))
+        //&& mat3x4(0) == matrixCompMult(mat3x4(0), mat3x4(0))
+        //&& mat4x2(0) == matrixCompMult(mat4x2(0), mat4x2(0))
+        //&& mat4x3(0) == matrixCompMult(mat4x3(0), mat4x3(0))
+        //&& mat4x4(0) == matrixCompMult(mat4x4(0), mat4x4(0))
+        //&& mat2(0) == outerProduct(vec2(0), vec2(0))
+        //&& mat3(0) == outerProduct(vec3(0), vec3(0))
+        //&& mat4(0) == outerProduct(vec4(0), vec4(0))
+        //&& mat2x3(0) == outerProduct(vec3(0), vec2(0))
+        //&& mat3x2(0) == outerProduct(vec2(0), vec3(0))
+        //&& mat2x4(0) == outerProduct(vec4(0), vec2(0))
+        //&& mat4x2(0) == outerProduct(vec2(0), vec4(0))
+        //&& mat3x4(0) == outerProduct(vec4(0), vec3(0))
+        //&& mat4x3(0) == outerProduct(vec3(0), vec4(0))
+        //&& mat2(0) == transpose(mat2(0))
+        //&& mat3(0) == transpose(mat3(0))
+        //&& mat4(0) == transpose(mat4(0))
+        //&& mat2x3(0) == transpose(mat3x2(0))
+        //&& mat3x2(0) == transpose(mat2x3(0))
+        //&& mat2x4(0) == transpose(mat4x2(0))
+        //&& mat4x2(0) == transpose(mat2x4(0))
+        //&& mat3x4(0) == transpose(mat4x3(0))
+        //&& mat4x3(0) == transpose(mat3x4(0))
+        //&& float(0) == determinant(mat2(0))
+        //&& float(0) == determinant(mat3(0))
+        //&& float(0) == determinant(mat4(0))
+        //&& mat2(0) == inverse(mat2(0))
+        //&& mat3(0) == inverse(mat3(0))
+        //&& mat4(0) == inverse(mat4(0))
+
+        // 8.8. Integer Functions
+        && genUType(0) == uaddCarry(genUType(0), genUType(0), outGenUType) && genUType(0) == outGenUType
+        && genUType(0) == usubBorrow(genUType(0), genUType(0), outGenUType) && genUType(0) == outGenUType
+        && genIType(0) == bitfieldExtract(genIType(0), int(0), int(0))
+        && genUType(0) == bitfieldExtract(genUType(0), int(0), int(0))
+        && genIType(0) == bitfieldInsert(genIType(0), genIType(0), int(0), int(0))
+        && genUType(0) == bitfieldInsert(genUType(0), genUType(0), int(0), int(0))
+        && genIType(0) == bitfieldReverse(genIType(0))
+        && genUType(0) == bitfieldReverse(genUType(0))
+        && genIType(0) == bitCount(genIType(0))
+        && genIType(0) == bitCount(genUType(0))
+        && genIType(0) == findLSB(genIType(0))
+        && genIType(0) == findLSB(genUType(0))
+        && genIType(0) == findMSB(genIType(0))
+        && genIType(0) == findMSB(genUType(0))
+        ;
+}
+
+__generic<let N : int>
+bool dimNTypeFuncs()
+{
+    typealias genFType = vector<float, N>;
+    typealias genDType = vector<double, N>;
+    typealias genIType = vector<int, N>;
+    typealias genUType = vector<uint, N>;
+    typealias genBType = vector<bool, N>;
+    typealias vec      = vector<float, N>;
+    typealias ivec     = vector<int, N>;
+    typealias uvec     = vector<uint, N>;
+    typealias bvec     = vector<bool, N>;
+
+    genFType outGenFType;
+    genDType outGenDType;
+    genIType outGenIType, outGenIType2;
+    genUType outGenUType, outGenUType2;
+
+    bool voidResults = true;
+
+    // 8.8. Integer Functions
+    umulExtended(genUType(0), genUType(0), outGenUType, outGenUType2);
+    voidResults = voidResults && (genUType(0) == outGenUType && genUType(0) == outGenUType2);
+
+    imulExtended(genIType(0), genIType(0), outGenIType, outGenIType);
+    voidResults = voidResults && (genIType(0) == outGenIType && genIType(0) == outGenIType2);
+
+    return voidResults
+        // 8.1. Angle and Trigonometry Functions
+        && genFType(0) == radians(genFType(0))
+        && genFType(0) == degrees(genFType(0))
+        && genFType(0) == sin(genFType(0))
+        && genFType(0) == cos(genFType(0))
+        && genFType(0) == tan(genFType(0))
+        && genFType(0) == asin(genFType(0))
+        && genFType(0) == acos(genFType(0))
+        && genFType(0) == atan(genFType(0), genFType(0))
+        && genFType(0) == atan(genFType(0))
+        && genFType(0) == sinh(genFType(0))
+        && genFType(0) == cosh(genFType(0))
+        && genFType(0) == tanh(genFType(0))
+        //&& genFType(0) == asinh(genFType(0)) // CUDA error
+        //&& genFType(0) == acosh(genFType(0)) // CUDA error
+        //&& genFType(0) == atanh(genFType(0)) // CUDA error
+
+        // 8.2. Exponential Functions
+        && genFType(0) == pow(genFType(0), genFType(0))
+        && genFType(0) == exp(genFType(0))
+        && genFType(0) == log(genFType(0))
+        && genFType(0) == exp2(genFType(0))
+        && genDType(0) == exp2(genDType(0))
+        && genFType(0) == log2(genFType(0))
+        && genFType(0) == sqrt(genFType(0))
+        && genDType(0) == sqrt(genDType(0))
+        && genFType(0) == inversesqrt(genFType(0))
+        && genDType(0) == inversesqrt(genDType(0))
+
+        // 8.3. Common Functions
+        && genFType(0) == abs(genFType(0))
+        && genIType(0) == abs(genIType(0))
+        && genDType(0) == abs(genDType(0))
+        && genFType(0) == sign(genFType(0))
+        //&& genIType(0) == sign(genIType(0)) // CUDA error
+        && genDType(0) == sign(genDType(0))
+        && genFType(0) == floor(genFType(0))
+        && genDType(0) == floor(genDType(0))
+        && genFType(0) == trunc(genFType(0))
+        && genDType(0) == trunc(genDType(0))
+        && genFType(0) == round(genFType(0))
+        && genDType(0) == round(genDType(0))
+        //&& genFType(0) == roundEven(genFType(0))
+        //&& genDType(0) == roundEven(genDType(0))
+        && genFType(0) == ceil(genFType(0))
+        && genDType(0) == ceil(genDType(0))
+        && genFType(0) == fract(genFType(0))
+        && genDType(0) == fract(genDType(0))
+        && genFType(0) == mod(genFType(0), float(1))
+        && genFType(0) == mod(genFType(0), genFType(1))
+        && genDType(0) == mod(genDType(0), double(1))
+        && genDType(0) == mod(genDType(0), genDType(0))
+        && genFType(0) == modf(genFType(0), outGenFType) && genFType(0) == outGenFType
+        && genDType(0) == modf(genDType(0), outGenDType) && genDType(0) == outGenDType
+        && genFType(0) == min(genFType(0), genFType(0))
+        && genFType(0) == min(genFType(0), float(0))
+        && genDType(0) == min(genDType(0), genDType(0))
+        && genDType(0) == min(genDType(0), double(0))
+        && genIType(0) == min(genIType(0), genIType(0))
+        && genIType(0) == min(genIType(0), int(0))
+        && genUType(0) == min(genUType(0), genUType(0))
+        && genUType(0) == min(genUType(0), uint(0))
+        && genFType(0) == max(genFType(0), genFType(0))
+        && genFType(0) == max(genFType(0), float(0))
+        && genDType(0) == max(genDType(0), genDType(0))
+        && genDType(0) == max(genDType(0), double(0))
+        && genIType(0) == max(genIType(0), genIType(0))
+        && genIType(0) == max(genIType(0), int(0))
+        && genUType(0) == max(genUType(0), genUType(0))
+        && genUType(0) == max(genUType(0), uint(0))
+        && genFType(0) == clamp(genFType(0), genFType(0), genFType(0))
+        && genFType(0) == clamp(genFType(0), float(0), float(0))
+        && genDType(0) == clamp(genDType(0), genDType(0), genDType(0))
+        && genDType(0) == clamp(genDType(0), double(0), double(0))
+        && genIType(0) == clamp(genIType(0), genIType(0), genIType(0))
+        && genIType(0) == clamp(genIType(0), int(0), int(0))
+        && genUType(0) == clamp(genUType(0), genUType(0), genUType(0))
+        && genUType(0) == clamp(genUType(0), uint(0), uint(0))
+        && genFType(0) == mix(genFType(0), genFType(0), genFType(0))
+        && genFType(0) == mix(genFType(0), genFType(0), float(0))
+        && genDType(0) == mix(genDType(0), genDType(0), genDType(0))
+        && genDType(0) == mix(genDType(0), genDType(0), double(0))
+        //&& genFType(0) == mix(genFType(0), genFType(0), genBType(0)) // CUDA error
+        //&& genDType(0) == mix(genDType(0), genDType(0), genBType(0)) // CUDA error
+        //&& genIType(0) == mix(genIType(0), genIType(0), genBType(0)) // CUDA error
+        //&& genUType(0) == mix(genUType(0), genUType(0), genBType(0)) // CUDA error
+        //&& genBType(0) == mix(genBType(0), genBType(0), genBType(0)) // CUDA error
+        && genFType(0) == step(genFType(1), genFType(0))
+        && genFType(0) == step(float(1), genFType(0))
+        && genDType(0) == step(genDType(1), genDType(0))
+        && genDType(0) == step(double(1), genDType(0))
+        && genFType(0) == smoothstep(genFType(0), genFType(1), genFType(0))
+        && genFType(0) == smoothstep(float(0), float(1), genFType(0))
+        && genDType(0) == smoothstep(genDType(0), genDType(1), genDType(0))
+        && genDType(0) == smoothstep(double(0), double(1), genDType(0))
+        //&& genBType(0) == isnan(genFType(0)) // CUDA error
+        //&& genBType(0) == isnan(genDType(0)) // CUDA error
+        //&& genBType(0) == isinf(genFType(0)) // CUDA error
+        //&& genBType(0) == isinf(genDType(0)) // CUDA error
+        && genIType(0) == floatBitsToInt(genFType(0))
+        && genUType(0) == floatBitsToUint(genFType(0))
+        && genFType(0) == intBitsToFloat(genIType(0))
+        && genFType(0) == uintBitsToFloat(genUType(0))
+        && genFType(0) == fma(genFType(0), genFType(0), genFType(0))
+        && genDType(0) == fma(genDType(0), genDType(0), genDType(0))
+        && genFType(0) == frexp(genFType(0), outGenIType) && genIType(0) == outGenIType
+        && genDType(0) == frexp(genDType(0), outGenIType) && genIType(0) == outGenIType
+        && genFType(0) == ldexp(genFType(0), genIType(0))
+        && genDType(0) == ldexp(genDType(0), genIType(0))
+
+        // 8.4. Floating-Point Pack and Unpack Functions
+        //&& highp uint(0) == packUnorm2x16(vec2(0))
+        //&& highp uint(0) == packSnorm2x16(vec2(0))
+        //&& uint(0) == packUnorm4x8(vec4(0))
+        //&& uint(0) == packSnorm4x8(vec4(0))
+        //&& vec2(0) == unpackUnorm2x16(highp uint(0))
+        //&& vec2(0) == unpackSnorm2x16(highp uint(0))
+        //&& vec4(0) == unpackUnorm4x8(highp uint(0))
+        //&& vec4(0) == unpackSnorm4x8(highp uint(0))
+        //&& uint(0) == packHalf2x16(vec2(0))
+        //&& vec2(0) == unpackHalf2x16(uint(0))
+        //&& double(0) == packDouble2x32(uvec2(0))
+        //&& uvec2(0) == unpackDouble2x32(double(0))
+
+        // 8.5. Geometric Functions
+        && float(0) == length(genFType(0))
+        && double(0) == length(genDType(0))
+        && float(0) == distance(genFType(0), genFType(0))
+        && double(0) == distance(genDType(0), genDType(0))
+        && float(0) == dot(genFType(0), genFType(0))
+        && float(0) == dot(vec2(0), vec2(0))
+        && float(0) == dot(vec3(0), vec3(0))
+        && float(0) == dot(vec4(0), vec4(0))
+        && double(0) == dot(genDType(0), genDType(0))
+        && double(0) == dot(dvec2(0), dvec2(0))
+        && double(0) == dot(dvec3(0), dvec3(0))
+        && double(0) == dot(dvec4(0), dvec4(0))
+        && vec3(0) == cross(vec3(1), vec3(1))
+        && dvec3(0) == cross(dvec3(1), dvec3(1))
+        && genFType(0) == normalize(genFType(1))
+        && vec2(1,0) == normalize(vec2(1,0))
+        && vec3(1,0,0) == normalize(vec3(1,0,0))
+        && vec4(1,0,0,0) == normalize(vec4(1,0,0,0))
+        && genDType(0) == normalize(genDType(1))
+        && dvec2(1,0) == normalize(dvec2(1,0))
+        && dvec3(1,0,0) == normalize(dvec3(1,0,0))
+        && dvec4(1,0,0,0) == normalize(dvec4(1,0,0,0))
+        //&& vec4(0) == ftransform()
+        && genFType(0) == faceforward(genFType(0), genFType(0), genFType(0))
+        && genDType(0) == faceforward(genDType(0), genDType(0), genDType(0))
+        && genFType(0) == reflect(genFType(0), genFType(0))
+        && genDType(0) == reflect(genDType(0), genDType(0))
+        && genFType(0) == refract(genFType(0), genFType(0), float(0))
+        && genDType(0) == refract(genDType(0), genDType(0), double(0))
+
+        // 8.7. Vector Relational Functions
+        //&& bvec(1) == lessThan(vec(0), vec(1)) // CUDA error
+        //&& bvec(1) == lessThan(ivec(0), ivec(1)) // CUDA error
+        //&& bvec(1) == lessThan(uvec(0), uvec(1)) // CUDA error
+        //&& bvec(1) == lessThanEqual(vec(0), vec(1)) // CUDA error
+        //&& bvec(1) == lessThanEqual(ivec(0), ivec(1)) // CUDA error
+        //&& bvec(1) == lessThanEqual(uvec(0), uvec(1)) // CUDA error
+        //&& bvec(0) == greaterThan(vec(0), vec(1)) // CUDA error
+        //&& bvec(0) == greaterThan(ivec(0), ivec(1)) // CUDA error
+        //&& bvec(0) == greaterThan(uvec(0), uvec(1)) // CUDA error
+        //&& bvec(0) == greaterThanEqual(vec(0), vec(1)) // CUDA error
+        //&& bvec(0) == greaterThanEqual(ivec(0), ivec(1)) // CUDA error
+        //&& bvec(0) == greaterThanEqual(uvec(0), uvec(1)) // CUDA error
+        //&& bvec(1) == equal(vec(0), vec(0)) // CUDA error
+        //&& bvec(1) == equal(ivec(0), ivec(0)) // CUDA error
+        //&& bvec(1) == equal(uvec(0), uvec(0)) // CUDA error
+        //&& bvec(1) == equal(bvec(0), bvec(0)) // CUDA error
+        //&& bvec(0) == notEqual(vec(0), vec(0)) // CUDA error
+        //&& bvec(0) == notEqual(ivec(0), ivec(0)) // CUDA error
+        //&& bvec(0) == notEqual(uvec(0), uvec(0)) // CUDA error
+        //&& bvec(0) == notEqual(bvec(0), bvec(0)) // CUDA error
+        //&& bool(0) == any(bvec(0)) // CUDA error
+        //&& bool(0) == all(bvec(0)) // CUDA error
+        //&& bvec(1) == not(bvec(0)) // CUDA error
+
+        // 8.8. Integer Functions
+        && genUType(0) == uaddCarry(genUType(0), genUType(0), outGenUType) && genUType(0) == outGenUType
+        && genUType(0) == usubBorrow(genUType(0), genUType(0), outGenUType) && genUType(0) == outGenUType
+        && genIType(0) == bitfieldExtract(genIType(0), int(0), int(0))
+        && genUType(0) == bitfieldExtract(genUType(0), int(0), int(0))
+        && genIType(0) == bitfieldInsert(genIType(0), genIType(0), int(0), int(0))
+        && genUType(0) == bitfieldInsert(genUType(0), genUType(0), int(0), int(0))
+        && genIType(0) == bitfieldReverse(genIType(0))
+        && genUType(0) == bitfieldReverse(genUType(0))
+        && genIType(0) == bitCount(genIType(0))
+        && genIType(0) == bitCount(genUType(0))
+        //&& genIType(0) == findLSB(genIType(0)) // CUDA error
+        //&& genIType(0) == findLSB(genUType(0)) // CUDA error
+        //&& genIType(0) == findMSB(genIType(0)) // CUDA error
+        //&& genIType(0) == findMSB(genUType(0)) // CUDA error
+        ;
+}
+
+[numthreads(4, 1, 1)]
+void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+{
+    // CHECK_GLSL: void main(
+    // CHECK_SPV: OpEntryPoint
+    // CHECK_HLSL: void computeMain(
+    // CHECK_CUDA: void computeMain(
+    // CHECK_CPP: void _computeMain(
+
+    bool r = true
+        && dim1TypeFuncs()
+        && dimNTypeFuncs<2>()
+        && dimNTypeFuncs<3>()
+        && dimNTypeFuncs<4>();
+
+    //outputBuffer[0] = float(r);
+}
