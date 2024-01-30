@@ -71,6 +71,10 @@ struct Options
 
     bool dontAddDefaultEntryPoints = false;
 
+    bool allowGLSL = false;
+
+    Slang::String entryPointName;
+
     Slang::List<Slang::String> renderFeatures;          /// Required render features for this test to run
 
     uint32_t computeDispatchSize[3] = { 1, 1, 1 };

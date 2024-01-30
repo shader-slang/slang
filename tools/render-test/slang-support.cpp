@@ -110,6 +110,8 @@ void ShaderCompilerUtil::Output::reset()
     if (options.generateSPIRVDirectly)
         spSetTargetFlags(slangRequest, 0, SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY);
 
+    slangRequest->setAllowGLSLInput(options.allowGLSL);
+
     // Define a macro so that shader code in a test can detect what language we
     // are nominally working with.
     char const* langDefine = nullptr;
