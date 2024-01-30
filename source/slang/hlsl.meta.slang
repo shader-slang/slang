@@ -6201,7 +6201,7 @@ __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Normalize _0")
 [__readNone]
 T normalize(T x)
 {
-    return x;
+    return x / length(x);
 }
 
 // Raise to a power
@@ -6439,6 +6439,19 @@ vector<T,N> refract(vector<T,N> i, vector<T,N> n, T eta)
     let dotNI = dot(n,i);
     let k = T(1) - eta*eta*(T(1) - dotNI * dotNI);
     if(k < T(0)) return vector<T,N>(T(0));
+    return eta * i - (eta * dotNI + sqrt(k)) * n;
+}
+
+__generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Refract _0 _1 _2")
+[__readNone]
+T refract(T i, T n, T eta)
+{
+    let dotNI = dot(n,i);
+    let k = T(1) - eta*eta*(T(1) - dotNI * dotNI);
+    if(k < T(0)) return T(0);
     return eta * i - (eta * dotNI + sqrt(k)) * n;
 }
 

@@ -9,6 +9,22 @@
 #define mediump
 #define lowp
 
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+bool equals(matrix<T, N, M> lhs, matrix<T, N, M> rhs)
+{
+    for (int i = 0; i < N; ++i)
+    {
+        for (int j = 0; j < M; ++j)
+        {
+            if (lhs[i][j] != rhs[i][j])
+            {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 RWStructuredBuffer<float> outputBuffer;
 
 bool dim1TypeFuncs()
@@ -161,39 +177,39 @@ bool dim1TypeFuncs()
         && genDType(0) == refract(genDType(0), genDType(0), double(0))
 
         // 8.6. Matrix Functions
-        //&& mat2x2(0) == matrixCompMult(mat2x2(0), mat2x2(0))
-        //&& mat2x3(0) == matrixCompMult(mat2x3(0), mat2x3(0))
-        //&& mat2x4(0) == matrixCompMult(mat2x4(0), mat2x4(0))
-        //&& mat3x2(0) == matrixCompMult(mat3x2(0), mat3x2(0))
-        //&& mat3x3(0) == matrixCompMult(mat3x3(0), mat3x3(0))
-        //&& mat3x4(0) == matrixCompMult(mat3x4(0), mat3x4(0))
-        //&& mat4x2(0) == matrixCompMult(mat4x2(0), mat4x2(0))
-        //&& mat4x3(0) == matrixCompMult(mat4x3(0), mat4x3(0))
-        //&& mat4x4(0) == matrixCompMult(mat4x4(0), mat4x4(0))
-        //&& mat2(0) == outerProduct(vec2(0), vec2(0))
-        //&& mat3(0) == outerProduct(vec3(0), vec3(0))
-        //&& mat4(0) == outerProduct(vec4(0), vec4(0))
-        //&& mat2x3(0) == outerProduct(vec3(0), vec2(0))
-        //&& mat3x2(0) == outerProduct(vec2(0), vec3(0))
-        //&& mat2x4(0) == outerProduct(vec4(0), vec2(0))
-        //&& mat4x2(0) == outerProduct(vec2(0), vec4(0))
-        //&& mat3x4(0) == outerProduct(vec4(0), vec3(0))
-        //&& mat4x3(0) == outerProduct(vec3(0), vec4(0))
-        //&& mat2(0) == transpose(mat2(0))
-        //&& mat3(0) == transpose(mat3(0))
-        //&& mat4(0) == transpose(mat4(0))
-        //&& mat2x3(0) == transpose(mat3x2(0))
-        //&& mat3x2(0) == transpose(mat2x3(0))
-        //&& mat2x4(0) == transpose(mat4x2(0))
-        //&& mat4x2(0) == transpose(mat2x4(0))
-        //&& mat3x4(0) == transpose(mat4x3(0))
-        //&& mat4x3(0) == transpose(mat3x4(0))
-        //&& float(0) == determinant(mat2(0))
-        //&& float(0) == determinant(mat3(0))
-        //&& float(0) == determinant(mat4(0))
-        //&& mat2(0) == inverse(mat2(0))
-        //&& mat3(0) == inverse(mat3(0))
-        //&& mat4(0) == inverse(mat4(0))
+        && equals(mat2x2(0), matrixCompMult(mat2x2(0), mat2x2(0)))
+        && equals(mat2x3(0), matrixCompMult(mat2x3(0), mat2x3(0)))
+        && equals(mat2x4(0), matrixCompMult(mat2x4(0), mat2x4(0)))
+        && equals(mat3x2(0), matrixCompMult(mat3x2(0), mat3x2(0)))
+        && equals(mat3x3(0), matrixCompMult(mat3x3(0), mat3x3(0)))
+        && equals(mat3x4(0), matrixCompMult(mat3x4(0), mat3x4(0)))
+        && equals(mat4x2(0), matrixCompMult(mat4x2(0), mat4x2(0)))
+        && equals(mat4x3(0), matrixCompMult(mat4x3(0), mat4x3(0)))
+        && equals(mat4x4(0), matrixCompMult(mat4x4(0), mat4x4(0)))
+        && equals(mat2(0), outerProduct(vec2(0), vec2(0)))
+        && equals(mat3(0), outerProduct(vec3(0), vec3(0)))
+        && equals(mat4(0), outerProduct(vec4(0), vec4(0)))
+        && equals(mat2x3(0), outerProduct(vec3(0), vec2(0)))
+        && equals(mat3x2(0), outerProduct(vec2(0), vec3(0)))
+        && equals(mat2x4(0), outerProduct(vec4(0), vec2(0)))
+        && equals(mat4x2(0), outerProduct(vec2(0), vec4(0)))
+        && equals(mat3x4(0), outerProduct(vec4(0), vec3(0)))
+        && equals(mat4x3(0), outerProduct(vec3(0), vec4(0)))
+        && equals(mat2(0), transpose(mat2(0)))
+        && equals(mat3(0), transpose(mat3(0)))
+        && equals(mat4(0), transpose(mat4(0)))
+        && equals(mat2x3(0), transpose(mat3x2(0)))
+        && equals(mat3x2(0), transpose(mat2x3(0)))
+        && equals(mat2x4(0), transpose(mat4x2(0)))
+        && equals(mat4x2(0), transpose(mat2x4(0)))
+        && equals(mat3x4(0), transpose(mat4x3(0)))
+        && equals(mat4x3(0), transpose(mat3x4(0)))
+        && float(0) == determinant(mat2(0))
+        && float(0) == determinant(mat3(0))
+        && float(0) == determinant(mat4(0))
+        //&& equals(mat2(0), inverse(mat2(0)))
+        //&& equals(mat3(0), inverse(mat3(0)))
+        //&& equals(mat4(0), inverse(mat4(0)))
 
         // 8.8. Integer Functions
         && genUType(0) == uaddCarry(genUType(0), genUType(0), outGenUType) && genUType(0) == outGenUType
@@ -352,18 +368,18 @@ bool dimNTypeFuncs()
         && genDType(0) == ldexp(genDType(0), genIType(0))
 
         // 8.4. Floating-Point Pack and Unpack Functions
-        //&& highp uint(0) == packUnorm2x16(vec2(0))
-        //&& highp uint(0) == packSnorm2x16(vec2(0))
-        //&& uint(0) == packUnorm4x8(vec4(0))
-        //&& uint(0) == packSnorm4x8(vec4(0))
-        //&& vec2(0) == unpackUnorm2x16(highp uint(0))
-        //&& vec2(0) == unpackSnorm2x16(highp uint(0))
-        //&& vec4(0) == unpackUnorm4x8(highp uint(0))
-        //&& vec4(0) == unpackSnorm4x8(highp uint(0))
-        //&& uint(0) == packHalf2x16(vec2(0))
-        //&& vec2(0) == unpackHalf2x16(uint(0))
-        //&& double(0) == packDouble2x32(uvec2(0))
-        //&& uvec2(0) == unpackDouble2x32(double(0))
+        && uint(0) == packUnorm2x16(vec2(0))
+        && uint(0) == packSnorm2x16(vec2(0))
+        && uint(0) == packUnorm4x8(vec4(0))
+        && uint(0) == packSnorm4x8(vec4(0))
+        && vec2(0) == unpackUnorm2x16(uint(0))
+        && vec2(0) == unpackSnorm2x16(uint(0))
+        && vec4(0) == unpackUnorm4x8(uint(0))
+        && vec4(0) == unpackSnorm4x8(uint(0))
+        && uint(0) == packHalf2x16(vec2(0))
+        && vec2(0) == unpackHalf2x16(uint(0))
+        && double(0) == packDouble2x32(uvec2(0))
+        && uvec2(0) == unpackDouble2x32(double(0))
 
         // 8.5. Geometric Functions
         && float(0) == length(genFType(0))
