@@ -1,15 +1,17 @@
 //TEST:SIMPLE(filecheck=CHECK_GLSL): -allow-glsl -stage fragment -entry computeMain -target glsl
 //TEST:SIMPLE(filecheck=CHECK_SPV):  -allow-glsl -stage fragment -entry computeMain -target spirv
 //TEST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage fragment -entry computeMain -target hlsl
-//TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage fragment -entry computeMain -target cuda
+//TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage fragment -entry computeMain -target cuda -DTARGET_CUDA
 //TEST:SIMPLE(filecheck=CHECK_CPP): -allow-glsl -stage fragment -entry computeMain -target cpp
 
-// TODO: These keywords are not recognized but they should be.
-#define highp
-#define mediump
-#define lowp
-
 RWStructuredBuffer<float> outputBuffer;
+/*
+//T-EST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
+buffer MyBlockName2
+{
+    float4 result;
+} outputBuffer;
+*/
 
 bool dim1TypeFuncs()
 {
@@ -68,7 +70,9 @@ bool dim1TypeFuncs()
         && genIType(0) == abs(genIType(0))
         && genDType(0) == abs(genDType(0))
         && genFType(0) == sign(genFType(0))
-        //&& genIType(0) == sign(genIType(0)) // CUDA error
+#if !defined(TARGET_CUDA)
+        && genIType(0) == sign(genIType(0))
+#endif // #if !defined(TARGET_CUDA)
         && genDType(0) == sign(genDType(0))
         && genFType(0) == floor(genFType(0))
         && genDType(0) == floor(genDType(0))
@@ -204,8 +208,8 @@ bool dim1TypeFuncs()
         && genUType(0) == bitfieldInsert(genUType(0), genUType(0), int(0), int(0))
         && genIType(0) == bitfieldReverse(genIType(0))
         && genUType(0) == bitfieldReverse(genUType(0))
-        && genIType(0) == bitCount(genIType(0))
-        && genIType(0) == bitCount(genUType(0))
+        //&& genIType(0) == bitCount(genIType(0))
+        //&& genIType(0) == bitCount(genUType(0))
         && genIType(0) == findLSB(genIType(0))
         && genIType(0) == findLSB(genUType(0))
         && genIType(0) == findMSB(genIType(0))
@@ -254,9 +258,11 @@ bool dimNTypeFuncs()
         && genFType(0) == sinh(genFType(0))
         && genFType(0) == cosh(genFType(0))
         && genFType(0) == tanh(genFType(0))
-        //&& genFType(0) == asinh(genFType(0)) // CUDA error
-        //&& genFType(0) == acosh(genFType(0)) // CUDA error
-        //&& genFType(0) == atanh(genFType(0)) // CUDA error
+#if !defined(TARGET_CUDA)
+        && genFType(0) == asinh(genFType(0))
+        && genFType(0) == acosh(genFType(0))
+        && genFType(0) == atanh(genFType(0))
+#endif // #if !defined(TARGET_CUDA)
 
         // 8.2. Exponential Functions
         && genFType(0) == pow(genFType(0), genFType(0))
@@ -275,7 +281,9 @@ bool dimNTypeFuncs()
         && genIType(0) == abs(genIType(0))
         && genDType(0) == abs(genDType(0))
         && genFType(0) == sign(genFType(0))
-        //&& genIType(0) == sign(genIType(0)) // CUDA error
+#if !defined(TARGET_CUDA)
+        && genIType(0) == sign(genIType(0))
+#endif // #if !defined(TARGET_CUDA)
         && genDType(0) == sign(genDType(0))
         && genFType(0) == floor(genFType(0))
         && genDType(0) == floor(genDType(0))
@@ -323,11 +331,13 @@ bool dimNTypeFuncs()
         && genFType(0) == mix(genFType(0), genFType(0), float(0))
         && genDType(0) == mix(genDType(0), genDType(0), genDType(0))
         && genDType(0) == mix(genDType(0), genDType(0), double(0))
-        //&& genFType(0) == mix(genFType(0), genFType(0), genBType(0)) // CUDA error
-        //&& genDType(0) == mix(genDType(0), genDType(0), genBType(0)) // CUDA error
-        //&& genIType(0) == mix(genIType(0), genIType(0), genBType(0)) // CUDA error
-        //&& genUType(0) == mix(genUType(0), genUType(0), genBType(0)) // CUDA error
-        //&& genBType(0) == mix(genBType(0), genBType(0), genBType(0)) // CUDA error
+#if !defined(TARGET_CUDA)
+        && genFType(0) == mix(genFType(0), genFType(0), genBType(0))
+        && genDType(0) == mix(genDType(0), genDType(0), genBType(0))
+        && genIType(0) == mix(genIType(0), genIType(0), genBType(0))
+        && genUType(0) == mix(genUType(0), genUType(0), genBType(0))
+        && genBType(0) == mix(genBType(0), genBType(0), genBType(0))
+#endif // #if !defined(TARGET_CUDA)
         && genFType(0) == step(genFType(1), genFType(0))
         && genFType(0) == step(float(1), genFType(0))
         && genDType(0) == step(genDType(1), genDType(0))
@@ -336,10 +346,12 @@ bool dimNTypeFuncs()
         && genFType(0) == smoothstep(float(0), float(1), genFType(0))
         && genDType(0) == smoothstep(genDType(0), genDType(1), genDType(0))
         && genDType(0) == smoothstep(double(0), double(1), genDType(0))
-        //&& genBType(0) == isnan(genFType(0)) // CUDA error
-        //&& genBType(0) == isnan(genDType(0)) // CUDA error
-        //&& genBType(0) == isinf(genFType(0)) // CUDA error
-        //&& genBType(0) == isinf(genDType(0)) // CUDA error
+#if !defined(TARGET_CUDA)
+        && genBType(0) == isnan(genFType(0))
+        && genBType(0) == isnan(genDType(0))
+        && genBType(0) == isinf(genFType(0))
+        && genBType(0) == isinf(genDType(0))
+#endif // #if !defined(TARGET_CUDA)
         && genIType(0) == floatBitsToInt(genFType(0))
         && genUType(0) == floatBitsToUint(genFType(0))
         && genFType(0) == intBitsToFloat(genIType(0))
@@ -380,14 +392,14 @@ bool dimNTypeFuncs()
         && double(0) == dot(dvec4(0), dvec4(0))
         && vec3(0) == cross(vec3(1), vec3(1))
         && dvec3(0) == cross(dvec3(1), dvec3(1))
-        && genFType(0) == normalize(genFType(1))
-        && vec2(1,0) == normalize(vec2(1,0))
-        && vec3(1,0,0) == normalize(vec3(1,0,0))
-        && vec4(1,0,0,0) == normalize(vec4(1,0,0,0))
-        && genDType(0) == normalize(genDType(1))
-        && dvec2(1,0) == normalize(dvec2(1,0))
-        && dvec3(1,0,0) == normalize(dvec3(1,0,0))
-        && dvec4(1,0,0,0) == normalize(dvec4(1,0,0,0))
+        && float(1) == length(normalize(genFType(1)))
+        && float(1) == length(normalize(vec2(1)))
+        && float(1) == length(normalize(vec3(1)))
+        && float(1) == length(normalize(vec4(1,0,0,0)))
+        && float(1) == length(normalize(genDType(1)))
+        && float(1) == length(normalize(dvec2(1,0)))
+        && float(1) == length(normalize(dvec3(1,0,0)))
+        && float(1) == length(normalize(dvec4(1,0,0,0)))
         //&& vec4(0) == ftransform()
         && genFType(0) == faceforward(genFType(0), genFType(0), genFType(0))
         && genDType(0) == faceforward(genDType(0), genDType(0), genDType(0))
@@ -397,29 +409,31 @@ bool dimNTypeFuncs()
         && genDType(0) == refract(genDType(0), genDType(0), double(0))
 
         // 8.7. Vector Relational Functions
-        //&& bvec(1) == lessThan(vec(0), vec(1)) // CUDA error
-        //&& bvec(1) == lessThan(ivec(0), ivec(1)) // CUDA error
-        //&& bvec(1) == lessThan(uvec(0), uvec(1)) // CUDA error
-        //&& bvec(1) == lessThanEqual(vec(0), vec(1)) // CUDA error
-        //&& bvec(1) == lessThanEqual(ivec(0), ivec(1)) // CUDA error
-        //&& bvec(1) == lessThanEqual(uvec(0), uvec(1)) // CUDA error
-        //&& bvec(0) == greaterThan(vec(0), vec(1)) // CUDA error
-        //&& bvec(0) == greaterThan(ivec(0), ivec(1)) // CUDA error
-        //&& bvec(0) == greaterThan(uvec(0), uvec(1)) // CUDA error
-        //&& bvec(0) == greaterThanEqual(vec(0), vec(1)) // CUDA error
-        //&& bvec(0) == greaterThanEqual(ivec(0), ivec(1)) // CUDA error
-        //&& bvec(0) == greaterThanEqual(uvec(0), uvec(1)) // CUDA error
-        //&& bvec(1) == equal(vec(0), vec(0)) // CUDA error
-        //&& bvec(1) == equal(ivec(0), ivec(0)) // CUDA error
-        //&& bvec(1) == equal(uvec(0), uvec(0)) // CUDA error
-        //&& bvec(1) == equal(bvec(0), bvec(0)) // CUDA error
-        //&& bvec(0) == notEqual(vec(0), vec(0)) // CUDA error
-        //&& bvec(0) == notEqual(ivec(0), ivec(0)) // CUDA error
-        //&& bvec(0) == notEqual(uvec(0), uvec(0)) // CUDA error
-        //&& bvec(0) == notEqual(bvec(0), bvec(0)) // CUDA error
-        //&& bool(0) == any(bvec(0)) // CUDA error
-        //&& bool(0) == all(bvec(0)) // CUDA error
-        //&& bvec(1) == not(bvec(0)) // CUDA error
+#if !defined(TARGET_CUDA)
+        && bvec(1) == lessThan(vec(0), vec(1))
+        && bvec(1) == lessThan(ivec(0), ivec(1))
+        && bvec(1) == lessThan(uvec(0), uvec(1))
+        && bvec(1) == lessThanEqual(vec(0), vec(1))
+        && bvec(1) == lessThanEqual(ivec(0), ivec(1))
+        && bvec(1) == lessThanEqual(uvec(0), uvec(1))
+        && bvec(0) == greaterThan(vec(0), vec(1))
+        && bvec(0) == greaterThan(ivec(0), ivec(1))
+        && bvec(0) == greaterThan(uvec(0), uvec(1))
+        && bvec(0) == greaterThanEqual(vec(0), vec(1))
+        && bvec(0) == greaterThanEqual(ivec(0), ivec(1))
+        && bvec(0) == greaterThanEqual(uvec(0), uvec(1))
+        && bvec(1) == equal(vec(0), vec(0))
+        && bvec(1) == equal(ivec(0), ivec(0))
+        && bvec(1) == equal(uvec(0), uvec(0))
+        && bvec(1) == equal(bvec(0), bvec(0))
+        && bvec(0) == notEqual(vec(0), vec(0))
+        && bvec(0) == notEqual(ivec(0), ivec(0))
+        && bvec(0) == notEqual(uvec(0), uvec(0))
+        && bvec(0) == notEqual(bvec(0), bvec(0))
+        && bool(0) == any(bvec(0))
+        && bool(0) == all(bvec(0))
+        && bvec(1) == not(bvec(0))
+#endif // #if !defined(TARGET_CUDA)
 
         // 8.8. Integer Functions
         && genUType(0) == uaddCarry(genUType(0), genUType(0), outGenUType) && genUType(0) == outGenUType
@@ -430,12 +444,14 @@ bool dimNTypeFuncs()
         && genUType(0) == bitfieldInsert(genUType(0), genUType(0), int(0), int(0))
         && genIType(0) == bitfieldReverse(genIType(0))
         && genUType(0) == bitfieldReverse(genUType(0))
-        && genIType(0) == bitCount(genIType(0))
-        && genIType(0) == bitCount(genUType(0))
-        //&& genIType(0) == findLSB(genIType(0)) // CUDA error
-        //&& genIType(0) == findLSB(genUType(0)) // CUDA error
-        //&& genIType(0) == findMSB(genIType(0)) // CUDA error
-        //&& genIType(0) == findMSB(genUType(0)) // CUDA error
+        //&& genIType(0) == bitCount(genIType(0))
+        //&& genIType(0) == bitCount(genUType(0))
+#if !defined(TARGET_CUDA)
+        && genIType(0) == findLSB(genIType(0))
+        && genIType(0) == findLSB(genUType(0))
+        && genIType(0) == findMSB(genIType(0))
+        && genIType(0) == findMSB(genUType(0))
+#endif // #if !defined(TARGET_CUDA)
         ;
 }
 
