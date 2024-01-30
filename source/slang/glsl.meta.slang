@@ -501,6 +501,186 @@ public vector<float, N> uintBitsToFloat(highp vector<uint, N> x)
 }
 
 //
+// Section 8.4. Floating-Point Pack and Unpack Functions
+//
+
+[__readNone]
+[ForceInline]
+uint packUnorm1x16(float c)
+{
+    return uint(round(clamp(c, 0.0, 1.0) * 65535.0));
+}
+
+[__readNone]
+[ForceInline]
+uint packSnorm1x16(float v)
+{
+    return uint(round(clamp(v ,-1.0, 1.0) * 32767.0) + 32767.0);
+}
+
+[__readNone]
+[ForceInline]
+uint packUnorm1x8(float c)
+{
+    return uint(round(clamp(c, 0.0, 1.0) * 255.0));
+}
+
+[__readNone]
+[ForceInline]
+uint packSnorm1x8(float c)
+{
+    return uint(round(clamp(c, -1.0, 1.0) * 127.0) + 127.0);
+}
+
+[__readNone]
+[ForceInline]
+float unpackUnorm1x16(uint p)
+{
+    return float(p) / 65535.0;
+}
+
+[__readNone]
+[ForceInline]
+float unpackSnorm1x16(uint p)
+{
+    return clamp((float(p) - 32767.0) / 32767.0, -1.0, 1.0);
+}
+
+[__readNone]
+[ForceInline]
+float unpackUnorm1x8(uint p)
+{
+    return float(p) / 255.0;
+}
+
+[__readNone]
+[ForceInline]
+float unpackSnorm1x8(uint p)
+{
+    return clamp((float(p) - 127.0) / 127.0, -1.0, 1.0);
+}
+
+[__readNone]
+[ForceInline]
+uint float2half(float f)
+{
+    uint u = floatBitsToUint(f);
+    uint s = ((u >> uint(16)) & uint(0x8000));
+    uint e = ((((u & uint(0x7f800000)) - uint(0x38000000)) >> uint(13)) & uint(0x7c00));
+    uint m = ((u >> uint(13)) & uint(0x03ff));
+    return (s | e | m);
+}
+
+__target_intrinsic(glsl)
+[__readNone]
+[ForceInline]
+public uint packUnorm2x16(vec2 v)
+{
+    return packUnorm1x16(v.x) | (packUnorm1x16(v.y) << uint(16));
+}
+
+__target_intrinsic(glsl)
+[__readNone]
+[ForceInline]
+public uint packSnorm2x16(vec2 v)
+{
+    return packSnorm1x16(v.x) | (packSnorm1x16(v.y) << uint(16));
+}
+
+__target_intrinsic(glsl)
+[__readNone]
+[ForceInline]
+public uint packUnorm4x8(vec4 v)
+{
+    return packUnorm1x8(v.x) | (packUnorm1x8(v.y) << uint(8)) | (packUnorm1x8(v.z) << uint(16)) | (packUnorm1x8(v.w) << uint(24));
+}
+
+__target_intrinsic(glsl)
+[__readNone]
+[ForceInline]
+public uint packSnorm4x8(vec4 v)
+{
+    return packSnorm1x8(v.x) | (packSnorm1x8(v.y) << uint(8)) | (packSnorm1x8(v.z) << uint(16)) | (packSnorm1x8(v.w) << uint(24));
+}
+
+__target_intrinsic(glsl)
+[__readNone]
+[ForceInline]
+public vec2 unpackUnorm2x16(uint p)
+{
+    return vec2(unpackUnorm1x16(p & uint(0xffff)), unpackUnorm1x16(p >> uint(16)));
+}
+
+__target_intrinsic(glsl)
+[__readNone]
+[ForceInline]
+public vec2 unpackSnorm2x16(uint p)
+{
+    return vec2(unpackSnorm1x16(p & uint(0xffff)), unpackSnorm1x16(p >> uint(16)));
+}
+
+__target_intrinsic(glsl)
+[__readNone]
+[ForceInline]
+public vec4 unpackUnorm4x8(highp uint p)
+{
+    return vec4(unpackUnorm1x8(p & uint(0xffff)), unpackUnorm1x8(p >> uint(8)), unpackUnorm1x8(p >> uint(16)), unpackUnorm1x8(p >> uint(24)));
+}
+
+__target_intrinsic(glsl)
+[__readNone]
+[ForceInline]
+public vec4 unpackSnorm4x8(highp uint p)
+{
+    return vec4(unpackSnorm1x8(p & uint(0xffff)), unpackSnorm1x8(p >> uint(8)), unpackSnorm1x8(p >> uint(16)), unpackSnorm1x8(p >> uint(24)));
+}
+
+__target_intrinsic(glsl)
+[__readNone]
+[ForceInline]
+public uint packHalf2x16(vec2 v)
+{
+    return float2half(v.x) | (float2half(v.y) << uint(16));
+}
+
+__target_intrinsic(glsl)
+[__readNone]
+[ForceInline]
+public float half2float(uint h)
+{
+    uint s = ((h & uint(0x8000)) << uint(16));
+    uint e = (((h & uint(0x7c00)) + uint(0x1c000)) << uint(13));
+    uint m = ((h & uint(0x03ff)) << uint(13));
+    return uintBitsToFloat(s | e | m); 
+}
+
+__target_intrinsic(glsl)
+[__readNone]
+[ForceInline]
+public vec2 unpackHalf2x16(uint p)
+{
+    return vec2(half2float(p & uint(0xffff)), half2float(p >> uint(16)));
+}
+
+__target_intrinsic(glsl)
+[__readNone]
+[ForceInline]
+public double packDouble2x32(uvec2 v)
+{
+    return 0.0;
+    //return asdouble(uint64_t(v.x) | (uint64_t(v.y) << 32));
+}
+
+__target_intrinsic(glsl)
+[__readNone]
+[ForceInline]
+public uvec2 unpackDouble2x32(double v)
+{
+    uint64_t u = 0; // asuint64(v);
+    return uvec2(uint(u & 0xFFFFFFFF), uint(u >> 32));
+}
+
+//
 // Section 8.5. Geometric Functions
 //
 
@@ -515,6 +695,30 @@ public T faceforward(T n, T i, T ng)
 //
 // Section 8.6. Matrix Functions
 //
+
+__generic<T : __BuiltinFloatingPointType, let C : int, let R : int>
+__target_intrinsic(glsl)
+[__readNone]
+[ForceInline]
+[OverloadRank(15)]
+public matrix<T, C, R> outerProduct(vector<T, C> c, vector<T, R> r)
+{
+    // Column major matrix in GLSL
+    matrix<T, C, R> result;
+    for (int i = 0; i < C; ++i)
+    {
+        for (int j = 0; j < R; ++j)
+        {
+            result[i][j] = c[i] * r[j];
+        }
+    }
+    return result;
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+matrix<T,N,N> inverse(matrix<T,N,N> m);
 
 //
 // Section 8.8. Integer Functions
