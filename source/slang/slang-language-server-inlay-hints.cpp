@@ -18,7 +18,7 @@ List<LanguageServerProtocol::InlayHint> getInlayHints(
     List<LanguageServerProtocol::InlayHint> result;
     auto manager = linkage->getSourceManager();
     auto docText = doc->getText().getUnownedSlice();
-    iterateAST(fileName, manager, module->getModuleDecl(), [&](SyntaxNode* node)
+    iterateASTWithLanguageServerFilter(fileName, manager, module->getModuleDecl(), [&](SyntaxNode* node)
         {
             if (auto invokeExpr = as<InvokeExpr>(node))
             {

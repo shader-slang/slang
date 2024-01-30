@@ -49,7 +49,7 @@ SlangResult SlangCTool::innerMain(StdWriters* stdWriters, slang::IGlobalSession*
         const SlangResult res = compileRequest->processCommandLineArguments(&argv[1], argc - 1);
         if (SLANG_FAILED(res))
         {
-            // TODO: print usage message
+            StdWriters::getOut().print("%s", compileRequest->getDiagnosticOutput());
             return res;
         }
     }

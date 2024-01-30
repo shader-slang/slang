@@ -443,6 +443,11 @@ List<LanguageServerProtocol::CompletionItem> CompletionContext::collectMembersAn
             linkage->contentAssistInfo.completionSuggestions.swizzleBaseType,
             linkage->contentAssistInfo.completionSuggestions.elementCount);
     }
+    else if (linkage->contentAssistInfo.completionSuggestions.scopeKind ==
+        CompletionSuggestions::ScopeKind::Capabilities)
+    {
+        return createCapabilityCandidates();
+    }
     List<LanguageServerProtocol::CompletionItem> result;
     bool useCommitChars = true;
     bool addKeywords = false;
@@ -591,6 +596,24 @@ List<LanguageServerProtocol::CompletionItem> CompletionContext::collectMembersAn
             for (auto ch : getCommitChars())
                 item.commitCharacters.add(ch);
         }
+    }
+    return result;
+}
+
+List<LanguageServerProtocol::CompletionItem> CompletionContext::createCapabilityCandidates()
+{
+    List<LanguageServerProtocol::CompletionItem> result;
+    List<UnownedStringSlice> names;
+    getCapabilityNames(names);
+    for (auto name : names.getArrayView(1, names.getCount()-1))
+    {
+        if (name.startsWith("_"))
+            continue;
+        LanguageServerProtocol::CompletionItem item;
+        item.data = 0;
+        item.kind = LanguageServerProtocol::kCompletionItemKindEnumMember;
+        item.label = name;
+        result.add(item);
     }
     return result;
 }

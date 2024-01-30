@@ -3178,10 +3178,10 @@ SlangResult OptionsParser::parse(
     
     m_sink = nullptr;
 
-    if (requestSink->getErrorCount() > 0)
+    if (m_parseSink.getErrorCount() > 0)
     {
         // Put the errors in the diagnostic 
-        m_requestImpl->m_diagnosticOutput = requestSink->outputBuffer.produceString();
+        m_requestImpl->m_diagnosticOutput = m_parseSink.outputBuffer.produceString();
     }
 
     return res;

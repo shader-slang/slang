@@ -88,12 +88,7 @@ PROFILE_FAMILY(DX)
 PROFILE_FAMILY(GLSL)
 
 // Profile versions
-
-
 PROFILE_VERSION(DX_4_0,             DX)
-PROFILE_VERSION(DX_4_0_Level_9_0,   DX)
-PROFILE_VERSION(DX_4_0_Level_9_1,   DX)
-PROFILE_VERSION(DX_4_0_Level_9_3,   DX)
 PROFILE_VERSION(DX_4_1,             DX)
 PROFILE_VERSION(DX_5_0,             DX)
 PROFILE_VERSION(DX_5_1,             DX)
@@ -106,10 +101,6 @@ PROFILE_VERSION(DX_6_5,             DX)
 PROFILE_VERSION(DX_6_6,             DX)
 PROFILE_VERSION(DX_6_7,             DX)
 
-PROFILE_VERSION(GLSL_110,           GLSL)
-PROFILE_VERSION(GLSL_120,           GLSL)
-PROFILE_VERSION(GLSL_130,           GLSL)
-PROFILE_VERSION(GLSL_140,           GLSL)
 PROFILE_VERSION(GLSL_150,           GLSL)
 PROFILE_VERSION(GLSL_330,           GLSL)
 PROFILE_VERSION(GLSL_400,           GLSL)
@@ -122,7 +113,6 @@ PROFILE_VERSION(GLSL_460,           GLSL)
 
 
 // Specific profiles
-
 PROFILE(DX_Compute_4_0,				cs_4_0,				Compute,	DX_4_0)
 PROFILE(DX_Compute_4_1,				cs_4_1,				Compute,	DX_4_1)
 PROFILE(DX_Compute_5_0,				cs_5_0,				Compute,	DX_5_0)
@@ -160,7 +150,6 @@ PROFILE(DX_Geometry_6_5,			gs_6_5,				Geometry,	DX_6_5)
 PROFILE(DX_Geometry_6_6,			gs_6_6,				Geometry,	DX_6_6)
 PROFILE(DX_Geometry_6_7,			gs_6_7,				Geometry,	DX_6_7)
 
-
 PROFILE(DX_Hull_5_0,				hs_5_0,				Hull,		DX_5_0)
 PROFILE(DX_Hull_5_1,				hs_5_1,				Hull,		DX_5_1)
 PROFILE(DX_Hull_6_0,			    hs_6_0,				Hull,   	DX_6_0)
@@ -172,13 +161,9 @@ PROFILE(DX_Hull_6_5,			    hs_6_5,				Hull,   	DX_6_5)
 PROFILE(DX_Hull_6_6,			    hs_6_6,				Hull,   	DX_6_6)
 PROFILE(DX_Hull_6_7,			    hs_6_7,				Hull,   	DX_6_7)
 
-
-PROFILE(DX_Fragment_4_0,			ps_4_0,				Fragment,	DX_4_0)
-PROFILE(DX_Fragment_4_0_Level_9_0,	ps_4_0_level_9_0,	Fragment,	DX_4_0_Level_9_0)
-PROFILE(DX_Fragment_4_0_Level_9_1,	ps_4_0_level_9_1,	Fragment,	DX_4_0_Level_9_1)
-PROFILE(DX_Fragment_4_0_Level_9_3,	ps_4_0_level_9_3,	Fragment,	DX_4_0_Level_9_3)
-PROFILE(DX_Fragment_4_1,			ps_4_1,				Fragment,	DX_4_1)
-PROFILE(DX_Fragment_5_0,			ps_5_0,				Fragment,	DX_5_0)
+PROFILE(DX_Fragment_4_0,	        ps_4_0,				Fragment,	DX_4_0)
+PROFILE(DX_Fragment_4_1,	        ps_4_1,				Fragment,	DX_4_1)
+PROFILE(DX_Fragment_5_0,	        ps_5_0,				Fragment,	DX_5_0)
 PROFILE(DX_Fragment_5_1,			ps_5_1,				Fragment,	DX_5_1)
 PROFILE(DX_Fragment_6_0,			ps_6_0,				Fragment,	DX_6_0)
 PROFILE(DX_Fragment_6_1,			ps_6_1,				Fragment,	DX_6_1)
@@ -189,11 +174,7 @@ PROFILE(DX_Fragment_6_5,			ps_6_5,				Fragment,	DX_6_5)
 PROFILE(DX_Fragment_6_6,			ps_6_6,				Fragment,	DX_6_6)
 PROFILE(DX_Fragment_6_7,			ps_6_7,				Fragment,	DX_6_7)
 
-
 PROFILE(DX_Vertex_4_0,				vs_4_0,				Vertex,		DX_4_0)
-PROFILE(DX_Vertex_4_0_Level_9_0,	vs_4_0_level_9_0,	Vertex,		DX_4_0_Level_9_0)
-PROFILE(DX_Vertex_4_0_Level_9_1,	vs_4_0_level_9_1,	Vertex,		DX_4_0_Level_9_1)
-PROFILE(DX_Vertex_4_0_Level_9_3,	vs_4_0_level_9_3,	Vertex,		DX_4_0_Level_9_3)
 PROFILE(DX_Vertex_4_1,				vs_4_1,				Vertex,		DX_4_1)
 PROFILE(DX_Vertex_5_0,				vs_5_0,				Vertex,		DX_5_0)
 PROFILE(DX_Vertex_5_1,				vs_5_1,				Vertex,		DX_5_1)
@@ -216,9 +197,6 @@ PROFILE(DX_Amplification_6_7,	as_6_7,	Amplification,	DX_6_7)
 
 // TODO: consider making `lib_*_*` alias these...
 PROFILE(DX_None_4_0,              sm_4_0,             Unknown, DX_4_0)
-PROFILE(DX_None_4_0_Level_9_0,    sm_4_0_level_9_0,   Unknown, DX_4_0_Level_9_0)
-PROFILE(DX_None_4_0_Level_9_1,    sm_4_0_level_9_1,   Unknown, DX_4_0_Level_9_1)
-PROFILE(DX_None_4_0_Level_9_3,    sm_4_0_level_9_3,   Unknown, DX_4_0_Level_9_3)
 PROFILE(DX_None_4_1,              sm_4_1,             Unknown, DX_4_1)
 PROFILE(DX_None_5_0,              sm_5_0,             Unknown, DX_5_0)
 PROFILE(DX_None_5_1,              sm_5_1,             Unknown, DX_5_1)
@@ -254,10 +232,6 @@ PROFILE_ALIAS(DX_None_6_7,  DX_Lib_6_7,     sm_6_7)
 
 // Define all the GLSL profiles
 
-PROFILE(GLSL_None_110, glsl_110, Unknown, GLSL_110)
-PROFILE(GLSL_None_120, glsl_120, Unknown, GLSL_120)
-PROFILE(GLSL_None_130, glsl_130, Unknown, GLSL_130)
-PROFILE(GLSL_None_140, glsl_140, Unknown, GLSL_140)
 PROFILE(GLSL_None_150, glsl_150, Unknown, GLSL_150)
 PROFILE(GLSL_None_330, glsl_330, Unknown, GLSL_330)
 PROFILE(GLSL_None_400, glsl_400, Unknown, GLSL_400)
@@ -271,10 +245,6 @@ PROFILE(GLSL_None_460, glsl_460, Unknown, GLSL_460)
 #define P(UPPER, LOWER, VERSION) \
 PROFILE(GLSL_##UPPER##_##VERSION,   glsl_##LOWER##_##VERSION, UPPER, GLSL_##VERSION)
 
-P(Vertex, vertex, 110)
-P(Vertex, vertex, 120)
-P(Vertex, vertex, 130)
-P(Vertex, vertex, 140)
 P(Vertex, vertex, 150)
 P(Vertex, vertex, 330)
 P(Vertex, vertex, 400)
@@ -284,10 +254,6 @@ P(Vertex, vertex, 430)
 P(Vertex, vertex, 440)
 P(Vertex, vertex, 450)
 
-P(Fragment, fragment, 110)
-P(Fragment, fragment, 120)
-P(Fragment, fragment, 130)
-P(Fragment, fragment, 140)
 P(Fragment, fragment, 150)
 P(Fragment, fragment, 330)
 P(Fragment, fragment, 400)

@@ -3359,18 +3359,9 @@ struct SPIRVEmitContext
                 }
                 else if (semanticName == "sv_barycentrics")
                 {
-                    if (m_targetRequest->getTargetCaps().implies(CapabilityAtom::_GL_NV_fragment_shader_barycentric))
-                    {
-                        requireSPIRVCapability(SpvCapabilityFragmentBarycentricNV);
-                        ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_fragment_shader_barycentric"));
-                        return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInBaryCoordNV);
-                    }
-                    else
-                    {
-                        requireSPIRVCapability(SpvCapabilityFragmentBarycentricKHR);
-                        ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_fragment_shader_barycentric"));
-                        return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInBaryCoordKHR);
-                    }
+                    requireSPIRVCapability(SpvCapabilityFragmentBarycentricKHR);
+                    ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_fragment_shader_barycentric"));
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInBaryCoordKHR);
 
                     // TODO: There is also the `gl_BaryCoordNoPerspNV` builtin, which
                     // we ought to use if the `noperspective` modifier has been
