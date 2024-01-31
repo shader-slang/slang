@@ -789,8 +789,6 @@ struct OptionsParser
 
     static Profile::RawVal findGlslProfileFromPath(const String& path);
 
-    static SlangSourceLanguage findSourceLanguageFromPath(const String& path, Stage& outImpliedStage);
-
     SlangResult addInputPath(char const* inPath, SourceLanguage langOverride = SourceLanguage::Unknown);
 
     void addOutputPath(String const& path, CodeGenTarget impliedFormat);
@@ -1010,7 +1008,7 @@ void OptionsParser::addInputForeignShaderPath(
     return Profile::Unknown;
 }
 
-/* static */SlangSourceLanguage OptionsParser::findSourceLanguageFromPath(const String& path, Stage& outImpliedStage)
+SlangSourceLanguage findSourceLanguageFromPath(const String& path, Stage& outImpliedStage)
 {
     struct Entry
     {
@@ -1035,6 +1033,12 @@ void OptionsParser::addInputForeignShaderPath(
         { ".comp", SLANG_SOURCE_LANGUAGE_GLSL,  SLANG_STAGE_COMPUTE },
         { ".mesh", SLANG_SOURCE_LANGUAGE_GLSL,  SLANG_STAGE_MESH },
         { ".task", SLANG_SOURCE_LANGUAGE_GLSL,  SLANG_STAGE_AMPLIFICATION },
+        { ".rgen", SLANG_SOURCE_LANGUAGE_GLSL,  SLANG_STAGE_RAY_GENERATION },
+        { ".rint", SLANG_SOURCE_LANGUAGE_GLSL,  SLANG_STAGE_INTERSECTION },
+        { ".rahit", SLANG_SOURCE_LANGUAGE_GLSL, SLANG_STAGE_ANY_HIT },
+        { ".rchit", SLANG_SOURCE_LANGUAGE_GLSL, SLANG_STAGE_CLOSEST_HIT },
+        { ".rmiss", SLANG_SOURCE_LANGUAGE_GLSL, SLANG_STAGE_MISS },
+        { ".rcall", SLANG_SOURCE_LANGUAGE_GLSL, SLANG_STAGE_CALLABLE },
 
         { ".c",    SLANG_SOURCE_LANGUAGE_C,     SLANG_STAGE_NONE },
         { ".cpp",  SLANG_SOURCE_LANGUAGE_CPP,   SLANG_STAGE_NONE },
@@ -2697,7 +2701,7 @@ SlangResult OptionsParser::_parse(
             translationUnitID,
             rawEntryPoint.name.begin(),
             SlangStage(rawEntryPoint.stage),
-            specializationArgs.getCount(),
+            (int)specializationArgs.getCount(),
             specializationArgs.getBuffer());
 
         rawEntryPoint.entryPointID = entryPointID;

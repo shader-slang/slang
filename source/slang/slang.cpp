@@ -25,7 +25,6 @@
 #include "slang-mangle.h"
 #include "slang-parser.h"
 #include "slang-preprocessor.h"
-
 #include "slang-type-layout.h"
 
 #include "slang-options.h"
@@ -2601,23 +2600,6 @@ SlangResult FrontEndCompileRequest::executeActionsInner()
     {
         // Make sure SourceFile representation is available for all translationUnits
         SLANG_RETURN_ON_FAIL(translationUnit->requireSourceFiles());
-
-        if(!getLinkage()->getAllowGLSLInput())
-        {
-            // We currently allow GlSL files on the command line so that we can
-            // drive our "pass-through" mode, but we really want to issue an error
-            // message if the user is seriously asking us to compile them and
-            // doesn't explicitly opt into the glsl frontend
-            switch(translationUnit->sourceLanguage)
-            {
-            default:
-                break;
-
-            case SourceLanguage::GLSL:
-                getSink()->diagnose(SourceLoc(), Diagnostics::glslIsNotSupported);
-                return SLANG_FAIL;
-            }
-        }
     }
 
 
@@ -3138,8 +3120,17 @@ RefPtr<Module> Linkage::loadModule(
     RefPtr<TranslationUnitRequest> translationUnit = new TranslationUnitRequest(frontEndReq);
     translationUnit->compileRequest = frontEndReq;
     translationUnit->moduleName = name;
+    Stage impliedStage;
     translationUnit->sourceLanguage = SourceLanguage::Slang;
 
+    // If we are loading from a file with apparaent glsl extension,
+    // set the source language to GLSL to enable GLSL compatibility mode.
+    if ((SourceLanguage)findSourceLanguageFromPath(filePathInfo.getName(), impliedStage) ==
+        SourceLanguage::GLSL)
+    {
+        translationUnit->sourceLanguage = SourceLanguage::GLSL;
+    }
+    
     frontEndReq->addTranslationUnit(translationUnit);
 
     auto module = translationUnit->getModule();
