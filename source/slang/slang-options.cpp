@@ -52,6 +52,7 @@ enum class OptionKind
     MacroDefine,
     DepFile,
     EntryPointName,
+    Specialize,
     Help,
     HelpStyle,
     Include,
@@ -393,6 +394,8 @@ void initCommandOptions(CommandOptions& options)
         "When they do, the file associated with the entry point will be the first one found when searching to the left in the command line.\n"
         "If no -entry options are given, compiler will use [shader(...)] "
         "attributes to detect entry points."},
+        { OptionKind::Specialize, "-specialize", "-specialize <typename>",
+            "Specialize the last entrypoint with <typename>.\n"},
         { OptionKind::EmitIr,       "-emit-ir", nullptr, "Emit IR typically as a '.slang-module' when outputting to a container." },
         { OptionKind::Help,         "-h,-help,--help", "-h or -h <help-category>", "Print this message, or help in specified category." },
         { OptionKind::HelpStyle,    "-help-style", "-help-style <help-style>", "Help formatting style" },
@@ -744,7 +747,7 @@ struct OptionsParser
         Stage   stage = Stage::Unknown;
         int     translationUnitIndex = -1;
         int     entryPointID = -1;
-
+        List<String> specializationArgs;
         // State for tracking command-line errors
         bool conflictingStagesSet = false;
         bool redundantStageSet = false;
@@ -2179,6 +2182,24 @@ SlangResult OptionsParser::_parse(
                 m_rawEntryPoints.add(rawEntryPoint);
                 break;
             }
+            case OptionKind::Specialize:
+            {
+                for (;;)
+                {
+                    CommandLineArg name;
+                    SLANG_RETURN_ON_FAIL(m_reader.expectArg(name));
+                    if (m_rawEntryPoints.getCount() > 0)
+                    {
+                        auto& lastEntryPoint = m_rawEntryPoints.getLast();
+                        lastEntryPoint.specializationArgs.add(name.value);
+                    }
+                    if (m_reader.hasArg() && m_reader.peekArg().value == ",")
+                        m_reader.advance();
+                    else
+                        break;
+                }
+                break;
+            }
             case OptionKind::Language:
             {
                 CommandLineArg name;
@@ -2668,10 +2689,16 @@ SlangResult OptionsParser::_parse(
 
         auto translationUnitID = m_rawTranslationUnits[rawEntryPoint.translationUnitIndex].translationUnitID;
 
-        int entryPointID = m_compileRequest->addEntryPoint(
+        List<const char*> specializationArgs;
+        for (auto& arg : rawEntryPoint.specializationArgs)
+            specializationArgs.add(arg.getBuffer());
+
+        int entryPointID = m_compileRequest->addEntryPointEx(
             translationUnitID,
             rawEntryPoint.name.begin(),
-            SlangStage(rawEntryPoint.stage));
+            SlangStage(rawEntryPoint.stage),
+            specializationArgs.getCount(),
+            specializationArgs.getBuffer());
 
         rawEntryPoint.entryPointID = entryPointID;
     }
