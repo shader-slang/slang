@@ -21,7 +21,7 @@ void computeMain()
 {
     outputBuffer.data[gl_GlobalInvocationID.x] = inputBuffer.data[gl_GlobalInvocationID.x];
     // BUF: 2
-    // BUF: 3
-    // BUF: 5
-    // BUF: 7
+    // BUF-NEXT: 3
+    // BUF-NEXT: 5
+    // BUF-NEXT: 7
 }

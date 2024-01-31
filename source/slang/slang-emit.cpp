@@ -243,7 +243,7 @@ Result linkAndOptimizeIR(
     dumpIRIfEnabled(codeGenContext, irModule);
 
     if(!isKhronosTarget(targetRequest))
-        lowerGLSLShaderStorageBufferObjects(irModule, sink);
+        lowerGLSLShaderStorageBufferObjectsToStructuredBuffers(irModule, sink);
 
     translateGLSLGlobalVar(codeGenContext, irModule);
 
