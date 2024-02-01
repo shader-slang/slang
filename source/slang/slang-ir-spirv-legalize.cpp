@@ -620,9 +620,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 storageClass = SpvStorageClassStorageBuffer;
                 needLoad = false;
             }
-            else if (auto structuredBufferType = as<IRGLSLShaderStorageBufferType>(innerType))
+            else if (auto glslShaderStorageBufferType = as<IRGLSLShaderStorageBufferType>(innerType))
             {
-                innerType = structuredBufferType->getElementType();
+                innerType = glslShaderStorageBufferType->getElementType();
                 builder.addDecoration(innerType, kIROp_SPIRVBlockDecoration);
                 storageClass = SpvStorageClassStorageBuffer;
                 needLoad = false;
