@@ -2332,7 +2332,7 @@ ${{{{
     // FP16x2
     __cuda_sm_version(2.0)
     [__requiresNVAPI]
-    uint _NvInterlockedAddF16x2(uint byteAddress, uint fp16x2Value)
+    uint _NvInterlockedAddFp16x2(uint byteAddress, uint fp16x2Value)
     {
         __target_switch
         {
@@ -2352,13 +2352,13 @@ ${{{{
             if ((byteAddress & 2) == 0)
             {
                 uint packedInput = asuint16(value);
-                originalValue = asfloat16((uint16_t)_NvInterlockedAddF16x2(byteAddress, packedInput));
+                originalValue = asfloat16((uint16_t)_NvInterlockedAddFp16x2(byteAddress, packedInput));
             }
             else
             {
                 byteAddress = byteAddress & ~3;
                 uint packedInput = asuint16(value) << 16;
-                originalValue = asfloat16((uint16_t)(_NvInterlockedAddF16x2(byteAddress, packedInput) >> 16));
+                originalValue = asfloat16((uint16_t)(_NvInterlockedAddFp16x2(byteAddress, packedInput) >> 16));
             }
             return;
         case glsl:
