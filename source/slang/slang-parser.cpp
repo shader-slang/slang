@@ -4650,6 +4650,8 @@ namespace Slang
                 importDecl->scope = currentScope;
                 AddMember(currentScope, importDecl);
             }
+            auto glslModuleModifier = astBuilder->create<GLSLModuleModifier>();
+            addModifier(currentModule, glslModuleModifier);
         }
 
         parseDecls(this, program, MatchedTokenType::File);
@@ -7360,7 +7362,8 @@ namespace Slang
     {
         ParserOptions options = {};
         options.enableEffectAnnotations = translationUnit->compileRequest->getLinkage()->getEnableEffectAnnotations();
-        options.allowGLSLInput = translationUnit->compileRequest->getLinkage()->getAllowGLSLInput();
+        options.allowGLSLInput = translationUnit->compileRequest->getLinkage()->getAllowGLSLInput() ||
+            translationUnit->sourceLanguage == SourceLanguage::GLSL;
         options.isInLanguageServer = translationUnit->compileRequest->getLinkage()->isInLanguageServer();
 
         Parser parser(astBuilder, tokens, sink, outerScope, options);

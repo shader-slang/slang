@@ -1125,7 +1125,11 @@ namespace Slang
 
         if (auto decl = as<Decl>(syntaxNode))
         {
-            if (!isModifierAllowedOnDecl(getLinkage()->getAllowGLSLInput(), m->astNodeType, decl))
+            auto moduleDecl = getModuleDecl(decl);
+            bool isGLSLInput = getLinkage()->getAllowGLSLInput();
+            if (!isGLSLInput && moduleDecl && moduleDecl->findModifier<GLSLModuleModifier>())
+                isGLSLInput = true;
+            if (!isModifierAllowedOnDecl(isGLSLInput, m->astNodeType, decl))
             {
                 getSink()->diagnose(m, Diagnostics::modifierNotAllowed, m);
                 return m;
