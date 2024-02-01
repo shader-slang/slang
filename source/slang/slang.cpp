@@ -4866,6 +4866,9 @@ void Session::addBuiltinSource(
         SLANG_UNEXPECTED("error in Slang standard library");
     }
 
+    // Compiling stdlib should not yield any warnings.
+    SLANG_ASSERT(sink.outputBuffer.getLength() == 0);
+
     // Extract the AST for the code we just parsed
     auto module = compileRequest->translationUnits[translationUnitIndex]->getModule();
     auto moduleDecl = module->getModuleDecl();

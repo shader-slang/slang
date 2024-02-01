@@ -7138,12 +7138,22 @@ namespace Slang
 
             if(opInfo && ret.operands.getCount() == opInfo->maxOperandCount)
             {
-                parser->diagnose(
-                    parser->tokenReader.peekLoc(),
-                    Diagnostics::spirvInstructionWithTooManyOperands,
-                    ret.opcode.token,
-                    opInfo->maxOperandCount
-                );
+                // The SPIRV grammar says we are providing more arguments than expected operand count.
+                // We will issue a warning if it is likely that the user missed a semicolon.
+                // This is likely the case when the next operand starts with "Op" or is an assignment
+                // in the form of %something = ....
+                //
+                auto token = parser->tokenReader.peekToken();
+                if (token.getContent().startsWith("Op") ||
+                    token.type == TokenType::OpMod && parser->LookAheadToken(TokenType::OpAssign, 2))
+                {
+                    parser->diagnose(
+                        parser->tokenReader.peekLoc(),
+                        Diagnostics::spirvInstructionWithTooManyOperands,
+                        ret.opcode.token,
+                        opInfo->maxOperandCount
+                    );
+                }
             }
 
             if(auto operand = parseSPIRVAsmOperand(parser))
@@ -7168,7 +7178,7 @@ namespace Slang
     static Expr* parseSPIRVAsmExpr(Parser* parser)
     {
         SPIRVAsmExpr* asmExpr = parser->astBuilder->create<SPIRVAsmExpr>();
-
+        parser->FillPosition(asmExpr);
         parser->ReadToken(TokenType::LBrace);
         while(!parser->tokenReader.isAtEnd())
         {

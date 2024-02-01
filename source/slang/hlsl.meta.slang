@@ -117,9 +117,14 @@ interface __ITextureShape
     static const int dimensions;
     static const int planeDimensions;
 }
+[sealed]
+[builtin]
+interface __ITextureShape1D2D3D : __ITextureShape
+{
+}
 __magic_type(TextureShape1DType)
 __intrinsic_type($(kIROp_TextureShape1DType))
-struct __Shape1D : __ITextureShape
+struct __Shape1D : __ITextureShape1D2D3D
 {
     static const int flavor = $(SLANG_TEXTURE_1D);
     static const int dimensions = 1;
@@ -127,7 +132,7 @@ struct __Shape1D : __ITextureShape
 }
 __magic_type(TextureShape2DType)
 __intrinsic_type($(kIROp_TextureShape2DType))
-struct __Shape2D : __ITextureShape
+struct __Shape2D : __ITextureShape1D2D3D
 {
     static const int flavor = $(SLANG_TEXTURE_2D);
     static const int dimensions = 2;
@@ -135,7 +140,7 @@ struct __Shape2D : __ITextureShape
 }
 __magic_type(TextureShape3DType)
 __intrinsic_type($(kIROp_TextureShape3DType))
-struct __Shape3D : __ITextureShape
+struct __Shape3D : __ITextureShape1D2D3D
 {
     static const int flavor = $(SLANG_TEXTURE_3D);
     static const int dimensions = 3;
@@ -255,6 +260,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                         __intrinsic_asm "tex2DLayered<$T0>($0, ($1).x, ($1).y, int(($1).z))";
                     case $(SLANG_TEXTURE_CUBE):
                         __intrinsic_asm "texCubemapLayered<$T0>($0, ($1).x, ($1).y, ($1).z, int(($1).w))";
+                    default: __intrinsic_asm "invalid texture shape";
                     }
                 }
                 else
@@ -269,6 +275,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                         __intrinsic_asm "tex3D<$T0>($0, ($1).x, ($1).y, ($1).z)";
                     case $(SLANG_TEXTURE_CUBE):
                         __intrinsic_asm "texCubemap<$T0>($0, ($1).x, ($1).y, ($1).z)";
+                    default: __intrinsic_asm "invalid texture shape";
                     }
                 }
             case spirv:
@@ -355,7 +362,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         __target_switch
         {
         case glsl:
-            __glsl_texture(__makeVector(location, compareValue));
+            return __glsl_texture(__makeVector(location, compareValue));
         case hlsl:
             __intrinsic_asm ".SampleCmp";
         case spirv:
@@ -373,7 +380,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         __target_switch
         {
         case glsl:
-            __glsl_texture_level_zero(__makeVector(location, compareValue));
+            return __glsl_texture_level_zero(__makeVector(location, compareValue));
         case hlsl:
             __intrinsic_asm ".SampleCmpLevelZero";
         case spirv:
@@ -392,7 +399,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         __target_switch
         {
         case glsl:
-            __glsl_texture_offset(__makeVector(location, compareValue), offset);
+            return __glsl_texture_offset(__makeVector(location, compareValue), offset);
         case hlsl:
             __intrinsic_asm ".SampleCmp";
         case spirv:
@@ -410,7 +417,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         __target_switch
         {
         case glsl:
-            __glsl_texture_offset_level_zero(__makeVector(location, compareValue), offset);
+            return __glsl_texture_offset_level_zero(__makeVector(location, compareValue), offset);
         case hlsl:
             __intrinsic_asm ".SampleCmpLevelZero";
         case spirv:
@@ -518,6 +525,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                         __intrinsic_asm "tex3DLod<$T0>($0, ($1).x, ($1).y, ($1).z, ($2))";
                     case $(SLANG_TEXTURE_CUBE):
                         __intrinsic_asm "texCubemapLod<$T0>($0, ($1).x, ($1).y, ($1).z, ($2))";
+                    default:
+                        __intrinsic_asm "<invalid intrinsic>";
                     }
                 }
             case spirv:
@@ -648,6 +657,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                         __intrinsic_asm "tex3D<$T0>($0, ($2).x, ($2).y, ($2).z)";
                     case $(SLANG_TEXTURE_CUBE):
                         __intrinsic_asm "texCubemap<$T0>($0, ($2).x, ($2).y, ($2).z)";
+                    default:
+                        __intrinsic_asm "<invalid intrinsic>";
                     }
                 }
             case spirv:
@@ -924,6 +935,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                         __intrinsic_asm "tex3DLod<$T0>($0, ($2).x, ($2).y, ($2).z, ($3))";
                     case $(SLANG_TEXTURE_CUBE):
                         __intrinsic_asm "texCubemapLod<$T0>($0, ($2).x, ($2).y, ($2).z, ($3))";
+                    default:
+                        __intrinsic_asm "<invalid intrinsic>";
                     }
                 }
             case spirv:
@@ -1764,6 +1777,23 @@ float __atomicAdd(__ref float value, float amount)
     }
 }
 
+__glsl_version(430)
+__glsl_extension(GL_EXT_shader_atomic_float2)
+half __atomicAdd(__ref half value, half amount)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "atomicAdd($0, $1)";
+    case spirv:
+        return spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_atomic_float16_add";
+            OpCapability AtomicFloat16AddEXT;
+            result:$$half = OpAtomicFAddEXT &value Device None $amount
+        };
+    }
+}
+
 // Helper for hlsl, using NVAPI
 __target_intrinsic(hlsl, "NvInterlockedAddUint64($0, $1, $2)")
 [__requiresNVAPI]
@@ -1907,6 +1937,40 @@ uint64_t __atomicMax(__ref uint64_t ioValue, uint64_t value)
     }
 }
 
+__glsl_version(430)
+__glsl_extension(GL_EXT_shader_atomic_float_min_max)
+float __atomicMax(__ref float ioValue, float value)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "atomicMax($0, $1)";
+    case spirv:
+        return spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_atomic_float_min_max";
+            OpCapability AtomicFloat32MinMaxEXT;
+            result:$$float = OpAtomicFMaxEXT &ioValue Device None $value
+        };
+    }
+}
+
+__glsl_version(430)
+__glsl_extension(GL_EXT_shader_atomic_float_min_max)
+half __atomicMax(__ref half ioValue, half value)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "atomicMax($0, $1)";
+    case spirv:
+        return spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_atomic_float_min_max";
+            OpCapability AtomicFloat16MinMaxEXT;
+            result:$$half = OpAtomicFMaxEXT &ioValue Device None $value
+        };
+    }
+}
+
 // Min
 
 __target_intrinsic(hlsl, "NvInterlockedMinUint64($0, $1, $2)")
@@ -1925,6 +1989,40 @@ uint64_t __atomicMin(__ref uint64_t ioValue, uint64_t value)
         {
             OpCapability Int64Atomics;
             result:$$uint64_t = OpAtomicUMin &ioValue Device None $value
+        };
+    }
+}
+
+__glsl_version(430)
+__glsl_extension(GL_EXT_shader_atomic_float_min_max)
+float __atomicMin(__ref float ioValue, float value)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "atomicMin($0, $1)";
+    case spirv:
+        return spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_atomic_float_min_max";
+            OpCapability AtomicFloat32MinMaxEXT;
+            result:$$float = OpAtomicFMinEXT &ioValue Device None $value
+        };
+    }
+}
+
+__glsl_version(430)
+__glsl_extension(GL_EXT_shader_atomic_float_min_max)
+half __atomicMin(__ref half ioValue, half value)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "atomicMin($0, $1)";
+    case spirv:
+        return spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_atomic_float_min_max";
+            OpCapability AtomicFloat16MinMaxEXT;
+            result:$$half = OpAtomicFMinEXT &ioValue Device None $value
         };
     }
 }
@@ -2226,6 +2324,48 @@ ${{{{
             {
                 let buf = __getEquivalentStructuredBuffer<float>(this);
                 originalValue = __atomicAdd(buf[byteAddress / 4], valueToAdd);
+                return;
+            }
+        }
+    }
+
+    // FP16x2
+    __cuda_sm_version(2.0)
+    [__requiresNVAPI]
+    uint _NvInterlockedAddF16x2(uint byteAddress, uint fp16x2Value)
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm "NvInterlockedAddFp32($0, $1, $2))";
+        }
+    }
+
+    __cuda_sm_version(2.0)
+    [__requiresNVAPI]
+    [ForceInline]
+    void InterlockedAddF16(uint byteAddress, half value, out half originalValue)
+    {
+        __target_switch
+        {
+        case hlsl:
+            if ((byteAddress & 2) == 0)
+            {
+                uint packedInput = asuint16(value);
+                originalValue = asfloat16((uint16_t)_NvInterlockedAddF16x2(byteAddress, packedInput));
+            }
+            else
+            {
+                byteAddress = byteAddress & ~3;
+                uint packedInput = asuint16(value) << 16;
+                originalValue = asfloat16((uint16_t)(_NvInterlockedAddF16x2(byteAddress, packedInput) >> 16));
+            }
+            return;
+        case glsl:
+        case spirv:
+            {
+                let buf = __getEquivalentStructuredBuffer<half>(this);
+                originalValue = __atomicAdd(buf[byteAddress / 2], value);
                 return;
             }
         }
@@ -3010,6 +3150,8 @@ bool all(T x)
             };
         else if (__isBool<T>())
             return __slang_noop_cast<bool>(x);
+        else
+            return false;
     }
 }
 
@@ -3124,6 +3266,7 @@ bool any(T x)
             };
         else if (__isBool<T>())
             return __slang_noop_cast<bool>(x);
+        return false;
     }
 }
 
@@ -4291,7 +4434,7 @@ __target_intrinsic(spirv, "OpFConvert resultType resultId _0")
 [__readNone]
 vector<float16_t, N> f32tof16_(vector<float, N> value)
 {
-    VECTOR_MAP_UNARY(float16_t, N, f32tof16, value);
+    VECTOR_MAP_UNARY(float16_t, N, f32tof16_, value);
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -7271,6 +7414,7 @@ T WaveMaskMax(WaveMask mask, T expr)
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformSMax $$T result Subgroup 0 $expr};
         else if (__isUnsignedInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMax $$T result Subgroup 0 $expr};
+        else return expr;
     }
 }
 __generic<T : __BuiltinArithmeticType, let N : int>
@@ -7290,6 +7434,7 @@ vector<T,N> WaveMaskMax(WaveMask mask, vector<T,N> expr)
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformSMax $$vector<T,N> result Subgroup 0 $expr};
         else if (__isUnsignedInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMax $$vector<T,N> result Subgroup 0 $expr};
+        else return expr;
     }
 }
 
@@ -7315,6 +7460,7 @@ T WaveMaskMin(WaveMask mask, T expr)
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformSMin $$T result Subgroup 0 $expr};
         else if (__isUnsignedInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMin $$T result Subgroup 0 $expr};
+        else return expr;
     }
 }
 
@@ -7335,6 +7481,7 @@ vector<T,N> WaveMaskMin(WaveMask mask, vector<T,N> expr)
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformSMin $$vector<T,N>  result Subgroup 0 $expr};
         else if (__isUnsignedInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMin $$vector<T,N>  result Subgroup 0 $expr};
+        else return expr;
     }
 }
 
@@ -7369,6 +7516,7 @@ T WaveMaskProduct(WaveMask mask, T expr)
         }
         else if (__isUnsignedInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIMul $$T result Subgroup 0 $expr};
+        else return expr;
     }
 }
 
@@ -7398,6 +7546,7 @@ vector<T,N> WaveMaskProduct(WaveMask mask, vector<T,N> expr)
         }
         else if (__isUnsignedInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIMul $$vector<T,N> result Subgroup 0 $expr};
+        else return expr;
     }
 }
 
@@ -7432,6 +7581,7 @@ T WaveMaskSum(WaveMask mask, T expr)
         }
         else if (__isUnsignedInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIAdd $$T result Subgroup 0 $expr};
+        else return expr;
     }
 }
 __generic<T : __BuiltinArithmeticType, let N : int>
@@ -7460,6 +7610,7 @@ vector<T,N> WaveMaskSum(WaveMask mask, vector<T,N> expr)
         }
         else if (__isUnsignedInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIAdd $$vector<T,N> result Subgroup 0 $expr};
+        else return expr;
     }
 }
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
@@ -7549,6 +7700,7 @@ T WaveMaskPrefixProduct(WaveMask mask, T expr)
         }
         else if (__isUnsignedInt<T>())
             return spirv_asm {OpGroupNonUniformIMul $$T result Subgroup ExclusiveScan $expr};
+        else return expr;
     }
 }
 __generic<T : __BuiltinArithmeticType, let N : int>
@@ -7577,6 +7729,7 @@ vector<T,N> WaveMaskPrefixProduct(WaveMask mask, vector<T,N> expr)
         }
         else if (__isUnsignedInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIMul $$vector<T,N> result Subgroup ExclusiveScan $expr};
+        else return expr;
     }
 }
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
@@ -7610,6 +7763,7 @@ T WaveMaskPrefixSum(WaveMask mask, T expr)
         }
         else if (__isUnsignedInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIAdd $$T result Subgroup ExclusiveScan $expr};
+        else return expr;
     }
 }
 
@@ -7639,6 +7793,7 @@ vector<T,N> WaveMaskPrefixSum(WaveMask mask, vector<T,N> expr)
         }
         else if (__isUnsignedInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIAdd $$vector<T,N> result Subgroup ExclusiveScan $expr};
+        else return expr;
     }
 }
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
@@ -8151,6 +8306,7 @@ T WaveActive$(opName.hlslName)(T expr)
                 OpCapability GroupNonUniformArithmetic;
                 OpGroupNonUniformI$(opName.glslName) $$T result Subgroup 0 $expr
             };
+        else return expr;
     default:
         return WaveMask$(opName.hlslName)(WaveGetActiveMask(), expr);
     }
@@ -8189,6 +8345,7 @@ vector<T,N> WaveActive$(opName.hlslName)(vector<T,N> expr)
                 OpCapability GroupNonUniformArithmetic;
                 OpGroupNonUniformI$(opName.glslName) $$vector<T,N> result Subgroup 0 $expr
             };
+        else return expr;
     default:
         return WaveMask$(opName.hlslName)(WaveGetActiveMask(), expr);
     }
@@ -8438,6 +8595,7 @@ T WavePrefixProduct(T expr)
         }
         else if (__isUnsignedInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIMul $$T result Subgroup ExclusiveScan $expr};
+        else return expr;
     default:
         return WaveMaskPrefixProduct(WaveGetActiveMask(), expr);
     }
@@ -8469,6 +8627,7 @@ vector<T,N> WavePrefixProduct(vector<T,N> expr)
         }
         else if (__isUnsignedInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIMul $$vector<T,N> result Subgroup ExclusiveScan $expr};
+        else return expr;
     default:
         return WaveMaskPrefixProduct(WaveGetActiveMask(), expr);
     }
@@ -8506,6 +8665,7 @@ T WavePrefixSum(T expr)
         }
         else if (__isUnsignedInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIAdd $$T result Subgroup ExclusiveScan $expr};
+        else return expr;
     default:
         return WaveMaskPrefixSum(WaveGetActiveMask(), expr);
     }
@@ -8536,6 +8696,7 @@ vector<T,N> WavePrefixSum(vector<T,N> expr)
         }
         else if (__isUnsignedInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIAdd $$vector<T,N> result Subgroup ExclusiveScan $expr};
+        else return expr;
     default:
         return WaveMaskPrefixSum(WaveGetActiveMask(), expr);
     }
@@ -12611,6 +12772,25 @@ ${{{{
 }}}}
 
 } // extension
+
+
+//<T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
+__generic<Shape:__ITextureShape1D2D3D, let format : int>
+extension __TextureImpl<float, Shape, 0, 0, 0, $(kStdlibResourceAccessReadWrite), 0, 0, format>
+{
+    [__requiresNVAPI]
+    void InterlockedAddF32(vector<uint, Shape.dimensions> coord, float value, out float originalValue)
+    {
+        __target_switch
+        {
+        case spirv:
+            originalValue = __atomicAdd(this[coord], value);
+            return;
+        case hlsl:
+            __intrinsic_asm "$3 = NvInterlockedAddFp32($0, $1, $2)";
+        }
+    }
+}
 
 // Buffer Pointer
 
