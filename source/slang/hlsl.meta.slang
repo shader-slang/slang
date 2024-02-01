@@ -12795,7 +12795,8 @@ extension __TextureImpl<float, Shape, 0, 0, 0, $(kStdlibResourceAccessReadWrite)
     float InterlockedAddF32(vector<uint, Shape.dimensions> coord, float value)
     {
         float originalValue;
-        return InterlockedAddF32(coord, value, originalValue);
+        InterlockedAddF32(coord, value, originalValue);
+        return originalValue;
     }
 }
 

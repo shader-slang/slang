@@ -70,9 +70,11 @@ namespace Slang
                         break;
                     case kIROp_Call:
                     case kIROp_SPIRVAsm:
-                    case kIROp_SPIRVAsmOperandInst:
                         // If we see a call using this address, treat it as a store.
                         stores.add(StoreSite{ use->getUser(), addr });
+                        break;
+                    case kIROp_SPIRVAsmOperandInst:
+                        stores.add(StoreSite{ use->getUser()->getParent(), addr});
                         break;
                     }
                 }
@@ -91,15 +93,7 @@ namespace Slang
             {
                 auto t = as<IRReturn>(b->getTerminator());
                 if (!t) continue;
-                switch (t->getVal()->getOp())
-                {
-                case kIROp_VoidLit:
-                case kIROp_SPIRVAsm:
-                    // Don't count return void and return spirv_asm as a load.
-                    break;
-                default:
-                    loadsAndReturns.add(t);
-                }
+                loadsAndReturns.add(t);
             }
 
             for (auto store : stores)

@@ -7145,7 +7145,7 @@ namespace Slang
                 //
                 auto token = parser->tokenReader.peekToken();
                 if (token.getContent().startsWith("Op") ||
-                    token.type == TokenType::OpMod && parser->LookAheadToken(TokenType::OpAssign, 2))
+                    token.type == TokenType::OpMod && (parser->LookAheadToken(TokenType::OpAssign, 2) || parser->LookAheadToken(TokenType::Colon, 2)))
                 {
                     parser->diagnose(
                         parser->tokenReader.peekLoc(),
