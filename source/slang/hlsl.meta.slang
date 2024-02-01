@@ -12790,6 +12790,13 @@ extension __TextureImpl<float, Shape, 0, 0, 0, $(kStdlibResourceAccessReadWrite)
             __intrinsic_asm "$3 = NvInterlockedAddFp32($0, $1, $2)";
         }
     }
+
+    [ForceInline]
+    float InterlockedAddF32(vector<uint, Shape.dimensions> coord, float value)
+    {
+        float originalValue;
+        return InterlockedAddF32(coord, value, originalValue);
+    }
 }
 
 // Buffer Pointer
