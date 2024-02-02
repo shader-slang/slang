@@ -209,6 +209,8 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
 
         const char* layerNames[] = { nullptr };
 
+        VkValidationFeaturesEXT validationFeatures = {};
+        VkValidationFeatureEnableEXT enabledValidationFeatures[1] = { VK_VALIDATION_FEATURE_ENABLE_DEBUG_PRINTF_EXT };
         if (useValidationLayer)
         {
             // Depending on driver version, validation layer may or may not exist.
@@ -255,6 +257,12 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
             {
                 instanceCreateInfo.enabledLayerCount = SLANG_COUNT_OF(layerNames);
                 instanceCreateInfo.ppEnabledLayerNames = layerNames;
+
+                // Include support for printf
+                validationFeatures.sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT;
+                validationFeatures.enabledValidationFeatureCount = 1;
+                validationFeatures.pEnabledValidationFeatures = enabledValidationFeatures;
+                instanceCreateInfo.pNext = &validationFeatures;
             }
         }
         uint32_t apiVersionsToTry[] = { VK_API_VERSION_1_2, VK_API_VERSION_1_1, VK_API_VERSION_1_0 };
@@ -360,6 +368,7 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
 
     List<const char*> deviceExtensions;
     deviceExtensions.add(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+    deviceExtensions.add(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
 #if SLANG_APPLE_FAMILY
     deviceExtensions.add("VK_KHR_portability_subset");
 #endif
