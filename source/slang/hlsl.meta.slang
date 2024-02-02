@@ -1778,8 +1778,8 @@ float __atomicAdd(__ref float value, float amount)
 }
 
 __glsl_version(430)
-__glsl_extension(GL_EXT_shader_atomic_float2)
-half __atomicAdd(__ref half value, half amount)
+__glsl_extension(GL_NV_shader_atomic_fp16_vector)
+half2 __atomicAdd(__ref half2 value, half2 amount)
 {
     __target_switch
     {
@@ -1787,9 +1787,9 @@ half __atomicAdd(__ref half value, half amount)
     case spirv:
         return spirv_asm
         {
-            OpExtension "SPV_EXT_shader_atomic_float16_add";
-            OpCapability AtomicFloat16AddEXT;
-            result:$$half = OpAtomicFAddEXT &value Device None $amount
+            OpExtension "SPV_EXT_shader_atomic_float_add";
+            OpCapability AtomicFloat32AddEXT;
+            result:$$half2 = OpAtomicFAddEXT &value Device None $amount
         };
     }
 }
@@ -2337,7 +2337,7 @@ ${{{{
         __target_switch
         {
         case hlsl:
-            __intrinsic_asm "NvInterlockedAddFp32($0, $1, $2))";
+            __intrinsic_asm "NvInterlockedAddFp16x2($0, $1, $2))";
         }
     }
 
@@ -2364,8 +2364,15 @@ ${{{{
         case glsl:
         case spirv:
             {
-                let buf = __getEquivalentStructuredBuffer<half>(this);
-                originalValue = __atomicAdd(buf[byteAddress / 2], value);
+                let buf = __getEquivalentStructuredBuffer<half2>(this);
+                if ((byteAddress & 2) == 0)
+                {
+                    originalValue = __atomicAdd(buf[byteAddress/4], half2(value, half(0.0))).x;
+                }
+                else
+                {
+                    originalValue = __atomicAdd(buf[byteAddress/4], half2(half(0.0), value)).y;
+                }
                 return;
             }
         }

@@ -15,7 +15,7 @@ namespace vk
 
 enum
 {
-    kMaxDescriptorSets = 8,
+    kMaxDescriptorSets = 32,
 };
 
 class ShaderObjectLayoutImpl : public ShaderObjectLayoutBase

@@ -13,23 +13,17 @@ RWTexture2D<float> t;
 RWStructuredBuffer<float> outputBuffer;
 
 [shader("compute")]
-[numthreads(1, 1, 1)]
+[numthreads(4, 1, 1)]
 void computeMain(uint3 tid : SV_DispatchThreadID)
 {
     float originalValue;
+    
     // HLSL: {{.*}}originalValue{{.*}} = NvInterlockedAddFp32({{.*}}t{{.*}}, {{.*}}, {{.*}}1.0{{.*}});
-    // HLSL: {{.*}}originalValue{{.*}} = NvInterlockedAddFp32({{.*}}t{{.*}}, {{.*}}, {{.*}}2.0{{.*}});
-    // HLSL: {{.*}}originalValue{{.*}} = NvInterlockedAddFp32({{.*}}t{{.*}}, {{.*}}, {{.*}}3.0{{.*}});
-    t.InterlockedAddF32(uint2(0, 0), 1.0, originalValue);
-    t.InterlockedAddF32(uint2(1, 0), 2.0, originalValue);
-    t.InterlockedAddF32(uint2(1, 1), 3.0, originalValue);
-    // CHECK: 1.0
-    outputBuffer[0] = t[uint2(0, 0)];
-    // CHECK: 2.0
-    outputBuffer[1] = t[uint2(1, 0)];
-    // CHECK: 3.0
-    outputBuffer[2] = t[uint2(1, 1)];
-    // CHECK: 0.0
-    outputBuffer[3] = originalValue;
+    t.InterlockedAddF32(uint2(1, 0), 1.0, originalValue);
+    
+    AllMemoryBarrier();
+
+    // CHECK: 4.0
+    outputBuffer[0] = t[uint2(1, 0)];
 
 }

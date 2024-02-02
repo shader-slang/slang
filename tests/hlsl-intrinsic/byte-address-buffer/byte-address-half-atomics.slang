@@ -2,9 +2,7 @@
 // test the atomics on half types.
 
 // Disabled because our current driver doesn't support half atomics yet.
-//DISABLED_TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -compute -profile cs_6_2 -render-features half -shaderobj
-
-//TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry computeMain -stage compute
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -compute -profile cs_6_2 -render-features half -shaderobj -emit-spirv-directly -output-using-type
 //TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry computeMain -stage compute -emit-spirv-directly
 
 //TEST_INPUT:set tmpBuffer = ubuffer(data=[0 0 0 0], stride=4)
