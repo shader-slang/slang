@@ -15,12 +15,7 @@ void foo(const int constParam)
             %b
             %c
             %d
-            %e
-        // CHECK: too-many-operands.slang([[#@LINE-1]]): warning {{.*}}: too many operands for OpLoad (expected max 4), did you forget a semicolon?
-            %f;
-
-        %r : $$int = OpIAdd %r %r // oops, I forgot the semicolon
-        OpNop
-        // CHECK: too-many-operands.slang([[#@LINE-1]]): warning {{.*}}: too many operands for OpIAdd (expected max 4), did you forget a semicolon?
+        // CHECK: too-many-operands.slang([[#@LINE+1]]): warning {{.*}}: too many operands for OpLoad
+        %r : $$int = OpIAdd %r %r
     };
 }

@@ -73,6 +73,9 @@ namespace Slang
                         // If we see a call using this address, treat it as a store.
                         stores.add(StoreSite{ use->getUser(), addr });
                         break;
+                    case kIROp_SPIRVAsmOperandInst:
+                        stores.add(StoreSite{ use->getUser()->getParent(), addr});
+                        break;
                     }
                 }
             }
@@ -88,9 +91,9 @@ namespace Slang
             }
             for(const auto& b : func->getBlocks())
             {
-                auto t = b->getTerminator();
-                if (t->m_op == kIROp_Return)
-                    loadsAndReturns.add(t);
+                auto t = as<IRReturn>(b->getTerminator());
+                if (!t) continue;
+                loadsAndReturns.add(t);
             }
 
             for (auto store : stores)

@@ -4650,6 +4650,8 @@ namespace Slang
                 importDecl->scope = currentScope;
                 AddMember(currentScope, importDecl);
             }
+            auto glslModuleModifier = astBuilder->create<GLSLModuleModifier>();
+            addModifier(currentModule, glslModuleModifier);
         }
 
         parseDecls(this, program, MatchedTokenType::File);
@@ -7136,12 +7138,22 @@ namespace Slang
 
             if(opInfo && ret.operands.getCount() == opInfo->maxOperandCount)
             {
-                parser->diagnose(
-                    parser->tokenReader.peekLoc(),
-                    Diagnostics::spirvInstructionWithTooManyOperands,
-                    ret.opcode.token,
-                    opInfo->maxOperandCount
-                );
+                // The SPIRV grammar says we are providing more arguments than expected operand count.
+                // We will issue a warning if it is likely that the user missed a semicolon.
+                // This is likely the case when the next operand starts with "Op" or is an assignment
+                // in the form of %something = ....
+                //
+                auto token = parser->tokenReader.peekToken();
+                if (token.getContent().startsWith("Op") ||
+                    token.type == TokenType::OpMod && (parser->LookAheadToken(TokenType::OpAssign, 2) || parser->LookAheadToken(TokenType::Colon, 2)))
+                {
+                    parser->diagnose(
+                        parser->tokenReader.peekLoc(),
+                        Diagnostics::spirvInstructionWithTooManyOperands,
+                        ret.opcode.token,
+                        opInfo->maxOperandCount
+                    );
+                }
             }
 
             if(auto operand = parseSPIRVAsmOperand(parser))
@@ -7166,7 +7178,7 @@ namespace Slang
     static Expr* parseSPIRVAsmExpr(Parser* parser)
     {
         SPIRVAsmExpr* asmExpr = parser->astBuilder->create<SPIRVAsmExpr>();
-
+        parser->FillPosition(asmExpr);
         parser->ReadToken(TokenType::LBrace);
         while(!parser->tokenReader.isAtEnd())
         {
@@ -7360,7 +7372,8 @@ namespace Slang
     {
         ParserOptions options = {};
         options.enableEffectAnnotations = translationUnit->compileRequest->getLinkage()->getEnableEffectAnnotations();
-        options.allowGLSLInput = translationUnit->compileRequest->getLinkage()->getAllowGLSLInput();
+        options.allowGLSLInput = translationUnit->compileRequest->getLinkage()->getAllowGLSLInput() ||
+            translationUnit->sourceLanguage == SourceLanguage::GLSL;
         options.isInLanguageServer = translationUnit->compileRequest->getLinkage()->isInLanguageServer();
 
         Parser parser(astBuilder, tokens, sink, outerScope, options);
