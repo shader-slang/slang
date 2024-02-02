@@ -46,6 +46,9 @@ The Slang project provides a variety of different [documentation](docs/), but mo
 
 We also provide a few [examples](examples/) of how to integrate Slang into a rendering application.
 
+These examples use a graphics layer that we include with Slang called "GFX" which is an abstraction library of various graphics APIs (D3D11, D2D12, OpenGL, Vulkan, CUDA, and the CPU) to support cross-platform applications using GPU graphics and compute capabilities. 
+If you'd like to learn more about GFX, see the [GFX User Guide](https://shader-slang.com/slang/gfx-user-guide/index.html).
+
 Contributing
 ------------
 
