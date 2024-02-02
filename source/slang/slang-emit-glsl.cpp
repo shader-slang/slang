@@ -2065,6 +2065,19 @@ void GLSLSourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)
 
         }
     }
+
+    // The function may have IRRequireGLSLExtensionInst in its body. We also need to look for them.
+    auto func = as<IRFunc>(inst);
+    if (!func)
+        return;
+    auto block = func->getFirstBlock();
+    for (auto childInst : block->getChildren())
+    {
+        if (auto requireGLSLExt = as<IRRequireGLSLExtension>(childInst))
+        {
+            _requireGLSLExtension(requireGLSLExt->getExtensionName());
+        }
+    }
 }
 
 static Index _getGLSLVersion(ProfileVersion profile)

@@ -7562,6 +7562,9 @@ __target_intrinsic(cuda, "_waveProductMultiple($0, $1)")
 __target_intrinsic(hlsl, "WaveActiveProduct($1)")
 matrix<T,N,M> WaveMaskProduct(WaveMask mask, matrix<T,N,M> expr);
 
+__intrinsic_op($(kIROp_RequireGLSLExtension))
+void __requireGLSLExtension(String extensionName);
+
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
@@ -7569,7 +7572,9 @@ T WaveMaskSum(WaveMask mask, T expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupAdd($1)";
+    case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupAdd($1)";
     case cuda: __intrinsic_asm "_waveSum($0, $1)";
     case hlsl: __intrinsic_asm "WaveActiveSum($1)";
     case spirv:
@@ -7598,7 +7603,9 @@ vector<T,N> WaveMaskSum(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupAdd($1)";
+    case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupAdd($1)";
     case cuda: __intrinsic_asm "_waveSumMultiple($0, $1)";
     case hlsl: __intrinsic_asm "WaveActiveSum($1)";
     case spirv:
@@ -7634,6 +7641,7 @@ bool WaveMaskAllEqual(WaveMask mask, T value)
     __target_switch
     {
     case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupAllEqual($1)";
     case hlsl:
         __intrinsic_asm "WaveActiveAllEqual($1)";
@@ -7658,6 +7666,7 @@ bool WaveMaskAllEqual(WaveMask mask, vector<T,N> value)
     __target_switch
     {
     case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupAllEqual($1)";
     case hlsl:
         __intrinsic_asm "WaveActiveAllEqual($1)";
@@ -7688,7 +7697,9 @@ T WaveMaskPrefixProduct(WaveMask mask, T expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupExclusiveMul($1)";
+    case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupExclusiveMul($1)";
     case cuda: __intrinsic_asm "_wavePrefixProduct($0, $1)";
     case hlsl: __intrinsic_asm "WavePrefixProduct($1)";
     case spirv:
@@ -7717,7 +7728,9 @@ vector<T,N> WaveMaskPrefixProduct(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupExclusiveMul($1)";
+    case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupExclusiveMul($1)";
     case cuda: __intrinsic_asm "_wavePrefixProductMultiple($0, $1)";
     case hlsl: __intrinsic_asm "WavePrefixProduct($1)";
     case spirv:
@@ -7751,7 +7764,9 @@ T WaveMaskPrefixSum(WaveMask mask, T expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupExclusiveAdd($1)";
+    case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupExclusiveAdd($1)";
     case cuda: __intrinsic_asm "_wavePrefixSum($0, $1)";
     case hlsl: __intrinsic_asm "WavePrefixSum($1)";
     case spirv:
@@ -7781,7 +7796,9 @@ vector<T,N> WaveMaskPrefixSum(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupExclusiveAdd($1)";
+    case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupExclusiveAdd($1)";
     case cuda: __intrinsic_asm "_wavePrefixSumMultiple($0, $1)";
     case hlsl: __intrinsic_asm "WavePrefixSum($1)";
     case spirv:
@@ -8288,7 +8305,9 @@ T WaveActive$(opName.hlslName)(T expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroup$(opName.glslName)($0)";
+    case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroup$(opName.glslName)($0)";
     case hlsl: __intrinsic_asm "WaveActive$(opName.hlslName)";
     case spirv:
         if (__isFloat<T>())
@@ -8327,7 +8346,9 @@ vector<T,N> WaveActive$(opName.hlslName)(vector<T,N> expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroup$(opName.glslName)($0)";
+    case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroup$(opName.glslName)($0)";
     case hlsl: __intrinsic_asm "WaveActive$(opName.hlslName)";
     case spirv:
         if (__isFloat<T>())
@@ -8581,7 +8602,9 @@ T WavePrefixProduct(T expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupExclusiveMul($0)";
+    case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupExclusiveMul($0)";
     case hlsl: __intrinsic_asm "WavePrefixProduct";
     case spirv:
         if (__isFloat<T>())
@@ -8616,7 +8639,9 @@ vector<T,N> WavePrefixProduct(vector<T,N> expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupExclusiveMul($0)";
+    case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupExclusiveMul($0)";
     case hlsl: __intrinsic_asm "WavePrefixProduct";
     case spirv:
         if (__isFloat<T>())
@@ -8654,7 +8679,9 @@ T WavePrefixSum(T expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupExclusiveAdd($0)";
+    case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupExclusiveAdd($0)";
     case hlsl: __intrinsic_asm "WavePrefixSum";
     case spirv:
         if (__isFloat<T>())
@@ -8685,7 +8712,9 @@ vector<T,N> WavePrefixSum(vector<T,N> expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupExclusiveAdd($0)";
+    case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupExclusiveAdd($0)";
     case hlsl: __intrinsic_asm "WavePrefixSum";
     case spirv:
         if (__isFloat<T>())
@@ -8723,7 +8752,9 @@ T WaveReadLaneFirst(T expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupBroadcastFirst($0)";
+    case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupBroadcastFirst($0)";
     case hlsl: __intrinsic_asm "WaveReadLaneFirst";
     case spirv:
         return spirv_asm {OpCapability GroupNonUniformBallot; OpGroupNonUniformBroadcastFirst $$T result Subgroup $expr};
@@ -8739,7 +8770,9 @@ vector<T,N> WaveReadLaneFirst(vector<T,N> expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupBroadcastFirst($0)";
+    case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupBroadcastFirst($0)";
     case hlsl: __intrinsic_asm "WaveReadLaneFirst";
     case spirv:
         return spirv_asm {OpCapability GroupNonUniformBallot; OpGroupNonUniformBroadcastFirst $$vector<T,N> result Subgroup $expr};
@@ -8768,7 +8801,9 @@ T WaveBroadcastLaneAt(T value, constexpr int lane)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupBroadcast($0, $1)";
+    case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupBroadcast($0, $1)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt";
     case spirv:
         let ulane = uint(lane);
@@ -8785,7 +8820,9 @@ vector<T,N> WaveBroadcastLaneAt(vector<T,N> value, constexpr int lane)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupBroadcast($0, $1)";
+    case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupBroadcast($0, $1)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt";
     case spirv:
         let ulane = uint(lane);
@@ -8812,7 +8849,9 @@ T WaveReadLaneAt(T value, int lane)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupShuffle($0, $1)";
+    case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupShuffle($0, $1)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt";
     case spirv:
         let ulane = uint(lane);
@@ -8829,7 +8868,9 @@ vector<T,N> WaveReadLaneAt(vector<T,N> value, int lane)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupShuffle($0, $1)";
+    case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupShuffle($0, $1)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt";
     case spirv:
         let ulane = uint(lane);
@@ -8857,7 +8898,9 @@ T WaveShuffle(T value, int lane)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupShuffle($0, $1)";
+    case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupShuffle($0, $1)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt";
     case spirv:
         let ulane = uint(lane);
@@ -8874,7 +8917,9 @@ vector<T,N> WaveShuffle(vector<T,N> value, int lane)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupShuffle($0, $1)";
+    case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupShuffle($0, $1)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt";
     case spirv:
         let ulane = uint(lane);
@@ -8897,7 +8942,8 @@ uint WavePrefixCountBits(bool value)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupBallotExclusiveBitCount(subgroupBallot($0))";
+    case glsl:
+        __intrinsic_asm "subgroupBallotExclusiveBitCount(subgroupBallot($0))";
     case hlsl: __intrinsic_asm "WavePrefixCountBits($0)";
     case spirv:
         return spirv_asm
@@ -8917,7 +8963,8 @@ uint4 WaveGetConvergedMulti()
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupBallot(true)";
+    case glsl:
+        __intrinsic_asm "subgroupBallot(true)";
     case hlsl: __intrinsic_asm "WaveActiveBallot(true)";
     case cuda: __intrinsic_asm "make_uint4(__activemask(), 0, 0, 0)";
     case spirv:
