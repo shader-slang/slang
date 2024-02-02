@@ -2071,6 +2071,8 @@ void GLSLSourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)
     if (!func)
         return;
     auto block = func->getFirstBlock();
+    if (!block)
+        return;
     for (auto childInst : block->getChildren())
     {
         if (auto requireGLSLExt = as<IRRequireGLSLExtension>(childInst))
