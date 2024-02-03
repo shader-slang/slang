@@ -1346,9 +1346,6 @@ ${{{{
         const char* componentNames[] = {"", "Red", "Green", "Blue", "Alpha"};
 
         for (auto componentId = 0;  componentId <= 4; componentId++) {
-            if (isCmp && componentId > 0)
-                continue;
-
             auto component = componentNames[componentId];
             auto componentIndex = componentId == 0 ? 0 : componentId - 1;
     }}}}
