@@ -61,6 +61,8 @@ protected:
 
     void _emitGLSLByteAddressBuffer(IRGlobalParam* varDecl, IRByteAddressBufferTypeBase* byteAddressBufferType);
     void _emitGLSLParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type);
+    void _emitGLSLSSBO(IRGlobalParam* varDecl, IRGLSLShaderStorageBufferType* ssboType);
+    void emitSSBOHeader(IRGlobalParam* varDecl, IRType* bufferType);
 
     void _emitGLSLPerVertexVaryingFragmentInput(IRGlobalParam* param, IRType* type);
 
