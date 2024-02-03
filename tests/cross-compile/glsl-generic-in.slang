@@ -1,4 +1,7 @@
-//TEST:CROSS_COMPILE:-target spirv-assembly -entry main -profile vs_5_0
+//TEST:SIMPLE(filecheck=CHECK): -target spirv-assembly -entry main -profile vs_5_0
+// CHECK: vIn_field_v0_0 = OpVariable %_ptr_Input_v4float Input
+// CHECK: %vIn_field_v1_0 = OpVariable %_ptr_Input_v2float Input
+// CHECK: %vIn_p0_0 = OpVariable %_ptr_Input_v3float Input
 interface IField
 {
 	float get();

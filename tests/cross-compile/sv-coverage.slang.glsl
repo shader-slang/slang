@@ -2,15 +2,15 @@
 #version 450
 
 layout(location = 0)
-out vec4 _S1;
+out vec4 main_0;
 
 layout(location = 0)
-in vec4 _S2;
+in vec4 color_0;
 
 void main()
 {
-    uint _S3 = uint(gl_SampleMaskIn[0]) ^ uint(1);
-    _S1 = _S2;
-    gl_SampleMask[0] = int(_S3);
+    uint _S1 = uint(gl_SampleMaskIn[0]) ^ uint(1);
+    main_0 = color_0;
+    gl_SampleMask[0] = int(_S1);
     return;
 }

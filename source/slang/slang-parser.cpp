@@ -114,7 +114,7 @@ namespace Slang
         DiagnosticSink* sink;
         SourceLoc lastErrorLoc;
         ParserOptions options;
-
+        Modifiers* pendingModifiers = nullptr;
         int genericDepth = 0;
 
         // Is the parser in a "recovering" state?
@@ -3095,7 +3095,7 @@ namespace Slang
     }
 
     static Decl* ParseHLSLBufferDecl(
-        Parser*	parser,
+        Parser* parser,
         String  bufferWrapperTypeName)
     {
         // An HLSL declaration of a constant buffer like this:
@@ -3119,7 +3119,19 @@ namespace Slang
         // the second is a variable declaration that uses the buffer type.
         StructDecl* bufferDataTypeDecl = parser->astBuilder->create<StructDecl>();
 
-        addModifier(bufferDataTypeDecl, parser->astBuilder->create<PublicModifier>());
+        if (parser->pendingModifiers)
+        {
+            // Clone visibility modifier from cbuffer decl to the internal struct type decl.
+            // For example, if cbuffer is public, we want the element buffer type to also be
+            // public.
+            if (auto visModifier = parser->pendingModifiers->findModifier<VisibilityModifier>())
+            {
+                auto cloneVisModifier = (VisibilityModifier*)parser->astBuilder->createByNodeType(visModifier->astNodeType);
+                cloneVisModifier->keywordName = visModifier->keywordName;
+                cloneVisModifier->loc = visModifier->loc;
+                addModifier(bufferDataTypeDecl, cloneVisModifier);
+            }
+        }
 
         VarDecl* bufferVarDecl = parser->astBuilder->create<VarDecl>();
 
@@ -4396,6 +4408,18 @@ namespace Slang
         Modifiers           modifiers )
     {
         DeclBase* decl = nullptr;
+        
+        struct RestorePendingModifiersRAII
+        {
+            Modifiers* oldValue;
+            Parser* parser;
+            ~RestorePendingModifiersRAII()
+            {
+                parser->pendingModifiers = oldValue;
+            }
+        };
+        RestorePendingModifiersRAII restorePendingModifiersRAII{ parser->pendingModifiers, parser };
+        parser->pendingModifiers = &modifiers;
 
         auto loc = parser->tokenReader.peekLoc();
 
@@ -4626,6 +4650,8 @@ namespace Slang
                 importDecl->scope = currentScope;
                 AddMember(currentScope, importDecl);
             }
+            auto glslModuleModifier = astBuilder->create<GLSLModuleModifier>();
+            addModifier(currentModule, glslModuleModifier);
         }
 
         parseDecls(this, program, MatchedTokenType::File);
@@ -7112,12 +7138,22 @@ namespace Slang
 
             if(opInfo && ret.operands.getCount() == opInfo->maxOperandCount)
             {
-                parser->diagnose(
-                    parser->tokenReader.peekLoc(),
-                    Diagnostics::spirvInstructionWithTooManyOperands,
-                    ret.opcode.token,
-                    opInfo->maxOperandCount
-                );
+                // The SPIRV grammar says we are providing more arguments than expected operand count.
+                // We will issue a warning if it is likely that the user missed a semicolon.
+                // This is likely the case when the next operand starts with "Op" or is an assignment
+                // in the form of %something = ....
+                //
+                auto token = parser->tokenReader.peekToken();
+                if (token.getContent().startsWith("Op") ||
+                    token.type == TokenType::OpMod && (parser->LookAheadToken(TokenType::OpAssign, 2) || parser->LookAheadToken(TokenType::Colon, 2)))
+                {
+                    parser->diagnose(
+                        parser->tokenReader.peekLoc(),
+                        Diagnostics::spirvInstructionWithTooManyOperands,
+                        ret.opcode.token,
+                        opInfo->maxOperandCount
+                    );
+                }
             }
 
             if(auto operand = parseSPIRVAsmOperand(parser))
@@ -7142,7 +7178,7 @@ namespace Slang
     static Expr* parseSPIRVAsmExpr(Parser* parser)
     {
         SPIRVAsmExpr* asmExpr = parser->astBuilder->create<SPIRVAsmExpr>();
-
+        parser->FillPosition(asmExpr);
         parser->ReadToken(TokenType::LBrace);
         while(!parser->tokenReader.isAtEnd())
         {
@@ -7336,7 +7372,8 @@ namespace Slang
     {
         ParserOptions options = {};
         options.enableEffectAnnotations = translationUnit->compileRequest->getLinkage()->getEnableEffectAnnotations();
-        options.allowGLSLInput = translationUnit->compileRequest->getLinkage()->getAllowGLSLInput();
+        options.allowGLSLInput = translationUnit->compileRequest->getLinkage()->getAllowGLSLInput() ||
+            translationUnit->sourceLanguage == SourceLanguage::GLSL;
         options.isInLanguageServer = translationUnit->compileRequest->getLinkage()->isInLanguageServer();
 
         Parser parser(astBuilder, tokens, sink, outerScope, options);
@@ -7606,6 +7643,8 @@ namespace Slang
                 {
                     numThreadsAttrib = parser->astBuilder->create<GLSLLayoutLocalSizeAttribute>();
                     numThreadsAttrib->args.setCount(3);
+                    for (auto& i : numThreadsAttrib->args)
+                        i = nullptr;
 
                     // Just mark the loc and name from the first in the list
                     numThreadsAttrib->keywordName = getName(parser, "numthreads");

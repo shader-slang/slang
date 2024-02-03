@@ -528,6 +528,7 @@ namespace Slang
         }
         else if( auto enumCaseDeclRef = declRef.as<EnumCaseDecl>() )
         {
+            sema->ensureDecl(declRef.declRefBase, DeclCheckState::Checked);
             QualType qualType;
             qualType.type = getType(astBuilder, enumCaseDeclRef);
             qualType.isLeftValue = false;
@@ -5117,6 +5118,8 @@ namespace Slang
         // TODO: Do we need/want to support generic cases some day?
         auto parentEnumDecl = as<EnumDecl>(decl->parentDecl);
         SLANG_ASSERT(parentEnumDecl);
+        
+        decl->type.type = DeclRefType::create(m_astBuilder, makeDeclRef(parentEnumDecl));
 
         // The tag type should have already been set by
         // the surrounding `enum` declaration.
@@ -5851,6 +5854,13 @@ namespace Slang
                 return checkFuncRedeclaration(newFuncDecl, oldFuncDecl);
             }
         }
+
+        if (as<ModuleDeclarationDecl>(oldDecl) || as<ModuleDeclarationDecl>(newDecl))
+        {
+            // It is allowed to have a decl whose name is the same as the module.
+            return SLANG_OK;
+        }
+
 
         // For all other flavors of declaration, we do not
         // allow duplicate declarations with the same name.

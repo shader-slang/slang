@@ -19,5 +19,9 @@ SlangResult parseOptions(
 // Initialize command options. Holds the details how parsing works. 
 void initCommandOptions(CommandOptions& commandOptions);
 
+enum class Stage : SlangUInt32;
+
+SlangSourceLanguage findSourceLanguageFromPath(const String& path, Stage& outImpliedStage);
+
 }
 #endif

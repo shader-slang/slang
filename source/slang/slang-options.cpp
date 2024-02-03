@@ -52,6 +52,7 @@ enum class OptionKind
     MacroDefine,
     DepFile,
     EntryPointName,
+    Specialize,
     Help,
     HelpStyle,
     Include,
@@ -393,6 +394,8 @@ void initCommandOptions(CommandOptions& options)
         "When they do, the file associated with the entry point will be the first one found when searching to the left in the command line.\n"
         "If no -entry options are given, compiler will use [shader(...)] "
         "attributes to detect entry points."},
+        { OptionKind::Specialize, "-specialize", "-specialize <typename>",
+            "Specialize the last entrypoint with <typename>.\n"},
         { OptionKind::EmitIr,       "-emit-ir", nullptr, "Emit IR typically as a '.slang-module' when outputting to a container." },
         { OptionKind::Help,         "-h,-help,--help", "-h or -h <help-category>", "Print this message, or help in specified category." },
         { OptionKind::HelpStyle,    "-help-style", "-help-style <help-style>", "Help formatting style" },
@@ -744,7 +747,7 @@ struct OptionsParser
         Stage   stage = Stage::Unknown;
         int     translationUnitIndex = -1;
         int     entryPointID = -1;
-
+        List<String> specializationArgs;
         // State for tracking command-line errors
         bool conflictingStagesSet = false;
         bool redundantStageSet = false;
@@ -785,8 +788,6 @@ struct OptionsParser
         Stage                   impliedStage);
 
     static Profile::RawVal findGlslProfileFromPath(const String& path);
-
-    static SlangSourceLanguage findSourceLanguageFromPath(const String& path, Stage& outImpliedStage);
 
     SlangResult addInputPath(char const* inPath, SourceLanguage langOverride = SourceLanguage::Unknown);
 
@@ -1007,7 +1008,7 @@ void OptionsParser::addInputForeignShaderPath(
     return Profile::Unknown;
 }
 
-/* static */SlangSourceLanguage OptionsParser::findSourceLanguageFromPath(const String& path, Stage& outImpliedStage)
+SlangSourceLanguage findSourceLanguageFromPath(const String& path, Stage& outImpliedStage)
 {
     struct Entry
     {
@@ -1032,6 +1033,12 @@ void OptionsParser::addInputForeignShaderPath(
         { ".comp", SLANG_SOURCE_LANGUAGE_GLSL,  SLANG_STAGE_COMPUTE },
         { ".mesh", SLANG_SOURCE_LANGUAGE_GLSL,  SLANG_STAGE_MESH },
         { ".task", SLANG_SOURCE_LANGUAGE_GLSL,  SLANG_STAGE_AMPLIFICATION },
+        { ".rgen", SLANG_SOURCE_LANGUAGE_GLSL,  SLANG_STAGE_RAY_GENERATION },
+        { ".rint", SLANG_SOURCE_LANGUAGE_GLSL,  SLANG_STAGE_INTERSECTION },
+        { ".rahit", SLANG_SOURCE_LANGUAGE_GLSL, SLANG_STAGE_ANY_HIT },
+        { ".rchit", SLANG_SOURCE_LANGUAGE_GLSL, SLANG_STAGE_CLOSEST_HIT },
+        { ".rmiss", SLANG_SOURCE_LANGUAGE_GLSL, SLANG_STAGE_MISS },
+        { ".rcall", SLANG_SOURCE_LANGUAGE_GLSL, SLANG_STAGE_CALLABLE },
 
         { ".c",    SLANG_SOURCE_LANGUAGE_C,     SLANG_STAGE_NONE },
         { ".cpp",  SLANG_SOURCE_LANGUAGE_CPP,   SLANG_STAGE_NONE },
@@ -2179,6 +2186,24 @@ SlangResult OptionsParser::_parse(
                 m_rawEntryPoints.add(rawEntryPoint);
                 break;
             }
+            case OptionKind::Specialize:
+            {
+                for (;;)
+                {
+                    CommandLineArg name;
+                    SLANG_RETURN_ON_FAIL(m_reader.expectArg(name));
+                    if (m_rawEntryPoints.getCount() > 0)
+                    {
+                        auto& lastEntryPoint = m_rawEntryPoints.getLast();
+                        lastEntryPoint.specializationArgs.add(name.value);
+                    }
+                    if (m_reader.hasArg() && m_reader.peekArg().value == ",")
+                        m_reader.advance();
+                    else
+                        break;
+                }
+                break;
+            }
             case OptionKind::Language:
             {
                 CommandLineArg name;
@@ -2668,10 +2693,16 @@ SlangResult OptionsParser::_parse(
 
         auto translationUnitID = m_rawTranslationUnits[rawEntryPoint.translationUnitIndex].translationUnitID;
 
-        int entryPointID = m_compileRequest->addEntryPoint(
+        List<const char*> specializationArgs;
+        for (auto& arg : rawEntryPoint.specializationArgs)
+            specializationArgs.add(arg.getBuffer());
+
+        int entryPointID = m_compileRequest->addEntryPointEx(
             translationUnitID,
             rawEntryPoint.name.begin(),
-            SlangStage(rawEntryPoint.stage));
+            SlangStage(rawEntryPoint.stage),
+            (int)specializationArgs.getCount(),
+            specializationArgs.getBuffer());
 
         rawEntryPoint.entryPointID = entryPointID;
     }

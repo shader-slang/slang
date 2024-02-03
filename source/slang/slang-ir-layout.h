@@ -17,6 +17,7 @@
 //
 
 #include "slang-ir.h"
+#include <limits>
 
 namespace Slang
 {
@@ -40,9 +41,12 @@ struct IRSizeAndAlignment
         , alignment(alignment)
     {}
 
-    IRIntegerValue  size = 0;
+    IRIntegerValue size = 0;
 
-    int             alignment = 1;
+    // Used for an unsized array as a final struct member
+    const static IRIntegerValue kIndeterminateSize = std::numeric_limits<IRIntegerValue>::min();
+
+    int alignment = 1;
 
     inline IRIntegerValue getStride()
     {

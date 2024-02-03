@@ -2109,27 +2109,6 @@ bool finalizeAutoDiffPass(TargetRequest* target, IRModule* module)
     return modified;
 }
 
-IRBlock* getBlock(IRInst* inst)
-{
-    if (!inst)
-        return nullptr;
-
-    if (auto block = as<IRBlock>(inst))
-        return block;
-
-    return getBlock(inst->getParent());
-}
-
-IRInst* getInstInBlock(IRInst* inst)
-{
-    SLANG_RELEASE_ASSERT(inst);
-
-    if (const auto block = as<IRBlock>(inst->getParent()))
-        return inst;
-
-    return getInstInBlock(inst->getParent());
-}
-
 UIndex addPhiOutputArg(IRBuilder* builder, IRBlock* block, IRInst*& inoutTerminatorInst, IRInst* arg)
 {
     SLANG_RELEASE_ASSERT(as<IRUnconditionalBranch>(block->getTerminator()));

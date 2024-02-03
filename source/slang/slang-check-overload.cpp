@@ -992,6 +992,12 @@ namespace Slang
         if(leftIsInterfaceRequirement != rightIsInterfaceRequirement)
             return int(leftIsInterfaceRequirement) - int(rightIsInterfaceRequirement);
 
+        // Any decl is strictly better than a module decl.
+        bool leftIsModule = (as<ModuleDeclarationDecl>(left.declRef) != nullptr);
+        bool rightIsModule = (as<ModuleDeclarationDecl>(right.declRef) != nullptr);
+        if(leftIsModule != rightIsModule)
+            return int(rightIsModule) - int(leftIsModule);
+
         // If both are interface requirements, prefer to more derived interface.
         if (leftIsInterfaceRequirement && rightIsInterfaceRequirement)
         {

@@ -223,6 +223,14 @@ static gfx::DeviceType _toRenderType(Slang::RenderApiType apiType)
             //
             // TODO: At some point we could warn/error and deprecate this option.
         }
+        else if (argValue == "-allow-glsl")
+        {
+            outOptions.allowGLSL = true;
+        }
+        else if (argValue == "-entry")
+        {
+            SLANG_RETURN_ON_FAIL(reader.expectArg(outOptions.entryPointName));
+        }
         else
         {
             // Lookup

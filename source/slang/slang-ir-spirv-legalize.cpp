@@ -614,24 +614,24 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     varLayoutInst->removeAndDeallocate();
                 }
             }
-            else
+            else if (auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(innerType))
             {
-                if (auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(innerType))
-                {
-                    innerType = lowerStructuredBufferType(structuredBufferType).structType;
-                    storageClass = SpvStorageClassStorageBuffer;
-                    needLoad = false;
-                }
+                innerType = lowerStructuredBufferType(structuredBufferType).structType;
+                storageClass = SpvStorageClassStorageBuffer;
+                needLoad = false;
+            }
+            else if (auto glslShaderStorageBufferType = as<IRGLSLShaderStorageBufferType>(innerType))
+            {
+                innerType = glslShaderStorageBufferType->getElementType();
+                builder.addDecoration(innerType, kIROp_SPIRVBlockDecoration);
+                storageClass = SpvStorageClassStorageBuffer;
+                needLoad = false;
             }
 
             auto innerElementType = innerType;
             if (arrayType)
             {
-                Array<IRInst*, 2> arrayTypeArgs;
-                arrayTypeArgs.add(innerType);
-                if (arraySize)
-                    arrayTypeArgs.add(arraySize);
-                innerType = (IRType*)builder.emitIntrinsicInst(builder.getTypeKind(), arrayType->getOp(), (UInt)arrayTypeArgs.getCount(), arrayTypeArgs.getBuffer());
+                innerType = (IRType*)builder.getArrayTypeBase(arrayType->getOp(), innerType, arraySize);
                 if (!arraySize)
                 {
                     builder.addRequireSPIRVDescriptorIndexingExtensionDecoration(inst);

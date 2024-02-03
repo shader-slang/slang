@@ -5,21 +5,20 @@ precision highp float;
 precision highp int;
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
-layout(binding = 0) buffer MyBlockName
+buffer MyBlockName2
 {
-    int a;
-    int b;
-    int c;
-    int d;
+    uint foo;
+    uint bar;
+    uint data[];
 } outputBuffer;
 
 layout(local_size_x = 1) in;
 void computeMain()
 {
-    outputBuffer.a = 1;
-    outputBuffer.b = 2;
-    outputBuffer.c = 3;
-    outputBuffer.d = 4;
+    outputBuffer.foo = 1;
+    outputBuffer.bar = 2;
+    outputBuffer.data[0] = 3;
+    outputBuffer.data[1] = 4;
     // BUF: 1
     // BUF-NEXT: 2
     // BUF-NEXT: 3

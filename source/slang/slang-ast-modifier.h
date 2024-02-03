@@ -32,7 +32,7 @@ class ConstExprModifier : public Modifier { SLANG_AST_CLASS(ConstExprModifier)};
 class GloballyCoherentModifier : public Modifier { SLANG_AST_CLASS(GloballyCoherentModifier)};
 class ExternCppModifier : public Modifier { SLANG_AST_CLASS(ExternCppModifier)};
 class GLSLPrecisionModifier : public Modifier { SLANG_AST_CLASS(GLSLPrecisionModifier)};
-
+class GLSLModuleModifier : public Modifier {SLANG_AST_CLASS(GLSLModuleModifier)};
 // Marks that the definition of a decl is not yet synthesized.
 class ToBeSynthesizedModifier : public Modifier {SLANG_AST_CLASS(ToBeSynthesizedModifier)};
 
@@ -748,6 +748,14 @@ class DisableArrayFlatteningAttribute : public Attribute
 class GLSLLayoutLocalSizeAttribute : public Attribute
 {
     SLANG_AST_CLASS(GLSLLayoutLocalSizeAttribute)
+
+    // The number of threads to use along each axis
+    //
+    // TODO: These should be accessors that use the
+    // ordinary `args` list, rather than side data.
+    int32_t x;
+    int32_t y;
+    int32_t z;
 };
 
 // TODO: for attributes that take arguments, the syntax node

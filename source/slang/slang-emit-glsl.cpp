@@ -9,6 +9,7 @@
 
 #include "slang-legalize-types.h"
 #include "slang-ir-layout.h"
+#include "slang/slang-ir.h"
 
 #include <assert.h>
 
@@ -179,7 +180,7 @@ void GLSLSourceEmitter::_emitGLSLStructuredBuffer(IRGlobalParam* varDecl, IRHLSL
             m_writer->emit(space);
         }
     }
-
+    
     m_writer->emit(") ");
 
     /*
@@ -194,7 +195,10 @@ void GLSLSourceEmitter::_emitGLSLStructuredBuffer(IRGlobalParam* varDecl, IRHLSL
     HLSLAppendStructuredBufferType                  - Write
     HLSLConsumeStructuredBufferType                 - TODO (JS): Its possible that this can be readonly, but we currently don't support on GLSL
     */
-
+    if (varDecl->findDecoration<IRGloballyCoherentDecoration>())
+    {
+        m_writer->emit("coherent ");
+    }
     if (as<IRHLSLStructuredBufferType>(structuredBufferType))
     {
         m_writer->emit("readonly ");
@@ -226,8 +230,7 @@ void GLSLSourceEmitter::_emitGLSLStructuredBuffer(IRGlobalParam* varDecl, IRHLSL
     m_writer->emit(";\n");
 }
 
-
-void GLSLSourceEmitter::_emitGLSLByteAddressBuffer(IRGlobalParam* varDecl, IRByteAddressBufferTypeBase* byteAddressBufferType)
+void GLSLSourceEmitter::emitSSBOHeader(IRGlobalParam* varDecl, IRType* bufferType)
 {
     // TODO: A lot of this logic is copy-pasted from `emitIRStructuredBuffer_GLSL`.
     // It might be worthwhile to share the common code to avoid regressions sneaking
@@ -244,9 +247,9 @@ void GLSLSourceEmitter::_emitGLSLByteAddressBuffer(IRGlobalParam* varDecl, IRByt
     auto layout = getVarLayout(varDecl);
     if (layout)
     {
-        // We can use ShaderResource/DescriptorSlot interchangably here. 
+        // We can use ShaderResource/DescriptorSlot interchangably here.
         // This is possible because vk-shift-*
-        bool isReadOnly = (as<IRHLSLByteAddressBufferType>(byteAddressBufferType) != nullptr);
+        bool isReadOnly = (as<IRHLSLByteAddressBufferType>(bufferType) != nullptr);
 
         const LayoutResourceKindFlags kinds = (isReadOnly ? LayoutResourceKindFlag::ShaderResource : LayoutResourceKindFlag::UnorderedAccess)
             | LayoutResourceKindFlag::DescriptorTableSlot;
@@ -264,8 +267,12 @@ void GLSLSourceEmitter::_emitGLSLByteAddressBuffer(IRGlobalParam* varDecl, IRByt
             m_writer->emit(space);
         }
     }
-
     m_writer->emit(") ");
+
+    if (varDecl->findDecoration<IRGloballyCoherentDecoration>())
+    {
+        m_writer->emit("coherent ");
+    }
 
     /*
     If the output type is a buffer, and we can determine it is only readonly we can prefix before
@@ -276,12 +283,17 @@ void GLSLSourceEmitter::_emitGLSLByteAddressBuffer(IRGlobalParam* varDecl, IRByt
     HLSLRasterizerOrderedByteAddressBufferType  - Allows read/write access
     */
 
-    if (as<IRHLSLByteAddressBufferType>(byteAddressBufferType))
+    if (as<IRHLSLByteAddressBufferType>(bufferType))
     {
         m_writer->emit("readonly ");
     }
 
     m_writer->emit("buffer ");
+}
+
+void GLSLSourceEmitter::_emitGLSLByteAddressBuffer(IRGlobalParam* varDecl, IRByteAddressBufferTypeBase* byteAddressBufferType)
+{
+    emitSSBOHeader(varDecl, byteAddressBufferType);
 
     // Generate a dummy name for the block
     m_writer->emit("_S");
@@ -293,6 +305,21 @@ void GLSLSourceEmitter::_emitGLSLByteAddressBuffer(IRGlobalParam* varDecl, IRByt
 
     m_writer->dedent();
     m_writer->emit("} ");
+
+    m_writer->emit(getName(varDecl));
+    emitArrayBrackets(varDecl->getDataType());
+
+    m_writer->emit(";\n");
+}
+
+void GLSLSourceEmitter::_emitGLSLSSBO(IRGlobalParam* varDecl, IRGLSLShaderStorageBufferType* ssboType)
+{
+    emitSSBOHeader(varDecl, ssboType);
+
+    const auto structType = cast<IRStructType>(ssboType->getOperand(0));
+    m_writer->emit(getName(structType));
+    m_writer->emit("_Block");
+    emitStructDeclarationsBlock(structType, true);
 
     m_writer->emit(getName(varDecl));
     emitArrayBrackets(varDecl->getDataType());
@@ -1275,6 +1302,11 @@ bool GLSLSourceEmitter::tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* v
         _emitGLSLByteAddressBuffer(varDecl, byteAddressBufferType);
         return true;
     }
+    else if (const auto glslSSBOType = as<IRGLSLShaderStorageBufferType>(unwrapArray(varType)))
+    {
+        _emitGLSLSSBO(varDecl, glslSSBOType);
+        return true;
+    }
 
     // We want to skip the declaration of any system-value variables
     // when outputting GLSL (well, except in the case where they
@@ -1596,6 +1628,25 @@ void GLSLSourceEmitter::emitBufferPointerTypeDefinition(IRInst* ptrType)
     m_writer->emit("};\n");
 }
 
+// Is this type only used by SSBO declarations, if so then we don't need to
+// emit it and it'll be emitted inline there.
+static bool isSSBOInternalStructType(IRInst* inst)
+{
+    if(!as<IRStructType>(inst))
+        return false;
+
+    bool onlySSBOUses = true;
+    for(auto use = inst->firstUse; use; use = use->nextUse)
+    {
+        if(!as<IRGLSLShaderStorageBufferType>(use->user))
+        {
+            onlySSBOUses = false;
+            break;
+        }
+    }
+    return onlySSBOUses;
+}
+
 void GLSLSourceEmitter::emitGlobalInstImpl(IRInst* inst)
 {
     switch (inst->getOp())
@@ -1603,6 +1654,11 @@ void GLSLSourceEmitter::emitGlobalInstImpl(IRInst* inst)
     case kIROp_HLSLConstBufferPointerType:
         emitBufferPointerTypeDefinition(inst);
         break;
+    // No need to use structs which are just taking part in a SSBO declaration
+    case kIROp_StructType:
+        if(isSSBOInternalStructType(inst))
+            break;
+        [[fallthrough]];
     default:
         Super::emitGlobalInstImpl(inst);
         break;
