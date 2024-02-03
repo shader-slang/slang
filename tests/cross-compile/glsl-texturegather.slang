@@ -17,5 +17,5 @@ float4 main()
     return t.GatherCmp(sc, loc, cmp)
          + t.GatherCmp(sc, loc, cmp, off)
          + t.GatherCmp(sc, loc, cmp, off, off, off, off)
-         + t.GatherCmpRed(sc, loc, cmp, int2(6,6), int2(7,7), int2(8,8), int2(9,9));
+         + t.GatherCmp(sc, loc, cmp, int2(6,6), int2(7,7), int2(8,8), int2(9,9));
 }

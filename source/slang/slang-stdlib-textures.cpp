@@ -50,12 +50,14 @@ TextureTypeInfo::TextureTypeInfo(
     bool isArray,
     bool isMultisample,
     bool isShadow,
+    bool isRectangle,
     StringBuilder& inSB,
     String const& inPath)
     : base(base)
     , isArray(isArray)
     , isMultisample(isMultisample)
     , isShadow(isShadow)
+    , isRectangle(isRectangle)
     , sb(inSB)
     , path(inPath)
 {
@@ -167,6 +169,12 @@ void TextureTypeInfo::writeGetDimensionFunctions()
 
         for (int includeMipInfo = 0; includeMipInfo < 2; ++includeMipInfo)
         {
+            if (includeMipInfo)
+            {
+                if (isRectangle || isMultisample)
+                    continue;
+            }
+
             int sizeDimCount = 0;
             StringBuilder params;
             if (includeMipInfo)
@@ -281,7 +289,7 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                         }
                     };
                 glsl << "if (access == " << kStdlibResourceAccessReadOnly << ") __intrinsic_asm \"";
-                emitIntrinsic(toSlice("textureSize"), true);
+                emitIntrinsic(toSlice("textureSize"), !isMultisample);
                 glsl << "\";\n";
                 glsl << "__intrinsic_asm \"";
                 emitIntrinsic(toSlice("imageSize"), false);

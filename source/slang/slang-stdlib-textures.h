@@ -35,6 +35,7 @@ struct TextureTypeInfo
         bool isArray,
         bool isMultisample,
         bool isShadow,
+        bool isRectangle,
         StringBuilder& inSB,
         String const& inPath);
 
@@ -42,6 +43,7 @@ struct TextureTypeInfo
     bool isArray;
     bool isMultisample;
     bool isShadow;
+    bool isRectangle;
     StringBuilder& sb;
     String path;
 
