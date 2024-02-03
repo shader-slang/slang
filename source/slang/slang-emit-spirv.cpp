@@ -5142,7 +5142,8 @@ SlangResult emitSPIRVFromIR(
 
     StringBuilder runSpirvValEnvVar;
     PlatformUtil::getEnvironmentVariable(UnownedStringSlice("SLANG_RUN_SPIRV_VALIDATION"), runSpirvValEnvVar);
-    if (runSpirvValEnvVar.getUnownedSlice() == "1")
+    if (runSpirvValEnvVar.getUnownedSlice() == "1"
+        && !codeGenContext->shouldSkipSPIRVValidation())
     {
         const auto validationResult = debugValidateSPIRV(spirvOut);
         // If validation isn't available, don't say it failed, it's just a debug

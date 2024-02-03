@@ -2562,6 +2562,8 @@ namespace Slang
 
         bool isSpecializationDisabled();
 
+        bool shouldSkipSPIRVValidation();
+
         SlangResult requireTranslationUnitSourceFiles();
 
         //
@@ -2707,7 +2709,8 @@ namespace Slang
         virtual SLANG_NO_THROW void SLANG_MCALL setDebugInfoFormat(SlangDebugInfoFormat format) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setReportDownstreamTime(bool value) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setReportPerfBenchmark(bool value) SLANG_OVERRIDE;
-        
+        virtual SLANG_NO_THROW void SLANG_MCALL setSkipSPIRVValidation(bool value) SLANG_OVERRIDE;
+
         void setHLSLToVulkanLayoutOptions(int targetIndex, HLSLToVulkanLayoutOptions* vulkanLayoutOptions);
 
         EndToEndCompileRequest(
@@ -2759,6 +2762,8 @@ namespace Slang
 
         // If set, will print out compiler performance benchmark results.
         bool m_reportPerfBenchmark = false;
+
+        bool m_skipSPIRVValidation = false;
         
         String m_diagnosticOutput;
 

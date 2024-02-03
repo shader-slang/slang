@@ -7,7 +7,7 @@
 
 //TEST_INPUT: set t = RWTexture2D(format=R32_FLOAT, size=4, content = zero, mipMaps = 1)
 [format("r32f")]
-RWTexture2D<float> t;
+globallycoherent RWTexture2D<float> t;
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<float> outputBuffer;
