@@ -7,8 +7,13 @@ namespace Slang
     struct IRModule;
     class DiagnosticSink;
 
-    /// Lower tuple types to ordinary `struct`s.
-    void lowerGLSLShaderStorageBufferObjects(
+    void lowerGLSLShaderStorageBufferObjectsToPointers(
         IRModule* module,
-        DiagnosticSink* sink);
+        DiagnosticSink* sink
+    );
+
+    void lowerGLSLShaderStorageBufferObjectsToStructuredBuffers(
+        IRModule* module,
+        DiagnosticSink* sink
+    );
 }
