@@ -8747,17 +8747,20 @@ namespace Slang
             declaredCaps.join(localDeclaredCaps);
         }
 
-        // If the function is an entrypoint, add the stage to declaredCaps.
-        if (auto entryPointAttr = funcDecl->findModifier<EntryPointAttribute>())
+        if (!declaredCaps.isEmpty())
         {
-            auto stageCaps = CapabilitySet(Profile(entryPointAttr->stage).getCapabilityName());
-            if (declaredCaps.isIncompatibleWith(stageCaps))
+            // If the function is an entrypoint, add the stage to declaredCaps.
+            if (auto entryPointAttr = funcDecl->findModifier<EntryPointAttribute>())
             {
-                getSink()->diagnose(funcDecl->loc, Diagnostics::stageIsInCompatibleWithCapabilityDefinition, funcDecl, stageCaps, declaredCaps);
-            }
-            else
-            {
-                declaredCaps.join(stageCaps);
+                auto stageCaps = CapabilitySet(Profile(entryPointAttr->stage).getCapabilityName());
+                if (declaredCaps.isIncompatibleWith(stageCaps))
+                {
+                    getSink()->diagnose(funcDecl->loc, Diagnostics::stageIsInCompatibleWithCapabilityDefinition, funcDecl, stageCaps, declaredCaps);
+                }
+                else
+                {
+                    declaredCaps.join(stageCaps);
+                }
             }
         }
 
