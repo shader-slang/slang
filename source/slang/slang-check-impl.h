@@ -1099,7 +1099,6 @@ namespace Slang
             SourceLoc loc,
             Expr*    originalExpr);
 
-        DeclVisibility getDeclVisibility(Decl* decl);
         DeclVisibility getTypeVisibility(Type* type);
         bool isDeclVisibleFromScope(DeclRef<Decl> declRef, Scope* scope);
         LookupResult filterLookupResultByVisibility(const LookupResult& lookupResult);
@@ -1471,6 +1470,8 @@ namespace Slang
         bool checkLiteralStringVal(
             Expr*    expr,
             String*         outVal);
+
+        bool checkCapabilityName(Expr* expr, CapabilityName& outCapabilityName);
 
         void visitModifier(Modifier*);
 
@@ -2646,4 +2647,8 @@ namespace Slang
     };
 
     bool isUnsizedArrayType(Type* type);
+
+    DeclVisibility getDeclVisibility(Decl* decl);
+
+    void diagnoseCapabilityProvenance(DiagnosticSink* sink, Decl* decl, CapabilityAtom missingAtom);
 }

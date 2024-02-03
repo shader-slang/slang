@@ -78,6 +78,50 @@ struct PtrSerialTypeInfo<T, std::enable_if_t<std::is_base_of_v<Val, T>>>
 template <typename T>
 struct SerialTypeInfo<DeclRef<T>> : public SerialTypeInfo<DeclRefBase*> {};
 
+template<>
+struct SerialTypeInfo<CapabilitySet>
+{
+    typedef CapabilitySet NativeType;
+    typedef SerialIndex SerialType;
+    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
+    static void toSerial(SerialWriter* writer, const void* native, void* serial)
+    {
+        auto& src = *(const NativeType*)native;
+        auto& dst = *(SerialType*)serial;
+
+        dst = writer->addArray(src.getExpandedAtoms().getBuffer(), src.getExpandedAtoms().getCount());
+    }
+    static void toNative(SerialReader* reader, const void* serial, void* native)
+    {
+        auto& dst = *(NativeType*)native;
+        auto& src = *(const SerialType*)serial;
+
+        reader->getArray(src, dst.getExpandedAtoms());
+    }
+};
+
+template<>
+struct SerialTypeInfo<CapabilityConjunctionSet>
+{
+    typedef CapabilityConjunctionSet NativeType;
+    typedef SerialIndex SerialType;
+    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
+    static void toSerial(SerialWriter* writer, const void* native, void* serial)
+    {
+        auto& src = *(const NativeType*)native;
+        auto& dst = *(SerialType*)serial;
+
+        dst = writer->addArray(src.getExpandedAtoms().getBuffer(), src.getExpandedAtoms().getCount());
+    }
+    static void toNative(SerialReader* reader, const void* serial, void* native)
+    {
+        auto& dst = *(NativeType*)native;
+        auto& src = *(const SerialType*)serial;
+
+        reader->getArray(src, dst.getExpandedAtoms());
+    }
+};
+
 // ValNodeOperand
 template <>
 struct SerialTypeInfo<ValNodeOperand>

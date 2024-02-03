@@ -62,7 +62,7 @@ namespace Slang
     {
         VarDecl* varDecl = m_astBuilder->create<VarDecl>();
         varDecl->parentDecl = nullptr; // TODO: need to fill this in somehow!
-        varDecl->checkState = DeclCheckState::Checked;
+        varDecl->checkState = DeclCheckState::DefinitionChecked;
         varDecl->nameAndLoc.loc = expr->loc;
         varDecl->initExpr = expr;
         varDecl->type.type = expr->type.type;
@@ -825,55 +825,6 @@ namespace Slang
         {
             return ConstructLookupResultExpr(lookupResult.item, baseExpr, loc, originalExpr);
         }
-    }
-
-    DeclVisibility SemanticsVisitor::getDeclVisibility(Decl* decl)
-    {
-        if (as<GenericTypeParamDecl>(decl) || as<GenericValueParamDecl>(decl) || as<GenericTypeConstraintDecl>(decl))
-        {
-            auto genericDecl = as<GenericDecl>(decl->parentDecl);
-            if (!genericDecl)
-                return DeclVisibility::Default;
-            if (genericDecl->inner)
-                return getDeclVisibility(genericDecl->inner);
-            return DeclVisibility::Default;
-        }
-        if (auto genericDecl = as<GenericDecl>(decl))
-            decl = genericDecl->inner;
-        for (; decl; decl = getParentDecl(decl))
-        {
-            if (as<AccessorDecl>(decl))
-                continue;
-            if (as<EnumCaseDecl>(decl))
-                continue;
-            break;
-        }
-        if (!decl)
-            return DeclVisibility::Public;
-
-        for (auto modifier : decl->modifiers)
-        {
-            if (as<PublicModifier>(modifier))
-                return DeclVisibility::Public;
-            else if (as<InternalModifier>(modifier))
-                return DeclVisibility::Internal;
-            else if (as<PrivateModifier>(modifier))
-                return DeclVisibility::Private;
-        }
-        
-        // Interface members will always have the same visibility as the interface itself.
-        if (auto interfaceDecl = findParentInterfaceDecl(decl))
-        {
-            return getDeclVisibility(interfaceDecl);
-        }
-        else if (as<NamespaceDecl>(decl))
-        {
-            return DeclVisibility::Public;
-        }
-        if (auto parentModule = getModuleDecl(decl))
-            return parentModule->isInLegacyLanguage ? DeclVisibility::Public : DeclVisibility::Internal;
-
-        return DeclVisibility::Default;
     }
 
     DeclVisibility SemanticsVisitor::getTypeVisibility(Type* type)
@@ -1721,7 +1672,7 @@ namespace Slang
         if (!getInitExpr(m_astBuilder, declRef))
             return nullptr;
 
-        ensureDecl(declRef.getDecl(), DeclCheckState::Checked);
+        ensureDecl(declRef.getDecl(), DeclCheckState::DefinitionChecked);
         ConstantFoldingCircularityInfo newCircularityInfo(decl, circularityInfo);
         return tryConstantFoldExpr(getInitExpr(m_astBuilder, declRef), &newCircularityInfo);
     }

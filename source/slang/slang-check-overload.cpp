@@ -351,7 +351,7 @@ namespace Slang
                     {
                         // Otherwise, the generic decl had better provide a default value
                         // or this reference is ill-formed.
-                        ensureDecl(valParamRef, DeclCheckState::Checked);
+                        ensureDecl(valParamRef, DeclCheckState::DefinitionChecked);
                         ConstantFoldingCircularityInfo newCircularityInfo(valParamRef.getDecl(), nullptr);
                         auto defaultVal = tryConstantFoldExpr(valParamRef.substitute(m_astBuilder, valParamRef.getDecl()->initExpr), &newCircularityInfo);
                         if (!defaultVal)

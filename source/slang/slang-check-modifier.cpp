@@ -74,6 +74,30 @@ namespace Slang
         return false;
     }
 
+    bool SemanticsVisitor::checkCapabilityName(Expr* expr, CapabilityName& outCapabilityName)
+    {
+        if (auto varExpr = as<VarExpr>(expr))
+        {
+            if (!varExpr->name)
+                return false;
+            if (varExpr->name == getSession()->getCompletionRequestTokenName())
+            {
+                auto& suggestions = getLinkage()->contentAssistInfo.completionSuggestions;
+                suggestions.clear();
+                suggestions.scopeKind = CompletionSuggestions::ScopeKind::Capabilities;
+            }
+            outCapabilityName = findCapabilityName(varExpr->name->text.getUnownedSlice());
+            if (outCapabilityName == CapabilityName::Invalid)
+            {
+                getSink()->diagnose(expr, Diagnostics::unknownCapability, varExpr->name);
+                return false;
+            }
+            return true;
+        }
+        getSink()->diagnose(expr, Diagnostics::expectCapability);
+        return false;
+    }
+
     void SemanticsVisitor::visitModifier(Modifier*)
     {
         // Do nothing with modifiers for now
@@ -209,7 +233,7 @@ namespace Slang
                 paramDecl->nameAndLoc = member->nameAndLoc;
                 paramDecl->type = varMember->type;
                 paramDecl->loc = member->loc;
-                paramDecl->setCheckState(DeclCheckState::Checked);
+                paramDecl->setCheckState(DeclCheckState::DefinitionChecked);
 
                 paramDecl->parentDecl = attrDecl;
                 attrDecl->members.add(paramDecl);
@@ -233,7 +257,7 @@ namespace Slang
         //
         // TODO: what check state is relevant here?
         //
-        ensureDecl(attrDecl, DeclCheckState::Checked);
+        ensureDecl(attrDecl, DeclCheckState::DefinitionChecked);
 
         return attrDecl;
     }
@@ -782,6 +806,19 @@ namespace Slang
             }
 
             pyExportAttr->name = name;
+        }
+        else if (auto requireCapAttr = as<RequireCapabilityAttribute>(attr))
+        {
+            List<CapabilityName> capabilityNames;
+            for (auto& arg : attr->args)
+            {
+                CapabilityName capName;
+                if (checkCapabilityName(arg, capName))
+                {
+                    capabilityNames.add(capName);
+                }
+            }
+            requireCapAttr->capabilitySet = CapabilitySet(capabilityNames);
         }
         else
         {

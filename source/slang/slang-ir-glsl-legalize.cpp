@@ -518,6 +518,8 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     GlobalVaryingDeclarator*    declarator,
     GLSLSystemValueInfo*        inStorage)
 {
+    SLANG_UNUSED(codeGenContext);
+
     if(auto indicesSemantic = getMeshOutputIndicesSystemValueInfo(
             context,
             kind,
@@ -914,16 +916,8 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     else if (semanticName == "sv_barycentrics")
     {
         context->requireGLSLVersion(ProfileVersion::GLSL_450);
-        if (codeGenContext->getTargetCaps().implies(CapabilityAtom::_GL_NV_fragment_shader_barycentric))
-        {
-            context->requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_NV_fragment_shader_barycentric"));
-            name = "gl_BaryCoordNV";
-        }
-        else
-        {
-            context->requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_EXT_fragment_shader_barycentric"));
-            name = "gl_BaryCoordEXT";
-        }
+        context->requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_EXT_fragment_shader_barycentric"));
+        name = "gl_BaryCoordEXT";
 
         // TODO: There is also the `gl_BaryCoordNoPerspNV` builtin, which
         // we ought to use if the `noperspective` modifier has been

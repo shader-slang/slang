@@ -2475,6 +2475,9 @@ attribute_syntax [vk_image_format(format : String)] : FormatAttribute;
 __attributeTarget(Decl)
 attribute_syntax [allow(diagnostic: String)] : AllowAttribute;
 
+__attributeTarget(Decl)
+attribute_syntax[require(capability)] : RequireCapabilityAttribute;
+
 // Linking
 __attributeTarget(Decl)
 attribute_syntax [__extern] : ExternAttribute;
