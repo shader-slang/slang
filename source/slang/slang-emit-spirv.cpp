@@ -2262,6 +2262,7 @@ struct SPIRVEmitContext
                 SLANG_UNIMPLEMENTED_X(e.getBuffer());
             }
         case kIROp_Specialize:
+        case kIROp_MissingReturn:
             return nullptr;
         case kIROp_Var:
             return emitVar(parent, inst);
