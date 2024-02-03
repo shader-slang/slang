@@ -5149,6 +5149,11 @@ void EndToEndCompileRequest::setReportPerfBenchmark(bool value)
     m_reportPerfBenchmark = value;
 }
 
+void EndToEndCompileRequest::setSkipSPIRVValidation(bool value)
+{
+    m_skipSPIRVValidation = value;
+}
+
 void EndToEndCompileRequest::setDiagnosticCallback(SlangDiagnosticCallback callback, void const* userData)
 {
     ComPtr<ISlangWriter> writer(new CallbackWriter(callback, userData, WriterFlag::IsConsole));

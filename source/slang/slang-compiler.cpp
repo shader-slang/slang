@@ -2346,6 +2346,17 @@ namespace Slang
         return false;
     }
 
+    bool CodeGenContext::shouldSkipSPIRVValidation()
+    {
+        if (auto endToEndReq = isEndToEndCompile())
+        {
+            if (endToEndReq->m_skipSPIRVValidation)
+                return true;
+        }
+
+        return false;
+    }
+
     bool CodeGenContext::shouldDumpIR()
     {
         if (getTargetReq()->getTargetFlags() & SLANG_TARGET_FLAG_DUMP_IR)

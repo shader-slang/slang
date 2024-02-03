@@ -217,6 +217,9 @@ attribute_syntax [Differentiable(order:int = 0)] : BackwardDifferentiableAttribu
 __intrinsic_op($(kIROp_RequirePrelude))
 void __requirePrelude(constexpr String preludeText);
 
+__intrinsic_op($(kIROp_RequireGLSLExtension))
+void __requireGLSLExtension(constexpr String preludeText);
+
 /// Interface to denote types as differentiable.
 /// Allows for user-specified differential types as
 /// well as automatic generation, for when the associated type
@@ -2255,10 +2258,21 @@ __intrinsic_op($(kIROp_IsFloat))
 bool __isFloat_impl(T t);
 
 __generic<T>
+__intrinsic_op($(kIROp_IsHalf))
+bool __isHalf_impl(T t);
+
+__generic<T>
 [__unsafeForceInlineEarly]
 bool __isFloat()
 {
     return __isFloat_impl(__declVal<T>());
+}
+
+__generic<T>
+[__unsafeForceInlineEarly]
+bool __isHalf()
+{
+    return __isHalf_impl(__declVal<T>());
 }
 
 __generic<T>

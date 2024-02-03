@@ -278,6 +278,14 @@ struct VulkanExtendedFeatureProperties
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT
     };
 
+    // Multiview features
+    VkPhysicalDeviceMultiviewFeaturesKHR multiviewFeatures = {
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES_KHR };
+
+    // Fragment shading rate features
+    VkPhysicalDeviceFragmentShadingRateFeaturesKHR fragmentShadingRateFeatures = {
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_FEATURES_KHR };
+
     // Vulkan 1.2 features.
     VkPhysicalDeviceVulkan12Features vulkan12Features = {
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES};
