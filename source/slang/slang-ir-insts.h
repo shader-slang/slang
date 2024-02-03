@@ -3080,6 +3080,12 @@ struct IRRequirePrelude : IRInst
     UnownedStringSlice getPrelude() { return as<IRStringLit>(getOperand(0))->getStringSlice(); }
 };
 
+struct IRRequireGLSLExtension : IRInst
+{
+    IR_LEAF_ISA(RequireGLSLExtension)
+    UnownedStringSlice getExtensionName() { return as<IRStringLit>(getOperand(0))->getStringSlice(); }
+};
+
 struct IRBuilderSourceLocRAII;
 
 struct IRBuilder
