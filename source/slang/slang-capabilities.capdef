@@ -89,11 +89,6 @@ def mesh : stage;
 def amplification : stage;
 def callable : stage;
 
-alias all_stages = vertex + fragment + compute + hull + domain
-                   + geometry + raygen + intersection + anyhit
-                   + closesthit + miss + mesh + amplification
-                   + callable;
-
 def _sm_4_0 : hlsl;
 def _sm_4_1 : _sm_4_0;
 def _sm_5_0 : _sm_4_1;
@@ -377,5 +372,3 @@ alias DX_6_4 = sm_6_4;
 alias DX_6_5 = sm_6_5;
 alias DX_6_6 = sm_6_6;
 alias DX_6_7 = sm_6_7;
-
-
