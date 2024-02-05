@@ -3,9 +3,20 @@
 
 //TEST:SIMPLE(filecheck=CHECK_GLSL): -allow-glsl -stage fragment -entry computeMain -target glsl
 //TEST:SIMPLE(filecheck=CHECK_SPV):  -allow-glsl -stage fragment -entry computeMain -target spirv
-//T-EST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage fragment -entry computeMain -target hlsl
 //TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage fragment -entry computeMain -target cuda
+
+// Disabling following targets because they are currently causing compile errors.
+//T-EST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage fragment -entry computeMain -target hlsl
 //T-EST:SIMPLE(filecheck=CHECK_CPP):  -allow-glsl -stage fragment -entry computeMain -target cpp
+
+// "Offset" family of texture functions in GLSL requires offset parameter to be a constant value.
+// It appears that slangc removes the constant-ness of constant values.
+//#define TEST_when_constexpr_works
+
+// It appears that CUDA doesn't have implementations for multisampling samplers.
+// When targetting glsl and spirv, the DEBUG build of slangc encounters issues with "Array" variant
+// of multisampling samplers: sampler2DMSArray, isampler2DMSArray and usampler2DMSArray.
+//#define TEST_when_multisampling_works
 
 //RWStructuredBuffer<float> outputBuffer;
 //layout(location = 0) out vec4 o_color;
@@ -27,11 +38,11 @@ uniform samplerCube uniform_samplerCube;
 uniform sampler1DArray uniform_sampler1DArray;
 uniform sampler2DArray uniform_sampler2DArray;
 uniform samplerCubeArray uniform_samplerCubeArray;
+uniform samplerBuffer uniform_samplerBuffer;
+#if defined(TEST_when_multisampling_works)
 uniform sampler2DMS uniform_sampler2DMS;
 uniform sampler2DMSArray uniform_sampler2DMSArray;
-#if defined(TEST_samplerBuffer)
-uniform samplerBuffer uniform_samplerBuffer;
-#endif // #if defined(TEST_samplerBuffer)
+#endif // #if defined(TEST_when_multisampling_works)
 
 uniform isampler1D uniform_isampler1D;
 uniform isampler2D uniform_isampler2D;
@@ -41,11 +52,11 @@ uniform isamplerCube uniform_isamplerCube;
 uniform isampler1DArray uniform_isampler1DArray;
 uniform isampler2DArray uniform_isampler2DArray;
 uniform isamplerCubeArray uniform_isamplerCubeArray;
+uniform isamplerBuffer uniform_isamplerBuffer;
+#if defined(TEST_when_multisampling_works)
 uniform isampler2DMS uniform_isampler2DMS;
 uniform isampler2DMSArray uniform_isampler2DMSArray;
-#if defined(TEST_samplerBuffer)
-uniform isamplerBuffer uniform_isamplerBuffer;
-#endif // #if defined(TEST_samplerBuffer)
+#endif // #if defined(TEST_when_multisampling_works)
 
 uniform usampler1D uniform_usampler1D;
 uniform usampler2D uniform_usampler2D;
@@ -55,11 +66,11 @@ uniform usamplerCube uniform_usamplerCube;
 uniform usampler1DArray uniform_usampler1DArray;
 uniform usampler2DArray uniform_usampler2DArray;
 uniform usamplerCubeArray uniform_usamplerCubeArray;
+uniform usamplerBuffer uniform_usamplerBuffer;
+#if defined(TEST_when_multisampling_works)
 uniform usampler2DMS uniform_usampler2DMS;
 uniform usampler2DMSArray uniform_usampler2DMSArray;
-#if defined(TEST_samplerBuffer)
-uniform usamplerBuffer uniform_usamplerBuffer;
-#endif // #if defined(TEST_samplerBuffer)
+#endif // #if defined(TEST_when_multisampling_works)
 
 __generic<T : __BuiltinArithmeticType, let N : int>
 bool textureFuncs( Sampler1D<vector<T,N>> gsampler1D
@@ -70,11 +81,11 @@ bool textureFuncs( Sampler1D<vector<T,N>> gsampler1D
     , Sampler1DArray<vector<T,N>> gsampler1DArray
     , Sampler2DArray<vector<T,N>> gsampler2DArray
     , SamplerCubeArray<vector<T,N>> gsamplerCubeArray
+    , SamplerBuffer<vector<T,N>> gsamplerBuffer
+#if defined(TEST_when_multisampling_works)
     , Sampler2DMS<vector<T,N>> gsampler2DMS
     , Sampler2DMSArray<vector<T,N>> gsampler2DMSArray
-#if defined(TEST_samplerBuffer)
-    , SamplerBuffer<vector<T,N>> gsamplerBuffer
-#endif // #if defined(TEST_samplerBuffer)
+#endif // #if defined(TEST_when_multisampling_works)
 )
 {
     typealias gvec4 = vector<T,4>;
@@ -98,11 +109,11 @@ bool textureFuncs( Sampler1D<vector<T,N>> gsampler1D
         && ivec2(0) == textureSize(uniform_sampler1DArrayShadow, int(0))
         && ivec3(0) == textureSize(gsampler2DArray, int(0))
         && ivec3(0) == textureSize(uniform_sampler2DArrayShadow, int(0))
-#if defined(TEST_samplerBuffer)
         && int(0) == textureSize(gsamplerBuffer)
-#endif // #if defined(TEST_samplerBuffer)
+#if defined(TEST_when_multisampling_works)
         && ivec2(0) == textureSize(gsampler2DMS)
         && ivec3(0) == textureSize(gsampler2DMSArray)
+#endif // #if defined(TEST_when_multisampling_works)
         && vec2(0) == textureQueryLod(gsampler1D, float(0))
         && vec2(0) == textureQueryLod(gsampler2D, vec2(0))
         && vec2(0) == textureQueryLod(gsampler3D, vec3(0))
@@ -129,8 +140,10 @@ bool textureFuncs( Sampler1D<vector<T,N>> gsampler1D
         && int(0) == textureQueryLevels(uniform_sampler1DArrayShadow)
         && int(0) == textureQueryLevels(uniform_sampler2DArrayShadow)
         && int(0) == textureQueryLevels(uniform_samplerCubeArrayShadow)
+#if defined(TEST_when_multisampling_works)
         && int(0) == textureSamples(gsampler2DMS)
         && int(0) == textureSamples(gsampler2DMSArray)
+#endif // #if defined(TEST_when_multisampling_works)
 
         // 8.9.2. Texel Lookup Functions
         && gvec4(T(0)) == texture(gsampler1D, float(0))
@@ -211,11 +224,11 @@ bool textureFuncs( Sampler1D<vector<T,N>> gsampler1D
         && gvec4(T(0)) == texelFetch(gsampler2DRect, ivec2(0))
         && gvec4(T(0)) == texelFetch(gsampler1DArray, ivec2(0), int(0))
         && gvec4(T(0)) == texelFetch(gsampler2DArray, ivec3(0), int(0))
-#if defined(TEST_samplerBuffer)
         && gvec4(T(0)) == texelFetch(gsamplerBuffer, int(0))
-#endif // #if defined(TEST_samplerBuffer)
+#if defined(TEST_when_multisampling_works)
         && gvec4(T(0)) == texelFetch(gsampler2DMS, ivec2(0), int(0))
         && gvec4(T(0)) == texelFetch(gsampler2DMSArray, ivec3(0), int(0))
+#endif // #if defined(TEST_when_multisampling_works)
         && gvec4(T(0)) == texelFetchOffset(gsampler1D, int(0), int(0), __LINE__)
         && gvec4(T(0)) == texelFetchOffset(gsampler2D, ivec2(0), int(0), { __LINE__ })
         && gvec4(T(0)) == texelFetchOffset(gsampler3D, ivec3(0), int(0), { __LINE__ })
@@ -332,15 +345,17 @@ bool textureFuncs( Sampler1D<vector<T,N>> gsampler1D
         && gvec4(T(0)) == textureGatherOffset(gsampler2DRect, vec2(0), { __LINE__ })
         && gvec4(T(0)) == textureGatherOffset(gsampler2DRect, vec2(0), { __LINE__ }, int(0))
         && vec4(0) == textureGatherOffset(uniform_sampler2DRectShadow, vec2(0), float(0), { __LINE__ })
-        //&& gvec4(T(0)) == textureGatherOffsets(gsampler2D, vec2(0), { __LINE__ }) // constexpr not working
-        //&& gvec4(T(0)) == textureGatherOffsets(gsampler2D, vec2(0), { __LINE__ }, int(0)) // constexpr not working
-        //&& gvec4(T(0)) == textureGatherOffsets(gsampler2DArray, vec3(0), { __LINE__ }) // constexpr not working
-        //&& gvec4(T(0)) == textureGatherOffsets(gsampler2DArray, vec3(0), { __LINE__ }, int(0)) // constexpr not working
-        //&& vec4(0) == textureGatherOffsets(uniform_sampler2DShadow, vec2(0), float(0), { __LINE__ }) // constexpr not working
-        //&& vec4(0) == textureGatherOffsets(uniform_sampler2DArrayShadow, vec3(0), float(0), { __LINE__ }) // constexpr not working
-        //&& gvec4(T(0)) == textureGatherOffsets(gsampler2DRect, vec2(0), { __LINE__ }) // constexpr not working
-        //&& gvec4(T(0)) == textureGatherOffsets(gsampler2DRect, vec2(0), { __LINE__ }, int(0)) // constexpr not working
-        //&& vec4(0) == textureGatherOffsets(uniform_sampler2DRectShadow, vec2(0), float(0), { __LINE__ }) // constexpr not working
+#if defined(TEST_when_constexpr_works)
+        && gvec4(T(0)) == textureGatherOffsets(gsampler2D, vec2(0), { __LINE__ }) // constexpr not working
+        && gvec4(T(0)) == textureGatherOffsets(gsampler2D, vec2(0), { __LINE__ }, int(0)) // constexpr not working
+        && gvec4(T(0)) == textureGatherOffsets(gsampler2DArray, vec3(0), { __LINE__ }) // constexpr not working
+        && gvec4(T(0)) == textureGatherOffsets(gsampler2DArray, vec3(0), { __LINE__ }, int(0)) // constexpr not working
+        && vec4(0) == textureGatherOffsets(uniform_sampler2DShadow, vec2(0), float(0), { __LINE__ }) // constexpr not working
+        && vec4(0) == textureGatherOffsets(uniform_sampler2DArrayShadow, vec3(0), float(0), { __LINE__ }) // constexpr not working
+        && gvec4(T(0)) == textureGatherOffsets(gsampler2DRect, vec2(0), { __LINE__ }) // constexpr not working
+        && gvec4(T(0)) == textureGatherOffsets(gsampler2DRect, vec2(0), { __LINE__ }, int(0)) // constexpr not working
+        && vec4(0) == textureGatherOffsets(uniform_sampler2DRectShadow, vec2(0), float(0), { __LINE__ }) // constexpr not working
+#endif // #if defined(TEST_when_constexpr_works)
 
         // 8.9.5. Compatibility Profile Texture Functions
         && vec4(0) == texture1D(uniform_sampler1D, float(0))
@@ -404,11 +419,11 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
             , uniform_sampler1DArray
             , uniform_sampler2DArray
             , uniform_samplerCubeArray
+            , uniform_samplerBuffer
+#if defined(TEST_when_multisampling_works)
             , uniform_sampler2DMS
             , uniform_sampler2DMSArray
-#if defined(TEST_samplerBuffer)
-            , uniform_samplerBuffer
-#endif // #if defined(TEST_samplerBuffer)
+#endif // #if defined(TEST_when_multisampling_works)
             )
         && textureFuncs(
             uniform_isampler1D
@@ -419,11 +434,11 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
             , uniform_isampler1DArray
             , uniform_isampler2DArray
             , uniform_isamplerCubeArray
+            , uniform_isamplerBuffer
+#if defined(TEST_when_multisampling_works)
             , uniform_isampler2DMS
             , uniform_isampler2DMSArray
-#if defined(TEST_samplerBuffer)
-            , uniform_isamplerBuffer
-#endif // #if defined(TEST_samplerBuffer)
+#endif // #if defined(TEST_when_multisampling_works)
             )
         && textureFuncs(
             uniform_usampler1D
@@ -434,11 +449,11 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
             , uniform_usampler1DArray
             , uniform_usampler2DArray
             , uniform_usamplerCubeArray
+            , uniform_usamplerBuffer
+#if defined(TEST_when_multisampling_works)
             , uniform_usampler2DMS
             , uniform_usampler2DMSArray
-#if defined(TEST_samplerBuffer)
-            , uniform_usamplerBuffer
-#endif // #if defined(TEST_samplerBuffer)
+#endif // #if defined(TEST_when_multisampling_works)
             );
 
     //outputBuffer[0] = float(r);

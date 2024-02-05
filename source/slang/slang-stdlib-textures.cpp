@@ -50,14 +50,12 @@ TextureTypeInfo::TextureTypeInfo(
     bool isArray,
     bool isMultisample,
     bool isShadow,
-    bool isRectangle,
     StringBuilder& inSB,
     String const& inPath)
     : base(base)
     , isArray(isArray)
     , isMultisample(isMultisample)
     , isShadow(isShadow)
-    , isRectangle(isRectangle)
     , sb(inSB)
     , path(inPath)
 {
@@ -169,10 +167,9 @@ void TextureTypeInfo::writeGetDimensionFunctions()
 
         for (int includeMipInfo = 0; includeMipInfo < 2; ++includeMipInfo)
         {
-            if (includeMipInfo)
+            if (includeMipInfo && isMultisample)
             {
-                if (isRectangle || isMultisample)
-                    continue;
+                continue;
             }
 
             int sizeDimCount = 0;
