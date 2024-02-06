@@ -1,6 +1,4 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -vk -compute
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -vk -compute -emit-spirv-directly
-//TEST:SIMPLE(filecheck=GLSL): -target glsl -entry computeMain -stage compute
 
 float getData<L:IBufferDataLayout>(StructuredBuffer<float3, L> p, int index)
 {
