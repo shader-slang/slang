@@ -1984,17 +1984,23 @@ Expr* Linkage::parseTermString(String typeStr, Scope* scope)
 
     // We need to temporarily replace the SourceManager for this CompileRequest
     ScopeReplaceSourceManager scopeReplaceSourceManager(this, &localSourceManager);
+    
+    SourceLanguage sourceLanguage;
 
     auto tokens = preprocessSource(
         srcFile,
         &sink,
         nullptr,
         Dictionary<String,String>(),
-        this);
+        this,
+        sourceLanguage);
+
+    if (sourceLanguage == SourceLanguage::Unknown)
+        sourceLanguage = SourceLanguage::Slang;
 
     return parseTermFromSourceFile(
         getASTBuilder(),
-        tokens, &sink, scope, getNamePool(), SourceLanguage::Slang);
+        tokens, &sink, scope, getNamePool(), sourceLanguage);
 }
 
 Type* checkProperType(
@@ -2349,19 +2355,6 @@ void FrontEndCompileRequest::parseTranslationUnit(
     // would be checked too (after those on the FrontEndCompileRequest).
     IncludeSystem includeSystem(&linkage->searchDirectories, linkage->getFileSystemExt(), linkage->getSourceManager());
 
-    Scope* languageScope = nullptr;
-    switch (translationUnit->sourceLanguage)
-    {
-    case SourceLanguage::HLSL:
-        languageScope = getSession()->hlslLanguageScope;
-        break;
-
-    case SourceLanguage::Slang:
-    default:
-        languageScope = getSession()->slangLanguageScope;
-        break;
-    }
-
     auto combinedPreprocessorDefinitions = translationUnit->getCombinedPreprocessorDefinitions();
     
     auto module = translationUnit->getModule();
@@ -2406,13 +2399,31 @@ void FrontEndCompileRequest::parseTranslationUnit(
 
     for (auto sourceFile : translationUnit->getSourceFiles())
     {
+        SourceLanguage sourceLanguage = SourceLanguage::Unknown;
         auto tokens = preprocessSource(
             sourceFile,
             getSink(),
             &includeSystem,
             combinedPreprocessorDefinitions,
             getLinkage(),
+            sourceLanguage,
             &preprocessorHandler);
+
+        if (sourceLanguage == SourceLanguage::Unknown)
+            sourceLanguage = translationUnit->sourceLanguage;
+
+        Scope* languageScope = nullptr;
+        switch (sourceLanguage)
+        {
+        case SourceLanguage::HLSL:
+            languageScope = getSession()->hlslLanguageScope;
+            break;
+
+        case SourceLanguage::Slang:
+        default:
+            languageScope = getSession()->slangLanguageScope;
+            break;
+        }
 
         if (outputIncludes)
         {
@@ -2432,6 +2443,7 @@ void FrontEndCompileRequest::parseTranslationUnit(
         parseSourceFile(
             astBuilder,
             translationUnit,
+            sourceLanguage,
             tokens,
             getSink(),
             languageScope,
@@ -3420,18 +3432,24 @@ Linkage::IncludeResult Linkage::findAndIncludeFile(Module* module, TranslationUn
 
     FrontEndPreprocessorHandler preprocessorHandler(module, module->getASTBuilder(), sink);
     auto combinedPreprocessorDefinitions = translationUnit->getCombinedPreprocessorDefinitions();
+    SourceLanguage sourceLanguage = SourceLanguage::Unknown;
     auto tokens = preprocessSource(
         sourceFile,
         sink,
         &includeSystem,
         combinedPreprocessorDefinitions,
         this,
+        sourceLanguage,
         &preprocessorHandler);
+    
+    if (sourceLanguage == SourceLanguage::Unknown)
+        sourceLanguage = translationUnit->sourceLanguage;
 
     auto outerScope = module->getModuleDecl()->ownedScope;
     parseSourceFile(
         module->getASTBuilder(),
         translationUnit,
+        sourceLanguage,
         tokens,
         sink,
         outerScope,

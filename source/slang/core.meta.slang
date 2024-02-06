@@ -1296,11 +1296,6 @@ struct Primitives
     }
 };
 
-__generic<T>
-__intrinsic_type($(kIROp_GLSLShaderStorageBufferType))
-__magic_type(GLSLShaderStorageBufferType)
-struct GLSLShaderStorageBuffer {}
-
 //@ hidden:
 
 // Need to add constructors to the types above
