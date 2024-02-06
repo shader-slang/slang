@@ -75,6 +75,20 @@ struct MyType
 ```
 `MyType.method` has requirement `spvShaderClockKHR + spvShaderClockKHR`.
 
+The `[require]` attribute can also be used on module declarations, so that the requirement will
+apply to all decls within the module. For example:
+```csharp
+[require(glsl)]
+[require(hlsl)]
+[require(spirv)]
+module myModule;
+
+// myFunc has requirement glsl|hlsl|spirv
+public void myFunc()
+{
+}
+```
+
 ## Inferrence of Capability Requirements
 
 By default, Slang will infer the capability requirements of a function given its definition, as long as the function has `internal` or `private` visibilty. For example, given:
