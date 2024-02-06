@@ -66,6 +66,7 @@ jobs:
           IDENTITY_ID: d6ada82a113e4204aaad914e1013e9548ffd30d0
         run: |
           /usr/bin/codesign --force --options runtime -s ${IDENTITY_ID} ./bin/macosx-${{matrix.targetPlatform}}/release/libslang.dylib -v
+          /usr/bin/codesign --force --options runtime -s ${IDENTITY_ID} ./bin/macosx-${{matrix.targetPlatform}}/release/libslang-glslang.dylib -v
           /usr/bin/codesign --force --options runtime -s ${IDENTITY_ID} ./bin/macosx-${{matrix.targetPlatform}}/release/libgfx.dylib -v
           /usr/bin/codesign --force --options runtime -s ${IDENTITY_ID} ./bin/macosx-${{matrix.targetPlatform}}/release/slangd -v
           /usr/bin/codesign --force --options runtime -s ${IDENTITY_ID} ./bin/macosx-${{matrix.targetPlatform}}/release/slangc -v
@@ -107,10 +108,12 @@ jobs:
           AC_USERNAME: ${{secrets.APPLE_ID_USERNAME}}
         run: |
           cp ./bin/macosx-${{matrix.targetPlatform}}/release/libslang.dylib libslang.dylib
+          cp ./bin/macosx-${{matrix.targetPlatform}}/release/libslang-glslang.dylib libslang-glslang.dylib
           cp ./bin/macosx-${{matrix.targetPlatform}}/release/libslang.dylib libgfx.dylib
           cp ./bin/macosx-${{matrix.targetPlatform}}/release/slangd slangd
           cp ./bin/macosx-${{matrix.targetPlatform}}/release/slangc slangc
           7z a slang-macos-dist.zip libslang.dylib
+          7z a slang-macos-dist.zip libslang-glslang.dylib
           7z a slang-macos-dist.zip libgfx.dylib
           7z a slang-macos-dist.zip slangd
           7z a slang-macos-dist.zip slangc
