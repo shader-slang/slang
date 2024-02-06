@@ -122,7 +122,10 @@ void GLSLSourceEmitter::_emitGLSLStructuredBuffer(IRGlobalParam* varDecl, IRHLSL
     _requireGLSLVersion(430);
 
     m_writer->emit("layout(");
-    switch (structuredBufferType->getDataLayout()->getOp())
+    auto layoutTypeOp = structuredBufferType->getDataLayout()
+        ? structuredBufferType->getDataLayout()->getOp()
+        : kIROp_DefaultBufferLayoutType;
+    switch (layoutTypeOp)
     {
     case kIROp_DefaultBufferLayoutType:
         m_writer->emit(getTargetReq()->getForceGLSLScalarBufferLayout() ? "scalar" : "std430");

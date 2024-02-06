@@ -834,8 +834,10 @@ namespace Slang
         case kIROp_HLSLRasterizerOrderedStructuredBufferType:
         {
             auto structBufferType = as<IRHLSLStructuredBufferTypeBase>(bufferType);
-            auto layoutType = structBufferType->getDataLayout();
-            switch (layoutType->getOp())
+            auto layoutTypeOp = structBufferType->getDataLayout()
+                ? structBufferType->getDataLayout()->getOp()
+                : kIROp_DefaultBufferLayoutType;
+            switch (layoutTypeOp)
             {
             case kIROp_DefaultBufferLayoutType:
                 return IRTypeLayoutRules::getStd430();
