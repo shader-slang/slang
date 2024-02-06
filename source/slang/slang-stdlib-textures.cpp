@@ -167,6 +167,11 @@ void TextureTypeInfo::writeGetDimensionFunctions()
 
         for (int includeMipInfo = 0; includeMipInfo < 2; ++includeMipInfo)
         {
+            if (includeMipInfo && isMultisample)
+            {
+                continue;
+            }
+
             int sizeDimCount = 0;
             StringBuilder params;
             if (includeMipInfo)
@@ -281,7 +286,7 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                         }
                     };
                 glsl << "if (access == " << kStdlibResourceAccessReadOnly << ") __intrinsic_asm \"";
-                emitIntrinsic(toSlice("textureSize"), true);
+                emitIntrinsic(toSlice("textureSize"), !isMultisample);
                 glsl << "\";\n";
                 glsl << "__intrinsic_asm \"";
                 emitIntrinsic(toSlice("imageSize"), false);

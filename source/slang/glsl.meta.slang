@@ -78,171 +78,6 @@ public typealias dmat4x2 = matrix<double, 2, 4>;
 public typealias dmat4x3 = matrix<double, 3, 4>;
 public typealias dmat4x4 = matrix<double, 4, 4>;
 
-public typealias usampler1D = Sampler1D<uint4>;
-public typealias isampler1D = Sampler1D<int4>;
-public typealias sampler1D = Sampler1D<float4>;
-
-public typealias usampler2D = Sampler2D<uint4>;
-public typealias isampler2D = Sampler2D<int4>;
-public typealias sampler2D = Sampler2D<float4>;
-
-public typealias usampler3D = Sampler3D<uint4>;
-public typealias isampler3D = Sampler3D<int4>;
-public typealias sampler3D = Sampler3D<float4>;
-
-public typealias usamplerCube = SamplerCube<uint4>;
-public typealias isamplerCube = SamplerCube<int4>;
-public typealias samplerCube = SamplerCube<float4>;
-
-public typealias Sampler1DShadow<T=float> = __TextureImpl<T, __Shape1D, /*isArray:*/ 0, /*isMS:*/ 0, /*sampleCount:*/ 0, /*access:*/ 0, /*isShadow: */ 1, /*isCombined: */ 1, /*format*/ 0>;
-public typealias usampler1DShadow = Sampler1DShadow<uint>;
-public typealias isampler1DShadow = Sampler1DShadow<int>;
-public typealias sampler1DShadow = Sampler1DShadow<float>;
-
-public typealias Sampler2DShadow<T=float> = __TextureImpl<T, __Shape2D, /*isArray:*/ 0, /*isMS:*/ 0, /*sampleCount:*/ 0, /*access:*/ 0, /*isShadow: */ 1, /*isCombined: */ 1, /*format*/ 0>;
-public typealias usampler2DShadow = Sampler2DShadow<uint>;
-public typealias isampler2DShadow = Sampler2DShadow<int>;
-public typealias sampler2DShadow = Sampler2DShadow<float>;
-
-public typealias SamplerCubeShadow<T=float> = __TextureImpl<T, __ShapeCube, /*isArray:*/ 0, /*isMS:*/ 0, /*sampleCount:*/ 0, /*access:*/ 0, /*isShadow: */ 1, /*isCombined: */ 1, /*format*/ 0>;
-public typealias usamplerCubeShadow = SamplerCubeShadow<uint>;
-public typealias isamplerCubeShadow = SamplerCubeShadow<int>;
-public typealias samplerCubeShadow = SamplerCubeShadow<float>;
-
-public typealias usampler1DArray = Sampler1DArray<uint4>;
-public typealias isampler1DArray = Sampler1DArray<int4>;
-public typealias sampler1DArray = Sampler1DArray<float4>;
-
-public typealias usampler2DArray = Sampler2DArray<uint4>;
-public typealias isampler2DArray = Sampler2DArray<int4>;
-public typealias sampler2DArray = Sampler2DArray<float4>;
-
-public typealias usamplerCubeArray = SamplerCubeArray<uint4>;
-public typealias isamplerCubeArray = SamplerCubeArray<int4>;
-public typealias samplerCubeArray = SamplerCubeArray<float4>;
-
-public typealias Sampler1DArrayShadow<T=float> = __TextureImpl<T, __Shape1D, /*isArray:*/ 1, /*isMS:*/ 0, /*sampleCount:*/ 0, /*access:*/ 0, /*isShadow: */ 1, /*isCombined: */ 1, /*format*/ 0>;
-public typealias usampler1DArrayShadow = Sampler1DArrayShadow<uint>;
-public typealias isampler1DArrayShadow = Sampler1DArrayShadow<int>;
-public typealias sampler1DArrayShadow = Sampler1DArrayShadow<float>;
-
-public typealias Sampler2DArrayShadow<T=float> = __TextureImpl<T, __Shape2D, /*isArray:*/ 1, /*isMS:*/ 0, /*sampleCount:*/ 0, /*access:*/ 0, /*isShadow: */ 1, /*isCombined: */ 1, /*format*/ 0>;
-public typealias usampler2DArrayShadow = Sampler2DArrayShadow<uint>;
-public typealias isampler2DArrayShadow = Sampler2DArrayShadow<int>;
-public typealias sampler2DArrayShadow = Sampler2DArrayShadow<float>;
-
-public typealias SamplerCubeArrayShadow<T=float> = __TextureImpl<T, __ShapeCube, /*isArray:*/ 1, /*isMS:*/ 0, /*sampleCount:*/ 0, /*access:*/ 0, /*isShadow: */ 1, /*isCombined: */ 1, /*format*/ 0>;
-public typealias usamplerCubeArrayShadow = SamplerCubeArrayShadow<uint>;
-public typealias isamplerCubeArrayShadow = SamplerCubeArrayShadow<int>;
-public typealias samplerCubeArrayShadow = SamplerCubeArrayShadow<float>;
-
-[ForceInline]
-public vector<T,4> texelFetch<T:__BuiltinArithmeticType, let N : int> (Sampler1D<vector<T,N>> sampler, int p, int lod)
-{
-    return __vectorReshape<4>(sampler.Load(int2(p, lod)));
-}
-
-[ForceInline]
-public vector<T,4> texelFetch<T:__BuiltinArithmeticType, let N : int> (Sampler2D<vector<T,N>> sampler, ivec2 p, int lod)
-{
-    return __vectorReshape<4>(sampler.Load(int3(p, lod)));
-}
-
-[ForceInline]
-public vector<T,4> texelFetch<T:__BuiltinArithmeticType, let N : int> (Sampler3D<vector<T,N>> sampler, ivec3 p, int lod)
-{
-    return __vectorReshape<4>(sampler.Load(int4(p, lod)));
-}
-
-[ForceInline]
-public vector<T,4> texelFetch<T:__BuiltinArithmeticType, let N : int> (Sampler1DArray<vector<T,N>> sampler, ivec2 p, int lod)
-{
-    return __vectorReshape<4>(sampler.Load(int3(p, lod)));
-}
-
-[ForceInline]
-public vector<T,4> texelFetch<T:__BuiltinArithmeticType, let N : int> (Sampler2DArray<vector<T,N>> sampler, ivec3 p, int lod)
-{
-    return __vectorReshape<4>(sampler.Load(int4(p, lod)));
-}
-
-[ForceInline]
-public vector<T,4> texture<T:__BuiltinFloatingPointType, let N : int> (Sampler1D<vector<T,N>> sampler, float p, float bias = 0.0)
-{
-    return __vectorReshape<4>(sampler.SampleBias(p, bias));
-}
-
-[ForceInline]
-public vector<T,4> texture<T:__BuiltinFloatingPointType, let N : int> (Sampler2D<vector<T,N>> sampler, float2 p, float bias = 0.0)
-{
-    return __vectorReshape<4>(sampler.SampleBias(p, bias));
-}
-
-[ForceInline]
-public vector<T,4> texture<T:__BuiltinFloatingPointType, let N : int> (Sampler3D<vector<T,N>> sampler, float3 p, float bias = 0.0)
-{
-    return __vectorReshape<4>(sampler.SampleBias(p, bias));
-}
-
-[ForceInline]
-public vector<T,4> texture<T:__BuiltinFloatingPointType, let N : int> (SamplerCube<vector<T,N>> sampler, float3 p, float bias = 0.0)
-{
-    return __vectorReshape<4>(sampler.SampleBias(p, bias));
-}
-
-[ForceInline]
-public float texture<T:__BuiltinFloatingPointType, let N : int> (Sampler1DShadow<vector<T,N>> sampler, float2 p)
-{
-    return sampler.SampleCmp(p.x, p.y);
-}
-
-[ForceInline]
-public float texture<T:__BuiltinFloatingPointType, let N : int> (Sampler2DShadow<vector<T,N>> sampler, float3 p)
-{
-    return sampler.SampleCmp(p.xy, p.z);
-}
-
-[ForceInline]
-public float texture<T:__BuiltinFloatingPointType, let N : int> (SamplerCubeShadow<vector<T,N>> sampler, float4 p)
-{
-    return sampler.SampleCmp(p.xyz, p.w);
-}
-
-[ForceInline]
-public vector<T,4> texture<T:__BuiltinFloatingPointType, let N : int> (Sampler1DArray<vector<T,N>> sampler, float2 p, float bias = 0.0)
-{
-    return __vectorReshape<4>(sampler.SampleBias(p, bias));
-}
-
-[ForceInline]
-public vector<T,4> texture<T:__BuiltinFloatingPointType, let N : int> (Sampler2DArray<vector<T,N>> sampler, float3 p, float bias = 0.0)
-{
-    return __vectorReshape<4>(sampler.SampleBias(p, bias));
-}
-
-[ForceInline]
-public vector<T,4> texture<T:__BuiltinFloatingPointType, let N : int> (SamplerCubeArray<vector<T,N>> sampler, float4 p, float bias = 0.0)
-{
-    return __vectorReshape<4>(sampler.SampleBias(p, bias));
-}
-
-[ForceInline]
-public float texture<T:__BuiltinFloatingPointType, let N : int> (Sampler1DArrayShadow<vector<T,N>> sampler, float3 p)
-{
-    return sampler.SampleCmp(p.xy, p.z);
-}
-
-[ForceInline]
-public float texture<T:__BuiltinFloatingPointType, let N : int> (Sampler2DArrayShadow<vector<T,N>> sampler, float4 p)
-{
-    return sampler.SampleCmp(p.xyz, p.w);
-}
-
-__generic<T:__BuiltinFloatingPointType, let N : int, shape:__ITextureShape, let sampleCount: int, let isArray:int, let format:int>
-public vector<T,4> textureGrad(__TextureImpl<vector<T,N>, shape, isArray, 0, sampleCount, 0, 1, 1, format> sampler, vector<float, shape.dimensions+isArray> P, vector<float,shape.planeDimensions> dPdx, vector<float,shape.planeDimensions> dPdy)
-{
-    return __vectorReshape<4>(sampler.SampleGrad(P, dPdx, dPdy));
-}
 
 public out float4 gl_Position : SV_Position;
 public out float gl_PointSize : SV_PointSize;
@@ -417,3 +252,1737 @@ ${{{{
 {
     return firstbitlow(value);
 }
+
+//
+// Section 8.9.1. Texture Query Functions
+//
+
+public typealias usampler1D = Sampler1D<uint4>;
+public typealias isampler1D = Sampler1D<int4>;
+public typealias sampler1D = Sampler1D<float4>;
+
+public typealias usampler2D = Sampler2D<uint4>;
+public typealias isampler2D = Sampler2D<int4>;
+public typealias sampler2D = Sampler2D<float4>;
+
+public typealias usampler3D = Sampler3D<uint4>;
+public typealias isampler3D = Sampler3D<int4>;
+public typealias sampler3D = Sampler3D<float4>;
+
+public typealias usamplerCube = SamplerCube<uint4>;
+public typealias isamplerCube = SamplerCube<int4>;
+public typealias samplerCube = SamplerCube<float4>;
+
+__generic<let sampleCount:int=0, let format:int=0>
+public typealias sampler1DShadow = __TextureImpl<
+    float,
+    __Shape1D,
+    0, // isArray
+    0, // isMS
+    sampleCount,
+    0, // access
+    1, // isShadow
+    1, // isCombined
+    format
+>;
+
+__generic<let sampleCount:int=0, let format:int=0>
+public typealias sampler2DShadow = __TextureImpl<
+    float,
+    __Shape2D,
+    0, // isArray
+    0, // isMS
+    sampleCount,
+    0, // access
+    1, // isShadow
+    1, // isCombined
+    format
+>;
+
+__generic<let sampleCount:int=0, let format:int=0>
+public typealias samplerCubeShadow = __TextureImpl<
+    float,
+    __ShapeCube,
+    0, // isArray
+    0, // isMS
+    sampleCount,
+    0, // access
+    1, // isShadow
+    1, // isCombined
+    format
+>;
+
+public typealias usampler1DArray = Sampler1DArray<uint4>;
+public typealias isampler1DArray = Sampler1DArray<int4>;
+public typealias sampler1DArray = Sampler1DArray<float4>;
+
+public typealias usampler2DArray = Sampler2DArray<uint4>;
+public typealias isampler2DArray = Sampler2DArray<int4>;
+public typealias sampler2DArray = Sampler2DArray<float4>;
+
+public typealias usamplerCubeArray = SamplerCubeArray<uint4>;
+public typealias isamplerCubeArray = SamplerCubeArray<int4>;
+public typealias samplerCubeArray = SamplerCubeArray<float4>;
+
+__generic<let sampleCount:int=0, let format:int=0>
+public typealias sampler1DArrayShadow = __TextureImpl<
+    float,
+    __Shape1D,
+    1, // isArray
+    0, // isMS
+    sampleCount,
+    0, // access
+    1, // isShadow
+    1, // isCombined
+    format
+>;
+
+__generic<let sampleCount:int=0, let format:int=0>
+public typealias sampler2DArrayShadow = __TextureImpl<
+    float,
+    __Shape2D,
+    1, // isArray
+    0, // isMS
+    sampleCount,
+    0, // access
+    1, // isShadow
+    1, // isCombined
+    format
+>;
+
+__generic<let sampleCount:int=0, let format:int=0>
+public typealias samplerCubeArrayShadow = __TextureImpl<
+    float,
+    __ShapeCube,
+    1, // isArray
+    0, // isMS
+    sampleCount,
+    0, // access
+    1, // isShadow
+    1, // isCombined
+    format
+>;
+
+public typealias sampler2DMS = Sampler2DMS<float4>;
+public typealias isampler2DMS = Sampler2DMS<int4>;
+public typealias usampler2DMS = Sampler2DMS<uint4>;
+
+__generic<T=float4, let sampleCount:int=0, let format:int=0>
+public typealias Sampler2DMSArray = Sampler2DArrayMS<T, sampleCount, format>;
+public typealias sampler2DMSArray = Sampler2DMSArray<float4>;
+public typealias isampler2DMSArray = Sampler2DMSArray<int4>;
+public typealias usampler2DMSArray = Sampler2DMSArray<uint4>;
+
+__generic<T=float4, let sampleCount:int=0, let format:int=0>
+public typealias Sampler2DRect = __TextureImpl<T, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format>;
+public typealias sampler2DRect = Sampler2DRect<float4>;
+public typealias isampler2DRect = Sampler2DRect<int4>;
+public typealias usampler2DRect = Sampler2DRect<uint4>;
+
+__generic<let sampleCount:int=0, let format:int=0>
+public typealias sampler2DRectShadow = __TextureImpl<
+    float,
+    __Shape2D,
+    0, // isArray
+    0, // isMS
+    sampleCount,
+    0, // access
+    1, // isShadow
+    1, // isCombined
+    format
+>;
+
+__generic<T, let format:int=0>
+public typealias SamplerBuffer = __TextureImpl<
+    T,
+    __ShapeBuffer,
+    0, // isArray
+    0, // isMS
+    0, // sampleCount
+    1, // RW
+    0, // isShadow
+    0, // isCombined
+    format
+>;
+public typealias samplerBuffer = SamplerBuffer<vec4>;
+public typealias isamplerBuffer = SamplerBuffer<int4>;
+public typealias usamplerBuffer = SamplerBuffer<uint4>;
+
+
+// -------------------
+// textureSize
+// -------------------
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public int textureSize(Sampler1D<vector<T,N>> sampler, int lod)
+{
+    int result;
+    int numberOfLevels;
+    sampler.GetDimensions(lod, result, numberOfLevels);
+    return result;
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public ivec2 textureSize(Sampler2D<vector<T,N>> sampler, int lod)
+{
+    vector<int,2> result;
+    int numberOfLevels;
+    sampler.GetDimensions(lod, result.x, result.y, numberOfLevels);
+    return result;
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public ivec3 textureSize(Sampler3D<vector<T,N>> sampler, int lod)
+{
+    vector<int,3> result;
+    int numberOfLevels;
+    sampler.GetDimensions(lod, result.x, result.y, result.z, numberOfLevels);
+    return result;
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public ivec2 textureSize(SamplerCube<vector<T,N>> sampler, int lod)
+{
+    vector<int,2> result;
+    int numberOfLevels;
+    sampler.GetDimensions(lod, result.x, result.y, numberOfLevels);
+    return result;
+}
+
+[ForceInline]
+public int textureSize(sampler1DShadow sampler, int lod)
+{
+    int result;
+    int numberOfLevels;
+    sampler.GetDimensions(lod, result, numberOfLevels);
+    return result;
+}
+
+[ForceInline]
+public ivec2 textureSize(sampler2DShadow sampler, int lod)
+{
+    vector<int,2> result;
+    int numberOfLevels;
+    sampler.GetDimensions(lod, result.x, result.y, numberOfLevels);
+    return result;
+}
+
+[ForceInline]
+public ivec2 textureSize(samplerCubeShadow sampler, int lod)
+{
+    vector<int,2> result;
+    int numberOfLevels;
+    sampler.GetDimensions(lod, result.x, result.y, numberOfLevels);
+    return result;
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public ivec3 textureSize(SamplerCubeArray<vector<T,N>> sampler, int lod)
+{
+    vector<int,3> result;
+    int numberOfLevels;
+    sampler.GetDimensions(lod, result.x, result.y, result.z, numberOfLevels);
+    return result;
+}
+
+[ForceInline]
+public ivec3 textureSize(samplerCubeArrayShadow sampler, int lod)
+{
+    vector<int,3> result;
+    int numberOfLevels;
+    sampler.GetDimensions(lod, result.x, result.y, result.z, numberOfLevels);
+    return result;
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public ivec2 textureSize(Sampler2DRect<vector<T,N>> sampler)
+{
+    vector<int,2> result;
+    int numberOfLevels;
+    sampler.GetDimensions(0, result.x, result.y, numberOfLevels);
+    return result;
+}
+
+[ForceInline]
+public ivec2 textureSize(sampler2DRectShadow sampler)
+{
+    vector<int,2> result;
+    int numberOfLevels;
+    sampler.GetDimensions(result.x, result.y);
+    return result;
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public ivec2 textureSize(Sampler1DArray<vector<T,N>> sampler, int lod)
+{
+    vector<int,2> result;
+    int numberOfLevels;
+    sampler.GetDimensions(lod, result.x, result.y, numberOfLevels);
+    return result;
+}
+
+[ForceInline]
+public ivec2 textureSize(sampler1DArrayShadow sampler, int lod)
+{
+    vector<int,2> result;
+    int numberOfLevels;
+    sampler.GetDimensions(lod, result.x, result.y, numberOfLevels);
+    return result;
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public ivec3 textureSize(Sampler2DArray<vector<T,N>> sampler, int lod)
+{
+    vector<int,3> result;
+    int numberOfLevels;
+    sampler.GetDimensions(lod, result.x, result.y, result.z, numberOfLevels);
+    return result;
+}
+
+[ForceInline]
+public ivec3 textureSize(sampler2DArrayShadow sampler, int lod)
+{
+    vector<int,3> result;
+    int numberOfLevels;
+    sampler.GetDimensions(lod, result.x, result.y, result.z, numberOfLevels);
+    return result;
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int, let format:int>
+[ForceInline]
+public int textureSize(SamplerBuffer<vector<T,N>,format> sampler)
+{
+    uint result;
+    sampler.GetDimensions(result);
+    return int(result);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int, let sampleCount:int>
+[ForceInline]
+public ivec2 textureSize(Sampler2DMS<vector<T,N>,sampleCount> sampler)
+{
+    vector<int,2> result;
+    int sampleCount;
+    int numberOfLevels;
+    sampler.GetDimensions(result.x, result.y, sampleCount);
+    return result;
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int, let sampleCount:int>
+[ForceInline]
+public ivec3 textureSize(Sampler2DMSArray<vector<T,N>,sampleCount> sampler)
+{
+    vector<int,3> result;
+    int sampleCount;
+    int numberOfLevels;
+    sampler.GetDimensions(result.x, result.y, result.z, sampleCount);
+    return result;
+}
+
+// -------------------
+// textureQueryLod
+// -------------------
+
+__generic<T, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
+[ForceInline]
+public vec2 textureQueryLod(__TextureImpl<
+        T,
+        __Shape1D,
+        isArray,
+        0, // isMS
+        sampleCount,
+        0, // access
+        isShadow,
+        1, // isCombined
+        format
+    > sampler, float p)
+{
+    return vec2(
+        sampler.CalculateLevelOfDetail(p),
+        sampler.CalculateLevelOfDetailUnclamped(p)
+        );
+}
+
+__generic<T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
+[ForceInline]
+public vec2 textureQueryLod(__TextureImpl<T,
+        Shape,
+        isArray,
+        0, // isMS
+        sampleCount,
+        0, // access
+        isShadow,
+        1, // isCombined
+        format
+    > sampler, vector<float,Shape.dimensions> p)
+{
+    return vec2(
+        sampler.CalculateLevelOfDetail(p),
+        sampler.CalculateLevelOfDetailUnclamped(p)
+        );
+}
+
+// -------------------
+// textureQueryLevels
+// -------------------
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public int textureQueryLevels(Sampler1D<vector<T,N>> sampler)
+{
+    int width;
+    int numberOfLevels;
+    sampler.GetDimensions(0, width, numberOfLevels);
+    return numberOfLevels;
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public int textureQueryLevels(Sampler2D<vector<T,N>> sampler)
+{
+    vector<int,2> dim;
+    int numberOfLevels;
+    sampler.GetDimensions(0, dim.x, dim.y, numberOfLevels);
+    return numberOfLevels;
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public int textureQueryLevels(Sampler3D<vector<T,N>> sampler)
+{
+    vector<int,3> dim;
+    int numberOfLevels;
+    sampler.GetDimensions(0, dim.x, dim.y, dim.z, numberOfLevels);
+    return numberOfLevels;
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public int textureQueryLevels(SamplerCube<vector<T,N>> sampler)
+{
+    vector<int,2> dim;
+    int numberOfLevels;
+    sampler.GetDimensions(0, dim.x, dim.y, numberOfLevels);
+    return numberOfLevels;
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public int textureQueryLevels(Sampler1DArray<vector<T,N>> sampler)
+{
+    vector<int,2> dim;
+    int numberOfLevels;
+    sampler.GetDimensions(0, dim.x, dim.y, numberOfLevels);
+    return numberOfLevels;
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public int textureQueryLevels(Sampler2DArray<vector<T,N>> sampler)
+{
+    vector<int,3> dim;
+    int numberOfLevels;
+    sampler.GetDimensions(0, dim.x, dim.y, dim.z, numberOfLevels);
+    return numberOfLevels;
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public int textureQueryLevels(SamplerCubeArray<vector<T,N>> sampler)
+{
+    vector<int,3> dim;
+    int numberOfLevels;
+    sampler.GetDimensions(0, dim.x, dim.y, dim.z, numberOfLevels);
+    return numberOfLevels;
+}
+
+[ForceInline]
+public int textureQueryLevels(sampler1DShadow sampler)
+{
+    int dim;
+    int numberOfLevels;
+    sampler.GetDimensions(0, dim, numberOfLevels);
+    return numberOfLevels;
+}
+
+[ForceInline]
+public int textureQueryLevels(sampler2DShadow sampler)
+{
+    vector<int,2> dim;
+    int numberOfLevels;
+    sampler.GetDimensions(0, dim.x, dim.y, numberOfLevels);
+    return numberOfLevels;
+}
+
+[ForceInline]
+public int textureQueryLevels(samplerCubeShadow sampler)
+{
+    vector<int,2> dim;
+    int numberOfLevels;
+    sampler.GetDimensions(0, dim.x, dim.y, numberOfLevels);
+    return numberOfLevels;
+}
+
+[ForceInline]
+public int textureQueryLevels(sampler1DArrayShadow sampler)
+{
+    vector<int,2> dim;
+    int numberOfLevels;
+    sampler.GetDimensions(0, dim.x, dim.y, numberOfLevels);
+    return numberOfLevels;
+}
+
+[ForceInline]
+public int textureQueryLevels(sampler2DArrayShadow sampler)
+{
+    vector<int,3> dim;
+    int numberOfLevels;
+    sampler.GetDimensions(0, dim.x, dim.y, dim.z, numberOfLevels);
+    return numberOfLevels;
+}
+
+[ForceInline]
+public int textureQueryLevels(samplerCubeArrayShadow sampler)
+{
+    vector<int,3> dim;
+    int numberOfLevels;
+    sampler.GetDimensions(0, dim.x, dim.y, dim.z, numberOfLevels);
+    return numberOfLevels;
+}
+
+// -------------------
+// textureSamples
+// -------------------
+
+__generic<T:__BuiltinArithmeticType, let N:int, let sampleCount:int>
+[ForceInline]
+public int textureSamples(Sampler2DMS<vector<T,N>,sampleCount> sampler)
+{
+    vector<int,2> dim;
+    int sampleCount;
+    int numberOfLevels;
+    sampler.GetDimensions( dim.x, dim.y, sampleCount);
+    return sampleCount;
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int, let sampleCount:int>
+[ForceInline]
+public int textureSamples(Sampler2DMSArray<vector<T,N>,sampleCount> sampler)
+{
+    vector<int,3> dim;
+    int sampleCount;
+    int numberOfLevels;
+    sampler.GetDimensions(dim.x, dim.y, dim.z, sampleCount);
+    return sampleCount;
+}
+
+//
+// Section 8.9.2. Texel Lookup Functions
+//
+
+// -------------------
+// texture
+// -------------------
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> texture(Sampler1D<vector<T,N>> sampler, float p)
+{
+    return __vectorReshape<4>(sampler.Sample(p));
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> texture(Sampler1D<vector<T,N>> sampler, float p, constexpr float bias)
+{
+    return __vectorReshape<4>(sampler.SampleBias(p, bias));
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let format:int>
+[ForceInline]
+public vector<T,4> texture(__TextureImpl<
+        vector<T,N>,
+        Shape,
+        isArray,
+        0, // isMS
+        sampleCount,
+        0, // access
+        0, // isShadow
+        1, // isCombined
+        format
+    > sampler, vector<float,Shape.dimensions+isArray> p)
+{
+    return __vectorReshape<4>(sampler.Sample(p));
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let format:int>
+[ForceInline]
+public vector<T,4> texture(__TextureImpl<
+        vector<T,N>,
+        Shape,
+        isArray,
+        0, // isMS
+        sampleCount,
+        0, // access
+        0, // isShadow
+        1, // isCombined
+        format
+    > sampler, vector<float,Shape.dimensions+isArray> p, constexpr float bias)
+{
+    return __vectorReshape<4>(sampler.SampleBias(p, bias));
+}
+
+[ForceInline]
+public float texture(sampler1DShadow sampler, vec3 p)
+{
+    return sampler.SampleCmp(p.x, p.z);
+}
+
+[ForceInline]
+public float texture(sampler1DShadow sampler, vec3 p, float bias)
+{
+    // TODO: Need to apply bias
+    return sampler.SampleCmp(p.x, p.z);
+}
+
+[ForceInline]
+public float texture(sampler2DShadow sampler, vec3 p)
+{
+    return sampler.SampleCmp(p.xy, p.z);
+}
+
+[ForceInline]
+public float texture(sampler2DShadow sampler, vec3 p, float bias)
+{
+    // TODO: Need to apply bias
+    return sampler.SampleCmp(p.xy, p.z);
+}
+
+[ForceInline]
+public float texture(samplerCubeShadow sampler, vec4 p)
+{
+    return sampler.SampleCmp(p.xyz, p.w);
+}
+
+[ForceInline]
+public float texture(samplerCubeShadow sampler, vec4 p, float bias)
+{
+    // TODO: Need to apply bias
+    return sampler.SampleCmp(p.xyz, p.w);
+}
+
+[ForceInline]
+public float texture(sampler1DArrayShadow sampler, vec3 p)
+{
+    return sampler.SampleCmp(p.xy, p.z);
+}
+
+[ForceInline]
+public float texture(sampler1DArrayShadow sampler, vec3 p, float bias)
+{
+    // TODO: Need to apply bias
+    return sampler.SampleCmp(p.xy, p.z);
+}
+
+[ForceInline]
+public float texture(sampler2DArrayShadow sampler, vec4 p)
+{
+    return sampler.SampleCmp(p.xyz, p.w);
+}
+
+[ForceInline]
+public float texture(samplerCubeArrayShadow sampler, vec4 p, float compare)
+{
+    return sampler.SampleCmp(p, compare);
+}
+
+// -------------------
+// textureProj
+// -------------------
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProj(Sampler1D<vector<T,N>> sampler, vec2 p)
+{
+    return texture(sampler, p.x / p.y);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProj(Sampler1D<vector<T,N>> sampler, vec2 p, float bias)
+{
+    return texture(sampler, p.x / p.y, bias);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProj(Sampler1D<vector<T,N>> sampler, vec4 p)
+{
+    return texture(sampler, p.x / p.w);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProj(Sampler1D<vector<T,N>> sampler, vec4 p, float bias)
+{
+    return texture(sampler, p.x / p.w, bias);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProj(Sampler2D<vector<T,N>> sampler, vec3 p)
+{
+    return texture(sampler, p.xy / p.z);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProj(Sampler2D<vector<T,N>> sampler, vec3 p, float bias)
+{
+    return texture(sampler, p.xy / p.z, bias);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProj(Sampler2D<vector<T,N>> sampler, vec4 p)
+{
+    return texture(sampler, p.xy / p.w);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProj(Sampler2D<vector<T,N>> sampler, vec4 p, float bias)
+{
+    return texture(sampler, p.xy / p.w, bias);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProj(Sampler3D<vector<T,N>> sampler, vec4 p)
+{
+    return texture(sampler, p.xyz / p.w);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProj(Sampler3D<vector<T,N>> sampler, vec4 p, float bias)
+{
+    return texture(sampler, p.xyz / p.w, bias);
+}
+
+[ForceInline]
+public float textureProj(sampler1DShadow sampler, vec4 p)
+{
+    return texture(sampler, p.xyz / p.w);
+}
+
+[ForceInline]
+public float textureProj(sampler1DShadow sampler, vec4 p, float bias)
+{
+    return texture(sampler, p.xyz / p.w, bias);
+}
+
+[ForceInline]
+public float textureProj(sampler2DShadow sampler, vec4 p)
+{
+    return texture(sampler, p.xyz / p.w);
+}
+
+[ForceInline]
+public float textureProj(sampler2DShadow sampler, vec4 p, float bias)
+{
+    return texture(sampler, p.xyz / p.w, bias);
+}
+
+// -------------------
+// textureLod
+// -------------------
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureLod(Sampler1D<vector<T,N>> sampler, float p, float lod)
+{
+    return __vectorReshape<4>(sampler.SampleLevel(p, lod));
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let format:int>
+[ForceInline]
+public vector<T,4> textureLod(__TextureImpl<
+        vector<T,N>,
+        Shape,
+        isArray,
+        0, // isMS
+        sampleCount,
+        0, // access
+        0, // isShadow
+        1, // isCombined
+        format
+    > sampler, vector<float,Shape.dimensions+isArray> p, float lod)
+{
+    return __vectorReshape<4>(sampler.SampleLevel(p, lod));
+}
+
+[ForceInline]
+public float textureLod(sampler2DShadow sampler, vec3 p, float lod)
+{
+    // TODO: Need to apply lod
+    return sampler.SampleCmp(p.xy, p.z);
+}
+
+[ForceInline]
+public float textureLod(sampler1DShadow sampler, vec3 p, float lod)
+{
+    // TODO: Need to apply lod
+    return sampler.SampleCmp(p.x, p.z);
+}
+
+[ForceInline]
+public float textureLod(sampler1DArrayShadow sampler, vec3 p, float lod)
+{
+    // TODO: Need to apply lod
+    return sampler.SampleCmp(p.xy, p.z);
+}
+
+// -------------------
+// textureOffset
+// -------------------
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureOffset(Sampler1D<vector<T,N>> sampler, float p, constexpr int offset, float bias = 0.0)
+{
+    return __vectorReshape<4>(sampler.SampleBias(p, bias, offset));
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureOffset(Sampler2D<vector<T,N>> sampler, vec2 p, constexpr ivec2 offset, float bias = 0.0)
+{
+    return __vectorReshape<4>(sampler.SampleBias(p, bias, offset));
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureOffset(Sampler3D<vector<T,N>> sampler, vec3 p, constexpr ivec3 offset, float bias = 0.0)
+{
+    return __vectorReshape<4>(sampler.SampleBias(p, bias, offset));
+}
+
+[ForceInline]
+public float textureOffset(sampler2DShadow sampler, vec3 p, constexpr ivec2 offset, float bias = 0.0)
+{
+    // TODO: Need to apply bias
+    return sampler.SampleCmp(p.xy, p.z, offset);
+}
+
+[ForceInline]
+public float textureOffset(sampler1DShadow sampler, vec3 p, constexpr int offset, float bias = 0.0)
+{
+    // TODO: Need to apply bias
+    return sampler.SampleCmp(p.x, p.z, offset);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureOffset(Sampler1DArray<vector<T,N>> sampler, vec2 p, constexpr int offset, float bias = 0.0)
+{
+    return __vectorReshape<4>(sampler.SampleBias(p, bias, offset));
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureOffset(Sampler2DArray<vector<T,N>> sampler, vec3 p, constexpr ivec2 offset, float bias = 0.0)
+{
+    return __vectorReshape<4>(sampler.SampleBias(p, bias, offset));
+}
+
+[ForceInline]
+public float textureOffset(sampler1DArrayShadow sampler, vec3 p, constexpr int offset, float bias = 0.0)
+{
+    // TODO: Need to apply bias
+    return sampler.SampleCmp(p.xy, p.z, vector<int,1>(offset));
+}
+
+[ForceInline]
+public float textureOffset(sampler2DArrayShadow sampler, vec4 p, constexpr ivec2 offset)
+{
+    return sampler.SampleCmp(p.xyz, p.w, offset);
+}
+
+// -------------------
+// texelFetch
+// -------------------
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> texelFetch(Sampler1D<vector<T,N>> sampler, int p, int lod)
+{
+    return __vectorReshape<4>(sampler.Load(int2(p, lod)));
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int, Shape:__ITextureShape, let isArray:int, let sampleCount:int, let format:int>
+[ForceInline]
+public vector<T,4> texelFetch(__TextureImpl<
+        vector<T,N>,
+        Shape,
+        isArray,
+        0, // isMS
+        sampleCount,
+        0, // access
+        0, // isShadow
+        1, // isCombined
+        format
+    > sampler, vector<int,Shape.dimensions+isArray> p, int lod)
+{
+    return __vectorReshape<4>(sampler.Load(__makeVector(p,lod)));
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> texelFetch(Sampler2DRect<vector<T,N>> sampler, ivec2 p)
+{
+    return __vectorReshape<4>(sampler.Load(int3(p.xy,0)));
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int, let format:int>
+[ForceInline]
+public vector<T,4> texelFetch(SamplerBuffer<vector<T,N>,format> sampler, int p)
+{
+    return __vectorReshape<4>(sampler.Load(p));
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int, let isArray:int, let sampleCount:int, let format:int>
+[ForceInline]
+public vector<T,4> texelFetch(__TextureImpl<
+        vector<T,N>,
+        __Shape2D,
+        isArray,
+        1, // isMS
+        sampleCount,
+        0, // access
+        0, // isShadow
+        1, // isCombined
+        format
+    > sampler, vector<int,2+isArray> p, int lod)
+{
+    return __vectorReshape<4>(sampler.Load(p, lod));
+}
+
+// -------------------
+// texelFetchOffset
+// -------------------
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> texelFetchOffset(Sampler1D<vector<T,N>> sampler, int p, int lod, constexpr int offset)
+{
+    return texelFetch(sampler, p + offset, lod);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int, Shape:__ITextureShape, let sampleCount:int, let format:int>
+[ForceInline]
+public vector<T,4> texelFetchOffset(__TextureImpl<
+        vector<T,N>,
+        Shape,
+        0, // isArray
+        0, // isMS
+        sampleCount,
+        0, // access
+        0, // isShadow
+        1, // isCombined
+        format
+    > sampler, vector<int,Shape.dimensions> p, int lod, constexpr vector<int,Shape.dimensions> offset)
+{
+    return texelFetch(sampler, p + offset, lod);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int, Shape:__ITextureShape, let sampleCount:int, let format:int>
+[ForceInline]
+public vector<T,4> texelFetchOffset(__TextureImpl<
+        vector<T,N>,
+        Shape,
+        1, // isArray
+        0, // isMS
+        sampleCount,
+        0, // access
+        0, // isShadow
+        1, // isCombined
+        format
+    > sampler, vector<int,Shape.dimensions+1> p, int lod, constexpr vector<int,Shape.dimensions> offset)
+{
+    return texelFetch(sampler, p + __makeVector(offset,0), lod);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> texelFetchOffset(Sampler2DRect<vector<T,N>> sampler, ivec2 p, constexpr ivec2 offset)
+{
+    return texelFetch(sampler, p + offset);
+}
+
+// -------------------
+// textureProjOffset
+// -------------------
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProjOffset(Sampler1D<vector<T,N>> sampler, vec2 p, constexpr int offset, float bias = 0.0)
+{
+    return textureOffset(sampler, p.x / p.y, offset, bias);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProjOffset(Sampler1D<vector<T,N>> sampler, vec4 p, constexpr int offset, float bias = 0.0)
+{
+    return textureOffset(sampler, p.x / p.w, offset, bias);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProjOffset(Sampler2D<vector<T,N>> sampler, vec3 p, constexpr ivec2 offset, float bias = 0.0)
+{
+    return textureOffset(sampler, p.xy / p.z, offset, bias);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProjOffset(Sampler2D<vector<T,N>> sampler, vec4 p, constexpr ivec2 offset, float bias = 0.0)
+{
+    return textureOffset(sampler, p.xy / p.w, offset, bias);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProjOffset(Sampler3D<vector<T,N>> sampler, vec4 p, constexpr ivec3 offset, float bias = 0.0)
+{
+    return textureOffset(sampler, p.xyz / p.w, offset, bias);
+}
+
+[ForceInline]
+public float textureProjOffset(sampler1DShadow sampler, vec4 p, constexpr int offset, float bias = 0.0)
+{
+    return textureOffset(sampler, p.xyz / p.w, offset, bias);
+}
+
+[ForceInline]
+public float textureProjOffset(sampler2DShadow sampler, vec4 p, constexpr ivec2 offset, float bias = 0.0)
+{
+    return textureOffset(sampler, p.xyz / p.w, offset, bias);
+}
+
+// -------------------
+// textureLodOffset
+// -------------------
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureLodOffset(Sampler1D<vector<T,N>> sampler, float p, float lod, constexpr int offset)
+{
+    return __vectorReshape<4>(sampler.SampleLevel(p, lod, offset));
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int, Shape:__ITextureShape, let isArray:int, let sampleCount:int, let format:int>
+[ForceInline]
+public vector<T,4> textureLodOffset(__TextureImpl<
+        vector<T,N>,
+        Shape,
+        isArray,
+        0, // isMS
+        sampleCount,
+        0, // access
+        0, // isShadow
+        1, // isCombined
+        format
+    > sampler, vector<float,Shape.dimensions+isArray> p, float lod, constexpr vector<int,Shape.planeDimensions> offset)
+{
+    return __vectorReshape<4>(sampler.SampleLevel(p, lod, offset));
+}
+
+[ForceInline]
+public float textureLodOffset(sampler1DShadow sampler, vec3 p, float lod, constexpr int offset)
+{
+    // TODO: Need to apply lod
+    return sampler.SampleCmpLevelZero(p.x, p.z, offset);
+}
+
+[ForceInline]
+public float textureLodOffset(sampler2DShadow sampler, vec3 p, float lod, constexpr ivec2 offset)
+{
+    // TODO: Need to apply lod
+    return sampler.SampleCmpLevelZero(p.xy, p.z, offset);
+}
+
+[ForceInline]
+public float textureLodOffset(sampler1DArrayShadow sampler, vec3 p, float lod, constexpr int offset)
+{
+    // TODO: Need to apply lod
+    return sampler.SampleCmpLevelZero(p.xy, p.z, offset);
+}
+
+// -------------------
+// textureProjLod
+// -------------------
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProjLod(Sampler1D<vector<T,N>> sampler, vec2 p, float lod)
+{
+    return textureLod(sampler, p.x / p.y, lod);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProjLod(Sampler1D<vector<T,N>> sampler, vec4 p, float lod)
+{
+    return textureLod(sampler, p.x / p.w, lod);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProjLod(Sampler2D<vector<T,N>> sampler, vec3 p, float lod)
+{
+    return textureLod(sampler, p.xy / p.z, lod);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProjLod(Sampler2D<vector<T,N>> sampler, vec4 p, float lod)
+{
+    return textureLod(sampler, p.xy / p.w, lod);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProjLod(Sampler3D<vector<T,N>> sampler, vec4 p, float lod)
+{
+    return textureLod(sampler, p.xyz / p.w, lod);
+}
+
+[ForceInline]
+public float textureProjLod(sampler1DShadow sampler, vec4 p, float lod)
+{
+    return textureLod(sampler, p.xyz / p.w, lod);
+}
+
+[ForceInline]
+public float textureProjLod(sampler2DShadow sampler, vec4 p, float lod)
+{
+    return textureLod(sampler, p.xyz / p.w, lod);
+}
+
+// -------------------
+// textureProjLodOffset
+// -------------------
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProjLodOffset(Sampler1D<vector<T,N>> sampler, vec2 p, float lod, constexpr int offset)
+{
+    return textureLodOffset(sampler, p.x / p.y, lod, offset);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProjLodOffset(Sampler1D<vector<T,N>> sampler, vec4 p, float lod, constexpr int offset)
+{
+    return textureLodOffset(sampler, p.x / p.w, lod, offset);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProjLodOffset(Sampler2D<vector<T,N>> sampler, vec3 p, float lod, constexpr ivec2 offset)
+{
+    return textureLodOffset(sampler, p.xy / p.z, lod, offset);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProjLodOffset(Sampler2D<vector<T,N>> sampler, vec4 p, float lod, constexpr ivec2 offset)
+{
+    return textureLodOffset(sampler, p.xy / p.w, lod, offset);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProjLodOffset(Sampler3D<vector<T,N>> sampler, vec4 p, float lod, constexpr ivec3 offset)
+{
+    return textureLodOffset(sampler, p.xyz / p.w, lod, offset);
+}
+
+[ForceInline]
+public float textureProjLodOffset(sampler1DShadow sampler, vec4 p, float lod, constexpr int offset)
+{
+    return textureLodOffset(sampler, p.xyz / p.w, lod, offset);
+}
+
+[ForceInline]
+public float textureProjLodOffset(sampler2DShadow sampler, vec4 p, float lod, constexpr ivec2 offset)
+{
+    return textureLodOffset(sampler, p.xyz / p.w, lod, offset);
+}
+
+// -------------------
+// textureGrad
+// -------------------
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureGrad(Sampler1D<vector<T,N>> sampler, float p, float dPdx, float dPdy)
+{
+    return __vectorReshape<4>(sampler.SampleGrad(p, dPdx, dPdy));
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int, Shape:__ITextureShape, let isArray:int, let sampleCount:int, let format:int>
+[ForceInline]
+public vector<T,4> textureGrad(__TextureImpl<
+        vector<T,N>,
+        Shape,
+        isArray,
+        0, // isMS
+        sampleCount,
+        0, // access
+        0, // isShadow
+        1, // isCombined
+        format
+    > sampler, vector<float,Shape.dimensions+isArray> p, vector<float,Shape.dimensions> dPdx, vector<float,Shape.dimensions> dPdy)
+{
+    return __vectorReshape<4>(sampler.SampleGrad(p, dPdx, dPdy));
+}
+
+[ForceInline]
+public float textureGrad(sampler1DShadow sampler, vec3 p, float dPdx, float dPdy)
+{
+    // TODO: Not implemented
+    return 0;
+}
+
+[ForceInline]
+public float textureGrad(sampler1DArrayShadow sampler, vec3 p, float dPdx, float dPdy)
+{
+    // TODO: Not implemented
+    return 0;
+}
+
+[ForceInline]
+public float textureGrad(sampler2DShadow sampler, vec3 p, vec2 dPdx, vec2 dPdy)
+{
+    // TODO: Not implemented on HLSL side yet.
+    return 0;
+}
+
+[ForceInline]
+public float textureGrad(samplerCubeShadow sampler, vec4 p, vec3 dPdx, vec3 dPdy)
+{
+    // TODO: Not implemented on HLSL side yet.
+    return 0;
+}
+
+[ForceInline]
+public float textureGrad(sampler2DArrayShadow sampler, vec4 p, vec2 dPdx, vec2 dPdy)
+{
+    // TODO: Not implemented on HLSL side yet.
+    return 0;
+}
+
+// -------------------
+// textureGradOffset
+// -------------------
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureGradOffset(Sampler1D<vector<T,N>> sampler, float p, float dPdx, float dPdy, constexpr int offset)
+{
+    return __vectorReshape<4>(sampler.SampleGrad(p, dPdx, dPdy, offset));
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int, Shape:__ITextureShape, let isArray:int, let sampleCount:int, let format:int>
+[ForceInline]
+public vector<T,4> textureGradOffset(__TextureImpl<
+        vector<T,N>,
+        Shape,
+        isArray,
+        0, // isMS
+        sampleCount,
+        0, // access
+        0, // isShadow
+        1, // isCombined
+        format
+    > sampler, vector<float,Shape.dimensions+isArray> p, vector<float,Shape.dimensions> dPdx, vector<float,Shape.dimensions> dPdy, constexpr vector<int,Shape.dimensions> offset)
+{
+    return __vectorReshape<4>(sampler.SampleGrad(p, dPdx, dPdy, offset));
+}
+
+[ForceInline]
+public float textureGradOffset(sampler1DShadow sampler, vec3 p, float dPdx, float dPdy, constexpr int offset)
+{
+    // TODO: Not implemented on HLSL side yet.
+    return 0;
+}
+
+[ForceInline]
+public float textureGradOffset(sampler2DShadow sampler, vec3 p, vec2 dPdx, vec2 dPdy, constexpr ivec2 offset)
+{
+    // TODO: Not implemented on HLSL side yet.
+    return 0;
+}
+
+[ForceInline]
+public float textureGradOffset(sampler1DArrayShadow sampler, vec3 p, float dPdx, float dPdy, constexpr int offset)
+{
+    // TODO: Not implemented on HLSL side yet.
+    return 0;
+}
+
+[ForceInline]
+public float textureGradOffset(sampler2DArrayShadow sampler, vec4 p, vec2 dPdx, vec2 dPdy, constexpr ivec2 offset)
+{
+    // TODO: Not implemented on HLSL side yet.
+    return 0;
+}
+
+// -------------------
+// textureProjGrad
+// -------------------
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProjGrad(Sampler1D<vector<T,N>> sampler, vec2 p, float dPdx, float dPdy)
+{
+    return textureGrad(sampler, p.x / p.y, dPdx, dPdy);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProjGrad(Sampler1D<vector<T,N>> sampler, vec4 p, float dPdx, float dPdy)
+{
+    return textureGrad(sampler, p.x / p.w, dPdx, dPdy);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProjGrad(Sampler2D<vector<T,N>> sampler, vec3 p, vec2 dPdx, vec2 dPdy)
+{
+    return textureGrad(sampler, p.xy / p.z, dPdx, dPdy);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProjGrad(Sampler2D<vector<T,N>> sampler, vec4 p, vec2 dPdx, vec2 dPdy)
+{
+    return textureGrad(sampler, p.xy / p.w, dPdx, dPdy);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProjGrad(Sampler3D<vector<T,N>> sampler, vec4 p, vec3 dPdx, vec3 dPdy)
+{
+    return textureGrad(sampler, p.xyz / p.w, dPdx, dPdy);
+}
+
+[ForceInline]
+public float textureProjGrad(sampler1DShadow sampler, vec4 p, float dPdx, float dPdy)
+{
+    return textureGrad(sampler, p.xyz / p.w, dPdx, dPdy);
+}
+
+[ForceInline]
+public float textureProjGrad(sampler2DShadow sampler, vec4 p, vec2 dPdx, vec2 dPdy)
+{
+    return textureGrad(sampler, p.xyz / p.w, dPdx, dPdy);
+}
+
+// -------------------
+// textureProjGradOffset
+// -------------------
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProjGradOffset(Sampler1D<vector<T,N>> sampler, vec2 p, float dPdx, float dPdy, constexpr int offset)
+{
+    return textureGradOffset(sampler, p.x / p.y, dPdx, dPdy, offset);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProjGradOffset(Sampler1D<vector<T,N>> sampler, vec4 p, float dPdx, float dPdy, constexpr int offset)
+{
+    return textureGradOffset(sampler, p.x / p.w, dPdx, dPdy, offset);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProjGradOffset(Sampler2D<vector<T,N>> sampler, vec3 p, vec2 dPdx, vec2 dPdy, constexpr ivec2 offset)
+{
+    return textureGradOffset(sampler, p.xy / p.z, dPdx, dPdy, offset);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProjGradOffset(Sampler2D<vector<T,N>> sampler, vec4 p, vec2 dPdx, vec2 dPdy, constexpr ivec2 offset)
+{
+    return textureGradOffset(sampler, p.xy / p.w, dPdx, dPdy, offset);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProjGradOffset(Sampler3D<vector<T,N>> sampler, vec4 p, vec3 dPdx, vec3 dPdy, constexpr ivec3 offset)
+{
+    return textureGradOffset(sampler, p.xyz / p.w, dPdx, dPdy, offset);
+}
+
+[ForceInline]
+public float textureProjGradOffset(sampler1DShadow sampler, vec4 p, float dPdx, float dPdy, constexpr int offset)
+{
+    return textureGradOffset(sampler, p.xyz / p.w, dPdx, dPdy, offset);
+}
+
+[ForceInline]
+public float textureProjGradOffset(sampler2DShadow sampler, vec4 p, vec2 dPdx, vec2 dPdy, constexpr ivec2 offset)
+{
+    return textureGradOffset(sampler, p.xyz / p.w, dPdx, dPdy, offset);
+}
+
+//
+// Section 8.9.4. Texture Gather Functions
+//
+
+// -------------------
+// textureGather
+// -------------------
+
+__generic<T:__BuiltinArithmeticType, let N:int, Shape:__ITextureShape, let isArray:int, let sampleCount:int, let format:int>
+[ForceInline]
+public vector<T,4> textureGather(__TextureImpl<
+        vector<T,N>,
+        Shape,
+        isArray,
+        0, // isMS
+        sampleCount,
+        0, // access
+        0, // isShadow
+        1, // isCombined
+        format
+    > sampler, vector<float,Shape.dimensions+isArray> p, int comp = 0)
+{
+    switch (comp)
+    {
+        case 1: return sampler.GatherGreen(p);
+        case 2: return sampler.GatherBlue(p);
+        case 3: return sampler.GatherAlpha(p);
+    }
+    return sampler.GatherRed(p);
+}
+
+__generic<Shape:__ITextureShape, let isArray:int, let sampleCount:int, let format:int>
+[ForceInline]
+public vec4 textureGather(__TextureImpl<
+        float,
+        Shape,
+        isArray,
+        0, // isMS
+        sampleCount,
+        0, // access
+        1, // isShadow
+        1, // isCombined
+        format
+    > sampler, vector<float,Shape.dimensions+isArray> p, float refZ)
+{
+    return sampler.GatherCmp(p, refZ);
+}
+
+// -------------------
+// textureGatherOffset
+// -------------------
+
+__generic<T:__BuiltinArithmeticType, let N:int, let isArray:int, let sampleCount:int, let format:int>
+[ForceInline]
+public vector<T,4> textureGatherOffset(__TextureImpl<
+        vector<T,N>,
+        __Shape2D,
+        isArray,
+        0, // isMS
+        sampleCount,
+        0, // access
+        0, // isShadow
+        1, // isCombined
+        format
+    > sampler, vector<float,2+isArray> p, constexpr vector<int,2> offset, int comp = 0)
+{
+    switch (comp)
+    {
+        case 1: return sampler.GatherGreen(p, offset);
+        case 2: return sampler.GatherBlue(p, offset);
+        case 3: return sampler.GatherAlpha(p, offset);
+    }
+    return sampler.Gather(p, offset);
+}
+
+__generic<let isArray:int, let sampleCount:int, let format:int>
+[ForceInline]
+public vec4 textureGatherOffset(__TextureImpl<
+        float,
+        __Shape2D,
+        isArray,
+        0, // isMS
+        sampleCount,
+        0, // access
+        1, // isShadow
+        1, // isCombined
+        format
+    > sampler, vector<float,2+isArray> p, float refZ, constexpr vector<int,2> offset)
+{
+    return sampler.GatherCmp(p, refZ, offset);
+}
+
+// -------------------
+// textureGatherOffsets
+// -------------------
+
+__generic<T:__BuiltinArithmeticType, let N:int, let isArray:int, let sampleCount:int, let format:int>
+[ForceInline]
+public vector<T,4> textureGatherOffsets(__TextureImpl<
+        vector<T,N>,
+        __Shape2D,
+        isArray,
+        0, // isMS
+        sampleCount,
+        0, // access
+        0, // isShadow
+        1, // isCombined
+        format
+    > sampler, vector<float,2+isArray> p, constexpr vector<int,2> offsets[4], int comp = 0)
+{
+    switch (comp)
+    {
+        case 1: return sampler.GatherGreen(p, offsets[0], offsets[1], offsets[2], offsets[3]);
+        case 2: return sampler.GatherBlue(p, offsets[0], offsets[1], offsets[2], offsets[3]);
+        case 3: return sampler.GatherAlpha(p, offsets[0], offsets[1], offsets[2], offsets[3]);
+    }
+    return sampler.Gather(p, offsets[0], offsets[1], offsets[2], offsets[3]);
+}
+
+__generic<let isArray:int, let sampleCount:int, let format:int>
+[ForceInline]
+public vec4 textureGatherOffsets(__TextureImpl<
+        float,
+        __Shape2D,
+        isArray,
+        0, // isMS
+        sampleCount,
+        0, // access
+        1, // isShadow
+        1, // isCombined
+        format
+    > sampler, vector<float,2+isArray> p, float refZ, constexpr vector<int,2> offsets[4])
+{
+    return sampler.GatherCmp(p, refZ, offsets[0], offsets[1], offsets[2], offsets[3]);
+}
+
+//
+// Section 8.9.5. Compatibility Profile Texture Functions
+//
+
+public vec4 texture1D(sampler1D sampler, float coord)
+{
+    return texture(sampler, coord);
+}
+
+public vec4 texture1D(sampler1D sampler, float coord, float bias)
+{
+    return texture(sampler, coord, bias);
+}
+
+public vec4 texture1DProj(sampler1D sampler, vec2 coord)
+{
+    return textureProj(sampler, coord);
+}
+
+public vec4 texture1DProj(sampler1D sampler, vec2 coord, float bias)
+{
+    return textureProj(sampler, coord, bias);
+}
+
+public vec4 texture1DProj(sampler1D sampler, vec4 coord)
+{
+    return textureProj(sampler, coord);
+}
+
+public vec4 texture1DProj(sampler1D sampler, vec4 coord, float bias)
+{
+    return textureProj(sampler, coord, bias);
+}
+
+public vec4 texture1DLod(sampler1D sampler, float coord, float lod)
+{
+    return textureLod(sampler, coord, lod);
+}
+
+public vec4 texture1DProjLod(sampler1D sampler, vec2 coord, float lod)
+{
+    return textureProjLod(sampler, coord, lod);
+}
+
+public vec4 texture1DProjLod(sampler1D sampler, vec4 coord, float lod)
+{
+    return textureProjLod(sampler, coord, lod);
+}
+
+public vec4 texture2D(sampler2D sampler, vec2 coord)
+{
+    return texture(sampler, coord);
+}
+
+public vec4 texture2D(sampler2D sampler, vec2 coord, float bias)
+{
+    return texture(sampler, coord, bias);
+}
+
+public vec4 texture2DProj(sampler2D sampler, vec3 coord)
+{
+    return textureProj(sampler, coord);
+}
+
+public vec4 texture2DProj(sampler2D sampler, vec3 coord, float bias)
+{
+    return textureProj(sampler, coord, bias);
+}
+
+public vec4 texture2DProj(sampler2D sampler, vec4 coord)
+{
+    return textureProj(sampler, coord);
+}
+
+public vec4 texture2DProj(sampler2D sampler, vec4 coord, float bias)
+{
+    return textureProj(sampler, coord, bias);
+}
+
+public vec4 texture2DLod(sampler2D sampler, vec2 coord, float lod)
+{
+    return textureLod(sampler, coord, lod);
+}
+
+public vec4 texture2DProjLod(sampler2D sampler, vec3 coord, float lod)
+{
+    return textureProjLod(sampler, coord, lod);
+}
+
+public vec4 texture2DProjLod(sampler2D sampler, vec4 coord, float lod)
+{
+    return textureProjLod(sampler, coord, lod);
+}
+
+public vec4 texture3D(sampler3D sampler, vec3 coord)
+{
+    return texture(sampler, coord);
+}
+
+public vec4 texture3D(sampler3D sampler, vec3 coord, float bias)
+{
+    return texture(sampler, coord, bias);
+}
+
+public vec4 texture3DProj(sampler3D sampler, vec4 coord)
+{
+    return textureProj(sampler, coord);
+}
+
+public vec4 texture3DProj(sampler3D sampler, vec4 coord, float bias)
+{
+    return textureProj(sampler, coord, bias);
+}
+
+public vec4 texture3DLod(sampler3D sampler, vec3 coord, float lod)
+{
+    return textureLod(sampler, coord, lod);
+}
+
+public vec4 texture3DProjLod(sampler3D sampler, vec4 coord, float lod)
+{
+    return textureProjLod(sampler, coord, lod);
+}
+
+public vec4 textureCube(samplerCube sampler, vec3 coord)
+{
+    return texture(sampler, coord);
+}
+
+public vec4 textureCube(samplerCube sampler, vec3 coord, float bias)
+{
+    return texture(sampler, coord, bias);
+}
+
+public vec4 textureCubeLod(samplerCube sampler, vec3 coord, float lod)
+{
+    return textureLod(sampler, coord, lod);
+}
+
+public vec4 shadow1D(sampler1DShadow sampler, vec3 coord)
+{
+    return texture(sampler, coord);
+}
+
+public vec4 shadow1D(sampler1DShadow sampler, vec3 coord, float bias)
+{
+    return texture(sampler, coord, bias);
+}
+
+public vec4 shadow2D(sampler2DShadow sampler, vec3 coord)
+{
+    return texture(sampler, coord);
+}
+
+public vec4 shadow2D(sampler2DShadow sampler, vec3 coord, float bias)
+{
+    return texture(sampler, coord, bias);
+}
+
+public vec4 shadow1DProj(sampler1DShadow sampler, vec4 coord)
+{
+    return textureProj(sampler, coord);
+}
+
+public vec4 shadow1DProj(sampler1DShadow sampler, vec4 coord, float bias)
+{
+    return textureProj(sampler, coord, bias);
+}
+
+public vec4 shadow2DProj(sampler2DShadow sampler, vec4 coord)
+{
+    return textureProj(sampler, coord);
+}
+
+public vec4 shadow2DProj(sampler2DShadow sampler, vec4 coord, float bias)
+{
+    return textureProj(sampler, coord, bias);
+}
+
+public vec4 shadow1DLod(sampler1DShadow sampler, vec3 coord, float lod)
+{
+    return textureLod(sampler, coord, lod);
+}
+
+public vec4 shadow2DLod(sampler2DShadow sampler, vec3 coord, float lod)
+{
+    return textureLod(sampler, coord, lod);
+}
+
+public vec4 shadow1DProjLod(sampler1DShadow sampler, vec4 coord, float lod)
+{
+    return textureProjLod(sampler, coord, lod);
+}
+
+public vec4 shadow2DProjLod(sampler2DShadow sampler, vec4 coord, float lod)
+{
+    return textureProjLod(sampler, coord, lod);
+}
+
