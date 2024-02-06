@@ -4,7 +4,7 @@
 // Disabled because validation layer doesn't like vector atomics, although nv driver does allow it.
 //DISABLED_TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -compute -profile cs_6_2 -render-features half -shaderobj -emit-spirv-directly -output-using-type
 //TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry computeMain -stage compute -emit-spirv-directly -skip-spirv-validation
-
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -profile cs_6_3
 //TEST_INPUT:set tmpBuffer = ubuffer(data=[0 0 0 0], stride=4)
 RWByteAddressBuffer tmpBuffer;
 
@@ -17,7 +17,7 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
     half originalValue;
     
     // SPIRV: OpAtomicFAddEXT
-
+    // HLSL: NvInterlockedAddFp16x2
     tmpBuffer.InterlockedAddF16(0, 1.0h, originalValue);
     tmpBuffer.InterlockedAddF16(2, 2.0h, originalValue);
     
