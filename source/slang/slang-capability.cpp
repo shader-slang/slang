@@ -96,6 +96,16 @@ void getCapabilityNames(List<UnownedStringSlice>& ioNames)
     }
 }
 
+UnownedStringSlice capabilityNameToString(CapabilityName name)
+{
+    return UnownedStringSlice(_getInfo(name).name);
+}
+
+bool isDirectChildOfAbstractAtom(CapabilityAtom name)
+{
+    return _getInfo(name).abstractBase != CapabilityName::Invalid;
+}
+
 bool lookupCapabilityName(const UnownedStringSlice& str, CapabilityName& value);
 
 CapabilityName findCapabilityName(UnownedStringSlice const& name)
@@ -482,7 +492,10 @@ bool CapabilityConjunctionSet::implies(CapabilityConjunctionSet const& that) con
             return false;
         }
     }
-    return true;
+    // We reached the end of either this or that atom.
+    // If we reached the end of 'that', we know everything in 'that'
+    // is also contained in this, so this implies that.
+    return thatIndex == thatCount;
 }
 
     /// Helper functor for binary search on lists of `CapabilityAtom`
@@ -935,6 +948,46 @@ void CapabilitySet::calcCompactedAtoms(List<List<CapabilityAtom>>& outAtoms) con
     }
 }
 
+void CapabilitySet::unionWith(const CapabilityConjunctionSet& conjunctionToAdd)
+{
+    // We add conjunctionToAdd to resultSet only if it does not imply any existing conjunctions.
+    // For example, if `resultSet` is (a), and conjunctionToAdd is (ab), then we don't want to add the conjunction
+    // to form (a | ab) because that would reduce to (a).
+    bool skipAdd = false;
+    for (auto& c : m_conjunctions)
+    {
+        if (conjunctionToAdd.implies(c))
+        {
+            skipAdd = true;
+            break;
+        }
+    }
+    if (!skipAdd)
+    {
+        // Once we added the new conjunction, any existing conjunctions that implies the new one can be
+        // removed.
+        // For example, if resultSet was (ab), and we are adding (a), the result should be just (a).
+        for (Index i = 0; i < m_conjunctions.getCount();)
+        {
+            if (m_conjunctions[i].implies(conjunctionToAdd))
+            {
+                m_conjunctions.fastRemoveAt(i);
+            }
+            else
+            {
+                i++;
+            }
+        }
+        m_conjunctions.add(conjunctionToAdd);
+    }
+}
+
+void CapabilitySet::canonicalize()
+{
+    // Make sure conjunctions are sorted so equality tests are trivial.
+    m_conjunctions.sort();
+}
+
 void CapabilitySet::join(const CapabilitySet& other)
 {
     if (isEmpty() || other.isInvalid())
@@ -947,7 +1000,7 @@ void CapabilitySet::join(const CapabilitySet& other)
     if (other.isEmpty())
         return;
 
-    List<CapabilityConjunctionSet> resultSet;
+    CapabilitySet resultSet;
     for (auto& thatConjunction : other.m_conjunctions)
     {
         for (auto& thisConjunction : m_conjunctions)
@@ -980,42 +1033,20 @@ void CapabilitySet::join(const CapabilitySet& other)
                 // Otherwise, thisConjunction implies thatConjunction, so we just add thisConjunction to resultSet.
                 conjunctionToAdd = &thisConjunction;
             }
-            // We add conjunctionToAdd to resultSet only if it does not imply any existing conjunctions.
-            // For example, if `resultSet` is (a), and conjunctionToAdd is (ab), then we don't want to add the conjunction
-            // to form (a | ab) because that would reduce to (a).
-            bool skipAdd = false;
-            for (auto& c : resultSet)
-            {
-                if (conjunctionToAdd->implies(c))
-                {
-                    skipAdd = true;
-                    break;
-                }
-            }
-            if (!skipAdd)
-            {
-                // Once we added the new conjunction, any existing conjunctions that implies the new one can be
-                // removed.
-                // For example, if resultSet was (ab), and we are adding (a), the result should be just (a).
-                for (Index i = 0; i < resultSet.getCount();)
-                {
-                    if (resultSet[i].implies(*conjunctionToAdd))
-                    {
-                        resultSet.fastRemoveAt(i);
-                    }
-                    else
-                    {
-                        i++;
-                    }
-                }
-                resultSet.add(*conjunctionToAdd);
-            }
+            resultSet.unionWith(*conjunctionToAdd);
         }
     }
-    m_conjunctions = _Move(resultSet);
+    m_conjunctions = _Move(resultSet.m_conjunctions);
 
-    // Make sure conjunctions are sorted so equality tests are trivial.
-    m_conjunctions.sort();
+    if (m_conjunctions.getCount() == 0)
+    {
+        // If the result is empty, then we should return as impossible.
+        *this = CapabilitySet::makeInvalid();
+    }
+    else
+    {
+        canonicalize();
+    }
 }
 
 bool CapabilitySet::isBetterForTarget(CapabilitySet const& that, CapabilitySet const& targetCaps) const
@@ -1100,6 +1131,88 @@ bool CapabilitySet::isBetterForTarget(CapabilitySet const& that, CapabilitySet c
         }
     }
     return false;
+}
+
+bool CapabilitySet::checkCapabilityRequirement(CapabilitySet const& available, CapabilitySet const& required, const CapabilityConjunctionSet*& outFailedAvailableSet)
+{
+    // Requirements x are met by available disjoint capabilities (a | b) iff
+    // both 'a' satisfies x and 'b' satisfies x.
+    // If we have a caller function F() decorated with:
+    //     [require(hlsl, _sm_6_3)] [require(spirv, _spv_ray_tracing)] void F() { g(); }
+    // We'd better make sure that `g()` can be compiled with both (hlsl+_sm_6_3) and (spirv+_spv_ray_tracing) capability sets.
+    // In this method, F()'s capability declaration is represented by `available`,
+    // and g()'s capability is represented by `required`.
+    // We will check that for every capability conjunction X of F(), there is one capability conjunction Y in g() such that X implies Y.
+    // 
+
+    outFailedAvailableSet = nullptr;
+
+    if (required.isInvalid())
+        return false;
+
+    // If F's capability is empty, we can satisfy any non-empty requirements.
+    //
+    if (available.isEmpty() && !required.isEmpty())
+        return false;
+
+    for (auto& availTargetSet : available.getExpandedAtoms())
+    {
+        bool implied = false;
+        for (auto& requiredTargetSet : required.getExpandedAtoms())
+        {
+            if (availTargetSet.implies(requiredTargetSet))
+            {
+                implied = true;
+                break;
+            }
+        }
+        if (!implied)
+        {
+            outFailedAvailableSet = &availTargetSet;
+            return false;
+        }
+    }
+
+    return true;
+}
+
+void printDiagnosticArg(StringBuilder& sb, const CapabilitySet& capSet)
+{
+    bool isFirstSet = true;
+    for (auto& set : capSet.getExpandedAtoms())
+    {
+        List<CapabilityAtom> compactAtomList;
+        set.calcCompactedAtoms(compactAtomList);
+
+        if (!isFirstSet)
+        {
+            sb<< " | ";
+        }
+        bool isFirst = true;
+        for (auto atom : compactAtomList)
+        {
+            if (!isFirst)
+            {
+                sb << " + ";
+            }
+            auto name = capabilityNameToString((CapabilityName)atom);
+            if (name.startsWith("_"))
+                name = name.tail(1);
+            sb << name;
+            isFirst = false;
+        }
+        isFirstSet = false;
+    }
+}
+
+void printDiagnosticArg(StringBuilder& sb, CapabilityAtom atom)
+{
+    printDiagnosticArg(sb, (CapabilityName)atom);
+}
+
+void printDiagnosticArg(StringBuilder& sb, CapabilityName name)
+{
+    sb << _getInfo(name).name;
 }
 
 }

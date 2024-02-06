@@ -31,6 +31,10 @@ VkDescriptorPool DescriptorSetAllocator::newPool()
     descriptorPoolInfo.pPoolSizes = poolSizes.getBuffer();
     descriptorPoolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 
+    VkDescriptorPoolInlineUniformBlockCreateInfo inlineUniformBlockInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_INLINE_UNIFORM_BLOCK_CREATE_INFO };
+    inlineUniformBlockInfo.maxInlineUniformBlockBindings = 16;
+    descriptorPoolInfo.pNext = &inlineUniformBlockInfo;
+
     VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
     SLANG_VK_CHECK(m_api->vkCreateDescriptorPool(
         m_api->m_device, &descriptorPoolInfo, nullptr, &descriptorPool));

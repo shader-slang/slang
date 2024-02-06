@@ -605,7 +605,6 @@ class Attribute : public AttributeBase
 class UserDefinedAttribute : public Attribute 
 {
     SLANG_AST_CLASS(UserDefinedAttribute)
- 
 };
 
 class AttributeUsageAttribute : public Attribute 
@@ -614,6 +613,14 @@ class AttributeUsageAttribute : public Attribute
  
     SyntaxClass<NodeBase> targetSyntaxClass;
 };
+
+
+class RequireCapabilityAttribute : public Attribute
+{
+    SLANG_AST_CLASS(RequireCapabilityAttribute)
+    CapabilitySet capabilitySet;
+};
+
 
 // An `[unroll]` or `[unroll(count)]` attribute
 class UnrollAttribute : public Attribute 

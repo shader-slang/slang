@@ -164,6 +164,12 @@ namespace toc
                         node.sections.Add(sectionStr);
                         node.sectionShortTitles.Add(maybeGetShortTitle(sectionStr, content, i));
                     }
+                    if (content[i].StartsWith("permalink:"))
+                    {
+                        var prefixLength = ("permalink:").Length;
+                        var permaPath = content[i].Substring(prefixLength, content[i].Length - prefixLength).Trim();
+                        node.fileID = Path.GetFileName(permaPath);
+                    }
                 }
                 if (node.title == null)
                 {

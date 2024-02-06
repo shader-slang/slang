@@ -1,5 +1,6 @@
 ---
 layout: user-guide
+permalink: /user-guide/targets
 ---
 
 Supported Compilation Targets

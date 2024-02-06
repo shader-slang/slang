@@ -31,6 +31,6 @@ namespace Slang
         IRModule*       irModule);
 
     bool isIllegalGLSLParameterType(IRType* type);
-    bool isIllegalSPIRVParameterType(IRType* type);
+    bool isIllegalSPIRVParameterType(IRType* type, bool isArray);
 
 }

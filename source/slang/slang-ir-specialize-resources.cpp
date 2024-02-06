@@ -38,6 +38,7 @@ struct ResourceParameterSpecializationCondition : FunctionCallSpecializeConditio
         // our decision.
         //
         type = unwrapArray(type);
+        bool isArray = type != param->getDataType();
 
         // On all of our (current) targets, a function that
         // takes a `ConstantBuffer<T>` parameter requires
@@ -63,7 +64,7 @@ struct ResourceParameterSpecializationCondition : FunctionCallSpecializeConditio
         if( isKhronosTarget(targetRequest) )
         {
             if (targetRequest->shouldEmitSPIRVDirectly())
-                return isIllegalSPIRVParameterType(type);
+                return isIllegalSPIRVParameterType(type, isArray);
             else
                 return isIllegalGLSLParameterType(type);
         }
@@ -1212,7 +1213,7 @@ bool specializeResourceUsage(
 
 bool isIllegalGLSLParameterType(IRType* type)
 {
-    if (as<IRUniformParameterGroupType>(type))
+    if (as<IRParameterGroupType>(type))
         return true;
     if (as<IRHLSLStructuredBufferTypeBase>(type))
         return true;
@@ -1236,7 +1237,7 @@ bool isIllegalGLSLParameterType(IRType* type)
     return false;
 }
 
-bool isIllegalSPIRVParameterType(IRType* type)
+bool isIllegalSPIRVParameterType(IRType* type, bool isArray)
 {
     if (isIllegalGLSLParameterType(type))
         return true;
@@ -1245,6 +1246,13 @@ bool isIllegalSPIRVParameterType(IRType* type)
     // all Texture types.
     if (as<IRTextureType>(type))
         return true;
+    if (isArray)
+    {
+        if (as<IRSamplerStateTypeBase>(type))
+        {
+            return true;
+        }
+    }
     return false;
 }
 } // namespace Slang

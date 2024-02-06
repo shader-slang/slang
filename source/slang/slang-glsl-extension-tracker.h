@@ -39,7 +39,7 @@ protected:
 
     uint32_t m_hasBaseTypeFlags = _getFlag(BaseType::Float) | _getFlag(BaseType::Int) | _getFlag(BaseType::UInt) | _getFlag(BaseType::Void) | _getFlag(BaseType::Bool);
 
-    ProfileVersion m_profileVersion = ProfileVersion::GLSL_110;
+    ProfileVersion m_profileVersion = ProfileVersion::GLSL_150;
 
     StringSlicePool m_extensionPool;
 

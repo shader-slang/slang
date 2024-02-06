@@ -4900,6 +4900,7 @@ namespace Slang
                         parser->sink->diagnose(caseName.loc, Diagnostics::unknownTargetName, caseName.getContent());
                     }
                     targetCase->capability = int32_t(cap);
+                    targetCase->capabilityToken = caseName;
                     targetCase->loc = caseName.loc;
                     targetCase->body = bodyStmt;
                     stmt->targetCases.add(targetCase);

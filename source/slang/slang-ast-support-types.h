@@ -51,7 +51,7 @@ namespace Slang
     class NodeBase;
     class LookupDeclRef;
     class GenericAppDeclRef;
-
+    struct CapabilitySet;
 
     template <typename T>
     T* as(NodeBase* node);
@@ -66,6 +66,8 @@ namespace Slang
     void printDiagnosticArg(StringBuilder& sb, Val* val);
     void printDiagnosticArg(StringBuilder& sb, DeclRefBase* declRefBase);
     void printDiagnosticArg(StringBuilder& sb, ASTNodeType nodeType);
+    void printDiagnosticArg(StringBuilder& sb, const CapabilitySet& set);
+
 
     struct QualifiedDeclPath
     {
@@ -442,7 +444,7 @@ namespace Slang
             /// checking the function body.
         AttributesChecked,
 
-            /// The declaration is fully checked.
+            /// The body/definition is checked.
             ///
             /// This step includes any validation of the declaration that is
             /// immaterial to clients code using the declaration, but that is
@@ -453,7 +455,11 @@ namespace Slang
             /// but we still need to (eventually) check the bodies of all
             /// functions, so it belongs in the last phase of checking.
             ///
-        Checked,
+        DefinitionChecked,
+
+            /// The capabilities required by the decl is infered and validated.
+            ///
+        CapabilityChecked,
 
         // For convenience at sites that call `ensureDecl()`, we define
         // some aliases for the above states that are expressed in terms

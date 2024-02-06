@@ -127,6 +127,8 @@ SlangResult LanguageServer::parseNextMessage()
                     caps.completionProvider.triggerCharacters.add(".");
                     caps.completionProvider.triggerCharacters.add(":");
                     caps.completionProvider.triggerCharacters.add("[");
+                    caps.completionProvider.triggerCharacters.add(" ");
+                    caps.completionProvider.triggerCharacters.add("(");
                     caps.completionProvider.triggerCharacters.add("\"");
                     caps.completionProvider.triggerCharacters.add("/");
                     caps.completionProvider.resolveProvider = true;
@@ -985,6 +987,12 @@ SlangResult LanguageServer::completion(
     context.line = utf8Line;
     context.col = utf8Col;
     context.commitCharacterBehavior = m_commitCharacterBehavior;
+    if (args.context.triggerKind == kCompletionTriggerKindTriggerCharacter &&
+        (args.context.triggerCharacter == " " || args.context.triggerCharacter == "[" || args.context.triggerCharacter == "("))
+    {
+        // Never use commit character if completion request is triggerred by these characters to prevent annoyance.
+        context.commitCharacterBehavior = CommitCharacterBehavior::Disabled;
+    }
 
     if (SLANG_SUCCEEDED(context.tryCompleteInclude()))
     {

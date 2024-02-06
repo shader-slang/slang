@@ -692,6 +692,31 @@ struct ASTDumpContext
         m_writer->emit("}");
     }
 
+    void dump(const CapabilitySet& capSet)
+    {
+        m_writer->emit("capability_set(");
+        bool isFirstSet = true;
+        for (auto& set : capSet.getExpandedAtoms())
+        {
+            if (!isFirstSet)
+            {
+                m_writer->emit(" | ");
+            }
+            bool isFirst = true;
+            for (auto atom : set.getExpandedAtoms())
+            {
+                if (!isFirst)
+                {
+                    m_writer->emit("+");
+                }
+                dump(capabilityNameToString((CapabilityName)atom));
+                isFirst = false;
+            }
+            isFirstSet = false;
+        }
+        m_writer->emit(")");
+    }
+
     void dumpObjectFull(NodeBase* node);
 
     ASTDumpContext(SourceWriter* writer, ASTDumpUtil::Flags flags, ASTDumpUtil::Style dumpStyle):

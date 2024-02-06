@@ -3,6 +3,7 @@
 
 #include "../core/slang-basic.h"
 #include "../../slang.h"
+#include "slang-capability.h"
 
 namespace Slang
 {
@@ -108,6 +109,8 @@ namespace Slang
         static Profile lookUp(UnownedStringSlice const& name);
         static Profile lookUp(char const* name);
         char const* getName();
+
+        List<CapabilityName> getCapabilityName();
 
         RawVal raw = Unknown;
     };
