@@ -708,9 +708,12 @@ namespace Slang
 
         CapabilitySet getDeclaredCapabilitySet(Decl* decl);
 
-        void visitDecl(Decl*);
+
+        void visitDecl(Decl*) {}
         void visitDeclGroup(DeclGroup*) {}
         void checkVarDeclCommon(VarDeclBase* varDecl);
+        void visitAggTypeDeclBase(AggTypeDeclBase* decl);
+        void visitNamespaceDeclBase(NamespaceDeclBase* decl);
 
         void visitVarDecl(VarDecl* varDecl)
         {
@@ -8784,7 +8787,12 @@ namespace Slang
         return declaredCaps;
     }
 
-    void SemanticsDeclCapabilityVisitor::visitDecl(Decl* decl)
+    void SemanticsDeclCapabilityVisitor::visitAggTypeDeclBase(AggTypeDeclBase* decl)
+    {
+        decl->inferredCapabilityRequirements = getDeclaredCapabilitySet(decl);
+    }
+
+    void SemanticsDeclCapabilityVisitor::visitNamespaceDeclBase(NamespaceDeclBase* decl)
     {
         decl->inferredCapabilityRequirements = getDeclaredCapabilitySet(decl);
     }
