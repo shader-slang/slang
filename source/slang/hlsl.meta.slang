@@ -2564,7 +2564,7 @@ ${{{{
         __target_switch
         {
         case hlsl:
-            __intrinsic_asm "NvInterlockedAddFp16x2($0, $1, $2))";
+            __intrinsic_asm "NvInterlockedAddFp16x2($0, $1, $2)";
         }
     }
 
