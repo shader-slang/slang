@@ -397,9 +397,18 @@ SLANG_NO_THROW Result SLANG_MCALL RendererBase::initialize(const Desc& desc)
 
     if (desc.apiCommandDispatcher)
     {
-        desc.apiCommandDispatcher->queryInterface(
-            GfxGUID::IID_IPipelineCreationAPIDispatcher,
-            (void**)m_pipelineCreationAPIDispatcher.writeRef());
+        if (desc.deviceType == DeviceType::Vulkan)
+        {
+            desc.apiCommandDispatcher->queryInterface(
+                SLANG_UUID_IVulkanPipelineCreationAPIDispatcher,
+                (void**)m_pipelineCreationAPIDispatcher.writeRef());
+        }
+        else
+        {
+            desc.apiCommandDispatcher->queryInterface(
+                GfxGUID::IID_IPipelineCreationAPIDispatcher,
+                (void**)m_pipelineCreationAPIDispatcher.writeRef());
+        }
     }
     return SLANG_OK;
 }
