@@ -1466,7 +1466,14 @@ struct IRBuiltinGenericType : IRType
 };
 
 SIMPLE_IR_PARENT_TYPE(PointerLikeType, BuiltinGenericType);
-SIMPLE_IR_PARENT_TYPE(HLSLStructuredBufferTypeBase, BuiltinGenericType)
+
+struct IRHLSLStructuredBufferTypeBase : IRBuiltinGenericType
+{
+    IRType* getDataLayout() { return (IRType*)getOperand(1); }
+
+    IR_PARENT_ISA(HLSLStructuredBufferTypeBase)
+};
+
 SIMPLE_IR_TYPE(HLSLStructuredBufferType, HLSLStructuredBufferTypeBase)
 SIMPLE_IR_TYPE(HLSLRWStructuredBufferType, HLSLStructuredBufferTypeBase)
 SIMPLE_IR_TYPE(HLSLRasterizerOrderedStructuredBufferType, HLSLStructuredBufferTypeBase)

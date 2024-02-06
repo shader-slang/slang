@@ -133,6 +133,11 @@ INST(Nop, nop, 0, 0)
         INST(SamplerComparisonStateType, SamplerComparisonState, 0, HOISTABLE)
     INST_RANGE(SamplerStateTypeBase, SamplerStateType, SamplerComparisonStateType)
 
+    INST(DefaultBufferLayoutType, DefaultLayout, 0, HOISTABLE)
+    INST(Std140BufferLayoutType, Std140Layout, 0, HOISTABLE)
+    INST(Std430BufferLayoutType, Std430Layout, 0, HOISTABLE)
+    INST(ScalarBufferLayoutType, ScalarLayout, 0, HOISTABLE)
+
     INST(TextureFootprintType, TextureFootprintType, 1, HOISTABLE)
 
     INST(TextureShape1DType, TextureShape1DType, 0, HOISTABLE)
