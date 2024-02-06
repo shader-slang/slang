@@ -63,17 +63,20 @@ For example, requirement `spvShaderClockKHR + fragment` and requirement `spvShad
 
 ## Requirements in Parent Scope
 
-The capability requirement of a decl is always joined with the requirements declared in its parents.
-For example:
+The capability requirement of a decl is always merged with the requirements declared in its parents. If the decl declares requirements for additional compilation targets, they are added
+to the requirement set as a separate disjunction.
+For example, given:
 ```csharp
-[require(spvShaderClockKHR)]
+[require(glsl)]
+[require(hlsl)]
 struct MyType
 {
-    [require(spvShaderClockKHR)]
-    void method() { ... }
+    [require(hlsl, hlsl_nvapi)]
+    [require(spirv)]
+    static void method() { ... }
 }
 ```
-`MyType.method` has requirement `spvShaderClockKHR + spvShaderClockKHR`.
+`MyType.method` will have requirement `glsl | hlsl + hlsl_nvapi | spirv`.
 
 The `[require]` attribute can also be used on module declarations, so that the requirement will
 apply to all decls within the module. For example:

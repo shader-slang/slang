@@ -866,6 +866,18 @@ Decl* getParentDecl(Decl* decl)
     return decl;
 }
 
+Decl* getParentAggTypeDecl(Decl* decl)
+{
+    decl = decl->parentDecl;
+    while (decl)
+    {
+        if (as<AggTypeDecl>(decl))
+            return decl;
+        decl = decl->parentDecl;
+    }
+    return nullptr;
+}
+
 Decl* getParentFunc(Decl* decl)
 {
     while (decl)
