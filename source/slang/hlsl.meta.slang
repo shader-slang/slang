@@ -2330,7 +2330,6 @@ ${{{{
     }
 
     // FP16x2
-    __cuda_sm_version(2.0)
     [__requiresNVAPI]
     uint _NvInterlockedAddFp16x2(uint byteAddress, uint fp16x2Value)
     {
@@ -2341,7 +2340,6 @@ ${{{{
         }
     }
 
-    __cuda_sm_version(2.0)
     [__requiresNVAPI]
     [ForceInline]
     void InterlockedAddF16(uint byteAddress, half value, out half originalValue)
@@ -2357,7 +2355,7 @@ ${{{{
             else
             {
                 byteAddress = byteAddress & ~3;
-                uint packedInput = asuint16(value) << 16;
+                uint packedInput = ((uint)asuint16(value)) << 16;
                 originalValue = asfloat16((uint16_t)(_NvInterlockedAddFp16x2(byteAddress, packedInput) >> 16));
             }
             return;
@@ -12816,6 +12814,7 @@ __generic<Shape:__ITextureShape1D2D3D, let format : int>
 extension __TextureImpl<float, Shape, 0, 0, 0, $(kStdlibResourceAccessReadWrite), 0, 0, format>
 {
     [__requiresNVAPI]
+    __glsl_extension(GL_EXT_shader_atomic_float)
     void InterlockedAddF32(vector<uint, Shape.dimensions> coord, float value, out float originalValue)
     {
         __target_switch
@@ -12823,6 +12822,8 @@ extension __TextureImpl<float, Shape, 0, 0, 0, $(kStdlibResourceAccessReadWrite)
         case spirv:
             originalValue = __atomicAdd(this[coord], value);
             return;
+        case glsl:
+            __intrinsic_asm "$3 = imageAtomicAdd($0, $1, $2)";
         case hlsl:
             __intrinsic_asm "$3 = NvInterlockedAddFp32($0, $1, $2)";
         }
