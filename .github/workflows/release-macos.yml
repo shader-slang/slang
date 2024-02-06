@@ -87,6 +87,7 @@ jobs:
           7z a ${SLANG_BINARY_ARCHIVE} slang-gfx.h
           7z a ${SLANG_BINARY_ARCHIVE} prelude/*.h
           7z a ${SLANG_BINARY_ARCHIVE} bin/*/*/libslang.dylib
+          7z a ${SLANG_BINARY_ARCHIVE} bin/*/*/libslang-glslang.dylib
           7z a ${SLANG_BINARY_ARCHIVE} bin/*/*/libgfx.dylib
           7z a ${SLANG_BINARY_ARCHIVE} bin/*/*/slangc
           7z a ${SLANG_BINARY_ARCHIVE} bin/*/*/slangd
