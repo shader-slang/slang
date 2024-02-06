@@ -2080,11 +2080,16 @@ struct SpecializationContext
                 baseElementType,
                 slotOperandCount,
                 type->getExistentialArgs());
-
-            auto newPtrLikeType = builder.getType(
+            // Create a new type inst where the first operand is replaced
+            // with wrappedElementType.
+            Array<IRInst*, 4> operands;
+            operands.add(baseElementType);
+            for (UInt i = 1; i < baseType->getOperandCount(); i++)
+                operands.add(baseType->getOperand(1));
+            IRInst* newPtrLikeType = builder.getType(
                 baseType->getOp(),
-                1,
-                &wrappedElementType);
+                operands.getCount(),
+                operands.getBuffer());
             addUsersToWorkList(type);
             addToWorkList(newPtrLikeType);
             addToWorkList(wrappedElementType);

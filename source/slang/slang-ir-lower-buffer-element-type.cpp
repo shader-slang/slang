@@ -477,7 +477,11 @@ namespace Slang
             {
                 IRBuilder builder(newElementType);
                 builder.setInsertAfter(newElementType);
-                return builder.getType(originalPtrLikeType->getOp(), newElementType);
+                ShortList<IRInst*> operands;
+                for (UInt i = 0; i < originalPtrLikeType->getOperandCount(); i++)
+                    operands.add(originalPtrLikeType->getOperand(i));
+                operands[0] = newElementType;
+                return builder.getType(originalPtrLikeType->getOp(), (UInt)operands.getCount(), operands.getArrayView().getBuffer());
             }
             SLANG_UNREACHABLE("unhandled ptr like or buffer type");
         }
@@ -538,9 +542,14 @@ namespace Slang
 
                 builder.setInsertBefore(bufferType);
 
+                ShortList<IRInst*> typeOperands;
+                for (UInt i = 0; i < bufferType->getOperandCount(); i++)
+                    typeOperands.add(bufferType->getOperand(i));
+                typeOperands[0] = loweredBufferElementTypeInfo.loweredType;
                 auto loweredBufferType = builder.getType(
                     bufferType->getOp(),
-                    loweredBufferElementTypeInfo.loweredType);
+                    (UInt)typeOperands.getCount(),
+                    typeOperands.getArrayView().getBuffer());
 
                 // We treat a value of a buffer type as a pointer, and use a work list to translate
                 // all loads and stores through the pointer values that needs lowering.
