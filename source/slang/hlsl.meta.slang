@@ -6606,18 +6606,6 @@ T cbrt(T x)
     return pow(x, T(1) / T(3));
 }
 
-// Derivative of cube root
-__generic<T : __BuiltinFloatingPointType>
-[__readNone, Differentiable, ForwardDerivativeOf(cbrt)]
-DifferentialPair<T> cbrtFwdDiff(DifferentialPair<T> x)
-{
-    return diffPair(
-        // Primal is the output of cbrt(x.p)
-        no_diff(cbrt(x.p)),
-        // Derivative is the output of cbrt'(x.p)
-        __slang_noop_cast<T.Differential>(T(1) / T(3) * pow(x.p, T(-2) / T(3))));
-}
-
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 [__readNone]

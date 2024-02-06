@@ -1364,6 +1364,12 @@ SIMPLE_UNARY_DERIVATIVE_IMPL(sqrt, T(0.5) / sqrt(max(ReturnType(T(1e-7)), dpx.p)
 SIMPLE_UNARY_DERIVATIVE_IMPL(rcp, T(-1.0) / max(ReturnType(T(1e-7)), dpx.p * dpx.p))
 // rsqrt
 SIMPLE_UNARY_DERIVATIVE_IMPL(rsqrt, T(-0.5) / (dpx.p * sqrt(dpx.p)))
+// Cube root => (0.333...) / (x ** -2/3)
+SIMPLE_UNARY_DERIVATIVE_IMPL(cbrt, (T(1) / T(3)) /
+                                       pow((max(ReturnType(T(1e-7)), dpx.p)),
+                                           T(-2) / T(3)))
+// rcbrt
+SIMPLE_UNARY_DERIVATIVE_IMPL(rcbrt, (T(1) / T(3)) / (dpx.p * cbrt(dpx.p)))
 // Arc-sin
 SIMPLE_UNARY_DERIVATIVE_IMPL(asin, T(1.0) / sqrt(T(1.0) - dpx.p * dpx.p))
 // Arc-cos
