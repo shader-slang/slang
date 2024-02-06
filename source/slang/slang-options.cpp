@@ -74,6 +74,7 @@ enum class OptionKind
     EmitIr,
     ReportDownstreamTime,
     ReportPerfBenchmark,
+    SkipSPIRVValidation,
 
     SourceEmbedStyle,
     SourceEmbedName,
@@ -446,6 +447,7 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::InputFilesRemain, "--", nullptr, "Treat the rest of the command line as input files."},
         { OptionKind::ReportDownstreamTime, "-report-downstream-time", nullptr, "Reports the time spent in the downstream compiler." },
         { OptionKind::ReportPerfBenchmark, "-report-perf-benchmark", nullptr, "Reports compiler performance benchmark results." },
+        { OptionKind::SkipSPIRVValidation, "-skip-spirv-validation", nullptr, "Skips spirv validation." },
         { OptionKind::SourceEmbedStyle, "-source-embed-style", "-source-embed-style <source-embed-style>",
         "If source embedding is enabled, defines the style used. When enabled (with any style other than `none`), "
         "will write compile results into embeddable source for the target language. "
@@ -1930,6 +1932,11 @@ SlangResult OptionsParser::_parse(
                 m_compileRequest->setReportPerfBenchmark(true);
                 break;
             }
+            case OptionKind::SkipSPIRVValidation:
+            {
+                m_compileRequest->setSkipSPIRVValidation(true);
+                break;
+            }
             case OptionKind::ModuleName:
             {
                 CommandLineArg moduleName;
@@ -3178,10 +3185,10 @@ SlangResult OptionsParser::parse(
     
     m_sink = nullptr;
 
-    if (requestSink->getErrorCount() > 0)
+    if (m_parseSink.getErrorCount() > 0)
     {
         // Put the errors in the diagnostic 
-        m_requestImpl->m_diagnosticOutput = requestSink->outputBuffer.produceString();
+        m_requestImpl->m_diagnosticOutput = m_parseSink.outputBuffer.produceString();
     }
 
     return res;

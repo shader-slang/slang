@@ -359,6 +359,26 @@ namespace Slang
         return lookUp(UnownedTerminatedStringSlice(name));
     }
 
+    List<CapabilityName> Profile::getCapabilityName()
+    {
+        List<CapabilityName> result;
+        switch (getVersion())
+        {
+            #define PROFILE_VERSION(TAG, NAME) case ProfileVersion::TAG: result.add(CapabilityName::TAG); break;
+            #include "slang-profile-defs.h"
+        default:
+            break;
+        }
+        switch (getStage())
+        {
+#define PROFILE_STAGE(TAG, NAME, VAL) case Stage::TAG: result.add(CapabilityName::NAME); break;
+#include "slang-profile-defs.h"
+        default:
+            break;
+        }
+        return result;
+    }
+
     char const* Profile::getName()
     {
         switch( raw )
@@ -711,7 +731,7 @@ namespace Slang
             // to clobber it with something to get a default.
             //
             // TODO: This is a huge hack...
-            profile.setVersion(ProfileVersion::DX_5_0);
+            profile.setVersion(ProfileVersion::DX_5_1);
             break;
         }
 
@@ -755,9 +775,6 @@ namespace Slang
         {
     #define CASE(TAG, SUFFIX) case ProfileVersion::TAG: versionSuffix = #SUFFIX; break
         CASE(DX_4_0,             _4_0);
-        CASE(DX_4_0_Level_9_0,   _4_0_level_9_0);
-        CASE(DX_4_0_Level_9_1,   _4_0_level_9_1);
-        CASE(DX_4_0_Level_9_3,   _4_0_level_9_3);
         CASE(DX_4_1,             _4_1);
         CASE(DX_5_0,             _5_0);
         CASE(DX_5_1,             _5_1);
@@ -2323,6 +2340,17 @@ namespace Slang
         if (auto endToEndReq = isEndToEndCompile())
         {
             if (endToEndReq->getFrontEndReq()->shouldValidateIR)
+                return true;
+        }
+
+        return false;
+    }
+
+    bool CodeGenContext::shouldSkipSPIRVValidation()
+    {
+        if (auto endToEndReq = isEndToEndCompile())
+        {
+            if (endToEndReq->m_skipSPIRVValidation)
                 return true;
         }
 

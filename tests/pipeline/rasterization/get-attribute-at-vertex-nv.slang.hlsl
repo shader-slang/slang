@@ -2,6 +2,8 @@
 
 //TEST_IGNORE_FILE:
 
+#pragma warning(disable: 3557)
+
 [shader("pixel")]
 void main(
     nointerpolation vector<float,4> color_0 : COLOR,

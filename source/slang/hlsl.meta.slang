@@ -1976,8 +1976,8 @@ float __atomicAdd(__ref float value, float amount)
 }
 
 __glsl_version(430)
-__glsl_extension(GL_EXT_shader_atomic_float2)
-half __atomicAdd(__ref half value, half amount)
+__glsl_extension(GL_NV_shader_atomic_fp16_vector)
+half2 __atomicAdd(__ref half2 value, half2 amount)
 {
     __target_switch
     {
@@ -1985,9 +1985,9 @@ half __atomicAdd(__ref half value, half amount)
     case spirv:
         return spirv_asm
         {
-            OpExtension "SPV_EXT_shader_atomic_float16_add";
-            OpCapability AtomicFloat16AddEXT;
-            result:$$half = OpAtomicFAddEXT &value Device None $amount
+            OpExtension "SPV_EXT_shader_atomic_float_add";
+            OpCapability AtomicFloat32AddEXT;
+            result:$$half2 = OpAtomicFAddEXT &value Device None $amount
         };
     }
 }
@@ -2535,7 +2535,7 @@ ${{{{
         __target_switch
         {
         case hlsl:
-            __intrinsic_asm "NvInterlockedAddFp32($0, $1, $2))";
+            __intrinsic_asm "NvInterlockedAddFp16x2($0, $1, $2))";
         }
     }
 
@@ -2562,8 +2562,15 @@ ${{{{
         case glsl:
         case spirv:
             {
-                let buf = __getEquivalentStructuredBuffer<half>(this);
-                originalValue = __atomicAdd(buf[byteAddress / 2], value);
+                let buf = __getEquivalentStructuredBuffer<half2>(this);
+                if ((byteAddress & 2) == 0)
+                {
+                    originalValue = __atomicAdd(buf[byteAddress/4], half2(value, half(0.0))).x;
+                }
+                else
+                {
+                    originalValue = __atomicAdd(buf[byteAddress/4], half2(half(0.0), value)).y;
+                }
                 return;
             }
         }
@@ -4907,7 +4914,6 @@ T GetAttributeAtVertex(T attribute, uint vertexIndex)
     {
     case hlsl:
         __intrinsic_asm "GetAttributeAtVertex";
-    case _GL_NV_fragment_shader_barycentric:
     case _GL_EXT_fragment_shader_barycentric: 
         __intrinsic_asm "$0[$1]";
     case spirv:
@@ -4940,7 +4946,6 @@ vector<T,N> GetAttributeAtVertex(vector<T,N> attribute, uint vertexIndex)
     {
     case hlsl:
         __intrinsic_asm "GetAttributeAtVertex";
-    case _GL_NV_fragment_shader_barycentric:
     case _GL_EXT_fragment_shader_barycentric: 
         __intrinsic_asm "$0[$1]";
     case spirv:
@@ -4973,7 +4978,6 @@ matrix<T,N,M> GetAttributeAtVertex(matrix<T,N,M> attribute, uint vertexIndex)
     {
     case hlsl:
         __intrinsic_asm "GetAttributeAtVertex";
-    case _GL_NV_fragment_shader_barycentric:
     case _GL_EXT_fragment_shader_barycentric: 
         __intrinsic_asm "$0[$1]";
     case spirv:
@@ -7753,6 +7757,9 @@ __target_intrinsic(cuda, "_waveProductMultiple($0, $1)")
 __target_intrinsic(hlsl, "WaveActiveProduct($1)")
 matrix<T,N,M> WaveMaskProduct(WaveMask mask, matrix<T,N,M> expr);
 
+__intrinsic_op($(kIROp_RequireGLSLExtension))
+void __requireGLSLExtension(String extensionName);
+
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
@@ -7760,7 +7767,9 @@ T WaveMaskSum(WaveMask mask, T expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupAdd($1)";
+    case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupAdd($1)";
     case cuda: __intrinsic_asm "_waveSum($0, $1)";
     case hlsl: __intrinsic_asm "WaveActiveSum($1)";
     case spirv:
@@ -7789,7 +7798,9 @@ vector<T,N> WaveMaskSum(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupAdd($1)";
+    case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupAdd($1)";
     case cuda: __intrinsic_asm "_waveSumMultiple($0, $1)";
     case hlsl: __intrinsic_asm "WaveActiveSum($1)";
     case spirv:
@@ -7825,6 +7836,7 @@ bool WaveMaskAllEqual(WaveMask mask, T value)
     __target_switch
     {
     case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupAllEqual($1)";
     case hlsl:
         __intrinsic_asm "WaveActiveAllEqual($1)";
@@ -7849,6 +7861,7 @@ bool WaveMaskAllEqual(WaveMask mask, vector<T,N> value)
     __target_switch
     {
     case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupAllEqual($1)";
     case hlsl:
         __intrinsic_asm "WaveActiveAllEqual($1)";
@@ -7879,7 +7892,9 @@ T WaveMaskPrefixProduct(WaveMask mask, T expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupExclusiveMul($1)";
+    case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupExclusiveMul($1)";
     case cuda: __intrinsic_asm "_wavePrefixProduct($0, $1)";
     case hlsl: __intrinsic_asm "WavePrefixProduct($1)";
     case spirv:
@@ -7908,7 +7923,9 @@ vector<T,N> WaveMaskPrefixProduct(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupExclusiveMul($1)";
+    case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupExclusiveMul($1)";
     case cuda: __intrinsic_asm "_wavePrefixProductMultiple($0, $1)";
     case hlsl: __intrinsic_asm "WavePrefixProduct($1)";
     case spirv:
@@ -7942,7 +7959,9 @@ T WaveMaskPrefixSum(WaveMask mask, T expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupExclusiveAdd($1)";
+    case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupExclusiveAdd($1)";
     case cuda: __intrinsic_asm "_wavePrefixSum($0, $1)";
     case hlsl: __intrinsic_asm "WavePrefixSum($1)";
     case spirv:
@@ -7972,7 +7991,9 @@ vector<T,N> WaveMaskPrefixSum(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupExclusiveAdd($1)";
+    case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupExclusiveAdd($1)";
     case cuda: __intrinsic_asm "_wavePrefixSumMultiple($0, $1)";
     case hlsl: __intrinsic_asm "WavePrefixSum($1)";
     case spirv:
@@ -8479,7 +8500,9 @@ T WaveActive$(opName.hlslName)(T expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroup$(opName.glslName)($0)";
+    case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroup$(opName.glslName)($0)";
     case hlsl: __intrinsic_asm "WaveActive$(opName.hlslName)";
     case spirv:
         if (__isFloat<T>())
@@ -8518,7 +8541,9 @@ vector<T,N> WaveActive$(opName.hlslName)(vector<T,N> expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroup$(opName.glslName)($0)";
+    case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroup$(opName.glslName)($0)";
     case hlsl: __intrinsic_asm "WaveActive$(opName.hlslName)";
     case spirv:
         if (__isFloat<T>())
@@ -8772,7 +8797,9 @@ T WavePrefixProduct(T expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupExclusiveMul($0)";
+    case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupExclusiveMul($0)";
     case hlsl: __intrinsic_asm "WavePrefixProduct";
     case spirv:
         if (__isFloat<T>())
@@ -8807,7 +8834,9 @@ vector<T,N> WavePrefixProduct(vector<T,N> expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupExclusiveMul($0)";
+    case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupExclusiveMul($0)";
     case hlsl: __intrinsic_asm "WavePrefixProduct";
     case spirv:
         if (__isFloat<T>())
@@ -8845,7 +8874,9 @@ T WavePrefixSum(T expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupExclusiveAdd($0)";
+    case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupExclusiveAdd($0)";
     case hlsl: __intrinsic_asm "WavePrefixSum";
     case spirv:
         if (__isFloat<T>())
@@ -8876,7 +8907,9 @@ vector<T,N> WavePrefixSum(vector<T,N> expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupExclusiveAdd($0)";
+    case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupExclusiveAdd($0)";
     case hlsl: __intrinsic_asm "WavePrefixSum";
     case spirv:
         if (__isFloat<T>())
@@ -8914,7 +8947,9 @@ T WaveReadLaneFirst(T expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupBroadcastFirst($0)";
+    case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupBroadcastFirst($0)";
     case hlsl: __intrinsic_asm "WaveReadLaneFirst";
     case spirv:
         return spirv_asm {OpCapability GroupNonUniformBallot; OpGroupNonUniformBroadcastFirst $$T result Subgroup $expr};
@@ -8930,7 +8965,9 @@ vector<T,N> WaveReadLaneFirst(vector<T,N> expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupBroadcastFirst($0)";
+    case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupBroadcastFirst($0)";
     case hlsl: __intrinsic_asm "WaveReadLaneFirst";
     case spirv:
         return spirv_asm {OpCapability GroupNonUniformBallot; OpGroupNonUniformBroadcastFirst $$vector<T,N> result Subgroup $expr};
@@ -8959,7 +8996,9 @@ T WaveBroadcastLaneAt(T value, constexpr int lane)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupBroadcast($0, $1)";
+    case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupBroadcast($0, $1)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt";
     case spirv:
         let ulane = uint(lane);
@@ -8976,7 +9015,9 @@ vector<T,N> WaveBroadcastLaneAt(vector<T,N> value, constexpr int lane)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupBroadcast($0, $1)";
+    case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupBroadcast($0, $1)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt";
     case spirv:
         let ulane = uint(lane);
@@ -9003,7 +9044,9 @@ T WaveReadLaneAt(T value, int lane)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupShuffle($0, $1)";
+    case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupShuffle($0, $1)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt";
     case spirv:
         let ulane = uint(lane);
@@ -9020,7 +9063,9 @@ vector<T,N> WaveReadLaneAt(vector<T,N> value, int lane)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupShuffle($0, $1)";
+    case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupShuffle($0, $1)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt";
     case spirv:
         let ulane = uint(lane);
@@ -9048,7 +9093,9 @@ T WaveShuffle(T value, int lane)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupShuffle($0, $1)";
+    case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupShuffle($0, $1)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt";
     case spirv:
         let ulane = uint(lane);
@@ -9065,7 +9112,9 @@ vector<T,N> WaveShuffle(vector<T,N> value, int lane)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupShuffle($0, $1)";
+    case glsl:
+        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupShuffle($0, $1)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt";
     case spirv:
         let ulane = uint(lane);
@@ -9088,7 +9137,8 @@ uint WavePrefixCountBits(bool value)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupBallotExclusiveBitCount(subgroupBallot($0))";
+    case glsl:
+        __intrinsic_asm "subgroupBallotExclusiveBitCount(subgroupBallot($0))";
     case hlsl: __intrinsic_asm "WavePrefixCountBits($0)";
     case spirv:
         return spirv_asm
@@ -9108,7 +9158,8 @@ uint4 WaveGetConvergedMulti()
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupBallot(true)";
+    case glsl:
+        __intrinsic_asm "subgroupBallot(true)";
     case hlsl: __intrinsic_asm "WaveActiveBallot(true)";
     case cuda: __intrinsic_asm "make_uint4(__activemask(), 0, 0, 0)";
     case spirv:
@@ -9432,8 +9483,7 @@ struct BuiltInTriangleIntersectionAttributes
 // `executeCallableNV` is the GLSL intrinsic that will be used to implement
 // `CallShader()` for GLSL-based targets.
 //
-__target_intrinsic(GL_NV_ray_tracing, "executeCallableNV")
-__target_intrinsic(GL_EXT_ray_tracing, "executeCallableEXT")
+__target_intrinsic(_GL_EXT_ray_tracing, "executeCallableEXT")
 void __executeCallable(uint shaderIndex, int payloadLocation);
 
 // Next is the custom intrinsic that will compute the payload location
@@ -9479,8 +9529,7 @@ void CallShader(uint shaderIndex, inout Payload payload)
 
 // 10.3.2
 
-__target_intrinsic(GL_NV_ray_tracing, "traceNV")
-__target_intrinsic(GL_EXT_ray_tracing, "traceRayEXT")
+__target_intrinsic(_GL_EXT_ray_tracing, "traceRayEXT")
 void __traceRay(
     RaytracingAccelerationStructure AccelerationStructure,
     uint                            RayFlags,
@@ -9672,7 +9721,6 @@ bool __reportIntersection(float tHit, uint hitKind)
     __target_switch
     {
     case _GL_EXT_ray_tracing: __intrinsic_asm "reportIntersectionEXT";
-    case _GL_NV_ray_tracing: __intrinsic_asm "reportIntersectionNV";
     case spirv:
         return spirv_asm {
             result:$$bool = OpReportIntersectionKHR $tHit $hitKind;
@@ -9699,7 +9747,6 @@ void IgnoreHit()
     {
     case hlsl: __intrinsic_asm "IgnoreHit";
     case _GL_EXT_ray_tracing: __intrinsic_asm "ignoreIntersectionEXT;";
-    case _GL_NV_ray_tracing: __intrinsic_asm "ignoreIntersectionNV";
     case cuda: __intrinsic_asm "optixIgnoreIntersection";
     case spirv: spirv_asm { OpIgnoreIntersectionKHR; %_ = OpLabel };
     }
@@ -9712,7 +9759,6 @@ void AcceptHitAndEndSearch()
     {
     case hlsl: __intrinsic_asm "AcceptHitAndEndSearch";
     case _GL_EXT_ray_tracing: __intrinsic_asm "terminateRayEXT;";
-    case _GL_NV_ray_tracing: __intrinsic_asm "terminateRayNV";
     case cuda: __intrinsic_asm "optixTerminateRay";
     case spirv: spirv_asm { OpTerminateRayKHR; %_ = OpLabel };
     }
@@ -9731,7 +9777,6 @@ uint3 DispatchRaysIndex()
     {
     case hlsl:  __intrinsic_asm "DispatchRaysIndex";
     case _GL_EXT_ray_tracing: __intrinsic_asm "(gl_LaunchIDEXT)";
-    case _GL_NV_ray_tracing: __intrinsic_asm "(gl_LaunchIDNV)";
     case cuda: __intrinsic_asm "optixGetLaunchIndex";
     case spirv:
         return spirv_asm {
@@ -9746,7 +9791,6 @@ uint3 DispatchRaysDimensions()
     {
     case hlsl:  __intrinsic_asm "DispatchRaysDimensions";
     case _GL_EXT_ray_tracing: __intrinsic_asm "(gl_LaunchSizeEXT)";
-    case _GL_NV_ray_tracing: __intrinsic_asm "(gl_LaunchSizeNV)";
     case cuda: __intrinsic_asm "optixGetLaunchDimensions";
     case spirv:
         return spirv_asm {
@@ -9763,7 +9807,6 @@ float3 WorldRayOrigin()
     {
     case hlsl:  __intrinsic_asm "WorldRayOrigin";
     case _GL_EXT_ray_tracing: __intrinsic_asm "(gl_WorldRayOriginEXT)";
-    case _GL_NV_ray_tracing: __intrinsic_asm "(gl_WorldRayOriginNV)";
     case cuda: __intrinsic_asm "optixGetWorldRayOrigin";
     case spirv:
         return spirv_asm {
@@ -9778,7 +9821,6 @@ float3 WorldRayDirection()
     {
     case hlsl:  __intrinsic_asm "WorldRayDirection";
     case _GL_EXT_ray_tracing: __intrinsic_asm "(gl_WorldRayDirectionEXT)";
-    case _GL_NV_ray_tracing: __intrinsic_asm "(gl_WorldRayDirectionNV)";
     case cuda: __intrinsic_asm "optixGetWorldRayDirection";
     case spirv:
         return spirv_asm {
@@ -9793,7 +9835,6 @@ float RayTMin()
     {
     case hlsl:  __intrinsic_asm "RayTMin";
     case _GL_EXT_ray_tracing: __intrinsic_asm "(gl_RayTminEXT)";
-    case _GL_NV_ray_tracing: __intrinsic_asm "(gl_RayTminNV)";
     case cuda: __intrinsic_asm "optixGetRayTmin";
     case spirv:
         return spirv_asm {
@@ -9818,7 +9859,6 @@ float RayTCurrent()
     {
     case hlsl:  __intrinsic_asm "RayTCurrent";
     case _GL_EXT_ray_tracing: __intrinsic_asm "(gl_RayTmaxEXT)";
-    case _GL_NV_ray_tracing: __intrinsic_asm "(gl_RayTmaxNV)";
     case cuda: __intrinsic_asm "optixGetRayTmax";
     case spirv:
         return spirv_asm {
@@ -9833,7 +9873,6 @@ uint RayFlags()
     {
     case hlsl:  __intrinsic_asm "RayFlags";
     case _GL_EXT_ray_tracing: __intrinsic_asm "(gl_IncomingRayFlagsEXT)";
-    case _GL_NV_ray_tracing: __intrinsic_asm "(gl_IncomingRayFlagsNV)";
     case cuda: __intrinsic_asm "optixGetRayFlags";
     case spirv:
         return spirv_asm {
@@ -9864,7 +9903,6 @@ uint InstanceID()
     {
     case hlsl:  __intrinsic_asm "InstanceID";
     case _GL_EXT_ray_tracing: __intrinsic_asm "(gl_InstanceCustomIndexEXT)";
-    case _GL_NV_ray_tracing:  __intrinsic_asm "(gl_InstanceCustomIndexNV)";
     case cuda: __intrinsic_asm "optixGetInstanceId";
     case spirv:
         return spirv_asm {
@@ -9893,7 +9931,6 @@ float3 ObjectRayOrigin()
     {
     case hlsl:  __intrinsic_asm "ObjectRayOrigin";
     case _GL_EXT_ray_tracing: __intrinsic_asm "(gl_ObjectRayOriginEXT)";
-    case _GL_NV_ray_tracing:  __intrinsic_asm "(gl_ObjectRayOriginNV)";
     case cuda: __intrinsic_asm "optixGetObjectRayOrigin";
     case spirv:
         return spirv_asm {
@@ -9908,7 +9945,6 @@ float3 ObjectRayDirection()
     {
     case hlsl:  __intrinsic_asm "ObjectRayDirection";
     case _GL_EXT_ray_tracing: __intrinsic_asm "(gl_ObjectRayDirectionEXT)";
-    case _GL_NV_ray_tracing:  __intrinsic_asm "(gl_ObjectRayDirectionNV)";
     case cuda: __intrinsic_asm "optixGetObjectRayDirection";
     case spirv:
         return spirv_asm {
@@ -9925,7 +9961,6 @@ float3x4 ObjectToWorld3x4()
     {
     case hlsl:  __intrinsic_asm "ObjectToWorld3x4";
     case _GL_EXT_ray_tracing: __intrinsic_asm "transpose(gl_ObjectToWorldEXT)";
-    case _GL_NV_ray_tracing:  __intrinsic_asm "transpose(gl_ObjectToWorldNV)";
     case spirv:
         return spirv_asm {
             %mat:$$float4x3 = OpLoad builtin(ObjectToWorldKHR:float4x3);
@@ -9940,7 +9975,6 @@ float3x4 WorldToObject3x4()
     {
     case hlsl:  __intrinsic_asm "WorldToObject3x4";
     case _GL_EXT_ray_tracing: __intrinsic_asm "transpose(gl_WorldToObjectEXT)";
-    case _GL_NV_ray_tracing:  __intrinsic_asm "transpose(gl_WorldToObjectNV)";
     case spirv:
         return spirv_asm {
             %mat:$$float4x3 = OpLoad builtin(WorldToObjectKHR:float4x3);
@@ -9955,7 +9989,6 @@ float4x3 ObjectToWorld4x3()
     {
     case hlsl:  __intrinsic_asm "ObjectToWorld4x3";
     case _GL_EXT_ray_tracing: __intrinsic_asm "(gl_ObjectToWorldEXT)";
-    case _GL_NV_ray_tracing:  __intrinsic_asm "(gl_ObjectToWorldNV)";
     case spirv:
         return spirv_asm {
             result:$$float4x3 = OpLoad builtin(ObjectToWorldKHR:float4x3);
@@ -9969,7 +10002,6 @@ float4x3 WorldToObject4x3()
     {
     case hlsl:  __intrinsic_asm "WorldToObject4x3";
     case _GL_EXT_ray_tracing: __intrinsic_asm "(gl_WorldToObjectEXT)";
-    case _GL_NV_ray_tracing:  __intrinsic_asm "(gl_WorldToObjectNV)";
     case spirv:
         return spirv_asm {
             result:$$float4x3 = OpLoad builtin(WorldToObjectKHR:float4x3);
@@ -10016,7 +10048,6 @@ uint HitKind()
     {
     case hlsl:  __intrinsic_asm "HitKind";
     case _GL_EXT_ray_tracing:  __intrinsic_asm "(gl_HitKindEXT)";
-    case _GL_NV_ray_tracing:  __intrinsic_asm "(gl_HitKindNV)";
     case cuda:  __intrinsic_asm "optixGetHitKind";
     case spirv:
         return spirv_asm {
@@ -12018,6 +12049,7 @@ void debugBreak();
 
 [__requiresNVAPI]
 __glsl_extension(GL_EXT_shader_realtime_clock)
+[require(shaderclock)]
 uint getRealtimeClockLow()
 {
     __target_switch
@@ -12030,14 +12062,18 @@ uint getRealtimeClockLow()
         __intrinsic_asm "clock";
     case spirv:
         return getRealtimeClock().x;
+    case cpp:
+        __intrinsic_asm "(uint32_t)std::chrono::high_resolution_clock::now().time_since_epoch().count()";
     }
 }
 
+__target_intrinsic(cpp, "std::chrono::high_resolution_clock::now().time_since_epoch().count()")
 __target_intrinsic(cuda, "clock64")
-int64_t __cudaGetRealtimeClock();
+int64_t __cudaCppGetRealtimeClock();
 
 [__requiresNVAPI]
 __glsl_extension(GL_EXT_shader_realtime_clock)
+[require(shaderclock)]
 uint2 getRealtimeClock()
 {
     __target_switch
@@ -12047,7 +12083,8 @@ uint2 getRealtimeClock()
     case glsl:
         __intrinsic_asm "clockRealtime2x32EXT()";
     case cuda:
-        int64_t ticks = __cudaGetRealtimeClock();
+    case cpp:
+        int64_t ticks = __cudaCppGetRealtimeClock();
         return uint2(uint(ticks), uint(uint64_t(ticks) >> 32));
     case spirv:
         return spirv_asm

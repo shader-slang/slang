@@ -297,8 +297,8 @@ DIAGNOSTIC(30041, Error, bitOperationNonIntegral, "bit operation: operand must b
 DIAGNOSTIC(30043, Error, getStringHashRequiresStringLiteral, "getStringHash parameter can only accept a string literal")
 DIAGNOSTIC(30047, Error, argumentExpectedLValue, "argument passed to parameter '$0' must be l-value.")
 
-DIAGNOSTIC(30049, Note,  thisIsImmutableByDefault, "a 'this' parameter is an immutable parameter by default in Slang; apply the `[mutating]` attribute to the function declaration to opt in to a mutable `this`")
-DIAGNOSTIC(30050, Error,  mutatingMethodOnImmutableValue, "mutating method '$0' cannot be called on an immutable value")
+DIAGNOSTIC(30049, Note, thisIsImmutableByDefault, "a 'this' parameter is an immutable parameter by default in Slang; apply the `[mutating]` attribute to the function declaration to opt in to a mutable `this`")
+DIAGNOSTIC(30050, Error, mutatingMethodOnImmutableValue, "mutating method '$0' cannot be called on an immutable value")
 
 DIAGNOSTIC(30051, Error, invalidValueForArgument, "invalid value for argument '$0'")
 DIAGNOSTIC(30052, Error, invalidSwizzleExpr, "invalid swizzle pattern '$0' on type '$1'")
@@ -312,9 +312,9 @@ DIAGNOSTIC(30058, Warning, danglingEqualityExpr, "result of '==' not used, did y
 DIAGNOSTIC(30060, Error, expectedAType, "expected a type, got a '$0'")
 DIAGNOSTIC(30061, Error, expectedANamespace, "expected a namespace, got a '$0'")
 
-DIAGNOSTIC(30062, Note,  implicitCastUsedAsLValueRef, "argument was implicitly cast from '$0' to '$1', and Slang does not support using an implicit cast as an l-value with a reference")
-DIAGNOSTIC(30063, Note,  implicitCastUsedAsLValueType, "argument was implicitly cast from '$0' to '$1', and Slang does not support using an implicit cast as an l-value with this type")
-DIAGNOSTIC(30064, Note,  implicitCastUsedAsLValue, "argument was implicitly cast from '$0' to '$1', and Slang does not support using an implicit cast as an l-value for this usage")
+DIAGNOSTIC(30062, Note, implicitCastUsedAsLValueRef, "argument was implicitly cast from '$0' to '$1', and Slang does not support using an implicit cast as an l-value with a reference")
+DIAGNOSTIC(30063, Note, implicitCastUsedAsLValueType, "argument was implicitly cast from '$0' to '$1', and Slang does not support using an implicit cast as an l-value with this type")
+DIAGNOSTIC(30064, Note, implicitCastUsedAsLValue, "argument was implicitly cast from '$0' to '$1', and Slang does not support using an implicit cast as an l-value for this usage")
 
 DIAGNOSTIC(30065, Error, newCanOnlyBeUsedToInitializeAClass, "`new` can only be used to initialize a class")
 DIAGNOSTIC(30066, Error, classCanOnlyBeInitializedWithNew, "a class can only be initialized by a `new` clause")
@@ -333,7 +333,7 @@ DIAGNOSTIC(30300, Error, isOperatorValueMustBeInterfaceType, "'is'/'as' operator
 DIAGNOSTIC(33070, Error, expectedFunction, "expected a function, got '$0'")
 DIAGNOSTIC(33071, Error, expectedAStringLiteral, "expected a string literal")
 
-DIAGNOSTIC(   -1, Note, noteExplicitConversionPossible, "explicit conversion from '$0' to '$1' is possible")
+DIAGNOSTIC(-1, Note, noteExplicitConversionPossible, "explicit conversion from '$0' to '$1' is possible")
 DIAGNOSTIC(30080, Error, ambiguousConversion, "more than one implicit conversion exists from '$0' to '$1'")
 DIAGNOSTIC(30081, Warning, unrecommendedImplicitConversion, "implicit conversion from '$0' to '$1' is not recommended")
 DIAGNOSTIC(30082, Warning, implicitConversionToDouble, " implicit float-to-double conversion may cause unexpected performance issues, use explicit cast if intended.")
@@ -365,6 +365,20 @@ DIAGNOSTIC(30602, Error, satisfyingDeclCannotHaveLowerVisibility, "'$0' is less 
 DIAGNOSTIC(30603, Error, invalidUseOfPrivateVisibility, "'$0' cannot have private visibility because it is not a member of a type.")
 DIAGNOSTIC(30604, Error, useOfLessVisibleType, "'$0' references less visible type '$1'.")
 DIAGNOSTIC(36005, Error, invalidVisibilityModifierOnTypeOfDecl, "visibility modifier is not allowed on '$0'.")
+
+// Capability
+DIAGNOSTIC(36100, Error, conflictingCapabilityDueToUseOfDecl, "'$0' requires capability '$1' that is conflicting with the '$2''s current capability requirement '$3'.")
+DIAGNOSTIC(36101, Error, conflictingCapabilityDueToStatement, "statement requires capability '$0' that is conflicting with the '$1''s current capability requirement '$2'.")
+DIAGNOSTIC(36102, Error, conflictingCapabilityDueToStatementEnclosingFunc, "statement requires capability '$0' that is conflicting with the current function's capability requirement '$1'.")
+DIAGNOSTIC(36103, Error, missingCapabilityRequirementOnPublicDecl, "public symbol '$0' is missing capability requirement declaration.")
+DIAGNOSTIC(36104, Error, useOfUndeclaredCapability, "'$0' uses undeclared capability '$1'.")
+DIAGNOSTIC(36104, Error, useOfUndeclaredCapabilityOfInterfaceRequirement, "'$0' uses capability '$1' that is missing from the interface requirement.")
+DIAGNOSTIC(36105, Error, unknownCapability, "unknown capability name '$0'.")
+DIAGNOSTIC(36106, Error, expectCapability, "expect a capability name.")
+DIAGNOSTIC(36107, Error, entryPointUsesUnavailableCapability, "entrypoint '$0' requires capability '$1', which is incompatible with the current compilation target '$2'.")
+DIAGNOSTIC(36108, Error, declHasDependenciesNotDefinedOnTarget, "'$0' has dependencies that are not defined on the required target '$1'.")
+DIAGNOSTIC(36109, Error, invalidTargetSwitchCase, "'$0' cannot be used as a target_switch case.")
+DIAGNOSTIC(36110, Error, stageIsInCompatibleWithCapabilityDefinition, "'$0' is defined for stage '$1', which is incompatible with the declared capability set '$2'.")
 
 // Attributes
 DIAGNOSTIC(31000, Error, unknownAttributeName, "unknown attribute '$0'")

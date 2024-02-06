@@ -108,6 +108,7 @@ public:
         /// Does this capability set imply all the capabilities in `other`?
     bool implies(CapabilityConjunctionSet const& other) const;
 
+
         /// Does this capability set imply the atomic capability `other`?
     bool implies(CapabilityAtom other) const;
 
@@ -206,6 +207,10 @@ public:
     /// Join two capability sets to form (this & other).
     void join(const CapabilitySet& other);
 
+    void unionWith(const CapabilityConjunctionSet& other);
+
+    void canonicalize();
+
         /// Are these two capability sets equal?
     bool operator==(CapabilitySet const& that) const;
 
@@ -218,6 +223,8 @@ public:
     void calcCompactedAtoms(List<List<CapabilityAtom>>& outAtoms) const;
 
     bool isBetterForTarget(CapabilitySet const& that, CapabilitySet const& targetCaps) const;
+
+    static bool checkCapabilityRequirement(CapabilitySet const& available, CapabilitySet const& required, const CapabilityConjunctionSet*& outFailedAvailableSet);
 
 private:
     // The underlying representation we use is a list of conjunctions.
@@ -241,5 +248,12 @@ CapabilityName findCapabilityName(UnownedStringSlice const& name);
 
     /// Gets the capability names.
 void getCapabilityNames(List<UnownedStringSlice>& ioNames);
+
+UnownedStringSlice capabilityNameToString(CapabilityName name);
+
+bool isDirectChildOfAbstractAtom(CapabilityAtom name);
+
+void printDiagnosticArg(StringBuilder& sb, CapabilityAtom atom);
+void printDiagnosticArg(StringBuilder& sb, CapabilityName name);
 
 }

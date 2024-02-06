@@ -396,7 +396,6 @@ namespace Slang
         auto module = getModule(entryPointFuncDecl);
         auto linkage = module->getLinkage();
 
-
         // Every entry point needs to have a stage specified either via
         // command-line/API options, or via an explicit `[shader("...")]` attribute.
         //
@@ -506,6 +505,38 @@ namespace Slang
                 }
             }
         }
+        
+        for (auto target : linkage->targets)
+        {
+            auto targetCaps = target->getTargetCaps();
+            auto stageCapabilitySet = CapabilitySet(entryPoint->getProfile().getCapabilityName());
+            targetCaps.join(stageCapabilitySet);
+            if (targetCaps.isIncompatibleWith(entryPointFuncDecl->inferredCapabilityRequirements))
+            {
+                sink->diagnose(entryPointFuncDecl, Diagnostics::entryPointUsesUnavailableCapability, entryPointFuncDecl, entryPointFuncDecl->inferredCapabilityRequirements, targetCaps);
+                auto& interredCapConjunctions = entryPointFuncDecl->inferredCapabilityRequirements.getExpandedAtoms();
+
+                // Find out what exactly is incompatible and print out a trace of provenance to
+                // help user diagnose their code.
+                auto& conjunctions = targetCaps.getExpandedAtoms();
+                if (conjunctions.getCount() == 1 && interredCapConjunctions.getCount() == 1)
+                {
+                    for (auto atom : conjunctions[0].getExpandedAtoms())
+                    {
+                        for (auto inferredAtom : interredCapConjunctions[0].getExpandedAtoms())
+                        {
+                            if (CapabilityConjunctionSet(inferredAtom).isIncompatibleWith(atom))
+                            {
+                                diagnoseCapabilityProvenance(sink, entryPointFuncDecl, inferredAtom);
+                                goto breakLabel;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        breakLabel:;
+
     }
 
     // Given an entry point specified via API or command line options,
@@ -533,7 +564,7 @@ namespace Slang
 
         auto entryPointName = entryPointReq->getName();
         FuncDecl* entryPointFuncDecl = findFunctionDeclByName(translationUnit->getModule(), entryPointName, sink);
-
+        
         // Did we find a function declaration in our search?
         if(!entryPointFuncDecl)
         {

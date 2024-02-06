@@ -858,7 +858,7 @@ Profile getEffectiveProfile(EntryPoint* entryPoint, TargetRequest* target)
     case CodeGenTarget::SPIRVAssembly:
         if(targetProfile.getFamily() != ProfileFamily::GLSL)
         {
-            targetProfile.setVersion(ProfileVersion::GLSL_110);
+            targetProfile.setVersion(ProfileVersion::GLSL_150);
         }
         break;
 
@@ -869,7 +869,7 @@ Profile getEffectiveProfile(EntryPoint* entryPoint, TargetRequest* target)
     case CodeGenTarget::DXILAssembly:
         if(targetProfile.getFamily() != ProfileFamily::DX)
         {
-            targetProfile.setVersion(ProfileVersion::DX_4_0);
+            targetProfile.setVersion(ProfileVersion::DX_5_1);
         }
         break;
     }
@@ -1608,6 +1608,8 @@ CapabilitySet TargetRequest::getTargetCaps()
         break;
     }
 
+    CapabilitySet targetCap = CapabilitySet(atoms);
+
     CapabilitySet latestSpirvCapSet = CapabilitySet(CapabilityName::spirv_latest);
     CapabilityName latestSpirvAtom = (CapabilityName)latestSpirvCapSet.getExpandedAtoms()[0].getExpandedAtoms().getLast();
     for (auto atom : rawCapabilities)
@@ -1623,7 +1625,11 @@ CapabilitySet TargetRequest::getTargetCaps()
                 atom = (CapabilityName)((Int)CapabilityName::glsl_spirv_1_0 + ((Int)atom - (Int)CapabilityName::spirv_1_0));
             }
         }
-        atoms.add(atom);
+        if (!targetCap.isIncompatibleWith(atom))
+        {
+            // Only add atoms that are compatible with the current target.
+            atoms.add(atom);
+        }
     }
 
     cookedCapabilities = CapabilitySet(atoms);
@@ -5141,6 +5147,11 @@ void EndToEndCompileRequest::setReportDownstreamTime(bool value)
 void EndToEndCompileRequest::setReportPerfBenchmark(bool value)
 {
     m_reportPerfBenchmark = value;
+}
+
+void EndToEndCompileRequest::setSkipSPIRVValidation(bool value)
+{
+    m_skipSPIRVValidation = value;
 }
 
 void EndToEndCompileRequest::setDiagnosticCallback(SlangDiagnosticCallback callback, void const* userData)

@@ -6,7 +6,7 @@
 
 #include "slang-generated-ast.h"
 #include "slang-ast-reflect.h"
-
+#include "slang-capability.h"
 #include "slang-serialize-reflection.h"
 
 // This file defines the primary base classes for the hierarchy of
@@ -695,6 +695,11 @@ class ModifiableSyntaxNode : public SyntaxNode
     bool hasModifier() { return findModifier<T>() != nullptr; }
 };
 
+struct DeclReferenceWithLoc
+{
+    Decl* referencedDecl;
+    SourceLoc referenceLoc;
+};
 
 // An intermediate type to represent either a single declaration, or a group of declarations
 class DeclBase : public ModifiableSyntaxNode
@@ -716,6 +721,7 @@ public:
     DeclRefBase* getDefaultDeclRef();
 
     NameLoc nameAndLoc;
+    CapabilitySet inferredCapabilityRequirements;
 
     RefPtr<MarkupEntry> markup;
 
@@ -736,6 +742,8 @@ public:
     }
     bool isChildOf(Decl* other) const;
 
+    // Track the decl reference that caused the requirement of a capability atom.
+    SLANG_UNREFLECTED Dictionary<CapabilityAtom, DeclReferenceWithLoc> capabilityRequirementProvenance;
 private:
     SLANG_UNREFLECTED DeclRefBase* m_defaultDeclRef = nullptr;
     SLANG_UNREFLECTED Index m_defaultDeclRefEpoch = -1;

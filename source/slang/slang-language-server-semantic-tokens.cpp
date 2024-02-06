@@ -126,7 +126,7 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
         }
         maybeInsertToken(token);
     };
-    iterateAST(
+    iterateASTWithLanguageServerFilter(
         fileName,
         manager,
         module->getModuleDecl(),
@@ -240,7 +240,33 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
                     token.length = (int)attr->originalIdentifierToken.getContentLength();
                     token.type = SemanticTokenType::Type;
                     maybeInsertToken(token);
+
+                    // Insert capability names as enum cases.
+                    if (as<RequireCapabilityAttribute>(attr))
+                    {
+                        for (auto arg : attr->args)
+                        {
+                            if (auto varExpr = as<VarExpr>(arg))
+                            {
+                                if (varExpr->name)
+                                {
+                                    SemanticToken capToken = _createSemanticToken(
+                                        manager, varExpr->loc, nullptr);
+                                    capToken.length = (int)varExpr->name->text.getLength();
+                                    capToken.type = SemanticTokenType::EnumMember;
+                                    maybeInsertToken(capToken);
+                                }
+                            }
+                        }
+                    }
                 }
+            }
+            else if (auto targetCase = as<TargetCaseStmt>(node))
+            {
+                SemanticToken token = _createSemanticToken(
+                    manager, targetCase->capabilityToken.loc, targetCase->capabilityToken.getName());
+                token.type = SemanticTokenType::EnumMember;
+                maybeInsertToken(token);
             }
             else if (auto spirvAsmExpr = as<SPIRVAsmExpr>(node))
             {
