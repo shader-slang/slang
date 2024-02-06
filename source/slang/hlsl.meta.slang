@@ -27,6 +27,11 @@ __intrinsic_type($(kIROp_ScalarBufferLayoutType))
 struct ScalarDataLayout : IBufferDataLayout
 {};
 
+__generic<T, L : IBufferDataLayout = DefaultDataLayout>
+__intrinsic_type($(kIROp_GLSLShaderStorageBufferType))
+__magic_type(GLSLShaderStorageBufferType)
+struct GLSLShaderStorageBuffer {}
+
 __generic<T,L:IBufferDataLayout>
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
 uint2 __structuredBufferGetDimensions(AppendStructuredBuffer<T,L> buffer);

@@ -243,6 +243,26 @@ class GLSLLocationLayoutModifier : public GLSLParsedLayoutModifier
     SLANG_AST_CLASS(GLSLLocationLayoutModifier)
 };
 
+class GLSLBufferDataLayoutModifier : public GLSLParsedLayoutModifier
+{
+    SLANG_AST_CLASS(GLSLBufferDataLayoutModifier)
+};
+
+class GLSLStd140Modifier : public GLSLBufferDataLayoutModifier
+{
+    SLANG_AST_CLASS(GLSLStd140Modifier)
+};
+
+class GLSLStd430Modifier : public GLSLBufferDataLayoutModifier
+{
+    SLANG_AST_CLASS(GLSLStd430Modifier)
+};
+
+class GLSLScalarModifier : public GLSLBufferDataLayoutModifier
+{
+    SLANG_AST_CLASS(GLSLScalarModifier)
+};
+
 
 // A catch-all for single-keyword modifiers
 class SimpleModifier : public Modifier 

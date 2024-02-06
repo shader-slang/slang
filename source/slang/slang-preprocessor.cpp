@@ -1015,6 +1015,9 @@ struct Preprocessor
         /// Stores the initiating macro source location.
     SourceLoc                               initiatingMacroSourceLoc;
 
+        /// Detected source language.
+    SourceLanguage                          language = SourceLanguage::Unknown;
+
         /// Stores macro definition and invocation info for language server.
     PreprocessorContentAssistInfo* contentAssistInfo = nullptr;
 
@@ -3655,6 +3658,7 @@ static void HandleVersionDirective(PreprocessorDirectiveContext* context)
     }
 
     SkipToEndOfLine(context);
+    context->m_preprocessor->language = SourceLanguage::GLSL;
     // TODO, just skip the version for now
 }
 
@@ -4022,6 +4026,7 @@ TokenList preprocessSource(
     IncludeSystem*                      includeSystem,
     Dictionary<String, String> const&   defines,
     Linkage*                            linkage,
+    SourceLanguage&                     outDetectedLanguage,
     PreprocessorHandler*                handler)
 {
     PreprocessorDesc desc;
@@ -4040,12 +4045,13 @@ TokenList preprocessSource(
     {
         desc.contentAssistInfo = &linkage->contentAssistInfo.preprocessorInfo;
     }
-    return preprocessSource(file, desc);
+    return preprocessSource(file, desc, outDetectedLanguage);
 }
 
 TokenList preprocessSource(
     SourceFile*             file,
-    PreprocessorDesc const& desc)
+    PreprocessorDesc const& desc,
+    SourceLanguage          &outDetectedLanguage)
 {
     using namespace preprocessor;
 
@@ -4131,6 +4137,8 @@ TokenList preprocessSource(
 
     String s = sb.produceString();
 #endif
+
+    outDetectedLanguage = preprocessor.language;
 
     return tokens;
 }
