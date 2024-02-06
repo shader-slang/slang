@@ -823,7 +823,22 @@ namespace Slang
         case kIROp_HLSLAppendStructuredBufferType:
         case kIROp_HLSLConsumeStructuredBufferType:
         case kIROp_HLSLRasterizerOrderedStructuredBufferType:
+        {
+            auto structBufferType = as<IRHLSLStructuredBufferTypeBase>(bufferType);
+            auto layoutType = structBufferType->getDataLayout();
+            switch (layoutType->getOp())
+            {
+            case kIROp_DefaultBufferLayoutType:
+                return IRTypeLayoutRules::getStd430();
+            case kIROp_Std140BufferLayoutType:
+                return IRTypeLayoutRules::getStd140();
+            case kIROp_Std430BufferLayoutType:
+                return IRTypeLayoutRules::getStd430();
+            case kIROp_ScalarBufferLayoutType:
+                return IRTypeLayoutRules::getNatural();
+            }
             return IRTypeLayoutRules::getStd430();
+        }
         case kIROp_ConstantBufferType:
         case kIROp_ParameterBlockType:
             return IRTypeLayoutRules::getStd140();
