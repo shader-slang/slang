@@ -47,6 +47,8 @@ DIAGNOSTIC(-1, Note, declaredHere, "declared here")
 DIAGNOSTIC(-1, Note, seeOtherDeclarationOf, "see other declaration of '$0'")
 DIAGNOSTIC(-1, Note, seePreviousDeclarationOf, "see previous declaration of '$0'")
 DIAGNOSTIC(-1, Note, includeOutput, "include $0")
+DIAGNOSTIC(-1, Note, genericSignatureTried, "see declaration of $0")
+DIAGNOSTIC(-1, Note, entryPointCandidate, "see candidate declaration for entry point '$0'")
 
 //
 // 0xxxx -  Command line and interaction with host platform APIs.
@@ -536,7 +538,6 @@ DIAGNOSTIC(39999, Error, defaultOutsideSwitch, "'default' not allowed outside of
 DIAGNOSTIC(39999, Error, expectedAGeneric, "expected a generic when using '<...>' (found: '$0')")
 
 DIAGNOSTIC(39999, Error, genericArgumentInferenceFailed, "could not specialize generic for arguments of type $0")
-DIAGNOSTIC(39999, Note, genericSignatureTried, "see declaration of $0")
 
 DIAGNOSTIC(39999, Error, ambiguousReference, "ambiguous reference to '$0'")
 DIAGNOSTIC(39999, Error, ambiguousExpression, "ambiguous reference")
@@ -564,7 +565,6 @@ DIAGNOSTIC(39999, Error, overloadedParameterToHigherOrderFunction, "passing over
 
 DIAGNOSTIC(38000, Error, entryPointFunctionNotFound, "no function found matching entry point name '$0'")
 DIAGNOSTIC(38001, Error, ambiguousEntryPoint, "more than one function matches entry point name '$0'")
-DIAGNOSTIC(38002, Note, entryPointCandidate, "see candidate declaration for entry point '$0'")
 DIAGNOSTIC(38003, Error, entryPointSymbolNotAFunction, "entry point '$0' must be declared as a function")
 
 DIAGNOSTIC(38004, Error, entryPointTypeParameterNotFound, "no type found matching entry-point type parameter name '$0'")

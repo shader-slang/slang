@@ -194,6 +194,7 @@ void WorkspaceVersion::parseDiagnostics(String compilerOutput)
 {
     List<UnownedStringSlice> lines;
     StringUtil::calcLines(compilerOutput.getUnownedSlice(), lines);
+
     for (Index lineIndex = 0; lineIndex < lines.getCount(); lineIndex++)
     {
         auto line = lines[lineIndex];
@@ -272,7 +273,19 @@ void WorkspaceVersion::parseDiagnostics(String compilerOutput)
             diagnostic.range.end.line--;
             diagnostic.range.end.character--;
         }
-        diagnosticList.messages.add(diagnostic);
+        if (diagnostic.code == -1 && diagnosticList.messages.getCount())
+        {
+            // If this is a decoration message, add it as related information.
+            LanguageServerProtocol::DiagnosticRelatedInformation relatedInfo;
+            relatedInfo.location.range = diagnostic.range;
+            relatedInfo.location.uri = URI::fromLocalFilePath(fileName.getUnownedSlice()).uri;
+            relatedInfo.message = diagnostic.message;
+            diagnosticList.messages.getLast().relatedInformation.add(relatedInfo);
+        }
+        else
+        {
+            diagnosticList.messages.add(diagnostic);
+        }
         if (diagnosticList.messages.getCount() >= 1000)
             break;
     }
