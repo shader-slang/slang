@@ -1,5 +1,6 @@
 ---
 layout: user-guide
+permalink: /user-guide/modules
 ---
 
 Modules and Access Control
