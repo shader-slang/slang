@@ -528,7 +528,10 @@ namespace Slang
 
         // Stmt Visitor
 
-        void visitDeclStmt(DeclStmt* stmt) { dispatchIfNotNull(stmt->decl); }
+        void visitDeclStmt(DeclStmt* stmt)
+        {
+            dispatchIfNotNull(stmt->decl);
+        }
 
         void visitBlockStmt(BlockStmt* stmt)
         {
@@ -687,9 +690,20 @@ namespace Slang
         : public SemanticsDeclVisitorBase
         , public DeclVisitor<SemanticsDeclCapabilityVisitor>
     {
+        CapabilitySet m_anyPlatfromCapabilitySet;
+
         SemanticsDeclCapabilityVisitor(SemanticsContext const& outer)
             : SemanticsDeclVisitorBase(outer)
         {}
+
+        CapabilitySet& getAnyPlatformCapabilitySet()
+        {
+            if (m_anyPlatfromCapabilitySet.isEmpty())
+            {
+                m_anyPlatfromCapabilitySet = CapabilitySet(CapabilityName::any_target);
+            }
+            return m_anyPlatfromCapabilitySet;
+        }
 
         void visitDecl(Decl*) {}
         void visitDeclGroup(DeclGroup*) {}
@@ -8678,6 +8692,10 @@ namespace Slang
             set.canonicalize();
             handleReferenceFunc(stmt, set, stmt->loc);
         }
+        void visitRequireCapabilityDecl(RequireCapabilityDecl* decl)
+        {
+            handleReferenceFunc(decl, decl->inferredCapabilityRequirements, decl->loc);
+        }
     };
 
     template<typename ProcessFunc>
@@ -8773,7 +8791,13 @@ namespace Slang
             {
                 if (!getModuleDecl(funcDecl)->isInLegacyLanguage)
                 {
-                    getSink()->diagnose(funcDecl->loc, Diagnostics::missingCapabilityRequirementOnPublicDecl, funcDecl);
+                    if (funcDecl->inferredCapabilityRequirements != getAnyPlatformCapabilitySet())
+                    {
+                        getSink()->diagnose(
+                            funcDecl->loc,
+                            Diagnostics::missingCapabilityRequirementOnPublicDecl,
+                            funcDecl, funcDecl->inferredCapabilityRequirements);
+                    }
                 }
             }
         }
@@ -8924,6 +8948,7 @@ namespace Slang
     {
         Decl* refDecl = nullptr;
         SourceLoc loc;
+        HashSet<Decl*> printedDecls;
         while (traceLevels > 0)
         {
             refDecl = nullptr;
@@ -8940,7 +8965,7 @@ namespace Slang
                             sink->diagnose(refLoc, Diagnostics::seeDefinitionOf, "statement");
                     }
                 });
-            if (refDecl)
+            if (printedDecls.add(refDecl))
             {
                 sink->diagnose(loc, Diagnostics::seeUsingOf, refDecl);
                 decl = refDecl;
