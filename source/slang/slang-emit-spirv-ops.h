@@ -362,6 +362,20 @@ SpvInst* emitOpTypeStruct(IRInst* inst, const Ts& member0TypeMember1TypeEtc)
     );
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypeForwardPointer
+template<typename T>
+SpvInst* emitOpTypeForwardPointer(const T& type, SpvStorageClass storageClass)
+{
+    static_assert(isSingular<T>);
+    return emitInst(
+        getSection(SpvLogicalSectionID::ConstantsAndTypes),
+        nullptr,
+        SpvOpTypeForwardPointer,
+        type,
+        storageClass
+    );
+}
+
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypePointer
 template<typename T>
 SpvInst* emitOpTypePointer(IRInst* inst, SpvStorageClass storageClass, const T& type)
@@ -621,6 +635,23 @@ SpvInst* emitOpAccessChain(
     static_assert(isSingular<T2>);
     static_assert(isPlural<Ts>);
     return emitInst(parent, inst, SpvOpAccessChain, idResultType, kResultID, base, indexes);
+}
+
+
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpPtrAccessChain
+template<typename T1, typename T2, typename T3>
+SpvInst* emitOpPtrAccessChain(
+    SpvInstParent* parent,
+    IRInst* inst,
+    const T1& idResultType,
+    const T2& base,
+    const T3& element
+)
+{
+    static_assert(isSingular<T1>);
+    static_assert(isSingular<T2>);
+    static_assert(isSingular<T3>);
+    return emitInst(parent, inst, SpvOpPtrAccessChain, idResultType, kResultID, base, element);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpDecorate

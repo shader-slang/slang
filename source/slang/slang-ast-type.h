@@ -535,10 +535,11 @@ class PtrType : public PtrTypeBase
     SLANG_AST_CLASS(PtrType)
 };
 
-// A GPU pointer type that for general readonly memory access.
-class ConstBufferPointerType : public PtrTypeBase
+// A GPU pointer type into global memory.
+
+class BufferPointerType : public PtrTypeBase
 {
-    SLANG_AST_CLASS(ConstBufferPointerType)
+    SLANG_AST_CLASS(BufferPointerType)
 };
 
 /// A pointer-like type used to represent a parameter "direction"

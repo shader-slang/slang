@@ -1030,6 +1030,26 @@ IRInst* getInstInBlock(IRInst* inst)
     return getInstInBlock(inst->getParent());
 }
 
+ShortList<IRInst*> getPhiArgs(IRInst* phiParam)
+{
+    ShortList<IRInst*> result;
+    auto block = cast<IRBlock>(phiParam->getParent());
+    UInt paramIndex = 0;
+    for (auto p = block->getFirstParam(); p; p = p->getNextParam())
+    {
+        if (p == phiParam)
+            break;
+        paramIndex++;
+    }
+    for (auto predBlock : block->getPredecessors())
+    {
+        auto termInst = as<IRUnconditionalBranch>(predBlock->getTerminator());
+        SLANG_ASSERT(paramIndex < termInst->getArgCount());
+        result.add(termInst->getArg(paramIndex));
+    }
+    return result;
+}
+
 void removePhiArgs(IRInst* phiParam)
 {
     auto block = cast<IRBlock>(phiParam->getParent());

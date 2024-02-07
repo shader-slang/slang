@@ -4264,6 +4264,10 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             return LoweredValInfo::simple(
                 getBuilder()->emitMakeArrayFromElement(irType, irDefaultElement));
         }
+        else if (auto ptrType = as<PtrType>(type))
+        {
+            return LoweredValInfo::simple(getBuilder()->getNullPtrValue(irType));
+        }
         else if (auto declRefType = as<DeclRefType>(type))
         {
             DeclRef<Decl> declRef = declRefType->getDeclRef();

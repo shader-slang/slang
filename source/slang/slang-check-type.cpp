@@ -33,6 +33,10 @@ namespace Slang
         {
             return ptrType->getValueType();
         }
+        else if (auto bufferPtrType = as<BufferPointerType>(type))
+        {
+            return bufferPtrType->getValueType();
+        }
         return nullptr;
     }
 

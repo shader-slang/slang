@@ -1813,6 +1813,10 @@ struct IRStructField : IRInst
         //
         return (IRType*) getOperand(1);
     }
+    void setFieldType(IRType* type)
+    {
+        setOperand(1, type);
+    }
 
     IR_LEAF_ISA(StructField)
 };
