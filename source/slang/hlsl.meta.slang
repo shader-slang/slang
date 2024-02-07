@@ -9915,12 +9915,12 @@ uint InstanceIndex()
 {
     __target_switch
     {
-    case hlsl:  __intrinsic_asm "InstanceIndex";
-    case _GL_EXT_ray_tracing: __intrinsic_asm "(gl_InstanceID)";
+    case hlsl: __intrinsic_asm "InstanceIndex";
+    case _GL_EXT_ray_tracing: __intrinsic_asm "(gl_InstanceIndex)";
     case cuda: __intrinsic_asm "optixGetInstanceIndex";
     case spirv:
         return spirv_asm {
-            result:$$uint = OpLoad builtin(InstanceId:uint);
+            result:$$uint = OpLoad builtin(InstanceIndex:uint);
         };
     }
 }
