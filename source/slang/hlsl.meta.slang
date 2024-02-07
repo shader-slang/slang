@@ -4583,7 +4583,17 @@ T exp2(T x)
             __intrinsic_asm "exp2($0)";
         __intrinsic_asm "exp2(float($0))";
     case spirv:
-        return spirv_asm { OpExtInst $$T result glsl450 Exp2 $x };
+        if (__isHalf<T>())
+        {
+            return spirv_asm { OpExtInst $$T result glsl450 Exp2 $x };
+        }
+        else
+        {
+            float xf = __slang_noop_cast<float>(x);
+            return T(spirv_asm {
+                 result:$$float = OpExtInst glsl450 Exp2 $xf
+            });
+        }
     }
 }
 
