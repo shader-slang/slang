@@ -47,6 +47,8 @@ DIAGNOSTIC(-1, Note, declaredHere, "declared here")
 DIAGNOSTIC(-1, Note, seeOtherDeclarationOf, "see other declaration of '$0'")
 DIAGNOSTIC(-1, Note, seePreviousDeclarationOf, "see previous declaration of '$0'")
 DIAGNOSTIC(-1, Note, includeOutput, "include $0")
+DIAGNOSTIC(-1, Note, genericSignatureTried, "see declaration of $0")
+DIAGNOSTIC(-1, Note, entryPointCandidate, "see candidate declaration for entry point '$0'")
 
 //
 // 0xxxx -  Command line and interaction with host platform APIs.
@@ -370,7 +372,7 @@ DIAGNOSTIC(36005, Error, invalidVisibilityModifierOnTypeOfDecl, "visibility modi
 DIAGNOSTIC(36100, Error, conflictingCapabilityDueToUseOfDecl, "'$0' requires capability '$1' that is conflicting with the '$2''s current capability requirement '$3'.")
 DIAGNOSTIC(36101, Error, conflictingCapabilityDueToStatement, "statement requires capability '$0' that is conflicting with the '$1''s current capability requirement '$2'.")
 DIAGNOSTIC(36102, Error, conflictingCapabilityDueToStatementEnclosingFunc, "statement requires capability '$0' that is conflicting with the current function's capability requirement '$1'.")
-DIAGNOSTIC(36103, Error, missingCapabilityRequirementOnPublicDecl, "public symbol '$0' is missing capability requirement declaration.")
+DIAGNOSTIC(36103, Warning, missingCapabilityRequirementOnPublicDecl, "public symbol '$0' is missing capability requirement declaration, the symbol is assumed to require inferred capabilities '$1'.")
 DIAGNOSTIC(36104, Error, useOfUndeclaredCapability, "'$0' uses undeclared capability '$1'.")
 DIAGNOSTIC(36104, Error, useOfUndeclaredCapabilityOfInterfaceRequirement, "'$0' uses capability '$1' that is missing from the interface requirement.")
 DIAGNOSTIC(36105, Error, unknownCapability, "unknown capability name '$0'.")
@@ -536,7 +538,6 @@ DIAGNOSTIC(39999, Error, defaultOutsideSwitch, "'default' not allowed outside of
 DIAGNOSTIC(39999, Error, expectedAGeneric, "expected a generic when using '<...>' (found: '$0')")
 
 DIAGNOSTIC(39999, Error, genericArgumentInferenceFailed, "could not specialize generic for arguments of type $0")
-DIAGNOSTIC(39999, Note, genericSignatureTried, "see declaration of $0")
 
 DIAGNOSTIC(39999, Error, ambiguousReference, "ambiguous reference to '$0'")
 DIAGNOSTIC(39999, Error, ambiguousExpression, "ambiguous reference")
@@ -564,7 +565,6 @@ DIAGNOSTIC(39999, Error, overloadedParameterToHigherOrderFunction, "passing over
 
 DIAGNOSTIC(38000, Error, entryPointFunctionNotFound, "no function found matching entry point name '$0'")
 DIAGNOSTIC(38001, Error, ambiguousEntryPoint, "more than one function matches entry point name '$0'")
-DIAGNOSTIC(38002, Note, entryPointCandidate, "see candidate declaration for entry point '$0'")
 DIAGNOSTIC(38003, Error, entryPointSymbolNotAFunction, "entry point '$0' must be declared as a function")
 
 DIAGNOSTIC(38004, Error, entryPointTypeParameterNotFound, "no type found matching entry-point type parameter name '$0'")
