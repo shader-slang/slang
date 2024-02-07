@@ -4573,17 +4573,17 @@ __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
 __target_intrinsic(cuda, "$P_exp2($0)")
 __target_intrinsic(cpp, "$P_exp2($0)")
-__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Exp2 _0")
 [__readNone]
 T exp2(T x)
 {
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>() || __isFloat<T>())
+        if (__isHalf<T>())
             __intrinsic_asm "exp2($0)";
-        else
-            __intrinsic_asm "exp2(float($0))";
+        __intrinsic_asm "exp2(float($0))";
+    case spirv:
+        return spirv_asm { OpExtInst $$T result glsl450 Exp2 $x };
     }
 }
 

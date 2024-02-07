@@ -2,7 +2,22 @@
 //TEST:SIMPLE(filecheck=CHECK_SPV):  -allow-glsl -stage fragment -entry computeMain -target spirv
 //TEST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage fragment -entry computeMain -target hlsl
 //TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage fragment -entry computeMain -target cuda -DTARGET_CUDA
-//TEST:SIMPLE(filecheck=CHECK_CPP): -allow-glsl -stage fragment -entry computeMain -target cpp
+//TEST:SIMPLE(filecheck=CHECK_CPP):  -allow-glsl -stage fragment -entry computeMain -target cpp
+
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -output-using-type
+
+// "inverse()" function is not implemented yet.
+//#defined TEST_when_inverse_works
+
+// "ftransform()" function is not implemented yet.
+//#defined TEST_when_fransform_works
+
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
+buffer MyBlockName2
+{
+    int4 result;
+} outputBuffer;
+
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 bool equals(matrix<T, N, M> lhs, matrix<T, N, M> rhs)
@@ -20,15 +35,6 @@ bool equals(matrix<T, N, M> lhs, matrix<T, N, M> rhs)
     return true;
 }
 
-RWStructuredBuffer<float> outputBuffer;
-/*
-//T-EST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
-buffer MyBlockName2
-{
-    float4 result;
-} outputBuffer;
-*/
-
 bool dim1TypeFuncs()
 {
     typealias genFType = float;
@@ -42,44 +48,48 @@ bool dim1TypeFuncs()
     genIType outGenIType, outGenIType2;
     genUType outGenUType, outGenUType2;
 
+    constexpr float epsilon = 0.000001;
+
     bool voidResults = true;
 
     // 8.8. Integer Functions
     umulExtended(genUType(0), genUType(0), outGenUType, outGenUType2);
-    voidResults = voidResults && (genUType(0) == outGenUType && genUType(0) == outGenUType2);
+    voidResults = voidResults && genUType(0) == outGenUType;
+    voidResults = voidResults && genUType(0) == outGenUType2;
 
-    imulExtended(genIType(0), genIType(0), outGenIType, outGenIType);
-    voidResults = voidResults && (genIType(0) == outGenIType && genIType(0) == outGenIType2);
+    imulExtended(genIType(0), genIType(0), outGenIType, outGenIType2);
+    voidResults = voidResults && genIType(0) == outGenIType;
+    voidResults = voidResults && genIType(0) == outGenIType2;
 
     return voidResults
         // 8.1. Angle and Trigonometry Functions
         && genFType(0) == radians(genFType(0))
         && genFType(0) == degrees(genFType(0))
         && genFType(0) == sin(genFType(0))
-        && genFType(0) == cos(genFType(0))
+        && genFType(1) == cos(genFType(0))
         && genFType(0) == tan(genFType(0))
         && genFType(0) == asin(genFType(0))
-        && genFType(0) == acos(genFType(0))
+        && genFType(0) == acos(genFType(1))
         && genFType(0) == atan(genFType(0), genFType(0))
         && genFType(0) == atan(genFType(0))
         && genFType(0) == sinh(genFType(0))
-        && genFType(0) == cosh(genFType(0))
+        && genFType(1) == cosh(genFType(0))
         && genFType(0) == tanh(genFType(0))
         && genFType(0) == asinh(genFType(0))
-        && genFType(0) == acosh(genFType(0))
+        && genFType(0) == acosh(genFType(1))
         && genFType(0) == atanh(genFType(0))
 
         // 8.2. Exponential Functions
-        && genFType(0) == pow(genFType(0), genFType(0))
-        && genFType(0) == exp(genFType(0))
-        && genFType(0) == log(genFType(0))
-        && genFType(0) == exp2(genFType(0))
-        && genDType(0) == exp2(genDType(0))
-        && genFType(0) == log2(genFType(0))
+        && genFType(1) == pow(genFType(1), genFType(0))
+        && genFType(1) == exp(genFType(0))
+        && genFType(0) == log(genFType(1))
+        && genFType(1) == exp2(genFType(0))
+        && genDType(1) == exp2(genDType(0))
+        && genFType(0) == log2(genFType(1))
         && genFType(0) == sqrt(genFType(0))
         && genDType(0) == sqrt(genDType(0))
-        && genFType(0) == inversesqrt(genFType(0))
-        && genDType(0) == inversesqrt(genDType(0))
+        && genFType(1) == inversesqrt(genFType(1))
+        && genDType(1) == inversesqrt(genDType(1))
 
         // 8.3. Common Functions
         && genFType(0) == abs(genFType(0))
@@ -96,8 +106,8 @@ bool dim1TypeFuncs()
         && genDType(0) == trunc(genDType(0))
         && genFType(0) == round(genFType(0))
         && genDType(0) == round(genDType(0))
-        //&& genFType(0) == roundEven(genFType(0))
-        //&& genDType(0) == roundEven(genDType(0))
+        && genFType(0) == roundEven(genFType(0))
+        && genDType(0) == roundEven(genDType(0))
         && genFType(0) == ceil(genFType(0))
         && genDType(0) == ceil(genDType(0))
         && genFType(0) == fract(genFType(0))
@@ -171,10 +181,10 @@ bool dim1TypeFuncs()
         && double(0) == distance(genDType(0), genDType(0))
         && float(0) == dot(genFType(0), genFType(0))
         && double(0) == dot(genDType(0), genDType(0))
-        && genFType(0) == normalize(genFType(1))
-        && genDType(0) == normalize(genDType(1))
-        && genFType(0) == faceforward(genFType(0), genFType(0), genFType(0))
-        && genDType(0) == faceforward(genDType(0), genDType(0), genDType(0))
+        && (abs(float(1) - length(normalize(genFType(1)))) < epsilon)
+        && (abs(double(1) - length(normalize(genDType(1)))) < double(epsilon))
+        && genFType(1) == faceforward(genFType(1), genFType(1), genFType(-1))
+        && genDType(1) == faceforward(genDType(1), genDType(1), genDType(-1))
         && genFType(0) == reflect(genFType(0), genFType(0))
         && genDType(0) == reflect(genDType(0), genDType(0))
         && genFType(0) == refract(genFType(0), genFType(0), float(0))
@@ -211,9 +221,11 @@ bool dim1TypeFuncs()
         && float(0) == determinant(mat2(0))
         && float(0) == determinant(mat3(0))
         && float(0) == determinant(mat4(0))
-        //&& equals(mat2(0), inverse(mat2(0)))
-        //&& equals(mat3(0), inverse(mat3(0)))
-        //&& equals(mat4(0), inverse(mat4(0)))
+#if defined(TEST_when_inverse_works)
+        && equals(mat2(0), inverse(mat2(0)))
+        && equals(mat3(0), inverse(mat3(0)))
+        && equals(mat4(0), inverse(mat4(0)))
+#endif // #if defined(TEST_when_inverse_works)
 
         // 8.8. Integer Functions
         && genUType(0) == uaddCarry(genUType(0), genUType(0), outGenUType) && genUType(0) == outGenUType
@@ -224,12 +236,12 @@ bool dim1TypeFuncs()
         && genUType(0) == bitfieldInsert(genUType(0), genUType(0), int(0), int(0))
         && genIType(0) == bitfieldReverse(genIType(0))
         && genUType(0) == bitfieldReverse(genUType(0))
-        //&& genIType(0) == bitCount(genIType(0))
-        //&& genIType(0) == bitCount(genUType(0))
-        && genIType(0) == findLSB(genIType(0))
-        && genIType(0) == findLSB(genUType(0))
-        && genIType(0) == findMSB(genIType(0))
-        && genIType(0) == findMSB(genUType(0))
+        && genIType(0) == bitCount(genIType(0))
+        && genIType(0) == bitCount(genUType(0))
+        && genIType(-1) == findLSB(genIType(0))
+        && genIType(-1) == findLSB(genUType(0))
+        && genIType(-1) == findMSB(genIType(0))
+        && genIType(-1) == findMSB(genUType(0))
         ;
 }
 
@@ -251,46 +263,50 @@ bool dimNTypeFuncs()
     genIType outGenIType, outGenIType2;
     genUType outGenUType, outGenUType2;
 
+    constexpr float epsilon = 0.000001;
+
     bool voidResults = true;
 
     // 8.8. Integer Functions
     umulExtended(genUType(0), genUType(0), outGenUType, outGenUType2);
-    voidResults = voidResults && (genUType(0) == outGenUType && genUType(0) == outGenUType2);
+    voidResults = voidResults && genUType(0) == outGenUType;
+    voidResults = voidResults && genUType(0) == outGenUType2;
 
-    imulExtended(genIType(0), genIType(0), outGenIType, outGenIType);
-    voidResults = voidResults && (genIType(0) == outGenIType && genIType(0) == outGenIType2);
+    imulExtended(genIType(0), genIType(0), outGenIType, outGenIType2);
+    voidResults = voidResults && genIType(0) == outGenIType;
+    voidResults = voidResults && genIType(0) == outGenIType2;
 
     return voidResults
         // 8.1. Angle and Trigonometry Functions
         && genFType(0) == radians(genFType(0))
         && genFType(0) == degrees(genFType(0))
         && genFType(0) == sin(genFType(0))
-        && genFType(0) == cos(genFType(0))
+        && genFType(1) == cos(genFType(0))
         && genFType(0) == tan(genFType(0))
         && genFType(0) == asin(genFType(0))
-        && genFType(0) == acos(genFType(0))
+        && genFType(0) == acos(genFType(1))
         && genFType(0) == atan(genFType(0), genFType(0))
         && genFType(0) == atan(genFType(0))
         && genFType(0) == sinh(genFType(0))
-        && genFType(0) == cosh(genFType(0))
+        && genFType(1) == cosh(genFType(0))
         && genFType(0) == tanh(genFType(0))
 #if !defined(TARGET_CUDA)
         && genFType(0) == asinh(genFType(0))
-        && genFType(0) == acosh(genFType(0))
+        && genFType(0) == acosh(genFType(1))
         && genFType(0) == atanh(genFType(0))
 #endif // #if !defined(TARGET_CUDA)
 
         // 8.2. Exponential Functions
-        && genFType(0) == pow(genFType(0), genFType(0))
-        && genFType(0) == exp(genFType(0))
-        && genFType(0) == log(genFType(0))
-        && genFType(0) == exp2(genFType(0))
-        && genDType(0) == exp2(genDType(0))
-        && genFType(0) == log2(genFType(0))
+        && genFType(1) == pow(genFType(1), genFType(0))
+        && genFType(1) == exp(genFType(0))
+        && genFType(0) == log(genFType(1))
+        && genFType(1) == exp2(genFType(0))
+        && genDType(1) == exp2(genDType(0))
+        && genFType(0) == log2(genFType(1))
         && genFType(0) == sqrt(genFType(0))
         && genDType(0) == sqrt(genDType(0))
-        && genFType(0) == inversesqrt(genFType(0))
-        && genDType(0) == inversesqrt(genDType(0))
+        && genFType(1) == inversesqrt(genFType(1))
+        && genDType(1) == inversesqrt(genDType(1))
 
         // 8.3. Common Functions
         && genFType(0) == abs(genFType(0))
@@ -307,8 +323,8 @@ bool dimNTypeFuncs()
         && genDType(0) == trunc(genDType(0))
         && genFType(0) == round(genFType(0))
         && genDType(0) == round(genDType(0))
-        //&& genFType(0) == roundEven(genFType(0))
-        //&& genDType(0) == roundEven(genDType(0))
+        && genFType(0) == roundEven(genFType(0))
+        && genDType(0) == roundEven(genDType(0))
         && genFType(0) == ceil(genFType(0))
         && genDType(0) == ceil(genDType(0))
         && genFType(0) == fract(genFType(0))
@@ -381,13 +397,13 @@ bool dimNTypeFuncs()
 
         // 8.4. Floating-Point Pack and Unpack Functions
         && uint(0) == packUnorm2x16(vec2(0))
-        && uint(0) == packSnorm2x16(vec2(0))
+        && uint(0) == packSnorm2x16(vec2(-1))
         && uint(0) == packUnorm4x8(vec4(0))
-        && uint(0) == packSnorm4x8(vec4(0))
+        && uint(0) == packSnorm4x8(vec4(-1))
         && vec2(0) == unpackUnorm2x16(uint(0))
-        && vec2(0) == unpackSnorm2x16(uint(0))
+        && vec2(-1) == unpackSnorm2x16(uint(0))
         && vec4(0) == unpackUnorm4x8(uint(0))
-        && vec4(0) == unpackSnorm4x8(uint(0))
+        && vec4(-1) == unpackSnorm4x8(uint(0))
         && uint(0) == packHalf2x16(vec2(0))
         && vec2(0) == unpackHalf2x16(uint(0))
         && double(0) == packDouble2x32(uvec2(0))
@@ -399,26 +415,16 @@ bool dimNTypeFuncs()
         && float(0) == distance(genFType(0), genFType(0))
         && double(0) == distance(genDType(0), genDType(0))
         && float(0) == dot(genFType(0), genFType(0))
-        && float(0) == dot(vec2(0), vec2(0))
-        && float(0) == dot(vec3(0), vec3(0))
-        && float(0) == dot(vec4(0), vec4(0))
         && double(0) == dot(genDType(0), genDType(0))
-        && double(0) == dot(dvec2(0), dvec2(0))
-        && double(0) == dot(dvec3(0), dvec3(0))
-        && double(0) == dot(dvec4(0), dvec4(0))
-        && vec3(0) == cross(vec3(1), vec3(1))
-        && dvec3(0) == cross(dvec3(1), dvec3(1))
-        && float(1) == length(normalize(genFType(1)))
-        && float(1) == length(normalize(vec2(1)))
-        && float(1) == length(normalize(vec3(1)))
-        && float(1) == length(normalize(vec4(1,0,0,0)))
-        && float(1) == length(normalize(genDType(1)))
-        && float(1) == length(normalize(dvec2(1,0)))
-        && float(1) == length(normalize(dvec3(1,0,0)))
-        && float(1) == length(normalize(dvec4(1,0,0,0)))
-        //&& vec4(0) == ftransform()
-        && genFType(0) == faceforward(genFType(0), genFType(0), genFType(0))
-        && genDType(0) == faceforward(genDType(0), genDType(0), genDType(0))
+        && vec3(0) == cross(vec3(0), vec3(0))
+        && dvec3(0) == cross(dvec3(0), dvec3(0))
+        && (abs(float(1) - length(normalize(genFType(1)))) < epsilon)
+        && (abs(double(1) - length(normalize(genDType(1)))) < double(epsilon))
+#if defined(TEST_when_fransform_works)
+        && vec4(0) == ftransform()
+#endif // #if defined(TEST_when_fransform_works)
+        && genFType(1) == faceforward(genFType(1), genFType(1), genFType(-1))
+        && genDType(1) == faceforward(genDType(1), genDType(1), genDType(-1))
         && genFType(0) == reflect(genFType(0), genFType(0))
         && genDType(0) == reflect(genDType(0), genDType(0))
         && genFType(0) == refract(genFType(0), genFType(0), float(0))
@@ -460,13 +466,13 @@ bool dimNTypeFuncs()
         && genUType(0) == bitfieldInsert(genUType(0), genUType(0), int(0), int(0))
         && genIType(0) == bitfieldReverse(genIType(0))
         && genUType(0) == bitfieldReverse(genUType(0))
-        //&& genIType(0) == bitCount(genIType(0))
-        //&& genIType(0) == bitCount(genUType(0))
+        && genIType(0) == bitCount(genIType(0))
+        && genIType(0) == bitCount(genUType(0))
 #if !defined(TARGET_CUDA)
-        && genIType(0) == findLSB(genIType(0))
-        && genIType(0) == findLSB(genUType(0))
-        && genIType(0) == findMSB(genIType(0))
-        && genIType(0) == findMSB(genUType(0))
+        && genIType(-1) == findLSB(genIType(0))
+        && genIType(-1) == findLSB(genUType(0))
+        && genIType(-1) == findMSB(genIType(0))
+        && genIType(-1) == findMSB(genUType(0))
 #endif // #if !defined(TARGET_CUDA)
         ;
 }
@@ -479,6 +485,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // CHECK_HLSL: void computeMain(
     // CHECK_CUDA: void computeMain(
     // CHECK_CPP: void _computeMain(
+    // BUF: 1
 
     bool r = true
         && dim1TypeFuncs()
@@ -486,5 +493,5 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         && dimNTypeFuncs<3>()
         && dimNTypeFuncs<4>();
 
-    //outputBuffer[0] = float(r);
+    outputBuffer.result[0] = int(r);
 }

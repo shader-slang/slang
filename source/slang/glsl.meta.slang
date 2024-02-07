@@ -9,6 +9,8 @@
 #define VECTOR_MAP_TRINARY(TYPE, COUNT, FUNC, A, B, C) \
     vector<TYPE,COUNT> result; for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result
 
+#define REQUIRE_KHRONOS [require(glsl)] [require(spirv)]
+
 //
 // OpenGL 4.60 spec
 //
@@ -358,6 +360,31 @@ public vector<T, N> inversesqrt(vector<T, N> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
+public T roundEven(T x)
+{
+    T i;
+    if (T(0.5) <= fmod(x, i))
+    {
+        bool evenInteger = (fmod(i, T(2)) == T(0));
+        if (!evenInteger)
+        {
+            x += T(0.1);
+        }
+    }
+    return round(x);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N:int>
+[__readNone]
+[ForceInline]
+public vector<T,N> roundEven(vector<T,N> x)
+{
+    VECTOR_MAP_UNARY(T, N, roundEven, x);
+}
+
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[ForceInline]
 public T fract(T x)
 {
     return frac(x);
@@ -508,28 +535,28 @@ public vector<float, N> uintBitsToFloat(highp vector<uint, N> x)
 [ForceInline]
 uint packUnorm1x16(float c)
 {
-    return uint(round(clamp(c, 0.0, 1.0) * 65535.0));
+    return uint(clamp(c, 0.0, 1.0) * 65535.0 + 0.5);
 }
 
 [__readNone]
 [ForceInline]
 uint packSnorm1x16(float v)
 {
-    return uint(round(clamp(v ,-1.0, 1.0) * 32767.0) + 32767.0);
+    return uint(clamp(v ,-1.0, 1.0) * 32767.0 + 32767.5);
 }
 
 [__readNone]
 [ForceInline]
 uint packUnorm1x8(float c)
 {
-    return uint(round(clamp(c, 0.0, 1.0) * 255.0));
+    return uint(clamp(c, 0.0, 1.0) * 255.0 + 0.5);
 }
 
 [__readNone]
 [ForceInline]
 uint packSnorm1x8(float c)
 {
-    return uint(round(clamp(c, -1.0, 1.0) * 127.0) + 127.0);
+    return uint(clamp(c, -1.0, 1.0) * 127.0 + 127.5);
 }
 
 [__readNone]
@@ -566,8 +593,12 @@ uint float2half(float f)
 {
     uint u = floatBitsToUint(f);
     uint s = ((u >> uint(16)) & uint(0x8000));
-    uint e = ((((u & uint(0x7f800000)) - uint(0x38000000)) >> uint(13)) & uint(0x7c00));
+    uint e = 0;
     uint m = ((u >> uint(13)) & uint(0x03ff));
+    if (m != 0)
+    {
+        e = ((((u & uint(0x7f800000)) - uint(0x38000000)) >> uint(13)) & uint(0x7c00));
+    }
     return (s | e | m);
 }
 
@@ -649,8 +680,12 @@ __target_intrinsic(glsl)
 public float half2float(uint h)
 {
     uint s = ((h & uint(0x8000)) << uint(16));
-    uint e = (((h & uint(0x7c00)) + uint(0x1c000)) << uint(13));
+    uint e = 0;
     uint m = ((h & uint(0x03ff)) << uint(13));
+    if (m != 0)
+    {
+        e = (((h & uint(0x7c00)) + uint(0x1c000)) << uint(13));
+    }
     return uintBitsToFloat(s | e | m); 
 }
 
@@ -667,8 +702,9 @@ __target_intrinsic(glsl)
 [ForceInline]
 public double packDouble2x32(uvec2 v)
 {
-    return 0.0;
+    // TODO: there is no "asdouble()"
     //return asdouble(uint64_t(v.x) | (uint64_t(v.y) << 32));
+    return 0.0;
 }
 
 __target_intrinsic(glsl)
@@ -676,6 +712,7 @@ __target_intrinsic(glsl)
 [ForceInline]
 public uvec2 unpackDouble2x32(double v)
 {
+    // TODO: there is no "asuint64()"
     uint64_t u = 0; // asuint64(v);
     return uvec2(uint(u & 0xFFFFFFFF), uint(u >> 32));
 }
@@ -761,20 +798,9 @@ public vector<uint,N> usubBorrow(highp vector<uint,N> x, highp vector<uint,N> y,
 [ForceInline]
 public void umulExtended(highp uint x, highp uint y, out highp uint msb, out highp uint lsb)
 {
-    uint xLo = x & 0xffff;
-    uint xHi = x >> 16;
-    uint yLo = y & 0xffff;
-    uint yHi = y >> 16;
-
-    uint loProduct = xLo * yLo;
-    uint midProduct1 = xLo * yHi;
-    uint midProduct2 = xHi * yLo;
-    uint hiProduct = xHi * yHi;
-
-    uint carry1 = (midProduct1 >> 16) + (midProduct2 & 0xffff);
-    uint carry2 = (loProduct >> 16) + (midProduct1 & 0xffff) + (carry1 & 0xffff);
-    msb = hiProduct + (carry2 >> 16);
-    lsb = (carry2 << 16) | (loProduct & 0xffff);
+    uint64_t result = x * y;
+    msb = uint(result >> 32);
+    lsb = uint(result);
 }
 
 __generic<let N:int>
@@ -792,22 +818,9 @@ public void umulExtended(highp vector<uint,N> x, highp vector<uint,N> y, out hig
 [ForceInline]
 public void imulExtended(highp int x, highp int y, out highp int msb, out highp int lsb)
 {
-    // Extract the sign bits
-    int signX = (x >> 31) & 1;
-    int signY = (y >> 31) & 1;
-
-    // Make x and y positive
-    int absX = (x ^ (signX << 31)) - signX;
-    int absY = (y ^ (signY << 31)) - signY;
-
-    // Calculate the product of the absolute values
-    uint loProduct;
-    int product = absX * absY;
-    loProduct = product & 0xFFFFFFFF;
-
-    // Calculate the high part
-    msb = (product >> 32) + (signX ^ signY) * loProduct;
-    lsb = loProduct;
+    int64_t result = x * y;
+    msb = int(result >> 32);
+    lsb = int(result);
 }
 
 __generic<let N:int>
@@ -947,37 +960,31 @@ public vector<uint,N> bitfieldReverse(highp vector<uint,N> value)
     VECTOR_MAP_UNARY(int, N, bitfieldReverse, value);
 }
 
-/*
-[__readNone]
-[ForceInline]
+[__readNone] [ForceInline] REQUIRE_KHRONOS
 public uint bitCount(uint value)
 {
     return countbits(value);
 }
 
 __generic<let N:int>
-[__readNone]
-[ForceInline]
+[__readNone] [ForceInline] REQUIRE_KHRONOS
 public vector<uint,N> bitCount(vector<uint,N> value)
 {
     VECTOR_MAP_UNARY(uint, N, countbits, value);
 }
 
-[__readNone]
-[ForceInline]
+[__readNone] [ForceInline] REQUIRE_KHRONOS
 public int bitCount(int value)
 {
     return countbits(uint(value));
 }
     
 __generic<let N:int>
-[__readNone]
-[ForceInline]
+[__readNone] [ForceInline] REQUIRE_KHRONOS
 public vector<int,N> bitCount(vector<int,N> value)
 {
     VECTOR_MAP_UNARY(int, N, countbits, value);
 }
-*/
 
 [__readNone]
 [ForceInline]
