@@ -98,6 +98,7 @@ class TargetCaseStmt : public Stmt
 {
     SLANG_AST_CLASS(TargetCaseStmt)
     int32_t capability;
+    Token capabilityToken;
     Stmt* body = nullptr;
 };
 

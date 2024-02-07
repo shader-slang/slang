@@ -19,7 +19,8 @@ struct CompletionSuggestions
         Stmt,
         Expr,
         Attribute,
-        HLSLSemantics
+        HLSLSemantics,
+        Capabilities
     };
     ScopeKind scopeKind = ScopeKind::Invalid;
     List<LookupResultItem> candidateItems;

@@ -25,7 +25,6 @@
 #include "slang-mangle.h"
 #include "slang-parser.h"
 #include "slang-preprocessor.h"
-
 #include "slang-type-layout.h"
 
 #include "slang-options.h"
@@ -859,7 +858,7 @@ Profile getEffectiveProfile(EntryPoint* entryPoint, TargetRequest* target)
     case CodeGenTarget::SPIRVAssembly:
         if(targetProfile.getFamily() != ProfileFamily::GLSL)
         {
-            targetProfile.setVersion(ProfileVersion::GLSL_110);
+            targetProfile.setVersion(ProfileVersion::GLSL_150);
         }
         break;
 
@@ -870,7 +869,7 @@ Profile getEffectiveProfile(EntryPoint* entryPoint, TargetRequest* target)
     case CodeGenTarget::DXILAssembly:
         if(targetProfile.getFamily() != ProfileFamily::DX)
         {
-            targetProfile.setVersion(ProfileVersion::DX_4_0);
+            targetProfile.setVersion(ProfileVersion::DX_5_1);
         }
         break;
     }
@@ -1609,6 +1608,8 @@ CapabilitySet TargetRequest::getTargetCaps()
         break;
     }
 
+    CapabilitySet targetCap = CapabilitySet(atoms);
+
     CapabilitySet latestSpirvCapSet = CapabilitySet(CapabilityName::spirv_latest);
     CapabilityName latestSpirvAtom = (CapabilityName)latestSpirvCapSet.getExpandedAtoms()[0].getExpandedAtoms().getLast();
     for (auto atom : rawCapabilities)
@@ -1624,7 +1625,11 @@ CapabilitySet TargetRequest::getTargetCaps()
                 atom = (CapabilityName)((Int)CapabilityName::glsl_spirv_1_0 + ((Int)atom - (Int)CapabilityName::spirv_1_0));
             }
         }
-        atoms.add(atom);
+        if (!targetCap.isIncompatibleWith(atom))
+        {
+            // Only add atoms that are compatible with the current target.
+            atoms.add(atom);
+        }
     }
 
     cookedCapabilities = CapabilitySet(atoms);
@@ -1979,17 +1984,23 @@ Expr* Linkage::parseTermString(String typeStr, Scope* scope)
 
     // We need to temporarily replace the SourceManager for this CompileRequest
     ScopeReplaceSourceManager scopeReplaceSourceManager(this, &localSourceManager);
+    
+    SourceLanguage sourceLanguage;
 
     auto tokens = preprocessSource(
         srcFile,
         &sink,
         nullptr,
         Dictionary<String,String>(),
-        this);
+        this,
+        sourceLanguage);
+
+    if (sourceLanguage == SourceLanguage::Unknown)
+        sourceLanguage = SourceLanguage::Slang;
 
     return parseTermFromSourceFile(
         getASTBuilder(),
-        tokens, &sink, scope, getNamePool(), SourceLanguage::Slang);
+        tokens, &sink, scope, getNamePool(), sourceLanguage);
 }
 
 Type* checkProperType(
@@ -2344,19 +2355,6 @@ void FrontEndCompileRequest::parseTranslationUnit(
     // would be checked too (after those on the FrontEndCompileRequest).
     IncludeSystem includeSystem(&linkage->searchDirectories, linkage->getFileSystemExt(), linkage->getSourceManager());
 
-    Scope* languageScope = nullptr;
-    switch (translationUnit->sourceLanguage)
-    {
-    case SourceLanguage::HLSL:
-        languageScope = getSession()->hlslLanguageScope;
-        break;
-
-    case SourceLanguage::Slang:
-    default:
-        languageScope = getSession()->slangLanguageScope;
-        break;
-    }
-
     auto combinedPreprocessorDefinitions = translationUnit->getCombinedPreprocessorDefinitions();
     
     auto module = translationUnit->getModule();
@@ -2401,13 +2399,31 @@ void FrontEndCompileRequest::parseTranslationUnit(
 
     for (auto sourceFile : translationUnit->getSourceFiles())
     {
+        SourceLanguage sourceLanguage = SourceLanguage::Unknown;
         auto tokens = preprocessSource(
             sourceFile,
             getSink(),
             &includeSystem,
             combinedPreprocessorDefinitions,
             getLinkage(),
+            sourceLanguage,
             &preprocessorHandler);
+
+        if (sourceLanguage == SourceLanguage::Unknown)
+            sourceLanguage = translationUnit->sourceLanguage;
+
+        Scope* languageScope = nullptr;
+        switch (sourceLanguage)
+        {
+        case SourceLanguage::HLSL:
+            languageScope = getSession()->hlslLanguageScope;
+            break;
+
+        case SourceLanguage::Slang:
+        default:
+            languageScope = getSession()->slangLanguageScope;
+            break;
+        }
 
         if (outputIncludes)
         {
@@ -2427,6 +2443,7 @@ void FrontEndCompileRequest::parseTranslationUnit(
         parseSourceFile(
             astBuilder,
             translationUnit,
+            sourceLanguage,
             tokens,
             getSink(),
             languageScope,
@@ -2601,23 +2618,6 @@ SlangResult FrontEndCompileRequest::executeActionsInner()
     {
         // Make sure SourceFile representation is available for all translationUnits
         SLANG_RETURN_ON_FAIL(translationUnit->requireSourceFiles());
-
-        if(!getLinkage()->getAllowGLSLInput())
-        {
-            // We currently allow GlSL files on the command line so that we can
-            // drive our "pass-through" mode, but we really want to issue an error
-            // message if the user is seriously asking us to compile them and
-            // doesn't explicitly opt into the glsl frontend
-            switch(translationUnit->sourceLanguage)
-            {
-            default:
-                break;
-
-            case SourceLanguage::GLSL:
-                getSink()->diagnose(SourceLoc(), Diagnostics::glslIsNotSupported);
-                return SLANG_FAIL;
-            }
-        }
     }
 
 
@@ -3138,8 +3138,17 @@ RefPtr<Module> Linkage::loadModule(
     RefPtr<TranslationUnitRequest> translationUnit = new TranslationUnitRequest(frontEndReq);
     translationUnit->compileRequest = frontEndReq;
     translationUnit->moduleName = name;
+    Stage impliedStage;
     translationUnit->sourceLanguage = SourceLanguage::Slang;
 
+    // If we are loading from a file with apparaent glsl extension,
+    // set the source language to GLSL to enable GLSL compatibility mode.
+    if ((SourceLanguage)findSourceLanguageFromPath(filePathInfo.getName(), impliedStage) ==
+        SourceLanguage::GLSL)
+    {
+        translationUnit->sourceLanguage = SourceLanguage::GLSL;
+    }
+    
     frontEndReq->addTranslationUnit(translationUnit);
 
     auto module = translationUnit->getModule();
@@ -3423,18 +3432,24 @@ Linkage::IncludeResult Linkage::findAndIncludeFile(Module* module, TranslationUn
 
     FrontEndPreprocessorHandler preprocessorHandler(module, module->getASTBuilder(), sink);
     auto combinedPreprocessorDefinitions = translationUnit->getCombinedPreprocessorDefinitions();
+    SourceLanguage sourceLanguage = SourceLanguage::Unknown;
     auto tokens = preprocessSource(
         sourceFile,
         sink,
         &includeSystem,
         combinedPreprocessorDefinitions,
         this,
+        sourceLanguage,
         &preprocessorHandler);
+    
+    if (sourceLanguage == SourceLanguage::Unknown)
+        sourceLanguage = translationUnit->sourceLanguage;
 
     auto outerScope = module->getModuleDecl()->ownedScope;
     parseSourceFile(
         module->getASTBuilder(),
         translationUnit,
+        sourceLanguage,
         tokens,
         sink,
         outerScope,
@@ -4875,6 +4890,9 @@ void Session::addBuiltinSource(
         SLANG_UNEXPECTED("error in Slang standard library");
     }
 
+    // Compiling stdlib should not yield any warnings.
+    SLANG_ASSERT(sink.outputBuffer.getLength() == 0);
+
     // Extract the AST for the code we just parsed
     auto module = compileRequest->translationUnits[translationUnitIndex]->getModule();
     auto moduleDecl = module->getModuleDecl();
@@ -5147,6 +5165,11 @@ void EndToEndCompileRequest::setReportDownstreamTime(bool value)
 void EndToEndCompileRequest::setReportPerfBenchmark(bool value)
 {
     m_reportPerfBenchmark = value;
+}
+
+void EndToEndCompileRequest::setSkipSPIRVValidation(bool value)
+{
+    m_skipSPIRVValidation = value;
 }
 
 void EndToEndCompileRequest::setDiagnosticCallback(SlangDiagnosticCallback callback, void const* userData)

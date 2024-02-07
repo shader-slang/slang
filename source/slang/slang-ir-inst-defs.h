@@ -133,6 +133,11 @@ INST(Nop, nop, 0, 0)
         INST(SamplerComparisonStateType, SamplerComparisonState, 0, HOISTABLE)
     INST_RANGE(SamplerStateTypeBase, SamplerStateType, SamplerComparisonStateType)
 
+    INST(DefaultBufferLayoutType, DefaultLayout, 0, HOISTABLE)
+    INST(Std140BufferLayoutType, Std140Layout, 0, HOISTABLE)
+    INST(Std430BufferLayoutType, Std430Layout, 0, HOISTABLE)
+    INST(ScalarBufferLayoutType, ScalarLayout, 0, HOISTABLE)
+
     INST(TextureFootprintType, TextureFootprintType, 1, HOISTABLE)
 
     INST(TextureShape1DType, TextureShape1DType, 0, HOISTABLE)
@@ -572,6 +577,7 @@ INST_RANGE(Unreachable, MissingReturn, Unreachable)
 INST_RANGE(TerminatorInst, Return, Unreachable)
 
 INST(RequirePrelude, RequirePrelude, 1, 0)
+INST(RequireGLSLExtension, RequireGLSLExtension, 1, 0)
 
 // TODO: We should consider splitting the basic arithmetic/comparison
 // ops into cases for signed integers, unsigned integers, and floating-point
@@ -1014,6 +1020,7 @@ INST(TypeEquals, TypeEquals, 2, 0)
 INST(IsInt, IsInt, 1, 0)
 INST(IsBool, IsBool, 1, 0)
 INST(IsFloat, IsFloat, 1, 0)
+INST(IsHalf, IsHalf, 1, 0)
 INST(IsUnsignedInt, IsUnsignedInt, 1, 0)
 INST(IsSignedInt, IsSignedInt, 1, 0)
 INST(IsVector, IsVector, 1, 0)

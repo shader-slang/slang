@@ -2317,6 +2317,8 @@ static void addNameHint(
     String name = getNameForNameHint(context, decl);
     if(name.getLength() == 0)
         return;
+    if (name == "MyBlockName2")
+        printf("break");
     context->irBuilder->addNameHintDecoration(inst, name.getUnownedSlice());
 }
 
@@ -6938,14 +6940,37 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     IGNORED_CASE(IncludeDecl)
     IGNORED_CASE(ImplementingDecl)
     IGNORED_CASE(UsingDecl)
-    IGNORED_CASE(EmptyDecl)
     IGNORED_CASE(SyntaxDecl)
     IGNORED_CASE(AttributeDecl)
     IGNORED_CASE(NamespaceDecl)
     IGNORED_CASE(ModuleDeclarationDecl)
     IGNORED_CASE(FileDecl)
+    IGNORED_CASE(RequireCapabilityDecl)
 
 #undef IGNORED_CASE
+
+    LoweredValInfo visitEmptyDecl(EmptyDecl* decl)
+    {
+        for(const auto modifier : decl->modifiers)
+        {
+            if(const auto layoutLocalSizeAttr = as<GLSLLayoutLocalSizeAttribute>(modifier))
+            {
+                for(const auto d : context->irBuilder->getModule()->getModuleInst()->getGlobalInsts())
+                {
+                    if(d->findDecoration<IREntryPointDecoration>())
+                    {
+                        getBuilder()->addNumThreadsDecoration(
+                            d,
+                            layoutLocalSizeAttr->x,
+                            layoutLocalSizeAttr->y,
+                            layoutLocalSizeAttr->z
+                        );
+                    }
+                }
+            }
+        }
+        return LoweredValInfo();
+    }
 
     void ensureInsertAtGlobalScope(IRBuilder* builder)
     {
@@ -9325,16 +9350,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
             else if (auto numThreadsAttr = as<NumThreadsAttribute>(modifier))
             {
-                auto builder = getBuilder();
-                IRType* intType = builder->getIntType();
-
-                IRInst* operands[3] = {
-                    builder->getIntValue(intType, numThreadsAttr->x),
-                    builder->getIntValue(intType, numThreadsAttr->y),
-                    builder->getIntValue(intType, numThreadsAttr->z)
-                };
-
-                builder->addDecoration(irFunc, kIROp_NumThreadsDecoration, operands, 3);
+                getBuilder()->addNumThreadsDecoration(
+                    irFunc,
+                    numThreadsAttr->x,
+                    numThreadsAttr->y,
+                    numThreadsAttr->z
+                );
             }
             else if (as<ReadNoneAttribute>(modifier))
             {

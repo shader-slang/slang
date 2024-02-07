@@ -81,11 +81,11 @@ namespace Slang
         for(const auto& [ssbo, info] : arrayLikeSSBOTypes)
         {
             builder.setInsertAfter(ssbo);
-            IRInst* operands = info.elementType;
+            IRInst* operands[2] = { info.elementType, ssbo->getDataLayout() };
             const auto sb = builder.getType(
                 kIROp_HLSLRWStructuredBufferType,
-                1,
-                &operands
+                2,
+                operands
             );
             ssbo->replaceUsesWith(sb);
             ssbo->removeAndDeallocate();
@@ -188,6 +188,20 @@ namespace Slang
         }
     }
 
+    static void lowerSSBOsToPointers(IRModule* module)
+    {
+        IRBuilder builder{module};
+        overAllInsts(module, [&](IRInst* inst){
+            if(const auto ssbo = as<IRGLSLShaderStorageBufferType>(inst))
+            {
+                builder.setInsertAfter(ssbo);
+                const auto ptr = builder.getPtrType(ssbo->getElementType());
+                ssbo->replaceUsesWith(ptr);
+                ssbo->removeAndDeallocate();
+            }
+        });
+    }
+
     static void diagnoseRemainingSSBOs(IRModule* module, DiagnosticSink* sink)
     {
         overAllInsts(module, [&](IRInst* inst){
@@ -198,10 +212,16 @@ namespace Slang
         });
     }
 
-    void lowerGLSLShaderStorageBufferObjects(IRModule* module, DiagnosticSink* sink)
+    void lowerGLSLShaderStorageBufferObjectsToStructuredBuffers(IRModule* module, DiagnosticSink* sink)
     {
         lowerArrayLikeSSBOs(module);
         lowerStructLikeSSBOs(module);
+        diagnoseRemainingSSBOs(module, sink);
+    }
+
+    void lowerGLSLShaderStorageBufferObjectsToPointers(IRModule* module, DiagnosticSink* sink)
+    {
+        lowerSSBOsToPointers(module);
         diagnoseRemainingSSBOs(module, sink);
     }
 }

@@ -209,6 +209,8 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
 
         const char* layerNames[] = { nullptr };
 
+        VkValidationFeaturesEXT validationFeatures = {};
+        VkValidationFeatureEnableEXT enabledValidationFeatures[1] = { VK_VALIDATION_FEATURE_ENABLE_DEBUG_PRINTF_EXT };
         if (useValidationLayer)
         {
             // Depending on driver version, validation layer may or may not exist.
@@ -255,6 +257,12 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
             {
                 instanceCreateInfo.enabledLayerCount = SLANG_COUNT_OF(layerNames);
                 instanceCreateInfo.ppEnabledLayerNames = layerNames;
+
+                // Include support for printf
+                validationFeatures.sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT;
+                validationFeatures.enabledValidationFeatureCount = 1;
+                validationFeatures.pEnabledValidationFeatures = enabledValidationFeatures;
+                instanceCreateInfo.pNext = &validationFeatures;
             }
         }
         uint32_t apiVersionsToTry[] = { VK_API_VERSION_1_2, VK_API_VERSION_1_1, VK_API_VERSION_1_0 };
@@ -360,6 +368,7 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
 
     List<const char*> deviceExtensions;
     deviceExtensions.add(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+    deviceExtensions.add(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
 #if SLANG_APPLE_FAMILY
     deviceExtensions.add("VK_KHR_portability_subset");
 #endif
@@ -477,6 +486,14 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         // mesh shader features
         extendedFeatures.meshShaderFeatures.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &extendedFeatures.meshShaderFeatures;
+
+        // multiview features
+        extendedFeatures.multiviewFeatures.pNext = deviceFeatures2.pNext;
+        deviceFeatures2.pNext = &extendedFeatures.multiviewFeatures;
+
+        // fragment shading rate features
+        extendedFeatures.fragmentShadingRateFeatures.pNext = deviceFeatures2.pNext;
+        deviceFeatures2.pNext = &extendedFeatures.fragmentShadingRateFeatures;
 
         if (VK_MAKE_VERSION(majorVersion, minorVersion, 0) >= VK_API_VERSION_1_2)
         {
@@ -616,6 +633,20 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         );
 
         SIMPLE_EXTENSION_FEATURE(
+            extendedFeatures.multiviewFeatures,
+            multiview,
+            VK_KHR_MULTIVIEW_EXTENSION_NAME,
+            "multiview"
+        );
+
+        SIMPLE_EXTENSION_FEATURE(
+            extendedFeatures.fragmentShadingRateFeatures,
+            primitiveFragmentShadingRate,
+            VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME,
+            "fragment-shading-rate"
+        );
+
+        SIMPLE_EXTENSION_FEATURE(
             extendedFeatures.rayTracingInvocationReorderFeatures,
             rayTracingInvocationReorder,
             VK_NV_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME,
@@ -650,10 +681,12 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
             VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR };
         VkPhysicalDeviceSubgroupProperties subgroupProps = {
             VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES };
+
         rtProps.pNext = extendedProps.pNext;
         extendedProps.pNext = &rtProps;
         subgroupProps.pNext = extendedProps.pNext;
         extendedProps.pNext = &subgroupProps;
+
         m_api.vkGetPhysicalDeviceProperties2(m_api.m_physicalDevice, &extendedProps);
         m_api.m_rtProperties = rtProps;
 

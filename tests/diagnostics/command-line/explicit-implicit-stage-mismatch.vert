@@ -1,3 +1,5 @@
 // explicit-implicit-stage-mismatch.vert
 
-//DIAGNOSTIC_TEST:SIMPLE:-stage fragment
+//TEST:SIMPLE(filecheck=CHECK):-stage fragment
+
+//CHECK: warning 32:

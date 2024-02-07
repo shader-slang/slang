@@ -3080,6 +3080,12 @@ struct IRRequirePrelude : IRInst
     UnownedStringSlice getPrelude() { return as<IRStringLit>(getOperand(0))->getStringSlice(); }
 };
 
+struct IRRequireGLSLExtension : IRInst
+{
+    IR_LEAF_ISA(RequireGLSLExtension)
+    UnownedStringSlice getExtensionName() { return as<IRStringLit>(getOperand(0))->getStringSlice(); }
+};
+
 struct IRBuilderSourceLocRAII;
 
 struct IRBuilder
@@ -3482,6 +3488,8 @@ public:
     IRInst* addDifferentiableTypeEntry(IRInst* dictDecoration, IRInst* irType, IRInst* conformanceWitness);
 
     IRInst* addFloatingModeOverrideDecoration(IRInst* dest, FloatingPointMode mode);
+
+    IRInst* addNumThreadsDecoration(IRInst* inst, Int x, Int y, Int z);
 
     IRInst* emitSpecializeInst(
         IRType*         type,

@@ -2698,6 +2698,8 @@ TestResult generateActualOutput(TestContext* const context, const TestInput& inp
         return TestResult::Pass;
     }
 
+    actualOutput = getOutput(actualExeRes);
+
     // Always fail if the compilation produced a failure, just
     // to catch situations where, e.g., command-line options parsing
     // caused the same error in both the Slang and glslang cases.
@@ -2707,7 +2709,6 @@ TestResult generateActualOutput(TestContext* const context, const TestInput& inp
         return TestResult::Fail;
     }
 
-    actualOutput = getOutput(actualExeRes);
     return TestResult::Pass;
 }
 

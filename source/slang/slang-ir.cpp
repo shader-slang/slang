@@ -5032,6 +5032,19 @@ namespace Slang
             getIntValue(getIntType(), (IRIntegerValue)mode));
     }
 
+    IRInst* IRBuilder::addNumThreadsDecoration(IRInst* inst, Int x, Int y, Int z)
+    {
+        IRType* intType = getIntType();
+
+        IRInst* operands[3] = {
+            getIntValue(intType, x),
+            getIntValue(intType, y),
+            getIntValue(intType, z)
+        };
+
+        return addDecoration(inst, kIROp_NumThreadsDecoration, operands, 3);
+    }
+
     IRInst* IRBuilder::emitSwizzle(
         IRType*         type,
         IRInst*         base,

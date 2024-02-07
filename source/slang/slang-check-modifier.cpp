@@ -74,6 +74,30 @@ namespace Slang
         return false;
     }
 
+    bool SemanticsVisitor::checkCapabilityName(Expr* expr, CapabilityName& outCapabilityName)
+    {
+        if (auto varExpr = as<VarExpr>(expr))
+        {
+            if (!varExpr->name)
+                return false;
+            if (varExpr->name == getSession()->getCompletionRequestTokenName())
+            {
+                auto& suggestions = getLinkage()->contentAssistInfo.completionSuggestions;
+                suggestions.clear();
+                suggestions.scopeKind = CompletionSuggestions::ScopeKind::Capabilities;
+            }
+            outCapabilityName = findCapabilityName(varExpr->name->text.getUnownedSlice());
+            if (outCapabilityName == CapabilityName::Invalid)
+            {
+                getSink()->diagnose(expr, Diagnostics::unknownCapability, varExpr->name);
+                return false;
+            }
+            return true;
+        }
+        getSink()->diagnose(expr, Diagnostics::expectCapability);
+        return false;
+    }
+
     void SemanticsVisitor::visitModifier(Modifier*)
     {
         // Do nothing with modifiers for now
@@ -209,7 +233,7 @@ namespace Slang
                 paramDecl->nameAndLoc = member->nameAndLoc;
                 paramDecl->type = varMember->type;
                 paramDecl->loc = member->loc;
-                paramDecl->setCheckState(DeclCheckState::Checked);
+                paramDecl->setCheckState(DeclCheckState::DefinitionChecked);
 
                 paramDecl->parentDecl = attrDecl;
                 attrDecl->members.add(paramDecl);
@@ -233,7 +257,7 @@ namespace Slang
         //
         // TODO: what check state is relevant here?
         //
-        ensureDecl(attrDecl, DeclCheckState::Checked);
+        ensureDecl(attrDecl, DeclCheckState::DefinitionChecked);
 
         return attrDecl;
     }
@@ -783,6 +807,19 @@ namespace Slang
 
             pyExportAttr->name = name;
         }
+        else if (auto requireCapAttr = as<RequireCapabilityAttribute>(attr))
+        {
+            List<CapabilityName> capabilityNames;
+            for (auto& arg : attr->args)
+            {
+                CapabilityName capName;
+                if (checkCapabilityName(arg, capName))
+                {
+                    capabilityNames.add(capName);
+                }
+            }
+            requireCapAttr->capabilitySet = CapabilitySet(capabilityNames);
+        }
         else
         {
             if(attr->args.getCount() == 0)
@@ -1008,6 +1045,7 @@ namespace Slang
             // layout(local_size_x=1) in;
         case ASTNodeType::InModifier:
         case ASTNodeType::InOutModifier:
+        case ASTNodeType::OutModifier:
         case ASTNodeType::GLSLLayoutModifier:
         case ASTNodeType::GLSLParsedLayoutModifier:
         case ASTNodeType::GLSLConstantIDLayoutModifier:
@@ -1022,8 +1060,6 @@ namespace Slang
                 return true;
             [[fallthrough]];
 
-            // Allowed only on parameters and global variables.
-        case ASTNodeType::OutModifier:
         case ASTNodeType::RefModifier:
         case ASTNodeType::ConstRefModifier:
         case ASTNodeType::GLSLBufferModifier:
@@ -1125,7 +1161,11 @@ namespace Slang
 
         if (auto decl = as<Decl>(syntaxNode))
         {
-            if (!isModifierAllowedOnDecl(getLinkage()->getAllowGLSLInput(), m->astNodeType, decl))
+            auto moduleDecl = getModuleDecl(decl);
+            bool isGLSLInput = getLinkage()->getAllowGLSLInput();
+            if (!isGLSLInput && moduleDecl && moduleDecl->findModifier<GLSLModuleModifier>())
+                isGLSLInput = true;
+            if (!isModifierAllowedOnDecl(isGLSLInput, m->astNodeType, decl))
             {
                 getSink()->diagnose(m, Diagnostics::modifierNotAllowed, m);
                 return m;
@@ -1270,6 +1310,39 @@ namespace Slang
                 getSink()->diagnose(m, Diagnostics::invalidVisibilityModifierOnTypeOfDecl, syntaxNode->astNodeType);
                 return m;
             }
+        }
+
+        if (auto attr = as<GLSLLayoutLocalSizeAttribute>(m))
+        {
+            SLANG_ASSERT(attr->args.getCount() == 3);
+
+            int32_t values[3];
+
+            for (int i = 0; i < 3; ++i)
+            {
+                int32_t value = 1;
+
+                auto arg = attr->args[i];
+                if (arg)
+                {
+                    auto intValue = checkConstantIntVal(arg);
+                    if (!intValue)
+                    {
+                        return nullptr;
+                    }
+                    if (intValue->getValue() < 1)
+                    {
+                        getSink()->diagnose(attr, Diagnostics::nonPositiveNumThreads, intValue->getValue());
+                        return nullptr;
+                    }
+                    value = int32_t(intValue->getValue());
+                }
+                values[i] = value;
+            }
+
+            attr->x = values[0];
+            attr->y = values[1];
+            attr->z = values[2];
         }
 
         // Default behavior is to leave things as they are,

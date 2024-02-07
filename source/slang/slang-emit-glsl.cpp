@@ -9,6 +9,7 @@
 
 #include "slang-legalize-types.h"
 #include "slang-ir-layout.h"
+#include "slang/slang-ir.h"
 
 #include <assert.h>
 
@@ -63,43 +64,14 @@ SlangResult GLSLSourceEmitter::init()
 
 void GLSLSourceEmitter::_requireRayTracing()
 {
-    // There is more than one extension that provides ray-tracing capabilities,
-    // and we need to pick which one to enable.
-    //
-    // By default, we will use the `GL_EXT_ray_tracing` extension, but if
-    // the user has explicitly opted in to the `GL_NV_ray_tracing` extension
-    // we will use that one instead.
-    //
-    if( getTargetCaps().implies(CapabilityAtom::_GL_NV_ray_tracing) )
-    {
-        m_glslExtensionTracker->requireExtension(UnownedStringSlice::fromLiteral("GL_NV_ray_tracing"));
-    }
-    else
-    {
-        m_glslExtensionTracker->requireExtension(UnownedStringSlice::fromLiteral("GL_EXT_ray_tracing"));
-        m_glslExtensionTracker->requireSPIRVVersion(SemanticVersion(1, 4));
-    }
-
+    m_glslExtensionTracker->requireExtension(UnownedStringSlice::fromLiteral("GL_EXT_ray_tracing"));
+    m_glslExtensionTracker->requireSPIRVVersion(SemanticVersion(1, 4));
     m_glslExtensionTracker->requireVersion(ProfileVersion::GLSL_460);
 }
 
 void GLSLSourceEmitter::_requireFragmentShaderBarycentric()
 {
-    // There is more than one extension that provides barycentric coords in fragment shaders,
-    // and we need to pick which one to enable.
-    //
-    // By default, we will use the `GL_EXT_fragment_shader_barycentric` extension, but if
-    // the user has explicitly opted in to the `GL_NV_fragment_shader_barycentric` extension 
-    // we will use that one instead.
-    
-    if( getTargetCaps().implies(CapabilityAtom::_GL_NV_fragment_shader_barycentric) )
-    {
-        m_glslExtensionTracker->requireExtension(UnownedStringSlice::fromLiteral("GL_NV_fragment_shader_barycentric"));
-    }
-    else
-    {
-        m_glslExtensionTracker->requireExtension(UnownedStringSlice::fromLiteral("GL_EXT_fragment_shader_barycentric"));
-    }
+    m_glslExtensionTracker->requireExtension(UnownedStringSlice::fromLiteral("GL_EXT_fragment_shader_barycentric"));
     m_glslExtensionTracker->requireVersion(ProfileVersion::GLSL_450);
 }
 
@@ -128,11 +100,6 @@ void GLSLSourceEmitter::_requireGLSLVersion(int version)
     {
 #define CASE(NUMBER) \
     case NUMBER: _requireGLSLVersion(ProfileVersion::GLSL_##NUMBER); break
-
-        CASE(110);
-        CASE(120);
-        CASE(130);
-        CASE(140);
         CASE(150);
         CASE(330);
         CASE(400);
@@ -155,7 +122,28 @@ void GLSLSourceEmitter::_emitGLSLStructuredBuffer(IRGlobalParam* varDecl, IRHLSL
     _requireGLSLVersion(430);
 
     m_writer->emit("layout(");
-    m_writer->emit(getTargetReq()->getForceGLSLScalarBufferLayout() ? "scalar" : "std430");
+    auto layoutTypeOp = structuredBufferType->getDataLayout()
+        ? structuredBufferType->getDataLayout()->getOp()
+        : kIROp_DefaultBufferLayoutType;
+    switch (layoutTypeOp)
+    {
+    case kIROp_DefaultBufferLayoutType:
+        m_writer->emit(getTargetReq()->getForceGLSLScalarBufferLayout() ? "scalar" : "std430");
+        break;
+    case kIROp_Std430BufferLayoutType:
+        m_writer->emit("std430");
+        break;
+    case kIROp_Std140BufferLayoutType:
+        m_writer->emit("std140");
+        break;
+    case kIROp_ScalarBufferLayoutType:
+        _requireGLSLExtension(toSlice("GL_EXT_scalar_block_layout"));
+        m_writer->emit("scalar");
+        break;
+    default:
+        m_writer->emit("std430");
+        break;
+    }
 
     bool isReadOnly = (as<IRHLSLStructuredBufferType>(structuredBufferType) != nullptr);
     auto layout = getVarLayout(varDecl);
@@ -229,8 +217,7 @@ void GLSLSourceEmitter::_emitGLSLStructuredBuffer(IRGlobalParam* varDecl, IRHLSL
     m_writer->emit(";\n");
 }
 
-
-void GLSLSourceEmitter::_emitGLSLByteAddressBuffer(IRGlobalParam* varDecl, IRByteAddressBufferTypeBase* byteAddressBufferType)
+void GLSLSourceEmitter::emitSSBOHeader(IRGlobalParam* varDecl, IRType* bufferType)
 {
     // TODO: A lot of this logic is copy-pasted from `emitIRStructuredBuffer_GLSL`.
     // It might be worthwhile to share the common code to avoid regressions sneaking
@@ -242,14 +229,46 @@ void GLSLSourceEmitter::_emitGLSLByteAddressBuffer(IRGlobalParam* varDecl, IRByt
     _requireGLSLVersion(430);
 
     m_writer->emit("layout(");
-    m_writer->emit(getTargetReq()->getForceGLSLScalarBufferLayout() ? "scalar" : "std430");
+    IROp layoutOp = kIROp_DefaultBufferLayoutType;
+    if (auto structBufferType = as<IRHLSLStructuredBufferTypeBase>(bufferType))
+    {
+        layoutOp = structBufferType->getDataLayout()? structBufferType->getDataLayout()->getOp() : kIROp_DefaultBufferLayoutType;
+    }
+    else if (auto ssboType = as<IRGLSLShaderStorageBufferType>(bufferType))
+    {
+        layoutOp = ssboType->getDataLayout() ? ssboType->getDataLayout()->getOp() : kIROp_DefaultBufferLayoutType;
+    }
+
+    if (layoutOp == kIROp_DefaultBufferLayoutType)
+    {
+        m_writer->emit(getTargetReq()->getForceGLSLScalarBufferLayout() ? "scalar" : "std430");
+    }
+    else
+    {
+        switch (layoutOp)
+        {
+        case kIROp_DefaultBufferLayoutType:
+            m_writer->emit(getTargetReq()->getForceGLSLScalarBufferLayout() ? "scalar" : "std430");
+            break;
+        case kIROp_Std430BufferLayoutType:
+            m_writer->emit("std430");
+            break;
+        case kIROp_Std140BufferLayoutType:
+            m_writer->emit("std140");
+            break;
+        case kIROp_ScalarBufferLayoutType:
+            _requireGLSLExtension(toSlice("GL_EXT_scalar_block_layout"));
+            m_writer->emit("scalar");
+            break;
+        }
+    }
 
     auto layout = getVarLayout(varDecl);
     if (layout)
     {
-        // We can use ShaderResource/DescriptorSlot interchangably here. 
+        // We can use ShaderResource/DescriptorSlot interchangably here.
         // This is possible because vk-shift-*
-        bool isReadOnly = (as<IRHLSLByteAddressBufferType>(byteAddressBufferType) != nullptr);
+        bool isReadOnly = (as<IRHLSLByteAddressBufferType>(bufferType) != nullptr);
 
         const LayoutResourceKindFlags kinds = (isReadOnly ? LayoutResourceKindFlag::ShaderResource : LayoutResourceKindFlag::UnorderedAccess)
             | LayoutResourceKindFlag::DescriptorTableSlot;
@@ -283,12 +302,17 @@ void GLSLSourceEmitter::_emitGLSLByteAddressBuffer(IRGlobalParam* varDecl, IRByt
     HLSLRasterizerOrderedByteAddressBufferType  - Allows read/write access
     */
 
-    if (as<IRHLSLByteAddressBufferType>(byteAddressBufferType))
+    if (as<IRHLSLByteAddressBufferType>(bufferType))
     {
         m_writer->emit("readonly ");
     }
 
     m_writer->emit("buffer ");
+}
+
+void GLSLSourceEmitter::_emitGLSLByteAddressBuffer(IRGlobalParam* varDecl, IRByteAddressBufferTypeBase* byteAddressBufferType)
+{
+    emitSSBOHeader(varDecl, byteAddressBufferType);
 
     // Generate a dummy name for the block
     m_writer->emit("_S");
@@ -300,6 +324,21 @@ void GLSLSourceEmitter::_emitGLSLByteAddressBuffer(IRGlobalParam* varDecl, IRByt
 
     m_writer->dedent();
     m_writer->emit("} ");
+
+    m_writer->emit(getName(varDecl));
+    emitArrayBrackets(varDecl->getDataType());
+
+    m_writer->emit(";\n");
+}
+
+void GLSLSourceEmitter::_emitGLSLSSBO(IRGlobalParam* varDecl, IRGLSLShaderStorageBufferType* ssboType)
+{
+    emitSSBOHeader(varDecl, ssboType);
+
+    const auto structType = cast<IRStructType>(ssboType->getOperand(0));
+    m_writer->emit(getName(structType));
+    m_writer->emit("_Block");
+    emitStructDeclarationsBlock(structType, true);
 
     m_writer->emit(getName(varDecl));
     emitArrayBrackets(varDecl->getDataType());
@@ -664,14 +703,7 @@ bool GLSLSourceEmitter::_emitGLSLLayoutQualifierWithBindingKinds(LayoutResourceK
             m_writer->emit("layout(push_constant)\n");
             break;
         case LayoutResourceKind::ShaderRecord:
-            if (getTargetCaps().implies(CapabilityAtom::_GL_NV_ray_tracing))
-            {
-                m_writer->emit("layout(shaderRecordNV)\n");
-            }
-            else
-            {
-                m_writer->emit("layout(shaderRecordEXT)\n");
-            }
+            m_writer->emit("layout(shaderRecordEXT)\n");
             break;
 
     }
@@ -1282,6 +1314,11 @@ bool GLSLSourceEmitter::tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* v
         _emitGLSLByteAddressBuffer(varDecl, byteAddressBufferType);
         return true;
     }
+    else if (const auto glslSSBOType = as<IRGLSLShaderStorageBufferType>(unwrapArray(varType)))
+    {
+        _emitGLSLSSBO(varDecl, glslSSBOType);
+        return true;
+    }
 
     // We want to skip the declaration of any system-value variables
     // when outputting GLSL (well, except in the case where they
@@ -1405,40 +1442,19 @@ void GLSLSourceEmitter::emitLayoutQualifiersImpl(IRVarLayout* layout)
 
             case LayoutResourceKind::RayPayload:
             {
-                if( getTargetCaps().implies(CapabilityAtom::_GL_NV_ray_tracing) )
-                {
-                    m_writer->emit("rayPayloadInNV ");
-                }
-                else
-                {
-                    m_writer->emit("rayPayloadInEXT ");
-                }
+                m_writer->emit("rayPayloadInEXT ");
             }
             break;
 
             case LayoutResourceKind::CallablePayload:
             {
-                if( getTargetCaps().implies(CapabilityAtom::_GL_NV_ray_tracing) )
-                {
-                    m_writer->emit("callableDataInNV ");
-                }
-                else
-                {
-                    m_writer->emit("callableDataInEXT ");
-                }
+                m_writer->emit("callableDataInEXT ");
             }
             break;
 
             case LayoutResourceKind::HitAttributes:
             {
-                if( getTargetCaps().implies(CapabilityAtom::_GL_NV_ray_tracing) )
-                {
-                    m_writer->emit("hitAttributeNV ");
-                }
-                else
-                {
-                    m_writer->emit("hitAttributeEXT ");
-                }
+                m_writer->emit("hitAttributeEXT ");
             }
             break;
 
@@ -1603,6 +1619,25 @@ void GLSLSourceEmitter::emitBufferPointerTypeDefinition(IRInst* ptrType)
     m_writer->emit("};\n");
 }
 
+// Is this type only used by SSBO declarations, if so then we don't need to
+// emit it and it'll be emitted inline there.
+static bool isSSBOInternalStructType(IRInst* inst)
+{
+    if(!as<IRStructType>(inst))
+        return false;
+
+    bool onlySSBOUses = true;
+    for(auto use = inst->firstUse; use; use = use->nextUse)
+    {
+        if(!as<IRGLSLShaderStorageBufferType>(use->user))
+        {
+            onlySSBOUses = false;
+            break;
+        }
+    }
+    return onlySSBOUses;
+}
+
 void GLSLSourceEmitter::emitGlobalInstImpl(IRInst* inst)
 {
     switch (inst->getOp())
@@ -1610,6 +1645,11 @@ void GLSLSourceEmitter::emitGlobalInstImpl(IRInst* inst)
     case kIROp_HLSLConstBufferPointerType:
         emitBufferPointerTypeDefinition(inst);
         break;
+    // No need to use structs which are just taking part in a SSBO declaration
+    case kIROp_StructType:
+        if(isSSBOInternalStructType(inst))
+            break;
+        [[fallthrough]];
     default:
         Super::emitGlobalInstImpl(inst);
         break;
@@ -2065,6 +2105,21 @@ void GLSLSourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)
 
         }
     }
+
+    // The function may have IRRequireGLSLExtensionInst in its body. We also need to look for them.
+    auto func = as<IRFunc>(inst);
+    if (!func)
+        return;
+    auto block = func->getFirstBlock();
+    if (!block)
+        return;
+    for (auto childInst : block->getChildren())
+    {
+        if (auto requireGLSLExt = as<IRRequireGLSLExtension>(childInst))
+        {
+            _requireGLSLExtension(requireGLSLExt->getExtensionName());
+        }
+    }
 }
 
 static Index _getGLSLVersion(ProfileVersion profile)
@@ -2072,10 +2127,6 @@ static Index _getGLSLVersion(ProfileVersion profile)
     switch (profile)
     {
 #define CASE(TAG, VALUE) case ProfileVersion::TAG: return VALUE;
-        CASE(GLSL_110, 110);
-        CASE(GLSL_120, 120);
-        CASE(GLSL_130, 130);
-        CASE(GLSL_140, 140);
         CASE(GLSL_150, 150);
         CASE(GLSL_330, 330);
         CASE(GLSL_400, 400);
@@ -2415,45 +2466,8 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         {
             case kIROp_RaytracingAccelerationStructureType:
             {
-                // Note: We have the problem here that we want to do `_requireRayTracing()`,
-                // but just based on the use of a ray-tracing acceleration structure we
-                // cannot know which extension the user means to use. The current options are:
-                //
-                //  * GL_NV_ray_tracing
-                //  * GL_EXT_ray_tracing
-                //  * GL_EXT_ray_query
-                //
-                // The first two options there are basically equivalent extensions with
-                // different GLSL syntax. We end up requiring the user to opt in to
-                // `GL_NV_ray_tracing` using target capabilities, and will always default
-                // to `GL_EXT_ray_tracing` otherwise.
-                //
-                if( getTargetCaps().implies(CapabilityAtom::_GL_NV_ray_tracing) )
-                {
-                    // If the user has explicitly opted in to `GL_NV_ray_tracing`,
-                    // then we don't need to explicitly request the extentsion again.
-                    // We know that the acceleration structure type will translate
-                    // to the one from that extension:
-                    //
-                    _requireRayTracing();
-                    m_writer->emit("accelerationStructureNV");
-                }
-                else
-                {
-                    // If the user does *not* opt into a specific extension, then we
-                    // have the problem that either `GL_EXT_ray_tracing` or `GL_EXT_ray-query`
-                    // could provide the `accelerationSturctureEXT` type, but there
-                    // can be drivers that provide only one and not the other.
-                    //
-                    // For now we will just kludge this by assuming that any driver
-                    // that supports one of these extensions supports the other.
-                    //
-                    // TODO: Revisit that decision once the driver landscape is more stable/clear.
-                    //
-                    _requireRayTracing();
-
-                    m_writer->emit("accelerationStructureEXT");
-                }
+                _requireRayTracing();
+                m_writer->emit("accelerationStructureEXT");
                 break;
             }
 
@@ -2516,14 +2530,7 @@ bool GLSLSourceEmitter::_maybeEmitInterpolationModifierText(IRInterpolationMode 
             if( stage == Stage::Fragment && isInput)
             {
                 _requireFragmentShaderBarycentric();
-                if (getTargetCaps().implies(CapabilityAtom::_GL_NV_fragment_shader_barycentric))
-                {
-                    m_writer->emit("pervertexNV ");    
-                }
-                else 
-                {
-                    m_writer->emit("pervertexEXT ");
-                }
+                m_writer->emit("pervertexEXT ");
             }
             else 
             {
@@ -2630,6 +2637,7 @@ void GLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
     for (auto decoration : varDecl->getDecorations())
     {
         UnownedStringSlice prefix;
+        UnownedStringSlice postfix = toSlice("EXT");
         if (as<IRVulkanHitAttributesDecoration>(decoration))
         {
             prefix = toSlice("hitAttribute");
@@ -2649,6 +2657,7 @@ void GLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
                 break;
             case kIROp_VulkanHitObjectAttributesDecoration:
                 prefix = toSlice("hitObjectAttribute");
+                postfix = toSlice("NV");
                 locationValue = getIntVal(decoration->getOperand(0));
                 break;
             default:
@@ -2661,17 +2670,7 @@ void GLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
 
         SLANG_ASSERT(prefix.getLength());
         m_writer->emit(prefix);
-
-        // Special case  hitObjectAttribute as is only NV currently 
-        if (decoration->getOp() == kIROp_VulkanHitObjectAttributesDecoration ||
-            getTargetCaps().implies(CapabilityAtom::_GL_NV_ray_tracing))
-        {
-            m_writer->emit(toSlice("NV"));
-        }
-        else
-        {
-            m_writer->emit(toSlice("EXT"));
-        }
+        m_writer->emit(postfix);
         m_writer->emit(toSlice("\n"));
 
         // If we emit a location we are done.

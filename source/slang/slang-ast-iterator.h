@@ -3,16 +3,14 @@
 
 namespace Slang
 {
-template <typename Callback>
+template <typename Callback, typename Filter>
 struct ASTIterator
 {
     const Callback& callback;
-    UnownedStringSlice fileName;
-    SourceManager* sourceManager;
-    ASTIterator(const Callback& func, SourceManager* manager, UnownedStringSlice sourceFileName)
+    const Filter& filter;
+    ASTIterator(const Callback& func, const Filter& filterFunc)
         : callback(func)
-        , fileName(sourceFileName)
-        , sourceManager(manager)
+        , filter(filterFunc)
     {}
 
     void visitDecl(DeclBase* decl);
@@ -429,13 +427,11 @@ struct ASTIterator
     };
 };
 
-template <typename CallbackFunc>
-void ASTIterator<CallbackFunc>::visitDecl(DeclBase* decl)
+template <typename CallbackFunc, typename FilterFunc>
+void ASTIterator<CallbackFunc, FilterFunc>::visitDecl(DeclBase* decl)
 {
     // Don't look at the decl if it is defined in a different file.
-    if (!as<NamespaceDeclBase>(decl) && !sourceManager->getHumaneLoc(decl->loc, SourceLocType::Actual)
-                                      .pathInfo.foundPath.getUnownedSlice()
-                                      .endsWithCaseInsensitive(fileName))
+    if (!filter(decl))
         return;
 
     maybeDispatchCallback(decl);
@@ -490,24 +486,23 @@ void ASTIterator<CallbackFunc>::visitDecl(DeclBase* decl)
         }
     }
 }
-template <typename CallbackFunc>
-void ASTIterator<CallbackFunc>::visitExpr(Expr* expr)
+template <typename CallbackFunc, typename FilterFunc>
+void ASTIterator<CallbackFunc, FilterFunc>::visitExpr(Expr* expr)
 {
     ASTIteratorExprVisitor visitor(this);
     visitor.dispatchIfNotNull(expr);
 }
-template <typename CallbackFunc>
-void ASTIterator<CallbackFunc>::visitStmt(Stmt* stmt)
+template <typename CallbackFunc, typename FilterFunc>
+void ASTIterator<CallbackFunc, FilterFunc>::visitStmt(Stmt* stmt)
 {
     ASTIteratorStmtVisitor visitor(this);
     visitor.dispatchIfNotNull(stmt);
 }
 
-template <typename Func>
-void iterateAST(
-    UnownedStringSlice fileName, SourceManager* manager, SyntaxNode* node, const Func& f)
+template <typename Func, typename FilterFunc>
+void iterateAST(SyntaxNode* node, const FilterFunc& filterFunc, const Func& f)
 {
-    ASTIterator<Func> iter(f, manager, fileName);
+    ASTIterator<Func, FilterFunc> iter(f, filterFunc);
     if (auto decl = as<Decl>(node))
     {
         iter.visitDecl(decl);
@@ -520,5 +515,19 @@ void iterateAST(
     {
         iter.visitStmt(stmt);
     }
+}
+
+template <typename Func>
+void iterateASTWithLanguageServerFilter(
+    UnownedStringSlice fileName, SourceManager* sourceManager, SyntaxNode* node, const Func& f)
+{
+    auto filter = [&](DeclBase* decl)
+        {
+            return as<NamespaceDeclBase>(decl) ||
+                sourceManager->getHumaneLoc(decl->loc, SourceLocType::Actual)
+                .pathInfo.foundPath.getUnownedSlice()
+                .endsWithCaseInsensitive(fileName);
+        };
+    iterateAST(node, filter, f);
 }
 } // namespace Slang

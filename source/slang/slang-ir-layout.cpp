@@ -152,10 +152,18 @@ case kIROp_##TYPE##Type:                                        \
         auto structType = cast<IRStructType>(type);
         IRSizeAndAlignment structLayout;
         IRIntegerValue offset = 0;
+        bool seenFinalUnsizedArrayField = false;
         for (auto field : structType->getFields())
         {
+            // If we failed to catch an unsized array earlier in the pipeline,
+            // this will pick it up before generating nonsense results for
+            // subsequent offsets
+            SLANG_ASSERT(!seenFinalUnsizedArrayField);
+
             IRSizeAndAlignment fieldTypeLayout;
             SLANG_RETURN_ON_FAIL(getSizeAndAlignment(target, rules, field->getFieldType(), &fieldTypeLayout));
+            seenFinalUnsizedArrayField = fieldTypeLayout.size == IRSizeAndAlignment::kIndeterminateSize;
+
             structLayout.size = align(offset, fieldTypeLayout.alignment);
             structLayout.alignment = std::max(structLayout.alignment, fieldTypeLayout.alignment);
 
@@ -199,6 +207,15 @@ case kIROp_##TYPE##Type:                                        \
             arrayType->getElementType(),
             arrayType->getElementCount(),
             outSizeAndAlignment);
+    }
+    break;
+
+    case kIROp_UnsizedArrayType:
+    {
+        auto unsizedArrayType = cast<IRUnsizedArrayType>(type);
+        getSizeAndAlignment(target, rules, unsizedArrayType->getElementType(), outSizeAndAlignment);
+        outSizeAndAlignment->size = IRSizeAndAlignment::kIndeterminateSize;
+        return SLANG_OK;
     }
     break;
 
@@ -299,6 +316,12 @@ case kIROp_##TYPE##Type:                                        \
         return SLANG_OK;
     }
     break;
+    case kIROp_ScalarBufferLayoutType:
+    case kIROp_Std140BufferLayoutType:
+    case kIROp_Std430BufferLayoutType:
+    case kIROp_DefaultBufferLayoutType:
+        *outSizeAndAlignment = IRSizeAndAlignment(0, 4);
+        return SLANG_OK;
     default:
         break;
     }
@@ -307,6 +330,7 @@ case kIROp_##TYPE##Type:                                        \
         *outSizeAndAlignment = IRSizeAndAlignment(8, 8);
         return SLANG_OK;
     }
+
     return SLANG_FAIL;
 }
 

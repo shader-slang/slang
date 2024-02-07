@@ -52,7 +52,7 @@ namespace Slang
         // local `struct` declaration, where it would have members
         // that need to be recursively checked.
         //
-        ensureDeclBase(stmt->decl, DeclCheckState::Checked, this);
+        ensureDeclBase(stmt->decl, DeclCheckState::DefinitionChecked, this);
     }
 
     void SemanticsStmtVisitor::visitBlockStmt(BlockStmt* stmt)
@@ -207,7 +207,7 @@ namespace Slang
 
         stmt->varDecl->type.type = m_astBuilder->getIntType();
         addModifier(stmt->varDecl, m_astBuilder->create<ConstModifier>());
-        stmt->varDecl->setCheckState(DeclCheckState::Checked);
+        stmt->varDecl->setCheckState(DeclCheckState::DefinitionChecked);
 
         IntVal* rangeBeginVal = nullptr;
         IntVal* rangeEndVal = nullptr;
@@ -280,7 +280,20 @@ namespace Slang
     void SemanticsStmtVisitor::visitTargetCaseStmt(TargetCaseStmt* stmt)
     {
         auto switchStmt = FindOuterStmt<TargetSwitchStmt>();
+        CapabilitySet set((CapabilityName)stmt->capability);
+        if (getShared()->isInLanguageServer() && getShared()->getSession()->getCompletionRequestTokenName() == stmt->capabilityToken.getName())
+        {
+            getShared()->getLinkage()->contentAssistInfo.completionSuggestions.scopeKind = CompletionSuggestions::ScopeKind::Capabilities;
+        }
 
+        if (stmt->capabilityToken.getContentLength() != 0 &&
+            (set.getExpandedAtoms().getCount() != 1 || set.isInvalid() || set.isEmpty()))
+        {
+            getSink()->diagnose(
+                stmt->capabilityToken.loc,
+                Diagnostics::invalidTargetSwitchCase,
+                capabilityNameToString((CapabilityName)stmt->capability));
+        }
         if (!switchStmt)
         {
             getSink()->diagnose(stmt, Diagnostics::caseOutsideSwitch);
@@ -648,7 +661,7 @@ namespace Slang
     {
         stmt->device = CheckExpr(stmt->device);
         stmt->gridDims = CheckExpr(stmt->gridDims);
-        ensureDeclBase(stmt->dispatchThreadID, DeclCheckState::Checked, this);
+        ensureDeclBase(stmt->dispatchThreadID, DeclCheckState::DefinitionChecked, this);
         WithOuterStmt subContext(this, stmt);
         stmt->kernelCall = subContext.CheckExpr(stmt->kernelCall);
         return;
