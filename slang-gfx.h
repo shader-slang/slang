@@ -2639,6 +2639,10 @@ public:
         0xc3d5f782, 0xeae1, 0x4da6, { 0xab, 0x40, 0x75, 0x32, 0x31, 0x2, 0xb7, 0xdc } \
     }
 
+#define SLANG_UUID_IVulkanPipelineCreationAPIDispatcher                                 \
+    {                                                                                   \
+        0x4fcf1274, 0x8752, 0x4743, { 0xb3, 0x51, 0x47, 0xcb, 0x83, 0x71, 0xef, 0x99 }  \
+    }
 
 // Global public functions
 
