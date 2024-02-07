@@ -2,24 +2,54 @@
 
 typedef uint UINT;
 
-__generic<T>
-__intrinsic_op($(kIROp_StructuredBufferGetDimensions))
-uint2 __structuredBufferGetDimensions(AppendStructuredBuffer<T> buffer);
+[sealed]
+interface IBufferDataLayout
+{
+}
 
-__generic<T>
+__intrinsic_type($(kIROp_DefaultBufferLayoutType))
+struct DefaultDataLayout : IBufferDataLayout
+{};
+
+__intrinsic_type($(kIROp_Std140BufferLayoutType))
+[require(spirv)]
+[require(glsl)]
+struct Std140DataLayout : IBufferDataLayout
+{};
+
+__intrinsic_type($(kIROp_Std430BufferLayoutType))
+[require(spirv)]
+[require(glsl)]
+struct Std430DataLayout : IBufferDataLayout
+{};
+
+__intrinsic_type($(kIROp_ScalarBufferLayoutType))
+struct ScalarDataLayout : IBufferDataLayout
+{};
+
+__generic<T, L : IBufferDataLayout = DefaultDataLayout>
+__intrinsic_type($(kIROp_GLSLShaderStorageBufferType))
+__magic_type(GLSLShaderStorageBufferType)
+struct GLSLShaderStorageBuffer {}
+
+__generic<T,L:IBufferDataLayout>
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
-uint2 __structuredBufferGetDimensions(ConsumeStructuredBuffer<T> buffer);
+uint2 __structuredBufferGetDimensions(AppendStructuredBuffer<T,L> buffer);
+
+__generic<T,L:IBufferDataLayout>
+__intrinsic_op($(kIROp_StructuredBufferGetDimensions))
+uint2 __structuredBufferGetDimensions(ConsumeStructuredBuffer<T,L> buffer);
 
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
-uint2 __structuredBufferGetDimensions<T>(StructuredBuffer<T> buffer);
+uint2 __structuredBufferGetDimensions<T,L:IBufferDataLayout>(StructuredBuffer<T,L> buffer);
 
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
-uint2 __structuredBufferGetDimensions<T>(RWStructuredBuffer<T> buffer);
+uint2 __structuredBufferGetDimensions<T,L:IBufferDataLayout>(RWStructuredBuffer<T,L> buffer);
 
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
-uint2 __structuredBufferGetDimensions<T>(RasterizerOrderedStructuredBuffer<T> buffer);
+uint2 __structuredBufferGetDimensions<T,L:IBufferDataLayout>(RasterizerOrderedStructuredBuffer<T,L> buffer);
 
-__generic<T>
+__generic<T, L:IBufferDataLayout=DefaultDataLayout>
 __magic_type(HLSLAppendStructuredBufferType)
 __intrinsic_type($(kIROp_HLSLAppendStructuredBufferType))
 struct AppendStructuredBuffer
@@ -2342,7 +2372,7 @@ void __byteAddressBufferStore<T>(RWByteAddressBuffer buffer, int offset, T value
 __intrinsic_op($(kIROp_ByteAddressBufferStore))
 void __byteAddressBufferStore<T>(RasterizerOrderedByteAddressBuffer buffer, int offset, T value);
 
-__generic<T>
+__generic<T, L:IBufferDataLayout=DefaultDataLayout>
 __magic_type(HLSLStructuredBufferType)
 __intrinsic_type($(kIROp_HLSLStructuredBufferType))
 struct StructuredBuffer
@@ -2375,7 +2405,7 @@ struct StructuredBuffer
     };
 };
 
-__generic<T>
+__generic<T, L:IBufferDataLayout=DefaultDataLayout>
 __magic_type(HLSLConsumeStructuredBufferType)
 __intrinsic_type($(kIROp_HLSLConsumeStructuredBufferType))
 struct ConsumeStructuredBuffer
@@ -2528,18 +2558,16 @@ ${{{{
     }
 
     // FP16x2
-    __cuda_sm_version(2.0)
     [__requiresNVAPI]
     uint _NvInterlockedAddFp16x2(uint byteAddress, uint fp16x2Value)
     {
         __target_switch
         {
         case hlsl:
-            __intrinsic_asm "NvInterlockedAddFp16x2($0, $1, $2))";
+            __intrinsic_asm "NvInterlockedAddFp16x2($0, $1, $2)";
         }
     }
 
-    __cuda_sm_version(2.0)
     [__requiresNVAPI]
     [ForceInline]
     void InterlockedAddF16(uint byteAddress, half value, out half originalValue)
@@ -2555,7 +2583,7 @@ ${{{{
             else
             {
                 byteAddress = byteAddress & ~3;
-                uint packedInput = asuint16(value) << 16;
+                uint packedInput = ((uint)asuint16(value)) << 16;
                 originalValue = asfloat16((uint16_t)(_NvInterlockedAddFp16x2(byteAddress, packedInput) >> 16));
             }
             return;
@@ -3095,7 +3123,7 @@ static const struct {
 for(auto item : kMutableStructuredBufferCases) {
 }}}}
 
-__generic<T>
+__generic<T, L:IBufferDataLayout=DefaultDataLayout>
 __magic_type(HLSL$(item.name)Type)
 __intrinsic_type($(item.op))
 struct $(item.name)
@@ -13014,6 +13042,7 @@ __generic<Shape:__ITextureShape1D2D3D, let format : int>
 extension __TextureImpl<float, Shape, 0, 0, 0, $(kStdlibResourceAccessReadWrite), 0, 0, format>
 {
     [__requiresNVAPI]
+    __glsl_extension(GL_EXT_shader_atomic_float)
     void InterlockedAddF32(vector<uint, Shape.dimensions> coord, float value, out float originalValue)
     {
         __target_switch
@@ -13021,6 +13050,8 @@ extension __TextureImpl<float, Shape, 0, 0, 0, $(kStdlibResourceAccessReadWrite)
         case spirv:
             originalValue = __atomicAdd(this[coord], value);
             return;
+        case glsl:
+            __intrinsic_asm "$3 = imageAtomicAdd($0, $1, $2)";
         case hlsl:
             __intrinsic_asm "$3 = NvInterlockedAddFp32($0, $1, $2)";
         }

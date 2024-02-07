@@ -120,7 +120,7 @@ void Hey::doAnotherThing(int a);
 # inputBuffer
 
 ```
-RWStructuredBuffer<int> inputBuffer
+RWStructuredBuffer<int, DefaultDataLayout> inputBuffer
 ```
 
 ## Description
@@ -330,7 +330,7 @@ An enum
 # outputBuffer
 
 ```
-RWStructuredBuffer<int> outputBuffer
+RWStructuredBuffer<int, DefaultDataLayout> outputBuffer
 ```
 
 ## Description

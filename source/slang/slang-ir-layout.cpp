@@ -316,6 +316,12 @@ case kIROp_##TYPE##Type:                                        \
         return SLANG_OK;
     }
     break;
+    case kIROp_ScalarBufferLayoutType:
+    case kIROp_Std140BufferLayoutType:
+    case kIROp_Std430BufferLayoutType:
+    case kIROp_DefaultBufferLayoutType:
+        *outSizeAndAlignment = IRSizeAndAlignment(0, 4);
+        return SLANG_OK;
     default:
         break;
     }
@@ -324,6 +330,7 @@ case kIROp_##TYPE##Type:                                        \
         *outSizeAndAlignment = IRSizeAndAlignment(8, 8);
         return SLANG_OK;
     }
+
     return SLANG_FAIL;
 }
 
