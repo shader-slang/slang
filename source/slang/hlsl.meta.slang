@@ -2,6 +2,9 @@
 
 typedef uint UINT;
 
+__intrinsic_op($(kIROp_FloatCast))
+T __floatCast<T, U>(U v);
+
 [sealed]
 interface IBufferDataLayout
 {
@@ -4589,7 +4592,7 @@ T exp2(T x)
         }
         else
         {
-            float xf = __slang_noop_cast<float>(x);
+            float xf = __floatCast<float>(x);
             return T(spirv_asm {
                  result:$$float = OpExtInst glsl450 Exp2 $xf
             });
