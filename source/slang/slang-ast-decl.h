@@ -506,7 +506,12 @@ class ImplementingDecl : public IncludeDeclBase
 
 class ModuleDeclarationDecl : public Decl
 {
-    SLANG_AST_CLASS(ModuleDeclarationDecl);
+    SLANG_AST_CLASS(ModuleDeclarationDecl)
+};
+
+class RequireCapabilityDecl : public Decl
+{
+    SLANG_AST_CLASS(RequireCapabilityDecl)
 };
 
 // A generic declaration, parameterized on types/values
