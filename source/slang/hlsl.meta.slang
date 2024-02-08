@@ -9531,22 +9531,32 @@ static const RAY_FLAG RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES       = 0x200;
 
 __target_intrinsic(hlsl, RayDesc)
 __target_intrinsic(cuda, RayDesc)
+//__target_intrinsic(glsl, RayDesc)
+//__target_intrinsic(spirv, RayDesc)
 struct RayDesc
 {
     __target_intrinsic(hlsl, Origin)
     __target_intrinsic(cuda, Origin)
+    //__target_intrinsic(glsl, Origin)
+    //__target_intrinsic(spirv, Origin)
     float3 Origin;
 
     __target_intrinsic(hlsl, TMin)
     __target_intrinsic(cuda, TMin)
+    //__target_intrinsic(glsl, TMin)
+    //__target_intrinsic(spirv, TMin)
     float  TMin;
 
     __target_intrinsic(hlsl, Direction)
     __target_intrinsic(cuda, Direction)
+    //__target_intrinsic(glsl, Direction)
+    //__target_intrinsic(spirv, Direction)
     float3 Direction;
 
     __target_intrinsic(hlsl, TMax)
     __target_intrinsic(cuda, TMax)
+    //__target_intrinsic(glsl, TMax)
+    //__target_intrinsic(spirv, TMax)
     float  TMax;
 };
 
@@ -10644,7 +10654,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         __target_switch
         {
         case hlsl: __intrinsic_asm ".CandidateProceduralPrimitiveNonOpaque";
-        case glsl: __intrinsic_asm "(!rayQueryGetIntersectionCandidateAABBOpaqueEXT($0, false))";
+        case glsl: __intrinsic_asm "(!rayQueryGetIntersectionCandidateAABBOpaqueEXT($0))";
         case spirv:
             uint iCandidateOrCommitted = 0;
             return spirv_asm
@@ -10689,6 +10699,377 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
             };
         }
     }
+
+///missing hlsl equivlent; only implemented for glsl & spirv
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_version(460)
+    [__NoSideEffect]
+    int CandidateRayInstanceCustomIndex()
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "rayQueryGetIntersectionInstanceCustomIndexEXT($0, false)";
+        case spirv:
+            uint iCandidateOrCommitted = 0;
+            return spirv_asm
+            {
+                result:$$int = OpRayQueryGetIntersectionInstanceCustomIndexKHR &this $iCandidateOrCommitted;
+            };
+        }
+    }
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_version(460)
+    [__NoSideEffect]
+    int CommittedRayInstanceCustomIndex()
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "rayQueryGetIntersectionInstanceCustomIndexEXT($0, true)";
+        case spirv:
+            uint iCandidateOrCommitted = 1;
+            return spirv_asm
+            {
+                result:$$int = OpRayQueryGetIntersectionInstanceCustomIndexKHR &this $iCandidateOrCommitted;
+            };
+        }
+    }
+
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_version(460)
+    [__NoSideEffect]
+    int CandidateRayInstanceId()
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "rayQueryGetIntersectionInstanceIdEXT($0, false)";
+        case spirv:
+            uint iCandidateOrCommitted = 0;
+            return spirv_asm
+            {
+                result:$$int = OpRayQueryGetIntersectionInstanceIdKHR &this $iCandidateOrCommitted;
+            };
+        }
+    }
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_version(460)
+    [__NoSideEffect]
+    int CommittedRayInstanceId()
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "rayQueryGetIntersectionInstanceIdEXT($0, true)";
+        case spirv:
+            uint iCandidateOrCommitted = 1;
+            return spirv_asm
+            {
+                result:$$int = OpRayQueryGetIntersectionInstanceIdKHR &this $iCandidateOrCommitted;
+            };
+        }
+    }
+
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_version(460)
+    [__NoSideEffect]
+    uint CandidateRayInstanceShaderBindingTableRecordOffset()
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "rayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetEXT($0, false)";
+        case spirv:
+            uint iCandidateOrCommitted = 0;
+            return spirv_asm
+            {
+                result:$$uint = OpRayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetKHR &this $iCandidateOrCommitted;
+            };
+        }
+    }
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_version(460)
+    [__NoSideEffect]
+    uint CommittedRayInstanceShaderBindingTableRecordOffset()
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "rayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetEXT($0, true)";
+        case spirv:
+            uint iCandidateOrCommitted = 1;
+            return spirv_asm
+            {
+                result:$$uint = OpRayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetKHR &this $iCandidateOrCommitted;
+            };
+        }
+    }
+    
+    
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_version(460)
+    [__NoSideEffect]
+    int CandidateRayGeometryIndex()
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "rayQueryGetIntersectionGeometryIndexEXT($0, false)";
+        case spirv:
+            uint iCandidateOrCommitted = 0;
+            return spirv_asm
+            {
+                result:$$int = OpRayQueryGetIntersectionGeometryIndexKHR &this $iCandidateOrCommitted;
+            };
+        }
+    }
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_version(460)
+    [__NoSideEffect]
+    int CommittedRayGeometryIndex()
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "rayQueryGetIntersectionGeometryIndexEXT($0, true)";
+        case spirv:
+            uint iCandidateOrCommitted = 1;
+            return spirv_asm
+            {
+                result:$$int = OpRayQueryGetIntersectionGeometryIndexKHR &this $iCandidateOrCommitted;
+            };
+        }
+    }
+    
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_version(460)
+    [__NoSideEffect]
+    int CandidateRayPrimitiveIndex()
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "rayQueryGetIntersectionPrimitiveIndexEXT($0, false)";
+        case spirv:
+            uint iCandidateOrCommitted = 0;
+            return spirv_asm
+            {
+                result:$$int = OpRayQueryGetIntersectionPrimitiveIndexKHR &this $iCandidateOrCommitted;
+            };
+        }
+    }
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_version(460)
+    [__NoSideEffect]
+    int CommittedRayPrimitiveIndex()
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "rayQueryGetIntersectionPrimitiveIndexEXT($0, true)";
+        case spirv:
+            uint iCandidateOrCommitted = 1;
+            return spirv_asm
+            {
+                result:$$int = OpRayQueryGetIntersectionPrimitiveIndexKHR &this $iCandidateOrCommitted;
+            };
+        }
+    }
+
+    __glsl_extension(GL_EXT_ray_query)
+        __glsl_version(460)
+            [__NoSideEffect]
+    float2 CandidateRayBarycentrics()
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "rayQueryGetIntersectionBarycentricsEXT($0, false)";
+        case spirv:
+            uint iCandidateOrCommitted = 0;
+            return spirv_asm
+            {
+                result:$$float2 = OpRayQueryGetIntersectionBarycentricsKHR &this $iCandidateOrCommitted;
+            };
+        }
+    }
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_version(460)
+    [__NoSideEffect]
+    float2 CommittedRayBarycentrics()
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "rayQueryGetIntersectionBarycentricsEXT($0, true)";
+        case spirv:
+            uint iCandidateOrCommitted = 1;
+            return spirv_asm
+            {
+                result:$$float2 = OpRayQueryGetIntersectionBarycentricsKHR &this $iCandidateOrCommitted;
+            };
+        }
+    }
+
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_version(460)
+    [__NoSideEffect]
+    bool CandidateRayFrontFace()
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "rayQueryGetIntersectionFrontFaceEXT($0, false)";
+        case spirv:
+            uint iCandidateOrCommitted = 0;
+            return spirv_asm
+            {
+                result:$$bool = OpRayQueryGetIntersectionFrontFaceKHR &this $iCandidateOrCommitted;
+            };
+        }
+    }
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_version(460)
+    [__NoSideEffect]
+    bool CommittedRayFrontFace()
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "rayQueryGetIntersectionFrontFaceEXT($0, true)";
+        case spirv:
+            uint iCandidateOrCommitted = 1;
+            return spirv_asm
+            {
+                result:$$bool = OpRayQueryGetIntersectionFrontFaceKHR &this $iCandidateOrCommitted;
+            };
+        }
+    }
+
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_version(460)
+    [__NoSideEffect]
+    float3 CandidateRayObjectRayDirection()
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "rayQueryGetIntersectionObjectRayDirectionEXT($0, false)";
+        case spirv:
+            uint iCandidateOrCommitted = 0;
+            return spirv_asm
+            {
+                result:$$float3 = OpRayQueryGetIntersectionObjectRayDirectionKHR &this $iCandidateOrCommitted;
+            };
+        }
+    }
+
+    __glsl_extension(GL_EXT_ray_query)
+        __glsl_version(460)
+            [__NoSideEffect]
+    float3 CommittedRayObjectRayDirection()
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "rayQueryGetIntersectionObjectRayDirectionEXT($0, true)";
+        case spirv:
+            uint iCandidateOrCommitted = 1;
+            return spirv_asm
+            {
+                result:$$float3 = OpRayQueryGetIntersectionObjectRayDirectionKHR &this $iCandidateOrCommitted;
+            };
+        }
+    }
+
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_version(460)
+    [__NoSideEffect]
+    float3 CandidateRayObjectRayOrigin()
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "rayQueryGetIntersectionObjectRayOriginEXT($0, false)";
+        case spirv:
+            uint iCandidateOrCommitted = 0;
+            return spirv_asm
+            {
+                result:$$float3 = OpRayQueryGetIntersectionObjectRayOriginKHR &this $iCandidateOrCommitted;
+            };
+        }
+    }
+
+    __glsl_extension(GL_EXT_ray_query)
+        __glsl_version(460)
+    [__NoSideEffect]
+    float3 CommittedRayObjectRayOrigin()
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "rayQueryGetIntersectionObjectRayOriginEXT($0, true)";
+        case spirv:
+            uint iCandidateOrCommitted = 1;
+            return spirv_asm
+            {
+                result:$$float3 = OpRayQueryGetIntersectionObjectRayOriginKHR &this $iCandidateOrCommitted;
+            };
+        }
+    }
+
+    __glsl_extension(GL_EXT_ray_query)
+        __glsl_version(460)
+    [__NoSideEffect]
+    float4x3 CandidateRayObjectToWorld()
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "rayQueryGetIntersectionObjectToWorldEXT($0, false)";
+        case spirv:
+            uint iCandidateOrCommitted = 0;
+            return spirv_asm
+            {
+                result:$$float4x3 = OpRayQueryGetIntersectionObjectToWorldKHR &this $iCandidateOrCommitted;
+            };
+        }
+    }
+    
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_version(460)
+    [__NoSideEffect]
+    float4x3 CommittedRayObjectToWorld()
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "rayQueryGetIntersectionObjectToWorldEXT($0, true)";
+        case spirv:
+            uint iCandidateOrCommitted = 1;
+            return spirv_asm
+            {
+                result:$$float4x3 = OpRayQueryGetIntersectionObjectToWorldKHR &this $iCandidateOrCommitted;
+            };
+        }
+    }
+
+
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_version(460)
+    [__NoSideEffect]
+    float4x3 CandidateRayWorldToObject()
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "rayQueryGetIntersectionWorldToObjectEXT($0, false)";
+        case spirv:
+            uint iCandidateOrCommitted = 0;
+            return spirv_asm
+            {
+                result:$$float4x3 = OpRayQueryGetIntersectionWorldToObjectKHR &this $iCandidateOrCommitted;
+            };
+        }
+    }
+
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_version(460)
+    [__NoSideEffect]
+    float4x3 CommittedRayWorldToObject()
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "rayQueryGetIntersectionWorldToObjectEXT($0, true)";
+        case spirv:
+            uint iCandidateOrCommitted = 1;
+            return spirv_asm
+            {
+                OpRayQueryGetIntersectionWorldToObjectKHR $$float4x3 result &this $iCandidateOrCommitted;
+            };
+        }
+    }
+///~
 
 ${{{{
     const char* kCandidateCommitted[] = {"Candidate", "Committed"};
@@ -11036,6 +11417,7 @@ struct HitObject
                 let tmin = Ray.TMin;
                 let tmax = Ray.TMax;
                 spirv_asm {
+                    OpCapability ShaderInvocationReorderNV;
                     OpHitObjectTraceRayNV
                         /**/ &__return_val
                         /**/ $AccelerationStructure
@@ -11465,6 +11847,8 @@ struct HitObject
                 let tmin = Ray.TMin;
                 let tmax = Ray.TMax;
                 spirv_asm {
+                    OpExtension "SPV_NV_shader_invocation_reorder";
+                    OpCapability ShaderInvocationReorderNV;
                     OpHitObjectRecordMissNV
                         /**/ &__return_val
                         /**/ $MissShaderIndex
@@ -11608,6 +11992,7 @@ struct HitObject
         case hlsl: __intrinsic_asm ".IsHit";
         case glsl: __intrinsic_asm "hitObjectIsHitNV($0)";
         case spirv: return spirv_asm {
+                OpCapability ShaderInvocationReorderNV;
                 result:$$bool = OpHitObjectIsHitNV &this;
             };
         }
@@ -11781,7 +12166,66 @@ struct HitObject
         }
     }
 
-        /// Returns the attributes of a hit. Valid if the hit object represents a hit or a miss.
+    [__requiresNVAPI]
+    [ForceInline]
+    __glsl_extension(GL_NV_shader_invocation_reorder)
+    float GetCurrentTime() {
+        __target_switch
+        {
+        case glsl:
+            __intrinsic_asm "hitObjectGetCurrentTimeNV($0)";
+        case spirv:
+            spirv_asm {
+                result:$$float = OpHitObjectGetCurrentTimeNV &this
+            };
+        }
+    }
+
+    [__requiresNVAPI]
+    [ForceInline]
+    __glsl_extension(GL_NV_shader_invocation_reorder)
+    float3 GetObjectRayOrigin() {
+        __target_switch
+        {
+        case glsl:
+            __intrinsic_asm "hitObjectGetObjectRayOriginNV($0)";
+        case spirv:
+            spirv_asm {
+                result:$$float3 = OpHitObjectGetObjectRayOriginNV &this
+            };
+        }
+    }
+
+    [__requiresNVAPI]
+    [ForceInline]
+    __glsl_extension(GL_NV_shader_invocation_reorder)
+    float3 GetObjectRayDirection() {
+        __target_switch
+        {
+        case glsl:
+            __intrinsic_asm "hitObjectGetObjectRayDirectionNV($0)";
+        case spirv:
+            spirv_asm {
+                result:$$float3 = OpHitObjectGetObjectRayDirectionNV &this
+            };
+        }
+    }
+
+    [__requiresNVAPI]
+    [ForceInline]
+    __glsl_extension(GL_NV_shader_invocation_reorder)
+    uint2 GetShaderRecordBufferHandle() {
+        __target_switch
+        {
+        case glsl:
+            __intrinsic_asm "hitObjectGetShaderRecordBufferHandleNV($0)";
+        case spirv:
+            spirv_asm {
+                result:$$uint2 = OpHitObjectGetShaderRecordBufferHandleNV &this
+            };
+        }
+    }
+    /// Returns the attributes of a hit. Valid if the hit object represents a hit or a miss.
     [ForceInline]
     attr_t GetAttributes<attr_t>()
     {

@@ -2787,20 +2787,47 @@ public vec4 shadow2DProjLod(sampler2DShadow sampler, vec4 coord, float lod)
     return textureProjLod(sampler, coord, lod);
 }
 
-//
-// Ray tracing
-//
+
+//// RayTracing
 
 public typealias rayQueryEXT = RayQuery;
+public typealias accelerationStructureEXT = RaytracingAccelerationStructure;
+public typealias hitObjectNV = HitObject;
 
+/// GL_EXT_ray_query
+
+// Raytracing constants
+public const uint gl_RayFlagsNoneEXT = 0U;
+public const uint gl_RayFlagsOpaqueEXT = 1U;
+public const uint gl_RayFlagsNoOpaqueEXT = 2U;
+public const uint gl_RayFlagsTerminateOnFirstHitEXT = 4U;
+public const uint gl_RayFlagsSkipClosestHitShaderEXT = 8U;
+public const uint gl_RayFlagsCullBackFacingTrianglesEXT = 16U;
+public const uint gl_RayFlagsCullFrontFacingTrianglesEXT = 32U;
+public const uint gl_RayFlagsCullOpaqueEXT = 64U;
+public const uint gl_RayFlagsCullNoOpaqueEXT = 128U;
+public const uint gl_RayQueryCommittedIntersectionNoneEXT = 0U;
+public const uint gl_RayQueryCommittedIntersectionTriangleEXT = 1U;
+public const uint gl_RayQueryCommittedIntersectionGeneratedEXT = 2U;
+public const uint gl_RayQueryCandidateIntersectionTriangleEXT = 0U;
+public const uint gl_RayQueryCandidateIntersectionAABBEXT = 1U;
+
+// GL_EXT_ray_query functions
+
+[__requiresNVAPI]
 __glsl_extension(GL_EXT_ray_query)
 __glsl_version(460)
-[ForceInline]
-public void rayQueryConfirmIntersectionEXT(inout rayQueryEXT q)
-{
-    q.CommitNonOpaqueTriangleHit();
+public void rayQueryInitializeEXT(
+    inout rayQueryEXT q,
+    accelerationStructureEXT topLevel,
+    uint rayFlags, uint cullMask, vec3 origin,
+    float tMin, vec3 direction, float tMax) {
+
+    q.TraceRayInline(topLevel, rayFlags, cullMask, { origin, tMin, direction, tMax });
+
 }
 
+[__requiresNVAPI]
 __glsl_extension(GL_EXT_ray_query)
 __glsl_version(460)
 [ForceInline]
@@ -2809,6 +2836,31 @@ public bool rayQueryProceedEXT(inout rayQueryEXT q)
     return q.Proceed();
 }
 
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_query)
+__glsl_version(460)
+[mutating]
+public void rayQueryTerminateEXT(inout rayQueryEXT q) {
+    q.Abort();
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_query)
+__glsl_version(460)
+public void rayQueryGenerateIntersectionEXT(inout rayQueryEXT q, float tHit) {
+    q.CommitProceduralPrimitiveHit(tHit);
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_query)
+__glsl_version(460)
+[ForceInline]
+public void rayQueryConfirmIntersectionEXT(inout rayQueryEXT q)
+{
+    q.CommitNonOpaqueTriangleHit();
+}
+
+[__requiresNVAPI]
 __glsl_extension(GL_EXT_ray_query)
 __glsl_version(460)
 [__NoSideEffect]
@@ -2816,30 +2868,718 @@ public uint rayQueryGetIntersectionTypeEXT(rayQueryEXT q, bool committed)
 {
     if (committed)
     {
-        q.CommittedStatus();
+        return q.CommittedStatus();
     }
     else
     {
-        q.CandidateType();
+        return q.CandidateType();
     }
-    return 0;
 }
 
-
-//
-// Subgroup
-//
-
-__glsl_extension(KHR_shader_subgroup)
-__glsl_version(450)
-public void subgroupBarrier()
-{
-    //__subgroupBarrier();
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_query)
+__glsl_version(460)
+public float rayQueryGetRayTMinEXT(rayQueryEXT q) {
+    return q.RayTMin();
 }
 
-__glsl_extension(KHR_shader_subgroup)
-__glsl_version(450)
-public void subgroupMemoryBarrier()
-{
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_query)
+    __glsl_version(460)
+public uint rayQueryGetRayFlagsEXT(rayQueryEXT q) {
+    return q.RayFlags();
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_query)
+__glsl_version(460)
+public vec3 rayQueryGetWorldRayOriginEXT(rayQueryEXT q) {
+    return q.WorldRayOrigin();
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_query)
+__glsl_version(460)
+public vec3 rayQueryGetWorldRayDirectionEXT(rayQueryEXT q) {
+    return q.WorldRayDirection();
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_query)
+    __glsl_version(460)
+public float rayQueryGetIntersectionTEXT(rayQueryEXT q, bool committed) {
+    if (committed) {
+        return q.CommittedRayT();
+    }
+    else {
+        return q.CandidateTriangleRayT();
+    }
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_query)
+__glsl_version(460)
+public int rayQueryGetIntersectionInstanceCustomIndexEXT(rayQueryEXT q, bool committed) {
+    
+    if (committed) {
+        return q.CommittedRayInstanceCustomIndex();
+    }
+    else {
+        return q.CandidateRayInstanceCustomIndex();;
+    }
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_query)
+__glsl_version(460)
+public int rayQueryGetIntersectionInstanceIdEXT(rayQueryEXT q, bool committed) {
+    
+    if (committed) {
+        return q.CommittedRayInstanceId();
+    }
+    else {
+        return q.CandidateRayInstanceId();
+    }
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_query)
+__glsl_version(460)
+public uint rayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetEXT(rayQueryEXT q, bool committed) {
+    
+    if (committed) {
+        return q.CommittedRayInstanceShaderBindingTableRecordOffset();
+    }
+    else {
+        return q.CandidateRayInstanceShaderBindingTableRecordOffset();    
+    }
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_query)
+__glsl_version(460)
+public int rayQueryGetIntersectionGeometryIndexEXT(rayQueryEXT q, bool committed) {
+    
+    if (committed) {
+        return q.CommittedRayGeometryIndex();
+    }
+    else {
+        return q.CandidateRayGeometryIndex();
+    }
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_query)
+__glsl_version(460)
+public int rayQueryGetIntersectionPrimitiveIndexEXT(rayQueryEXT q, bool committed) {
+    
+    if (committed) {
+        return q.CommittedRayPrimitiveIndex();
+    }
+    else {
+        return q.CandidateRayPrimitiveIndex();
+    }
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_query)
+__glsl_version(460)
+public vec2 rayQueryGetIntersectionBarycentricsEXT(rayQueryEXT q, bool committed) {
+    
+    if (committed) {
+        return q.CommittedRayBarycentrics();
+    }
+    else {
+        return q.CandidateRayBarycentrics();
+    }
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_query)
+__glsl_version(460)
+public bool rayQueryGetIntersectionFrontFaceEXT(rayQueryEXT q, bool committed) {
+    
+    if (committed) {
+        return q.CommittedRayFrontFace();
+    }
+    else {
+        return q.CandidateRayFrontFace();
+    }
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_query)
+__glsl_version(460)
+public bool rayQueryGetIntersectionCandidateAABBOpaqueEXT(rayQueryEXT q) {
+    return q.CandidateProceduralPrimitiveNonOpaque();
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_query)
+__glsl_version(460)
+public vec3 rayQueryGetIntersectionObjectRayDirectionEXT(rayQueryEXT q, bool committed) {
+    
+    if (committed) {
+        return q.CommittedRayObjectRayDirection();
+    }
+    else {
+        return q.CandidateRayObjectRayDirection();
+    }
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_query)
+__glsl_version(460)
+public vec3 rayQueryGetIntersectionObjectRayOriginEXT(rayQueryEXT q, bool committed) {
+    
+    if (committed) {
+        return q.CommittedRayObjectRayOrigin();
+    }
+    else {
+        return q.CandidateRayObjectRayOrigin();
+    }
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_query)
+__glsl_version(460)
+public mat4x3 rayQueryGetIntersectionObjectToWorldEXT(rayQueryEXT q, bool committed) {
+
+    if (committed) {
+        return reinterpret<mat4x3, mat3x4>(q.CommittedRayObjectToWorld());
+    }
+    else {
+        return reinterpret<mat4x3, mat3x4>(q.CandidateRayObjectToWorld());
+    }
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_query)
+    __glsl_version(460)
+public mat4x3 rayQueryGetIntersectionWorldToObjectEXT(rayQueryEXT q, bool committed) {
+
+    if (committed) {
+        return reinterpret<mat4x3, mat3x4>(q.CommittedRayWorldToObject());
+    }
+    else {
+        return reinterpret<mat4x3, mat3x4>(q.CandidateRayWorldToObject());
+    }
+}
+
+/// GL_NV_shader_invocation_reorder
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+void hitObjectTraceRayNV(
+    hitObjectNV hitObject,
+    accelerationStructureEXT topLevel,
+    uint rayFlags,
+    uint cullMask,
+    uint sbtRecordOffset,
+    uint sbtRecordStride,
+    uint missIndex,
+    vec3 origin,
+    float Tmin,
+    vec3 direction,
+    float Tmax,
+    int payload) {
+
+    hitObject.TraceRay(
+        topLevel,
+        rayFlags,
+        cullMask,
+        sbtRecordOffset,
+        sbtRecordStride,
+        missIndex,
+        {origin, Tmin, direction, Tmax},
+        payload
+        );
+
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+void hitObjectTraceRayMotionNV(
+    hitObjectNV hitObject, 
+    accelerationStructureEXT topLevel,
+    uint rayFlags,
+    uint cullMask,
+    uint sbtRecordOffset,
+    uint sbtRecordStride,
+    uint missIndex,
+    vec3 origin,
+    float Tmin,
+    vec3 direction,
+    float Tmax,
+    float currentTime,
+    int payload){
+
+    hitObject.TraceMotionRay(
+        topLevel,
+        rayFlags,
+        cullMask,
+        sbtRecordOffset,
+        sbtRecordStride,
+        missIndex,
+        {origin, Tmin, direction, Tmax},
+        currentTime,
+        payload
+        );
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+void hitObjectRecordHitNV(
+    hitObjectNV hitObject,
+    accelerationStructureEXT topLevel,
+    int instanceid,
+    int primitiveid,
+    int geometryindex,
+    uint hitKind,
+    uint sbtRecordOffset,
+    uint sbtRecordStride,
+    vec3 origin,
+    float Tmin,
+    vec3 direction,
+    float Tmax,
+    int attributeLocation){
+
+    hitObject.MakeHit(
+        topLevel,
+        uint(instanceid),
+        uint(primitiveid),
+        uint(geometryindex),
+        hitKind,
+        sbtRecordOffset,
+        sbtRecordStride,
+        {origin, Tmin, direction, Tmax},
+        attributeLocation
+    );
+
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+void hitObjectRecordHitMotionNV(
+    hitObjectNV hitObject,
+    accelerationStructureEXT topLevel,
+    int instanceid,
+    int primitiveid,
+    int geometryindex,
+    uint hitKind,
+    uint sbtRecordOffset,
+    uint sbtRecordStride,
+    vec3 origin,
+    float Tmin,
+    vec3 direction,
+    float Tmax,
+    float currentTime,
+    int attributeLocation){
+
+    hitObject.MakeMotionHit(
+        topLevel,
+        uint(instanceid),
+        uint(primitiveid),
+        uint(geometryindex),
+        hitKind,
+        sbtRecordOffset,
+        sbtRecordStride,
+        {origin, Tmin, direction, Tmax},
+        currentTime,
+        attributeLocation
+    );
+
+}
+
+[__requiresNVAPI]
+void hitObjectRecordHitWithIndexNV(
+    hitObjectNV hitObject,
+    accelerationStructureEXT topLevel,
+    int instanceid,
+    int primitiveid,
+    int geometryindex,
+    uint hitKind,
+    uint sbtRecordIndex,
+    vec3 origin,
+    float Tmin,
+    vec3 direction,
+    float Tmax,
+    int attributeLocation) {
+
+    hitObject.MakeHit(
+        topLevel,
+        uint(instanceid),
+        uint(geometryindex),
+        uint(primitiveid),
+        hitKind,
+        sbtRecordIndex,
+        1,
+        {origin, Tmin, direction, Tmax},
+        attributeLocation
+    );
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+void hitObjectRecordHitWithIndexMotionNV(
+    hitObjectNV hitObject,
+    accelerationStructureEXT topLevel,
+    int instanceid,
+    int primitiveid,
+    int geometryindex,
+    uint hitKind,
+    uint sbtRecordIndex,
+    vec3 origin,
+    float Tmin,
+    vec3 direction,
+    float Tmax,
+    float currentTime,
+    int attributeLocation){
+
+    hitObject.MakeMotionHit(
+        topLevel,
+        uint(instanceid),
+        uint(primitiveid),
+        uint(geometryindex),
+        hitKind,
+        sbtRecordIndex,
+        1,
+        {origin, Tmin, direction, Tmax},
+        currentTime,
+        attributeLocation
+    );
+
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+void hitObjectRecordMissNV(
+    hitObjectNV hitObject, 
+    uint sbtRecordIndex, 
+    vec3 origin,
+    float Tmin,
+    vec3 direction,
+    float Tmax){
+
+    hitObject.MakeMiss(
+        sbtRecordIndex,
+        { origin, Tmin, direction, Tmax }
+        );
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+void hitObjectRecordMissMotionNV(
+    hitObjectNV hitObject, 
+    uint sbtRecordIndex, 
+    vec3 origin,
+    float Tmin,
+    vec3 direction,
+    float Tmax,
+    float currentTime){
+
+    hitObject.MakeMotionMiss(
+        sbtRecordIndex,
+        {origin, Tmin, direction, Tmax},
+        currentTime
+    );
+
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+void hitObjectRecordEmptyNV(
+    hitObjectNV hitObject){
+
+    hitObject.MakeNop();
+
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+__generic<payload_t>
+void hitObjectExecuteShaderNV(
+    hitObjectNV hitObject,
+    payload_t payload){
+
+    // TODO: need to get acceleration stucture associated with hitObjectExecuteShaderNV; KIRop some type fetching + handle internals?
+
+    __target_switch
+    {
+    case glsl:
+    {
+        __intrinsic_asm "hitObjectExecuteShaderNV($0, $1)";
+    }
+    case spirv:
+    {
+
+        return spirv_asm {
+                    OpHitObjectExecuteShaderNV
+                        /**/ $hitObject
+                        /**/ $payload;
+                };
+
+    }
+    }
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+bool hitObjectIsEmptyNV(hitObjectNV hitObject){
+
+    return hitObject.IsNop();
+
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+bool hitObjectIsMissNV(hitObjectNV hitObject){
+
+    return hitObject.IsMiss();
+
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+bool hitObjectIsHitNV(hitObjectNV hitObject){
+
+    return hitObject.IsHit();
+
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+float hitObjectGetRayTMinNV(hitObjectNV hitObject) {
+    return hitObject.GetRayDesc().TMin;  
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+float hitObjectGetRayTMaxNV(hitObjectNV hitObject) {
+    return hitObject.GetRayDesc().TMax; 
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+vec3 hitObjectGetWorldRayOriginNV(hitObjectNV hitObject) {
+    return hitObject.GetRayDesc().Origin;
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+vec3 hitObjectGetWorldRayDirectionNV(hitObjectNV hitObject) {
+    return hitObject.GetRayDesc().Direction; 
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+vec3 hitObjectGetObjectRayOriginNV(hitObjectNV hitObject){
+
+    return hitObject.GetObjectRayOrigin();
+
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+vec3 hitObjectGetObjectRayDirectionNV(hitObjectNV hitObject) {
+
+    return hitObject.GetObjectRayDirection();
+
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+mat4x3 hitObjectGetObjectToWorldNV(hitObjectNV hitObject){
+    return reinterpret<mat4x3, mat3x4>(hitObject.GetObjectToWorld());
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+mat4x3 hitObjectGetWorldToObjectNV(hitObjectNV hitObject) {
+    return bit_cast<mat4x3, mat3x4>(hitObject.GetWorldToObject()); 
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+int hitObjectGetInstanceCustomIndexNV(hitObjectNV hitObject) {
+    return hitObject.GetInstanceID();
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+int hitObjectGetInstanceIdNV(hitObjectNV hitObject) {
+    return hitObject.GetInstanceIndex();
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+int hitObjectGetGeometryIndexNV(hitObjectNV hitObject) {
+    return hitObject.GetGeometryIndex();
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+int hitObjectGetPrimitiveIndexNV(hitObjectNV hitObject) {
+    return hitObject.GetPrimitiveIndex();
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+uint hitObjectGetHitKindNV(hitObjectNV hitObject) {
+    return hitObject.GetHitKind();
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+void hitObjectGetAttributesNV(hitObjectNV hitObject, int attributeLocation) {
+    // TODO: maybe make kIROp which fetches type and feeds that to HLSL to set a buffer which has hitObjectGetShaderRecordBufferHandleNV
+    __target_switch 
+    {
+    case glsl:
+    {
+        __intrinsic_asm "hitObjectGetAttributesNV($0,$1)";
+    }
+    case spirv:
+    {
+        spirv_asm {
+            OpCapability ShaderInvocationReorderNV;
+            OpHitObjectGetAttributesNV &hitObject $attributeLocation;
+        };
+    }
+    }
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+uvec2 hitObjectGetShaderRecordBufferHandleNV(hitObjectNV hitObject) {
+    return hitObject.GetShaderRecordBufferHandle();
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+uint hitObjectGetShaderBindingTableRecordIndexNV(hitObjectNV hitObject){
+    return hitObject.GetShaderTableIndex();
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+float hitObjectGetCurrentTimeNV(hitObjectNV hitObject) {
+    return hitObject.GetCurrentTime();
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+void reorderThreadNV(uint hint, uint bits){
+    ReorderThread(hint, bits);
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+void reorderThreadNV(hitObjectNV hitObject){
+    ReorderThread(hitObject);
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+void reorderThreadNV(hitObjectNV hitObject, uint hint, uint bits){
+    ReorderThread(hitObject, hint, bits);
+}
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_ray_tracing_motion_blur)
+public float gl_SubgroupInvocationID; // RayCurrentTime analog
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_ray_tracing_motion_blur)
+void traceRayMotionNV(
+    accelerationStructureEXT topLevel,
+    uint rayFlags,
+    uint cullMask,
+    uint sbtRecordOffset,
+    uint sbtRecordStride,
+    uint missIndex,
+    vec3 origin,
+    float Tmin,
+    vec3 direction,
+    float Tmax,
+    float currentTime,
+    int payload) {
+    TraceMotionRay(
+        topLevel,
+        rayFlags,
+        cullMask,
+        sbtRecordOffset,
+        sbtRecordStride,
+        missIndex,
+        {origin, Tmin, direction, Tmax},
+        currentTime,
+        payload
+    );
 }
 
