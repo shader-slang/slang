@@ -785,8 +785,6 @@ struct SPIRVEmitContext
             // the ordering of instruction words to be interleaved.
             //
             spvInst = emitGlobalInst(irInst);
-            if (spvInst && !m_mapIRInstToSpvInst.containsKey(irInst))
-                registerInst(irInst, spvInst);
         }
         return spvInst;
     }
