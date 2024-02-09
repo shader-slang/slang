@@ -11,12 +11,6 @@
 precision highp float;
 precision highp int;
 
-//TEST_INPUT:ubuffer(data=[2 3 5 7], stride=4):name=inputBuffer
-buffer MyBlockName
-{
-    uint data[];
-} inputBuffer;
-
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 buffer MyBlockName2 
 {
@@ -26,10 +20,7 @@ buffer MyBlockName2
 layout(local_size_x = 32) in;
 
 void computeMain()
-{
-
-    // TODO: make more robust of a test than simple call verification
-    
+{    
     uint v = gl_NumSubgroups;
 
     v = gl_SubgroupID;

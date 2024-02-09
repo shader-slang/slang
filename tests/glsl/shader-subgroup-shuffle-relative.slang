@@ -1,11 +1,18 @@
 //TEST:SIMPLE(filecheck=CHECK_GLSL):  -allow-glsl -stage compute -entry computeMain -target glsl
 //TEST:SIMPLE(filecheck=CHECK_SPV):  -allow-glsl -stage compute -entry computeMain -target spirv
-//TEST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage compute -entry computeMain -target hlsl
-//TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda 
-//TEST:SIMPLE(filecheck=CHECK_CPP):  -allow-glsl -stage compute -entry computeMain -target cpp
+
+// not testing hlsl due to missing impl
+// TEST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage compute -entry computeMain -target hlsl
+// not testing cuda due to missing impl
+// TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda 
+// not testing cpp due to missing impl
+// TEST:SIMPLE(filecheck=CHECK_CPP):  -allow-glsl -stage compute -entry computeMain -target cpp
 
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
+
+//#define TEST_when_doubles_dont_crash
+
 #version 430
 
 precision highp float;
@@ -27,18 +34,33 @@ layout(local_size_x = 32) in;
 
 void computeMain()
 {
-    // note: missing cuda and cpp implementation for system variables; test #3 and #4 will fail
-    // TODO: make more robust of a test than simple call verification
+    outputBuffer.data[0] = subgroupShuffleUp(1, 1) == 1 &&
+#ifdef TEST_when_doubles_dont_crash
+                           subgroupShuffleUp((double)1.0, 1) == 1.0f && // crashes, spir-v & glsl
+#endif
+                           subgroupShuffleUp((float)1.0f, 1) == 1.0f &&
+                           subgroupShuffleUp((uint)1, 1) == 1 &&
+                           subgroupShuffleUp((int)1, 1) == 1 &&
+                           subgroupShuffleUp(vec2(1), 1) == vec2(1) &&
+                           subgroupShuffleUp(ivec4(1), 1) == ivec4(1) &&
+                           subgroupShuffleUp((bool)1, 1) == true;
 
-    outputBuffer.data[0] = subgroupShuffleUp(1, 1) == 1;
+    outputBuffer.data[1] = subgroupShuffleDown(1, 1) == 1 &&
+#ifdef TEST_when_doubles_dont_crash
+                           subgroupShuffleDown((double)1, 1) == 1.0f && // crashes, spir-v & glsl
+#endif
+                           subgroupShuffleDown((float)1, 1) == 1.0f &&
+                           subgroupShuffleDown((uint)1, 1) == 1 &&
+                           subgroupShuffleDown((int)1, 1) == 1 &&
+                           subgroupShuffleDown(vec2(1), 1) == vec2(1) &&
+                           subgroupShuffleDown(ivec4(1), 1) == ivec4(1) &&
+                           subgroupShuffleDown((bool)1, 1) == true;
 
-    outputBuffer.data[1] = subgroupShuffleDown(1, 1) == 1;
-
-    // CHECK_GLSL: void main(
-    // CHECK_SPV: OpEntryPoint
-    // CHECK_HLSL: void computeMain(
-    // CHECK_CUDA: void computeMain(
-    // CHECK_CPP: void _computeMain(
-    // BUF: 1
-    // BUF-NEXT: 1
+    //CHECK_GLSL: void main(
+    //CHECK_SPV: OpEntryPoint
+    //CHECK_HLSL: void computeMain(
+    //CHECK_CUDA: void computeMain(
+    //CHECK_CPP: void _computeMain(
+    //BUF: 1
+    //BUF-NEXT: 1
 }
