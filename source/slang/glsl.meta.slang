@@ -403,7 +403,7 @@ public bool operator!=<let N : int>(vector<$(typeName), N> left, vector<$(typeNa
 {
     return any(notEqual(left, right));
 }
-${{{{
+${{{{ 
 }
 }}}}
 
@@ -417,3 +417,1399 @@ ${{{{
 {
     return firstbitlow(value);
 }
+
+//// GL_KHR_shader_subgroup 
+
+// GL_KHR_shader_subgroup_*/GLSL ref: https://github.com/KhronosGroup/GLSL/blob/main/extensions/khr/GL_KHR_shader_subgroup.txt
+// also: https://www.khronos.org/blog/vulkan-subgroup-tutorial
+// also: https://www.khronos.org/assets/uploads/developers/library/2018-vulkan-devday/06-subgroups.pdf
+//
+// HLSL ref: https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-intrinsic-functions
+// also: https://github.com/Microsoft/DirectXShaderCompiler/wiki/Wave-Intrinsics
+//
+// CUDA ref: https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html
+//
+// SPIR-V ref: https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#_memory_semantics_id
+
+/// GL_KHR_shader_subgroup Built-In Variables
+// TODO: implementation of built-in variables; proper tests; these are stubs
+// likley related to the following issue since GLSL adds new 
+// 'system' variables: https://github.com/shader-slang/slang/issues/411
+__glsl_extension(GL_KHR_shader_subgroup_basic)
+public uint gl_NumSubgroups;
+
+__glsl_extension(GL_KHR_shader_subgroup_basic)
+public uint gl_SubgroupID;
+
+__glsl_extension(GL_KHR_shader_subgroup_basic)
+public uint gl_SubgroupSize;
+
+__glsl_extension(GL_KHR_shader_subgroup_basic)
+public uint gl_SubgroupInvocationID;
+
+__glsl_extension(GL_KHR_shader_subgroup_basic)
+public uint gl_SubgroupEqMask;
+
+__glsl_extension(GL_KHR_shader_subgroup_basic)
+public uint gl_SubgroupGeMask;
+
+__glsl_extension(GL_KHR_shader_subgroup_basic)
+public uint gl_SubgroupGtMask;
+
+__glsl_extension(GL_KHR_shader_subgroup_basic)
+public uint gl_SubgroupLeMask;
+
+__glsl_extension(GL_KHR_shader_subgroup_basic)
+public uint gl_SubgroupLtMask;
+/// ~GL_KHR_shader_subgroup Built-In Variables
+
+/// GL_KHR_shader_subgroup Functions
+/*
+the cuda code is illistrated by the following c++:
+1. (active & -active) gets the lowest non 0 value
+2. now I need to check if "your lane" == lowest non 0 value
+```
+#include <iostream>
+#include <stdint.h>
+
+//NOTE: active implies that the thread is running;
+//if a divergent branch is taken, the thread is INACTIVE
+
+uint32_t active = 0b1010;
+uint32_t v1 = 2;
+uint32_t v2 = 4;
+
+uint32_t isMin(uint32_t u){
+    return (active & -active) == u;
+}
+int main(){
+    printf("%b\n", isMin(v1));
+    printf("%b\n", isMin(v2));
+}
+```
+*/
+[ForceInline] bool __isMinimumWarpActiveInBranchCUDA() {
+    __intrinsic_asm "( (__activemask() & __activemask()*-1) == _getLaneId())";
+}
+
+__spirv_version(1.3)
+[ForceInline] void __subgroupBarrierSPIRV()
+{
+    spirv_asm {
+        OpControlBarrier Subgroup Subgroup AcquireRelease|SubgroupMemory|ImageMemory|UniformMemory
+    };
+}
+__spirv_version(1.3)
+[ForceInline] void __subgroupMemoryBarrierSPIRV()
+{
+    spirv_asm {
+        OpMemoryBarrier Subgroup AcquireRelease|SubgroupMemory|ImageMemory|UniformMemory
+    };
+}
+__spirv_version(1.3)
+[ForceInline] void __subgroupMemoryBarrierBufferSPIRV()
+{
+    spirv_asm {
+        OpMemoryBarrier Subgroup AcquireRelease|UniformMemory
+    };
+}
+__spirv_version(1.3)
+[ForceInline] void __subgroupMemoryBarrierSharedSPIRV()
+{
+    spirv_asm {
+        OpMemoryBarrier Subgroup AcquireRelease|SubgroupMemory
+    };
+}
+__spirv_version(1.3)
+[ForceInline] void __subgroupMemoryBarrierImageSPIRV()
+{
+    spirv_asm {
+        OpMemoryBarrier Subgroup AcquireRelease|ImageMemory
+    };
+}
+
+__spirv_version(1.3)
+[ForceInline] bool __subgroupAllEqualSPIRV(bool value)
+{
+    return (spirv_asm {
+            OpCapability GroupNonUniformVote;
+            OpGroupNonUniformAllEqual $$bool result Subgroup $value
+    }).x;
+}
+
+__generic<T : __BuiltinType>
+__spirv_version(1.3)
+[ForceInline] T __subgroupBroadcastSPIRV(T value, uint id)
+{
+    return (spirv_asm {
+            OpCapability GroupNonUniformBallot; 
+            OpGroupNonUniformBroadcast $$T result Subgroup $value $id
+    });
+}
+
+__generic<T : __BuiltinType>
+__spirv_version(1.3)
+[ForceInline] T __subgroupBroadcastFirstSPIRV(T value)
+{
+    return (spirv_asm {
+            OpCapability GroupNonUniformBallot; 
+            OpGroupNonUniformBroadcastFirst $$T result Subgroup $value
+    });
+}
+
+__spirv_version(1.3)
+[ForceInline] uvec4 __subgroupBallotSPIRV(bool value)
+{
+    return (spirv_asm {
+            OpCapability GroupNonUniformBallot; 
+            OpGroupNonUniformBallot $$uint4 result Subgroup $value
+    });
+}
+
+__spirv_version(1.3)
+[ForceInline] bool __subgroupInverseBallotSPIRV(uvec4 value)
+{
+    return (spirv_asm {
+            OpCapability GroupNonUniformBallot; 
+            OpGroupNonUniformInverseBallot $$bool result Subgroup $value
+    });
+}
+
+__spirv_version(1.3)
+[ForceInline] bool __subgroupBallotBitExtractSPIRV(uvec4 value, uint index)
+{
+    return (spirv_asm {
+            OpCapability GroupNonUniformBallot; 
+            OpGroupNonUniformBallotBitExtract $$bool result Subgroup $value $index
+    });
+}
+
+__spirv_version(1.3)
+[ForceInline] uint __subgroupBallotBitCountSPIRV(uvec4 value)
+{
+    return (spirv_asm {
+            OpCapability GroupNonUniformBallot; 
+            OpGroupNonUniformBallotBitCount $$uint result Subgroup Reduce $value
+    });
+}
+
+__spirv_version(1.3)
+[ForceInline] uint __subgroupBallotInclusiveBitCountSPIRV(uvec4 value)
+{
+    return (spirv_asm {
+            OpCapability GroupNonUniformBallot; 
+            OpGroupNonUniformBallotBitCount $$uint result Subgroup InclusiveScan $value
+    });
+}
+
+__spirv_version(1.3)
+    [ForceInline] uint __subgroupBallotExclusiveBitCountSPIRV(uvec4 value)
+{
+    return (spirv_asm {
+            OpCapability GroupNonUniformBallot; 
+            OpGroupNonUniformBallotBitCount $$uint result Subgroup ExclusiveScan $value
+    });
+}
+
+__spirv_version(1.3)
+[ForceInline] uint __subgroupBallotFindLSBSPIRV(uvec4 value)
+{
+    return (spirv_asm {
+            OpCapability GroupNonUniformBallot; 
+            OpGroupNonUniformBallotFindLSB $$uint result Subgroup $value
+    });
+}
+
+__spirv_version(1.3)
+[ForceInline] uint __subgroupBallotFindMSBSPIRV(uvec4 value)
+{
+    return (spirv_asm {
+            OpCapability GroupNonUniformBallot; 
+            OpGroupNonUniformBallotFindMSB $$uint result Subgroup $value
+    });
+}
+
+__spirv_version(1.3)
+[ForceInline] uint __subgroupShuffleDownSPIRV(uvec4 value)
+{
+    return (spirv_asm {
+            OpCapability GroupNonUniformBallot; 
+            OpGroupNonUniformBallotFindMSB $$uint result Subgroup $value
+    });
+}
+
+// GL_KHR_shader_subgroup_basic
+
+public void subgroupBarrier();
+public void subgroupMemoryBarrier();
+public void subgroupMemoryBarrierBuffer();
+public void subgroupMemoryBarrierImage();
+public void subgroupMemoryBarrierShared();
+public bool subgroupElect();
+
+__glsl_extension(GL_KHR_shader_subgroup_basic)
+__spirv_version(1.3)
+[ForceInline] void subgroupBarrier()
+{
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm "__syncwarp()";
+    case hlsl:
+        __intrinsic_asm "AllMemoryBarrierWithGroupSync()";
+    case glsl:
+        __intrinsic_asm "subgroupBarrier()";
+    case spirv:
+        __subgroupBarrierSPIRV();
+        return;
+    case cpp:
+        // TODO: cpp
+        return;
+    }
+}
+
+__glsl_extension(GL_KHR_shader_subgroup_basic)
+__spirv_version(1.3)
+[ForceInline] void subgroupMemoryBarrier()
+{
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm "__threadfence_block()";
+    case hlsl:
+        __intrinsic_asm "AllMemoryBarrier()";
+    case glsl:
+        __intrinsic_asm "subgroupMemoryBarrier()";
+    case spirv:
+        __subgroupMemoryBarrierSPIRV();
+        return;
+    case cpp:
+        // TODO: cpp
+        return;
+    }
+}
+
+__glsl_extension(GL_KHR_shader_subgroup_basic)
+__spirv_version(1.3)
+[ForceInline] void subgroupMemoryBarrierBuffer()
+{
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm "__threadfence_block()";
+    case hlsl:
+        __intrinsic_asm "DeviceMemoryBarrier()";
+    case glsl:
+        __intrinsic_asm "subgroupMemoryBarrierBuffer()";
+    case spirv:
+        __subgroupMemoryBarrierBufferSPIRV();
+        return;
+    case cpp:
+        // TODO: cpp
+        return;
+    }
+}
+
+__glsl_extension(GL_KHR_shader_subgroup_basic)
+__spirv_version(1.3)
+[ForceInline] void subgroupMemoryBarrierImage()
+{
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm "__threadfence_block()";
+    case hlsl:
+        __intrinsic_asm "DeviceMemoryBarrier()";
+    case glsl:
+        __intrinsic_asm "subgroupMemoryBarrierImage()";
+    case spirv:
+        __subgroupMemoryBarrierImageSPIRV();
+        return;
+    case cpp:
+        // TODO: cpp
+        return;
+    }
+}
+
+__glsl_extension(GL_KHR_shader_subgroup_basic)
+__spirv_version(1.3)
+[ForceInline] void subgroupMemoryBarrierShared()
+{
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm "__threadfence_block()";
+    case hlsl:
+        __intrinsic_asm "GroupMemoryBarrier()";
+    case glsl:
+        __intrinsic_asm "subgroupMemoryBarrierShared()";
+    case spirv:
+        __subgroupMemoryBarrierSharedSPIRV();
+        return;
+    case cpp:
+        // TODO: cpp
+        return;
+    }
+}
+
+__glsl_extension(GL_KHR_shader_subgroup_basic)
+__spirv_version(1.3)
+[ForceInline] bool subgroupElect()
+{
+    __target_switch
+    {
+    case cuda:
+        return __isMinimumWarpActiveInBranchCUDA();
+    case glsl:
+    case spirv:
+    case hlsl:
+        return WaveIsFirstLane();
+    case cpp:
+        // TODO: cpp
+        return false;
+    }
+}
+
+// ~GL_KHR_shader_subgroup_basic
+
+// GL_KHR_shader_subgroup_vote
+
+public bool subgroupAll(bool value);
+public bool subgroupAny(bool value);
+public bool subgroupAllEqual(bool value);
+
+__glsl_extension(GL_KHR_shader_subgroup_vote)
+__spirv_version(1.3)
+[ForceInline] bool subgroupAll(bool value)
+{
+    __target_switch
+    {
+    case cuda: 
+    case glsl:
+    case spirv:
+    case hlsl:
+        return WaveActiveAllTrue(value);
+    case cpp:
+        // TODO: cpp
+        return false;
+    }
+}
+
+__glsl_extension(GL_KHR_shader_subgroup_vote)
+__spirv_version(1.3)
+[ForceInline] bool subgroupAny(bool value)
+{
+    return WaveMaskAnyTrue(WaveGetActiveMask(), value);
+    
+}
+
+__glsl_extension(GL_KHR_shader_subgroup_vote)
+__spirv_version(1.3)
+[ForceInline] bool subgroupAllEqual(bool value)
+{
+    return WaveMaskAllEqual(WaveGetActiveMask(), value);
+}
+
+// ~GL_KHR_shader_subgroup_vote
+
+// GL_KHR_shader_subgroup_ballot
+
+__generic<T : __BuiltinType> public T subgroupBroadcast(T value, uint id);
+__generic<T : __BuiltinType> public T subgroupBroadcastFirst(T value);
+public uvec4 subgroupBallot(bool value);
+public bool subgroupInverseBallot(uvec4 value);
+public bool subgroupBallotBitExtract(uvec4 value, uint index);
+public uint subgroupBallotBitCount(uvec4 value);
+public uint subgroupBallotInclusiveBitCount(uvec4 value);
+public uint subgroupBallotExclusiveBitCount(uvec4 value);
+public uint subgroupBallotFindLSB(uvec4 value);
+public uint subgroupBallotFindMSB(uvec4 value);
+
+__generic<T : __BuiltinType>
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+__spirv_version(1.3)
+[ForceInline] T subgroupBroadcast(T value, uint id)
+{
+    return WaveMaskBroadcastLaneAt(WaveGetActiveMask(), value, id);
+}
+
+__generic<T : __BuiltinType>
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+__spirv_version(1.3)
+[ForceInline] T subgroupBroadcastFirst(T value)
+{
+    return WaveMaskReadLaneFirst(WaveGetActiveMask(), value);
+}
+
+// WaveMaskBallot is not the same; it force trunc's
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+__spirv_version(1.3)
+[ForceInline] uvec4 subgroupBallot(bool value)
+{
+    return WaveActiveBallot(value);
+}
+
+// logic for HLSL and CUDA which lack InverseBalloc
+// CUDA: works exclusivly 32 waves, therefore only need comp x
+// HLSL:{
+// 1. index into comp I want: index = trunc(float(lane)*(1/32))
+// 2. lane & value[index]
+// note: 1/32 wil be converted to multiplication
+// we do 1/32 since 1 uint stores 32 threads 
+// note 2: we have a waveLaneCount check because based on wave lane count we can determine if we can do a 
+// fast path or slow path (know index is 0 or non 0)
+// }
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+__spirv_version(1.3)
+[ForceInline] bool subgroupInverseBallot(uvec4 value)
+{
+    __target_switch
+    {
+    case cuda:
+        // only has 32 warps
+        __intrinsic_asm "(($0).x >> (c()) & 1)";
+    case hlsl:
+        // much like _WaveCountBits, but here we hope that we hit case 0; we can then avoid the expensive logic
+        const uint waveLaneCount = WaveGetLaneCount();
+        switch ((waveLaneCount - 1) / 32)
+        {
+        case 0:
+            __intrinsic_asm "(($0)[0] >> WaveGetLaneIndex()) & 1)";
+        case 1:
+        case 2:
+        case 3:
+            __intrinsic_asm "((($0)[uint(float(WaveGetLaneIndex())*0.03125f)] >> WaveGetLaneIndex()) & 1)";
+        }
+    case glsl:
+        __intrinsic_asm "subgroupInverseBallot($0)";
+    case spirv:
+        return __subgroupInverseBallotSPIRV(value);
+    case cpp:
+        // TODO: cpp
+        return false;
+    }
+    return false;
+}
+
+// same logic as subgroupInverseBallot
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+__spirv_version(1.3)
+[ForceInline] bool subgroupBallotBitExtract(uvec4 value, uint index)
+{
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm "($1 & ($0).x) != 0";
+    case hlsl:
+        const uint waveLaneCount = WaveGetLaneCount();
+        switch ((waveLaneCount - 1) / 32)
+        {
+        case 0:
+            __intrinsic_asm "($0)[0] & ($1)";
+        case 1:
+        case 2:
+        case 3:
+            __intrinsic_asm "($0)[uint(float($1)*0.03125f)] & ($1)";
+        }
+    case glsl:
+        __intrinsic_asm "subgroupBallotBitExtract($0, $1)";
+    case spirv:
+        return __subgroupBallotBitExtractSPIRV(value, index);
+    case cpp:
+        // TODO: cpp
+        return false;
+    }
+    return false;
+}
+
+
+// the count is only supposed to use uvec4 values within bottom bits of subgroup launched, not a simple countbits
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+__spirv_version(1.3)
+[ForceInline] uint subgroupBallotBitCount(uvec4 value)
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupBallotBitCount($0)";
+    case spirv:
+        return __subgroupBallotBitCountSPIRV(value);
+    case hlsl:
+    case cuda:
+    case cpp:
+        //TODO: implement
+        return 0;
+    }
+}
+
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+__spirv_version(1.3)
+[ForceInline] uint subgroupBallotInclusiveBitCount(uvec4 value)
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupBallotInclusiveBitCount($0)";
+    case spirv:
+        return __subgroupBallotInclusiveBitCountSPIRV(value);
+    case hlsl:
+    case cuda:
+    case cpp:
+        // TODO: implementation
+        return 0;
+    }
+}
+
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+__spirv_version(1.3)
+[ForceInline] uint subgroupBallotExclusiveBitCount(uvec4 value)
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupBallotExclusiveBitCount($0)";
+    case spirv:
+        return __subgroupBallotExclusiveBitCountSPIRV(value);
+    case hlsl:
+    case cuda:
+    case cpp:
+        // TODO: implementation
+        return 0;
+    }
+}
+
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+__spirv_version(1.3)
+[ForceInline] uint subgroupBallotFindLSB(uvec4 value)
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupBallotFindLSB($0)";
+    case spirv:
+        return __subgroupBallotFindLSBSPIRV(value);
+    case hlsl:
+    case cuda:
+    case cpp:
+        // TODO: implementation
+        return 0;
+    }
+}
+
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+__spirv_version(1.3)
+[ForceInline] uint subgroupBallotFindMSB(uvec4 value)
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupBallotFindMSB($0)";
+    case spirv:
+        return __subgroupBallotFindMSBSPIRV(value);
+    case hlsl:
+    case cuda:
+    case cpp:
+        // TODO: implementation
+        return 0;
+    }
+}
+
+// ~GL_KHR_shader_subgroup_ballot
+
+// GL_KHR_shader_subgroup_arithmetic
+
+__generic<T : __BuiltinArithmeticType> 
+public T subgroupAdd(T value);
+
+__generic<T : __BuiltinArithmeticType> 
+public T subgroupMul(T value);
+
+__generic<T : __BuiltinArithmeticType> 
+public T subgroupMin(T value);
+
+__generic<T : __BuiltinArithmeticType> 
+public T subgroupMax(T value);
+
+__generic<T : __BuiltinIntegerType> 
+public T subgroupAnd(T value);
+
+__generic<T : __BuiltinIntegerType> 
+public T subgroupOr(T value);
+
+__generic<T : __BuiltinIntegerType> 
+public T subgroupXor(T value);
+
+__generic<T : __BuiltinArithmeticType>
+public T subgroupInclusiveAdd(T value);
+
+__generic<T : __BuiltinArithmeticType>
+public T subgroupInclusiveMul(T value);
+
+__generic<T : __BuiltinArithmeticType>
+public T subgroupInclusiveMin(T value);
+
+__generic<T : __BuiltinArithmeticType>
+public T subgroupInclusiveMax(T value);
+
+__generic<T : __BuiltinIntegerType>
+public T subgroupInclusiveAnd(T value);
+
+__generic<T : __BuiltinIntegerType>
+public T subgroupInclusiveOr(T value);
+
+__generic<T : __BuiltinIntegerType>
+public T subgroupInclusiveXor(T value);
+
+__generic<T : __BuiltinArithmeticType>
+public T subgroupExclusiveAdd(T value);
+
+__generic<T : __BuiltinArithmeticType>
+public T subgroupExclusiveMul(T value);
+
+__generic<T : __BuiltinArithmeticType>
+public T subgroupExclusiveMin(T value);
+
+__generic<T : __BuiltinArithmeticType>
+public T subgroupExclusiveMax(T value);
+
+__generic<T : __BuiltinIntegerType>
+public T subgroupExclusiveAnd(T value);
+
+__generic<T : __BuiltinIntegerType>
+public T subgroupExclusiveOr(T value);
+
+__generic<T : __BuiltinIntegerType>
+public T subgroupExclusiveXor(T value);
+
+__generic<T : __BuiltinArithmeticType>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+[ForceInline] T subgroupAdd(T value)
+{
+    return WaveMaskSum(WaveGetActiveMask(), value);
+}
+
+__generic<T : __BuiltinArithmeticType>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+[ForceInline] T subgroupMul(T value)
+{
+    return WaveMaskProduct(WaveGetActiveMask(), value);
+}
+
+__generic<T : __BuiltinArithmeticType>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+[ForceInline] T subgroupMin(T value)
+{
+
+    return WaveMaskMin(WaveGetActiveMask(), value);
+}
+
+__generic<T : __BuiltinArithmeticType>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+[ForceInline] T subgroupMax(T value)
+{
+
+    return WaveMaskMax(WaveGetActiveMask(), value);
+}
+
+__generic<T : __BuiltinIntegerType>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+[ForceInline] T subgroupAnd(T value)
+{
+    return WaveMaskBitAnd(WaveGetActiveMask(), value);
+}
+
+__generic<T : __BuiltinIntegerType>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+[ForceInline] T subgroupOr(T value)
+{
+    return WaveMaskBitOr(WaveGetActiveMask(), value);
+}
+
+__generic<T : __BuiltinIntegerType>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+[ForceInline] T subgroupXor(T value)
+{
+    return WaveMaskBitXor(WaveGetActiveMask(), value);
+}
+
+__generic<T : __BuiltinArithmeticType>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+[ForceInline] T subgroupInclusiveAdd(T value)
+{
+    __target_switch
+    {
+    case glsl:
+        __target_intrinsic "subgroupInclusiveAdd($0)";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFAdd $$T result Subgroup InclusiveScan $value};
+        else if (__isSignedInt<T>())
+        {
+            return spirv_asm
+            {
+                OpCapability GroupNonUniformArithmetic;
+                // TODO: use the correct integer width
+                OpBitcast $$uint %uvalue $value;
+                OpGroupNonUniformIAdd $$uint %mulResult Subgroup InclusiveScan %uvalue;
+                OpBitcast $$T result %mulResult
+            };
+        }
+        else if (__isUnsignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIAdd $$T result Subgroup InclusiveScan $value};
+        else return value;
+    case hlsl:
+    case cuda:
+    case cpp:
+        // TODO: implementation
+        return value;
+    }
+    return value;
+}
+
+__generic<T : __BuiltinArithmeticType>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+[ForceInline] T subgroupInclusiveMul(T value)
+{
+    __target_switch
+    {
+    case glsl:
+        __target_intrinsic "subgroupInclusiveMul($0)";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMul $$T result Subgroup InclusiveScan $value};
+        else if (__isSignedInt<T>())
+        {
+            return spirv_asm
+            {
+                OpCapability GroupNonUniformArithmetic;
+                // TODO: use the correct integer width
+                OpBitcast $$uint %uvalue $value;
+                OpGroupNonUniformIMul $$uint %mulResult Subgroup InclusiveScan %uvalue;
+                OpBitcast $$T result %mulResult
+            };
+        }
+        else if (__isUnsignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIMul $$T result Subgroup InclusiveScan $value};
+        else return value;
+    case hlsl:
+    case cuda:
+    case cpp:
+        // TODO: implementation
+        return value;
+    }
+    return value;
+}
+
+__generic<T : __BuiltinArithmeticType>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+[ForceInline] T subgroupInclusiveMin(T value)
+{
+    __target_switch
+    {
+    case glsl:
+        __target_intrinsic "subgroupInclusiveMin($0)";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMin $$T result Subgroup InclusiveScan $value};
+        else if (__isSignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformSMin $$T result Subgroup InclusiveScan $value};
+        else if (__isUnsignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMin $$T result Subgroup InclusiveScan $value};
+        else return value;
+    case hlsl:
+    case cuda:
+    case cpp:
+        // TODO: implementation
+        return value;
+    }
+    return value;
+}
+
+__generic<T : __BuiltinArithmeticType>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+[ForceInline] T subgroupInclusiveMax(T value)
+{
+    __target_switch
+    {
+    case glsl:
+        __target_intrinsic "subgroupInclusiveMax($0)";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMax $$T result Subgroup InclusiveScan $value};
+        else if (__isSignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformSMax $$T result Subgroup InclusiveScan $value};
+        else if (__isUnsignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMax $$T result Subgroup InclusiveScan $value};
+        else return value;
+    case hlsl:
+    case cuda:
+    case cpp:
+        // TODO: implementation
+        return value;
+    }
+    return value;
+}
+
+__generic<T : __BuiltinIntegerType>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+[ForceInline] T subgroupInclusiveAnd(T value)
+{
+    __target_switch
+    {
+    case glsl:
+        __target_intrinsic "subgroupInclusiveAnd($0)";
+    case spirv:
+        return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseAnd $$T result Subgroup InclusiveScan $value};
+    case hlsl:
+    case cuda:
+    case cpp:
+        // TODO: implementation
+        return value;
+    }
+    return value;
+}
+
+__generic<T : __BuiltinIntegerType>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+[ForceInline] T subgroupInclusiveOr(T value)
+{
+    __target_switch
+    {
+    case glsl:
+        __target_intrinsic "subgroupInclusiveOr($0)";
+    case spirv:
+        return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseOr $$T result Subgroup InclusiveScan $value};
+    case hlsl:
+    case cuda:
+    case cpp:
+        // TODO: implementation
+        return value;
+    }
+    return value;
+}
+
+__generic<T : __BuiltinIntegerType>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+[ForceInline] T subgroupInclusiveXor(T value)
+{
+    __target_switch
+    {
+    case glsl:
+        __target_intrinsic "subgroupInclusiveXor($0)";
+    case spirv:
+        return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseXor $$T result Subgroup InclusiveScan $value};
+    case hlsl:
+    case cuda:
+    case cpp:
+        // TODO: implementation
+        return value;
+    }
+    return value;
+}
+
+__generic<T : __BuiltinArithmeticType>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+[ForceInline] T subgroupExclusiveAdd(T value)
+{
+    __target_switch
+    {
+    case glsl:
+    case spirv:
+    case hlsl:
+        return WaveMaskPrefixSum(WaveGetActiveMask(), value);
+    case cuda:
+    case cpp:
+        // TODO: implementation
+        return value;
+    }
+}
+
+
+__generic<T : __BuiltinArithmeticType>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+[ForceInline] T subgroupExclusiveMul(T value)
+{
+    __target_switch
+    {
+    case glsl:
+    case spirv:
+    case hlsl:
+        return WaveMaskPrefixProduct(WaveGetActiveMask(), value);
+    case cuda:
+    case cpp:
+        // TODO: implementation
+        return value;
+    }
+}
+
+__generic<T : __BuiltinArithmeticType>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+[ForceInline] T subgroupExclusiveMin(T value)
+{
+    __target_switch
+    {
+    case glsl:
+    case spirv:
+    case hlsl:
+    case cuda:
+    case cpp:
+        // TODO: implementation
+        return value;
+    }
+}
+
+__generic<T : __BuiltinArithmeticType>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+[ForceInline] T subgroupExclusiveMax(T value)
+{
+    __target_switch
+    {
+    case glsl:
+    case spirv:
+    case hlsl:
+    case cuda:
+    case cpp:
+        // TODO: implementation
+        return value;
+    }
+}
+
+__generic<T : __BuiltinIntegerType>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+[ForceInline] T subgroupExclusiveAnd(T value)
+{
+    __target_switch
+    {
+    case glsl:
+    case spirv:
+    case hlsl:
+        return WaveMaskPrefixBitAnd(WaveGetActiveMask(), value);
+    case cuda:
+    case cpp:
+        // TODO: implementation
+        return value;
+    }
+}
+
+__generic<T : __BuiltinIntegerType>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+[ForceInline] T subgroupExclusiveOr(T value)
+{
+    __target_switch
+    {
+    case glsl:
+    case spirv:
+    case hlsl:
+        return WaveMaskPrefixBitOr(WaveGetActiveMask(), value);
+    case cuda:
+    case cpp:
+        // TODO: implementation
+        return value;
+    }
+}
+
+__generic<T : __BuiltinIntegerType>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+[ForceInline] T subgroupExclusiveXor(T value)
+{
+    __target_switch
+    {
+    case glsl:
+    case spirv:
+    case hlsl:
+        return WaveMaskPrefixBitXor(WaveGetActiveMask(), value);
+    case cuda:
+    case cpp:
+        // TODO: implementation
+        return value;
+    }
+}
+
+// ~GL_KHR_shader_subgroup_arithmetic
+
+
+// GL_KHR_shader_subgroup_shuffle
+
+__generic<T : __BuiltinType>
+public T subgroupShuffle(T value, uint index);
+
+__generic<T : __BuiltinType>
+public T subgroupShuffleXor(T value, uint mask);
+
+__generic<T : __BuiltinType>
+__glsl_extension(GL_KHR_shader_subgroup_shuffle)
+__spirv_version(1.3)
+[ForceInline] T subgroupShuffle(T value, uint index)
+{
+    __target_switch
+    {
+    case hlsl:
+    case cuda:
+    case glsl:
+    case spirv:
+    case cpp: 
+        return WaveShuffle(value, index);
+    }
+}
+
+__generic<T : __BuiltinType>
+__glsl_extension(GL_KHR_shader_subgroup_shuffle)
+__spirv_version(1.3)
+[ForceInline] T subgroupShuffleXor(T value, uint mask)
+{
+    __target_switch
+    {
+    case glsl:
+        __target_intrinsic "subgroupShuffleXor($0,$1)";
+    case spirv:
+        return spirv_asm {
+            OpCapability GroupNonUniformBallot; 
+            OpGroupNonUniformShuffleXor $$T result Subgroup $value $mask
+        };
+    case hlsl:
+    case cuda:
+    case cpp:
+        // TODO: implementation
+        return value;
+    }
+    return value;
+}
+
+// ~GL_KHR_shader_subgroup_shuffle
+
+// GL_KHR_shader_subgroup_shuffle_relative
+
+__generic<T : __BuiltinType>
+public T subgroupShuffleUp(T value, uint delta);
+
+__generic<T : __BuiltinType>
+public T subgroupShuffleDown(T value, uint delta);
+
+__generic<T : __BuiltinType>
+__glsl_extension(GL_KHR_shader_subgroup_shuffle_relative)
+__spirv_version(1.3)
+[ForceInline] T subgroupShuffleUp(T value, uint delta)
+{
+    __target_switch
+    {
+    case glsl:
+        __target_intrinsic "subgroupShuffleUp($0, $1)";
+    case spirv:
+        return spirv_asm {
+            OpCapability GroupNonUniformBallot; 
+            OpGroupNonUniformShuffleUp $$T result Subgroup $value $delta
+        };
+    case hlsl:
+    case cuda:
+    case cpp:
+        // TODO: implementation
+        return value;
+    }
+    return value;
+}
+
+__generic<T : __BuiltinType>
+__glsl_extension(GL_KHR_shader_subgroup_shuffle_relative)
+__spirv_version(1.3)
+[ForceInline] T subgroupShuffleDown(T value, uint delta)
+{
+    __target_switch
+    {
+    case glsl:
+        __target_intrinsic "subgroupShuffleDown($0, $1)";
+    case spirv:
+        return spirv_asm {
+            OpCapability GroupNonUniformBallot; 
+            OpGroupNonUniformShuffleDown $$T result Subgroup $value $delta
+        };
+    case hlsl:
+    case cuda:
+    case cpp:
+        // TODO: implementation
+        return value;
+    }
+    return value;
+}
+
+// ~GL_KHR_shader_subgroup_shuffle_relative
+
+// GL_KHR_shader_subgroup_clustered
+
+__generic<T : __BuiltinArithmeticType>
+public T subgroupClusteredAdd(T value, uint clusterSize);
+
+__generic<T : __BuiltinArithmeticType>
+public T subgroupClusteredMul(T value, uint clusterSize);
+
+__generic<T : __BuiltinArithmeticType>
+public T subgroupClusteredMin(T value, uint clusterSize);
+
+__generic<T : __BuiltinArithmeticType>
+public T subgroupClusteredMax(T value, uint clusterSize);
+
+__generic<T : __BuiltinIntegerType>
+public T subgroupClusteredAnd(T value, uint clusterSize);
+
+__generic<T : __BuiltinIntegerType>
+public T subgroupClusteredOr(T value, uint clusterSize);
+
+__generic<T : __BuiltinIntegerType>
+public T subgroupClusteredXor(T value, uint clusterSize);
+
+__generic<T : __BuiltinArithmeticType>
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+__spirv_version(1.3)
+    [ForceInline] T subgroupClusteredAdd(T value, uint clusterSize)
+{
+    __target_switch
+    {
+    case glsl:
+        __target_intrinsic "subgroupClusteredAdd($0, $1)";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; 
+            OpGroupNonUniformFAdd $$T result Subgroup ClusteredReduce $value $clusterSize};
+        else if (__isSignedInt<T>())
+        {
+            return spirv_asm
+            {
+                OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered;
+                // TODO: use the correct integer width
+                OpBitcast $$uint %uvalue $value;
+                OpGroupNonUniformIAdd $$uint %mulResult Subgroup ClusteredReduce %uvalue $clusterSize;
+                OpBitcast $$T result %mulResult
+            };
+        }
+        else if (__isUnsignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformIAdd $$T result Subgroup ClusteredReduce $value $clusterSize};
+        else return value;
+    case hlsl:
+    case cuda:
+    case cpp:
+        // TODO: implementation
+        return value;
+    }
+    return value;
+}
+
+__generic<T : __BuiltinArithmeticType>
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+__spirv_version(1.3)
+[ForceInline] T subgroupClusteredMul(T value, uint clusterSize)
+{
+    __target_switch
+    {
+    case glsl:
+        __target_intrinsic "subgroupClusteredMul($0, $1)";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformFMul $$T result Subgroup ClusteredReduce $value $clusterSize};
+        else if (__isSignedInt<T>())
+        {
+            return spirv_asm
+            {
+                OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered;
+                // TODO: use the correct integer width
+                OpBitcast $$uint %uvalue $value;
+                OpGroupNonUniformIMul $$uint %mulResult Subgroup ClusteredReduce %uvalue $clusterSize;
+                OpBitcast $$T result %mulResult
+            };
+        }
+        else if (__isUnsignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformIMul $$T result Subgroup ClusteredReduce $value $clusterSize};
+        else return value;
+    case hlsl:
+    case cuda:
+    case cpp:
+        // TODO: implementation
+        return value;
+    } 
+    return value;
+}
+
+__generic<T : __BuiltinArithmeticType>
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+__spirv_version(1.3)
+[ForceInline] T subgroupClusteredMin(T value, uint clusterSize)
+{
+    __target_switch
+    {
+    case glsl:
+        __target_intrinsic "subgroupClusteredMin($0, $1)";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformFMin $$T result Subgroup ClusteredReduce $value $clusterSize};
+        else if (__isSignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformSMin $$T result Subgroup ClusteredReduce $value $clusterSize};
+        else if (__isUnsignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformUMin $$T result Subgroup ClusteredReduce $value $clusterSize};
+        else return value;
+    case hlsl:
+    case cuda:
+    case cpp:
+        // TODO: implementation
+        return value;
+    }
+    return value;
+}
+
+__generic<T : __BuiltinArithmeticType>
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+__spirv_version(1.3)
+[ForceInline] T subgroupClusteredMax(T value, uint clusterSize)
+{
+    __target_switch
+    {
+    case glsl:
+        __target_intrinsic "subgroupClusteredMax($0, $1)";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformFMax $$T result Subgroup ClusteredReduce $value $clusterSize};
+        else if (__isSignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformSMax $$T result Subgroup ClusteredReduce $value $clusterSize};
+        else if (__isUnsignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered;  OpGroupNonUniformUMax $$T result Subgroup ClusteredReduce $value $clusterSize};
+        else return value;
+    case hlsl:
+    case cuda:
+    case cpp:
+        // TODO: implementation
+        return value;
+    }
+    return value;
+}
+
+__generic<T : __BuiltinIntegerType>
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+__spirv_version(1.3)
+[ForceInline] T subgroupClusteredAnd(T value, uint clusterSize)
+{
+    __target_switch
+    {
+    case glsl:
+        __target_intrinsic "subgroupClusteredAnd($0, $1)";
+    case spirv:
+        return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseAnd $$T result Subgroup ClusteredReduce $value $clusterSize};
+    case hlsl:
+    case cuda:
+    case cpp:
+        // TODO: implementation
+        return value;
+    }
+    return value;
+}
+
+__generic<T : __BuiltinIntegerType>
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+__spirv_version(1.3)
+[ForceInline] T subgroupClusteredOr(T value, uint clusterSize)
+{
+    __target_switch
+    {
+    case glsl:
+        __target_intrinsic "subgroupClusteredOr($0, $1)";
+    case spirv:
+        return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseOr $$T result Subgroup ClusteredReduce $value $clusterSize};
+    case hlsl:
+    case cuda:
+    case cpp:
+        // TODO: implementation
+        return value;
+    }
+    return value;
+}
+
+__generic<T : __BuiltinIntegerType>
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+__spirv_version(1.3)
+[ForceInline] T subgroupClusteredXor(T value, uint clusterSize)
+{
+    __target_switch
+    {
+    case glsl:
+        __target_intrinsic "subgroupClusteredXor($0, $1)";
+    case spirv:
+        return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseXor $$T result Subgroup ClusteredReduce $value $clusterSize};
+    case hlsl:
+    case cuda:
+    case cpp:
+        // TODO: implementation
+        return value;
+    }
+    return value;
+}
+
+// ~GL_KHR_shader_subgroup_clustered
+
+// GL_KHR_shader_subgroup_quad
+
+__generic<T : __BuiltinType>
+public T subgroupQuadBroadcast(T value, uint id);
+
+__generic<T : __BuiltinType>
+public T subgroupQuadSwapHorizontal(T value);
+
+__generic<T : __BuiltinType>
+public T subgroupQuadSwapVertical(T value);
+
+__generic<T : __BuiltinType>
+public T subgroupQuadSwapDiagonal(T value);
+
+__generic<T : __BuiltinType>
+__glsl_extension(GL_KHR_shader_subgroup_quad)
+__spirv_version(1.3)
+[ForceInline] T subgroupQuadBroadcast(T value, uint id)
+{
+    return QuadReadLaneAt(value, id);
+}
+
+__generic<T : __BuiltinType>
+__glsl_extension(GL_KHR_shader_subgroup_quad)
+__spirv_version(1.3)
+[ForceInline] T subgroupQuadSwapHorizontal(T value)
+{
+    return QuadReadAcrossX(value);
+}
+
+__generic<T : __BuiltinType>
+__glsl_extension(GL_KHR_shader_subgroup_quad)
+__spirv_version(1.3)
+[ForceInline] T subgroupQuadSwapVertical(T value)
+{
+    return QuadReadAcrossY(value);
+}
+
+__generic<T : __BuiltinType>
+__glsl_extension(GL_KHR_shader_subgroup_quad)
+__spirv_version(1.3)
+[ForceInline] T subgroupQuadSwapDiagonal(T value)
+{
+    return QuadReadAcrossDiagonal(value);
+}
+
+// ~GL_KHR_shader_subgroup_quad
+
+/// ~GL_KHR_shader_subgroup Functions
+
+//// ~GL_KHR_shader_subgroup
