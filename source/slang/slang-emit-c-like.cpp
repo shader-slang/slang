@@ -4107,7 +4107,8 @@ void CLikeSourceEmitter::ensureGlobalInst(ComputeEmitActionsContext* ctx, IRInst
     }
     if (as<IRBasicType>(inst))
         return;
-
+    if (as<IRPtrLit>(inst))
+        return;
     // Certain inst ops will always emit as definition.
     switch (inst->getOp())
     {
