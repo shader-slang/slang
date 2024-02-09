@@ -7955,7 +7955,7 @@ T WaveMaskPrefixBitOr(WaveMask mask, T expr)
     case cuda: __intrinsic_asm "_wavePrefixOr($0, $1)";
     case hlsl: __intrinsic_asm "WaveMultiPrefixBitOr($1, uint4($0, 0, 0, 0))";
     case spirv:
-        return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseAnd $$T result Subgroup ExclusiveScan $expr};
+        return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseOr $$T result Subgroup ExclusiveScan $expr};
     }
 }
 

@@ -1,8 +1,10 @@
 //TEST:SIMPLE(filecheck=CHECK_GLSL):  -allow-glsl -stage compute -entry computeMain -target glsl
 //TEST:SIMPLE(filecheck=CHECK_SPV):  -allow-glsl -stage compute -entry computeMain -target spirv
 //TEST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage compute -entry computeMain -target hlsl
-//TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda 
-//TEST:SIMPLE(filecheck=CHECK_CPP):  -allow-glsl -stage compute -entry computeMain -target cpp
+// not testing cuda due to missing impl
+// TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda 
+// not testing cpp due to missing impl
+// TEST:SIMPLE(filecheck=CHECK_CPP):  -allow-glsl -stage compute -entry computeMain -target cpp
 
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
@@ -25,12 +27,13 @@ buffer MyBlockName2
 
 layout(local_size_x = 32) in;
 
+#include "./glsl-test-utils.slang"
+
 void computeMain()
 {
-    // note: only implemented logic for glsl & spirv currently
     uvec4 in = (0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF);
-    outputBuffer.data[0] = subgroupBroadcast(1, 0) == 1;
-    outputBuffer.data[1] = subgroupBroadcastFirst(1) == 1;
+    outputBuffer.data[0] = testFunctionIn2Param(subgroupBroadcast, 1, 0, 1);
+    outputBuffer.data[1] = testFunctionIn1Param(subgroupBroadcastFirst, 1, 1);
     outputBuffer.data[2] = subgroupBallot(true).x == 0xFFFFFFFF; // all 32 should be running
     outputBuffer.data[3] = subgroupInverseBallot(in) == true;
     outputBuffer.data[4] = subgroupBallotBitExtract(in, 0) == true;

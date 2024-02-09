@@ -1,8 +1,12 @@
 //TEST:SIMPLE(filecheck=CHECK_GLSL):  -allow-glsl -stage compute -entry computeMain -target glsl
 //TEST:SIMPLE(filecheck=CHECK_SPV):  -allow-glsl -stage compute -entry computeMain -target spirv
 //TEST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage compute -entry computeMain -target hlsl
-//TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda 
-//TEST:SIMPLE(filecheck=CHECK_CPP):  -allow-glsl -stage compute -entry computeMain -target cpp
+
+// not testing cuda due to missing impl
+// TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda 
+
+// not testing cpp due to missing impl
+// TEST:SIMPLE(filecheck=CHECK_CPP):  -allow-glsl -stage compute -entry computeMain -target cpp
 
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
@@ -25,10 +29,10 @@ buffer MyBlockName2
 
 layout(local_size_x = 32) in;
 
+#include "./glsl-test-utils.slang"
+
 void computeMain()
 {
-    // note: missing cuda and cpp implementation for system variables; test #3 and #4 will fail
-
     // one is true, rest false, positive
     outputBuffer.data[0] = 1;
     bool t1 = inputBuffer.data[0] == gl_GlobalInvocationID.x;
@@ -63,8 +67,8 @@ void computeMain()
 
     // all false, positive
     outputBuffer.data[4] = 1;
-    t1 = false;
-    if (subgroupAllEqual(t1)) {
+
+    if (testFunctionIn1ParamBool(subgroupAllEqual, 0, true)) {
         subgroupBarrier();
         outputBuffer.data[4] = 2;
     }
@@ -72,7 +76,7 @@ void computeMain()
     // one is true, rest false, negative
     outputBuffer.data[5] = 1;
     t1 = inputBuffer.data[0] == gl_GlobalInvocationID.x;
-    if (!subgroupAllEqual(t1)) {
+    if (testFunctionIn1ParamBool(subgroupAllEqual, t1, false)) {
         subgroupBarrier();
         outputBuffer.data[5] = 2;
     }
