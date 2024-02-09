@@ -537,9 +537,9 @@ class PtrType : public PtrTypeBase
 
 // A GPU pointer type into global memory.
 
-class BufferPointerType : public PtrTypeBase
+class ConstBufferPointerType : public PtrTypeBase
 {
-    SLANG_AST_CLASS(BufferPointerType)
+    SLANG_AST_CLASS(ConstBufferPointerType)
 };
 
 /// A pointer-like type used to represent a parameter "direction"
