@@ -13164,12 +13164,6 @@ struct ConstBufferPointer
         }
     }
 
-    __subscript(int index) -> T
-    {
-        [ForceInline]
-        get {return ConstBufferPointer<T>.fromUInt(toUInt() + __naturalStrideOf<T>() * index).get(); }
-    }
-
     __glsl_version(450)
     __glsl_extension(GL_EXT_shader_explicit_arithmetic_types_int64)
     __glsl_extension(GL_EXT_buffer_reference)
@@ -13220,5 +13214,11 @@ struct ConstBufferPointer
                 result:$$bool = OpINotEqual %ptrval $zero;
             };
         }
+    }
+
+    __subscript(int index)->T
+    {
+        [ForceInline]
+        get { return ConstBufferPointer<T>.fromUInt(toUInt() + __naturalStrideOf<T>() * index).get(); }
     }
 }
