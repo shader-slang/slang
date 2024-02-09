@@ -1,5 +1,22 @@
+// TODO: These keywords are not recognized but they should be.
+#define highp
+#define mediump
+#define lowp
+
+#define VECTOR_MAP_UNARY(TYPE, COUNT, FUNC, VALUE) \
+    vector<TYPE,COUNT> result; for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(VALUE[i]); } return result
+
+#define VECTOR_MAP_TRINARY(TYPE, COUNT, FUNC, A, B, C) \
+    vector<TYPE,COUNT> result; for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result
+
+#define REQUIRE_KHRONOS [require(glsl)] [require(spirv)]
+
 //
-// From the GLSL spec, section 4.1. 'asic Types'
+// OpenGL 4.60 spec
+//
+
+//
+// Section 4.1. 'asic Types'
 //
 
 public typealias vec2 = vector<float, 2>;
@@ -109,21 +126,21 @@ public in int gl_ViewportIndex : SV_ViewportArrayIndex;
 
 [OverloadRank(15)]
 [ForceInline]
-public matrix<float, N, N> operator*<let N : int>(matrix<float, N, N> m1, matrix<float, N, N> m2)
+public matrix<float, N, N> operator*<let N:int>(matrix<float, N, N> m1, matrix<float, N, N> m2)
 {
     return mul(m2, m1);
 }
 
 [OverloadRank(15)]
 [ForceInline]
-public matrix<half, N, N> operator*<let N : int>(matrix<half, N, N> m1, matrix<half, N, N> m2)
+public matrix<half, N, N> operator*<let N:int>(matrix<half, N, N> m1, matrix<half, N, N> m2)
 {
     return mul(m2, m1);
 }
 
 [OverloadRank(15)]
 [ForceInline]
-public matrix<double, N, N> operator*<let N : int>(matrix<double, N, N> m1, matrix<double, N, N> m2)
+public matrix<double, N, N> operator*<let N:int>(matrix<double, N, N> m1, matrix<double, N, N> m2)
 {
     return mul(m2, m1);
 }
@@ -150,7 +167,7 @@ public vector<T, C> operator*<T:__BuiltinFloatingPointType, let C : int, let R :
 }
 
 __intrinsic_op(mul)
-public matrix<T, N, M> matrixCompMult<T:__BuiltinFloatingPointType, let N : int, let M : int>(matrix<T,N,M> left, matrix<T,N,M> right);
+public matrix<T, N, M> matrixCompMult<T:__BuiltinFloatingPointType, let N:int, let M : int>(matrix<T,N,M> left, matrix<T,N,M> right);
 
 __intrinsic_op(cmpLE)
 public vector<bool, N> lessThanEqual<T, let N:int>(vector<T, N> x, vector<T, N> y);
@@ -180,42 +197,42 @@ public extension vector<T, 3>
 
 [ForceInline]
 [OverloadRank(15)]
-public bool operator==<T:__BuiltinArithmeticType, let N : int>(vector<T, N> left, vector<T, N> right)
+public bool operator==<T:__BuiltinArithmeticType, let N:int>(vector<T, N> left, vector<T, N> right)
 {
     return all(equal(left, right));
 }
 
 [ForceInline]
 [OverloadRank(15)]
-public bool operator!=<T:__BuiltinArithmeticType, let N : int>(vector<T, N> left, vector<T, N> right)
+public bool operator!=<T:__BuiltinArithmeticType, let N:int>(vector<T, N> left, vector<T, N> right)
 {
     return any(notEqual(left, right));
 }
 
 [ForceInline]
 [OverloadRank(14)]
-public bool operator==<T:__BuiltinFloatingPointType, let N : int>(vector<T, N> left, vector<T, N> right)
+public bool operator==<T:__BuiltinFloatingPointType, let N:int>(vector<T, N> left, vector<T, N> right)
 {
     return all(equal(left, right));
 }
 
 [ForceInline]
 [OverloadRank(14)]
-public bool operator!=<T:__BuiltinFloatingPointType, let N : int>(vector<T, N> left, vector<T, N> right)
+public bool operator!=<T:__BuiltinFloatingPointType, let N:int>(vector<T, N> left, vector<T, N> right)
 {
     return any(notEqual(left, right));
 }
 
 [ForceInline]
 [OverloadRank(14)]
-public bool operator==<T:__BuiltinLogicalType, let N : int>(vector<T, N> left, vector<T, N> right)
+public bool operator==<T:__BuiltinLogicalType, let N:int>(vector<T, N> left, vector<T, N> right)
 {
     return all(equal(left, right));
 }
 
 [ForceInline]
 [OverloadRank(14)]
-public bool operator!=<T:__BuiltinLogicalType, let N : int>(vector<T, N> left, vector<T, N> right)
+public bool operator!=<T:__BuiltinLogicalType, let N:int>(vector<T, N> left, vector<T, N> right)
 {
     return any(notEqual(left, right));
 }
@@ -227,14 +244,14 @@ for (auto type : kBaseTypes) {
 }}}}
 [ForceInline]
 [OverloadRank(15)]
-public bool operator==<let N : int>(vector<$(typeName), N> left, vector<$(typeName), N> right)
+public bool operator==<let N:int>(vector<$(typeName), N> left, vector<$(typeName), N> right)
 {
     return all(equal(left, right));
 }
 
 [ForceInline]
 [OverloadRank(15)]
-public bool operator!=<let N : int>(vector<$(typeName), N> left, vector<$(typeName), N> right)
+public bool operator!=<let N:int>(vector<$(typeName), N> left, vector<$(typeName), N> right)
 {
     return any(notEqual(left, right));
 }
@@ -242,15 +259,799 @@ ${{{{
 }
 }}}}
 
-[ForceInline] public int findLSB(int v) { return firstbitlow(v); }
-[ForceInline] public uint findLSB(uint v) { return firstbitlow(v); }
-[ForceInline] public vector<int,N> findLSB<let N:int>(vector<int,N> value)
+//
+// Section 8.1. Angle and Trigonometry Functions
+//
+
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[ForceInline]
+public T atan(T y, T x)
+{
+    return atan2(y, x);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N:int>
+[__readNone]
+[ForceInline]
+public vector<T,N> atan(vector<T,N> y, vector<T,N> x)
+{
+    return atan2(y, x);
+}
+
+__generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(cuda, "$P_asinh($0)")
+__target_intrinsic(cpp, "$P_asinh($0)")
+[__readNone]
+[ForceInline]
+public T asinh(T x)
+{
+    return log(x + sqrt(x * x + T(1)));
+}
+
+__generic<T : __BuiltinFloatingPointType, let N:int>
+[__readNone]
+[ForceInline]
+public vector<T,N> asinh(vector<T,N> x)
+{
+    VECTOR_MAP_UNARY(T, N, asinh, x);
+}
+
+__generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(cuda, "$P_acosh($0)")
+__target_intrinsic(cpp, "$P_acosh($0)")
+[__readNone]
+[ForceInline]
+public T acosh(T x)
+{
+    return log(x + sqrt( x * x - T(1)));
+}
+
+__generic<T : __BuiltinFloatingPointType, let N:int>
+[__readNone]
+[ForceInline]
+public vector<T,N> acosh(vector<T,N> x)
+{
+    VECTOR_MAP_UNARY(T, N, acosh, x);
+}
+
+__generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(cuda, "$P_atanh($0)")
+__target_intrinsic(cpp, "$P_atanh($0)")
+[__readNone]
+[ForceInline]
+public T atanh(T x)
+{
+    return T(0.5) * log((T(1) + x) / (T(1) - x));
+}
+
+__generic<T : __BuiltinFloatingPointType, let N:int>
+[__readNone]
+[ForceInline]
+public vector<T,N> atanh(vector<T,N> x)
+{
+    VECTOR_MAP_UNARY(T, N, atanh, x);
+}
+
+//
+// Section 8.2. Exponential Functions
+//
+
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[ForceInline]
+public T inversesqrt(T x)
+{
+    return rsqrt(x);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N:int>
+[__readNone]
+[ForceInline]
+public vector<T, N> inversesqrt(vector<T, N> x)
+{
+    return rsqrt(x);
+}
+
+//
+// Section 8.3. Common Functions
+//
+
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[ForceInline]
+public T roundEven(T x)
+{
+    T i;
+    if (T(0.5) <= fmod(x, i))
+    {
+        bool evenInteger = (fmod(i, T(2)) == T(0));
+        if (!evenInteger)
+        {
+            x += T(0.1);
+        }
+    }
+    return round(x);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N:int>
+[__readNone]
+[ForceInline]
+public vector<T,N> roundEven(vector<T,N> x)
+{
+    VECTOR_MAP_UNARY(T, N, roundEven, x);
+}
+
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[ForceInline]
+public T fract(T x)
+{
+    return frac(x);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N:int>
+[__readNone]
+[ForceInline]
+public vector<T, N> fract(vector<T, N> x)
+{
+    return frac(x);
+}
+
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[ForceInline]
+public T mod(T x, T y)
+{
+    return fmod(x, y);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N:int>
+[__readNone]
+[ForceInline]
+public vector<T, N> mod(vector<T, N> x, T y)
+{
+    return fmod(x, vector<T, N>(y));
+}
+
+__generic<T : __BuiltinFloatingPointType, let N:int>
+[__readNone]
+[ForceInline]
+public vector<T, N> mod(vector<T, N> x, vector<T, N> y)
+{
+    return fmod(x, y);
+}
+
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[ForceInline]
+public T mix(T x, T y, T a)
+{
+    return lerp(x, y, a);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N:int>
+[__readNone]
+[ForceInline]
+public vector<T, N> mix(vector<T, N> x, vector<T, N> y, T a)
+{
+    return lerp(x, y, vector<T, N>(a));
+}
+
+__generic<T : __BuiltinFloatingPointType, let N:int>
+[__readNone]
+[ForceInline]
+public vector<T, N> mix(vector<T, N> x, vector<T, N> y, vector<T, N> a)
+{
+    return lerp(x, y, a);
+}
+
+__generic<T>
+[__readNone]
+[ForceInline]
+public T mix(T x, T y, bool a)
+{
+    return (a ? y : x);
+}
+
+__generic<T, let N:int>
+[__readNone]
+[ForceInline]
+public vector<T, N> mix(vector<T, N> x, vector<T, N> y, vector<bool, N> a)
+{
+    vector<T, N> result;
+    for (int i = 0; i < N; i++)
+    {
+        result[i] = (a[i] ? y[i] : x[i]);
+    }
+    return result;
+}
+
+[__readNone]
+[ForceInline]
+public int floatBitsToInt(highp float x)
+{
+    return asint(x);
+}
+
+__generic<let N:int>
+[__readNone]
+[ForceInline]
+public vector<int, N> floatBitsToInt(highp vector<float, N> x)
+{
+    return asint(x);
+}
+
+[__readNone]
+[ForceInline]
+public uint floatBitsToUint(highp float x)
+{
+    return asuint(x);
+}
+
+__generic<let N:int>
+[__readNone]
+[ForceInline]
+public vector<uint, N> floatBitsToUint(highp vector<float, N> x)
+{
+    return asuint(x);
+}
+
+[__readNone]
+[ForceInline]
+public float intBitsToFloat(highp int x)
+{
+    return asfloat(x);
+}
+
+__generic<let N:int>
+[__readNone]
+[ForceInline]
+public vector<float, N> intBitsToFloat(highp vector<int, N> x)
+{
+    return asfloat(x);
+}
+
+[__readNone]
+[ForceInline]
+public float uintBitsToFloat(highp uint x)
+{
+    return asfloat(x);
+}
+
+__generic<let N:int>
+[__readNone]
+[ForceInline]
+public vector<float, N> uintBitsToFloat(highp vector<uint, N> x)
+{
+    return asfloat(x);
+}
+
+//
+// Section 8.4. Floating-Point Pack and Unpack Functions
+//
+
+[__readNone]
+[ForceInline]
+uint packUnorm1x16(float c)
+{
+    return uint(clamp(c, 0.0, 1.0) * 65535.0 + 0.5);
+}
+
+[__readNone]
+[ForceInline]
+uint packSnorm1x16(float v)
+{
+    return uint(clamp(v ,-1.0, 1.0) * 32767.0 + 32767.5);
+}
+
+[__readNone]
+[ForceInline]
+uint packUnorm1x8(float c)
+{
+    return uint(clamp(c, 0.0, 1.0) * 255.0 + 0.5);
+}
+
+[__readNone]
+[ForceInline]
+uint packSnorm1x8(float c)
+{
+    return uint(clamp(c, -1.0, 1.0) * 127.0 + 127.5);
+}
+
+[__readNone]
+[ForceInline]
+float unpackUnorm1x16(uint p)
+{
+    return float(p) / 65535.0;
+}
+
+[__readNone]
+[ForceInline]
+float unpackSnorm1x16(uint p)
+{
+    return clamp((float(p) - 32767.0) / 32767.0, -1.0, 1.0);
+}
+
+[__readNone]
+[ForceInline]
+float unpackUnorm1x8(uint p)
+{
+    return float(p) / 255.0;
+}
+
+[__readNone]
+[ForceInline]
+float unpackSnorm1x8(uint p)
+{
+    return clamp((float(p) - 127.0) / 127.0, -1.0, 1.0);
+}
+
+[__readNone]
+[ForceInline]
+uint float2half(float f)
+{
+    uint u = floatBitsToUint(f);
+    uint s = ((u >> uint(16)) & uint(0x8000));
+    uint e = 0;
+    uint m = ((u >> uint(13)) & uint(0x03ff));
+    if (m != 0)
+    {
+        e = ((((u & uint(0x7f800000)) - uint(0x38000000)) >> uint(13)) & uint(0x7c00));
+    }
+    return (s | e | m);
+}
+
+__target_intrinsic(glsl)
+[__readNone]
+[ForceInline]
+public uint packUnorm2x16(vec2 v)
+{
+    return packUnorm1x16(v.x) | (packUnorm1x16(v.y) << uint(16));
+}
+
+__target_intrinsic(glsl)
+[__readNone]
+[ForceInline]
+public uint packSnorm2x16(vec2 v)
+{
+    return packSnorm1x16(v.x) | (packSnorm1x16(v.y) << uint(16));
+}
+
+__target_intrinsic(glsl)
+[__readNone]
+[ForceInline]
+public uint packUnorm4x8(vec4 v)
+{
+    return packUnorm1x8(v.x) | (packUnorm1x8(v.y) << uint(8)) | (packUnorm1x8(v.z) << uint(16)) | (packUnorm1x8(v.w) << uint(24));
+}
+
+__target_intrinsic(glsl)
+[__readNone]
+[ForceInline]
+public uint packSnorm4x8(vec4 v)
+{
+    return packSnorm1x8(v.x) | (packSnorm1x8(v.y) << uint(8)) | (packSnorm1x8(v.z) << uint(16)) | (packSnorm1x8(v.w) << uint(24));
+}
+
+__target_intrinsic(glsl)
+[__readNone]
+[ForceInline]
+public vec2 unpackUnorm2x16(uint p)
+{
+    return vec2(unpackUnorm1x16(p & uint(0xffff)), unpackUnorm1x16(p >> uint(16)));
+}
+
+__target_intrinsic(glsl)
+[__readNone]
+[ForceInline]
+public vec2 unpackSnorm2x16(uint p)
+{
+    return vec2(unpackSnorm1x16(p & uint(0xffff)), unpackSnorm1x16(p >> uint(16)));
+}
+
+__target_intrinsic(glsl)
+[__readNone]
+[ForceInline]
+public vec4 unpackUnorm4x8(highp uint p)
+{
+    return vec4(unpackUnorm1x8(p & uint(0xffff)), unpackUnorm1x8(p >> uint(8)), unpackUnorm1x8(p >> uint(16)), unpackUnorm1x8(p >> uint(24)));
+}
+
+__target_intrinsic(glsl)
+[__readNone]
+[ForceInline]
+public vec4 unpackSnorm4x8(highp uint p)
+{
+    return vec4(unpackSnorm1x8(p & uint(0xffff)), unpackSnorm1x8(p >> uint(8)), unpackSnorm1x8(p >> uint(16)), unpackSnorm1x8(p >> uint(24)));
+}
+
+__target_intrinsic(glsl)
+[__readNone]
+[ForceInline]
+public uint packHalf2x16(vec2 v)
+{
+    return float2half(v.x) | (float2half(v.y) << uint(16));
+}
+
+__target_intrinsic(glsl)
+[__readNone]
+[ForceInline]
+public float half2float(uint h)
+{
+    uint s = ((h & uint(0x8000)) << uint(16));
+    uint e = 0;
+    uint m = ((h & uint(0x03ff)) << uint(13));
+    if (m != 0)
+    {
+        e = (((h & uint(0x7c00)) + uint(0x1c000)) << uint(13));
+    }
+    return uintBitsToFloat(s | e | m); 
+}
+
+__target_intrinsic(glsl)
+[__readNone]
+[ForceInline]
+public vec2 unpackHalf2x16(uint p)
+{
+    return vec2(half2float(p & uint(0xffff)), half2float(p >> uint(16)));
+}
+
+__target_intrinsic(glsl)
+[__readNone]
+[ForceInline]
+public double packDouble2x32(uvec2 v)
+{
+    // TODO: there is no "asdouble()"
+    //return asdouble(uint64_t(v.x) | (uint64_t(v.y) << 32));
+    return 0.0;
+}
+
+__target_intrinsic(glsl)
+[__readNone]
+[ForceInline]
+public uvec2 unpackDouble2x32(double v)
+{
+    // TODO: there is no "asuint64()"
+    uint64_t u = 0; // asuint64(v);
+    return uvec2(uint(u & 0xFFFFFFFF), uint(u >> 32));
+}
+
+//
+// Section 8.5. Geometric Functions
+//
+
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[ForceInline]
+public T faceforward(T n, T i, T ng)
+{
+    return dot(ng, i) < T(0.0f) ? n : -n;
+}
+
+//
+// Section 8.6. Matrix Functions
+//
+
+__generic<T : __BuiltinFloatingPointType, let C : int, let R : int>
+__target_intrinsic(glsl)
+[__readNone]
+[ForceInline]
+[OverloadRank(15)]
+public matrix<T, C, R> outerProduct(vector<T, C> c, vector<T, R> r)
+{
+    // Column major matrix in GLSL
+    matrix<T, C, R> result;
+    for (int i = 0; i < C; ++i)
+    {
+        for (int j = 0; j < R; ++j)
+        {
+            result[i][j] = c[i] * r[j];
+        }
+    }
+    return result;
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+matrix<T,N,N> inverse(matrix<T,N,N> m);
+
+//
+// Section 8.8. Integer Functions
+//
+
+[__readNone]
+[ForceInline]
+public uint uaddCarry(highp uint x, highp uint y, out lowp uint carry)
+{
+    let result = x * y;
+    carry = ((result < x || result < y) ? 1 : 0);
+    return result;
+}
+
+__generic<let N:int>
+[__readNone]
+[ForceInline]
+public vector<uint,N> uaddCarry(highp vector<uint,N> x, highp vector<uint,N> y, out lowp vector<uint,N> carry)
+{
+    VECTOR_MAP_TRINARY(uint, N, uaddCarry, x, y, carry);
+}
+
+[__readNone]
+[ForceInline]
+public uint usubBorrow(highp uint x, highp uint y, out lowp uint borrow)
+{
+    borrow = (y > x) ? 1 : 0;
+    return x - y;
+}
+
+__generic<let N:int>
+[__readNone]
+[ForceInline]
+public vector<uint,N> usubBorrow(highp vector<uint,N> x, highp vector<uint,N> y, out lowp vector<uint,N> borrow)
+{
+    VECTOR_MAP_TRINARY(uint, N, usubBorrow, x, y, borrow);
+}
+
+[__readNone]
+[ForceInline]
+public void umulExtended(highp uint x, highp uint y, out highp uint msb, out highp uint lsb)
+{
+    uint64_t result = x * y;
+    msb = uint(result >> 32);
+    lsb = uint(result);
+}
+
+__generic<let N:int>
+[__readNone]
+[ForceInline]
+public void umulExtended(highp vector<uint,N> x, highp vector<uint,N> y, out highp vector<uint,N> msb, out highp vector<uint,N> lsb)
+{
+    for(int i = 0; i < N; ++i)
+    {
+       umulExtended(x[i], y[i], msb[i], lsb[i]);
+    }
+}
+
+[__readNone]
+[ForceInline]
+public void imulExtended(highp int x, highp int y, out highp int msb, out highp int lsb)
+{
+    int64_t result = x * y;
+    msb = int(result >> 32);
+    lsb = int(result);
+}
+
+__generic<let N:int>
+[__readNone]
+[ForceInline]
+public void imulExtended(highp vector<int,N> x, highp vector<int,N> y, out highp vector<int,N> msb, out highp vector<int,N> lsb)
+{
+    for(int i = 0; i < N; ++i)
+    {
+       imulExtended(x[i], y[i], msb[i], lsb[i]);
+    }
+}
+
+[__readNone]
+[ForceInline]
+public int bitfieldExtract(int value, int offset, int bits)
+{
+    return int(uint(value >> offset) & ((1u << bits) - 1));
+}
+
+__generic<let N:int>
+[__readNone]
+[ForceInline]
+public vector<int,N> bitfieldExtract(vector<int,N> value, int offset, int bits)
+{
+    vector<int,N> result;
+    for (int i = 0; i < N; ++i)
+    {
+        result[i] = bitfieldExtract(value[i], offset, bits);
+    }
+    return result;
+}
+
+[__readNone]
+[ForceInline]
+public uint bitfieldExtract(uint value, int offset, int bits)
+{
+    return (value >> offset) & ((1u << bits) - 1);
+}
+
+__generic<let N:int>
+[__readNone]
+[ForceInline]
+public vector<uint,N> bitfieldExtract(vector<uint,N> value, int offset, int bits)
+{
+    vector<uint,N> result;
+    for (int i = 0; i < N; ++i)
+    {
+        result[i] = bitfieldExtract(value[i], offset, bits);
+    }
+    return result;
+}
+
+[__readNone]
+[ForceInline]
+public uint bitfieldInsert(uint base, uint insert, int offset, int bits)
+{
+    uint clearMask = ~(((1u << bits) - 1u) << offset);
+    uint clearedBase = base & clearMask;
+    uint maskedInsert = (insert & ((1u << bits) - 1u)) << offset;
+    return clearedBase | maskedInsert;
+}
+
+__generic<let N:int>
+[__readNone]
+[ForceInline]
+public vector<uint,N> bitfieldInsert(vector<uint,N> base, vector<uint,N> insert, int offset, int bits)
+{
+    vector<uint,N> result;
+    for (int i = 0; i < N; ++i)
+    {
+        result[i] = bitfieldInsert(base[i], insert[i], offset, bits);
+    }
+    return result;
+}
+
+[__readNone]
+[ForceInline]
+public int bitfieldInsert(int base, int insert, int offset, int bits)
+{
+    uint clearMask = ~(((1u << bits) - 1u) << offset);
+    uint clearedBase = base & clearMask;
+    uint maskedInsert = (insert & ((1u << bits) - 1u)) << offset;
+    return clearedBase | maskedInsert;
+}
+
+__generic<let N:int>
+[__readNone]
+[ForceInline]
+public vector<int,N> bitfieldInsert(vector<int,N> base, vector<int,N> insert, int offset, int bits)
+{
+    vector<int,N> result;
+    for (int i = 0; i < N; ++i)
+    {
+        result[i] = bitfieldInsert(base[i], insert[i], offset, bits);
+    }
+    return result;
+}
+
+[__readNone]
+[ForceInline]
+public int bitfieldReverse(highp int value)
+{
+    value = ((value & 0xAAAAAAAA) >> 1) | ((value & 0x55555555) << 1);
+    value = ((value & 0xCCCCCCCC) >> 2) | ((value & 0x33333333) << 2);
+    value = ((value & 0xF0F0F0F0) >> 4) | ((value & 0x0F0F0F0F) << 4);
+    value = ((value & 0xFF00FF00) >> 8) | ((value & 0x00FF00FF) << 8);
+    value = ((value & 0xFFFF0000) >> 16) | ((value & 0x0000FFFF) << 16);
+    return value;
+}
+
+__generic<let N:int>
+[__readNone]
+[ForceInline]
+public vector<int,N> bitfieldReverse(highp vector<int,N> value)
+{
+    VECTOR_MAP_UNARY(int, N, bitfieldReverse, value);
+}
+
+[__readNone]
+[ForceInline]
+public uint bitfieldReverse(highp uint value)
+{
+    value = ((value & 0xAAAAAAAA) >> 1) | ((value & 0x55555555) << 1);
+    value = ((value & 0xCCCCCCCC) >> 2) | ((value & 0x33333333) << 2);
+    value = ((value & 0xF0F0F0F0) >> 4) | ((value & 0x0F0F0F0F) << 4);
+    value = ((value & 0xFF00FF00) >> 8) | ((value & 0x00FF00FF) << 8);
+    value = ((value & 0xFFFF0000) >> 16) | ((value & 0x0000FFFF) << 16);
+    return value;
+}
+
+__generic<let N:int>
+[__readNone]
+[ForceInline]
+public vector<uint,N> bitfieldReverse(highp vector<uint,N> value)
+{
+    VECTOR_MAP_UNARY(int, N, bitfieldReverse, value);
+}
+
+[__readNone] [ForceInline] REQUIRE_KHRONOS
+public uint bitCount(uint value)
+{
+    return countbits(value);
+}
+
+__generic<let N:int>
+[__readNone] [ForceInline] REQUIRE_KHRONOS
+public vector<uint,N> bitCount(vector<uint,N> value)
+{
+    VECTOR_MAP_UNARY(uint, N, countbits, value);
+}
+
+[__readNone] [ForceInline] REQUIRE_KHRONOS
+public int bitCount(int value)
+{
+    return countbits(uint(value));
+}
+    
+__generic<let N:int>
+[__readNone] [ForceInline] REQUIRE_KHRONOS
+public vector<int,N> bitCount(vector<int,N> value)
+{
+    VECTOR_MAP_UNARY(int, N, countbits, value);
+}
+
+[__readNone]
+[ForceInline]
+public int findLSB(int v)
+{
+    return firstbitlow(v);
+}
+
+__generic<let N:int>
+[__readNone]
+[ForceInline]
+public vector<int,N> findLSB(vector<int,N> value)
 {
     return firstbitlow(value);
 }
-[ForceInline] public vector<uint,N> findLSB<let N:int>(vector<uint,N> value)
+
+[__readNone]
+[ForceInline]
+public uint findLSB(uint v)
+{
+    return firstbitlow(v);
+}
+
+__generic<let N:int>
+[__readNone]
+[ForceInline]
+public vector<uint,N> findLSB(vector<uint,N> value)
 {
     return firstbitlow(value);
+}
+
+[__readNone]
+[ForceInline]
+public int findMSB(int value)
+{
+    return firstbithigh(value);
+}
+
+__generic<let N:int>
+[__readNone]
+[ForceInline]
+public vector<int,N> findMSB(vector<int,N> value)
+{
+    return firstbithigh(value);
+}
+
+[__readNone]
+[ForceInline]
+public uint findMSB(uint value)
+{
+    return firstbithigh(value);
+}
+
+__generic<let N:int>
+[__readNone]
+[ForceInline]
+public vector<uint,N> findMSB(vector<uint,N> value)
+{
+    return firstbithigh(value);
+}
+
+__generic<let N:int>
+[__readNone]
+[ForceInline]
+public vector<bool,N> not(vector<bool,N> x)
+{
+    return !x;
 }
 
 //
@@ -1984,5 +2785,61 @@ public vec4 shadow1DProjLod(sampler1DShadow sampler, vec4 coord, float lod)
 public vec4 shadow2DProjLod(sampler2DShadow sampler, vec4 coord, float lod)
 {
     return textureProjLod(sampler, coord, lod);
+}
+
+//
+// Ray tracing
+//
+
+public typealias rayQueryEXT = RayQuery;
+
+__glsl_extension(GL_EXT_ray_query)
+__glsl_version(460)
+[ForceInline]
+public void rayQueryConfirmIntersectionEXT(inout rayQueryEXT q)
+{
+    q.CommitNonOpaqueTriangleHit();
+}
+
+__glsl_extension(GL_EXT_ray_query)
+__glsl_version(460)
+[ForceInline]
+public bool rayQueryProceedEXT(inout rayQueryEXT q)
+{
+    return q.Proceed();
+}
+
+__glsl_extension(GL_EXT_ray_query)
+__glsl_version(460)
+[__NoSideEffect]
+public uint rayQueryGetIntersectionTypeEXT(rayQueryEXT q, bool committed)
+{
+    if (committed)
+    {
+        q.CommittedStatus();
+    }
+    else
+    {
+        q.CandidateType();
+    }
+    return 0;
+}
+
+
+//
+// Subgroup
+//
+
+__glsl_extension(KHR_shader_subgroup)
+__glsl_version(450)
+public void subgroupBarrier()
+{
+    //__subgroupBarrier();
+}
+
+__glsl_extension(KHR_shader_subgroup)
+__glsl_version(450)
+public void subgroupMemoryBarrier()
+{
 }
 

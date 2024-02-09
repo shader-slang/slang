@@ -358,6 +358,11 @@ public:
         return dispatchIfNotNull(expr->baseExpression);
     }
 
+    bool visitOpenRefExpr(OpenRefExpr* expr)
+    {
+        return dispatchIfNotNull(expr->innerExpr);
+    }
+
     bool visitInitializerListExpr(InitializerListExpr* expr)
     {
         for (auto arg : expr->args)

@@ -2,6 +2,9 @@
 
 typedef uint UINT;
 
+__intrinsic_op($(kIROp_FloatCast))
+T __floatCast<T, U>(U v);
+
 [sealed]
 interface IBufferDataLayout
 {
@@ -4407,6 +4410,16 @@ T distance(T x, T y)
 
 // Vector dot product
 
+__generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+[__readNone]
+[ForceInline]
+T dot(T x, T y)
+{
+    return x * y;
+}
+
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
@@ -4561,16 +4574,34 @@ matrix<T, N, M> exp(matrix<T, N, M> x)
 
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
-__target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_exp2($0)")
 __target_intrinsic(cpp, "$P_exp2($0)")
-__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Exp2 _0")
 [__readNone]
-T exp2(T x);
+T exp2(T x)
+{
+    __target_switch
+    {
+    case glsl:
+        if (__isHalf<T>())
+            __intrinsic_asm "exp2($0)";
+        __intrinsic_asm "exp2(float($0))";
+    case spirv:
+        if (__isHalf<T>())
+        {
+            return spirv_asm { OpExtInst $$T result glsl450 Exp2 $x };
+        }
+        else
+        {
+            float xf = __floatCast<float>(x);
+            return T(spirv_asm {
+                 result:$$float = OpExtInst glsl450 Exp2 $xf
+            });
+        }
+    }
+}
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
-__target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Exp2 _0")
 [__readNone]
 vector<T,N> exp2(vector<T,N> x)
@@ -4786,31 +4817,41 @@ matrix<T, N, M> floor(matrix<T, N, M> x)
     MATRIX_MAP_UNARY(T, N, M, floor, x);
 }
 
-// Fused multiply-add for doubles
-__target_intrinsic(hlsl)
+// Fused multiply-add
+__generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_fma($0, $1, $2)")
 __target_intrinsic(cpp, "$P_fma($0, $1, $2)")
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Fma _0 _1 _2")
 [__readNone]
-double fma(double a, double b, double c);
+T fma(T a, T b, T c)
+{
+    __target_switch
+    {
+    case hlsl:
+        if (__isFloat<T>() || __isHalf<T>())
+            return mad(a, b, c);
+        else
+            __intrinsic_asm "fma($0, $1, $2)";
+    }
+}
 
-__generic<let N : int>
+__generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Fma _0 _1 _2")
 [__readNone]
-vector<double, N> fma(vector<double, N> a, vector<double, N> b, vector<double, N> c)
+vector<T, N> fma(vector<T, N> a, vector<T, N> b, vector<T, N> c)
 {
-    VECTOR_MAP_TRINARY(double, N, fma, a, b, c);
+    VECTOR_MAP_TRINARY(T, N, fma, a, b, c);
 }
 
-__generic<let N : int, let M : int>
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 [__readNone]
-matrix<double, N, M> fma(matrix<double, N, M> a, matrix<double, N, M> b, matrix<double, N, M> c)
+matrix<T, N, M> fma(matrix<T, N, M> a, matrix<T, N, M> b, matrix<T, N, M> c)
 {
-    MATRIX_MAP_TRINARY(double, N, M, fma, a, b, c);
+    MATRIX_MAP_TRINARY(T, N, M, fma, a, b, c);
 }
 
 // Floating point remainder of x/y
@@ -6414,6 +6455,16 @@ vector<T,N> normalize(vector<T,N> x)
     return x / length(x);
 }
 
+__generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Normalize _0")
+[__readNone]
+T normalize(T x)
+{
+    return x / length(x);
+}
+
 // Raise to a power
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
@@ -6618,6 +6669,16 @@ matrix<T, N, M> rcp(matrix<T, N, M> x)
 }
 
 // Reflect incident vector across plane with given normal
+__generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Reflect _0 _1")
+[__readNone]
+T reflect(T i, T n)
+{
+    return i - T(2) * dot(n,i) * n;
+}
+
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
@@ -6639,6 +6700,19 @@ vector<T,N> refract(vector<T,N> i, vector<T,N> n, T eta)
     let dotNI = dot(n,i);
     let k = T(1) - eta*eta*(T(1) - dotNI * dotNI);
     if(k < T(0)) return vector<T,N>(T(0));
+    return eta * i - (eta * dotNI + sqrt(k)) * n;
+}
+
+__generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(spirv, "OpExtInst resultType resultId glsl450 Refract _0 _1 _2")
+[__readNone]
+T refract(T i, T n, T eta)
+{
+    let dotNI = dot(n,i);
+    let k = T(1) - eta*eta*(T(1) - dotNI * dotNI);
+    if(k < T(0)) return T(0);
     return eta * i - (eta * dotNI + sqrt(k)) * n;
 }
 
@@ -13090,12 +13164,6 @@ struct ConstBufferPointer
         }
     }
 
-    __subscript(int index) -> T
-    {
-        [ForceInline]
-        get {return ConstBufferPointer<T>.fromUInt(toUInt() + __naturalStrideOf<T>() * index).get(); }
-    }
-
     __glsl_version(450)
     __glsl_extension(GL_EXT_shader_explicit_arithmetic_types_int64)
     __glsl_extension(GL_EXT_buffer_reference)
@@ -13146,5 +13214,11 @@ struct ConstBufferPointer
                 result:$$bool = OpINotEqual %ptrval $zero;
             };
         }
+    }
+
+    __subscript(int index)->T
+    {
+        [ForceInline]
+        get { return ConstBufferPointer<T>.fromUInt(toUInt() + __naturalStrideOf<T>() * index).get(); }
     }
 }

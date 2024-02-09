@@ -3537,6 +3537,28 @@ namespace Slang
         return fileDecl;
     }
 
+    static NodeBase* parseRequireCapabilityDecl(Parser* parser, void*)
+    {
+        auto decl = parser->astBuilder->create<RequireCapabilityDecl>();
+        parser->FillPosition(decl);
+        List<CapabilityName> capNames;
+        while (parser->LookAheadToken(TokenType::Identifier))
+        {
+            auto capNameToken = parser->ReadToken(TokenType::Identifier);
+            CapabilityName capName = findCapabilityName(capNameToken.getContent());
+            if (capName != CapabilityName::Invalid)
+                capNames.add(capName);
+            else
+                parser->sink->diagnose(capNameToken, Diagnostics::unknownCapability, capNameToken.getContent());
+            if (AdvanceIf(parser, "+") || AdvanceIf(parser, ","))
+                continue;
+            break;
+        }
+        decl->inferredCapabilityRequirements = CapabilitySet(capNames);
+        parser->ReadToken(TokenType::Semicolon);
+        return decl;
+    }
+
     static NodeBase* parseConstructorDecl(Parser* parser, void* /*userData*/)
     {
         ConstructorDecl* decl = parser->astBuilder->create<ConstructorDecl>();
@@ -4351,7 +4373,20 @@ namespace Slang
         Decl* declToModify = decl;
         if(auto genericDecl = as<GenericDecl>(decl))
             declToModify = genericDecl->inner;
-        _addModifiers(declToModify, modifiers);
+
+        if (as<ModuleDeclarationDecl>(decl))
+        {
+            // Modifiers on module declaration should be added to the module itself.
+            auto moduleDecl = getModuleDecl(containerDecl);
+            if (moduleDecl)
+            {
+                _addModifiers(moduleDecl, modifiers);
+            }
+        }
+        else
+        {
+            _addModifiers(declToModify, modifiers);
+        }
 
         if (containerDecl)
         {
@@ -7901,7 +7936,7 @@ namespace Slang
         _makeParseDecl("__ignored_block",   parseIgnoredBlockDecl ),
         _makeParseDecl("__transparent_block", parseTransparentBlockDecl),
         _makeParseDecl("__file_decl",         parseFileDecl),
-
+        _makeParseDecl("__require_capability", parseRequireCapabilityDecl),
 
         // !!!!!!!!!!!!!!!!!!!!!! Modifer !!!!!!!!!!!!!!!!!!!!!!
 

@@ -1995,11 +1995,6 @@ struct SpecializationContext
         {
             return 2;
         }
-        else if (auto ptrType = as<IRPtrTypeBase>(type))
-        {
-            type = ptrType->getValueType();
-            goto top;
-        }
         else if (auto ptrLikeType = as<IRPointerLikeType>(type))
         {
             type = ptrLikeType->getElementType();

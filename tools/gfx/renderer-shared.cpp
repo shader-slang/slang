@@ -46,6 +46,7 @@ const Slang::Guid GfxGUID::IID_IAccelerationStructure = SLANG_UUID_IAcceleration
 const Slang::Guid GfxGUID::IID_IFence = SLANG_UUID_IFence;
 const Slang::Guid GfxGUID::IID_IShaderTable = SLANG_UUID_IShaderTable;
 const Slang::Guid GfxGUID::IID_IPipelineCreationAPIDispatcher = SLANG_UUID_IPipelineCreationAPIDispatcher;
+const Slang::Guid GfxGUID::IID_IVulkanPipelineCreationAPIDispatcher = SLANG_UUID_IVulkanPipelineCreationAPIDispatcher;
 const Slang::Guid GfxGUID::IID_ITransientResourceHeapD3D12 = SLANG_UUID_ITransientResourceHeapD3D12;
 
 
@@ -397,9 +398,18 @@ SLANG_NO_THROW Result SLANG_MCALL RendererBase::initialize(const Desc& desc)
 
     if (desc.apiCommandDispatcher)
     {
-        desc.apiCommandDispatcher->queryInterface(
-            GfxGUID::IID_IPipelineCreationAPIDispatcher,
-            (void**)m_pipelineCreationAPIDispatcher.writeRef());
+        if (desc.deviceType == DeviceType::Vulkan)
+        {
+            desc.apiCommandDispatcher->queryInterface(
+                GfxGUID::IID_IVulkanPipelineCreationAPIDispatcher,
+                (void**)m_pipelineCreationAPIDispatcher.writeRef());
+        }
+        else
+        {
+            desc.apiCommandDispatcher->queryInterface(
+                GfxGUID::IID_IPipelineCreationAPIDispatcher,
+                (void**)m_pipelineCreationAPIDispatcher.writeRef());
+        }
     }
     return SLANG_OK;
 }

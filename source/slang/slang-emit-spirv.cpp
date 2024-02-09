@@ -135,7 +135,6 @@ public:
         /// Dump all children, recursively, to a flattened list of SPIR-V words
     void dumpTo(List<SpvWord>& ioWords);
 
-private:
         /// The first child, if any.
     SpvInst* m_firstChild = nullptr;
 
@@ -145,7 +144,7 @@ private:
         /// while if it is non-empty it points to the `nextSibling` field
         /// of the last instruction.
         ///
-    SpvInst** m_link = &m_firstChild;
+    SpvInst* m_lastChild = nullptr;
 };
 
 // A SPIR-V instruction is then (in the general case) a potential
@@ -198,9 +197,13 @@ struct SpvInst : SpvInstParent
     // We will store the instructions in a given `SpvInstParent`
     // using an intrusive linked list.
 
+    SpvInstParent* parent = nullptr;
+
         /// The next instruction in the same `SpvInstParent`
     SpvInst* nextSibling = nullptr;
 
+    SpvInst* prevSibling = nullptr;
+    
         /// The result <id> produced by this instruction, or zero if it has no result.
     SpvWord id = 0;
 
@@ -235,6 +238,43 @@ struct SpvInst : SpvInstParent
         //
         SpvInstParent::dumpTo(ioWords);
     }
+
+    void removeFromParent()
+    {
+        auto oldParent = parent;
+
+        // If we don't currently have a parent, then
+        // we are doing fine.
+        if (!oldParent)
+            return;
+
+        auto pp = prevSibling;
+        auto nn = nextSibling;
+
+        if (pp)
+        {
+            SLANG_ASSERT(pp->parent == oldParent);
+            pp->nextSibling = nn;
+        }
+        else
+        {
+            oldParent->m_firstChild = nn;
+        }
+
+        if (nn)
+        {
+            SLANG_ASSERT(nn->parent == oldParent);
+            nn->prevSibling = pp;
+        }
+        else
+        {
+            oldParent->m_lastChild = pp;
+        }
+
+        prevSibling = nullptr;
+        nextSibling = nullptr;
+        parent = nullptr;
+    }
 };
 
     /// A logical section of a SPIR-V module
@@ -248,15 +288,22 @@ struct SpvLogicalSection : SpvInstParent
 void SpvInstParent::addInst(SpvInst* inst)
 {
     SLANG_ASSERT(inst);
+    SLANG_ASSERT(!inst->nextSibling);
+
+    if (m_firstChild == nullptr)
+    {
+        m_firstChild = m_lastChild = inst;
+        return;
+    }
 
     // The user shouldn't be trying to add multiple instructions at once.
     // If they really want that then they probably wanted to give `inst`
     // some children.
     //
-    SLANG_ASSERT(!inst->nextSibling);
-
-    *m_link = inst;
-    m_link = &inst->nextSibling;
+    m_lastChild->nextSibling = inst;
+    inst->prevSibling = m_lastChild;
+    inst->parent = this;
+    m_lastChild = inst;
 }
 
 void SpvInstParent::dumpTo(List<SpvWord>& ioWords)
@@ -428,6 +475,11 @@ struct SPIRVEmitContext
 
         /// The next destination `<id>` to allocate.
     SpvWord m_nextID = 1;
+
+    OrderedHashSet<IRPtrTypeBase*> m_forwardDeclaredPointers;
+
+        // A hash set to prevent redecorating the same spv inst.
+    HashSet<SpvId> m_decoratedSpvInsts;
 
     SpvAddressingModel m_addressingMode = SpvAddressingModelLogical;
 
@@ -1244,6 +1296,17 @@ struct SPIRVEmitContext
         return m_targetRequest->getHLSLToVulkanLayoutOptions()->shouldEmitSPIRVReflectionInfo();
     }
 
+    void requireVariablePointers()
+    {
+        if (m_addressingMode == SpvAddressingModelPhysicalStorageBuffer64)
+            return;
+        ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_variable_pointers"));
+        requireSPIRVCapability(SpvCapabilityVariablePointers);
+        ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_physical_storage_buffer"));
+        requireSPIRVCapability(SpvCapabilityPhysicalStorageBufferAddresses);
+        m_addressingMode = SpvAddressingModelPhysicalStorageBuffer64;
+    }
+
     // Next, let's look at emitting some of the instructions
     // that can occur at global scope.
 
@@ -1312,11 +1375,41 @@ struct SPIRVEmitContext
                     storageClass = (SpvStorageClass)ptrType->getAddressSpace();
                 if (storageClass == SpvStorageClassStorageBuffer)
                     ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_storage_buffer_storage_class"));
-                return emitOpTypePointer(
+                if (storageClass == SpvStorageClassPhysicalStorageBuffer)
+                {
+                    requireVariablePointers();
+                }
+                auto valueType = ptrType->getValueType();
+                // If we haven't emitted the inner type yet, we need to emit a forward declaration.
+                bool useForwardDeclaration = (!m_mapIRInstToSpvInst.containsKey(valueType)
+                    && as<IRStructType>(valueType)
+                    && storageClass == SpvStorageClassPhysicalStorageBuffer);
+                auto resultSpvType = emitOpTypePointer(
                     inst,
                     storageClass,
-                    inst->getOperand(0)
+                    useForwardDeclaration? getIRInstSpvID(valueType) : getID(ensureInst(valueType))
                 );
+                if (useForwardDeclaration)
+                {
+                    // After everything has been emitted, we will move the pointer definition to the end
+                    // of the Types & Constants section.
+                    if (m_forwardDeclaredPointers.add(ptrType))
+                        emitOpTypeForwardPointer(resultSpvType, storageClass);
+                }
+                if (storageClass == SpvStorageClassPhysicalStorageBuffer)
+                {
+                    if (m_decoratedSpvInsts.add(getID(resultSpvType)))
+                    {
+                        IRSizeAndAlignment sizeAndAlignment;
+                        getNaturalSizeAndAlignment(m_targetRequest, ptrType->getValueType(), &sizeAndAlignment);
+                        emitOpDecorateArrayStride(
+                            getSection(SpvLogicalSectionID::Annotations),
+                            nullptr,
+                            resultSpvType,
+                            SpvLiteralInteger::from32((uint32_t)sizeAndAlignment.getStride()));
+                    }
+                }
+                return resultSpvType;
             }
         case kIROp_ConstantBufferType:
             SLANG_UNEXPECTED("Constant buffer type remaining in spirv emit");
@@ -1404,11 +1497,7 @@ struct SPIRVEmitContext
             return emitOpTypeHitObject(inst);
 
         case kIROp_HLSLConstBufferPointerType:
-            ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_variable_pointers"));
-            requireSPIRVCapability(SpvCapabilityVariablePointers);
-            ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_physical_storage_buffer"));
-            requireSPIRVCapability(SpvCapabilityPhysicalStorageBufferAddresses);
-            m_addressingMode = SpvAddressingModelPhysicalStorageBuffer64;
+            requireVariablePointers();
             return emitOpTypePointer(inst, SpvStorageClassPhysicalStorageBuffer, inst->getOperand(0));
 
         case kIROp_FuncType:
@@ -1446,6 +1535,7 @@ struct SPIRVEmitContext
         case kIROp_IntLit:
         case kIROp_FloatLit:
         case kIROp_StringLit:
+        case kIROp_PtrLit:
         {
             return emitLit(inst);
         }
@@ -1978,6 +2068,7 @@ struct SPIRVEmitContext
             param->getDataType(),
             storageClass
         );
+        maybeEmitPointerDecoration(varInst, param);
         if (auto layout = getVarLayout(param))
             emitVarLayout(param, varInst, layout);
         maybeEmitName(varInst, param);
@@ -2001,6 +2092,7 @@ struct SPIRVEmitContext
             globalVar->getDataType(),
             storageClass
         );
+        maybeEmitPointerDecoration(varInst, globalVar);
         if(layout)
             emitVarLayout(globalVar, varInst, layout);
         maybeEmitName(varInst, globalVar);
@@ -2274,6 +2366,8 @@ struct SPIRVEmitContext
             return emitFieldExtract(parent, as<IRFieldExtract>(inst));
         case kIROp_GetElementPtr:
             return emitGetElementPtr(parent, as<IRGetElementPtr>(inst));
+        case kIROp_GetOffsetPtr:
+            return emitGetOffsetPtr(parent, inst);
         case kIROp_GetElement:
             return emitGetElement(parent, as<IRGetElement>(inst));
         case kIROp_MakeStruct:
@@ -2306,6 +2400,13 @@ struct SPIRVEmitContext
             return emitIntToFloatCast(parent, as<IRCastIntToFloat>(inst));
         case kIROp_CastFloatToInt:
             return emitFloatToIntCast(parent, as<IRCastFloatToInt>(inst));
+        case kIROp_CastPtrToInt:
+            return emitCastPtrToInt(parent, inst);
+        case kIROp_CastPtrToBool:
+            return emitCastPtrToBool(parent, inst);
+        case kIROp_CastIntToPtr:
+            return emitCastIntToPtr(parent, inst);
+        case kIROp_PtrCast:
         case kIROp_BitCast:
             return emitOpBitcast(
                 parent,
@@ -3403,10 +3504,27 @@ struct SPIRVEmitContext
         return nullptr;
     }
 
+    void maybeEmitPointerDecoration(SpvInst* varInst, IRInst* inst)
+    {
+        auto ptrType = as<IRPtrType>(inst->getDataType());
+        if (!ptrType)
+            return;
+        if (ptrType->getAddressSpace() == SpvStorageClassPhysicalStorageBuffer)
+        {
+            emitOpDecorate(
+                getSection(SpvLogicalSectionID::Annotations),
+                nullptr,
+                varInst,
+                (as<IRVar>(inst) ? SpvDecorationAliasedPointer : SpvDecorationAliased)
+            );
+        }
+    }
+
     SpvInst* emitParam(SpvInstParent* parent, IRInst* inst)
     {
         auto paramSpvInst = emitOpFunctionParameter(parent, inst, inst->getFullType());
         maybeEmitName(paramSpvInst, inst);
+        maybeEmitPointerDecoration(paramSpvInst, inst);
         return paramSpvInst;
     }
 
@@ -3421,6 +3539,7 @@ struct SPIRVEmitContext
         }
         auto varSpvInst = emitOpVariable(parent, inst, inst->getFullType(), storageClass);
         maybeEmitName(varSpvInst, inst);
+        maybeEmitPointerDecoration(varSpvInst, inst);
         return varSpvInst;
     }
 
@@ -3962,6 +4081,11 @@ struct SPIRVEmitContext
         );
     }
 
+    SpvInst* emitGetOffsetPtr(SpvInstParent* parent, IRInst* inst)
+    {
+        return emitOpPtrAccessChain(parent, inst, inst->getDataType(), inst->getOperand(0), inst->getOperand(1));
+    }
+
     SpvInst* emitGetElementPtr(SpvInstParent* parent, IRGetElementPtr* inst)
     {
         IRBuilder builder(m_irModule);
@@ -4025,12 +4149,32 @@ struct SPIRVEmitContext
 
     SpvInst* emitLoad(SpvInstParent* parent, IRLoad* inst)
     {
-        return emitOpLoad(parent, inst, inst->getDataType(), inst->getPtr());
+        auto ptrType = as<IRPtrTypeBase>(inst->getPtr()->getDataType());
+        if (ptrType && ptrType->getAddressSpace() == SpvStorageClassPhysicalStorageBuffer)
+        {
+            IRSizeAndAlignment sizeAndAlignment;
+            getNaturalSizeAndAlignment(m_targetRequest, ptrType->getValueType(), &sizeAndAlignment);
+            return emitOpLoadAligned(parent, inst, inst->getDataType(), inst->getPtr(), SpvLiteralInteger::from32(sizeAndAlignment.alignment));
+        }
+        else
+        {
+            return emitOpLoad(parent, inst, inst->getDataType(), inst->getPtr());
+        }
     }
 
     SpvInst* emitStore(SpvInstParent* parent, IRStore* inst)
     {
-        return emitOpStore(parent, inst, inst->getPtr(), inst->getVal());
+        auto ptrType = as<IRPtrTypeBase>(inst->getPtr()->getDataType());
+        if (ptrType && ptrType->getAddressSpace() == SpvStorageClassPhysicalStorageBuffer)
+        {
+            IRSizeAndAlignment sizeAndAlignment;
+            getNaturalSizeAndAlignment(m_targetRequest, ptrType->getValueType(), &sizeAndAlignment);
+            return emitOpStoreAligned(parent, inst, inst->getPtr(), inst->getVal(), SpvLiteralInteger::from32(sizeAndAlignment.alignment));
+        }
+        else
+        {
+            return emitOpStore(parent, inst, inst->getPtr(), inst->getVal());
+        }
     }
 
     SpvInst* emitSwizzledStore(SpvInstParent* parent, IRSwizzledStore* inst)
@@ -4320,6 +4464,23 @@ struct SPIRVEmitContext
         return toInfo.isSigned
             ? emitOpConvertFToS(parent, inst, toTypeV, inst->getOperand(0))
             : emitOpConvertFToU(parent, inst, toTypeV, inst->getOperand(0));
+    }
+
+    SpvInst* emitCastPtrToInt(SpvInstParent* parent, IRInst* inst)
+    {
+        return emitInst(parent, inst, SpvOpConvertPtrToU, inst->getFullType(), kResultID, inst->getOperand(0));
+    }
+
+    SpvInst* emitCastPtrToBool(SpvInstParent* parent, IRInst* inst)
+    {
+        IRBuilder builder(inst);
+        auto uintVal = emitInst(parent, nullptr, SpvOpConvertPtrToU, builder.getUInt64Type(), kResultID, inst->getOperand(0));
+        return emitOpINotEqual(parent, inst, kResultID, uintVal, builder.getIntValue(builder.getUInt64Type(), 0));
+    }
+
+    SpvInst* emitCastIntToPtr(SpvInstParent* parent, IRInst* inst)
+    {
+        return emitInst(parent, inst, SpvOpConvertUToPtr, inst->getFullType(), kResultID, inst->getOperand(0));
     }
 
     template<typename T, typename Ts>
@@ -5124,6 +5285,16 @@ SlangResult emitSPIRVFromIR(
     {
         context.ensureInst(irEntryPoint);
     }
+
+    // Move forward delcared pointers to the end.
+    for (auto ptrType : context.m_forwardDeclaredPointers)
+    {
+        auto spvPtrType = context.m_mapIRInstToSpvInst[ptrType];
+        auto parent = spvPtrType->parent;
+        spvPtrType->removeFromParent();
+        parent->addInst(spvPtrType);
+    }
+
     context.emitFrontMatter();
 
     context.emitPhysicalLayout();
