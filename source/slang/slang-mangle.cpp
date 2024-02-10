@@ -132,7 +132,8 @@ namespace Slang
 
     void emitQualifiedName(
         ManglingContext*    context,
-        DeclRef<Decl>       declRef);
+        DeclRef<Decl>       declRef,
+        bool includeModuleName);
 
     void emitSimpleIntVal(
         ManglingContext*    context,
@@ -211,7 +212,7 @@ namespace Slang
         }
         else if( auto declRefType = dynamicCast<DeclRefType>(type) )
         {
-            emitQualifiedName(context, declRefType->getDeclRef());
+            emitQualifiedName(context, declRefType->getDeclRef(), true);
         }
         else if (auto arrType = dynamicCast<ArrayExpressionType>(type))
         {
@@ -222,7 +223,7 @@ namespace Slang
         else if( auto thisType = dynamicCast<ThisType>(type) )
         {
             emitRaw(context, "t");
-            emitQualifiedName(context, thisType->getInterfaceDeclRef());
+            emitQualifiedName(context, thisType->getInterfaceDeclRef(), true);
         }
         else if (const auto errorType = dynamicCast<ErrorType>(type))
         {
@@ -356,16 +357,33 @@ namespace Slang
 
     void emitQualifiedName(
         ManglingContext*    context,
-        DeclRef<Decl>       declRef)
+        DeclRef<Decl>       declRef,
+        bool includeModuleName)
     {
         auto parentDeclRef = declRef.getParent();
         if (as<FileDecl>(parentDeclRef))
             parentDeclRef = parentDeclRef.getParent();
+        if (!includeModuleName)
+        {
+            if (as<ModuleDecl>(parentDeclRef))
+                return;
+        }
+        else
+        {
+            for (auto modifier : declRef.getDecl()->modifiers)
+            {
+                if (as<ExternModifier>(modifier) || as<HLSLExportModifier>(modifier))
+                {
+                    includeModuleName = false;
+                    break;
+                }
+            }
+        }
 
         auto parentGenericDeclRef = parentDeclRef.as<GenericDecl>();
         if( parentDeclRef )
         {
-            emitQualifiedName(context, parentDeclRef);
+            emitQualifiedName(context, parentDeclRef, includeModuleName);
         }
 
         // A generic declaration is kind of a pseudo-declaration
@@ -490,7 +508,7 @@ namespace Slang
                     for (auto type : constraint.value)
                     {
                         emitRaw(context, "C");
-                        emitQualifiedName(context, makeDeclRef(constraint.key));
+                        emitQualifiedName(context, makeDeclRef(constraint.key), true);
                             emitType(context, type);
                     }
                 }
@@ -541,9 +559,7 @@ namespace Slang
 
         // Handle `__extern_cpp` modifier by simply emitting
         // the given name.
-        if (decl->hasModifier<ExternCppModifier>() ||
-            decl->hasModifier<ExternModifier>() ||
-            decl->hasModifier<HLSLExportModifier>())
+        if (decl->hasModifier<ExternCppModifier>())
         {
             emit(context, decl->getName()->text);
             return;
@@ -581,7 +597,7 @@ namespace Slang
 
             auto innerDecl = getInner(genericDecl);
 
-            emitQualifiedName(context, makeDeclRef(innerDecl));
+            emitQualifiedName(context, makeDeclRef(innerDecl), true);
             return;
         }
         else if (as<ForwardDerivativeRequirementDecl>(decl))
@@ -594,7 +610,8 @@ namespace Slang
         }
 
         // Now we encode the qualified name of the decl.
-        emitQualifiedName(context, declRef);
+        
+        emitQualifiedName(context, declRef, true);
     }
 
     static String getMangledName(ASTBuilder* astBuilder, DeclRef<Decl> const& declRef)
@@ -627,8 +644,8 @@ namespace Slang
         SLANG_AST_BUILDER_RAII(astBuilder);
         ManglingContext context(astBuilder);
         emitRaw(&context, "_SW");
-        emitQualifiedName(&context, sub);
-        emitQualifiedName(&context, sup);
+        emitQualifiedName(&context, sub, true);
+        emitQualifiedName(&context, sup, true);
         return context.sb.produceString();
     }
 
@@ -645,7 +662,7 @@ namespace Slang
         //
         ManglingContext context(astBuilder);
         emitRaw(&context, "_SW");
-        emitQualifiedName(&context, sub);
+        emitQualifiedName(&context, sub, true);
         emitType(&context, sup);
         return context.sb.produceString();
     }
