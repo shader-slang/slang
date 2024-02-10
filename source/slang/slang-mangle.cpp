@@ -360,12 +360,9 @@ namespace Slang
         DeclRef<Decl>       declRef,
         bool includeModuleName)
     {
-        auto parentDeclRef = declRef.getParent();
-        if (as<FileDecl>(parentDeclRef))
-            parentDeclRef = parentDeclRef.getParent();
         if (!includeModuleName)
         {
-            if (as<ModuleDecl>(parentDeclRef))
+            if (as<ModuleDecl>(declRef))
                 return;
         }
         else
@@ -379,6 +376,10 @@ namespace Slang
                 }
             }
         }
+
+        auto parentDeclRef = declRef.getParent();
+        if (as<FileDecl>(parentDeclRef))
+            parentDeclRef = parentDeclRef.getParent();
 
         auto parentGenericDeclRef = parentDeclRef.as<GenericDecl>();
         if( parentDeclRef )

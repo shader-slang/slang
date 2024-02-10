@@ -1471,6 +1471,11 @@ namespace Slang
             }
             else
             {
+                if (varDecl->hasModifier<ExternModifier>())
+                {
+                    getSink()->diagnose(initExpr, Diagnostics::externValueCannotHaveInitializer);
+                }
+
                 initExpr = CheckExpr(initExpr);
 
                 // TODO: We might need some additional steps here to ensure
@@ -1484,7 +1489,7 @@ namespace Slang
 
                 _validateCircularVarDefinition(varDecl);
             }
-
+            
             // If we've gone down this path, then the variable
             // declaration is actually pretty far along in checking
             varDecl->setCheckState(DeclCheckState::DefinitionChecked);

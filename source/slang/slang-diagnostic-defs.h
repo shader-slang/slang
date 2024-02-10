@@ -478,10 +478,10 @@ DIAGNOSTIC(30502, Error, cannotUseInitializerListForVectorOfUnknownSize, "cannot
 DIAGNOSTIC(30503, Error, cannotUseInitializerListForMatrixOfUnknownSize, "cannot use initializer list for matrix of statically unknown size '$0' rows")
 DIAGNOSTIC(30504, Error, cannotUseInitializerListForType, "cannot use initializer list for type '$0'")
 
-// 306xx: variables
-DIAGNOSTIC(30600, Error, varWithoutTypeMustHaveInitializer, "a variable declaration without an initial-value expression must be given an explicit type")
-
-DIAGNOSTIC(30610, Error, ambiguousDefaultInitializerForType, "more than one default initializer was found for type '$0'")
+// 3062x: variables
+DIAGNOSTIC(30620, Error, varWithoutTypeMustHaveInitializer, "a variable declaration without an initial-value expression must be given an explicit type")
+DIAGNOSTIC(30621, Error, externValueCannotHaveInitializer, "an 'extern' variable declaration cannot have a value.")
+DIAGNOSTIC(30622, Error, ambiguousDefaultInitializerForType, "more than one default initializer was found for type '$0'")
 
 // 307xx: parameters
 DIAGNOSTIC(30700, Error, outputParameterCannotHaveDefaultValue, "an 'out' or 'inout' parameter cannot have a default-value expression")
