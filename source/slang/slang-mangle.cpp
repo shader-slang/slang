@@ -541,7 +541,9 @@ namespace Slang
 
         // Handle `__extern_cpp` modifier by simply emitting
         // the given name.
-        if (decl->hasModifier<ExternCppModifier>())
+        if (decl->hasModifier<ExternCppModifier>() ||
+            decl->hasModifier<ExternModifier>() ||
+            decl->hasModifier<HLSLExportModifier>())
         {
             emit(context, decl->getName()->text);
             return;
