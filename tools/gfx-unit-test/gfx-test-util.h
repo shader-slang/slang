@@ -8,7 +8,7 @@
 namespace gfx_test
 {
         /// Helper function for print out diagnostic messages output by Slang compiler.
-    void diagnoseIfNeeded(ISlangWriter* diagnosticWriter, slang::IBlob* diagnosticsBlob);
+    void diagnoseIfNeeded(slang::IBlob* diagnosticsBlob);
 
         /// Loads a compute shader module and produces a `gfx::IShaderProgram`.
     Slang::Result loadComputeProgram(
