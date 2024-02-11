@@ -126,6 +126,8 @@ namespace Slang
             while (workList.getCount() != 0)
             {
                 IRInst* inst = pop(false);
+                if (!inst->parent)
+                    continue;
                 f(inst);
                 for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
                 {
