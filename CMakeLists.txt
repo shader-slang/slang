@@ -90,8 +90,9 @@ option(SLANG_ENABLE_ASAN "Enable ASAN (address sanitizer)")
 option(SLANG_ENABLE_GFX "Enable gfx targets" ON)
 option(SLANG_ENABLE_SLANGD "Enable language server target" ON)
 option(SLANG_ENABLE_SLANGC "Enable standalone compiler target" ON)
-option(SLANG_ENABLE_TESTS "Enable test targets, requires SLANG_ENABLE_GFX" ON)
-option(SLANG_ENABLE_EXAMPLES "Enable examples, requires SLANG_ENABLE_GFX" ON)
+option(SLANG_ENABLE_SLANGRT "Enable runtime target" ON)
+option(SLANG_ENABLE_TESTS "Enable test targets, requires SLANG_ENABLE_GFX, SLANG_ENABLE_SLANGD and SLANG_ENABLE_SLANGRT" ON)
+option(SLANG_ENABLE_EXAMPLES "Enable example targets, requires SLANG_ENABLE_GFX" ON)
 
 set(SLANG_GENERATORS_PATH
     ""
@@ -192,16 +193,18 @@ slang_add_target(
     INCLUDE_DIRECTORIES_PUBLIC source
 )
 
-slang_add_target(
-    source/slang-rt
-    SHARED
-    # This compiles 'core' again with the SLANG_RT_DYNAMIC_EXPORT macro defined
-    EXTRA_SOURCE_DIRS source/core
-    USE_EXTRA_WARNINGS
-    LINK_WITH_PRIVATE miniz lz4_static Threads::Threads ${CMAKE_DL_LIBS}
-    EXPORT_MACRO_PREFIX SLANG_RT
-    INSTALL
-)
+if(SLANG_ENABLE_SLANGRT)
+    slang_add_target(
+        source/slang-rt
+        SHARED
+        # This compiles 'core' again with the SLANG_RT_DYNAMIC_EXPORT macro defined
+        EXTRA_SOURCE_DIRS source/core
+        USE_EXTRA_WARNINGS
+        LINK_WITH_PRIVATE miniz lz4_static Threads::Threads ${CMAKE_DL_LIBS}
+        EXPORT_MACRO_PREFIX SLANG_RT
+        INSTALL
+    )
+endif()
 
 slang_add_target(
     source/compiler-core
@@ -520,7 +523,7 @@ endif()
 #
 # The test executables and runtime-loaded modules
 #
-if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_GFX)
+if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_GFX AND SLANG_ENABLE_SLANGD AND SLANG_ENABLE_SLANGRT)
     slang_add_target(
         tools/test-server
         EXECUTABLE
