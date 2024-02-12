@@ -493,12 +493,18 @@ spirv_caps_shader_subgroup(1.3)
         spirv_asm {
             OpControlBarrier Subgroup Subgroup AcquireRelease|SubgroupMemory|ImageMemory|UniformMemory
         };
+        spirv_asm {
+            OpControlBarrier Subgroup Subgroup AcquireRelease|SubgroupMemory|ImageMemory|UniformMemory
+        };
     case cpp:
         // TODO: cpp
         return;
     }
 }
 
+glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_basic)
+spirv_caps_shader_subgroup(1.3)
+[ForceInline] public void subgroupMemoryBarrier()
 glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_basic)
 spirv_caps_shader_subgroup(1.3)
 [ForceInline] public void subgroupMemoryBarrier()
@@ -512,6 +518,9 @@ spirv_caps_shader_subgroup(1.3)
     case glsl:
         __intrinsic_asm "subgroupMemoryBarrier()";
     case spirv:
+        spirv_asm {
+            OpMemoryBarrier Subgroup AcquireRelease|SubgroupMemory|ImageMemory|UniformMemory
+        };
         spirv_asm {
             OpMemoryBarrier Subgroup AcquireRelease|SubgroupMemory|ImageMemory|UniformMemory
         };
@@ -692,6 +701,10 @@ __generic<T : __BuiltinIntegerType>
 glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
 spirv_caps_shader_subgroup(1.3)
 [ForceInline] public T subgroupAnd(T value)
+__generic<T : __BuiltinIntegerType>
+glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
+spirv_caps_shader_subgroup(1.3)
+[ForceInline] public T subgroupAnd(T value)
 {
     shader_subgroup_preamble<T>();
     return WaveMaskBitAnd(WaveGetActiveMask(), value);
@@ -725,6 +738,7 @@ spirv_caps_shader_subgroup(1.3)
     {
     case glsl:
         __target_intrinsic "subgroupInclusiveAdd($0)";
+        __target_intrinsic "subgroupInclusiveAdd($0)";
     case spirv:
         if (__isFloat<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFAdd $$T result Subgroup InclusiveScan $value};
@@ -736,7 +750,10 @@ spirv_caps_shader_subgroup(1.3)
     case cpp:
         // TODO: implementation
         return value;
+        // TODO: implementation
+        return value;
     }
+    return value;
     return value;
 }
 
