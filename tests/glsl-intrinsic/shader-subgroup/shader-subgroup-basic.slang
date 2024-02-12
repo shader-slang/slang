@@ -5,10 +5,6 @@
 // TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda 
 // not testing cpp due to missing impl
 // TEST:SIMPLE(filecheck=CHECK_CPP):  -allow-glsl -stage compute -entry computeMain -target cpp
-// not testing cuda due to missing impl
-// TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda 
-// not testing cpp due to missing impl
-// TEST:SIMPLE(filecheck=CHECK_CPP):  -allow-glsl -stage compute -entry computeMain -target cpp
 
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
@@ -17,38 +13,56 @@
 precision highp float;
 precision highp int;
 
-//TEST_INPUT:ubuffer(data=[9 0 0 0 0], stride=4):name=inputBuffer
-buffer MyBlockName
-{
-    uint data[];
-} inputBuffer;
-
-//TEST_INPUT:ubuffer(data=[0 1], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 buffer MyBlockName2 
 {
     uint data[];
 } outputBuffer;
 
-layout(local_size_x = 4) in;
+layout(local_size_x = 32) in;
 
-#include "./glsl-test-utils.slang"
+shared uint shareMem;
 
 void computeMain()
 {
+    // TODO: no test for image memory was done -- subgroupMemoryBarrierImage();
+    // tests are seperate since concurrency testing
 
-    if (gl_GlobalInvocationID.x == 1) {
-        outputBuffer.data[0] = testFunctionIn2ParamPlus(subgroupQuadBroadcast, 1, 1, 1);
+    shareMem = 100;
+    subgroupMemoryBarrierShared();
+    outputBuffer.data[0] = 1;
+    subgroupBarrier();
+    outputBuffer.data[0] = 2;
+    subgroupBarrier();
+
+    outputBuffer.data[1] = 1;
+    subgroupMemoryBarrier();
+    outputBuffer.data[1] = 2;
+    subgroupBarrier();
+
+    outputBuffer.data[2] = 1;
+    subgroupMemoryBarrierBuffer();
+    outputBuffer.data[2] = 2;
+    subgroupBarrier();
+
+    shareMem = 2;
+    subgroupMemoryBarrierShared();
+    outputBuffer.data[3] = shareMem;
+    subgroupBarrier();
+
+    if (subgroupElect()) {
+        outputBuffer.data[4] = gl_GlobalInvocationID.x + 2;
     }
-
-    outputBuffer.data[1] = testFunctionIn1Param(subgroupQuadSwapHorizontal, 2, 2) &&
-                            testFunctionIn1Param(subgroupQuadSwapVertical, 2, 2) &&
-                            testFunctionIn1Param(subgroupQuadSwapDiagonal, 3, 3);
 
     // CHECK_GLSL: void main(
     // CHECK_SPV: OpEntryPoint
     // CHECK_HLSL: void computeMain(
     // CHECK_CUDA: void computeMain(
     // CHECK_CPP: void _computeMain(
-    // BUF: 1
-    // BUF-NEXT: 1
+
+    // BUF: 2
+    // BUF-NEXT: 2
+    // BUF-NEXT: 2
+    // BUF-NEXT: 2
+    // BUF-NEXT: 2
 }

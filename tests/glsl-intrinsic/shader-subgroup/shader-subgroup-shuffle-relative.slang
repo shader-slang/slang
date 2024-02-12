@@ -1,6 +1,15 @@
 //TEST:SIMPLE(filecheck=CHECK_GLSL):  -allow-glsl -stage compute -entry computeMain -target glsl
 //TEST:SIMPLE(filecheck=CHECK_SPV):  -allow-glsl -stage compute -entry computeMain -target spirv
-//TEST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage compute -entry computeMain -target hlsl
+
+// not testing hlsl due to missing impl
+// TEST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage compute -entry computeMain -target hlsl
+// not testing cuda due to missing impl
+// TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda 
+// not testing cpp due to missing impl
+// TEST:SIMPLE(filecheck=CHECK_CPP):  -allow-glsl -stage compute -entry computeMain -target cpp
+
+// not testing hlsl due to missing impl
+// TEST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage compute -entry computeMain -target hlsl
 // not testing cuda due to missing impl
 // TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda 
 // not testing cpp due to missing impl
@@ -12,13 +21,6 @@
 
 precision highp float;
 precision highp int;
-
-//TEST_INPUT:ubuffer(data=[9 0 0 0 0], stride=4):name=inputBuffer
-buffer MyBlockName
-{
-    uint data[];
-} inputBuffer;
-
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 buffer MyBlockName2 
 {
@@ -31,17 +33,8 @@ layout(local_size_x = 32) in;
 
 void computeMain()
 {
-    uvec4 in = (0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF);
-    outputBuffer.data[0] = testFunctionIn2ParamPlus(subgroupBroadcast, 1, 1, 0) &&
-                            testFunctionIn1Param(subgroupBroadcastFirst, 1, 1) &&
-                            (subgroupBallot(true).x == 0xFFFFFFFF) &&
-                            (subgroupInverseBallot(in) == true) &&
-                            (subgroupBallotBitExtract(in, 0) == true) &&
-                            (subgroupBallotBitCount(in) == 32) &&
-                            (subgroupBallotInclusiveBitCount(in) != 0) &&
-                            (subgroupBallotExclusiveBitCount(in) != 0) &&
-                            (subgroupBallotFindLSB(in) == 0) && 
-                            (subgroupBallotFindMSB(in) == 31); 
+    outputBuffer.data[0] = testFunctionIn2ParamPlus(subgroupShuffleUp, 1, 1, 1) &&
+                           testFunctionIn2ParamPlus(subgroupShuffleDown, 1, 1, 1);
 
     // CHECK_GLSL: void main(
     // CHECK_SPV: OpEntryPoint

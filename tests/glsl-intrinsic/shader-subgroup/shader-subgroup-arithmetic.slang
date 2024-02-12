@@ -17,8 +17,6 @@
 precision highp float;
 precision highp int;
 
-// #define TEST_when_equallity_and_uint_cast_on_templates_work
-
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 buffer MyBlockName2
 {

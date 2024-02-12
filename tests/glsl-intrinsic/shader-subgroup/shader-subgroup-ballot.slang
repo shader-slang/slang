@@ -13,13 +13,7 @@
 precision highp float;
 precision highp int;
 
-//TEST_INPUT:ubuffer(data=[1 1 1 1 1], stride=4):name=inputBuffer
-buffer MyBlockName
-{
-    uint data[];
-} inputBuffer;
-
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 buffer MyBlockName2 
 {
     uint data[];
@@ -27,48 +21,26 @@ buffer MyBlockName2
 
 layout(local_size_x = 32) in;
 
-shared uint shareMem;
+#include "./glsl-test-utils.slang"
 
 void computeMain()
 {
-    // TODO: no test for image memory was done -- subgroupMemoryBarrierImage();
-    // tests are seperate since concurrency testing
-
-    shareMem = 100;
-    subgroupMemoryBarrierShared();
-    outputBuffer.data[0] = 1;
-    subgroupBarrier();
-    outputBuffer.data[0] = 2;
-    subgroupBarrier();
-
-    outputBuffer.data[1] = 1;
-    subgroupMemoryBarrier();
-    outputBuffer.data[1] = 2;
-    subgroupBarrier();
-
-    outputBuffer.data[2] = 1;
-    subgroupMemoryBarrierBuffer();
-    outputBuffer.data[2] = 2;
-    subgroupBarrier();
-
-    shareMem = 2;
-    subgroupMemoryBarrierShared();
-    outputBuffer.data[3] = shareMem;
-    subgroupBarrier();
-
-    if (subgroupElect()) {
-        outputBuffer.data[4] = gl_GlobalInvocationID.x + 2;
-    }
+    uvec4 in = (0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF);
+    outputBuffer.data[0] = testFunctionIn2ParamPlus(subgroupBroadcast, 1, 1, 0) &&
+                            testFunctionIn1Param(subgroupBroadcastFirst, 1, 1) &&
+                            (subgroupBallot(true).x == 0xFFFFFFFF) &&
+                            (subgroupInverseBallot(in) == true) &&
+                            (subgroupBallotBitExtract(in, 0) == true) &&
+                            (subgroupBallotBitCount(in) == 32) &&
+                            (subgroupBallotInclusiveBitCount(in) != 0) &&
+                            (subgroupBallotExclusiveBitCount(in) != 0) &&
+                            (subgroupBallotFindLSB(in) == 0) && 
+                            (subgroupBallotFindMSB(in) == 31); 
 
     // CHECK_GLSL: void main(
     // CHECK_SPV: OpEntryPoint
     // CHECK_HLSL: void computeMain(
     // CHECK_CUDA: void computeMain(
     // CHECK_CPP: void _computeMain(
-
-    // BUF: 2
-    // BUF-NEXT: 2
-    // BUF-NEXT: 2
-    // BUF-NEXT: 2
-    // BUF-NEXT: 2
+    // BUF: 1
 }
