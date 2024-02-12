@@ -7439,25 +7439,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         NestedContext nested(this);
         auto subBuilder = nested.getBuilder();
         auto subContext = nested.getContext();
-        IRGeneric* outerGeneric = emitOuterGenerics(subContext, decl, decl);
 
-        // TODO(JS): Is this right? 
-        //
-        // If we *are* in a generic, then outputting this in the (current) generic scope would be correct.
-        // If we *aren't* we want to go the level above for insertion
-        //
-        // Just inserting into the parent doesn't work with a generic that holds a function that has a static const
-        // variable.
-        // 
+        // If we are static, then we need to insert the declaration before the parent.
         // This tries to match the behavior of previous `lowerFunctionStaticConstVarDecl` functionality
-        if (!outerGeneric && isFunctionStaticVarDecl(decl))
+        if (isFunctionStaticVarDecl(decl))
         {
             // We need to insert the constant at a level above
             // the function being emitted. This will usually
             // be the global scope, but it might be an outer
             // generic if we are lowering a generic function.
-
-            subBuilder->setInsertInto(subBuilder->getFunc()->getParent());
+            subBuilder->setInsertBefore(subBuilder->getFunc());
         }
 
         auto initExpr = decl->initExpr;
@@ -7520,7 +7511,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // Finish of generic
 
-        auto loweredValue = LoweredValInfo::simple(finishOuterGenerics(subBuilder, irConstant, outerGeneric));
+        auto loweredValue = LoweredValInfo::simple(irConstant);
 
         // Register the value that was emitted as the value
         // for any references to the constant from elsewhere
