@@ -7440,6 +7440,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         auto subBuilder = nested.getBuilder();
         auto subContext = nested.getContext();
 
+        IRGeneric* outerGeneric = nullptr;
+
         // If we are static, then we need to insert the declaration before the parent.
         // This tries to match the behavior of previous `lowerFunctionStaticConstVarDecl` functionality
         if (isFunctionStaticVarDecl(decl))
@@ -7449,6 +7451,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // be the global scope, but it might be an outer
             // generic if we are lowering a generic function.
             subBuilder->setInsertBefore(subBuilder->getFunc());
+        }
+        else if (!isFunctionVarDecl(decl))
+        {
+            outerGeneric = emitOuterGenerics(subContext, decl, decl);
         }
 
         auto initExpr = decl->initExpr;
@@ -7511,7 +7517,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // Finish of generic
 
-        auto loweredValue = LoweredValInfo::simple(irConstant);
+        auto loweredValue = LoweredValInfo::simple(finishOuterGenerics(subBuilder, irConstant, outerGeneric));
 
         // Register the value that was emitted as the value
         // for any references to the constant from elsewhere
@@ -7604,12 +7610,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return globalVal;
     }
 
-    bool isFunctionStaticVarDecl(VarDeclBase* decl)
+    bool isFunctionVarDecl(VarDeclBase* decl)
     {
-        // Only a variable marked `static` can be static.
-        if(!decl->findModifier<HLSLStaticModifier>())
-            return false;
-
         // The immediate parent of a function-scope variable
         // declaration will be a `ScopeDecl`.
         //
@@ -7617,12 +7619,19 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // set correctly, so we can't just scan up and look
         // for a function in the parent chain...
         auto parent = decl->parentDecl;
-        if( as<ScopeDecl>(parent) )
+        if (as<ScopeDecl>(parent))
         {
             return true;
         }
-
         return false;
+    }
+
+    bool isFunctionStaticVarDecl(VarDeclBase* decl)
+    {
+        // Only a variable marked `static` can be static.
+        if(!decl->findModifier<HLSLStaticModifier>())
+            return false;
+        return isFunctionVarDecl(decl);
     }
 
     struct NestedContext
