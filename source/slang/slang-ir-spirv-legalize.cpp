@@ -258,8 +258,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
 
         for (auto i : instsToRemove)
-            if (!i->hasUses())
-                i->removeAndDeallocate();
+            i->removeAndDeallocate();
     }
 
     // Returns true if the given type that should be decorated as in `UniformConstant` address space.

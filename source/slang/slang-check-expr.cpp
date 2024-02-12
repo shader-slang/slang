@@ -1659,6 +1659,9 @@ namespace Slang
             return nullptr;
         if(!decl->hasModifier<ConstModifier>())
             return nullptr;
+        // Extern static const is not considered compile-time constant by the front-end.
+        if (decl->hasModifier<ExternModifier>())
+            return nullptr;
 
         if (isInterfaceRequirement(decl))
         {
