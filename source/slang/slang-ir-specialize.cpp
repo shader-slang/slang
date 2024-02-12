@@ -1995,11 +1995,6 @@ struct SpecializationContext
         {
             return 2;
         }
-        else if (auto ptrType = as<IRPtrTypeBase>(type))
-        {
-            type = ptrType->getValueType();
-            goto top;
-        }
         else if (auto ptrLikeType = as<IRPointerLikeType>(type))
         {
             type = ptrLikeType->getElementType();
@@ -2080,11 +2075,16 @@ struct SpecializationContext
                 baseElementType,
                 slotOperandCount,
                 type->getExistentialArgs());
-
-            auto newPtrLikeType = builder.getType(
+            // Create a new type inst where the first operand is replaced
+            // with wrappedElementType.
+            ShortList<IRInst*> operands;
+            operands.add(wrappedElementType);
+            for (UInt i = 1; i < baseType->getOperandCount(); i++)
+                operands.add(baseType->getOperand(i));
+            IRInst* newPtrLikeType = builder.getType(
                 baseType->getOp(),
-                1,
-                &wrappedElementType);
+                operands.getCount(),
+                operands.getArrayView().getBuffer());
             addUsersToWorkList(type);
             addToWorkList(newPtrLikeType);
             addToWorkList(wrappedElementType);

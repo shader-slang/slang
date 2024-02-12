@@ -479,7 +479,10 @@ namespace Slang
         derefExpr->base = base;
         derefExpr->type = QualType(elementType);
 
-        derefExpr->type.isLeftValue = base->type.isLeftValue;
+        if (as<PtrType>(base->type))
+            derefExpr->type.isLeftValue = true;
+        else
+            derefExpr->type.isLeftValue = base->type.isLeftValue;
 
         return derefExpr;
     }

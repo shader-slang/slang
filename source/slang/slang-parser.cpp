@@ -2379,15 +2379,6 @@ namespace Slang
         }
     }
 
-    static String _wrappingModifierType(const WrappingTypeModifier* mod)
-    {
-        if(as<GLSLBufferModifier>(mod))
-        {
-            return "GLSLShaderStorageBuffer";
-        }
-        SLANG_UNREACHABLE("unhandled wrapping type modifier");
-    }
-
         /// Apply any type modifier in `ioBaseModifiers` to the given `typeExpr`.
         ///
         /// If any type modifiers were present, `ioBaseModifiers` will be updated
@@ -2432,30 +2423,6 @@ namespace Slang
                 // of "base" modifiers), and advance to the next one in order.
                 //
                 baseModifierLink = &baseModifier->next;
-            }
-            else if(const auto wrappingTypeModifier = as<WrappingTypeModifier>(typeModifier))
-            {
-                // This is where we match things which are modifiers in the
-                // syntax, but we match conceptually as wrappers around a type
-                // expression
-
-                // Firstly, disptach the modifier, we don't need it again
-                baseModifierLink = &baseModifier->next;
-
-                // Conjure up the generic wrapper type
-                // Make sure to use the outer scope, to avoid user name shadowing
-                auto bufferWrapperTypeExpr = parser->astBuilder->create<VarExpr>();
-                bufferWrapperTypeExpr->loc = wrappingTypeModifier->loc;
-                bufferWrapperTypeExpr->name = getName(parser, _wrappingModifierType(wrappingTypeModifier));
-                bufferWrapperTypeExpr->scope = parser->outerScope;
-
-                // Apply the wrapper
-                auto bufferPointerTypeExpr = parser->astBuilder->create<GenericAppExpr>();
-                bufferPointerTypeExpr->loc = wrappingTypeModifier->loc;
-                bufferPointerTypeExpr->functionExpr = bufferWrapperTypeExpr;
-                bufferPointerTypeExpr->arguments.add(typeExpr);
-
-                typeExpr = bufferPointerTypeExpr;
             }
             else
             {
@@ -2526,7 +2493,7 @@ namespace Slang
     }
 
         /// Parse a type specifier, without dealing with modifiers.
-    static TypeSpec _parseSimpleTypeSpec(Parser* parser, bool mightBeGLSLInterfaceBlock)
+    static TypeSpec _parseSimpleTypeSpec(Parser* parser)
     {
         TypeSpec typeSpec;
 
@@ -2560,16 +2527,6 @@ namespace Slang
             auto decl = parser->ParseClass();
             typeSpec.decl = decl;
             typeSpec.expr = createDeclRefType(parser, decl);
-            return typeSpec;
-        }
-        else if( mightBeGLSLInterfaceBlock
-                && parser->LookAheadToken(TokenType::Identifier)
-                && parser->LookAheadToken(TokenType::LBrace,1) )
-        {
-            // Parse the struct-like part
-            auto innerStructDecl = parser->ParseGLSLInterfaceBlock();
-            typeSpec.decl = innerStructDecl;
-            typeSpec.expr = createDeclRefType(parser, typeSpec.decl);
             return typeSpec;
         }
         else if(parser->LookAheadToken("enum"))
@@ -2629,17 +2586,17 @@ namespace Slang
         return typeSpec;
     }
 
-    static bool hasPotentialGLSLInterfaceBlockModifier(Parser* parser, Modifiers& mods)
+    static Modifier* findPotentialGLSLInterfaceBlockModifier(Parser* parser, Modifiers& mods)
     {
         if (!parser->options.allowGLSLInput)
-            return false;
+            return nullptr;
 
         for (auto mod : mods)
         {
-            if (as<GLSLBufferModifier>(mod) || as<InModifier>(mod) || as<OutModifier>(mod))
-                return true;
+            if (as<HLSLUniformModifier>(mod) || as<InModifier>(mod) || as<OutModifier>(mod))
+                return mod;
         }
-        return false;
+        return nullptr;
     }
 
         /// Parse a type specifier, following the given list of modifiers.
@@ -2650,7 +2607,7 @@ namespace Slang
         ///
     static TypeSpec _parseTypeSpec(Parser* parser, Modifiers& ioModifiers)
     {
-        TypeSpec typeSpec = _parseSimpleTypeSpec(parser, hasPotentialGLSLInterfaceBlockModifier(parser, ioModifiers));
+        TypeSpec typeSpec = _parseSimpleTypeSpec(parser);
 
         // We don't know whether `ioModifiers` has any modifiers in it,
         // or which of them might be type modifiers, so we will delegate
@@ -2675,7 +2632,7 @@ namespace Slang
     static TypeSpec _parseTypeSpec(Parser* parser)
     {
         Modifiers modifiers = ParseModifiers(parser);
-        TypeSpec typeSpec = _parseSimpleTypeSpec(parser, hasPotentialGLSLInterfaceBlockModifier(parser, modifiers));
+        TypeSpec typeSpec = _parseSimpleTypeSpec(parser);
 
         typeSpec = _applyModifiersToTypeSpec(parser, typeSpec, modifiers);
 
@@ -3094,9 +3051,10 @@ namespace Slang
         _addModifiers(decl, _parseOptSemantics(parser));
     }
 
-    static Decl* ParseHLSLBufferDecl(
+    static Decl* ParseBufferBlockDecl(
         Parser* parser,
-        String  bufferWrapperTypeName)
+        String  bufferWrapperTypeName,
+        String  *additionalTypeArg = nullptr)
     {
         // An HLSL declaration of a constant buffer like this:
         //
@@ -3161,23 +3119,37 @@ namespace Slang
         bufferDataTypeExpr->name = bufferDataTypeDecl->nameAndLoc.name;
         bufferDataTypeExpr->scope = parser->currentScope;
 
-        // Construct a type expression to reference the type constructor
-        auto bufferWrapperTypeExpr = parser->astBuilder->create<VarExpr>();
-        bufferWrapperTypeExpr->loc = bufferWrapperTypeNamePos;
-        bufferWrapperTypeExpr->name = getName(parser, bufferWrapperTypeName);
-
-        // Always need to look this up in the outer scope,
-        // so that it won't collide with, e.g., a local variable called `ConstantBuffer`
-        bufferWrapperTypeExpr->scope = parser->outerScope;
-
         // Construct a type expression that represents the type for the variable,
         // which is the wrapper type applied to the data type
-        auto bufferVarTypeExpr = parser->astBuilder->create<GenericAppExpr>();
-        bufferVarTypeExpr->loc = bufferVarDecl->loc;
-        bufferVarTypeExpr->functionExpr = bufferWrapperTypeExpr;
-        bufferVarTypeExpr->arguments.add(bufferDataTypeExpr);
+        if (bufferWrapperTypeName.getLength())
+        {
+            // Construct a type expression to reference the type constructor
+            auto bufferWrapperTypeExpr = parser->astBuilder->create<VarExpr>();
+            bufferWrapperTypeExpr->loc = bufferWrapperTypeNamePos;
+            bufferWrapperTypeExpr->name = getName(parser, bufferWrapperTypeName);
 
-        bufferVarDecl->type.exp = bufferVarTypeExpr;
+            // Always need to look this up in the outer scope,
+            // so that it won't collide with, e.g., a local variable called `ConstantBuffer`
+            bufferWrapperTypeExpr->scope = parser->outerScope;
+
+            auto bufferVarTypeExpr = parser->astBuilder->create<GenericAppExpr>();
+            bufferVarTypeExpr->loc = bufferVarDecl->loc;
+            bufferVarTypeExpr->functionExpr = bufferWrapperTypeExpr;
+            bufferVarTypeExpr->arguments.add(bufferDataTypeExpr);
+            if (additionalTypeArg)
+            {
+                auto additionalArgExpr = parser->astBuilder->create<VarExpr>();
+                additionalArgExpr->scope = parser->outerScope;
+                additionalArgExpr->loc = SourceLoc();
+                additionalArgExpr->name = getName(parser, *additionalTypeArg);
+                bufferVarTypeExpr->arguments.add(additionalArgExpr);
+            }
+            bufferVarDecl->type.exp = bufferVarTypeExpr;
+        }
+        else
+        {
+            bufferVarDecl->type.exp = bufferDataTypeExpr;
+        }
 
         // Any semantics applied to the buffer declaration are taken as applying
         // to the variable instead.
@@ -3191,6 +3163,7 @@ namespace Slang
         {
             // If the user specified an explicit name of the buffer var, use it.
             bufferVarDecl->nameAndLoc = ParseDeclName(parser);
+            reflectionNameModifier->nameAndLoc = bufferVarDecl->nameAndLoc;
             parser->ReadToken(TokenType::Semicolon);
         }
         else
@@ -3227,13 +3200,19 @@ namespace Slang
     static NodeBase* parseHLSLCBufferDecl(
         Parser*	parser, void* /*userData*/)
     {
-        return ParseHLSLBufferDecl(parser, "ConstantBuffer");
+        return ParseBufferBlockDecl(parser, "ConstantBuffer");
     }
 
     static NodeBase* parseHLSLTBufferDecl(
         Parser*	parser, void* /*userData*/)
     {
-        return ParseHLSLBufferDecl(parser, "TextureBuffer");
+        return ParseBufferBlockDecl(parser, "TextureBuffer");
+    }
+
+    static NodeBase* parseGLSLShaderStorageBufferDecl(
+        Parser* parser, String layoutType)
+    {
+        return ParseBufferBlockDecl(parser, "GLSLShaderStorageBuffer", &layoutType);
     }
 
     static void parseOptionalInheritanceClause(Parser* parser, AggTypeDeclBase* decl)
@@ -3556,6 +3535,28 @@ namespace Slang
         parser->FillPosition(fileDecl);
         parseDeclBody(parser, fileDecl);
         return fileDecl;
+    }
+
+    static NodeBase* parseRequireCapabilityDecl(Parser* parser, void*)
+    {
+        auto decl = parser->astBuilder->create<RequireCapabilityDecl>();
+        parser->FillPosition(decl);
+        List<CapabilityName> capNames;
+        while (parser->LookAheadToken(TokenType::Identifier))
+        {
+            auto capNameToken = parser->ReadToken(TokenType::Identifier);
+            CapabilityName capName = findCapabilityName(capNameToken.getContent());
+            if (capName != CapabilityName::Invalid)
+                capNames.add(capName);
+            else
+                parser->sink->diagnose(capNameToken, Diagnostics::unknownCapability, capNameToken.getContent());
+            if (AdvanceIf(parser, "+") || AdvanceIf(parser, ","))
+                continue;
+            break;
+        }
+        decl->inferredCapabilityRequirements = CapabilitySet(capNames);
+        parser->ReadToken(TokenType::Semicolon);
+        return decl;
     }
 
     static NodeBase* parseConstructorDecl(Parser* parser, void* /*userData*/)
@@ -4372,7 +4373,20 @@ namespace Slang
         Decl* declToModify = decl;
         if(auto genericDecl = as<GenericDecl>(decl))
             declToModify = genericDecl->inner;
-        _addModifiers(declToModify, modifiers);
+
+        if (as<ModuleDeclarationDecl>(decl))
+        {
+            // Modifiers on module declaration should be added to the module itself.
+            auto moduleDecl = getModuleDecl(containerDecl);
+            if (moduleDecl)
+            {
+                _addModifiers(moduleDecl, modifiers);
+            }
+        }
+        else
+        {
+            _addModifiers(declToModify, modifiers);
+        }
 
         if (containerDecl)
         {
@@ -4440,6 +4454,55 @@ namespace Slang
                 {
                     decl = parsedDecl;
                     break;
+                }
+
+                // This can also be a GLSL style buffer block declaration.
+                if (parser->options.allowGLSLInput)
+                {
+                    auto getLayoutArg = [&](const char* defaultLayout)
+                        {
+                            if (auto dataLayoutMod = modifiers.findModifier<GLSLBufferDataLayoutModifier>())
+                            {
+                                if (as<GLSLStd140Modifier>(dataLayoutMod))
+                                    return "Std140DataLayout";
+                                else if (as<GLSLStd430Modifier>(dataLayoutMod))
+                                    return "Std430DataLayout";
+                                else if (as<GLSLScalarModifier>(dataLayoutMod))
+                                    return "ScalarDataLayout";
+                            }
+                            return defaultLayout;
+                        };
+                    if (AdvanceIf(parser, "buffer"))
+                    {
+                        decl = as<Decl>(parseGLSLShaderStorageBufferDecl(parser, getLayoutArg("Std430DataLayout")));
+                        break;
+                    }
+                    else if (auto mod = findPotentialGLSLInterfaceBlockModifier(parser, modifiers))
+                    {
+                        if (!parser->LookAheadToken(TokenType::LBrace, 1))
+                        {
+                            goto endOfGlslBufferBlock;
+                        }
+
+                        if (as<HLSLUniformModifier>(mod))
+                        {
+                            decl = as<Decl>(parseHLSLCBufferDecl(parser, nullptr));
+                            break;
+                        }
+                        else
+                        {
+                            bool isGLSLBuiltinRedeclaration = parser->tokenReader.peekToken().getContent().startsWith("gl_");
+                            decl = ParseBufferBlockDecl(parser, "", nullptr);
+                            if (isGLSLBuiltinRedeclaration)
+                            {
+                                // Ignore builtin redeclaration.
+                                decl = parser->astBuilder->create<EmptyDecl>();
+                                decl->loc = loc;
+                            }
+                            break;
+                        }
+                    }
+                    endOfGlslBufferBlock:;
                 }
 
                 // Our final fallback case is to assume that the user is
@@ -4546,34 +4609,6 @@ namespace Slang
             parser->ReadToken();
             parser->ReadToken();
             parser->ReadToken(TokenType::Semicolon);
-            return true;
-        }
-        
-        Modifier* layoutModifier = nullptr;
-        if (parser->LookAheadToken("layout"))
-        {
-            tryParseUsingSyntaxDecl<Modifier>(parser, &layoutModifier);
-        }
-
-        DeclBase* decl = nullptr;
-        if (parser->LookAheadToken("uniform", 0) &&
-            (parser->LookAheadToken(TokenType::LBrace, 1) || 
-                parser->LookAheadToken(TokenType::Identifier, 1) &&
-                parser->LookAheadToken(TokenType::LBrace, 2)))
-        {
-            parser->ReadToken();
-            decl = as<Decl>(parseHLSLCBufferDecl(parser, containerDecl));
-            if (decl)
-                AddMember(parser->currentScope, (Decl*)decl);
-        }
-        else if (layoutModifier)
-        {
-            decl = ParseDecl(parser, containerDecl);
-        }
-
-        if (decl)
-        {
-            addModifier(decl, layoutModifier);
             return true;
         }
         return false;
@@ -7333,7 +7368,7 @@ namespace Slang
             // If there are any modifiers, then we know that we are actually
             // in the type case.
             //
-            auto typeSpec = _parseSimpleTypeSpec(parser, false);
+            auto typeSpec = _parseSimpleTypeSpec(parser);
             typeSpec = _applyModifiersToTypeSpec(parser, typeSpec, modifiers);
 
             auto typeExpr = typeSpec.expr;
@@ -7355,7 +7390,9 @@ namespace Slang
         NamePool*                       namePool,
         SourceLanguage                  sourceLanguage)
     {
-        Parser parser(astBuilder, tokens, sink, outerScope, ParserOptions{});
+        ParserOptions options;
+        options.allowGLSLInput = sourceLanguage == SourceLanguage::GLSL;
+        Parser parser(astBuilder, tokens, sink, outerScope, options);
         parser.currentScope = outerScope;
         parser.namePool = namePool;
         parser.sourceLanguage = sourceLanguage;
@@ -7366,6 +7403,7 @@ namespace Slang
     void parseSourceFile(
         ASTBuilder*                     astBuilder,
         TranslationUnitRequest*         translationUnit,
+        SourceLanguage                  sourceLanguage,
         TokenSpan const&                tokens,
         DiagnosticSink*                 sink,
         Scope*                          outerScope,
@@ -7373,8 +7411,9 @@ namespace Slang
     {
         ParserOptions options = {};
         options.enableEffectAnnotations = translationUnit->compileRequest->getLinkage()->getEnableEffectAnnotations();
-        options.allowGLSLInput = translationUnit->compileRequest->getLinkage()->getAllowGLSLInput() ||
-            translationUnit->sourceLanguage == SourceLanguage::GLSL;
+        options.allowGLSLInput = 
+            translationUnit->compileRequest->getLinkage()->getAllowGLSLInput() ||
+            sourceLanguage == SourceLanguage::GLSL;
         options.isInLanguageServer = translationUnit->compileRequest->getLinkage()->isInLanguageServer();
 
         Parser parser(astBuilder, tokens, sink, outerScope, options);
@@ -7701,7 +7740,10 @@ namespace Slang
 #define CASE(key, type) if (nameText == #key) { modifier = parser->astBuilder->create<type>(); } else
                 CASE(push_constant, PushConstantAttribute) 
                 CASE(shaderRecordNV, ShaderRecordAttribute)
-                CASE(constant_id,   GLSLConstantIDLayoutModifier) 
+                CASE(constant_id,   GLSLConstantIDLayoutModifier)
+                CASE(std140, GLSLStd140Modifier)
+                CASE(std430, GLSLStd430Modifier)
+                CASE(scalar, GLSLScalarModifier)
                 CASE(location, GLSLLocationLayoutModifier) 
                 {
                     modifier = parser->astBuilder->create<GLSLUnparsedLayoutModifier>();
@@ -7894,7 +7936,7 @@ namespace Slang
         _makeParseDecl("__ignored_block",   parseIgnoredBlockDecl ),
         _makeParseDecl("__transparent_block", parseTransparentBlockDecl),
         _makeParseDecl("__file_decl",         parseFileDecl),
-
+        _makeParseDecl("__require_capability", parseRequireCapabilityDecl),
 
         // !!!!!!!!!!!!!!!!!!!!!! Modifer !!!!!!!!!!!!!!!!!!!!!!
 
@@ -7941,7 +7983,6 @@ namespace Slang
         _makeParseModifier("uniform",       HLSLUniformModifier::kReflectClassInfo),
         _makeParseModifier("volatile",      HLSLVolatileModifier::kReflectClassInfo),
         _makeParseModifier("export",        HLSLExportModifier::kReflectClassInfo),
-        _makeParseModifier("buffer",        GLSLBufferModifier::kReflectClassInfo),
 
         // Modifiers for geometry shader input
         _makeParseModifier("point",         HLSLPointModifier::kReflectClassInfo),

@@ -337,7 +337,7 @@ namespace Slang
 
         /// Get the parent decl, skipping any generic decls in between.
     Decl* getParentDecl(Decl* decl);
-
+    Decl* getParentAggTypeDecl(Decl* decl);
     Decl* getParentFunc(Decl* decl);
 
 } // namespace Slang

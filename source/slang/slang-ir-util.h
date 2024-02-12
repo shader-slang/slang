@@ -221,6 +221,8 @@ IRInst* getInstInBlock(IRInst* inst);
 
 void removePhiArgs(IRInst* phiParam);
 
+ShortList<IRInst*> getPhiArgs(IRInst* phiParam);
+
 int getParamIndexInBlock(IRParam* paramInst);
 
 bool isGlobalOrUnknownMutableAddress(IRGlobalValueWithCode* parentFunc, IRInst* inst);

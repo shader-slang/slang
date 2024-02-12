@@ -33,8 +33,12 @@ namespace Slang
 
         builder.addDecoration(elementBufferKey, kIROp_CounterBufferDecoration, counterBufferKey);
 
-        auto elementBufferType = builder.getType(kIROp_HLSLRWStructuredBufferType, elementType);
-        auto counterBufferType = builder.getType(kIROp_HLSLRWStructuredBufferType, builder.getIntType());
+        IRInst* operands[2] = { elementType, type->getDataLayout() };
+        auto elementBufferType = builder.getType(kIROp_HLSLRWStructuredBufferType, 2, operands);
+
+        operands[0] = builder.getIntType();
+        operands[1] = builder.getType(kIROp_DefaultBufferLayoutType);
+        auto counterBufferType = builder.getType(kIROp_HLSLRWStructuredBufferType, 2, operands);
 
         builder.createStructField(structType, elementBufferKey, elementBufferType);
         builder.createStructField(structType, counterBufferKey, counterBufferType);

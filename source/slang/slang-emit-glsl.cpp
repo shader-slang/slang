@@ -122,7 +122,28 @@ void GLSLSourceEmitter::_emitGLSLStructuredBuffer(IRGlobalParam* varDecl, IRHLSL
     _requireGLSLVersion(430);
 
     m_writer->emit("layout(");
-    m_writer->emit(getTargetReq()->getForceGLSLScalarBufferLayout() ? "scalar" : "std430");
+    auto layoutTypeOp = structuredBufferType->getDataLayout()
+        ? structuredBufferType->getDataLayout()->getOp()
+        : kIROp_DefaultBufferLayoutType;
+    switch (layoutTypeOp)
+    {
+    case kIROp_DefaultBufferLayoutType:
+        m_writer->emit(getTargetReq()->getForceGLSLScalarBufferLayout() ? "scalar" : "std430");
+        break;
+    case kIROp_Std430BufferLayoutType:
+        m_writer->emit("std430");
+        break;
+    case kIROp_Std140BufferLayoutType:
+        m_writer->emit("std140");
+        break;
+    case kIROp_ScalarBufferLayoutType:
+        _requireGLSLExtension(toSlice("GL_EXT_scalar_block_layout"));
+        m_writer->emit("scalar");
+        break;
+    default:
+        m_writer->emit("std430");
+        break;
+    }
 
     bool isReadOnly = (as<IRHLSLStructuredBufferType>(structuredBufferType) != nullptr);
     auto layout = getVarLayout(varDecl);
@@ -208,7 +229,39 @@ void GLSLSourceEmitter::emitSSBOHeader(IRGlobalParam* varDecl, IRType* bufferTyp
     _requireGLSLVersion(430);
 
     m_writer->emit("layout(");
-    m_writer->emit(getTargetReq()->getForceGLSLScalarBufferLayout() ? "scalar" : "std430");
+    IROp layoutOp = kIROp_DefaultBufferLayoutType;
+    if (auto structBufferType = as<IRHLSLStructuredBufferTypeBase>(bufferType))
+    {
+        layoutOp = structBufferType->getDataLayout()? structBufferType->getDataLayout()->getOp() : kIROp_DefaultBufferLayoutType;
+    }
+    else if (auto ssboType = as<IRGLSLShaderStorageBufferType>(bufferType))
+    {
+        layoutOp = ssboType->getDataLayout() ? ssboType->getDataLayout()->getOp() : kIROp_DefaultBufferLayoutType;
+    }
+
+    if (layoutOp == kIROp_DefaultBufferLayoutType)
+    {
+        m_writer->emit(getTargetReq()->getForceGLSLScalarBufferLayout() ? "scalar" : "std430");
+    }
+    else
+    {
+        switch (layoutOp)
+        {
+        case kIROp_DefaultBufferLayoutType:
+            m_writer->emit(getTargetReq()->getForceGLSLScalarBufferLayout() ? "scalar" : "std430");
+            break;
+        case kIROp_Std430BufferLayoutType:
+            m_writer->emit("std430");
+            break;
+        case kIROp_Std140BufferLayoutType:
+            m_writer->emit("std140");
+            break;
+        case kIROp_ScalarBufferLayoutType:
+            _requireGLSLExtension(toSlice("GL_EXT_scalar_block_layout"));
+            m_writer->emit("scalar");
+            break;
+        }
+    }
 
     auto layout = getVarLayout(varDecl);
     if (layout)

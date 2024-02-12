@@ -52,6 +52,10 @@ struct ASTIterator
         {
             iterator->maybeDispatchCallback(expr);
         }
+        void visitOpenRefExpr(OpenRefExpr* expr)
+        {
+            dispatchIfNotNull(expr->innerExpr);
+        }
         void visitFloatingPointLiteralExpr(FloatingPointLiteralExpr* expr)
         {
             iterator->maybeDispatchCallback(expr);

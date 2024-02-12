@@ -2317,6 +2317,8 @@ static void addNameHint(
     String name = getNameForNameHint(context, decl);
     if(name.getLength() == 0)
         return;
+    if (name == "MyBlockName2")
+        printf("break");
     context->irBuilder->addNameHintDecoration(inst, name.getUnownedSlice());
 }
 
@@ -4261,6 +4263,10 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
             return LoweredValInfo::simple(
                 getBuilder()->emitMakeArrayFromElement(irType, irDefaultElement));
+        }
+        else if (auto ptrType = as<PtrType>(type))
+        {
+            return LoweredValInfo::simple(getBuilder()->getNullPtrValue(irType));
         }
         else if (auto declRefType = as<DeclRefType>(type))
         {
@@ -6943,6 +6949,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     IGNORED_CASE(NamespaceDecl)
     IGNORED_CASE(ModuleDeclarationDecl)
     IGNORED_CASE(FileDecl)
+    IGNORED_CASE(RequireCapabilityDecl)
 
 #undef IGNORED_CASE
 

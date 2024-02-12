@@ -727,6 +727,12 @@ int StringUtil::parseIntAndAdvancePos(UnownedStringSlice text, Index& pos)
         pos++;
         continue;
     }
+    bool isNeg = false;
+    if (pos < text.getLength() && text[pos] == '-')
+    {
+        pos++;
+        isNeg = true;
+    }
     while (pos < text.getLength())
     {
         if (text[pos] >= '0' && text[pos] <= '9')
@@ -740,6 +746,8 @@ int StringUtil::parseIntAndAdvancePos(UnownedStringSlice text, Index& pos)
             break;
         }
     }
+    if (isNeg)
+        result = -result;
     return result;
 }
 

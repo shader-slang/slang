@@ -17,7 +17,10 @@ void printDiagnosticArg(StringBuilder& sb, Decl* decl)
 {
     if (!decl)
         return;
-    sb << getText(decl->getName());
+    if (decl->getName() && decl->getName()->text.getLength())
+        sb << getText(decl->getName());
+    else
+        printDiagnosticArg(sb, decl->astNodeType);
 }
 
 void printDiagnosticArg(StringBuilder& sb, DeclRefBase* declRefBase)
@@ -92,6 +95,7 @@ void printDiagnosticArg(StringBuilder& sb, ASTNodeType nodeType)
         case ASTNodeType::EmptyDecl: sb << "empty"; break;
         case ASTNodeType::SyntaxDecl: sb << "syntax"; break;
         case ASTNodeType::DeclGroup: sb << "decl-group"; break;
+        case ASTNodeType::RequireCapabilityDecl: sb << "__require_capability"; break;
         default: sb << "decl"; break;
     }
 }
@@ -860,6 +864,18 @@ Decl* getParentDecl(Decl* decl)
     while (as<GenericDecl>(decl))
         decl = decl->parentDecl;
     return decl;
+}
+
+Decl* getParentAggTypeDecl(Decl* decl)
+{
+    decl = decl->parentDecl;
+    while (decl)
+    {
+        if (as<AggTypeDecl>(decl))
+            return decl;
+        decl = decl->parentDecl;
+    }
+    return nullptr;
 }
 
 Decl* getParentFunc(Decl* decl)

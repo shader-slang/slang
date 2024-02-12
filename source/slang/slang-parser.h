@@ -12,6 +12,7 @@ namespace Slang
     void parseSourceFile(
         ASTBuilder*                     astBuilder,
         TranslationUnitRequest*         translationUnit,
+        SourceLanguage                  sourceLanguage,
         TokenSpan const&                tokens,
         DiagnosticSink*                 sink,
         Scope*                          outerScope,
