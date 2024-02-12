@@ -724,6 +724,31 @@ LoweredValInfo emitDeclRef(
     DeclRef<Decl>   declRef,
     IRType*         type);
 
+
+bool isFunctionVarDecl(VarDeclBase* decl)
+{
+    // The immediate parent of a function-scope variable
+    // declaration will be a `ScopeDecl`.
+    //
+    // TODO: right now the parent links for scopes are *not*
+    // set correctly, so we can't just scan up and look
+    // for a function in the parent chain...
+    auto parent = decl->parentDecl;
+    if (as<ScopeDecl>(parent))
+    {
+        return true;
+    }
+    return false;
+}
+
+bool isFunctionStaticVarDecl(VarDeclBase* decl)
+{
+    // Only a variable marked `static` can be static.
+    if (!decl->findModifier<HLSLStaticModifier>())
+        return false;
+    return isFunctionVarDecl(decl);
+}
+
 IRInst* getSimpleVal(IRGenContext* context, LoweredValInfo lowered);
 
 int32_t getIntrinsicOp(
@@ -7610,30 +7635,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return globalVal;
     }
 
-    bool isFunctionVarDecl(VarDeclBase* decl)
-    {
-        // The immediate parent of a function-scope variable
-        // declaration will be a `ScopeDecl`.
-        //
-        // TODO: right now the parent links for scopes are *not*
-        // set correctly, so we can't just scan up and look
-        // for a function in the parent chain...
-        auto parent = decl->parentDecl;
-        if (as<ScopeDecl>(parent))
-        {
-            return true;
-        }
-        return false;
-    }
-
-    bool isFunctionStaticVarDecl(VarDeclBase* decl)
-    {
-        // Only a variable marked `static` can be static.
-        if(!decl->findModifier<HLSLStaticModifier>())
-            return false;
-        return isFunctionVarDecl(decl);
-    }
-
     struct NestedContext
     {
         IRGenEnv        subEnvStorage;
@@ -9782,7 +9783,7 @@ bool canDeclLowerToAGeneric(Decl* decl)
     {
         if (varDecl->hasModifier<HLSLStaticModifier>() && varDecl->hasModifier<ConstModifier>())
         {
-            return true;
+            return !isFunctionVarDecl(varDecl);
         }
     }
     
