@@ -88,8 +88,8 @@ option(SLANG_ENABLE_FULL_IR_VALIDATION "Enable full IR validation (SLOW!)")
 option(SLANG_ENABLE_ASAN "Enable ASAN (address sanitizer)")
 
 option(SLANG_ENABLE_GFX "Enable gfx targets" ON)
-option(SLANG_ENABLE_TESTS "Enable test targets (requires gfx targets)" ON)
-option(SLANG_ENABLE_EXAMPLES "Enable examples (requires gfx targets)" ON)
+option(SLANG_ENABLE_TESTS "Enable test targets, requires SLANG_ENABLE_GFX" ON)
+option(SLANG_ENABLE_EXAMPLES "Enable examples, requires SLANG_ENABLE_GFX" ON)
 
 set(SLANG_GENERATORS_PATH
     ""
