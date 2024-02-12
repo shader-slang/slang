@@ -67,6 +67,7 @@ public:
         const String& glsl,
         const String& cuda,
         const String& spirvDefault,
+        const String& spirvRWDefault,
         const String& spirvCombined
     );
     void writeFuncWithSig(
@@ -74,6 +75,7 @@ public:
         const String& sig,
         const String& glsl = String{},
         const String& spirvDefault = String{},
+        const String& spirvRWDefault = String{},
         const String& spirvCombined = String{},
         const String& cuda = String{},
         const ReadNoneMode readNoneMode = ReadNoneMode::Never
@@ -84,6 +86,7 @@ public:
         const String& params,
         const String& glsl = String{},
         const String& spirvDefault = String{},
+        const String& spirvRWDefault = String{},
         const String& spirvCombined = String{},
         const String& cuda = String{},
         const ReadNoneMode readNoneMode = ReadNoneMode::Never
