@@ -13,7 +13,7 @@
 precision highp float;
 precision highp int;
 
-//TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name=outputBuffer
 buffer MyBlockName2 
 {
     uint data[];
@@ -21,21 +21,101 @@ buffer MyBlockName2
 
 layout(local_size_x = 32) in;
 
-#include "./glsl-test-utils.slang"
+
+
+// required since at the time of making, __BuiltinType does not allow simple casting, so we have a split test
+
+__generic<T : __BuiltinLogicalType>
+bool test1BroadcastX() {
+    return true
+        && subgroupBroadcast(T(1), 0) == T(1)
+        && subgroupBroadcastFirst(T(1)) == T(1)
+        ;
+}
+__generic<T : __BuiltinLogicalType, let N : int>
+bool testVBroadcastX() {
+    typealias gvec = vector<T, N>;
+
+    return true
+        && subgroupBroadcast(gvec(T(1)), 0) == gvec(T(1))
+        && subgroupBroadcastFirst(gvec(T(1))) == gvec(T(1))
+        ;
+}
+
+__generic<T : __BuiltinFloatingPointType>
+bool test1BroadcastX() {
+    return true
+        && subgroupBroadcast(T(1), 0) == T(1)
+        && subgroupBroadcastFirst(T(1)) == T(1)
+        ;
+}
+__generic<T : __BuiltinFloatingPointType, let N : int>
+bool testVBroadcastX() {
+    typealias gvec = vector<T, N>;
+
+    return true
+        && subgroupBroadcast(gvec(T(1)), 0) == gvec(T(1))
+        && subgroupBroadcastFirst(gvec(T(1))) == gvec(T(1))
+        ;
+}
+bool testBroadcastX() {
+    return true
+        && test1BroadcastX<float>()
+        && testVBroadcastX<float, 2>()
+        && testVBroadcastX<float, 3>()
+        && testVBroadcastX<float, 4>()
+        //&& test1BroadcastX<double>() // hang
+        //&& testVBroadcastX<double, 2>()
+        //&& testVBroadcastX<double, 3>()
+        //&& testVBroadcastX<double, 4>()
+        //&& test1BroadcastX<half>() // shader_subgroup_preamble --> __requireGLSLExtension fails
+        //&& testVBroadcastX<half, 2>()
+        //&& testVBroadcastX<half, 3>()
+        //&& testVBroadcastX<half, 4>()
+        && test1BroadcastX<int>()
+        && testVBroadcastX<int, 2>()
+        && testVBroadcastX<int, 3>()
+        && testVBroadcastX<int, 4>()
+        //&& test1BroadcastX<int8_t>() // shader_subgroup_preamble --> __requireGLSLExtension fails
+        //&& testVBroadcastX<int8_t, 2>()
+        //&& testVBroadcastX<int8_t, 3>()
+        //&& testVBroadcastX<int8_t, 4>()
+        //&& test1BroadcastX<int16_t>() // shader_subgroup_preamble --> __requireGLSLExtension fails
+        //&& testVBroadcastX<int16_t, 2>()
+        //&& testVBroadcastX<int16_t, 3>()
+        //&& testVBroadcastX<int16_t, 4>()
+        //&& test1BroadcastX<int64_t>() // shader_subgroup_preamble --> __requireGLSLExtension fails
+        //&& testVBroadcastX<int64_t, 2>()
+        //&& testVBroadcastX<int64_t, 3>()
+        //&& testVBroadcastX<int64_t, 4>()
+        && test1BroadcastX<uint>()
+        && testVBroadcastX<uint, 2>()
+        && testVBroadcastX<uint, 3>()
+        && testVBroadcastX<uint, 4>()
+        && test1BroadcastX<bool>()
+        && testVBroadcastX<bool, 2>()
+        && testVBroadcastX<bool, 3>()
+        && testVBroadcastX<bool, 4>()
+        ;
+}
+
+bool testBallot() {
+    return true 
+        && (subgroupBallot(true).x == 0xFFFFFFFF)
+        && (subgroupInverseBallot(uvec4(0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF)) == true)
+        && (subgroupBallotBitExtract(uvec4(0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF), 0) == true)
+        && (subgroupBallotBitCount(uvec4(0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF)) == 32)
+        && (subgroupBallotInclusiveBitCount(uvec4(0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF)) != 0)
+        && (subgroupBallotExclusiveBitCount(uvec4(0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF)) != 0)
+        && (subgroupBallotFindLSB(uvec4(0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF)) == 0)
+        && (subgroupBallotFindMSB(uvec4(0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF)) == 31)
+        ;
+}
 
 void computeMain()
 {
-    uvec4 in = (0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF);
-    outputBuffer.data[0] = testFunctionIn2ParamPlus(subgroupBroadcast, 1, 1, 0) &&
-                            testFunctionIn1Param(subgroupBroadcastFirst, 1, 1) &&
-                            (subgroupBallot(true).x == 0xFFFFFFFF) &&
-                            (subgroupInverseBallot(in) == true) &&
-                            (subgroupBallotBitExtract(in, 0) == true) &&
-                            (subgroupBallotBitCount(in) == 32) &&
-                            (subgroupBallotInclusiveBitCount(in) != 0) &&
-                            (subgroupBallotExclusiveBitCount(in) != 0) &&
-                            (subgroupBallotFindLSB(in) == 0) && 
-                            (subgroupBallotFindMSB(in) == 31); 
+    outputBuffer.data[0] = testBroadcastX();
+    outputBuffer.data[1] = testBallot();
 
     // CHECK_GLSL: void main(
     // CHECK_SPV: OpEntryPoint
@@ -43,4 +123,5 @@ void computeMain()
     // CHECK_CUDA: void computeMain(
     // CHECK_CPP: void _computeMain(
     // BUF: 1
+    // BUF-NEXT: 1
 }

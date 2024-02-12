@@ -17,7 +17,7 @@
 precision highp float;
 precision highp int;
 
-//TEST_INPUT:ubuffer(data=[0 1], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 buffer MyBlockName2 
 {
     uint data[];
@@ -25,18 +25,94 @@ buffer MyBlockName2
 
 layout(local_size_x = 4) in;
 
-#include "./glsl-test-utils.slang"
+__generic<T : __BuiltinLogicalType>
+bool test1QuadX() {
+    return true
+        && subgroupQuadSwapHorizontal(T(2)) == T(2)
+        && subgroupQuadSwapVertical(T(2)) == T(2)
+        && subgroupQuadSwapDiagonal(T(3)) == T(3)
+        && subgroupQuadBroadcast(T(1), 1) == T(1)
+        ;
+}
+__generic<T : __BuiltinLogicalType, let N : int>
+bool testVQuadX() {
+    typealias gvec = vector<T, N>;
+
+    return true
+        && subgroupQuadSwapHorizontal(gvec(T(2))) == gvec(T(2))
+        && subgroupQuadSwapVertical(gvec(T(2))) == gvec(T(2))
+        && subgroupQuadSwapDiagonal(gvec(T(3))) == gvec(T(3))
+        && subgroupQuadBroadcast(gvec(T(1)), 1) == gvec(T(1))
+        ;
+}
+
+__generic<T : __BuiltinFloatingPointType>
+bool test1QuadX() {
+    return true
+        && subgroupQuadSwapHorizontal(T(2)) == T(2)
+        && subgroupQuadSwapVertical(T(2)) == T(2)
+        && subgroupQuadSwapDiagonal(T(3)) == T(3)
+        && subgroupQuadBroadcast(T(1), 1) == T(1)
+        ;
+}
+__generic<T : __BuiltinFloatingPointType, let N : int>
+bool testVQuadX() {
+    typealias gvec = vector<T, N>;
+
+    return true
+        && subgroupQuadSwapHorizontal(gvec(T(2))) == gvec(T(2))
+        && subgroupQuadSwapVertical(gvec(T(2))) == gvec(T(2))
+        && subgroupQuadSwapDiagonal(gvec(T(3))) == gvec(T(3))
+        && subgroupQuadBroadcast(gvec(T(1)), 1) == gvec(T(1))
+        ;
+}
+bool testQuadSwapX() {
+    return true
+        && test1QuadX<float>()
+        && testVQuadX<float, 2>()
+        && testVQuadX<float, 3>()
+        && testVQuadX<float, 4>()
+        //&& test1QuadX<double>() // hang
+        //&& testVQuadX<double, 2>()
+        //&& testVQuadX<double, 3>()
+        //&& testVQuadX<double, 4>()
+        //&& test1QuadX<half>() // shader_subgroup_preamble --> __requireGLSLExtension fails
+        //&& testVQuadX<half, 2>()
+        //&& testVQuadX<half, 3>()
+        //&& testVQuadX<half, 4>()
+        && test1QuadX<int>()
+        && testVQuadX<int, 2>()
+        && testVQuadX<int, 3>()
+        && testVQuadX<int, 4>()
+        //&& test1QuadX<int8_t>() // shader_subgroup_preamble --> __requireGLSLExtension fails
+        //&& testVQuadX<int8_t, 2>()
+        //&& testVQuadX<int8_t, 3>()
+        //&& testVQuadX<int8_t, 4>()
+        //&& test1QuadX<int16_t>() // shader_subgroup_preamble --> __requireGLSLExtension fails
+        //&& testVQuadX<int16_t, 2>()
+        //&& testVQuadX<int16_t, 3>()
+        //&& testVQuadX<int16_t, 4>()
+        //&& test1QuadX<int64_t>() // shader_subgroup_preamble --> __requireGLSLExtension fails
+        //&& testVQuadX<int64_t, 2>()
+        //&& testVQuadX<int64_t, 3>()
+        //&& testVQuadX<int64_t, 4>()
+        && test1QuadX<uint>()
+        && testVQuadX<uint, 2>()
+        && testVQuadX<uint, 3>()
+        && testVQuadX<uint, 4>()
+        && test1QuadX<bool>()
+        && testVQuadX<bool, 2>()
+        && testVQuadX<bool, 3>()
+        && testVQuadX<bool, 4>()
+        ;
+}
 
 void computeMain()
 {
 
-    if (gl_GlobalInvocationID.x == 1) {
-        outputBuffer.data[0] = testFunctionIn2ParamPlus(subgroupQuadBroadcast, 1, 1, 1);
-    }
-
-    outputBuffer.data[1] = testFunctionIn1Param(subgroupQuadSwapHorizontal, 2, 2) &&
-                            testFunctionIn1Param(subgroupQuadSwapVertical, 2, 2) &&
-                            testFunctionIn1Param(subgroupQuadSwapDiagonal, 3, 3);
+    outputBuffer.data[0] = true
+        && testQuadSwapX()
+        ;
 
     // CHECK_GLSL: void main(
     // CHECK_SPV: OpEntryPoint
@@ -44,5 +120,4 @@ void computeMain()
     // CHECK_CUDA: void computeMain(
     // CHECK_CPP: void _computeMain(
     // BUF: 1
-    // BUF-NEXT: 1
 }

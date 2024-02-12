@@ -15,7 +15,7 @@
 precision highp float;
 precision highp int;
 
-//TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name=outputBuffer
 buffer MyBlockName2 
 {
     uint data[];
@@ -23,20 +23,118 @@ buffer MyBlockName2
 
 layout(local_size_x = 32) in;
 
-#include "./glsl-test-utils.slang"
+__generic<T : __BuiltinLogicalType>
+bool test1Logical() {
+    return true
+        && subgroupClusteredAnd(T(1), 1) == T(1)
+        && subgroupClusteredOr(T(1), 1) == T(1)
+        && subgroupClusteredXor(T(1), 1) == T(1)
+        ;
+}
+
+__generic<T : __BuiltinLogicalType, let N : int>
+bool testVLogical() {
+    typealias gvec = vector<T, N>;
+
+    return true
+        && subgroupClusteredAnd(gvec(T(1)), 1) == gvec(T(1))
+        && subgroupClusteredOr(gvec(T(1)), 1) == gvec(T(1))
+        && subgroupClusteredXor(gvec(T(1)), 1) == gvec(T(1))   
+        ;     
+}
+
+bool testLogical() {
+    return true
+        && test1Logical<int>()
+        && testVLogical<int, 2>()
+        && testVLogical<int, 3>()
+        && testVLogical<int, 4>()
+        //&& test1Logical<int8_t>()
+        //&& testVLogical<int8_t, 2>()
+        //&& testVLogical<int8_t, 3>()
+        //&& testVLogical<int8_t, 4>()
+        //&& test1Logical<int16_t>()
+        //&& testVLogical<int16_t, 2>()
+        //&& testVLogical<int16_t, 3>()
+        //&& testVLogical<int16_t, 4>()
+        //&& test1Logical<int64_t>()
+        //&& testVLogical<int64_t, 2>()
+        //&& testVLogical<int64_t, 3>()
+        //&& testVLogical<int64_t, 4>()
+        && test1Logical<uint>()
+        && testVLogical<uint, 2>()
+        && testVLogical<uint, 3>()
+        && testVLogical<uint, 4>()
+        && test1Logical<bool>()
+        && testVLogical<bool, 2>()
+        && testVLogical<bool, 3>()
+        && testVLogical<bool, 4>()
+        ;
+}
+
+__generic<T : __BuiltinArithmeticType>
+bool test1Arithmetic() {
+    return true
+        && subgroupClusteredAdd(T(1), 1) == T(1)
+        && subgroupClusteredMul(T(1), 1) == T(1)
+        && subgroupClusteredMin(T(1), 1) == T(1)
+        && subgroupClusteredMax(T(1), 1) == T(1)
+        ;
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+bool testVArithmetic() {
+    typealias gvec = vector<T, N>;
+
+    return true
+        && subgroupClusteredAdd(gvec(T(1)), 1) == gvec(T(1))
+        && subgroupClusteredMul(gvec(T(1)), 1) == gvec(T(1))
+        && subgroupClusteredMin(gvec(T(1)), 1) == gvec(T(1))
+        && subgroupClusteredMax(gvec(T(1)), 1) == gvec(T(1))
+        ;
+}
+
+bool testArithmetic() {
+    return true
+        && test1Arithmetic<float>()
+        && testVArithmetic<float, 2>()
+        && testVArithmetic<float, 3>()
+        && testVArithmetic<float, 4>()
+        //&& test1Arithmetic<double>() // hang
+        //&& testVArithmetic<double, 2>() 
+        //&& testVArithmetic<double, 3>()
+        //&& testVArithmetic<double, 4>()
+        //&& test1Arithmetic<half>() // shader_subgroup_preamble --> __requireGLSLExtension fails
+        //&& testVArithmetic<half, 2>()
+        //&& testVArithmetic<half, 3>()
+        //&& testVArithmetic<half, 4>()
+        && test1Arithmetic<int>()
+        && testVArithmetic<int, 2>()
+        && testVArithmetic<int, 3>()
+        && testVArithmetic<int, 4>()
+        //&& test1Arithmetic<int8_t>() // shader_subgroup_preamble --> __requireGLSLExtension fails
+        //&& testVArithmetic<int8_t, 2>()
+        //&& testVArithmetic<int8_t, 3>()
+        //&& testVArithmetic<int8_t, 4>()
+        //&& test1Arithmetic<int16_t>() // shader_subgroup_preamble --> __requireGLSLExtension fails
+        //&& testVArithmetic<int16_t, 2>()
+        //&& testVArithmetic<int16_t, 3>()
+        //&& testVArithmetic<int16_t, 4>()
+        //&& test1Arithmetic<int64_t>() // shader_subgroup_preamble --> __requireGLSLExtension fails
+        //&& testVArithmetic<int64_t, 2>()
+        //&& testVArithmetic<int64_t, 3>()
+        //&& testVArithmetic<int64_t, 4>()
+        && test1Arithmetic<uint>()
+        && testVArithmetic<uint, 2>()
+        && testVArithmetic<uint, 3>()
+        && testVArithmetic<uint, 4>()
+        ;
+}
 
 void computeMain()
 {
-    float v = 1.0f;
-    outputBuffer.data[0] = testFunctionIn2ParamPlus(subgroupClusteredAdd, 1, v, 1) &&
-                           testFunctionIn2ParamPlus(subgroupClusteredMul, 1, v, 1) &&
-                           testFunctionIn2ParamPlus(subgroupClusteredMin, 1, v, 1) &&
-                           testFunctionIn2ParamPlus(subgroupClusteredMax, 1, v, 1) &&
-                           testFunctionInInt2ParamPlus(subgroupClusteredAnd, 1, v, 1) &&
-                           testFunctionInInt2ParamPlus(subgroupClusteredOr, 1, v, 1) &&
-                           testFunctionInInt2ParamPlus(subgroupClusteredXor, 1, v, 1);
-
-
+    outputBuffer.data[0] = testLogical();
+    outputBuffer.data[1] = testArithmetic();
 
     // CHECK_GLSL: void main(
     // CHECK_SPV: OpEntryPoint
@@ -44,4 +142,5 @@ void computeMain()
     // CHECK_CUDA: void computeMain(
     // CHECK_CPP: void _computeMain(
     // BUF: 1
+    // BUF-NEXT: 1
 }

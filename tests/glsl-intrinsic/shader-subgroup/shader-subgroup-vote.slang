@@ -21,13 +21,13 @@
 precision highp float;
 precision highp int;
 
-//TEST_INPUT:ubuffer(data=[9 0 0 0 0], stride=4):name=inputBuffer
+//TEST_INPUT:ubuffer(data=[9], stride=4):name=inputBuffer
 buffer MyBlockName
 {
     uint data[];
 } inputBuffer;
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 buffer MyBlockName2 
 {
     uint data[];
@@ -35,7 +35,79 @@ buffer MyBlockName2
 
 layout(local_size_x = 32) in;
 
-#include "./glsl-test-utils.slang"
+__generic<T : __BuiltinLogicalType>
+bool test1AllEqual() {
+    return true
+        && subgroupAllEqual(T(1)) == true
+        && subgroupAllEqual(T(gl_GlobalInvocationID.x)) == false
+        ;
+}
+__generic<T : __BuiltinLogicalType, let N : int>
+bool testVAllEqual() {
+    typealias gvec = vector<T, N>;
+
+    return true
+        && subgroupAllEqual(gvec(T(1))) == true
+        && subgroupAllEqual(gvec(T(gl_GlobalInvocationID.x))) == false
+        ;
+}
+
+__generic<T : __BuiltinFloatingPointType>
+bool test1AllEqual() {
+    return true
+        && subgroupAllEqual(T(1)) == true
+        && subgroupAllEqual(T(gl_GlobalInvocationID.x)) == false
+        ;
+}
+__generic<T : __BuiltinFloatingPointType, let N : int>
+bool testVAllEqual() {
+    typealias gvec = vector<T, N>;
+
+    return true
+        && subgroupAllEqual(gvec(T(1))) == true
+        && subgroupAllEqual(gvec(T(gl_GlobalInvocationID.x))) == false
+        ;
+}
+bool testAllEqual() {
+    return true
+        && test1AllEqual<float>()
+        && testVAllEqual<float, 2>()
+        && testVAllEqual<float, 3>()
+        && testVAllEqual<float, 4>()
+        //&& test1AllEqual<double>() // hang
+        //&& testVAllEqual<double, 2>()
+        //&& testVAllEqual<double, 3>()
+        //&& testVAllEqual<double, 4>()
+        //&& test1AllEqual<half>() // shader_subgroup_preamble --> __requireGLSLExtension fails
+        //&& testVAllEqual<half, 2>()
+        //&& testVAllEqual<half, 3>()
+        //&& testVAllEqual<half, 4>()
+        && test1AllEqual<int>()
+        && testVAllEqual<int, 2>()
+        && testVAllEqual<int, 3>()
+        && testVAllEqual<int, 4>()
+        //&& test1AllEqual<int8_t>() // shader_subgroup_preamble --> __requireGLSLExtension fails
+        //&& testVAllEqual<int8_t, 2>()
+        //&& testVAllEqual<int8_t, 3>()
+        //&& testVAllEqual<int8_t, 4>()
+        //&& test1AllEqual<int16_t>() // shader_subgroup_preamble --> __requireGLSLExtension fails
+        //&& testVAllEqual<int16_t, 2>()
+        //&& testVAllEqual<int16_t, 3>()
+        //&& testVAllEqual<int16_t, 4>()
+        //&& test1AllEqual<int64_t>() // shader_subgroup_preamble --> __requireGLSLExtension fails
+        //&& testVAllEqual<int64_t, 2>()
+        //&& testVAllEqual<int64_t, 3>()
+        //&& testVAllEqual<int64_t, 4>()
+        && test1AllEqual<uint>()
+        && testVAllEqual<uint, 2>()
+        && testVAllEqual<uint, 3>()
+        && testVAllEqual<uint, 4>()
+        && test1AllEqual<bool>()
+        && testVAllEqual<bool, 2>()
+        && testVAllEqual<bool, 3>()
+        && testVAllEqual<bool, 4>()
+        ;
+}
 
 void computeMain()
 {
@@ -73,21 +145,14 @@ void computeMain()
         outputBuffer.data[3] = 2;
     }
 
-    // all false, positive
+
     outputBuffer.data[4] = 1;
 
-    if (testFunctionIn1ParamBool(subgroupAllEqual, true, 0)) {
+    if (testAllEqual()) {
         subgroupBarrier();
         outputBuffer.data[4] = 2;
     }
 
-    // one is true, rest false, negative
-    outputBuffer.data[5] = 1;
-    t1 = inputBuffer.data[0] == gl_GlobalInvocationID.x;
-    if (testFunctionIn1ParamBool(subgroupAllEqual, false, t1)) {
-        subgroupBarrier();
-        outputBuffer.data[5] = 2;
-    }
 
     // CHECK_GLSL: void main(
     // CHECK_SPV: OpEntryPoint
@@ -95,7 +160,6 @@ void computeMain()
     // CHECK_CUDA: void computeMain(
     // CHECK_CPP: void _computeMain(
     // BUF: 2
-    // BUF-NEXT: 2
     // BUF-NEXT: 2
     // BUF-NEXT: 2
     // BUF-NEXT: 2
