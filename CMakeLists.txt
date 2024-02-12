@@ -88,6 +88,8 @@ option(SLANG_ENABLE_FULL_IR_VALIDATION "Enable full IR validation (SLOW!)")
 option(SLANG_ENABLE_ASAN "Enable ASAN (address sanitizer)")
 
 option(SLANG_ENABLE_GFX "Enable gfx targets" ON)
+option(SLANG_ENABLE_SLANGD "Enable language server target" ON)
+option(SLANG_ENABLE_SLANGC "Enable standalone compiler target" ON)
 option(SLANG_ENABLE_TESTS "Enable test targets, requires SLANG_ENABLE_GFX" ON)
 option(SLANG_ENABLE_EXAMPLES "Enable examples, requires SLANG_ENABLE_GFX" ON)
 
@@ -279,24 +281,28 @@ generator(
 add_subdirectory(prelude)
 add_subdirectory(source/slang)
 
-slang_add_target(
-    tools/slangd
-    EXECUTABLE
-    LINK_WITH_PRIVATE
-        core
-        slang
-        slang-reflect-headers
-        slang-capability-defs
-        Threads::Threads
-    INSTALL
-)
-slang_add_target(
-    source/slangc
-    EXECUTABLE
-    USE_FEWER_WARNINGS
-    LINK_WITH_PRIVATE core slang Threads::Threads
-    INSTALL
-)
+if(SLANG_ENABLE_SLANGD)
+    slang_add_target(
+        tools/slangd
+        EXECUTABLE
+        LINK_WITH_PRIVATE
+            core
+            slang
+            slang-reflect-headers
+            slang-capability-defs
+            Threads::Threads
+        INSTALL
+    )
+endif()
+if(SLANG_ENABLE_SLANGC)
+    slang_add_target(
+        source/slangc
+        EXECUTABLE
+        USE_FEWER_WARNINGS
+        LINK_WITH_PRIVATE core slang Threads::Threads
+        INSTALL
+    )
+endif()
 
 #
 # Our wrappers for glslang and llvm
