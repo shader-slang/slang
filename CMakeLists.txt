@@ -91,6 +91,8 @@ option(SLANG_ENABLE_GFX "Enable gfx targets" ON)
 option(SLANG_ENABLE_SLANGD "Enable language server target" ON)
 option(SLANG_ENABLE_SLANGC "Enable standalone compiler target" ON)
 option(SLANG_ENABLE_SLANGRT "Enable runtime target" ON)
+option(SLANG_ENABLE_SLANG_GLSLANG "Enable glslang and slang wrapper target for glslang" ON)
+option(SLANG_ENABLE_SLANG_LLVM "Enable slang wrapper target for llvm" ON)
 option(SLANG_ENABLE_TESTS "Enable test targets, requires SLANG_ENABLE_GFX, SLANG_ENABLE_SLANGD and SLANG_ENABLE_SLANGRT" ON)
 option(SLANG_ENABLE_EXAMPLES "Enable example targets, requires SLANG_ENABLE_GFX" ON)
 
@@ -310,123 +312,127 @@ endif()
 #
 # Our wrappers for glslang and llvm
 #
-slang_add_target(
-    source/slang-glslang
-    MODULE
-    USE_EXTRA_WARNINGS
-    LINK_WITH_PRIVATE glslang SPIRV SPIRV-Tools-opt
-    INSTALL
-)
-# Our only interface is through what we define in source/slang-glslang, in the
-# interests of hygiene, hide anything else we link in.
-add_supported_cxx_linker_flags(slang-glslang PRIVATE "-Wl,--exclude-libs,ALL")
-
-if(SLANG_SLANG_LLVM_FLAVOR STREQUAL "FETCH_BINARY")
-    #
-    # Do some stupid little dance to put everything in the right shape with
-    # correct dependencies
-    #
-
-    set(slang_llvm_filename
-        "${CMAKE_SHARED_LIBRARY_PREFIX}slang-llvm${CMAKE_SHARED_LIBRARY_SUFFIX}"
-    )
-    macro(from_glob dir)
-        # A little helper function
-        file(
-            GLOB_RECURSE slang_llvm_source_object
-            "${dir}/${slang_llvm_filename}"
-        )
-        list(LENGTH slang_llvm_source_object nmatches)
-        if(nmatches EQUAL 0)
-            message(
-                SEND_ERROR
-                "Unable to find ${slang_llvm_filename} in ${SLANG_SLANG_LLVM_BINARY_URL}"
-            )
-        elseif(nmatches GREATER 1)
-            message(
-                SEND_ERROR
-                "Found multiple files named ${slang_llvm_filename} in ${SLANG_SLANG_LLVM_BINARY_URL}"
-            )
-        endif()
-    endmacro()
-
-    if(IS_DIRECTORY "${SLANG_SLANG_LLVM_BINARY_URL}")
-        # Just glob directly from a local directory
-        from_glob("${SLANG_SLANG_LLVM_BINARY_URL}")
-    elseif(
-        SLANG_SLANG_LLVM_BINARY_URL
-            MATCHES
-            "${CMAKE_SHARED_LIBRARY_PREFIX}.+${CMAKE_SHARED_LIBRARY_SUFFIX}$"
-        AND EXISTS "${SLANG_SLANG_LLVM_BINARY_URL}"
-    )
-        # Otherwise, if it's a direct path to a shared object, use that
-        set(slang_llvm_source_object "${SLANG_SLANG_LLVM_BINARY_URL}")
-    else()
-        # Otherwise, download and extract from whatever URL we have
-        fetchcontent_declare(slang-llvm URL "${SLANG_SLANG_LLVM_BINARY_URL}")
-        fetchcontent_populate(slang-llvm)
-        from_glob("${slang-llvm_SOURCE_DIR}")
-    endif()
-
-    set(slang_llvm_dest_object
-        ${CMAKE_BINARY_DIR}/$<CONFIG>/${library_subdir}/${slang_llvm_filename}
-    )
-    add_custom_command(
-        OUTPUT ${slang_llvm_dest_object}
-        COMMAND
-            ${CMAKE_COMMAND} -E copy_if_different ${slang_llvm_source_object}
-            ${slang_llvm_dest_object}
-        DEPENDS ${slang_llvm_source_object}
-        VERBATIM
-    )
-    # Give this copying action a name
-    add_custom_target(copy-slang-llvm DEPENDS ${slang_llvm_dest_object})
-    set_target_properties(copy-slang-llvm PROPERTIES FOLDER generated)
-
-    # Put this into a library target
-    add_library(slang-llvm MODULE IMPORTED GLOBAL)
-    add_dependencies(slang-llvm copy-slang-llvm)
-    set_property(
-        TARGET slang-llvm
-        PROPERTY IMPORTED_LOCATION ${slang_llvm_dest_object}
-    )
-    install(PROGRAMS ${slang_llvm_dest_object} DESTINATION ${module_subdir})
-elseif(SLANG_SLANG_LLVM_FLAVOR STREQUAL "USE_SYSTEM_LLVM")
-    llvm_target_from_components(llvm-dep filecheck native orcjit)
-    clang_target_from_libs(
-        clang-dep
-        clangBasic
-        clangCodeGen
-        clangDriver
-        clangLex
-        clangFrontend
-        clangFrontendTool
-    )
+if(SLANG_ENABLE_SLANG_GLSLANG)
     slang_add_target(
-        source/slang-llvm
+        source/slang-glslang
         MODULE
-        LINK_WITH_PRIVATE core compiler-core llvm-dep clang-dep
-        # We include slang.h, but don't need to link with it
-        INCLUDE_FROM_PRIVATE slang
-        # This uses the SLANG_DLL_EXPORT macro from slang.h, so make sure to set
-        # SLANG_DYNAMIC and SLANG_DYNAMIC_EXPORT
-        EXPORT_MACRO_PREFIX SLANG
+        USE_EXTRA_WARNINGS
+        LINK_WITH_PRIVATE glslang SPIRV SPIRV-Tools-opt
         INSTALL
-        INSTALL_COMPONENT slang-llvm
     )
-    # If we don't include this, then the symbols in the LLVM linked here may
-    # conflict with those of other LLVMs linked at runtime, for instance in mesa.
-    add_supported_cxx_linker_flags(slang-llvm PRIVATE "-Wl,--exclude-libs,ALL")
+    # Our only interface is through what we define in source/slang-glslang, in the
+    # interests of hygiene, hide anything else we link in.
+    add_supported_cxx_linker_flags(slang-glslang PRIVATE "-Wl,--exclude-libs,ALL")
+endif()
 
-    # The LLVM headers need a warning disabling, which somehow slips through \external
-    if(MSVC)
-        target_compile_options(slang-llvm PRIVATE -wd4244)
+if(SLANG_ENABLE_SLANG_LLVM)
+    if(SLANG_SLANG_LLVM_FLAVOR STREQUAL "FETCH_BINARY")
+        #
+        # Do some stupid little dance to put everything in the right shape with
+        # correct dependencies
+        #
+
+        set(slang_llvm_filename
+            "${CMAKE_SHARED_LIBRARY_PREFIX}slang-llvm${CMAKE_SHARED_LIBRARY_SUFFIX}"
+        )
+        macro(from_glob dir)
+            # A little helper function
+            file(
+                GLOB_RECURSE slang_llvm_source_object
+                "${dir}/${slang_llvm_filename}"
+            )
+            list(LENGTH slang_llvm_source_object nmatches)
+            if(nmatches EQUAL 0)
+                message(
+                    SEND_ERROR
+                    "Unable to find ${slang_llvm_filename} in ${SLANG_SLANG_LLVM_BINARY_URL}"
+                )
+            elseif(nmatches GREATER 1)
+                message(
+                    SEND_ERROR
+                    "Found multiple files named ${slang_llvm_filename} in ${SLANG_SLANG_LLVM_BINARY_URL}"
+                )
+            endif()
+        endmacro()
+
+        if(IS_DIRECTORY "${SLANG_SLANG_LLVM_BINARY_URL}")
+            # Just glob directly from a local directory
+            from_glob("${SLANG_SLANG_LLVM_BINARY_URL}")
+        elseif(
+            SLANG_SLANG_LLVM_BINARY_URL
+                MATCHES
+                "${CMAKE_SHARED_LIBRARY_PREFIX}.+${CMAKE_SHARED_LIBRARY_SUFFIX}$"
+            AND EXISTS "${SLANG_SLANG_LLVM_BINARY_URL}"
+        )
+            # Otherwise, if it's a direct path to a shared object, use that
+            set(slang_llvm_source_object "${SLANG_SLANG_LLVM_BINARY_URL}")
+        else()
+            # Otherwise, download and extract from whatever URL we have
+            fetchcontent_declare(slang-llvm URL "${SLANG_SLANG_LLVM_BINARY_URL}")
+            fetchcontent_populate(slang-llvm)
+            from_glob("${slang-llvm_SOURCE_DIR}")
+        endif()
+
+        set(slang_llvm_dest_object
+            ${CMAKE_BINARY_DIR}/$<CONFIG>/${library_subdir}/${slang_llvm_filename}
+        )
+        add_custom_command(
+            OUTPUT ${slang_llvm_dest_object}
+            COMMAND
+                ${CMAKE_COMMAND} -E copy_if_different ${slang_llvm_source_object}
+                ${slang_llvm_dest_object}
+            DEPENDS ${slang_llvm_source_object}
+            VERBATIM
+        )
+        # Give this copying action a name
+        add_custom_target(copy-slang-llvm DEPENDS ${slang_llvm_dest_object})
+        set_target_properties(copy-slang-llvm PROPERTIES FOLDER generated)
+
+        # Put this into a library target
+        add_library(slang-llvm MODULE IMPORTED GLOBAL)
+        add_dependencies(slang-llvm copy-slang-llvm)
+        set_property(
+            TARGET slang-llvm
+            PROPERTY IMPORTED_LOCATION ${slang_llvm_dest_object}
+        )
+        install(PROGRAMS ${slang_llvm_dest_object} DESTINATION ${module_subdir})
+    elseif(SLANG_SLANG_LLVM_FLAVOR STREQUAL "USE_SYSTEM_LLVM")
+        llvm_target_from_components(llvm-dep filecheck native orcjit)
+        clang_target_from_libs(
+            clang-dep
+            clangBasic
+            clangCodeGen
+            clangDriver
+            clangLex
+            clangFrontend
+            clangFrontendTool
+        )
+        slang_add_target(
+            source/slang-llvm
+            MODULE
+            LINK_WITH_PRIVATE core compiler-core llvm-dep clang-dep
+            # We include slang.h, but don't need to link with it
+            INCLUDE_FROM_PRIVATE slang
+            # This uses the SLANG_DLL_EXPORT macro from slang.h, so make sure to set
+            # SLANG_DYNAMIC and SLANG_DYNAMIC_EXPORT
+            EXPORT_MACRO_PREFIX SLANG
+            INSTALL
+            INSTALL_COMPONENT slang-llvm
+        )
+        # If we don't include this, then the symbols in the LLVM linked here may
+        # conflict with those of other LLVMs linked at runtime, for instance in mesa.
+        add_supported_cxx_linker_flags(slang-llvm PRIVATE "-Wl,--exclude-libs,ALL")
+
+        # The LLVM headers need a warning disabling, which somehow slips through \external
+        if(MSVC)
+            target_compile_options(slang-llvm PRIVATE -wd4244)
+        endif()
+
+        # TODO: Put a check here that libslang-llvm.so doesn't have a 'NEEDED'
+        # directive for libLLVM-13.so, it's almost certainly going to break at
+        # runtime in surprising ways when linked alongside Mesa (or anything else
+        # pulling in libLLVM.so)
     endif()
-
-    # TODO: Put a check here that libslang-llvm.so doesn't have a 'NEEDED'
-    # directive for libLLVM-13.so, it's almost certainly going to break at
-    # runtime in surprising ways when linked alongside Mesa (or anything else
-    # pulling in libLLVM.so)
 endif()
 
 if(SLANG_ENABLE_GFX)
@@ -550,7 +556,6 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_GFX AND SLANG_ENABLE_SLANGD AND SLANG_ENA
             render-test
             slang-unit-test
             gfx-unit-test
-            slang-glslang
             # Used by some tests when they run
             slangd
             slang-rt
@@ -560,6 +565,10 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_GFX AND SLANG_ENABLE_SLANGD AND SLANG_ENA
         FOLDER test
         DEBUG_DIR ${slang_SOURCE_DIR}
     )
+    if(TARGET slang-glslang)
+        # Only add a dependency here if slang-glslang exists
+        add_dependencies(slang-test slang-glslang)
+    endif()
     if(TARGET slang-llvm)
         # Only add a dependency here if slang-llvm exists
         # Pending https://gitlab.kitware.com/cmake/cmake/-/issues/19467 to be able
