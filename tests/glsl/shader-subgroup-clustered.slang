@@ -21,7 +21,7 @@ buffer MyBlockName
     uint data[];
 } inputBuffer;
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 buffer MyBlockName2 
 {
     uint data[];
@@ -34,26 +34,20 @@ layout(local_size_x = 32) in;
 void computeMain()
 {
     float v = 1.0f;
-    outputBuffer.data[0] = testFunctionInArithmetic2Param(subgroupClusteredAdd, v, 1, 1);
-    outputBuffer.data[1] = testFunctionInArithmetic2Param(subgroupClusteredMul, v, 1, 1);
-    outputBuffer.data[2] = testFunctionInArithmetic2Param(subgroupClusteredMin, v, 1, 1);
-    outputBuffer.data[3] = testFunctionInArithmetic2Param(subgroupClusteredMax, v, 1, 1);
-    outputBuffer.data[4] = testFunctionInInt2Param(subgroupClusteredAnd, v, 1, 1);
-    outputBuffer.data[5] = testFunctionInInt2Param(subgroupClusteredOr, v, 1, 1);
-    outputBuffer.data[6] = testFunctionInInt2Param(subgroupClusteredXor, v, 1, 1);
+    outputBuffer.data[0] = testFunctionIn2ParamPlus(subgroupClusteredAdd, 1, v, 1) &&
+                           testFunctionIn2ParamPlus(subgroupClusteredMul, 1, v, 1) &&
+                           testFunctionIn2ParamPlus(subgroupClusteredMin, 1, v, 1) &&
+                           testFunctionIn2ParamPlus(subgroupClusteredMax, 1, v, 1) &&
+                           testFunctionInInt2ParamPlus(subgroupClusteredAnd, 1, v, 1) &&
+                           testFunctionInInt2ParamPlus(subgroupClusteredOr, 1, v, 1) &&
+                           testFunctionInInt2ParamPlus(subgroupClusteredXor, 1, v, 1);
 
 
 
-    //CHECK_GLSL: void main(
-    //CHECK_SPV: OpEntryPoint
-    //CHECK_HLSL: void computeMain(
-    //CHECK_CUDA: void computeMain(
-    //CHECK_CPP: void _computeMain(
-    //BUF: 1
-    //BUF-NEXT: 1
-    //BUF-NEXT: 1
-    //BUF-NEXT: 1
-    //BUF-NEXT: 1
-    //BUF-NEXT: 1
-    //BUF-NEXT: 1
+    // CHECK_GLSL: void main(
+    // CHECK_SPV: OpEntryPoint
+    // CHECK_HLSL: void computeMain(
+    // CHECK_CUDA: void computeMain(
+    // CHECK_CPP: void _computeMain(
+    // BUF: 1
 }

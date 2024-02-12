@@ -1,8 +1,8 @@
 //TEST:SIMPLE(filecheck=CHECK_GLSL):  -allow-glsl -stage compute -entry computeMain -target glsl
 //TEST:SIMPLE(filecheck=CHECK_SPV):  -allow-glsl -stage compute -entry computeMain -target spirv
-
 // not testing hlsl due to missing impl
-// TEST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage compute -entry computeMain -target hlsl
+//TEST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage compute -entry computeMain -target hlsl
+
 // not testing cuda due to missing impl
 // TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda 
 // not testing cpp due to missing impl
@@ -30,39 +30,53 @@ layout(local_size_x = local_size_x_v) in;
 
 void computeMain()
 {
-    
+    // tests are seperate since subset crashes; once this is fixed, make all into 1 
+
     float test = 1.0f;
     uint test2 = 1;
-    outputBuffer.data[0] = testFunctionInArithmetic1Param(subgroupAdd, test, local_size_x_v);
-    outputBuffer.data[1] = testFunctionInArithmetic1Param(subgroupMul, test, 1);
-    outputBuffer.data[2] = testFunctionInArithmetic1Param(subgroupMin, test, test);
-    outputBuffer.data[3] = testFunctionInArithmetic1Param(subgroupMin, test, test);
+    outputBuffer.data[0] = testFunctionIn1Param(subgroupAdd, local_size_x_v, test);
+    outputBuffer.data[1] = testFunctionIn1Param(subgroupMul, 1, test);
+    outputBuffer.data[2] = testFunctionIn1Param(subgroupMin, test, test);
+    outputBuffer.data[3] = testFunctionIn1Param(subgroupMin, test, test);
 
-    outputBuffer.data[4] = testFunctionInInt1Param(subgroupAnd, test2, 1);
-    outputBuffer.data[5] = testFunctionInInt1Param(subgroupOr, test2, 1);
-    outputBuffer.data[6] = testFunctionInInt1Param(subgroupXor, test2, 0);
+    outputBuffer.data[4] = testFunctionInInt1Param(subgroupAnd, 1, test2);
+    outputBuffer.data[5] = testFunctionInInt1Param(subgroupOr, 1, test2);
+    outputBuffer.data[6] = testFunctionInInt1Param(subgroupXor, 0, test2);
 
+//following functions don't have an hlsl implementation
+#ifdef TARGET_HLSL
+    vec[7] = 1;
+    vec[8] = 1;
+    vec[9] = 1;
+    vec[10] = 1;
+    vec[11] = 1;
+    vec[12] = 1;
+    vec[13] = 1;
+    vec[14] = 1;
+#else 
     //// compare with goal of true with invocation id 3, not 0
     uint vec[21];
-    vec[7] = testFunctionInArithmetic1Param(subgroupExclusiveAdd, test, 3); 
-    vec[8] = testFunctionInArithmetic1Param(subgroupExclusiveMul, test, 1); 
-    vec[9] = testFunctionInArithmetic1Param(subgroupExclusiveMin, test, 1);
-    vec[10] = testFunctionInArithmetic1Param(subgroupExclusiveMax, test, 1);
-    vec[11] = testFunctionInInt1Param(subgroupExclusiveAnd, test2, 1);
-    vec[12] = testFunctionInInt1Param(subgroupExclusiveOr, test2, 1);
-    vec[13] = testFunctionInInt1Param(subgroupExclusiveXor, test2, 1);
+    vec[7] = testFunctionIn1Param(subgroupExclusiveAdd, 3, test); 
+    vec[8] = testFunctionIn1Param(subgroupExclusiveMul, 1, test); 
+    vec[9] = testFunctionIn1Param(subgroupExclusiveMin, 1, test);
+    vec[10] = testFunctionIn1Param(subgroupExclusiveMax, 1, test);
+    vec[11] = testFunctionInInt1Param(subgroupExclusiveAnd, 1, test2);
+    vec[12] = testFunctionInInt1Param(subgroupExclusiveOr, 1, test2);
+    vec[13] = testFunctionInInt1Param(subgroupExclusiveXor, 1, test2);
 #ifdef TEST_when_glsl_subgroupInclusiveXor_and_subgroupInclusiveAdd_are_not_bugged
-    vec[14] = testFunctionInArithmetic1Param(subgroupInclusiveAdd, test, 4);
+    vec[14] = testFunctionIn1Param(subgroupInclusiveAdd, 4, test);
 #else 
     vec[14] = 1;
 #endif
-    vec[15] = testFunctionInArithmetic1Param(subgroupInclusiveMul, test, 1); 
-    vec[16] = testFunctionInArithmetic1Param(subgroupInclusiveMin, test, 1);
-    vec[17] = testFunctionInArithmetic1Param(subgroupInclusiveMax, test, 1);
-    vec[18] = testFunctionInInt1Param(subgroupInclusiveAnd, test2, 1);
-    vec[19] = testFunctionInInt1Param(subgroupInclusiveOr, test2, 1);
+#endif
+
+    vec[15] = testFunctionIn1Param(subgroupInclusiveMul, 1, test); 
+    vec[16] = testFunctionIn1Param(subgroupInclusiveMin, 1, test);
+    vec[17] = testFunctionIn1Param(subgroupInclusiveMax, 1, test);
+    vec[18] = testFunctionInInt1Param(subgroupInclusiveAnd, 1, test2);
+    vec[19] = testFunctionInInt1Param(subgroupInclusiveOr, 1, test2);
 #ifdef TEST_when_glsl_subgroupInclusiveXor_and_subgroupInclusiveAdd_are_not_bugged
-    vec[20] = testFunctionInInt1Param(subgroupInclusiveXor, test2, 0);
+    vec[20] = testFunctionInInt1Param(subgroupInclusiveXor, 0, test2);
 #else
     vec[20] = 1;
 #endif

@@ -19,7 +19,7 @@ buffer MyBlockName
     uint data[];
 } inputBuffer;
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 1], stride=4):out,name=outputBuffer
 buffer MyBlockName2 
 {
     uint data[];
@@ -33,13 +33,12 @@ void computeMain()
 {
 
     if (gl_GlobalInvocationID.x == 1) {
-        outputBuffer.data[0] = testFunctionIn2Param(subgroupQuadBroadcast, 1, 1, 1);
+        outputBuffer.data[0] = testFunctionIn2ParamPlus(subgroupQuadBroadcast, 1, 1, 1);
     }
 
-    //not testing more types currently because that would already require a more elaborate test
-    outputBuffer.data[1] = testFunctionIn1Param(subgroupQuadSwapHorizontal, 2, 2);
-    outputBuffer.data[2] = testFunctionIn1Param(subgroupQuadSwapVertical, 2, 2);
-    outputBuffer.data[3] = testFunctionIn1Param(subgroupQuadSwapDiagonal, 3, 3);
+    outputBuffer.data[1] = testFunctionIn1Param(subgroupQuadSwapHorizontal, 2, 2) &&
+                            testFunctionIn1Param(subgroupQuadSwapVertical, 2, 2) &&
+                            testFunctionIn1Param(subgroupQuadSwapDiagonal, 3, 3);
 
     // CHECK_GLSL: void main(
     // CHECK_SPV: OpEntryPoint
@@ -47,7 +46,5 @@ void computeMain()
     // CHECK_CUDA: void computeMain(
     // CHECK_CPP: void _computeMain(
     // BUF: 1
-    // BUF-NEXT: 1
-    // BUF-NEXT: 1
     // BUF-NEXT: 1
 }

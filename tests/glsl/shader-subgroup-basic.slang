@@ -32,7 +32,8 @@ shared uint shareMem;
 void computeMain()
 {
     // TODO: no test for image memory was done -- subgroupMemoryBarrierImage();
-    
+    // tests are seperate since concurrency testing
+
     shareMem = 100;
     subgroupMemoryBarrierShared();
     outputBuffer.data[0] = 1;

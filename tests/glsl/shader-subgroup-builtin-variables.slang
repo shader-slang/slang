@@ -11,7 +11,7 @@
 precision highp float;
 precision highp int;
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 buffer MyBlockName2 
 {
     uint data[];
@@ -46,7 +46,4 @@ void computeMain()
     // CHECK_CUDA: void computeMain(
     // CHECK_CPP: void _computeMain(
     // BUF: 0
-    // BUF-NEXT: 0
-    // BUF-NEXT: 0
-    // BUF-NEXT: 0
 }

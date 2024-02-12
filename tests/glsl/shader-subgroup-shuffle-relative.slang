@@ -22,7 +22,7 @@ buffer MyBlockName
     uint data[];
 } inputBuffer;
 
-//TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 buffer MyBlockName2 
 {
     uint data[];
@@ -34,15 +34,13 @@ layout(local_size_x = 32) in;
 
 void computeMain()
 {
-    outputBuffer.data[0] = testFunctionIn2Param(subgroupShuffleUp, 1, 1, 1);
+    outputBuffer.data[0] = testFunctionIn2ParamPlus(subgroupShuffleUp, 1, 1, 1) &&
+                           testFunctionIn2ParamPlus(subgroupShuffleDown, 1, 1, 1);
 
-    outputBuffer.data[1] = testFunctionIn2Param(subgroupShuffleDown, 1, 1, 1);
-
-    //CHECK_GLSL: void main(
-    //CHECK_SPV: OpEntryPoint
-    //CHECK_HLSL: void computeMain(
-    //CHECK_CUDA: void computeMain(
-    //CHECK_CPP: void _computeMain(
-    //BUF: 1
-    //BUF-NEXT: 1
+    // CHECK_GLSL: void main(
+    // CHECK_SPV: OpEntryPoint
+    // CHECK_HLSL: void computeMain(
+    // CHECK_CUDA: void computeMain(
+    // CHECK_CPP: void _computeMain(
+    // BUF: 1
 }

@@ -33,6 +33,8 @@ layout(local_size_x = 32) in;
 
 void computeMain()
 {
+    //seperate tests since testing concurrency
+
     // one is true, rest false, positive
     outputBuffer.data[0] = 1;
     bool t1 = inputBuffer.data[0] == gl_GlobalInvocationID.x;
@@ -68,7 +70,7 @@ void computeMain()
     // all false, positive
     outputBuffer.data[4] = 1;
 
-    if (testFunctionIn1ParamBool(subgroupAllEqual, 0, true)) {
+    if (testFunctionIn1ParamBool(subgroupAllEqual, true, 0)) {
         subgroupBarrier();
         outputBuffer.data[4] = 2;
     }
@@ -76,7 +78,7 @@ void computeMain()
     // one is true, rest false, negative
     outputBuffer.data[5] = 1;
     t1 = inputBuffer.data[0] == gl_GlobalInvocationID.x;
-    if (testFunctionIn1ParamBool(subgroupAllEqual, t1, false)) {
+    if (testFunctionIn1ParamBool(subgroupAllEqual, false, t1)) {
         subgroupBarrier();
         outputBuffer.data[5] = 2;
     }

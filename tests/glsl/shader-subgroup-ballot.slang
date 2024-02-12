@@ -19,7 +19,7 @@ buffer MyBlockName
     uint data[];
 } inputBuffer;
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 buffer MyBlockName2 
 {
     uint data[];
@@ -32,18 +32,16 @@ layout(local_size_x = 32) in;
 void computeMain()
 {
     uvec4 in = (0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF);
-    outputBuffer.data[0] = testFunctionIn2Param(subgroupBroadcast, 1, 0, 1);
-    outputBuffer.data[1] = testFunctionIn1Param(subgroupBroadcastFirst, 1, 1);
-    outputBuffer.data[2] = subgroupBallot(true).x == 0xFFFFFFFF; // all 32 should be running
-    outputBuffer.data[3] = subgroupInverseBallot(in) == true;
-    outputBuffer.data[4] = subgroupBallotBitExtract(in, 0) == true;
-    outputBuffer.data[5] = subgroupBallotBitCount(in) == 32;
-    outputBuffer.data[6] = subgroupBallotInclusiveBitCount(in) != 0;
-    outputBuffer.data[7] = subgroupBallotExclusiveBitCount(in) != 0;
-    outputBuffer.data[8] = subgroupBallotFindLSB(in) == 0;
-    
-    // only 32 in warp, so read up to first 32, hence 31
-    outputBuffer.data[9] = subgroupBallotFindMSB(in) == 31; 
+    outputBuffer.data[0] = testFunctionIn2ParamPlus(subgroupBroadcast, 1, 1, 0) &&
+                            testFunctionIn1Param(subgroupBroadcastFirst, 1, 1) &&
+                            (subgroupBallot(true).x == 0xFFFFFFFF) &&
+                            (subgroupInverseBallot(in) == true) &&
+                            (subgroupBallotBitExtract(in, 0) == true) &&
+                            (subgroupBallotBitCount(in) == 32) &&
+                            (subgroupBallotInclusiveBitCount(in) != 0) &&
+                            (subgroupBallotExclusiveBitCount(in) != 0) &&
+                            (subgroupBallotFindLSB(in) == 0) && 
+                            (subgroupBallotFindMSB(in) == 31); 
 
     // CHECK_GLSL: void main(
     // CHECK_SPV: OpEntryPoint
@@ -51,13 +49,4 @@ void computeMain()
     // CHECK_CUDA: void computeMain(
     // CHECK_CPP: void _computeMain(
     // BUF: 1
-    // BUF-NEXT: 1
-    // BUF-NEXT: 1
-    // BUF-NEXT: 1
-    // BUF-NEXT: 1
-    // BUF-NEXT: 1
-    // BUF-NEXT: 1
-    // BUF-NEXT: 1
-    // BUF-NEXT: 1
-    // BUF-NEXT: 1
 }
