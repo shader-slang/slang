@@ -12,11 +12,8 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
 #version 430
 
-// __requireGLSLExtension does not work with GLSL, as a result half/i8/i16/i64 all don't run
+// __requireGLSLExtension does not add an extension specified with GLSL, as a result half/i8/i16/i64 all don't run and complain about missing extension
 //#define TEST_when_requireGLSLExtension_works
-
-precision highp float;
-precision highp int;
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 buffer MyBlockName2 

@@ -2829,18 +2829,11 @@ public uint rayQueryGetIntersectionTypeEXT(rayQueryEXT q, bool committed)
 // likley related to the following issue since GLSL adds new 
 // 'system' variables: https://github.com/shader-slang/slang/issues/411
 
-#define glsl_caps_shader_subgroup(param1) __glsl_extension(param1) [require(glsl)] 
-#define spirv_caps_shader_subgroup(param1) __spirv_version(param1) [require(spirv)] 
-
-//macros used to make implementation and modification reasonable under regex
-#define macroAnyVecGenericBuiltIn __generic<T : __BuiltinType, let N : int>
-#define macroAnyVecGenericLogical __generic<T : __BuiltinLogicalType, let N : int>
-#define macroAnyVecGenericArithmetic __generic<T : __BuiltinArithmeticType, let N : int>
-#define macroAnyVec vector<T, N>
-
 __generic<T : __BuiltinType>
 void shader_subgroup_preamble() {
-    // checks needed for shader_subgroup functions; __requireGLSLExtension does not work, the call fails to find the OP
+    // checks needed for shader_subgroup functions; __requireGLSLExtension does not work 
+    // (does not add the ext specified correctly to the compile output; using extended type
+    // will result in error for using the type)
     __target_switch
     {
     case glsl:
@@ -2850,47 +2843,43 @@ void shader_subgroup_preamble() {
         if (__type_equals<T, uint64_t>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_int64");
         return;
     case spirv:
-    case cpp:
-    case cuda:
-    case cpp:
-        return;
+        return spirv_asm {};
     }
-    return;
 } 
 
 // GL_KHR_shader_subgroup_basic Built-in Variables 
 
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_basic)
+__glsl_extension(GL_KHR_shader_subgroup_basic) [require(glsl)] 
 public uint gl_NumSubgroups;
 
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_basic)
+__glsl_extension(GL_KHR_shader_subgroup_basic) [require(glsl)] 
 public uint gl_SubgroupID;
 
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_basic)
+__glsl_extension(GL_KHR_shader_subgroup_basic) [require(glsl)] 
 public uint gl_SubgroupSize;
 
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_basic)
+__glsl_extension(GL_KHR_shader_subgroup_basic) [require(glsl)] 
 public uint gl_SubgroupInvocationID;
 
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_basic)
+__glsl_extension(GL_KHR_shader_subgroup_basic) [require(glsl)] 
 public uint gl_SubgroupEqMask;
 
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_basic)
+__glsl_extension(GL_KHR_shader_subgroup_basic) [require(glsl)] 
 public uint gl_SubgroupGeMask;
 
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_basic)
+__glsl_extension(GL_KHR_shader_subgroup_basic) [require(glsl)] 
 public uint gl_SubgroupGtMask;
 
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_basic)
+__glsl_extension(GL_KHR_shader_subgroup_basic) [require(glsl)] 
 public uint gl_SubgroupLeMask;
 
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_basic)
+__glsl_extension(GL_KHR_shader_subgroup_basic) [require(glsl)] 
 public uint gl_SubgroupLtMask;
 
 // GL_KHR_shader_subgroup_basic
 
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_basic)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_basic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public void subgroupBarrier()
 {
     __target_switch
@@ -2912,8 +2901,8 @@ spirv_caps_shader_subgroup(1.3)
     }
 }
 
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_basic)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_basic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public void subgroupMemoryBarrier()
 {
     __target_switch
@@ -2935,10 +2924,12 @@ spirv_caps_shader_subgroup(1.3)
     }
 }
 
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_basic)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_basic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public void subgroupMemoryBarrierBuffer()
 {
+    // the following implementation is NOT the same as DeviceMemoryBarrier
+    // HLSL lacks the same granularity of blocking on subgroup memory within a subgroup
     __target_switch
     {
     case cuda:
@@ -2958,8 +2949,8 @@ spirv_caps_shader_subgroup(1.3)
     }
 }
 
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_basic)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_basic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public void subgroupMemoryBarrierImage()
 {
     __target_switch
@@ -2980,8 +2971,8 @@ spirv_caps_shader_subgroup(1.3)
     }
 }
 
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_basic)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_basic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public void subgroupMemoryBarrierShared()
 {
     __target_switch
@@ -3004,8 +2995,8 @@ spirv_caps_shader_subgroup(1.3)
     }
 }
 
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_basic)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_basic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public bool subgroupElect()
 {
     __target_switch
@@ -3024,8 +3015,8 @@ spirv_caps_shader_subgroup(1.3)
 
 // GL_KHR_shader_subgroup_vote
 
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_vote)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_vote) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public bool subgroupAll(bool value)
 {
     __target_switch
@@ -3041,8 +3032,8 @@ spirv_caps_shader_subgroup(1.3)
     }
 }
 
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_vote)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_vote) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public bool subgroupAny(bool value)
 {
     return WaveMaskAnyTrue(WaveGetActiveMask(), value);
@@ -3050,18 +3041,18 @@ spirv_caps_shader_subgroup(1.3)
 }
 
 __generic<T : __BuiltinType>
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_vote)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_vote) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public bool subgroupAllEqual(T value)
 {
     shader_subgroup_preamble<T>();
     return WaveMaskAllEqual(WaveGetActiveMask(), value);
 }
 
-macroAnyVecGenericBuiltIn
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_vote)
-spirv_caps_shader_subgroup(1.3)
-[ForceInline] public bool subgroupAllEqual(macroAnyVec value)
+__generic<T : __BuiltinType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_vote) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
+[ForceInline] public bool subgroupAllEqual(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     return WaveMaskAllEqual(WaveGetActiveMask(), value);
@@ -3070,8 +3061,8 @@ spirv_caps_shader_subgroup(1.3)
 // GL_KHR_shader_subgroup_arithmetic
 
 __generic<T : __BuiltinArithmeticType>
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupAdd(T value)
 {
     shader_subgroup_preamble<T>();
@@ -3079,8 +3070,8 @@ spirv_caps_shader_subgroup(1.3)
 }
 
 __generic<T : __BuiltinArithmeticType>
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupMul(T value)
 {
     shader_subgroup_preamble<T>();
@@ -3088,8 +3079,8 @@ spirv_caps_shader_subgroup(1.3)
 }
 
 __generic<T : __BuiltinArithmeticType>
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupMin(T value)
 {
     shader_subgroup_preamble<T>();
@@ -3097,8 +3088,8 @@ spirv_caps_shader_subgroup(1.3)
 }
 
 __generic<T : __BuiltinArithmeticType>
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupMax(T value)
 {
     shader_subgroup_preamble<T>();
@@ -3106,8 +3097,8 @@ spirv_caps_shader_subgroup(1.3)
 }
 
 __generic<T : __BuiltinLogicalType>
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupAnd(T value)
 {
     shader_subgroup_preamble<T>();
@@ -3136,8 +3127,8 @@ spirv_caps_shader_subgroup(1.3)
 }
 
 __generic<T : __BuiltinLogicalType>
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupOr(T value)
 {
     shader_subgroup_preamble<T>();
@@ -3166,8 +3157,8 @@ spirv_caps_shader_subgroup(1.3)
 }
 
 __generic<T : __BuiltinLogicalType>
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupXor(T value)
 {
     shader_subgroup_preamble<T>();
@@ -3196,8 +3187,8 @@ spirv_caps_shader_subgroup(1.3)
 }
 
 __generic<T : __BuiltinArithmeticType>
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupInclusiveAdd(T value)
 {
     shader_subgroup_preamble<T>();
@@ -3221,8 +3212,8 @@ spirv_caps_shader_subgroup(1.3)
 }
 
 __generic<T : __BuiltinArithmeticType>
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupInclusiveMul(T value)
 {
     shader_subgroup_preamble<T>();
@@ -3246,8 +3237,8 @@ spirv_caps_shader_subgroup(1.3)
 }
 
 __generic<T : __BuiltinArithmeticType>
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupInclusiveMin(T value)
 {
     shader_subgroup_preamble<T>();
@@ -3273,8 +3264,8 @@ spirv_caps_shader_subgroup(1.3)
 }
 
 __generic<T : __BuiltinArithmeticType>
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupInclusiveMax(T value)
 {
     shader_subgroup_preamble<T>();
@@ -3300,8 +3291,8 @@ spirv_caps_shader_subgroup(1.3)
 }
 
 __generic<T : __BuiltinLogicalType>
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupInclusiveAnd(T value)
 {
     shader_subgroup_preamble<T>();
@@ -3322,8 +3313,8 @@ spirv_caps_shader_subgroup(1.3)
 }
 
 __generic<T : __BuiltinLogicalType>
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupInclusiveOr(T value)
 {
     shader_subgroup_preamble<T>();
@@ -3344,8 +3335,8 @@ spirv_caps_shader_subgroup(1.3)
 }
 
 __generic<T : __BuiltinLogicalType>
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupInclusiveXor(T value)
 {
     shader_subgroup_preamble<T>();
@@ -3366,47 +3357,27 @@ spirv_caps_shader_subgroup(1.3)
 }
 
 __generic<T : __BuiltinArithmeticType>
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupExclusiveAdd(T value)
 {
     shader_subgroup_preamble<T>();
-    __target_switch
-    {
-    case glsl:
-    case spirv:
-    case hlsl:
-        return WaveMaskPrefixSum(WaveGetActiveMask(), value);
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
-    }
+    return WaveMaskPrefixSum(WaveGetActiveMask(), value);
 }
 
 
 __generic<T : __BuiltinArithmeticType>
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupExclusiveMul(T value)
 {
     shader_subgroup_preamble<T>();
-    __target_switch
-    {
-    case glsl:
-    case spirv:
-    case hlsl:
-        return WaveMaskPrefixProduct(WaveGetActiveMask(), value);
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
-    }
+    return WaveMaskPrefixProduct(WaveGetActiveMask(), value);
 }
 
 __generic<T : __BuiltinArithmeticType>
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupExclusiveMin(T value)
 {
     shader_subgroup_preamble<T>();
@@ -3432,8 +3403,8 @@ spirv_caps_shader_subgroup(1.3)
 }
 
 __generic<T : __BuiltinArithmeticType>
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupExclusiveMax(T value)
 {
     shader_subgroup_preamble<T>();
@@ -3459,8 +3430,8 @@ spirv_caps_shader_subgroup(1.3)
 }
 
 __generic<T : __BuiltinLogicalType>
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupExclusiveAnd(T value)
 {
     shader_subgroup_preamble<T>();
@@ -3479,8 +3450,8 @@ spirv_caps_shader_subgroup(1.3)
 }
 
 __generic<T : __BuiltinLogicalType>
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupExclusiveOr(T value)
 {
     shader_subgroup_preamble<T>();
@@ -3499,8 +3470,8 @@ spirv_caps_shader_subgroup(1.3)
 }
 
 __generic<T : __BuiltinLogicalType>
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupExclusiveXor(T value)
 {
     shader_subgroup_preamble<T>();
@@ -3522,46 +3493,46 @@ spirv_caps_shader_subgroup(1.3)
 // GL_KHR_shader_subgroup_arithmetic
 //note: this is a seperate section because it is so huge that the only reasonable way to implement this is to just regex replace code
 
-macroAnyVecGenericArithmetic
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
-spirv_caps_shader_subgroup(1.3)
-[ForceInline] public macroAnyVec subgroupAdd(macroAnyVec value)
+__generic<T : __BuiltinArithmeticType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
+[ForceInline] public vector<T,N> subgroupAdd(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     return WaveMaskSum(WaveGetActiveMask(), value);
 }
 
-macroAnyVecGenericArithmetic
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
-spirv_caps_shader_subgroup(1.3)
-[ForceInline] public macroAnyVec subgroupMul(macroAnyVec value)
+__generic<T : __BuiltinArithmeticType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
+[ForceInline] public vector<T,N> subgroupMul(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     return WaveMaskProduct(WaveGetActiveMask(), value);
 }
 
-macroAnyVecGenericArithmetic
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
-spirv_caps_shader_subgroup(1.3)
-[ForceInline] public macroAnyVec subgroupMin(macroAnyVec value)
+__generic<T : __BuiltinArithmeticType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
+[ForceInline] public vector<T,N> subgroupMin(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     return WaveMaskMin(WaveGetActiveMask(), value);
 }
 
-macroAnyVecGenericArithmetic
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
-spirv_caps_shader_subgroup(1.3)
-[ForceInline] public macroAnyVec subgroupMax(macroAnyVec value)
+__generic<T : __BuiltinArithmeticType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
+[ForceInline] public vector<T,N> subgroupMax(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     return WaveMaskMax(WaveGetActiveMask(), value);
 }
 
-macroAnyVecGenericLogical
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
-spirv_caps_shader_subgroup(1.3)
-[ForceInline] public macroAnyVec subgroupAnd(macroAnyVec value)
+__generic<T : __BuiltinLogicalType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
+[ForceInline] public vector<T,N> subgroupAnd(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -3571,13 +3542,13 @@ spirv_caps_shader_subgroup(1.3)
         if (__isBool<T>()) {
             return spirv_asm {
                 OpCapability GroupNonUniformArithmetic;
-                OpGroupNonUniformLogicalAnd $$macroAnyVec result Subgroup 0 $value
+                OpGroupNonUniformLogicalAnd $$vector<T,N> result Subgroup 0 $value
             };
         }
         else {
             return spirv_asm {
                 OpCapability GroupNonUniformArithmetic;
-                OpGroupNonUniformBitwiseAnd $$macroAnyVec result Subgroup 0 $value
+                OpGroupNonUniformBitwiseAnd $$vector<T,N> result Subgroup 0 $value
             };
         }
     case hlsl:
@@ -3588,10 +3559,10 @@ spirv_caps_shader_subgroup(1.3)
     }
 }
 
-macroAnyVecGenericLogical
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
-spirv_caps_shader_subgroup(1.3)
-[ForceInline] public macroAnyVec subgroupOr(macroAnyVec value)
+__generic<T : __BuiltinLogicalType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
+[ForceInline] public vector<T,N> subgroupOr(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -3601,13 +3572,13 @@ spirv_caps_shader_subgroup(1.3)
         if (__isBool<T>()) {
             return spirv_asm {
                 OpCapability GroupNonUniformArithmetic;
-                OpGroupNonUniformLogicalOr $$macroAnyVec result Subgroup 0 $value
+                OpGroupNonUniformLogicalOr $$vector<T,N> result Subgroup 0 $value
             };
         }
         else {
             return spirv_asm {
                 OpCapability GroupNonUniformArithmetic;
-                OpGroupNonUniformBitwiseOr $$macroAnyVec result Subgroup 0 $value
+                OpGroupNonUniformBitwiseOr $$vector<T,N> result Subgroup 0 $value
             };
         }
     case hlsl:
@@ -3618,10 +3589,10 @@ spirv_caps_shader_subgroup(1.3)
     }
 }
 
-macroAnyVecGenericLogical
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
-spirv_caps_shader_subgroup(1.3)
-[ForceInline] public macroAnyVec subgroupXor(macroAnyVec value)
+__generic<T : __BuiltinLogicalType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
+[ForceInline] public vector<T,N> subgroupXor(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -3631,13 +3602,13 @@ spirv_caps_shader_subgroup(1.3)
         if (__isBool<T>()) {
             return spirv_asm {
                 OpCapability GroupNonUniformArithmetic;
-                OpGroupNonUniformLogicalXor $$macroAnyVec result Subgroup 0 $value
+                OpGroupNonUniformLogicalXor $$vector<T,N> result Subgroup 0 $value
             };
         }
         else {
             return spirv_asm {
                 OpCapability GroupNonUniformArithmetic;
-                OpGroupNonUniformBitwiseXor $$macroAnyVec result Subgroup 0 $value
+                OpGroupNonUniformBitwiseXor $$vector<T,N> result Subgroup 0 $value
             };
         }
     case hlsl:
@@ -3648,10 +3619,10 @@ spirv_caps_shader_subgroup(1.3)
     }
 }
 
-macroAnyVecGenericArithmetic
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
-spirv_caps_shader_subgroup(1.3)
-[ForceInline] public macroAnyVec subgroupInclusiveAdd(macroAnyVec value)
+__generic<T : __BuiltinArithmeticType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
+[ForceInline] public vector<T,N> subgroupInclusiveAdd(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -3660,9 +3631,9 @@ spirv_caps_shader_subgroup(1.3)
         __target_intrinsic "subgroupInclusiveAdd($0)";
     case spirv:
         if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFAdd $$macroAnyVec result Subgroup InclusiveScan $value};
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFAdd $$vector<T,N> result Subgroup InclusiveScan $value};
         else if (__isInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIAdd $$macroAnyVec result Subgroup InclusiveScan $value};
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIAdd $$vector<T,N> result Subgroup InclusiveScan $value};
     case hlsl:
     case cuda:
     case cpp:
@@ -3672,10 +3643,10 @@ spirv_caps_shader_subgroup(1.3)
     return value;
 }
 
-macroAnyVecGenericArithmetic
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
-spirv_caps_shader_subgroup(1.3)
-[ForceInline] public macroAnyVec subgroupInclusiveMul(macroAnyVec value)
+__generic<T : __BuiltinArithmeticType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
+[ForceInline] public vector<T,N> subgroupInclusiveMul(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -3684,9 +3655,9 @@ spirv_caps_shader_subgroup(1.3)
         __target_intrinsic "subgroupInclusiveMul($0)";
     case spirv:
         if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMul $$macroAnyVec result Subgroup InclusiveScan $value};
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMul $$vector<T,N> result Subgroup InclusiveScan $value};
         else if (__isInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIMul $$macroAnyVec result Subgroup InclusiveScan $value};
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIMul $$vector<T,N> result Subgroup InclusiveScan $value};
         else return value;
     case hlsl:
     case cuda:
@@ -3697,10 +3668,10 @@ spirv_caps_shader_subgroup(1.3)
     return value;
 }
 
-macroAnyVecGenericArithmetic
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
-spirv_caps_shader_subgroup(1.3)
-[ForceInline] public macroAnyVec subgroupInclusiveMin(macroAnyVec value)
+__generic<T : __BuiltinArithmeticType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
+[ForceInline] public vector<T,N> subgroupInclusiveMin(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -3709,11 +3680,11 @@ spirv_caps_shader_subgroup(1.3)
         __target_intrinsic "subgroupInclusiveMin($0)";
     case spirv:
         if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMin $$macroAnyVec result Subgroup InclusiveScan $value};
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMin $$vector<T,N> result Subgroup InclusiveScan $value};
         else if (__isSignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformSMin $$macroAnyVec result Subgroup InclusiveScan $value};
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformSMin $$vector<T,N> result Subgroup InclusiveScan $value};
         else if (__isUnsignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMin $$macroAnyVec result Subgroup InclusiveScan $value};
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMin $$vector<T,N> result Subgroup InclusiveScan $value};
         else return value;
     case hlsl:
     case cuda:
@@ -3724,10 +3695,10 @@ spirv_caps_shader_subgroup(1.3)
     return value;
 }
 
-macroAnyVecGenericArithmetic
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
-spirv_caps_shader_subgroup(1.3)
-[ForceInline] public macroAnyVec subgroupInclusiveMax(macroAnyVec value)
+__generic<T : __BuiltinArithmeticType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
+[ForceInline] public vector<T,N> subgroupInclusiveMax(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -3736,11 +3707,11 @@ spirv_caps_shader_subgroup(1.3)
         __target_intrinsic "subgroupInclusiveMax($0)";
     case spirv:
         if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMax $$macroAnyVec result Subgroup InclusiveScan $value};
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMax $$vector<T,N> result Subgroup InclusiveScan $value};
         else if (__isSignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformSMax $$macroAnyVec result Subgroup InclusiveScan $value};
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformSMax $$vector<T,N> result Subgroup InclusiveScan $value};
         else if (__isUnsignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMax $$macroAnyVec result Subgroup InclusiveScan $value};
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMax $$vector<T,N> result Subgroup InclusiveScan $value};
         else return value;
     case hlsl:
     case cuda:
@@ -3751,10 +3722,10 @@ spirv_caps_shader_subgroup(1.3)
     return value;
 }
 
-macroAnyVecGenericLogical
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
-spirv_caps_shader_subgroup(1.3)
-[ForceInline] public macroAnyVec subgroupInclusiveAnd(macroAnyVec value)
+__generic<T : __BuiltinLogicalType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
+[ForceInline] public vector<T,N> subgroupInclusiveAnd(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -3762,8 +3733,8 @@ spirv_caps_shader_subgroup(1.3)
     case glsl:
         __target_intrinsic "subgroupInclusiveAnd($0)";
     case spirv:
-        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalAnd $$macroAnyVec result Subgroup InclusiveScan $value};
-        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseAnd $$macroAnyVec result Subgroup InclusiveScan $value};
+        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalAnd $$vector<T,N> result Subgroup InclusiveScan $value};
+        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseAnd $$vector<T,N> result Subgroup InclusiveScan $value};
     case hlsl:
     case cuda:
     case cpp:
@@ -3773,10 +3744,10 @@ spirv_caps_shader_subgroup(1.3)
     return value;
 }
 
-macroAnyVecGenericLogical
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
-spirv_caps_shader_subgroup(1.3)
-[ForceInline] public macroAnyVec subgroupInclusiveOr(macroAnyVec value)
+__generic<T : __BuiltinLogicalType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
+[ForceInline] public vector<T,N> subgroupInclusiveOr(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -3784,8 +3755,8 @@ spirv_caps_shader_subgroup(1.3)
     case glsl:
         __target_intrinsic "subgroupInclusiveOr($0)";
     case spirv:
-        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalOr $$macroAnyVec result Subgroup InclusiveScan $value};
-        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseOr $$macroAnyVec result Subgroup InclusiveScan $value};
+        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalOr $$vector<T,N> result Subgroup InclusiveScan $value};
+        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseOr $$vector<T,N> result Subgroup InclusiveScan $value};
     case hlsl:
     case cuda:
     case cpp:
@@ -3795,10 +3766,10 @@ spirv_caps_shader_subgroup(1.3)
     return value;
 }
 
-macroAnyVecGenericLogical
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
-spirv_caps_shader_subgroup(1.3)
-[ForceInline] public macroAnyVec subgroupInclusiveXor(macroAnyVec value)
+__generic<T : __BuiltinLogicalType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
+[ForceInline] public vector<T,N> subgroupInclusiveXor(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -3806,8 +3777,8 @@ spirv_caps_shader_subgroup(1.3)
     case glsl:
         __target_intrinsic "subgroupInclusiveXor($0)";
     case spirv:
-        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalXor $$macroAnyVec result Subgroup InclusiveScan $value};
-        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseXor $$macroAnyVec result Subgroup InclusiveScan $value};
+        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalXor $$vector<T,N> result Subgroup InclusiveScan $value};
+        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseXor $$vector<T,N> result Subgroup InclusiveScan $value};
     case hlsl:
     case cuda:
     case cpp:
@@ -3817,49 +3788,29 @@ spirv_caps_shader_subgroup(1.3)
     return value;
 }
 
-macroAnyVecGenericArithmetic
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
-spirv_caps_shader_subgroup(1.3)
-[ForceInline] public macroAnyVec subgroupExclusiveAdd(macroAnyVec value)
+__generic<T : __BuiltinArithmeticType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
+[ForceInline] public vector<T,N> subgroupExclusiveAdd(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
-    __target_switch
-    {
-    case glsl:
-    case spirv:
-    case hlsl:
-        return WaveMaskPrefixSum(WaveGetActiveMask(), value);
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
-    }
+    return WaveMaskPrefixSum(WaveGetActiveMask(), value);
 }
 
 
-macroAnyVecGenericArithmetic
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
-spirv_caps_shader_subgroup(1.3)
-[ForceInline] public macroAnyVec subgroupExclusiveMul(macroAnyVec value)
+__generic<T : __BuiltinArithmeticType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
+[ForceInline] public vector<T,N> subgroupExclusiveMul(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
-    __target_switch
-    {
-    case glsl:
-    case spirv:
-    case hlsl:
-        return WaveMaskPrefixProduct(WaveGetActiveMask(), value);
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
-    }
+    return WaveMaskPrefixProduct(WaveGetActiveMask(), value);
 }
 
-macroAnyVecGenericArithmetic
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
-spirv_caps_shader_subgroup(1.3)
-[ForceInline] public macroAnyVec subgroupExclusiveMin(macroAnyVec value)
+__generic<T : __BuiltinArithmeticType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
+[ForceInline] public vector<T,N> subgroupExclusiveMin(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -3868,11 +3819,11 @@ spirv_caps_shader_subgroup(1.3)
         __target_intrinsic "subgroupExclusiveMin($0)";
     case spirv:
         if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMin $$macroAnyVec result Subgroup ExclusiveScan $value};
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMin $$vector<T,N> result Subgroup ExclusiveScan $value};
         else if (__isSignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformSMin $$macroAnyVec result Subgroup ExclusiveScan $value};
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformSMin $$vector<T,N> result Subgroup ExclusiveScan $value};
         else if (__isUnsignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMin $$macroAnyVec result Subgroup ExclusiveScan $value};
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMin $$vector<T,N> result Subgroup ExclusiveScan $value};
         else return value;
     case hlsl:
     case cuda:
@@ -3883,10 +3834,10 @@ spirv_caps_shader_subgroup(1.3)
     return value;
 }
 
-macroAnyVecGenericArithmetic
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
-spirv_caps_shader_subgroup(1.3)
-[ForceInline] public macroAnyVec subgroupExclusiveMax(macroAnyVec value)
+__generic<T : __BuiltinArithmeticType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
+[ForceInline] public vector<T,N> subgroupExclusiveMax(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -3895,11 +3846,11 @@ spirv_caps_shader_subgroup(1.3)
         __target_intrinsic "subgroupExclusiveMax($0)";
     case spirv:
         if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMax $$macroAnyVec result Subgroup ExclusiveScan $value};
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMax $$vector<T,N> result Subgroup ExclusiveScan $value};
         else if (__isSignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformSMax $$macroAnyVec result Subgroup ExclusiveScan $value};
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformSMax $$vector<T,N> result Subgroup ExclusiveScan $value};
         else if (__isUnsignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMax $$macroAnyVec result Subgroup ExclusiveScan $value};
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMax $$vector<T,N> result Subgroup ExclusiveScan $value};
         else return value;
     case hlsl:
     case cuda:
@@ -3910,18 +3861,18 @@ spirv_caps_shader_subgroup(1.3)
     return value;
 }
 
-macroAnyVecGenericLogical
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
-spirv_caps_shader_subgroup(1.3)
-[ForceInline] public macroAnyVec subgroupExclusiveAnd(macroAnyVec value)
+__generic<T : __BuiltinLogicalType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
+[ForceInline] public vector<T,N> subgroupExclusiveAnd(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
     {
     case glsl: __intrinsic_asm "subgroupExclusiveAnd($0)";
     case spirv:
-        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalAnd $$macroAnyVec result Subgroup ExclusiveScan $value};
-        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseAnd $$macroAnyVec result Subgroup ExclusiveScan $value};
+        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalAnd $$vector<T,N> result Subgroup ExclusiveScan $value};
+        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseAnd $$vector<T,N> result Subgroup ExclusiveScan $value};
     case hlsl:
     case cuda:
     case cpp:
@@ -3930,18 +3881,18 @@ spirv_caps_shader_subgroup(1.3)
     }
 }
 
-macroAnyVecGenericLogical
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
-spirv_caps_shader_subgroup(1.3)
-[ForceInline] public macroAnyVec subgroupExclusiveOr(macroAnyVec value)
+__generic<T : __BuiltinLogicalType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
+[ForceInline] public vector<T,N> subgroupExclusiveOr(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
     {
     case glsl: __intrinsic_asm "subgroupExclusiveOr($0)";
     case spirv:
-        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalOr $$macroAnyVec result Subgroup ExclusiveScan $value};
-        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseOr $$macroAnyVec result Subgroup ExclusiveScan $value};
+        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalOr $$vector<T,N> result Subgroup ExclusiveScan $value};
+        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseOr $$vector<T,N> result Subgroup ExclusiveScan $value};
     case hlsl:
     case cuda:
     case cpp:
@@ -3950,18 +3901,18 @@ spirv_caps_shader_subgroup(1.3)
     }
 }
 
-macroAnyVecGenericLogical
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
-spirv_caps_shader_subgroup(1.3)
-[ForceInline] public macroAnyVec subgroupExclusiveXor(macroAnyVec value)
+__generic<T : __BuiltinLogicalType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
+[ForceInline] public vector<T,N> subgroupExclusiveXor(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
     {
     case glsl: __intrinsic_asm "subgroupExclusiveXor($0)";
     case spirv:
-        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalXor $$macroAnyVec result Subgroup ExclusiveScan $value};
-        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseXor $$macroAnyVec result Subgroup ExclusiveScan $value};
+        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalXor $$vector<T,N> result Subgroup ExclusiveScan $value};
+        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseXor $$vector<T,N> result Subgroup ExclusiveScan $value};
     case hlsl:
     case cuda:
     case cpp:
@@ -3973,44 +3924,44 @@ spirv_caps_shader_subgroup(1.3)
 // GL_KHR_shader_subgroup_ballot
 
 __generic<T : __BuiltinType>
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_ballot)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_ballot) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupBroadcast(T value, uint id)
 {
     shader_subgroup_preamble<T>();
     return WaveMaskBroadcastLaneAt(WaveGetActiveMask(), value, id);
 }
 
-macroAnyVecGenericBuiltIn
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_ballot)
-spirv_caps_shader_subgroup(1.3)
-[ForceInline] public macroAnyVec subgroupBroadcast(macroAnyVec value, uint id)
+__generic<T : __BuiltinType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_ballot) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
+[ForceInline] public vector<T,N> subgroupBroadcast(vector<T,N> value, uint id)
 {
     shader_subgroup_preamble<T>();
     return WaveMaskBroadcastLaneAt(WaveGetActiveMask(), value, id);
 }
 
 __generic<T : __BuiltinType>
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_ballot)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_ballot) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupBroadcastFirst(T value)
 {
     shader_subgroup_preamble<T>();
     return WaveMaskReadLaneFirst(WaveGetActiveMask(), value);
 }
 
-macroAnyVecGenericBuiltIn
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_ballot)
-spirv_caps_shader_subgroup(1.3)
-[ForceInline] public macroAnyVec subgroupBroadcastFirst(macroAnyVec value)
+__generic<T : __BuiltinType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_ballot) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
+[ForceInline] public vector<T,N> subgroupBroadcastFirst(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     return WaveMaskReadLaneFirst(WaveGetActiveMask(), value);
 }
 
 // WaveMaskBallot is not the same; it force trunc's
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_ballot)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_ballot) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public uvec4 subgroupBallot(bool value)
 {
     return WaveActiveBallot(value);
@@ -4026,8 +3977,8 @@ spirv_caps_shader_subgroup(1.3)
 // note 2: we have a waveLaneCount check because based on wave lane count we can determine if we can do a 
 // fast path or slow path (know index is 0 or non 0)
 // }
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_ballot)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_ballot) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public bool subgroupInverseBallot(uvec4 value)
 {
     __target_switch
@@ -4062,8 +4013,8 @@ spirv_caps_shader_subgroup(1.3)
 }
 
 // same logic as subgroupInverseBallot
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_ballot)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_ballot) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public bool subgroupBallotBitExtract(uvec4 value, uint index)
 {
     __target_switch
@@ -4097,8 +4048,8 @@ spirv_caps_shader_subgroup(1.3)
 
 
 // the count is only supposed to use uvec4 values within bottom bits of subgroup launched, not a simple countbits
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_ballot)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_ballot) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public uint subgroupBallotBitCount(uvec4 value)
 {
     __target_switch
@@ -4118,8 +4069,8 @@ spirv_caps_shader_subgroup(1.3)
     }
 }
 
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_ballot)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_ballot) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public uint subgroupBallotInclusiveBitCount(uvec4 value)
 {
     __target_switch
@@ -4139,8 +4090,8 @@ spirv_caps_shader_subgroup(1.3)
     }
 }
 
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_ballot)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_ballot) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public uint subgroupBallotExclusiveBitCount(uvec4 value)
 {
     __target_switch
@@ -4160,8 +4111,8 @@ spirv_caps_shader_subgroup(1.3)
     }
 }
 
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_ballot)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_ballot) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public uint subgroupBallotFindLSB(uvec4 value)
 {
     __target_switch
@@ -4181,8 +4132,8 @@ spirv_caps_shader_subgroup(1.3)
     }
 }
 
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_ballot)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_ballot) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public uint subgroupBallotFindMSB(uvec4 value)
 {
     __target_switch
@@ -4205,8 +4156,8 @@ spirv_caps_shader_subgroup(1.3)
 // GL_KHR_shader_subgroup_shuffle
 
 __generic<T : __BuiltinType>
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_shuffle)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_shuffle) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupShuffle(T value, uint index)
 {
     shader_subgroup_preamble<T>();
@@ -4222,8 +4173,8 @@ spirv_caps_shader_subgroup(1.3)
 }
 
 __generic<T : __BuiltinType>
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_shuffle)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_shuffle) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupShuffleXor(T value, uint mask)
 {
     shader_subgroup_preamble<T>();
@@ -4245,10 +4196,10 @@ spirv_caps_shader_subgroup(1.3)
     return value;
 }
 
-macroAnyVecGenericBuiltIn
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_shuffle)
-spirv_caps_shader_subgroup(1.3)
-[ForceInline] public macroAnyVec subgroupShuffle(macroAnyVec value, uint index)
+__generic<T : __BuiltinType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_shuffle) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
+[ForceInline] public vector<T,N> subgroupShuffle(vector<T,N> value, uint index)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -4262,10 +4213,10 @@ spirv_caps_shader_subgroup(1.3)
     }
 }
 
-macroAnyVecGenericBuiltIn
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_shuffle)
-spirv_caps_shader_subgroup(1.3)
-[ForceInline] public macroAnyVec subgroupShuffleXor(macroAnyVec value, uint mask)
+__generic<T : __BuiltinType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_shuffle) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
+[ForceInline] public vector<T,N> subgroupShuffleXor(vector<T,N> value, uint mask)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -4275,7 +4226,7 @@ spirv_caps_shader_subgroup(1.3)
     case spirv:
         return spirv_asm {
             OpCapability GroupNonUniformBallot; 
-            OpGroupNonUniformShuffleXor $$macroAnyVec result Subgroup $value $mask
+            OpGroupNonUniformShuffleXor $$vector<T,N> result Subgroup $value $mask
         };
     case hlsl:
     case cuda:
@@ -4290,8 +4241,8 @@ spirv_caps_shader_subgroup(1.3)
 // GL_KHR_shader_subgroup_shuffle_relative
 
 __generic<T : __BuiltinType>
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_shuffle_relative)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_shuffle_relative) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupShuffleUp(T value, uint delta)
 {
     shader_subgroup_preamble<T>();
@@ -4314,8 +4265,8 @@ spirv_caps_shader_subgroup(1.3)
 }
 
 __generic<T : __BuiltinType>
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_shuffle_relative)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_shuffle_relative) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupShuffleDown(T value, uint delta)
 {
     shader_subgroup_preamble<T>();
@@ -4338,10 +4289,10 @@ spirv_caps_shader_subgroup(1.3)
 }
 
 
-macroAnyVecGenericBuiltIn
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_shuffle_relative)
-spirv_caps_shader_subgroup(1.3)
-[ForceInline] public macroAnyVec subgroupShuffleUp(macroAnyVec value, uint delta)
+__generic<T : __BuiltinType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_shuffle_relative) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
+[ForceInline] public vector<T,N> subgroupShuffleUp(vector<T,N> value, uint delta)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -4351,7 +4302,7 @@ spirv_caps_shader_subgroup(1.3)
     case spirv:
         return spirv_asm {
             OpCapability GroupNonUniformShuffleRelative;
-            OpGroupNonUniformShuffleUp $$macroAnyVec result Subgroup $value $delta
+            OpGroupNonUniformShuffleUp $$vector<T,N> result Subgroup $value $delta
         };
     case hlsl:
     case cuda:
@@ -4362,10 +4313,10 @@ spirv_caps_shader_subgroup(1.3)
     return value;
 }
 
-macroAnyVecGenericBuiltIn
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_shuffle_relative)
-spirv_caps_shader_subgroup(1.3)
-[ForceInline] public macroAnyVec subgroupShuffleDown(macroAnyVec value, uint delta)
+__generic<T : __BuiltinType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_shuffle_relative) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
+[ForceInline] public vector<T,N> subgroupShuffleDown(vector<T,N> value, uint delta)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -4375,7 +4326,7 @@ spirv_caps_shader_subgroup(1.3)
     case spirv:
         return spirv_asm {
             OpCapability GroupNonUniformShuffleRelative;
-            OpGroupNonUniformShuffleDown $$macroAnyVec result Subgroup $value $delta
+            OpGroupNonUniformShuffleDown $$vector<T,N> result Subgroup $value $delta
         };
     case hlsl:
     case cuda:
@@ -4388,8 +4339,8 @@ spirv_caps_shader_subgroup(1.3)
 // GL_KHR_shader_subgroup_clustered
 
 __generic<T : __BuiltinArithmeticType>
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_clustered)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupClusteredAdd(T value, uint clusterSize)
 {
     shader_subgroup_preamble<T>();
@@ -4413,8 +4364,8 @@ spirv_caps_shader_subgroup(1.3)
 }
 
 __generic<T : __BuiltinArithmeticType>
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_clustered)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupClusteredMul(T value, uint clusterSize)
 {
     shader_subgroup_preamble<T>();
@@ -4438,8 +4389,8 @@ spirv_caps_shader_subgroup(1.3)
 }
 
 __generic<T : __BuiltinArithmeticType>
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_clustered)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupClusteredMin(T value, uint clusterSize)
 {
     shader_subgroup_preamble<T>();
@@ -4465,8 +4416,8 @@ spirv_caps_shader_subgroup(1.3)
 }
 
 __generic<T : __BuiltinArithmeticType>
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_clustered)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupClusteredMax(T value, uint clusterSize)
 {
     shader_subgroup_preamble<T>();
@@ -4492,8 +4443,8 @@ spirv_caps_shader_subgroup(1.3)
 }
 
 __generic<T : __BuiltinLogicalType>
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_clustered)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupClusteredAnd(T value, uint clusterSize)
 {
     shader_subgroup_preamble<T>();
@@ -4514,8 +4465,8 @@ spirv_caps_shader_subgroup(1.3)
 }
 
 __generic<T : __BuiltinLogicalType>
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_clustered)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupClusteredOr(T value, uint clusterSize)
 {
     shader_subgroup_preamble<T>();
@@ -4538,8 +4489,8 @@ spirv_caps_shader_subgroup(1.3)
 
 
 __generic<T : __BuiltinLogicalType>
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_clustered)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupClusteredXor(T value, uint clusterSize)
 {
     shader_subgroup_preamble<T>();
@@ -4561,10 +4512,10 @@ spirv_caps_shader_subgroup(1.3)
 
 
 
-macroAnyVecGenericArithmetic
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_clustered)
-spirv_caps_shader_subgroup(1.3)
-[ForceInline] public macroAnyVec subgroupClusteredAdd(macroAnyVec value, uint clusterSize)
+__generic<T : __BuiltinArithmeticType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_clustered) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
+[ForceInline] public vector<T,N> subgroupClusteredAdd(vector<T,N> value, uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -4574,9 +4525,9 @@ spirv_caps_shader_subgroup(1.3)
     case spirv:
         if (__isFloat<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; 
-            OpGroupNonUniformFAdd $$macroAnyVec result Subgroup ClusteredReduce $value $clusterSize};
+            OpGroupNonUniformFAdd $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
         else if (__isInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformIAdd $$macroAnyVec result Subgroup ClusteredReduce $value $clusterSize};
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformIAdd $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
         else return value;
     case hlsl:
     case cuda:
@@ -4587,10 +4538,10 @@ spirv_caps_shader_subgroup(1.3)
     return value;
 }
 
-macroAnyVecGenericArithmetic
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_clustered)
-spirv_caps_shader_subgroup(1.3)
-[ForceInline] public macroAnyVec subgroupClusteredMul(macroAnyVec value, uint clusterSize)
+__generic<T : __BuiltinArithmeticType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_clustered) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
+[ForceInline] public vector<T,N> subgroupClusteredMul(vector<T,N> value, uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -4599,9 +4550,9 @@ spirv_caps_shader_subgroup(1.3)
         __target_intrinsic "subgroupClusteredMul($0, $1)";
     case spirv:
         if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformFMul $$macroAnyVec result Subgroup ClusteredReduce $value $clusterSize};
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformFMul $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
         else if (__isInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformIMul $$macroAnyVec result Subgroup ClusteredReduce $value $clusterSize};
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformIMul $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
         else return value;
     case hlsl:
     case cuda:
@@ -4612,10 +4563,10 @@ spirv_caps_shader_subgroup(1.3)
     return value;
 }
 
-macroAnyVecGenericArithmetic
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_clustered)
-spirv_caps_shader_subgroup(1.3)
-[ForceInline] public macroAnyVec subgroupClusteredMin(macroAnyVec value, uint clusterSize)
+__generic<T : __BuiltinArithmeticType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_clustered) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
+[ForceInline] public vector<T,N> subgroupClusteredMin(vector<T,N> value, uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -4624,11 +4575,11 @@ spirv_caps_shader_subgroup(1.3)
         __target_intrinsic "subgroupClusteredMin($0, $1)";
     case spirv:
         if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformFMin $$macroAnyVec result Subgroup ClusteredReduce $value $clusterSize};
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformFMin $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
         else if (__isSignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformSMin $$macroAnyVec result Subgroup ClusteredReduce $value $clusterSize};
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformSMin $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
         else if (__isUnsignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformUMin $$macroAnyVec result Subgroup ClusteredReduce $value $clusterSize};
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformUMin $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
         else return value;
     case hlsl:
     case cuda:
@@ -4639,10 +4590,10 @@ spirv_caps_shader_subgroup(1.3)
     return value;
 }
 
-macroAnyVecGenericArithmetic
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_clustered)
-spirv_caps_shader_subgroup(1.3)
-[ForceInline] public macroAnyVec subgroupClusteredMax(macroAnyVec value, uint clusterSize)
+__generic<T : __BuiltinArithmeticType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_clustered) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
+[ForceInline] public vector<T,N> subgroupClusteredMax(vector<T,N> value, uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -4651,11 +4602,11 @@ spirv_caps_shader_subgroup(1.3)
         __target_intrinsic "subgroupClusteredMax($0, $1)";
     case spirv:
         if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformFMax $$macroAnyVec result Subgroup ClusteredReduce $value $clusterSize};
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformFMax $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
         else if (__isSignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformSMax $$macroAnyVec result Subgroup ClusteredReduce $value $clusterSize};
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformSMax $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
         else if (__isUnsignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered;  OpGroupNonUniformUMax $$macroAnyVec result Subgroup ClusteredReduce $value $clusterSize};
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered;  OpGroupNonUniformUMax $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
         else return value;
     case hlsl:
     case cuda:
@@ -4666,10 +4617,10 @@ spirv_caps_shader_subgroup(1.3)
     return value;
 }
 
-macroAnyVecGenericLogical
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_clustered)
-spirv_caps_shader_subgroup(1.3)
-[ForceInline] public macroAnyVec subgroupClusteredAnd(macroAnyVec value, uint clusterSize)
+__generic<T : __BuiltinLogicalType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_clustered) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
+[ForceInline] public vector<T,N> subgroupClusteredAnd(vector<T,N> value, uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -4677,8 +4628,8 @@ spirv_caps_shader_subgroup(1.3)
     case glsl:
         __target_intrinsic "subgroupClusteredAnd($0, $1)";
     case spirv:
-        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformLogicalAnd $$macroAnyVec result Subgroup ClusteredReduce $value $clusterSize};
-        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseAnd $$macroAnyVec result Subgroup ClusteredReduce $value $clusterSize};
+        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformLogicalAnd $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
+        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseAnd $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
     case hlsl:
     case cuda:
     case cpp:
@@ -4688,10 +4639,10 @@ spirv_caps_shader_subgroup(1.3)
     return value;
 }
 
-macroAnyVecGenericLogical
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_clustered)
-spirv_caps_shader_subgroup(1.3)
-[ForceInline] public macroAnyVec subgroupClusteredOr(macroAnyVec value, uint clusterSize)
+__generic<T : __BuiltinLogicalType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_clustered) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
+[ForceInline] public vector<T,N> subgroupClusteredOr(vector<T,N> value, uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -4699,8 +4650,8 @@ spirv_caps_shader_subgroup(1.3)
     case glsl:
         __target_intrinsic "subgroupClusteredOr($0, $1)";
     case spirv:
-        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformLogicalOr $$macroAnyVec result Subgroup ClusteredReduce $value $clusterSize};
-        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseOr $$macroAnyVec result Subgroup ClusteredReduce $value $clusterSize};
+        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformLogicalOr $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
+        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseOr $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
     case hlsl:
     case cuda:
     case cpp:
@@ -4710,10 +4661,10 @@ spirv_caps_shader_subgroup(1.3)
     return value;
 }
 
-macroAnyVecGenericLogical
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_clustered)
-spirv_caps_shader_subgroup(1.3)
-[ForceInline] public macroAnyVec subgroupClusteredXor(macroAnyVec value, uint clusterSize)
+__generic<T : __BuiltinLogicalType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_clustered) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
+[ForceInline] public vector<T,N> subgroupClusteredXor(vector<T,N> value, uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
@@ -4721,8 +4672,8 @@ spirv_caps_shader_subgroup(1.3)
     case glsl:
         __target_intrinsic "subgroupClusteredXor($0, $1)";
     case spirv:
-        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformLogicalXor $$macroAnyVec result Subgroup ClusteredReduce $value $clusterSize};
-        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseXor $$macroAnyVec result Subgroup ClusteredReduce $value $clusterSize};
+        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformLogicalXor $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
+        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseXor $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
     case hlsl:
     case cuda:
     case cpp:
@@ -4735,8 +4686,8 @@ spirv_caps_shader_subgroup(1.3)
 // GL_KHR_shader_subgroup_quad
 
 __generic<T : __BuiltinType>
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_quad)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_quad) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupQuadBroadcast(T value, uint id)
 {
     shader_subgroup_preamble<T>();
@@ -4744,8 +4695,8 @@ spirv_caps_shader_subgroup(1.3)
 }
 
 __generic<T : __BuiltinType>
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_quad)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_quad) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupQuadSwapHorizontal(T value)
 {
     shader_subgroup_preamble<T>();
@@ -4753,8 +4704,8 @@ spirv_caps_shader_subgroup(1.3)
 }
 
 __generic<T : __BuiltinType>
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_quad)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_quad) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupQuadSwapVertical(T value)
 {
     shader_subgroup_preamble<T>();
@@ -4762,8 +4713,8 @@ spirv_caps_shader_subgroup(1.3)
 }
 
 __generic<T : __BuiltinType>
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_quad)
-spirv_caps_shader_subgroup(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_quad) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupQuadSwapDiagonal(T value)
 {
     shader_subgroup_preamble<T>();
@@ -4771,37 +4722,37 @@ spirv_caps_shader_subgroup(1.3)
 }
 
 
-macroAnyVecGenericBuiltIn
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_quad)
-spirv_caps_shader_subgroup(1.3)
-[ForceInline] public macroAnyVec subgroupQuadBroadcast(macroAnyVec value, uint id)
+__generic<T : __BuiltinType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_quad) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
+[ForceInline] public vector<T,N> subgroupQuadBroadcast(vector<T,N> value, uint id)
 {
     shader_subgroup_preamble<T>();
     return QuadReadLaneAt(value, id);
 }
 
-macroAnyVecGenericBuiltIn
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_quad)
-spirv_caps_shader_subgroup(1.3)
-[ForceInline] public macroAnyVec subgroupQuadSwapHorizontal(macroAnyVec value)
+__generic<T : __BuiltinType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_quad) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
+[ForceInline] public vector<T,N> subgroupQuadSwapHorizontal(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     return QuadReadAcrossX(value);
 }
 
-macroAnyVecGenericBuiltIn
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_quad)
-spirv_caps_shader_subgroup(1.3)
-[ForceInline] public macroAnyVec subgroupQuadSwapVertical(macroAnyVec value)
+__generic<T : __BuiltinType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_quad) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
+[ForceInline] public vector<T,N> subgroupQuadSwapVertical(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     return QuadReadAcrossY(value);
 }
 
-macroAnyVecGenericBuiltIn
-glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_quad)
-spirv_caps_shader_subgroup(1.3)
-[ForceInline] public macroAnyVec subgroupQuadSwapDiagonal(macroAnyVec value)
+__generic<T : __BuiltinType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_quad) [require(glsl)] 
+__spirv_version(1.3) [require(spirv)]
+[ForceInline] public vector<T,N> subgroupQuadSwapDiagonal(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
     return QuadReadAcrossDiagonal(value);

@@ -8209,7 +8209,7 @@ __cuda_sm_version(7.0)
 __target_intrinsic(cuda, "_waveMatchMultiple($0, $1)")
 WaveMask WaveMaskMatch(WaveMask mask, matrix<T,N,M> value);
 
-__generic<T : __BuiltinArithmeticType>
+__generic<T : __BuiltinIntegerType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 T WaveMaskPrefixBitAnd(WaveMask mask, T expr)
@@ -8224,7 +8224,7 @@ T WaveMaskPrefixBitAnd(WaveMask mask, T expr)
     }
 }
 
-__generic<T : __BuiltinArithmeticType, let N : int>
+__generic<T : __BuiltinIntegerType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 vector<T,N> WaveMaskPrefixBitAnd(WaveMask mask, vector<T,N> expr)
@@ -8239,12 +8239,12 @@ vector<T,N> WaveMaskPrefixBitAnd(WaveMask mask, vector<T,N> expr)
     }
 }
 
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__generic<T : __BuiltinIntegerType, let N : int, let M : int>
 __target_intrinsic(hlsl, "WaveMultiPrefixBitAnd($1, uint4($0, 0, 0, 0))")
 __target_intrinsic(cuda, "_wavePrefixAndMultiple(_getMultiPrefixMask($0, $1)")
 matrix<T,N,M> WaveMaskPrefixBitAnd(WaveMask mask, matrix<T,N,M> expr);
 
-__generic<T : __BuiltinArithmeticType>
+__generic<T : __BuiltinIntegerType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 T WaveMaskPrefixBitOr(WaveMask mask, T expr)
@@ -8259,7 +8259,7 @@ T WaveMaskPrefixBitOr(WaveMask mask, T expr)
     }
 }
 
-__generic<T : __BuiltinArithmeticType, let N : int>
+__generic<T : __BuiltinIntegerType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 vector<T,N> WaveMaskPrefixBitOr(WaveMask mask, vector<T,N> expr)
@@ -8274,12 +8274,12 @@ vector<T,N> WaveMaskPrefixBitOr(WaveMask mask, vector<T,N> expr)
     }
 }
 
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__generic<T : __BuiltinIntegerType, let N : int, let M : int>
 __target_intrinsic(hlsl, "WaveMultiPrefixBitOr($1, uint4($0, 0, 0, 0))")
 __target_intrinsic(cuda, "_wavePrefixOrMultiple($0, $1)")
 matrix<T,N,M> WaveMaskPrefixBitOr(WaveMask mask, matrix<T,N,M> expr);
 
-__generic<T : __BuiltinArithmeticType>
+__generic<T : __BuiltinIntegerType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 T WaveMaskPrefixBitXor(WaveMask mask, T expr)
@@ -8294,7 +8294,7 @@ T WaveMaskPrefixBitXor(WaveMask mask, T expr)
     }
 }
 
-__generic<T : __BuiltinArithmeticType, let N : int>
+__generic<T : __BuiltinIntegerType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 vector<T,N> WaveMaskPrefixBitXor(WaveMask mask, vector<T,N> expr)
@@ -8309,7 +8309,7 @@ vector<T,N> WaveMaskPrefixBitXor(WaveMask mask, vector<T,N> expr)
     }
 }
 
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__generic<T : __BuiltinIntegerType, let N : int, let M : int>
 __target_intrinsic(hlsl, "WaveMultiPrefixBitXor($1, uint4($0, 0, 0, 0))")
 __target_intrinsic(cuda, "_wavePrefixXorMultiple($0, $1)")
 matrix<T,N,M> WaveMaskPrefixBitXor(WaveMask mask, matrix<T,N,M> expr);
