@@ -243,7 +243,7 @@ target_include_directories(
 #
 slang_add_target(
     .
-    SHARED
+    ${SLANG_BUILD_LIB_TYPE}
     LINK_WITH_PRIVATE
         core
         compiler-core

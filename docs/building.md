@@ -253,6 +253,7 @@ See the [documentation on testing](../tools/slang-test/README.md) for more infor
 | `SLANG_EMBED_STDLIB_SOURCE`       | `TRUE`           | Embed stdlib source in the binary                                  |
 | `SLANG_ENABLE_ASAN`               | `FALSE`          | Enable ASAN (address sanitizer)                                    |
 | `SLANG_ENABLE_FULL_IR_VALIDATION` | `FALSE`          | Enable full IR validation (SLOW!)                                  |
+| `SLANG_BUILD_LIB_TYPE`            | `SHARED`         | How to build the slang library                                     |
 | `SLANG_SLANG_LLVM_FLAVOR`         | `FETCH_BINARY`   | How to set up llvm support                                         |
 | `SLANG_SLANG_LLVM_BINARY_URL`     | System dependent | URL specifying the location of the slang-llvm prebuilt library     |
 | `SLANG_GENERATORS_PATH`           | ``               | Path to an installed `all-generators` target for cross compilation |

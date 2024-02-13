@@ -87,6 +87,18 @@ option(SLANG_EMBED_STDLIB "Build slang with an embedded version of the stdlib")
 option(SLANG_ENABLE_FULL_IR_VALIDATION "Enable full IR validation (SLOW!)")
 option(SLANG_ENABLE_ASAN "Enable ASAN (address sanitizer)")
 
+enum_option(
+    SLANG_BUILD_LIB_TYPE
+    # Default
+    SHARED
+    "How to build the slang lib:"
+    # Options
+    SHARED
+    "Build slang as a shared library (default)"
+    STATIC
+    "Build slang as a static library"
+)
+
 set(SLANG_GENERATORS_PATH
     ""
     CACHE PATH

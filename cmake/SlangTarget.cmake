@@ -241,6 +241,13 @@ function(slang_add_target dir type)
                 PUBLIC "${ARG_EXPORT_MACRO_PREFIX}_DYNAMIC"
                 PRIVATE "${ARG_EXPORT_MACRO_PREFIX}_DYNAMIC_EXPORT"
             )
+        elseif(
+            target_type STREQUAL STATIC_LIBRARY
+        )
+            target_compile_definitions(
+                ${target}
+                PUBLIC "${ARG_EXPORT_MACRO_PREFIX}_STATIC"
+            )
         endif()
     endif()
 
