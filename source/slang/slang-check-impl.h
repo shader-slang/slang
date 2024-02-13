@@ -2589,6 +2589,9 @@ namespace Slang
 
             /// Perform semantic checking on a `modifier` that is being applied to the given `type`
         Val* checkTypeModifier(Modifier* modifier, Type* type);
+    private:
+        // Convert the logic operator expression to not use 'InvokeExpr' type
+        Expr* convertToLogicOperatorExpr(InvokeExpr* expr);
 
     };
 

@@ -2371,11 +2371,73 @@ namespace Slang
         return result;
     }
 
+    Expr* SemanticsExprVisitor::convertToLogicOperatorExpr(InvokeExpr* expr)
+    {
+        LogicOperatorShortCircuitExpr* newExpr = nullptr;
+
+        const ReflectClassInfo& classInfo = expr->functionExpr->getClassInfo();
+        const ASTNodeType astType = ASTNodeType(classInfo.m_classId);
+        if (ASTNodeType::VarExpr == astType)
+        {
+            VarExpr const* varExpr = as<VarExpr const>(expr->functionExpr);
+            if ((varExpr->name->text == "&&") || (varExpr->name->text == "||"))
+            {
+                // Don't use short-circuiting in differentiable function
+                if (getParentDifferentiableAttribute())
+                {
+                    return nullptr;
+                }
+
+                for (auto & arg : expr->arguments)
+                {
+                    arg = CheckTerm(arg);
+                    // We only use short-circuiting in scalar input, will fall back
+                    // to non-short-circuiting in vector input.
+                    if(as<BasicExpressionType>(arg->type.type))
+                    {
+                        arg = coerce(CoercionSite::Argument, m_astBuilder->getBoolType(), arg);
+                    }
+                    else
+                    {
+                        return nullptr;
+                    }
+                }
+
+                expr->functionExpr = CheckTerm(expr->functionExpr);
+                CheckInvokeExprWithCheckedOperands(expr);
+                newExpr = m_astBuilder->create<LogicOperatorShortCircuitExpr>();
+                if (varExpr->name->text == "&&")
+                {
+                   newExpr->flavor = LogicOperatorShortCircuitExpr::Flavor::And;
+                }
+                else
+                {
+                   newExpr->flavor = LogicOperatorShortCircuitExpr::Flavor::Or;
+                }
+
+                newExpr->functionExpr = expr->functionExpr;
+                newExpr->type = m_astBuilder->getBoolType();
+                newExpr->arguments = expr->arguments;
+            }
+        }
+
+        return newExpr;
+    }
+
     Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
     {
         // check the base expression first
         if (!expr->originalFunctionExpr)
             expr->originalFunctionExpr = expr->functionExpr;
+
+        // if the expression is '&&' or '||', we will convert it
+        // to use short-circuit evaluation.
+        Expr* newExpr = convertToLogicOperatorExpr(expr);
+        if (newExpr != nullptr)
+        {
+            return newExpr;
+        }
+
         expr->functionExpr = CheckTerm(expr->functionExpr);
         auto treatAsDifferentiableExpr = m_treatAsDifferentiableExpr;
         m_treatAsDifferentiableExpr = nullptr;
