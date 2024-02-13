@@ -3,7 +3,7 @@
 //TEST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage compute -entry computeMain -target hlsl -DTARGET_HLSL
 
 // not testing cuda due to missing impl
-//T-EST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target hlsl -DTARGET_CUDA 
+//T-EST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda -DTARGET_CUDA 
 // not testing cpp due to missing impl
 //T-EST:SIMPLE(filecheck=CHECK_CPP):  -allow-glsl -stage compute -entry computeMain -target cpp
 
@@ -67,7 +67,7 @@ bool testAllEqual() {
         && testVAllEqual<float, 2>()
         && testVAllEqual<float, 3>()
         && testVAllEqual<float, 4>()
-        && test1AllEqual<double>() // will silently hang on intel IGPUS
+        && test1AllEqual<double>() // WARNING: intel GPU's lack FP64 support
         && testVAllEqual<double, 2>()
         && testVAllEqual<double, 3>()
         && testVAllEqual<double, 4>()

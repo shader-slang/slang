@@ -2903,9 +2903,7 @@ spirv_caps_shader_subgroup(1.3)
         __intrinsic_asm "subgroupBarrier()";
     case spirv:
         spirv_asm {
-            OpControlBarrier Subgroup Subgroup AcquireRelease|SubgroupMemory|ImageMemory|UniformMemory
-        };
-        spirv_asm {
+            OpCapability Shader;
             OpControlBarrier Subgroup Subgroup AcquireRelease|SubgroupMemory|ImageMemory|UniformMemory
         };
     case cpp:
@@ -2928,9 +2926,7 @@ spirv_caps_shader_subgroup(1.3)
         __intrinsic_asm "subgroupMemoryBarrier()";
     case spirv:
         spirv_asm {
-            OpMemoryBarrier Subgroup AcquireRelease|SubgroupMemory|ImageMemory|UniformMemory
-        };
-        spirv_asm {
+            OpCapability Shader;
             OpMemoryBarrier Subgroup AcquireRelease|SubgroupMemory|ImageMemory|UniformMemory
         };
     case cpp:
@@ -2953,6 +2949,7 @@ spirv_caps_shader_subgroup(1.3)
         __intrinsic_asm "subgroupMemoryBarrierBuffer()";
     case spirv:
         spirv_asm {
+            OpCapability Shader;
             OpMemoryBarrier Subgroup AcquireRelease|UniformMemory
         };
     case cpp:
@@ -2997,7 +2994,9 @@ spirv_caps_shader_subgroup(1.3)
         __intrinsic_asm "subgroupMemoryBarrierShared()";
     case spirv:
         spirv_asm {
-            OpMemoryBarrier Subgroup AcquireRelease|SubgroupMemory
+            // SubgroupMemory triggers vulkan validation layer error; 
+            // WorkgroupMemory is the next level of granularity 
+            OpMemoryBarrier Subgroup AcquireRelease|WorkgroupMemory
         };
     case cpp:
         // TODO: cpp
@@ -4302,7 +4301,7 @@ spirv_caps_shader_subgroup(1.3)
         __target_intrinsic "subgroupShuffleUp($0, $1)";
     case spirv:
         return spirv_asm {
-            OpCapability GroupNonUniformBallot; 
+            OpCapability GroupNonUniformShuffleRelative;
             OpGroupNonUniformShuffleUp $$T result Subgroup $value $delta
         };
     case hlsl:
@@ -4326,7 +4325,7 @@ spirv_caps_shader_subgroup(1.3)
         __target_intrinsic "subgroupShuffleDown($0, $1)";
     case spirv:
         return spirv_asm {
-            OpCapability GroupNonUniformBallot; 
+            OpCapability GroupNonUniformShuffleRelative; 
             OpGroupNonUniformShuffleDown $$T result Subgroup $value $delta
         };
     case hlsl:
@@ -4351,7 +4350,7 @@ spirv_caps_shader_subgroup(1.3)
         __target_intrinsic "subgroupShuffleUp($0, $1)";
     case spirv:
         return spirv_asm {
-            OpCapability GroupNonUniformBallot; 
+            OpCapability GroupNonUniformShuffleRelative;
             OpGroupNonUniformShuffleUp $$macroAnyVec result Subgroup $value $delta
         };
     case hlsl:
@@ -4375,7 +4374,7 @@ spirv_caps_shader_subgroup(1.3)
         __target_intrinsic "subgroupShuffleDown($0, $1)";
     case spirv:
         return spirv_asm {
-            OpCapability GroupNonUniformBallot; 
+            OpCapability GroupNonUniformShuffleRelative;
             OpGroupNonUniformShuffleDown $$macroAnyVec result Subgroup $value $delta
         };
     case hlsl:

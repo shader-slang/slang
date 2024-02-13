@@ -4,7 +4,7 @@
 // not testing hlsl due to missing impl
 //T-EST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage compute -entry computeMain -target hlsl -DTARGET_HLSL
 // not testing cuda due to missing impl
-//T-EST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target hlsl -DTARGET_CUDA 
+//T-EST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda -DTARGET_CUDA 
 // not testing cpp due to missing impl
 //T-EST:SIMPLE(filecheck=CHECK_CPP):  -allow-glsl -stage compute -entry computeMain -target cpp
 
@@ -100,7 +100,7 @@ bool testArithmetic() {
         && testVArithmetic<float, 2>()
         && testVArithmetic<float, 3>()
         && testVArithmetic<float, 4>()
-        && test1Arithmetic<double>() // will silently hang on intel IGPUS
+        && test1Arithmetic<double>() // WARNING: intel GPU's lack FP64 support
         && testVArithmetic<double, 2>() 
         && testVArithmetic<double, 3>()
         && testVArithmetic<double, 4>()
@@ -133,8 +133,12 @@ bool testArithmetic() {
 
 void computeMain()
 {
-    outputBuffer.data[0] = testLogical();
-    outputBuffer.data[1] = testArithmetic();
+    outputBuffer.data[0] = true
+        && testLogical()
+        ;
+    outputBuffer.data[1] = true
+        && testArithmetic()
+        ;
 
     // CHECK_GLSL: void main(
     // CHECK_SPV: OpEntryPoint

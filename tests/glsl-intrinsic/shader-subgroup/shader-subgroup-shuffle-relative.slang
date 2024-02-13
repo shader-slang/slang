@@ -4,7 +4,7 @@
 // not testing hlsl due to missing impl
 //T-EST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage compute -entry computeMain -target hlsl -DTARGET_HLSL
 // not testing cuda due to missing impl
-//T-EST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target hlsl -DTARGET_CUDA 
+//T-EST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda -DTARGET_CUDA 
 // not testing cpp due to missing impl
 //T-EST:SIMPLE(filecheck=CHECK_CPP):  -allow-glsl -stage compute -entry computeMain -target cpp
 
@@ -61,7 +61,7 @@ bool testShuffleX() {
         && testVShuffleX<float, 2>()
         && testVShuffleX<float, 3>()
         && testVShuffleX<float, 4>()
-        && test1ShuffleX<double>() // will silently hang on intel IGPUS
+        && test1ShuffleX<double>() // WARNING: intel GPU's lack FP64 support
         && testVShuffleX<double, 2>()
         && testVShuffleX<double, 3>()
         && testVShuffleX<double, 4>()
