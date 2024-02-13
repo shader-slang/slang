@@ -11,6 +11,9 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
 #version 430
 
+// __requireGLSLExtension does not work with GLSL, as a result half/i8/i16/i64 all don't run
+//#define TEST_when_requireGLSLExtension_works
+
 precision highp float;
 precision highp int;
 
@@ -71,26 +74,30 @@ bool testAllEqual() {
         && testVAllEqual<double, 2>()
         && testVAllEqual<double, 3>()
         && testVAllEqual<double, 4>()
-        //&& test1AllEqual<half>() // shader_subgroup_preamble --> __requireGLSLExtension fails
-        //&& testVAllEqual<half, 2>()
-        //&& testVAllEqual<half, 3>()
-        //&& testVAllEqual<half, 4>()
+#ifdef TEST_when_requireGLSLExtension_works
+        && test1AllEqual<half>() 
+        && testVAllEqual<half, 2>()
+        && testVAllEqual<half, 3>()
+        && testVAllEqual<half, 4>()
+#endif // #ifdef TEST_when_requireGLSLExtension_works
         && test1AllEqual<int>()
         && testVAllEqual<int, 2>()
         && testVAllEqual<int, 3>()
         && testVAllEqual<int, 4>()
-        //&& test1AllEqual<int8_t>() // shader_subgroup_preamble --> __requireGLSLExtension fails
-        //&& testVAllEqual<int8_t, 2>()
-        //&& testVAllEqual<int8_t, 3>()
-        //&& testVAllEqual<int8_t, 4>()
-        //&& test1AllEqual<int16_t>() // shader_subgroup_preamble --> __requireGLSLExtension fails
-        //&& testVAllEqual<int16_t, 2>()
-        //&& testVAllEqual<int16_t, 3>()
-        //&& testVAllEqual<int16_t, 4>()
-        //&& test1AllEqual<int64_t>() // shader_subgroup_preamble --> __requireGLSLExtension fails
-        //&& testVAllEqual<int64_t, 2>()
-        //&& testVAllEqual<int64_t, 3>()
-        //&& testVAllEqual<int64_t, 4>()
+#ifdef TEST_when_requireGLSLExtension_works
+        && test1AllEqual<int8_t>() 
+        && testVAllEqual<int8_t, 2>()
+        && testVAllEqual<int8_t, 3>()
+        && testVAllEqual<int8_t, 4>()
+        && test1AllEqual<int16_t>() 
+        && testVAllEqual<int16_t, 2>()
+        && testVAllEqual<int16_t, 3>()
+        && testVAllEqual<int16_t, 4>()
+        && test1AllEqual<int64_t>() 
+        && testVAllEqual<int64_t, 2>()
+        && testVAllEqual<int64_t, 3>()
+        && testVAllEqual<int64_t, 4>()
+#endif // #ifdef TEST_when_requireGLSLExtension_works
         && test1AllEqual<uint>()
         && testVAllEqual<uint, 2>()
         && testVAllEqual<uint, 3>()

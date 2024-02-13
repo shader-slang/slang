@@ -12,7 +12,8 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
 #version 430
 
-//#define TEST_when_doubles_dont_crash
+// __requireGLSLExtension does not work with GLSL, as a result half/i8/i16/i64 all don't run
+//#define TEST_when_requireGLSLExtension_works
 
 precision highp float;
 precision highp int;
@@ -62,7 +63,7 @@ bool testVShuffleX() {
     return true
         && subgroupShuffle(gvec(T(1)), 1) == gvec(T(1))
 #if !defined(TARGET_CUDA) && !defined(TARGET_HLSL)
-           && subgroupShuffleXor(gvec(T(1)), 1) == gvec(T(1))
+        && subgroupShuffleXor(gvec(T(1)), 1) == gvec(T(1))
 #endif // #if !defined(TARGET_CUDA) && !defined(TARGET_HLSL)
         ;
 }
@@ -76,26 +77,30 @@ bool testShuffleX() {
         && testVShuffleX<double, 2>()
         && testVShuffleX<double, 3>()
         && testVShuffleX<double, 4>()
-        //&& test1ShuffleX<half>() // shader_subgroup_preamble --> __requireGLSLExtension fails
-        //&& testVShuffleX<half, 2>()
-        //&& testVShuffleX<half, 3>()
-        //&& testVShuffleX<half, 4>()
+#ifdef TEST_when_requireGLSLExtension_works
+        && test1ShuffleX<half>() 
+        && testVShuffleX<half, 2>()
+        && testVShuffleX<half, 3>()
+        && testVShuffleX<half, 4>()
+#endif // #ifdef TEST_when_requireGLSLExtension_works
         && test1ShuffleX<int>()
         && testVShuffleX<int, 2>()
         && testVShuffleX<int, 3>()
         && testVShuffleX<int, 4>()
-        //&& test1ShuffleX<int8_t>() // shader_subgroup_preamble --> __requireGLSLExtension fails
-        //&& testVShuffleX<int8_t, 2>()
-        //&& testVShuffleX<int8_t, 3>()
-        //&& testVShuffleX<int8_t, 4>()
-        //&& test1ShuffleX<int16_t>() // shader_subgroup_preamble --> __requireGLSLExtension fails
-        //&& testVShuffleX<int16_t, 2>()
-        //&& testVShuffleX<int16_t, 3>()
-        //&& testVShuffleX<int16_t, 4>()
-        //&& test1ShuffleX<int64_t>() // shader_subgroup_preamble --> __requireGLSLExtension fails
-        //&& testVShuffleX<int64_t, 2>()
-        //&& testVShuffleX<int64_t, 3>()
-        //&& testVShuffleX<int64_t, 4>()
+#ifdef TEST_when_requireGLSLExtension_works
+        && test1ShuffleX<int8_t>() 
+        && testVShuffleX<int8_t, 2>()
+        && testVShuffleX<int8_t, 3>()
+        && testVShuffleX<int8_t, 4>()
+        && test1ShuffleX<int16_t>() 
+        && testVShuffleX<int16_t, 2>()
+        && testVShuffleX<int16_t, 3>()
+        && testVShuffleX<int16_t, 4>()
+        && test1ShuffleX<int64_t>() 
+        && testVShuffleX<int64_t, 2>()
+        && testVShuffleX<int64_t, 3>()
+        && testVShuffleX<int64_t, 4>()
+#endif // #ifdef TEST_when_requireGLSLExtension_works
         && test1ShuffleX<uint>()
         && testVShuffleX<uint, 2>()
         && testVShuffleX<uint, 3>()

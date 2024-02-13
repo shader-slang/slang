@@ -12,6 +12,9 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
 #version 430
 
+// __requireGLSLExtension does not work with GLSL, as a result half/i8/i16/i64 all don't run
+//#define TEST_when_requireGLSLExtension_works
+
 precision highp float;
 precision highp int;
 
@@ -49,18 +52,20 @@ bool testLogical() {
         && testVLogical<int, 2>()
         && testVLogical<int, 3>()
         && testVLogical<int, 4>()
-        //&& test1Logical<int8_t>()
-        //&& testVLogical<int8_t, 2>()
-        //&& testVLogical<int8_t, 3>()
-        //&& testVLogical<int8_t, 4>()
-        //&& test1Logical<int16_t>()
-        //&& testVLogical<int16_t, 2>()
-        //&& testVLogical<int16_t, 3>()
-        //&& testVLogical<int16_t, 4>()
-        //&& test1Logical<int64_t>()
-        //&& testVLogical<int64_t, 2>()
-        //&& testVLogical<int64_t, 3>()
-        //&& testVLogical<int64_t, 4>()
+#ifdef TEST_when_requireGLSLExtension_works
+        && test1Logical<int8_t>()
+        && testVLogical<int8_t, 2>()
+        && testVLogical<int8_t, 3>()
+        && testVLogical<int8_t, 4>()
+        && test1Logical<int16_t>()
+        && testVLogical<int16_t, 2>()
+        && testVLogical<int16_t, 3>()
+        && testVLogical<int16_t, 4>()
+        && test1Logical<int64_t>()
+        && testVLogical<int64_t, 2>()
+        && testVLogical<int64_t, 3>()
+        && testVLogical<int64_t, 4>()
+#endif // #ifdef TEST_when_requireGLSLExtension_works
         && test1Logical<uint>()
         && testVLogical<uint, 2>()
         && testVLogical<uint, 3>()
@@ -104,26 +109,30 @@ bool testArithmetic() {
         && testVArithmetic<double, 2>() 
         && testVArithmetic<double, 3>()
         && testVArithmetic<double, 4>()
-        //&& test1Arithmetic<half>() // shader_subgroup_preamble --> __requireGLSLExtension fails
-        //&& testVArithmetic<half, 2>()
-        //&& testVArithmetic<half, 3>()
-        //&& testVArithmetic<half, 4>()
+#ifdef TEST_when_requireGLSLExtension_works
+        && test1Arithmetic<half>() 
+        && testVArithmetic<half, 2>()
+        && testVArithmetic<half, 3>()
+        && testVArithmetic<half, 4>()
+#endif // #ifdef TEST_when_requireGLSLExtension_works
         && test1Arithmetic<int>()
         && testVArithmetic<int, 2>()
         && testVArithmetic<int, 3>()
         && testVArithmetic<int, 4>()
-        //&& test1Arithmetic<int8_t>() // shader_subgroup_preamble --> __requireGLSLExtension fails
-        //&& testVArithmetic<int8_t, 2>()
-        //&& testVArithmetic<int8_t, 3>()
-        //&& testVArithmetic<int8_t, 4>()
-        //&& test1Arithmetic<int16_t>() // shader_subgroup_preamble --> __requireGLSLExtension fails
-        //&& testVArithmetic<int16_t, 2>()
-        //&& testVArithmetic<int16_t, 3>()
-        //&& testVArithmetic<int16_t, 4>()
-        //&& test1Arithmetic<int64_t>() // shader_subgroup_preamble --> __requireGLSLExtension fails
-        //&& testVArithmetic<int64_t, 2>()
-        //&& testVArithmetic<int64_t, 3>()
-        //&& testVArithmetic<int64_t, 4>()
+#ifdef TEST_when_requireGLSLExtension_works
+        && test1Arithmetic<int8_t>() 
+        && testVArithmetic<int8_t, 2>()
+        && testVArithmetic<int8_t, 3>()
+        && testVArithmetic<int8_t, 4>()
+        && test1Arithmetic<int16_t>() 
+        && testVArithmetic<int16_t, 2>()
+        && testVArithmetic<int16_t, 3>()
+        && testVArithmetic<int16_t, 4>()
+        && test1Arithmetic<int64_t>() 
+        && testVArithmetic<int64_t, 2>()
+        && testVArithmetic<int64_t, 3>()
+        && testVArithmetic<int64_t, 4>()
+#endif // #ifdef TEST_when_requireGLSLExtension_works
         && test1Arithmetic<uint>()
         && testVArithmetic<uint, 2>()
         && testVArithmetic<uint, 3>()

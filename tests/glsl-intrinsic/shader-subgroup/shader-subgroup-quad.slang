@@ -11,6 +11,9 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
 #version 430
 
+// __requireGLSLExtension does not work with GLSL, as a result half/i8/i16/i64 all don't run
+//#define TEST_when_requireGLSLExtension_works
+
 precision highp float;
 precision highp int;
 
@@ -73,26 +76,30 @@ bool testQuadSwapX() {
         && testVQuadX<double, 2>()
         && testVQuadX<double, 3>()
         && testVQuadX<double, 4>()
-        //&& test1QuadX<half>() // shader_subgroup_preamble --> __requireGLSLExtension fails
-        //&& testVQuadX<half, 2>()
-        //&& testVQuadX<half, 3>()
-        //&& testVQuadX<half, 4>()
+#ifdef TEST_when_requireGLSLExtension_works
+        && test1QuadX<half>() 
+        && testVQuadX<half, 2>()
+        && testVQuadX<half, 3>()
+        && testVQuadX<half, 4>()
+#endif // #ifdef TEST_when_requireGLSLExtension_works
         && test1QuadX<int>()
         && testVQuadX<int, 2>()
         && testVQuadX<int, 3>()
         && testVQuadX<int, 4>()
-        //&& test1QuadX<int8_t>() // shader_subgroup_preamble --> __requireGLSLExtension fails
-        //&& testVQuadX<int8_t, 2>()
-        //&& testVQuadX<int8_t, 3>()
-        //&& testVQuadX<int8_t, 4>()
-        //&& test1QuadX<int16_t>() // shader_subgroup_preamble --> __requireGLSLExtension fails
-        //&& testVQuadX<int16_t, 2>()
-        //&& testVQuadX<int16_t, 3>()
-        //&& testVQuadX<int16_t, 4>()
-        //&& test1QuadX<int64_t>() // shader_subgroup_preamble --> __requireGLSLExtension fails
-        //&& testVQuadX<int64_t, 2>()
-        //&& testVQuadX<int64_t, 3>()
-        //&& testVQuadX<int64_t, 4>()
+#ifdef TEST_when_requireGLSLExtension_works
+        && test1QuadX<int8_t>() 
+        && testVQuadX<int8_t, 2>()
+        && testVQuadX<int8_t, 3>()
+        && testVQuadX<int8_t, 4>()
+        && test1QuadX<int16_t>() 
+        && testVQuadX<int16_t, 2>()
+        && testVQuadX<int16_t, 3>()
+        && testVQuadX<int16_t, 4>()
+        && test1QuadX<int64_t>() 
+        && testVQuadX<int64_t, 2>()
+        && testVQuadX<int64_t, 3>()
+        && testVQuadX<int64_t, 4>()
+#endif // #ifdef TEST_when_requireGLSLExtension_works
         && test1QuadX<uint>()
         && testVQuadX<uint, 2>()
         && testVQuadX<uint, 3>()

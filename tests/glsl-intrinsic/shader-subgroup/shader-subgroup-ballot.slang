@@ -14,6 +14,9 @@
 // breaks on Nvidia GPU by returning 0 which is trivially wrong (works on Intel Iris Xe)
 //#define TEST_when_glsl_subgroupBallotExclusiveBitCount_is_not_bugged
 
+// __requireGLSLExtension does not work with GLSL, as a result half/i8/i16/i64 all don't run
+//#define TEST_when_requireGLSLExtension_works
+
 precision highp float;
 precision highp int;
 
@@ -72,26 +75,31 @@ bool testBroadcastX() {
         && testVBroadcastX<double, 2>()
         && testVBroadcastX<double, 3>()
         && testVBroadcastX<double, 4>()
-        //&& test1BroadcastX<half>() // shader_subgroup_preamble --> __requireGLSLExtension fails
-        //&& testVBroadcastX<half, 2>()
-        //&& testVBroadcastX<half, 3>()
-        //&& testVBroadcastX<half, 4>()
+#ifdef TEST_when_requireGLSLExtension_works
+        && test1BroadcastX<half>() 
+        && testVBroadcastX<half, 2>()
+        && testVBroadcastX<half, 3>()
+        && testVBroadcastX<half, 4>()
+#endif // #ifdef TEST_when_requireGLSLExtension_works
         && test1BroadcastX<int>()
         && testVBroadcastX<int, 2>()
         && testVBroadcastX<int, 3>()
         && testVBroadcastX<int, 4>()
-        //&& test1BroadcastX<int8_t>() // shader_subgroup_preamble --> __requireGLSLExtension fails
-        //&& testVBroadcastX<int8_t, 2>()
-        //&& testVBroadcastX<int8_t, 3>()
-        //&& testVBroadcastX<int8_t, 4>()
-        //&& test1BroadcastX<int16_t>() // shader_subgroup_preamble --> __requireGLSLExtension fails
-        //&& testVBroadcastX<int16_t, 2>()
-        //&& testVBroadcastX<int16_t, 3>()
-        //&& testVBroadcastX<int16_t, 4>()
-        //&& test1BroadcastX<int64_t>() // shader_subgroup_preamble --> __requireGLSLExtension fails
-        //&& testVBroadcastX<int64_t, 2>()
-        //&& testVBroadcastX<int64_t, 3>()
-        //&& testVBroadcastX<int64_t, 4>()
+#ifdef TEST_when_requireGLSLExtension_works
+        && test1BroadcastX<int8_t>() 
+        && testVBroadcastX<int8_t, 2>()
+        && testVBroadcastX<int8_t, 3>()
+        && testVBroadcastX<int8_t, 4>()
+        && test1BroadcastX<int16_t>() 
+        && testVBroadcastX<int16_t, 2>()
+        && testVBroadcastX<int16_t, 3>()
+        && testVBroadcastX<int16_t, 4>()
+        && test1BroadcastX<int64_t>() 
+        && testVBroadcastX<int64_t, 2>()
+        && testVBroadcastX<int64_t, 3>()
+        && testVBroadcastX<int64_t, 4>()
+#endif // #ifdef TEST_when_requireGLSLExtension_works
+
         && test1BroadcastX<uint>()
         && testVBroadcastX<uint, 2>()
         && testVBroadcastX<uint, 3>()
