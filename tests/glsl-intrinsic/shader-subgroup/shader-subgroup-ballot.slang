@@ -64,10 +64,10 @@ bool testBroadcastX() {
         && testVBroadcastX<float, 2>()
         && testVBroadcastX<float, 3>()
         && testVBroadcastX<float, 4>()
-        //&& test1BroadcastX<double>() // hang
-        //&& testVBroadcastX<double, 2>()
-        //&& testVBroadcastX<double, 3>()
-        //&& testVBroadcastX<double, 4>()
+        && test1BroadcastX<double>() // will silently hang on intel IGPUS
+        && testVBroadcastX<double, 2>()
+        && testVBroadcastX<double, 3>()
+        && testVBroadcastX<double, 4>()
         //&& test1BroadcastX<half>() // shader_subgroup_preamble --> __requireGLSLExtension fails
         //&& testVBroadcastX<half, 2>()
         //&& testVBroadcastX<half, 3>()

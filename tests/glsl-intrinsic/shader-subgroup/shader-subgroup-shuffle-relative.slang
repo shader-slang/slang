@@ -61,10 +61,10 @@ bool testShuffleX() {
         && testVShuffleX<float, 2>()
         && testVShuffleX<float, 3>()
         && testVShuffleX<float, 4>()
-        //&& test1ShuffleX<double>() // hang
-        //&& testVShuffleX<double, 2>()
-        //&& testVShuffleX<double, 3>()
-        //&& testVShuffleX<double, 4>()
+        && test1ShuffleX<double>() // will silently hang on intel IGPUS
+        && testVShuffleX<double, 2>()
+        && testVShuffleX<double, 3>()
+        && testVShuffleX<double, 4>()
         //&& test1ShuffleX<half>() // shader_subgroup_preamble --> __requireGLSLExtension fails
         //&& testVShuffleX<half, 2>()
         //&& testVShuffleX<half, 3>()

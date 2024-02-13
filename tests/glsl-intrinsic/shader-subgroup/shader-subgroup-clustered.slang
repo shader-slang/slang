@@ -100,10 +100,10 @@ bool testArithmetic() {
         && testVArithmetic<float, 2>()
         && testVArithmetic<float, 3>()
         && testVArithmetic<float, 4>()
-        //&& test1Arithmetic<double>() // hang
-        //&& testVArithmetic<double, 2>() 
-        //&& testVArithmetic<double, 3>()
-        //&& testVArithmetic<double, 4>()
+        && test1Arithmetic<double>() // will silently hang on intel IGPUS
+        && testVArithmetic<double, 2>() 
+        && testVArithmetic<double, 3>()
+        && testVArithmetic<double, 4>()
         //&& test1Arithmetic<half>() // shader_subgroup_preamble --> __requireGLSLExtension fails
         //&& testVArithmetic<half, 2>()
         //&& testVArithmetic<half, 3>()

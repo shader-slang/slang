@@ -67,10 +67,10 @@ bool testAllEqual() {
         && testVAllEqual<float, 2>()
         && testVAllEqual<float, 3>()
         && testVAllEqual<float, 4>()
-        //&& test1AllEqual<double>() // hang
-        //&& testVAllEqual<double, 2>()
-        //&& testVAllEqual<double, 3>()
-        //&& testVAllEqual<double, 4>()
+        && test1AllEqual<double>() // will silently hang on intel IGPUS
+        && testVAllEqual<double, 2>()
+        && testVAllEqual<double, 3>()
+        && testVAllEqual<double, 4>()
         //&& test1AllEqual<half>() // shader_subgroup_preamble --> __requireGLSLExtension fails
         //&& testVAllEqual<half, 2>()
         //&& testVAllEqual<half, 3>()

@@ -2,11 +2,13 @@
 //TEST:SIMPLE(filecheck=CHECK_SPV):  -allow-glsl -stage compute -entry computeMain -target spirv
 //TEST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage compute -entry computeMain -target hlsl -DTARGET_HLSL
 //TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target hlsl -DTARGET_CUDA 
+
 // not testing cpp due to missing impl
 //T-EST:SIMPLE(filecheck=CHECK_CPP):  -allow-glsl -stage compute -entry computeMain -target cpp
 
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
+
 #version 430
 
 //#define TEST_when_glsl_subgroupInclusiveXor_is_not_bugged
@@ -56,7 +58,7 @@ bool testVLogical() {
         && subgroupInclusiveOr(gvec(T(1))) == gvec(T(1))
 #ifdef TEST_when_glsl_subgroupInclusiveXor_is_not_bugged
         && subgroupInclusiveXor(gvec(T(1))) == gvec(T(0))
-#endif // #ifdef TEST_when_glsl_subgroupInclusiveXor_is_not_buggeds
+#endif // #ifdef TEST_when_glsl_subgroupInclusiveXor_is_not_bugged
         && subgroupExclusiveAnd(gvec(T(1))) == gvec(T(1))
         && subgroupExclusiveOr(gvec(T(1))) == gvec(T(1))
         && subgroupExclusiveXor(gvec(T(1))) == gvec(T(1))
@@ -97,7 +99,7 @@ __generic<T : __BuiltinArithmeticType>
 bool test1Arithmetic() {
     return true
         && subgroupAdd(T(1)) == T(local_size_x_v) // 32
-           && subgroupMul(T(1)) == T(1)
+        && subgroupMul(T(1)) == T(1)
         && subgroupMin(T(1)) == T(1)
         && subgroupMin(T(1)) == T(1)
         && subgroupExclusiveAdd(T(1)) == T(3)
@@ -106,7 +108,7 @@ bool test1Arithmetic() {
         && subgroupExclusiveMax(T(1)) == T(1)
 #ifdef TEST_when_glsl_subgroupInclusiveAdd_is_not_bugged
            && subgroupInclusiveAdd(T(1)) == T(4)
-#endif // #ifdef TEST_when_glsl_subgroupInclusiveAdd_is_not_buggeds
+#endif // #ifdef TEST_when_glsl_subgroupInclusiveAdd_is_not_bugged
         && subgroupInclusiveMul(T(1)) == T(1)
         && subgroupInclusiveMin(T(1)) == T(1)
         && subgroupInclusiveMax(T(1)) == T(1)
@@ -140,10 +142,10 @@ bool testArithmetic() {
         && testVArithmetic<float, 2>()
         && testVArithmetic<float, 3>()
         && testVArithmetic<float, 4>()
-        //&& test1Arithmetic<double>() // hang
-        //&& testVArithmetic<double, 2>()
-        //&& testVArithmetic<double, 3>()
-        //&& testVArithmetic<double, 4>()
+        && test1Arithmetic<double>() // will silently hang on intel IGPUS
+        && testVArithmetic<double, 2>()
+        && testVArithmetic<double, 3>()
+        && testVArithmetic<double, 4>()
         //&& test1Arithmetic<half>()
         //&& testVArithmetic<half, 2>()
         //&& testVArithmetic<half, 3>()

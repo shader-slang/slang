@@ -72,10 +72,10 @@ bool testQuadSwapX() {
         && testVQuadX<float, 2>()
         && testVQuadX<float, 3>()
         && testVQuadX<float, 4>()
-        //&& test1QuadX<double>() // hang
-        //&& testVQuadX<double, 2>()
-        //&& testVQuadX<double, 3>()
-        //&& testVQuadX<double, 4>()
+        && test1QuadX<double>() // will silently hang on intel IGPUS
+        && testVQuadX<double, 2>()
+        && testVQuadX<double, 3>()
+        && testVQuadX<double, 4>()
         //&& test1QuadX<half>() // shader_subgroup_preamble --> __requireGLSLExtension fails
         //&& testVQuadX<half, 2>()
         //&& testVQuadX<half, 3>()

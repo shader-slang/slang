@@ -2841,15 +2841,20 @@ public uint rayQueryGetIntersectionTypeEXT(rayQueryEXT q, bool committed)
 __generic<T : __BuiltinType>
 void shader_subgroup_preamble() {
     // checks needed for shader_subgroup functions; __requireGLSLExtension does not work, the call fails to find the OP
-    //__target_switch
-    //{
-    //case glsl:
-        //if (__type_equals<T, half>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
-        //if (__type_equals<T, uint8_t>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_int8");
-        //if (__type_equals<T, uint16_t>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_int16");
-        //if (__type_equals<T, uint64_t>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_int64");
-        //return;
-    //}
+    __target_switch
+    {
+    case glsl:
+        if (__type_equals<T, half>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__type_equals<T, uint8_t>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_int8");
+        if (__type_equals<T, uint16_t>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_int16");
+        if (__type_equals<T, uint64_t>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_int64");
+        return;
+    case spirv:
+    case cpp:
+    case cuda:
+    case cpp:
+        return;
+    }
     return;
 } 
 
@@ -3517,7 +3522,6 @@ spirv_caps_shader_subgroup(1.3)
 
 // GL_KHR_shader_subgroup_arithmetic
 //note: this is a seperate section because it is so huge that the only reasonable way to implement this is to just regex replace code
-
 
 macroAnyVecGenericArithmetic
 glsl_caps_shader_subgroup(GL_KHR_shader_subgroup_arithmetic)
