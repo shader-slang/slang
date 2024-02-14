@@ -197,6 +197,7 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     val += height;
     val += elements;
 
+    // For DX11: fxc 47.0: (95): error X4598:  The array element count of GetDimensions on TextureCubeArray objects is unavailable on cs_5_0
     /*tCubeArray.GetDimensions(fwidth, fheight, felements);
     val += fwidth;
     val += fheight;
@@ -261,7 +262,7 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     val += t1D.SampleGrad(samplerState, 0.0f, _ddx, _ddy);
     val += t2D.SampleGrad(samplerState, float2(u, u), float2(_ddx, _ddx), float2(_ddy, _ddy));
     val += t3D.SampleGrad(samplerState, float3(u, u, u), float3(_ddx, _ddx, _ddx), float3(_ddy, _ddy, _ddy));
-    //val += tCube.SampleGrad(samplerState, normalize(float3(u, 1 - u, u)), float3(_ddx, _ddx), float3(_ddy, _ddy));
+    //val += tCube.SampleGrad(samplerState, normalize(float3(u, 1 - u, u)), float3(_ddx, _ddx, _ddx), float3(_ddy, _ddy, _ddy));
         // This should be float3 for the ddx/ddy, but currently it's defined in slang as float2 and either way does not run
 
     val += t1DArray.SampleGrad(samplerState, float2(0.0f, 0.0f), _ddx, _ddy);
