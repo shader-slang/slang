@@ -96,7 +96,7 @@ option(SLANG_ENABLE_TESTS "Enable test targets, requires SLANG_ENABLE_GFX, SLANG
 option(SLANG_ENABLE_EXAMPLES "Enable example targets, requires SLANG_ENABLE_GFX" ON)
 
 enum_option(
-    SLANG_BUILD_LIB_TYPE
+    SLANG_LIB_TYPE 
     # Default
     SHARED
     "How to build the slang lib:"

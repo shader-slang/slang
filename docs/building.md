@@ -260,7 +260,7 @@ See the [documentation on testing](../tools/slang-test/README.md) for more infor
 | `SLANG_ENABLE_SLANG_GLSLANG`      | `TRUE`           | Enable glslang dependency and slang-glslang wrapper target         |
 | `SLANG_ENABLE_TESTS`              | `TRUE`           | Enable test targets, requires SLANG_ENABLE_GFX, SLANG_ENABLE_SLANGD and SLANG_ENABLE_SLANGRT |
 | `SLANG_ENABLE_EXAMPLES`           | `TRUE`           | Enable example targets, requires SLANG_ENABLE_GFX                  |
-| `SLANG_BUILD_LIB_TYPE`            | `SHARED`         | How to build the slang library                                     |
+| `SLANG_LIB_TYPE`                  | `SHARED`         | How to build the slang library                                     |
 | `SLANG_SLANG_LLVM_FLAVOR`         | `FETCH_BINARY`   | How to set up llvm support                                         |
 | `SLANG_SLANG_LLVM_BINARY_URL`     | System dependent | URL specifying the location of the slang-llvm prebuilt library     |
 | `SLANG_GENERATORS_PATH`           | ``               | Path to an installed `all-generators` target for cross compilation |
