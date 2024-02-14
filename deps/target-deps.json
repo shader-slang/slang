@@ -6,19 +6,19 @@
                 "name" : "slang-llvm",
                 "baseUrl" : "https://github.com/shader-slang/slang-llvm/releases/download/v13.x-42/",
                 "optional" : true,
-                "packages" :
+                "packages" : 
                 {
                     "windows-x86_64" : { "type" : "url", "path" : "slang-llvm-13.x-42-win64.zip" },
                     "windows-x86" : { "type": "url", "path" : "slang-llvm-13.x-42-win32.zip" },
                     "linux-x86_64" : { "type": "url", "path" : "slang-llvm-v13.x-42-linux-x86_64-release.zip" },
                     "macosx-x86_64" : { "type": "url", "path" : "slang-llvm-v13.x-42-macosx-x86_64-release.zip" }
-                }
+                } 
             },
             {
                 "name" : "slang-glslang",
                 "baseUrl" : "https://github.com/shader-slang/slang-glslang/releases/download/v13.0.0.x-h/slang-glslang-13.0.0.x-h-",
                 "optional" : true,
-                "packages" :
+                "packages" : 
                 {
                     "windows-x86_64" : { "type" : "url", "path" : "windows-x64-release.zip" },
                     "windows-x86" : { "type": "url", "path" : "windows-win32-release.zip" },
@@ -29,19 +29,9 @@
                 }
             },
             {
-                "name" : "falcor-perf-test",
-                "baseUrl" : "https://github.com/shader-slang/falcor-compile-perf-test/releases/download/v0.0.1/falcor_perf_test-v0.0.1-",
-                "optional" : true,
-                "packages" :
-                {
-                    "windows-x86_64" : { "type" : "url", "path" : "win-64.zip" },
-                    "linux-x86_64" : { "type": "url", "path" : "linux-x86_64.zip" }
-                }
-            },
-            {
                 "name" : "dxc",
                 "type" : "submodule"
-            },
+            },                
             {
                 "name" : "vulkan",
                 "type" : "submodule"
@@ -94,7 +84,7 @@
                 "name" : "glslang",
                 "type" : "submodule"
             },
-            {
+            { 
                 "name" : "glm",
                 "type" : "submodule"
             }
