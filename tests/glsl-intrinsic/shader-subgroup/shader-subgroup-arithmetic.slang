@@ -11,10 +11,6 @@
 
 #version 430
 
-// breaks on all gpu's tested (Nvidia & Intel) -- GLSL does not work, SPIR-V does work
-//#define TEST_when_glsl_subgroupInclusiveXor_is_not_bugged
-//#define TEST_when_glsl_subgroupInclusiveAdd_is_not_bugged
-
 // __requireGLSLExtension does not add an extension specified with GLSL, as a result half/i8/i16/i64 all don't run and complain about missing extension
 //#define TEST_when_requireGLSLExtension_works 
 
@@ -36,9 +32,7 @@ bool test1Logical() {
         && subgroupXor(T(1)) == T(0) 
         && subgroupInclusiveAnd(T(1)) == T(1)
         && subgroupInclusiveOr(T(1)) == T(1)
-#ifdef TEST_when_glsl_subgroupInclusiveXor_is_not_bugged
         && subgroupInclusiveXor(T(1)) == T(0)
-#endif // #ifdef TEST_when_glsl_subgroupInclusiveXor_is_not_bugged
         && subgroupExclusiveAnd(T(1)) == T(1)
         && subgroupExclusiveOr(T(1)) == T(1)
         && subgroupExclusiveXor(T(1)) == T(1)
@@ -57,9 +51,7 @@ bool testVLogical() {
         && subgroupXor(gvec(T(1))) == gvec(T(0))
         && subgroupInclusiveAnd(gvec(T(1))) == gvec(T(1))
         && subgroupInclusiveOr(gvec(T(1))) == gvec(T(1))
-#ifdef TEST_when_glsl_subgroupInclusiveXor_is_not_bugged
         && subgroupInclusiveXor(gvec(T(1))) == gvec(T(0))
-#endif // #ifdef TEST_when_glsl_subgroupInclusiveXor_is_not_bugged
         && subgroupExclusiveAnd(gvec(T(1))) == gvec(T(1))
         && subgroupExclusiveOr(gvec(T(1))) == gvec(T(1))
         && subgroupExclusiveXor(gvec(T(1))) == gvec(T(1))

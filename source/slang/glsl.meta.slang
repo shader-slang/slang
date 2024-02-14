@@ -2837,14 +2837,16 @@ void shader_subgroup_preamble() {
     __target_switch
     {
     case glsl:
-        if (__type_equals<T, half>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
-        if (__type_equals<T, uint8_t>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_int8");
-        if (__type_equals<T, uint16_t>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_int16");
-        if (__type_equals<T, uint64_t>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_int64");
+        // unimplemented intrinsic error with `__requireGLSLExtension` 
+        //if (__type_equals<T, half>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        //if (__type_equals<T, uint8_t>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_int8");
+        //if (__type_equals<T, uint16_t>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_int16");
+        //if (__type_equals<T, uint64_t>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_int64");
         return;
     case spirv:
         return spirv_asm {};
     }
+    return;
 } 
 
 // GL_KHR_shader_subgroup_basic Built-in Variables 
@@ -3169,7 +3171,7 @@ __spirv_version(1.3) [require(spirv)]
     __target_switch
     {
     case glsl:
-        __target_intrinsic "subgroupInclusiveAdd($0)";
+        __intrinsic_asm "subgroupInclusiveAdd($0)";
     case spirv:
         if (__isFloat<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFAdd $$T result Subgroup InclusiveScan $value};
@@ -3178,7 +3180,7 @@ __spirv_version(1.3) [require(spirv)]
         else return value;
 
     }
-    return value;
+
 }
 
 __generic<T : __BuiltinArithmeticType>
@@ -3190,7 +3192,7 @@ __spirv_version(1.3) [require(spirv)]
     __target_switch
     {
     case glsl:
-        __target_intrinsic "subgroupInclusiveMul($0)";
+        __intrinsic_asm "subgroupInclusiveMul($0)";
     case spirv:
         if (__isFloat<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMul $$T result Subgroup InclusiveScan $value};
@@ -3199,7 +3201,7 @@ __spirv_version(1.3) [require(spirv)]
         else return value;
 
     }
-    return value;
+
 }
 
 __generic<T : __BuiltinArithmeticType>
@@ -3211,7 +3213,7 @@ __spirv_version(1.3) [require(spirv)]
     __target_switch
     {
     case glsl:
-        __target_intrinsic "subgroupInclusiveMin($0)";
+        __intrinsic_asm "subgroupInclusiveMin($0)";
     case spirv:
         if (__isFloat<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMin $$T result Subgroup InclusiveScan $value};
@@ -3222,7 +3224,7 @@ __spirv_version(1.3) [require(spirv)]
         else return value;
 
     }
-    return value;
+
 }
 
 __generic<T : __BuiltinArithmeticType>
@@ -3234,7 +3236,7 @@ __spirv_version(1.3) [require(spirv)]
     __target_switch
     {
     case glsl:
-        __target_intrinsic "subgroupInclusiveMax($0)";
+        __intrinsic_asm "subgroupInclusiveMax($0)";
     case spirv:
         if (__isFloat<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMax $$T result Subgroup InclusiveScan $value};
@@ -3245,7 +3247,7 @@ __spirv_version(1.3) [require(spirv)]
         else return value;
 
     }
-    return value;
+
 }
 
 __generic<T : __BuiltinLogicalType>
@@ -3256,14 +3258,22 @@ __spirv_version(1.3) [require(spirv)]
     shader_subgroup_preamble<T>();
     __target_switch
     {
-    case glsl:
-        __target_intrinsic "subgroupInclusiveAnd($0)";
+    case glsl: __intrinsic_asm "subgroupInclusiveAnd($0)";
     case spirv:
-        if (__isBool<T>()) return spirv_asm { OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalAnd $$T result Subgroup InclusiveScan $value};
-        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseAnd $$T result Subgroup InclusiveScan $value};
+        if (__isBool<T>()) {
+            return spirv_asm {
+                OpCapability GroupNonUniformArithmetic;
+                OpGroupNonUniformLogicalAnd $$T result Subgroup InclusiveScan $value
+            };
+        }
+        else {
+            return spirv_asm {
+                OpCapability GroupNonUniformArithmetic;
+                OpGroupNonUniformBitwiseAnd $$T result Subgroup InclusiveScan $value
+            };
+        }
 
     }
-    return value;
 }
 
 __generic<T : __BuiltinLogicalType>
@@ -3274,14 +3284,22 @@ __spirv_version(1.3) [require(spirv)]
     shader_subgroup_preamble<T>();
     __target_switch
     {
-    case glsl:
-        __target_intrinsic "subgroupInclusiveOr($0)";
+    case glsl: __intrinsic_asm "subgroupInclusiveOr($0)";
     case spirv:
-        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalOr $$T result Subgroup InclusiveScan $value};
-        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseOr $$T result Subgroup InclusiveScan $value};
+        if (__isBool<T>()) {
+            return spirv_asm {
+                OpCapability GroupNonUniformArithmetic;
+                OpGroupNonUniformLogicalOr $$T result Subgroup InclusiveScan $value
+            };
+        }
+        else {
+            return spirv_asm {
+                OpCapability GroupNonUniformArithmetic;
+                OpGroupNonUniformBitwiseOr $$T result Subgroup InclusiveScan $value
+            };
+        }
 
     }
-    return value;
 }
 
 __generic<T : __BuiltinLogicalType>
@@ -3293,13 +3311,14 @@ __spirv_version(1.3) [require(spirv)]
     __target_switch
     {
     case glsl:
-        __target_intrinsic "subgroupInclusiveXor($0)";
+        __intrinsic_asm "subgroupInclusiveXor($0)";
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalXor $$T result Subgroup InclusiveScan $value};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseXor $$T result Subgroup InclusiveScan $value};
 
     }
-    return value;
+
+    return T(0);
 }
 
 __generic<T : __BuiltinArithmeticType>
@@ -3330,7 +3349,7 @@ __spirv_version(1.3) [require(spirv)]
     __target_switch
     {
     case glsl:
-        __target_intrinsic "subgroupExclusiveMin($0)";
+        __intrinsic_asm "subgroupExclusiveMin($0)";
     case spirv:
         if (__isFloat<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMin $$T result Subgroup ExclusiveScan $value};
@@ -3341,7 +3360,7 @@ __spirv_version(1.3) [require(spirv)]
         else return value;
 
     }
-    return value;
+
 }
 
 __generic<T : __BuiltinArithmeticType>
@@ -3353,7 +3372,7 @@ __spirv_version(1.3) [require(spirv)]
     __target_switch
     {
     case glsl:
-        __target_intrinsic "subgroupExclusiveMax($0)";
+        __intrinsic_asm "subgroupExclusiveMax($0)";
     case spirv:
         if (__isFloat<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMax $$T result Subgroup ExclusiveScan $value};
@@ -3364,7 +3383,7 @@ __spirv_version(1.3) [require(spirv)]
         else return value;
 
     }
-    return value;
+
 }
 
 __generic<T : __BuiltinLogicalType>
@@ -3542,15 +3561,15 @@ __spirv_version(1.3) [require(spirv)]
     __target_switch
     {
     case glsl:
-        __target_intrinsic "subgroupInclusiveAdd($0)";
+        __intrinsic_asm "subgroupInclusiveAdd($0)";
     case spirv:
         if (__isFloat<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFAdd $$vector<T,N> result Subgroup InclusiveScan $value};
         else if (__isInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIAdd $$vector<T,N> result Subgroup InclusiveScan $value};
-
+        else return value;
     }
-    return value;
+
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
@@ -3562,7 +3581,7 @@ __spirv_version(1.3) [require(spirv)]
     __target_switch
     {
     case glsl:
-        __target_intrinsic "subgroupInclusiveMul($0)";
+        __intrinsic_asm "subgroupInclusiveMul($0)";
     case spirv:
         if (__isFloat<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMul $$vector<T,N> result Subgroup InclusiveScan $value};
@@ -3571,7 +3590,7 @@ __spirv_version(1.3) [require(spirv)]
         else return value;
 
     }
-    return value;
+
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
@@ -3583,7 +3602,7 @@ __spirv_version(1.3) [require(spirv)]
     __target_switch
     {
     case glsl:
-        __target_intrinsic "subgroupInclusiveMin($0)";
+        __intrinsic_asm "subgroupInclusiveMin($0)";
     case spirv:
         if (__isFloat<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMin $$vector<T,N> result Subgroup InclusiveScan $value};
@@ -3594,7 +3613,7 @@ __spirv_version(1.3) [require(spirv)]
         else return value;
 
     }
-    return value;
+
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
@@ -3606,7 +3625,7 @@ __spirv_version(1.3) [require(spirv)]
     __target_switch
     {
     case glsl:
-        __target_intrinsic "subgroupInclusiveMax($0)";
+        __intrinsic_asm "subgroupInclusiveMax($0)";
     case spirv:
         if (__isFloat<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMax $$vector<T,N> result Subgroup InclusiveScan $value};
@@ -3617,7 +3636,7 @@ __spirv_version(1.3) [require(spirv)]
         else return value;
 
     }
-    return value;
+
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
@@ -3629,13 +3648,13 @@ __spirv_version(1.3) [require(spirv)]
     __target_switch
     {
     case glsl:
-        __target_intrinsic "subgroupInclusiveAnd($0)";
+        __intrinsic_asm "subgroupInclusiveAnd($0)";
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalAnd $$vector<T,N> result Subgroup InclusiveScan $value};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseAnd $$vector<T,N> result Subgroup InclusiveScan $value};
 
     }
-    return value;
+
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
@@ -3647,13 +3666,13 @@ __spirv_version(1.3) [require(spirv)]
     __target_switch
     {
     case glsl:
-        __target_intrinsic "subgroupInclusiveOr($0)";
+        __intrinsic_asm "subgroupInclusiveOr($0)";
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalOr $$vector<T,N> result Subgroup InclusiveScan $value};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseOr $$vector<T,N> result Subgroup InclusiveScan $value};
 
     }
-    return value;
+
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
@@ -3665,13 +3684,13 @@ __spirv_version(1.3) [require(spirv)]
     __target_switch
     {
     case glsl:
-        __target_intrinsic "subgroupInclusiveXor($0)";
+        __intrinsic_asm "subgroupInclusiveXor($0)";
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalXor $$vector<T,N> result Subgroup InclusiveScan $value};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseXor $$vector<T,N> result Subgroup InclusiveScan $value};
 
     }
-    return value;
+
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
@@ -3702,7 +3721,7 @@ __spirv_version(1.3) [require(spirv)]
     __target_switch
     {
     case glsl:
-        __target_intrinsic "subgroupExclusiveMin($0)";
+        __intrinsic_asm "subgroupExclusiveMin($0)";
     case spirv:
         if (__isFloat<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMin $$vector<T,N> result Subgroup ExclusiveScan $value};
@@ -3713,7 +3732,7 @@ __spirv_version(1.3) [require(spirv)]
         else return value;
 
     }
-    return value;
+
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
@@ -3725,7 +3744,7 @@ __spirv_version(1.3) [require(spirv)]
     __target_switch
     {
     case glsl:
-        __target_intrinsic "subgroupExclusiveMax($0)";
+        __intrinsic_asm "subgroupExclusiveMax($0)";
     case spirv:
         if (__isFloat<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMax $$vector<T,N> result Subgroup ExclusiveScan $value};
@@ -3736,7 +3755,7 @@ __spirv_version(1.3) [require(spirv)]
         else return value;
 
     }
-    return value;
+
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
@@ -4023,7 +4042,7 @@ __spirv_version(1.3) [require(spirv)]
     __target_switch
     {
     case glsl:
-        __target_intrinsic "subgroupShuffleXor($0,$1)";
+        __intrinsic_asm "subgroupShuffleXor($0,$1)";
     case spirv:
         return spirv_asm {
             OpCapability GroupNonUniformBallot; 
@@ -4031,7 +4050,7 @@ __spirv_version(1.3) [require(spirv)]
         };
 
     }
-    return value;
+
 }
 
 __generic<T : __BuiltinType, let N : int>
@@ -4060,7 +4079,7 @@ __spirv_version(1.3) [require(spirv)]
     __target_switch
     {
     case glsl:
-        __target_intrinsic "subgroupShuffleXor($0,$1)";
+        __intrinsic_asm "subgroupShuffleXor($0,$1)";
     case spirv:
         return spirv_asm {
             OpCapability GroupNonUniformBallot; 
@@ -4068,7 +4087,7 @@ __spirv_version(1.3) [require(spirv)]
         };
 
     }
-    return value;
+
 }
 
 
@@ -4083,7 +4102,7 @@ __spirv_version(1.3) [require(spirv)]
     __target_switch
     {
     case glsl:
-        __target_intrinsic "subgroupShuffleUp($0, $1)";
+        __intrinsic_asm "subgroupShuffleUp($0, $1)";
     case spirv:
         return spirv_asm {
             OpCapability GroupNonUniformShuffleRelative;
@@ -4091,7 +4110,7 @@ __spirv_version(1.3) [require(spirv)]
         };
 
     }
-    return value;
+
 }
 
 __generic<T : __BuiltinType>
@@ -4103,7 +4122,7 @@ __spirv_version(1.3) [require(spirv)]
     __target_switch
     {
     case glsl:
-        __target_intrinsic "subgroupShuffleDown($0, $1)";
+        __intrinsic_asm "subgroupShuffleDown($0, $1)";
     case spirv:
         return spirv_asm {
             OpCapability GroupNonUniformShuffleRelative; 
@@ -4111,7 +4130,7 @@ __spirv_version(1.3) [require(spirv)]
         };
 
     }
-    return value;
+
 }
 
 
@@ -4124,7 +4143,7 @@ __spirv_version(1.3) [require(spirv)]
     __target_switch
     {
     case glsl:
-        __target_intrinsic "subgroupShuffleUp($0, $1)";
+        __intrinsic_asm "subgroupShuffleUp($0, $1)";
     case spirv:
         return spirv_asm {
             OpCapability GroupNonUniformShuffleRelative;
@@ -4132,7 +4151,7 @@ __spirv_version(1.3) [require(spirv)]
         };
 
     }
-    return value;
+
 }
 
 __generic<T : __BuiltinType, let N : int>
@@ -4144,7 +4163,7 @@ __spirv_version(1.3) [require(spirv)]
     __target_switch
     {
     case glsl:
-        __target_intrinsic "subgroupShuffleDown($0, $1)";
+        __intrinsic_asm "subgroupShuffleDown($0, $1)";
     case spirv:
         return spirv_asm {
             OpCapability GroupNonUniformShuffleRelative;
@@ -4152,7 +4171,7 @@ __spirv_version(1.3) [require(spirv)]
         };
 
     }
-    return value;
+
 }
 // GL_KHR_shader_subgroup_clustered
 
@@ -4165,7 +4184,7 @@ __spirv_version(1.3) [require(spirv)]
     __target_switch
     {
     case glsl:
-        __target_intrinsic "subgroupClusteredAdd($0, $1)";
+        __intrinsic_asm "subgroupClusteredAdd($0, $1)";
     case spirv:
         if (__isFloat<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformFAdd $$T result Subgroup ClusteredReduce $value $clusterSize};
@@ -4174,7 +4193,7 @@ __spirv_version(1.3) [require(spirv)]
         else return value;
 
     }
-    return value;
+
 }
 
 __generic<T : __BuiltinArithmeticType>
@@ -4186,7 +4205,7 @@ __spirv_version(1.3) [require(spirv)]
     __target_switch
     {
     case glsl:
-        __target_intrinsic "subgroupClusteredMul($0, $1)";
+        __intrinsic_asm "subgroupClusteredMul($0, $1)";
     case spirv:
         if (__isFloat<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformFMul $$T result Subgroup ClusteredReduce $value $clusterSize};
@@ -4195,7 +4214,7 @@ __spirv_version(1.3) [require(spirv)]
         else return value;
 
     } 
-    return value;
+
 }
 
 __generic<T : __BuiltinArithmeticType>
@@ -4207,7 +4226,7 @@ __spirv_version(1.3) [require(spirv)]
     __target_switch
     {
     case glsl:
-        __target_intrinsic "subgroupClusteredMin($0, $1)";
+        __intrinsic_asm "subgroupClusteredMin($0, $1)";
     case spirv:
         if (__isFloat<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformFMin $$T result Subgroup ClusteredReduce $value $clusterSize};
@@ -4218,7 +4237,7 @@ __spirv_version(1.3) [require(spirv)]
         else return value;
 
     }
-    return value;
+
 }
 
 __generic<T : __BuiltinArithmeticType>
@@ -4230,7 +4249,7 @@ __spirv_version(1.3) [require(spirv)]
     __target_switch
     {
     case glsl:
-        __target_intrinsic "subgroupClusteredMax($0, $1)";
+        __intrinsic_asm "subgroupClusteredMax($0, $1)";
     case spirv:
         if (__isFloat<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformFMax $$T result Subgroup ClusteredReduce $value $clusterSize};
@@ -4241,7 +4260,7 @@ __spirv_version(1.3) [require(spirv)]
         else return value;
 
     }
-    return value;
+
 }
 
 __generic<T : __BuiltinLogicalType>
@@ -4253,13 +4272,13 @@ __spirv_version(1.3) [require(spirv)]
     __target_switch
     {
     case glsl:
-        __target_intrinsic "subgroupClusteredAnd($0, $1)";
+        __intrinsic_asm "subgroupClusteredAnd($0, $1)";
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformLogicalAnd $$T result Subgroup ClusteredReduce $value $clusterSize};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseAnd $$T result Subgroup ClusteredReduce $value $clusterSize};
 
     }
-    return value;
+
 }
 
 __generic<T : __BuiltinLogicalType>
@@ -4271,13 +4290,13 @@ __spirv_version(1.3) [require(spirv)]
     __target_switch
     {
     case glsl:
-        __target_intrinsic "subgroupClusteredOr($0, $1)";
+        __intrinsic_asm "subgroupClusteredOr($0, $1)";
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformLogicalOr $$T result Subgroup ClusteredReduce $value $clusterSize};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseOr $$T result Subgroup ClusteredReduce $value $clusterSize};
 
     }
-    return value;
+
 }
 
 
@@ -4291,13 +4310,13 @@ __spirv_version(1.3) [require(spirv)]
     __target_switch
     {
     case glsl:
-        __target_intrinsic "subgroupClusteredXor($0, $1)";
+        __intrinsic_asm "subgroupClusteredXor($0, $1)";
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformLogicalXor $$T result Subgroup ClusteredReduce $value $clusterSize};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseXor $$T result Subgroup ClusteredReduce $value $clusterSize};
 
     }
-    return value;
+
 }
 
 
@@ -4311,7 +4330,7 @@ __spirv_version(1.3) [require(spirv)]
     __target_switch
     {
     case glsl:
-        __target_intrinsic "subgroupClusteredAdd($0, $1)";
+        __intrinsic_asm "subgroupClusteredAdd($0, $1)";
     case spirv:
         if (__isFloat<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; 
@@ -4321,7 +4340,7 @@ __spirv_version(1.3) [require(spirv)]
         else return value;
 
     }
-    return value;
+
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
@@ -4333,7 +4352,7 @@ __spirv_version(1.3) [require(spirv)]
     __target_switch
     {
     case glsl:
-        __target_intrinsic "subgroupClusteredMul($0, $1)";
+        __intrinsic_asm "subgroupClusteredMul($0, $1)";
     case spirv:
         if (__isFloat<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformFMul $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
@@ -4342,7 +4361,7 @@ __spirv_version(1.3) [require(spirv)]
         else return value;
 
     } 
-    return value;
+
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
@@ -4354,7 +4373,7 @@ __spirv_version(1.3) [require(spirv)]
     __target_switch
     {
     case glsl:
-        __target_intrinsic "subgroupClusteredMin($0, $1)";
+        __intrinsic_asm "subgroupClusteredMin($0, $1)";
     case spirv:
         if (__isFloat<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformFMin $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
@@ -4365,7 +4384,7 @@ __spirv_version(1.3) [require(spirv)]
         else return value;
 
     }
-    return value;
+
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
@@ -4377,7 +4396,7 @@ __spirv_version(1.3) [require(spirv)]
     __target_switch
     {
     case glsl:
-        __target_intrinsic "subgroupClusteredMax($0, $1)";
+        __intrinsic_asm "subgroupClusteredMax($0, $1)";
     case spirv:
         if (__isFloat<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformFMax $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
@@ -4388,7 +4407,7 @@ __spirv_version(1.3) [require(spirv)]
         else return value;
 
     }
-    return value;
+
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
@@ -4400,13 +4419,13 @@ __spirv_version(1.3) [require(spirv)]
     __target_switch
     {
     case glsl:
-        __target_intrinsic "subgroupClusteredAnd($0, $1)";
+        __intrinsic_asm "subgroupClusteredAnd($0, $1)";
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformLogicalAnd $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseAnd $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
 
     }
-    return value;
+
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
@@ -4418,13 +4437,13 @@ __spirv_version(1.3) [require(spirv)]
     __target_switch
     {
     case glsl:
-        __target_intrinsic "subgroupClusteredOr($0, $1)";
+        __intrinsic_asm "subgroupClusteredOr($0, $1)";
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformLogicalOr $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseOr $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
 
     }
-    return value;
+
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
@@ -4436,13 +4455,13 @@ __spirv_version(1.3) [require(spirv)]
     __target_switch
     {
     case glsl:
-        __target_intrinsic "subgroupClusteredXor($0, $1)";
+        __intrinsic_asm "subgroupClusteredXor($0, $1)";
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformLogicalXor $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseXor $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
 
     }
-    return value;
+
 }
 
 // GL_KHR_shader_subgroup_quad
