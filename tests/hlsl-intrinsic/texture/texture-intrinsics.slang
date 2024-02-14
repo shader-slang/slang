@@ -198,12 +198,12 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     val += elements;
 
     // fxc 47.0: (95): error X4598:  The array element count of GetDimensions on TextureCubeArray objects is unavailable on cs_5_0
-    #ifdef CS60
+#ifdef CS60
     tCubeArray.GetDimensions(fwidth, fheight, felements);
     val += fwidth;
     val += fheight;
     val += felements;
-    #endif
+#endif
 
     tCubeArray.GetDimensions(0, width, height, elements, numLevels);
     val += width;
@@ -211,11 +211,13 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     val += elements;
     val += numLevels;
 
-    /*tCubeArray.GetDimensions(0, fwidth, fheight, felements, fnumLevels);
+#ifdef CS60
+    tCubeArray.GetDimensions(0, fwidth, fheight, felements, fnumLevels);
     val += fwidth;
     val += fheight;
     val += felements;
-    val += fnumLevels;*/
+    val += fnumLevels;
+#endif
 
     /*
         <Template Type>4 Object.Gather()
@@ -289,11 +291,11 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 // DX12: 312
 // DX12: 312
 // DX12: 312
-// DX12CS6: 322
-// DX12CS6: 322
-// DX12CS6: 322
-// DX12CS6: 322
-// VK: 322
-// VK: 322
-// VK: 322
-// VK: 322
+// DX12CS6: 335
+// DX12CS6: 335
+// DX12CS6: 335
+// DX12CS6: 335
+// VK: 335
+// VK: 335
+// VK: 335
+// VK: 335
