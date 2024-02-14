@@ -253,6 +253,13 @@ See the [documentation on testing](../tools/slang-test/README.md) for more infor
 | `SLANG_EMBED_STDLIB_SOURCE`       | `TRUE`           | Embed stdlib source in the binary                                  |
 | `SLANG_ENABLE_ASAN`               | `FALSE`          | Enable ASAN (address sanitizer)                                    |
 | `SLANG_ENABLE_FULL_IR_VALIDATION` | `FALSE`          | Enable full IR validation (SLOW!)                                  |
+| `SLANG_ENABLE_GFX`                | `TRUE`           | Enable gfx targets                                                 |
+| `SLANG_ENABLE_SLANGD`             | `TRUE`           | Enable language server target                                      |
+| `SLANG_ENABLE_SLANGC`             | `TRUE`           | Enable standalone compiler target                                  |
+| `SLANG_ENABLE_SLANGRT`            | `TRUE`           | Enable runtime target                                              |
+| `SLANG_ENABLE_SLANG_GLSLANG`      | `TRUE`           | Enable glslang dependency and slang-glslang wrapper target         |
+| `SLANG_ENABLE_TESTS`              | `TRUE`           | Enable test targets, requires SLANG_ENABLE_GFX, SLANG_ENABLE_SLANGD and SLANG_ENABLE_SLANGRT |
+| `SLANG_ENABLE_EXAMPLES`           | `TRUE`           | Enable example targets, requires SLANG_ENABLE_GFX                  |
 | `SLANG_BUILD_LIB_TYPE`            | `SHARED`         | How to build the slang library                                     |
 | `SLANG_SLANG_LLVM_FLAVOR`         | `FETCH_BINARY`   | How to set up llvm support                                         |
 | `SLANG_SLANG_LLVM_BINARY_URL`     | System dependent | URL specifying the location of the slang-llvm prebuilt library     |
