@@ -1,8 +1,8 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type -render-feature hardware-device
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_0 -use-dxil -shaderobj -output-using-type
-//DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type -render-feature hardware-device
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=DX11):-slang -compute -shaderobj -output-using-type -render-feature hardware-device
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=DX12):-slang -compute -dx12 -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=DX12CS6):-slang -compute -dx12 -profile cs_6_0 -use-dxil -shaderobj -output-using-type -xslang -DCS60
+//DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=VK):-vk -compute -shaderobj -output-using-type -render-feature hardware-device -xslang -DCS60
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
 
 //TEST_INPUT: Texture1D(size=4, content = one):name t1D
@@ -197,11 +197,13 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     val += height;
     val += elements;
 
-    // For DX11: fxc 47.0: (95): error X4598:  The array element count of GetDimensions on TextureCubeArray objects is unavailable on cs_5_0
-    /*tCubeArray.GetDimensions(fwidth, fheight, felements);
+    // fxc 47.0: (95): error X4598:  The array element count of GetDimensions on TextureCubeArray objects is unavailable on cs_5_0
+    #ifdef CS60
+    tCubeArray.GetDimensions(fwidth, fheight, felements);
     val += fwidth;
     val += fheight;
-    val += felements;*/
+    val += felements;
+    #endif
 
     tCubeArray.GetDimensions(0, width, height, elements, numLevels);
     val += width;
@@ -278,3 +280,20 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 
     outputBuffer[idx] = val;
 }
+
+// DX11: 312
+// DX11: 312
+// DX11: 312
+// DX11: 312
+// DX12: 312
+// DX12: 312
+// DX12: 312
+// DX12: 312
+// DX12CS6: 322
+// DX12CS6: 322
+// DX12CS6: 322
+// DX12CS6: 322
+// VK: 322
+// VK: 322
+// VK: 322
+// VK: 322
