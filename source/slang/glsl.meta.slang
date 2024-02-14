@@ -2895,9 +2895,7 @@ __spirv_version(1.3) [require(spirv)]
             OpCapability Shader;
             OpControlBarrier Subgroup Subgroup AcquireRelease|SubgroupMemory|ImageMemory|UniformMemory
         };
-    case cpp:
-        // TODO: cpp
-        return;
+
     }
 }
 
@@ -2918,9 +2916,7 @@ __spirv_version(1.3) [require(spirv)]
             OpCapability Shader;
             OpMemoryBarrier Subgroup AcquireRelease|SubgroupMemory|ImageMemory|UniformMemory
         };
-    case cpp:
-        // TODO: cpp
-        return;
+
     }
 }
 
@@ -2943,9 +2939,7 @@ __spirv_version(1.3) [require(spirv)]
             OpCapability Shader;
             OpMemoryBarrier Subgroup AcquireRelease|UniformMemory
         };
-    case cpp:
-        // TODO: cpp
-        return;
+
     }
 }
 
@@ -2965,9 +2959,7 @@ __spirv_version(1.3) [require(spirv)]
         spirv_asm {
             OpMemoryBarrier Subgroup AcquireRelease|ImageMemory
         };
-    case cpp:
-        // TODO: cpp
-        return;
+
     }
 }
 
@@ -2989,9 +2981,7 @@ __spirv_version(1.3) [require(spirv)]
             // WorkgroupMemory is the next level of granularity 
             OpMemoryBarrier Subgroup AcquireRelease|WorkgroupMemory
         };
-    case cpp:
-        // TODO: cpp
-        return;
+
     }
 }
 
@@ -3007,9 +2997,7 @@ __spirv_version(1.3) [require(spirv)]
     case spirv:
     case hlsl:
         return WaveIsFirstLane();
-    case cpp:
-        // TODO: cpp
-        return false;
+
     }
 }
 
@@ -3026,9 +3014,7 @@ __spirv_version(1.3) [require(spirv)]
     case spirv:
     case hlsl:
         return WaveActiveAllTrue(value);
-    case cpp:
-        // TODO: cpp
-        return false;
+
     }
 }
 
@@ -3036,7 +3022,7 @@ __glsl_extension(GL_KHR_shader_subgroup_vote) [require(glsl)]
 __spirv_version(1.3) [require(spirv)]
 [ForceInline] public bool subgroupAny(bool value)
 {
-    return WaveMaskAnyTrue(WaveGetActiveMask(), value);
+    return WaveActiveAnyTrue(value);
     
 }
 
@@ -3046,7 +3032,7 @@ __spirv_version(1.3) [require(spirv)]
 [ForceInline] public bool subgroupAllEqual(T value)
 {
     shader_subgroup_preamble<T>();
-    return WaveMaskAllEqual(WaveGetActiveMask(), value);
+    return WaveActiveAllEqual(value);
 }
 
 __generic<T : __BuiltinType, let N : int>
@@ -3055,7 +3041,7 @@ __spirv_version(1.3) [require(spirv)]
 [ForceInline] public bool subgroupAllEqual(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
-    return WaveMaskAllEqual(WaveGetActiveMask(), value);
+    return WaveActiveAllEqual(value);
 }
 
 // GL_KHR_shader_subgroup_arithmetic
@@ -3066,7 +3052,7 @@ __spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupAdd(T value)
 {
     shader_subgroup_preamble<T>();
-    return WaveMaskSum(WaveGetActiveMask(), value);
+    return WaveActiveSum(value);
 }
 
 __generic<T : __BuiltinArithmeticType>
@@ -3075,7 +3061,7 @@ __spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupMul(T value)
 {
     shader_subgroup_preamble<T>();
-    return WaveMaskProduct(WaveGetActiveMask(), value);
+    return WaveActiveProduct(value);
 }
 
 __generic<T : __BuiltinArithmeticType>
@@ -3084,7 +3070,7 @@ __spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupMin(T value)
 {
     shader_subgroup_preamble<T>();
-    return WaveMaskMin(WaveGetActiveMask(), value);
+    return WaveActiveMin(value);
 }
 
 __generic<T : __BuiltinArithmeticType>
@@ -3093,7 +3079,7 @@ __spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupMax(T value)
 {
     shader_subgroup_preamble<T>();
-    return WaveMaskMax(WaveGetActiveMask(), value);
+    return WaveActiveMax(value);
 }
 
 __generic<T : __BuiltinLogicalType>
@@ -3118,11 +3104,7 @@ __spirv_version(1.3) [require(spirv)]
                 OpGroupNonUniformBitwiseAnd $$T result Subgroup 0 $value
             };
         }
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
 }
 
@@ -3148,11 +3130,7 @@ __spirv_version(1.3) [require(spirv)]
                 OpGroupNonUniformBitwiseOr $$T result Subgroup 0 $value
             };
         }
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
 }
 
@@ -3178,11 +3156,7 @@ __spirv_version(1.3) [require(spirv)]
                 OpGroupNonUniformBitwiseXor $$T result Subgroup 0 $value
             };
         }
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
 }
 
@@ -3202,11 +3176,7 @@ __spirv_version(1.3) [require(spirv)]
         else if (__isInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIAdd $$T result Subgroup InclusiveScan $value};
         else return value;
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
     return value;
 }
@@ -3227,11 +3197,7 @@ __spirv_version(1.3) [require(spirv)]
         else if (__isInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIMul $$T result Subgroup InclusiveScan $value};
         else return value;
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
     return value;
 }
@@ -3254,11 +3220,7 @@ __spirv_version(1.3) [require(spirv)]
         else if (__isUnsignedInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMin $$T result Subgroup InclusiveScan $value};
         else return value;
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
     return value;
 }
@@ -3281,11 +3243,7 @@ __spirv_version(1.3) [require(spirv)]
         else if (__isUnsignedInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMax $$T result Subgroup InclusiveScan $value};
         else return value;
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
     return value;
 }
@@ -3303,11 +3261,7 @@ __spirv_version(1.3) [require(spirv)]
     case spirv:
         if (__isBool<T>()) return spirv_asm { OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalAnd $$T result Subgroup InclusiveScan $value};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseAnd $$T result Subgroup InclusiveScan $value};
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
     return value;
 }
@@ -3325,11 +3279,7 @@ __spirv_version(1.3) [require(spirv)]
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalOr $$T result Subgroup InclusiveScan $value};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseOr $$T result Subgroup InclusiveScan $value};
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
     return value;
 }
@@ -3347,11 +3297,7 @@ __spirv_version(1.3) [require(spirv)]
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalXor $$T result Subgroup InclusiveScan $value};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseXor $$T result Subgroup InclusiveScan $value};
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
     return value;
 }
@@ -3362,7 +3308,7 @@ __spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupExclusiveAdd(T value)
 {
     shader_subgroup_preamble<T>();
-    return WaveMaskPrefixSum(WaveGetActiveMask(), value);
+    return WavePrefixSum(value);
 }
 
 
@@ -3372,7 +3318,7 @@ __spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupExclusiveMul(T value)
 {
     shader_subgroup_preamble<T>();
-    return WaveMaskPrefixProduct(WaveGetActiveMask(), value);
+    return WavePrefixProduct(value);
 }
 
 __generic<T : __BuiltinArithmeticType>
@@ -3393,11 +3339,7 @@ __spirv_version(1.3) [require(spirv)]
         else if (__isUnsignedInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMin $$T result Subgroup ExclusiveScan $value};
         else return value;
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
     return value;
 }
@@ -3420,11 +3362,7 @@ __spirv_version(1.3) [require(spirv)]
         else if (__isUnsignedInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMax $$T result Subgroup ExclusiveScan $value};
         else return value;
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
     return value;
 }
@@ -3441,11 +3379,7 @@ __spirv_version(1.3) [require(spirv)]
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalAnd $$T result Subgroup ExclusiveScan $value};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseAnd $$T result Subgroup ExclusiveScan $value};
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
 }
 
@@ -3461,11 +3395,7 @@ __spirv_version(1.3) [require(spirv)]
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalOr $$T result Subgroup ExclusiveScan $value};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseOr $$T result Subgroup ExclusiveScan $value};
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
 }
 
@@ -3481,11 +3411,7 @@ __spirv_version(1.3) [require(spirv)]
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalXor $$T result Subgroup ExclusiveScan $value};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseXor $$T result Subgroup ExclusiveScan $value};
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
 
 }
@@ -3499,7 +3425,7 @@ __spirv_version(1.3) [require(spirv)]
 [ForceInline] public vector<T,N> subgroupAdd(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
-    return WaveMaskSum(WaveGetActiveMask(), value);
+    return WaveActiveSum(value);
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
@@ -3508,7 +3434,7 @@ __spirv_version(1.3) [require(spirv)]
 [ForceInline] public vector<T,N> subgroupMul(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
-    return WaveMaskProduct(WaveGetActiveMask(), value);
+    return WaveActiveProduct(value);
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
@@ -3517,7 +3443,7 @@ __spirv_version(1.3) [require(spirv)]
 [ForceInline] public vector<T,N> subgroupMin(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
-    return WaveMaskMin(WaveGetActiveMask(), value);
+    return WaveActiveMin(value);
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
@@ -3526,7 +3452,7 @@ __spirv_version(1.3) [require(spirv)]
 [ForceInline] public vector<T,N> subgroupMax(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
-    return WaveMaskMax(WaveGetActiveMask(), value);
+    return WaveActiveMax(value);
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
@@ -3551,11 +3477,7 @@ __spirv_version(1.3) [require(spirv)]
                 OpGroupNonUniformBitwiseAnd $$vector<T,N> result Subgroup 0 $value
             };
         }
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
 }
 
@@ -3581,11 +3503,7 @@ __spirv_version(1.3) [require(spirv)]
                 OpGroupNonUniformBitwiseOr $$vector<T,N> result Subgroup 0 $value
             };
         }
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
 }
 
@@ -3611,11 +3529,7 @@ __spirv_version(1.3) [require(spirv)]
                 OpGroupNonUniformBitwiseXor $$vector<T,N> result Subgroup 0 $value
             };
         }
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
 }
 
@@ -3634,11 +3548,7 @@ __spirv_version(1.3) [require(spirv)]
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFAdd $$vector<T,N> result Subgroup InclusiveScan $value};
         else if (__isInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIAdd $$vector<T,N> result Subgroup InclusiveScan $value};
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
     return value;
 }
@@ -3659,11 +3569,7 @@ __spirv_version(1.3) [require(spirv)]
         else if (__isInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIMul $$vector<T,N> result Subgroup InclusiveScan $value};
         else return value;
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
     return value;
 }
@@ -3686,11 +3592,7 @@ __spirv_version(1.3) [require(spirv)]
         else if (__isUnsignedInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMin $$vector<T,N> result Subgroup InclusiveScan $value};
         else return value;
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
     return value;
 }
@@ -3713,11 +3615,7 @@ __spirv_version(1.3) [require(spirv)]
         else if (__isUnsignedInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMax $$vector<T,N> result Subgroup InclusiveScan $value};
         else return value;
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
     return value;
 }
@@ -3735,11 +3633,7 @@ __spirv_version(1.3) [require(spirv)]
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalAnd $$vector<T,N> result Subgroup InclusiveScan $value};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseAnd $$vector<T,N> result Subgroup InclusiveScan $value};
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
     return value;
 }
@@ -3757,11 +3651,7 @@ __spirv_version(1.3) [require(spirv)]
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalOr $$vector<T,N> result Subgroup InclusiveScan $value};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseOr $$vector<T,N> result Subgroup InclusiveScan $value};
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
     return value;
 }
@@ -3779,11 +3669,7 @@ __spirv_version(1.3) [require(spirv)]
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalXor $$vector<T,N> result Subgroup InclusiveScan $value};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseXor $$vector<T,N> result Subgroup InclusiveScan $value};
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
     return value;
 }
@@ -3794,7 +3680,7 @@ __spirv_version(1.3) [require(spirv)]
 [ForceInline] public vector<T,N> subgroupExclusiveAdd(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
-    return WaveMaskPrefixSum(WaveGetActiveMask(), value);
+    return WavePrefixSum(value);
 }
 
 
@@ -3804,7 +3690,7 @@ __spirv_version(1.3) [require(spirv)]
 [ForceInline] public vector<T,N> subgroupExclusiveMul(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
-    return WaveMaskPrefixProduct(WaveGetActiveMask(), value);
+    return WavePrefixProduct(value);
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
@@ -3825,11 +3711,7 @@ __spirv_version(1.3) [require(spirv)]
         else if (__isUnsignedInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMin $$vector<T,N> result Subgroup ExclusiveScan $value};
         else return value;
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
     return value;
 }
@@ -3852,11 +3734,7 @@ __spirv_version(1.3) [require(spirv)]
         else if (__isUnsignedInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMax $$vector<T,N> result Subgroup ExclusiveScan $value};
         else return value;
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
     return value;
 }
@@ -3873,11 +3751,7 @@ __spirv_version(1.3) [require(spirv)]
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalAnd $$vector<T,N> result Subgroup ExclusiveScan $value};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseAnd $$vector<T,N> result Subgroup ExclusiveScan $value};
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
 }
 
@@ -3893,11 +3767,7 @@ __spirv_version(1.3) [require(spirv)]
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalOr $$vector<T,N> result Subgroup ExclusiveScan $value};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseOr $$vector<T,N> result Subgroup ExclusiveScan $value};
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
 }
 
@@ -3913,11 +3783,7 @@ __spirv_version(1.3) [require(spirv)]
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalXor $$vector<T,N> result Subgroup ExclusiveScan $value};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseXor $$vector<T,N> result Subgroup ExclusiveScan $value};
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
 }
 
@@ -3985,7 +3851,7 @@ __spirv_version(1.3) [require(spirv)]
     {
     case cuda:
         // only has 32 warps
-        __intrinsic_asm "(($0).x >> (c()) & 1)";
+        __intrinsic_asm "(($0).x >> (_getLaneId()) & 1)";
     case hlsl:
         // much like _WaveCountBits, but here we hope that we hit case 0; we can then avoid the expensive logic
         const uint waveLaneCount = WaveGetLaneCount();
@@ -4005,9 +3871,7 @@ __spirv_version(1.3) [require(spirv)]
                 OpCapability GroupNonUniformBallot; 
                 OpGroupNonUniformInverseBallot $$bool result Subgroup $value
         };
-    case cpp:
-        // TODO: cpp
-        return false;
+
     }
     return false;
 }
@@ -4039,9 +3903,7 @@ __spirv_version(1.3) [require(spirv)]
                 OpCapability GroupNonUniformBallot; 
                 OpGroupNonUniformBallotBitExtract $$bool result Subgroup $value $index
         };
-    case cpp:
-        // TODO: cpp
-        return false;
+
     }
     return false;
 }
@@ -4061,11 +3923,7 @@ __spirv_version(1.3) [require(spirv)]
             OpCapability GroupNonUniformBallot; 
             OpGroupNonUniformBallotBitCount $$uint result Subgroup Reduce $value
         };
-    case hlsl:
-    case cuda:
-    case cpp:
-        //TODO: implement
-        return 0;
+
     }
 }
 
@@ -4082,11 +3940,7 @@ __spirv_version(1.3) [require(spirv)]
             OpCapability GroupNonUniformBallot; 
             OpGroupNonUniformBallotBitCount $$uint result Subgroup InclusiveScan $value
         };
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return 0;
+
     }
 }
 
@@ -4103,11 +3957,7 @@ __spirv_version(1.3) [require(spirv)]
             OpCapability GroupNonUniformBallot; 
             OpGroupNonUniformBallotBitCount $$uint result Subgroup ExclusiveScan $value
         };
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return 0;
+
     }
 }
 
@@ -4124,11 +3974,7 @@ __spirv_version(1.3) [require(spirv)]
             OpCapability GroupNonUniformBallot; 
             OpGroupNonUniformBallotFindLSB $$uint result Subgroup $value
         };
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return 0;
+
     }
 }
 
@@ -4145,11 +3991,7 @@ __spirv_version(1.3) [require(spirv)]
             OpCapability GroupNonUniformBallot; 
             OpGroupNonUniformBallotFindMSB $$uint result Subgroup $value
         };
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return 0;
+
     }
 }
 
@@ -4187,11 +4029,7 @@ __spirv_version(1.3) [require(spirv)]
             OpCapability GroupNonUniformBallot; 
             OpGroupNonUniformShuffleXor $$T result Subgroup $value $mask
         };
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
     return value;
 }
@@ -4228,11 +4066,7 @@ __spirv_version(1.3) [require(spirv)]
             OpCapability GroupNonUniformBallot; 
             OpGroupNonUniformShuffleXor $$vector<T,N> result Subgroup $value $mask
         };
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
     return value;
 }
@@ -4255,11 +4089,7 @@ __spirv_version(1.3) [require(spirv)]
             OpCapability GroupNonUniformShuffleRelative;
             OpGroupNonUniformShuffleUp $$T result Subgroup $value $delta
         };
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
     return value;
 }
@@ -4279,11 +4109,7 @@ __spirv_version(1.3) [require(spirv)]
             OpCapability GroupNonUniformShuffleRelative; 
             OpGroupNonUniformShuffleDown $$T result Subgroup $value $delta
         };
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
     return value;
 }
@@ -4304,11 +4130,7 @@ __spirv_version(1.3) [require(spirv)]
             OpCapability GroupNonUniformShuffleRelative;
             OpGroupNonUniformShuffleUp $$vector<T,N> result Subgroup $value $delta
         };
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
     return value;
 }
@@ -4328,11 +4150,7 @@ __spirv_version(1.3) [require(spirv)]
             OpCapability GroupNonUniformShuffleRelative;
             OpGroupNonUniformShuffleDown $$vector<T,N> result Subgroup $value $delta
         };
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
     return value;
 }
@@ -4354,11 +4172,7 @@ __spirv_version(1.3) [require(spirv)]
         else if (__isInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformIAdd $$T result Subgroup ClusteredReduce $value $clusterSize};
         else return value;
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
     return value;
 }
@@ -4379,11 +4193,7 @@ __spirv_version(1.3) [require(spirv)]
         else if (__isInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformIMul $$T result Subgroup ClusteredReduce $value $clusterSize};
         else return value;
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     } 
     return value;
 }
@@ -4406,11 +4216,7 @@ __spirv_version(1.3) [require(spirv)]
         else if (__isUnsignedInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformUMin $$T result Subgroup ClusteredReduce $value $clusterSize};
         else return value;
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
     return value;
 }
@@ -4433,11 +4239,7 @@ __spirv_version(1.3) [require(spirv)]
         else if (__isUnsignedInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered;  OpGroupNonUniformUMax $$T result Subgroup ClusteredReduce $value $clusterSize};
         else return value;
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
     return value;
 }
@@ -4455,11 +4257,7 @@ __spirv_version(1.3) [require(spirv)]
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformLogicalAnd $$T result Subgroup ClusteredReduce $value $clusterSize};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseAnd $$T result Subgroup ClusteredReduce $value $clusterSize};
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
     return value;
 }
@@ -4477,11 +4275,7 @@ __spirv_version(1.3) [require(spirv)]
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformLogicalOr $$T result Subgroup ClusteredReduce $value $clusterSize};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseOr $$T result Subgroup ClusteredReduce $value $clusterSize};
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
     return value;
 }
@@ -4501,11 +4295,7 @@ __spirv_version(1.3) [require(spirv)]
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformLogicalXor $$T result Subgroup ClusteredReduce $value $clusterSize};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseXor $$T result Subgroup ClusteredReduce $value $clusterSize};
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
     return value;
 }
@@ -4529,11 +4319,7 @@ __spirv_version(1.3) [require(spirv)]
         else if (__isInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformIAdd $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
         else return value;
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
     return value;
 }
@@ -4554,11 +4340,7 @@ __spirv_version(1.3) [require(spirv)]
         else if (__isInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformIMul $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
         else return value;
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     } 
     return value;
 }
@@ -4581,11 +4363,7 @@ __spirv_version(1.3) [require(spirv)]
         else if (__isUnsignedInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformUMin $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
         else return value;
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
     return value;
 }
@@ -4608,11 +4386,7 @@ __spirv_version(1.3) [require(spirv)]
         else if (__isUnsignedInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered;  OpGroupNonUniformUMax $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
         else return value;
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
     return value;
 }
@@ -4630,11 +4404,7 @@ __spirv_version(1.3) [require(spirv)]
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformLogicalAnd $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseAnd $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
     return value;
 }
@@ -4652,11 +4422,7 @@ __spirv_version(1.3) [require(spirv)]
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformLogicalOr $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseOr $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
     return value;
 }
@@ -4674,11 +4440,7 @@ __spirv_version(1.3) [require(spirv)]
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformLogicalXor $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseXor $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
-    case hlsl:
-    case cuda:
-    case cpp:
-        // TODO: implementation
-        return value;
+
     }
     return value;
 }
