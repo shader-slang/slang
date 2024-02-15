@@ -213,7 +213,11 @@ namespace Slang {
                     }
 
                     ModuleSerialFilter filter(moduleDecl);
-                    SerialWriter writer(serialClasses, &filter);
+                    auto astWriterFlag = SerialWriter::Flag::ZeroInitialize;
+                    if ((options.optionFlags & SerialOptionFlag::ASTFunctionBody) == 0)
+                        astWriterFlag = (SerialWriter::Flag::Enum)(astWriterFlag | SerialWriter::Flag::SkipFunctionBody);
+
+                    SerialWriter writer(serialClasses, &filter, astWriterFlag);
 
                     writer.getExtraObjects().set(sourceLocWriter);
                     
@@ -300,7 +304,7 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
     return entry->candidateExtensions;
 }
 
-/* static */Result SerialContainerUtil::read(RiffContainer* container, const ReadOptions& options, SerialContainerData& out)
+/* static */Result SerialContainerUtil::read(RiffContainer* container, const ReadOptions& options, const LoadedModuleDictionary* additionalLoadedModules, SerialContainerData& out)
 {
     out.clear();
 
@@ -441,7 +445,7 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
                                     NamePool* namePool = linkage->getNamePool();
                                     Name* moduleNameName = namePool->getName(moduleName);
 
-                                    readModule = linkage->findOrImportModule(moduleNameName, SourceLoc::fromRaw(0), options.sink);
+                                    readModule = linkage->findOrImportModule(moduleNameName, SourceLoc::fromRaw(0), options.sink, additionalLoadedModules);
                                     if (!readModule)
                                     {
                                         return SLANG_FAIL;
@@ -570,7 +574,6 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
                                 else if (Val* val = dynamicCast<Val>(nodeBase))
                                 {
                                     val->_setUnique();
-                                    astBuilder->m_cachedNodes.tryGetValueOrAdd(ValKey(val), val);
                                 }
                             }
                         }
