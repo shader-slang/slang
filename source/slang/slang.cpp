@@ -3415,6 +3415,7 @@ RefPtr<Module> Linkage::findOrImportModule(
                 // This is a builtin glsl module, just load it from embedded definition.
                 fileContents = getSessionImpl()->getGLSLLibraryCode();
                 filePathInfo = PathInfo::makeFromString("glsl");
+                checkBinaryModule = 0;
             }
             else
             {
