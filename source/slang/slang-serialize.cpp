@@ -222,51 +222,52 @@ SerialWriter::SerialWriter(SerialClasses* classes, SerialFilter* filter, Flags f
     m_ptrMap.add(nullptr, 0);
 }
 
+struct SkipFunctionBodyRAII
+{
+    FunctionDeclBase* funcDecl = nullptr;
+    Stmt* oldBody = nullptr;
+    SkipFunctionBodyRAII(SerialWriter::Flags flags, const SerialClass* serialCls, const void* ptr)
+    {
+        if ((flags & SerialWriter::Flag::SkipFunctionBody) == 0)
+            return;
+
+        if (serialCls->typeKind != SerialTypeKind::NodeBase)
+            return;
+        auto cls = serialCls;
+        while (cls)
+        {
+            auto astNodeType = (ASTNodeType)cls->subType;
+            if (astNodeType == ASTNodeType::FunctionDeclBase)
+            {
+                funcDecl = (FunctionDeclBase*)ptr;
+                break;
+            }
+            cls = cls->super;
+        }
+        if (funcDecl)
+        {
+            oldBody = funcDecl->body;
+            // We always need to include body of unsafeForceInlineEarly functions
+            // since they will need to be available at IR lowering time of the
+            // user module for pre-linking inling.
+            if (!funcDecl->hasModifier<UnsafeForceInlineEarlyAttribute>())
+            {
+                funcDecl->body = nullptr;
+            }
+        }
+
+    }
+    ~SkipFunctionBodyRAII()
+    {
+        if (funcDecl)
+        {
+            funcDecl->body = oldBody;
+        }
+    }
+};
+
 SerialIndex SerialWriter::writeObject(const SerialClass* serialCls, const void* ptr)
 {
-    struct SkipFunctionBodyRAII
-    {
-        FunctionDeclBase* funcDecl = nullptr;
-        Stmt* oldBody;
-        SkipFunctionBodyRAII(SerialWriter::Flags flags, const SerialClass* serialCls, const void* ptr)
-        {
-            if ((flags & SerialWriter::Flag::SkipFunctionBody) == 0)
-                return;
-
-            if (serialCls->typeKind != SerialTypeKind::NodeBase)
-                return;
-            auto cls = serialCls;
-            while (cls)
-            {
-                auto astNodeType = (ASTNodeType)cls->subType;
-                if (astNodeType == ASTNodeType::FunctionDeclBase)
-                {
-                    funcDecl = (FunctionDeclBase*)ptr;
-                    break;
-                }
-                cls = cls->super;
-            }
-            if (funcDecl)
-            {
-                oldBody = funcDecl->body;
-                // We always need to include body of unsafeForceInlineEarly functions
-                // since they will need to be available at IR lowering time of the
-                // user module for pre-linking inling.
-                if (!funcDecl->hasModifier<UnsafeForceInlineEarlyAttribute>())
-                {
-                    funcDecl->body = nullptr;
-                }
-            }
-
-        }
-        ~SkipFunctionBodyRAII()
-        {
-            if (funcDecl)
-            {
-                funcDecl->body = oldBody;
-            }
-        }
-    };
     if (serialCls->flags & SerialClassFlag::DontSerialize)
     {
         return SerialIndex(0);
