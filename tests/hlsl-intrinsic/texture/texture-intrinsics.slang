@@ -2,7 +2,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=DX11):-slang -compute -shaderobj -output-using-type -render-feature hardware-device
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=DX12):-slang -compute -dx12 -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=DX12CS6):-slang -compute -dx12 -profile cs_6_0 -use-dxil -shaderobj -output-using-type -xslang -DCS60
-//DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=VK):-vk -compute -shaderobj -output-using-type -render-feature hardware-device -xslang -DCS60
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=VK):-vk -emit-spirv-directly -compute -shaderobj -output-using-type -render-feature hardware-device -xslang -DVK
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
 
 //TEST_INPUT: Texture1D(size=4, content = one):name t1D
@@ -68,6 +68,7 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
         float Object.SampleCmpLevelZero()
     */
     // NOTE: These are having issues with vulkan (glsl)
+#ifndef VK
     val += t1D.SampleCmpLevelZero(shadowSampler, u, 0);
     val += t2D.SampleCmpLevelZero(shadowSampler, float2(u, u), 0);
     val += tCube.SampleCmpLevelZero(shadowSampler, normalize(float3(u, 1 - u, u)), 0);
@@ -76,6 +77,7 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     val += t1D.SampleCmpLevelZero(shadowSampler, u, 0, 0);
     val += t2D.SampleCmpLevelZero(shadowSampler, float2(u, u), 0, int2(0, 0));
     // TextureCube does not have an offset version of this
+#endif
 
     /*
         void Object.GetDimensions()
@@ -198,7 +200,7 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     val += elements;
 
     // fxc 47.0: (95): error X4598:  The array element count of GetDimensions on TextureCubeArray objects is unavailable on cs_5_0
-#ifdef CS60
+#if defined(CS60) || defined(VK)
     tCubeArray.GetDimensions(fwidth, fheight, felements);
     val += fwidth;
     val += fheight;
@@ -211,7 +213,7 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     val += elements;
     val += numLevels;
 
-#ifdef CS60
+#if defined(CS60) || defined(VK)
     tCubeArray.GetDimensions(0, fwidth, fheight, felements, fnumLevels);
     val += fwidth;
     val += fheight;
@@ -294,7 +296,7 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 // DX12CS6: 336
 // DX12CS6: 336
 // DX12CS6: 336
-// VK: 336
-// VK: 336
-// VK: 336
-// VK: 336
+// VK: 331
+// VK: 331
+// VK: 331
+// VK: 331
