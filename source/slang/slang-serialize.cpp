@@ -852,7 +852,7 @@ SerialPointer SerialReader::getValPointer(SerialIndex index)
     ValNodeDesc desc;
     desc.type = (ASTNodeType)entry->subType;
     auto readPtr = (SerialInfo::SerialValOperand*)(entry + 1);
-    for (Index i = 0; i < entry->operandCount; i++)
+    for (uint32_t i = 0; i < entry->operandCount; i++)
     {
         auto serialOperand = readPtr[i];
         ValNodeOperand operand;
