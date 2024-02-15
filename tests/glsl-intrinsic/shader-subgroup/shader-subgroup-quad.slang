@@ -3,9 +3,9 @@
 //TEST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage compute -entry computeMain -target hlsl -DTARGET_HLSL
 
 // not testing cuda due to missing impl
-//T-EST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda -DTARGET_CUDA 
+//DISABLE_TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda -DTARGET_CUDA 
 // not testing cpp due to missing impl
-//T-EST:SIMPLE(filecheck=CHECK_CPP):  -allow-glsl -stage compute -entry computeMain -target cpp
+//DISABLE_TEST:SIMPLE(filecheck=CHECK_CPP):  -allow-glsl -stage compute -entry computeMain -target cpp
 
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
@@ -67,7 +67,7 @@ bool testQuadSwapX() {
         && testVQuadX<float, 3>()
         && testVQuadX<float, 4>()
         && test1QuadX<double>() // WARNING: intel GPU's lack FP64 support
-        && testVQuadX<double, 2>()
+           && testVQuadX<double, 2>()
         && testVQuadX<double, 3>()
         && testVQuadX<double, 4>()
         && test1QuadX<half>() 
@@ -94,6 +94,18 @@ bool testQuadSwapX() {
         && testVQuadX<uint, 2>()
         && testVQuadX<uint, 3>()
         && testVQuadX<uint, 4>()
+        && test1QuadX<uint8_t>() 
+        && testVQuadX<uint8_t, 2>()
+        && testVQuadX<uint8_t, 3>()
+        && testVQuadX<uint8_t, 4>()
+        && test1QuadX<uint16_t>() 
+        && testVQuadX<uint16_t, 2>()
+        && testVQuadX<uint16_t, 3>()
+        && testVQuadX<uint16_t, 4>()
+        && test1QuadX<uint64_t>() 
+        && testVQuadX<uint64_t, 2>()
+        && testVQuadX<uint64_t, 3>()
+        && testVQuadX<uint64_t, 4>()
         && test1QuadX<bool>()
         && testVQuadX<bool, 2>()
         && testVQuadX<bool, 3>()

@@ -2,11 +2,11 @@
 //TEST:SIMPLE(filecheck=CHECK_SPV):  -allow-glsl -stage compute -entry computeMain -target spirv
 
 // not testing hlsl due to missing impl
-//T-EST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage compute -entry computeMain -target hlsl -DTARGET_HLSL
+//DISABLE_TEST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage compute -entry computeMain -target hlsl -DTARGET_HLSL
 // not testing cuda due to missing impl
-//T-EST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda -DTARGET_CUDA 
+//DISABLE_TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda -DTARGET_CUDA 
 // not testing cpp due to missing impl
-//T-EST:SIMPLE(filecheck=CHECK_CPP):  -allow-glsl -stage compute -entry computeMain -target cpp
+//DISABLE_TEST:SIMPLE(filecheck=CHECK_CPP):  -allow-glsl -stage compute -entry computeMain -target cpp
 
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
@@ -62,6 +62,18 @@ bool testLogical() {
         && testVLogical<uint, 2>()
         && testVLogical<uint, 3>()
         && testVLogical<uint, 4>()
+        && test1Logical<uint8_t>()
+        && testVLogical<uint8_t, 2>()
+        && testVLogical<uint8_t, 3>()
+        && testVLogical<uint8_t, 4>()
+        && test1Logical<uint16_t>()
+        && testVLogical<uint16_t, 2>()
+        && testVLogical<uint16_t, 3>()
+        && testVLogical<uint16_t, 4>()
+        && test1Logical<uint64_t>()
+        && testVLogical<uint64_t, 2>()
+        && testVLogical<uint64_t, 3>()
+        && testVLogical<uint64_t, 4>()
         && test1Logical<bool>()
         && testVLogical<bool, 2>()
         && testVLogical<bool, 3>()
@@ -98,7 +110,7 @@ bool testArithmetic() {
         && testVArithmetic<float, 3>()
         && testVArithmetic<float, 4>()
         && test1Arithmetic<double>() // WARNING: intel GPU's lack FP64 support
-        && testVArithmetic<double, 2>() 
+           && testVArithmetic<double, 2>() 
         && testVArithmetic<double, 3>()
         && testVArithmetic<double, 4>()
         && test1Arithmetic<half>() 
@@ -125,6 +137,18 @@ bool testArithmetic() {
         && testVArithmetic<uint, 2>()
         && testVArithmetic<uint, 3>()
         && testVArithmetic<uint, 4>()
+        && test1Arithmetic<uint8_t>() 
+        && testVArithmetic<uint8_t, 2>()
+        && testVArithmetic<uint8_t, 3>()
+        && testVArithmetic<uint8_t, 4>()
+        && test1Arithmetic<uint16_t>() 
+        && testVArithmetic<uint16_t, 2>()
+        && testVArithmetic<uint16_t, 3>()
+        && testVArithmetic<uint16_t, 4>()
+        && test1Arithmetic<uint64_t>() 
+        && testVArithmetic<uint64_t, 2>()
+        && testVArithmetic<uint64_t, 3>()
+        && testVArithmetic<uint64_t, 4>()
         ;
 }
 

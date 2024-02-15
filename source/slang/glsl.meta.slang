@@ -2836,58 +2836,20 @@ void typeRequireChecks_shader_subgroup_GLSL() {
     __target_switch
     {
     case glsl:
-        if (__type_equals<T, half>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
-        else if (__type_equals<T, float16_t>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
-        else if (__type_equals<T, uint8_t>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_int8");
-        else if (__type_equals<T, uint16_t>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_int16");
-        else if (__type_equals<T, uint64_t>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_int64");
-        else if (__type_equals<T, int8_t>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_int8");
-        else if (__type_equals<T, int16_t>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_int16");
-        else if (__type_equals<T, int64_t>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_int64");
+        if (__type_equals<T, half>()
+            || __type_equals<T, float16_t>()
+            ) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        else if (__type_equals<T, uint8_t>()
+            || __type_equals<T, int8_t>()
+            ) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_int8");
+        else if (__type_equals<T, uint16_t>()
+            || __type_equals<T, int16_t>()
+            ) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_int16");
+        else if (__type_equals<T, uint64_t>()
+            || __type_equals<T, int64_t>()
+            ) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_int64");
+
         __intrinsic_asm "";
-    }
-}
-
-__generic<T : __BuiltinType>
-[require(spirv)]
-void typeRequireChecks_shader_subgroup_SPIRV() {
-    __target_switch
-    {
-    case spirv:
-
-        if (__type_equals<T, half>()) {
-
-            spirv_asm {OpCapability Float16};
-        }
-        else if (__type_equals<T, float16_t>()) {
-
-            spirv_asm {OpCapability Float16};
-        }
-        else if (__type_equals<T, uint8_t>()) {
-
-            spirv_asm {OpCapability Int8};
-        }
-        else if (__type_equals<T, uint16_t>()) {
-
-            spirv_asm {OpCapability Int16};
-        }
-        else if (__type_equals<T, uint64_t>()) {
-
-            spirv_asm {OpCapability Int64};
-        }
-        else if (__type_equals<T, int8_t>()) {
-
-            spirv_asm {OpCapability Int8};
-        }
-        else if (__type_equals<T, int16_t>()) {
-
-            spirv_asm {OpCapability Int16};
-        }
-        else if (__type_equals<T, int64_t>()) {
-
-            spirv_asm {OpCapability Int64};
-        }
-        else spirv_asm {};
     }
 }
 
@@ -2902,7 +2864,7 @@ void shader_subgroup_preamble() {
     case glsl:
         typeRequireChecks_shader_subgroup_GLSL<T>();
     case spirv:
-        typeRequireChecks_shader_subgroup_SPIRV<T>();
+        spirv_asm {};
     }
 
 } 

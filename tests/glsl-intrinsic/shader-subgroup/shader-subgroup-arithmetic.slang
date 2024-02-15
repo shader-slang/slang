@@ -1,15 +1,24 @@
-//TEST:SIMPLE(filecheck=CHECK_GLSL):  -allow-glsl -stage compute -entry computeMain -target glsl
-//TEST:SIMPLE(filecheck=CHECK_SPV):  -allow-glsl -stage compute -entry computeMain -target spirv
+//TEST:SIMPLE(filecheck=CHECK_GLSL):  -allow-glsl -stage compute -entry computeMain -target glsl -DTARGET_GLSL
+//TEST:SIMPLE(filecheck=CHECK_SPV):  -allow-glsl -stage compute -entry computeMain -target spirv -DTARGET_SPIRV
 //TEST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage compute -entry computeMain -target hlsl -DTARGET_HLSL
-//TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda -DTARGET_CUDA 
+//TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda -DTARGET_CUDA
 
 // not testing cpp due to missing impl
-//T-EST:SIMPLE(filecheck=CHECK_CPP):  -allow-glsl -stage compute -entry computeMain -target cpp
+// DISABLE_TEST:SIMPLE(filecheck=CHECK_CPP):  -allow-glsl -stage compute -entry computeMain -target cpp -DTARGET_HLSL
 
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
 
 #version 430
+
+#define DEF_BLOCK
+#if defined(DEF_BLOCK)\
+    && !defined(TARGET_HLSL) \
+    && !defined(TARGET_CUDA)
+// hlsl does not treat boolean types with subgroup.* as a logical operator
+// cuda is missing an implementation
+#define TEST_when_logical_operators_are_implemented
+#endif
 
 //TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name=outputBuffer
 buffer MyBlockName2
@@ -23,7 +32,7 @@ layout(local_size_x = local_size_x_v) in;
 __generic<T : __BuiltinLogicalType>
 bool test1Logical() {
     return true
-#if !defined(TARGET_HLSL) && !defined(TARGET_CUDA)
+#if defined(TEST_when_logical_operators_are_implemented)
         && subgroupAnd(T(1)) == T(1)
         && subgroupOr(T(1)) == T(1)
         && subgroupXor(T(1)) == T(0) 
@@ -33,16 +42,17 @@ bool test1Logical() {
         && subgroupExclusiveAnd(T(1)) == T(1)
         && subgroupExclusiveOr(T(1)) == T(1)
         && subgroupExclusiveXor(T(1)) == T(1)
-#endif // #if !defined(TARGET_HLSL) && !defined(TARGET_CUDA)
+#endif // #if !defined(TEST_when_logical_operators_are_implemented)
         ;
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
 bool testVLogical() {
     typealias gvec = vector<T, N>;
-    
+
     return true
-#if !defined(TARGET_HLSL) && !defined(TARGET_CUDA)
+#if !defined(TEST_when_logical_operators_are_implemented)
+
         && subgroupAnd(gvec(T(1))) == gvec(T(1))
         && subgroupOr(gvec(T(1))) == gvec(T(1))
         && subgroupXor(gvec(T(1))) == gvec(T(0))
@@ -52,7 +62,7 @@ bool testVLogical() {
         && subgroupExclusiveAnd(gvec(T(1))) == gvec(T(1))
         && subgroupExclusiveOr(gvec(T(1))) == gvec(T(1))
         && subgroupExclusiveXor(gvec(T(1))) == gvec(T(1))
-#endif // #if !defined(TARGET_HLSL) && !defined(TARGET_CUDA)
+#endif // #if !defined(TEST_when_logical_operators_are_implemented)
         ;
 }
 
@@ -78,6 +88,18 @@ bool testLogical() {
         && testVLogical<uint, 2>()
         && testVLogical<uint, 3>()
         && testVLogical<uint, 4>()
+        && test1Logical<uint8_t>()
+        && testVLogical<uint8_t, 2>()
+        && testVLogical<uint8_t, 3>()
+        && testVLogical<uint8_t, 4>()
+        && test1Logical<uint16_t>()
+        && testVLogical<uint16_t, 2>()
+        && testVLogical<uint16_t, 3>()
+        && testVLogical<uint16_t, 4>()
+        && test1Logical<uint64_t>()
+        && testVLogical<uint64_t, 2>()
+        && testVLogical<uint64_t, 3>()
+        && testVLogical<uint64_t, 4>()
         && test1Logical<bool>()
         && testVLogical<bool, 2>()
         && testVLogical<bool, 3>()
@@ -129,7 +151,7 @@ bool testArithmetic() {
         && testVArithmetic<float, 3>()
         && testVArithmetic<float, 4>()
         && test1Arithmetic<double>() // WARNING: intel GPU's lack FP64 support
-        && testVArithmetic<double, 2>()
+           && testVArithmetic<double, 2>()
         && testVArithmetic<double, 3>()
         && testVArithmetic<double, 4>()
         && test1Arithmetic<half>()
@@ -156,6 +178,18 @@ bool testArithmetic() {
         && testVArithmetic<uint, 2>()
         && testVArithmetic<uint, 3>()
         && testVArithmetic<uint, 4>()
+        && test1Arithmetic<uint8_t>() 
+        && testVArithmetic<uint8_t, 2>()
+        && testVArithmetic<uint8_t, 3>()
+        && testVArithmetic<uint8_t, 4>()
+        && test1Arithmetic<uint16_t>() 
+        && testVArithmetic<uint16_t, 2>()
+        && testVArithmetic<uint16_t, 3>()
+        && testVArithmetic<uint16_t, 4>()
+        && test1Arithmetic<uint64_t>() 
+        && testVArithmetic<uint64_t, 2>()
+        && testVArithmetic<uint64_t, 3>()
+        && testVArithmetic<uint64_t, 4>()
         ;
 }
 

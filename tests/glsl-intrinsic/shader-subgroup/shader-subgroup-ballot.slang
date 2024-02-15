@@ -3,9 +3,9 @@
 //TEST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage compute -entry computeMain -target hlsl -DTARGET_HLSL
 
 // not testing cuda due to missing impl
-//T-EST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda -DTARGET_CUDA 
+//DISABLE_TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda -DTARGET_CUDA 
 // not testing cpp due to missing impl
-//T-EST:SIMPLE(filecheck=CHECK_CPP):  -allow-glsl -stage compute -entry computeMain -target cpp
+//DISABLE_TEST:SIMPLE(filecheck=CHECK_CPP):  -allow-glsl -stage compute -entry computeMain -target cpp
 
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
@@ -66,7 +66,7 @@ bool testBroadcastX() {
         && testVBroadcastX<float, 3>()
         && testVBroadcastX<float, 4>()
         && test1BroadcastX<double>() // WARNING: intel GPU's lack FP64 support
-        && testVBroadcastX<double, 2>()
+           && testVBroadcastX<double, 2>()
         && testVBroadcastX<double, 3>()
         && testVBroadcastX<double, 4>()
         && test1BroadcastX<half>() 
@@ -93,6 +93,18 @@ bool testBroadcastX() {
         && testVBroadcastX<uint, 2>()
         && testVBroadcastX<uint, 3>()
         && testVBroadcastX<uint, 4>()
+        && test1BroadcastX<uint8_t>() 
+        && testVBroadcastX<uint8_t, 2>()
+        && testVBroadcastX<uint8_t, 3>()
+        && testVBroadcastX<uint8_t, 4>()
+        && test1BroadcastX<uint16_t>() 
+        && testVBroadcastX<uint16_t, 2>()
+        && testVBroadcastX<uint16_t, 3>()
+        && testVBroadcastX<uint16_t, 4>()
+        && test1BroadcastX<uint64_t>() 
+        && testVBroadcastX<uint64_t, 2>()
+        && testVBroadcastX<uint64_t, 3>()
+        && testVBroadcastX<uint64_t, 4>()
         && test1BroadcastX<bool>()
         && testVBroadcastX<bool, 2>()
         && testVBroadcastX<bool, 3>()

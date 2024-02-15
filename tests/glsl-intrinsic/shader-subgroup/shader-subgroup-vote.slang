@@ -3,9 +3,9 @@
 //TEST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage compute -entry computeMain -target hlsl -DTARGET_HLSL
 
 // not testing cuda due to missing impl
-//T-EST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda -DTARGET_CUDA 
+//DISABLE_TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda -DTARGET_CUDA 
 // not testing cpp due to missing impl
-//T-EST:SIMPLE(filecheck=CHECK_CPP):  -allow-glsl -stage compute -entry computeMain -target cpp
+//DISABLE_TEST:SIMPLE(filecheck=CHECK_CPP):  -allow-glsl -stage compute -entry computeMain -target cpp
 
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
@@ -65,7 +65,7 @@ bool testAllEqual() {
         && testVAllEqual<float, 3>()
         && testVAllEqual<float, 4>()
         && test1AllEqual<double>() // WARNING: intel GPU's lack FP64 support
-        && testVAllEqual<double, 2>()
+           && testVAllEqual<double, 2>()
         && testVAllEqual<double, 3>()
         && testVAllEqual<double, 4>()
         && test1AllEqual<half>() 
@@ -92,6 +92,18 @@ bool testAllEqual() {
         && testVAllEqual<uint, 2>()
         && testVAllEqual<uint, 3>()
         && testVAllEqual<uint, 4>()
+        && test1AllEqual<uint8_t>() 
+        && testVAllEqual<uint8_t, 2>()
+        && testVAllEqual<uint8_t, 3>()
+        && testVAllEqual<uint8_t, 4>()
+        && test1AllEqual<uint16_t>() 
+        && testVAllEqual<uint16_t, 2>()
+        && testVAllEqual<uint16_t, 3>()
+        && testVAllEqual<uint16_t, 4>()
+        && test1AllEqual<uint64_t>() 
+        && testVAllEqual<uint64_t, 2>()
+        && testVAllEqual<uint64_t, 3>()
+        && testVAllEqual<uint64_t, 4>()
         && test1AllEqual<bool>()
         && testVAllEqual<bool, 2>()
         && testVAllEqual<bool, 3>()
