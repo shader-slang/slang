@@ -1,5 +1,6 @@
 ---
 layout: user-guide
+permalink: /user-guide/get-started
 ---
 
 # Getting Started with Slang

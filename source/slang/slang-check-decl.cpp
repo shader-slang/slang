@@ -448,6 +448,7 @@ namespace Slang
 
         void visitDeclRefExpr(DeclRefExpr* expr)
         {
+            dispatchIfNotNull(expr->type.type);
             dispatchIfNotNull(expr->declRef.declRefBase);
         }
         void visitStaticMemberExpr(StaticMemberExpr* expr)
@@ -528,7 +529,10 @@ namespace Slang
 
         // Stmt Visitor
 
-        void visitDeclStmt(DeclStmt* stmt) { dispatchIfNotNull(stmt->decl); }
+        void visitDeclStmt(DeclStmt* stmt)
+        {
+            dispatchIfNotNull(stmt->decl);
+        }
 
         void visitBlockStmt(BlockStmt* stmt)
         {
@@ -687,14 +691,29 @@ namespace Slang
         : public SemanticsDeclVisitorBase
         , public DeclVisitor<SemanticsDeclCapabilityVisitor>
     {
+        CapabilitySet m_anyPlatfromCapabilitySet;
+
         SemanticsDeclCapabilityVisitor(SemanticsContext const& outer)
             : SemanticsDeclVisitorBase(outer)
         {}
 
+        CapabilitySet& getAnyPlatformCapabilitySet()
+        {
+            if (m_anyPlatfromCapabilitySet.isEmpty())
+            {
+                m_anyPlatfromCapabilitySet = CapabilitySet(CapabilityName::any_target);
+            }
+            return m_anyPlatfromCapabilitySet;
+        }
+
+        CapabilitySet getDeclaredCapabilitySet(Decl* decl);
+
+
         void visitDecl(Decl*) {}
         void visitDeclGroup(DeclGroup*) {}
-
         void checkVarDeclCommon(VarDeclBase* varDecl);
+        void visitAggTypeDeclBase(AggTypeDeclBase* decl);
+        void visitNamespaceDeclBase(NamespaceDeclBase* decl);
 
         void visitVarDecl(VarDecl* varDecl)
         {
@@ -799,6 +818,11 @@ namespace Slang
         if (auto genericDecl = as<GenericDecl>(parentDecl))
             parentDecl = genericDecl->parentDecl;
         return as<NamespaceDeclBase>(parentDecl) != nullptr || as<FileDecl>(parentDecl) != nullptr;
+    }
+
+    bool isUnsafeForceInlineFunc(FunctionDeclBase* funcDecl)
+    {
+        return funcDecl->hasModifier<UnsafeForceInlineEarlyAttribute>();
     }
 
         /// Is `decl` a global shader parameter declaration?
@@ -1452,6 +1476,11 @@ namespace Slang
             }
             else
             {
+                if (varDecl->hasModifier<ExternModifier>())
+                {
+                    getSink()->diagnose(initExpr, Diagnostics::externValueCannotHaveInitializer);
+                }
+
                 initExpr = CheckExpr(initExpr);
 
                 // TODO: We might need some additional steps here to ensure
@@ -1465,7 +1494,7 @@ namespace Slang
 
                 _validateCircularVarDefinition(varDecl);
             }
-
+            
             // If we've gone down this path, then the variable
             // declaration is actually pretty far along in checking
             varDecl->setCheckState(DeclCheckState::DefinitionChecked);
@@ -7278,7 +7307,7 @@ namespace Slang
     {
         // Create a new sub-scope to wire the module
         // into our lookup chain.
-        addSiblingScopeForContainerDecl(scope, fileDecl);
+        addSiblingScopeForContainerDecl(getASTBuilder(), scope, fileDecl);
     }
 
     void SemanticsVisitor::importModuleIntoScope(Scope* scope, ModuleDecl* moduleDecl)
@@ -7301,7 +7330,7 @@ namespace Slang
             if (moduleScope->containerDecl != moduleDecl && moduleScope->containerDecl->parentDecl != moduleDecl)
                 continue;
 
-            addSiblingScopeForContainerDecl(scope, moduleScope->containerDecl);
+            addSiblingScopeForContainerDecl(getASTBuilder(), scope, moduleScope->containerDecl);
         }
 
         // Also import any modules from nested `import` declarations
@@ -7523,7 +7552,7 @@ namespace Slang
                     if (addedScopes.add(s->containerDecl))
                     {
                         scopesAdded = true;
-                        addSiblingScopeForContainerDecl(scope, s->containerDecl);
+                        addSiblingScopeForContainerDecl(getASTBuilder(), scope, s->containerDecl);
                     }
                 }
             };
@@ -7584,7 +7613,7 @@ namespace Slang
                     {
                         ensureDecl(ns, DeclCheckState::ScopesWired);
                     }
-                    addSiblingScopeForContainerDecl(decl, otherNamespace);
+                    addSiblingScopeForContainerDecl(getASTBuilder(), decl, otherNamespace);
                 }
             }
             // For file decls, we need to continue searching up in the parent module scope.
@@ -8678,6 +8707,10 @@ namespace Slang
             set.canonicalize();
             handleReferenceFunc(stmt, set, stmt->loc);
         }
+        void visitRequireCapabilityDecl(RequireCapabilityDecl* decl)
+        {
+            handleReferenceFunc(decl, decl->inferredCapabilityRequirements, decl->loc);
+        }
     };
 
     template<typename ProcessFunc>
@@ -8721,6 +8754,59 @@ namespace Slang
             });
     }
 
+    CapabilitySet SemanticsDeclCapabilityVisitor::getDeclaredCapabilitySet(Decl* decl)
+    {
+        // Merge a decls's declared capability set with all parent declarations.
+        // For every existing target, we want to join their requirements together.
+        // If the the parent defines additional targets, we want to add them to the disjunction set.
+        // For example:
+        //    [require(glsl)] struct Parent { [require(glsl, glsl_ext_1)] [require(spirv)] void foo(); }
+        // The requirement for `foo` should be glsl+glsl_ext_1 | spirv.
+        //
+        CapabilitySet declaredCaps;
+        for (Decl* parent = decl; parent; parent = getParentDecl(parent))
+        {
+            CapabilitySet localDeclaredCaps;
+            bool shouldBreak = false;
+            if (!as<AggTypeDeclBase>(parent) || parent->inferredCapabilityRequirements.isEmpty())
+            {
+                for (auto decoration : parent->getModifiersOfType<RequireCapabilityAttribute>())
+                {
+                    for (auto& set : decoration->capabilitySet.getExpandedAtoms())
+                        localDeclaredCaps.unionWith(set);
+                }
+            }
+            else
+            {
+                localDeclaredCaps = parent->inferredCapabilityRequirements;
+                shouldBreak = true;
+            }
+            // Merge decl's capability declaration with the parent.
+            for (auto& localConjunction : localDeclaredCaps.getExpandedAtoms())
+            {
+                if (declaredCaps.isIncompatibleWith(localConjunction))
+                    declaredCaps.unionWith(localConjunction);
+                else
+                    declaredCaps.join(localDeclaredCaps);
+            }
+            // If the parent already has inferred capability requirements, we should stop now
+            // since that already covers transitive parents.
+            if (shouldBreak)
+                break;
+        }
+        return declaredCaps;
+    }
+
+    void SemanticsDeclCapabilityVisitor::visitAggTypeDeclBase(AggTypeDeclBase* decl)
+    {
+        decl->inferredCapabilityRequirements = getDeclaredCapabilitySet(decl);
+    }
+
+    void SemanticsDeclCapabilityVisitor::visitNamespaceDeclBase(NamespaceDeclBase* decl)
+    {
+        decl->inferredCapabilityRequirements = getDeclaredCapabilitySet(decl);
+    }
+
     void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* funcDecl)
     {
         for (auto member : funcDecl->members)
@@ -8733,19 +8819,17 @@ namespace Slang
                 _propagateRequirement(this, funcDecl->inferredCapabilityRequirements, funcDecl, node, nodeCaps, refLoc);
             });
 
-        // A decls's declared capability set is a transitive join of all parent declarations.
-        CapabilitySet declaredCaps;
-        for (Decl* parent = funcDecl; parent; parent = getParentDecl(parent))
+        if (!isEffectivelyStatic(funcDecl))
         {
-            CapabilitySet localDeclaredCaps;
-
-            for (auto decoration : parent->getModifiersOfType<RequireCapabilityAttribute>())
+            auto parentAggTypeDecl = getParentAggTypeDecl(funcDecl);
+            if (parentAggTypeDecl)
             {
-                for (auto& set : decoration->capabilitySet.getExpandedAtoms())
-                    localDeclaredCaps.unionWith(set);
+                ensureDecl(parentAggTypeDecl, DeclCheckState::CapabilityChecked);
+                _propagateRequirement(this, funcDecl->inferredCapabilityRequirements, funcDecl, parentAggTypeDecl, parentAggTypeDecl->inferredCapabilityRequirements, funcDecl->loc);
             }
-            declaredCaps.join(localDeclaredCaps);
         }
+        
+        auto declaredCaps = getDeclaredCapabilitySet(funcDecl);
 
         if (!declaredCaps.isEmpty())
         {
@@ -8773,7 +8857,13 @@ namespace Slang
             {
                 if (!getModuleDecl(funcDecl)->isInLegacyLanguage)
                 {
-                    getSink()->diagnose(funcDecl->loc, Diagnostics::missingCapabilityRequirementOnPublicDecl, funcDecl);
+                    if (funcDecl->inferredCapabilityRequirements != getAnyPlatformCapabilitySet())
+                    {
+                        getSink()->diagnose(
+                            funcDecl->loc,
+                            Diagnostics::missingCapabilityRequirementOnPublicDecl,
+                            funcDecl, funcDecl->inferredCapabilityRequirements);
+                    }
                 }
             }
         }
@@ -8924,6 +9014,7 @@ namespace Slang
     {
         Decl* refDecl = nullptr;
         SourceLoc loc;
+        HashSet<Decl*> printedDecls;
         while (traceLevels > 0)
         {
             refDecl = nullptr;
@@ -8940,7 +9031,9 @@ namespace Slang
                             sink->diagnose(refLoc, Diagnostics::seeDefinitionOf, "statement");
                     }
                 });
-            if (refDecl)
+            if (!refDecl)
+                break;
+            if (printedDecls.add(refDecl))
             {
                 sink->diagnose(loc, Diagnostics::seeUsingOf, refDecl);
                 decl = refDecl;

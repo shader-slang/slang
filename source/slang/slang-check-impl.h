@@ -17,6 +17,8 @@ namespace Slang
 
     bool isGlobalDecl(Decl* decl);
 
+    bool isUnsafeForceInlineFunc(FunctionDeclBase* funcDecl);
+
     bool isUniformParameterType(Type* type);
 
     Type* checkProperType(
@@ -1047,11 +1049,6 @@ namespace Slang
         Expr* maybeOpenRef(Expr* expr);
 
         Scope* getScope(SyntaxNode* node);
-
-        // Add a sibling lookup scope for `dest` to refer to `source`.
-        void addSiblingScopeForContainerDecl(ContainerDecl* dest, ContainerDecl* source);
-        void addSiblingScopeForContainerDecl(Scope* destScope, ContainerDecl* source);
-
 
         void diagnoseDeprecatedDeclRefUsage(DeclRef<Decl> declRef, SourceLoc loc, Expr* originalExpr);
 

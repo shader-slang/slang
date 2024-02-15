@@ -719,19 +719,7 @@ struct Ptr
 
     __subscript(int index) -> T
     {
-        [__unsafeForceInlineEarly]
-        get
-        {
-            return __load(__getElementPtr(this, index));
-        }
-
-        [__unsafeForceInlineEarly]
-        set(T newValue)
-        {
-            __store(__getElementPtr(this, index), newValue);
-        }
-
-        __intrinsic_op($(kIROp_GetElementPtr))
+        __intrinsic_op($(kIROp_GetOffsetPtr))
         ref;
     }
 };
@@ -747,6 +735,12 @@ Ptr<T> __getElementPtr<T>(Ptr<T> ptr, int index);
 
 __intrinsic_op($(kIROp_GetElementPtr))
 Ptr<T> __getElementPtr<T>(Ptr<T> ptr, int64_t index);
+
+__intrinsic_op($(kIROp_GetOffsetPtr))
+Ptr<T> __getOffsetPtr<T>(Ptr<T> ptr, int index);
+
+__intrinsic_op($(kIROp_GetOffsetPtr))
+Ptr<T> __getOffsetPtr<T>(Ptr<T> ptr, int64_t index);
 
 __generic<T>
 __intrinsic_op($(kIROp_Less))
@@ -1296,11 +1290,6 @@ struct Primitives
     }
 };
 
-__generic<T>
-__intrinsic_type($(kIROp_GLSLShaderStorageBufferType))
-__magic_type(GLSLShaderStorageBufferType)
-struct GLSLShaderStorageBuffer {}
-
 //@ hidden:
 
 // Need to add constructors to the types above
@@ -1548,14 +1537,14 @@ __intrinsic_op(0)
 __prefix Ptr<T> operator&(__ref T value);
 
 __generic<T>
-__intrinsic_op($(kIROp_GetElementPtr))
+__intrinsic_op($(kIROp_GetOffsetPtr))
 Ptr<T> operator+(Ptr<T> value, int64_t offset);
 
 __generic<T>
 [__unsafeForceInlineEarly]
 Ptr<T> operator-(Ptr<T> value, int64_t offset)
 {
-    return __getElementPtr(value, -offset);
+    return __getOffsetPtr(value, -offset);
 }
 
 __generic<T : IArithmetic>

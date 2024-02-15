@@ -2216,7 +2216,6 @@ struct IRFieldAddress : IRInst
     IRInst* getBase() { return base.get(); }
     IRInst* getField() { return field.get(); }
     IR_LEAF_ISA(FieldAddress)
-
 };
 
 struct IRGetElement : IRInst
@@ -4065,6 +4064,8 @@ public:
         IRInst* sizedType);
 
     IRInst* emitCastPtrToBool(IRInst* val);
+    IRInst* emitCastPtrToInt(IRInst* val);
+    IRInst* emitCastIntToPtr(IRType* ptrType, IRInst* val);
 
     IRGlobalConstant* emitGlobalConstant(
         IRType* type);

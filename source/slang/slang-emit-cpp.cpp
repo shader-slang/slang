@@ -352,6 +352,9 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
                     // Assumes ordering of types matches ordering of operands.
 
                     UInt operandCount = type->getOperandCount();
+                    if (as<IRHLSLStructuredBufferTypeBase>(type))
+                        operandCount = 1;
+
                     if (operandCount)
                     {
                         m_writer->emit("<");

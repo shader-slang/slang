@@ -1045,6 +1045,7 @@ namespace Slang
             // layout(local_size_x=1) in;
         case ASTNodeType::InModifier:
         case ASTNodeType::InOutModifier:
+        case ASTNodeType::OutModifier:
         case ASTNodeType::GLSLLayoutModifier:
         case ASTNodeType::GLSLParsedLayoutModifier:
         case ASTNodeType::GLSLConstantIDLayoutModifier:
@@ -1059,8 +1060,6 @@ namespace Slang
                 return true;
             [[fallthrough]];
 
-            // Allowed only on parameters and global variables.
-        case ASTNodeType::OutModifier:
         case ASTNodeType::RefModifier:
         case ASTNodeType::ConstRefModifier:
         case ASTNodeType::GLSLBufferModifier:

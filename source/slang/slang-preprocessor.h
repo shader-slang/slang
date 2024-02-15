@@ -13,6 +13,8 @@ class DiagnosticSink;
 class Linkage;
 struct PreprocessorContentAssistInfo;
 
+enum class SourceLanguage : SlangSourceLanguageIntegral;
+
 namespace preprocessor
 {
     struct Preprocessor;
@@ -62,7 +64,8 @@ struct PreprocessorDesc
     /// Take a source `file` and preprocess it into a list of tokens.
 TokenList preprocessSource(
     SourceFile*             file,
-    PreprocessorDesc const& desc);
+    PreprocessorDesc const& desc,
+    SourceLanguage& outDetectedLanguage);
 
     /// Convenience wrapper for `preprocessSource` when a `Linkage` is available
 TokenList preprocessSource(
@@ -71,6 +74,7 @@ TokenList preprocessSource(
     IncludeSystem*                      includeSystem,
     Dictionary<String, String> const&   defines,
     Linkage*                            linkage,
+    SourceLanguage&                           outDetectedLanguage,
     PreprocessorHandler*                handler = nullptr);
 
 // The following functions are intended to be used inside of implementations

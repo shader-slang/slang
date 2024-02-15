@@ -2055,6 +2055,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
     case kIROp_MatrixReshape:
     case kIROp_CastPtrToInt:
     case kIROp_CastIntToPtr:
+    case kIROp_PtrCast:
     {
         // Simple constructor call
         auto prec = getInfo(EmitOp::Prefix);
@@ -2343,6 +2344,15 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         needClose = maybeEmitParens(outerPrec, prec);
         emitOperand(inst->getOperand(0), leftSide(outerPrec, prec));
         m_writer->emit(".detach()");
+        break;
+    }
+    case kIROp_GetOffsetPtr:
+    {
+        auto prec = getInfo(EmitOp::Add);
+        needClose = maybeEmitParens(outerPrec, prec);
+        emitOperand(inst->getOperand(0), leftSide(outerPrec, prec));
+        m_writer->emit(" + ");
+        emitOperand(inst->getOperand(1), rightSide(prec, outerPrec));
         break;
     }
     case kIROp_GetElement:
@@ -4097,7 +4107,8 @@ void CLikeSourceEmitter::ensureGlobalInst(ComputeEmitActionsContext* ctx, IRInst
     }
     if (as<IRBasicType>(inst))
         return;
-
+    if (as<IRPtrLit>(inst))
+        return;
     // Certain inst ops will always emit as definition.
     switch (inst->getOp())
     {

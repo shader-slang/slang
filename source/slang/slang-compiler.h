@@ -1325,6 +1325,22 @@ namespace Slang
             return Super::getEntryPointHash(entryPointIndex, targetIndex, outHash);
         }
 
+        /// Get a serialized representation of the checked module.
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL serialize(ISlangBlob** outSerializedBlob) override;
+
+        /// Write the serialized representation of this module to a file.
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL writeToFile(char const* fileName) override;
+
+        /// Get the name of the module.
+        virtual SLANG_NO_THROW const char* SLANG_MCALL getName() override;
+
+        /// Get the path of the module.
+        virtual SLANG_NO_THROW const char* SLANG_MCALL getFilePath() override;
+
+        /// Get the unique identity of the module.
+        virtual SLANG_NO_THROW const char* SLANG_MCALL getUniqueIdentity() override;
+
+
         virtual void buildHash(DigestBuilder<SHA1>& builder) SLANG_OVERRIDE;
 
             /// Create a module (initially empty).
@@ -1353,6 +1369,10 @@ namespace Slang
             /// This should only be called once, during creation of the module.
             ///
         void setModuleDecl(ModuleDecl* moduleDecl);// { m_moduleDecl = moduleDecl; }
+
+        void setName(String name);
+        void setName(Name* name) { m_name = name; }
+        void setPathInfo(PathInfo pathInfo) { m_pathInfo = pathInfo; }
 
             /// Set the IR for this module.
             ///
@@ -1395,6 +1415,8 @@ namespace Slang
             ///
         void _collectShaderParams();
 
+        void _discoverEntryPoints(DiagnosticSink* sink);
+
         class ModuleSpecializationInfo : public SpecializationInfo
         {
         public:
@@ -1426,6 +1448,9 @@ namespace Slang
             DiagnosticSink*             sink) SLANG_OVERRIDE;
 
     private:
+        Name* m_name = nullptr;
+        PathInfo m_pathInfo;
+
         // The AST for the module
         ModuleDecl*  m_moduleDecl = nullptr;
 
@@ -1538,6 +1563,13 @@ namespace Slang
         Scope* getLanguageScope();
 
         Dictionary<String, String> getCombinedPreprocessorDefinitions();
+
+        void setModuleName(Name* name)
+        {
+            moduleName = name;
+            if (module)
+                module->setName(name);
+        }
 
     protected:
         void _addSourceFile(SourceFile* sourceFile);
@@ -1730,6 +1762,11 @@ namespace Slang
         /// lookup additional loaded modules.
     typedef Dictionary<Name*, Module*> LoadedModuleDictionary;
 
+    enum ModuleBlobType
+    {
+        Source, IR
+    };
+
         /// A context for loading and re-using code modules.
     class Linkage : public RefObject, public slang::ISession
     {
@@ -1742,6 +1779,17 @@ namespace Slang
         SLANG_NO_THROW slang::IModule* SLANG_MCALL loadModule(
             const char* moduleName,
             slang::IBlob**     outDiagnostics = nullptr) override;
+        slang::IModule* loadModuleFromBlob(
+            const char* moduleName,
+            const char* path,
+            slang::IBlob* source,
+            ModuleBlobType blobType,
+            slang::IBlob** outDiagnostics = nullptr);
+        SLANG_NO_THROW slang::IModule* SLANG_MCALL loadModuleFromIRBlob(
+            const char* moduleName,
+            const char* path,
+            slang::IBlob* source,
+            slang::IBlob** outDiagnostics = nullptr) override;
         SLANG_NO_THROW slang::IModule* SLANG_MCALL loadModuleFromSource(
             const char* moduleName,
             const char* path,
@@ -1786,6 +1834,8 @@ namespace Slang
             ISlangBlob** outDiagnostics) override;
         SLANG_NO_THROW SlangResult SLANG_MCALL createCompileRequest(
             SlangCompileRequest**   outCompileRequest) override;
+        virtual SLANG_NO_THROW SlangInt SLANG_MCALL getLoadedModuleCount() override;
+        virtual SLANG_NO_THROW slang::IModule* SLANG_MCALL getLoadedModule(SlangInt index) override;
 
         // Updates the supplied builder with linkage-related information, which includes preprocessor
         // defines, the compiler version, and other compiler options. This is then merged with the hash
@@ -1935,6 +1985,15 @@ namespace Slang
             ISlangBlob*         fileContentsBlob,
             SourceLoc const&    loc,
             DiagnosticSink*     sink,
+            const LoadedModuleDictionary* additionalLoadedModules,
+            ModuleBlobType      blobType);
+
+        RefPtr<Module> loadModuleFromIRBlobImpl(
+            Name* name,
+            const PathInfo& filePathInfo,
+            ISlangBlob* fileContentsBlob,
+            SourceLoc const& loc,
+            DiagnosticSink* sink,
             const LoadedModuleDictionary* additionalLoadedModules);
 
         void loadParsedModule(
@@ -1951,6 +2010,8 @@ namespace Slang
             SourceLoc const&    loc,
             DiagnosticSink*     sink,
             const LoadedModuleDictionary* loadedModules = nullptr);
+
+        void prepareDeserializedModule(Module* module, DiagnosticSink* sink);
 
         SourceFile* findFile(Name* name, SourceLoc loc, IncludeSystem& outIncludeSystem);
         struct IncludeResult

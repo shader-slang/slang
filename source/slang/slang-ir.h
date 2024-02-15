@@ -1466,7 +1466,14 @@ struct IRBuiltinGenericType : IRType
 };
 
 SIMPLE_IR_PARENT_TYPE(PointerLikeType, BuiltinGenericType);
-SIMPLE_IR_PARENT_TYPE(HLSLStructuredBufferTypeBase, BuiltinGenericType)
+
+struct IRHLSLStructuredBufferTypeBase : IRBuiltinGenericType
+{
+    IRType* getDataLayout() { return (IRType*)getOperand(1); }
+
+    IR_PARENT_ISA(HLSLStructuredBufferTypeBase)
+};
+
 SIMPLE_IR_TYPE(HLSLStructuredBufferType, HLSLStructuredBufferTypeBase)
 SIMPLE_IR_TYPE(HLSLRWStructuredBufferType, HLSLStructuredBufferTypeBase)
 SIMPLE_IR_TYPE(HLSLRasterizerOrderedStructuredBufferType, HLSLStructuredBufferTypeBase)
@@ -1519,8 +1526,14 @@ SIMPLE_IR_TYPE(ConstantBufferType, UniformParameterGroupType)
 SIMPLE_IR_TYPE(TextureBufferType, UniformParameterGroupType)
 SIMPLE_IR_TYPE(GLSLInputParameterGroupType, VaryingParameterGroupType)
 SIMPLE_IR_TYPE(GLSLOutputParameterGroupType, VaryingParameterGroupType)
-SIMPLE_IR_TYPE(GLSLShaderStorageBufferType, ParameterGroupType)
 SIMPLE_IR_TYPE(ParameterBlockType, UniformParameterGroupType)
+
+struct IRGLSLShaderStorageBufferType : IRBuiltinGenericType
+{
+    IRType* getDataLayout() { return (IRType*)getOperand(1); }
+
+    IR_LEAF_ISA(GLSLShaderStorageBufferType)
+};
 
 struct IRArrayTypeBase : IRType
 {
@@ -1799,6 +1812,10 @@ struct IRStructField : IRInst
         // inherit from `IRType` in the hierarchy.
         //
         return (IRType*) getOperand(1);
+    }
+    void setFieldType(IRType* type)
+    {
+        setOperand(1, type);
     }
 
     IR_LEAF_ISA(StructField)

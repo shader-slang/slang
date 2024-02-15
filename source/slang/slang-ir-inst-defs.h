@@ -133,6 +133,11 @@ INST(Nop, nop, 0, 0)
         INST(SamplerComparisonStateType, SamplerComparisonState, 0, HOISTABLE)
     INST_RANGE(SamplerStateTypeBase, SamplerStateType, SamplerComparisonStateType)
 
+    INST(DefaultBufferLayoutType, DefaultLayout, 0, HOISTABLE)
+    INST(Std140BufferLayoutType, Std140Layout, 0, HOISTABLE)
+    INST(Std430BufferLayoutType, Std430Layout, 0, HOISTABLE)
+    INST(ScalarBufferLayoutType, ScalarLayout, 0, HOISTABLE)
+
     INST(TextureFootprintType, TextureFootprintType, 1, HOISTABLE)
 
     INST(TextureShape1DType, TextureShape1DType, 0, HOISTABLE)
@@ -381,6 +386,8 @@ INST(FieldAddress, get_field_addr, 2, 0)
 
 INST(GetElement, getElement, 2, 0)
 INST(GetElementPtr, getElementPtr, 2, 0)
+// Pointer offset: computes pBase + offset_in_elements
+INST(GetOffsetPtr, getOffsetPtr, 2, 0) 
 INST(GetAddr, getAddr, 1, 0)
 
 // Get an unowned NativeString from a String.
@@ -1006,6 +1013,7 @@ INST(CastPtrToBool, CastPtrToBool, 1, 0)
 INST(CastPtrToInt, CastPtrToInt, 1, 0)
 INST(CastIntToPtr, CastIntToPtr, 1, 0)
 INST(CastToVoid, castToVoid, 1, 0)
+INST(PtrCast, PtrCast, 1, 0)
 
 INST(SizeOf,                            sizeOf,                     1, 0)
 INST(AlignOf,                           alignOf,                    1, 0)
