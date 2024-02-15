@@ -52,8 +52,8 @@ inline void serializeValPointerValue(SerialWriter* writer, Val* ptrValue, Serial
 
 inline void deserializeValPointerValue(SerialReader* reader, const SerialIndex* inSerial, void* outPtr)
 {
-    auto val = reader->getPointer(*(const SerialIndex*)inSerial).dynamicCast<Val>();
-    *(Val**)outPtr = val;
+    auto val = reader->getValPointer(*(const SerialIndex*)inSerial);
+    *(void**)outPtr = val.m_ptr;
 }
 
 template<typename T>

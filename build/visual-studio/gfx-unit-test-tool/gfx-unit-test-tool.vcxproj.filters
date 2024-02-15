@@ -74,6 +74,12 @@
     <ClCompile Include="..\..\..\tools\gfx-unit-test\nested-parameter-block.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\precompiled-module-2.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\precompiled-module.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\tools\gfx-unit-test\ray-tracing-tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -131,6 +137,12 @@
       <Filter>Source Files</Filter>
     </None>
     <None Include="..\..\..\tools\gfx-unit-test\nested-parameter-block.slang">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="..\..\..\tools\gfx-unit-test\precompiled-module-imported.slang">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="..\..\..\tools\gfx-unit-test\precompiled-module.slang">
       <Filter>Source Files</Filter>
     </None>
     <None Include="..\..\..\tools\gfx-unit-test\ray-tracing-test-shaders.slang">

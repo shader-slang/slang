@@ -26,7 +26,7 @@
 #include "slang-parser.h"
 #include "slang-preprocessor.h"
 #include "slang-type-layout.h"
-
+#
 #include "slang-options.h"
 
 #include "slang-repro.h"
@@ -480,11 +480,12 @@ SlangResult Session::_readBuiltinModule(ISlangFileSystem* fileSystem, Scope* sco
     // Hmm - don't have a suitable sink yet, so attempt to just not have one
     options.sink = nullptr;
 
-    SLANG_RETURN_ON_FAIL(SerialContainerUtil::read(&riffContainer, options, containerData));
+    SLANG_RETURN_ON_FAIL(SerialContainerUtil::read(&riffContainer, options, nullptr, containerData));
 
     for (auto& srcModule : containerData.modules)
     {
         RefPtr<Module> module(new Module(linkage, srcModule.astBuilder));
+        module->setName(moduleName);
 
         ModuleDecl* moduleDecl = as<ModuleDecl>(srcModule.astRootNode);
         // Set the module back reference on the decl
@@ -1086,10 +1087,11 @@ SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModule(
     }
 }
 
-SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModuleFromSource(
+SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModuleFromBlob(
     const char* moduleName,
     const char* path,
     slang::IBlob* source,
+    ModuleBlobType blobType,
     slang::IBlob** outDiagnostics)
 {
     SLANG_AST_BUILDER_RAII(getASTBuilder());
@@ -1124,7 +1126,8 @@ SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModuleFromSource(
             source,
             SourceLoc(),
             &sink,
-            nullptr);
+            nullptr,
+            blobType);
         sink.getBlobIfNeeded(outDiagnostics);
         return asExternal(module);
 
@@ -1134,6 +1137,24 @@ SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModuleFromSource(
         sink.getBlobIfNeeded(outDiagnostics);
         return nullptr;
     }
+}
+
+SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModuleFromSource(
+    const char* moduleName,
+    const char* path,
+    slang::IBlob* source,
+    slang::IBlob** outDiagnostics)
+{
+    return loadModuleFromBlob(moduleName, path, source, ModuleBlobType::Source, outDiagnostics);
+}
+
+SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModuleFromIRBlob(
+    const char* moduleName,
+    const char* path,
+    slang::IBlob* source,
+    slang::IBlob** outDiagnostics)
+{
+    return loadModuleFromBlob(moduleName, path, source, ModuleBlobType::IR, outDiagnostics);
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createCompositeComponentType(
@@ -1396,6 +1417,18 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createCompileRequest(
     compileRequest->addRef();
     *outCompileRequest = asExternal(compileRequest);
     return SLANG_OK;
+}
+
+SLANG_NO_THROW SlangInt SLANG_MCALL Linkage::getLoadedModuleCount()
+{
+    return loadedModulesList.getCount();
+}
+
+SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::getLoadedModule(SlangInt index)
+{
+    if (index >= 0 && index < loadedModulesList.getCount())
+        return loadedModulesList[index].get();
+    return nullptr;
 }
 
 void Linkage::buildHash(DigestBuilder<SHA1>& builder, SlangInt targetIndex)
@@ -2909,8 +2942,7 @@ int FrontEndCompileRequest::addTranslationUnit(SourceLanguage language, Name* mo
     translationUnit->compileRequest = this;
     translationUnit->sourceLanguage = SourceLanguage(language);
 
-    translationUnit->moduleName = moduleName;
-
+    translationUnit->setModuleName(moduleName);
     return addTranslationUnit(translationUnit);
 }
 
@@ -3097,6 +3129,54 @@ void Linkage::loadParsedModule(
     loadedModulesList.add(loadedModule);
 }
 
+RefPtr<Module> Linkage::loadModuleFromIRBlobImpl(
+    Name* name,
+    const PathInfo& filePathInfo,
+    ISlangBlob* fileContentsBlob,
+    SourceLoc const& loc,
+    DiagnosticSink* sink,
+    const LoadedModuleDictionary* additionalLoadedModules)
+{
+    RefPtr<Module> resultModule = new Module(this, getASTBuilder());
+    resultModule->setName(name);
+    ModuleBeingImportedRAII moduleBeingImported(
+        this,
+        resultModule,
+        name,
+        loc);
+
+    String mostUniqueIdentity = filePathInfo.getMostUniqueIdentity();
+    SLANG_ASSERT(mostUniqueIdentity.getLength() > 0);
+
+    mapPathToLoadedModule.add(mostUniqueIdentity, resultModule);
+    mapNameToLoadedModules.add(name, resultModule);
+
+    RiffContainer container;
+    MemoryStreamBase readStream(FileAccess::Read, fileContentsBlob->getBufferPointer(), fileContentsBlob->getBufferSize());
+    SLANG_RETURN_NULL_ON_FAIL(RiffUtil::read(&readStream, container));
+    SerialContainerUtil::ReadOptions readOptions;
+    readOptions.linkage = this;
+    readOptions.astBuilder = getASTBuilder();
+    readOptions.session = getSessionImpl();
+    readOptions.sharedASTBuilder = getASTBuilder()->getSharedASTBuilder();
+    readOptions.sink = sink;
+    readOptions.sourceManager = getSourceManager();
+    readOptions.namePool = getNamePool();
+    SerialContainerData containerData;
+    SLANG_RETURN_NULL_ON_FAIL(SerialContainerUtil::read(&container, readOptions, additionalLoadedModules, containerData));
+    if (containerData.modules.getCount() != 1)
+        return nullptr;
+    auto moduleEntry = containerData.modules.getFirst();
+    resultModule->setIRModule(moduleEntry.irModule);
+    resultModule->setModuleDecl(as<ModuleDecl>(moduleEntry.astRootNode));
+
+    prepareDeserializedModule(resultModule, sink);
+
+    loadedModulesList.add(resultModule);
+    resultModule->setPathInfo(filePathInfo);
+    return resultModule;
+}
+
 Module* Linkage::loadModule(String const& name)
 {
     // TODO: We either need to have a diagnostics sink
@@ -3129,15 +3209,19 @@ RefPtr<Module> Linkage::loadModule(
     ISlangBlob*         sourceBlob,
     SourceLoc const&    srcLoc,
     DiagnosticSink*     sink,
-    const LoadedModuleDictionary* additionalLoadedModules)
+    const LoadedModuleDictionary* additionalLoadedModules,
+    ModuleBlobType      blobType)
 {
+    if (blobType == ModuleBlobType::IR)
+        return loadModuleFromIRBlobImpl(name, filePathInfo, sourceBlob, srcLoc, sink, additionalLoadedModules);
+
     RefPtr<FrontEndCompileRequest> frontEndReq = new FrontEndCompileRequest(this, nullptr, sink);
 
     frontEndReq->additionalLoadedModules = additionalLoadedModules;
 
     RefPtr<TranslationUnitRequest> translationUnit = new TranslationUnitRequest(frontEndReq);
     translationUnit->compileRequest = frontEndReq;
-    translationUnit->moduleName = name;
+    translationUnit->setModuleName(name);
     Stage impliedStage;
     translationUnit->sourceLanguage = SourceLanguage::Slang;
 
@@ -3216,6 +3300,7 @@ RefPtr<Module> Linkage::loadModule(
         return nullptr;
     }
 
+    module->setPathInfo(filePathInfo);
     return module;
 }
 
@@ -3299,7 +3384,6 @@ RefPtr<Module> Linkage::findOrImportModule(
         return previouslyLoadedModule;
     }
 
-    auto fileName = getFileNameFromModuleName(name);
 
     // Next, try to find the file of the given name,
     // using our ordinary include-handling logic.
@@ -3310,46 +3394,60 @@ RefPtr<Module> Linkage::findOrImportModule(
     PathInfo pathIncludedFromInfo = getSourceManager()->getPathInfo(loc, SourceLocType::Actual);
     PathInfo filePathInfo;
 
-    ComPtr<ISlangBlob> fileContents;
+    auto moduleSourceFileName = getFileNameFromModuleName(name);
 
-    // We have to load via the found path - as that is how file was originally loaded
-    if (SLANG_FAILED(includeSystem.findFile(fileName, pathIncludedFromInfo.foundPath, filePathInfo)))
+    // Look for a precompiled module first, if not exist, load from source.
+    for (int checkBinaryModule = 1; checkBinaryModule >= 0; checkBinaryModule--)
     {
-        if (name && name->text == "glsl")
-        {
-            // This is a builtin glsl module, just load it from embedded definition.
-            fileContents = getSessionImpl()->getGLSLLibraryCode();
-            filePathInfo = PathInfo::makeFromString("glsl");
-        }
+        String fileName;
+        if (checkBinaryModule == 1)
+            fileName = Path::replaceExt(moduleSourceFileName, "slang-module");
         else
+            fileName = moduleSourceFileName;
+
+        ComPtr<ISlangBlob> fileContents;
+
+        // We have to load via the found path - as that is how file was originally loaded
+        if (SLANG_FAILED(includeSystem.findFile(fileName, pathIncludedFromInfo.foundPath, filePathInfo)))
         {
-            sink->diagnose(loc, Diagnostics::cannotFindFile, fileName);
-            mapNameToLoadedModules[name] = nullptr;
-            return nullptr;
+            if (name && name->text == "glsl")
+            {
+                // This is a builtin glsl module, just load it from embedded definition.
+                fileContents = getSessionImpl()->getGLSLLibraryCode();
+                filePathInfo = PathInfo::makeFromString("glsl");
+            }
+            else
+            {
+                continue;
+            }
         }
+
+        // Maybe this was loaded previously at a different relative name?
+        if (mapPathToLoadedModule.tryGetValue(filePathInfo.getMostUniqueIdentity(), loadedModule))
+            return loadedModule;
+
+        // Try to load it
+        if (!fileContents && SLANG_FAILED(includeSystem.loadFile(filePathInfo, fileContents)))
+        {
+            continue;
+        }
+
+        // We've found a file that we can load for the given module, so
+        // go ahead and perform the module-load action
+        return loadModule(
+            name,
+            filePathInfo,
+            fileContents,
+            loc,
+            sink,
+            loadedModules,
+            (checkBinaryModule == 1 ? ModuleBlobType::IR : ModuleBlobType::Source));
     }
 
-    // Maybe this was loaded previously at a different relative name?
-    if (mapPathToLoadedModule.tryGetValue(filePathInfo.getMostUniqueIdentity(), loadedModule))
-        return loadedModule;
-
-    // Try to load it
-    if( !fileContents && SLANG_FAILED(includeSystem.loadFile(filePathInfo, fileContents)))
-    {
-        sink->diagnose(loc, Diagnostics::cannotOpenFile, fileName);
-        mapNameToLoadedModules[name] = nullptr;
-        return nullptr;
-    }
-
-    // We've found a file that we can load for the given module, so
-    // go ahead and perform the module-load action
-    return loadModule(
-        name,
-        filePathInfo,
-        fileContents,
-        loc,
-        sink,
-        loadedModules);
+    // Error: we cannot find the file.
+    sink->diagnose(loc, Diagnostics::cannotOpenFile, moduleSourceFileName);
+    mapNameToLoadedModules[name] = nullptr;
+    return nullptr;
 }
 
 SourceFile* Linkage::findFile(Name* name, SourceLoc loc, IncludeSystem& outIncludeSystem)
@@ -3567,7 +3665,14 @@ void Module::addFileDependency(SourceFile* sourceFile)
 void Module::setModuleDecl(ModuleDecl* moduleDecl)
 {
     m_moduleDecl = moduleDecl;
+    moduleDecl->module = this;
 }
+
+void Module::setName(String name)
+{
+    m_name = getLinkage()->getNamePool()->getName(name);
+}
+
 
 RefPtr<EntryPoint> Module::findEntryPointByName(UnownedStringSlice const& name)
 {
@@ -4826,6 +4931,22 @@ void Linkage::setFileSystem(ISlangFileSystem* inFileSystem)
 
     // Set the file system used on the source manager
     getSourceManager()->setFileSystemExt(m_fileSystemExt);
+}
+
+void Linkage::prepareDeserializedModule(Module* module, DiagnosticSink* sink)
+{
+    module->_collectShaderParams();
+    module->_discoverEntryPoints(sink);
+
+    // Hook up fileDecl's scope to module's scope.
+    auto moduleDecl = module->getModuleDecl();
+    for (auto globalDecl : moduleDecl->members)
+    {
+        if (auto fileDecl = as<FileDecl>(globalDecl))
+        {
+            addSiblingScopeForContainerDecl(m_astBuilder, moduleDecl->ownedScope, fileDecl);
+        }
+    }
 }
 
 void Linkage::setRequireCacheFileSystem(bool requireCacheFileSystem)

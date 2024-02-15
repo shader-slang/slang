@@ -1280,21 +1280,24 @@ namespace Slang
         Parser* parser, void* /*userData*/)
     {
         auto decl = parser->astBuilder->create<ModuleDeclarationDecl>();
+        auto moduleDecl = parser->getCurrentModuleDecl();
         if (parser->LookAheadToken(TokenType::Identifier))
         {
             auto nameToken = parser->ReadToken(TokenType::Identifier);
             decl->nameAndLoc.name = parser->getNamePool()->getName(nameToken.getContent());
             decl->nameAndLoc.loc = nameToken.loc;
+            if (moduleDecl) moduleDecl->nameAndLoc = decl->nameAndLoc;
         }
         else if (parser->LookAheadToken(TokenType::StringLiteral))
         {
             auto nameToken = parser->ReadToken(TokenType::StringLiteral);
             decl->nameAndLoc.name = parser->getNamePool()->getName(getStringLiteralTokenValue(nameToken));
             decl->nameAndLoc.loc = nameToken.loc;
+            if (moduleDecl) moduleDecl->nameAndLoc = decl->nameAndLoc;
         }
         else
         {
-            if (auto moduleDecl = parser->getCurrentModuleDecl())
+            if (moduleDecl)
                 decl->nameAndLoc.name = moduleDecl->getName();
             decl->nameAndLoc.loc = parser->tokenReader.peekLoc();
         }
