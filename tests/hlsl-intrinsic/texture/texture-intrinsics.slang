@@ -266,8 +266,7 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     val += t1D.SampleGrad(samplerState, 0.0f, _ddx, _ddy);
     val += t2D.SampleGrad(samplerState, float2(u, u), float2(_ddx, _ddx), float2(_ddy, _ddy));
     val += t3D.SampleGrad(samplerState, float3(u, u, u), float3(_ddx, _ddx, _ddx), float3(_ddy, _ddy, _ddy));
-    //val += tCube.SampleGrad(samplerState, normalize(float3(u, 1 - u, u)), float3(_ddx, _ddx, _ddx), float3(_ddy, _ddy, _ddy));
-        // This should be float3 for the ddx/ddy, but currently it's defined in slang as float2 and either way does not run
+    val += tCube.SampleGrad(samplerState, normalize(float3(u, 1 - u, u)), float3(_ddx, _ddx, _ddx), float3(_ddy, _ddy, _ddy));
 
     val += t1DArray.SampleGrad(samplerState, float2(0.0f, 0.0f), _ddx, _ddy);
     val += t2DArray.SampleGrad(samplerState, float3(u, u, 0.0f), float2(_ddx, _ddx), float2(_ddy, _ddy));
@@ -283,19 +282,19 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     outputBuffer[idx] = val;
 }
 
-// DX11: 312
-// DX11: 312
-// DX11: 312
-// DX11: 312
-// DX12: 312
-// DX12: 312
-// DX12: 312
-// DX12: 312
-// DX12CS6: 335
-// DX12CS6: 335
-// DX12CS6: 335
-// DX12CS6: 335
-// VK: 335
-// VK: 335
-// VK: 335
-// VK: 335
+// DX11: 313
+// DX11: 313
+// DX11: 313
+// DX11: 313
+// DX12: 313
+// DX12: 313
+// DX12: 313
+// DX12: 313
+// DX12CS6: 336
+// DX12CS6: 336
+// DX12CS6: 336
+// DX12CS6: 336
+// VK: 336
+// VK: 336
+// VK: 336
+// VK: 336
