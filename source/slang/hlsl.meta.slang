@@ -7267,7 +7267,7 @@ bool WaveMaskIsFirstLane(WaveMask mask)
     case spirv:
         return spirv_asm
         {
-            OpCapability GroupNonUniform;
+            OpCapability GroupNonUniformBallot;
             OpGroupNonUniformElect $$bool result Subgroup
         };
     default:
@@ -7290,7 +7290,7 @@ bool WaveMaskAllTrue(WaveMask mask, bool condition)
     case spirv:
         return spirv_asm
         {
-            OpCapability GroupNonUniformVote;
+            OpCapability GroupNonUniformBallot;
             OpGroupNonUniformAll $$bool result Subgroup $condition
         };
     default:
@@ -7313,7 +7313,7 @@ bool WaveMaskAnyTrue(WaveMask mask, bool condition)
     case spirv:
         return spirv_asm
         {
-            OpCapability GroupNonUniformVote;
+            OpCapability GroupNonUniformBallot;
             OpGroupNonUniformAny $$bool result Subgroup $condition
         };
     default:
@@ -7808,7 +7808,13 @@ T WaveMaskProduct(WaveMask mask, T expr)
         if (__isFloat<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMul $$T result Subgroup 0 $expr};
         else if (__isInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIMul $$T result Subgroup 0 $expr};
+        {
+            return spirv_asm
+            {
+                OpCapability GroupNonUniformArithmetic;
+                OpGroupNonUniformIMul $$T result Subgroup 0 $expr;
+            };
+        }
         else return expr;
     }
 }
@@ -7827,7 +7833,13 @@ vector<T,N> WaveMaskProduct(WaveMask mask, vector<T,N> expr)
         if (__isFloat<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMul $$vector<T,N> result Subgroup 0 $expr};
         else if (__isInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIMul $$vector<T,N> result Subgroup 0 $expr};
+        {
+            return spirv_asm
+            {
+                OpCapability GroupNonUniformArithmetic;
+                OpGroupNonUniformIMul $$vector<T,N> result Subgroup 0 $expr;
+            };
+        }
         else return expr;
     }
 }
@@ -7856,7 +7868,13 @@ T WaveMaskSum(WaveMask mask, T expr)
         if (__isFloat<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFAdd $$T result Subgroup 0 $expr};
         else if (__isInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIAdd $$T result Subgroup 0 $expr};
+        {
+            return spirv_asm
+            {
+                OpCapability GroupNonUniformArithmetic;
+                OpGroupNonUniformIAdd $$T result Subgroup 0 $expr;
+            };
+        }
         else return expr;
     }
 }
@@ -7876,7 +7894,13 @@ vector<T,N> WaveMaskSum(WaveMask mask, vector<T,N> expr)
         if (__isFloat<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFAdd $$vector<T,N> result Subgroup 0 $expr};
         else if (__isInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIAdd $$vector<T,N> result Subgroup 0 $expr};
+        {
+            return spirv_asm
+            {
+                OpCapability GroupNonUniformArithmetic; 
+                OpGroupNonUniformIAdd $$vector<T,N> result Subgroup 0 $expr;
+            };
+        }
         else return expr;
     }
 }
@@ -7959,7 +7983,13 @@ T WaveMaskPrefixProduct(WaveMask mask, T expr)
         if (__isFloat<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMul $$T result Subgroup ExclusiveScan $expr};
         else if (__isInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIMul $$T result Subgroup ExclusiveScan $expr};
+        {
+            return spirv_asm
+            {
+                OpCapability GroupNonUniformArithmetic;
+                OpGroupNonUniformIMul $$T result Subgroup ExclusiveScan $expr;
+            };
+        }
         else return expr;
     }
 }
@@ -7979,7 +8009,13 @@ vector<T,N> WaveMaskPrefixProduct(WaveMask mask, vector<T,N> expr)
         if (__isFloat<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMul $$vector<T,N> result Subgroup ExclusiveScan $expr};
         else if (__isInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIMul $$vector<T,N> result Subgroup ExclusiveScan $expr};
+        {
+            return spirv_asm
+            {
+                OpCapability GroupNonUniformArithmetic;
+                OpGroupNonUniformIMul $$vector<T,N> result Subgroup ExclusiveScan $expr;
+            };
+        }
         else return expr;
     }
 }
@@ -8004,7 +8040,13 @@ T WaveMaskPrefixSum(WaveMask mask, T expr)
         if (__isFloat<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFAdd $$T result Subgroup ExclusiveScan $expr};
         else if (__isInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIAdd $$T result Subgroup ExclusiveScan $expr};
+        {
+            return spirv_asm
+            {
+                OpCapability GroupNonUniformArithmetic;
+                result:$$T = OpGroupNonUniformIAdd Subgroup ExclusiveScan $expr;
+            };
+        }
         else return expr;
     }
 }
@@ -8025,7 +8067,13 @@ vector<T,N> WaveMaskPrefixSum(WaveMask mask, vector<T,N> expr)
         if (__isFloat<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFAdd $$vector<T,N> result Subgroup ExclusiveScan $expr};
         else if (__isInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIAdd $$vector<T,N> result Subgroup ExclusiveScan $expr};
+        {
+            return spirv_asm
+            {
+                OpCapability GroupNonUniformArithmetic;
+                result:$$vector<T,N> = OpGroupNonUniformIAdd Subgroup ExclusiveScan $expr;
+            };
+        }
         else return expr;
     }
 }
@@ -8121,7 +8169,7 @@ __cuda_sm_version(7.0)
 __target_intrinsic(cuda, "_waveMatchMultiple($0, $1)")
 WaveMask WaveMaskMatch(WaveMask mask, matrix<T,N,M> value);
 
-__generic<T : __BuiltinIntegerType>
+__generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 T WaveMaskPrefixBitAnd(WaveMask mask, T expr)
@@ -8136,7 +8184,7 @@ T WaveMaskPrefixBitAnd(WaveMask mask, T expr)
     }
 }
 
-__generic<T : __BuiltinIntegerType, let N : int>
+__generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 vector<T,N> WaveMaskPrefixBitAnd(WaveMask mask, vector<T,N> expr)
@@ -8151,12 +8199,12 @@ vector<T,N> WaveMaskPrefixBitAnd(WaveMask mask, vector<T,N> expr)
     }
 }
 
-__generic<T : __BuiltinIntegerType, let N : int, let M : int>
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 __target_intrinsic(hlsl, "WaveMultiPrefixBitAnd($1, uint4($0, 0, 0, 0))")
 __target_intrinsic(cuda, "_wavePrefixAndMultiple(_getMultiPrefixMask($0, $1)")
 matrix<T,N,M> WaveMaskPrefixBitAnd(WaveMask mask, matrix<T,N,M> expr);
 
-__generic<T : __BuiltinIntegerType>
+__generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 T WaveMaskPrefixBitOr(WaveMask mask, T expr)
@@ -8167,11 +8215,11 @@ T WaveMaskPrefixBitOr(WaveMask mask, T expr)
     case cuda: __intrinsic_asm "_wavePrefixOr($0, $1)";
     case hlsl: __intrinsic_asm "WaveMultiPrefixBitOr($1, uint4($0, 0, 0, 0))";
     case spirv:
-        return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseOr $$T result Subgroup ExclusiveScan $expr};
+        return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseAnd $$T result Subgroup ExclusiveScan $expr};
     }
 }
 
-__generic<T : __BuiltinIntegerType, let N : int>
+__generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 vector<T,N> WaveMaskPrefixBitOr(WaveMask mask, vector<T,N> expr)
@@ -8186,12 +8234,12 @@ vector<T,N> WaveMaskPrefixBitOr(WaveMask mask, vector<T,N> expr)
     }
 }
 
-__generic<T : __BuiltinIntegerType, let N : int, let M : int>
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 __target_intrinsic(hlsl, "WaveMultiPrefixBitOr($1, uint4($0, 0, 0, 0))")
 __target_intrinsic(cuda, "_wavePrefixOrMultiple($0, $1)")
 matrix<T,N,M> WaveMaskPrefixBitOr(WaveMask mask, matrix<T,N,M> expr);
 
-__generic<T : __BuiltinIntegerType>
+__generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 T WaveMaskPrefixBitXor(WaveMask mask, T expr)
@@ -8206,7 +8254,7 @@ T WaveMaskPrefixBitXor(WaveMask mask, T expr)
     }
 }
 
-__generic<T : __BuiltinIntegerType, let N : int>
+__generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 vector<T,N> WaveMaskPrefixBitXor(WaveMask mask, vector<T,N> expr)
@@ -8221,7 +8269,7 @@ vector<T,N> WaveMaskPrefixBitXor(WaveMask mask, vector<T,N> expr)
     }
 }
 
-__generic<T : __BuiltinIntegerType, let N : int, let M : int>
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 __target_intrinsic(hlsl, "WaveMultiPrefixBitXor($1, uint4($0, 0, 0, 0))")
 __target_intrinsic(cuda, "_wavePrefixXorMultiple($0, $1)")
 matrix<T,N,M> WaveMaskPrefixBitXor(WaveMask mask, matrix<T,N,M> expr);
@@ -8529,7 +8577,7 @@ T WaveActive$(opName.hlslName)(T expr)
             return spirv_asm
             {
                 OpCapability GroupNonUniformArithmetic;
-                OpGroupNonUniformI$(opName.glslName) $$T result Subgroup 0 $expr
+                OpGroupNonUniformI$(opName.glslName) $$T result Subgroup 0 $expr;
             };
         }
         else return expr;
@@ -8749,7 +8797,7 @@ bool WaveIsFirstLane()
     case spirv:
         return spirv_asm
         {
-            OpCapability GroupNonUniform;
+            OpCapability GroupNonUniformBallot;
             OpGroupNonUniformElect $$bool result Subgroup
         };
     default:
@@ -8872,7 +8920,7 @@ T WavePrefixSum(T expr)
             return spirv_asm
             {
                 OpCapability GroupNonUniformArithmetic;
-                OpGroupNonUniformIAdd $$T result Subgroup ExclusiveScan $expr
+                result:$$T = OpGroupNonUniformIAdd Subgroup ExclusiveScan $expr;
             };
         }
         else return expr;
@@ -8900,7 +8948,7 @@ vector<T,N> WavePrefixSum(vector<T,N> expr)
             return spirv_asm
             {
                 OpCapability GroupNonUniformArithmetic;
-                OpGroupNonUniformIAdd $$vector<T,N> result Subgroup ExclusiveScan $expr
+                result:$$vector<T,N> = OpGroupNonUniformIAdd Subgroup ExclusiveScan $expr;
             };
         }
         else return expr;
@@ -10910,6 +10958,7 @@ struct HitObject
                 let tmin = Ray.TMin;
                 let tmax = Ray.TMax;
                 spirv_asm {
+                    OpCapability ShaderInvocationReorderNV;
                     OpHitObjectTraceRayNV
                         /**/ &__return_val
                         /**/ $AccelerationStructure
@@ -11655,7 +11704,7 @@ struct HitObject
         }
     }
 
-        /// Returns the attributes of a hit. Valid if the hit object represents a hit or a miss.
+    /// Returns the attributes of a hit. Valid if the hit object represents a hit or a miss.
     [ForceInline]
     attr_t GetAttributes<attr_t>()
     {
@@ -13038,6 +13087,14 @@ struct ConstBufferPointer
         }
     }
 
+
+
+    __subscript(int index) -> T
+    {
+        [ForceInline]
+        get {return ConstBufferPointer<T>.fromUInt(toUInt() + __naturalStrideOf<T>() * index).get(); }
+    }
+
     __glsl_version(450)
     __glsl_extension(GL_EXT_shader_explicit_arithmetic_types_int64)
     __glsl_extension(GL_EXT_buffer_reference)
@@ -13088,11 +13145,5 @@ struct ConstBufferPointer
                 result:$$bool = OpINotEqual %ptrval $zero;
             };
         }
-    }
-
-    __subscript(int index)->T
-    {
-        [ForceInline]
-        get { return ConstBufferPointer<T>.fromUInt(toUInt() + __naturalStrideOf<T>() * index).get(); }
     }
 }

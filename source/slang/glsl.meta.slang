@@ -2830,7 +2830,7 @@ public uint rayQueryGetIntersectionTypeEXT(rayQueryEXT q, bool committed)
 // 'system' variables: https://github.com/shader-slang/slang/issues/411
 
 __generic<T : __BuiltinType>
-[require(glsl)]
+[ForceInline]
 void typeRequireChecks_shader_subgroup_GLSL() {
     // the following is a seperate function call, since else the `__requireGLSLExtension` and associated __intrinsic_asm is ignored if the calling function also calls an __intrinsic_asm
     __target_switch
@@ -2854,7 +2854,6 @@ void typeRequireChecks_shader_subgroup_GLSL() {
 }
 
 __generic<T : __BuiltinType>
-[require(spirv)] [require(glsl)]
 void shader_subgroup_preamble() {
     // checks needed for shader_subgroup functions; __requireGLSLExtension does not work 
     // (does not add the ext specified correctly to the compile output; using extended type
@@ -2864,39 +2863,211 @@ void shader_subgroup_preamble() {
     case glsl:
         typeRequireChecks_shader_subgroup_GLSL<T>();
     case spirv:
-        spirv_asm {};
+        return;
     }
 
 } 
 
-// GL_KHR_shader_subgroup_basic Built-in Variables 
+// GL_KHR_shader_subgroup_basic Built-in Variables
 
-__glsl_extension(GL_KHR_shader_subgroup_basic) [require(glsl)] 
-public uint gl_NumSubgroups;
+void requireGLSLExtForSubgroupBasicBuiltin() {
+    __target_switch
+    {
+    case glsl:
+        __requireGLSLExtension("GL_KHR_shader_subgroup_basic");
+        __intrinsic_asm "";
+    }
+}
 
-__glsl_extension(GL_KHR_shader_subgroup_basic) [require(glsl)] 
-public uint gl_SubgroupID;
+__spirv_version(1.3) 
+void setupExtForSubgroupBasicBuiltIn() {
+    __target_switch
+    {
+    case glsl:
+        requireGLSLExtForSubgroupBasicBuiltin();
+    case spirv:
+        return;
+    }
+}
 
-__glsl_extension(GL_KHR_shader_subgroup_basic) [require(glsl)] 
-public uint gl_SubgroupSize;
+void requireGLSLExtForSubgroupBallotBuiltin() {
+    __target_switch
+    {
+    case glsl:
+        __requireGLSLExtension("GL_KHR_shader_subgroup_ballot");
+        __intrinsic_asm "";
+    }
+}
 
-__glsl_extension(GL_KHR_shader_subgroup_basic) [require(glsl)] 
-public uint gl_SubgroupInvocationID;
+__spirv_version(1.3) 
+void setupExtForSubgroupBallotBuiltIn() {
+    __target_switch
+    {
+    case glsl:
+        requireGLSLExtForSubgroupBallotBuiltin();
+    case spirv:
+        return;
+    }
+}
 
-__glsl_extension(GL_KHR_shader_subgroup_basic) [require(glsl)] 
-public uint gl_SubgroupEqMask;
+[require(glsl)]
+[require(spirv)]
+public property uint gl_NumSubgroups {
+    
+    get {
+        setupExtForSubgroupBasicBuiltIn();
+        __target_switch
+        {
+        case glsl:
+            __intrinsic_asm "(gl_NumSubgroups)";
+        case spirv:
+            return spirv_asm {
+                    OpCapability GroupNonUniform;
+                    result:$$uint = OpLoad builtin(NumSubgroups:uint);
+                };
+        }
 
-__glsl_extension(GL_KHR_shader_subgroup_basic) [require(glsl)] 
-public uint gl_SubgroupGeMask;
+    }
+}
 
-__glsl_extension(GL_KHR_shader_subgroup_basic) [require(glsl)] 
-public uint gl_SubgroupGtMask;
+[require(glsl)]
+[require(spirv)]
+public property uint gl_SubgroupID
+{
+    get {
+        setupExtForSubgroupBasicBuiltIn();
+        __target_switch
+        {
+        case glsl:
+            __intrinsic_asm "(gl_SubgroupID)";
+        case spirv:
+            return spirv_asm {
+                        OpCapability GroupNonUniform;
+                        result:$$uint = OpLoad builtin(SubgroupId:uint);
+                    };
+        }
+    }
+}
 
-__glsl_extension(GL_KHR_shader_subgroup_basic) [require(glsl)] 
-public uint gl_SubgroupLeMask;
+[require(glsl)]
+[require(spirv)]
+public property uint gl_SubgroupSize
+{
+    get {
+        setupExtForSubgroupBasicBuiltIn();
+        return WaveGetLaneCount();
+    }
+}
 
-__glsl_extension(GL_KHR_shader_subgroup_basic) [require(glsl)] 
-public uint gl_SubgroupLtMask;
+[require(glsl)]
+[require(spirv)]
+public property uint gl_SubgroupInvocationID
+{
+    get {
+        setupExtForSubgroupBasicBuiltIn();
+        return WaveGetLaneIndex();
+    }
+}
+
+[require(glsl)]
+[require(spirv)]
+public property uvec4 gl_SubgroupEqMask
+{
+    get {
+        setupExtForSubgroupBasicBuiltIn();
+        setupExtForSubgroupBallotBuiltIn();
+        __target_switch
+        {
+        case glsl:
+            __intrinsic_asm "(gl_SubgroupEqMask)";
+        case spirv:
+            return spirv_asm {
+                        OpCapability GroupNonUniformBallot;
+                        result:$$uvec4 = OpLoad builtin(SubgroupEqMask:uvec4);
+                    };
+        }
+    }
+}
+
+[require(glsl)]
+[require(spirv)]
+public property uvec4 gl_SubgroupGeMask
+{
+    get {
+        setupExtForSubgroupBasicBuiltIn();
+        setupExtForSubgroupBallotBuiltIn();
+        __target_switch
+        {
+        case glsl:
+            __intrinsic_asm "(gl_SubgroupGeMask)";
+        case spirv:
+            return spirv_asm {
+                        OpCapability GroupNonUniformBallot;
+                        result:$$uvec4 = OpLoad builtin(SubgroupGeMask:uvec4);
+                    };
+        }
+    }
+}
+
+[require(glsl)]
+[require(spirv)]
+public property uvec4 gl_SubgroupGtMask
+{
+    get {
+        setupExtForSubgroupBasicBuiltIn();
+        setupExtForSubgroupBallotBuiltIn();
+        __target_switch
+        {
+        case glsl:
+            __intrinsic_asm "(gl_SubgroupGtMask)";
+        case spirv:
+            return spirv_asm {
+                        OpCapability GroupNonUniformBallot;
+                        result:$$uvec4 = OpLoad builtin(SubgroupGtMask:uvec4);
+                    };
+        }
+    }
+}
+
+[require(glsl)]
+[require(spirv)]
+public property uvec4 gl_SubgroupLeMask
+{
+    get {
+        setupExtForSubgroupBasicBuiltIn();
+        setupExtForSubgroupBallotBuiltIn();
+        __target_switch
+        {
+        case glsl:
+            __intrinsic_asm "(gl_SubgroupLeMask)";
+        case spirv:
+            return spirv_asm {
+                        OpCapability GroupNonUniformBallot;
+                        result:$$uvec4 = OpLoad builtin(SubgroupLeMask:uvec4);
+                    };
+        }
+    }
+}
+
+[require(glsl)]
+[require(spirv)]
+public property uvec4 gl_SubgroupLtMask
+{
+    get {
+        setupExtForSubgroupBasicBuiltIn();
+        setupExtForSubgroupBallotBuiltIn();
+        __target_switch
+        {
+        case glsl:
+            __intrinsic_asm "(gl_SubgroupLtMask)";
+        case spirv:
+            return spirv_asm {
+                        OpCapability GroupNonUniformBallot;
+                        result:$$uvec4 = OpLoad builtin(SubgroupLtMask:uvec4);
+                    };
+        }
+    }
+}
 
 // GL_KHR_shader_subgroup_basic
 
@@ -3029,15 +3200,9 @@ __glsl_extension(GL_KHR_shader_subgroup_vote) [require(glsl)]
 __spirv_version(1.3) [require(spirv)]
 [ForceInline] public bool subgroupAll(bool value)
 {
-    __target_switch
-    {
-    case cuda: 
-    case glsl:
-    case spirv:
-    case hlsl:
-        return WaveActiveAllTrue(value);
 
-    }
+    return WaveActiveAllTrue(value);
+
 }
 
 __glsl_extension(GL_KHR_shader_subgroup_vote) [require(glsl)] 

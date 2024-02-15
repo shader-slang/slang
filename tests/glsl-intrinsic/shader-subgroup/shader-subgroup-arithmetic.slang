@@ -1,14 +1,13 @@
 //TEST:SIMPLE(filecheck=CHECK_GLSL):  -allow-glsl -stage compute -entry computeMain -target glsl -DTARGET_GLSL
-//TEST:SIMPLE(filecheck=CHECK_SPV):  -allow-glsl -stage compute -entry computeMain -target spirv -DTARGET_SPIRV
+//TEST:SIMPLE(filecheck=CHECK_SPV):  -allow-glsl -stage compute -entry computeMain -target spirv -emit-spirv-directly -DTARGET_SPIRV
 //TEST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage compute -entry computeMain -target hlsl -DTARGET_HLSL
 //TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda -DTARGET_CUDA
 
 // not testing cpp due to missing impl
-// DISABLE_TEST:SIMPLE(filecheck=CHECK_CPP):  -allow-glsl -stage compute -entry computeMain -target cpp -DTARGET_HLSL
+//DISABLE_TEST:SIMPLE(filecheck=CHECK_CPP):  -allow-glsl -stage compute -entry computeMain -target cpp -DTARGET_CPP
 
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
-
 #version 430
 
 #define DEF_BLOCK
@@ -151,7 +150,7 @@ bool testArithmetic() {
         && testVArithmetic<float, 3>()
         && testVArithmetic<float, 4>()
         && test1Arithmetic<double>() // WARNING: intel GPU's lack FP64 support
-           && testVArithmetic<double, 2>()
+        && testVArithmetic<double, 2>()
         && testVArithmetic<double, 3>()
         && testVArithmetic<double, 4>()
         && test1Arithmetic<half>()
