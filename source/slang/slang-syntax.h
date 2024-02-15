@@ -295,7 +295,7 @@ namespace Slang
     // being in templates, because gcc/clang get angry.
     //
     template<typename T>
-    inline Modifier* FilteredModifierList<T>::adjust(Modifier* modifier)
+    Modifier* FilteredModifierList<T>::adjust(Modifier* modifier)
     {
         Modifier* m = modifier;
         for (;;)
@@ -310,9 +310,9 @@ namespace Slang
     }
 
     template<typename T>
-    inline void FilteredModifierList<T>::Iterator::operator++()
+    void FilteredModifierList<T>::Iterator::operator++()
     {
-        current = adjust(current->next);
+        current = FilteredModifierList<T>::adjust(current->next);
     }
     //
 
