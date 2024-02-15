@@ -1326,10 +1326,10 @@ namespace Slang
         }
 
         /// Get a serialized representation of the checked module.
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL serialize(ISlangBlob** outSerializedBlob);
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL serialize(ISlangBlob** outSerializedBlob) override;
 
         /// Write the serialized representation of this module to a file.
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL writeToFile(char const* fileName);
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL writeToFile(char const* fileName) override;
 
         /// Get the name of the module.
         virtual SLANG_NO_THROW const char* SLANG_MCALL getName() override;

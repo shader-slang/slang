@@ -1087,7 +1087,7 @@ SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModule(
     }
 }
 
-SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModuleFromBlob(
+slang::IModule* Linkage::loadModuleFromBlob(
     const char* moduleName,
     const char* path,
     slang::IBlob* source,
