@@ -863,10 +863,10 @@ SerialPointer SerialReader::getValPointer(SerialIndex index)
             operand.values.intOperand = serialOperand.payload;
             break;
         case ValNodeOperandKind::ASTNode:
-            operand.values.nodeOperand = getPointer((SerialIndex)serialOperand.payload).dynamicCast<NodeBase>();
+            operand.values.nodeOperand = (NodeBase*)getPointer((SerialIndex)serialOperand.payload).m_ptr;
             break;
         case ValNodeOperandKind::ValNode:
-            operand.values.nodeOperand = getValPointer((SerialIndex)serialOperand.payload).dynamicCast<Val>();
+            operand.values.nodeOperand = (Val*)getValPointer((SerialIndex)serialOperand.payload).m_ptr;
             break;
         }
         desc.operands.add(operand);
