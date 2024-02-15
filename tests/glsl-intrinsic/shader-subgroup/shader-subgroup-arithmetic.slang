@@ -11,9 +11,6 @@
 
 #version 430
 
-// __requireGLSLExtension does not add an extension specified with GLSL, as a result half/i8/i16/i64 all don't run and complain about missing extension
-//#define TEST_when_requireGLSLExtension_works 
-
 //TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name=outputBuffer
 buffer MyBlockName2
 {
@@ -65,7 +62,6 @@ bool testLogical() {
         && testVLogical<int, 2>()
         && testVLogical<int, 3>()
         && testVLogical<int, 4>()
-#ifdef TEST_when_requireGLSLExtension_works
         && test1Logical<int8_t>()
         && testVLogical<int8_t, 2>()
         && testVLogical<int8_t, 3>()
@@ -78,7 +74,6 @@ bool testLogical() {
         && testVLogical<int64_t, 2>()
         && testVLogical<int64_t, 3>()
         && testVLogical<int64_t, 4>()
-#endif //#ifdef TEST_when_requireGLSLExtension_works
         && test1Logical<uint>()
         && testVLogical<uint, 2>()
         && testVLogical<uint, 3>()
@@ -96,14 +91,12 @@ bool test1Arithmetic() {
         && subgroupAdd(T(1)) == T(local_size_x_v) // 32
         && subgroupMul(T(1)) == T(1)
         && subgroupMin(T(1)) == T(1)
-        && subgroupMin(T(1)) == T(1)
+        && subgroupMax(T(1)) == T(1)
         && subgroupExclusiveAdd(T(1)) == T(3)
         && subgroupExclusiveMul(T(1)) == T(1)
         && subgroupExclusiveMin(T(1)) == T(1)
         && subgroupExclusiveMax(T(1)) == T(1)
-#ifdef TEST_when_glsl_subgroupInclusiveAdd_is_not_bugged
-           && subgroupInclusiveAdd(T(1)) == T(4)
-#endif // #ifdef TEST_when_glsl_subgroupInclusiveAdd_is_not_bugged
+        && subgroupInclusiveAdd(T(1)) == T(4)
         && subgroupInclusiveMul(T(1)) == T(1)
         && subgroupInclusiveMin(T(1)) == T(1)
         && subgroupInclusiveMax(T(1)) == T(1)
@@ -117,14 +110,12 @@ bool testVArithmetic() {
         && subgroupAdd(gvec(T(1))) == gvec(T(local_size_x_v)) // 32
         && subgroupMul(gvec(T(1))) == gvec(T(1))
         && subgroupMin(gvec(T(1))) == gvec(T(1))
-        && subgroupMin(gvec(T(1))) == gvec(T(1))
+        && subgroupMax(gvec(T(1))) == gvec(T(1))
         && subgroupExclusiveAdd(gvec(T(1))) == gvec(T(3))
         && subgroupExclusiveMul(gvec(T(1))) == gvec(T(1))
         && subgroupExclusiveMin(gvec(T(1))) == gvec(T(1))
         && subgroupExclusiveMax(gvec(T(1))) == gvec(T(1))
-#ifdef TEST_when_glsl_subgroupInclusiveAdd_is_not_bugged
-        && subgroupInclusiveAdd(gvec(T(1))) == gvec(T(4))
-#endif // #ifdef TEST_when_glsl_subgroupInclusiveAdd_is_not_bugged 
+        && subgroupInclusiveAdd(gvec(T(1))) == gvec(T(4)) 
         && subgroupInclusiveMul(gvec(T(1))) == gvec(T(1))
         && subgroupInclusiveMin(gvec(T(1))) == gvec(T(1))
         && subgroupInclusiveMax(gvec(T(1))) == gvec(T(1))
@@ -141,17 +132,14 @@ bool testArithmetic() {
         && testVArithmetic<double, 2>()
         && testVArithmetic<double, 3>()
         && testVArithmetic<double, 4>()
-#ifdef TEST_when_requireGLSLExtension_works
         && test1Arithmetic<half>()
         && testVArithmetic<half, 2>()
         && testVArithmetic<half, 3>()
         && testVArithmetic<half, 4>()
-#endif // #ifdef TEST_when_requireGLSLExtension_works
         && test1Arithmetic<int>()
         && testVArithmetic<int, 2>()
         && testVArithmetic<int, 3>()
         && testVArithmetic<int, 4>()
-#ifdef TEST_when_requireGLSLExtension_works
         && test1Arithmetic<int8_t>() 
         && testVArithmetic<int8_t, 2>()
         && testVArithmetic<int8_t, 3>()
@@ -164,7 +152,6 @@ bool testArithmetic() {
         && testVArithmetic<int64_t, 2>()
         && testVArithmetic<int64_t, 3>()
         && testVArithmetic<int64_t, 4>()
-#endif // TEST_when_requireGLSLExtension_works
         && test1Arithmetic<uint>()
         && testVArithmetic<uint, 2>()
         && testVArithmetic<uint, 3>()

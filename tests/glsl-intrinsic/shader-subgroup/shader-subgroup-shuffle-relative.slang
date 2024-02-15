@@ -12,9 +12,6 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
 #version 430
 
-// __requireGLSLExtension does not add an extension specified with GLSL, as a result half/i8/i16/i64 all don't run and complain about missing extension
-//#define TEST_when_requireGLSLExtension_works
-
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 buffer MyBlockName2 
 {
@@ -63,20 +60,17 @@ bool testShuffleX() {
         && testVShuffleX<float, 3>()
         && testVShuffleX<float, 4>()
         && test1ShuffleX<double>() // WARNING: intel GPU's lack FP64 support
-           && testVShuffleX<double, 2>()
+        && testVShuffleX<double, 2>()
         && testVShuffleX<double, 3>()
         && testVShuffleX<double, 4>()
-#ifdef TEST_when_requireGLSLExtension_works
-           && test1ShuffleX<half>() 
-           && testVShuffleX<half, 2>()
+        && test1ShuffleX<half>() 
+        && testVShuffleX<half, 2>()
         && testVShuffleX<half, 3>()
         && testVShuffleX<half, 4>()
-#endif // #ifdef TEST_when_requireGLSLExtension_works
         && test1ShuffleX<int>()
         && testVShuffleX<int, 2>()
         && testVShuffleX<int, 3>()
         && testVShuffleX<int, 4>()
-#ifdef TEST_when_requireGLSLExtension_works
         && test1ShuffleX<int8_t>() 
         && testVShuffleX<int8_t, 2>()
         && testVShuffleX<int8_t, 3>()
@@ -89,7 +83,6 @@ bool testShuffleX() {
         && testVShuffleX<int64_t, 2>()
         && testVShuffleX<int64_t, 3>()
         && testVShuffleX<int64_t, 4>()
-#endif // #ifdef TEST_when_requireGLSLExtension_works
         && test1ShuffleX<uint>()
         && testVShuffleX<uint, 2>()
         && testVShuffleX<uint, 3>()

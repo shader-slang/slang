@@ -2830,6 +2830,69 @@ public uint rayQueryGetIntersectionTypeEXT(rayQueryEXT q, bool committed)
 // 'system' variables: https://github.com/shader-slang/slang/issues/411
 
 __generic<T : __BuiltinType>
+[require(glsl)]
+void typeRequireChecks_shader_subgroup_GLSL() {
+    // the following is a seperate function call, since else the `__requireGLSLExtension` and associated __intrinsic_asm is ignored if the calling function also calls an __intrinsic_asm
+    __target_switch
+    {
+    case glsl:
+        if (__type_equals<T, half>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        else if (__type_equals<T, float16_t>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        else if (__type_equals<T, uint8_t>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_int8");
+        else if (__type_equals<T, uint16_t>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_int16");
+        else if (__type_equals<T, uint64_t>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_int64");
+        else if (__type_equals<T, int8_t>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_int8");
+        else if (__type_equals<T, int16_t>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_int16");
+        else if (__type_equals<T, int64_t>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_int64");
+        __intrinsic_asm "";
+    }
+}
+
+__generic<T : __BuiltinType>
+[require(spirv)]
+void typeRequireChecks_shader_subgroup_SPIRV() {
+    __target_switch
+    {
+    case spirv:
+
+        if (__type_equals<T, half>()) {
+
+            spirv_asm {OpCapability Float16};
+        }
+        else if (__type_equals<T, float16_t>()) {
+
+            spirv_asm {OpCapability Float16};
+        }
+        else if (__type_equals<T, uint8_t>()) {
+
+            spirv_asm {OpCapability Int8};
+        }
+        else if (__type_equals<T, uint16_t>()) {
+
+            spirv_asm {OpCapability Int16};
+        }
+        else if (__type_equals<T, uint64_t>()) {
+
+            spirv_asm {OpCapability Int64};
+        }
+        else if (__type_equals<T, int8_t>()) {
+
+            spirv_asm {OpCapability Int8};
+        }
+        else if (__type_equals<T, int16_t>()) {
+
+            spirv_asm {OpCapability Int16};
+        }
+        else if (__type_equals<T, int64_t>()) {
+
+            spirv_asm {OpCapability Int64};
+        }
+        else spirv_asm {};
+    }
+}
+
+__generic<T : __BuiltinType>
+[require(spirv)] [require(glsl)]
 void shader_subgroup_preamble() {
     // checks needed for shader_subgroup functions; __requireGLSLExtension does not work 
     // (does not add the ext specified correctly to the compile output; using extended type
@@ -2837,16 +2900,11 @@ void shader_subgroup_preamble() {
     __target_switch
     {
     case glsl:
-        // unimplemented intrinsic error with `__requireGLSLExtension` 
-        //if (__type_equals<T, half>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
-        //if (__type_equals<T, uint8_t>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_int8");
-        //if (__type_equals<T, uint16_t>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_int16");
-        //if (__type_equals<T, uint64_t>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_int64");
-        return;
+        typeRequireChecks_shader_subgroup_GLSL<T>();
     case spirv:
-        return spirv_asm {};
+        typeRequireChecks_shader_subgroup_SPIRV<T>();
     }
-    return;
+
 } 
 
 // GL_KHR_shader_subgroup_basic Built-in Variables 
@@ -4022,15 +4080,7 @@ __spirv_version(1.3) [require(spirv)]
 [ForceInline] public T subgroupShuffle(T value, uint index)
 {
     shader_subgroup_preamble<T>();
-    __target_switch
-    {
-    case hlsl:
-    case cuda:
-    case glsl:
-    case spirv:
-    case cpp: 
-        return WaveShuffle(value, index);
-    }
+    return WaveShuffle(value, index);
 }
 
 __generic<T : __BuiltinType>
@@ -4059,15 +4109,7 @@ __spirv_version(1.3) [require(spirv)]
 [ForceInline] public vector<T,N> subgroupShuffle(vector<T,N> value, uint index)
 {
     shader_subgroup_preamble<T>();
-    __target_switch
-    {
-    case hlsl:
-    case cuda:
-    case glsl:
-    case spirv:
-    case cpp: 
-        return WaveShuffle(value, index);
-    }
+    return WaveShuffle(value, index);
 }
 
 __generic<T : __BuiltinType, let N : int>

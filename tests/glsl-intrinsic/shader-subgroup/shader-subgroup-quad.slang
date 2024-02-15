@@ -11,9 +11,6 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
 #version 430
 
-// __requireGLSLExtension does not add an extension specified with GLSL, as a result half/i8/i16/i64 all don't run and complain about missing extension
-//#define TEST_when_requireGLSLExtension_works
-
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 buffer MyBlockName2 
 {
@@ -73,17 +70,14 @@ bool testQuadSwapX() {
         && testVQuadX<double, 2>()
         && testVQuadX<double, 3>()
         && testVQuadX<double, 4>()
-#ifdef TEST_when_requireGLSLExtension_works
         && test1QuadX<half>() 
         && testVQuadX<half, 2>()
         && testVQuadX<half, 3>()
         && testVQuadX<half, 4>()
-#endif // #ifdef TEST_when_requireGLSLExtension_works
         && test1QuadX<int>()
         && testVQuadX<int, 2>()
         && testVQuadX<int, 3>()
         && testVQuadX<int, 4>()
-#ifdef TEST_when_requireGLSLExtension_works
         && test1QuadX<int8_t>() 
         && testVQuadX<int8_t, 2>()
         && testVQuadX<int8_t, 3>()
@@ -96,7 +90,6 @@ bool testQuadSwapX() {
         && testVQuadX<int64_t, 2>()
         && testVQuadX<int64_t, 3>()
         && testVQuadX<int64_t, 4>()
-#endif // #ifdef TEST_when_requireGLSLExtension_works
         && test1QuadX<uint>()
         && testVQuadX<uint, 2>()
         && testVQuadX<uint, 3>()

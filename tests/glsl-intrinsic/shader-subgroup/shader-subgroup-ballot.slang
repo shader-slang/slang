@@ -14,9 +14,6 @@
 // breaks on Nvidia GPU by returning 0 which is trivially wrong (works on Intel Iris Xe)
 //#define TEST_when_glsl_subgroupBallotExclusiveBitCount_is_not_bugged
 
-// __requireGLSLExtension does not add an extension specified with GLSL, as a result half/i8/i16/i64 all don't run and complain about missing extension
-//#define TEST_when_requireGLSLExtension_works
-
 //TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name=outputBuffer
 buffer MyBlockName2 
 {
@@ -72,17 +69,14 @@ bool testBroadcastX() {
         && testVBroadcastX<double, 2>()
         && testVBroadcastX<double, 3>()
         && testVBroadcastX<double, 4>()
-#ifdef TEST_when_requireGLSLExtension_works
         && test1BroadcastX<half>() 
         && testVBroadcastX<half, 2>()
         && testVBroadcastX<half, 3>()
         && testVBroadcastX<half, 4>()
-#endif // #ifdef TEST_when_requireGLSLExtension_works
         && test1BroadcastX<int>()
         && testVBroadcastX<int, 2>()
         && testVBroadcastX<int, 3>()
         && testVBroadcastX<int, 4>()
-#ifdef TEST_when_requireGLSLExtension_works
         && test1BroadcastX<int8_t>() 
         && testVBroadcastX<int8_t, 2>()
         && testVBroadcastX<int8_t, 3>()
@@ -95,8 +89,6 @@ bool testBroadcastX() {
         && testVBroadcastX<int64_t, 2>()
         && testVBroadcastX<int64_t, 3>()
         && testVBroadcastX<int64_t, 4>()
-#endif // #ifdef TEST_when_requireGLSLExtension_works
-
         && test1BroadcastX<uint>()
         && testVBroadcastX<uint, 2>()
         && testVBroadcastX<uint, 3>()
