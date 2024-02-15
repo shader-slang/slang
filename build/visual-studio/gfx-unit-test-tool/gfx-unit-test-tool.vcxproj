@@ -330,6 +330,7 @@
     <None Include="..\..\..\tools\gfx-unit-test\mutable-shader-object.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\nested-parameter-block.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\precompiled-module-imported.slang" />
+    <None Include="..\..\..\tools\gfx-unit-test\precompiled-module-included.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\precompiled-module.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\ray-tracing-test-shaders.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\resolve-resource-shader.slang" />

@@ -142,6 +142,9 @@
     <None Include="..\..\..\tools\gfx-unit-test\precompiled-module-imported.slang">
       <Filter>Source Files</Filter>
     </None>
+    <None Include="..\..\..\tools\gfx-unit-test\precompiled-module-included.slang">
+      <Filter>Source Files</Filter>
+    </None>
     <None Include="..\..\..\tools\gfx-unit-test\precompiled-module.slang">
       <Filter>Source Files</Filter>
     </None>
