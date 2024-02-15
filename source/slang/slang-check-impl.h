@@ -17,6 +17,8 @@ namespace Slang
 
     bool isGlobalDecl(Decl* decl);
 
+    bool isUnsafeForceInlineFunc(FunctionDeclBase* funcDecl);
+
     bool isUniformParameterType(Type* type);
 
     Type* checkProperType(

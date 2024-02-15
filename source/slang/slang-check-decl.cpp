@@ -820,6 +820,11 @@ namespace Slang
         return as<NamespaceDeclBase>(parentDecl) != nullptr || as<FileDecl>(parentDecl) != nullptr;
     }
 
+    bool isUnsafeForceInlineFunc(FunctionDeclBase* funcDecl)
+    {
+        return funcDecl->hasModifier<UnsafeForceInlineEarlyAttribute>();
+    }
+
         /// Is `decl` a global shader parameter declaration?
     bool isGlobalShaderParameter(VarDeclBase* decl)
     {

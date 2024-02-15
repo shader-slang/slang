@@ -3,6 +3,7 @@
 
 #include "slang-ast-base.h"
 #include "slang-ast-builder.h"
+#include "slang-check-impl.h"
 
 namespace Slang {
 
@@ -250,7 +251,7 @@ struct SkipFunctionBodyRAII
             // We always need to include body of unsafeForceInlineEarly functions
             // since they will need to be available at IR lowering time of the
             // user module for pre-linking inling.
-            if (!funcDecl->hasModifier<UnsafeForceInlineEarlyAttribute>())
+            if (!isUnsafeForceInlineFunc(funcDecl))
             {
                 funcDecl->body = nullptr;
             }
