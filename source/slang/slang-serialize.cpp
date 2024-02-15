@@ -249,7 +249,13 @@ SerialIndex SerialWriter::writeObject(const SerialClass* serialCls, const void* 
             if (funcDecl)
             {
                 oldBody = funcDecl->body;
-                funcDecl->body = nullptr;
+                // We always need to include body of unsafeForceInlineEarly functions
+                // since they will need to be available at IR lowering time of the
+                // user module for pre-linking inling.
+                if (!funcDecl->hasModifier<UnsafeForceInlineEarlyAttribute>())
+                {
+                    funcDecl->body = nullptr;
+                }
             }
 
         }
