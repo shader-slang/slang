@@ -506,7 +506,12 @@ class ImplementingDecl : public IncludeDeclBase
 
 class ModuleDeclarationDecl : public Decl
 {
-    SLANG_AST_CLASS(ModuleDeclarationDecl);
+    SLANG_AST_CLASS(ModuleDeclarationDecl)
+};
+
+class RequireCapabilityDecl : public Decl
+{
+    SLANG_AST_CLASS(RequireCapabilityDecl)
 };
 
 // A generic declaration, parameterized on types/values
@@ -627,5 +632,10 @@ bool isInterfaceRequirement(Decl* decl);
 InterfaceDecl* findParentInterfaceDecl(Decl* decl);
 
 bool isLocalVar(const Decl* decl);
+
+
+// Add a sibling lookup scope for `dest` to refer to `source`.
+void addSiblingScopeForContainerDecl(ASTBuilder* builder, ContainerDecl* dest, ContainerDecl* source);
+void addSiblingScopeForContainerDecl(ASTBuilder* builder, Scope* destScope, ContainerDecl* source);
 
 } // namespace Slang

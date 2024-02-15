@@ -1,5 +1,6 @@
 ---
 layout: user-guide
+permalink: /user-guide/compiling
 ---
 
 Compiling Code with Slang

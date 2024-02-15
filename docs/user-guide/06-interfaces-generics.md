@@ -1,5 +1,6 @@
 ---
 layout: user-guide
+permalink: /user-guide/interfaces-generics
 ---
 
 Interfaces and Generics

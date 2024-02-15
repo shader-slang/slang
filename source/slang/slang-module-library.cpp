@@ -66,7 +66,7 @@ SlangResult loadModuleLibrary(const Byte* inBytes, size_t bytesCount, EndToEndCo
         options.linkage = req->getLinkage();
         options.sink = req->getSink();
 
-        SLANG_RETURN_ON_FAIL(SerialContainerUtil::read(&riffContainer, options, containerData));
+        SLANG_RETURN_ON_FAIL(SerialContainerUtil::read(&riffContainer, options, nullptr, containerData));
 
         for (const auto& module : containerData.modules)
         {

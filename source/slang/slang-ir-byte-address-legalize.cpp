@@ -775,13 +775,13 @@ struct ByteAddressBufferLegalizationContext
         // Our task in this function is to compute the type for
         // a structure buffer that is equivalent to `byteAddressBufferType`,
         // but with the given `elementType`.
-
+        IRInst* typeOperands[2] = { elementType, m_builder.getType(kIROp_DefaultBufferLayoutType) };
         switch( byteAddressBufferType->getOp() )
         {
             // The basic `*ByteAddressBuffer` types map directly to the `*StructuredBuffer<elementType>` cases.
-        case kIROp_HLSLByteAddressBufferType:                   return m_builder.getType(kIROp_HLSLStructuredBufferType, elementType);
-        case kIROp_HLSLRWByteAddressBufferType:                 return m_builder.getType(kIROp_HLSLRWStructuredBufferType, elementType);
-        case kIROp_HLSLRasterizerOrderedByteAddressBufferType:  return m_builder.getType(kIROp_HLSLRasterizerOrderedStructuredBufferType, elementType);
+        case kIROp_HLSLByteAddressBufferType:                   return m_builder.getType(kIROp_HLSLStructuredBufferType, 2, typeOperands);
+        case kIROp_HLSLRWByteAddressBufferType:                 return m_builder.getType(kIROp_HLSLRWStructuredBufferType, 2, typeOperands);
+        case kIROp_HLSLRasterizerOrderedByteAddressBufferType:  return m_builder.getType(kIROp_HLSLRasterizerOrderedStructuredBufferType, 2, typeOperands);
 
         case kIROp_ArrayType:
         case kIROp_UnsizedArrayType:

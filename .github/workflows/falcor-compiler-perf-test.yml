@@ -1,0 +1,77 @@
+# This is a basic workflow to help you get started with Actions
+
+name: Falcor Compiler Perf-Test
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: [Windows, self-hosted, perf]
+    timeout-minutes: 100
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        configuration: ['Release']
+        platform: ['x64']
+        include:
+          - platform: x64
+            testPlatform: x64
+          - platform: x64
+            testCategory: full
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: 'true'
+        fetch-depth: '0'
+    - name: setup-msbuild
+      uses: microsoft/setup-msbuild@v1
+    - name: build
+      run: |
+        .\premake.bat vs2019 --arch=${{matrix.platform}} --deps=true --no-progress=true --enable-cuda=true
+
+        .\make-slang-tag-version.bat
+
+        MSBuild.exe slang.sln -v:m -m -property:Configuration=${{matrix.configuration}} -property:Platform=${{matrix.platform}} -property:WindowsTargetPlatformVersion=10.0.19041.0 -maxcpucount:12
+
+    - uses: robinraju/release-downloader@v1.9
+      id: download
+      with:
+        # The source repository path.
+        # Expected format {owner}/{repo}
+        # Default: ${{ github.repository }}
+        repository: "shader-slang/falcor-compile-perf-test"
+
+        # A flag to set the download target as latest release
+        # The default value is 'false'
+        latest: true
+
+        # The name of the file to download.
+        # Use this field only to specify filenames other than tarball or zipball, if any.
+        # Supports wildcard pattern (eg: '*', '*.deb', '*.zip' etc..)
+        fileName: "falcor_perf_test-*-win-64.zip"
+
+        # Download the attached zipball (*.zip)
+        zipBall: true
+
+        # Relative path under $GITHUB_WORKSPACE to place the downloaded file(s)
+        # It will create the target directory automatically if not present
+        # eg: out-file-path: "my-downloads" => It will create directory $GITHUB_WORKSPACE/my-downloads
+        out-file-path: "./falcor-perf-test"
+
+        # Somehow there is a bug in this flag, the executable extracted is not runnable. We have to
+        # extract ourselves.
+        extract: false
+
+    - name: run falcor-compiler-perf-test
+      run: |
+        $filename = '${{ fromJson(steps.download.outputs.downloaded_files)[0] }}'
+        Expand-Archive $filename -DestinationPath .\falcor-perf-test
+        $env:PATH += ";.\bin\windows-${{matrix.testPlatform}}\${{matrix.configuration}}";
+        .\falcor-perf-test\bin\Release\falcor_perftest.exe

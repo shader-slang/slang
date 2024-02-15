@@ -17,7 +17,14 @@ namespace Slang
 
     SourceLoc const& getDiagnosticPos(IRInst* inst)
     {
-        return inst->sourceLoc;
+        while (inst)
+        {
+            if (inst->sourceLoc.isValid())
+                return inst->sourceLoc;
+            inst = inst->parent;
+        }
+        static SourceLoc invalid = SourceLoc();
+        return invalid;
     }
 
     void printDiagnosticArg(StringBuilder& sb, IRInst* irObject)
@@ -4900,7 +4907,7 @@ namespace Slang
         IRType* type = nullptr;
         auto basePtrType = as<IRPtrTypeBase>(basePtr->getDataType());
         auto valueType = unwrapAttributedType(basePtrType->getValueType());
-        if (auto arrayType = as<IRArrayType>(valueType))
+        if (auto arrayType = as<IRArrayTypeBase>(valueType))
         {
             type = arrayType->getElementType();
         }
@@ -5502,6 +5509,28 @@ namespace Slang
             this,
             kIROp_CastPtrToBool,
             getBoolType(),
+            val);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitCastPtrToInt(IRInst* val)
+    {
+        auto inst = createInst<IRInst>(
+            this,
+            kIROp_CastPtrToInt,
+            getUInt64Type(),
+            val);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitCastIntToPtr(IRType* ptrType, IRInst* val)
+    {
+        auto inst = createInst<IRInst>(
+            this,
+            kIROp_CastIntToPtr,
+            ptrType,
             val);
         addInst(inst);
         return inst;
@@ -7873,6 +7902,7 @@ namespace Slang
         case kIROp_FieldAddress:
         case kIROp_GetElement:
         case kIROp_GetElementPtr:
+        case kIROp_GetOffsetPtr:
         case kIROp_UpdateElement:
         case kIROp_MeshOutputRef:
         case kIROp_MakeVectorFromScalar:
@@ -7910,6 +7940,7 @@ namespace Slang
         case kIROp_FloatCast:
         case kIROp_CastPtrToInt:
         case kIROp_CastIntToPtr:
+        case kIROp_PtrCast:
         case kIROp_AllocObj:
         case kIROp_PackAnyValue:
         case kIROp_UnpackAnyValue:
@@ -8319,6 +8350,7 @@ namespace Slang
         case kIROp_FieldAddress:
         case kIROp_GetElement:
         case kIROp_GetElementPtr:
+        case kIROp_GetOffsetPtr:
         case kIROp_UpdateElement:
         case kIROp_Specialize:
         case kIROp_LookupWitness:
@@ -8347,6 +8379,7 @@ namespace Slang
         case kIROp_CastIntToPtr:
         case kIROp_CastPtrToBool:
         case kIROp_CastPtrToInt:
+        case kIROp_PtrCast:
         case kIROp_BitAnd:
         case kIROp_BitNot:
         case kIROp_BitOr:

@@ -581,7 +581,7 @@ struct PeepholeContext : InstPassBase
                 auto ptr = inst->getOperand(0);
                 IRBuilder builder(module);
                 builder.setInsertBefore(inst);
-                auto neq = builder.emitNeq(ptr, builder.getNullVoidPtrValue());
+                auto neq = builder.emitNeq(ptr, builder.getNullPtrValue(ptr->getDataType()));
                 inst->replaceUsesWith(neq);
                 maybeRemoveOldInst(inst);
                 changed = true;

@@ -338,6 +338,10 @@ ArrayExpressionType* ASTBuilder::getArrayType(Type* elementType, IntVal* element
         {
             elementCount = getIntVal(getIntType(), elementCountConstantInt->getValue());
         }
+        else
+        {
+            elementCount = getTypeCastIntVal(getIntType(), elementCount);
+        }
     }
     Val* args[] = {elementType, elementCount};
     return as<ArrayExpressionType>(getSpecializedBuiltinType(makeArrayView(args), "ArrayExpressionType"));

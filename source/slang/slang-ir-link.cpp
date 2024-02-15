@@ -276,7 +276,7 @@ IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
         {
             IRConstant* c = (IRConstant*)originalValue;
             SLANG_RELEASE_ASSERT(c->value.ptrVal == nullptr);
-            return builder->getNullVoidPtrValue();
+            return builder->getNullPtrValue(cloneType(this, c->getFullType()));
         }
         break;
 

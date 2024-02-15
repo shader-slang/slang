@@ -724,6 +724,31 @@ LoweredValInfo emitDeclRef(
     DeclRef<Decl>   declRef,
     IRType*         type);
 
+
+bool isFunctionVarDecl(VarDeclBase* decl)
+{
+    // The immediate parent of a function-scope variable
+    // declaration will be a `ScopeDecl`.
+    //
+    // TODO: right now the parent links for scopes are *not*
+    // set correctly, so we can't just scan up and look
+    // for a function in the parent chain...
+    auto parent = decl->parentDecl;
+    if (as<ScopeDecl>(parent))
+    {
+        return true;
+    }
+    return false;
+}
+
+bool isFunctionStaticVarDecl(VarDeclBase* decl)
+{
+    // Only a variable marked `static` can be static.
+    if (!decl->findModifier<HLSLStaticModifier>())
+        return false;
+    return isFunctionVarDecl(decl);
+}
+
 IRInst* getSimpleVal(IRGenContext* context, LoweredValInfo lowered);
 
 int32_t getIntrinsicOp(
@@ -2317,6 +2342,8 @@ static void addNameHint(
     String name = getNameForNameHint(context, decl);
     if(name.getLength() == 0)
         return;
+    if (name == "MyBlockName2")
+        printf("break");
     context->irBuilder->addNameHintDecoration(inst, name.getUnownedSlice());
 }
 
@@ -4261,6 +4288,10 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
             return LoweredValInfo::simple(
                 getBuilder()->emitMakeArrayFromElement(irType, irDefaultElement));
+        }
+        else if (auto ptrType = as<PtrType>(type))
+        {
+            return LoweredValInfo::simple(getBuilder()->getNullPtrValue(irType));
         }
         else if (auto declRefType = as<DeclRefType>(type))
         {
@@ -6943,6 +6974,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     IGNORED_CASE(NamespaceDecl)
     IGNORED_CASE(ModuleDeclarationDecl)
     IGNORED_CASE(FileDecl)
+    IGNORED_CASE(RequireCapabilityDecl)
 
 #undef IGNORED_CASE
 
@@ -7432,25 +7464,22 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         NestedContext nested(this);
         auto subBuilder = nested.getBuilder();
         auto subContext = nested.getContext();
-        IRGeneric* outerGeneric = emitOuterGenerics(subContext, decl, decl);
 
-        // TODO(JS): Is this right? 
-        //
-        // If we *are* in a generic, then outputting this in the (current) generic scope would be correct.
-        // If we *aren't* we want to go the level above for insertion
-        //
-        // Just inserting into the parent doesn't work with a generic that holds a function that has a static const
-        // variable.
-        // 
+        IRGeneric* outerGeneric = nullptr;
+
+        // If we are static, then we need to insert the declaration before the parent.
         // This tries to match the behavior of previous `lowerFunctionStaticConstVarDecl` functionality
-        if (!outerGeneric && isFunctionStaticVarDecl(decl))
+        if (isFunctionStaticVarDecl(decl))
         {
             // We need to insert the constant at a level above
             // the function being emitted. This will usually
             // be the global scope, but it might be an outer
             // generic if we are lowering a generic function.
-
-            subBuilder->setInsertInto(subBuilder->getFunc()->getParent());
+            subBuilder->setInsertBefore(subBuilder->getFunc());
+        }
+        else if (!isFunctionVarDecl(decl))
+        {
+            outerGeneric = emitOuterGenerics(subContext, decl, decl);
         }
 
         auto initExpr = decl->initExpr;
@@ -7604,27 +7633,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         irGlobal->moveToEnd();
 
         return globalVal;
-    }
-
-    bool isFunctionStaticVarDecl(VarDeclBase* decl)
-    {
-        // Only a variable marked `static` can be static.
-        if(!decl->findModifier<HLSLStaticModifier>())
-            return false;
-
-        // The immediate parent of a function-scope variable
-        // declaration will be a `ScopeDecl`.
-        //
-        // TODO: right now the parent links for scopes are *not*
-        // set correctly, so we can't just scan up and look
-        // for a function in the parent chain...
-        auto parent = decl->parentDecl;
-        if( as<ScopeDecl>(parent) )
-        {
-            return true;
-        }
-
-        return false;
     }
 
     struct NestedContext
@@ -9775,7 +9783,7 @@ bool canDeclLowerToAGeneric(Decl* decl)
     {
         if (varDecl->hasModifier<HLSLStaticModifier>() && varDecl->hasModifier<ConstModifier>())
         {
-            return true;
+            return !isFunctionVarDecl(varDecl);
         }
     }
     

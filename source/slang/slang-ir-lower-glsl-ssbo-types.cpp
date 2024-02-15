@@ -81,11 +81,11 @@ namespace Slang
         for(const auto& [ssbo, info] : arrayLikeSSBOTypes)
         {
             builder.setInsertAfter(ssbo);
-            IRInst* operands = info.elementType;
+            IRInst* operands[2] = { info.elementType, ssbo->getDataLayout() };
             const auto sb = builder.getType(
                 kIROp_HLSLRWStructuredBufferType,
-                1,
-                &operands
+                2,
+                operands
             );
             ssbo->replaceUsesWith(sb);
             ssbo->removeAndDeallocate();

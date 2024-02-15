@@ -112,6 +112,7 @@ bool opCanBeConstExpr(IROp op)
     case kIROp_CastIntToPtr:
     case kIROp_CastPtrToInt:
     case kIROp_CastPtrToBool:
+    case kIROp_PtrCast:
     case kIROp_Reinterpret:
     case kIROp_BitCast:
     case kIROp_MakeTuple:

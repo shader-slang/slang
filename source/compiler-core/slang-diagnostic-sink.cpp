@@ -147,7 +147,7 @@ static void formatDiagnostic(const HumaneSourceLoc& humaneLoc, Diagnostic const&
 
     outBuilder << getSeverityName(diagnostic.severity);
 
-    if (diagnostic.ErrorID >= 0)
+    if ((flags & DiagnosticSink::Flag::LanguageServer) || diagnostic.ErrorID >= 0)
     {
         outBuilder << " ";
         outBuilder << diagnostic.ErrorID;
