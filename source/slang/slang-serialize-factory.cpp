@@ -45,6 +45,11 @@ void* DefaultSerialObjectFactory::create(SerialTypeKind typeKind, SerialSubType 
     return nullptr;
 }
 
+void* DefaultSerialObjectFactory::getOrCreateVal(ValNodeDesc&& desc)
+{
+    return m_astBuilder->_getOrCreateImpl(_Move(desc));
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ModuleSerialFilter  !!!!!!!!!!!!!!!!!!!!!!!!
 
 SerialIndex ModuleSerialFilter::writePointer(SerialWriter* writer, const RefObject* inPtr)
@@ -65,12 +70,6 @@ SerialIndex ModuleSerialFilter::writePointer(SerialWriter* writer, const NodeBas
     NodeBase* ptr = const_cast<NodeBase*>(inPtr);
     SLANG_ASSERT(ptr);
 
-    // We don't serialize Scope
-    if (as<Scope>(ptr))
-    {
-        writer->setPointerIndex(inPtr, SerialIndex(0));
-        return SerialIndex(0);
-    }
 
     if (Decl* decl = as<Decl>(ptr))
     {

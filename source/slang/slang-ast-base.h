@@ -104,10 +104,10 @@ struct Scope : public NodeBase
     // but the opposite it allowed.
     ContainerDecl*          containerDecl = nullptr;
 
-    SLANG_UNREFLECTED
     // The parent of this scope (where lookup should go if nothing is found locally)
     Scope*                  parent = nullptr;
 
+    SLANG_UNREFLECTED
     // The next sibling of this scope (a peer for lookup)
     Scope*                  nextSibling = nullptr;
 };

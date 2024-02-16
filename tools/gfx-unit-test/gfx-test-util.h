@@ -18,6 +18,14 @@ namespace gfx_test
         const char* entryPointName,
         slang::ProgramLayout*& slangReflection);
 
+    Slang::Result loadComputeProgram(
+        gfx::IDevice* device,
+        slang::ISession* slangSession,
+        Slang::ComPtr<gfx::IShaderProgram>& outShaderProgram,
+        const char* shaderModuleName,
+        const char* entryPointName,
+        slang::ProgramLayout*& slangReflection);
+
     Slang::Result loadComputeProgramFromSource(
         gfx::IDevice* device,
         Slang::ComPtr<gfx::IShaderProgram>& outShaderProgram,
@@ -79,6 +87,8 @@ namespace gfx_test
         Slang::RenderApiFlag::Enum api,
         Slang::List<const char*> additionalSearchPaths = {},
         gfx::IDevice::ShaderCacheDesc shaderCache = {});
+    
+    Slang::List<const char*> getSlangSearchPaths();
 
     void initializeRenderDoc();
     void renderDocBeginFrame();

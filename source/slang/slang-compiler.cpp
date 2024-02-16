@@ -2417,4 +2417,116 @@ namespace Slang
         }
         return false;
     }
+
+    SLANG_NO_THROW SlangResult SLANG_MCALL Module::serialize(ISlangBlob** outSerializedBlob)
+    {
+        SerialContainerUtil::WriteOptions writeOptions;
+        writeOptions.sourceManager = getLinkage()->getSourceManager();
+        OwnedMemoryStream memoryStream(FileAccess::Write);
+        SLANG_RETURN_ON_FAIL(SerialContainerUtil::write(this, writeOptions, &memoryStream));
+        *outSerializedBlob = RawBlob::create(
+            memoryStream.getContents().getBuffer(),
+            (size_t)memoryStream.getContents().getCount()).detach();
+        return SLANG_OK;
+    }
+
+    SLANG_NO_THROW SlangResult SLANG_MCALL Module::writeToFile(char const* fileName)
+    {
+        SerialContainerUtil::WriteOptions writeOptions;
+        writeOptions.sourceManager = getLinkage()->getSourceManager();
+        FileStream fileStream;
+        SLANG_RETURN_ON_FAIL(fileStream.init(fileName, FileMode::Create));
+        return SerialContainerUtil::write(this, writeOptions, &fileStream);
+    }
+
+    SLANG_NO_THROW const char* SLANG_MCALL Module::getName()
+    {
+        if (m_name)
+            return m_name->text.getBuffer();
+        return nullptr;
+    }
+
+    SLANG_NO_THROW const char* SLANG_MCALL Module::getFilePath()
+    {
+        if (m_pathInfo.hasFoundPath())
+            return m_pathInfo.foundPath.getBuffer();
+        return nullptr;
+    }
+
+    SLANG_NO_THROW const char* SLANG_MCALL Module::getUniqueIdentity()
+    {
+        if (m_pathInfo.hasUniqueIdentity())
+            return m_pathInfo.getMostUniqueIdentity().getBuffer();
+        return nullptr;
+    }
+
+    void validateEntryPoint(
+        EntryPoint* entryPoint,
+        DiagnosticSink* sink);
+
+    void Module::_discoverEntryPoints(DiagnosticSink* sink)
+    {
+        for (auto globalDecl : m_moduleDecl->members)
+        {
+            auto maybeFuncDecl = globalDecl;
+            if (auto genericDecl = as<GenericDecl>(maybeFuncDecl))
+            {
+                maybeFuncDecl = genericDecl->inner;
+            }
+
+            auto funcDecl = as<FuncDecl>(maybeFuncDecl);
+            if (!funcDecl)
+                continue;
+
+            Profile profile;
+
+            auto entryPointAttr = funcDecl->findModifier<EntryPointAttribute>();
+            if (entryPointAttr)
+            {
+                // We've discovered a valid entry point. It is a function (possibly
+                // generic) that has a `[shader(...)]` attribute to mark it as an
+                // entry point.
+                //
+                // We will now register that entry point as an `EntryPoint`
+                // with an appropriately chosen profile.
+                //
+                // The profile will only include a stage, so that the profile "family"
+                // and "version" are left unspecified. Downstream code will need
+                // to be able to handle this case.
+                //
+                profile.setStage(entryPointAttr->stage);
+            }
+            else
+            {
+                // If there isn't a [shader] attribute, look for a [numthreads] attribute
+                // since that implicitly means a compute shader.
+                auto numThreadsAttr = funcDecl->findModifier<NumThreadsAttribute>();
+                if (numThreadsAttr)
+                    profile.setStage(Stage::Compute);
+                else
+                    continue;
+            }
+
+            RefPtr<EntryPoint> entryPoint = EntryPoint::create(
+                getLinkage(),
+                makeDeclRef(funcDecl),
+                profile);
+
+            validateEntryPoint(entryPoint, sink);
+
+            // Note: in the case that the user didn't explicitly
+            // specify entry points and we are instead compiling
+            // a shader "library," then we do not want to automatically
+            // combine the entry points into groups in the generated
+            // `Program`, since that would be slightly too magical.
+            //
+            // Instead, each entry point will end up in a singleton
+            // group, so that its entry-point parameters lay out
+            // independent of the others.
+            //
+            _addEntryPoint(entryPoint);
+        }
+    }
+
 }
+

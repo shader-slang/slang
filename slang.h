@@ -4444,6 +4444,17 @@ namespace slang
             ITypeConformance** outConformance,
             SlangInt conformanceIdOverride,
             ISlangBlob** outDiagnostics) = 0;
+
+            /** Load a module from a Slang module blob.
+            */
+        virtual SLANG_NO_THROW IModule* SLANG_MCALL loadModuleFromIRBlob(
+            const char* moduleName,
+            const char* path,
+            slang::IBlob* source,
+            slang::IBlob** outDiagnostics = nullptr) = 0;
+
+        virtual SLANG_NO_THROW SlangInt SLANG_MCALL getLoadedModuleCount() = 0;
+        virtual SLANG_NO_THROW IModule* SLANG_MCALL getLoadedModule(SlangInt index) = 0;
     };
 
     #define SLANG_UUID_ISession ISession::getTypeGuid()
@@ -4691,6 +4702,22 @@ namespace slang
         /// Get the name of an entry point defined in the module.
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL
             getDefinedEntryPoint(SlangInt32 index, IEntryPoint** outEntryPoint) = 0;
+
+        /// Get a serialized representation of the checked module.
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL serialize(ISlangBlob** outSerializedBlob) = 0;
+
+        /// Write the serialized representation of this module to a file.
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL writeToFile(char const* fileName) = 0;
+
+        /// Get the name of the module.
+        virtual SLANG_NO_THROW const char* SLANG_MCALL getName() = 0;
+
+        /// Get the path of the module.
+        virtual SLANG_NO_THROW const char* SLANG_MCALL getFilePath() = 0;
+
+        /// Get the unique identity of the module.
+        virtual SLANG_NO_THROW const char* SLANG_MCALL getUniqueIdentity() = 0;
+
     };
     
     #define SLANG_UUID_IModule IModule::getTypeGuid()

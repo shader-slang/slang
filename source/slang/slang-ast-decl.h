@@ -633,4 +633,9 @@ InterfaceDecl* findParentInterfaceDecl(Decl* decl);
 
 bool isLocalVar(const Decl* decl);
 
+
+// Add a sibling lookup scope for `dest` to refer to `source`.
+void addSiblingScopeForContainerDecl(ASTBuilder* builder, ContainerDecl* dest, ContainerDecl* source);
+void addSiblingScopeForContainerDecl(ASTBuilder* builder, Scope* destScope, ContainerDecl* source);
+
 } // namespace Slang
