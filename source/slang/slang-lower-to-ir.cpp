@@ -10238,7 +10238,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     SharedIRGenContext sharedContextStorage(
         session,
         translationUnit->compileRequest->getSink(),
-        translationUnit->compileRequest->getLinkage()->m_obfuscateCode,
+        translationUnit->compileRequest->optionSet.shouldObfuscateCode(),
         translationUnit->getModuleDecl(),
         translationUnit->compileRequest->getLinkage());
     SharedIRGenContext* sharedContext = &sharedContextStorage;
@@ -10252,7 +10252,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     IRBuilder* builder = &builderStorage;
 
     context->irBuilder = builder;
-    context->includeDebugInfo = compileRequest->getLinkage()->debugInfoLevel != DebugInfoLevel::None;
+    context->includeDebugInfo = compileRequest->getLinkage()->m_optionSet.getDebugInfoLevel() != DebugInfoLevel::None;
 
     // We need to emit IR for all public/exported symbols
     // in the translation unit.
@@ -10450,7 +10450,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 
         Linkage* linkage = compileRequest->getLinkage();
 
-        stripOptions.shouldStripNameHints = linkage->m_obfuscateCode;
+        stripOptions.shouldStripNameHints = linkage->m_optionSet.shouldObfuscateCode();
 
         // If we are generating an obfuscated source map, we don't want to strip locs, 
         // we want to generate *new* locs that can be mapped (via source map)
@@ -10474,7 +10474,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         options.keepExportsAlive = true;
         eliminateDeadCode(module, options);
 
-        if (linkage->m_obfuscateCode)
+        if (linkage->m_optionSet.shouldObfuscateCode())
         {
             // The obfuscated source map is stored on the module
             obfuscateModuleLocs(module, compileRequest->getSourceManager());
@@ -10494,7 +10494,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 
     // If we are being asked to dump IR during compilation,
     // then we can dump the initial IR for the module here.
-    if(compileRequest->shouldDumpIR)
+    if(compileRequest->optionSet.shouldDumpIR())
     {
         DiagnosticSinkWriter writer(compileRequest->getSink());
 
@@ -10525,7 +10525,7 @@ struct SpecializedComponentTypeIRGenContext : ComponentTypeVisitor
         SharedIRGenContext sharedContextStorage(
             session,
             sink,
-            linkage->m_obfuscateCode,
+            linkage->m_optionSet.shouldObfuscateCode(),
             nullptr,
             linkage
         );
@@ -10664,7 +10664,7 @@ struct TypeConformanceIRGenContext
         linkage = typeConformance->getLinkage();
         session = linkage->getSessionImpl();
 
-        SharedIRGenContext sharedContextStorage(session, sink, linkage->m_obfuscateCode, nullptr, linkage);
+        SharedIRGenContext sharedContextStorage(session, sink, linkage->m_optionSet.shouldObfuscateCode(), nullptr, linkage);
         SharedIRGenContext* sharedContext = &sharedContextStorage;
 
         IRGenContext contextStorage(sharedContext, linkage->getASTBuilder());
@@ -11016,7 +11016,7 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
     SharedIRGenContext sharedContextStorage(
         session,
         sink,
-        linkage->m_obfuscateCode,
+        linkage->m_optionSet.shouldObfuscateCode(),
         nullptr,
         linkage);
     auto sharedContext = &sharedContextStorage;
@@ -11111,12 +11111,12 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
     }
 
     // Lets strip and run DCE here
-    if (linkage->m_obfuscateCode)
+    if (linkage->m_optionSet.shouldObfuscateCode())
     {
         IRStripOptions stripOptions;
 
-        stripOptions.shouldStripNameHints = linkage->m_obfuscateCode;
-        stripOptions.stripSourceLocs = linkage->m_obfuscateCode;
+        stripOptions.shouldStripNameHints = true;
+        stripOptions.stripSourceLocs = true;;
 
         stripFrontEndOnlyInstructions(irModule, stripOptions);
 

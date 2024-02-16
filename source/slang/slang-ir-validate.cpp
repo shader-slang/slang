@@ -378,7 +378,7 @@ namespace Slang
         CompileRequestBase*  compileRequest,
         IRModule*               module)
     {
-        if (!compileRequest->shouldValidateIR)
+        if (!compileRequest->getLinkage()->m_optionSet.getBoolOption(CompilerOptionName::ValidateIr))
             return;
 
         auto sink = compileRequest->getSink();

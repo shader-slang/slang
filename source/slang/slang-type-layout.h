@@ -1052,14 +1052,14 @@ struct LayoutRulesImpl
 struct LayoutRulesFamilyImpl
 {
     virtual LayoutRulesImpl* getAnyValueRules()             = 0;
-    virtual LayoutRulesImpl* getConstantBufferRules(TargetRequest* request) = 0;
+    virtual LayoutRulesImpl* getConstantBufferRules(CompilerOptionSet& compilerOptions) = 0;
     virtual LayoutRulesImpl* getPushConstantBufferRules()   = 0;
     virtual LayoutRulesImpl* getTextureBufferRules()        = 0;
     virtual LayoutRulesImpl* getVaryingInputRules()         = 0;
     virtual LayoutRulesImpl* getVaryingOutputRules()        = 0;
     virtual LayoutRulesImpl* getSpecializationConstantRules()= 0;
-    virtual LayoutRulesImpl* getShaderStorageBufferRules(TargetRequest* request)  = 0;
-    virtual LayoutRulesImpl* getParameterBlockRules(TargetRequest* request) = 0;
+    virtual LayoutRulesImpl* getShaderStorageBufferRules(CompilerOptionSet& compilerOptions)  = 0;
+    virtual LayoutRulesImpl* getParameterBlockRules(CompilerOptionSet& compilerOptions) = 0;
 
     virtual LayoutRulesImpl* getRayPayloadParameterRules()  = 0;
     virtual LayoutRulesImpl* getCallablePayloadParameterRules()  = 0;
@@ -1067,7 +1067,7 @@ struct LayoutRulesFamilyImpl
 
     virtual LayoutRulesImpl* getShaderRecordConstantBufferRules() = 0;
 
-    virtual LayoutRulesImpl* getStructuredBufferRules(TargetRequest* request) = 0;
+    virtual LayoutRulesImpl* getStructuredBufferRules(CompilerOptionSet& compilerOptions) = 0;
 };
 
     /// A custom tuple to capture the outputs of type layout
@@ -1258,7 +1258,7 @@ private:
 // the ordering of all global generic type paramters.
 //
 TypeLayoutContext getInitialLayoutContextForTarget(
-    TargetRequest*  targetReq,
+    TargetRequest*  targetRequest,
     ProgramLayout*  programLayout);
 
     /// Direction(s) of a varying shader parameter

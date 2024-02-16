@@ -35,8 +35,8 @@
 #include "../core/slang-char-util.h"
 
 #include "../core/slang-name-value.h"
-
 #include "../core/slang-command-options-writer.h"
+#include "slang-compiler-options.h"
 
 #include <assert.h>
 
@@ -45,124 +45,7 @@ namespace Slang {
 namespace { // anonymous
 
 // All of the options are given an unique enum
-enum class OptionKind
-{
-    // General
-
-    MacroDefine,
-    DepFile,
-    EntryPointName,
-    Specialize,
-    Help,
-    HelpStyle,
-    Include,
-    Language,
-    MatrixLayoutColumn,
-    MatrixLayoutRow,
-    ModuleName,
-    Output,
-    Profile,
-    Stage,
-    Target,
-    Version,
-    WarningsAsErrors,
-    DisableWarnings,
-    EnableWarning,
-    DisableWarning,
-    DumpWarningDiagnostics,
-    InputFilesRemain,
-    EmitIr,
-    ReportDownstreamTime,
-    ReportPerfBenchmark,
-    SkipSPIRVValidation,
-
-    SourceEmbedStyle,
-    SourceEmbedName,
-    SourceEmbedLanguage,
-
-    // Target
-
-    Capability,
-    DefaultImageFormatUnknown,
-    DisableDynamicDispatch,
-    DisableSpecialization,
-    FloatingPointMode,
-    DebugInformation,
-    LineDirectiveMode,
-    Optimization,
-    Obfuscate,
-
-    VulkanBindShift,
-    VulkanBindGlobals,
-    VulkanInvertY,
-    VulkanUseEntryPointName,
-    VulkanUseGLLayout,
-    VulkanEmitReflection,
-
-    GLSLForceScalarLayout,
-    EnableEffectAnnotations,
-
-    EmitSpirvViaGLSL,
-    EmitSpirvDirectly,
-    SPIRVCoreGrammarJSON,
-    
-    // Downstream
-
-    CompilerPath,
-    DefaultDownstreamCompiler,
-    DownstreamArgs,
-    PassThrough,
-
-    // Repro
-
-    DumpRepro,
-    DumpReproOnError,
-    ExtractRepro,
-    LoadRepro,
-    LoadReproDirectory,
-    ReproFallbackDirectory,
-
-    // Debugging
-
-    DumpAst,
-    DumpIntermediatePrefix,
-    DumpIntermediates,
-    DumpIr,
-    DumpIrIds,
-    PreprocessorOutput,
-    NoCodeGen,
-    OutputIncludes,
-    ReproFileSystem,
-    SerialIr,
-    SkipCodeGen,
-    ValidateIr,
-    VerbosePaths,
-    VerifyDebugSerialIr,
-
-    // Experimental
-
-    FileSystem,
-    Heterogeneous,
-    NoMangle,
-    AllowGLSL,
-
-    // Internal
-
-    ArchiveType,
-    CompileStdLib,
-    Doc,
-    IrCompression,
-    LoadStdLib,
-    ReferenceModule,
-    SaveStdLib,
-    SaveStdLibBinSource,
-    TrackLiveness,
-
-    // Deprecated
-    ParameterBlocksUseRegisterSpaces,
-
-    CountOf,
-};
+typedef CompilerOptionName OptionKind;
 
 struct Option
 {
@@ -670,7 +553,7 @@ void initCommandOptions(CommandOptions& options)
 
     // We can now check that the whole range is available. If this fails it means there 
     // is an enum in the list that hasn't been setup as an option!
-    SLANG_ASSERT(options.hasContiguousUserValueRange(CommandOptions::LookupKind::Option, UserValue(0), UserValue(OptionKind::CountOf)));
+    SLANG_ASSERT(options.hasContiguousUserValueRange(CommandOptions::LookupKind::Option, UserValue(0), UserValue(OptionKind::CountOfParsableOptions)));
     SLANG_ASSERT(options.hasContiguousUserValueRange(CommandOptions::LookupKind::Category, UserValue(0), UserValue(ValueCategory::CountOf)));
 }
 
@@ -767,12 +650,9 @@ struct OptionsParser
     struct RawTarget
     {
         CodeGenTarget       format = CodeGenTarget::Unknown;
-        ProfileVersion      profileVersion = ProfileVersion::Unknown;
         SlangTargetFlags    targetFlags = kDefaultTargetFlags;
         int                 targetID = -1;
-        FloatingPointMode   floatingPointMode = FloatingPointMode::Default;
-        bool                forceGLSLScalarLayout = false;
-        List<CapabilityName> capabilityAtoms;
+        CompilerOptionSet   optionSet;
 
         // State for tracking command-line errors
         bool conflictingProfilesSet = false;
@@ -886,10 +766,6 @@ struct OptionsParser
     // before the first "proper" entry point is specified.
     RawEntryPoint m_defaultEntryPoint;
 
-    SlangCompileFlags m_flags = 0;
-
-    RefPtr<HLSLToVulkanLayoutOptions> m_hlslToVulkanLayoutOptions;
-
     List<RawTranslationUnit> m_rawTranslationUnits;
 
     // If we already have a translation unit for Slang code, then this will give its index.
@@ -902,25 +778,18 @@ struct OptionsParser
     int m_translationUnitCount = 0;
     int m_currentTranslationUnitIndex = -1;
 
+    bool m_hasLoadedRepro = false;
+    bool m_compileStdLib = false;
+    slang::CompileStdLibFlags m_compileStdLibFlags;
+
+    SlangArchiveType m_archiveType = SLANG_ARCHIVE_TYPE_RIFF_LZ4;
+    
     List<RawOutput> m_rawOutputs;
 
     DiagnosticSink m_parseSink;
     DiagnosticSink* m_sink = nullptr;
 
     FrontEndCompileRequest* m_frontEndReq = nullptr;
-
-    SlangMatrixLayoutMode m_defaultMatrixLayoutMode = SLANG_MATRIX_LAYOUT_MODE_UNKNOWN;
-
-        // The default archive type is zip
-    SlangArchiveType m_archiveType = SLANG_ARCHIVE_TYPE_ZIP;
-
-    bool m_compileStdLib = false;
-    slang::CompileStdLibFlags m_compileStdLibFlags = 0;
-    bool m_hasLoadedRepro = false;
-
-    String m_spirvCoreGrammarJSONPath;
-
-    bool m_allowGLSLInput = false;
 
     CommandLineReader m_reader;
 
@@ -1161,26 +1030,26 @@ OptionsParser::RawTarget* OptionsParser::getCurrentTarget()
 
 void OptionsParser::setProfileVersion(RawTarget* rawTarget, ProfileVersion profileVersion)
 {
-    if (rawTarget->profileVersion != ProfileVersion::Unknown)
+    if (rawTarget->optionSet.getProfileVersion() != ProfileVersion::Unknown)
     {
         rawTarget->redundantProfileSet = true;
 
-        if (profileVersion != rawTarget->profileVersion)
+        if (profileVersion != rawTarget->optionSet.getProfileVersion())
         {
             rawTarget->conflictingProfilesSet = true;
         }
     }
-    rawTarget->profileVersion = profileVersion;
+    rawTarget->optionSet.setProfileVersion(profileVersion);
 }
 
 void OptionsParser::addCapabilityAtom(RawTarget* rawTarget, CapabilityName atom)
 {
-    rawTarget->capabilityAtoms.add(atom);
+    rawTarget->optionSet.addCapabilityAtom(atom);
 }
 
 void OptionsParser::setFloatingPointMode(RawTarget* rawTarget, FloatingPointMode mode)
 {
-    rawTarget->floatingPointMode = mode;
+    rawTarget->optionSet.set(CompilerOptionName::FloatingPointMode, mode);
 }
 
 /* static */bool OptionsParser::_passThroughRequiresStage(PassThroughMode passThrough)
@@ -1290,67 +1159,6 @@ SlangResult OptionsParser::_compileReproDirectory(SlangSession* session, EndToEn
         const char end[] = "(END)\n";
         stdOut->write(end, SLANG_COUNT_OF(end) - 1);
     }
-
-    return SLANG_OK;
-}
-
-SlangResult OptionsParser::_overrideDiagnostics(const UnownedStringSlice& identifierList, Severity originalSeverity, Severity overrideSeverity)
-{
-    List<UnownedStringSlice> slices;
-    StringUtil::split(identifierList, ',', slices);
-
-    for (const auto& slice : slices)
-    {
-        SLANG_RETURN_ON_FAIL(_overrideDiagnostic(slice, originalSeverity, overrideSeverity));
-    }
-    return SLANG_OK;
-}
-
-SlangResult OptionsParser::_overrideDiagnostic(const UnownedStringSlice& identifier, Severity originalSeverity, Severity overrideSeverity)
-{
-    auto diagnosticsLookup = getDiagnosticsLookup();
-
-    const DiagnosticInfo* diagnostic = nullptr;
-    Int diagnosticId = -1;
-
-    // If it starts with a digit we assume it a number 
-    if (identifier.getLength() > 0 && (CharUtil::isDigit(identifier[0]) || identifier[0] == '-'))
-    {
-        if (SLANG_FAILED(StringUtil::parseInt(identifier, diagnosticId)))
-        {
-            m_sink->diagnose(SourceLoc(), Diagnostics::unknownDiagnosticName, identifier);
-            return SLANG_FAIL;
-        }
-
-        // If we use numbers, we don't worry if we can't find a diagnostic
-        // and silently ignore. This was the previous behavior, and perhaps
-        // provides a way to safely disable warnings, without worrying about
-        // the version of the compiler.
-        diagnostic = diagnosticsLookup->getDiagnosticById(diagnosticId);
-    }
-    else
-    {
-        diagnostic = diagnosticsLookup->findDiagnosticByName(identifier);
-        if (!diagnostic)
-        {
-            m_sink->diagnose(SourceLoc(), Diagnostics::unknownDiagnosticName, identifier);
-            return SLANG_FAIL;
-        }
-        diagnosticId = diagnostic->id;
-    }
-
-    // If we are only allowing certain original severities check it's the right type
-    if (diagnostic && originalSeverity != Severity::Disable && diagnostic->severity != originalSeverity)
-    {
-        // Strictly speaking the diagnostic name is known, but it's not the right severity
-        // to be converted from, so it is an 'unknown name' in the context of severity...
-        // Or perhaps we want another diagnostic
-        m_sink->diagnose(SourceLoc(), Diagnostics::unknownDiagnosticName, identifier);
-        return SLANG_FAIL;
-    }
-
-    // Override the diagnostic severity in the sink
-    m_requestImpl->getSink()->overrideDiagnosticSeverity(int(diagnosticId), overrideSeverity, diagnostic);
 
     return SLANG_OK;
 }
@@ -1784,20 +1592,28 @@ SlangResult OptionsParser::_parse(
     int             argc,
     char const* const* argv)
 {
-    // Copy some state out of the current request, in case we've been called
-    // after some other initialization has been performed.
-    m_flags = m_requestImpl->getFrontEndReq()->compileFlags;
-
     // Set up the args
     CommandLineArgs args(m_cmdLineContext);
+
     // Converts input args into args in 'args'.
     // Doing so will allocate some SourceLoc space from the CommandLineContext.
     args.setArgs(argv, argc);
 
+    auto linkage = m_requestImpl->getLinkage();
+
+    // Before we do anything else lets strip out all of the downstream arguments.
+    DownstreamArgs downstreamArgs(m_cmdLineContext);
+
+
+    SLANG_RETURN_ON_FAIL(downstreamArgs.stripDownstreamArgs(args, 0, m_sink));
+    for (auto& entry : downstreamArgs.m_entries)
     {
-        auto linkage = m_requestImpl->getLinkage();
-        // Before we do anything else lets strip out all of the downstream arguments.
-        SLANG_RETURN_ON_FAIL(linkage->m_downstreamArgs.stripDownstreamArgs(args, 0, m_sink));
+        String serializedArgs = entry.args.serialize();
+        CompilerOptionValue v;
+        v.kind = CompilerOptionValueKind::String;
+        v.stringValue = entry.name;
+        v.stringValue2 = serializedArgs;
+        linkage->m_optionSet.add(CompilerOptionName::DownstreamArgs, v);
     }
 
     m_reader.init(&args, m_sink);
@@ -1827,9 +1643,34 @@ SlangResult OptionsParser::_parse(
 
         switch (optionKind)
         {
-            case OptionKind::NoMangle: m_flags |= SLANG_COMPILE_FLAG_NO_MANGLING; break;
-            case OptionKind::AllowGLSL: m_allowGLSLInput = true; break;
-            case OptionKind::EmitIr: m_requestImpl->m_emitIr = true; break;
+            case OptionKind::NoMangle:
+            case OptionKind::AllowGLSL:
+            case OptionKind::EmitIr:
+            case OptionKind::DumpIntermediates:
+            case OptionKind::DumpReproOnError:
+            case OptionKind::ReportDownstreamTime:
+            case OptionKind::ReportPerfBenchmark:
+            case OptionKind::SkipSPIRVValidation:
+            case OptionKind::DisableSpecialization:
+            case OptionKind::DisableDynamicDispatch:
+            case OptionKind::TrackLiveness:
+            case OptionKind::SkipCodeGen:
+            case OptionKind::ParameterBlocksUseRegisterSpaces:
+            case OptionKind::ValidateIr:
+            case OptionKind::DumpIr:
+            case OptionKind::VulkanInvertY:
+            case OptionKind::VulkanUseEntryPointName:
+            case OptionKind::VulkanUseGLLayout:
+            case OptionKind::VulkanEmitReflection:
+            case OptionKind::MatrixLayoutRow:
+            case OptionKind::MatrixLayoutColumn:
+            case OptionKind::DefaultImageFormatUnknown:
+            case OptionKind::Obfuscate:
+                linkage->m_optionSet.set(optionKind, true); break;
+                break;
+            case OptionKind::NoCodeGen:
+                linkage->m_optionSet.set(OptionKind::SkipCodeGen, true); break;
+                break;
             case OptionKind::LoadStdLib:
             {
                 CommandLineArg fileName;
@@ -1842,7 +1683,11 @@ SlangResult OptionsParser::_parse(
                 break;
             }
             case OptionKind::CompileStdLib: m_compileStdLib = true; break;
-            case OptionKind::ArchiveType:   SLANG_RETURN_ON_FAIL(_expectValue(m_archiveType)); break;
+            case OptionKind::ArchiveType:
+            {
+                SLANG_RETURN_ON_FAIL(_expectValue(m_archiveType));
+                break;
+            }
             case OptionKind::SaveStdLib:
             {
                 CommandLineArg fileName;
@@ -1871,8 +1716,6 @@ SlangResult OptionsParser::_parse(
                 File::writeAllText(fileName.value, builder);
                 break;
             }
-            case OptionKind::NoCodeGen: m_flags |= SLANG_COMPILE_FLAG_NO_CODEGEN; break;
-            case OptionKind::DumpIntermediates: m_compileRequest->setDumpIntermediates(true); break;
             case OptionKind::DumpIrIds:
             {
                 m_frontEndReq->m_irDumpOptions.flags |= IRDumpOptions::Flag::DumpDebugIds;
@@ -1882,11 +1725,10 @@ SlangResult OptionsParser::_parse(
             {
                 CommandLineArg prefix;
                 SLANG_RETURN_ON_FAIL(m_reader.expectArg(prefix));
-                m_requestImpl->m_dumpIntermediatePrefix = prefix.value;
+                linkage->m_optionSet.set(CompilerOptionName::DumpIntermediatePrefix, prefix.value);
                 break;
             }
             case OptionKind::OutputIncludes: m_frontEndReq->outputIncludes = true; break;
-            case OptionKind::DumpIr: m_frontEndReq->shouldDumpIR = true; break;
             case OptionKind::PreprocessorOutput: m_frontEndReq->outputPreprocessor = true; break;
             case OptionKind::DumpAst: m_frontEndReq->shouldDumpAST = true; break;
             case OptionKind::Doc:
@@ -1902,11 +1744,10 @@ SlangResult OptionsParser::_parse(
             {
                 CommandLineArg dumpRepro;
                 SLANG_RETURN_ON_FAIL(m_reader.expectArg(dumpRepro));
-                m_requestImpl->m_dumpRepro = dumpRepro.value;
+                linkage->m_optionSet.set(OptionKind::DumpRepro, dumpRepro.value);
                 m_compileRequest->enableReproCapture();
                 break;
             }
-            case OptionKind::DumpReproOnError: m_requestImpl->m_dumpReproOnError = true; break;
             case OptionKind::ExtractRepro:
             {
                 CommandLineArg reproName;
@@ -1920,21 +1761,6 @@ SlangResult OptionsParser::_parse(
                         return res;
                     }
                 }
-                break;
-            }
-            case OptionKind::ReportDownstreamTime:
-            {
-                m_compileRequest->setReportDownstreamTime(true);
-                break;
-            }
-            case OptionKind::ReportPerfBenchmark:
-            {
-                m_compileRequest->setReportPerfBenchmark(true);
-                break;
-            }
-            case OptionKind::SkipSPIRVValidation:
-            {
-                m_compileRequest->setSkipSPIRVValidation(true);
                 break;
             }
             case OptionKind::ModuleName:
@@ -1986,64 +1812,50 @@ SlangResult OptionsParser::_parse(
             }
             case OptionKind::ReproFileSystem: SLANG_RETURN_ON_FAIL(_parseReproFileSystem(arg)); break;
             case OptionKind::SerialIr: m_frontEndReq->useSerialIRBottleneck = true; break;
-            case OptionKind::DisableSpecialization: m_requestImpl->disableSpecialization = true; break;
-            case OptionKind::DisableDynamicDispatch: m_requestImpl->disableDynamicDispatch = true; break;
-            case OptionKind::TrackLiveness: m_requestImpl->setTrackLiveness(true); break;
-            case OptionKind::VerbosePaths: m_requestImpl->getSink()->setFlag(DiagnosticSink::Flag::VerbosePath); break;
+            case OptionKind::VerbosePaths:
+                m_requestImpl->getSink()->setFlag(DiagnosticSink::Flag::VerbosePath); break;
             case OptionKind::DumpWarningDiagnostics: _dumpDiagnostics(Severity::Warning); break;
             case OptionKind::WarningsAsErrors:
             {
                 CommandLineArg operand;
                 SLANG_RETURN_ON_FAIL(m_reader.expectArg(operand));
-
-                if (operand.value == "all")
-                {
-                    // TODO(JS):
-                    // Perhaps there needs to be a way to disable this selectively.
-                    m_requestImpl->getSink()->setFlag(DiagnosticSink::Flag::TreatWarningsAsErrors);
-                }
-                else
-                {
-                    SLANG_RETURN_ON_FAIL(_overrideDiagnostics(operand.value.getUnownedSlice(), Severity::Warning, Severity::Error));
-                }
+                linkage->m_optionSet.add(OptionKind::WarningsAsErrors, operand.value.getUnownedSlice());
                 break;
             }
             case OptionKind::DisableWarnings:
             {
                 CommandLineArg operand;
                 SLANG_RETURN_ON_FAIL(m_reader.expectArg(operand));
-                SLANG_RETURN_ON_FAIL(_overrideDiagnostics(operand.value.getUnownedSlice(), Severity::Warning, Severity::Disable));
+                //SLANG_RETURN_ON_FAIL(_overrideDiagnostics(operand.value.getUnownedSlice(), Severity::Warning, Severity::Disable));
+                linkage->m_optionSet.add(OptionKind::DisableWarnings, operand.value.getUnownedSlice());
                 break;
             }
             case OptionKind::DisableWarning:
             {
                 // 5 because -Wno-
                 auto name = argValue.getUnownedSlice().tail(5);
-                SLANG_RETURN_ON_FAIL(_overrideDiagnostic(name, Severity::Warning, Severity::Disable));
+                linkage->m_optionSet.add(OptionKind::DisableWarning, name);
+
+                //SLANG_RETURN_ON_FAIL(_overrideDiagnostic(name, Severity::Warning, Severity::Disable));
                 break;
             }
             case OptionKind::EnableWarning:
             {
                 // 2 because -W
                 auto name = argValue.getUnownedSlice().tail(2);
+                linkage->m_optionSet.add(OptionKind::EnableWarning, name);
                 // Enable the warning
-                SLANG_RETURN_ON_FAIL(_overrideDiagnostic(name, Severity::Warning, Severity::Warning));
+                //SLANG_RETURN_ON_FAIL(_overrideDiagnostic(name, Severity::Warning, Severity::Warning));
                 break;
             }
             case OptionKind::VerifyDebugSerialIr: m_frontEndReq->verifyDebugSerialization = true; break;
-            case OptionKind::ValidateIr: m_frontEndReq->shouldValidateIR = true; break;
-            case OptionKind::SkipCodeGen: m_requestImpl->m_shouldSkipCodegen = true; break;
-            case OptionKind::ParameterBlocksUseRegisterSpaces:
-            {
-                getCurrentTarget()->targetFlags |= SLANG_TARGET_FLAG_PARAMETER_BLOCKS_USE_REGISTER_SPACES;
-                break;
-            }
             case OptionKind::IrCompression:
             {
                 CommandLineArg name;
                 SLANG_RETURN_ON_FAIL(m_reader.expectArg(name));
-
-                SLANG_RETURN_ON_FAIL(SerialParseUtil::parseCompressionType(name.value.getUnownedSlice(), m_requestImpl->getLinkage()->serialCompressionType));
+                SerialCompressionType compressionType;
+                SLANG_RETURN_ON_FAIL(SerialParseUtil::parseCompressionType(name.value.getUnownedSlice(), compressionType));
+                linkage->m_optionSet.set(optionKind, compressionType);
                 break;
             }
             case OptionKind::Target:
@@ -2078,13 +1890,13 @@ SlangResult OptionsParser::_parse(
                 if (m_reader.hasArg() && m_reader.peekArg().value == toSlice("all"))
                 {
                     m_reader.advance();
-                    m_hlslToVulkanLayoutOptions->setAllShift(kind, shift);
+                    linkage->m_optionSet.add(CompilerOptionName::VulkanBindShiftAll, (int)kind, (int)shift);
                 }
                 else
                 {
                     Int set;
                     SLANG_RETURN_ON_FAIL(_expectInt(arg, set));
-                    m_hlslToVulkanLayoutOptions->setShift(kind, set, shift);
+                    linkage->m_optionSet.add(CompilerOptionName::VulkanBindShift, (uint8_t)kind, (int)set, (int)shift);
                 }
                 break;
             }
@@ -2094,32 +1906,7 @@ SlangResult OptionsParser::_parse(
                 Int binding, bindingSet;
                 SLANG_RETURN_ON_FAIL(_expectInt(arg, binding));
                 SLANG_RETURN_ON_FAIL(_expectInt(arg, bindingSet));
-
-                m_hlslToVulkanLayoutOptions->setGlobalsBinding(Index(bindingSet), Index(binding));
-                break;
-            }
-            case OptionKind::VulkanInvertY:
-            {
-                // -fvk-invert-y
-                m_hlslToVulkanLayoutOptions->setInvertY(true);
-                break;
-            }
-            case OptionKind::VulkanUseEntryPointName:
-            {
-                // -fvk-use-entrypoint-name
-                m_hlslToVulkanLayoutOptions->setUseOriginalEntryPointName(true);
-                break;
-            }
-            case OptionKind::VulkanUseGLLayout:
-            {
-                // -fvk-use-gl-layout
-                m_hlslToVulkanLayoutOptions->setUseGLLayout(true);
-                break;
-            }
-            case OptionKind::VulkanEmitReflection:
-            {
-                // -fvk-invert-y
-                m_hlslToVulkanLayoutOptions->setEmitSPIRVReflectionInfo(true);
+                linkage->m_optionSet.set(OptionKind::VulkanBindGlobals, (int)binding, (int)bindingSet);
                 break;
             }
             case OptionKind::Profile: SLANG_RETURN_ON_FAIL(_parseProfile(arg)); break;
@@ -2172,7 +1959,7 @@ SlangResult OptionsParser::_parse(
             }
             case OptionKind::GLSLForceScalarLayout:
             {
-                getCurrentTarget()->forceGLSLScalarLayout = true;
+                getCurrentTarget()->optionSet.add(CompilerOptionName::GLSLForceScalarLayout, true);
                 break;
             }
             case OptionKind::EnableEffectAnnotations:
@@ -2327,8 +2114,6 @@ SlangResult OptionsParser::_parse(
                 }
                 break;
             }
-            case OptionKind::MatrixLayoutRow:       m_defaultMatrixLayoutMode = SlangMatrixLayoutMode(kMatrixLayoutMode_RowMajor); break;
-            case OptionKind::MatrixLayoutColumn:    m_defaultMatrixLayoutMode = SlangMatrixLayoutMode(kMatrixLayoutMode_ColumnMajor); break;
             case OptionKind::LineDirectiveMode: 
             {
                 SlangLineDirectiveMode value;
@@ -2357,8 +2142,6 @@ SlangResult OptionsParser::_parse(
                 break;
             }
             case OptionKind::DebugInformation: SLANG_RETURN_ON_FAIL(_parseDebugInformation(arg)); break;
-            case OptionKind::DefaultImageFormatUnknown: m_requestImpl->useUnknownImageFormatAsDefault = true; break;
-            case OptionKind::Obfuscate: m_requestImpl->getLinkage()->m_obfuscateCode = true; break;
             case OptionKind::FileSystem:
             {
                 typedef TypeTextUtil::FileSystemType FileSystemType;
@@ -2401,7 +2184,7 @@ SlangResult OptionsParser::_parse(
             {
                 CommandLineArg path;
                 SLANG_RETURN_ON_FAIL(m_reader.expectArg(path));
-                m_spirvCoreGrammarJSONPath = path.value;
+                m_session->setSPIRVCoreGrammar(path.value.getBuffer());
             }
             break;
 
@@ -2502,16 +2285,6 @@ SlangResult OptionsParser::_parse(
         }
     }
 
-    // If there is state set on HLSL to Vulkan layout settings, set on the end to end request
-    // such can be added when target requests are setup
-    if (!m_hlslToVulkanLayoutOptions->isReset())
-    {
-        m_requestImpl->setHLSLToVulkanLayoutOptions(m_hlslToVulkanLayoutOptions);
-    }
-
-    // No longer need to track
-    m_hlslToVulkanLayoutOptions.setNull();
-    
     if (m_compileStdLib)
     {
         SLANG_RETURN_ON_FAIL(m_session->compileStdLib(m_compileStdLibFlags));
@@ -2525,10 +2298,6 @@ SlangResult OptionsParser::_parse(
     {
         return SLANG_OK;
     }
-
-    m_compileRequest->setCompileFlags(m_flags);
-
-    m_compileRequest->setAllowGLSLInput(m_allowGLSLInput);
 
     // As a compatability feature, if the user didn't list any explicit entry
     // point names, *and* they are compiling a single translation unit, *and* they
@@ -2785,14 +2554,14 @@ SlangResult OptionsParser::_parse(
     // then we can try to infer a target from the profile.
     //
     if (m_rawTargets.getCount() == 0
-        && m_defaultTarget.profileVersion != ProfileVersion::Unknown
+        && m_defaultTarget.optionSet.getProfileVersion() != ProfileVersion::Unknown
         && !m_defaultTarget.conflictingProfilesSet)
     {
         // Let's see if the chosen profile allows us to infer
         // the code gen target format that the user probably meant.
         //
         CodeGenTarget inferredFormat = CodeGenTarget::Unknown;
-        auto profileVersion = m_defaultTarget.profileVersion;
+        auto profileVersion = m_defaultTarget.optionSet.getProfileVersion();
         switch (Profile(profileVersion).getFamily())
         {
             default:
@@ -2837,22 +2606,24 @@ SlangResult OptionsParser::_parse(
     // Similar to the case for entry points, if there is a single target,
     // then we allow some of its options to come from the "default"
     // target state.
+    auto defaultTargetFloatingPointMode = m_defaultTarget.optionSet.getEnumOption<FloatingPointMode>(CompilerOptionName::FloatingPointMode);
+
     if (m_rawTargets.getCount() == 1)
     {
-        if (m_defaultTarget.profileVersion != ProfileVersion::Unknown)
+        if (m_defaultTarget.optionSet.getProfileVersion() != ProfileVersion::Unknown)
         {
-            setProfileVersion(getCurrentTarget(), m_defaultTarget.profileVersion);
+            setProfileVersion(getCurrentTarget(), m_defaultTarget.optionSet.getProfileVersion());
         }
-        for (auto atom : m_defaultTarget.capabilityAtoms)
+        for (auto atom : m_defaultTarget.optionSet.getArray(CompilerOptionName::Capability))
         {
-            addCapabilityAtom(getCurrentTarget(), atom);
+            addCapabilityAtom(getCurrentTarget(), (CapabilityName)atom.intValue);
         }
 
         getCurrentTarget()->targetFlags |= m_defaultTarget.targetFlags;
 
-        if (m_defaultTarget.floatingPointMode != FloatingPointMode::Default)
+        if (defaultTargetFloatingPointMode != FloatingPointMode::Default)
         {
-            setFloatingPointMode(getCurrentTarget(), m_defaultTarget.floatingPointMode);
+            setFloatingPointMode(getCurrentTarget(), defaultTargetFloatingPointMode);
         }
     }
     else
@@ -2861,7 +2632,7 @@ SlangResult OptionsParser::_parse(
         // specified, but there is != 1 taget, then that state doesn't
         // apply to anythign and we should give the user an error.
         //
-        if (m_defaultTarget.profileVersion != ProfileVersion::Unknown)
+        if (m_defaultTarget.optionSet.getProfileVersion() != ProfileVersion::Unknown)
         {
             if (m_rawTargets.getCount() == 0)
             {
@@ -2889,7 +2660,7 @@ SlangResult OptionsParser::_parse(
             }
         }
 
-        if (m_defaultTarget.floatingPointMode != FloatingPointMode::Default)
+        if (defaultTargetFloatingPointMode != FloatingPointMode::Default)
         {
             if (m_rawTargets.getCount() == 0)
             {
@@ -2910,7 +2681,7 @@ SlangResult OptionsParser::_parse(
         }
         else if (rawTarget.redundantProfileSet)
         {
-            m_sink->diagnose(SourceLoc(), Diagnostics::sameProfileSpecifiedMoreThanOnce, rawTarget.profileVersion, rawTarget.format);
+            m_sink->diagnose(SourceLoc(), Diagnostics::sameProfileSpecifiedMoreThanOnce, rawTarget.optionSet.getProfileVersion(), rawTarget.format);
         }
     }
 
@@ -2925,13 +2696,13 @@ SlangResult OptionsParser::_parse(
         int targetID = m_compileRequest->addCodeGenTarget(SlangCompileTarget(rawTarget.format));
         rawTarget.targetID = targetID;
 
-        if (rawTarget.profileVersion != ProfileVersion::Unknown)
+        if (rawTarget.optionSet.getProfileVersion() != ProfileVersion::Unknown)
         {
-            m_compileRequest->setTargetProfile(targetID, SlangProfileID(Profile(rawTarget.profileVersion).raw));
+            m_compileRequest->setTargetProfile(targetID, SlangProfileID(Profile(rawTarget.optionSet.getProfileVersion()).raw));
         }
-        for (auto atom : rawTarget.capabilityAtoms)
+        for (auto atom : rawTarget.optionSet.getArray(CompilerOptionName::Capability))
         {
-            m_requestImpl->addTargetCapability(targetID, SlangCapabilityID(atom));
+            m_requestImpl->addTargetCapability(targetID, SlangCapabilityID(atom.intValue));
         }
 
         if (rawTarget.targetFlags)
@@ -2939,25 +2710,16 @@ SlangResult OptionsParser::_parse(
             m_compileRequest->setTargetFlags(targetID, rawTarget.targetFlags);
         }
 
-        if (rawTarget.floatingPointMode != FloatingPointMode::Default)
+        auto floatingPointMode = rawTarget.optionSet.getEnumOption<FloatingPointMode>(CompilerOptionName::FloatingPointMode);
+        if (floatingPointMode != FloatingPointMode::Default)
         {
-            m_compileRequest->setTargetFloatingPointMode(targetID, SlangFloatingPointMode(rawTarget.floatingPointMode));
+            m_compileRequest->setTargetFloatingPointMode(targetID, SlangFloatingPointMode(floatingPointMode));
         }
 
-        if (rawTarget.forceGLSLScalarLayout)
+        if (rawTarget.optionSet.getBoolOption(CompilerOptionName::GLSLForceScalarLayout))
         {
             m_compileRequest->setTargetForceGLSLScalarBufferLayout(targetID, true);
         }
-    }
-
-    if (m_defaultMatrixLayoutMode != SLANG_MATRIX_LAYOUT_MODE_UNKNOWN)
-    {
-        m_compileRequest->setMatrixLayoutMode(m_defaultMatrixLayoutMode);
-    }
-
-    if(m_spirvCoreGrammarJSONPath.getLength())
-    {
-        m_session->setSPIRVCoreGrammar(m_spirvCoreGrammarJSONPath.getBuffer());
     }
 
     // Next we need to sort out the output files specified with `-o`, and
@@ -3104,7 +2866,7 @@ SlangResult OptionsParser::_parse(
             }
             else
             {
-                target->addTargetFlags(SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM);
+                target->getOptionSet().addTargetFlags(SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM);
                 targetInfo->wholeTargetOutputPath = rawOutput.path;
             }
         }
@@ -3127,6 +2889,12 @@ SlangResult OptionsParser::_parse(
         }
     }
 
+    // Copy all settings from linkage to targets.
+    for (auto target : linkage->targets)
+        target->getOptionSet().inheritFrom(linkage->m_optionSet);
+    
+    applySettingsToDiagnosticSink(m_requestImpl->getSink(), m_sink, linkage->m_optionSet);
+
     return (m_sink->getErrorCount() == 0) ? SLANG_OK : SLANG_FAIL;
 }
 
@@ -3145,13 +2913,10 @@ SlangResult OptionsParser::parse(
     m_session = session;
     m_frontEndReq = m_requestImpl->getFrontEndReq();
 
-    m_hlslToVulkanLayoutOptions = new HLSLToVulkanLayoutOptions;
-
     m_cmdOptions = &session->m_commandOptions;
+    m_cmdLineContext = m_requestImpl->getLinkage()->m_cmdLineContext.get();
 
     DiagnosticSink* requestSink = m_requestImpl->getSink();
-
-    m_cmdLineContext = m_requestImpl->getLinkage()->m_downstreamArgs.getContext();
 
     // Why create a new DiagnosticSink?
     // We *don't* want the lexer that comes as default (it's for Slang source!)

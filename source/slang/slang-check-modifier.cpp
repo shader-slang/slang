@@ -1162,7 +1162,7 @@ namespace Slang
         if (auto decl = as<Decl>(syntaxNode))
         {
             auto moduleDecl = getModuleDecl(decl);
-            bool isGLSLInput = getLinkage()->getAllowGLSLInput();
+            bool isGLSLInput = getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL);
             if (!isGLSLInput && moduleDecl && moduleDecl->findModifier<GLSLModuleModifier>())
                 isGLSLInput = true;
             if (!isModifierAllowedOnDecl(isGLSLInput, m->astNodeType, decl))

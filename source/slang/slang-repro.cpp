@@ -363,19 +363,17 @@ static String _scrubName(const String& in)
     {
         RequestState* dst = base[requestState];
 
-        dst->compileFlags = request->getFrontEndReq()->compileFlags;
-        dst->shouldDumpIntermediates = request->shouldDumpIntermediates;
-
-        dst->debugInfoLevel = linkage->debugInfoLevel;
-        dst->optimizationLevel = linkage->optimizationLevel;
+        dst->compileFlags = 0;
+        dst->shouldDumpIntermediates = linkage->m_optionSet.getBoolOption(CompilerOptionName::DumpIntermediates);
+        dst->debugInfoLevel = linkage->m_optionSet.getEnumOption<DebugInfoLevel>(CompilerOptionName::DebugInformation);
+        dst->optimizationLevel = linkage->m_optionSet.getEnumOption<OptimizationLevel>(CompilerOptionName::Optimization);
         dst->containerFormat = request->m_containerFormat;
         dst->passThroughMode = request->m_passThrough;
 
+        dst->useUnknownImageFormatAsDefault = linkage->m_optionSet.getBoolOption(CompilerOptionName::DefaultImageFormatUnknown);;
+        dst->obfuscateCode = linkage->m_optionSet.getBoolOption(CompilerOptionName::Obfuscate);
 
-        dst->useUnknownImageFormatAsDefault = request->useUnknownImageFormatAsDefault;
-        dst->obfuscateCode = linkage->m_obfuscateCode;
-
-        dst->defaultMatrixLayoutMode = SlangMatrixLayoutMode(linkage->defaultMatrixLayoutMode);
+        dst->defaultMatrixLayoutMode = (SlangMatrixLayoutMode)linkage->m_optionSet.getMatrixLayoutMode();
     }
 
     // Entry points
@@ -434,9 +432,9 @@ static String _scrubName(const String& in)
             {
                 auto& dst = base[dstTargets[i]];
                 dst.target = srcTargetRequest->getTarget();
-                dst.profile = srcTargetRequest->getTargetProfile();
-                dst.targetFlags = srcTargetRequest->getTargetFlags();
-                dst.floatingPointMode = srcTargetRequest->getFloatingPointMode();
+                dst.profile = srcTargetRequest->getOptionSet().getProfile();
+                dst.targetFlags = srcTargetRequest->getOptionSet().getTargetFlags();
+                dst.floatingPointMode = srcTargetRequest->getOptionSet().getEnumOption<FloatingPointMode>(CompilerOptionName::FloatingPointMode);
             }
 
             // Copy the entry point/target output names
@@ -475,21 +473,26 @@ static String _scrubName(const String& in)
 
     // Add the search paths
     {
-        const auto& srcPaths = linkage->searchDirectories.searchDirectories;
-        Offset32Array<Offset32Ptr<OffsetString> > dstPaths = inOutContainer.newArray<Offset32Ptr<OffsetString> >(srcPaths.getCount());
+        auto srcPaths = linkage->getSearchDirectories();
+        Offset32Array<Offset32Ptr<OffsetString> > dstPaths = inOutContainer.newArray<Offset32Ptr<OffsetString> >(srcPaths.searchDirectories.getCount());
 
         // We don't handle parents here
-        SLANG_ASSERT(linkage->searchDirectories.parent == nullptr);
-        for (Index i = 0; i < srcPaths.getCount(); ++i)
+        SLANG_ASSERT(srcPaths.parent == nullptr);
+        for (Index i = 0; i < srcPaths.searchDirectories.getCount(); ++i)
         {
-            const auto srcPath = context.fromString(srcPaths[i].path);
+            const auto srcPath = context.fromString(srcPaths.searchDirectories[i].path);
             base[dstPaths[i]] = srcPath;
         }
         base[requestState]->searchPaths = dstPaths;
     }
 
     // Add preprocessor definitions
-    base[requestState]->preprocessorDefinitions = context.calcDefines(linkage->preprocessorDefinitions);
+    Dictionary<String, String> preprocessorDefines;
+    for (auto def : linkage->m_optionSet.getArray(CompilerOptionName::MacroDefine))
+    {
+        preprocessorDefines[def.stringValue] = def.stringValue2;
+    }
+    base[requestState]->preprocessorDefinitions = context.calcDefines(preprocessorDefines);
 
     {
         const auto& srcTranslationUnits = request->getFrontEndReq()->translationUnits;
@@ -915,10 +918,24 @@ struct LoadContext
         externalRequest->setOutputContainerFormat(SlangContainerFormat(requestState->containerFormat));
         externalRequest->setPassThrough(SlangPassThrough(request->m_passThrough));
 
-        request->useUnknownImageFormatAsDefault = requestState->useUnknownImageFormatAsDefault;
-        linkage->m_obfuscateCode = requestState->obfuscateCode;
+        linkage->m_optionSet.set(CompilerOptionName::DefaultImageFormatUnknown, requestState->useUnknownImageFormatAsDefault);
+        linkage->m_optionSet.set(CompilerOptionName::Obfuscate, requestState->obfuscateCode);
 
         linkage->setMatrixLayoutMode(requestState->defaultMatrixLayoutMode);
+    }
+
+    {
+        const auto& srcPaths = requestState->searchPaths;
+        for (Index i = 0; i < srcPaths.getCount(); ++i)
+        {
+            linkage->m_optionSet.add(CompilerOptionName::Include, base.asRaw(base.asRaw(srcPaths[i]))->getSlice());
+        }
+    }
+    Dictionary<String, String> preprocessorDefines;
+    context.loadDefines(requestState->preprocessorDefinitions, preprocessorDefines);
+    for (auto def : preprocessorDefines)
+    {
+        linkage->m_optionSet.addPreprocessorDefine(def.first, def.second);
     }
 
     // Add the target requests
@@ -932,9 +949,9 @@ struct LoadContext
             auto dstTarget = linkage->targets[index];
 
             SLANG_ASSERT(dstTarget->getTarget() == src.target);
-            dstTarget->setTargetProfile(src.profile);
-            dstTarget->addTargetFlags(src.targetFlags);
-            dstTarget->setFloatingPointMode(src.floatingPointMode);
+            dstTarget->getOptionSet().setProfile(src.profile);
+            dstTarget->getOptionSet().addTargetFlags(src.targetFlags);
+            dstTarget->getOptionSet().set(CompilerOptionName::FloatingPointMode, src.floatingPointMode);
 
             // If there is output state (like output filenames) add here
             if (src.outputStates.getCount())
@@ -960,17 +977,6 @@ struct LoadContext
         }
     }
 
-    {
-        const auto& srcPaths = requestState->searchPaths;
-        auto& dstPaths = linkage->searchDirectories.searchDirectories;
-        dstPaths.setCount(srcPaths.getCount());
-        for (Index i = 0; i < srcPaths.getCount(); ++i)
-        {
-            dstPaths[i].path = base.asRaw(base.asRaw(srcPaths[i]))->getSlice();
-        }
-    }
-
-    context.loadDefines(requestState->preprocessorDefinitions, linkage->preprocessorDefinitions);
 
     {
         auto frontEndReq = request->getFrontEndReq();

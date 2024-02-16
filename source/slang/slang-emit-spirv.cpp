@@ -1291,9 +1291,7 @@ struct SPIRVEmitContext
 
     bool shouldEmitSPIRVReflectionInfo()
     {
-        if (!m_targetRequest->getHLSLToVulkanLayoutOptions())
-            return false;
-        return m_targetRequest->getHLSLToVulkanLayoutOptions()->shouldEmitSPIRVReflectionInfo();
+        return m_targetProgram->getOptionSet().getBoolOption(CompilerOptionName::VulkanEmitReflection);
     }
 
     void requireVariablePointers()
@@ -1401,7 +1399,7 @@ struct SPIRVEmitContext
                     if (m_decoratedSpvInsts.add(getID(resultSpvType)))
                     {
                         IRSizeAndAlignment sizeAndAlignment;
-                        getNaturalSizeAndAlignment(m_targetRequest, ptrType->getValueType(), &sizeAndAlignment);
+                        getNaturalSizeAndAlignment(m_targetProgram, ptrType->getValueType(), &sizeAndAlignment);
                         emitOpDecorateArrayStride(
                             getSection(SpvLogicalSectionID::Annotations),
                             nullptr,
@@ -1465,7 +1463,7 @@ struct SPIRVEmitContext
                 else
                 {
                     IRSizeAndAlignment sizeAndAlignment;
-                    getNaturalSizeAndAlignment(m_targetRequest, elementType, &sizeAndAlignment);
+                    getNaturalSizeAndAlignment(m_targetProgram, elementType, &sizeAndAlignment);
                     stride = (int)sizeAndAlignment.getStride();
                 }
                 emitOpDecorateArrayStride(
@@ -3182,7 +3180,7 @@ struct SPIRVEmitContext
             }
             else
             {
-                getOffset(m_targetRequest, IRTypeLayoutRules::get(layoutRuleName), field, &offset);
+                getOffset(m_targetProgram, IRTypeLayoutRules::get(layoutRuleName), field, &offset);
             }
             emitOpMemberDecorateOffset(
                 getSection(SpvLogicalSectionID::Annotations),
@@ -3207,7 +3205,7 @@ struct SPIRVEmitContext
                 IRIntegerValue matrixStride = 0;
                 auto rule = IRTypeLayoutRules::get(layoutRuleName);
                 IRSizeAndAlignment elementSizeAlignment;
-                getSizeAndAlignment(m_targetRequest, rule, matrixType->getElementType(), &elementSizeAlignment);
+                getSizeAndAlignment(m_targetProgram, rule, matrixType->getElementType(), &elementSizeAlignment);
 
                 // Reminder: the meaning of row/column major layout
                 // in our semantics is the *opposite* of what GLSL/SPIRV
@@ -4153,7 +4151,7 @@ struct SPIRVEmitContext
         if (ptrType && ptrType->getAddressSpace() == SpvStorageClassPhysicalStorageBuffer)
         {
             IRSizeAndAlignment sizeAndAlignment;
-            getNaturalSizeAndAlignment(m_targetRequest, ptrType->getValueType(), &sizeAndAlignment);
+            getNaturalSizeAndAlignment(m_targetProgram, ptrType->getValueType(), &sizeAndAlignment);
             return emitOpLoadAligned(parent, inst, inst->getDataType(), inst->getPtr(), SpvLiteralInteger::from32(sizeAndAlignment.alignment));
         }
         else
@@ -4168,7 +4166,7 @@ struct SPIRVEmitContext
         if (ptrType && ptrType->getAddressSpace() == SpvStorageClassPhysicalStorageBuffer)
         {
             IRSizeAndAlignment sizeAndAlignment;
-            getNaturalSizeAndAlignment(m_targetRequest, ptrType->getValueType(), &sizeAndAlignment);
+            getNaturalSizeAndAlignment(m_targetProgram, ptrType->getValueType(), &sizeAndAlignment);
             return emitOpStoreAligned(parent, inst, inst->getPtr(), inst->getVal(), SpvLiteralInteger::from32(sizeAndAlignment.alignment));
         }
         else
@@ -5223,8 +5221,8 @@ struct SPIRVEmitContext
         }
     }
 
-    SPIRVEmitContext(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
-        : SPIRVEmitSharedContext(module, target, sink)
+    SPIRVEmitContext(IRModule* module, TargetProgram* program, DiagnosticSink* sink)
+        : SPIRVEmitSharedContext(module, program, sink)
         , m_irModule(module)
         , m_memoryArena(2048)
     {
@@ -5239,7 +5237,6 @@ SlangResult emitSPIRVFromIR(
 {
     spirvOut.clear();
 
-    auto targetRequest = codeGenContext->getTargetReq();
     auto sink = codeGenContext->getSink();
 
 #if 0
@@ -5254,7 +5251,7 @@ SlangResult emitSPIRVFromIR(
     }
 #endif
 
-    SPIRVEmitContext context(irModule, targetRequest, sink);
+    SPIRVEmitContext context(irModule, codeGenContext->getTargetProgram(), sink);
     legalizeIRForSPIRV(&context, irModule, irEntryPoints, codeGenContext);
 
 #if 0

@@ -123,9 +123,9 @@ namespace Slang {
 
             auto& dstTarget = targetComponent.target;
 
-            dstTarget.floatingPointMode = target->getFloatingPointMode();
-            dstTarget.profile = target->getTargetProfile();
-            dstTarget.flags = target->getTargetFlags();
+            dstTarget.floatingPointMode = target->getOptionSet().getFloatingPointMode();
+            dstTarget.profile = target->getOptionSet().getProfile();
+            dstTarget.flags = target->getOptionSet().getTargetFlags();
             dstTarget.codeGenTarget = target->getTarget();
 
             out.targetComponents.add(targetComponent);

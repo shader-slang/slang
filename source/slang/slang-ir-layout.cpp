@@ -51,7 +51,7 @@
 namespace Slang
 {
 static Result _calcArraySizeAndAlignment(
-    TargetRequest* target,
+    TargetProgram* target,
     IRTypeLayoutRules* rules,
     IRType* elementType,
     IRInst* elementCountInst,
@@ -85,13 +85,13 @@ IRIntegerValue getIntegerValueFromInst(IRInst* inst)
 }
 
 static Result _calcSizeAndAlignment(
-    TargetRequest* target,
+    TargetProgram* target,
     IRTypeLayoutRules* rules,
     IRType* type,
     IRSizeAndAlignment* outSizeAndAlignment)
 {
     int kPointerSize = 8;
-    switch (target->getTarget())
+    switch (target->getTargetReq()->getTarget())
     {
     case CodeGenTarget::HostCPPSource:
     case CodeGenTarget::HostHostCallable:
@@ -347,7 +347,7 @@ IRSizeAndAlignmentDecoration* findSizeAndAlignmentDecorationForLayout(IRType* ty
     return nullptr;
 }
 
-Result getSizeAndAlignment(TargetRequest* target, IRTypeLayoutRules* rules, IRType* type, IRSizeAndAlignment* outSizeAndAlignment)
+Result getSizeAndAlignment(TargetProgram* target, IRTypeLayoutRules* rules, IRType* type, IRSizeAndAlignment* outSizeAndAlignment)
 {
     if (auto decor = findSizeAndAlignmentDecorationForLayout(type, rules->ruleName))
     {
@@ -387,7 +387,7 @@ IROffsetDecoration* findOffsetDecorationForLayout(IRStructField* field, IRTypeLa
     return nullptr;
 }
 
-Result getOffset(TargetRequest* target, IRTypeLayoutRules* rules, IRStructField* field, IRIntegerValue* outOffset)
+Result getOffset(TargetProgram* target, IRTypeLayoutRules* rules, IRStructField* field, IRIntegerValue* outOffset)
 {
     if (auto decor = findOffsetDecorationForLayout(field, rules->ruleName))
     {
@@ -492,13 +492,13 @@ struct Std140LayoutRules : IRTypeLayoutRules
     }
 };
 
-Result getNaturalSizeAndAlignment(TargetRequest* target, IRType* type, IRSizeAndAlignment* outSizeAndAlignment)
+Result getNaturalSizeAndAlignment(TargetProgram* target, IRType* type, IRSizeAndAlignment* outSizeAndAlignment)
 {
     return getSizeAndAlignment(target, IRTypeLayoutRules::getNatural(), type, outSizeAndAlignment);
 
 }
 
-Result getNaturalOffset(TargetRequest* target, IRStructField* field, IRIntegerValue* outOffset)
+Result getNaturalOffset(TargetProgram* target, IRStructField* field, IRIntegerValue* outOffset)
 {
     return getOffset(target, IRTypeLayoutRules::getNatural(), field, outOffset);
 }
@@ -508,12 +508,12 @@ Result getNaturalOffset(TargetRequest* target, IRStructField* field, IRIntegerVa
 // Std430 Layout
 //////////////////////////
 
-Result getStd430SizeAndAlignment(TargetRequest* target, IRType* type, IRSizeAndAlignment* outSizeAndAlignment)
+Result getStd430SizeAndAlignment(TargetProgram* target, IRType* type, IRSizeAndAlignment* outSizeAndAlignment)
 {
     return getSizeAndAlignment(target, IRTypeLayoutRules::getStd430(), type, outSizeAndAlignment);
 }
 
-Result getStd430Offset(TargetRequest* target, IRStructField* field, IRIntegerValue* outOffset)
+Result getStd430Offset(TargetProgram* target, IRStructField* field, IRIntegerValue* outOffset)
 {
     return getOffset(target, IRTypeLayoutRules::getStd430(), field, outOffset);
 }

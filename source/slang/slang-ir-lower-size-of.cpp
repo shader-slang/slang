@@ -55,7 +55,7 @@ struct SizeOfLikeLoweringContext
 
         IRSizeAndAlignment sizeAndAlignment;
 
-        if (SLANG_FAILED(getNaturalSizeAndAlignment(m_targetReq, typeOperand, &sizeAndAlignment)))
+        if (SLANG_FAILED(getNaturalSizeAndAlignment(m_targetProgram, typeOperand, &sizeAndAlignment)))
         {
             // Output a diagnostic failure
             if(sizeOfLikeInst->getOp() == kIROp_AlignOf)
@@ -84,22 +84,22 @@ struct SizeOfLikeLoweringContext
         sizeOfLikeInst->removeAndDeallocate();
     }
 
-    SizeOfLikeLoweringContext(TargetRequest* targetReq, IRModule* module, DiagnosticSink* sink):
+    SizeOfLikeLoweringContext(TargetProgram* targetProgram, IRModule* module, DiagnosticSink* sink):
         m_module(module),
-        m_targetReq(targetReq),
+        m_targetProgram(targetProgram),
         m_sink(sink)
     {
     }
 
-    TargetRequest* m_targetReq;
+    TargetProgram* m_targetProgram;
     DiagnosticSink* m_sink;
     IRModule* m_module;
     OrderedHashSet<IRInst*> m_workList;
 };
 
-void lowerSizeOfLike(TargetRequest* targetReq, IRModule* module, DiagnosticSink* sink)
+void lowerSizeOfLike(TargetProgram* targetProgram, IRModule* module, DiagnosticSink* sink)
 { 
-    SizeOfLikeLoweringContext context(targetReq, module, sink);
+    SizeOfLikeLoweringContext context(targetProgram, module, sink);
     context.processModule();
 }
 

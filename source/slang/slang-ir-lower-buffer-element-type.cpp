@@ -23,9 +23,9 @@ namespace Slang
         Dictionary<IRType*, LoweredElementTypeInfo> mapLoweredTypeToInfo[(int)IRTypeLayoutRuleName::_Count];
 
         SlangMatrixLayoutMode defaultMatrixLayout = SLANG_MATRIX_LAYOUT_ROW_MAJOR;
-        TargetRequest* target;
+        TargetProgram* target;
 
-        LoweredElementTypeContext(TargetRequest* target, SlangMatrixLayoutMode inDefaultMatrixLayout)
+        LoweredElementTypeContext(TargetProgram* target, SlangMatrixLayoutMode inDefaultMatrixLayout)
             : target(target), defaultMatrixLayout(inDefaultMatrixLayout)
         {}
 
@@ -230,7 +230,7 @@ namespace Slang
             {
                 // For spirv, we always want to lower all matrix types, because matrix types
                 // are considered abstract types.
-                if (!target->shouldEmitSPIRVDirectly())
+                if (!target->getOptionSet().getBoolOption(CompilerOptionName::EmitSpirvDirectly))
                 {
                     // For other targets, we only lower the matrix types if they differ from the default
                     // matrix layout.
@@ -279,7 +279,7 @@ namespace Slang
                 // For spirv backend, we always want to lower all array types, even if the element type
                 // comes out the same. This is because different layout rules may have different array
                 // stride requirements.
-                if (!target->shouldEmitSPIRVDirectly())
+                if (!target->getOptionSet().shouldEmitSPIRVDirectly())
                 {
                     if (!loweredInnerTypeInfo.convertLoweredToOriginal)
                     {
@@ -326,7 +326,7 @@ namespace Slang
                 // For spirv backend, we always want to lower all array types, even if the element type
                 // comes out the same. This is because different layout rules may have different array
                 // stride requirements.
-                if (!target->shouldEmitSPIRVDirectly())
+                if (!target->getOptionSet().shouldEmitSPIRVDirectly())
                 {
                     // For non-spirv target, we skip lowering this type if all field types are unchanged.
                     if (isTrivial)
@@ -403,9 +403,9 @@ namespace Slang
                 return info;
             }
 
-            if (target->shouldEmitSPIRVDirectly())
+            if (target->getOptionSet().shouldEmitSPIRVDirectly())
             {
-                switch (target->getTarget())
+                switch (target->getTargetReq()->getTarget())
                 {
                 case CodeGenTarget::SPIRV:
                 case CodeGenTarget::SPIRVAssembly:
@@ -801,9 +801,9 @@ namespace Slang
         }
     };
 
-    void lowerBufferElementTypeToStorageType(TargetRequest* target, IRModule* module)
+    void lowerBufferElementTypeToStorageType(TargetProgram* target, IRModule* module)
     {
-        SlangMatrixLayoutMode defaultMatrixMode = (SlangMatrixLayoutMode)target->getDefaultMatrixLayoutMode();
+        SlangMatrixLayoutMode defaultMatrixMode = (SlangMatrixLayoutMode)target->getOptionSet().getMatrixLayoutMode();
         if (defaultMatrixMode == SLANG_MATRIX_LAYOUT_MODE_UNKNOWN)
             defaultMatrixMode = SLANG_MATRIX_LAYOUT_ROW_MAJOR;
         LoweredElementTypeContext context(target, defaultMatrixMode);
@@ -811,17 +811,17 @@ namespace Slang
     }
 
 
-    IRTypeLayoutRules* getTypeLayoutRuleForBuffer(TargetRequest* target, IRType* bufferType)
+    IRTypeLayoutRules* getTypeLayoutRuleForBuffer(TargetProgram* target, IRType* bufferType)
     {
-        if (!isKhronosTarget(target))
+        if (!isKhronosTarget(target->getTargetReq()))
             return IRTypeLayoutRules::getNatural();
 
         // If we are just emitting GLSL, we can just use the general layout rule.
-        if (!target->shouldEmitSPIRVDirectly())
+        if (!target->getOptionSet().getBoolOption(CompilerOptionName::EmitSpirvDirectly))
             return IRTypeLayoutRules::getNatural();
 
         // If the user specified a scalar buffer layout, then just use that.
-        if (target->getForceGLSLScalarBufferLayout())
+        if (target->getOptionSet().getBoolOption(CompilerOptionName::GLSLForceScalarLayout))
             return IRTypeLayoutRules::getNatural();
 
         // The default behavior is to use std140 for constant buffers and std430 for other buffers.

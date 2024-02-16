@@ -9,7 +9,7 @@ namespace Slang
 
 struct BitCastLoweringContext
 {
-    TargetRequest* targetReq;
+    TargetProgram* targetProgram;
     IRModule* module;
     OrderedHashSet<IRInst*> workList;
 
@@ -72,7 +72,7 @@ struct BitCastLoweringContext
                 {
                     IRIntegerValue fieldOffset = 0;
                     SLANG_RELEASE_ASSERT(
-                        getNaturalOffset(targetReq, field, &fieldOffset) == SLANG_OK);
+                        getNaturalOffset(targetProgram, field, &fieldOffset) == SLANG_OK);
                     auto fieldType = field->getFieldType();
                     auto fieldValue =
                         readObject(builder, src, fieldType, (uint32_t)(fieldOffset + offset));
@@ -90,7 +90,7 @@ struct BitCastLoweringContext
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(
                     getNaturalSizeAndAlignment(
-                        targetReq, arrayType->getElementType(), &elementLayout) == SLANG_OK);
+                        targetProgram, arrayType->getElementType(), &elementLayout) == SLANG_OK);
                 for (IRIntegerValue i = 0; i < arrayCount->value.intVal; i++)
                 {
                     elements.add(readObject(
@@ -111,7 +111,7 @@ struct BitCastLoweringContext
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(
                     getNaturalSizeAndAlignment(
-                        targetReq, vectorType->getElementType(), &elementLayout) == SLANG_OK);
+                        targetProgram, vectorType->getElementType(), &elementLayout) == SLANG_OK);
                 for (IRIntegerValue i = 0; i < elementCount->value.intVal; i++)
                 {
                     elements.add(readObject(
@@ -136,7 +136,7 @@ struct BitCastLoweringContext
                     matrixType->getElementType(), matrixType->getColumnCount());
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(
-                    getNaturalSizeAndAlignment(targetReq, elementType, &elementLayout) == SLANG_OK);
+                    getNaturalSizeAndAlignment(targetProgram, elementType, &elementLayout) == SLANG_OK);
                 for (IRIntegerValue i = 0; i < elementCount->value.intVal; i++)
                 {
                     elements.add(readObject(
@@ -153,7 +153,7 @@ struct BitCastLoweringContext
         case kIROp_Int16Type:
         case kIROp_UInt16Type:
             {
-                auto object = extractValueAtOffset(builder, targetReq, src, offset, 2);
+                auto object = extractValueAtOffset(builder, targetProgram, src, offset, 2);
                 return builder.emitBitCast(type, object);
             }
             break;
@@ -166,7 +166,7 @@ struct BitCastLoweringContext
         case kIROp_UIntPtrType:
 #endif
             {
-                auto object = extractValueAtOffset(builder, targetReq, src, offset, 4);
+                auto object = extractValueAtOffset(builder, targetProgram, src, offset, 4);
                 return builder.emitBitCast(type, object);
             }
             break;
@@ -179,8 +179,8 @@ struct BitCastLoweringContext
 #endif
         case kIROp_RawPointerType:
             {
-                auto low = extractValueAtOffset(builder, targetReq, src, offset, 4);
-                auto high = extractValueAtOffset(builder, targetReq, src, offset + 4, 4);
+                auto low = extractValueAtOffset(builder, targetProgram, src, offset, 4);
+                auto high = extractValueAtOffset(builder, targetProgram, src, offset + 4, 4);
                 auto combined = builder.emitAdd(builder.getUInt64Type(),
                     low,
                     builder.emitShl(
@@ -195,7 +195,7 @@ struct BitCastLoweringContext
         case kIROp_UInt8Type:
         case kIROp_Int8Type:
             {
-                auto object = extractValueAtOffset(builder, targetReq, src, offset, 1);
+                auto object = extractValueAtOffset(builder, targetProgram, src, offset, 1);
                 return builder.emitBitCast(type, object);
             }
             break;
@@ -247,11 +247,11 @@ struct BitCastLoweringContext
     }
 };
 
-void lowerBitCast(TargetRequest* targetReq, IRModule* module)
+void lowerBitCast(TargetProgram* targetProgram, IRModule* module)
 {
     BitCastLoweringContext context;
     context.module = module;
-    context.targetReq = targetReq;
+    context.targetProgram = targetProgram;
     context.processModule();
 }
 

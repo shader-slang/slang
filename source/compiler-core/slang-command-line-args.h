@@ -69,6 +69,9 @@ struct CommandLineArgs
     //String m_executablePath;                ///< Can be optionally be set
     List<Arg> m_args;                       ///< The args
     RefPtr<CommandLineContext> m_context;   ///< The context, which mainly has source manager
+
+    String serialize();
+    void deserialize(String content);
 };
 
 struct CommandLineReader
@@ -155,17 +158,15 @@ struct DownstreamArgs
     CommandLineContext* getContext() const { return m_context; }
 
         /// Ctor
-    DownstreamArgs(CommandLineContext* context):
-        m_context(context)
-    {
-    }
+    DownstreamArgs(CommandLineContext* context);
+
         /// Default ctor - for convenience, should really use with context normally
     DownstreamArgs() {}
 
+    List<Entry> m_entries;                  ///< All of the entries
+
 protected:
     Index _findOrAddName(SourceLoc loc, const UnownedStringSlice& name, Flags flags, DiagnosticSink* sink);
-
-    List<Entry> m_entries;                  ///< All of the entries
 
     RefPtr<CommandLineContext> m_context;   ///< The context that is being used (primarily for loc tracking) across all entries/args
 };

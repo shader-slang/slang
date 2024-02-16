@@ -1687,7 +1687,7 @@ namespace Slang
                 }
             }
 
-            if (getLinkage()->getAllowGLSLInput())
+            if (getModuleDecl(varDecl)->hasModifier<GLSLModuleModifier>())
             {
                 // If we are in GLSL compatiblity mode, we want to treat all global variables
                 // without any `uniform` modifiers as true global variables by default.
