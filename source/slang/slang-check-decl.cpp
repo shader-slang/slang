@@ -820,6 +820,11 @@ namespace Slang
         return as<NamespaceDeclBase>(parentDecl) != nullptr || as<FileDecl>(parentDecl) != nullptr;
     }
 
+    bool isUnsafeForceInlineFunc(FunctionDeclBase* funcDecl)
+    {
+        return funcDecl->hasModifier<UnsafeForceInlineEarlyAttribute>();
+    }
+
         /// Is `decl` a global shader parameter declaration?
     bool isGlobalShaderParameter(VarDeclBase* decl)
     {
@@ -7302,7 +7307,7 @@ namespace Slang
     {
         // Create a new sub-scope to wire the module
         // into our lookup chain.
-        addSiblingScopeForContainerDecl(scope, fileDecl);
+        addSiblingScopeForContainerDecl(getASTBuilder(), scope, fileDecl);
     }
 
     void SemanticsVisitor::importModuleIntoScope(Scope* scope, ModuleDecl* moduleDecl)
@@ -7325,7 +7330,7 @@ namespace Slang
             if (moduleScope->containerDecl != moduleDecl && moduleScope->containerDecl->parentDecl != moduleDecl)
                 continue;
 
-            addSiblingScopeForContainerDecl(scope, moduleScope->containerDecl);
+            addSiblingScopeForContainerDecl(getASTBuilder(), scope, moduleScope->containerDecl);
         }
 
         // Also import any modules from nested `import` declarations
@@ -7547,7 +7552,7 @@ namespace Slang
                     if (addedScopes.add(s->containerDecl))
                     {
                         scopesAdded = true;
-                        addSiblingScopeForContainerDecl(scope, s->containerDecl);
+                        addSiblingScopeForContainerDecl(getASTBuilder(), scope, s->containerDecl);
                     }
                 }
             };
@@ -7608,7 +7613,7 @@ namespace Slang
                     {
                         ensureDecl(ns, DeclCheckState::ScopesWired);
                     }
-                    addSiblingScopeForContainerDecl(decl, otherNamespace);
+                    addSiblingScopeForContainerDecl(getASTBuilder(), decl, otherNamespace);
                 }
             }
             // For file decls, we need to continue searching up in the parent module scope.

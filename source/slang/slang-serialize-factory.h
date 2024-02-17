@@ -15,6 +15,7 @@ class DefaultSerialObjectFactory : public SerialObjectFactory
 public:
 
     virtual void* create(SerialTypeKind typeKind, SerialSubType subType) SLANG_OVERRIDE;
+    virtual void* getOrCreateVal(ValNodeDesc&& desc) SLANG_OVERRIDE;
 
     DefaultSerialObjectFactory(ASTBuilder* astBuilder) :
         m_astBuilder(astBuilder)

@@ -929,7 +929,14 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     }
     else if (semanticName == "sv_shadingrate")
     {
-        name = "gl_PrimitiveShadingRateEXT";
+        if (kind == LayoutResourceKind::VaryingInput)
+        {
+            name = "gl_ShadingRateEXT";
+        }
+        else
+        {
+            name = "gl_PrimitiveShadingRateEXT";
+        }
     }
 
     if( name )

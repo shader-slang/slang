@@ -107,7 +107,7 @@ struct SerialContainerUtil
     static SlangResult write(const SerialContainerData& data, const WriteOptions& options, RiffContainer* container);
 
         /// Read the container into outData
-    static SlangResult read(RiffContainer* container, const ReadOptions& options, SerialContainerData& outData);
+    static SlangResult read(RiffContainer* container, const ReadOptions& options, const LoadedModuleDictionary* additionalLoadedModules, SerialContainerData& outData);
 
         /// Verify IR serialization
     static SlangResult verifyIRSerialize(IRModule* module, Session* session, const WriteOptions& options);

@@ -295,12 +295,6 @@ namespace Slang
     // being in templates, because gcc/clang get angry.
     //
     template<typename T>
-    void FilteredModifierList<T>::Iterator::operator++()
-    {
-        current = adjust(current->next);
-    }
-    //
-    template<typename T>
     Modifier* FilteredModifierList<T>::adjust(Modifier* modifier)
     {
         Modifier* m = modifier;
@@ -315,6 +309,11 @@ namespace Slang
         }        
     }
 
+    template<typename T>
+    void FilteredModifierList<T>::Iterator::operator++()
+    {
+        current = FilteredModifierList<T>::adjust(current->next);
+    }
     //
 
     enum class UserDefinedAttributeTargets
