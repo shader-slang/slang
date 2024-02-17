@@ -11,7 +11,7 @@
 #include "SPIRV/doc.h"
 #include "SPIRV/disassemble.h"
 
-#include "OGLCompilersDLL/InitializeDll.h"
+#include "glslang/MachineIndependent/localintermediate.h"
 
 #include "../../slang.h"
 
@@ -815,11 +815,6 @@ int glslang_compile_1_2(glslang_CompileRequest_1_2 * inRequest)
 {
     static ProcessInitializer g_processInitializer;
     if (!g_processInitializer.init())
-    {
-        // Failed
-        return 1;
-    }
-    if (!glslang::InitThread())
     {
         // Failed
         return 1;
