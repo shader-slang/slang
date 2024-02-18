@@ -5155,6 +5155,10 @@ void EndToEndCompileRequest::setLineDirectiveMode(SlangLineDirectiveMode mode)
 void EndToEndCompileRequest::setCommandLineCompilerMode()
 {
     m_isCommandLineCompile = true;
+
+    // legacy slangc tool defaults to column major layout.
+    if (!getOptionSet().hasOption(CompilerOptionName::MatrixLayoutRow))
+        getOptionSet().setMatrixLayoutMode(kMatrixLayoutMode_ColumnMajor);
 }
 
 void EndToEndCompileRequest::_completeTargetRequest(UInt targetIndex)

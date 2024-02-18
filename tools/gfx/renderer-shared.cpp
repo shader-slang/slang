@@ -908,15 +908,12 @@ Result ShaderObjectBase::setExistentialHeader(
     // Slang runtime, so we can look up the ID for this particular conformance (which
     // will create it on demand).
     //
-    ComPtr<slang::ISession> slangSession;
-    SLANG_RETURN_ON_FAIL(getRenderer()->getSlangSession(slangSession.writeRef()));
-    //
     // Note: If the type doesn't actually conform to the required interface for
     // this sub-object range, then this is the point where we will detect that
     // fact and error out.
     //
     uint32_t conformanceID = 0xFFFFFFFF;
-    SLANG_RETURN_ON_FAIL(slangSession->getTypeConformanceWitnessSequentialID(
+    SLANG_RETURN_ON_FAIL(getLayoutBase()->m_slangSession->getTypeConformanceWitnessSequentialID(
         concreteType, existentialType, &conformanceID));
     //
     // Once we have the conformance ID, then we can write it into the object

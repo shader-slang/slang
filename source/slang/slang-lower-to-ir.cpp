@@ -2342,8 +2342,6 @@ static void addNameHint(
     String name = getNameForNameHint(context, decl);
     if(name.getLength() == 0)
         return;
-    if (name == "MyBlockName2")
-        printf("break");
     context->irBuilder->addNameHintDecoration(inst, name.getUnownedSlice());
 }
 
