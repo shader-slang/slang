@@ -64,7 +64,7 @@ struct ResourceParameterSpecializationCondition : FunctionCallSpecializeConditio
         //
         if( isKhronosTarget(targetRequest) )
         {
-            if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmitSpirvDirectly))
+            if (targetProgram->getOptionSet().shouldEmitSPIRVDirectly())
                 return isIllegalSPIRVParameterType(type, isArray);
             else
                 return isIllegalGLSLParameterType(type);

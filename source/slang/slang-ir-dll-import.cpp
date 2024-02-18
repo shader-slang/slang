@@ -91,7 +91,7 @@ struct DllImportContext
         for (auto param : func->getParams())
         {
             IRSizeAndAlignment sizeAndAlignment;
-            getNaturalSizeAndAlignment(targetProgram, param->getDataType(), &sizeAndAlignment);
+            getNaturalSizeAndAlignment(targetProgram->getOptionSet(), param->getDataType(), &sizeAndAlignment);
             result += (uint32_t)align(sizeAndAlignment.size, 4);
         }
         return result;

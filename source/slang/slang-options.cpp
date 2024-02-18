@@ -2716,7 +2716,7 @@ SlangResult OptionsParser::_parse(
             m_compileRequest->setTargetFloatingPointMode(targetID, SlangFloatingPointMode(floatingPointMode));
         }
 
-        if (rawTarget.optionSet.getBoolOption(CompilerOptionName::GLSLForceScalarLayout))
+        if (rawTarget.optionSet.shouldUseScalarLayout())
         {
             m_compileRequest->setTargetForceGLSLScalarBufferLayout(targetID, true);
         }

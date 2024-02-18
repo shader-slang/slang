@@ -1615,7 +1615,7 @@ CapabilitySet TargetRequest::getTargetCaps()
         break;
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
-        if (getOptionSet().getBoolOption(CompilerOptionName::EmitSpirvDirectly))
+        if (getOptionSet().shouldEmitSPIRVDirectly())
         {
             atoms.add(CapabilityName::spirv_1_5);
         }

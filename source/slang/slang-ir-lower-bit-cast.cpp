@@ -72,7 +72,7 @@ struct BitCastLoweringContext
                 {
                     IRIntegerValue fieldOffset = 0;
                     SLANG_RELEASE_ASSERT(
-                        getNaturalOffset(targetProgram, field, &fieldOffset) == SLANG_OK);
+                        getNaturalOffset(targetProgram->getOptionSet(), field, &fieldOffset) == SLANG_OK);
                     auto fieldType = field->getFieldType();
                     auto fieldValue =
                         readObject(builder, src, fieldType, (uint32_t)(fieldOffset + offset));
@@ -90,7 +90,7 @@ struct BitCastLoweringContext
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(
                     getNaturalSizeAndAlignment(
-                        targetProgram, arrayType->getElementType(), &elementLayout) == SLANG_OK);
+                        targetProgram->getOptionSet(), arrayType->getElementType(), &elementLayout) == SLANG_OK);
                 for (IRIntegerValue i = 0; i < arrayCount->value.intVal; i++)
                 {
                     elements.add(readObject(
@@ -111,7 +111,7 @@ struct BitCastLoweringContext
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(
                     getNaturalSizeAndAlignment(
-                        targetProgram, vectorType->getElementType(), &elementLayout) == SLANG_OK);
+                        targetProgram->getOptionSet(), vectorType->getElementType(), &elementLayout) == SLANG_OK);
                 for (IRIntegerValue i = 0; i < elementCount->value.intVal; i++)
                 {
                     elements.add(readObject(
@@ -136,7 +136,7 @@ struct BitCastLoweringContext
                     matrixType->getElementType(), matrixType->getColumnCount());
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(
-                    getNaturalSizeAndAlignment(targetProgram, elementType, &elementLayout) == SLANG_OK);
+                    getNaturalSizeAndAlignment(targetProgram->getOptionSet(), elementType, &elementLayout) == SLANG_OK);
                 for (IRIntegerValue i = 0; i < elementCount->value.intVal; i++)
                 {
                     elements.add(readObject(

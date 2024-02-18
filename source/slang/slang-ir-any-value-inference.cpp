@@ -213,7 +213,7 @@ namespace Slang
             for (auto implType : mapInterfaceToImplementations[interfaceType])
             {                            
                 IRSizeAndAlignment sizeAndAlignment;
-                getNaturalSizeAndAlignment(targetProgram, (IRType*)implType, &sizeAndAlignment);
+                getNaturalSizeAndAlignment(targetProgram->getOptionSet(), (IRType*)implType, &sizeAndAlignment);
                 
                 maxAnyValueSize = Math::Max(maxAnyValueSize, sizeAndAlignment.size);
             }

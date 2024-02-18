@@ -16,6 +16,7 @@ namespace Slang
     enum class FloatingPointMode : SlangFloatingPointModeIntegral;
     enum class OptimizationLevel : SlangOptimizationLevelIntegral;
     enum class DebugInfoLevel : SlangDebugInfoLevelIntegral;
+    enum class CodeGenTarget : SlangCompileTargetIntegral;
 
     struct CompilerOptionValue
     {
@@ -298,6 +299,11 @@ namespace Slang
             return ArrayView<CompilerOptionValue>();
         }
 
+        CodeGenTarget getTarget()
+        {
+            return getEnumOption<CodeGenTarget>(CompilerOptionName::Target);
+        }
+
         SlangTargetFlags getTargetFlags();
         void setTargetFlags(SlangTargetFlags flags);
         void addTargetFlags(SlangTargetFlags flags);
@@ -332,6 +338,11 @@ namespace Slang
         bool shouldEmitSPIRVDirectly()
         {
             return getBoolOption(CompilerOptionName::EmitSpirvDirectly);
+        }
+
+        bool shouldUseScalarLayout()
+        {
+            return getBoolOption(CompilerOptionName::GLSLForceScalarLayout);
         }
 
         bool shouldDumpIntermediates()

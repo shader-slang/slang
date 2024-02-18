@@ -1561,7 +1561,7 @@ namespace Slang
                 return SLANG_OK;
             }
             case CodeGenTarget::SPIRV:
-                if (getTargetProgram()->getOptionSet().getBoolOption(CompilerOptionName::EmitSpirvDirectly))
+                if (getTargetProgram()->getOptionSet().shouldEmitSPIRVDirectly())
                 {
                     SLANG_RETURN_ON_FAIL(emitSPIRVForEntryPointsDirectly(this, outArtifact));
                     return SLANG_OK;

@@ -1231,14 +1231,14 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getAnyValueRules()
 
 LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getConstantBufferRules(CompilerOptionSet& compilerOptions)
 {
-    if (compilerOptions.getBoolOption(CompilerOptionName::GLSLForceScalarLayout))
+    if (compilerOptions.shouldUseScalarLayout())
         return &kScalarLayoutRulesImpl_;
     return &kStd140LayoutRulesImpl_;
 }
 
 LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getParameterBlockRules(CompilerOptionSet& compilerOptions)
 {
-    if (compilerOptions.getBoolOption(CompilerOptionName::GLSLForceScalarLayout))
+    if (compilerOptions.shouldUseScalarLayout())
         return &kScalarLayoutRulesImpl_;
     return &kStd140LayoutRulesImpl_;
 }
@@ -1275,7 +1275,7 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getSpecializationConstantRules()
 
 LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getShaderStorageBufferRules(CompilerOptionSet& compilerOptions)
 {
-    if (compilerOptions.getBoolOption(CompilerOptionName::GLSLForceScalarLayout))
+    if (compilerOptions.shouldUseScalarLayout())
         return &kScalarLayoutRulesImpl_;
     return &kStd430LayoutRulesImpl_;
 }
@@ -1297,7 +1297,7 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getHitAttributesParameterRules()
 
 LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getStructuredBufferRules(CompilerOptionSet& options)
 {
-    if (options.getBoolOption(CompilerOptionName::GLSLForceScalarLayout))
+    if (options.shouldUseScalarLayout())
         return &kScalarLayoutRulesImpl_;
     return &kGLSLStructuredBufferLayoutRulesImpl_;
 }
@@ -1767,7 +1767,7 @@ bool isCUDATarget(TargetRequest* targetReq)
 SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgram)
 {
     // If we are emitting directly, there is no intermediate source language
-    if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmitSpirvDirectly))
+    if (targetProgram->getOptionSet().shouldEmitSPIRVDirectly())
     {
         return SourceLanguage::Unknown;
     }

@@ -55,7 +55,7 @@ struct SizeOfLikeLoweringContext
 
         IRSizeAndAlignment sizeAndAlignment;
 
-        if (SLANG_FAILED(getNaturalSizeAndAlignment(m_targetProgram, typeOperand, &sizeAndAlignment)))
+        if (SLANG_FAILED(getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), typeOperand, &sizeAndAlignment)))
         {
             // Output a diagnostic failure
             if(sizeOfLikeInst->getOp() == kIROp_AlignOf)

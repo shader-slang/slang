@@ -230,7 +230,7 @@ namespace Slang
             {
                 // For spirv, we always want to lower all matrix types, because matrix types
                 // are considered abstract types.
-                if (!target->getOptionSet().getBoolOption(CompilerOptionName::EmitSpirvDirectly))
+                if (!target->getOptionSet().shouldEmitSPIRVDirectly())
                 {
                     // For other targets, we only lower the matrix types if they differ from the default
                     // matrix layout.
@@ -257,7 +257,7 @@ namespace Slang
                 auto vectorType = builder.getVectorType(matrixType->getElementType(),
                     isColMajor?matrixType->getRowCount():matrixType->getColumnCount());
                 IRSizeAndAlignment elementSizeAlignment;
-                getSizeAndAlignment(target, rules, vectorType, &elementSizeAlignment);
+                getSizeAndAlignment(target->getOptionSet(), rules, vectorType, &elementSizeAlignment);
                 elementSizeAlignment = rules->alignCompositeElement(elementSizeAlignment);
 
                 auto arrayType = builder.getArrayType(
@@ -297,7 +297,7 @@ namespace Slang
                 auto structKey = builder.createStructKey();
                 builder.addNameHintDecoration(structKey, UnownedStringSlice("data"));
                 IRSizeAndAlignment elementSizeAlignment;
-                getSizeAndAlignment(target, rules, loweredInnerTypeInfo.loweredType, &elementSizeAlignment);
+                getSizeAndAlignment(target->getOptionSet(), rules, loweredInnerTypeInfo.loweredType, &elementSizeAlignment);
                 elementSizeAlignment = rules->alignCompositeElement(elementSizeAlignment);
                 auto innerArrayType = builder.getArrayType(
                     loweredInnerTypeInfo.loweredType,
@@ -465,7 +465,7 @@ namespace Slang
                 return info;
             info = getLoweredTypeInfoImpl(type, rules);
             IRSizeAndAlignment sizeAlignment;
-            getSizeAndAlignment(target, rules, info.loweredType, &sizeAlignment);
+            getSizeAndAlignment(target->getOptionSet(), rules, info.loweredType, &sizeAlignment);
             loweredTypeInfo[(int)rules->ruleName].set(type, info);
             mapLoweredTypeToInfo[(int)rules->ruleName].set(info.loweredType, info);
             return info;
@@ -817,11 +817,11 @@ namespace Slang
             return IRTypeLayoutRules::getNatural();
 
         // If we are just emitting GLSL, we can just use the general layout rule.
-        if (!target->getOptionSet().getBoolOption(CompilerOptionName::EmitSpirvDirectly))
+        if (!target->getOptionSet().shouldEmitSPIRVDirectly())
             return IRTypeLayoutRules::getNatural();
 
         // If the user specified a scalar buffer layout, then just use that.
-        if (target->getOptionSet().getBoolOption(CompilerOptionName::GLSLForceScalarLayout))
+        if (target->getOptionSet().shouldUseScalarLayout())
             return IRTypeLayoutRules::getNatural();
 
         // The default behavior is to use std140 for constant buffers and std430 for other buffers.

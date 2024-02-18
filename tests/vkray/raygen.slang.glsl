@@ -1,7 +1,7 @@
 #version 460
 #extension GL_EXT_ray_tracing : require
-layout(column_major) uniform;
-layout(column_major) buffer;
+layout(row_major) uniform;
+layout(row_major) buffer;
 layout(binding = 0)
 uniform texture2D samplerPosition_0;
 

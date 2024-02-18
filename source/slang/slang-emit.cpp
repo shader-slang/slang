@@ -929,7 +929,7 @@ Result linkAndOptimizeIR(
     // bit_cast on basic types.
     lowerBitCast(targetProgram, irModule);
 
-    bool emitSpirvDirectly = targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmitSpirvDirectly);
+    bool emitSpirvDirectly = targetProgram->getOptionSet().shouldEmitSPIRVDirectly();
 
     if (isKhronosTarget(targetRequest) && emitSpirvDirectly)
     {

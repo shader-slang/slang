@@ -1399,7 +1399,7 @@ struct SPIRVEmitContext
                     if (m_decoratedSpvInsts.add(getID(resultSpvType)))
                     {
                         IRSizeAndAlignment sizeAndAlignment;
-                        getNaturalSizeAndAlignment(m_targetProgram, ptrType->getValueType(), &sizeAndAlignment);
+                        getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), ptrType->getValueType(), &sizeAndAlignment);
                         emitOpDecorateArrayStride(
                             getSection(SpvLogicalSectionID::Annotations),
                             nullptr,
@@ -1463,7 +1463,7 @@ struct SPIRVEmitContext
                 else
                 {
                     IRSizeAndAlignment sizeAndAlignment;
-                    getNaturalSizeAndAlignment(m_targetProgram, elementType, &sizeAndAlignment);
+                    getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), elementType, &sizeAndAlignment);
                     stride = (int)sizeAndAlignment.getStride();
                 }
                 emitOpDecorateArrayStride(
@@ -3180,7 +3180,7 @@ struct SPIRVEmitContext
             }
             else
             {
-                getOffset(m_targetProgram, IRTypeLayoutRules::get(layoutRuleName), field, &offset);
+                getOffset(m_targetProgram->getOptionSet(), IRTypeLayoutRules::get(layoutRuleName), field, &offset);
             }
             emitOpMemberDecorateOffset(
                 getSection(SpvLogicalSectionID::Annotations),
@@ -3205,7 +3205,7 @@ struct SPIRVEmitContext
                 IRIntegerValue matrixStride = 0;
                 auto rule = IRTypeLayoutRules::get(layoutRuleName);
                 IRSizeAndAlignment elementSizeAlignment;
-                getSizeAndAlignment(m_targetProgram, rule, matrixType->getElementType(), &elementSizeAlignment);
+                getSizeAndAlignment(m_targetProgram->getOptionSet(), rule, matrixType->getElementType(), &elementSizeAlignment);
 
                 // Reminder: the meaning of row/column major layout
                 // in our semantics is the *opposite* of what GLSL/SPIRV
@@ -4151,7 +4151,7 @@ struct SPIRVEmitContext
         if (ptrType && ptrType->getAddressSpace() == SpvStorageClassPhysicalStorageBuffer)
         {
             IRSizeAndAlignment sizeAndAlignment;
-            getNaturalSizeAndAlignment(m_targetProgram, ptrType->getValueType(), &sizeAndAlignment);
+            getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), ptrType->getValueType(), &sizeAndAlignment);
             return emitOpLoadAligned(parent, inst, inst->getDataType(), inst->getPtr(), SpvLiteralInteger::from32(sizeAndAlignment.alignment));
         }
         else
@@ -4166,7 +4166,7 @@ struct SPIRVEmitContext
         if (ptrType && ptrType->getAddressSpace() == SpvStorageClassPhysicalStorageBuffer)
         {
             IRSizeAndAlignment sizeAndAlignment;
-            getNaturalSizeAndAlignment(m_targetProgram, ptrType->getValueType(), &sizeAndAlignment);
+            getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), ptrType->getValueType(), &sizeAndAlignment);
             return emitOpStoreAligned(parent, inst, inst->getPtr(), inst->getVal(), SpvLiteralInteger::from32(sizeAndAlignment.alignment));
         }
         else

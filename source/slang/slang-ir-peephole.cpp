@@ -971,7 +971,7 @@ struct PeepholeContext : InstPassBase
                     break;
                 auto type = inst->getOperand(0)->getDataType();
                 IRSizeAndAlignment sizeAlignment;
-                getNaturalSizeAndAlignment(targetProgram, type, &sizeAlignment);
+                getNaturalSizeAndAlignment(targetProgram->getOptionSet(), type, &sizeAlignment);
                 IRBuilder builder(module);
                 builder.setInsertBefore(inst);
                 auto stride = builder.getIntValue(inst->getDataType(), sizeAlignment.getStride());
