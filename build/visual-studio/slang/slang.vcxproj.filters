@@ -746,6 +746,9 @@
     <ClCompile Include="..\..\..\source\slang\slang-check.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-compiler-options.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-compiler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -1289,7 +1292,6 @@
     <ClCompile Include="..\..\..\source\slang\slang.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\source\slang\slang-compiler-options.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\source\slang\core.meta.slang">
