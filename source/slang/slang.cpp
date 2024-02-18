@@ -5612,7 +5612,7 @@ SlangResult EndToEndCompileRequest::setTypeNameForEntryPointExistentialTypeParam
 
 void EndToEndCompileRequest::setAllowGLSLInput(bool value)
 {
-    m_optionSet.set(CompilerOptionName::AllowGLSL, value);
+    getOptionSet().set(CompilerOptionName::AllowGLSL, value);
 }
 
 SlangResult EndToEndCompileRequest::compile()
@@ -5621,7 +5621,7 @@ SlangResult EndToEndCompileRequest::compile()
     double downstreamStartTime = 0.0;
     double totalStartTime = 0.0;
 
-    if (m_optionSet.getBoolOption(CompilerOptionName::ReportDownstreamTime))
+    if (getOptionSet().getBoolOption(CompilerOptionName::ReportDownstreamTime))
     {
         getSession()->getCompilerElapsedTime(&totalStartTime, &downstreamStartTime);
     }
@@ -5678,7 +5678,7 @@ SlangResult EndToEndCompileRequest::compile()
     }
 #endif
 
-    if (m_optionSet.getBoolOption(CompilerOptionName::ReportDownstreamTime))
+    if (getOptionSet().getBoolOption(CompilerOptionName::ReportDownstreamTime))
     {
         double downstreamEndTime = 0;
         double totalEndTime = 0;
@@ -5687,7 +5687,7 @@ SlangResult EndToEndCompileRequest::compile()
         String downstreamTimeStr = String(downstreamTime, "%.2f");
         getSink()->diagnose(SourceLoc(), Diagnostics::downstreamCompileTime, downstreamTimeStr);
     }
-    if (m_optionSet.getBoolOption(CompilerOptionName::ReportPerfBenchmark))
+    if (getOptionSet().getBoolOption(CompilerOptionName::ReportPerfBenchmark))
     {
         StringBuilder perfResult;
         PerformanceProfiler::getProfiler()->getResult(perfResult);
@@ -5697,8 +5697,8 @@ SlangResult EndToEndCompileRequest::compile()
 
     // Repro dump handling
     {
-        auto dumpRepro = m_optionSet.getStringOption(CompilerOptionName::DumpRepro);
-        auto dumpReproOnError = m_optionSet.getBoolOption(CompilerOptionName::DumpReproOnError);
+        auto dumpRepro = getOptionSet().getStringOption(CompilerOptionName::DumpRepro);
+        auto dumpReproOnError = getOptionSet().getBoolOption(CompilerOptionName::DumpReproOnError);
 
         if (dumpRepro.getLength())
         {

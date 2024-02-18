@@ -2854,7 +2854,6 @@ namespace Slang
 
         Session*                        m_session = nullptr;
         RefPtr<Linkage>                 m_linkage;
-        CompilerOptionSet               m_optionSet;
         DiagnosticSink                  m_sink;
         RefPtr<FrontEndCompileRequest>  m_frontEndReq;
         RefPtr<ComponentType>           m_specializedGlobalComponentType;
