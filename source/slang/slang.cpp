@@ -2803,13 +2803,6 @@ void EndToEndCompileRequest::init()
         setWriter(WriterChannel(i), nullptr);
     }
 
-    if (!getOptionSet().hasOption(CompilerOptionName::MatrixLayoutColumn) &&
-        !getOptionSet().hasOption(CompilerOptionName::MatrixLayoutRow))
-    {
-        // For backward compatibility, default to column major matrix layout when
-        // using the old API.
-        getOptionSet().setMatrixLayoutMode(kMatrixLayoutMode_ColumnMajor);
-    }
     m_frontEndReq = new FrontEndCompileRequest(getLinkage(), m_writers, getSink());
 }
 

@@ -204,6 +204,10 @@ SLANG_API SlangCompileRequest* spCreateCompileRequest(
     slang::ICompileRequest* request = nullptr;
     // Will return with suitable ref count
     session->createCompileRequest(&request);
+
+    // For backward compatibility, default to column major matrix layout when
+    // using the old API.
+    request->setMatrixLayoutMode(SLANG_MATRIX_LAYOUT_COLUMN_MAJOR);
     return request;
 }
 
