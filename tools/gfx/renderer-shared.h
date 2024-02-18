@@ -390,6 +390,8 @@ protected:
     ShaderObjectContainerType m_containerType = ShaderObjectContainerType::None;
 
 public:
+    slang::ISession* m_slangSession = nullptr;
+
     ShaderObjectContainerType getContainerType() { return m_containerType; }
 
     static slang::TypeLayoutReflection* _unwrapParameterGroups(
@@ -495,6 +497,7 @@ protected:
     // The specialized shader object type.
     ExtendedShaderObjectType shaderObjectType = { nullptr, kInvalidComponentID };
 
+    ComPtr<slang::ISession> m_slangSession;
 
     Result _getSpecializedShaderObjectType(ExtendedShaderObjectType* outType);
     slang::TypeLayoutReflection* _getElementTypeLayout()
@@ -1265,7 +1268,19 @@ public:
         ShaderObjectContainerType containerType,
         IShaderObject** outObject) SLANG_OVERRIDE;
 
+    virtual SLANG_NO_THROW Result SLANG_MCALL createShaderObject2(
+        slang::ISession* session,
+        slang::TypeReflection* type,
+        ShaderObjectContainerType containerType,
+        IShaderObject** outObject) SLANG_OVERRIDE;
+
     virtual SLANG_NO_THROW Result SLANG_MCALL createMutableShaderObject(
+        slang::TypeReflection* type,
+        ShaderObjectContainerType containerType,
+        IShaderObject** outObject) SLANG_OVERRIDE;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL createMutableShaderObject2(
+        slang::ISession* session,
         slang::TypeReflection* type,
         ShaderObjectContainerType containerType,
         IShaderObject** outObject) SLANG_OVERRIDE;
@@ -1325,6 +1340,7 @@ public:
         slang::IBlob** outDiagnostics = nullptr);
 
     Result getShaderObjectLayout(
+        slang::ISession*            session,
         slang::TypeReflection*      type,
         ShaderObjectContainerType   container,
         ShaderObjectLayoutBase**    outLayout);

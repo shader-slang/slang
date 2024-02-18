@@ -3833,6 +3833,10 @@ ISlangUnknown* ComponentType::getInterface(Guid const& guid)
     {
         return static_cast<slang::IComponentType*>(this);
     }
+    else if (guid == slang::IComponentType2::getTypeGuid())
+    {
+        return static_cast<slang::IComponentType2*>(this);
+    }
 
     return nullptr;
 }
@@ -4159,6 +4163,23 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::link(
     return SLANG_OK;
 }
 
+SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::linkWithOptions(
+    slang::IComponentType** outLinkedComponentType,
+    uint32_t count,
+    slang::CompilerOptionEntry* entries,
+    ISlangBlob** outDiagnostics)
+{
+    SLANG_RETURN_ON_FAIL(link(outLinkedComponentType, outDiagnostics));
+
+    auto linked = *outLinkedComponentType;
+
+    if (linked)
+    {
+        static_cast<ComponentType*>(linked)->getOptionSet().load(count, entries);
+    }
+
+    return SLANG_OK;
+}
 
     /// Visitor used by `ComponentType::enumerateModules`
 struct EnumerateModulesVisitor : ComponentTypeVisitor

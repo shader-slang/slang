@@ -322,6 +322,8 @@ Result RootShaderObjectLayoutImpl::_init(Builder const* builder)
     m_programLayout = builder->m_programLayout;
     m_entryPoints = builder->m_entryPoints;
     m_pendingDataOffset = builder->m_pendingDataOffset;
+    m_slangSession = m_program->getSession();
+
     return SLANG_OK;
 }
 

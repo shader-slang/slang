@@ -278,7 +278,7 @@ namespace Slang
         /// Base class for "component types" that represent the pieces a final
         /// shader program gets linked together from.
         ///
-    class ComponentType : public RefObject, public slang::IComponentType
+    class ComponentType : public RefObject, public slang::IComponentType, public slang::IComponentType2
     {
     public:
         //
@@ -332,11 +332,11 @@ namespace Slang
             SlangInt targetIndex,
             slang::IBlob** outHash) SLANG_OVERRIDE;
 
-        SLANG_NO_THROW SlangResult SLANG_MCALL setCompilerOptions(uint32_t count, slang::CompilerOptionEntry* entries) override
-        {
-            m_optionSet.load(count, entries);
-            return SLANG_OK;
-        }
+        SLANG_NO_THROW SlangResult SLANG_MCALL linkWithOptions(
+            slang::IComponentType** outLinkedComponentType,
+            uint32_t count,
+            slang::CompilerOptionEntry* entries,
+            ISlangBlob** outDiagnostics) override;
 
         CompilerOptionSet& getOptionSet() { return m_optionSet; }
 
@@ -901,9 +901,13 @@ namespace Slang
                 outDiagnostics);
         }
 
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL setCompilerOptions(uint32_t count, slang::CompilerOptionEntry* entries) override
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL linkWithOptions(
+            slang::IComponentType** outLinkedComponentType,
+            uint32_t count,
+            slang::CompilerOptionEntry* entries,
+            ISlangBlob** outDiagnostics) override
         {
-            return Super::setCompilerOptions(count, entries);
+            return Super::linkWithOptions(outLinkedComponentType, count, entries, outDiagnostics);
         }
 
         SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointHostCallable(
@@ -1128,9 +1132,13 @@ namespace Slang
             return Super::link(outLinkedComponentType, outDiagnostics);
         }
 
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL setCompilerOptions(uint32_t count, slang::CompilerOptionEntry* entries) override
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL linkWithOptions(
+            slang::IComponentType** outLinkedComponentType,
+            uint32_t count,
+            slang::CompilerOptionEntry* entries,
+            ISlangBlob** outDiagnostics) override
         {
-            return Super::setCompilerOptions(count, entries);
+            return Super::linkWithOptions(outLinkedComponentType, count, entries, outDiagnostics);
         }
 
         SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointHostCallable(
@@ -1335,9 +1343,13 @@ namespace Slang
             return SLANG_OK;
         }
 
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL setCompilerOptions(uint32_t count, slang::CompilerOptionEntry* entries) override
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL linkWithOptions(
+            slang::IComponentType** outLinkedComponentType,
+            uint32_t count,
+            slang::CompilerOptionEntry* entries,
+            ISlangBlob** outDiagnostics) override
         {
-            return Super::setCompilerOptions(count, entries);
+            return Super::linkWithOptions(outLinkedComponentType, count, entries, outDiagnostics);
         }
         //
 

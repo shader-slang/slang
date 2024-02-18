@@ -4822,15 +4822,24 @@ namespace slang
             */
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL renameEntryPoint(
             const char* newName, IComponentType** outEntryPoint) = 0;
-
-            /** Set additional compiler options for generating code associated with this
-                component.
-            */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL setCompilerOptions(
-            uint32_t compilerOptionEntryCount,
-            CompilerOptionEntry* compilerOptionEntries) = 0;
     };
     #define SLANG_UUID_IComponentType IComponentType::getTypeGuid()
+
+    struct IComponentType2 : public ISlangUnknown
+    {
+        SLANG_COM_INTERFACE(0xc343ffc, 0xb564, 0x4ae3, { 0x93, 0x18, 0xd4, 0xbc, 0xe7, 0x29, 0x10, 0xda })
+
+        /** Set additional compiler options for generating code associated with this
+            component.
+        */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL linkWithOptions(
+            IComponentType** outLinkedComponentType,
+            uint32_t compilerOptionEntryCount,
+            CompilerOptionEntry* compilerOptionEntries,
+            ISlangBlob** outDiagnostics = nullptr) = 0;
+    };
+    #define SLANG_UUID_IComponentType2 IComponentType2::getTypeGuid()
+
 
     struct IEntryPoint : public IComponentType
     {
