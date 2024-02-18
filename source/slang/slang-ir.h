@@ -21,6 +21,7 @@
 #include "slang-type-system-shared.h"
 #include "slang-container-pool.h"
 
+
 namespace Slang {
 
 class   Decl;
@@ -2239,6 +2240,8 @@ struct IRAnalysis
     IRDominatorTree* getDominatorTree();
 };
 
+struct DiagnosticSink;
+
 struct IRModule : RefObject
 {
 public:
@@ -2309,6 +2312,22 @@ public:
     {
         return m_containerPool;
     }
+
+    // Raytracing variables/attributes managment functions
+    bool checkedForRayVariables = false;
+    void trySearchForAndFillAllRayVariables();
+
+    IRInst* getRayVariableFromLocation(IRInst* payloadVariable, Slang::IROp rayVariableType, DiagnosticSink* sink);
+    
+    void storeLocationToRayPayloadVariable(int location, IRInst* inst);
+    IRInst** getRayPayloadVariableFromLocation(int location);
+    Dictionary<int, IRInst*> m_RayLocationToPayloads;
+
+    void storeLocationToRayAttributeVariable(int location, IRInst* inst);
+    IRInst** getRayAttributeVariableFromLocation(int location);
+    Dictionary<int, IRInst*> m_RayLocationToAttributes;
+
+    
 private:
     IRModule() = delete;
 
@@ -2346,7 +2365,6 @@ private:
     ComPtr<IBoxValue<SourceMap>> m_obfuscatedSourceMap;
 
     Dictionary<IRInst*, IRAnalysis> m_mapInstToAnalysis;
-
 };
 
 

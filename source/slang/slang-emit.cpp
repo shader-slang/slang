@@ -240,7 +240,7 @@ Result linkAndOptimizeIR(
     // If the user specified the flag that they want us to dump
     // IR, then do it here, for the target-specific, but
     // un-specialized IR.
-    dumpIRIfEnabled(codeGenContext, irModule);
+    dumpIRIfEnabled(codeGenContext, irModule, "POST IR VALIDATION");
 
     if(!isKhronosTarget(targetRequest))
         lowerGLSLShaderStorageBufferObjectsToStructuredBuffers(irModule, sink);

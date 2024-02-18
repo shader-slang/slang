@@ -655,6 +655,9 @@ INST(GetOptiXSbtDataPtr, getOptiXSbtDataPointer, 0, 0)
 
 INST(GetVulkanRayTracingPayloadLocation, GetVulkanRayTracingPayloadLocation, 1, 0)
 
+INST(GetRayPayloadVariableFromLocation, GetRayPayloadVariableFromLocation, 1, 0)
+INST(GetRayAttributeVariableFromLocation, GetRayAttributeVariableFromLocation, 1, 0)
+
 INST(MakeArrayList, makeArrayList, 0, 0)
 INST(MakeTensorView, makeTensorView, 0, 0)
 INST(AllocateTorchTensor, allocTorchTensor, 0, 0)
@@ -1119,7 +1122,10 @@ INST(SPIRVAsmInst, SPIRVAsmInst, 1, 0)
     // A reference to a slang IRInst, either a value or a type
     // This isn't hoistable, as we sometimes need to change the used value and
     // instructions around the specific asm block
-    INST(SPIRVAsmOperandInst, SPIRVAsmOperandInst, 1, 0)
+    INST(SPIRVAsmOperandInst, SPIRVAsmOperandInst, 1, 0)    
+    //a late resolving type to handle the case of ray objects (resolving late due to constexpr data requirment)
+    INST(SPIRVAsmOperandRayPayloadFromLocation, SPIRVAsmOperandRayPayloadFromLocation, 1, 0)
+    INST(SPIRVAsmOperandRayAttributeFromLocation, SPIRVAsmOperandRayAttributeFromLocation, 1, 0)
     // A named enumerator, the value is stored as a constant operand
     // It may have a second operand, which if present is a type with which to
     // construct a constant id to pass, instead of a literal constant
@@ -1152,7 +1158,6 @@ INST(SPIRVAsmInst, SPIRVAsmInst, 1, 0)
 
     // A type function which returns the equivalent OpTypeImage type of sampled image value
     INST(SPIRVAsmOperandSampledImageType, __sampledImageType, 1, HOISTABLE)
-
 INST_RANGE(SPIRVAsmOperand, SPIRVAsmOperandLiteral, SPIRVAsmOperandSampledImageType)
 
 

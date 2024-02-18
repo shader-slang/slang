@@ -3,6 +3,7 @@
 
 #include "../core/slang-writer.h"
 
+#include "slang-ir-util.h"
 #include "slang-emit-source-writer.h"
 #include "slang-mangled-lexer.h"
 
@@ -688,6 +689,15 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             // is already handled by the base `CLikeSourceEmitter`
             return false;
         }
+        case kIROp_GetRayPayloadVariableFromLocation:
+        case kIROp_GetRayAttributeVariableFromLocation:
+        {
+            IRInst* variableAtLocation = this->m_irModule->getRayVariableFromLocation(inst->getOperand(0), inst->getOp(), getSink());
+            m_writer->emit("(");
+            m_writer->emit(getName(variableAtLocation));
+            m_writer->emit(")");
+            return true;
+        }
         break;
 
         default: break;
@@ -987,7 +997,6 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             case kIROp_HLSLRWByteAddressBufferType:                 m_writer->emit("RWByteAddressBuffer");                break;
             case kIROp_HLSLRasterizerOrderedByteAddressBufferType:  m_writer->emit("RasterizerOrderedByteAddressBuffer"); break;
             case kIROp_RaytracingAccelerationStructureType:         m_writer->emit("RaytracingAccelerationStructure");    break;
-
             default:
                 SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled buffer type");
                 break;

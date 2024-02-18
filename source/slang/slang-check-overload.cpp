@@ -1557,6 +1557,75 @@ namespace Slang
         AddOverloadCandidates(initializers, context);
     }
 
+    template<class T>
+    void SemanticsVisitor::trySetGenericToRayTracingWithParamAttribute(
+            LookupResultItem                genericItem,
+            DeclRef<GenericDecl>            genericDeclRef,
+            OverloadResolveContext&         context)
+    {
+            // this case is a backup incase the user did not specify a template argument (drop in GLSL code) for
+            // raytracing structure reliant GLSL code
+
+            // this case is used for GLSL->[SPIR-V/HLSL] since we need a way to specialize a generic based on
+            // only a location (to a payload) passed-into a raytracing function
+            
+            // TO CHECK: ray tracing is very lenient on how you treat payloads in GLSL, I don't exactly
+            // know if there should even be constraints
+
+            auto mod = (T*)genericDeclRef.getDecl()->inner->getModifiersOfType<T>().begin().current;
+            if (context.getArgCount() <= mod->paramToFetchGenericTypeFrom) 
+            {
+                getSink()->diagnose(
+                    context.loc,
+                    Diagnostics::expectedArgNumberToGenericFromRayTracingWithinArgCount, mod->paramToFetchGenericTypeFrom, context.getArgCount());
+                return;
+            }
+
+            auto argWithPayloadLocation = as<IntegerLiteralExpr>(context.getArg(mod->paramToFetchGenericTypeFrom));
+            if (argWithPayloadLocation == NULL) 
+            {
+                getSink()->diagnose(
+                    context.loc,
+                    Diagnostics::expectedIntegerConstantNotConstant);
+                return;
+            }
+
+            VarDecl** varDeclOfTargetType;
+            if constexpr (std::is_same<T, SetGenericToRayTracingPayloadWithParamAttribute>())
+                varDeclOfTargetType = this->getShared()->m_module->getRayPayloadTypeFromLocation(argWithPayloadLocation->value);
+            else if constexpr (std::is_same<T, SetGenericToRayTracingAttributeWithParamAttribute>()) 
+                varDeclOfTargetType = this->getShared()->m_module->getRayAttributeTypeFromLocation(argWithPayloadLocation->value);
+            else 
+            {
+                // this case should never occur
+                assert(false);
+            }
+
+            if (varDeclOfTargetType == NULL) 
+            {
+                if constexpr (std::is_same<T, SetGenericToRayTracingPayloadWithParamAttribute>())
+                {
+                    getSink()->diagnose(
+                        context.loc,
+                        Diagnostics::expectedRayTracingPayloadObjectAtLocationButMissing, argWithPayloadLocation->value);
+                }
+                if constexpr (std::is_same<T, SetGenericToRayTracingAttributeWithParamAttribute>())
+                {
+                    getSink()->diagnose(
+                        context.loc,
+                        Diagnostics::expectedRayTracingAttributeObjectAtLocationButMissing, argWithPayloadLocation->value);
+                }
+                return;
+            }
+
+            LookupResultItem innerItem;
+            innerItem.breadcrumbs = genericItem.breadcrumbs;
+
+            List<Val*> args = { (*varDeclOfTargetType)->getType()->getCanonicalType() };
+            innerItem.declRef = m_astBuilder->getGenericAppDeclRef(genericDeclRef, args.getArrayView()); //getType()->getCanonicalType()->getDeclOperand(0);
+            AddDeclRefOverloadCandidates(innerItem, context, {});
+    }
+
     void SemanticsVisitor::addOverloadCandidatesForCallToGeneric(
         LookupResultItem                genericItem,
         OverloadResolveContext&         context,
@@ -1579,6 +1648,22 @@ namespace Slang
             innerItem.breadcrumbs = genericItem.breadcrumbs;
             innerItem.declRef = innerRef;
             AddDeclRefOverloadCandidates(innerItem, context, baseCost);
+        }
+        else if (genericDeclRef.getDecl()->inner->hasModifier<SetGenericToRayTracingPayloadWithParamAttribute>()) 
+        {
+            // these cases MUST be last inside `addOverloadCandidatesForCallToGeneric`.
+            trySetGenericToRayTracingWithParamAttribute<SetGenericToRayTracingPayloadWithParamAttribute>(
+                genericItem,
+                genericDeclRef,
+                context);
+        }
+        else if(genericDeclRef.getDecl()->inner->hasModifier<SetGenericToRayTracingAttributeWithParamAttribute>())
+        {
+            // these cases MUST be last inside `addOverloadCandidatesForCallToGeneric`.
+            trySetGenericToRayTracingWithParamAttribute<SetGenericToRayTracingAttributeWithParamAttribute>(
+                genericItem,
+                genericDeclRef,
+                context);
         }
         else
         {

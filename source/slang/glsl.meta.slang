@@ -2790,13 +2790,110 @@ public vec4 shadow2DProjLod(sampler2DShadow sampler, vec4 coord, float lod)
 
 //// RayTracing
 
+// `param` is 0 based indexed
+// the index passed is the index of a parameter that is a
+// contexpr int literal.
+// this int literal will be used to fetch the type of a layout
+// object [payload/attribute] and will use the type to set a 
+// generic of the function
+__attributeTarget(FuncDecl)
+attribute_syntax[SetGenericToRayTracingPayloadWithParam(param: int)] : SetGenericToRayTracingPayloadWithParamAttribute;
+__attributeTarget(FuncDecl)
+attribute_syntax[SetGenericToRayTracingAttributeWithParam(param: int)] : SetGenericToRayTracingAttributeWithParamAttribute;
+
+// These functions are kind-of a hack; they just emit the target payload 
+// global and you treat it like a ptr (but it really is just a literal); 
+// force 'inout' treatment
+__generic<payload_t>
+__intrinsic_op($(kIROp_GetRayPayloadVariableFromLocation))
+Ptr<payload_t> __getRayPayloadVariableFromLocation(constexpr int location);
+
+__generic<attr_t>
+__intrinsic_op($(kIROp_GetRayAttributeVariableFromLocation))
+Ptr<attr_t> __getRayAttributeVariableFromLocation(constexpr int location);
+
+// Ray Tracing variables
+
 public typealias rayQueryEXT = RayQuery;
 public typealias accelerationStructureEXT = RaytracingAccelerationStructure;
-public typealias hitObjectNV = HitObject;
+public typealias accelerationStructureNV = RaytracingAccelerationStructure;
+
+// Need a subtype since else we cannot track accelerationStructureEXT
+// in use for GLSL->HLSL
+// same rules of a regular hitObjectNV object
+[__NonCopyableType]
+public struct hitObjectNV {
+    public HitObject hit;
+    public accelerationStructureEXT ras;
+}
+
+//Ray Traing BuiltIn's
+
+void requireGLSLExtForRayTracingBuiltin() {
+    __target_switch
+    {
+    case glsl:
+        __requireGLSLExtension("GL_EXT_ray_tracing");
+        __intrinsic_asm "";
+    }
+}
+
+__spirv_version(1.4) 
+void setupExtForRayTracingBuiltIn() {
+    __target_switch
+    {
+    case glsl:
+        requireGLSLExtForRayTracingBuiltin();
+    case spirv:
+        return;
+    }
+}
+
+[require(glsl)]
+__spirv_version(1.4) [require(spirv)]
+public property uint3 gl_LaunchIDNV {
+    get {
+        setupExtForRayTracingBuiltIn();
+        return DispatchRaysIndex();
+    }
+}
+
+[require(glsl)]
+__spirv_version(1.4) [require(spirv)]
+public property uint3 gl_LaunchIDEXT {
+    get {
+        setupExtForRayTracingBuiltIn();
+        return gl_LaunchIDNV;
+    }
+}
+
+[require(glsl)]
+__spirv_version(1.4) [require(spirv)]
+public property uint3 gl_LaunchSizeNV {
+    get {
+        setupExtForRayTracingBuiltIn();
+        return DispatchRaysDimensions();
+    }
+}
+
+[require(glsl)]
+__spirv_version(1.4) [require(spirv)]
+public property uint3 gl_LaunchSizeEXT {
+    get {
+        setupExtForRayTracingBuiltIn();
+        return gl_LaunchSizeNV;
+    }
+}
+
+// Ray Tracing constants
+
+public const uint gl_HitKindFrontFacingTriangleEXT = 0xFEU;
+public const uint gl_HitKindBackFacingTriangleEXT = 0xFFU;
 
 /// GL_EXT_ray_query
 
-// Raytracing constants
+// GL_EXT_ray_query constants
+
 public const uint gl_RayFlagsNoneEXT = 0U;
 public const uint gl_RayFlagsOpaqueEXT = 1U;
 public const uint gl_RayFlagsNoOpaqueEXT = 2U;
@@ -2806,15 +2903,18 @@ public const uint gl_RayFlagsCullBackFacingTrianglesEXT = 16U;
 public const uint gl_RayFlagsCullFrontFacingTrianglesEXT = 32U;
 public const uint gl_RayFlagsCullOpaqueEXT = 64U;
 public const uint gl_RayFlagsCullNoOpaqueEXT = 128U;
+
 public const uint gl_RayQueryCommittedIntersectionNoneEXT = 0U;
 public const uint gl_RayQueryCommittedIntersectionTriangleEXT = 1U;
 public const uint gl_RayQueryCommittedIntersectionGeneratedEXT = 2U;
+
 public const uint gl_RayQueryCandidateIntersectionTriangleEXT = 0U;
 public const uint gl_RayQueryCandidateIntersectionAABBEXT = 1U;
 
 // GL_EXT_ray_query functions
 
-[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
 __glsl_version(460)
 public void rayQueryInitializeEXT(
@@ -2823,20 +2923,25 @@ public void rayQueryInitializeEXT(
     uint rayFlags, uint cullMask, vec3 origin,
     float tMin, vec3 direction, float tMax) {
 
-    q.TraceRayInline(topLevel, rayFlags, cullMask, { origin, tMin, direction, tMax });
+    q.TraceRayInline(
+        topLevel, 
+        rayFlags, 
+        cullMask, 
+        { origin, tMin, direction, tMax });
 
 }
 
-[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
 __glsl_version(460)
 [ForceInline]
-public bool rayQueryProceedEXT(inout rayQueryEXT q)
-{
+public bool rayQueryProceedEXT(inout rayQueryEXT q){
     return q.Proceed();
 }
 
-[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
 __glsl_version(460)
 [mutating]
@@ -2844,28 +2949,29 @@ public void rayQueryTerminateEXT(inout rayQueryEXT q) {
     q.Abort();
 }
 
-[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
 __glsl_version(460)
 public void rayQueryGenerateIntersectionEXT(inout rayQueryEXT q, float tHit) {
     q.CommitProceduralPrimitiveHit(tHit);
 }
 
-[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
 __glsl_version(460)
 [ForceInline]
-public void rayQueryConfirmIntersectionEXT(inout rayQueryEXT q)
-{
+public void rayQueryConfirmIntersectionEXT(inout rayQueryEXT q){
     q.CommitNonOpaqueTriangleHit();
 }
 
-[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
 __glsl_version(460)
 [__NoSideEffect]
-public uint rayQueryGetIntersectionTypeEXT(rayQueryEXT q, bool committed)
-{
+public uint rayQueryGetIntersectionTypeEXT(rayQueryEXT q, bool committed){
     if (committed)
     {
         return q.CommittedStatus();
@@ -2876,35 +2982,40 @@ public uint rayQueryGetIntersectionTypeEXT(rayQueryEXT q, bool committed)
     }
 }
 
-[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
 __glsl_version(460)
 public float rayQueryGetRayTMinEXT(rayQueryEXT q) {
     return q.RayTMin();
 }
 
-[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
-    __glsl_version(460)
+__glsl_version(460)
 public uint rayQueryGetRayFlagsEXT(rayQueryEXT q) {
     return q.RayFlags();
 }
 
-[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
 __glsl_version(460)
 public vec3 rayQueryGetWorldRayOriginEXT(rayQueryEXT q) {
     return q.WorldRayOrigin();
 }
 
-[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
 __glsl_version(460)
 public vec3 rayQueryGetWorldRayDirectionEXT(rayQueryEXT q) {
     return q.WorldRayDirection();
 }
 
-[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
 public float rayQueryGetIntersectionTEXT(rayQueryEXT q, bool committed) {
@@ -2916,11 +3027,11 @@ public float rayQueryGetIntersectionTEXT(rayQueryEXT q, bool committed) {
     }
 }
 
-[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
 __glsl_version(460)
 public int rayQueryGetIntersectionInstanceCustomIndexEXT(rayQueryEXT q, bool committed) {
-    
     if (committed) {
         return q.CommittedRayInstanceCustomIndex();
     }
@@ -2929,7 +3040,8 @@ public int rayQueryGetIntersectionInstanceCustomIndexEXT(rayQueryEXT q, bool com
     }
 }
 
-[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
 __glsl_version(460)
 public int rayQueryGetIntersectionInstanceIdEXT(rayQueryEXT q, bool committed) {
@@ -2942,11 +3054,11 @@ public int rayQueryGetIntersectionInstanceIdEXT(rayQueryEXT q, bool committed) {
     }
 }
 
-[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
 __glsl_version(460)
 public uint rayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetEXT(rayQueryEXT q, bool committed) {
-    
     if (committed) {
         return q.CommittedRayInstanceShaderBindingTableRecordOffset();
     }
@@ -2955,11 +3067,11 @@ public uint rayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetEXT(ray
     }
 }
 
-[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
 __glsl_version(460)
 public int rayQueryGetIntersectionGeometryIndexEXT(rayQueryEXT q, bool committed) {
-    
     if (committed) {
         return q.CommittedRayGeometryIndex();
     }
@@ -2968,11 +3080,11 @@ public int rayQueryGetIntersectionGeometryIndexEXT(rayQueryEXT q, bool committed
     }
 }
 
-[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
 __glsl_version(460)
 public int rayQueryGetIntersectionPrimitiveIndexEXT(rayQueryEXT q, bool committed) {
-    
     if (committed) {
         return q.CommittedRayPrimitiveIndex();
     }
@@ -2981,11 +3093,11 @@ public int rayQueryGetIntersectionPrimitiveIndexEXT(rayQueryEXT q, bool committe
     }
 }
 
-[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
 __glsl_version(460)
 public vec2 rayQueryGetIntersectionBarycentricsEXT(rayQueryEXT q, bool committed) {
-    
     if (committed) {
         return q.CommittedRayBarycentrics();
     }
@@ -2994,11 +3106,11 @@ public vec2 rayQueryGetIntersectionBarycentricsEXT(rayQueryEXT q, bool committed
     }
 }
 
-[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
 __glsl_version(460)
 public bool rayQueryGetIntersectionFrontFaceEXT(rayQueryEXT q, bool committed) {
-    
     if (committed) {
         return q.CommittedRayFrontFace();
     }
@@ -3007,18 +3119,20 @@ public bool rayQueryGetIntersectionFrontFaceEXT(rayQueryEXT q, bool committed) {
     }
 }
 
-[__requiresNVAPI]
+
+x__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
 __glsl_version(460)
 public bool rayQueryGetIntersectionCandidateAABBOpaqueEXT(rayQueryEXT q) {
     return q.CandidateProceduralPrimitiveNonOpaque();
 }
 
-[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
 __glsl_version(460)
 public vec3 rayQueryGetIntersectionObjectRayDirectionEXT(rayQueryEXT q, bool committed) {
-    
     if (committed) {
         return q.CommittedRayObjectRayDirection();
     }
@@ -3027,11 +3141,11 @@ public vec3 rayQueryGetIntersectionObjectRayDirectionEXT(rayQueryEXT q, bool com
     }
 }
 
-[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
 __glsl_version(460)
 public vec3 rayQueryGetIntersectionObjectRayOriginEXT(rayQueryEXT q, bool committed) {
-    
     if (committed) {
         return q.CommittedRayObjectRayOrigin();
     }
@@ -3040,524 +3154,934 @@ public vec3 rayQueryGetIntersectionObjectRayOriginEXT(rayQueryEXT q, bool commit
     }
 }
 
-[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
 __glsl_version(460)
 public mat4x3 rayQueryGetIntersectionObjectToWorldEXT(rayQueryEXT q, bool committed) {
-
     if (committed) {
-        return reinterpret<mat4x3, mat3x4>(q.CommittedRayObjectToWorld());
+        return transpose(q.CommittedRayObjectToWorld());
     }
     else {
-        return reinterpret<mat4x3, mat3x4>(q.CandidateRayObjectToWorld());
+        return transpose(q.CandidateRayObjectToWorld());
     }
 }
 
-[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
-    __glsl_version(460)
+__glsl_version(460)
 public mat4x3 rayQueryGetIntersectionWorldToObjectEXT(rayQueryEXT q, bool committed) {
-
     if (committed) {
-        return reinterpret<mat4x3, mat3x4>(q.CommittedRayWorldToObject());
+        return transpose(q.CommittedRayWorldToObject());
     }
     else {
-        return reinterpret<mat4x3, mat3x4>(q.CandidateRayWorldToObject());
+        return transpose(q.CandidateRayWorldToObject());
     }
 }
 
 /// GL_NV_shader_invocation_reorder
 
-[__requiresNVAPI]
-__glsl_extension(GL_EXT_ray_tracing)
-__glsl_extension(GL_NV_shader_invocation_reorder)
-__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-void hitObjectTraceRayNV(
-    hitObjectNV hitObject,
-    accelerationStructureEXT topLevel,
-    uint rayFlags,
-    uint cullMask,
-    uint sbtRecordOffset,
-    uint sbtRecordStride,
-    uint missIndex,
-    vec3 origin,
-    float Tmin,
-    vec3 direction,
-    float Tmax,
-    int payload) {
-
-    hitObject.TraceRay(
-        topLevel,
-        rayFlags,
-        cullMask,
-        sbtRecordOffset,
-        sbtRecordStride,
-        missIndex,
-        {origin, Tmin, direction, Tmax},
-        payload
-        );
-
-}
-
-[__requiresNVAPI]
-__glsl_extension(GL_EXT_ray_tracing)
-__glsl_extension(GL_NV_shader_invocation_reorder)
-__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-void hitObjectTraceRayMotionNV(
-    hitObjectNV hitObject, 
-    accelerationStructureEXT topLevel,
-    uint rayFlags,
-    uint cullMask,
-    uint sbtRecordOffset,
-    uint sbtRecordStride,
-    uint missIndex,
-    vec3 origin,
-    float Tmin,
-    vec3 direction,
-    float Tmax,
-    float currentTime,
-    int payload){
-
-    hitObject.TraceMotionRay(
-        topLevel,
-        rayFlags,
-        cullMask,
-        sbtRecordOffset,
-        sbtRecordStride,
-        missIndex,
-        {origin, Tmin, direction, Tmax},
-        currentTime,
-        payload
-        );
-}
-
-[__requiresNVAPI]
-__glsl_extension(GL_EXT_ray_tracing)
-__glsl_extension(GL_NV_shader_invocation_reorder)
-__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-void hitObjectRecordHitNV(
-    hitObjectNV hitObject,
-    accelerationStructureEXT topLevel,
-    int instanceid,
-    int primitiveid,
-    int geometryindex,
-    uint hitKind,
-    uint sbtRecordOffset,
-    uint sbtRecordStride,
-    vec3 origin,
-    float Tmin,
-    vec3 direction,
-    float Tmax,
-    int attributeLocation){
-
-    hitObject.MakeHit(
-        topLevel,
-        uint(instanceid),
-        uint(primitiveid),
-        uint(geometryindex),
-        hitKind,
-        sbtRecordOffset,
-        sbtRecordStride,
-        {origin, Tmin, direction, Tmax},
-        attributeLocation
-    );
-
-}
-
-[__requiresNVAPI]
-__glsl_extension(GL_EXT_ray_tracing)
-__glsl_extension(GL_NV_shader_invocation_reorder)
-__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-void hitObjectRecordHitMotionNV(
-    hitObjectNV hitObject,
-    accelerationStructureEXT topLevel,
-    int instanceid,
-    int primitiveid,
-    int geometryindex,
-    uint hitKind,
-    uint sbtRecordOffset,
-    uint sbtRecordStride,
-    vec3 origin,
-    float Tmin,
-    vec3 direction,
-    float Tmax,
-    float currentTime,
-    int attributeLocation){
-
-    hitObject.MakeMotionHit(
-        topLevel,
-        uint(instanceid),
-        uint(primitiveid),
-        uint(geometryindex),
-        hitKind,
-        sbtRecordOffset,
-        sbtRecordStride,
-        {origin, Tmin, direction, Tmax},
-        currentTime,
-        attributeLocation
-    );
-
-}
-
-[__requiresNVAPI]
-void hitObjectRecordHitWithIndexNV(
-    hitObjectNV hitObject,
-    accelerationStructureEXT topLevel,
-    int instanceid,
-    int primitiveid,
-    int geometryindex,
-    uint hitKind,
-    uint sbtRecordIndex,
-    vec3 origin,
-    float Tmin,
-    vec3 direction,
-    float Tmax,
-    int attributeLocation) {
-
-    hitObject.MakeHit(
-        topLevel,
-        uint(instanceid),
-        uint(geometryindex),
-        uint(primitiveid),
-        hitKind,
-        sbtRecordIndex,
-        1,
-        {origin, Tmin, direction, Tmax},
-        attributeLocation
-    );
-}
-
-[__requiresNVAPI]
-__glsl_extension(GL_EXT_ray_tracing)
-__glsl_extension(GL_NV_shader_invocation_reorder)
-__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-void hitObjectRecordHitWithIndexMotionNV(
-    hitObjectNV hitObject,
-    accelerationStructureEXT topLevel,
-    int instanceid,
-    int primitiveid,
-    int geometryindex,
-    uint hitKind,
-    uint sbtRecordIndex,
-    vec3 origin,
-    float Tmin,
-    vec3 direction,
-    float Tmax,
-    float currentTime,
-    int attributeLocation){
-
-    hitObject.MakeMotionHit(
-        topLevel,
-        uint(instanceid),
-        uint(primitiveid),
-        uint(geometryindex),
-        hitKind,
-        sbtRecordIndex,
-        1,
-        {origin, Tmin, direction, Tmax},
-        currentTime,
-        attributeLocation
-    );
-
-}
-
-[__requiresNVAPI]
-__glsl_extension(GL_EXT_ray_tracing)
-__glsl_extension(GL_NV_shader_invocation_reorder)
-__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-void hitObjectRecordMissNV(
-    hitObjectNV hitObject, 
-    uint sbtRecordIndex, 
-    vec3 origin,
-    float Tmin,
-    vec3 direction,
-    float Tmax){
-
-    hitObject.MakeMiss(
-        sbtRecordIndex,
-        { origin, Tmin, direction, Tmax }
-        );
-}
-
-[__requiresNVAPI]
-__glsl_extension(GL_EXT_ray_tracing)
-__glsl_extension(GL_NV_shader_invocation_reorder)
-__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-void hitObjectRecordMissMotionNV(
-    hitObjectNV hitObject, 
-    uint sbtRecordIndex, 
-    vec3 origin,
-    float Tmin,
-    vec3 direction,
-    float Tmax,
-    float currentTime){
-
-    hitObject.MakeMotionMiss(
-        sbtRecordIndex,
-        {origin, Tmin, direction, Tmax},
-        currentTime
-    );
-
-}
-
-[__requiresNVAPI]
-__glsl_extension(GL_EXT_ray_tracing)
-__glsl_extension(GL_NV_shader_invocation_reorder)
-__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-void hitObjectRecordEmptyNV(
-    hitObjectNV hitObject){
-
-    hitObject.MakeNop();
-
-}
-
-[__requiresNVAPI]
-__glsl_extension(GL_EXT_ray_tracing)
-__glsl_extension(GL_NV_shader_invocation_reorder)
-__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 __generic<payload_t>
-void hitObjectExecuteShaderNV(
-    hitObjectNV hitObject,
-    payload_t payload){
+[SetGenericToRayTracingPayloadWithParam(11)]
+[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+public void hitObjectTraceRayNV(
+    inout hitObjectNV hitObject,
+    accelerationStructureEXT topLevel,
+    uint rayFlags,
+    uint cullMask,
+    uint sbtRecordOffset,
+    uint sbtRecordStride,
+    uint missIndex,
+    vec3 origin,
+    float Tmin,
+    vec3 direction,
+    float Tmax,
+    constexpr int payload) {
 
-    // TODO: need to get acceleration stucture associated with hitObjectExecuteShaderNV; KIRop some type fetching + handle internals?
+    hitObject.ras = topLevel;
 
     __target_switch
     {
+    case hlsl:
+    case cuda:
+    {
+        Ptr<payload_t> payloadVal = __getRayPayloadVariableFromLocation<payload_t>(payload);
+        hitObject.hit = HitObject::TraceRay(
+            topLevel,
+            rayFlags,
+            cullMask,
+            sbtRecordOffset,
+            sbtRecordStride,
+            missIndex,
+            { origin, Tmin, direction, Tmax },
+            *payloadVal);
+    }
     case glsl:
     {
-        __intrinsic_asm "hitObjectExecuteShaderNV($0, $1)";
+        HitObject::__glslTraceRay(
+            hitObject.hit,
+            topLevel,
+            rayFlags,
+            cullMask,
+            sbtRecordOffset,
+            sbtRecordStride,
+            missIndex,
+            origin,
+            Tmin,
+            direction,
+            Tmax,
+            payload);
     }
     case spirv:
     {
-
-        return spirv_asm {
-                    OpHitObjectExecuteShaderNV
-                        /**/ $hitObject
-                        /**/ $payload;
-                };
-
+        spirv_asm
+        {
+            OpHitObjectTraceRayNV
+                &(hitObject.hit)
+                $topLevel
+                $rayFlags
+                $cullMask
+                $sbtRecordOffset
+                $sbtRecordStride
+                $missIndex
+                $origin
+                $Tmin
+                $direction
+                $Tmax
+                __rayPayloadFromLocation(payload)
+        };
     }
     }
 }
 
+__generic<payload_t>
+[SetGenericToRayTracingPayloadWithParam(12)]
 [__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-bool hitObjectIsEmptyNV(hitObjectNV hitObject){
+__glsl_extension(GLSL_NV_ray_tracing_motion_blur)
+public void hitObjectTraceRayMotionNV(
+    inout hitObjectNV hitObject, 
+    accelerationStructureEXT topLevel,
+    uint rayFlags,
+    uint cullMask,
+    uint sbtRecordOffset,
+    uint sbtRecordStride,
+    uint missIndex,
+    vec3 origin,
+    float Tmin,
+    vec3 direction,
+    float Tmax,
+    float currentTime,
+    constexpr int payload){
 
-    return hitObject.IsNop();
-
-}
-
-[__requiresNVAPI]
-__glsl_extension(GL_EXT_ray_tracing)
-__glsl_extension(GL_NV_shader_invocation_reorder)
-__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-bool hitObjectIsMissNV(hitObjectNV hitObject){
-
-    return hitObject.IsMiss();
-
-}
-
-[__requiresNVAPI]
-__glsl_extension(GL_EXT_ray_tracing)
-__glsl_extension(GL_NV_shader_invocation_reorder)
-__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-bool hitObjectIsHitNV(hitObjectNV hitObject){
-
-    return hitObject.IsHit();
-
-}
-
-[__requiresNVAPI]
-__glsl_extension(GL_EXT_ray_tracing)
-__glsl_extension(GL_NV_shader_invocation_reorder)
-__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-float hitObjectGetRayTMinNV(hitObjectNV hitObject) {
-    return hitObject.GetRayDesc().TMin;  
-}
-
-[__requiresNVAPI]
-__glsl_extension(GL_EXT_ray_tracing)
-__glsl_extension(GL_NV_shader_invocation_reorder)
-__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-float hitObjectGetRayTMaxNV(hitObjectNV hitObject) {
-    return hitObject.GetRayDesc().TMax; 
-}
-
-[__requiresNVAPI]
-__glsl_extension(GL_EXT_ray_tracing)
-__glsl_extension(GL_NV_shader_invocation_reorder)
-__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-vec3 hitObjectGetWorldRayOriginNV(hitObjectNV hitObject) {
-    return hitObject.GetRayDesc().Origin;
-}
-
-[__requiresNVAPI]
-__glsl_extension(GL_EXT_ray_tracing)
-__glsl_extension(GL_NV_shader_invocation_reorder)
-__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-vec3 hitObjectGetWorldRayDirectionNV(hitObjectNV hitObject) {
-    return hitObject.GetRayDesc().Direction; 
-}
-
-[__requiresNVAPI]
-__glsl_extension(GL_EXT_ray_tracing)
-__glsl_extension(GL_NV_shader_invocation_reorder)
-__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-vec3 hitObjectGetObjectRayOriginNV(hitObjectNV hitObject){
-
-    return hitObject.GetObjectRayOrigin();
-
-}
-
-[__requiresNVAPI]
-__glsl_extension(GL_EXT_ray_tracing)
-__glsl_extension(GL_NV_shader_invocation_reorder)
-__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-vec3 hitObjectGetObjectRayDirectionNV(hitObjectNV hitObject) {
-
-    return hitObject.GetObjectRayDirection();
-
-}
-
-[__requiresNVAPI]
-__glsl_extension(GL_EXT_ray_tracing)
-__glsl_extension(GL_NV_shader_invocation_reorder)
-__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-mat4x3 hitObjectGetObjectToWorldNV(hitObjectNV hitObject){
-    return reinterpret<mat4x3, mat3x4>(hitObject.GetObjectToWorld());
-}
-
-[__requiresNVAPI]
-__glsl_extension(GL_EXT_ray_tracing)
-__glsl_extension(GL_NV_shader_invocation_reorder)
-__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-mat4x3 hitObjectGetWorldToObjectNV(hitObjectNV hitObject) {
-    return bit_cast<mat4x3, mat3x4>(hitObject.GetWorldToObject()); 
-}
-
-[__requiresNVAPI]
-__glsl_extension(GL_EXT_ray_tracing)
-__glsl_extension(GL_NV_shader_invocation_reorder)
-__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-int hitObjectGetInstanceCustomIndexNV(hitObjectNV hitObject) {
-    return hitObject.GetInstanceID();
-}
-
-[__requiresNVAPI]
-__glsl_extension(GL_EXT_ray_tracing)
-__glsl_extension(GL_NV_shader_invocation_reorder)
-__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-int hitObjectGetInstanceIdNV(hitObjectNV hitObject) {
-    return hitObject.GetInstanceIndex();
-}
-
-[__requiresNVAPI]
-__glsl_extension(GL_EXT_ray_tracing)
-__glsl_extension(GL_NV_shader_invocation_reorder)
-__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-int hitObjectGetGeometryIndexNV(hitObjectNV hitObject) {
-    return hitObject.GetGeometryIndex();
-}
-
-[__requiresNVAPI]
-__glsl_extension(GL_EXT_ray_tracing)
-__glsl_extension(GL_NV_shader_invocation_reorder)
-__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-int hitObjectGetPrimitiveIndexNV(hitObjectNV hitObject) {
-    return hitObject.GetPrimitiveIndex();
-}
-
-[__requiresNVAPI]
-__glsl_extension(GL_EXT_ray_tracing)
-__glsl_extension(GL_NV_shader_invocation_reorder)
-__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-uint hitObjectGetHitKindNV(hitObjectNV hitObject) {
-    return hitObject.GetHitKind();
-}
-
-[__requiresNVAPI]
-__glsl_extension(GL_EXT_ray_tracing)
-__glsl_extension(GL_NV_shader_invocation_reorder)
-__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-void hitObjectGetAttributesNV(hitObjectNV hitObject, int attributeLocation) {
-    // TODO: maybe make kIROp which fetches type and feeds that to HLSL to set a buffer which has hitObjectGetShaderRecordBufferHandleNV
-    __target_switch 
+    hitObject.ras = topLevel;
+    
+    __target_switch
     {
+    case hlsl:
+    {
+        Ptr<payload_t> payloadVal = __getRayPayloadVariableFromLocation<payload_t>(payload);
+        hitObject.hit = HitObject::TraceMotionRay(
+            topLevel,
+            rayFlags,
+            cullMask,
+            sbtRecordOffset,
+            sbtRecordStride,
+            missIndex,
+            { origin, Tmin, direction, Tmax },
+            currentTime,
+            *payloadVal);
+    }
     case glsl:
     {
-        __intrinsic_asm "hitObjectGetAttributesNV($0,$1)";
+        HitObject::__glslTraceMotionRay(
+            hitObject.hit,
+            topLevel,
+            rayFlags,
+            cullMask,
+            sbtRecordOffset,
+            sbtRecordStride,
+            missIndex,
+            origin,
+            Tmin,
+            direction,
+            Tmax,
+            currentTime,
+            payload);
     }
     case spirv:
     {
-        spirv_asm {
-            OpCapability ShaderInvocationReorderNV;
-            OpHitObjectGetAttributesNV &hitObject $attributeLocation;
+        spirv_asm
+        {
+            OpCapability RayTracingMotionBlurNV;
+            OpExtension "SPV_NV_ray_tracing_motion_blur";
+            OpHitObjectTraceRayMotionNV
+                &(hitObject.hit) 
+                $topLevel
+                $rayFlags
+                $cullMask
+                $sbtRecordOffset
+                $sbtRecordStride
+                $missIndex
+                $origin
+                $Tmin
+                $direction
+                $Tmax
+                $currentTime
+                __rayPayloadFromLocation(payload)
+        };
+    }
+    }
+}
+
+__generic<attr_t>
+[SetGenericToRayTracingAttributeWithParam(12)]
+[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+public void hitObjectRecordHitNV(
+    inout hitObjectNV hitObject,
+    accelerationStructureEXT topLevel,
+    int instanceid,
+    int primitiveid,
+    int geometryindex,
+    uint hitKind,
+    uint sbtRecordOffset,
+    uint sbtRecordStride,
+    vec3 origin,
+    float Tmin,
+    vec3 direction,
+    float Tmax,
+    constexpr int attributeLocation){
+
+    hitObject.ras = topLevel;
+
+    __target_switch
+    {
+    case hlsl:
+    {
+        Ptr<attr_t> attrVal = __getRayAttributeVariableFromLocation<attr_t>(attributeLocation);
+        hitObject.hit = HitObject::MakeHit(
+            topLevel,
+            uint(instanceid),
+            uint(primitiveid),
+            uint(geometryindex),
+            hitKind,
+            sbtRecordOffset,
+            sbtRecordStride,
+            { origin, Tmin, direction, Tmax },
+            *attrVal);
+    }
+    case glsl:
+    {
+        HitObject::__glslMakeHit(
+            hitObject.hit,
+            topLevel,
+            instanceid,
+            primitiveid,
+            geometryindex,
+            hitKind,
+            sbtRecordOffset,
+            sbtRecordStride,
+            origin,
+            Tmin,
+            direction,
+            Tmax,
+            attributeLocation);
+    }
+    case spirv:
+    {
+        spirv_asm
+        {
+            OpHitObjectRecordHitNV
+                &(hitObject.hit)
+                $topLevel
+                $instanceid
+                $primitiveid
+                $geometryindex
+                $hitKind
+                $sbtRecordOffset
+                $sbtRecordStride
+                $origin
+                $Tmin
+                $direction
+                $Tmax
+                __rayAttributeFromLocation(attributeLocation)
+        };
+    }
+    }
+}
+
+__generic<attr_t>
+[SetGenericToRayTracingAttributeWithParam(13)]
+[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+__glsl_extension(GLSL_NV_ray_tracing_motion_blur)
+public void hitObjectRecordHitMotionNV(
+    inout hitObjectNV hitObject,
+    accelerationStructureEXT topLevel,
+    int instanceid,
+    int primitiveid,
+    int geometryindex,
+    uint hitKind,
+    uint sbtRecordOffset,
+    uint sbtRecordStride,
+    vec3 origin,
+    float Tmin,
+    vec3 direction,
+    float Tmax,
+    float currentTime,
+    constexpr int attributeLocation){
+
+    hitObject.ras = topLevel;
+
+    __target_switch
+    {
+    case hlsl:
+    {
+        Ptr<attr_t> attrVal = __getRayAttributeVariableFromLocation<attr_t>(attributeLocation);
+        hitObject.hit = HitObject::MakeMotionHit(
+            topLevel,
+            uint(instanceid),
+            uint(primitiveid),
+            uint(geometryindex),
+            hitKind,
+            sbtRecordOffset,
+            sbtRecordStride,
+            { origin, Tmin, direction, Tmax },
+            currentTime,
+            *attrVal);
+    }
+    case glsl:
+    {
+        HitObject::__glslMakeMotionHit(
+            hitObject.hit,
+            topLevel,
+            instanceid,
+            primitiveid,
+            geometryindex,
+            hitKind,
+            sbtRecordOffset,
+            sbtRecordStride,
+            origin,
+            Tmin,
+            direction,
+            Tmax,
+            currentTime,
+            attributeLocation);
+    }
+    case spirv:
+    {
+        spirv_asm
+        {
+            OpHitObjectRecordHitMotionNV
+                &(hitObject.hit)
+                $topLevel
+                $instanceid
+                $primitiveid
+                $geometryindex
+                $hitKind
+                $sbtRecordOffset
+                $sbtRecordStride
+                $origin
+                $Tmin
+                $direction
+                $Tmax
+                $currentTime
+                __rayAttributeFromLocation(attributeLocation)
+        };
+    }
+    }
+}
+
+__generic<attr_t>
+[SetGenericToRayTracingAttributeWithParam(11)]
+[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+public void hitObjectRecordHitWithIndexNV(
+    inout hitObjectNV hitObject,
+    accelerationStructureEXT topLevel,
+    int instanceid,
+    int primitiveid,
+    int geometryindex,
+    uint hitKind,
+    uint sbtRecordIndex,
+    vec3 origin,
+    float Tmin,
+    vec3 direction,
+    float Tmax,
+    constexpr int attributeLocation) {
+
+    hitObject.ras = topLevel;
+
+    __target_switch
+    {
+    case hlsl:
+    {
+        Ptr<attr_t> attrVal = __getRayAttributeVariableFromLocation<attr_t>(attributeLocation);
+        hitObject.hit = HitObject::MakeHit(
+            sbtRecordIndex,
+            topLevel,
+            uint(instanceid),
+            uint(geometryindex),
+            uint(primitiveid),
+            hitKind,
+            { origin, Tmin, direction, Tmax },
+            *attrVal);
+    }
+    case glsl:
+    {
+        HitObject::__glslMakeHitWithIndex(
+            hitObject.hit,
+            topLevel,
+            instanceid,
+            primitiveid,
+            geometryindex,
+            hitKind,
+            sbtRecordIndex,
+            origin,
+            Tmin,
+            direction,
+            Tmax,
+            attributeLocation);
+    }
+    case spirv:
+    {
+        spirv_asm
+        {
+            OpHitObjectRecordHitWithIndexNV
+                &(hitObject.hit)
+                $topLevel
+                $instanceid
+                $primitiveid
+                $geometryindex
+                $hitKind
+                $sbtRecordIndex
+                $origin
+                $Tmin
+                $direction
+                $Tmax
+                __rayAttributeFromLocation(attributeLocation)
+        };
+    }
+    }
+}
+
+__generic<attr_t>
+[SetGenericToRayTracingAttributeWithParam(12)]
+[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+__glsl_extension(GLSL_NV_ray_tracing_motion_blur)
+public void hitObjectRecordHitWithIndexMotionNV(
+    inout hitObjectNV hitObject,
+    accelerationStructureEXT topLevel,
+    int instanceid,
+    int primitiveid,
+    int geometryindex,
+    uint hitKind,
+    uint sbtRecordIndex,
+    vec3 origin,
+    float Tmin,
+    vec3 direction,
+    float Tmax,
+    float currentTime,
+    constexpr int attributeLocation){
+
+    hitObject.ras = topLevel;
+
+    __target_switch
+    {
+    case hlsl:
+    {
+        Ptr<attr_t> attrVal = __getRayAttributeVariableFromLocation<attr_t>(attributeLocation);
+        hitObject.hit = HitObject::MakeMotionHit(
+            sbtRecordIndex,
+            topLevel,
+            uint(instanceid),
+            uint(geometryindex),
+            uint(primitiveid),
+            hitKind,
+            { origin, Tmin, direction, Tmax },
+            currentTime,
+            *attrVal);
+    }
+    case glsl:
+    {
+        HitObject::__glslMakeMotionHitWithIndex(
+            hitObject.hit,
+            topLevel,
+            instanceid,
+            primitiveid,
+            geometryindex,
+            hitKind,
+            sbtRecordIndex,
+            origin,
+            Tmin,
+            direction,
+            Tmax,
+            currentTime,
+            attributeLocation);
+    }
+    case spirv:
+    {
+        spirv_asm
+        {
+            OpCapability RayTracingMotionBlurNV;
+            OpExtension "SPV_NV_ray_tracing_motion_blur";
+            OpHitObjectRecordHitWithIndexMotionNV
+                &(hitObject.hit)
+                $topLevel
+                $instanceid
+                $primitiveid
+                $geometryindex
+                $hitKind
+                $sbtRecordIndex
+                $origin
+                $Tmin
+                $direction
+                $Tmax
+                $currentTime
+                __rayAttributeFromLocation(attributeLocation)
         };
     }
     }
 }
 
 [__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-uvec2 hitObjectGetShaderRecordBufferHandleNV(hitObjectNV hitObject) {
-    return hitObject.GetShaderRecordBufferHandle();
+public void hitObjectRecordMissNV(
+    inout hitObjectNV hitObject, 
+    uint sbtRecordIndex, 
+    vec3 origin,
+    float Tmin,
+    vec3 direction,
+    float Tmax){
+    hitObject.hit = HitObject::MakeMiss(
+        sbtRecordIndex,
+        { origin, Tmin, direction, Tmax }
+        );
 }
 
 [__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-uint hitObjectGetShaderBindingTableRecordIndexNV(hitObjectNV hitObject){
-    return hitObject.GetShaderTableIndex();
+__glsl_extension(GLSL_NV_ray_tracing_motion_blur)
+public void hitObjectRecordMissMotionNV(
+    inout hitObjectNV hitObject, 
+    uint sbtRecordIndex, 
+    vec3 origin,
+    float Tmin,
+    vec3 direction,
+    float Tmax,
+    float currentTime){
+    hitObject.hit = HitObject::MakeMotionMiss(
+        sbtRecordIndex,
+        { origin, Tmin, direction, Tmax },
+        currentTime
+        );
 }
 
 [__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-float hitObjectGetCurrentTimeNV(hitObjectNV hitObject) {
-    return hitObject.GetCurrentTime();
+public void hitObjectRecordEmptyNV(hitObjectNV hitObject){
+    hitObject.hit = HitObject::MakeNop();
+}
+
+__spirv_version(1.4) [require(spirv)]
+void hitObjectExecuteShaderNV_SPIRV_wrapped(
+    inout HitObject hit, 
+    constexpr int payload) {
+    // TODO: odd parsing error if I have a &(.*) __ray.*FromLocation(.*) pattern
+    __target_switch {
+    case spirv:
+    {
+        spirv_asm 
+        {
+            OpHitObjectExecuteShaderNV &hit __rayPayloadFromLocation(payload)
+        };
+    }
+    }
+}
+
+__generic<payload_t>
+[SetGenericToRayTracingPayloadWithParam(1)]
+[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+public void hitObjectExecuteShaderNV(inout hitObjectNV hitObject, constexpr int payload){    
+    __target_switch {
+    case hlsl:
+    {
+        Ptr<payload_t> payloadVal = __getRayPayloadVariableFromLocation<payload_t>(payload);
+        HitObject::Invoke(hitObject.ras, hitObject.hit, *payloadVal);
+    }
+    case glsl:
+    {
+        HitObject::__glslInvoke(hitObject.hit, payload);
+    }
+    case spirv:
+    {
+        hitObjectExecuteShaderNV_SPIRV_wrapped(hitObject.hit, payload);
+    }
+    }
 }
 
 [__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-void reorderThreadNV(uint hint, uint bits){
+public bool hitObjectIsEmptyNV(hitObjectNV hitObject){
+    return hitObject.hit.IsNop();
+}
+
+[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+public bool hitObjectIsMissNV(hitObjectNV hitObject){
+    return hitObject.hit.IsMiss();
+}
+
+[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+public bool hitObjectIsHitNV(hitObjectNV hitObject){
+    return hitObject.hit.IsHit();
+}
+
+[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+public float hitObjectGetRayTMinNV(hitObjectNV hitObject) {
+    return hitObject.hit.GetRayDesc().TMin;  
+}
+
+[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+public float hitObjectGetRayTMaxNV(hitObjectNV hitObject) {
+    return hitObject.hit.GetRayDesc().TMax; 
+}
+
+[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+public vec3 hitObjectGetWorldRayOriginNV(hitObjectNV hitObject) {
+    return hitObject.hit.GetRayDesc().Origin;
+}
+
+[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+public vec3 hitObjectGetWorldRayDirectionNV(hitObjectNV hitObject) {
+    return hitObject.hit.GetRayDesc().Direction; 
+}
+
+[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+public vec3 hitObjectGetObjectRayOriginNV(hitObjectNV hitObject){
+    return hitObject.hit.GetObjectRayOrigin();
+}
+
+[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+public vec3 hitObjectGetObjectRayDirectionNV(hitObjectNV hitObject) {
+    return hitObject.hit.GetObjectRayDirection();
+}
+
+[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+public mat4x3 hitObjectGetObjectToWorldNV(hitObjectNV hitObject){
+    return transpose(hitObject.hit.GetObjectToWorld());
+}
+
+[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+public mat4x3 hitObjectGetWorldToObjectNV(hitObjectNV hitObject) {
+    return transpose(hitObject.hit.GetWorldToObject()); 
+}
+
+[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+public int hitObjectGetInstanceCustomIndexNV(hitObjectNV hitObject) {
+    return hitObject.hit.GetInstanceID();
+}
+
+[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+public int hitObjectGetInstanceIdNV(hitObjectNV hitObject) {
+    return hitObject.hit.GetInstanceIndex();
+}
+
+[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+public int hitObjectGetGeometryIndexNV(hitObjectNV hitObject) {
+    return hitObject.hit.GetGeometryIndex();
+}
+
+[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+public int hitObjectGetPrimitiveIndexNV(hitObjectNV hitObject) {
+    return hitObject.hit.GetPrimitiveIndex();
+}
+
+[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+public uint hitObjectGetHitKindNV(hitObjectNV hitObject) {
+    return hitObject.hit.GetHitKind();
+}
+
+
+[__requiresNVAPI]
+[require(glsl)]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+internal void hitObjectGetAttributesNV_GLSL_wrapped(
+    inout HitObject hit,
+    constexpr int attributeLocation) { 
+    __target_switch 
+    {
+    case glsl:
+    {
+        __intrinsic_asm "hitObjectGetAttributesNV($0, $1)";
+    }
+    }
+}
+
+__spirv_version(1.4) [require(spirv)]
+public void hitObjectGetAttributesNV_SPIRV_wrapped(
+    inout HitObject hit, 
+    constexpr int attributeLocation) {
+    // TODO: odd parsing error if I have a &(.*) __ray.*FromLocation(.*) pattern
+    __target_switch
+    {
+    case spirv:
+    {
+        spirv_asm 
+        {
+            OpCapability ShaderInvocationReorderNV;
+            OpHitObjectGetAttributesNV &hit __rayAttributeFromLocation(attributeLocation)
+        };    
+    }
+    }
+}
+__generic<attr_t>
+[SetGenericToRayTracingAttributeWithParam(1)]
+[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+public void hitObjectGetAttributesNV(
+    inout hitObjectNV hitObject, 
+    constexpr int attributeLocation) {
+    __target_switch
+    {
+    case hlsl:
+    {
+        Ptr<attr_t> attrVal = __getRayAttributeVariableFromLocation<attr_t>(attributeLocation);
+        hitObject.hit.__hlslGetAttributesFromHitObject(*attrVal);
+    }
+    case glsl:
+    {
+        hitObjectGetAttributesNV_GLSL_wrapped(hitObject.hit, attributeLocation);
+    }
+    case spirv:
+    {
+        hitObjectGetAttributesNV_SPIRV_wrapped(hitObject.hit, attributeLocation);
+    }
+    }
+}
+
+[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+public uvec2 hitObjectGetShaderRecordBufferHandleNV(hitObjectNV hitObject) {
+    return hitObject.hit.GetShaderRecordBufferHandle();
+}
+
+[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+public uint hitObjectGetShaderBindingTableRecordIndexNV(hitObjectNV hitObject){
+    return hitObject.hit.GetShaderTableIndex();
+}
+
+[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+public float hitObjectGetCurrentTimeNV(hitObjectNV hitObject) {
+    return hitObject.hit.GetCurrentTime();
+}
+
+[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+public void reorderThreadNV(uint hint, uint bits){
     ReorderThread(hint, bits);
 }
 
 [__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-void reorderThreadNV(hitObjectNV hitObject){
-    ReorderThread(hitObject);
+public void reorderThreadNV(hitObjectNV hitObject){
+    ReorderThread(hitObject.hit);
 }
 
 [__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-void reorderThreadNV(hitObjectNV hitObject, uint hint, uint bits){
-    ReorderThread(hitObject, hint, bits);
+public void reorderThreadNV(hitObjectNV hitObject, uint hint, uint bits){
+    ReorderThread(hitObject.hit, hint, bits);
 }
 
-[__requiresNVAPI]
-__glsl_extension(GL_EXT_ray_tracing)
-__glsl_extension(GL_NV_ray_tracing_motion_blur)
-public float gl_SubgroupInvocationID; // RayCurrentTime analog
+/// GL_NV_ray_tracing_motion_blur
 
 [__requiresNVAPI]
-__glsl_extension(GL_EXT_ray_tracing)
+__spirv_version(1.4) [require(spirv)]
+__glsl_extension(GL_NV_ray_tracing_motion_blur) 
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GL_EXT_ray_tracing) 
+[require(glsl)]
+__spirv_version(1.4) [require(spirv)]
+public property float gl_CurrentRayTimeNV {
+    get {
+        __target_switch
+        {
+        case glsl:
+            __intrinsic_asm "(gl_CurrentRayTimeNV)";
+        case spirv:
+            return spirv_asm 
+            {
+                result:$$float = OpLoad builtin(CurrentRayTimeNV:float);
+            };
+        }
+    }
+}
+
+__generic<payload_t>
+[SetGenericToRayTracingPayloadWithParam(11)]
+[__requiresNVAPI]
+__spirv_version(1.4) [require(spirv)]
+[require(glsl)]
 __glsl_extension(GL_NV_ray_tracing_motion_blur)
-void traceRayMotionNV(
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GL_EXT_ray_tracing) 
+public void traceRayMotionNV(
     accelerationStructureEXT topLevel,
     uint rayFlags,
     uint cullMask,
@@ -3569,17 +4093,60 @@ void traceRayMotionNV(
     vec3 direction,
     float Tmax,
     float currentTime,
-    int payload) {
-    TraceMotionRay(
-        topLevel,
-        rayFlags,
-        cullMask,
-        sbtRecordOffset,
-        sbtRecordStride,
-        missIndex,
-        {origin, Tmin, direction, Tmax},
-        currentTime,
-        payload
-    );
+    constexpr int payload) {
+    __target_switch {
+    case hlsl:
+    {
+        Ptr<payload_t> payloadVal = __getRayPayloadVariableFromLocation<payload_t>(payload);
+        TraceMotionRay(
+            topLevel,
+            rayFlags,
+            cullMask,
+            sbtRecordOffset,
+            sbtRecordStride,
+            missIndex,
+            { origin, Tmin, direction, Tmax },
+            currentTime,
+            *payloadVal
+        );
+    }
+    case glsl:
+    {
+        __traceMotionRay(
+            topLevel,
+            rayFlags,
+            cullMask,
+            sbtRecordOffset,
+            sbtRecordStride,
+            missIndex,
+            origin,
+            Tmin,
+            direction,
+            Tmax,
+            currentTime,
+            payload);
+    }
+    case spirv:
+    {
+        spirv_asm 
+        {
+            OpCapability RayTracingMotionBlurNV;
+            OpExtension "SPV_NV_ray_tracing_motion_blur";
+            OpTraceRayMotionNV
+                $topLevel
+                $rayFlags
+                $cullMask
+                $sbtRecordOffset
+                $sbtRecordStride
+                $missIndex
+                $origin
+                $Tmin
+                $direction
+                $Tmax
+                $currentTime
+                __rayPayloadFromLocation(payload)
+        };
+    }
+    }
 }
 

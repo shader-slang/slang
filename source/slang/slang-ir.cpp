@@ -4287,11 +4287,105 @@ namespace Slang
         }
     }
 
+
+    void IRModule::trySearchForAndFillAllRayVariables(){
+        //instead of forcing order of code, a single pass if needed can be used
+        //likley forcing order is a faster and better idea
+
+        if(!checkedForRayVariables)
+        {
+            checkedForRayVariables = true;
+            for(auto i : getGlobalInsts())
+            {
+                if(auto rayDec = i->findDecoration<IRVulkanRayPayloadDecoration>())
+                {
+                    storeLocationToRayPayloadVariable(getIntVal(rayDec->getOperand(0)), i);
+                }
+                else if(auto rayDec = i->findDecoration<IRVulkanHitObjectAttributesDecoration>())
+                {
+                    storeLocationToRayAttributeVariable(getIntVal(rayDec->getOperand(0)), i);
+                }
+            }
+
+        }
+    }
+
+    IRInst* IRModule::getRayVariableFromLocation(IRInst* payloadVariable, Slang::IROp rayVariableType, DiagnosticSink* sink)
+    {
+        IRBuilder builder(payloadVariable);
+        IRInst** varLayoutPointsTo;
+        int intLitValue = -1;
+        IRIntLit* intLit = as<IRIntLit>(payloadVariable);
+        if(intLit){
+            intLitValue = intLit->getValue();
+            if (rayVariableType == kIROp_GetRayPayloadVariableFromLocation)
+            {
+                varLayoutPointsTo = this->getRayPayloadVariableFromLocation(
+                        intLitValue
+                    );
+            }
+            else if (rayVariableType == kIROp_GetRayAttributeVariableFromLocation)
+            {
+                varLayoutPointsTo = this->getRayAttributeVariableFromLocation(
+                        intLitValue
+                    );
+            }
+            else
+            {
+                // should be impossible to hit
+                assert(false);
+            }
+        }
+        else{
+            sink->diagnose(payloadVariable, Diagnostics::expectedIntegerConstantNotConstant);
+        }
+
+        IRInst* resultVariable;
+        if (!varLayoutPointsTo)
+        {
+            // if somehow the location tied variable is missing and an error was not thrown by the compiler
+            resultVariable = builder.getIntValue(builder.getIntType(), 0);
+            sink->diagnose(payloadVariable, Diagnostics::expectedRayTracingPayloadObjectAtLocationButMissing, intLitValue);
+        }
+        else {
+            resultVariable = *varLayoutPointsTo;
+        }
+        return resultVariable;
+    }
+
+    void IRModule::storeLocationToRayPayloadVariable(int location, IRInst* inst)
+    {
+        // Try to remove duplicates since IR will try to remove/re-add globals 
+        // sometimes to move them around, this case needs to be handled
+        if (m_RayLocationToPayloads.tryGetValue(location) != nullptr) 
+        {
+            m_RayLocationToPayloads.remove(location);
+        }
+        m_RayLocationToPayloads.add(location, inst);
+    }
+    IRInst** IRModule::getRayPayloadVariableFromLocation(int location)
+    {
+        // As long as we keep up to date the current ir of a location we won't get bad data
+        // storeLocationToRayPayloadVariable manages this
+        return m_RayLocationToPayloads.tryGetValue(location);
+    }
+    void IRModule::storeLocationToRayAttributeVariable(int location, IRInst* inst)
+    {
+        if (m_RayLocationToAttributes.tryGetValue(location) != nullptr) 
+        {
+            m_RayLocationToAttributes.remove(location);
+        }
+        m_RayLocationToAttributes.add(location, inst);
+    }
+    IRInst** IRModule::getRayAttributeVariableFromLocation(int location)
+    {
+        return m_RayLocationToAttributes.tryGetValue(location);
+    }
+    
     IRInst* IRBuilder::addDifferentiableTypeDictionaryDecoration(IRInst* target)
     {
         return addDecoration(target, kIROp_DifferentiableTypeDictionaryDecoration);
     }
-
     IRInst* IRBuilder::addDifferentiableTypeEntry(IRInst* dictDecoration, IRInst* irType, IRInst* conformanceWitness)
     {
         auto oldLoc = this->getInsertLoc();
@@ -5794,7 +5888,30 @@ namespace Slang
         addInst(i);
         return i;
     }
-
+    IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandRayPayloadFromLocation(IRInst* inst)
+    {
+        SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
+        const auto i = createInst<IRSPIRVAsmOperand>(
+            this,
+            kIROp_SPIRVAsmOperandRayPayloadFromLocation,
+            inst->getFullType(),
+            inst
+        );
+        addInst(i);
+        return i;
+    }
+    IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandRayAttributeFromLocation(IRInst* inst)
+    {
+        SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
+        const auto i = createInst<IRSPIRVAsmOperand>(
+            this,
+            kIROp_SPIRVAsmOperandRayAttributeFromLocation,
+            inst->getFullType(),
+            inst
+        );
+        addInst(i);
+        return i;
+    }
     IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandId(IRInst* inst)
     {
         SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
@@ -6816,6 +6933,16 @@ namespace Slang
             return;
         case kIROp_SPIRVAsmOperandInst:
             dumpInstExpr(context, inst->getOperand(0));
+            return;
+        case kIROp_SPIRVAsmOperandRayPayloadFromLocation:
+            dump(context, "__rayPayloadFromLocation(");
+            dumpInstExpr(context, inst->getOperand(0));
+            dump(context, ")");
+            return;
+        case kIROp_SPIRVAsmOperandRayAttributeFromLocation:
+            dump(context, "__rayAttributeFromLocation(");
+            dumpInstExpr(context, inst->getOperand(0));
+            dump(context, ")");
             return;
         case kIROp_SPIRVAsmOperandId:
             dump(context, "%");

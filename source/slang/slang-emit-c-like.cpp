@@ -1235,6 +1235,8 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
         return true;
 
     case kIROp_GetVulkanRayTracingPayloadLocation:
+    case kIROp_GetRayPayloadVariableFromLocation:
+    case kIROp_GetRayAttributeVariableFromLocation:
         return true;
     }
 

@@ -2336,7 +2336,7 @@ __attributeTarget(DeclBase)
 attribute_syntax [push_constant]									: PushConstantAttribute;
 
 __attributeTarget(VarDeclBase)
-attribute_syntax [vk_location(locaiton : int)] : GLSLLocationAttribute;
+attribute_syntax [vk_location(location : int)] : GLSLLocationAttribute;
 
 __attributeTarget(VarDeclBase)
 attribute_syntax [vk_index(index : int)] : GLSLIndexAttribute;
@@ -2471,7 +2471,7 @@ __attributeTarget(Decl)
 attribute_syntax [allow(diagnostic: String)] : AllowAttribute;
 
 __attributeTarget(Decl)
-attribute_syntax[require(capability)] : RequireCapabilityAttribute;
+attribute_syntax [require(capability)] : RequireCapabilityAttribute;
 
 // Linking
 __attributeTarget(Decl)
@@ -2514,7 +2514,7 @@ __attributeTarget(FuncDecl)
 attribute_syntax [CUDAKernel] : CudaKernelAttribute;
 
 __attributeTarget(FuncDecl)
-attribute_syntax[AutoPyBindCUDA] : AutoPyBindCudaAttribute;
+attribute_syntax [AutoPyBindCUDA] : AutoPyBindCudaAttribute;
 
 __attributeTarget(AggTypeDecl)
 attribute_syntax [PyExport(name: String)] : PyExportAttribute;

@@ -2356,6 +2356,14 @@ struct SPIRVEmitContext
                 registerInst(inst, inner);
                 return inner;
             }
+        case kIROp_GetRayPayloadVariableFromLocation: // fallthrough
+        case kIROp_GetRayAttributeVariableFromLocation:
+            {
+                IRInst* variableAtLocation = this->m_irModule->getRayVariableFromLocation(inst->getOperand(0), inst->getOp(), m_sink);
+                auto inner = ensureInst(variableAtLocation);
+                registerInst(inst, inner);
+                return inner;
+            }
         case kIROp_Return:
             if (as<IRReturn>(inst)->getVal()->getOp() == kIROp_VoidLit)
                 return emitOpReturn(parent, inst);
@@ -2955,8 +2963,18 @@ struct SPIRVEmitContext
             break;
 
         case kIROp_VulkanCallablePayloadDecoration:
+            goto rayExtensionAddition;
         case kIROp_VulkanHitObjectAttributesDecoration:
+            // needed since GLSL will not set optypes accordingly, but will keep the decoration 
+            ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_shader_invocation_reorder"));
+            requireSPIRVCapability(SpvCapabilityShaderInvocationReorderNV);
+            goto rayExtensionAddition;
         case kIROp_VulkanRayPayloadDecoration:
+            // needed since GLSL will not set optypes accordingly, but will keep the decoration 
+            ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_ray_query"));
+            requireSPIRVCapability(SpvCapabilityRayQueryKHR);
+            goto rayExtensionAddition;
+rayExtensionAddition:
             emitOpDecorateLocation(getSection(SpvLogicalSectionID::Annotations),
                 decoration,
                 dstID,
@@ -4783,6 +4801,20 @@ struct SPIRVEmitContext
 
                     break;
                 }
+                case kIROp_SPIRVAsmOperandRayPayloadFromLocation:
+                {
+                    IRInst* opValue = operand->getValue();
+                    IRInst* globalVar = this->m_irModule->getRayVariableFromLocation(opValue, kIROp_GetRayPayloadVariableFromLocation, m_sink);
+                    emitOperand(ensureInst(globalVar));
+                    break;
+                }
+                case kIROp_SPIRVAsmOperandRayAttributeFromLocation:
+                {
+                    IRInst* opValue = operand->getValue();
+                    IRInst* globalVar = this->m_irModule->getRayVariableFromLocation(opValue, kIROp_GetRayAttributeVariableFromLocation, m_sink);
+                    emitOperand(ensureInst(globalVar));
+                    break;
+                }
                 case kIROp_SPIRVAsmOperandResult:
                 {
                     SLANG_ASSERT(isLast);
@@ -5094,6 +5126,8 @@ SlangResult emitSPIRVFromIR(
 #endif
 
     SPIRVEmitContext context(irModule, targetRequest, sink);
+
+    irModule->trySearchForAndFillAllRayVariables();
     legalizeIRForSPIRV(&context, irModule, irEntryPoints, codeGenContext);
 
 #if 0

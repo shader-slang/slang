@@ -1956,6 +1956,15 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit(getIntVal(location));
             return true;
         }
+        case kIROp_GetRayPayloadVariableFromLocation: // fallthrough
+        case kIROp_GetRayAttributeVariableFromLocation:
+        {
+            IRInst* variableAtLocation = this->m_irModule->getRayVariableFromLocation(inst->getOperand(0), inst->getOp(), getSink());
+            m_writer->emit("(");
+            m_writer->emit(getName(variableAtLocation));
+            m_writer->emit(")");
+            return true;
+        }
         case kIROp_ImageLoad:
         {
             m_writer->emit("imageLoad(");

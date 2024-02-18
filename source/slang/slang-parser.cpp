@@ -4386,7 +4386,18 @@ namespace Slang
         else
         {
             _addModifiers(declToModify, modifiers);
-        }
+            if (modifiers.hasModifier<VulkanRayPayloadAttribute>()) 
+            {
+                parser->currentModule->module->storeLocationToRayPayloadType(
+                    ((VulkanRayPayloadAttribute*)modifiers.getModifiersOfType<VulkanRayPayloadAttribute>().begin().current)->location,
+                    as<VarDecl>(declToModify));
+            }
+            if (modifiers.hasModifier<VulkanHitObjectAttributesAttribute>()) 
+            {
+                parser->currentModule->module->storeLocationToRayAttributeType(
+                    ((VulkanHitObjectAttributesAttribute*)modifiers.getModifiersOfType<VulkanHitObjectAttributesAttribute>().begin().current)->location,
+                    as<VarDecl>(declToModify));
+            }        }
 
         if (containerDecl)
         {
@@ -7013,6 +7024,20 @@ namespace Slang
         {
             return SPIRVAsmOperand{ SPIRVAsmOperand::NonSemanticDebugPrintfExtSet, parser->ReadToken() };
         }
+        else if (AdvanceIf(parser, "__rayPayloadFromLocation")) {
+            // reference a magic number to a layout(location) for late compiler resolution of rayPayload objects
+            parser->ReadToken(TokenType::LParent);
+            auto operand = SPIRVAsmOperand{ SPIRVAsmOperand::RayPayloadFromLocation, Token{}, parseAtomicExpr(parser) };
+            parser->ReadToken(TokenType::RParent);
+            return operand;
+        }
+        else if (AdvanceIf(parser, "__rayAttributeFromLocation")) {
+            // works simmilar to __rayPayloadFromLocation
+            parser->ReadToken(TokenType::LParent);
+            auto operand = SPIRVAsmOperand{ SPIRVAsmOperand::RayAttributeFromLocation, Token{}, parseAtomicExpr(parser) };
+            parser->ReadToken(TokenType::RParent);
+            return operand;
+        }
         // A regular identifier
         else if(parser->LookAheadToken(TokenType::Identifier))
         {
@@ -7769,6 +7794,28 @@ namespace Slang
             if (AdvanceIf(parser, TokenType::RParent))
                 break;
             parser->ReadToken(TokenType::Comma);
+        }
+
+        if (parser->LookAheadToken("rayPayloadEXT") || parser->LookAheadToken("rayPayloadNV")) 
+        {
+            parser->ReadToken();
+            auto modifier = parser->astBuilder->create<VulkanRayPayloadAttribute>();
+            modifier->location = getIntegerLiteralValue(listBuilder.find<GLSLLayoutModifier>()->valToken);
+            listBuilder.add(modifier);
+        }
+        else if (parser->LookAheadToken("rayPayloadInEXT") || parser->LookAheadToken("rayPayloadInNV")) 
+        {
+            parser->ReadToken();
+            auto modifier = parser->astBuilder->create<VulkanRayPayloadAttribute>();
+            modifier->location = getIntegerLiteralValue(listBuilder.find<GLSLLayoutModifier>()->valToken);
+            listBuilder.add(modifier);
+        }
+        else if (parser->LookAheadToken("hitObjectAttributeNV")) 
+        {
+            parser->ReadToken();
+            auto modifier = parser->astBuilder->create<VulkanHitObjectAttributesAttribute>();
+            modifier->location = getIntegerLiteralValue(listBuilder.find<GLSLLayoutModifier>()->valToken);
+            listBuilder.add(modifier);
         }
 
         if (numThreadsAttrib)

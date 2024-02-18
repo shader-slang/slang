@@ -1377,6 +1377,26 @@ namespace Slang
         List<Module*> const& getModuleDependencies() SLANG_OVERRIDE { return m_moduleDependencyList.getModuleList(); }
         List<SourceFile*> const& getFileDependencies() SLANG_OVERRIDE { return m_fileDependencyList.getFileList(); }
 
+        // Store GLSL layout-location->variable-type; payload
+        void storeLocationToRayPayloadType(int location, VarDecl* type) 
+        {
+            m_rayLocationToPayloadType.addIfNotExists(location, type);
+        }
+        VarDecl** getRayPayloadTypeFromLocation(int location) 
+        {
+            return m_rayLocationToPayloadType.tryGetValue(location);
+        }
+
+        // Store GLSL layout-location->variable-type; attribute
+        void storeLocationToRayAttributeType(int location, VarDecl* type) 
+        {
+            m_rayLocationToAttributeType.addIfNotExists(location, type);
+        }
+        VarDecl** getRayAttributeTypeFromLocation(int location) 
+        {
+            return m_rayLocationToAttributeType.tryGetValue(location);
+        }
+        
             /// Given a mangled name finds the exported NodeBase associated with this module.
             /// If not found returns nullptr.
         NodeBase* findExportFromMangledName(const UnownedStringSlice& slice);
@@ -1474,6 +1494,13 @@ namespace Slang
 
         // Source files that have been pulled into the module with `__include`.
         Dictionary<SourceFile*, FileDecl*> m_mapSourceFileToFileDecl;
+
+        // GLSL layout-location->variable-type; needed to force generic specialization 
+        // without auxilery data from user (to allow drop in GLSL->[HLSL/SPIR-V]) 
+        Dictionary<int, VarDecl*> m_rayLocationToPayloadType;
+
+        Dictionary<int, VarDecl*> m_rayLocationToAttributeType;
+
     };
     typedef Module LoadedModule;
 

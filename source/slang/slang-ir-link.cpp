@@ -1518,6 +1518,31 @@ LinkedIR linkIR(
 
     context->builder->setInsertInto(context->getModule()->getModuleInst());
 
+    // Raypayload/related objects found under GLSL are likley never referenced
+    // this is because internally they are used by slang functions; these emit later in code gen
+    // as a result we emit them now
+    // we also emit these early since if these are not at the top of scope, that could be deadly to a compile
+    if (state->targetReq->getLinkage()->getAllowGLSLInput()) {
+        auto insertGlobalVar = [&](IRInst* instToAdd){
+            auto clone = cloneValue(context, instToAdd);
+            if (!clone->findDecorationImpl(kIROp_KeepAliveDecoration)) context->builder->addKeepAliveDecoration(clone);
+            context->builder->addInst(clone);
+        };
+        for (IRModule* irModule : irModules)
+        {
+            for (auto inst : irModule->getGlobalInsts())
+            {
+                if (0
+                    || inst->findDecoration<IRVulkanRayPayloadDecoration>()
+                    || inst->findDecoration<IRVulkanHitObjectAttributesDecoration>()
+                    )
+                {
+                    insertGlobalVar(inst);
+                }
+            }
+        }
+    }
+
     // Next, we make sure to clone the global value for
     // the entry point function itself, and rely on
     // this step to recursively copy over anything else

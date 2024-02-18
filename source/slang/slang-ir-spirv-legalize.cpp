@@ -1763,6 +1763,20 @@ void buildEntryPointReferenceGraph(SPIRVEmitSharedContext* context, IRModule* mo
                 }
                 break;
             }
+            
+            // since glsl late evaluates raytracing objects, we need to assume they 
+            // will all be in use 
+            if(context->m_targetRequest->getLinkage()->getAllowGLSLInput()){
+                for(auto i : module->m_RayLocationToPayloads)
+                {
+                    addToWorkList({ entryPoint, i.second });
+                }
+                for(auto i : module->m_RayLocationToAttributes)
+                {
+                    addToWorkList({ entryPoint, i.second });
+                }
+            }
+
             for (UInt i = 0; i < inst->getOperandCount(); i++)
             {
                 auto operand = inst->getOperand(i);

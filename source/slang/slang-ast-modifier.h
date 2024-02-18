@@ -1373,6 +1373,24 @@ class PayloadAttribute : public Attribute
     SLANG_AST_CLASS(PayloadAttribute)
 };
 
+    /// An attribute which tracks the argument number of which argument has the 
+    /// (in GLSL terms) layout location for a rayPayload(In|)(EXT|NV). This 
+    /// allows our code to specialize a generic at compile time from payloads 
+    /// to allow drop in GLSL raytracing code to work with SPIR-V and HLSL
+class SetGenericToRayTracingPayloadWithParamAttribute : public Attribute
+{
+    SLANG_AST_CLASS(SetGenericToRayTracingPayloadWithParamAttribute)
+
+    int paramToFetchGenericTypeFrom;
+};
+
+class SetGenericToRayTracingAttributeWithParamAttribute : public Attribute
+{
+    SLANG_AST_CLASS(SetGenericToRayTracingAttributeWithParamAttribute)
+
+    int paramToFetchGenericTypeFrom;
+};
+
     /// A `[deprecated("message")]` attribute indicates the target is
     /// deprecated.
     /// A compiler warning including the message will be raised if the

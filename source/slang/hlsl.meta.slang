@@ -9883,12 +9883,15 @@ void AcceptHitAndEndSearch()
 
 // 10.4.1 - Ray Dispatch System Values
 
+__spirv_version(1.4) [require(spirv)]
 uint3 DispatchRaysIndex()
 {
     __target_switch
     {
-    case hlsl:  __intrinsic_asm "DispatchRaysIndex";
-    case _GL_EXT_ray_tracing: __intrinsic_asm "(gl_LaunchIDEXT)";
+    case hlsl: __intrinsic_asm "DispatchRaysIndex";
+    case _GL_EXT_ray_tracing:
+    case glsl: 
+        __intrinsic_asm "(gl_LaunchIDEXT)";
     case cuda: __intrinsic_asm "optixGetLaunchIndex";
     case spirv:
         return spirv_asm {
@@ -9897,12 +9900,15 @@ uint3 DispatchRaysIndex()
     }
 }
 
+__spirv_version(1.4) [require(spirv)]
 uint3 DispatchRaysDimensions()
 {
     __target_switch
     {
     case hlsl:  __intrinsic_asm "DispatchRaysDimensions";
-    case _GL_EXT_ray_tracing: __intrinsic_asm "(gl_LaunchSizeEXT)";
+    case _GL_EXT_ray_tracing:
+    case glsl:
+         __intrinsic_asm "(gl_LaunchSizeEXT)";
     case cuda: __intrinsic_asm "optixGetLaunchDimensions";
     case spirv:
         return spirv_asm {
@@ -10868,8 +10874,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     }
 
     __glsl_extension(GL_EXT_ray_query)
-        __glsl_version(460)
-            [__NoSideEffect]
+    __glsl_version(460)
+    [__NoSideEffect]
     float2 CandidateRayBarycentrics()
     {
         __target_switch
@@ -10951,8 +10957,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     }
 
     __glsl_extension(GL_EXT_ray_query)
-        __glsl_version(460)
-            [__NoSideEffect]
+    __glsl_version(460)
+    [__NoSideEffect]
     float3 CommittedRayObjectRayDirection()
     {
         __target_switch
@@ -10985,7 +10991,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     }
 
     __glsl_extension(GL_EXT_ray_query)
-        __glsl_version(460)
+    __glsl_version(460)
     [__NoSideEffect]
     float3 CommittedRayObjectRayOrigin()
     {
@@ -11719,10 +11725,10 @@ struct HitObject
 
             __glslMakeHitWithIndex(
                 __return_val,
-                AccelerationStructure, 
-                InstanceIndex,              ///? Same as instanceid ?
-                GeometryIndex, 
+                AccelerationStructure,
+                InstanceIndex, ///? Same as instanceid ?
                 PrimitiveIndex,
+                GeometryIndex,
                 HitKind,                    /// Assuming HitKinds are compatible
                 HitGroupRecordIndex,        /// sbtRecordIndex
                 Ray.Origin,
@@ -11782,10 +11788,10 @@ struct HitObject
 
             __glslMakeMotionHitWithIndex(
                 __return_val,
-                AccelerationStructure, 
-                InstanceIndex,              ///? Same as instanceid ?
-                GeometryIndex, 
-                PrimitiveIndex,
+                AccelerationStructure,
+                InstanceIndex, ///? Same as instanceid ?
+                PrimitiveIndex, 
+                GeometryIndex,
                 HitKind,                    /// Assuming HitKinds are compatible
                 HitGroupRecordIndex,        /// sbtRecordIndex
                 Ray.Origin,
@@ -12179,6 +12185,7 @@ struct HitObject
                 result:$$float = OpHitObjectGetCurrentTimeNV &this
             };
         }
+        return 0.0f;
     }
 
     [__requiresNVAPI]
@@ -12194,6 +12201,7 @@ struct HitObject
                 result:$$float3 = OpHitObjectGetObjectRayOriginNV &this
             };
         }
+        return float3(0);
     }
 
     [__requiresNVAPI]
@@ -12209,6 +12217,7 @@ struct HitObject
                 result:$$float3 = OpHitObjectGetObjectRayDirectionNV &this
             };
         }
+        return float3(0);
     }
 
     [__requiresNVAPI]
@@ -12224,6 +12233,7 @@ struct HitObject
                 result:$$uint2 = OpHitObjectGetShaderRecordBufferHandleNV &this
             };
         }
+        return uint2(0);
     }
     /// Returns the attributes of a hit. Valid if the hit object represents a hit or a miss.
     [ForceInline]
