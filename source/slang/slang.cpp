@@ -578,7 +578,7 @@ static T makeFromSizeVersioned(const uint8_t* src)
 
     // The size to copy is the minimum on the two sizes
     const auto copySize = std::min(srcSize, dstSize);
-    ::memcpy(&dst, &src, copySize);
+    ::memcpy(&dst, src, copySize);
 
     // The final struct size is the destination size
     dst.structureSize = dstSize;
