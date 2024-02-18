@@ -3833,11 +3833,6 @@ ISlangUnknown* ComponentType::getInterface(Guid const& guid)
     {
         return static_cast<slang::IComponentType*>(this);
     }
-    else if (guid == slang::IComponentType2::getTypeGuid())
-    {
-        return static_cast<slang::IComponentType2*>(this);
-    }
-
     return nullptr;
 }
 

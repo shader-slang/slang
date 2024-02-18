@@ -278,7 +278,7 @@ namespace Slang
         /// Base class for "component types" that represent the pieces a final
         /// shader program gets linked together from.
         ///
-    class ComponentType : public RefObject, public slang::IComponentType, public slang::IComponentType2
+    class ComponentType : public RefObject, public slang::IComponentType
     {
     public:
         //

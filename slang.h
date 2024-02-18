@@ -4375,13 +4375,14 @@ namespace slang
             */
         bool forceGLSLScalarBufferLayout = false;
 
+            /** Pointer to an array of compiler option entries, whose size is compilerOptionEntryCount.
+            */
+        CompilerOptionEntry* compilerOptionEntries = nullptr;
+
             /** Number of additional compiler option entries.
             */
         uint32_t compilerOptionEntryCount = 0;
 
-            /** Pointer to an array of compiler option entries, whose size is compilerOptionEntryCount.
-            */
-        CompilerOptionEntry* compilerOptionEntries = nullptr;
     };
 
     typedef uint32_t SessionFlags;
@@ -4428,13 +4429,14 @@ namespace slang
         bool enableEffectAnnotations = false;
         bool allowGLSLSyntax = false;
 
+        /** Pointer to an array of compiler option entries, whose size is compilerOptionEntryCount.
+        */
+        CompilerOptionEntry* compilerOptionEntries = nullptr;
+
         /** Number of additional compiler option entries.
         */
         uint32_t compilerOptionEntryCount = 0;
 
-        /** Pointer to an array of compiler option entries, whose size is compilerOptionEntryCount.
-        */
-        CompilerOptionEntry* compilerOptionEntries = nullptr;
     };
 
     enum class ContainerType
@@ -4822,24 +4824,17 @@ namespace slang
             */
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL renameEntryPoint(
             const char* newName, IComponentType** outEntryPoint) = 0;
-    };
-    #define SLANG_UUID_IComponentType IComponentType::getTypeGuid()
-
-    struct IComponentType2 : public ISlangUnknown
-    {
-        SLANG_COM_INTERFACE(0xc343ffc, 0xb564, 0x4ae3, { 0x93, 0x18, 0xd4, 0xbc, 0xe7, 0x29, 0x10, 0xda })
-
-        /** Set additional compiler options for generating code associated with this
-            component.
-        */
+        
+            /** Link and specify additional compiler options when generating code
+            *   from the linked program.
+            */
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL linkWithOptions(
             IComponentType** outLinkedComponentType,
             uint32_t compilerOptionEntryCount,
             CompilerOptionEntry* compilerOptionEntries,
             ISlangBlob** outDiagnostics = nullptr) = 0;
     };
-    #define SLANG_UUID_IComponentType2 IComponentType2::getTypeGuid()
-
+    #define SLANG_UUID_IComponentType IComponentType::getTypeGuid()
 
     struct IEntryPoint : public IComponentType
     {

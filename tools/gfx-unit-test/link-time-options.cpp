@@ -49,16 +49,13 @@ namespace gfx_test
         diagnoseIfNeeded(diagnosticsBlob);
         SLANG_RETURN_ON_FAIL(result);
 
-        Slang::ComPtr<slang::IComponentType2> composedProgram2;
-        composedProgram->queryInterface(slang::IComponentType2::getTypeGuid(), (void**)composedProgram2.writeRef());
-
         ComPtr<slang::IComponentType> linkedProgram;
         slang::CompilerOptionEntry entry;
         entry.name = slang::CompilerOptionName::DownstreamArgs;
         entry.value.kind = slang::CompilerOptionValueKind::String;
         entry.value.stringValue0 = "dxc";
         entry.value.stringValue1 = "-DDOWNSTREAM_VALUE=4.0";
-        result = composedProgram2->linkWithOptions(linkedProgram.writeRef(), 1, &entry, diagnosticsBlob.writeRef());
+        result = composedProgram->linkWithOptions(linkedProgram.writeRef(), 1, &entry, diagnosticsBlob.writeRef());
         diagnoseIfNeeded(diagnosticsBlob);
         SLANG_RETURN_ON_FAIL(result);
 
