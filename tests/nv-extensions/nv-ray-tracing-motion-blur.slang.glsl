@@ -1,8 +1,8 @@
 #version 460
 #extension GL_EXT_ray_tracing : require
 #extension GL_NV_ray_tracing_motion_blur : require
-layout(row_major) uniform;
-layout(row_major) buffer;
+layout(column_major) uniform;
+layout(column_major) buffer;
 layout(binding = 0)
 uniform texture2D samplerPosition_0;
 
