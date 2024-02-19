@@ -390,7 +390,7 @@ protected:
     ShaderObjectContainerType m_containerType = ShaderObjectContainerType::None;
 
 public:
-    slang::ISession* m_slangSession = nullptr;
+    ComPtr<slang::ISession> m_slangSession;
 
     ShaderObjectContainerType getContainerType() { return m_containerType; }
 
@@ -446,7 +446,7 @@ public:
         return m_componentID;
     }
 
-    void initBase(RendererBase* renderer, slang::TypeLayoutReflection* elementTypeLayout);
+    void initBase(RendererBase* renderer, slang::ISession* session, slang::TypeLayoutReflection* elementTypeLayout);
 };
 
 class SimpleShaderObjectData
@@ -496,8 +496,6 @@ protected:
 
     // The specialized shader object type.
     ExtendedShaderObjectType shaderObjectType = { nullptr, kInvalidComponentID };
-
-    ComPtr<slang::ISession> m_slangSession;
 
     Result _getSpecializedShaderObjectType(ExtendedShaderObjectType* outType);
     slang::TypeLayoutReflection* _getElementTypeLayout()
@@ -1346,6 +1344,7 @@ public:
         ShaderObjectLayoutBase**    outLayout);
 
     Result getShaderObjectLayout(
+        slang::ISession* session,
         slang::TypeLayoutReflection* typeLayout,
         ShaderObjectLayoutBase** outLayout);
 
@@ -1361,6 +1360,7 @@ public:
 
 
     virtual Result createShaderObjectLayout(
+        slang::ISession* session,
         slang::TypeLayoutReflection* typeLayout,
         ShaderObjectLayoutBase** outLayout) = 0;
 

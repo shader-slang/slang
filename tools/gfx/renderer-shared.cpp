@@ -634,7 +634,7 @@ SLANG_NO_THROW Result SLANG_MCALL RendererBase::createShaderObjectFromTypeLayout
     slang::TypeLayoutReflection* typeLayout, IShaderObject** outObject)
 {
     RefPtr<ShaderObjectLayoutBase> shaderObjectLayout;
-    SLANG_RETURN_ON_FAIL(getShaderObjectLayout(typeLayout, shaderObjectLayout.writeRef()));
+    SLANG_RETURN_ON_FAIL(getShaderObjectLayout(slangContext.session, typeLayout, shaderObjectLayout.writeRef()));
     return createShaderObject(shaderObjectLayout, outObject);
 }
 
@@ -642,7 +642,7 @@ SLANG_NO_THROW Result SLANG_MCALL RendererBase::createMutableShaderObjectFromTyp
     slang::TypeLayoutReflection* typeLayout, IShaderObject** outObject)
 {
     RefPtr<ShaderObjectLayoutBase> shaderObjectLayout;
-    SLANG_RETURN_ON_FAIL(getShaderObjectLayout(typeLayout, shaderObjectLayout.writeRef()));
+    SLANG_RETURN_ON_FAIL(getShaderObjectLayout(slangContext.session, typeLayout, shaderObjectLayout.writeRef()));
     return createMutableShaderObject(shaderObjectLayout, outObject);
 }
 
@@ -738,18 +738,20 @@ Result RendererBase::getShaderObjectLayout(
     }
 
     auto typeLayout = session->getTypeLayout(type);
-    SLANG_RETURN_ON_FAIL(getShaderObjectLayout(typeLayout, outLayout));
+    SLANG_RETURN_ON_FAIL(getShaderObjectLayout(session, typeLayout, outLayout));
     (*outLayout)->m_slangSession = session;
     return SLANG_OK;
 }
 
 Result RendererBase::getShaderObjectLayout(
-    slang::TypeLayoutReflection* typeLayout, ShaderObjectLayoutBase** outLayout)
+    slang::ISession* session,
+    slang::TypeLayoutReflection* typeLayout,
+    ShaderObjectLayoutBase** outLayout)
 {
     RefPtr<ShaderObjectLayoutBase> shaderObjectLayout;
     if (!m_shaderObjectLayoutCache.tryGetValue(typeLayout, shaderObjectLayout))
     {
-        SLANG_RETURN_ON_FAIL(createShaderObjectLayout(typeLayout, shaderObjectLayout.writeRef()));
+        SLANG_RETURN_ON_FAIL(createShaderObjectLayout(session, typeLayout, shaderObjectLayout.writeRef()));
         m_shaderObjectLayoutCache.add(typeLayout, shaderObjectLayout);
     }
     *outLayout = shaderObjectLayout.detach();
@@ -851,9 +853,10 @@ void ShaderCache::addSpecializedPipeline(PipelineKey key, Slang::RefPtr<Pipeline
     specializedPipelines[key] = specializedPipeline;
 }
 
-void ShaderObjectLayoutBase::initBase(RendererBase* renderer, slang::TypeLayoutReflection* elementTypeLayout)
+void ShaderObjectLayoutBase::initBase(RendererBase* renderer, slang::ISession* session, slang::TypeLayoutReflection* elementTypeLayout)
 {
     m_renderer = renderer;
+    m_slangSession = session;
     m_elementTypeLayout = elementTypeLayout;
     m_componentID = m_renderer->shaderCache.getComponentId(m_elementTypeLayout->getType());
 }

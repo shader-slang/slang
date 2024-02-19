@@ -2582,8 +2582,15 @@ extern "C"
     SLANG_API SlangReflectionVariableLayout* spReflection_getGlobalParamsVarLayout(
         SlangReflection* reflection);
 
-#ifdef __cplusplus
 }
+#ifdef __cplusplus
+
+namespace slang
+{
+    struct ISession;
+}
+
+SLANG_API slang::ISession* spReflection_GetSession(SlangReflection* reflection);
 
 /* Helper interfaces for C++ users */
 namespace slang
@@ -3388,6 +3395,11 @@ namespace slang
             return spReflection_GetTypeParameterCount((SlangReflection*) this);
         }
 
+        slang::ISession* getSession()
+        {
+            return spReflection_GetSession((SlangReflection*)this);
+        }
+
         TypeParameterReflection* getTypeParameterByIndex(unsigned index)
         {
             return (TypeParameterReflection*)spReflection_GetTypeParameterByIndex((SlangReflection*) this, index);
@@ -3499,7 +3511,6 @@ namespace slang
     struct ITypeConformance;
     struct IGlobalSession;
     struct IModule;
-    struct ISession;
 
     struct SessionDesc;
     struct SpecializationArg;
