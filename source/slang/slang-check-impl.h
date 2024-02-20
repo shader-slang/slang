@@ -1957,6 +1957,12 @@ namespace Slang
 
         bool isTypeDifferentiable(Type* type);
 
+        bool doesTypeHaveTag(Type* type, TypeTag tag);
+
+        TypeTag getTypeTags(Type* type);
+
+        Type* getBufferElementType(Type* type);
+
             /// Check whether `subType` is a sub-type of `superTypeDeclRef`,
             /// and return a witness to the sub-type relationship if it holds
             /// (return null otherwise).

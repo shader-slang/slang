@@ -3232,6 +3232,9 @@ namespace Slang
                 inheritanceDecl->base = base;
 
                 AddMember(decl, inheritanceDecl);
+                
+                if (parser->pendingModifiers->hasModifier<ExternModifier>())
+                    addModifier(inheritanceDecl, parser->astBuilder->create<ExternModifier>());
 
             } while (AdvanceIf(parser, TokenType::Comma));
         }
@@ -4730,6 +4733,8 @@ namespace Slang
             // We allow for an inheritance clause on a `struct`
             // so that it can conform to interfaces.
             parseOptionalInheritanceClause(this, rs);
+            if (AdvanceIf(this, TokenType::Semicolon))
+                return rs;
             parseDeclBody(this, rs);
             return rs;
         });

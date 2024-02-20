@@ -657,17 +657,11 @@ bool isFromStdLib(Decl* decl)
 bool isImportedDecl(IRGenContext* context, Decl* decl)
 {
     // If the declaration has the extern attribute then it must be imported
-    // from another module
+    // from another module.
+    // Note that `extern` declarations will have a mangled name that does not
+    // include the module name so the linking step can resolve them correctly.
     //
-    // The [__extern] attribute is a very special case feature (aka "a hack") that allows a symbol to be declared
-    // as if it is part of the current module for AST purposes, but then expects to be imported from another IR module.
-    // For that linkage to work, both the exporting and importing modules must have the same name (which would
-    // usually indicate that they are the same module).
-    //
-    // Note that in practice for matching during linking uses the fully qualified name - including module name.
-    // Thus using extern __attribute isn't useful for symbols that are imported via `import`, only symbols
-    // that notionally come from the same module but are split into separate compilations (as can be done with -module-name)
-    if (decl->findModifier<ExternAttribute>())
+    if (decl->findModifier<ExternAttribute>() || decl->findModifier<ExternModifier>())
     {
         return true;
     }

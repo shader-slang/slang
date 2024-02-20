@@ -71,6 +71,9 @@
     <ClCompile Include="..\..\..\tools\gfx-unit-test\link-time-options.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\link-time-type.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\tools\gfx-unit-test\mutable-shader-object.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

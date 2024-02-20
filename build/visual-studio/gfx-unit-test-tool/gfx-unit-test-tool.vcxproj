@@ -305,6 +305,7 @@
     <ClCompile Include="..\..\..\tools\gfx-unit-test\instanced-draw-tests.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\link-time-constant.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\link-time-options.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\link-time-type.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\mutable-shader-object.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\nested-parameter-block.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\precompiled-module-2.cpp" />
