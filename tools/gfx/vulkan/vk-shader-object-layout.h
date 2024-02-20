@@ -134,11 +134,12 @@ public:
     struct Builder
     {
     public:
-        Builder(DeviceImpl* renderer)
-            : m_renderer(renderer)
+        Builder(DeviceImpl* renderer, slang::ISession* session)
+            : m_renderer(renderer), m_session(session)
         {}
 
         DeviceImpl* m_renderer;
+        slang::ISession* m_session;
         slang::TypeLayoutReflection* m_elementTypeLayout;
 
         /// The container type of this shader object. When `m_containerType` is
@@ -214,6 +215,7 @@ public:
 
     static Result createForElementType(
         DeviceImpl* renderer,
+        slang::ISession* session,
         slang::TypeLayoutReflection* elementType,
         ShaderObjectLayoutImpl** outLayout);
 
@@ -321,8 +323,8 @@ class EntryPointLayout : public ShaderObjectLayoutImpl
 public:
     struct Builder : Super::Builder
     {
-        Builder(DeviceImpl* device)
-            : Super::Builder(device)
+        Builder(DeviceImpl* device, slang::ISession* session)
+            : Super::Builder(device, session)
         {}
 
         Result build(EntryPointLayout** outLayout);
@@ -367,7 +369,7 @@ public:
             DeviceImpl* renderer,
             slang::IComponentType* program,
             slang::ProgramLayout* programLayout)
-            : Super::Builder(renderer)
+            : Super::Builder(renderer, program->getSession())
             , m_program(program)
             , m_programLayout(programLayout)
         {}

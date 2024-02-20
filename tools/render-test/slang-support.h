@@ -93,12 +93,12 @@ struct ShaderCompilerUtil
         Slang::String sourcePath;
     };
 
-    static SlangResult compileWithLayout(slang::ISession* session, const Options& options, const ShaderCompilerUtil::Input& input, OutputAndLayout& output);
+    static SlangResult compileWithLayout(slang::IGlobalSession* globalSession, const Options& options, const ShaderCompilerUtil::Input& input, OutputAndLayout& output);
 
     static SlangResult readSource(const Slang::String& inSourcePath, Slang::List<char>& outSourceText);
 
-    static SlangResult _compileProgramImpl(slang::ISession* session, const Options& options, const Input& input, const ShaderCompileRequest& request, Output& out);
-    static SlangResult compileProgram(slang::ISession* session, const Options& options, const Input& input, const ShaderCompileRequest& request, Output& out);
+    static SlangResult _compileProgramImpl(slang::IGlobalSession* globalSession, const Options& options, const Input& input, const ShaderCompileRequest& request, Output& out);
+    static SlangResult compileProgram(slang::IGlobalSession* globalSession, const Options& options, const Input& input, const ShaderCompileRequest& request, Output& out);
 };
 
 

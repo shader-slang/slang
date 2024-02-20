@@ -62,7 +62,6 @@ static gfx::DeviceType _toRenderType(Slang::RenderApiType apiType)
     {
         args.setArgs(argv, argc);
     }
-
     SLANG_RETURN_ON_FAIL(outOptions.downstreamArgs.stripDownstreamArgs(args, 0, &sink));
 
     CommandLineReader reader(&args, &sink);

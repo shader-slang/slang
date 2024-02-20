@@ -45,14 +45,7 @@ SlangResult SlangCTool::innerMain(StdWriters* stdWriters, slang::IGlobalSession*
     compileRequest->setDiagnosticCallback(&_diagnosticCallback, nullptr);
     compileRequest->setCommandLineCompilerMode();
 
-    {
-        const SlangResult res = compileRequest->processCommandLineArguments(&argv[1], argc - 1);
-        if (SLANG_FAILED(res))
-        {
-            StdWriters::getOut().print("%s", compileRequest->getDiagnosticOutput());
-            return res;
-        }
-    }
+    SLANG_RETURN_ON_FAIL(compileRequest->processCommandLineArguments(&argv[1], argc - 1));
 
     SlangResult compileRes = SLANG_OK;
 

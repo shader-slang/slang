@@ -79,7 +79,6 @@ struct FunctionParameterSpecializationContext
     // `specializeFunctionParameters` function.
     //
     CodeGenContext* codeGenContext;
-    TargetRequest*  targetRequest;
     IRModule*       module;
 
     // The condition on which parameters to specialize.
@@ -173,7 +172,7 @@ struct FunctionParameterSpecializationContext
         if(!func->isDefinition())
             return false;
         UnownedStringSlice def;
-        if (findTargetIntrinsicDefinition(func, targetRequest->getTargetCaps(), def))
+        if (findTargetIntrinsicDefinition(func, codeGenContext->getTargetReq()->getTargetCaps(), def))
             return false;
         // With the basic checks out of the way, there are
         // two conditions we care about:
@@ -891,7 +890,7 @@ struct FunctionParameterSpecializationContext
         //
         addCallsToWorkListRec(newFunc);
 
-        simplifyFunc(targetRequest, newFunc, IRSimplificationOptions::getFast());
+        simplifyFunc(codeGenContext->getTargetProgram(), newFunc, IRSimplificationOptions::getFast());
 
         return newFunc;
     }
@@ -908,7 +907,6 @@ bool specializeFunctionCalls(
 {
     FunctionParameterSpecializationContext context;
     context.codeGenContext = codeGenContext;
-    context.targetRequest = codeGenContext->getTargetReq();
     context.module = module;
     context.condition = condition;
 

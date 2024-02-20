@@ -73,6 +73,7 @@ public:
         IQueryPool** outPool) override;
 
     virtual Result createShaderObjectLayout(
+        slang::ISession* session,
         slang::TypeLayoutReflection* typeLayout,
         ShaderObjectLayoutBase** outLayout) override;
 

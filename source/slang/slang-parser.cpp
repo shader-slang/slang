@@ -7413,9 +7413,9 @@ namespace Slang
         ContainerDecl*                  parentDecl)
     {
         ParserOptions options = {};
-        options.enableEffectAnnotations = translationUnit->compileRequest->getLinkage()->getEnableEffectAnnotations();
+        options.enableEffectAnnotations = translationUnit->compileRequest->optionSet.getBoolOption(CompilerOptionName::EnableEffectAnnotations);
         options.allowGLSLInput = 
-            translationUnit->compileRequest->getLinkage()->getAllowGLSLInput() ||
+            translationUnit->compileRequest->optionSet.getBoolOption(CompilerOptionName::AllowGLSL) ||
             sourceLanguage == SourceLanguage::GLSL;
         options.isInLanguageServer = translationUnit->compileRequest->getLinkage()->isInLanguageServer();
 

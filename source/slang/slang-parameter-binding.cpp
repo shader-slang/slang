@@ -376,11 +376,12 @@ struct SharedParameterBindingContext
     SharedParameterBindingContext(
         LayoutRulesFamilyImpl*  defaultLayoutRules,
         ProgramLayout*          programLayout,
-        TargetRequest*          targetReq,
+        TargetProgram*          inTargetProgram,
         DiagnosticSink*         sink)
         : defaultLayoutRules(defaultLayoutRules)
         , programLayout(programLayout)
-        , targetRequest(targetReq)
+        , targetRequest(inTargetProgram->getTargetReq())
+        , targetProgram(inTargetProgram)
         , m_sink(sink)
     {
     }
@@ -388,7 +389,7 @@ struct SharedParameterBindingContext
     DiagnosticSink* m_sink = nullptr;
 
     // The program that we are laying out
-//    Program* program = nullptr;
+    // Program* program = nullptr;
 
     // The target request that is triggering layout
     //
@@ -396,6 +397,8 @@ struct SharedParameterBindingContext
     // just the subset of fields on the target that
     // can influence layout decisions.
     TargetRequest*  targetRequest = nullptr;
+
+    TargetProgram* targetProgram = nullptr;
 
     LayoutRulesFamilyImpl* defaultLayoutRules;
 
@@ -422,6 +425,7 @@ struct SharedParameterBindingContext
     TargetRequest* getTargetRequest() { return targetRequest; }
     DiagnosticSink* getSink() { return m_sink; }
     Linkage* getLinkage() { return targetRequest->getLinkage(); }
+    TargetProgram* getTargetProgram() { return targetProgram; }
 };
 
 static DiagnosticSink* getSink(SharedParameterBindingContext* shared)
@@ -447,6 +451,7 @@ struct ParameterBindingContext
     EntryPointLayout*   entryPointLayout = nullptr;
 
     TargetRequest* getTargetRequest() { return shared->getTargetRequest(); }
+    TargetProgram* getTargetProgram() { return shared->getTargetProgram(); }
     LayoutRulesFamilyImpl* getRulesFamily() { return layoutContext.getRulesFamily(); }
 
     ASTBuilder* getASTBuilder() { return shared->getLinkage()->getASTBuilder(); }
@@ -714,7 +719,7 @@ RefPtr<TypeLayout> getTypeLayoutForGlobalShaderParameter(
     // shader parameter.
     return createTypeLayoutWith(
         layoutContext,
-        rules->getConstantBufferRules(context->getTargetRequest()),
+        rules->getConstantBufferRules(context->getTargetRequest()->getOptionSet()),
         type);
 }
 
@@ -1107,7 +1112,7 @@ static void addExplicitParameterBindings_GLSL(
 
     // See if we can infer vulkan binding from HLSL if we have such options set, we know 
     // we can't map
-    auto hlslToVulkanLayoutOptions = context->getTargetRequest()->getHLSLToVulkanLayoutOptions();
+    auto hlslToVulkanLayoutOptions = context->getTargetProgram()->getHLSLToVulkanLayoutOptions();
 
     // If we have the options, but cannot infer bindings, we don't need to go further
     if (hlslToVulkanLayoutOptions == nullptr || !hlslToVulkanLayoutOptions->canInferBindings())
@@ -1559,7 +1564,7 @@ static RefPtr<TypeLayout> processSimpleEntryPointParameter(
             //
             if( isD3DTarget(context->getTargetRequest()) )
             {
-                auto version = context->getTargetRequest()->getTargetProfile().getVersion();
+                auto version = context->getTargetProgram()->getOptionSet().getProfileVersion();
                 if( version <= ProfileVersion::DX_5_0 )
                 {
                     // We will address the conflict here by claiming the corresponding
@@ -2238,7 +2243,7 @@ static RefPtr<TypeLayout> computeEntryPointParameterTypeLayout(
         //
         return createTypeLayoutWith(
             context->layoutContext,
-            context->getRulesFamily()->getConstantBufferRules(context->getTargetRequest()),
+            context->getRulesFamily()->getConstantBufferRules(context->getTargetRequest()->getOptionSet()),
             paramType);
     }
     else
@@ -2592,7 +2597,7 @@ static ParameterBindingAndKindInfo _allocateConstantBufferBinding(
     auto usedRangeSet = _getOrCreateUsedRangeSetForSpace(context, space);
 
     auto layoutInfo = context->getRulesFamily()
-                          ->getConstantBufferRules(context->getTargetRequest())
+                          ->getConstantBufferRules(context->getTargetRequest()->getOptionSet())
                           ->GetObjectLayout(ShaderParameterKind::ConstantBuffer, context->layoutContext.objectLayoutOptions);
 
     ParameterBindingAndKindInfo info;
@@ -2612,7 +2617,7 @@ static ParameterBindingAndKindInfo _assignConstantBufferBinding(
     auto usedRangeSet = _getOrCreateUsedRangeSetForSpace(context, space);
 
     auto layoutInfo = context->getRulesFamily()
-        ->getConstantBufferRules(context->getTargetRequest())
+        ->getConstantBufferRules(context->getTargetRequest()->getOptionSet())
         ->GetObjectLayout(ShaderParameterKind::ConstantBuffer, context->layoutContext.objectLayoutOptions);
 
     const Index count = Index(layoutInfo.size.getFiniteValue());
@@ -3555,7 +3560,7 @@ static bool _calcNeedsDefaultSpace(SharedParameterBindingContext& sharedContext)
                 {
                     // If it's uniform, but we have globals binding defined, we don't need a default space for it
                     // as it will go in the global binding specified
-                    if (auto hlslToVulkanOptions = sharedContext.getTargetRequest()->getHLSLToVulkanLayoutOptions())
+                    if (auto hlslToVulkanOptions = sharedContext.getTargetProgram()->getHLSLToVulkanLayoutOptions())
                     {
                         if (hlslToVulkanOptions->hasGlobalsBinding())
                         {
@@ -3628,7 +3633,7 @@ static void _appendRange(Index start, LayoutSize size, StringBuilder& ioBuf)
 static void _maybeApplyHLSLToVulkanShifts(
     ParameterBindingContext* paramContext,
     ParameterBindingAndKindInfo& globalConstantBinding,
-    TargetRequest* targetReq,
+    TargetProgram* targetProgram,
     DiagnosticSink* sink)
 {
     SLANG_UNUSED(sink);
@@ -3636,7 +3641,7 @@ static void _maybeApplyHLSLToVulkanShifts(
     SharedParameterBindingContext& sharedContext = *paramContext->shared;
 
     // We may need to finally do any shifting if we have HLSLToVulkanLayoutOptions
-    auto vulkanOptions = targetReq->getHLSLToVulkanLayoutOptions();
+    auto vulkanOptions = targetProgram->getHLSLToVulkanLayoutOptions();
     if (!vulkanOptions)
     {
         return;
@@ -3773,7 +3778,7 @@ RefPtr<ProgramLayout> generateParameterBindings(
     SharedParameterBindingContext sharedContext(
         layoutContext.getRulesFamily(),
         programLayout,
-        targetReq,
+        targetProgram,
         sink);
 
     // Create a sub-context to collect parameters that get
@@ -3917,7 +3922,7 @@ RefPtr<ProgramLayout> generateParameterBindings(
 
     // If we have a space/binding assigned for use for globals in Vulkan, 
     // we can't use *that* as the default space, so we allocate if
-    if (auto vulkanOptions = targetReq->getHLSLToVulkanLayoutOptions())
+    if (auto vulkanOptions = targetProgram->getHLSLToVulkanLayoutOptions())
     {
         const auto& globalBinding = vulkanOptions->getGlobalsBinding();
 
@@ -4041,7 +4046,7 @@ RefPtr<ProgramLayout> generateParameterBindings(
     _completeBindings(&context, program);
 
     // We may need to finally do any shifting if we have HLSLToVulkanLayoutOptions
-    _maybeApplyHLSLToVulkanShifts(&context, globalConstantBufferBinding, targetReq, sink);
+    _maybeApplyHLSLToVulkanShifts(&context, globalConstantBufferBinding, targetProgram, sink);
 
     // Next we need to create a type layout to reflect the information
     // we have collected, and we will use the `ScopeLayoutBuilder`
