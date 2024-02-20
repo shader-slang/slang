@@ -9,6 +9,6 @@
 namespace Slang
 {
     void inferAnyValueSizeWhereNecessary(
-        TargetRequest* targetReq,
+        TargetProgram* targetProgram,
         IRModule* module);
 }

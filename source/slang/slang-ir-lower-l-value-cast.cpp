@@ -209,24 +209,24 @@ struct LValueCastLoweringContext
         castInst->removeAndDeallocate();
     }
 
-    LValueCastLoweringContext(TargetRequest* targetRequest, IRModule* module):
-        m_targetReq(targetRequest),
+    LValueCastLoweringContext(TargetProgram* target, IRModule* module):
+        m_targetProgram(target),
         m_module(module)
     {
-        m_intermediateSourceLanguage = getIntermediateSourceLanguageForTarget(targetRequest);
+        m_intermediateSourceLanguage = getIntermediateSourceLanguageForTarget(target);
     }
 
     // The intermediate source language used to produce code for the target.
     // If no intermediate source language is used will be SourceLanguage::Unknown.
     SourceLanguage m_intermediateSourceLanguage = SourceLanguage::Unknown;
-    TargetRequest* m_targetReq;
+    TargetProgram* m_targetProgram;
     IRModule* m_module;
     OrderedHashSet<IRInst*> m_workList;
 };
 
-void lowerLValueCast(TargetRequest* targetReq, IRModule* module)
+void lowerLValueCast(TargetProgram* target, IRModule* module)
 { 
-    LValueCastLoweringContext context(targetReq, module);
+    LValueCastLoweringContext context(target, module);
     context.processModule();
 }
 

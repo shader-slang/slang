@@ -449,7 +449,7 @@ void ShaderObjectLayoutImpl::Builder::addBindingRanges(slang::TypeLayoutReflecti
                 auto varLayout = slangLeafTypeLayout->getElementVarLayout();
                 auto subTypeLayout = varLayout->getTypeLayout();
                 ShaderObjectLayoutImpl::createForElementType(
-                    m_renderer, subTypeLayout, subObjectLayout.writeRef());
+                    m_renderer, m_session, subTypeLayout, subObjectLayout.writeRef());
             }
             break;
 
@@ -457,7 +457,7 @@ void ShaderObjectLayoutImpl::Builder::addBindingRanges(slang::TypeLayoutReflecti
             if (auto pendingTypeLayout = slangLeafTypeLayout->getPendingDataTypeLayout())
             {
                 ShaderObjectLayoutImpl::createForElementType(
-                    m_renderer, pendingTypeLayout, subObjectLayout.writeRef());
+                    m_renderer, m_session, pendingTypeLayout, subObjectLayout.writeRef());
             }
             break;
         }
@@ -551,10 +551,11 @@ SlangResult ShaderObjectLayoutImpl::Builder::build(ShaderObjectLayoutImpl** outL
 
 Result ShaderObjectLayoutImpl::createForElementType(
     DeviceImpl* renderer,
+    slang::ISession* session,
     slang::TypeLayoutReflection* elementType,
     ShaderObjectLayoutImpl** outLayout)
 {
-    Builder builder(renderer);
+    Builder builder(renderer, session);
     builder.setElementTypeLayout(elementType);
 
     // When constructing a shader object layout directly from a reflected
@@ -618,7 +619,7 @@ Result ShaderObjectLayoutImpl::_init(Builder const* builder)
 {
     auto renderer = builder->m_renderer;
 
-    initBase(renderer, builder->m_elementTypeLayout);
+    initBase(renderer, builder->m_session, builder->m_elementTypeLayout);
 
     m_bindingRanges = builder->m_bindingRanges;
 
@@ -722,7 +723,7 @@ Result RootShaderObjectLayout::create(
     {
         auto slangEntryPoint = programLayout->getEntryPointByIndex(e);
 
-        EntryPointLayout::Builder entryPointBuilder(renderer);
+        EntryPointLayout::Builder entryPointBuilder(renderer, program->getSession());
         entryPointBuilder.addEntryPointParams(slangEntryPoint);
 
         RefPtr<EntryPointLayout> entryPointLayout;

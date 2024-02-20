@@ -24,6 +24,7 @@ struct ByteAddressBufferLegalizationContext
     // that control what constructs we legalize, and how.
     //
     Session* m_session = nullptr;
+    TargetProgram* m_targetProgram = nullptr;
     TargetRequest* m_target = nullptr;
     ByteAddressBufferLegalizationOptions m_options;
 
@@ -204,22 +205,22 @@ struct ByteAddressBufferLegalizationContext
         return false;
     }
 
-    SlangResult getOffset(TargetRequest* target, IRStructField* field, IRIntegerValue* outOffset)
+    SlangResult getOffset(TargetProgram* target, IRStructField* field, IRIntegerValue* outOffset)
     {
         if (target->getHLSLToVulkanLayoutOptions() && target->getHLSLToVulkanLayoutOptions()->shouldUseGLLayout())
         {
-            return getStd430Offset(target, field, outOffset);
+            return getStd430Offset(target->getOptionSet(), field, outOffset);
         }
-        return getNaturalOffset(target, field, outOffset);
+        return getNaturalOffset(target->getOptionSet(), field, outOffset);
     }
 
-    SlangResult getSizeAndAlignment(TargetRequest* target, IRType* type, IRSizeAndAlignment* outSizeAlignment)
+    SlangResult getSizeAndAlignment(TargetProgram* target, IRType* type, IRSizeAndAlignment* outSizeAlignment)
     {
         if (target->getHLSLToVulkanLayoutOptions() && target->getHLSLToVulkanLayoutOptions()->shouldUseGLLayout())
         {
-            return getStd430SizeAndAlignment(target, type, outSizeAlignment);
+            return getStd430SizeAndAlignment(target->getOptionSet(), type, outSizeAlignment);
         }
-        return getNaturalSizeAndAlignment(target, type, outSizeAlignment);
+        return getNaturalSizeAndAlignment(target->getOptionSet(), type, outSizeAlignment);
     }
 
     // The core workhorse routine for the load case is `emitLegalLoad`,
@@ -275,7 +276,7 @@ struct ByteAddressBufferLegalizationContext
                 // then we fail to legalize this load.
                 //
                 IRIntegerValue fieldOffset = 0;
-                SLANG_RETURN_NULL_ON_FAIL(getOffset(m_target, field, &fieldOffset));
+                SLANG_RETURN_NULL_ON_FAIL(getOffset(m_targetProgram, field, &fieldOffset));
 
                 // Otherwise, we load the field by recursively calling this function
                 // on the field type, with an adjusted immediate offset.
@@ -338,7 +339,7 @@ struct ByteAddressBufferLegalizationContext
                 auto rowCount = (Index)getIntVal(matType->getRowCount());
                 auto colVectorType = m_builder.getVectorType(matType->getElementType(), rowCount);
                 IRSizeAndAlignment colVectorSizeAlignment;
-                getSizeAndAlignment(m_target, colVectorType, &colVectorSizeAlignment);
+                getSizeAndAlignment(m_targetProgram, colVectorType, &colVectorSizeAlignment);
                 for (Index c = 0; c < colCount; c++)
                 {
                     auto colVector = emitLegalLoad(colVectorType, buffer, baseOffset, immediateOffset);
@@ -456,7 +457,7 @@ struct ByteAddressBufferLegalizationContext
         // the "stride" of the element type.
         //
         IRSizeAndAlignment elementLayout;
-        SLANG_RETURN_NULL_ON_FAIL(getNaturalSizeAndAlignment(m_target, elementType, &elementLayout));
+        SLANG_RETURN_NULL_ON_FAIL(getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), elementType, &elementLayout));
         IRIntegerValue elementStride = elementLayout.getStride();
 
         // We will collect all the element values into an array so
@@ -546,7 +547,7 @@ struct ByteAddressBufferLegalizationContext
                 auto offsetType = offset->getDataType();
 
                 IRSizeAndAlignment typeLayout;
-                SLANG_RETURN_NULL_ON_FAIL(getNaturalSizeAndAlignment(m_target, type, &typeLayout));
+                SLANG_RETURN_NULL_ON_FAIL(getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), type, &typeLayout));
                 auto typeStrideVal = typeLayout.getStride();
 
                 auto typeStrideInst = m_builder.getIntValue(offsetType, typeStrideVal);
@@ -858,7 +859,7 @@ struct ByteAddressBufferLegalizationContext
                 auto fieldType = field->getFieldType();
 
                 IRIntegerValue fieldOffset;
-                SLANG_RETURN_ON_FAIL(getOffset(m_target, field, &fieldOffset));
+                SLANG_RETURN_ON_FAIL(getOffset(m_targetProgram, field, &fieldOffset));
 
                 auto fieldVal = m_builder.emitFieldExtract(fieldType, value, field->getKey());
                 SLANG_RETURN_ON_FAIL(emitLegalStore(fieldType, buffer, baseOffset, immediateOffset + fieldOffset, fieldVal));
@@ -907,7 +908,7 @@ struct ByteAddressBufferLegalizationContext
                     auto colVectorType = m_builder.getVectorType(matType->getElementType(), rowCount);
                     auto colVector = m_builder.emitMakeVector(colVectorType, colVectorArgs);
                     IRSizeAndAlignment colVectorSizeAlignment;
-                    getSizeAndAlignment(m_target, colVectorType, &colVectorSizeAlignment);
+                    getSizeAndAlignment(m_targetProgram, colVectorType, &colVectorSizeAlignment);
                     emitLegalStore(colVectorType, buffer, baseOffset, immediateOffset, colVector);
                     immediateOffset += colVectorSizeAlignment.getStride();
                 }
@@ -967,7 +968,7 @@ struct ByteAddressBufferLegalizationContext
                 auto indexType = offset->getDataType();
 
                 IRSizeAndAlignment typeLayout;
-                SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(m_target, type, &typeLayout));
+                SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), type, &typeLayout));
 
                 auto typeStride = m_builder.getIntValue(indexType, typeLayout.getStride());
 
@@ -995,7 +996,7 @@ struct ByteAddressBufferLegalizationContext
         // We iterate over the elements and fetch then store each one.
         //
         IRSizeAndAlignment elementLayout;
-        SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(m_target, elementType, &elementLayout));
+        SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), elementType, &elementLayout));
         IRIntegerValue elementStride = elementLayout.getStride();
 
         auto indexType = m_builder.getIntType();
@@ -1013,14 +1014,15 @@ struct ByteAddressBufferLegalizationContext
 
 void legalizeByteAddressBufferOps(
     Session*                                    session,
-    TargetRequest*                              target,
+    TargetProgram*                              program,
     IRModule*                                   module,
     ByteAddressBufferLegalizationOptions const& options)
 {
     ByteAddressBufferLegalizationContext context;
     context.m_session = session;
-    context.m_target = target;
+    context.m_target = program->getTargetReq();
     context.m_options = options;
+    context.m_targetProgram = program;
     context.processModule(module);
 }
 

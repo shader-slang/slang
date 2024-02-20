@@ -106,10 +106,11 @@ namespace cpu
     }
 
     Result DeviceImpl::createShaderObjectLayout(
+        slang::ISession* session,
         slang::TypeLayoutReflection* typeLayout,
         ShaderObjectLayoutBase** outLayout)
     {
-        RefPtr<ShaderObjectLayoutImpl> cpuLayout = new ShaderObjectLayoutImpl(this, typeLayout);
+        RefPtr<ShaderObjectLayoutImpl> cpuLayout = new ShaderObjectLayoutImpl(this, session, typeLayout);
         returnRefPtrMove(outLayout, cpuLayout);
 
         return SLANG_OK;
@@ -166,7 +167,7 @@ namespace cpu
             if (!slangProgramLayout)
                 return SLANG_FAIL;
 
-            RefPtr<RootShaderObjectLayoutImpl> cpuProgramLayout = new RootShaderObjectLayoutImpl(this, slangProgramLayout);
+            RefPtr<RootShaderObjectLayoutImpl> cpuProgramLayout = new RootShaderObjectLayoutImpl(this, slangGlobalScope->getSession(), slangProgramLayout);
             cpuProgramLayout->m_programLayout = slangProgramLayout;
 
             cpuProgram->layout = cpuProgramLayout;

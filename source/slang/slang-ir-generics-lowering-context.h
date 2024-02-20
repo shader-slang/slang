@@ -22,7 +22,7 @@ namespace Slang
         // we are processing.
         IRModule* module;
 
-        TargetRequest* targetReq;
+        TargetProgram* targetProgram;
 
         DiagnosticSink* sink;
 

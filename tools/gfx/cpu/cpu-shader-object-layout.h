@@ -55,7 +55,7 @@ public:
     Index m_subObjectCount = 0;
     Index m_resourceCount = 0;
 
-    ShaderObjectLayoutImpl(RendererBase* renderer, slang::TypeLayoutReflection* layout);
+    ShaderObjectLayoutImpl(RendererBase* renderer, slang::ISession* session, slang::TypeLayoutReflection* layout);
 
     size_t getSize();
     Index getResourceCount() const;
@@ -73,8 +73,9 @@ private:
 public:
     EntryPointLayoutImpl(
         RendererBase*               renderer,
+        slang::ISession*            session,
         slang::EntryPointLayout*    entryPointLayout)
-        : ShaderObjectLayoutImpl(renderer, entryPointLayout->getTypeLayout())
+        : ShaderObjectLayoutImpl(renderer, session, entryPointLayout->getTypeLayout())
         , m_entryPointLayout(entryPointLayout)
     {}
 
@@ -87,7 +88,7 @@ public:
     slang::ProgramLayout* m_programLayout = nullptr;
     List<RefPtr<EntryPointLayoutImpl>> m_entryPointLayouts;
 
-    RootShaderObjectLayoutImpl(RendererBase* renderer, slang::ProgramLayout* programLayout);
+    RootShaderObjectLayoutImpl(RendererBase* renderer, slang::ISession* session, slang::ProgramLayout* programLayout);
 
     int getKernelIndex(UnownedStringSlice kernelName);
     void getKernelThreadGroupSize(int kernelIndex, UInt* threadGroupSizes);

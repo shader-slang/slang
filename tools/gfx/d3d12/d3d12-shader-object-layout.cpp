@@ -50,10 +50,11 @@ bool ShaderObjectLayoutImpl::isBindingRangeRootParameter(
 
 Result ShaderObjectLayoutImpl::createForElementType(
     RendererBase* renderer,
+    slang::ISession* session,
     slang::TypeLayoutReflection* elementType,
     ShaderObjectLayoutImpl** outLayout)
 {
-    Builder builder(renderer);
+    Builder builder(renderer, session);
     builder.setElementTypeLayout(elementType);
     return builder.build(outLayout);
 }
@@ -62,7 +63,7 @@ Result ShaderObjectLayoutImpl::init(Builder* builder)
 {
     auto renderer = builder->m_renderer;
 
-    initBase(renderer, builder->m_elementTypeLayout);
+    initBase(renderer, builder->m_session,  builder->m_elementTypeLayout);
 
     m_containerType = builder->m_containerType;
 
@@ -223,13 +224,14 @@ Result ShaderObjectLayoutImpl::Builder::setElementTypeLayout(
         {
             if (auto pendingTypeLayout = slangLeafTypeLayout->getPendingDataTypeLayout())
             {
-                createForElementType(m_renderer, pendingTypeLayout, subObjectLayout.writeRef());
+                createForElementType(m_renderer, m_session, pendingTypeLayout, subObjectLayout.writeRef());
             }
         }
         else
         {
             createForElementType(
                 m_renderer,
+                m_session,
                 slangLeafTypeLayout->getElementTypeLayout(),
                 subObjectLayout.writeRef());
         }
@@ -982,7 +984,7 @@ Result RootShaderObjectLayoutImpl::create(
         auto slangEntryPoint = programLayout->getEntryPointByIndex(e);
         RefPtr<ShaderObjectLayoutImpl> entryPointLayout;
         SLANG_RETURN_ON_FAIL(ShaderObjectLayoutImpl::createForElementType(
-            device, slangEntryPoint->getTypeLayout(), entryPointLayout.writeRef()));
+            device, program->getSession(), slangEntryPoint->getTypeLayout(), entryPointLayout.writeRef()));
         builder.addEntryPoint(slangEntryPoint->getStage(), entryPointLayout);
     }
 

@@ -3,9 +3,9 @@
 // Unfortunately CPU and CUDA only work with row layout, so they have to be disabled here.
 
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type -compile-arg -O3 -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type -dx12 -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type -shaderobj -Xslang -matrix-layout-column-major
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type -dx12 -shaderobj -Xslang -matrix-layout-column-major
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -shaderobj -Xslang -matrix-layout-column-major
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -shaderobj
 
 // This data is in column major layout order.... 

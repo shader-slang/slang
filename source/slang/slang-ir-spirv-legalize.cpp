@@ -97,14 +97,14 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         if (m_loweredStructuredBufferTypes.tryGetValue(inst, result))
             return result;
 
-        auto layoutRules = getTypeLayoutRuleForBuffer(m_sharedContext->m_targetRequest, inst);
+        auto layoutRules = getTypeLayoutRuleForBuffer(m_sharedContext->m_targetProgram, inst);
 
         IRBuilder builder(m_sharedContext->m_irModule);
 
         builder.setInsertBefore(inst);
         auto elementType = inst->getElementType();
         IRSizeAndAlignment elementSize;
-        getSizeAndAlignment(m_sharedContext->m_targetRequest, layoutRules, elementType, &elementSize);
+        getSizeAndAlignment(m_sharedContext->m_targetProgram->getOptionSet(), layoutRules, elementType, &elementSize);
         elementSize = layoutRules->alignCompositeElement(elementSize);
 
         const auto arrayType = builder.getUnsizedArrayType(inst->getElementType(), builder.getIntValue(builder.getIntType(), elementSize.getStride()));
@@ -112,7 +112,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         const auto arrayKey = builder.createStructKey();
         builder.createStructField(structType, arrayKey, arrayType);
         IRSizeAndAlignment structSize;
-        getSizeAndAlignment(m_sharedContext->m_targetRequest, layoutRules, structType, &structSize);
+        getSizeAndAlignment(m_sharedContext->m_targetProgram->getOptionSet(), layoutRules, structType, &structSize);
 
         StringBuilder nameSb;
         switch (inst->getOp())
@@ -190,9 +190,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         builder.setInsertBefore(cbParamInst);
         auto newCbType = builder.getType(cbParamInst->getDataType()->getOp(), structType);
         cbParamInst->setFullType(newCbType);
-        auto rules = getTypeLayoutRuleForBuffer(m_sharedContext->m_targetRequest, cbParamInst->getDataType());
+        auto rules = getTypeLayoutRuleForBuffer(m_sharedContext->m_targetProgram, cbParamInst->getDataType());
         IRSizeAndAlignment sizeAlignment;
-        getSizeAndAlignment(m_sharedContext->m_targetRequest, rules, structType, &sizeAlignment);
+        getSizeAndAlignment(m_sharedContext->m_targetProgram->getOptionSet(), rules, structType, &sizeAlignment);
         traverseUses(cbParamInst, [&](IRUse* use)
         {
             builder.setInsertBefore(use->getUser());
@@ -2099,7 +2099,7 @@ void buildEntryPointReferenceGraph(SPIRVEmitSharedContext* context, IRModule* mo
         visit(workList[i].entryPoint, workList[i].inst);
 }
 
-void simplifyIRForSpirvLegalization(TargetRequest* target, DiagnosticSink* sink, IRModule* module)
+void simplifyIRForSpirvLegalization(TargetProgram* target, DiagnosticSink* sink, IRModule* module)
 {
     bool changed = true;
     const int kMaxIterations = 8;
@@ -2147,7 +2147,7 @@ void legalizeIRForSPIRV(
 {
     SLANG_UNUSED(entryPoints);
     legalizeSPIRV(context, module);
-    simplifyIRForSpirvLegalization(context->m_targetRequest, codeGenContext->getSink(), module);
+    simplifyIRForSpirvLegalization(context->m_targetProgram, codeGenContext->getSink(), module);
     buildEntryPointReferenceGraph(context, module);
 }
 

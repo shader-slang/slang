@@ -15,6 +15,9 @@ https://github.com/microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#des
 
 Options that allow for infering Vulkan bindings based on HLSL register bindings
   */
+
+struct CompilerOptionSet;
+
 struct HLSLToVulkanLayoutOptions : public RefObject
 {
 public:
@@ -61,7 +64,7 @@ public:
             /// Constant buffer (b)
             /// 
             /// ConstantBufferViews, CBuffer
-        ConstantBuffer,     
+        ConstantBuffer,
 
         CountOf,
     };
@@ -156,6 +159,8 @@ public:
     void setUseGLLayout(bool value) { m_useGLLayout = value; }
 
     void setEmitSPIRVReflectionInfo(bool value) { m_emitSPIRVReflectionInfo = value; }
+
+    void loadFromOptionSet(CompilerOptionSet& optionSet);
 
         /// Ctor
     HLSLToVulkanLayoutOptions();

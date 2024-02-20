@@ -17,7 +17,7 @@ namespace Slang
 {
     // Run a combination of SSA, SCCP, SimplifyCFG, and DeadCodeElimination pass
     // until no more changes are possible.
-    void simplifyIR(TargetRequest* target, IRModule* module, IRSimplificationOptions options, DiagnosticSink* sink)
+    void simplifyIR(TargetProgram* target, IRModule* module, IRSimplificationOptions options, DiagnosticSink* sink)
     {
         SLANG_PROFILE;
         bool changed = true;
@@ -68,7 +68,7 @@ namespace Slang
         }
     }
 
-    void simplifyNonSSAIR(TargetRequest* target, IRModule* module, IRSimplificationOptions options)
+    void simplifyNonSSAIR(TargetProgram* target, IRModule* module, IRSimplificationOptions options)
     {
         bool changed = true;
         const int kMaxIterations = 8;
@@ -90,7 +90,7 @@ namespace Slang
     }
 
 
-    void simplifyFunc(TargetRequest* target, IRGlobalValueWithCode* func, IRSimplificationOptions options, DiagnosticSink* sink)
+    void simplifyFunc(TargetProgram* target, IRGlobalValueWithCode* func, IRSimplificationOptions options, DiagnosticSink* sink)
     {
         bool changed = true;
         const int kMaxIterations = 8;

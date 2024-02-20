@@ -563,6 +563,11 @@ namespace Slang
             return m_sink;
         }
 
+        CompilerOptionSet& getOptionSet()
+        {
+            return m_linkage->m_optionSet;
+        }
+
         // We need to track what has been `import`ed into
         // the scope of this semantic checking session,
         // and also to avoid importing the same thing more
@@ -975,7 +980,10 @@ namespace Slang
             : Super(context)
         {}
 
-
+        CompilerOptionSet& getOptionSet()
+        {
+            return getShared()->getOptionSet();
+        }
     public:
         // Translate Types
 

@@ -376,6 +376,27 @@ Result DebugDevice::createShaderObject(
     return result;
 }
 
+Result DebugDevice::createShaderObject2(
+    slang::ISession* session,
+    slang::TypeReflection* type,
+    ShaderObjectContainerType containerType,
+    IShaderObject** outShaderObject)
+{
+    SLANG_GFX_API_FUNC;
+
+    RefPtr<DebugShaderObject> outObject = new DebugShaderObject();
+    auto typeName = type->getName();
+    auto result =
+        baseObject->createShaderObject2(session, type, containerType, outObject->baseObject.writeRef());
+    outObject->m_typeName = typeName;
+    outObject->m_device = this;
+    outObject->m_slangType = type;
+    if (SLANG_FAILED(result))
+        return result;
+    returnComPtr(outShaderObject, outObject);
+    return result;
+}
+
 Result DebugDevice::createMutableShaderObject(
     slang::TypeReflection* type,
     ShaderObjectContainerType containerType,
@@ -387,6 +408,27 @@ Result DebugDevice::createMutableShaderObject(
     auto typeName = type->getName();
     auto result =
         baseObject->createMutableShaderObject(type, containerType, outObject->baseObject.writeRef());
+    outObject->m_typeName = typeName;
+    outObject->m_device = this;
+    outObject->m_slangType = type;
+    if (SLANG_FAILED(result))
+        return result;
+    returnComPtr(outShaderObject, outObject);
+    return result;
+}
+
+Result DebugDevice::createMutableShaderObject2(
+    slang::ISession* session,
+    slang::TypeReflection* type,
+    ShaderObjectContainerType containerType,
+    IShaderObject** outShaderObject)
+{
+    SLANG_GFX_API_FUNC;
+
+    RefPtr<DebugShaderObject> outObject = new DebugShaderObject();
+    auto typeName = type->getName();
+    auto result =
+        baseObject->createMutableShaderObject2(session, type, containerType, outObject->baseObject.writeRef());
     outObject->m_typeName = typeName;
     outObject->m_device = this;
     outObject->m_slangType = type;
