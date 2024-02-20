@@ -684,7 +684,7 @@ public:
         {
         public:
             Builder(RendererBase* renderer, slang::ISession* session)
-                : m_renderer(renderer)
+                : m_renderer(renderer), m_session(session)
             {}
 
             RendererBase* m_renderer;
