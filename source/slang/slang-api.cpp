@@ -204,7 +204,6 @@ SLANG_API SlangCompileRequest* spCreateCompileRequest(
     slang::ICompileRequest* request = nullptr;
     // Will return with suitable ref count
     session->createCompileRequest(&request);
-
     return request;
 }
 

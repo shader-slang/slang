@@ -2470,12 +2470,12 @@ void FrontEndCompileRequest::parseTranslationUnit(
             break;
         }
 
-        if (outputIncludes)
+        if (optionSet.getBoolOption(CompilerOptionName::OutputIncludes))
         {
             _outputIncludes(translationUnit->getSourceFiles(), getSink()->getSourceManager(), getSink());
         }
 
-        if (outputPreprocessor)
+        if (optionSet.getBoolOption(CompilerOptionName::PreprocessorOutput))
         {
             if (m_writers)
             {
@@ -2496,7 +2496,7 @@ void FrontEndCompileRequest::parseTranslationUnit(
 
         // Let's try dumping
 
-        if (shouldDumpAST)
+        if (optionSet.getBoolOption(CompilerOptionName::DumpAst))
         {
             StringBuilder buf;
             SourceWriter writer(linkage->getSourceManager(), LineDirectiveMode::None, nullptr);
@@ -2672,7 +2672,7 @@ SlangResult FrontEndCompileRequest::executeActionsInner()
         parseTranslationUnit(translationUnit);
     }
 
-    if (outputPreprocessor)
+    if (optionSet.getBoolOption(CompilerOptionName::PreprocessorOutput))
     {
         // If doing pre-processor output, then we are done
         return SLANG_OK;
@@ -2687,7 +2687,7 @@ SlangResult FrontEndCompileRequest::executeActionsInner()
         return SLANG_FAIL;
 
     // After semantic checking is performed we can try and output doc information for this
-    if (shouldDocument)
+    if (optionSet.getBoolOption(CompilerOptionName::Doc))
     {
         // Not 100% clear where best to get the ASTBuilder from, but from the linkage shouldn't
         // cause any problems with scoping
@@ -2845,7 +2845,7 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
         SLANG_RETURN_ON_FAIL(getFrontEndReq()->executeActionsInner());
     }
 
-    if (getFrontEndReq()->outputPreprocessor)
+    if (getOptionSet().getBoolOption(CompilerOptionName::PreprocessorOutput))
     {
         return SLANG_OK;
     }

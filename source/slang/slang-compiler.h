@@ -2093,14 +2093,6 @@ namespace Slang
         ISlangFileSystemExt* getFileSystemExt() { return getLinkage()->getFileSystemExt(); }
         SlangResult loadFile(String const& path, PathInfo& outPathInfo, ISlangBlob** outBlob) { return getLinkage()->loadFile(path, outPathInfo, outBlob); }
 
-        bool shouldDumpAST = false;
-        bool shouldDocument = false;
-
-        bool outputPreprocessor = false;
-
-            /// If true will after lexical analysis output the hierarchy of includes to stdout
-        bool outputIncludes = false;
-
     protected:
         CompileRequestBase(
             Linkage*        linkage,

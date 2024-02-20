@@ -1666,6 +1666,9 @@ SlangResult OptionsParser::_parse(
             case OptionKind::MatrixLayoutColumn:
             case OptionKind::DefaultImageFormatUnknown:
             case OptionKind::Obfuscate:
+            case OptionKind::OutputIncludes:
+            case OptionKind::PreprocessorOutput:
+            case OptionKind::DumpAst:
                 linkage->m_optionSet.set(optionKind, true); break;
                 break;
             case OptionKind::NoCodeGen:
@@ -1728,16 +1731,13 @@ SlangResult OptionsParser::_parse(
                 linkage->m_optionSet.set(CompilerOptionName::DumpIntermediatePrefix, prefix.value);
                 break;
             }
-            case OptionKind::OutputIncludes: m_frontEndReq->outputIncludes = true; break;
-            case OptionKind::PreprocessorOutput: m_frontEndReq->outputPreprocessor = true; break;
-            case OptionKind::DumpAst: m_frontEndReq->shouldDumpAST = true; break;
             case OptionKind::Doc:
             {
                 // If compiling stdlib is enabled, will write out documentation
                 m_compileStdLibFlags |= slang::CompileStdLibFlag::WriteDocumentation;
 
                 // Enable writing out documentation on the req
-                m_frontEndReq->shouldDocument = true;
+                linkage->m_optionSet.set(CompilerOptionName::Doc, true);
                 break;
             }
             case OptionKind::DumpRepro:
