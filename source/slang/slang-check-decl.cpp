@@ -302,6 +302,8 @@ namespace Slang
         void visitFunctionDeclBase(FunctionDeclBase* funcDecl);
 
         void visitParamDecl(ParamDecl* paramDecl);
+
+        void visitAggTypeDecl(AggTypeDecl* aggTypeDecl);
     };
 
     template<typename VisitorType>
@@ -1705,6 +1707,15 @@ namespace Slang
             }
         }
 
+        // Propagate type tags.
+        if (auto parentAggTypeDecl = as<AggTypeDecl>(getParentDecl(varDecl)))
+        {
+            if (auto varDeclRefType = as<DeclRefType>(varDecl->type.type))
+            {
+                parentAggTypeDecl->unionTagsWith(getTypeTags(varDecl->type.type));
+            }
+        }
+
         checkVisibility(varDecl);
     }
 
@@ -1722,11 +1733,20 @@ namespace Slang
         {
             addModifier(structDecl, m_astBuilder->create<NVAPIMagicModifier>());
         }
+
+        if (structDecl->hasModifier<ExternModifier>())
+        {
+            structDecl->addTag(TypeTag::Incomplete);
+        }
         checkVisibility(structDecl);
     }
 
     void SemanticsDeclHeaderVisitor::visitClassDecl(ClassDecl* classDecl)
     {
+        if (classDecl->hasModifier<ExternModifier>())
+        {
+            classDecl->addTag(TypeTag::Incomplete);
+        }
         checkVisibility(classDecl);
     }
 
@@ -1810,6 +1830,13 @@ namespace Slang
                 // code generation.
                 //
                 varDecl->initExpr = CompleteOverloadCandidate(overloadContext, *overloadContext.bestCandidate);
+            }
+        }
+        if (auto elementType = getBufferElementType(varDecl->getType()))
+        {
+            if (doesTypeHaveTag(elementType, TypeTag::Incomplete))
+            {
+                getSink()->diagnose(varDecl->type.exp->loc, Diagnostics::incompleteTypeCannotBeUsedInBuffer, elementType);
             }
         }
         maybeRegisterDifferentiableType(getASTBuilder(), varDecl->getType());
@@ -4784,6 +4811,9 @@ namespace Slang
         SubtypeWitness*             subIsSuperWitness,
         WitnessTable*               witnessTable)
     {
+        if (witnessTable->isExtern)
+            return true;
+
         if (auto supereclRefType = as<DeclRefType>(superType))
         {
             auto superTypeDeclRef = supereclRefType->getDeclRef();
@@ -4896,6 +4926,7 @@ namespace Slang
             witnessTable = new WitnessTable();
             witnessTable->baseType = superType;
             witnessTable->witnessedType = subType;
+            witnessTable->isExtern = parentDecl->hasModifier<ExternModifier>();
             inheritanceDecl->witnessTable = witnessTable;
         }
 
@@ -5179,6 +5210,7 @@ namespace Slang
         // order) is allowed to declare a base `class` type.
         //
         SLANG_OUTER_SCOPE_CONTEXT_DECL_RAII(this, decl);
+
         Index inheritanceClauseCounter = 0;
         for (auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
         {
@@ -6541,6 +6573,14 @@ namespace Slang
             {
                 getSink()->diagnose(initExpr, Diagnostics::outputParameterCannotHaveDefaultValue);
             }
+        }
+    }
+
+    void SemanticsDeclBodyVisitor::visitAggTypeDecl(AggTypeDecl* aggTypeDecl)
+    {
+        if (aggTypeDecl->hasTag(TypeTag::Incomplete) && aggTypeDecl->hasModifier<HLSLExportModifier>())
+        {
+            getSink()->diagnose(aggTypeDecl->loc, Diagnostics::cannotExportIncompleteType, aggTypeDecl);
         }
     }
 

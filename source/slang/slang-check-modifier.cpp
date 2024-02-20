@@ -1109,7 +1109,8 @@ namespace Slang
         case ASTNodeType::HLSLExportModifier:
         case ASTNodeType::ExternCppModifier:
             return as<VarDeclBase>(decl) || as<AggTypeDeclBase>(decl) || as<NamespaceDeclBase>(decl) || as<CallableDecl>(decl)
-                || as<TypeDefDecl>(decl) || as<PropertyDecl>(decl) || as<SyntaxDecl>(decl) || as<AttributeDecl>(decl);
+                || as<TypeDefDecl>(decl) || as<PropertyDecl>(decl) || as<SyntaxDecl>(decl) || as<AttributeDecl>(decl)
+                || as<InheritanceDecl>(decl);
 
         case ASTNodeType::ExportedModifier:
             return as<ImportDecl>(decl);

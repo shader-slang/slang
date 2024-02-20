@@ -343,6 +343,10 @@ struct ASTDumpContext
     {
         m_writer->emit((int)v);
     }
+    void dump(TypeTag tag)
+    {
+        m_writer->emit((int)tag);
+    }
     void dump(const String& string)
     {
         dump(string.getUnownedSlice());
