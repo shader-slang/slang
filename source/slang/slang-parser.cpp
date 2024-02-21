@@ -105,7 +105,8 @@ namespace Slang
         int sameTokenPeekedTimes = 0;
 
         Scope* outerScope = nullptr;
-        Scope* currentScope = nullptr;
+        Scope* currentLookupScope = nullptr; // Scope where expr lookup should initiate from.
+        Scope* currentScope = nullptr; // Scope where new decl definitions should be inserted into.
         ModuleDecl* currentModule = nullptr;
 
         bool hasSeenCompletionToken = false;
@@ -126,20 +127,20 @@ namespace Slang
         {
             node->loc = tokenReader.peekLoc();
         }
+
+        void resetLookupScope()
+        {
+            currentLookupScope = currentScope;
+        }
+
         void PushScope(ContainerDecl* containerDecl)
         {
-            // TODO(JS):
-            // 
-            // Previously Scope was ref counted. This meant that if a scope was pushed, but not used when popped
-            // it's memory would be freed.
-            //
-            // Here the memory is consumed and will not be freed until the astBuilder goes out of scope.
-
             Scope* newScope = astBuilder->create<Scope>();
             newScope->containerDecl = containerDecl;
             newScope->parent = currentScope;
             currentScope = newScope;
             containerDecl->ownedScope = newScope;
+            resetLookupScope();
         }
 
         void pushScopeAndSetParent(ContainerDecl* containerDecl)
@@ -151,6 +152,7 @@ namespace Slang
         void PopScope()
         {
             currentScope = currentScope->parent;
+            resetLookupScope();
         }
 
         ModuleDecl* getCurrentModuleDecl()
@@ -2554,7 +2556,7 @@ namespace Slang
         Token typeName = parser->ReadToken(TokenType::Identifier);
 
         auto basicType = parser->astBuilder->create<VarExpr>();
-        basicType->scope = parser->currentScope;
+        basicType->scope = parser->currentLookupScope;
         basicType->loc = typeName.loc;
         basicType->name = typeName.getNameOrNull();
 
@@ -5591,9 +5593,9 @@ namespace Slang
     {
         ParamDecl* parameter = astBuilder->create<ParamDecl>();
         parameter->modifiers = ParseModifiers(this);
-
+        currentLookupScope = currentScope->parent;
         _parseTraditionalParamDeclCommonBase(this, parameter, kDeclaratorParseOption_AllowEmpty);
-
+        resetLookupScope();
         return parameter;
     }
 
