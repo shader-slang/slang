@@ -248,14 +248,14 @@ namespace Slang
         return SourceLoc();
     }
 
-    void SemanticsVisitor::addSiblingScopeForContainerDecl(ContainerDecl* dest, ContainerDecl* source)
+    void addSiblingScopeForContainerDecl(ASTBuilder* builder, ContainerDecl* dest, ContainerDecl* source)
     {
-        addSiblingScopeForContainerDecl(dest->ownedScope, source);
+        addSiblingScopeForContainerDecl(builder, dest->ownedScope, source);
     }
 
-    void SemanticsVisitor::addSiblingScopeForContainerDecl(Scope* destScope, ContainerDecl* source)
+    void addSiblingScopeForContainerDecl(ASTBuilder* builder, Scope* destScope, ContainerDecl* source)
     {
-        auto subScope = getASTBuilder()->create<Scope>();
+        auto subScope = builder->create<Scope>();
         subScope->containerDecl = source;
 
         subScope->nextSibling = destScope->nextSibling;

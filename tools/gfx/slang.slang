@@ -331,17 +331,7 @@ public struct TargetDesc
 
 public enum SessionFlags
 {
-    kSessionFlags_None = 0,
-
-    /** Use application-specific policy for semantics of the `shared` keyword.
-
-    This is a legacy/compatibility flag to help an existing Slang client
-    migrate to new language features, and should *not* be used by other
-    clients. This feature may be removed in a future release without a
-    deprecation warning, and this bit may be re-used for another feature.
-    You have been warned.
-    */
-    kSessionFlag_FalcorCustomSharedKeywordSemantics = 1 << 0,
+    kSessionFlags_None = 0
 };
 
 public struct PreprocessorMacroDesc

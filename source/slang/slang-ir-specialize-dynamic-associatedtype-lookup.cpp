@@ -157,10 +157,6 @@ struct AssociatedTypeLookupSpecializationContext
         IRBuilder builder(sharedContext->module);
         builder.setInsertBefore(inst);
         auto witnessTableArg = inst->getWitnessTable();
-        if (witnessTableArg->getDataType()->getOp() == kIROp_WitnessTableType)
-        {
-            witnessTableArg = builder.emitGetSequentialIDInst(witnessTableArg);
-        }
         auto callInst = builder.emitCallInst(
             builder.getWitnessTableIDType(interfaceType), func, witnessTableArg);
         inst->replaceUsesWith(callInst);

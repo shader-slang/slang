@@ -243,7 +243,7 @@ namespace Slang
             // Don't process intrinsic functions.
             UnownedStringSlice intrinsicDef;
             if (findTargetIntrinsicDefinition(getResolvedInstForDecorations(loweredFunc),
-                sharedContext->targetReq->getTargetCaps(), intrinsicDef))
+                sharedContext->targetProgram->getTargetReq()->getTargetCaps(), intrinsicDef))
                 return;
 
             // All callees should have already been lowered in lower-generic-functions pass.

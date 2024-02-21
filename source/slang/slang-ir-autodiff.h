@@ -59,7 +59,7 @@ struct DiffTranscriberSet
 
 struct AutoDiffSharedContext
 {
-    TargetRequest* targetRequest = nullptr;
+    TargetProgram* targetProgram = nullptr;
 
     IRModuleInst* moduleInst = nullptr;
 
@@ -115,7 +115,7 @@ struct AutoDiffSharedContext
 
     DiffTranscriberSet transcriberSet;
 
-    AutoDiffSharedContext(TargetRequest* target, IRModuleInst* inModuleInst);
+    AutoDiffSharedContext(TargetProgram* target, IRModuleInst* inModuleInst);
 
 private:
 
@@ -359,12 +359,12 @@ struct IRAutodiffPassOptions
 };
 
 bool processAutodiffCalls(
-    TargetRequest* target,
+    TargetProgram* target,
     IRModule*                           module,
     DiagnosticSink*                     sink,
     IRAutodiffPassOptions const&   options = IRAutodiffPassOptions());
 
-bool finalizeAutoDiffPass(TargetRequest* target, IRModule* module);
+bool finalizeAutoDiffPass(TargetProgram* target, IRModule* module);
 
 // Utility methods
 

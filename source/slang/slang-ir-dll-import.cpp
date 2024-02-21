@@ -13,7 +13,7 @@ struct DllImportContext
 {
     IRModule* module;
     DiagnosticSink* diagnosticSink;
-    TargetRequest* targetReq;
+    TargetProgram* targetProgram;
 
     IRFunc* loadDllFunc = nullptr;
     IRFunc* loadFuncPtrFunc = nullptr;
@@ -91,7 +91,7 @@ struct DllImportContext
         for (auto param : func->getParams())
         {
             IRSizeAndAlignment sizeAndAlignment;
-            getNaturalSizeAndAlignment(targetReq, param->getDataType(), &sizeAndAlignment);
+            getNaturalSizeAndAlignment(targetProgram->getOptionSet(), param->getDataType(), &sizeAndAlignment);
             result += (uint32_t)align(sizeAndAlignment.size, 4);
         }
         return result;
@@ -188,11 +188,11 @@ struct DllImportContext
     }
 };
 
-void generateDllImportFuncs(TargetRequest* targetReq, IRModule* module, DiagnosticSink* sink)
+void generateDllImportFuncs(TargetProgram* targetProgram, IRModule* module, DiagnosticSink* sink)
 {
     DllImportContext context;
     context.module = module;
-    context.targetReq = targetReq;
+    context.targetProgram = targetProgram;
     context.diagnosticSink = sink;
     return context.processModule();
 }

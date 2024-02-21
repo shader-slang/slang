@@ -5,11 +5,11 @@ namespace Slang
 {
 struct IRModule;
 class DiagnosticSink;
-class TargetRequest;
+class TargetProgram;
 
     /// Specialize generic and interface-based code to use concrete types.
 bool specializeModule(
-    TargetRequest* target,
+    TargetProgram* target,
     IRModule*   module,
     DiagnosticSink* sink);
 

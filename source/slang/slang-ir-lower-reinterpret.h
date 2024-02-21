@@ -8,9 +8,9 @@ namespace Slang
 {
 
 struct IRModule;
-class TargetRequest;
+class TargetProgram;
 class DiagnosticSink;
 
-void lowerReinterpret(TargetRequest* targetReq, IRModule* module, DiagnosticSink* sink);
+void lowerReinterpret(TargetProgram* targetReq, IRModule* module, DiagnosticSink* sink);
 
 }
