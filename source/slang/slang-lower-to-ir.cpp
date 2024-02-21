@@ -7872,8 +7872,18 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         UInt operandCount = 0;
         for (auto requirementDecl : decl->members)
         {
+            if (as<SubscriptDecl>(requirementDecl) || as<PropertyDecl>(requirementDecl))
+            {
+                for (auto accessorDecl : as<ContainerDecl>(requirementDecl)->members)
+                {
+                    if (as<AccessorDecl>(accessorDecl))
+                        operandCount++;
+                }
+            }
             if (!shouldDeclBeTreatedAsInterfaceRequirement(requirementDecl))
+            {
                 continue;
+            }
 
             operandCount++;
             // As a special case, any type constraints placed
@@ -7911,29 +7921,26 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
 
         UInt entryIndex = 0;
-
-        for (auto requirementDecl : decl->members)
-        {
-            auto requirementKey = getInterfaceRequirementKey(requirementDecl);
-            if (!requirementKey) continue;
-            auto entry = subBuilder->createInterfaceRequirementEntry(
-                requirementKey,
-                nullptr);
-            if (auto inheritance = as<InheritanceDecl>(requirementDecl))
+        auto addEntry = [&](IRStructKey* requirementKey, Decl* requirementDecl)
             {
-                auto irBaseType = lowerType(context, inheritance->base.type);
-                auto irWitnessTableType = subBuilder->getWitnessTableType(irBaseType);
-                entry->setRequirementVal(irWitnessTableType);
-            }
-            else
-            {
-                IRInst* requirementVal = ensureDecl(subContext, requirementDecl).val;
-                if (requirementVal)
+                auto entry = subBuilder->createInterfaceRequirementEntry(
+                    requirementKey,
+                    nullptr);
+                if (auto inheritance = as<InheritanceDecl>(requirementDecl))
                 {
-                    switch (requirementVal->getOp())
+                    auto irBaseType = lowerType(context, inheritance->base.type);
+                    auto irWitnessTableType = subBuilder->getWitnessTableType(irBaseType);
+                    entry->setRequirementVal(irWitnessTableType);
+                }
+                else
+                {
+                    IRInst* requirementVal = ensureDecl(subContext, requirementDecl).val;
+                    if (requirementVal)
                     {
-                    case kIROp_Func:
-                    case kIROp_Generic:
+                        switch (requirementVal->getOp())
+                        {
+                        case kIROp_Func:
+                        case kIROp_Generic:
                         {
                             // Remove lowered `IRFunc`s since we only care about
                             // function types.
@@ -7941,58 +7948,82 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                             entry->setRequirementVal(reqType);
                             break;
                         }
-                    default:
-                        entry->setRequirementVal(requirementVal);
-                        break;
-                    }
-                    if (requirementDecl->findModifier<HLSLStaticModifier>())
-                    {
-                        getBuilder()->addStaticRequirementDecoration(requirementKey);
+                        default:
+                            entry->setRequirementVal(requirementVal);
+                            break;
+                        }
+                        if (requirementDecl->findModifier<HLSLStaticModifier>())
+                        {
+                            getBuilder()->addStaticRequirementDecoration(requirementKey);
+                        }
                     }
                 }
-            }
-            irInterface->setOperand(entryIndex, entry);
-            entryIndex++;
-            // Add addtional requirements for type constraints placed
-            // on an associated types.
-            if (auto associatedTypeDecl = as<AssocTypeDecl>(requirementDecl))
-            {
-                for (auto constraintDecl : associatedTypeDecl->getMembersOfType<TypeConstraintDecl>())
+                irInterface->setOperand(entryIndex, entry);
+                entryIndex++;
+                // Add addtional requirements for type constraints placed
+                // on an associated types.
+                if (auto associatedTypeDecl = as<AssocTypeDecl>(requirementDecl))
                 {
-                    auto constraintKey = getInterfaceRequirementKey(constraintDecl);
-                    auto constraintInterfaceType =
-                        lowerType(context, constraintDecl->getSup().type);
-                    auto witnessTableType =
-                        getBuilder()->getWitnessTableType(constraintInterfaceType);
+                    for (auto constraintDecl : associatedTypeDecl->getMembersOfType<TypeConstraintDecl>())
+                    {
+                        auto constraintKey = getInterfaceRequirementKey(constraintDecl);
+                        auto constraintInterfaceType =
+                            lowerType(context, constraintDecl->getSup().type);
+                        auto witnessTableType =
+                            getBuilder()->getWitnessTableType(constraintInterfaceType);
 
-                    auto constraintEntry = subBuilder->createInterfaceRequirementEntry(constraintKey,
+                        auto constraintEntry = subBuilder->createInterfaceRequirementEntry(constraintKey,
                             witnessTableType);
-                    irInterface->setOperand(entryIndex, constraintEntry);
-                    entryIndex++;
+                        irInterface->setOperand(entryIndex, constraintEntry);
+                        entryIndex++;
 
-                    context->setValue(constraintDecl, LoweredValInfo::simple(constraintEntry));
+                        context->setValue(constraintDecl, LoweredValInfo::simple(constraintEntry));
+                    }
                 }
+                else
+                {
+                    CallableDecl* callableDecl = nullptr;
+                    if (auto genDecl = as<GenericDecl>(requirementDecl))
+                        callableDecl = as<CallableDecl>(genDecl->inner);
+                    else
+                        callableDecl = as<CallableDecl>(requirementDecl);
+                    if (callableDecl)
+                    {
+                        // Differentiable functions has additional requirements for the derivatives.
+                        for (auto diffDecl : callableDecl->getMembersOfType<DerivativeRequirementReferenceDecl>())
+                        {
+                            auto diffKey = getInterfaceRequirementKey(diffDecl->referencedDecl);
+                            insertRequirementKeyAssociation(diffDecl->referencedDecl, requirementKey, diffKey);
+                        }
+                    }
+                    // Add lowered requirement entry to current decl mapping to prevent
+                    // the function requirements from being lowered again when we get to
+                    // `ensureAllDeclsRec`.
+                    context->setValue(requirementDecl, LoweredValInfo::simple(entry));
+                }
+            };
+        for (auto requirementDecl : decl->members)
+        {
+            auto requirementKey = getInterfaceRequirementKey(requirementDecl);
+            if (!requirementKey)
+            {
+                if (as<PropertyDecl>(requirementDecl) || as<SubscriptDecl>(requirementDecl))
+                {
+                    for (auto member : as<ContainerDecl>(requirementDecl)->members)
+                    {
+                        if (auto accessorDecl = as<AccessorDecl>(member))
+                        {
+                            auto accessorKey = getInterfaceRequirementKey(accessorDecl);
+                            if (accessorKey)
+                                addEntry(accessorKey, accessorDecl);
+                        }
+                    }
+                }
+                continue;
             }
             else
             {
-                CallableDecl* callableDecl = nullptr;
-                if (auto genDecl = as<GenericDecl>(requirementDecl))
-                    callableDecl = as<CallableDecl>(genDecl->inner);
-                else
-                    callableDecl = as<CallableDecl>(requirementDecl);
-                if (callableDecl)
-                {
-                    // Differentiable functions has additional requirements for the derivatives.
-                    for (auto diffDecl : callableDecl->getMembersOfType<DerivativeRequirementReferenceDecl>())
-                    {
-                        auto diffKey = getInterfaceRequirementKey(diffDecl->referencedDecl);
-                        insertRequirementKeyAssociation(diffDecl->referencedDecl, requirementKey, diffKey);
-                    }
-                }
-                // Add lowered requirement entry to current decl mapping to prevent
-                // the function requirements from being lowered again when we get to
-                // `ensureAllDeclsRec`.
-                context->setValue(requirementDecl, LoweredValInfo::simple(entry));
+                addEntry(requirementKey, requirementDecl);
             }
         }
 

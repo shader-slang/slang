@@ -144,6 +144,9 @@ class AggTypeDecl : public  AggTypeDeclBase
 
     TypeTag typeTags = TypeTag::None;
 
+    // Used if this type declaration is a wrapper, i.e. struct FooWrapper:IFoo = Foo;
+    TypeExp wrappedType;
+
     void unionTagsWith(TypeTag other);
     void addTag(TypeTag tag);
     bool hasTag(TypeTag tag);

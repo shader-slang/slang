@@ -4733,6 +4733,14 @@ namespace Slang
             // We allow for an inheritance clause on a `struct`
             // so that it can conform to interfaces.
             parseOptionalInheritanceClause(this, rs);
+            if (AdvanceIf(this, TokenType::OpAssign))
+            {
+                rs->wrappedType = ParseTypeExp();
+                PushScope(rs);
+                PopScope();
+                ReadToken(TokenType::Semicolon);
+                return rs;
+            }
             if (AdvanceIf(this, TokenType::Semicolon))
                 return rs;
             parseDeclBody(this, rs);
