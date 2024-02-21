@@ -592,8 +592,7 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
                 rayQuery,
                 VK_KHR_RAY_QUERY_EXTENSION_NAME,
                 "ray-query",
-                "ray-tracing",
-                "sm_6_6"
+                "ray-tracing"
             );
 
             SIMPLE_EXTENSION_FEATURE(
@@ -775,6 +774,46 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         {
             deviceExtensions.add(VK_NV_SHADER_SUBGROUP_PARTITIONED_EXTENSION_NAME);
             m_features.add("shader-subgroup-partitioned");
+        }
+
+        // Derive approximate DX12 shader model.
+        const char* featureTable[] = {
+            "sm_6_0", "wave-ops", "atomic-int64", nullptr,
+            "sm_6_1", "barycentrics", "multiview", nullptr,
+            "sm_6_2", "half", nullptr,
+            "sm_6_3", "ray-tracing-pipeline", nullptr,
+            "sm_6_4", "fragment-shading-rate", nullptr,
+            "sm_6_5", "ray-query", "mesh-shader", nullptr,
+            "sm_6_6", "wave-ops", "atomic-float", "atomic-int64", nullptr,
+            nullptr,
+        };
+
+        int i = 0;
+        while (i < SLANG_COUNT_OF(featureTable))
+        {
+            const char* sm = featureTable[i++];
+            if (sm == nullptr)
+            {
+                break;
+            }
+            bool hasAll = true;
+            while (i < SLANG_COUNT_OF(featureTable))
+            {
+                const char* feature = featureTable[i++];
+                if (feature == nullptr)
+                {
+                    break;
+                }
+                hasAll &= m_features.contains(feature);
+            }
+            if (hasAll)
+            {
+                m_features.add(sm);
+            }
+            else
+            {
+                break;
+            }
         }
     }
     if (m_api.m_module->isSoftware())
