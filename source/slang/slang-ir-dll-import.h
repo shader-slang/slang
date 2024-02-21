@@ -5,7 +5,7 @@ namespace Slang
 {
     struct IRModule;
     class DiagnosticSink;
-    class TargetRequest;
+    class TargetProgram;
         /// Generate implementations for functions marked as [DllImport].
-    void generateDllImportFuncs(TargetRequest* targetReq, IRModule* module, DiagnosticSink* sink);
+    void generateDllImportFuncs(TargetProgram* targetReq, IRModule* module, DiagnosticSink* sink);
 }

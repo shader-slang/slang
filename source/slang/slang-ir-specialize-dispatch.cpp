@@ -213,7 +213,7 @@ void ensureWitnessTableSequentialIDs(SharedGenericsLoweringContext* sharedContex
 {
     StringBuilder generatedMangledName;
 
-    auto linkage = sharedContext->targetReq->getLinkage();
+    auto linkage = sharedContext->targetProgram->getTargetReq()->getLinkage();
     for (auto inst : sharedContext->module->getGlobalInsts())
     {
         if (inst->getOp() == kIROp_WitnessTable)

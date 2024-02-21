@@ -242,6 +242,59 @@ namespace Slang
         return isSubtype(type, m_astBuilder->getDiffInterfaceType());
     }
 
+    bool SemanticsVisitor::doesTypeHaveTag(Type* type, TypeTag tag)
+    {
+        if (auto arrayType = as<ArrayExpressionType>(type))
+        {
+            return doesTypeHaveTag(arrayType->getElementType(), tag);
+        }
+        if (auto modifiedType = as<ModifiedType>(type))
+        {
+            return doesTypeHaveTag(modifiedType->getBase(), tag);
+        }
+        if (auto declRefType = as<DeclRefType>(type))
+        {
+            if (auto aggTypeDecl = as<AggTypeDecl>(declRefType->getDeclRef()))
+                return aggTypeDecl.getDecl()->hasTag(tag);
+        }
+        return false;
+    }
+
+    TypeTag SemanticsVisitor::getTypeTags(Type* type)
+    {
+        if (auto arrayType = as<ArrayExpressionType>(type))
+        {
+            return getTypeTags(arrayType->getElementType());
+        }
+        if (auto modifiedType = as<ModifiedType>(type))
+        {
+            return getTypeTags(modifiedType->getBase());
+        }
+        if (auto declRefType = as<DeclRefType>(type))
+        {
+            if (auto aggTypeDecl = as<AggTypeDecl>(declRefType->getDeclRef()))
+                return aggTypeDecl.getDecl()->typeTags;
+        }
+        return TypeTag::None;
+    }
+
+
+    Type* SemanticsVisitor::getBufferElementType(Type* type)
+    {
+        if (auto arrType = as<ArrayExpressionType>(type))
+            return getBufferElementType(arrType->getElementType());
+        if (auto modifiedType = as<ModifiedType>(type))
+            return getBufferElementType(modifiedType->getBase());
+        if (auto constantBuffer = as<ConstantBufferType>(type))
+            return constantBuffer->getElementType();
+        if (auto structuredBuffer = as<HLSLStructuredBufferTypeBase>(type))
+            return structuredBuffer->getElementType();
+        if (auto storageBuffer = as<GLSLShaderStorageBufferType>(type))
+            return storageBuffer->getElementType();
+        return nullptr;
+    }
+
+
     SubtypeWitness* SemanticsVisitor::tryGetInterfaceConformanceWitness(
         Type*   type,
         Type*   interfaceType)

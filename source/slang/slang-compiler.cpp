@@ -964,13 +964,11 @@ namespace Slang
         return desc.style == ArtifactStyle::Host;
     }
 
-    static bool _shouldSetEntryPointName(TargetRequest* targetReq)
+    static bool _shouldSetEntryPointName(TargetProgram* targetProgram)
     {
-        if (!isKhronosTarget(targetReq))
+        if (!isKhronosTarget(targetProgram->getTargetReq()))
             return true;
-        if (!targetReq->getHLSLToVulkanLayoutOptions())
-            return false;
-        if (targetReq->getHLSLToVulkanLayoutOptions()->getUseOriginalEntryPointName())
+        if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::VulkanUseEntryPointName))
             return true;
         return false;
     }
@@ -1102,25 +1100,19 @@ namespace Slang
 
         // Set compiler specific args
         {
-            auto linkage = getLinkage();
-        
             auto name = TypeTextUtil::getPassThroughName((SlangPassThrough)compilerType);
-            const Index nameIndex = linkage->m_downstreamArgs.findName(name);
-            if (nameIndex >= 0)
+            List<String> downstreamArgs = getTargetProgram()->getOptionSet().getDownstreamArgs(name);
+            for (const auto& arg : downstreamArgs)
             {
-                auto& args = linkage->m_downstreamArgs.getArgsAt(nameIndex);
-                for (const auto& arg : args.m_args)
+                // We special case some kinds of args, that can be handled directly
+                if (arg.startsWith("-I"))
                 {
-                    // We special case some kinds of args, that can be handled directly
-                    if (arg.value.startsWith("-I"))
-                    {
-                        // We handle the -I option, by just adding to the include paths
-                        includePaths.add(arg.value.getUnownedSlice().tail(2));
-                    }
-                    else
-                    {
-                        compilerSpecificArguments.add(arg.value);
-                    }
+                    // We handle the -I option, by just adding to the include paths
+                    includePaths.add(arg.getUnownedSlice().tail(2));
+                }
+                else
+                {
+                    compilerSpecificArguments.add(arg);
                 }
             }
         }
@@ -1150,8 +1142,8 @@ namespace Slang
             sourceTarget = CodeGenTarget(TypeConvertUtil::getCompileTargetFromSourceLanguage((SlangSourceLanguage)sourceLanguage));
 
             // If it's pass through we accumulate the preprocessor definitions. 
-            for (const auto& define : translationUnit->compileRequest->preprocessorDefinitions)
-                preprocessorDefinitions.add(define);
+            for (const auto& define : endToEndReq->getOptionSet().getArray(CompilerOptionName::MacroDefine))
+                preprocessorDefinitions.add(define.stringValue, define.stringValue2);
             for (const auto& define : translationUnit->preprocessorDefinitions)
                 preprocessorDefinitions.add(define);
             
@@ -1229,10 +1221,11 @@ namespace Slang
             // 
             // That said it's very convenient and provides way to control aspects 
             // of downstream compilation. 
-            
-            auto linkage = getLinkage();
-            for (const auto& define : linkage->preprocessorDefinitions)
-                preprocessorDefinitions.add(define);
+
+            for (const auto& define : getTargetProgram()->getOptionSet().getArray(CompilerOptionName::MacroDefine))
+            {
+                preprocessorDefinitions.addIfNotExists(define.stringValue, define.stringValue2);
+            }
         }
 
         
@@ -1295,12 +1288,12 @@ namespace Slang
             // * 'doesn't build into an executable/kernel'
             // 
             // So in some sense it is a library
-            if (targetReq->isWholeProgramRequest())
+            if (getTargetProgram()->getOptionSet().getBoolOption(CompilerOptionName::GenerateWholeProgram))
             {
                 if (compilerType == PassThroughMode::Dxc)
                 {
                     // Can support no entry points on DXC because we can build libraries
-                    profile = targetReq->getTargetProfile();
+                    profile = Profile(getTargetProgram()->getOptionSet().getEnumOption<Profile::RawEnum>(CompilerOptionName::Profile));
                 }
                 else
                 {
@@ -1318,7 +1311,7 @@ namespace Slang
                 auto entryPoint = getEntryPoint(entryPointIndex);
                 profile = getEffectiveProfile(entryPoint, targetReq);
 
-                if (_shouldSetEntryPointName(getTargetReq()))
+                if (_shouldSetEntryPointName(getTargetProgram()))
                 {
                     options.entryPointName = allocator.allocate(getText(entryPoint->getName()));
                     auto entryPointNameOverride = getProgram()->getEntryPointNameOverride(entryPointIndex);
@@ -1356,7 +1349,7 @@ namespace Slang
                 }
 
                 // Set the matrix layout
-                options.matrixLayout = SlangMatrixLayoutMode(getTargetReq()->getDefaultMatrixLayoutMode());
+                options.matrixLayout = (SlangMatrixLayoutMode)getTargetProgram()->getOptionSet().getMatrixLayoutMode();
             }
 
             // Set the profile
@@ -1394,7 +1387,7 @@ namespace Slang
         {
             auto linkage = getLinkage();
 
-            switch (linkage->optimizationLevel)
+            switch (getTargetProgram()->getOptionSet().getEnumOption<OptimizationLevel>(CompilerOptionName::Optimization))
             {
                 case OptimizationLevel::None:       options.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::None; break;
                 case OptimizationLevel::Default:    options.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::Default;  break;
@@ -1403,7 +1396,7 @@ namespace Slang
                 default: SLANG_ASSERT(!"Unhandled optimization level"); break;
             }
 
-            switch (linkage->debugInfoLevel)
+            switch (getTargetProgram()->getOptionSet().getEnumOption<DebugInfoLevel>(CompilerOptionName::DebugInformation))
             {
                 case DebugInfoLevel::None:          options.debugInfoType = DownstreamCompileOptions::DebugInfoType::None; break;
                 case DebugInfoLevel::Minimal:       options.debugInfoType = DownstreamCompileOptions::DebugInfoType::Minimal; break;
@@ -1413,7 +1406,7 @@ namespace Slang
                 default: SLANG_ASSERT(!"Unhandled debug level"); break;
             }
 
-            switch( getTargetReq()->getFloatingPointMode())
+            switch (getTargetProgram()->getOptionSet().getEnumOption<FloatingPointMode>(CompilerOptionName::FloatingPointMode))
             {
                 case FloatingPointMode::Default:    options.floatingPointMode = DownstreamCompileOptions::FloatingPointMode::Default; break;
                 case FloatingPointMode::Precise:    options.floatingPointMode = DownstreamCompileOptions::FloatingPointMode::Precise; break;
@@ -1568,7 +1561,7 @@ namespace Slang
                 return SLANG_OK;
             }
             case CodeGenTarget::SPIRV:
-                if (getTargetReq()->shouldEmitSPIRVDirectly())
+                if (getTargetProgram()->getOptionSet().shouldEmitSPIRVDirectly())
                 {
                     SLANG_RETURN_ON_FAIL(emitSPIRVForEntryPointsDirectly(this, outArtifact));
                     return SLANG_OK;
@@ -1844,12 +1837,11 @@ namespace Slang
         TargetProgram* targetProgram)
     {
         auto program = targetProgram->getProgram();
-        auto targetReq = targetProgram->getTargetReq();
 
         // Generate target code any entry points that
         // have been requested for compilation.
         auto entryPointCount = program->getEntryPointCount();
-        if (targetReq->isWholeProgramRequest())
+        if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::GenerateWholeProgram))
         {
             targetProgram->_createWholeProgramResult(getSink(), this);
         }
@@ -1869,7 +1861,7 @@ namespace Slang
     bool _shouldWriteSourceLocs(Linkage* linkage)
     {
         // If debug information or source manager are not avaiable we can't/shouldn't write out locs
-        if (linkage->debugInfoLevel == DebugInfoLevel::None || 
+        if (linkage->m_optionSet.getEnumOption<DebugInfoLevel>(CompilerOptionName::DebugInformation) == DebugInfoLevel::None ||
             linkage->getSourceManager() == nullptr)
         {
             return false;
@@ -1886,8 +1878,8 @@ namespace Slang
         // Set up options
         SerialContainerUtil::WriteOptions options;
 
-        options.compressionType = linkage->serialCompressionType;
-        if (linkage->m_obfuscateCode)
+        options.compressionType = linkage->m_optionSet.getEnumOption<SerialCompressionType>(CompilerOptionName::IrCompression);
+        if (linkage->m_optionSet.getBoolOption(CompilerOptionName::Obfuscate))
         {
             // If code is obfuscated, we *disable* AST output as it is not obfuscated and will reveal
             // too much about IR.
@@ -1942,7 +1934,7 @@ namespace Slang
         {
             auto targetProgram = program->getTargetProgram(targetReq);
 
-            if (targetReq->isWholeProgramRequest())
+            if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::GenerateWholeProgram))
             {                
                 if (auto artifact = targetProgram->getExistingWholeProgramResult())
                 {
@@ -2027,6 +2019,16 @@ namespace Slang
         }
 
         return SLANG_OK;
+    }
+
+    CompilerOptionSet& EndToEndCompileRequest::getTargetOptionSet(TargetRequest* req)
+    {
+        return req->getOptionSet();
+    }
+
+    CompilerOptionSet& EndToEndCompileRequest::getTargetOptionSet(Index targetIndex)
+    {
+        return m_linkage->targets[targetIndex]->getOptionSet();
     }
 
     SlangResult EndToEndCompileRequest::maybeWriteContainer(const String& fileName)
@@ -2118,7 +2120,7 @@ namespace Slang
         // Iterate over all the targets and their outputs
         for (const auto& targetReq : linkage->targets)
         {
-            if (targetReq->isWholeProgramRequest())
+            if (compileRequest->getTargetOptionSet(targetReq).getBoolOption(CompilerOptionName::GenerateWholeProgram))
             {
                 RefPtr<EndToEndCompileRequest::TargetInfo> targetInfo;
                 if (compileRequest->m_targetInfos.tryGetValue(targetReq, targetInfo))
@@ -2157,7 +2159,7 @@ namespace Slang
         // and report them as an error.
         //
         auto specializationParamCount = program->getSpecializationParamCount();
-        if (disableDynamicDispatch && specializationParamCount != 0)
+        if (getOptionSet().getBoolOption(CompilerOptionName::DisableDynamicDispatch) && specializationParamCount != 0)
         {
             auto sink = getSink();
             
@@ -2193,7 +2195,6 @@ namespace Slang
         }
     }
 
-    
     void EndToEndCompileRequest::generateOutput()
     {
         generateOutput(getSpecializedGlobalAndEntryPointsComponentType());
@@ -2211,7 +2212,7 @@ namespace Slang
             {
                 auto targetProgram = program->getTargetProgram(targetReq);
 
-                if (targetReq->isWholeProgramRequest())
+                if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::GenerateWholeProgram))
                 {
                     if (const auto artifact = targetProgram->getExistingWholeProgramResult())
                     {
@@ -2337,84 +2338,154 @@ namespace Slang
 
     bool CodeGenContext::shouldValidateIR()
     {
-        if (auto endToEndReq = isEndToEndCompile())
-        {
-            if (endToEndReq->getFrontEndReq()->shouldValidateIR)
-                return true;
-        }
-
-        return false;
+        return getTargetProgram()->getOptionSet().getBoolOption(CompilerOptionName::ValidateIr);
     }
 
     bool CodeGenContext::shouldSkipSPIRVValidation()
     {
-        if (auto endToEndReq = isEndToEndCompile())
-        {
-            if (endToEndReq->m_skipSPIRVValidation)
-                return true;
-        }
-
-        return false;
+        return getTargetProgram()->getOptionSet().getBoolOption(CompilerOptionName::SkipSPIRVValidation);
     }
 
     bool CodeGenContext::shouldDumpIR()
     {
-        if (getTargetReq()->getTargetFlags() & SLANG_TARGET_FLAG_DUMP_IR)
-            return true;
-
-        if (auto endToEndReq = isEndToEndCompile())
-        {
-            if (endToEndReq->getFrontEndReq()->shouldDumpIR)
-                return true;
-        }
-
-        return false;
+        return getTargetProgram()->getOptionSet().getBoolOption(CompilerOptionName::DumpIr);
     }
 
     bool CodeGenContext::shouldDumpIntermediates()
     {
-        if (getTargetReq()->shouldDumpIntermediates())
-            return true;
-        if (auto endToEndReq = isEndToEndCompile())
-        {
-            if (endToEndReq->shouldDumpIntermediates)
-                return true;
-        }
-        return false;
+        return getTargetProgram()->getOptionSet().getBoolOption(CompilerOptionName::DumpIntermediates);
     }
 
 
     bool CodeGenContext::shouldTrackLiveness()
     {
-        auto endToEndReq = isEndToEndCompile();
-        return (endToEndReq && endToEndReq->enableLivenessTracking) || 
-            getTargetReq()->shouldTrackLiveness();
+        return getTargetProgram()->getOptionSet().getBoolOption(CompilerOptionName::TrackLiveness);
     }
 
     String CodeGenContext::getIntermediateDumpPrefix()
     {
-        if (auto endToEndReq = isEndToEndCompile())
-        {
-            return endToEndReq->m_dumpIntermediatePrefix;
-        }
-        return String();
+        return getTargetProgram()->getOptionSet().getStringOption(CompilerOptionName::DumpIntermediatePrefix);
     }
 
     bool CodeGenContext::getUseUnknownImageFormatAsDefault()
     {
-        if (auto endToEndReq = isEndToEndCompile())
-        {
-            return endToEndReq->useUnknownImageFormatAsDefault;
-        }
-        return false;
+        return getTargetProgram()->getOptionSet().getBoolOption(CompilerOptionName::DefaultImageFormatUnknown);
     }
 
     bool CodeGenContext::isSpecializationDisabled()
     {
-        if (auto endToEndReq = isEndToEndCompile())
-        {
-            return endToEndReq->disableSpecialization;
-        }
-        return false;
+        return getTargetProgram()->getOptionSet().getBoolOption(CompilerOptionName::DisableSpecialization);
     }
+
+    SLANG_NO_THROW SlangResult SLANG_MCALL Module::serialize(ISlangBlob** outSerializedBlob)
+    {
+        SerialContainerUtil::WriteOptions writeOptions;
+        writeOptions.sourceManager = getLinkage()->getSourceManager();
+        OwnedMemoryStream memoryStream(FileAccess::Write);
+        SLANG_RETURN_ON_FAIL(SerialContainerUtil::write(this, writeOptions, &memoryStream));
+        *outSerializedBlob = RawBlob::create(
+            memoryStream.getContents().getBuffer(),
+            (size_t)memoryStream.getContents().getCount()).detach();
+        return SLANG_OK;
+    }
+
+    SLANG_NO_THROW SlangResult SLANG_MCALL Module::writeToFile(char const* fileName)
+    {
+        SerialContainerUtil::WriteOptions writeOptions;
+        writeOptions.sourceManager = getLinkage()->getSourceManager();
+        FileStream fileStream;
+        SLANG_RETURN_ON_FAIL(fileStream.init(fileName, FileMode::Create));
+        return SerialContainerUtil::write(this, writeOptions, &fileStream);
+    }
+
+    SLANG_NO_THROW const char* SLANG_MCALL Module::getName()
+    {
+        if (m_name)
+            return m_name->text.getBuffer();
+        return nullptr;
+    }
+
+    SLANG_NO_THROW const char* SLANG_MCALL Module::getFilePath()
+    {
+        if (m_pathInfo.hasFoundPath())
+            return m_pathInfo.foundPath.getBuffer();
+        return nullptr;
+    }
+
+    SLANG_NO_THROW const char* SLANG_MCALL Module::getUniqueIdentity()
+    {
+        if (m_pathInfo.hasUniqueIdentity())
+            return m_pathInfo.getMostUniqueIdentity().getBuffer();
+        return nullptr;
+    }
+
+    void validateEntryPoint(
+        EntryPoint* entryPoint,
+        DiagnosticSink* sink);
+
+    void Module::_discoverEntryPoints(DiagnosticSink* sink)
+    {
+        for (auto globalDecl : m_moduleDecl->members)
+        {
+            auto maybeFuncDecl = globalDecl;
+            if (auto genericDecl = as<GenericDecl>(maybeFuncDecl))
+            {
+                maybeFuncDecl = genericDecl->inner;
+            }
+
+            auto funcDecl = as<FuncDecl>(maybeFuncDecl);
+            if (!funcDecl)
+                continue;
+
+            Profile profile;
+
+            auto entryPointAttr = funcDecl->findModifier<EntryPointAttribute>();
+            if (entryPointAttr)
+            {
+                // We've discovered a valid entry point. It is a function (possibly
+                // generic) that has a `[shader(...)]` attribute to mark it as an
+                // entry point.
+                //
+                // We will now register that entry point as an `EntryPoint`
+                // with an appropriately chosen profile.
+                //
+                // The profile will only include a stage, so that the profile "family"
+                // and "version" are left unspecified. Downstream code will need
+                // to be able to handle this case.
+                //
+                profile.setStage(entryPointAttr->stage);
+            }
+            else
+            {
+                // If there isn't a [shader] attribute, look for a [numthreads] attribute
+                // since that implicitly means a compute shader.
+                auto numThreadsAttr = funcDecl->findModifier<NumThreadsAttribute>();
+                if (numThreadsAttr)
+                    profile.setStage(Stage::Compute);
+                else
+                    continue;
+            }
+
+            RefPtr<EntryPoint> entryPoint = EntryPoint::create(
+                getLinkage(),
+                makeDeclRef(funcDecl),
+                profile);
+
+            validateEntryPoint(entryPoint, sink);
+
+            // Note: in the case that the user didn't explicitly
+            // specify entry points and we are instead compiling
+            // a shader "library," then we do not want to automatically
+            // combine the entry points into groups in the generated
+            // `Program`, since that would be slightly too magical.
+            //
+            // Instead, each entry point will end up in a singleton
+            // group, so that its entry-point parameters lay out
+            // independent of the others.
+            //
+            _addEntryPoint(entryPoint);
+        }
+    }
+
 }
+

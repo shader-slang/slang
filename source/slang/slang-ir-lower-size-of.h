@@ -7,10 +7,10 @@ namespace Slang
 {
 
 struct IRModule;
-class TargetRequest;
+class TargetProgram;
 class DiagnosticSink;
 
-void lowerSizeOfLike(TargetRequest* target, IRModule* module, DiagnosticSink* sink);
+void lowerSizeOfLike(TargetProgram* target, IRModule* module, DiagnosticSink* sink);
 
 } // namespace Slang
 

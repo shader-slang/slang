@@ -2961,6 +2961,12 @@ SLANG_API unsigned int spReflection_GetTypeParameterCount(SlangReflection * refl
     return (unsigned int) program->specializationParams.getCount();
 }
 
+SLANG_API slang::ISession* spReflection_GetSession(SlangReflection* reflection)
+{
+    auto program = convert(reflection);
+    return program->getTargetProgram()->getTargetReq()->getLinkage();
+}
+
 SLANG_API SlangReflectionTypeParameter* spReflection_GetTypeParameterByIndex(SlangReflection * reflection, unsigned int index)
 {
     auto program = convert(reflection);

@@ -7,7 +7,7 @@
 
 namespace Slang
 {
-    static void lowerStructuredBufferType(TargetRequest* target, IRHLSLStructuredBufferTypeBase* type)
+    static void lowerStructuredBufferType(TargetProgram* target, IRHLSLStructuredBufferTypeBase* type)
     {
         IRBuilder builder(type);
         builder.setInsertBefore(type);
@@ -48,7 +48,7 @@ namespace Slang
 
         IRTypeLayout::Builder elementTypeLayoutBuilder(&builder);
         IRSizeAndAlignment elementSize;
-        getSizeAndAlignment(target, layoutRules, elementType, &elementSize);
+        getSizeAndAlignment(target->getOptionSet(), layoutRules, elementType, &elementSize);
         elementTypeLayoutBuilder.addResourceUsage(LayoutResourceKind::Uniform, LayoutSize((LayoutSize::RawValue)elementSize.getStride()));
         auto elementTypeLayout = elementTypeLayoutBuilder.build();
 
@@ -253,7 +253,7 @@ namespace Slang
         type->replaceUsesWith(structType);
     }
 
-    void lowerAppendConsumeStructuredBuffers(TargetRequest* target, IRModule* module, DiagnosticSink* sink)
+    void lowerAppendConsumeStructuredBuffers(TargetProgram* target, IRModule* module, DiagnosticSink* sink)
     {
         SLANG_UNUSED(sink);
         for (auto globalInst : module->getGlobalInsts())

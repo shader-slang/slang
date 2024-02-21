@@ -390,6 +390,8 @@ protected:
     ShaderObjectContainerType m_containerType = ShaderObjectContainerType::None;
 
 public:
+    ComPtr<slang::ISession> m_slangSession;
+
     ShaderObjectContainerType getContainerType() { return m_containerType; }
 
     static slang::TypeLayoutReflection* _unwrapParameterGroups(
@@ -444,7 +446,7 @@ public:
         return m_componentID;
     }
 
-    void initBase(RendererBase* renderer, slang::TypeLayoutReflection* elementTypeLayout);
+    void initBase(RendererBase* renderer, slang::ISession* session, slang::TypeLayoutReflection* elementTypeLayout);
 };
 
 class SimpleShaderObjectData
@@ -494,7 +496,6 @@ protected:
 
     // The specialized shader object type.
     ExtendedShaderObjectType shaderObjectType = { nullptr, kInvalidComponentID };
-
 
     Result _getSpecializedShaderObjectType(ExtendedShaderObjectType* outType);
     slang::TypeLayoutReflection* _getElementTypeLayout()
@@ -1265,7 +1266,19 @@ public:
         ShaderObjectContainerType containerType,
         IShaderObject** outObject) SLANG_OVERRIDE;
 
+    virtual SLANG_NO_THROW Result SLANG_MCALL createShaderObject2(
+        slang::ISession* session,
+        slang::TypeReflection* type,
+        ShaderObjectContainerType containerType,
+        IShaderObject** outObject) SLANG_OVERRIDE;
+
     virtual SLANG_NO_THROW Result SLANG_MCALL createMutableShaderObject(
+        slang::TypeReflection* type,
+        ShaderObjectContainerType containerType,
+        IShaderObject** outObject) SLANG_OVERRIDE;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL createMutableShaderObject2(
+        slang::ISession* session,
         slang::TypeReflection* type,
         ShaderObjectContainerType containerType,
         IShaderObject** outObject) SLANG_OVERRIDE;
@@ -1325,11 +1338,13 @@ public:
         slang::IBlob** outDiagnostics = nullptr);
 
     Result getShaderObjectLayout(
+        slang::ISession*            session,
         slang::TypeReflection*      type,
         ShaderObjectContainerType   container,
         ShaderObjectLayoutBase**    outLayout);
 
     Result getShaderObjectLayout(
+        slang::ISession* session,
         slang::TypeLayoutReflection* typeLayout,
         ShaderObjectLayoutBase** outLayout);
 
@@ -1345,6 +1360,7 @@ public:
 
 
     virtual Result createShaderObjectLayout(
+        slang::ISession* session,
         slang::TypeLayoutReflection* typeLayout,
         ShaderObjectLayoutBase** outLayout) = 0;
 

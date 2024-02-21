@@ -205,19 +205,19 @@ namespace Slang
     }
 
     void lowerGenerics(
-        TargetRequest*          targetReq,
+        TargetProgram*          targetProgram,
         IRModule*               module,
         DiagnosticSink*         sink)
     {
         SLANG_PROFILE;
 
         SharedGenericsLoweringContext sharedContext(module);
-        sharedContext.targetReq = targetReq;
+        sharedContext.targetProgram = targetProgram;
         sharedContext.sink = sink;
 
         checkTypeConformanceExists(&sharedContext);
 
-        inferAnyValueSizeWhereNecessary(targetReq, module);
+        inferAnyValueSizeWhereNecessary(targetProgram, module);
 
         // Replace all `makeExistential` insts with `makeExistentialWithRTTI`
         // before making any other changes. This is necessary because a parameter of
@@ -255,7 +255,7 @@ namespace Slang
         // real RTTI objects and witness tables.
         specializeRTTIObjects(&sharedContext, sink);
 
-        simplifyIR(sharedContext.targetReq, module, IRSimplificationOptions::getFast());
+        simplifyIR(sharedContext.targetProgram, module, IRSimplificationOptions::getFast());
 
         lowerTuples(module, sink);
         if (sink->getErrorCount() != 0)

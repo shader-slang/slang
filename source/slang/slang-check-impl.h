@@ -17,6 +17,8 @@ namespace Slang
 
     bool isGlobalDecl(Decl* decl);
 
+    bool isUnsafeForceInlineFunc(FunctionDeclBase* funcDecl);
+
     bool isUniformParameterType(Type* type);
 
     Type* checkProperType(
@@ -561,6 +563,11 @@ namespace Slang
             return m_sink;
         }
 
+        CompilerOptionSet& getOptionSet()
+        {
+            return m_linkage->m_optionSet;
+        }
+
         // We need to track what has been `import`ed into
         // the scope of this semantic checking session,
         // and also to avoid importing the same thing more
@@ -973,7 +980,10 @@ namespace Slang
             : Super(context)
         {}
 
-
+        CompilerOptionSet& getOptionSet()
+        {
+            return getShared()->getOptionSet();
+        }
     public:
         // Translate Types
 
@@ -1047,11 +1057,6 @@ namespace Slang
         Expr* maybeOpenRef(Expr* expr);
 
         Scope* getScope(SyntaxNode* node);
-
-        // Add a sibling lookup scope for `dest` to refer to `source`.
-        void addSiblingScopeForContainerDecl(ContainerDecl* dest, ContainerDecl* source);
-        void addSiblingScopeForContainerDecl(Scope* destScope, ContainerDecl* source);
-
 
         void diagnoseDeprecatedDeclRefUsage(DeclRef<Decl> declRef, SourceLoc loc, Expr* originalExpr);
 
@@ -1599,6 +1604,23 @@ namespace Slang
             DeclRef<PropertyDecl>       requiredMemberDeclRef,
             RefPtr<WitnessTable>        witnessTable);
 
+        bool trySynthesizeWrapperTypePropertyRequirementWitness(
+            ConformanceCheckingContext* context,
+            DeclRef<PropertyDecl>       requiredMemberDeclRef,
+            RefPtr<WitnessTable>        witnessTable);
+
+        bool trySynthesizeAssociatedTypeRequirementWitness(
+            ConformanceCheckingContext* context,
+            LookupResult const& lookupResult,
+            DeclRef<AssocTypeDecl>       requiredMemberDeclRef,
+            RefPtr<WitnessTable>        witnessTable);
+
+        bool trySynthesizeAssociatedConstantRequirementWitness(
+            ConformanceCheckingContext* context,
+            LookupResult const& lookupResult,
+            DeclRef<VarDeclBase>        requiredMemberDeclRef,
+            RefPtr<WitnessTable>        witnessTable);
+
             /// Attempt to synthesize a declartion that can satisfy `requiredMemberDeclRef` using `lookupResult`.
             ///
             /// On success, installs the syntethesized declaration in `witnessTable` and returns `true`.
@@ -1951,6 +1973,12 @@ namespace Slang
         bool isInterfaceType(Type* type);
 
         bool isTypeDifferentiable(Type* type);
+
+        bool doesTypeHaveTag(Type* type, TypeTag tag);
+
+        TypeTag getTypeTags(Type* type);
+
+        Type* getBufferElementType(Type* type);
 
             /// Check whether `subType` is a sub-type of `superTypeDeclRef`,
             /// and return a witness to the sub-type relationship if it holds

@@ -1503,6 +1503,9 @@ namespace Slang
         // The type witnessesd by the witness table (a concrete type).
         Type* witnessedType;
 
+        // Whether or not this witness table is an extern declaration.
+        bool isExtern = false;
+
         // Satisfying values of each requirement.
         List<KeyValuePair<Decl*, RequirementWitness>> m_requirements;
 

@@ -67,7 +67,7 @@ static int _getLoopMaxIterationsToUnroll(IRLoop* loopInst)
 }
 
 static void _foldAndSimplifyLoopIteration(
-    TargetRequest* targetRequest,
+    TargetProgram* targetProgram,
     IRBuilder& builder,
     List<IRBlock*>& clonedBlocks,
     IRBlock* firstIterationBreakBlock,
@@ -81,7 +81,7 @@ static void _foldAndSimplifyLoopIteration(
         {
             for (auto inst : b->getChildren())
             {
-                tryReplaceInstUsesWithSimplifiedValue(targetRequest, builder.getModule(), inst);
+                tryReplaceInstUsesWithSimplifiedValue(targetProgram, builder.getModule(), inst);
             }
         }
 
@@ -89,7 +89,7 @@ static void _foldAndSimplifyLoopIteration(
         // the phi arguments for next iteration evaluated (args in the new loop inst).
         for (auto inst : firstIterationBreakBlock->getChildren())
         {
-            tryReplaceInstUsesWithSimplifiedValue(targetRequest, builder.getModule(), inst);
+            tryReplaceInstUsesWithSimplifiedValue(targetProgram, builder.getModule(), inst);
         }
 
         // Fold conditional branches into unconditional branches if the condition is known.
@@ -148,7 +148,7 @@ static void _foldAndSimplifyLoopIteration(
 // Returns true if we can statically determine that the loop terminated within the iteration limit.
 // This operation assumes the loop does not have `continue` jumps, i.e. continueBlock == targetBlock.
 static bool _unrollLoop(
-    TargetRequest* targetRequest,
+    TargetProgram* targetProgram,
     IRModule* module,
     IRLoop* loopInst,
     List<IRBlock*>& blocks)
@@ -341,7 +341,7 @@ static bool _unrollLoop(
         // conditional jumps can be folded into unconditional jumps.
 
         _foldAndSimplifyLoopIteration(
-            targetRequest, builder, clonedBlocks, firstIterationBreakBlock, unreachableBlock);
+            targetProgram, builder, clonedBlocks, firstIterationBreakBlock, unreachableBlock);
 
         // Now we have peeled off one iteration from the loop, we check if there are any
         // branches into next iteration, if not, the loop terminates and we are done.
@@ -435,7 +435,7 @@ List<IRLoop*> collectLoopsInFunc(IRGlobalValueWithCode* func, const TFunc& filte
 }
 
 bool unrollLoopsInFunc(
-    TargetRequest* targetRequest,
+    TargetProgram* targetProgram,
     IRModule* module,
     IRGlobalValueWithCode* func,
     DiagnosticSink* sink)
@@ -453,7 +453,7 @@ bool unrollLoopsInFunc(
 
         auto blocks = collectBlocksInRegion(func, loop);
         auto loopLoc = loop->sourceLoc;
-        if (!_unrollLoop(targetRequest, module, loop, blocks))
+        if (!_unrollLoop(targetProgram, module, loop, blocks))
         {
             if (sink)
                 sink->diagnose(loopLoc, Diagnostics::cannotUnrollLoop);
@@ -468,7 +468,7 @@ bool unrollLoopsInFunc(
     return true;
 }
 
-bool unrollLoopsInModule(TargetRequest* targetRequest, IRModule* module, DiagnosticSink* sink)
+bool unrollLoopsInModule(TargetProgram* target, IRModule* module, DiagnosticSink* sink)
 {
     SLANG_PROFILE;
 
@@ -479,7 +479,7 @@ bool unrollLoopsInModule(TargetRequest* targetRequest, IRModule* module, Diagnos
             
         if (auto func = as<IRGlobalValueWithCode>(inst))
         {
-            bool result = unrollLoopsInFunc(targetRequest, module, func, sink);
+            bool result = unrollLoopsInFunc(target, module, func, sink);
             if (!result)
                 return false;
         }

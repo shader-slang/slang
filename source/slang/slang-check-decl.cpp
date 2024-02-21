@@ -302,6 +302,8 @@ namespace Slang
         void visitFunctionDeclBase(FunctionDeclBase* funcDecl);
 
         void visitParamDecl(ParamDecl* paramDecl);
+
+        void visitAggTypeDecl(AggTypeDecl* aggTypeDecl);
     };
 
     template<typename VisitorType>
@@ -818,6 +820,11 @@ namespace Slang
         if (auto genericDecl = as<GenericDecl>(parentDecl))
             parentDecl = genericDecl->parentDecl;
         return as<NamespaceDeclBase>(parentDecl) != nullptr || as<FileDecl>(parentDecl) != nullptr;
+    }
+
+    bool isUnsafeForceInlineFunc(FunctionDeclBase* funcDecl)
+    {
+        return funcDecl->hasModifier<UnsafeForceInlineEarlyAttribute>();
     }
 
         /// Is `decl` a global shader parameter declaration?
@@ -1682,7 +1689,7 @@ namespace Slang
                 }
             }
 
-            if (getLinkage()->getAllowGLSLInput())
+            if (getModuleDecl(varDecl)->hasModifier<GLSLModuleModifier>())
             {
                 // If we are in GLSL compatiblity mode, we want to treat all global variables
                 // without any `uniform` modifiers as true global variables by default.
@@ -1697,6 +1704,15 @@ namespace Slang
                         addModifier(varDecl, staticModifier);
                     }
                 }
+            }
+        }
+
+        // Propagate type tags.
+        if (auto parentAggTypeDecl = as<AggTypeDecl>(getParentDecl(varDecl)))
+        {
+            if (auto varDeclRefType = as<DeclRefType>(varDecl->type.type))
+            {
+                parentAggTypeDecl->unionTagsWith(getTypeTags(varDecl->type.type));
             }
         }
 
@@ -1717,11 +1733,38 @@ namespace Slang
         {
             addModifier(structDecl, m_astBuilder->create<NVAPIMagicModifier>());
         }
+
+        if (structDecl->hasModifier<ExternModifier>())
+        {
+            structDecl->addTag(TypeTag::Incomplete);
+        }
+
+        // Slang supports a convenient syntax to create a wrapper type from
+        // an existing type that implements a given interface. For example,
+        // the user can write: struct FooWrapper:IFoo = Foo;
+        // In this case we will synthesize the FooWrapper type with an inner
+        // member of type `Foo`, and use it to implement all requirements of
+        // IFoo.
+        // If this is a wrapper struct, synthesize the inner member now.
+        if (structDecl->wrappedType.exp)
+        {
+            structDecl->wrappedType = CheckProperType(structDecl->wrappedType);
+            auto member = m_astBuilder->create<VarDecl>();
+            member->type = structDecl->wrappedType;
+            member->nameAndLoc.name = getName("inner");
+            member->nameAndLoc.loc = structDecl->wrappedType.exp->loc;
+            member->loc = member->nameAndLoc.loc;
+            structDecl->addMember(member);
+        }
         checkVisibility(structDecl);
     }
 
     void SemanticsDeclHeaderVisitor::visitClassDecl(ClassDecl* classDecl)
     {
+        if (classDecl->hasModifier<ExternModifier>())
+        {
+            classDecl->addTag(TypeTag::Incomplete);
+        }
         checkVisibility(classDecl);
     }
 
@@ -1805,6 +1848,21 @@ namespace Slang
                 // code generation.
                 //
                 varDecl->initExpr = CompleteOverloadCandidate(overloadContext, *overloadContext.bestCandidate);
+            }
+        }
+        if (auto elementType = getBufferElementType(varDecl->getType()))
+        {
+            if (doesTypeHaveTag(elementType, TypeTag::Incomplete))
+            {
+                getSink()->diagnose(varDecl->type.exp->loc, Diagnostics::incompleteTypeCannotBeUsedInBuffer, elementType);
+            }
+        }
+        else if (varDecl->findModifier<HLSLUniformModifier>())
+        {
+            auto varType = varDecl->getType();
+            if (doesTypeHaveTag(varType, TypeTag::Incomplete))
+            {
+                getSink()->diagnose(varDecl->type.exp->loc, Diagnostics::incompleteTypeCannotBeUsedInUniformParameter, varType);
             }
         }
         maybeRegisterDifferentiableType(getASTBuilder(), varDecl->getType());
@@ -3467,6 +3525,16 @@ namespace Slang
         witnessTable->add(requiredMemberDeclRef.getDecl(), RequirementWitness(satisfyingMemberDeclRef));
     }
 
+    static bool isWrapperTypeDecl(Decl* decl)
+    {
+        if (auto aggTypeDecl = as<AggTypeDecl>(decl))
+        {
+            if (aggTypeDecl->wrappedType)
+                return true;
+        }
+        return false;
+    }
+
     bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
         ConformanceCheckingContext* context,
         LookupResult const&         lookupResult,
@@ -3544,14 +3612,47 @@ namespace Slang
         //
         auto synBase = m_astBuilder->create<OverloadedExpr>();
         synBase->name = requiredMemberDeclRef.getDecl()->getName();
-        synBase->lookupResult2 = lookupResult;
+
+        if (isWrapperTypeDecl(context->parentDecl))
+        {
+            auto aggTypeDecl = as<AggTypeDecl>(context->parentDecl);
+            synBase->lookupResult2 = lookUpMember(
+                m_astBuilder,
+                this,
+                synBase->name,
+                aggTypeDecl->wrappedType.type,
+                aggTypeDecl->ownedScope,
+                LookupMask::Default,
+                LookupOptions::IgnoreBaseInterfaces);
+            addModifier(synFuncDecl, m_astBuilder->create<ForceInlineAttribute>());
+        }
+        else
+        {
+            synBase->lookupResult2 = lookupResult;
+        }
 
         // If `synThis` is non-null, then we will use it as the base of
         // the overloaded expression, so that we have an overloaded
         // member reference, and not just an overloaded reference to some
         // static definitions.
         //
-        synBase->base = synThis;
+        if (synThis)
+        {
+            if (isWrapperTypeDecl(context->parentDecl))
+            {
+                // If this is a wrapper type, then use the inner
+                // object as the actual this parameter for the redirected
+                // call.
+                auto innerExpr = m_astBuilder->create<VarExpr>();
+                innerExpr->scope = synThis->scope;
+                innerExpr->name = getName("inner");
+                synBase->base = CheckExpr(innerExpr);
+            }
+            else
+            {
+                synBase->base = synThis;
+            }
+        }
 
         // We now have the reference to the overload group we plan to call,
         // and we already built up the argument list, so we can construct
@@ -3663,6 +3764,9 @@ namespace Slang
         DeclRef<PropertyDecl>       requiredMemberDeclRef,
         RefPtr<WitnessTable>        witnessTable)
     {
+        if (isWrapperTypeDecl(context->parentDecl))
+            return trySynthesizeWrapperTypePropertyRequirementWitness(context, requiredMemberDeclRef, witnessTable);
+
         // The situation here is that the context of an inheritance
         // declaration didn't provide an exact match for a required
         // property. E.g.:
@@ -3713,16 +3817,10 @@ namespace Slang
         //
         auto synPropertyDecl = m_astBuilder->create<PropertyDecl>();
 
-        // For now our synthesized property will use the name and source
-        // location of the requirement we are trying to satisfy.
-        //
-        // TODO: as it stands right now our syntesized property and its
-        // accesors will get mangled names, which we don't actually want.
-        // Leaving out the name here doesn't help matters, becaues then
-        // *all* synthesized members on a given type would share the same
-        // mangled name.
-        //
+        // Synthesize the property name with a prefix to avoid name clashing.
         synPropertyDecl->nameAndLoc = requiredMemberDeclRef.getDecl()->nameAndLoc;
+        synPropertyDecl->nameAndLoc.name = getName(String("$syn_property_") + getText(requiredMemberDeclRef.getName()));
+
 
         // The type of our synthesized property will be the expected type
         // of the interface requirement.
@@ -4009,6 +4107,233 @@ namespace Slang
         return true;
     }
 
+    bool SemanticsVisitor::trySynthesizeWrapperTypePropertyRequirementWitness(
+        ConformanceCheckingContext* context,
+        DeclRef<PropertyDecl>       requiredMemberDeclRef,
+        RefPtr<WitnessTable>        witnessTable)
+    {
+        // We are synthesizing a property requirement for a wrapper type:
+        //
+        //      interface IFoo { property value : int { get; set; } }
+        //      struct Foo : IFoo = FooImpl;
+        // 
+        // We need to synthesize Foo to:
+        // 
+        //      struct Foo : IFoo
+        //      {
+        //          FooImpl inner;
+        //          property value : int { get { return inner.value; }
+        //                                 set { inner.value = newValue; }
+        //                               }
+        //      }
+        // 
+        // To do so, we need to grab the witness table of FooImpl:IFoo, and create
+        // wrapper property in Foo that forwards the accessors to the inner object.
+        //
+        // We get started by constructing a synthesized `PropertyDecl`.
+        //
+        auto synPropertyDecl = m_astBuilder->create<PropertyDecl>();
+        synPropertyDecl->parentDecl = context->parentDecl;
+
+        // Synthesize the property name with a prefix to avoid name clashing.
+        //
+        synPropertyDecl->nameAndLoc = requiredMemberDeclRef.getDecl()->nameAndLoc;
+        synPropertyDecl->nameAndLoc.name = getName(String("$syn_property_") + getText(requiredMemberDeclRef.getName()));
+
+        // Find the witness that FooImpl : IFoo.
+        auto aggTypeDecl = as<AggTypeDecl>(context->parentDecl);
+        auto innerType = aggTypeDecl->wrappedType.type;
+        DeclRef<Decl> innerProperty;
+        auto innerWitness = tryGetSubtypeWitness(innerType, witnessTable->baseType);
+        if (!innerWitness)
+            return false;
+
+        for (auto requiredAccessorDeclRef : getMembersOfType<AccessorDecl>(m_astBuilder, requiredMemberDeclRef))
+        {
+            auto innerEntry = tryLookUpRequirementWitness(m_astBuilder, innerWitness, requiredAccessorDeclRef.getDecl());
+            if (innerEntry.getFlavor() != RequirementWitness::Flavor::declRef)
+                return false;
+            auto innerAccessorDeclRef = as<AccessorDecl>(innerEntry.getDeclRef());
+            if (!innerAccessorDeclRef)
+                return false;
+
+            // The synthesized accessor will be an AST node of the same class as
+            // the required accessor.
+            //
+            auto synAccessorDecl = (AccessorDecl*)m_astBuilder->createByNodeType(requiredAccessorDeclRef.getDecl()->astNodeType);
+            synAccessorDecl->ownedScope = m_astBuilder->create<Scope>();
+            synAccessorDecl->ownedScope->containerDecl = synAccessorDecl;
+            synAccessorDecl->ownedScope->parent = getScope(context->parentDecl);
+
+            // The return type should be the same as the inner object's accessor return type.
+            //
+            synAccessorDecl->returnType.type = getResultType(m_astBuilder, innerAccessorDeclRef);
+
+            // Similarly, our synthesized accessor will have parameters matching those of the inner accessor.
+            //
+            List<Expr*> synArgs;
+            for (auto innerParamDeclRef : getParameters(m_astBuilder, innerAccessorDeclRef))
+            {
+                auto paramType = getType(m_astBuilder, innerParamDeclRef);
+
+                // The synthesized parameter will ahve the same name and
+                // type as the parameter of the requirement.
+                //
+                auto synParamDecl = m_astBuilder->create<ParamDecl>();
+                synParamDecl->nameAndLoc = innerParamDeclRef.getDecl()->nameAndLoc;
+                synParamDecl->type.type = paramType;
+
+                // We need to add the parameter as a child declaration of
+                // the accessor we are building.
+                //
+                synParamDecl->parentDecl = synAccessorDecl;
+                synAccessorDecl->members.add(synParamDecl);
+
+                // For each paramter, we will create an argument expression
+                // to represent it in the body of the accessor.
+                //
+                auto synArg = m_astBuilder->create<VarExpr>();
+                synArg->declRef = makeDeclRef(synParamDecl);
+                synArg->type = paramType;
+                synArgs.add(synArg);
+            }
+
+            // Now synthesize the body of the property accessor.
+            // The body of the accessor will depend on the class of the accessor
+            // we are synthesizing (e.g., `get` vs. `set`).
+            //
+            Stmt* synBodyStmt = nullptr;
+            auto propertyRef = m_astBuilder->create<MemberExpr>();
+            propertyRef->scope = synAccessorDecl->ownedScope;
+            auto base = m_astBuilder->create<VarExpr>();
+            base->scope = propertyRef->scope;
+            base->name = getName("inner");
+            propertyRef->baseExpression = base;
+            innerProperty = innerAccessorDeclRef.getParent();
+            propertyRef->name = getParentDecl(innerAccessorDeclRef.getDecl())->getName();
+            auto checkedPropertyRefExpr = CheckExpr(propertyRef);
+
+            if (as<GetterDecl>(requiredAccessorDeclRef))
+            {
+                auto synReturn = m_astBuilder->create<ReturnStmt>();
+                synReturn->expression = checkedPropertyRefExpr;
+
+                synBodyStmt = synReturn;
+            }
+            else if (as<SetterDecl>(requiredAccessorDeclRef))
+            {
+                auto synAssign = m_astBuilder->create<AssignExpr>();
+                synAssign->left = checkedPropertyRefExpr;
+                synAssign->right = synArgs[0];
+
+                auto synCheckedAssign = checkAssignWithCheckedOperands(synAssign);
+
+                auto synExprStmt = m_astBuilder->create<ExpressionStmt>();
+                synExprStmt->expression = synCheckedAssign;
+
+                synBodyStmt = synExprStmt;
+            }
+            else
+            {
+                // While there are other kinds of accessors than `get` and `set`,
+                // those are currently only reserved for stdlib-internal use.
+                // We will not bother with synthesis for those cases.
+                //
+                return false;
+            }
+
+            addModifier(synAccessorDecl, m_astBuilder->create<ForceInlineAttribute>());
+            synAccessorDecl->body = synBodyStmt;
+
+            synAccessorDecl->parentDecl = synPropertyDecl;
+            synPropertyDecl->members.add(synAccessorDecl);
+
+            // Register the synthesized accessor.
+            //
+            witnessTable->add(requiredAccessorDeclRef.getDecl(), RequirementWitness(makeDeclRef(synAccessorDecl)));
+        }
+
+        // The type of our synthesized property will be the same as the inner property.
+        //
+        auto propertyType = getType(m_astBuilder, as<PropertyDecl>(innerProperty));
+        synPropertyDecl->type.type = propertyType;
+
+        // The visibility of synthesized decl should be the same as the inner requirement
+        if (innerProperty.getDecl()->findModifier<VisibilityModifier>())
+        {
+            auto vis = getDeclVisibility(innerProperty.getDecl());
+            addVisibilityModifier(m_astBuilder, synPropertyDecl, vis);
+        }
+
+        context->parentDecl->addMember(synPropertyDecl);
+        witnessTable->add(requiredMemberDeclRef.getDecl(),
+            RequirementWitness(makeDeclRef(synPropertyDecl)));
+        return true;
+    }
+
+    bool SemanticsVisitor::trySynthesizeAssociatedTypeRequirementWitness(
+        ConformanceCheckingContext* context,
+        LookupResult const&         inLookupResult,
+        DeclRef<AssocTypeDecl>      requiredMemberDeclRef,
+        RefPtr<WitnessTable>        witnessTable)
+    {
+        SLANG_UNUSED(inLookupResult);
+
+        // The only case we can synthesize for now is when the conformant type
+        // is a wrapper type.
+        if (!isWrapperTypeDecl(context->parentDecl))
+            return false;
+        auto aggTypeDecl = as<AggTypeDecl>(context->parentDecl);
+        auto lookupResult = lookUpMember(
+            m_astBuilder,
+            this,
+            requiredMemberDeclRef.getName(),
+            aggTypeDecl->wrappedType.type,
+            aggTypeDecl->ownedScope,
+            LookupMask::Default,
+            LookupOptions::IgnoreBaseInterfaces);
+        if (!lookupResult.isValid() || lookupResult.isOverloaded())
+            return false;
+        auto assocType = DeclRefType::create(m_astBuilder, lookupResult.item.declRef);
+        witnessTable->add(requiredMemberDeclRef.getDecl(), assocType);
+        for (auto typeConstraintDecl : getMembersOfType<TypeConstraintDecl>(m_astBuilder, requiredMemberDeclRef))
+        {
+            auto witness = tryGetSubtypeWitness(assocType, getSup(m_astBuilder, typeConstraintDecl));
+            if (!witness)
+                return false;
+            witnessTable->add(typeConstraintDecl.getDecl(), witness);
+        }
+        return true;
+    }
+
+    bool SemanticsVisitor::trySynthesizeAssociatedConstantRequirementWitness(
+        ConformanceCheckingContext* context,
+        LookupResult const&         inLookupResult,
+        DeclRef<VarDeclBase>        requiredMemberDeclRef,
+        RefPtr<WitnessTable>        witnessTable)
+    {
+        SLANG_UNUSED(inLookupResult);
+
+        // The only case we can synthesize for now is when the conformant type
+        // is a wrapper type, i.e.
+        // struct Foo:IFoo = FooImpl;
+        if (!isWrapperTypeDecl(context->parentDecl))
+            return false;
+
+        // Find the witness that FooImpl : IFoo.
+        auto aggTypeDecl = as<AggTypeDecl>(context->parentDecl);
+        auto innerType = aggTypeDecl->wrappedType.type;
+        DeclRef<Decl> innerProperty;
+        auto innerWitness = tryGetSubtypeWitness(innerType, witnessTable->baseType);
+        if (!innerWitness)
+            return false;
+
+        auto witness = tryLookUpRequirementWitness(m_astBuilder, innerWitness, requiredMemberDeclRef.getDecl());
+        if (witness.getFlavor() != RequirementWitness::Flavor::val)
+            return false;
+        witnessTable->add(requiredMemberDeclRef.getDecl(), witness.getVal());
+        return true;
+    }
 
     bool SemanticsVisitor::trySynthesizeRequirementWitness(
         ConformanceCheckingContext* context,
@@ -4086,6 +4411,23 @@ namespace Slang
                         witnessTable);
                 }
             }
+            else
+            {
+                return trySynthesizeAssociatedTypeRequirementWitness(
+                    context,
+                    lookupResult,
+                    requiredAssocTypeDeclRef,
+                    witnessTable);
+            }
+        }
+
+        if (auto requiredConstantDeclRef = requiredMemberDeclRef.as<VarDeclBase>())
+        {
+            return trySynthesizeAssociatedConstantRequirementWitness(
+                context,
+                lookupResult,
+                requiredConstantDeclRef,
+                witnessTable);
         }
 
         // TODO: There are other kinds of requirements for which synthesis should
@@ -4490,21 +4832,25 @@ namespace Slang
         // requests will be handled further down. For now we include
         // lookup results that might be usable, but not as-is.
         //
-        auto lookupResult = lookUpMember(m_astBuilder, this, name, subType, nullptr, LookupMask::Default, LookupOptions::IgnoreBaseInterfaces);
-
-        if(!lookupResult.isValid())
+        LookupResult lookupResult;
+        if (!isWrapperTypeDecl(context->parentDecl))
         {
-            // If we failed to look up a member with the name of the
-            // requirement, it may be possible that we can still synthesis the
-            // implementation if this is one of the known builtin requirements.
-            // Otherwise, report diagnostic now.
-            if (!requiredMemberDeclRef.getDecl()->hasModifier<BuiltinRequirementModifier>() && 
-                !(requiredMemberDeclRef.as<GenericDecl>() && 
-                    getInner(requiredMemberDeclRef.as<GenericDecl>())->hasModifier<BuiltinRequirementModifier>()))
+            lookupResult = lookUpMember(m_astBuilder, this, name, subType, nullptr, LookupMask::Default, LookupOptions::IgnoreBaseInterfaces);
+
+            if (!lookupResult.isValid())
             {
-                getSink()->diagnose(inheritanceDecl, Diagnostics::typeDoesntImplementInterfaceRequirement, subType, requiredMemberDeclRef);
-                getSink()->diagnose(requiredMemberDeclRef, Diagnostics::seeDeclarationOf, requiredMemberDeclRef);
-                return false;
+                // If we failed to look up a member with the name of the
+                // requirement, it may be possible that we can still synthesis the
+                // implementation if this is one of the known builtin requirements.
+                // Otherwise, report diagnostic now.
+                if (!requiredMemberDeclRef.getDecl()->hasModifier<BuiltinRequirementModifier>() &&
+                    !(requiredMemberDeclRef.as<GenericDecl>() &&
+                        getInner(requiredMemberDeclRef.as<GenericDecl>())->hasModifier<BuiltinRequirementModifier>()))
+                {
+                    getSink()->diagnose(inheritanceDecl, Diagnostics::typeDoesntImplementInterfaceRequirement, subType, requiredMemberDeclRef);
+                    getSink()->diagnose(requiredMemberDeclRef, Diagnostics::seeDeclarationOf, requiredMemberDeclRef);
+                    return false;
+                }
             }
         }
 
@@ -4543,6 +4889,10 @@ namespace Slang
         // used to synthesize an exact-match witness, by generating the
         // code required to handle all the conversions that might be
         // required on `this`.
+        // 
+        // Another situation that will get us here is that we are dealing with
+        // a wrapper type (struct Foo:IFoo=FooImpl), and we will synthesize
+        // wrappers that redirects the call into the inner element.
         //
         if( trySynthesizeRequirementWitness(context, lookupResult, requiredMemberDeclRef, witnessTable) )
         {
@@ -4779,6 +5129,9 @@ namespace Slang
         SubtypeWitness*             subIsSuperWitness,
         WitnessTable*               witnessTable)
     {
+        if (witnessTable->isExtern)
+            return true;
+
         if (auto supereclRefType = as<DeclRefType>(superType))
         {
             auto superTypeDeclRef = supereclRefType->getDeclRef();
@@ -4891,6 +5244,7 @@ namespace Slang
             witnessTable = new WitnessTable();
             witnessTable->baseType = superType;
             witnessTable->witnessedType = subType;
+            witnessTable->isExtern = parentDecl->hasModifier<ExternModifier>();
             inheritanceDecl->witnessTable = witnessTable;
         }
 
@@ -5174,6 +5528,7 @@ namespace Slang
         // order) is allowed to declare a base `class` type.
         //
         SLANG_OUTER_SCOPE_CONTEXT_DECL_RAII(this, decl);
+
         Index inheritanceClauseCounter = 0;
         for (auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
         {
@@ -6539,6 +6894,14 @@ namespace Slang
         }
     }
 
+    void SemanticsDeclBodyVisitor::visitAggTypeDecl(AggTypeDecl* aggTypeDecl)
+    {
+        if (aggTypeDecl->hasTag(TypeTag::Incomplete) && aggTypeDecl->hasModifier<HLSLExportModifier>())
+        {
+            getSink()->diagnose(aggTypeDecl->loc, Diagnostics::cannotExportIncompleteType, aggTypeDecl);
+        }
+    }
+
     void SemanticsDeclHeaderVisitor::cloneModifiers(Decl* dest, Decl* src)
     {
         dest->modifiers = src->modifiers;
@@ -7302,11 +7665,16 @@ namespace Slang
     {
         // Create a new sub-scope to wire the module
         // into our lookup chain.
-        addSiblingScopeForContainerDecl(scope, fileDecl);
+        if (!fileDecl)
+            return;
+        addSiblingScopeForContainerDecl(getASTBuilder(), scope, fileDecl);
     }
 
     void SemanticsVisitor::importModuleIntoScope(Scope* scope, ModuleDecl* moduleDecl)
     {
+        if (!moduleDecl)
+            return;
+
         // If we've imported this one already, then
         // skip the step where we modify the current scope.
         auto& importedModulesList = getShared()->importedModulesList;
@@ -7325,7 +7693,7 @@ namespace Slang
             if (moduleScope->containerDecl != moduleDecl && moduleScope->containerDecl->parentDecl != moduleDecl)
                 continue;
 
-            addSiblingScopeForContainerDecl(scope, moduleScope->containerDecl);
+            addSiblingScopeForContainerDecl(getASTBuilder(), scope, moduleScope->containerDecl);
         }
 
         // Also import any modules from nested `import` declarations
@@ -7547,7 +7915,7 @@ namespace Slang
                     if (addedScopes.add(s->containerDecl))
                     {
                         scopesAdded = true;
-                        addSiblingScopeForContainerDecl(scope, s->containerDecl);
+                        addSiblingScopeForContainerDecl(getASTBuilder(), scope, s->containerDecl);
                     }
                 }
             };
@@ -7608,7 +7976,7 @@ namespace Slang
                     {
                         ensureDecl(ns, DeclCheckState::ScopesWired);
                     }
-                    addSiblingScopeForContainerDecl(decl, otherNamespace);
+                    addSiblingScopeForContainerDecl(getASTBuilder(), decl, otherNamespace);
                 }
             }
             // For file decls, we need to continue searching up in the parent module scope.

@@ -47,17 +47,17 @@ struct SpecializationContext
     // we are specializing.
     IRModule* module;
     DiagnosticSink* sink;
-    TargetRequest* targetRequest;
+    TargetProgram* targetProgram;
 
     bool changed = false;
 
 
-    SpecializationContext(IRModule* inModule, TargetRequest* target)
+    SpecializationContext(IRModule* inModule, TargetProgram* target)
         : workList(*inModule->getContainerPool().getList<IRInst>())
         , workListSet(*inModule->getContainerPool().getHashSet<IRInst>())
         , cleanInsts(*module->getContainerPool().getHashSet<IRInst>())
         , module(inModule)
-        , targetRequest(target)
+        , targetProgram(target)
     {
     }
 
@@ -1524,7 +1524,7 @@ struct SpecializationContext
         //
         addToWorkList(newFunc);
 
-        simplifyFunc(targetRequest, newFunc, IRSimplificationOptions::getFast());
+        simplifyFunc(targetProgram, newFunc, IRSimplificationOptions::getFast());
 
         return newFunc;
     }
@@ -2243,7 +2243,7 @@ struct SpecializationContext
 };
 
 bool specializeModule(
-    TargetRequest* target,
+    TargetProgram* target,
     IRModule* module,
     DiagnosticSink* sink)
 {
@@ -2383,7 +2383,7 @@ IRInst* specializeGenericImpl(
                 // the same thing.
                 if (auto func = as<IRFunc>(specializedVal))
                 {
-                    simplifyFunc(context->targetRequest, func, IRSimplificationOptions::getFast());
+                    simplifyFunc(context->targetProgram, func, IRSimplificationOptions::getFast());
                 }
 
                 return specializedVal;
