@@ -3957,7 +3957,6 @@ namespace Slang
             DiagnosticSink tempSink(getSourceManager(), nullptr);
             SemanticsVisitor subVisitor(withSink(&tempSink));
 
-
             // We start by constructing an expression that represents
             // `this.name` where `name` is the name of the required
             // member. The caller already passed in a `lookupResult`
@@ -3989,12 +3988,12 @@ namespace Slang
             // general-purpose language features is unlikely to be as efficient
             // as special-case logic.
             //
-            Expr* synMemberRef = subVisitor.createLookupResultExpr(
-                    requiredMemberDeclRef.getName(),
-                    lookupResult,
-                    synThis,
-                    requiredMemberDeclRef.getLoc(),
-                    nullptr);
+            auto synMemberRef = subVisitor.createLookupResultExpr(
+                requiredMemberDeclRef.getName(),
+                lookupResult,
+                synThis,
+                requiredMemberDeclRef.getLoc(),
+                nullptr);
             synMemberRef->loc = requiredMemberDeclRef.getLoc();
 
             // The body of the accessor will depend on the class of the accessor
@@ -4833,21 +4832,25 @@ namespace Slang
         // requests will be handled further down. For now we include
         // lookup results that might be usable, but not as-is.
         //
-        auto lookupResult = lookUpMember(m_astBuilder, this, name, subType, nullptr, LookupMask::Default, LookupOptions::IgnoreBaseInterfaces);
-
-        if(!lookupResult.isValid() && !isWrapperTypeDecl(context->parentDecl))
+        LookupResult lookupResult;
+        if (!isWrapperTypeDecl(context->parentDecl))
         {
-            // If we failed to look up a member with the name of the
-            // requirement, it may be possible that we can still synthesis the
-            // implementation if this is one of the known builtin requirements.
-            // Otherwise, report diagnostic now.
-            if (!requiredMemberDeclRef.getDecl()->hasModifier<BuiltinRequirementModifier>() && 
-                !(requiredMemberDeclRef.as<GenericDecl>() && 
-                    getInner(requiredMemberDeclRef.as<GenericDecl>())->hasModifier<BuiltinRequirementModifier>()))
+            lookupResult = lookUpMember(m_astBuilder, this, name, subType, nullptr, LookupMask::Default, LookupOptions::IgnoreBaseInterfaces);
+
+            if (!lookupResult.isValid())
             {
-                getSink()->diagnose(inheritanceDecl, Diagnostics::typeDoesntImplementInterfaceRequirement, subType, requiredMemberDeclRef);
-                getSink()->diagnose(requiredMemberDeclRef, Diagnostics::seeDeclarationOf, requiredMemberDeclRef);
-                return false;
+                // If we failed to look up a member with the name of the
+                // requirement, it may be possible that we can still synthesis the
+                // implementation if this is one of the known builtin requirements.
+                // Otherwise, report diagnostic now.
+                if (!requiredMemberDeclRef.getDecl()->hasModifier<BuiltinRequirementModifier>() &&
+                    !(requiredMemberDeclRef.as<GenericDecl>() &&
+                        getInner(requiredMemberDeclRef.as<GenericDecl>())->hasModifier<BuiltinRequirementModifier>()))
+                {
+                    getSink()->diagnose(inheritanceDecl, Diagnostics::typeDoesntImplementInterfaceRequirement, subType, requiredMemberDeclRef);
+                    getSink()->diagnose(requiredMemberDeclRef, Diagnostics::seeDeclarationOf, requiredMemberDeclRef);
+                    return false;
+                }
             }
         }
 
@@ -4886,6 +4889,10 @@ namespace Slang
         // used to synthesize an exact-match witness, by generating the
         // code required to handle all the conversions that might be
         // required on `this`.
+        // 
+        // Another situation that will get us here is that we are dealing with
+        // a wrapper type (struct Foo:IFoo=FooImpl), and we will synthesize
+        // wrappers that redirects the call into the inner element.
         //
         if( trySynthesizeRequirementWitness(context, lookupResult, requiredMemberDeclRef, witnessTable) )
         {
