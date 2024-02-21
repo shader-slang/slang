@@ -60,7 +60,7 @@ bool testShuffleX() {
         && testVShuffleX<float, 3>()
         && testVShuffleX<float, 4>()
         && test1ShuffleX<double>() // WARNING: intel GPU's lack FP64 support
-           && testVShuffleX<double, 2>()
+        && testVShuffleX<double, 2>()
         && testVShuffleX<double, 3>()
         && testVShuffleX<double, 4>()
         && test1ShuffleX<half>() 

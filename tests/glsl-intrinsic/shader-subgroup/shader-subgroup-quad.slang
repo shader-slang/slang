@@ -67,7 +67,7 @@ bool testQuadSwapX() {
         && testVQuadX<float, 3>()
         && testVQuadX<float, 4>()
         && test1QuadX<double>() // WARNING: intel GPU's lack FP64 support
-           && testVQuadX<double, 2>()
+        && testVQuadX<double, 2>()
         && testVQuadX<double, 3>()
         && testVQuadX<double, 4>()
         && test1QuadX<half>() 

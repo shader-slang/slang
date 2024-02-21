@@ -10,8 +10,7 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
 #version 430
 
-#define DEF_BLOCK
-#if defined(DEF_BLOCK)\
+#if 1                       \
     && !defined(TARGET_HLSL) \
     && !defined(TARGET_CUDA)
 // hlsl does not treat boolean types with subgroup.* as a logical operator
@@ -41,7 +40,7 @@ bool test1Logical() {
         && subgroupExclusiveAnd(T(1)) == T(1)
         && subgroupExclusiveOr(T(1)) == T(1)
         && subgroupExclusiveXor(T(1)) == T(1)
-#endif // #if !defined(TEST_when_logical_operators_are_implemented)
+#endif // #if defined(TEST_when_logical_operators_are_implemented)
         ;
 }
 
@@ -50,8 +49,7 @@ bool testVLogical() {
     typealias gvec = vector<T, N>;
 
     return true
-#if !defined(TEST_when_logical_operators_are_implemented)
-
+#if defined(TEST_when_logical_operators_are_implemented)
         && subgroupAnd(gvec(T(1))) == gvec(T(1))
         && subgroupOr(gvec(T(1))) == gvec(T(1))
         && subgroupXor(gvec(T(1))) == gvec(T(0))
@@ -61,7 +59,7 @@ bool testVLogical() {
         && subgroupExclusiveAnd(gvec(T(1))) == gvec(T(1))
         && subgroupExclusiveOr(gvec(T(1))) == gvec(T(1))
         && subgroupExclusiveXor(gvec(T(1))) == gvec(T(1))
-#endif // #if !defined(TEST_when_logical_operators_are_implemented)
+#endif // #if defined(TEST_when_logical_operators_are_implemented)
         ;
 }
 
@@ -198,9 +196,11 @@ void computeMain()
     bool res0 = true
             && testLogical()
             ;
+    
     bool res1 = true
             && testArithmetic()
             ;
+
     if (gl_LocalInvocationID.x == 3) {
         // seperate so if there is an erroneous error the "major"
         // tests are issolated into 2 branches without polluting the

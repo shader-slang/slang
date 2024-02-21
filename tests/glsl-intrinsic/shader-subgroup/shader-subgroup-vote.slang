@@ -65,7 +65,7 @@ bool testAllEqual() {
         && testVAllEqual<float, 3>()
         && testVAllEqual<float, 4>()
         && test1AllEqual<double>() // WARNING: intel GPU's lack FP64 support
-           && testVAllEqual<double, 2>()
+        && testVAllEqual<double, 2>()
         && testVAllEqual<double, 3>()
         && testVAllEqual<double, 4>()
         && test1AllEqual<half>() 
@@ -147,14 +147,12 @@ void computeMain()
         outputBuffer.data[3] = 2;
     }
 
-
     outputBuffer.data[4] = 1;
 
     if (testAllEqual()) {
         subgroupBarrier();
         outputBuffer.data[4] = 2;
     }
-
 
     // CHECK_GLSL: void main(
     // CHECK_SPV: OpEntryPoint

@@ -110,7 +110,7 @@ bool testArithmetic() {
         && testVArithmetic<float, 3>()
         && testVArithmetic<float, 4>()
         && test1Arithmetic<double>() // WARNING: intel GPU's lack FP64 support
-           && testVArithmetic<double, 2>() 
+        && testVArithmetic<double, 2>() 
         && testVArithmetic<double, 3>()
         && testVArithmetic<double, 4>()
         && test1Arithmetic<half>() 

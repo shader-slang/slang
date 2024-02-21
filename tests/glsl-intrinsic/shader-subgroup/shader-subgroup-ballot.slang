@@ -66,7 +66,7 @@ bool testBroadcastX() {
         && testVBroadcastX<float, 3>()
         && testVBroadcastX<float, 4>()
         && test1BroadcastX<double>() // WARNING: intel GPU's lack FP64 support
-           && testVBroadcastX<double, 2>()
+        && testVBroadcastX<double, 2>()
         && testVBroadcastX<double, 3>()
         && testVBroadcastX<double, 4>()
         && test1BroadcastX<half>() 

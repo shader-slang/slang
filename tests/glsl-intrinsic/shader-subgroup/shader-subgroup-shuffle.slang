@@ -12,6 +12,14 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
 #version 430
 
+#if 1                       \
+    && !defined(TARGET_HLSL) \
+    && !defined(TARGET_CUDA)
+// hlsl is missing an implementation
+// cuda is missing an implementation
+#define TEST_when_subgroupShuffleXor_is_implemented
+#endif
+
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 buffer MyBlockName2 
 {
@@ -24,9 +32,9 @@ __generic<T : __BuiltinLogicalType>
 bool test1ShuffleX() {
     return true
         && subgroupShuffle(T(1), 1) == T(1)
-#if !defined(TARGET_CUDA) && !defined(TARGET_HLSL)
+#ifdef TEST_when_subgroupShuffleXor_is_implemented
         && subgroupShuffleXor(T(1), 1) == T(1)
-#endif // #if !defined(TARGET_CUDA) && !defined(TARGET_HLSL)
+#endif // #ifdef TEST_when_subgroupShuffleXor_is_implemented
         ;
 }
 __generic<T : __BuiltinLogicalType, let N : int>
@@ -35,9 +43,9 @@ bool testVShuffleX() {
 
     return true
         && subgroupShuffle(gvec(T(1)), 1) == gvec(T(1))
-#if !defined(TARGET_CUDA) && !defined(TARGET_HLSL)
+#ifdef TEST_when_subgroupShuffleXor_is_implemented
         && subgroupShuffleXor(gvec(T(1)), 1) == gvec(T(1))
-#endif // #if !defined(TARGET_CUDA) && !defined(TARGET_HLSL)
+#endif // #ifdef TEST_when_subgroupShuffleXor_is_implemented
         ;
 }
 
@@ -68,7 +76,7 @@ bool testShuffleX() {
         && testVShuffleX<float, 3>()
         && testVShuffleX<float, 4>()
         && test1ShuffleX<double>() // WARNING: intel GPU's lack FP64 support
-           && testVShuffleX<double, 2>()
+        && testVShuffleX<double, 2>()
         && testVShuffleX<double, 3>()
         && testVShuffleX<double, 4>()
         && test1ShuffleX<half>() 
