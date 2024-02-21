@@ -5878,7 +5878,7 @@ SlangResult EndToEndCompileRequest::getEntryPointCodeBlob(int entryPointIndex, i
     SLANG_RETURN_ON_FAIL(_getEntryPointResult(this, entryPointIndex, targetIndex, artifact));
     SLANG_RETURN_ON_FAIL(artifact->loadBlob(ArtifactKeep::Yes, outBlob));
 
-    return SLANG_E_NOT_AVAILABLE;
+    return SLANG_OK;
 }
 
 SlangResult EndToEndCompileRequest::getEntryPointHostCallable(int entryPointIndex, int targetIndex, ISlangSharedLibrary** outSharedLibrary)
@@ -5887,7 +5887,7 @@ SlangResult EndToEndCompileRequest::getEntryPointHostCallable(int entryPointInde
     ComPtr<IArtifact> artifact;
     SLANG_RETURN_ON_FAIL(_getEntryPointResult(this, entryPointIndex, targetIndex, artifact));
     SLANG_RETURN_ON_FAIL(artifact->loadSharedLibrary(ArtifactKeep::Yes, outSharedLibrary));
-    return SLANG_E_NOT_AVAILABLE;
+    return SLANG_OK;
 }
 
 SlangResult EndToEndCompileRequest::getTargetCodeBlob(int targetIndex, ISlangBlob** outBlob)
