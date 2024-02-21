@@ -479,6 +479,8 @@ void ASTIterator<CallbackFunc, FilterFunc>::visitDecl(DeclBase* decl)
         {
             visitDecl(member);
         }
+        if (auto aggTypeDecl = as<AggTypeDecl>(decl))
+            visitExpr(aggTypeDecl->wrappedType.exp);
     }
     for (auto modifier : decl->modifiers)
     {

@@ -519,7 +519,7 @@ void WorkspaceVersion::ensureWorkspaceFlavor(UnownedStringSlice path)
         // Setup linkage for vfx files.
         // TODO: consider supporting this as an external config file.
         flavor = WorkspaceFlavor::VFX;
-        linkage->setEnableEffectAnnotations(true);
+        linkage->m_optionSet.set(CompilerOptionName::EnableEffectAnnotations, true);
         linkage->addPreprocessorDefine("VS", "__file_decl");
         linkage->addPreprocessorDefine("CS", "__file_decl");
         linkage->addPreprocessorDefine("GS", "__file_decl");

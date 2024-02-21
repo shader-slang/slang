@@ -95,6 +95,18 @@ option(SLANG_ENABLE_SLANG_GLSLANG "Enable glslang dependency and slang-glslang w
 option(SLANG_ENABLE_TESTS "Enable test targets, requires SLANG_ENABLE_GFX, SLANG_ENABLE_SLANGD and SLANG_ENABLE_SLANGRT" ON)
 option(SLANG_ENABLE_EXAMPLES "Enable example targets, requires SLANG_ENABLE_GFX" ON)
 
+enum_option(
+    SLANG_LIB_TYPE 
+    # Default
+    SHARED
+    "How to build the slang lib:"
+    # Options
+    SHARED
+    "Build slang as a shared library (default)"
+    STATIC
+    "Build slang as a static library"
+)
+
 set(SLANG_GENERATORS_PATH
     ""
     CACHE PATH

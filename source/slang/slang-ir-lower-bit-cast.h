@@ -8,8 +8,8 @@ namespace Slang
 {
 
 struct IRModule;
-class TargetRequest;
+class TargetProgram;
 
-void lowerBitCast(TargetRequest* targetReq, IRModule* module);
+void lowerBitCast(TargetProgram* targetReq, IRModule* module);
 
 }

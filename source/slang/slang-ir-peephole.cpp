@@ -18,7 +18,7 @@ struct PeepholeContext : InstPassBase
     bool removeOldInst = true;
     bool isInGeneric = false;
 
-    TargetRequest* targetRequest;
+    TargetProgram* targetProgram;
 
     void maybeRemoveOldInst(IRInst* inst)
     {
@@ -965,13 +965,13 @@ struct PeepholeContext : InstPassBase
             }
         case kIROp_GetNaturalStride:
         {
-            if (targetRequest)
+            if (targetProgram)
             {
                 if (isInGeneric)
                     break;
                 auto type = inst->getOperand(0)->getDataType();
                 IRSizeAndAlignment sizeAlignment;
-                getNaturalSizeAndAlignment(targetRequest, type, &sizeAlignment);
+                getNaturalSizeAndAlignment(targetProgram->getOptionSet(), type, &sizeAlignment);
                 IRBuilder builder(module);
                 builder.setInsertBefore(inst);
                 auto stride = builder.getIntValue(inst->getDataType(), sizeAlignment.getStride());
@@ -1069,24 +1069,24 @@ struct PeepholeContext : InstPassBase
     }
 };
 
-bool peepholeOptimize(TargetRequest* target, IRModule* module)
+bool peepholeOptimize(TargetProgram* target, IRModule* module)
 {
     PeepholeContext context = PeepholeContext(module);
-    context.targetRequest = target;
+    context.targetProgram = target;
     return context.processModule();
 }
 
-bool peepholeOptimize(TargetRequest* target, IRInst* func)
+bool peepholeOptimize(TargetProgram* target, IRInst* func)
 {
     PeepholeContext context = PeepholeContext(func->getModule());
-    context.targetRequest = target;
+    context.targetProgram = target;
     return context.processFunc(func);
 }
 
-bool peepholeOptimizeGlobalScope(TargetRequest* target, IRModule* module)
+bool peepholeOptimizeGlobalScope(TargetProgram* target, IRModule* module)
 {
     PeepholeContext context = PeepholeContext(module);
-    context.targetRequest = target;
+    context.targetProgram = target;
 
     bool result = false;
     for (;;)
@@ -1101,13 +1101,13 @@ bool peepholeOptimizeGlobalScope(TargetRequest* target, IRModule* module)
     return result;
 }
 
-bool tryReplaceInstUsesWithSimplifiedValue(TargetRequest* target, IRModule* module, IRInst* inst)
+bool tryReplaceInstUsesWithSimplifiedValue(TargetProgram* target, IRModule* module, IRInst* inst)
 {
     if (inst != tryConstantFoldInst(module, inst))
         return true;
 
     PeepholeContext context = PeepholeContext(inst->getModule());
-    context.targetRequest = target;
+    context.targetProgram = target;
     context.removeOldInst = false;
     context.processInst(inst);
     return context.changed;

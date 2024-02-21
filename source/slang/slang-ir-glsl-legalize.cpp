@@ -2693,7 +2693,7 @@ void legalizeEntryPointParameterForGLSL(
 
 bool shouldUseOriginalEntryPointName(CodeGenContext* codeGenContext)
 {
-    if (auto hlslOptions = codeGenContext->getTargetReq()->getHLSLToVulkanLayoutOptions())
+    if (auto hlslOptions = codeGenContext->getTargetProgram()->getHLSLToVulkanLayoutOptions())
     {
         if (hlslOptions->getUseOriginalEntryPointName())
         {

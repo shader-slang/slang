@@ -24,12 +24,12 @@ namespace Slang
         }
     }
 
-    void specializeMatrixLayout(TargetRequest* target, IRModule* module)
+    void specializeMatrixLayout(TargetProgram* target, IRModule* module)
     {
         List<IRMatrixType*> typeWorkList;
         visitParent(typeWorkList, module->getModuleInst());
 
-        IRIntegerValue defaultLayout = target->getDefaultMatrixLayoutMode();
+        IRIntegerValue defaultLayout = target->getOptionSet().getMatrixLayoutMode();
         if (defaultLayout == SLANG_MATRIX_LAYOUT_MODE_UNKNOWN)
             defaultLayout = SLANG_MATRIX_LAYOUT_ROW_MAJOR;
 

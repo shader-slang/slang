@@ -495,6 +495,7 @@ Result ShaderObjectImpl::_createSpecializedLayout(ShaderObjectLayoutImpl** outLa
     auto renderer = getRenderer();
     RefPtr<ShaderObjectLayoutImpl> layout;
     SLANG_RETURN_ON_FAIL(renderer->getShaderObjectLayout(
+        m_layout->m_slangSession,
         extendedType.slangType,
         m_layout->getContainerType(),
         (ShaderObjectLayoutBase**)layout.writeRef()));

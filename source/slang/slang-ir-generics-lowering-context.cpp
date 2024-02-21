@@ -66,7 +66,7 @@ namespace Slang
 
         // For now the only type info we encapsualte is type size.
         IRSizeAndAlignment sizeAndAlignment;
-        getNaturalSizeAndAlignment(targetReq, (IRType*)typeInst, &sizeAndAlignment);
+        getNaturalSizeAndAlignment(targetProgram->getOptionSet(), (IRType*)typeInst, &sizeAndAlignment);
         builder->addRTTITypeSizeDecoration(result, sizeAndAlignment.size);
 
         // Give a name to the rtti object.
@@ -235,7 +235,7 @@ namespace Slang
                 //   value must be stored out-of-line.
                 //
                 IRSizeAndAlignment sizeAndAlignment;
-                Result result = getNaturalSizeAndAlignment(targetReq, concreteType, &sizeAndAlignment);
+                Result result = getNaturalSizeAndAlignment(targetProgram->getOptionSet(), concreteType, &sizeAndAlignment);
                 if(SLANG_FAILED(result) || (sizeAndAlignment.size > anyValueSize))
                 {
                     // If the value must be stored out-of-line, we construct
@@ -386,7 +386,7 @@ namespace Slang
         if (outLimit) *outLimit = anyValueSize;
 
         IRSizeAndAlignment sizeAndAlignment;
-        Result result = getNaturalSizeAndAlignment(targetReq, concreteType, &sizeAndAlignment);
+        Result result = getNaturalSizeAndAlignment(targetProgram->getOptionSet(), concreteType, &sizeAndAlignment);
         if (outTypeSize) *outTypeSize = sizeAndAlignment.size;
 
         if(SLANG_FAILED(result) || (sizeAndAlignment.size > anyValueSize))
