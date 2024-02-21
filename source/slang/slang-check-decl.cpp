@@ -7665,11 +7665,16 @@ namespace Slang
     {
         // Create a new sub-scope to wire the module
         // into our lookup chain.
+        if (!fileDecl)
+            return;
         addSiblingScopeForContainerDecl(getASTBuilder(), scope, fileDecl);
     }
 
     void SemanticsVisitor::importModuleIntoScope(Scope* scope, ModuleDecl* moduleDecl)
     {
+        if (!moduleDecl)
+            return;
+
         // If we've imported this one already, then
         // skip the step where we modify the current scope.
         auto& importedModulesList = getShared()->importedModulesList;

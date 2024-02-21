@@ -752,6 +752,12 @@ bool _findAstNodeImpl(ASTLookupContext& context, SyntaxNode* node)
                         return true;
                 }
             }
+            if (auto aggTypeDecl = as<AggTypeDecl>(container))
+            {
+                ASTLookupExprVisitor visitor(&context);
+                if (visitor.dispatchIfNotNull(aggTypeDecl->wrappedType.exp))
+                    return true;
+            }
         }
     }
     return false;

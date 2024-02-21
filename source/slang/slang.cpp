@@ -3302,22 +3302,34 @@ RefPtr<Module> Linkage::loadModule(
         return nullptr;
     }
 
-    loadParsedModule(
-        frontEndReq,
-        translationUnit,
-        name,
-        filePathInfo);
-
+    try
+    {
+        loadParsedModule(
+            frontEndReq,
+            translationUnit,
+            name,
+            filePathInfo);
+    }
+    catch (const Slang::AbortCompilationException&)
+    {
+        // Something is fatally wrong, we should return nullptr.
+        module = nullptr;
+    }
     errorCountAfter = sink->getErrorCount();
 
-    if (errorCountAfter != errorCountBefore && !isInLanguageServer())
+    if (errorCountAfter != errorCountBefore &&
+        (!module || !isInLanguageServer()))
     {
+        // If something is fatally wrong, we want to report
+        // the diagnostic even if we are in language server
+        // and processing a different module.
         _diagnoseErrorInImportedModule(sink);
         // Something went wrong during the parsing, so we should bail out.
         return nullptr;
     }
 
-    module->setPathInfo(filePathInfo);
+    if (module)
+        module->setPathInfo(filePathInfo);
     return module;
 }
 
