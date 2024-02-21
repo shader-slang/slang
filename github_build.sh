@@ -15,10 +15,15 @@ if [[ "" == "${TARGETARCH}" ]]; then
 TARGETARCH=${ARCH}
 fi
 
+glslangBuildFlag=""
+if [[ "aarch64" == "${TARGETARCH}"  && "release" == "${CONFIGURATION}" ]]; then
+    glslangBuildFlag="--build-glslang=true"
+fi
+
 if [[ "${ARCH}" != "${TARGETARCH}" ]]; then
 
 # Create the makefile
-./premake5 gmake2 --cc=${CC} --enable-embed-stdlib=true --arch=${ARCH} --deps=true --no-progress=true
+./premake5 gmake2 --cc=${CC} --enable-embed-stdlib=true --arch=${ARCH} --deps=true --no-progress=true ${glslangBuildFlag}
 
 # Build the configuration
 make config=${CONFIGURATION}_${ARCH} -j`nproc`
@@ -26,11 +31,11 @@ make config=${CONFIGURATION}_${ARCH} -j`nproc`
 rm -rf ./bin
 
 # Create the makefile
-./premake5 gmake2 --cc=${CC} --enable-embed-stdlib=true --arch=${TARGETARCH} --deps=true --no-progress=true  --skip-source-generation=true --deploy-slang-llvm=false --deploy-slang-glslang=false
+./premake5 gmake2 --cc=${CC} --enable-embed-stdlib=true --arch=${TARGETARCH} --deps=true --no-progress=true  --skip-source-generation=true --deploy-slang-llvm=false --deploy-slang-glslang=false ${glslangBuildFlag}
 
 else
 # Create the makefile
-./premake5 gmake2 --cc=${CC} --enable-embed-stdlib=true --arch=${TARGETARCH} --deps=true --no-progress=true
+./premake5 gmake2 --cc=${CC} --enable-embed-stdlib=true --arch=${TARGETARCH} --deps=true --no-progress=true ${glslangBuildFlag}
 fi
 
 # Build the configuration
