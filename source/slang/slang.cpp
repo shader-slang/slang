@@ -3317,8 +3317,7 @@ RefPtr<Module> Linkage::loadModule(
     }
     errorCountAfter = sink->getErrorCount();
 
-    if (errorCountAfter != errorCountBefore &&
-        (!module || !isInLanguageServer()))
+    if (errorCountAfter != errorCountBefore && !isInLanguageServer())
     {
         // If something is fatally wrong, we want to report
         // the diagnostic even if we are in language server
