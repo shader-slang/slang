@@ -6595,6 +6595,7 @@ namespace Slang
 
                 constExpr->value = value;
                 constExpr->type = QualType(suffixType);
+                constExpr->suffixType = suffixBaseType;
 
                 return constExpr;
             }
