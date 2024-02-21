@@ -5287,6 +5287,7 @@ SlangResult emitSPIRVFromIR(
     for (auto ptrType : context.m_forwardDeclaredPointers)
     {
         auto spvPtrType = context.m_mapIRInstToSpvInst[ptrType];
+        context.ensureInst(ptrType->getValueType());
         auto parent = spvPtrType->parent;
         spvPtrType->removeFromParent();
         parent->addInst(spvPtrType);
