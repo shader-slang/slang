@@ -731,6 +731,10 @@ namespace Slang
                     // scope.
                     workList.add(fileDecl);
                 }
+                else if (auto namespaceDecl = as<NamespaceDecl>(globalDecl))
+                {
+                    workList.add(namespaceDecl);
+                }
             }
         }
     }
