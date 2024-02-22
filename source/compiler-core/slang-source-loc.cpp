@@ -4,7 +4,6 @@
 #include "../core/slang-string-util.h"
 #include "../core/slang-string-escape-util.h"
 #include "../core/slang-char-encode.h"
-
 #include "slang-artifact-representation-impl.h"
 #include "slang-artifact-impl.h"
 #include "slang-artifact-util.h"
@@ -600,6 +599,17 @@ SourceFile::SourceFile(SourceManager* sourceManager, const PathInfo& pathInfo, s
 
 SourceFile::~SourceFile()
 {
+}
+
+SHA1::Digest SourceFile::getDigest()
+{
+    if (m_digest == SHA1::Digest())
+    {
+        DigestBuilder<SHA1> builder;
+        builder.append(getContent());
+        m_digest = builder.finalize();
+    }
+    return m_digest;
 }
 
 String SourceFile::calcVerbosePath() const

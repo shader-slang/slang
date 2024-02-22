@@ -3165,12 +3165,19 @@ RefPtr<Module> Linkage::loadModuleFromIRBlobImpl(
     String mostUniqueIdentity = filePathInfo.getMostUniqueIdentity();
     SLANG_ASSERT(mostUniqueIdentity.getLength() > 0);
 
-    mapPathToLoadedModule.add(mostUniqueIdentity, resultModule);
-    mapNameToLoadedModules.add(name, resultModule);
-
     RiffContainer container;
     MemoryStreamBase readStream(FileAccess::Read, fileContentsBlob->getBufferPointer(), fileContentsBlob->getBufferSize());
     SLANG_RETURN_NULL_ON_FAIL(RiffUtil::read(&readStream, container));
+
+    if (m_optionSet.getBoolOption(CompilerOptionName::UseUpToDateBinaryModule))
+    {
+        if (!isBinaryModuleUpToDate(filePathInfo.foundPath, &container))
+            return nullptr;
+    }
+
+    mapPathToLoadedModule.add(mostUniqueIdentity, resultModule);
+    mapNameToLoadedModules.add(name, resultModule);
+
     SerialContainerUtil::ReadOptions readOptions;
     readOptions.linkage = this;
     readOptions.astBuilder = getASTBuilder();
@@ -3180,12 +3187,25 @@ RefPtr<Module> Linkage::loadModuleFromIRBlobImpl(
     readOptions.sourceManager = getSourceManager();
     readOptions.namePool = getNamePool();
     SerialContainerData containerData;
-    SLANG_RETURN_NULL_ON_FAIL(SerialContainerUtil::read(&container, readOptions, additionalLoadedModules, containerData));
-    if (containerData.modules.getCount() != 1)
+    if (SLANG_FAILED(SerialContainerUtil::read(&container, readOptions, additionalLoadedModules, containerData)) ||
+        containerData.modules.getCount() != 1)
+    {
+        mapPathToLoadedModule.remove(mostUniqueIdentity);
+        mapNameToLoadedModules.remove(name);
         return nullptr;
+    }
     auto moduleEntry = containerData.modules.getFirst();
     resultModule->setIRModule(moduleEntry.irModule);
     resultModule->setModuleDecl(as<ModuleDecl>(moduleEntry.astRootNode));
+    resultModule->clearFileDependency();
+    for (auto file : moduleEntry.dependentFiles)
+    {
+        auto sourceFile = loadSourceFile(filePathInfo.foundPath, file);
+        if (sourceFile)
+        {
+            resultModule->addFileDependency(sourceFile);
+        }
+    }
 
     prepareDeserializedModule(resultModule, sink);
 
@@ -3463,7 +3483,7 @@ RefPtr<Module> Linkage::findOrImportModule(
 
         // We've found a file that we can load for the given module, so
         // go ahead and perform the module-load action
-        return loadModule(
+        auto resultModule = loadModule(
             name,
             filePathInfo,
             fileContents,
@@ -3471,12 +3491,75 @@ RefPtr<Module> Linkage::findOrImportModule(
             sink,
             loadedModules,
             (checkBinaryModule == 1 ? ModuleBlobType::IR : ModuleBlobType::Source));
+        if (resultModule)
+            return resultModule;
     }
 
     // Error: we cannot find the file.
     sink->diagnose(loc, Diagnostics::cannotOpenFile, moduleSourceFileName);
     mapNameToLoadedModules[name] = nullptr;
     return nullptr;
+}
+
+SourceFile* Linkage::loadSourceFile(String pathFrom, String path)
+{
+    IncludeSystem includeSystem(&getSearchDirectories(), getFileSystemExt(), getSourceManager());
+    ComPtr<slang::IBlob> blob;
+    PathInfo pathInfo;
+    SLANG_RETURN_NULL_ON_FAIL(includeSystem.findFile(path, pathFrom, pathInfo));
+    SourceFile* sourceFile = nullptr;
+    SLANG_RETURN_NULL_ON_FAIL(includeSystem.loadFile(pathInfo, blob, sourceFile));
+    return sourceFile;
+}
+
+    // Check if a serialized module is up-to-date with current compiler options and source files.
+bool Linkage::isBinaryModuleUpToDate(String fromPath, RiffContainer* container)
+{
+    DiagnosticSink sink;
+    SerialContainerUtil::ReadOptions readOptions;
+    readOptions.linkage = this;
+    readOptions.astBuilder = getASTBuilder();
+    readOptions.session = getSessionImpl();
+    readOptions.sharedASTBuilder = getASTBuilder()->getSharedASTBuilder();
+    readOptions.sink = &sink;
+    readOptions.sourceManager = getSourceManager();
+    readOptions.namePool = getNamePool();
+    readOptions.readHeaderOnly = true;
+
+    SerialContainerData containerData;
+    if (SLANG_FAILED(SerialContainerUtil::read(container, readOptions, nullptr, containerData)))
+        return false;
+
+    if (containerData.modules.getCount() != 1)
+        return false;
+    
+    auto& moduleHeader = containerData.modules[0];
+    DigestBuilder<SHA1> digestBuilder;
+    m_optionSet.buildHash(digestBuilder);
+    for (auto file : moduleHeader.dependentFiles)
+    {
+        auto sourceFile = loadSourceFile(fromPath, file);
+        if (!sourceFile)
+        {
+            // If we cannot find the source file from `fromPath`,
+            // try again from the module's source file path.
+            if (moduleHeader.dependentFiles.getCount() != 0)
+                sourceFile = loadSourceFile(moduleHeader.dependentFiles.getFirst(), file);
+        }
+        if (!sourceFile)
+            return false;
+        digestBuilder.append(sourceFile->getDigest());
+    }
+    return digestBuilder.finalize() == moduleHeader.digest;
+}
+
+SLANG_NO_THROW bool SLANG_MCALL Linkage::isBinaryModuleUpToDate(const char* modulePath, slang::IBlob* binaryModuleBlob)
+{
+    RiffContainer container;
+    MemoryStreamBase readStream(FileAccess::Read, binaryModuleBlob->getBufferPointer(), binaryModuleBlob->getBufferSize());
+    if (SLANG_FAILED(RiffUtil::read(&readStream, container)))
+        return false;
+    return isBinaryModuleUpToDate(modulePath, &container);
 }
 
 SourceFile* Linkage::findFile(Name* name, SourceLoc loc, IncludeSystem& outIncludeSystem)
@@ -3665,7 +3748,7 @@ Module::Module(Linkage* linkage, ASTBuilder* astBuilder)
     {
         m_astBuilder = linkage->getASTBuilder();
     }
-
+    getOptionSet() = linkage->m_optionSet;
     addModuleDependency(this);
 }
 
@@ -4004,9 +4087,7 @@ SLANG_NO_THROW void SLANG_MCALL ComponentType::getEntryPointHash(
     // Enumerate all file dependencies and add them to the hash.
     for (SourceFile* sourceFile : getFileDependencies())
     {
-        // TODO: We want to lazily evaluate & cache the source file digest
-        SHA1::Digest digest = SHA1::compute(sourceFile->getContent().begin(), sourceFile->getContent().getLength());
-        builder.append(digest);
+        builder.append(sourceFile->getDigest());
     }
 
     buildHash(builder);

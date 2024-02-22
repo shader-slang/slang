@@ -53,6 +53,8 @@ struct SerialContainerData
         RefPtr<IRModule> irModule;              ///< The IR for the module
         RefPtr<ASTBuilder> astBuilder;          ///< The astBuilder that owns the astRootNode
         NodeBase* astRootNode = nullptr;        ///< The module decl
+        List<String> dependentFiles;
+        SHA1::Digest digest;
     };
 
     struct EntryPoint
@@ -92,6 +94,7 @@ struct SerialContainerUtil
         ASTBuilder* astBuilder = nullptr; // Optional. If not provided will create one in SerialContainerData.
         Linkage* linkage = nullptr;
         DiagnosticSink* sink = nullptr;
+        bool readHeaderOnly = false;
     };
 
         /// Add module to outData
