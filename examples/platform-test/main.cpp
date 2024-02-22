@@ -25,12 +25,12 @@ void onLostFocus()
 
 void onKeyDown(platform::KeyEventArgs args)
 {
-    printf("onKeyDown(key=0x%02x, buttons=0x%02x)\n", args.key, args.buttons);
+    printf("onKeyDown(key=0x%02x, buttons=0x%02x)\n", (uint32_t)args.key, args.buttons);
 }
 
 void onKeyUp(platform::KeyEventArgs args)
 {
-    printf("okKeyUp(key=0x%02x, buttons=0x%02x)\n", args.key, args.buttons);
+    printf("okKeyUp(key=0x%02x, buttons=0x%02x)\n", (uint32_t)args.key, args.buttons);
 }
 
 void onKeyPress(platform::KeyEventArgs args)

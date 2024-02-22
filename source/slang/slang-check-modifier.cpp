@@ -989,7 +989,6 @@ namespace Slang
         case ASTNodeType::PreciseModifier:
         case ASTNodeType::IntrinsicOpModifier:
         case ASTNodeType::InlineModifier:
-        case ASTNodeType::ExternModifier:
         case ASTNodeType::HLSLExportModifier:
         case ASTNodeType::ExternCppModifier:
         case ASTNodeType::ExportedModifier:
@@ -1029,6 +1028,7 @@ namespace Slang
         case ASTNodeType::PublicModifier:
         case ASTNodeType::PrivateModifier:
         case ASTNodeType::InternalModifier:
+        case ASTNodeType::ExternModifier:
             return ASTNodeType::VisibilityModifier;
 
         default:

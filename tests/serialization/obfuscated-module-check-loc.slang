@@ -11,8 +11,8 @@ RWStructuredBuffer<float> outputBuffer;
 
 // We *don't* import because if we do we'll get a fresh compilation from source... we want to make sure it's using the -r module
 //import obfuscated_loc_module;
-int silly(int v);
-int billy(int v);
+extern int silly(int v);
+extern int billy(int v);
 
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)

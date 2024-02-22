@@ -557,7 +557,7 @@ void initCommandOptions(CommandOptions& options)
     SLANG_ASSERT(options.hasContiguousUserValueRange(CommandOptions::LookupKind::Category, UserValue(0), UserValue(ValueCategory::CountOf)));
 }
 
-SlangResult _addLibraryReference(EndToEndCompileRequest* req, IArtifact* artifact);
+SlangResult _addLibraryReference(EndToEndCompileRequest* req, String path, IArtifact* artifact, bool includeEntryPoint);
 
 class ReproPathVisitor : public Slang::Path::Visitor
 {
@@ -736,6 +736,7 @@ struct OptionsParser
     void _appendMinimalUsage(StringBuilder& out);
     void _outputMinimalUsage();
 
+    SlangResult addReferencedModule(String path, SourceLoc loc, bool includeEntryPoint);
     SlangResult _parseReferenceModule(const CommandLineArg& arg);
     SlangResult _parseReproFileSystem(const CommandLineArg& arg);
     SlangResult _parseLoadRepro(const CommandLineArg& arg);
@@ -771,9 +772,6 @@ struct OptionsParser
     // If we already have a translation unit for Slang code, then this will give its index.
     // If not, it will be `-1`.
     int m_slangTranslationUnitIndex = -1;
-
-    // The number of input files that have been specified
-    int m_inputPathCount = 0;
 
     int m_translationUnitCount = 0;
     int m_currentTranslationUnitIndex = -1;
@@ -931,18 +929,21 @@ SlangSourceLanguage findSourceLanguageFromPath(const String& path, Stage& outImp
 
 SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langOverride )
 {
-    m_inputPathCount++;
-
     // look at the extension on the file name to determine
     // how we should handle it.
     String path = String(inPath);
 
-    if (path.endsWith(".slang") || langOverride == SourceLanguage::Slang)
+    if (path.endsWith(".slang-module"))
+    {
+        return addReferencedModule(path, SourceLoc(), false);
+    }
+    else if (path.endsWith(".slang") || langOverride == SourceLanguage::Slang)
     {
         // Plain old slang code
         addInputSlangPath(path);
         return SLANG_OK;
     }
+    
 
     Stage impliedStage = Stage::Unknown;
     SlangSourceLanguage sourceLanguage = langOverride == SourceLanguage::Unknown ? findSourceLanguageFromPath(path, impliedStage) : SlangSourceLanguage(langOverride);
@@ -1298,20 +1299,13 @@ SlangResult OptionsParser::_expectInt(const CommandLineArg& initArg, Int& outInt
     return SLANG_OK;
 }
 
-SlangResult OptionsParser::_parseReferenceModule(const CommandLineArg& arg)
+SlangResult OptionsParser::addReferencedModule(String path, SourceLoc loc, bool includeEntryPoint)
 {
-    SLANG_UNUSED(arg);
-
-    CommandLineArg referenceModuleName;
-    SLANG_RETURN_ON_FAIL(m_reader.expectArg(referenceModuleName));
-
-    const auto path = referenceModuleName.value;
-
     auto desc = ArtifactDescUtil::getDescFromPath(path.getUnownedSlice());
 
     if (desc.kind == ArtifactKind::Unknown)
     {
-        m_sink->diagnose(referenceModuleName.loc, Diagnostics::unknownLibraryKind, Path::getPathExt(path));
+        m_sink->diagnose(loc, Diagnostics::unknownLibraryKind, Path::getPathExt(path));
         return SLANG_FAIL;
     }
 
@@ -1329,7 +1323,7 @@ SlangResult OptionsParser::_parseReferenceModule(const CommandLineArg& arg)
 
     if (!ArtifactDescUtil::isLinkable(desc))
     {
-        m_sink->diagnose(referenceModuleName.loc, Diagnostics::kindNotLinkable, Path::getPathExt(path));
+        m_sink->diagnose(loc, Diagnostics::kindNotLinkable, Path::getPathExt(path));
         return SLANG_FAIL;
     }
 
@@ -1354,14 +1348,34 @@ SlangResult OptionsParser::_parseReferenceModule(const CommandLineArg& arg)
         fileRep = new OSFileArtifactRepresentation(IOSFileArtifactRepresentation::Kind::Reference, path.getUnownedSlice(), nullptr);
         if (!fileRep->exists())
         {
-            m_sink->diagnose(referenceModuleName.loc, Diagnostics::libraryDoesNotExist, path);
+            m_sink->diagnose(loc, Diagnostics::libraryDoesNotExist, path);
             return SLANG_FAIL;
         }
     }
     artifact->addRepresentation(fileRep);
 
-    SLANG_RETURN_ON_FAIL(_addLibraryReference(m_requestImpl, artifact));
+    SLANG_RETURN_ON_FAIL(_addLibraryReference(m_requestImpl, path, artifact, includeEntryPoint));
+    for (Index i = m_rawTranslationUnits.getCount(); i < m_requestImpl->getTranslationUnitCount(); i++)
+    {
+        RawTranslationUnit rawTU;
+        rawTU.translationUnitID = (int)i;
+        rawTU.impliedStage = Stage::Unknown;
+        rawTU.sourceLanguage = SLANG_SOURCE_LANGUAGE_SLANG;
+        m_rawTranslationUnits.add(rawTU);
+    }
+    m_currentTranslationUnitIndex = m_requestImpl->getTranslationUnitCount() - 1;
+    m_slangTranslationUnitIndex = m_currentTranslationUnitIndex;
     return SLANG_OK;
+}
+
+SlangResult OptionsParser::_parseReferenceModule(const CommandLineArg& arg)
+{
+    SLANG_UNUSED(arg);
+
+    CommandLineArg referenceModuleName;
+    SLANG_RETURN_ON_FAIL(m_reader.expectArg(referenceModuleName));
+
+    return addReferencedModule(referenceModuleName.value, referenceModuleName.loc, true);
 }
 
 SlangResult OptionsParser::_parseReproFileSystem(const CommandLineArg& arg)
@@ -2367,7 +2381,8 @@ SlangResult OptionsParser::_parse(
             entryPoint.translationUnitIndex = 0;
         }
     }
-    else
+    else if (m_frontEndReq->additionalLoadedModules &&
+        m_frontEndReq->additionalLoadedModules->getCount() == 0)
     {
         // Otherwise, we require that all entry points be specified after
         // the translation unit to which tye belong.
@@ -2874,7 +2889,13 @@ SlangResult OptionsParser::_parse(
         {
             if (rawOutput.entryPointIndex == -1) continue;
 
-            Int entryPointID = m_rawEntryPoints[rawOutput.entryPointIndex].entryPointID;
+            auto entryPoint = m_rawEntryPoints[rawOutput.entryPointIndex];
+            Int entryPointID = entryPoint.entryPointID;
+            if (entryPointID == -1)
+            {
+                m_sink->diagnose(SourceLoc(), Diagnostics::entryPointFunctionNotFound, entryPoint.name);
+                continue;
+            }
             auto entryPointReq = m_requestImpl->getFrontEndReq()->getEntryPointReqs()[entryPointID];
 
             //String outputPath;

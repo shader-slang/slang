@@ -1,14 +1,9 @@
 //TEST_IGNORE_FILE:
 
 // obfuscated-serialized-module.slang
+import obfuscated_serialized_module_shared;
 
-struct Thing
-{
-    int a; 
-    int b;
-};
-
-int foo(Thing thing) 
+export int foo(Thing thing) 
 { 
     return (thing.a + thing.b) - thing.b; 
 }

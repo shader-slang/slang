@@ -2,13 +2,9 @@
 
 // serialized-module.slang
 
-struct Thing
-{
-    int a; 
-    int b;
-};
+import serialized_module_shared;
 
-int foo(Thing thing) 
+export int foo(Thing thing) 
 { 
     return (thing.a + thing.b) - thing.b; 
 }

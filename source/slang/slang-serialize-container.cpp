@@ -83,21 +83,29 @@ namespace Slang {
         DigestBuilder<SHA1> digestBuilder;
         module->getOptionSet().buildHash(digestBuilder);
         auto fileDependencies = module->getFileDependencies();
-        String canonicalModulePath;
+        String canonicalModulePath, moduleDir;
         if (auto modulePath = module->getFilePath())
         {
-            canonicalModulePath = Path::getParentDirectory(modulePath);
+            canonicalModulePath = modulePath;
             Path::getCanonical(canonicalModulePath, canonicalModulePath);
+            moduleDir = Path::getParentDirectory(canonicalModulePath);
         }
         for (auto file : fileDependencies)
         {
             digestBuilder.append(file->getDigest());
             if (file->getPathInfo().hasFoundPath())
             {
-                String canonicalFilePath = file->getPathInfo().foundPath;
-                Path::getCanonical(file->getPathInfo().foundPath, canonicalFilePath);
-                canonicalFilePath = Path::getRelativePath(canonicalModulePath, canonicalFilePath);
-                dstModule.dependentFiles.add(canonicalFilePath);
+                if (file->getPathInfo().foundPath == canonicalModulePath)
+                {
+                    dstModule.dependentFiles.add(Path::getFileName(canonicalModulePath));
+                }
+                else
+                {
+                    String canonicalFilePath = file->getPathInfo().foundPath;
+                    Path::getCanonical(file->getPathInfo().foundPath, canonicalFilePath);
+                    canonicalFilePath = Path::getRelativePath(moduleDir, canonicalFilePath);
+                    dstModule.dependentFiles.add(canonicalFilePath);
+                }
             }
             else
             {
@@ -109,6 +117,20 @@ namespace Slang {
     }
 
     return SLANG_OK;
+}
+
+
+static SlangResult _addModuleRecursive(HashSet<Module*>& processedModuleSet, const SerialContainerUtil::WriteOptions& options, SerialContainerData& container, Module* module)
+{
+    if (processedModuleSet.contains(module))
+        return SLANG_OK;
+    for (auto m : module->getModuleDependencies())
+    {
+        if (m != module)
+            _addModuleRecursive(processedModuleSet, options, container, m);
+    }
+    processedModuleSet.add(module);
+    return SerialContainerUtil::addModuleToData(module, options, container);
 }
 
 
@@ -124,12 +146,12 @@ namespace Slang {
 }
 
 /* static */SlangResult SerialContainerUtil::addEndToEndRequestToData(EndToEndCompileRequest* request, const WriteOptions& options, SerialContainerData& out)
-{    
+{
     auto linkage = request->getLinkage();
     auto sink = request->getSink();
 
-    // Output the front end request data
-    SLANG_RETURN_ON_FAIL(addFrontEndRequestToData(request->getFrontEndReq(), options, out));
+    // Output the parsed modules.
+    addFrontEndRequestToData(request->getFrontEndReq(), options, out);
 
     //
     auto program = request->getSpecializedGlobalAndEntryPointsComponentType();
@@ -388,6 +410,19 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
         SLANG_RETURN_ON_FAIL(sourceLocReader->read(&sourceLocData, options.sourceManager));
     }
 
+    // Create a source loc representing the binary module.
+    SourceLoc binaryModuleLoc = SourceLoc();
+
+    if (options.modulePath.getLength())
+    {
+        auto srcManager = options.linkage->getSourceManager();
+        auto modulePathInfo = PathInfo::makePath(options.modulePath);
+        auto srcFile = srcManager->createSourceFileWithString(modulePathInfo, String());
+        srcManager->addSourceFile(options.modulePath, srcFile);
+        auto srcView = srcManager->createSourceView(srcFile, &modulePathInfo, SourceLoc());
+        binaryModuleLoc = srcView->getRange().begin;
+    }
+
     // Add modules
     if (RiffContainer::ListChunk* moduleList = containerChunk->findContainedList(SerialBinary::kModuleListFourCc))
     {
@@ -400,10 +435,8 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
             NodeBase* astRootNode = nullptr;
             RefPtr<IRModule> irModule;
             SerialContainerData::Module module;
-            bool hasHeader = false;
             if (auto headerChunk = as<RiffContainer::DataChunk>(chunk, SerialBinary::kModuleHeaderFourCc))
             {
-                hasHeader = true;
                 MemoryStreamBase memStream(
                     FileAccess::Read,
                     headerChunk->getSingleData()->getPayload(),
@@ -507,10 +540,18 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
                                 const SerialInfo::Entry* entry = entries[i];
                                 if (entry->typeKind == SerialTypeKind::ImportSymbol)
                                 {
+                                    // Import symbols are always serialized with a mangled name in the form of
+                                    // <module_name>!<symbol_mangled_name>.
+                                    // As symbol_mangled_name may not contain the name of its parent module
+                                    // in the case of an `extern` or `export` symbol.
+                                    //
                                     UnownedStringSlice mangledName = reader.getStringSlice(SerialIndex(i));
-
-                                    String moduleName;
-                                    SLANG_RETURN_ON_FAIL(MangledNameParser::parseModuleName(mangledName, moduleName));
+                                    List<UnownedStringSlice> slicesOut;
+                                    StringUtil::split(mangledName, '!', slicesOut);
+                                    if (slicesOut.getCount() != 2)
+                                        return SLANG_FAIL;
+                                    auto moduleName = slicesOut[0];
+                                    mangledName = slicesOut[1];
 
                                     // If we already have looked up this module and it has the same name just use what we have
                                     Module* readModule = nullptr;
@@ -525,8 +566,7 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
 
                                         NamePool* namePool = linkage->getNamePool();
                                         Name* moduleNameName = namePool->getName(moduleName);
-
-                                        readModule = linkage->findOrImportModule(moduleNameName, SourceLoc::fromRaw(0), options.sink, additionalLoadedModules);
+                                        readModule = linkage->findOrImportModule(moduleNameName, binaryModuleLoc, options.sink, additionalLoadedModules);
                                         if (!readModule)
                                         {
                                             return SLANG_FAIL;
