@@ -256,6 +256,12 @@ namespace Slang
             /// Add all of the paths that `module` depends on to the list
         void addDependency(Module* module);
 
+        void clear()
+        {
+            m_fileList.clear();
+            m_fileSet.clear();
+        }
+
     private:
 
         // TODO: We are using a `HashSet` here to deduplicate
@@ -1400,6 +1406,7 @@ namespace Slang
             /// Register a source file that this module depends on
         void addFileDependency(SourceFile* sourceFile);
 
+        void clearFileDependency() { m_fileDependencyList.clear(); }
             /// Set the AST for this module.
             ///
             /// This should only be called once, during creation of the module.
@@ -1819,6 +1826,7 @@ namespace Slang
             SlangCompileRequest**   outCompileRequest) override;
         virtual SLANG_NO_THROW SlangInt SLANG_MCALL getLoadedModuleCount() override;
         virtual SLANG_NO_THROW slang::IModule* SLANG_MCALL getLoadedModule(SlangInt index) override;
+        virtual SLANG_NO_THROW bool SLANG_MCALL isBinaryModuleUpToDate(const char* modulePath, slang::IBlob* binaryModuleBlob) override;
 
         // Updates the supplied builder with linkage-related information, which includes preprocessor
         // defines, the compiler version, and other compiler options. This is then merged with the hash
@@ -1952,6 +1960,8 @@ namespace Slang
             DiagnosticSink* sink,
             const LoadedModuleDictionary* additionalLoadedModules);
 
+        SourceFile* loadSourceFile(String pathFrom, String path);
+
         void loadParsedModule(
             RefPtr<FrontEndCompileRequest>  compileRequest,
             RefPtr<TranslationUnitRequest>  translationUnit,
@@ -1960,6 +1970,8 @@ namespace Slang
 
             /// Load a module of the given name.
         Module* loadModule(String const& name);
+
+        bool isBinaryModuleUpToDate(String fromPath, RiffContainer* container);
 
         RefPtr<Module> findOrImportModule(
             Name*               name,

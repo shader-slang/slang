@@ -947,6 +947,8 @@ extern "C"
             DebugInformationFormat,     // intValue0: DebugInfoFormat
             VulkanBindShiftAll,         // intValue0: kind; intValue1: shift
             GenerateWholeProgram,       // bool
+            UseUpToDateBinaryModule,    // bool, when set, will only load
+                                        // precompiled modules if it is up-to-date with its source.
 
             CountOf,
         };
@@ -4633,6 +4635,12 @@ namespace slang
 
         virtual SLANG_NO_THROW SlangInt SLANG_MCALL getLoadedModuleCount() = 0;
         virtual SLANG_NO_THROW IModule* SLANG_MCALL getLoadedModule(SlangInt index) = 0;
+
+            /** Checks if a precompiled binary module is up-to-date with the current compiler
+            *   option settings and the source file contents.
+            */
+        virtual SLANG_NO_THROW bool SLANG_MCALL isBinaryModuleUpToDate(
+            const char* modulePath, slang::IBlob* binaryModuleBlob) = 0;
     };
 
     #define SLANG_UUID_ISession ISession::getTypeGuid()

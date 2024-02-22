@@ -213,6 +213,9 @@ namespace Slang
         static SlangResult remove(const String& path);
 
         static bool equals(String path1, String path2);
+
+            /// Turn `path` into a relative path from base.
+        static String getRelativePath(String base, String path);
     };
 
     struct URI
