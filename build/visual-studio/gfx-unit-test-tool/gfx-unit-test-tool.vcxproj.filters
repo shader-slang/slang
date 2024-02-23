@@ -83,6 +83,9 @@
     <ClCompile Include="..\..\..\tools\gfx-unit-test\precompiled-module-2.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\precompiled-module-cache.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\tools\gfx-unit-test\precompiled-module.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

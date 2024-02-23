@@ -1384,7 +1384,7 @@ namespace Slang
         //
         if(!expr->type.type)
         {
-            expr->type = m_astBuilder->getIntType();
+            expr->type = m_astBuilder->getBuiltinType(expr->suffixType);
         }
         return expr;
     }
@@ -1393,7 +1393,7 @@ namespace Slang
     {
         if(!expr->type.type)
         {
-            expr->type = m_astBuilder->getFloatType();
+            expr->type = m_astBuilder->getBuiltinType(expr->suffixType);
         }
         return expr;
     }
