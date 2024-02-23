@@ -2625,21 +2625,7 @@ SlangResult OptionsParser::_parse(
 
     if (m_rawTargets.getCount() == 1)
     {
-        if (m_defaultTarget.optionSet.getProfileVersion() != ProfileVersion::Unknown)
-        {
-            setProfileVersion(getCurrentTarget(), m_defaultTarget.optionSet.getProfileVersion());
-        }
-        for (auto atom : m_defaultTarget.optionSet.getArray(CompilerOptionName::Capability))
-        {
-            addCapabilityAtom(getCurrentTarget(), (CapabilityName)atom.intValue);
-        }
-
-        getCurrentTarget()->targetFlags |= m_defaultTarget.targetFlags;
-
-        if (defaultTargetFloatingPointMode != FloatingPointMode::Default)
-        {
-            setFloatingPointMode(getCurrentTarget(), defaultTargetFloatingPointMode);
-        }
+        getCurrentTarget()->optionSet.inheritFrom(m_defaultTarget.optionSet);
     }
     else
     {
