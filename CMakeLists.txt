@@ -285,7 +285,7 @@ generator(
     source/slangc
     TARGET_NAME slang-bootstrap
     USE_FEWER_WARNINGS
-    LINK_WITH_PRIVATE prelude slang-no-embedded-stdlib slang-capability-lookup Threads::Threads
+    LINK_WITH_PRIVATE prelude slang-no-embedded-stdlib slang-capability-lookup slang-lookup-tables Threads::Threads
 )
 
 #
