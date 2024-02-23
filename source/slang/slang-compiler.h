@@ -2023,7 +2023,7 @@ namespace Slang
         DiagnosticSink::Flags diagnosticSinkFlags = 0;
 
         bool m_requireCacheFileSystem = false;
-        
+
         // Modules that have been read in with the -r option
         List<ComPtr<IArtifact>> m_libModules;
 

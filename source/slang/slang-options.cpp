@@ -932,7 +932,7 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
     // how we should handle it.
     String path = String(inPath);
 
-    if (path.endsWith(".slang-module"))
+    if (path.endsWith(".slang-module") || path.endsWith(".slang-lib"))
     {
         return addReferencedModule(path, SourceLoc(), false);
     }
@@ -942,7 +942,6 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
         addInputSlangPath(path);
         return SLANG_OK;
     }
-    
 
     Stage impliedStage = Stage::Unknown;
     SlangSourceLanguage sourceLanguage = langOverride == SourceLanguage::Unknown ? findSourceLanguageFromPath(path, impliedStage) : SlangSourceLanguage(langOverride);

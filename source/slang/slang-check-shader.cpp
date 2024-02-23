@@ -839,6 +839,7 @@ namespace Slang
             {
                 translationUnitComponentTypes.add(tu->getModule());
             }
+
             globalComponentType = CompositeComponentType::create(
                 linkage,
                 translationUnitComponentTypes);

@@ -1028,7 +1028,6 @@ namespace Slang
         case ASTNodeType::PublicModifier:
         case ASTNodeType::PrivateModifier:
         case ASTNodeType::InternalModifier:
-        case ASTNodeType::ExternModifier:
             return ASTNodeType::VisibilityModifier;
 
         default:
