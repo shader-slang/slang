@@ -32,14 +32,14 @@ bool test1Logical() {
     return true
 #if defined(TEST_when_logical_operators_are_implemented)
         && subgroupAnd(T(1)) == T(1)
-        //&& subgroupOr(T(1)) == T(1)
-        //&& subgroupXor(T(1)) == T(0) 
+        && subgroupOr(T(1)) == T(1)
+        && subgroupXor(T(1)) == T(0) 
         //&& subgroupInclusiveAnd(T(1)) == T(1)
         //&& subgroupInclusiveOr(T(1)) == T(1)
         //&& subgroupInclusiveXor(T(1)) == T(0)
-        //&& subgroupExclusiveAnd(T(1)) == T(1)
-        //&& subgroupExclusiveOr(T(1)) == T(1)
-        //&& subgroupExclusiveXor(T(1)) == T(1)
+        && subgroupExclusiveAnd(T(1)) == T(1)
+        && subgroupExclusiveOr(T(1)) == T(1)
+        && subgroupExclusiveXor(T(1)) == T(1)
 #endif // #if defined(TEST_when_logical_operators_are_implemented)
         ;
 }
@@ -51,14 +51,14 @@ bool testVLogical() {
     return true
 #if defined(TEST_when_logical_operators_are_implemented)
         && subgroupAnd(gvec(T(1))) == gvec(T(1))
-        //&& subgroupOr(gvec(T(1))) == gvec(T(1))
-        //&& subgroupXor(gvec(T(1))) == gvec(T(0))
+        && subgroupOr(gvec(T(1))) == gvec(T(1))
+        && subgroupXor(gvec(T(1))) == gvec(T(0))
         //&& subgroupInclusiveAnd(gvec(T(1))) == gvec(T(1))
         //&& subgroupInclusiveOr(gvec(T(1))) == gvec(T(1))
         //&& subgroupInclusiveXor(gvec(T(1))) == gvec(T(0))
-        //&& subgroupExclusiveAnd(gvec(T(1))) == gvec(T(1))
-        //&& subgroupExclusiveOr(gvec(T(1))) == gvec(T(1))
-        //&& subgroupExclusiveXor(gvec(T(1))) == gvec(T(1))
+        && subgroupExclusiveAnd(gvec(T(1))) == gvec(T(1))
+        && subgroupExclusiveOr(gvec(T(1))) == gvec(T(1))
+        && subgroupExclusiveXor(gvec(T(1))) == gvec(T(1))
 #endif // #if defined(TEST_when_logical_operators_are_implemented)
         ;
 }
