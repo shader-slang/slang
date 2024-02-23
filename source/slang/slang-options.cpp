@@ -650,7 +650,6 @@ struct OptionsParser
     struct RawTarget
     {
         CodeGenTarget       format = CodeGenTarget::Unknown;
-        SlangTargetFlags    targetFlags = kDefaultTargetFlags;
         int                 targetID = -1;
         CompilerOptionSet   optionSet;
 
@@ -2185,13 +2184,9 @@ SlangResult OptionsParser::_parse(
                 return SLANG_FAIL;
             }
             case OptionKind::EmitSpirvViaGLSL:
-            {
-                getCurrentTarget()->targetFlags &= ~SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY;
-            }
-            break;
             case OptionKind::EmitSpirvDirectly:
             {
-                getCurrentTarget()->targetFlags |= SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY;
+                getCurrentTarget()->optionSet.add(optionKind, true);
             }
             break;
             case OptionKind::SPIRVCoreGrammarJSON:
@@ -2625,7 +2620,7 @@ SlangResult OptionsParser::_parse(
 
     if (m_rawTargets.getCount() == 1)
     {
-        getCurrentTarget()->optionSet.inheritFrom(m_defaultTarget.optionSet);
+        m_rawTargets[0].optionSet.overrideWith(m_defaultTarget.optionSet);
     }
     else
     {
@@ -2646,18 +2641,6 @@ SlangResult OptionsParser::_parse(
             else
             {
                 m_sink->diagnose(SourceLoc(), Diagnostics::profileSpecificationIgnoredBecauseBeforeAllTargets);
-            }
-        }
-
-        if (m_defaultTarget.targetFlags != kDefaultTargetFlags)
-        {
-            if (m_rawTargets.getCount() == 0)
-            {
-                m_sink->diagnose(SourceLoc(), Diagnostics::targetFlagsIgnoredBecauseNoTargets);
-            }
-            else
-            {
-                m_sink->diagnose(SourceLoc(), Diagnostics::targetFlagsIgnoredBecauseBeforeAllTargets);
             }
         }
 
@@ -2704,11 +2687,6 @@ SlangResult OptionsParser::_parse(
         for (auto atom : rawTarget.optionSet.getArray(CompilerOptionName::Capability))
         {
             m_requestImpl->addTargetCapability(targetID, SlangCapabilityID(atom.intValue));
-        }
-
-        if (rawTarget.targetFlags)
-        {
-            m_compileRequest->setTargetFlags(targetID, rawTarget.targetFlags);
         }
 
         auto floatingPointMode = rawTarget.optionSet.getEnumOption<FloatingPointMode>(CompilerOptionName::FloatingPointMode);
@@ -2827,7 +2805,7 @@ SlangResult OptionsParser::_parse(
                         break;
                     case CodeGenTarget::SPIRV:
                     case CodeGenTarget::SPIRVAssembly:
-                        if (getCurrentTarget()->targetFlags & SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY)
+                        if (getCurrentTarget()->optionSet.shouldEmitSPIRVDirectly())
                         {
                             rawOutput.isWholeProgram = true;
                         }
@@ -2858,7 +2836,7 @@ SlangResult OptionsParser::_parse(
             targetInfo = new EndToEndCompileRequest::TargetInfo();
             m_requestImpl->m_targetInfos[target] = targetInfo;
         }
-
+        target->getOptionSet().overrideWith(m_rawTargets[rawOutput.targetIndex].optionSet);
         if (rawOutput.isWholeProgram)
         {
             if (targetInfo->wholeTargetOutputPath != "")
