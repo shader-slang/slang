@@ -1559,7 +1559,7 @@ TargetRequest::TargetRequest(Linkage* linkage, CodeGenTarget format)
 }
 
 TargetRequest::TargetRequest(const TargetRequest& other)
-    : linkage(other.linkage), optionSet(other.optionSet)
+    : RefObject(), linkage(other.linkage), optionSet(other.optionSet)
 {
 }
 
@@ -1721,6 +1721,12 @@ TranslationUnitRequest::TranslationUnitRequest(
     module = new Module(compileRequest->getLinkage());
 }
 
+TranslationUnitRequest::TranslationUnitRequest(
+    FrontEndCompileRequest* compileRequest, Module* m)
+    : compileRequest(compileRequest), module(m), isChecked(true)
+{
+    moduleName = getNamePool()->getName(m->getName());
+}
 
 Session* TranslationUnitRequest::getSession()
 {
@@ -2388,6 +2394,9 @@ static void _outputIncludes(const List<SourceFile*>& sourceFiles, SourceManager*
 void FrontEndCompileRequest::parseTranslationUnit(
     TranslationUnitRequest* translationUnit)
 {
+    if (translationUnit->isChecked)
+        return;
+
     auto linkage = getLinkage();
 
     SLANG_AST_BUILDER_RAII(linkage->getASTBuilder());
@@ -2549,6 +2558,9 @@ void FrontEndCompileRequest::checkAllTranslationUnits()
     // apply the semantic checking logic.
     for( auto& translationUnit : translationUnits )
     {
+        if (translationUnit->isChecked)
+            continue;
+
         checkTranslationUnit(translationUnit.Ptr(), loadedModules);
 
         // Add the checked module to list of loadedModules so that they can be
@@ -2577,6 +2589,10 @@ void FrontEndCompileRequest::generateIR()
     // in isolation.
     for( auto& translationUnit : translationUnits )
     {
+        // Skip if the module is precompiled.
+        if (translationUnit->getModule()->getIRModule())
+            continue;
+
         // We want to only run generateIRForTranslationUnit once here. This is for two side effects:
         // * it can dump ir
         // * it can generate diagnostics
@@ -2943,18 +2959,6 @@ SlangResult EndToEndCompileRequest::executeActions()
 
 int FrontEndCompileRequest::addTranslationUnit(SourceLanguage language, Name* moduleName)
 {
-    if (!moduleName)
-    {
-        // We want to ensure that symbols defined in different translation
-        // units get unique mangled names, so that we can, e.g., tell apart
-        // a `main()` function in `vertex.hlsl` and a `main()` in `fragment.hlsl`,
-        // even when they are being compiled together.
-        //
-        String generatedName = "tu";
-        generatedName.append(translationUnits.getCount());
-        moduleName = getNamePool()->getName(generatedName);
-    }
-
     RefPtr<TranslationUnitRequest> translationUnit = new TranslationUnitRequest(this);
     translationUnit->compileRequest = this;
     translationUnit->sourceLanguage = SourceLanguage(language);
@@ -2978,6 +2982,14 @@ void FrontEndCompileRequest::addTranslationUnitSourceArtifact(
 
     // Add the source file
     translationUnit->addSourceArtifact(sourceArtifact);
+
+    if (!translationUnit->moduleName)
+    {
+        translationUnit->setModuleName(
+            getNamePool()->getName(Path::getFileNameWithoutExt(sourceArtifact->getName())));
+    }
+    if (translationUnit->module->getFilePath() == nullptr)
+        translationUnit->module->setPathInfo(PathInfo::makePath(sourceArtifact->getName()));
 }
 
 void FrontEndCompileRequest::addTranslationUnitSourceBlob(
@@ -2991,7 +3003,7 @@ void FrontEndCompileRequest::addTranslationUnitSourceBlob(
     auto artifact = ArtifactUtil::createArtifact(sourceDesc, path.getBuffer());
     artifact->addRepresentationUnknown(sourceBlob);
 
-    translationUnit->addSourceArtifact(artifact);
+    addTranslationUnitSourceArtifact(translationUnitIndex, artifact);
 }
 
 void FrontEndCompileRequest::addTranslationUnitSourceFile(
@@ -3011,7 +3023,7 @@ void FrontEndCompileRequest::addTranslationUnitSourceFile(
 
     auto sourceDesc = ArtifactDescUtil::makeDescForSourceLanguage(asExternal(translationUnit->sourceLanguage));
 
-    auto sourceArtifact = ArtifactUtil::createArtifact(sourceDesc);
+    auto sourceArtifact = ArtifactUtil::createArtifact(sourceDesc, path.getBuffer());
 
     auto extRep = new ExtFileArtifactRepresentation(path.getUnownedSlice(), fileSystemExt);
     sourceArtifact->addRepresentation(extRep);
@@ -3044,7 +3056,7 @@ void FrontEndCompileRequest::addTranslationUnitSourceFile(
         return;
     }
 
-    translationUnit->addSourceArtifact(sourceArtifact);
+    addTranslationUnitSourceArtifact(translationUnitIndex, sourceArtifact);
 }
 
 int FrontEndCompileRequest::addEntryPoint(
@@ -3146,6 +3158,27 @@ void Linkage::loadParsedModule(
     loadedModulesList.add(loadedModule);
 }
 
+RefPtr<Module> Linkage::loadDeserializedModule(Name* name,
+    const PathInfo& filePathInfo,
+    SerialContainerData::Module& moduleEntry,
+    DiagnosticSink* sink)
+{
+    SLANG_AST_BUILDER_RAII(m_astBuilder);
+    RefPtr<Module> resultModule;
+    if (mapNameToLoadedModules.tryGetValue(name, resultModule))
+        return resultModule;
+    if (mapPathToLoadedModule.tryGetValue(filePathInfo.getMostUniqueIdentity(), resultModule))
+        return resultModule;
+
+    resultModule = new Module(this, m_astBuilder);
+    prepareDeserializedModule(moduleEntry, filePathInfo, resultModule, sink);
+
+    loadedModulesList.add(resultModule);
+    mapPathToLoadedModule.add(filePathInfo.getMostUniqueIdentity(), resultModule);
+    mapNameToLoadedModules.add(name, resultModule);
+    return resultModule;
+}
+
 RefPtr<Module> Linkage::loadModuleFromIRBlobImpl(
     Name* name,
     const PathInfo& filePathInfo,
@@ -3154,6 +3187,8 @@ RefPtr<Module> Linkage::loadModuleFromIRBlobImpl(
     DiagnosticSink* sink,
     const LoadedModuleDictionary* additionalLoadedModules)
 {
+    SLANG_AST_BUILDER_RAII(m_astBuilder);
+
     RefPtr<Module> resultModule = new Module(this, getASTBuilder());
     resultModule->setName(name);
     ModuleBeingImportedRAII moduleBeingImported(
@@ -3195,19 +3230,8 @@ RefPtr<Module> Linkage::loadModuleFromIRBlobImpl(
         return nullptr;
     }
     auto moduleEntry = containerData.modules.getFirst();
-    resultModule->setIRModule(moduleEntry.irModule);
-    resultModule->setModuleDecl(as<ModuleDecl>(moduleEntry.astRootNode));
-    resultModule->clearFileDependency();
-    for (auto file : moduleEntry.dependentFiles)
-    {
-        auto sourceFile = loadSourceFile(filePathInfo.foundPath, file);
-        if (sourceFile)
-        {
-            resultModule->addFileDependency(sourceFile);
-        }
-    }
 
-    prepareDeserializedModule(resultModule, sink);
+    prepareDeserializedModule(moduleEntry, filePathInfo, resultModule, sink);
 
     loadedModulesList.add(resultModule);
     resultModule->setPathInfo(filePathInfo);
@@ -5062,8 +5086,21 @@ void Linkage::setFileSystem(ISlangFileSystem* inFileSystem)
     getSourceManager()->setFileSystemExt(m_fileSystemExt);
 }
 
-void Linkage::prepareDeserializedModule(Module* module, DiagnosticSink* sink)
+void Linkage::prepareDeserializedModule(SerialContainerData::Module& moduleEntry, const PathInfo& filePathInfo, Module* module, DiagnosticSink* sink)
 {
+    module->setIRModule(moduleEntry.irModule);
+    module->setModuleDecl(as<ModuleDecl>(moduleEntry.astRootNode));
+    module->clearFileDependency();
+    for (auto file : moduleEntry.dependentFiles)
+    {
+        auto sourceFile = loadSourceFile(filePathInfo.foundPath, file);
+        if (sourceFile)
+        {
+            module->addFileDependency(sourceFile);
+        }
+    }
+    module->setPathInfo(filePathInfo);
+
     module->_collectShaderParams();
     module->_discoverEntryPoints(sink);
 
@@ -5472,19 +5509,29 @@ void EndToEndCompileRequest::setDefaultModuleName(const char* defaultModuleName)
     frontEndReq->m_defaultModuleName = namePool->getName(defaultModuleName);
 }
 
-SlangResult _addLibraryReference(EndToEndCompileRequest* req, IArtifact* artifact, ModuleLibrary* moduleLibrary)
+SlangResult _addLibraryReference(EndToEndCompileRequest* req, ModuleLibrary* moduleLibrary, bool includeEntryPoint)
 {
     FrontEndCompileRequest* frontEndRequest = req->getFrontEndReq();
-    frontEndRequest->m_extraEntryPoints.addRange(moduleLibrary->m_entryPoints.getBuffer(), moduleLibrary->m_entryPoints.getCount());
 
-    // Add to the m_libModules
-    auto linkage = req->getLinkage();
-    linkage->m_libModules.add(ComPtr<IArtifact>(artifact));
+    if (includeEntryPoint)
+    {
+        frontEndRequest->m_extraEntryPoints.addRange(
+            moduleLibrary->m_entryPoints.getBuffer(), moduleLibrary->m_entryPoints.getCount());
+    }
 
+    for (auto m : moduleLibrary->m_modules)
+    {
+        RefPtr<TranslationUnitRequest> tu = new TranslationUnitRequest(frontEndRequest, m);
+        frontEndRequest->translationUnits.add(tu);
+        // For modules loaded for EndToEndCompileRequest,
+        // we don't need the automatically discovered entrypoints.
+        if (!includeEntryPoint)
+            m->getEntryPoints().clear();
+    }
     return SLANG_OK;
 }
 
-SlangResult _addLibraryReference(EndToEndCompileRequest* req, IArtifact* artifact)
+SlangResult _addLibraryReference(EndToEndCompileRequest* req, String path, IArtifact* artifact, bool includeEntryPoint)
 {
     auto desc = artifact->getDesc();
 
@@ -5507,7 +5554,7 @@ SlangResult _addLibraryReference(EndToEndCompileRequest* req, IArtifact* artifac
         }
 
         ComPtr<IModuleLibrary> libraryIntf;
-        SLANG_RETURN_ON_FAIL(loadModuleLibrary(ArtifactKeep::Yes, container, req, libraryIntf));
+        SLANG_RETURN_ON_FAIL(loadModuleLibrary(ArtifactKeep::Yes, container, path, req, libraryIntf));
 
         auto library = as<ModuleLibrary>(libraryIntf);
         
@@ -5536,9 +5583,9 @@ SlangResult _addLibraryReference(EndToEndCompileRequest* req, IArtifact* artifac
                 // for leaking.
                 // 
                 // That isn't a risk from -r though because, it doesn't create a translation unit(s).
-                for (auto irModule : library->m_modules)
+                for (auto module : library->m_modules)
                 {
-                    irModule->setObfuscatedSourceMap(sourceMap);
+                    module->getIRModule()->setObfuscatedSourceMap(sourceMap);
                 }
 
                 // Look up the source file
@@ -5554,7 +5601,7 @@ SlangResult _addLibraryReference(EndToEndCompileRequest* req, IArtifact* artifac
             }
         }
 
-        SLANG_RETURN_ON_FAIL(_addLibraryReference(req, container, library));
+        SLANG_RETURN_ON_FAIL(_addLibraryReference(req, library, includeEntryPoint));
         return SLANG_OK;
     }
 
@@ -5562,7 +5609,7 @@ SlangResult _addLibraryReference(EndToEndCompileRequest* req, IArtifact* artifac
     {
         ComPtr<IModuleLibrary> libraryIntf;
 
-        SLANG_RETURN_ON_FAIL(loadModuleLibrary(ArtifactKeep::Yes, artifact, req, libraryIntf));
+        SLANG_RETURN_ON_FAIL(loadModuleLibrary(ArtifactKeep::Yes, artifact, path, req, libraryIntf));
 
         auto library = as<ModuleLibrary>(libraryIntf);
         if (!library)
@@ -5570,7 +5617,7 @@ SlangResult _addLibraryReference(EndToEndCompileRequest* req, IArtifact* artifac
             return SLANG_FAIL;
         }
 
-        SLANG_RETURN_ON_FAIL(_addLibraryReference(req, artifact, library));
+        SLANG_RETURN_ON_FAIL(_addLibraryReference(req, library, includeEntryPoint));
         return SLANG_OK;
     }
 
@@ -5584,18 +5631,18 @@ SlangResult _addLibraryReference(EndToEndCompileRequest* req, IArtifact* artifac
     return SLANG_OK;
 }
 
-SlangResult EndToEndCompileRequest::addLibraryReference(const void* libData, size_t libDataSize)
+SlangResult EndToEndCompileRequest::addLibraryReference(const char* basePath, const void* libData, size_t libDataSize)
 {
     // We need to deserialize and add the modules
     ComPtr<IModuleLibrary> library;
 
-    SLANG_RETURN_ON_FAIL(loadModuleLibrary((const Byte*)libData, libDataSize, this, library));
+    SLANG_RETURN_ON_FAIL(loadModuleLibrary((const Byte*)libData, libDataSize, basePath, this, library));
 
     // Create an artifact without any name (as one is not provided)
     auto artifact = Artifact::create(ArtifactDesc::make(ArtifactKind::Library, ArtifactPayload::SlangIR));
     artifact->addRepresentation(library);
 
-    return _addLibraryReference(this, artifact);
+    return _addLibraryReference(this, basePath, artifact, true);
 }
 
 void EndToEndCompileRequest::addTranslationUnitPreprocessorDefine(int translationUnitIndex, const char* key, const char* value)
@@ -5631,7 +5678,7 @@ void EndToEndCompileRequest::addTranslationUnitSourceStringSpan(int translationU
     const auto slice = UnownedStringSlice(sourceBegin, sourceEnd);
 
     auto blob = RawBlob::create(slice.begin(), slice.getLength());
-
+    
     frontEndReq->addTranslationUnitSourceBlob(translationUnitIndex, path, blob);
 }
 

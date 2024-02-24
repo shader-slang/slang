@@ -85,19 +85,22 @@ void ShaderCompilerUtil::Output::reset()
     out.m_requestForKernels = slangRequest;
     out.session = globalSession;
 
+    bool hasRepro = false;
+
     // Parse all the extra args
     {
         List<const char*> args;
         for (const auto& arg : options.downstreamArgs.getArgsByName("slang"))
         {
             args.add(arg.value.getBuffer());
+            if (arg.value == "-load-repro")
+                hasRepro = true;
         }
 
         // If there are additional args parse them
         if (args.getCount())
         {
             const auto res = slangRequest->processCommandLineArguments(args.getBuffer(), int(args.getCount()));
-
             // If there is a parse failure and diagnostic, output it
             if (SLANG_FAILED(res))
             {
@@ -109,100 +112,105 @@ void ShaderCompilerUtil::Output::reset()
             }
         }
     }
-    spSetCodeGenTarget(slangRequest, input.target);
-    spSetTargetProfile(slangRequest, 0, spFindProfile(out.session, input.profile.getBuffer()));
-    if (options.generateSPIRVDirectly)
-        spSetTargetFlags(slangRequest, 0, SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY);
 
-    slangRequest->setAllowGLSLInput(options.allowGLSL);
-
-    // Define a macro so that shader code in a test can detect what language we
-    // are nominally working with.
-    char const* langDefine = nullptr;
-    switch (input.sourceLanguage)
+    // Only proceed if the command line arguments are not loading a repro.
+    if (!hasRepro)
     {
-    case SLANG_SOURCE_LANGUAGE_GLSL:
-        spAddPreprocessorDefine(slangRequest, "__GLSL__", "1");
-        break;
+        spSetCodeGenTarget(slangRequest, input.target);
+        spSetTargetProfile(slangRequest, 0, spFindProfile(out.session, input.profile.getBuffer()));
+        if (options.generateSPIRVDirectly)
+            spSetTargetFlags(slangRequest, 0, SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY);
 
-    case SLANG_SOURCE_LANGUAGE_SLANG:
-        spAddPreprocessorDefine(slangRequest, "__SLANG__", "1");
-        // fall through
-    case SLANG_SOURCE_LANGUAGE_HLSL:
-        spAddPreprocessorDefine(slangRequest, "__HLSL__", "1");
-        break;
-    case SLANG_SOURCE_LANGUAGE_C:
-        spAddPreprocessorDefine(slangRequest, "__C__", "1");
-        break;
-    case SLANG_SOURCE_LANGUAGE_CPP:
-        spAddPreprocessorDefine(slangRequest, "__CPP__", "1");
-        break;
-    case SLANG_SOURCE_LANGUAGE_CUDA:
-        spAddPreprocessorDefine(slangRequest, "__CUDA__", "1");
-        break;
+        slangRequest->setAllowGLSLInput(options.allowGLSL);
 
-    default:
-        assert(!"unexpected");
-        break;
-    }
-
-    if (input.passThrough != SLANG_PASS_THROUGH_NONE)
-    {
-        spSetPassThrough(slangRequest, input.passThrough);
-    }
-    else
-    {
-        spSetCompileFlags(slangRequest, SLANG_COMPILE_FLAG_NO_CODEGEN);
-    }
-
-    
-    const auto sourceLanguage = input.sourceLanguage;
-
-    int translationUnitIndex = 0;
-    {
-        translationUnitIndex = spAddTranslationUnit(slangRequest, sourceLanguage, nullptr);
-        spAddTranslationUnitSourceString(slangRequest, translationUnitIndex, request.source.path, request.source.dataBegin);
-    }
-
-    const int globalSpecializationArgCount = int(request.globalSpecializationArgs.getCount());
-    for(int ii = 0; ii < globalSpecializationArgCount; ++ii )
-    {
-        spSetTypeNameForGlobalExistentialTypeParam(slangRequest, ii, request.globalSpecializationArgs[ii].getBuffer());
-    }
-
-    const int entryPointSpecializationArgCount = int(request.entryPointSpecializationArgs.getCount());
-    auto setEntryPointSpecializationArgs = [&](int entryPoint)
-    {
-        for( int ii = 0; ii < entryPointSpecializationArgCount; ++ii )
+        // Define a macro so that shader code in a test can detect what language we
+        // are nominally working with.
+        char const* langDefine = nullptr;
+        switch (input.sourceLanguage)
         {
-            spSetTypeNameForEntryPointExistentialTypeParam(slangRequest, entryPoint, ii, request.entryPointSpecializationArgs[ii].getBuffer());
-        }
-    };
+        case SLANG_SOURCE_LANGUAGE_GLSL:
+            spAddPreprocessorDefine(slangRequest, "__GLSL__", "1");
+            break;
 
-   Index explicitEntryPointCount = request.entryPoints.getCount();
-   for(Index ee = 0; ee < explicitEntryPointCount; ++ee)
-   {
-        if(options.dontAddDefaultEntryPoints)
-        {
-            // If default entry points are not to be added, then
-            // the `request.entryPoints` array should have been
-            // left empty.
-            //
-            SLANG_ASSERT(false);
+        case SLANG_SOURCE_LANGUAGE_SLANG:
+            spAddPreprocessorDefine(slangRequest, "__SLANG__", "1");
+            // fall through
+        case SLANG_SOURCE_LANGUAGE_HLSL:
+            spAddPreprocessorDefine(slangRequest, "__HLSL__", "1");
+            break;
+        case SLANG_SOURCE_LANGUAGE_C:
+            spAddPreprocessorDefine(slangRequest, "__C__", "1");
+            break;
+        case SLANG_SOURCE_LANGUAGE_CPP:
+            spAddPreprocessorDefine(slangRequest, "__CPP__", "1");
+            break;
+        case SLANG_SOURCE_LANGUAGE_CUDA:
+            spAddPreprocessorDefine(slangRequest, "__CUDA__", "1");
+            break;
+
+        default:
+            assert(!"unexpected");
+            break;
         }
 
-       auto& entryPointInfo = request.entryPoints[ee];
-       int entryPointIndex = spAddEntryPoint(
-           slangRequest,
-           translationUnitIndex,
-           entryPointInfo.name,
-           entryPointInfo.slangStage);
-       SLANG_ASSERT(entryPointIndex == ee);
+        if (input.passThrough != SLANG_PASS_THROUGH_NONE)
+        {
+            spSetPassThrough(slangRequest, input.passThrough);
+        }
+        else
+        {
+            spSetCompileFlags(slangRequest, SLANG_COMPILE_FLAG_NO_CODEGEN);
+        }
 
-       setEntryPointSpecializationArgs(entryPointIndex);
-   }
 
-    spSetLineDirectiveMode(slangRequest, SLANG_LINE_DIRECTIVE_MODE_NONE);
+        const auto sourceLanguage = input.sourceLanguage;
+
+        int translationUnitIndex = 0;
+        {
+            translationUnitIndex = spAddTranslationUnit(slangRequest, sourceLanguage, nullptr);
+            spAddTranslationUnitSourceString(slangRequest, translationUnitIndex, request.source.path, request.source.dataBegin);
+        }
+
+        const int globalSpecializationArgCount = int(request.globalSpecializationArgs.getCount());
+        for (int ii = 0; ii < globalSpecializationArgCount; ++ii)
+        {
+            spSetTypeNameForGlobalExistentialTypeParam(slangRequest, ii, request.globalSpecializationArgs[ii].getBuffer());
+        }
+
+        const int entryPointSpecializationArgCount = int(request.entryPointSpecializationArgs.getCount());
+        auto setEntryPointSpecializationArgs = [&](int entryPoint)
+            {
+                for (int ii = 0; ii < entryPointSpecializationArgCount; ++ii)
+                {
+                    spSetTypeNameForEntryPointExistentialTypeParam(slangRequest, entryPoint, ii, request.entryPointSpecializationArgs[ii].getBuffer());
+                }
+            };
+
+        Index explicitEntryPointCount = request.entryPoints.getCount();
+        for (Index ee = 0; ee < explicitEntryPointCount; ++ee)
+        {
+            if (options.dontAddDefaultEntryPoints)
+            {
+                // If default entry points are not to be added, then
+                // the `request.entryPoints` array should have been
+                // left empty.
+                //
+                SLANG_ASSERT(false);
+            }
+
+            auto& entryPointInfo = request.entryPoints[ee];
+            int entryPointIndex = spAddEntryPoint(
+                slangRequest,
+                translationUnitIndex,
+                entryPointInfo.name,
+                entryPointInfo.slangStage);
+            SLANG_ASSERT(entryPointIndex == ee);
+
+            setEntryPointSpecializationArgs(entryPointIndex);
+        }
+
+        spSetLineDirectiveMode(slangRequest, SLANG_LINE_DIRECTIVE_MODE_NONE);
+    }
 
     const SlangResult res = spCompile(slangRequest);
 

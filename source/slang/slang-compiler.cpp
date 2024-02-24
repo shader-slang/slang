@@ -1488,7 +1488,7 @@ namespace Slang
             // Add all of the module libraries
             libraries.addRange(linkage->m_libModules.getBuffer(), linkage->m_libModules.getCount());
         }
-        
+
         options.compilerSpecificArguments = allocator.allocate(compilerSpecificArguments);
         options.requiredCapabilityVersions = SliceUtil::asSlice(requiredCapabilityVersions);
         options.libraries = SliceUtil::asSlice(libraries);
@@ -1879,14 +1879,7 @@ namespace Slang
         SerialContainerUtil::WriteOptions options;
 
         options.compressionType = linkage->m_optionSet.getEnumOption<SerialCompressionType>(CompilerOptionName::IrCompression);
-        if (linkage->m_optionSet.getBoolOption(CompilerOptionName::Obfuscate))
-        {
-            // If code is obfuscated, we *disable* AST output as it is not obfuscated and will reveal
-            // too much about IR.
-            // Also currently only IR is needed.
-            options.optionFlags &= ~SerialOptionFlag::ASTModule;
-        }
-        
+
         // If debug information is enabled, enable writing out source locs
         if (_shouldWriteSourceLocs(linkage))
         {

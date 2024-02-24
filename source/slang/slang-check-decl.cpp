@@ -1712,7 +1712,7 @@ namespace Slang
         {
             if (auto varDeclRefType = as<DeclRefType>(varDecl->type.type))
             {
-                parentAggTypeDecl->unionTagsWith(getTypeTags(varDecl->type.type));
+                parentAggTypeDecl->unionTagsWith(getTypeTags(varDeclRefType));
             }
         }
 
@@ -9321,20 +9321,21 @@ namespace Slang
             else if (as<PrivateModifier>(modifier))
                 return DeclVisibility::Private;
         }
-
         // Interface members will always have the same visibility as the interface itself.
         if (auto interfaceDecl = findParentInterfaceDecl(decl))
         {
             return getDeclVisibility(interfaceDecl);
         }
-        else if (as<NamespaceDecl>(decl))
+        auto defaultVis = DeclVisibility::Default;
+        if (auto parentModule = getModuleDecl(decl))
+            defaultVis = parentModule->isInLegacyLanguage ? DeclVisibility::Public : DeclVisibility::Internal;
+
+        // Members of other agg type decls will have their default visibility capped to the parents'.
+        if (as<NamespaceDecl>(decl))
         {
             return DeclVisibility::Public;
         }
-        if (auto parentModule = getModuleDecl(decl))
-            return parentModule->isInLegacyLanguage ? DeclVisibility::Public : DeclVisibility::Internal;
-
-        return DeclVisibility::Default;
+        return defaultVis;
     }
 
     void diagnoseCapabilityProvenance(DiagnosticSink* sink, Decl* decl, CapabilityAtom missingAtom)

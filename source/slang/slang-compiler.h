@@ -25,12 +25,10 @@
 
 #include "slang-capability.h"
 #include "slang-diagnostics.h"
-
 #include "slang-preprocessor.h"
 #include "slang-profile.h"
 #include "slang-syntax.h"
 #include "slang-content-assist-info.h"
-
 #include "slang-hlsl-to-vulkan-layout-options.h"
 #include "slang-compiler-options.h"
 #include "slang-serialize-ir-types.h"
@@ -1475,7 +1473,7 @@ namespace Slang
 
         RefPtr<EntryPoint> findEntryPointByName(UnownedStringSlice const& name);
 
-        List<RefPtr<EntryPoint>> const& getEntryPoints() { return m_entryPoints; }
+        List<RefPtr<EntryPoint>>& getEntryPoints() { return m_entryPoints; }
         void _addEntryPoint(EntryPoint* entryPoint);
         void _processFindDeclsExportSymbolsRec(Decl* decl);
 
@@ -1551,6 +1549,8 @@ namespace Slang
     public:
         TranslationUnitRequest(
             FrontEndCompileRequest* compileRequest);
+        TranslationUnitRequest(
+            FrontEndCompileRequest* compileRequest, Module* m);
 
         // The parent compile request
         FrontEndCompileRequest* compileRequest = nullptr;
@@ -1595,6 +1595,8 @@ namespace Slang
 
             /// Result of compiling this translation unit (a module)
         RefPtr<Module> module;
+
+        bool isChecked = false;
 
         Module* getModule() { return module; }
         ModuleDecl* getModuleDecl() { return module->getModuleDecl(); }
@@ -1754,6 +1756,8 @@ namespace Slang
     {
         Source, IR
     };
+
+    struct SerialContainerDataModule;
 
         /// A context for loading and re-using code modules.
     class Linkage : public RefObject, public slang::ISession
@@ -1959,6 +1963,11 @@ namespace Slang
             SourceLoc const& loc,
             DiagnosticSink* sink,
             const LoadedModuleDictionary* additionalLoadedModules);
+        RefPtr<Module> loadDeserializedModule(
+            Name* name,
+            const PathInfo& filePathInfo,
+            SerialContainerDataModule& m,
+            DiagnosticSink* sink);
 
         SourceFile* loadSourceFile(String pathFrom, String path);
 
@@ -1979,7 +1988,7 @@ namespace Slang
             DiagnosticSink*     sink,
             const LoadedModuleDictionary* loadedModules = nullptr);
 
-        void prepareDeserializedModule(Module* module, DiagnosticSink* sink);
+        void prepareDeserializedModule(SerialContainerDataModule& moduleEntry, const PathInfo& pathInfo, Module* module, DiagnosticSink* sink);
 
         SourceFile* findFile(Name* name, SourceLoc loc, IncludeSystem& outIncludeSystem);
         struct IncludeResult
@@ -2661,7 +2670,7 @@ namespace Slang
         virtual SLANG_NO_THROW void SLANG_MCALL addTranslationUnitPreprocessorDefine(int translationUnitIndex, const char* key, const char* value) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL addTranslationUnitSourceFile(int translationUnitIndex, char const* path) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL addTranslationUnitSourceString(int translationUnitIndex, char const* path, char const* source) SLANG_OVERRIDE;
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL addLibraryReference(const void* libData, size_t libDataSize) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL addLibraryReference(const char* basePath, const void* libData, size_t libDataSize) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL addTranslationUnitSourceStringSpan(int translationUnitIndex, char const* path, char const* sourceBegin, char const* sourceEnd) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL addTranslationUnitSourceBlob(int translationUnitIndex, char const* path, ISlangBlob* sourceBlob) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW int SLANG_MCALL addEntryPoint(int translationUnitIndex, char const* name, SlangStage stage) SLANG_OVERRIDE;
