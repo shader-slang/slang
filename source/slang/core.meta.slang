@@ -624,7 +624,7 @@ ${{{{
     case BaseType::Float:
     case BaseType::Double:
 }}}}
-        [TreatAsDifferentiable]
+        [Differentiable]
         static $(kBaseTypes[tt].name) getPi() { return $(kBaseTypes[tt].name)(3.14159265358979323846264338328); }
 
          __intrinsic_op($(kIROp_Less)) bool lessThan(This other);
