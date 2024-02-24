@@ -69,4 +69,4 @@ jobs:
         CONFIGURATION=${{matrix.configuration}}
         CC=${{matrix.compiler}}
         ARCH=${{matrix.targetPlatform}}
-        source ./github_test.sh       
+        source .github/github_test.sh    

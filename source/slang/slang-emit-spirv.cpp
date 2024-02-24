@@ -5256,6 +5256,17 @@ SlangResult emitSPIRVFromIR(
     }
 
     // Emit source language info.
+    // By default we will use SpvSourceLanguageSlang.
+    // However this will cause problems when using swiftshader.
+    // To workaround this problem, we allow overriding this behavior with an
+    // environment variable that will be set in the software testing environment.
+    auto sourceLanguage = SpvSourceLanguageSlang;
+    StringBuilder noSlangEnv;
+    PlatformUtil::getEnvironmentVariable(toSlice("SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN"), noSlangEnv);
+    if (noSlangEnv.produceString() == "1")
+    {
+        sourceLanguage = SpvSourceLanguageUnknown;
+    }
     context.emitInst(context.getSection(SpvLogicalSectionID::DebugStringsAndSource), nullptr, SpvOpSource,
         SpvLiteralInteger::from32(SpvSourceLanguageSlang), // language identifier, should be SpvSourceLanguageSlang.
         SpvLiteralInteger::from32(1)); // language version.
