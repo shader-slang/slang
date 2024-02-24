@@ -7221,6 +7221,23 @@ namespace Slang
                 break;
             }
         }
+
+        if (ret.opcode.flavor == SPIRVAsmOperand::Flavor::NamedValue
+            && ret.opcode.knownValue == SpvOp(0xffffffff))
+        {
+            if (ret.opcode.token.type == TokenType::IntegerLiteral)
+            {
+                Int intVal = -1;
+                StringUtil::parseInt(ret.opcode.token.getContent(), intVal);
+                ret.opcode.knownValue = (SpvWord)intVal;
+            }
+            else
+            {
+                parser->diagnose(ret.opcode.token, Diagnostics::unrecognizedSPIRVOpcode, ret.opcode.token);
+                return std::nullopt;
+            }
+        }
+
         return ret;
     }
 
