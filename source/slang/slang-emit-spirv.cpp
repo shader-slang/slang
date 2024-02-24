@@ -2816,18 +2816,6 @@ struct SPIRVEmitContext
         case kIROp_EntryPointDecoration:
             {
                 auto section = getSection(SpvLogicalSectionID::EntryPoints);
-
-                // TODO: The `OpEntryPoint` is required to list an varying
-                // input or output parameters (by `<id>`) used by the entry point,
-                // although these are encoded as global variables in the IR.
-                //
-                // Currently we have a pass that moves entry-point varying
-                // parameters to global scope for the benefit of GLSL output,
-                // but we do not maintain a connection between those parameters
-                // and the original entry point. That pass should be updated
-                // to attach a decoration linking the original entry point
-                // to the new globals, which would be used in the SPIR-V emit case.
-
                 auto entryPointDecor = cast<IREntryPointDecoration>(decoration);
                 auto entryPoint = as<IRFunc>(decoration->getParent());
                 auto spvStage = mapStageToExecutionModel(entryPointDecor->getProfile().getStage());
@@ -2842,6 +2830,7 @@ struct SPIRVEmitContext
                     {
                     case kIROp_GlobalVar:
                     case kIROp_GlobalParam:
+                    case kIROp_SPIRVAsmOperandBuiltinVar:
                     {
                         SpvInst* spvGlobalInst;
                         if (m_mapIRInstToSpvInst.tryGetValue(globalInst, spvGlobalInst))
@@ -2860,13 +2849,6 @@ struct SPIRVEmitContext
                     default:
                         break;
                     }
-                }
-                // Add remaining builtin variables that does not have a corresponding IR global var/param.
-                // These variables could be added from SPIRV ASM blocks.
-                for (auto builtinVar : m_builtinGlobalVars)
-                {
-                    if (paramsSet.add(builtinVar.second))
-                        params.add(builtinVar.second);
                 }
                 emitOpEntryPoint(
                     section,
@@ -3283,6 +3265,8 @@ struct SPIRVEmitContext
     }
 
     Dictionary<SpvBuiltIn, SpvInst*> m_builtinGlobalVars;
+    Dictionary<IRInst*, SpvInst*> m_spirvAsmBuiltinReferences;
+
     SpvInst* getBuiltinGlobalVar(IRType* type, SpvBuiltIn builtinVal)
     {
         SpvInst* result = nullptr;
