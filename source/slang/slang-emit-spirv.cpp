@@ -3265,7 +3265,6 @@ struct SPIRVEmitContext
     }
 
     Dictionary<SpvBuiltIn, SpvInst*> m_builtinGlobalVars;
-    Dictionary<IRInst*, SpvInst*> m_spirvAsmBuiltinReferences;
 
     SpvInst* getBuiltinGlobalVar(IRType* type, SpvBuiltIn builtinVal)
     {
