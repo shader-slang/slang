@@ -5268,7 +5268,7 @@ SlangResult emitSPIRVFromIR(
         sourceLanguage = SpvSourceLanguageUnknown;
     }
     context.emitInst(context.getSection(SpvLogicalSectionID::DebugStringsAndSource), nullptr, SpvOpSource,
-        SpvLiteralInteger::from32(SpvSourceLanguageSlang), // language identifier, should be SpvSourceLanguageSlang.
+        SpvLiteralInteger::from32(sourceLanguage), // language identifier, should be SpvSourceLanguageSlang.
         SpvLiteralInteger::from32(1)); // language version.
 
     for (auto irEntryPoint : irEntryPoints)
