@@ -144,6 +144,9 @@ struct SerialBinary
         /// Container
     static const FourCC kContainerHeaderFourCc = SLANG_FOUR_CC('S', 'c', 'h', 'd');
 
+        // Module header
+    static const FourCC kModuleHeaderFourCc = SLANG_FOUR_CC('S', 'm', 'h', 'd');
+
     struct ContainerHeader
     {
         uint32_t compressionType;         ///< Holds the compression type used (if used at all)

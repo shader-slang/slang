@@ -309,6 +309,7 @@
     <ClCompile Include="..\..\..\tools\gfx-unit-test\mutable-shader-object.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\nested-parameter-block.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\precompiled-module-2.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\precompiled-module-cache.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\precompiled-module.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\ray-tracing-tests.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\resolve-resource-tests.cpp" />

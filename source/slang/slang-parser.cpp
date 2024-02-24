@@ -6590,11 +6590,9 @@ namespace Slang
 
                 value = _fixIntegerLiteral(suffixBaseType, value, &token, parser->sink);
 
-                ASTBuilder* astBuilder = parser->astBuilder;
-                Type* suffixType = (suffixBaseType == BaseType::Void) ? astBuilder->getErrorType() : astBuilder->getBuiltinType(suffixBaseType);
 
                 constExpr->value = value;
-                constExpr->type = QualType(suffixType);
+                constExpr->suffixType = suffixBaseType;
 
                 return constExpr;
             }
@@ -6704,12 +6702,9 @@ namespace Slang
                     }
                 }
 
-                ASTBuilder* astBuilder = parser->astBuilder;
-
-                Type* suffixType = (suffixBaseType == BaseType::Void) ? astBuilder->getErrorType() : astBuilder->getBuiltinType(suffixBaseType);
 
                 constExpr->value = fixedValue;
-                constExpr->type = QualType(suffixType);
+                constExpr->suffixType = suffixBaseType;
 
                 return constExpr;
             }
