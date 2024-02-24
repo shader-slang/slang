@@ -22,10 +22,6 @@ buffer MyBlockName2
 
 layout(local_size_x = 32) in;
 
-
-
-// required since at the time of making, __BuiltinType does not allow simple casting, so we have a split test
-
 __generic<T : __BuiltinLogicalType>
 bool test1BroadcastX() {
     return true

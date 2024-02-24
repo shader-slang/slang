@@ -24,7 +24,7 @@ buffer MyBlockName2
     uint data[];
 } outputBuffer;
 
-#define local_size_x_v 32
+#define local_size_x_v 4
 layout(local_size_x = local_size_x_v) in;
 
 __generic<T : __BuiltinLogicalType>

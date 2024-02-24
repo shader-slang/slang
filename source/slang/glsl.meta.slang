@@ -3291,7 +3291,6 @@ __spirv_version(1.3) [require(spirv)]
                 OpGroupNonUniformBitwiseAnd $$T result Subgroup 0 $value
             };
         }
-
     }
 }
 
@@ -3317,7 +3316,6 @@ __spirv_version(1.3) [require(spirv)]
                 OpGroupNonUniformBitwiseOr $$T result Subgroup 0 $value
             };
         }
-
     }
 }
 
@@ -3343,7 +3341,6 @@ __spirv_version(1.3) [require(spirv)]
                 OpGroupNonUniformBitwiseXor $$T result Subgroup 0 $value
             };
         }
-
     }
 }
 
@@ -3363,9 +3360,7 @@ __spirv_version(1.3) [require(spirv)]
         else if (__isInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIAdd $$T result Subgroup InclusiveScan $value};
         else return value;
-
     }
-
 }
 
 __generic<T : __BuiltinArithmeticType>
@@ -3384,9 +3379,7 @@ __spirv_version(1.3) [require(spirv)]
         else if (__isInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIMul $$T result Subgroup InclusiveScan $value};
         else return value;
-
     }
-
 }
 
 __generic<T : __BuiltinArithmeticType>
@@ -3407,9 +3400,7 @@ __spirv_version(1.3) [require(spirv)]
         else if (__isUnsignedInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMin $$T result Subgroup InclusiveScan $value};
         else return value;
-
     }
-
 }
 
 __generic<T : __BuiltinArithmeticType>
@@ -3430,9 +3421,7 @@ __spirv_version(1.3) [require(spirv)]
         else if (__isUnsignedInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMax $$T result Subgroup InclusiveScan $value};
         else return value;
-
     }
-
 }
 
 __generic<T : __BuiltinLogicalType>
@@ -3457,7 +3446,6 @@ __spirv_version(1.3) [require(spirv)]
                 OpGroupNonUniformBitwiseAnd $$T result Subgroup InclusiveScan $value
             };
         }
-
     }
 }
 
@@ -3483,7 +3471,6 @@ __spirv_version(1.3) [require(spirv)]
                 OpGroupNonUniformBitwiseOr $$T result Subgroup InclusiveScan $value
             };
         }
-
     }
 }
 
@@ -3500,9 +3487,7 @@ __spirv_version(1.3) [require(spirv)]
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalXor $$T result Subgroup InclusiveScan $value};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseXor $$T result Subgroup InclusiveScan $value};
-
     }
-
     return T(0);
 }
 
@@ -3543,9 +3528,7 @@ __spirv_version(1.3) [require(spirv)]
         else if (__isUnsignedInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMin $$T result Subgroup ExclusiveScan $value};
         else return value;
-
     }
-
 }
 
 __generic<T : __BuiltinArithmeticType>
@@ -3566,9 +3549,7 @@ __spirv_version(1.3) [require(spirv)]
         else if (__isUnsignedInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMax $$T result Subgroup ExclusiveScan $value};
         else return value;
-
     }
-
 }
 
 __generic<T : __BuiltinLogicalType>
@@ -3583,7 +3564,6 @@ __spirv_version(1.3) [require(spirv)]
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalAnd $$T result Subgroup ExclusiveScan $value};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseAnd $$T result Subgroup ExclusiveScan $value};
-
     }
 }
 
@@ -3599,7 +3579,6 @@ __spirv_version(1.3) [require(spirv)]
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalOr $$T result Subgroup ExclusiveScan $value};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseOr $$T result Subgroup ExclusiveScan $value};
-
     }
 }
 
@@ -3615,9 +3594,7 @@ __spirv_version(1.3) [require(spirv)]
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalXor $$T result Subgroup ExclusiveScan $value};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseXor $$T result Subgroup ExclusiveScan $value};
-
     }
-
 }
 
 // GL_KHR_shader_subgroup_arithmetic
@@ -3733,7 +3710,6 @@ __spirv_version(1.3) [require(spirv)]
                 OpGroupNonUniformBitwiseXor $$vector<T,N> result Subgroup 0 $value
             };
         }
-
     }
 }
 
@@ -3754,7 +3730,6 @@ __spirv_version(1.3) [require(spirv)]
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIAdd $$vector<T,N> result Subgroup InclusiveScan $value};
         else return value;
     }
-
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
@@ -3773,9 +3748,7 @@ __spirv_version(1.3) [require(spirv)]
         else if (__isInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIMul $$vector<T,N> result Subgroup InclusiveScan $value};
         else return value;
-
     }
-
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
@@ -3796,9 +3769,7 @@ __spirv_version(1.3) [require(spirv)]
         else if (__isUnsignedInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMin $$vector<T,N> result Subgroup InclusiveScan $value};
         else return value;
-
     }
-
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
@@ -3819,9 +3790,7 @@ __spirv_version(1.3) [require(spirv)]
         else if (__isUnsignedInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMax $$vector<T,N> result Subgroup InclusiveScan $value};
         else return value;
-
     }
-
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
@@ -3837,9 +3806,7 @@ __spirv_version(1.3) [require(spirv)]
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalAnd $$vector<T,N> result Subgroup InclusiveScan $value};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseAnd $$vector<T,N> result Subgroup InclusiveScan $value};
-
     }
-
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
@@ -3855,9 +3822,7 @@ __spirv_version(1.3) [require(spirv)]
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalOr $$vector<T,N> result Subgroup InclusiveScan $value};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseOr $$vector<T,N> result Subgroup InclusiveScan $value};
-
     }
-
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
@@ -3873,9 +3838,7 @@ __spirv_version(1.3) [require(spirv)]
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalXor $$vector<T,N> result Subgroup InclusiveScan $value};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseXor $$vector<T,N> result Subgroup InclusiveScan $value};
-
     }
-
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
@@ -3915,9 +3878,7 @@ __spirv_version(1.3) [require(spirv)]
         else if (__isUnsignedInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMin $$vector<T,N> result Subgroup ExclusiveScan $value};
         else return value;
-
     }
-
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
@@ -3938,9 +3899,7 @@ __spirv_version(1.3) [require(spirv)]
         else if (__isUnsignedInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMax $$vector<T,N> result Subgroup ExclusiveScan $value};
         else return value;
-
     }
-
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
@@ -3955,7 +3914,6 @@ __spirv_version(1.3) [require(spirv)]
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalAnd $$vector<T,N> result Subgroup ExclusiveScan $value};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseAnd $$vector<T,N> result Subgroup ExclusiveScan $value};
-
     }
 }
 
@@ -3971,7 +3929,6 @@ __spirv_version(1.3) [require(spirv)]
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalOr $$vector<T,N> result Subgroup ExclusiveScan $value};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseOr $$vector<T,N> result Subgroup ExclusiveScan $value};
-
     }
 }
 
@@ -3987,7 +3944,6 @@ __spirv_version(1.3) [require(spirv)]
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalXor $$vector<T,N> result Subgroup ExclusiveScan $value};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseXor $$vector<T,N> result Subgroup ExclusiveScan $value};
-
     }
 }
 
@@ -4075,7 +4031,6 @@ __spirv_version(1.3) [require(spirv)]
                 OpCapability GroupNonUniformBallot; 
                 OpGroupNonUniformInverseBallot $$bool result Subgroup $value
         };
-
     }
     return false;
 }
@@ -4107,7 +4062,6 @@ __spirv_version(1.3) [require(spirv)]
                 OpCapability GroupNonUniformBallot; 
                 OpGroupNonUniformBallotBitExtract $$bool result Subgroup $value $index
         };
-
     }
     return false;
 }
@@ -4127,7 +4081,6 @@ __spirv_version(1.3) [require(spirv)]
             OpCapability GroupNonUniformBallot; 
             OpGroupNonUniformBallotBitCount $$uint result Subgroup Reduce $value
         };
-
     }
 }
 
@@ -4144,7 +4097,6 @@ __spirv_version(1.3) [require(spirv)]
             OpCapability GroupNonUniformBallot; 
             OpGroupNonUniformBallotBitCount $$uint result Subgroup InclusiveScan $value
         };
-
     }
 }
 
@@ -4161,7 +4113,6 @@ __spirv_version(1.3) [require(spirv)]
             OpCapability GroupNonUniformBallot; 
             OpGroupNonUniformBallotBitCount $$uint result Subgroup ExclusiveScan $value
         };
-
     }
 }
 
@@ -4178,7 +4129,6 @@ __spirv_version(1.3) [require(spirv)]
             OpCapability GroupNonUniformBallot; 
             OpGroupNonUniformBallotFindLSB $$uint result Subgroup $value
         };
-
     }
 }
 
@@ -4195,7 +4145,6 @@ __spirv_version(1.3) [require(spirv)]
             OpCapability GroupNonUniformBallot; 
             OpGroupNonUniformBallotFindMSB $$uint result Subgroup $value
         };
-
     }
 }
 
@@ -4225,9 +4174,7 @@ __spirv_version(1.3) [require(spirv)]
             OpCapability GroupNonUniformBallot; 
             OpGroupNonUniformShuffleXor $$T result Subgroup $value $mask
         };
-
     }
-
 }
 
 __generic<T : __BuiltinType, let N : int>
@@ -4254,9 +4201,7 @@ __spirv_version(1.3) [require(spirv)]
             OpCapability GroupNonUniformBallot; 
             OpGroupNonUniformShuffleXor $$vector<T,N> result Subgroup $value $mask
         };
-
     }
-
 }
 
 
@@ -4277,9 +4222,7 @@ __spirv_version(1.3) [require(spirv)]
             OpCapability GroupNonUniformShuffleRelative;
             OpGroupNonUniformShuffleUp $$T result Subgroup $value $delta
         };
-
     }
-
 }
 
 __generic<T : __BuiltinType>
@@ -4297,9 +4240,7 @@ __spirv_version(1.3) [require(spirv)]
             OpCapability GroupNonUniformShuffleRelative; 
             OpGroupNonUniformShuffleDown $$T result Subgroup $value $delta
         };
-
     }
-
 }
 
 
@@ -4318,9 +4259,7 @@ __spirv_version(1.3) [require(spirv)]
             OpCapability GroupNonUniformShuffleRelative;
             OpGroupNonUniformShuffleUp $$vector<T,N> result Subgroup $value $delta
         };
-
     }
-
 }
 
 __generic<T : __BuiltinType, let N : int>
@@ -4338,9 +4277,7 @@ __spirv_version(1.3) [require(spirv)]
             OpCapability GroupNonUniformShuffleRelative;
             OpGroupNonUniformShuffleDown $$vector<T,N> result Subgroup $value $delta
         };
-
     }
-
 }
 // GL_KHR_shader_subgroup_clustered
 
@@ -4360,9 +4297,7 @@ __spirv_version(1.3) [require(spirv)]
         else if (__isInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformIAdd $$T result Subgroup ClusteredReduce $value $clusterSize};
         else return value;
-
     }
-
 }
 
 __generic<T : __BuiltinArithmeticType>
@@ -4381,9 +4316,7 @@ __spirv_version(1.3) [require(spirv)]
         else if (__isInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformIMul $$T result Subgroup ClusteredReduce $value $clusterSize};
         else return value;
-
     } 
-
 }
 
 __generic<T : __BuiltinArithmeticType>
@@ -4404,9 +4337,7 @@ __spirv_version(1.3) [require(spirv)]
         else if (__isUnsignedInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformUMin $$T result Subgroup ClusteredReduce $value $clusterSize};
         else return value;
-
     }
-
 }
 
 __generic<T : __BuiltinArithmeticType>
@@ -4427,9 +4358,7 @@ __spirv_version(1.3) [require(spirv)]
         else if (__isUnsignedInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered;  OpGroupNonUniformUMax $$T result Subgroup ClusteredReduce $value $clusterSize};
         else return value;
-
     }
-
 }
 
 __generic<T : __BuiltinLogicalType>
@@ -4445,9 +4374,7 @@ __spirv_version(1.3) [require(spirv)]
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformLogicalAnd $$T result Subgroup ClusteredReduce $value $clusterSize};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseAnd $$T result Subgroup ClusteredReduce $value $clusterSize};
-
     }
-
 }
 
 __generic<T : __BuiltinLogicalType>
@@ -4463,9 +4390,7 @@ __spirv_version(1.3) [require(spirv)]
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformLogicalOr $$T result Subgroup ClusteredReduce $value $clusterSize};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseOr $$T result Subgroup ClusteredReduce $value $clusterSize};
-
     }
-
 }
 
 
@@ -4483,9 +4408,7 @@ __spirv_version(1.3) [require(spirv)]
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformLogicalXor $$T result Subgroup ClusteredReduce $value $clusterSize};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseXor $$T result Subgroup ClusteredReduce $value $clusterSize};
-
     }
-
 }
 
 
@@ -4507,9 +4430,7 @@ __spirv_version(1.3) [require(spirv)]
         else if (__isInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformIAdd $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
         else return value;
-
     }
-
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
@@ -4528,9 +4449,7 @@ __spirv_version(1.3) [require(spirv)]
         else if (__isInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformIMul $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
         else return value;
-
     } 
-
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
@@ -4551,9 +4470,7 @@ __spirv_version(1.3) [require(spirv)]
         else if (__isUnsignedInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformUMin $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
         else return value;
-
     }
-
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
@@ -4574,9 +4491,7 @@ __spirv_version(1.3) [require(spirv)]
         else if (__isUnsignedInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered;  OpGroupNonUniformUMax $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
         else return value;
-
     }
-
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
@@ -4592,9 +4507,7 @@ __spirv_version(1.3) [require(spirv)]
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformLogicalAnd $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseAnd $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
-
     }
-
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
@@ -4610,9 +4523,7 @@ __spirv_version(1.3) [require(spirv)]
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformLogicalOr $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseOr $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
-
     }
-
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
@@ -4628,9 +4539,7 @@ __spirv_version(1.3) [require(spirv)]
     case spirv:
         if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformLogicalXor $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
         else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseXor $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
-
     }
-
 }
 
 // GL_KHR_shader_subgroup_quad
@@ -4707,7 +4616,3 @@ __spirv_version(1.3) [require(spirv)]
     shader_subgroup_preamble<T>();
     return QuadReadAcrossDiagonal(value);
 }
-
-
-
-
