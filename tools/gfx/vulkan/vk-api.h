@@ -143,7 +143,7 @@ namespace gfx {
     /* */
 #elif SLANG_APPLE_FAMILY
 #   define VK_API_INSTANCE_PLATFORM_KHR_PROCS(x)          \
-    x(vkCreateMacOSSurfaceMVK) \
+    x(vkCreateMetalSurfaceEXT) \
     /* */
 #elif SLANG_ENABLE_XLIB
 #   define VK_API_INSTANCE_PLATFORM_KHR_PROCS(x)          \

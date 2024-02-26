@@ -50,8 +50,6 @@ class CocoaPlatformWindow : public Window
 public:
     NSWindow* window;
     WindowDelegate* delegate;
-    ContentView* view;
-    CAMetalLayer* layer;
     bool shouldClose = false;
 
     CocoaPlatformWindow(const WindowDesc& desc);
@@ -516,26 +514,14 @@ CocoaPlatformWindow::CocoaPlatformWindow(const WindowDesc& desc)
     else if (desc.style == WindowStyle::FixedSize)
         [window setStyleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable];
 
-    // Allocate view
-    rect = [window backingAlignedRect:rect options:NSAlignAllEdgesOutward];
-    view = [[ContentView alloc] initWithPlatformWindow:this];
-    [view setHidden:NO];
-    [view setNeedsDisplay:YES];
-    [view setWantsLayer:YES];
-
     delegate = [[WindowDelegate alloc] initWithPlatformWindow:this];
     [window setDelegate:delegate];
-    [window setContentView:view];
 
     NSString* title = [NSString stringWithUTF8String:desc.title];
     [window setTitle:title];
 
     [window center];
     [window makeKeyAndOrderFront:nil];
-
-    // Setup layer
-    layer = [[CAMetalLayer alloc] init];
-    [view setLayer:layer];
 }
 
 CocoaPlatformWindow::~CocoaPlatformWindow()
@@ -564,13 +550,9 @@ void CocoaPlatformWindow::close()
 {
     [window release];
     [delegate release];
-    [view release];
-    [layer release];
 
     window = nil;
     delegate = nil;
-    view = nil;
-    layer = nil;
 }
 
 bool CocoaPlatformWindow::getFocused()
@@ -585,7 +567,7 @@ bool CocoaPlatformWindow::getVisible()
 
 WindowHandle CocoaPlatformWindow::getNativeHandle()
 {
-    return WindowHandle::fromNSView(view);
+    return WindowHandle::fromNSWindow(window);
 }
 
 void CocoaPlatformWindow::setText(Slang::String text)

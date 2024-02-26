@@ -97,7 +97,7 @@ struct WindowHandle
     {
         Unknown,
         Win32Handle,
-        NSViewHandle,
+        NSWindowHandle,
         XLibHandle,
     };
     Type type;
@@ -109,11 +109,11 @@ struct WindowHandle
         handle.handleValues[0] = (intptr_t)(hwnd);
         return handle;
     }
-    static WindowHandle fromNSView(void* nsview)
+    static WindowHandle fromNSWindow(void* nswindow)
     {
         WindowHandle handle = {};
-        handle.type = WindowHandle::Type::NSViewHandle;
-        handle.handleValues[0] = (intptr_t)(nsview);
+        handle.type = WindowHandle::Type::NSWindowHandle;
+        handle.handleValues[0] = (intptr_t)(nswindow);
         return handle;
     }
     static WindowHandle fromXWindow(void* xdisplay, uint32_t xwindow)

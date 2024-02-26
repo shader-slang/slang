@@ -40,7 +40,7 @@ void SwapchainImpl::getWindowSize(int* widthOut, int* heightOut) const
     *widthOut = rc.right - rc.left;
     *heightOut = rc.bottom - rc.top;
 #elif SLANG_APPLE_FAMILY
-    CocoaUtil::getNSViewRectSize((void*)m_windowHandle.handleValues[0], widthOut, heightOut);
+    CocoaUtil::getNSWindowContentSize((void*)m_windowHandle.handleValues[0], widthOut, heightOut);
 #elif defined(SLANG_ENABLE_XLIB)
     XWindowAttributes winAttr = {};
     XGetWindowAttributes(
@@ -182,6 +182,9 @@ SwapchainImpl::~SwapchainImpl()
         m_surface = VK_NULL_HANDLE;
     }
     m_renderer->m_api.vkDestroySemaphore(m_renderer->m_api.m_device, m_nextImageSemaphore, nullptr);
+#if SLANG_APPLE_FAMILY
+    CocoaUtil::destroyMetalLayer(m_metalLayer);
+#endif
 }
 
 Index SwapchainImpl::_indexOfFormat(List<VkSurfaceFormatKHR>& formatsIn, VkFormat format)
@@ -225,11 +228,12 @@ Result SwapchainImpl::init(DeviceImpl* renderer, const ISwapchain::Desc& desc, W
     SLANG_VK_RETURN_ON_FAIL(
         m_api->vkCreateWin32SurfaceKHR(m_api->m_instance, &surfaceCreateInfo, nullptr, &m_surface));
 #elif SLANG_APPLE_FAMILY
-    VkMacOSSurfaceCreateInfoMVK surfaceCreateInfo = {};
-    surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_MACOS_SURFACE_CREATE_INFO_MVK;
-    surfaceCreateInfo.pView = (void*)window.handleValues[0];
+    m_metalLayer = CocoaUtil::createMetalLayer((void*)window.handleValues[0]);
+    VkMetalSurfaceCreateInfoEXT surfaceCreateInfo = {};
+    surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_METAL_SURFACE_CREATE_INFO_EXT;
+    surfaceCreateInfo.pLayer = (CAMetalLayer*)m_metalLayer;
     SLANG_VK_RETURN_ON_FAIL(
-        m_api->vkCreateMacOSSurfaceMVK(m_api->m_instance, &surfaceCreateInfo, nullptr, &m_surface));
+        m_api->vkCreateMetalSurfaceEXT(m_api->m_instance, &surfaceCreateInfo, nullptr, &m_surface));
 #elif SLANG_ENABLE_XLIB
     VkXlibSurfaceCreateInfoKHR surfaceCreateInfo = {};
     surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR;
