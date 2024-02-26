@@ -189,7 +189,7 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
 #if SLANG_WINDOWS_FAMILY
             instanceExtensions.add(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
 #elif SLANG_APPLE_FAMILY
-            instanceExtensions.add(VK_MVK_MACOS_SURFACE_EXTENSION_NAME);
+            instanceExtensions.add(VK_EXT_METAL_SURFACE_EXTENSION_NAME);
 #elif defined(SLANG_ENABLE_XLIB)
 
             instanceExtensions.add(VK_KHR_XLIB_SURFACE_EXTENSION_NAME);

@@ -495,11 +495,12 @@ SLANG_API void spSetDefaultModuleName(
 
 SLANG_API SlangResult spAddLibraryReference(
     slang::ICompileRequest*    request,
+    const char* basePath,
     const void* libData,
     size_t libDataSize)
 {
     SLANG_ASSERT(request);
-    return request->addLibraryReference(libData, libDataSize);
+    return request->addLibraryReference(basePath, libData, libDataSize);
 }
 
 SLANG_API void spTranslationUnit_addPreprocessorDefine(

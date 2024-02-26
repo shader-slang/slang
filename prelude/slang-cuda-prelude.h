@@ -363,11 +363,14 @@ SLANG_CUDA_VECTOR_FLOAT_OPS(__half)
 SLANG_CUDA_FLOAT_VECTOR_MOD(float)
 SLANG_CUDA_FLOAT_VECTOR_MOD(double)
 
-#if SLANG_CUDA_RTC
+#if SLANG_CUDA_RTC || SLANG_CUDA_ENABLE_HALF
 #define SLANG_MAKE_VECTOR(T) \
     SLANG_FORCE_INLINE SLANG_CUDA_CALL T##2 make_##T##2(T x, T y) { return T##2{x, y}; }\
     SLANG_FORCE_INLINE SLANG_CUDA_CALL T##3 make_##T##3(T x, T y, T z) { return T##3{ x, y, z }; }\
     SLANG_FORCE_INLINE SLANG_CUDA_CALL T##4 make_##T##4(T x, T y, T z, T w) { return T##4{ x, y, z, w }; }
+#endif
+
+#if SLANG_CUDA_RTC
 SLANG_MAKE_VECTOR(int)
 SLANG_MAKE_VECTOR(uint)
 SLANG_MAKE_VECTOR(short)
@@ -413,6 +416,9 @@ SLANG_MAKE_VECTOR_FROM_SCALAR(float)
 SLANG_MAKE_VECTOR_FROM_SCALAR(double)
 #if SLANG_CUDA_ENABLE_HALF
 SLANG_MAKE_VECTOR_FROM_SCALAR(__half)
+#if !SLANG_CUDA_RTC
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half1 make___half1(__half x) { return __half1{x}; }
+#endif
 #endif
 
 #define SLANG_CUDA_VECTOR_ATOMIC_BINARY_IMPL(Fn,T,N) \

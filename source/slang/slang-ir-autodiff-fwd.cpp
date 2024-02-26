@@ -498,9 +498,22 @@ InstPair ForwardDiffTranscriber::transcribeMakeStruct(IRBuilder* builder, IRInst
             {
                 auto operandDataType = origMakeStruct->getOperand(ii)->getDataType();
                 auto diffOperandType = differentiateType(builder, operandDataType);
-                SLANG_RELEASE_ASSERT(diffOperandType);
-                operandDataType = (IRType*)findOrTranscribePrimalInst(builder, operandDataType);
-                diffOperands.add(getDifferentialZeroOfType(builder, operandDataType));
+
+                if (diffOperandType)
+                {
+                    operandDataType = (IRType*)findOrTranscribePrimalInst(builder, operandDataType);
+                    diffOperands.add(getDifferentialZeroOfType(builder, operandDataType));
+                }
+                else
+                {
+                    // This case is only hit if the field is of a differentiable type but the operand is of
+                    // a non-differentiable type. This can happen if the operand is wrapped in no_diff.
+                    // In this case, we use the derivative of the field type to synthesize the 0.
+                    // 
+                    auto diffFieldOperandType = differentiateType(builder, field->getFieldType());
+                    SLANG_RELEASE_ASSERT(diffFieldOperandType);
+                    diffOperands.add(getDifferentialZeroOfType(builder, (IRType*)diffFieldOperandType));
+                }
             }
             ii++;
         }

@@ -30,16 +30,16 @@ public:
     virtual SLANG_NO_THROW bool SLANG_MCALL exists() SLANG_OVERRIDE { return true; }
 
     List<FrontEndCompileRequest::ExtraEntryPointInfo> m_entryPoints;
-    List<RefPtr<IRModule>> m_modules;
+    List<RefPtr<Module>> m_modules;
 
     void* getInterface(const Guid& uuid);
     void* getObject(const Guid& uuid);
 };
 
-SlangResult loadModuleLibrary(const Byte* inBytes, size_t bytesCount, EndToEndCompileRequest* req, ComPtr<IModuleLibrary>& outModule);
+SlangResult loadModuleLibrary(const Byte* inBytes, size_t bytesCount, String Path, EndToEndCompileRequest* req, ComPtr<IModuleLibrary>& outModule);
 
 // Given a product make available as a module
-SlangResult loadModuleLibrary(ArtifactKeep keep, IArtifact* artifact, EndToEndCompileRequest* req, ComPtr<IModuleLibrary>& outModule);
+SlangResult loadModuleLibrary(ArtifactKeep keep, IArtifact* artifact, String Path, EndToEndCompileRequest* req, ComPtr<IModuleLibrary>& outModule);
 
 } // namespace Slang
 

@@ -989,7 +989,6 @@ namespace Slang
         case ASTNodeType::PreciseModifier:
         case ASTNodeType::IntrinsicOpModifier:
         case ASTNodeType::InlineModifier:
-        case ASTNodeType::ExternModifier:
         case ASTNodeType::HLSLExportModifier:
         case ASTNodeType::ExternCppModifier:
         case ASTNodeType::ExportedModifier:

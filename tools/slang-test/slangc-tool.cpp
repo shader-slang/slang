@@ -7,13 +7,6 @@
 
 using namespace Slang;
 
-static void _diagnosticCallback(char const* message, void* /*userData*/)
-{
-    auto stdError = StdWriters::getError();
-    stdError.put(message);
-    stdError.flush();
-}
-
 SlangResult SlangCTool::innerMain(StdWriters* stdWriters, slang::IGlobalSession* sharedSession, int argc, const char*const* argv)
 {
     StdWriters::setSingleton(stdWriters);
@@ -42,7 +35,6 @@ SlangResult SlangCTool::innerMain(StdWriters* stdWriters, slang::IGlobalSession*
         compileRequest->setWriter(channel, stdWriters->getWriter(channel));
     }
 
-    compileRequest->setDiagnosticCallback(&_diagnosticCallback, nullptr);
     compileRequest->setCommandLineCompilerMode();
 
     SLANG_RETURN_ON_FAIL(compileRequest->processCommandLineArguments(&argv[1], argc - 1));

@@ -855,7 +855,6 @@ extern "C"
             ReportDownstreamTime,  // bool
             ReportPerfBenchmark,   // bool
             SkipSPIRVValidation,   // bool
-
             SourceEmbedStyle,
             SourceEmbedName,
             SourceEmbedLanguage,
@@ -1845,6 +1844,7 @@ extern "C"
     /*! @see slang::ICompileRequest::addLibraryReference */
     SLANG_API SlangResult spAddLibraryReference(
         SlangCompileRequest*    request,
+        const char* basePath,
         const void* libData,
         size_t libDataSize);
 
@@ -3952,10 +3952,12 @@ namespace slang
             /** Add a slang library - such that its contents can be referenced during linking.
             This is equivalent to the -r command line option.
 
+            @param basePath The base path used to lookup referenced modules.
             @param libData The library data
             @param libDataSize The size of the library data
             */
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL addLibraryReference(
+            const char* basePath,
             const void* libData,
             size_t libDataSize) = 0;
 
