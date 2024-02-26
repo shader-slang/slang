@@ -17,15 +17,17 @@ struct SPIRVEmitSharedContext
 {
     IRModule* m_irModule;
     TargetRequest* m_targetRequest;
+    TargetProgram* m_targetProgram;
     Dictionary<IRTargetIntrinsicDecoration*, RefPtr<SpvSnippet>> m_parsedSpvSnippets;
 
     Dictionary<IRInst*, HashSet<IRFunc*>> m_referencingEntryPoints; // The entry-points that directly or transitively reference this global inst.
 
     DiagnosticSink* m_sink;
     const SPIRVCoreGrammarInfo* m_grammarInfo;
-    SPIRVEmitSharedContext(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
+    SPIRVEmitSharedContext(IRModule* module, TargetProgram* program, DiagnosticSink* sink)
         : m_irModule(module),
-          m_targetRequest(target),
+          m_targetProgram(program),
+          m_targetRequest(program->getTargetReq()),
           m_sink(sink),
           m_grammarInfo(&module->getSession()->getSPIRVCoreGrammarInfo())
     {}

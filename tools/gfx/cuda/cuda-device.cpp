@@ -908,11 +908,12 @@ SLANG_NO_THROW Result SLANG_MCALL DeviceImpl::createQueryPool(
 }
 
 Result DeviceImpl::createShaderObjectLayout(
+    slang::ISession* session,
     slang::TypeLayoutReflection* typeLayout,
     ShaderObjectLayoutBase** outLayout)
 {
     RefPtr<ShaderObjectLayoutImpl> cudaLayout;
-    cudaLayout = new ShaderObjectLayoutImpl(this, typeLayout);
+    cudaLayout = new ShaderObjectLayoutImpl(this, session, typeLayout);
     returnRefPtrMove(outLayout, cudaLayout);
     return SLANG_OK;
 }

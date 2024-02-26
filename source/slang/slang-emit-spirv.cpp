@@ -1291,9 +1291,7 @@ struct SPIRVEmitContext
 
     bool shouldEmitSPIRVReflectionInfo()
     {
-        if (!m_targetRequest->getHLSLToVulkanLayoutOptions())
-            return false;
-        return m_targetRequest->getHLSLToVulkanLayoutOptions()->shouldEmitSPIRVReflectionInfo();
+        return m_targetProgram->getOptionSet().getBoolOption(CompilerOptionName::VulkanEmitReflection);
     }
 
     void requireVariablePointers()
@@ -1401,7 +1399,7 @@ struct SPIRVEmitContext
                     if (m_decoratedSpvInsts.add(getID(resultSpvType)))
                     {
                         IRSizeAndAlignment sizeAndAlignment;
-                        getNaturalSizeAndAlignment(m_targetRequest, ptrType->getValueType(), &sizeAndAlignment);
+                        getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), ptrType->getValueType(), &sizeAndAlignment);
                         emitOpDecorateArrayStride(
                             getSection(SpvLogicalSectionID::Annotations),
                             nullptr,
@@ -1465,7 +1463,7 @@ struct SPIRVEmitContext
                 else
                 {
                     IRSizeAndAlignment sizeAndAlignment;
-                    getNaturalSizeAndAlignment(m_targetRequest, elementType, &sizeAndAlignment);
+                    getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), elementType, &sizeAndAlignment);
                     stride = (int)sizeAndAlignment.getStride();
                 }
                 emitOpDecorateArrayStride(
@@ -2818,18 +2816,6 @@ struct SPIRVEmitContext
         case kIROp_EntryPointDecoration:
             {
                 auto section = getSection(SpvLogicalSectionID::EntryPoints);
-
-                // TODO: The `OpEntryPoint` is required to list an varying
-                // input or output parameters (by `<id>`) used by the entry point,
-                // although these are encoded as global variables in the IR.
-                //
-                // Currently we have a pass that moves entry-point varying
-                // parameters to global scope for the benefit of GLSL output,
-                // but we do not maintain a connection between those parameters
-                // and the original entry point. That pass should be updated
-                // to attach a decoration linking the original entry point
-                // to the new globals, which would be used in the SPIR-V emit case.
-
                 auto entryPointDecor = cast<IREntryPointDecoration>(decoration);
                 auto entryPoint = as<IRFunc>(decoration->getParent());
                 auto spvStage = mapStageToExecutionModel(entryPointDecor->getProfile().getStage());
@@ -2844,6 +2830,7 @@ struct SPIRVEmitContext
                     {
                     case kIROp_GlobalVar:
                     case kIROp_GlobalParam:
+                    case kIROp_SPIRVAsmOperandBuiltinVar:
                     {
                         SpvInst* spvGlobalInst;
                         if (m_mapIRInstToSpvInst.tryGetValue(globalInst, spvGlobalInst))
@@ -2862,13 +2849,6 @@ struct SPIRVEmitContext
                     default:
                         break;
                     }
-                }
-                // Add remaining builtin variables that does not have a corresponding IR global var/param.
-                // These variables could be added from SPIRV ASM blocks.
-                for (auto builtinVar : m_builtinGlobalVars)
-                {
-                    if (paramsSet.add(builtinVar.second))
-                        params.add(builtinVar.second);
                 }
                 emitOpEntryPoint(
                     section,
@@ -3182,7 +3162,7 @@ struct SPIRVEmitContext
             }
             else
             {
-                getOffset(m_targetRequest, IRTypeLayoutRules::get(layoutRuleName), field, &offset);
+                getOffset(m_targetProgram->getOptionSet(), IRTypeLayoutRules::get(layoutRuleName), field, &offset);
             }
             emitOpMemberDecorateOffset(
                 getSection(SpvLogicalSectionID::Annotations),
@@ -3207,7 +3187,7 @@ struct SPIRVEmitContext
                 IRIntegerValue matrixStride = 0;
                 auto rule = IRTypeLayoutRules::get(layoutRuleName);
                 IRSizeAndAlignment elementSizeAlignment;
-                getSizeAndAlignment(m_targetRequest, rule, matrixType->getElementType(), &elementSizeAlignment);
+                getSizeAndAlignment(m_targetProgram->getOptionSet(), rule, matrixType->getElementType(), &elementSizeAlignment);
 
                 // Reminder: the meaning of row/column major layout
                 // in our semantics is the *opposite* of what GLSL/SPIRV
@@ -3285,6 +3265,7 @@ struct SPIRVEmitContext
     }
 
     Dictionary<SpvBuiltIn, SpvInst*> m_builtinGlobalVars;
+
     SpvInst* getBuiltinGlobalVar(IRType* type, SpvBuiltIn builtinVal)
     {
         SpvInst* result = nullptr;
@@ -4153,7 +4134,7 @@ struct SPIRVEmitContext
         if (ptrType && ptrType->getAddressSpace() == SpvStorageClassPhysicalStorageBuffer)
         {
             IRSizeAndAlignment sizeAndAlignment;
-            getNaturalSizeAndAlignment(m_targetRequest, ptrType->getValueType(), &sizeAndAlignment);
+            getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), ptrType->getValueType(), &sizeAndAlignment);
             return emitOpLoadAligned(parent, inst, inst->getDataType(), inst->getPtr(), SpvLiteralInteger::from32(sizeAndAlignment.alignment));
         }
         else
@@ -4168,7 +4149,7 @@ struct SPIRVEmitContext
         if (ptrType && ptrType->getAddressSpace() == SpvStorageClassPhysicalStorageBuffer)
         {
             IRSizeAndAlignment sizeAndAlignment;
-            getNaturalSizeAndAlignment(m_targetRequest, ptrType->getValueType(), &sizeAndAlignment);
+            getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), ptrType->getValueType(), &sizeAndAlignment);
             return emitOpStoreAligned(parent, inst, inst->getPtr(), inst->getVal(), SpvLiteralInteger::from32(sizeAndAlignment.alignment));
         }
         else
@@ -5223,8 +5204,8 @@ struct SPIRVEmitContext
         }
     }
 
-    SPIRVEmitContext(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
-        : SPIRVEmitSharedContext(module, target, sink)
+    SPIRVEmitContext(IRModule* module, TargetProgram* program, DiagnosticSink* sink)
+        : SPIRVEmitSharedContext(module, program, sink)
         , m_irModule(module)
         , m_memoryArena(2048)
     {
@@ -5239,7 +5220,6 @@ SlangResult emitSPIRVFromIR(
 {
     spirvOut.clear();
 
-    auto targetRequest = codeGenContext->getTargetReq();
     auto sink = codeGenContext->getSink();
 
 #if 0
@@ -5254,7 +5234,7 @@ SlangResult emitSPIRVFromIR(
     }
 #endif
 
-    SPIRVEmitContext context(irModule, targetRequest, sink);
+    SPIRVEmitContext context(irModule, codeGenContext->getTargetProgram(), sink);
     legalizeIRForSPIRV(&context, irModule, irEntryPoints, codeGenContext);
 
 #if 0
@@ -5276,9 +5256,19 @@ SlangResult emitSPIRVFromIR(
     }
 
     // Emit source language info.
+    // By default we will use SpvSourceLanguageSlang.
+    // However this will cause problems when using swiftshader.
+    // To workaround this problem, we allow overriding this behavior with an
+    // environment variable that will be set in the software testing environment.
+    auto sourceLanguage = SpvSourceLanguageSlang;
+    StringBuilder noSlangEnv;
+    PlatformUtil::getEnvironmentVariable(toSlice("SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN"), noSlangEnv);
+    if (noSlangEnv.produceString() == "1")
+    {
+        sourceLanguage = SpvSourceLanguageUnknown;
+    }
     context.emitInst(context.getSection(SpvLogicalSectionID::DebugStringsAndSource), nullptr, SpvOpSource,
-        // TODO: update this to SpvSourceLanguageSlang when a new release of spirv-tools is available.
-        SpvLiteralInteger::from32(0), // language identifier, should be SpvSourceLanguageSlang.
+        SpvLiteralInteger::from32(sourceLanguage), // language identifier, should be SpvSourceLanguageSlang.
         SpvLiteralInteger::from32(1)); // language version.
 
     for (auto irEntryPoint : irEntryPoints)
@@ -5290,6 +5280,7 @@ SlangResult emitSPIRVFromIR(
     for (auto ptrType : context.m_forwardDeclaredPointers)
     {
         auto spvPtrType = context.m_mapIRInstToSpvInst[ptrType];
+        context.ensureInst(ptrType->getValueType());
         auto parent = spvPtrType->parent;
         spvPtrType->removeFromParent();
         parent->addInst(spvPtrType);

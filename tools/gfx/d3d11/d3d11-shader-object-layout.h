@@ -107,11 +107,12 @@ public:
     struct Builder
     {
     public:
-        Builder(RendererBase* renderer)
-            : m_renderer(renderer)
+        Builder(RendererBase* renderer, slang::ISession* session)
+            : m_renderer(renderer), m_session(session)
         {}
 
         RendererBase* m_renderer;
+        slang::ISession* m_session;
         slang::TypeLayoutReflection* m_elementTypeLayout;
 
         List<BindingRangeInfo> m_bindingRanges;
@@ -144,6 +145,7 @@ public:
 
     static Result createForElementType(
         RendererBase* renderer,
+        slang::ISession* session,
         slang::TypeLayoutReflection* elementType,
         ShaderObjectLayoutImpl** outLayout);
 
@@ -216,7 +218,7 @@ public:
             RendererBase* renderer,
             slang::IComponentType* program,
             slang::ProgramLayout* programLayout)
-            : Super::Builder(renderer)
+            : Super::Builder(renderer, program->getSession())
             , m_program(program)
             , m_programLayout(programLayout)
         {}

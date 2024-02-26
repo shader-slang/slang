@@ -9,11 +9,11 @@ using namespace Slang;
 namespace cuda
 {
 
-ShaderObjectLayoutImpl::ShaderObjectLayoutImpl(RendererBase* renderer, slang::TypeLayoutReflection* layout)
+ShaderObjectLayoutImpl::ShaderObjectLayoutImpl(RendererBase* renderer, slang::ISession* session, slang::TypeLayoutReflection* layout)
 {
     m_elementTypeLayout = _unwrapParameterGroups(layout, m_containerType);
 
-    initBase(renderer, m_elementTypeLayout);
+    initBase(renderer, session, m_elementTypeLayout);
 
     // Compute the binding ranges that are used to store
     // the logical contents of the object in memory. These will relate
@@ -101,7 +101,7 @@ ShaderObjectLayoutImpl::ShaderObjectLayoutImpl(RendererBase* renderer, slang::Ty
         if (slangBindingType != slang::BindingType::ExistentialValue)
         {
             subObjectLayout =
-                new ShaderObjectLayoutImpl(renderer, slangLeafTypeLayout->getElementTypeLayout());
+                new ShaderObjectLayoutImpl(renderer, session, slangLeafTypeLayout->getElementTypeLayout());
         }
 
         SubObjectRangeInfo subObjectRange;
@@ -118,13 +118,14 @@ BindingRangeInfo ShaderObjectLayoutImpl::getBindingRange(Index index) { return m
 Index ShaderObjectLayoutImpl::getBindingRangeCount() const { return m_bindingRanges.getCount(); }
 
 RootShaderObjectLayoutImpl::RootShaderObjectLayoutImpl(RendererBase* renderer, slang::ProgramLayout* inProgramLayout)
-    : ShaderObjectLayoutImpl(renderer, inProgramLayout->getGlobalParamsTypeLayout())
+    : ShaderObjectLayoutImpl(renderer, inProgramLayout->getSession(), inProgramLayout->getGlobalParamsTypeLayout())
     , programLayout(inProgramLayout)
 {
     for (UInt i = 0; i < programLayout->getEntryPointCount(); i++)
     {
         entryPointLayouts.add(new ShaderObjectLayoutImpl(
             renderer,
+            programLayout->getSession(),
             programLayout->getEntryPointByIndex(i)->getTypeLayout()));
     }
 

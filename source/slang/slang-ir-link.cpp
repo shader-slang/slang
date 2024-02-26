@@ -1477,14 +1477,7 @@ LinkedIR linkIR(
     {
         irModules.add(irModule);
     });
-    for (IArtifact* artifact : linkage->m_libModules)
-    {
-        if (auto library = findRepresentation<ModuleLibrary>(artifact))
-        {
-            irModules.addRange(library->m_modules.getBuffer()->readRef(), library->m_modules.getCount());
-        }
-    }
-    
+
     // Add any modules that were loaded as libraries
     for (IRModule* irModule : irModules)
     {

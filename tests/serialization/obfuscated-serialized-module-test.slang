@@ -3,20 +3,12 @@
 // A test to try out the basics of module
 // serialization, obfuscation and source maps.
 
-//TEST:COMPILE: tests/serialization/serialized-module.slang -o tests/serialization/obfuscated-serialized-module.slang-module -g -obfuscate
+//TEST:COMPILE: tests/serialization/obfuscated-serialized-module.slang -o tests/serialization/obfuscated-serialized-module.slang-module -g -obfuscate
 //TEST:COMPARE_COMPUTE_EX:-slang -compute -Xslang... -r tests/serialization/obfuscated-serialized-module.slang-module -obfuscate -X. -shaderobj
 
-//import obfuscated_serialized_module;
+import obfuscated_serialized_module_shared;
 
-// This is fragile - needs match the definition in obfuscated_serialized_module
-struct Thing
-{
-    int a;
-    int b;
-};
-
-// TODO: need to get the name mangling to line up!
-int foo(Thing thing);
+extern int foo(Thing thing);
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 ], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;

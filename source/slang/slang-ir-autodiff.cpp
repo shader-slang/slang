@@ -339,8 +339,8 @@ IRInst* DifferentialPairTypeBuilder::lowerDiffPairType(
     return result;
 }
 
-AutoDiffSharedContext::AutoDiffSharedContext(TargetRequest* target, IRModuleInst* inModuleInst)
-    : moduleInst(inModuleInst), targetRequest(target)
+AutoDiffSharedContext::AutoDiffSharedContext(TargetProgram* target, IRModuleInst* inModuleInst)
+    : moduleInst(inModuleInst), targetProgram(target)
 {
     differentiableInterfaceType = as<IRInterfaceType>(findDifferentiableInterface());
     if (differentiableInterfaceType)
@@ -1979,7 +1979,7 @@ protected:
 };
 
 bool processAutodiffCalls(
-    TargetRequest* target,
+    TargetProgram* target,
     IRModule*                           module,
     DiagnosticSink*                     sink,
     IRAutodiffPassOptions const&)
@@ -2078,7 +2078,7 @@ void releaseNullDifferentialType(AutoDiffSharedContext* context)
     }
 }
 
-bool finalizeAutoDiffPass(TargetRequest* target, IRModule* module)
+bool finalizeAutoDiffPass(TargetProgram* target, IRModule* module)
 {
     bool modified = false;
 

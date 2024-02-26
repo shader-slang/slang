@@ -130,10 +130,26 @@ class ExtensionDecl : public AggTypeDeclBase
     TypeExp targetType;
 };
 
+enum class TypeTag
+{
+    None = 0,
+    Unsized = 1,
+    Incomplete = 2
+};
+
 // Declaration of a type that represents some sort of aggregate
 class AggTypeDecl : public  AggTypeDeclBase
 {
     SLANG_ABSTRACT_AST_CLASS(AggTypeDecl)
+
+    TypeTag typeTags = TypeTag::None;
+
+    // Used if this type declaration is a wrapper, i.e. struct FooWrapper:IFoo = Foo;
+    TypeExp wrappedType;
+
+    void unionTagsWith(TypeTag other);
+    void addTag(TypeTag tag);
+    bool hasTag(TypeTag tag);
 
     FilteredMemberList<VarDecl> getFields()
     {

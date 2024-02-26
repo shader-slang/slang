@@ -39,4 +39,5 @@ SLANG_TEST=${OUTPUTDIR}slang-test
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$OUTPUTDIR
 export PATH=$PATH:${OUTPUTDIR}
 export SLANG_RUN_SPIRV_VALIDATION=1
+export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
 ${SLANG_TEST} -bindir ${OUTPUTDIR} -travis -category ${SLANG_TEST_CATEGORY} ${SLANG_TEST_FLAGS} -api all-vk -expected-failure-list tests/expected-failure-github.txt

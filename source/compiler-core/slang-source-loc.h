@@ -6,6 +6,7 @@
 #include "../core/slang-memory-arena.h"
 #include "../core/slang-string-slice-pool.h"
 #include "../core/slang-castable.h"
+#include "../core/slang-crypto.h"
 
 #include "slang-source-map.h"
 
@@ -60,7 +61,7 @@ struct PathInfo
         /// True if has a canonical path
     SLANG_FORCE_INLINE bool hasUniqueIdentity() const { return type == Type::Normal && uniqueIdentity.getLength() > 0; }
         /// True if has a regular found path
-    SLANG_FORCE_INLINE bool hasFoundPath() const { return type == Type::Normal || type == Type::FoundPath || (type == Type::FromString && foundPath.getLength() > 0); }
+    SLANG_FORCE_INLINE bool hasFoundPath() const { return (type == Type::Normal || type == Type::FoundPath || type == Type::FromString) && foundPath.getLength() > 0; }
         /// True if has a found path that has originated from a file (as opposed to string or some other origin)
     SLANG_FORCE_INLINE bool hasFileFoundPath() const { return (type == Type::Normal || type == Type::FoundPath) && foundPath.getLength() > 0; }
         /// Get the 'name'/path of the item. Will return an empty string if not applicable or not set.
@@ -277,6 +278,8 @@ public:
         /// Dtor
     ~SourceFile();
 
+    SHA1::Digest getDigest();
+
     protected:
 
     SourceManager* m_sourceManager;                             ///< The source manager this belongs to
@@ -285,6 +288,8 @@ public:
     ComPtr<ISlangBlob> m_contentBlob;                           ///< A blob that owns the storage for the file contents. If nullptr, there is no contents
     UnownedStringSlice m_content;                               ///< The actual contents of the file.
     size_t m_contentSize;                                       ///< The size of the actual contents
+
+    SHA1::Digest m_digest;
 
     // In order to speed up lookup of line number information,
     // we will cache the starting offset of each line break in

@@ -10,7 +10,7 @@ namespace Slang
 
 struct ReinterpretLoweringContext
 {
-    TargetRequest* targetReq;
+    TargetProgram* targetProgram;
     DiagnosticSink* sink;
     IRModule* module;
     OrderedHashSet<IRInst*> workList;
@@ -83,16 +83,16 @@ struct ReinterpretLoweringContext
     }
 };
 
-void lowerReinterpret(TargetRequest* targetReq, IRModule* module, DiagnosticSink* sink)
+void lowerReinterpret(TargetProgram* target, IRModule* module, DiagnosticSink* sink)
 {
     // Before processing reinterpret insts, ensure that existential types without 
     // user-defined sizes have inferred sizes where possible.
     // 
-    inferAnyValueSizeWhereNecessary(targetReq, module);
+    inferAnyValueSizeWhereNecessary(target, module);
 
     ReinterpretLoweringContext context;
     context.module = module;
-    context.targetReq = targetReq;
+    context.targetProgram = target;
     context.sink = sink;
     context.processModule();
 }

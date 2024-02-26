@@ -45,7 +45,7 @@ namespace Slang
             SLANG_ASSERT(func);
             // Do not lower intrinsic functions.
             UnownedStringSlice intrinsicDef;
-            if (!func->isDefinition() || findTargetIntrinsicDefinition(func, sharedContext->targetReq->getTargetCaps(), intrinsicDef))
+            if (!func->isDefinition() || findTargetIntrinsicDefinition(func, sharedContext->targetProgram->getTargetReq()->getTargetCaps(), intrinsicDef))
             {
                 sharedContext->loweredGenericFunctions[genericValue] = genericValue;
                 return genericValue;

@@ -824,6 +824,156 @@ extern "C"
         SLANG_OPTIMIZATION_LEVEL_MAXIMAL,   /**< Include optimizations that may take a very long time, or may involve severe space-vs-speed tradeoffs */
     };
 
+    // All compiler option names supported by Slang.
+    namespace slang
+    {
+        enum class CompilerOptionName
+        {
+            MacroDefine,        // stringValue0: macro name;  stringValue1: macro value
+            DepFile,
+            EntryPointName,
+            Specialize,
+            Help,
+            HelpStyle,
+            Include,            // stringValue: additional include path.
+            Language,
+            MatrixLayoutColumn, // bool
+            MatrixLayoutRow,    // bool
+            ModuleName,         // stringValue0: module name.
+            Output,
+            Profile,            // intValue0: profile
+            Stage,              // intValue0: stage
+            Target,             // intValue0: CodeGenTarget
+            Version,
+            WarningsAsErrors,   // stringValue0: "all" or comma separated list of warning codes or names.
+            DisableWarnings,    // stringValue0: comma separated list of warning codes or names.
+            EnableWarning,      // stringValue0: warning code or name.
+            DisableWarning,     // stringValue0: warning code or name.
+            DumpWarningDiagnostics,
+            InputFilesRemain,
+            EmitIr,                // bool
+            ReportDownstreamTime,  // bool
+            ReportPerfBenchmark,   // bool
+            SkipSPIRVValidation,   // bool
+            SourceEmbedStyle,
+            SourceEmbedName,
+            SourceEmbedLanguage,
+
+            // Target
+
+            Capability,                 // intValue0: CapabilityName
+            DefaultImageFormatUnknown,  // bool
+            DisableDynamicDispatch,     // bool
+            DisableSpecialization,      // bool
+            FloatingPointMode,          // intValue0: FloatingPointMode
+            DebugInformation,           // intValue0: DebugInfoLevel
+            LineDirectiveMode,
+            Optimization,               // intValue0: OptimizationLevel
+            Obfuscate,                  // bool
+
+            VulkanBindShift,            // intValue0 (lower 8 bits): kind; intValue0(higher bits): set; intValue1: shift
+            VulkanBindGlobals,          // intValue0: index; intValue1: set
+            VulkanInvertY,              // bool
+            VulkanUseEntryPointName,    // bool
+            VulkanUseGLLayout,          // bool
+            VulkanEmitReflection,       // bool
+
+            GLSLForceScalarLayout,      // bool
+            EnableEffectAnnotations,    // bool
+
+            EmitSpirvViaGLSL,           // bool
+            EmitSpirvDirectly,          // bool
+            SPIRVCoreGrammarJSON,       // stringValue0: json path
+
+            // Downstream
+
+            CompilerPath,
+            DefaultDownstreamCompiler,
+            DownstreamArgs,             // stringValue0: downstream compiler name. stringValue1: argument list, one per line.
+            PassThrough,
+
+            // Repro
+
+            DumpRepro,
+            DumpReproOnError,
+            ExtractRepro,
+            LoadRepro,
+            LoadReproDirectory,
+            ReproFallbackDirectory,
+
+            // Debugging
+
+            DumpAst,
+            DumpIntermediatePrefix,
+            DumpIntermediates,      // bool
+            DumpIr,                 // bool
+            DumpIrIds,
+            PreprocessorOutput,
+            OutputIncludes,
+            ReproFileSystem,
+            SerialIr,               // bool
+            SkipCodeGen,            // bool
+            ValidateIr,             // bool
+            VerbosePaths,
+            VerifyDebugSerialIr,
+            NoCodeGen,              // Not used.
+
+            // Experimental
+
+            FileSystem,
+            Heterogeneous,
+            NoMangle,
+            AllowGLSL,
+
+            // Internal
+
+            ArchiveType,
+            CompileStdLib,
+            Doc,
+            IrCompression,
+            LoadStdLib,
+            ReferenceModule,
+            SaveStdLib,
+            SaveStdLibBinSource,
+            TrackLiveness,
+
+            // Deprecated
+            ParameterBlocksUseRegisterSpaces,
+
+            CountOfParsableOptions,
+
+            // Used in parsed options only.
+            DebugInformationFormat,     // intValue0: DebugInfoFormat
+            VulkanBindShiftAll,         // intValue0: kind; intValue1: shift
+            GenerateWholeProgram,       // bool
+            UseUpToDateBinaryModule,    // bool, when set, will only load
+                                        // precompiled modules if it is up-to-date with its source.
+
+            CountOf,
+        };
+
+        enum class CompilerOptionValueKind
+        {
+            Int,
+            String
+        };
+
+        struct CompilerOptionValue
+        {
+            CompilerOptionValueKind kind = CompilerOptionValueKind::Int;
+            int32_t intValue0 = 0;
+            int32_t intValue1 = 0;
+            const char* stringValue0 = nullptr;
+            const char* stringValue1 = nullptr;
+        };
+
+        struct CompilerOptionEntry
+        {
+            CompilerOptionName name;
+            CompilerOptionValue value;
+        };
+    }
+
     /** A result code for a Slang API operation.
 
     This type is generally compatible with the Windows API `HRESULT` type. In particular, negative values indicate
@@ -1694,6 +1844,7 @@ extern "C"
     /*! @see slang::ICompileRequest::addLibraryReference */
     SLANG_API SlangResult spAddLibraryReference(
         SlangCompileRequest*    request,
+        const char* basePath,
         const void* libData,
         size_t libDataSize);
 
@@ -2433,8 +2584,15 @@ extern "C"
     SLANG_API SlangReflectionVariableLayout* spReflection_getGlobalParamsVarLayout(
         SlangReflection* reflection);
 
-#ifdef __cplusplus
 }
+#ifdef __cplusplus
+
+namespace slang
+{
+    struct ISession;
+}
+
+SLANG_API slang::ISession* spReflection_GetSession(SlangReflection* reflection);
 
 /* Helper interfaces for C++ users */
 namespace slang
@@ -3239,6 +3397,11 @@ namespace slang
             return spReflection_GetTypeParameterCount((SlangReflection*) this);
         }
 
+        slang::ISession* getSession()
+        {
+            return spReflection_GetSession((SlangReflection*)this);
+        }
+
         TypeParameterReflection* getTypeParameterByIndex(unsigned index)
         {
             return (TypeParameterReflection*)spReflection_GetTypeParameterByIndex((SlangReflection*) this, index);
@@ -3350,7 +3513,6 @@ namespace slang
     struct ITypeConformance;
     struct IGlobalSession;
     struct IModule;
-    struct ISession;
 
     struct SessionDesc;
     struct SpecializationArg;
@@ -3564,6 +3726,16 @@ namespace slang
              */
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL setSPIRVCoreGrammar(
             char const* jsonPath) = 0;
+
+            /** Parse slangc command line options into a SessionDesc that can be used to create a session
+            *   with all the compiler options specified in the command line.
+            *   @param argc The number of command line arguments.
+            *   @param argv An input array of command line arguments to parse.
+            *   @param outSessionDesc A pointer to a SessionDesc struct to receive parsed session desc.
+            *   @param outAuxAllocation Auxillary memory allocated to hold data used in the sesion desc.
+            */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL parseCommandLineArguments(
+            int argc, const char* const* argv, SessionDesc* outSessionDesc, ISlangUnknown** outAuxAllocation) = 0;
     };
 
     #define SLANG_UUID_IGlobalSession IGlobalSession::getTypeGuid()
@@ -3780,10 +3952,12 @@ namespace slang
             /** Add a slang library - such that its contents can be referenced during linking.
             This is equivalent to the -r command line option.
 
+            @param basePath The base path used to lookup referenced modules.
             @param libData The library data
             @param libDataSize The size of the library data
             */
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL addLibraryReference(
+            const char* basePath,
             const void* libData,
             size_t libDataSize) = 0;
 
@@ -4215,22 +4389,21 @@ namespace slang
             /** Whether to force `scalar` layout for glsl shader storage buffers.
             */
         bool forceGLSLScalarBufferLayout = false;
+
+            /** Pointer to an array of compiler option entries, whose size is compilerOptionEntryCount.
+            */
+        CompilerOptionEntry* compilerOptionEntries = nullptr;
+
+            /** Number of additional compiler option entries.
+            */
+        uint32_t compilerOptionEntryCount = 0;
+
     };
 
     typedef uint32_t SessionFlags;
     enum
     {
-        kSessionFlags_None = 0,
-
-        /** Use application-specific policy for semantics of the `shared` keyword.
-        
-        This is a legacy/compatibility flag to help an existing Slang client
-        migrate to new language features, and should *not* be used by other
-        clients. This feature may be removed in a future release without a
-        deprecation warning, and this bit may be re-used for another feature.
-        You have been warned.
-        */
-        kSessionFlag_FalcorCustomSharedKeywordSemantics = 1 << 0,
+        kSessionFlags_None = 0
     };
 
     struct PreprocessorMacroDesc
@@ -4270,6 +4443,15 @@ namespace slang
 
         bool enableEffectAnnotations = false;
         bool allowGLSLSyntax = false;
+
+        /** Pointer to an array of compiler option entries, whose size is compilerOptionEntryCount.
+        */
+        CompilerOptionEntry* compilerOptionEntries = nullptr;
+
+        /** Number of additional compiler option entries.
+        */
+        uint32_t compilerOptionEntryCount = 0;
+
     };
 
     enum class ContainerType
@@ -4455,6 +4637,12 @@ namespace slang
 
         virtual SLANG_NO_THROW SlangInt SLANG_MCALL getLoadedModuleCount() = 0;
         virtual SLANG_NO_THROW IModule* SLANG_MCALL getLoadedModule(SlangInt index) = 0;
+
+            /** Checks if a precompiled binary module is up-to-date with the current compiler
+            *   option settings and the source file contents.
+            */
+        virtual SLANG_NO_THROW bool SLANG_MCALL isBinaryModuleUpToDate(
+            const char* modulePath, slang::IBlob* binaryModuleBlob) = 0;
     };
 
     #define SLANG_UUID_ISession ISession::getTypeGuid()
@@ -4657,6 +4845,15 @@ namespace slang
             */
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL renameEntryPoint(
             const char* newName, IComponentType** outEntryPoint) = 0;
+        
+            /** Link and specify additional compiler options when generating code
+            *   from the linked program.
+            */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL linkWithOptions(
+            IComponentType** outLinkedComponentType,
+            uint32_t compilerOptionEntryCount,
+            CompilerOptionEntry* compilerOptionEntries,
+            ISlangBlob** outDiagnostics = nullptr) = 0;
     };
     #define SLANG_UUID_IComponentType IComponentType::getTypeGuid()
 

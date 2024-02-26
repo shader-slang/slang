@@ -152,7 +152,7 @@ public:
         createInputLayout(IInputLayout::Desc const& desc, IInputLayout** outLayout) override;
 
     virtual Result createShaderObjectLayout(
-        slang::TypeLayoutReflection* typeLayout, ShaderObjectLayoutBase** outLayout) override;
+        slang::ISession* session, slang::TypeLayoutReflection* typeLayout, ShaderObjectLayoutBase** outLayout) override;
     virtual Result createShaderObject(
         ShaderObjectLayoutBase* layout, IShaderObject** outObject) override;
     virtual Result createMutableShaderObject(
