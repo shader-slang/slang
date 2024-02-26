@@ -700,7 +700,7 @@ struct PeepholeContext : InstPassBase
                     // These witness tables provides `default`s in case they are not
                     // explicitly specialized via other linked modules, therefore we don't want
                     // to resolve them too soon before linking.
-                    if (isPrelinking && inst->getOperand(0)->findDecoration<IRImportDecoration>())
+                    if (isPrelinking && inst->getOperand(0)->findDecoration<IRUserExternDecoration>())
                         break;
 
                     auto wt = as<IRWitnessTable>(inst->getOperand(0));

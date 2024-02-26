@@ -787,6 +787,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         INST(ExportDecoration, export, 1, 0)
     INST_RANGE(LinkageDecoration, ImportDecoration, ExportDecoration)
 
+        /// Marks an inst as coming from an `extern` symbol defined in the user code.
+    INST(UserExternDecoration, UserExtern, 0, 0)
+
         /// An extern_cpp decoration marks the inst to emit its name without mangling for C++ interop.
     INST(ExternCppDecoration, externCpp, 1, 0)
 

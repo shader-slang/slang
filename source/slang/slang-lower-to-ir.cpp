@@ -1314,6 +1314,8 @@ static void addLinkageDecoration(
     if (isImportedDecl(context, decl))
     {
         builder->addImportDecoration(inst, mangledName);
+        if (decl->findModifier<ExternModifier>())
+            builder->addUserExternDecoration(inst);
     }
     else
     {
