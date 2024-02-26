@@ -279,18 +279,16 @@ namespace Slang
     }
 
 
-    Type* SemanticsVisitor::getBufferElementType(Type* type)
+    Type* SemanticsVisitor::getConstantBufferElementType(Type* type)
     {
         if (auto arrType = as<ArrayExpressionType>(type))
-            return getBufferElementType(arrType->getElementType());
+            return getConstantBufferElementType(arrType->getElementType());
         if (auto modifiedType = as<ModifiedType>(type))
-            return getBufferElementType(modifiedType->getBase());
+            return getConstantBufferElementType(modifiedType->getBase());
         if (auto constantBuffer = as<ConstantBufferType>(type))
             return constantBuffer->getElementType();
-        if (auto structuredBuffer = as<HLSLStructuredBufferTypeBase>(type))
-            return structuredBuffer->getElementType();
-        if (auto storageBuffer = as<GLSLShaderStorageBufferType>(type))
-            return storageBuffer->getElementType();
+        if (auto parameterBlock = as<ParameterBlockType>(type))
+            return parameterBlock->getElementType();
         return nullptr;
     }
 

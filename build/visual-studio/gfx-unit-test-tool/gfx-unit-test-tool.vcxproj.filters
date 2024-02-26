@@ -68,6 +68,9 @@
     <ClCompile Include="..\..\..\tools\gfx-unit-test\link-time-constant.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\link-time-default.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\tools\gfx-unit-test\link-time-options.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

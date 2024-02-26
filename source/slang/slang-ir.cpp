@@ -32,7 +32,15 @@ namespace Slang
         if (!irObject)
             return;
         if (auto nameHint = irObject->findDecoration<IRNameHintDecoration>())
+        {
             sb << nameHint->getName();
+            return;
+        }
+        if (auto linkage = irObject->findDecoration<IRLinkageDecoration>())
+        {
+            sb << linkage->getMangledName();
+            return;
+        }
     }
 
     // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

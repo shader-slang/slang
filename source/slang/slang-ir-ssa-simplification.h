@@ -2,6 +2,7 @@
 #pragma once
 
 #include "slang-ir-simplify-cfg.h"
+#include "slang-ir-peephole.h"
 
 namespace Slang
 {
@@ -13,6 +14,8 @@ namespace Slang
     struct IRSimplificationOptions
     {
         CFGSimplificationOptions cfgOptions;
+        PeepholeOptimizationOptions peepholeOptions;
+
         static IRSimplificationOptions getDefault()
         {
             IRSimplificationOptions result;

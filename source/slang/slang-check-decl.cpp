@@ -1478,11 +1478,6 @@ namespace Slang
             }
             else
             {
-                if (varDecl->hasModifier<ExternModifier>())
-                {
-                    getSink()->diagnose(initExpr, Diagnostics::externValueCannotHaveInitializer);
-                }
-
                 initExpr = CheckExpr(initExpr);
 
                 // TODO: We might need some additional steps here to ensure
@@ -1850,7 +1845,7 @@ namespace Slang
                 varDecl->initExpr = CompleteOverloadCandidate(overloadContext, *overloadContext.bestCandidate);
             }
         }
-        if (auto elementType = getBufferElementType(varDecl->getType()))
+        if (auto elementType = getConstantBufferElementType(varDecl->getType()))
         {
             if (doesTypeHaveTag(elementType, TypeTag::Incomplete))
             {
@@ -5166,6 +5161,13 @@ namespace Slang
         return false;
     }
 
+    static bool _doesTypeDeclHaveDefinition(ContainerDecl* decl)
+    {
+        if (auto aggTypeDecl = as<AggTypeDecl>(decl))
+            return aggTypeDecl->hasBody;
+        return false;
+    }
+
     bool SemanticsVisitor::checkConformance(
         Type*                       subType,
         InheritanceDecl*            inheritanceDecl,
@@ -5244,7 +5246,8 @@ namespace Slang
             witnessTable = new WitnessTable();
             witnessTable->baseType = superType;
             witnessTable->witnessedType = subType;
-            witnessTable->isExtern = parentDecl->hasModifier<ExternModifier>();
+            witnessTable->isExtern = (!_doesTypeDeclHaveDefinition(parentDecl)
+                && parentDecl->hasModifier<ExternModifier>());
             inheritanceDecl->witnessTable = witnessTable;
         }
 

@@ -3559,6 +3559,8 @@ bool Linkage::isBinaryModuleUpToDate(String fromPath, RiffContainer* container)
     
     auto& moduleHeader = containerData.modules[0];
     DigestBuilder<SHA1> digestBuilder;
+    auto version = String(getBuildTagString());
+    digestBuilder.append(version);
     m_optionSet.buildHash(digestBuilder);
     for (auto file : moduleHeader.dependentFiles)
     {

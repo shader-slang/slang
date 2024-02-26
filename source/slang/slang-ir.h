@@ -1878,6 +1878,8 @@ struct IRInterfaceRequirementEntry : IRInst
 struct IRInterfaceType : IRType
 {
     IR_LEAF_ISA(InterfaceType)
+
+    UInt getRequirementCount() { return getOperandCount(); }
 };
 
 struct IRConjunctionType : IRType

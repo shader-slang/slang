@@ -666,35 +666,13 @@ bool isImportedDecl(IRGenContext* context, Decl* decl)
         return true;
     }
 
-    ModuleDecl* moduleDecl = findModuleDecl(decl);
-    if (!moduleDecl)
-        return false;
-
-#if 0
-    // HACK: don't treat standard library code as
-    // being imported for right now, just because
-    // we don't load its IR in the same way as
-    // for other imports.
-    //
-    // TODO: Fix this the right way, by having standard
-    // library declarations have IR modules that we link
-    // in via the normal means.
-    if (isFromStdLib(decl))
-        return false;
-#endif
-
-    if (moduleDecl != context->getMainModuleDecl())
-        return true;
-
-    return false;
-}
-
-    /// Is `decl` a function that should be force-inlined early in compilation (before linking)?
-static bool isForceInlineEarly(Decl* decl)
-{
-    if(decl->hasModifier<UnsafeForceInlineEarlyAttribute>())
-        return true;
-
+    for (auto parent = decl; parent; parent = parent->parentDecl)
+    {
+        if (as<ModuleDecl>(parent) && parent != context->getMainModuleDecl())
+            return true;
+        if (parent->findModifier<ExternAttribute>() || parent->findModifier<ExternModifier>())
+            return true;
+    }
     return false;
 }
 
@@ -7596,12 +7574,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // the underlying storage.
         context->setGlobalValue(decl, globalVal);
 
-        if (isImportedDecl(decl))
-        {
-            // Always emit imported declarations as declarations,
-            // and not definitions.
-        }
-        else if( auto initExpr = decl->initExpr )
+        if( auto initExpr = decl->initExpr )
         {
             IRBuilder subBuilderStorage = *getBuilder();
             IRBuilder* subBuilder = &subBuilderStorage;
@@ -9104,12 +9077,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // pre-generated IR for the module that defines it (or do some kind
         // of minimal linking to bring in the inline functions).
         //
-        if (isImportedDecl(decl) && !isForceInlineEarly(decl))
-        {
-            // Always emit imported declarations as declarations,
-            // and not definitions.
-        }
-        else if (!decl->body)
+        if (!decl->body)
         {
             // This is a function declaration without a body.
             // In Slang we currently try not to support forward declarations
@@ -10373,7 +10341,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     constructSSA(module);
     simplifyCFG(module, CFGSimplificationOptions::getDefault());
     applySparseConditionalConstantPropagation(module, compileRequest->getSink());
-    peepholeOptimize(nullptr, module);
+    peepholeOptimize(nullptr, module, PeepholeOptimizationOptions::getPrelinking());
 
     for (auto inst : module->getGlobalInsts())
     {
@@ -10422,7 +10390,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         changed |= constructSSA(module);
         simplifyCFG(module, CFGSimplificationOptions::getDefault());
         changed |= applySparseConditionalConstantPropagation(module, compileRequest->getSink());
-        changed |= peepholeOptimize(nullptr, module);
+        changed |= peepholeOptimize(nullptr, module, PeepholeOptimizationOptions::getPrelinking());
         for (auto inst : module->getGlobalInsts())
         {
             if (auto func = as<IRGlobalValueWithCode>(inst))
