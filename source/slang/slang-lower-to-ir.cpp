@@ -905,7 +905,9 @@ LoweredValInfo emitCallToDeclRef(
     {
         if(!ctorDeclRef.getDecl()->body && isFromStdLib(ctorDeclRef.getDecl()) && !as<InterfaceDecl>(ctorDeclRef.getParent().getDecl()))
         {
+#if 0 // Workaround for an issue 3628
             SLANG_UNREACHABLE("stdlib error: __init() has no definition.");
+#endif
         }
     }
 
