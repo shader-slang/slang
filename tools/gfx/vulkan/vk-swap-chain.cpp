@@ -40,7 +40,7 @@ void SwapchainImpl::getWindowSize(int* widthOut, int* heightOut) const
     *widthOut = rc.right - rc.left;
     *heightOut = rc.bottom - rc.top;
 #elif SLANG_APPLE_FAMILY
-    CocoaUtil::getNSViewRectSize((void*)m_windowHandle.handleValues[0], widthOut, heightOut);
+    CocoaUtil::getNSWindowContentSize((void*)m_windowHandle.handleValues[0], widthOut, heightOut);
 #elif defined(SLANG_ENABLE_XLIB)
     XWindowAttributes winAttr = {};
     XGetWindowAttributes(

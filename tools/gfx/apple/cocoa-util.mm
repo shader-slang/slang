@@ -5,12 +5,12 @@
 
 namespace gfx {
 
-void CocoaUtil::getNSViewRectSize(void* nsview, int* widthOut, int* heightOut)
+void CocoaUtil::getNSWindowContentSize(void* nswindow, int* widthOut, int* heightOut)
 {
-    NSView* view = (NSView*)nsview;
-    NSRect rect = [view frame];
-    *widthOut = rect.size.width;
-    *heightOut = rect.size.height;
+    NSWindow* window = (NSWindow*)nswindow;
+    const NSRect contentRect = [window.contentView frame];
+    *widthOut = contentRect.size.width;
+    *heightOut = contentRect.size.height;
 }
 
 void* CocoaUtil::createMetalLayer(void* nswindow)
