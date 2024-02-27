@@ -308,8 +308,6 @@ struct DifferentialPairTypeBuilder
 
     DifferentialPairTypeBuilder(AutoDiffSharedContext* sharedContext) : sharedContext(sharedContext) {}
 
-    IRStructField* findField(IRInst* type, IRStructKey* key);
-
     IRInst* findSpecializationForParam(IRInst* specializeInst, IRInst* genericParam);
 
     IRInst* emitFieldAccessor(IRBuilder* builder, IRInst* baseInst, IRStructKey* key);

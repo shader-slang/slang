@@ -1240,6 +1240,14 @@ struct IRUnpackAnyValue : IRInst
     IRInst* getValue() { return getOperand(0); }
 };
 
+struct IRBitFieldAccessorDecoration : IRDecoration
+{
+    IR_LEAF_ISA(BitFieldAccessorDecoration);
+    IRStructKey* getBackingMemberKey() { return cast<IRStructKey>(getOperand(0)); }
+    IRIntegerValue getFieldWidth() { return as<IRIntLit>(getOperand(1))->getValue(); }
+    IRIntegerValue getFieldOffset() { return as<IRIntLit>(getOperand(2))->getValue(); }
+};
+
 // Layout decorations
 
     /// A decoration that marks a field key as having been associated

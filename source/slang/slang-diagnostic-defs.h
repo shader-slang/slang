@@ -518,6 +518,10 @@ DIAGNOSTIC(31101, Error, nonSetAccessorMustNotHaveParams, "accessors other than 
 DIAGNOSTIC(31102, Error, setAccessorMayNotHaveMoreThanOneParam, "a 'set' accessor may not have more than one parameter")
 DIAGNOSTIC(31102, Error, setAccessorParamWrongType, "'set' parameter '$0' has type '$1' which does not match the expected type '$2'")
 
+// 313xx: bit fields
+DIAGNOSTIC(31300, Error, bitFieldTooWide, "bit-field size ($0) exceeds the width of its type $1 ($2)")
+DIAGNOSTIC(31301, Error, bitFieldNonIntegral, "bit-field type ($0) must be an integral type")
+
 // 39999 waiting to be placed in the right range
 
 DIAGNOSTIC(39999, Error, expectedIntegerConstantWrongType, "expected integer constant (found: '$0')")

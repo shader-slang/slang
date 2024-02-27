@@ -967,8 +967,11 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// Recognized by SPIRV-emit pass so we can emit a SPIRV `Block` decoration.
     INST(SPIRVBlockDecoration, spvBlock, 0, 0)
 
+        /// Marks a function as one which access a bitfield with the specified
+        /// backing value key, width and offset
+    INST(BitFieldAccessorDecoration, BitFieldAccessorDecoration, 3, 0)
 
-    INST_RANGE(Decoration, HighLevelDeclDecoration, SPIRVBlockDecoration)
+    INST_RANGE(Decoration, HighLevelDeclDecoration, BitFieldAccessorDecoration)
 
     //
 
