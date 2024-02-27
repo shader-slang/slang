@@ -64,6 +64,23 @@ Result TextureResourceImpl::getSharedHandle(InteropHandle* outHandle)
     SLANG_RETURN_ON_FAIL(
         vkCreateSharedHandle(m_device->m_device, &info, (HANDLE*)&outHandle->handleValue) !=
         VK_SUCCESS);
+#else
+    VkMemoryGetFdInfoKHR info = {};
+    info.sType = VK_STRUCTURE_TYPE_MEMORY_GET_FD_INFO_KHR;
+    info.pNext = nullptr;
+    info.memory = m_imageMemory;
+    info.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+
+    auto& api = m_device->m_api;
+    PFN_vkGetMemoryFdKHR vkCreateSharedHandle;
+    vkCreateSharedHandle = api.vkGetMemoryFdKHR;
+    if (!vkCreateSharedHandle)
+    {
+        return SLANG_FAIL;
+    }
+    SLANG_RETURN_ON_FAIL(
+        vkCreateSharedHandle(m_device->m_device, &info, (int*)&outHandle->handleValue) !=
+        VK_SUCCESS);
 #endif
     outHandle->api = InteropHandleAPI::Vulkan;
     return SLANG_OK;
