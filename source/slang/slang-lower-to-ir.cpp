@@ -901,14 +901,6 @@ LoweredValInfo emitCallToDeclRef(
             args));
     }
 
-    if( auto ctorDeclRef = funcDeclRef.as<ConstructorDecl>() )
-    {
-        if(!ctorDeclRef.getDecl()->body && isFromStdLib(ctorDeclRef.getDecl()) && !as<InterfaceDecl>(ctorDeclRef.getParent().getDecl()))
-        {
-            SLANG_UNREACHABLE("stdlib error: __init() has no definition.");
-        }
-    }
-
     // Fallback case is to emit an actual call.
     //
     LoweredValInfo funcVal = emitDeclRef(context, funcDeclRef, funcType);
