@@ -363,5 +363,3 @@ Summary
 This chapter has reviewed the main target platforms supported by the Slang compiler and runtime system.
 A key point to take away is that there is great variation in the capabilities of these systems.
 Even superficially similar graphics APIs have complicated differences in their parameter-passing mechanisms that must be accounted for by application programmers and GPU compilers.
-
-In the next chapter, we will discuss how the Slang compiler adapts to the different capabilities and rules of these platforms when laying out shader parameters in memory and then binding those parameters to the mechanisms defined by each platform.
