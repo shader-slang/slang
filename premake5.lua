@@ -1208,7 +1208,7 @@ tool "gfx"
     end
 
     if os.target() == "macosx" then
-        links { "Cocoa.framework" }
+        links { "Cocoa.framework", "QuartzCore.framework" }
     end
 
     if enableXlib then

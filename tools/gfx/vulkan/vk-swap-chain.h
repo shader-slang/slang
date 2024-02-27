@@ -34,6 +34,10 @@ public:
     VulkanApi* m_api;
     uint32_t m_currentImageIndex = 0;
     WindowHandle m_windowHandle;
+#if SLANG_APPLE_FAMILY
+    void* m_metalLayer;
+#endif
+
     void destroySwapchainAndImages();
 
     void getWindowSize(int* widthOut, int* heightOut) const;
