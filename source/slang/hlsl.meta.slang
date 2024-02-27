@@ -7807,19 +7807,14 @@ T WaveMaskProduct(WaveMask mask, T expr)
     case spirv:
         if (__isFloat<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMul $$T result Subgroup 0 $expr};
-        else if (__isSignedInt<T>())
+        else if (__isInt<T>())
         {
             return spirv_asm
             {
                 OpCapability GroupNonUniformArithmetic;
-                // TODO: use the correct integer width
-                OpBitcast $$uint %uvalue $expr;
-                OpGroupNonUniformIMul $$uint %mulResult Subgroup 0 %uvalue;
-                OpBitcast $$T result %mulResult
+                OpGroupNonUniformIMul $$T result Subgroup 0 $expr;
             };
         }
-        else if (__isUnsignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIMul $$T result Subgroup 0 $expr};
         else return expr;
     }
 }
@@ -7837,19 +7832,14 @@ vector<T,N> WaveMaskProduct(WaveMask mask, vector<T,N> expr)
     case spirv:
         if (__isFloat<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMul $$vector<T,N> result Subgroup 0 $expr};
-        else if (__isSignedInt<T>())
+        else if (__isInt<T>())
         {
             return spirv_asm
             {
                 OpCapability GroupNonUniformArithmetic;
-                // TODO: use the correct integer width
-                OpBitcast $$vector<uint,N> %uvalue $expr;
-                OpGroupNonUniformIMul $$vector<uint,N> %mulResult Subgroup 0 %uvalue;
-                OpBitcast $$vector<T,N> result %mulResult
+                OpGroupNonUniformIMul $$vector<T,N> result Subgroup 0 $expr;
             };
         }
-        else if (__isUnsignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIMul $$vector<T,N> result Subgroup 0 $expr};
         else return expr;
     }
 }
@@ -7877,19 +7867,14 @@ T WaveMaskSum(WaveMask mask, T expr)
     case spirv:
         if (__isFloat<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFAdd $$T result Subgroup 0 $expr};
-        else if (__isSignedInt<T>())
+        else if (__isInt<T>())
         {
             return spirv_asm
             {
                 OpCapability GroupNonUniformArithmetic;
-                // TODO: use the correct integer width
-                OpBitcast $$uint %uvalue $expr;
-                OpGroupNonUniformIAdd $$uint %mulResult Subgroup 0 %uvalue;
-                OpBitcast $$T result %mulResult
+                OpGroupNonUniformIAdd $$T result Subgroup 0 $expr;
             };
         }
-        else if (__isUnsignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIAdd $$T result Subgroup 0 $expr};
         else return expr;
     }
 }
@@ -7908,19 +7893,14 @@ vector<T,N> WaveMaskSum(WaveMask mask, vector<T,N> expr)
     case spirv:
         if (__isFloat<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFAdd $$vector<T,N> result Subgroup 0 $expr};
-        else if (__isSignedInt<T>())
+        else if (__isInt<T>())
         {
             return spirv_asm
             {
                 OpCapability GroupNonUniformArithmetic; 
-                // TODO: use the correct integer width
-                OpBitcast $$vector<uint,N> %uvalue $expr;
-                OpGroupNonUniformIAdd $$vector<uint,N> %mulResult Subgroup 0 %uvalue;
-                OpBitcast $$vector<T,N> result %mulResult
+                OpGroupNonUniformIAdd $$vector<T,N> result Subgroup 0 $expr;
             };
         }
-        else if (__isUnsignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIAdd $$vector<T,N> result Subgroup 0 $expr};
         else return expr;
     }
 }
@@ -8002,19 +7982,14 @@ T WaveMaskPrefixProduct(WaveMask mask, T expr)
     case spirv:
         if (__isFloat<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMul $$T result Subgroup ExclusiveScan $expr};
-        else if (__isSignedInt<T>())
+        else if (__isInt<T>())
         {
             return spirv_asm
             {
                 OpCapability GroupNonUniformArithmetic;
-                // TODO: use the correct integer width
-                OpBitcast $$uint %uvalue $expr;
-                OpGroupNonUniformIMul $$uint %mulResult Subgroup ExclusiveScan %uvalue;
-                OpBitcast $$T result %mulResult
+                OpGroupNonUniformIMul $$T result Subgroup ExclusiveScan $expr;
             };
         }
-        else if (__isUnsignedInt<T>())
-            return spirv_asm {OpGroupNonUniformIMul $$T result Subgroup ExclusiveScan $expr};
         else return expr;
     }
 }
@@ -8033,19 +8008,14 @@ vector<T,N> WaveMaskPrefixProduct(WaveMask mask, vector<T,N> expr)
     case spirv:
         if (__isFloat<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMul $$vector<T,N> result Subgroup ExclusiveScan $expr};
-        else if (__isSignedInt<T>())
+        else if (__isInt<T>())
         {
             return spirv_asm
             {
                 OpCapability GroupNonUniformArithmetic;
-                // TODO: use the correct integer width
-                OpBitcast $$vector<uint,N> %uvalue $expr;
-                OpGroupNonUniformIMul $$vector<uint,N> %mulResult Subgroup ExclusiveScan %uvalue;
-                OpBitcast $$vector<T,N> result %mulResult
+                OpGroupNonUniformIMul $$vector<T,N> result Subgroup ExclusiveScan $expr;
             };
         }
-        else if (__isUnsignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIMul $$vector<T,N> result Subgroup ExclusiveScan $expr};
         else return expr;
     }
 }
@@ -8069,19 +8039,14 @@ T WaveMaskPrefixSum(WaveMask mask, T expr)
     case spirv:
         if (__isFloat<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFAdd $$T result Subgroup ExclusiveScan $expr};
-        else if (__isSignedInt<T>())
+        else if (__isInt<T>())
         {
             return spirv_asm
             {
                 OpCapability GroupNonUniformArithmetic;
-                // TODO: use the correct integer width
-                %uvalue:$$uint = OpBitcast $expr;
-                %mulResult:$$uint = OpGroupNonUniformIAdd Subgroup ExclusiveScan %uvalue;
-                result:$$T = OpBitcast %mulResult
+                result:$$T = OpGroupNonUniformIAdd Subgroup ExclusiveScan $expr;
             };
         }
-        else if (__isUnsignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIAdd $$T result Subgroup ExclusiveScan $expr};
         else return expr;
     }
 }
@@ -8101,19 +8066,14 @@ vector<T,N> WaveMaskPrefixSum(WaveMask mask, vector<T,N> expr)
     case spirv:
         if (__isFloat<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFAdd $$vector<T,N> result Subgroup ExclusiveScan $expr};
-        else if (__isSignedInt<T>())
+        else if (__isInt<T>())
         {
             return spirv_asm
             {
                 OpCapability GroupNonUniformArithmetic;
-                // TODO: use the correct integer width
-                %uvalue: $$vector<uint,N> = OpBitcast $expr;
-                %mulResult: $$vector<uint,N> = OpGroupNonUniformIAdd Subgroup ExclusiveScan %uvalue;
-                result: $$vector<T,N> = OpBitcast  %mulResult
+                result:$$vector<T,N> = OpGroupNonUniformIAdd Subgroup ExclusiveScan $expr;
             };
         }
-        else if (__isUnsignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIAdd $$vector<T,N> result Subgroup ExclusiveScan $expr};
         else return expr;
     }
 }
@@ -8612,23 +8572,14 @@ T WaveActive$(opName.hlslName)(T expr)
                 OpCapability GroupNonUniformArithmetic;
                 OpGroupNonUniformF$(opName.glslName) $$T result Subgroup 0 $expr
             };
-        else if (__isSignedInt<T>())
+        else if (__isInt<T>())
         {
             return spirv_asm
             {
                 OpCapability GroupNonUniformArithmetic;
-                // TODO: use the correct integer width
-                OpBitcast $$uint %uvalue $expr;
-                OpGroupNonUniformI$(opName.glslName) $$uint %mulResult Subgroup 0 %uvalue;
-                OpBitcast $$T result %mulResult
+                OpGroupNonUniformI$(opName.glslName) $$T result Subgroup 0 $expr;
             };
         }
-        else if (__isUnsignedInt<T>())
-            return spirv_asm
-            {
-                OpCapability GroupNonUniformArithmetic;
-                OpGroupNonUniformI$(opName.glslName) $$T result Subgroup 0 $expr
-            };
         else return expr;
     default:
         return WaveMask$(opName.hlslName)(WaveGetActiveMask(), expr);
@@ -8653,23 +8604,14 @@ vector<T,N> WaveActive$(opName.hlslName)(vector<T,N> expr)
                 OpCapability GroupNonUniformArithmetic;
                 OpGroupNonUniformF$(opName.glslName) $$vector<T,N> result Subgroup 0 $expr
             };
-        else if (__isSignedInt<T>())
+        else if (__isInt<T>())
         {
             return spirv_asm
             {
                 OpCapability GroupNonUniformArithmetic;
-                // TODO: use the correct integer width
-                OpBitcast $$vector<uint,N> %uvalue $expr;
-                OpGroupNonUniformI$(opName.glslName) $$vector<uint,N> %$(opName.glslName)Result Subgroup 0 %uvalue;
-                OpBitcast $$vector<T,N> result %$(opName.glslName)Result
+                OpGroupNonUniformI$(opName.glslName) $$vector<T,N> result Subgroup 0 $expr;
             };
         }
-        else if (__isUnsignedInt<T>())
-            return spirv_asm
-            {
-                OpCapability GroupNonUniformArithmetic;
-                OpGroupNonUniformI$(opName.glslName) $$vector<T,N> result Subgroup 0 $expr
-            };
         else return expr;
     default:
         return WaveMask$(opName.hlslName)(WaveGetActiveMask(), expr);
@@ -8909,19 +8851,14 @@ T WavePrefixProduct(T expr)
                 OpCapability GroupNonUniformArithmetic;
                 OpGroupNonUniformFMul $$T result Subgroup ExclusiveScan $expr
             };
-        else if (__isSignedInt<T>())
+        else if (__isInt<T>())
         {
             return spirv_asm
             {
                 OpCapability GroupNonUniformArithmetic;
-                // TODO: use the correct integer width
-                OpBitcast $$uint %uvalue $expr;
-                OpGroupNonUniformIMul $$uint %mulResult Subgroup ExclusiveScan %uvalue;
-                OpBitcast $$T result %mulResult
+                OpGroupNonUniformIMul $$T result Subgroup ExclusiveScan $expr;
             };
         }
-        else if (__isUnsignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIMul $$T result Subgroup ExclusiveScan $expr};
         else return expr;
     default:
         return WaveMaskPrefixProduct(WaveGetActiveMask(), expr);
@@ -8943,19 +8880,14 @@ vector<T,N> WavePrefixProduct(vector<T,N> expr)
     case spirv:
         if (__isFloat<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMul $$vector<T,N> result Subgroup ExclusiveScan $expr};
-        else if (__isSignedInt<T>())
+        else if (__isInt<T>())
         {
             return spirv_asm
             {
                 OpCapability GroupNonUniformArithmetic;
-                // TODO: use the correct integer width
-                OpBitcast $$vector<uint,N> %uvalue $expr;
-                OpGroupNonUniformIMul $$vector<uint,N> %mulResult Subgroup ExclusiveScan %uvalue;
-                OpBitcast $$vector<T,N> result %mulResult
+                OpGroupNonUniformIMul $$vector<T,N> result Subgroup ExclusiveScan $expr;
             };
         }
-        else if (__isUnsignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIMul $$vector<T,N> result Subgroup ExclusiveScan $expr};
         else return expr;
     default:
         return WaveMaskPrefixProduct(WaveGetActiveMask(), expr);
@@ -8983,19 +8915,14 @@ T WavePrefixSum(T expr)
     case spirv:
         if (__isFloat<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFAdd $$T result Subgroup ExclusiveScan $expr};
-        else if (__isSignedInt<T>())
+        else if (__isInt<T>())
         {
             return spirv_asm
             {
                 OpCapability GroupNonUniformArithmetic;
-                // TODO: use the correct integer width
-                %uvalue:$$uint = OpBitcast $expr;
-                %mulResult:$$uint = OpGroupNonUniformIAdd Subgroup ExclusiveScan %uvalue;
-                result:$$T = OpBitcast %mulResult
+                result:$$T = OpGroupNonUniformIAdd Subgroup ExclusiveScan $expr;
             };
         }
-        else if (__isUnsignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIAdd $$T result Subgroup ExclusiveScan $expr};
         else return expr;
     default:
         return WaveMaskPrefixSum(WaveGetActiveMask(), expr);
@@ -9016,19 +8943,14 @@ vector<T,N> WavePrefixSum(vector<T,N> expr)
     case spirv:
         if (__isFloat<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFAdd $$vector<T,N> result Subgroup ExclusiveScan $expr};
-        else if (__isSignedInt<T>())
+        else if (__isInt<T>())
         {
             return spirv_asm
             {
                 OpCapability GroupNonUniformArithmetic;
-                // TODO: use the correct integer width
-                %uvalue:$$vector<uint,N> = OpBitcast $expr;
-                %mulResult:$$vector<uint,N> = OpGroupNonUniformIAdd Subgroup ExclusiveScan %uvalue;
-                result:$$vector<T,N> = OpBitcast %mulResult
+                result:$$vector<T,N> = OpGroupNonUniformIAdd Subgroup ExclusiveScan $expr;
             };
         }
-        else if (__isUnsignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformIAdd $$vector<T,N> result Subgroup ExclusiveScan $expr};
         else return expr;
     default:
         return WaveMaskPrefixSum(WaveGetActiveMask(), expr);
@@ -11036,6 +10958,7 @@ struct HitObject
                 let tmin = Ray.TMin;
                 let tmax = Ray.TMax;
                 spirv_asm {
+                    OpCapability ShaderInvocationReorderNV;
                     OpHitObjectTraceRayNV
                         /**/ &__return_val
                         /**/ $AccelerationStructure
@@ -11781,7 +11704,7 @@ struct HitObject
         }
     }
 
-        /// Returns the attributes of a hit. Valid if the hit object represents a hit or a miss.
+    /// Returns the attributes of a hit. Valid if the hit object represents a hit or a miss.
     [ForceInline]
     attr_t GetAttributes<attr_t>()
     {
@@ -13164,6 +13087,14 @@ struct ConstBufferPointer
         }
     }
 
+
+
+    __subscript(int index) -> T
+    {
+        [ForceInline]
+        get {return ConstBufferPointer<T>.fromUInt(toUInt() + __naturalStrideOf<T>() * index).get(); }
+    }
+
     __glsl_version(450)
     __glsl_extension(GL_EXT_shader_explicit_arithmetic_types_int64)
     __glsl_extension(GL_EXT_buffer_reference)
@@ -13214,11 +13145,5 @@ struct ConstBufferPointer
                 result:$$bool = OpINotEqual %ptrval $zero;
             };
         }
-    }
-
-    __subscript(int index)->T
-    {
-        [ForceInline]
-        get { return ConstBufferPointer<T>.fromUInt(toUInt() + __naturalStrideOf<T>() * index).get(); }
     }
 }
