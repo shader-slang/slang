@@ -884,14 +884,6 @@ LoweredValInfo emitCallToDeclRef(
             args));
     }
 
-    if( auto ctorDeclRef = funcDeclRef.as<ConstructorDecl>() )
-    {
-        if(!ctorDeclRef.getDecl()->body && isFromStdLib(ctorDeclRef.getDecl()) && !as<InterfaceDecl>(ctorDeclRef.getParent().getDecl()))
-        {
-            SLANG_UNREACHABLE("stdlib error: __init() has no definition.");
-        }
-    }
-
     // Fallback case is to emit an actual call.
     //
     LoweredValInfo funcVal = emitDeclRef(context, funcDeclRef, funcType);
@@ -3700,10 +3692,19 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitVarExpr(VarExpr* expr)
     {
+        auto lowerTypeOfExpr = lowerType(context, expr->type);
+        auto declRef = expr->declRef;
+        if (auto propertyDeclRef = declRef.as<PropertyDecl>())
+        {
+            // A reference to a property is a special case, because
+            // we must translate the reference to the property
+            // into a reference to one of its accessors.   
+            return lowerStorageReference(context, lowerTypeOfExpr, propertyDeclRef, LoweredValInfo(), 0, nullptr);
+        }
         LoweredValInfo info = emitDeclRef(
             context,
-            expr->declRef,
-            lowerType(context, expr->type));
+            declRef,
+            lowerTypeOfExpr);
         return info;
     }
 
