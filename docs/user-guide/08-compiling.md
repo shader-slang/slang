@@ -53,7 +53,7 @@ In this example, the `scaleValue()` function in `B.slang` can freely refer to th
 
 It is allowed, and indeed common, for a translation unit to contain only a single source unit.
 For example, when adapting an existing codebase with many `.hlsl` files, it is appropriate to compile each `.hlsl` file as its own translation unit.
-A modernized codebase that uses modular `include` feature as documented in [Modules and Access Control](/user-guide/modules) might decide to compile multiple `.slang` files in a single directory as a single translation unit.
+A modernized codebase that uses modular `include` feature as documented in [Modules and Access Control](modules) might decide to compile multiple `.slang` files in a single directory as a single translation unit.
 
 The result of compiling a translation unit is a module in Slang's internal intermediate representation (IR). The compiled module can then be serialized to a `.slang-module` binary file and loaded/imported just as `.slang` files.
 
@@ -401,7 +401,7 @@ struct SessionDesc
 ```
 The user can specify a set of commonly used compiler options directly in the `SessionDesc` struct, such as `searchPath` and `preprocessMacros`.
 Additional compiler options can be specified via the `compilerOptionEntries` field, which is an array of `CompilerOptionEntry` that defines a key-value
-pair of a compiler option setting, see the (Compiler Options)[#compileroptions] section.
+pair of a compiler option setting, see the [Compiler Options](#compileroptions) section.
 
 ### Targets
 
@@ -459,7 +459,7 @@ sessionDesc.preprocessorMacroCount = 1;
 ### More Options
 
 You can specify other compiler options for the session or for a specific target through the `compilerOptionEntries` and `compilerOptionEntryCount` fields
-of the `SessionDesc` or `TargetDesc` structures. See the (Compiler Options)[#compileroptions] section for more details on how to encode such an array.
+of the `SessionDesc` or `TargetDesc` structures. See the [Compiler Options](#compileroptions) section for more details on how to encode such an array.
 
 ## Loading a Module
 
@@ -630,6 +630,7 @@ struct CompilerOptionValue
 ```
 The meaning of each integer or string value is dependent on the compiler option. The following table lists all available compiler options that can be set and
 meanings of their `CompilerOptionValue` encodings.
+
 | CompilerOptionName | Description |
 | ------------------ | ----------- |
 | MacroDefine        | Specifies a prepreocessor macro define entry. `stringValue0` encodes macro name, `stringValue1` encodes the macro value.
