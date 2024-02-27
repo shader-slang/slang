@@ -146,6 +146,7 @@ class AggTypeDecl : public  AggTypeDeclBase
 
     // Used if this type declaration is a wrapper, i.e. struct FooWrapper:IFoo = Foo;
     TypeExp wrappedType;
+    bool hasBody = true;
 
     void unionTagsWith(TypeTag other);
     void addTag(TypeTag tag);

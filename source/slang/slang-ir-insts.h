@@ -526,6 +526,12 @@ struct IRLinkageDecoration : IRDecoration
     }
 };
 
+struct IRUserExternDecoration : IRDecoration
+{
+    enum { kOp = kIROp_UserExternDecoration };
+    IR_LEAF_ISA(UserExternDecoration)
+};
+
 struct IRImportDecoration : IRLinkageDecoration
 {
     enum { kOp = kIROp_ImportDecoration };
@@ -4344,6 +4350,11 @@ public:
     void addExportDecoration(IRInst* value, UnownedStringSlice const& mangledName)
     {
         addDecoration(value, kIROp_ExportDecoration, getStringValue(mangledName));
+    }
+
+    void addUserExternDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_UserExternDecoration);
     }
 
     void addExternCppDecoration(IRInst* value, UnownedStringSlice const& mangledName)

@@ -81,6 +81,8 @@ namespace Slang {
             SLANG_ASSERT(dstModule.irModule);
         }
         DigestBuilder<SHA1> digestBuilder;
+        auto version = String(getBuildTagString());
+        digestBuilder.append(version);
         module->getOptionSet().buildHash(digestBuilder);
         auto fileDependencies = module->getFileDependencies();
         String canonicalModulePath, moduleDir;

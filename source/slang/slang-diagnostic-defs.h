@@ -484,7 +484,6 @@ DIAGNOSTIC(30504, Error, cannotUseInitializerListForType, "cannot use initialize
 
 // 3062x: variables
 DIAGNOSTIC(30620, Error, varWithoutTypeMustHaveInitializer, "a variable declaration without an initial-value expression must be given an explicit type")
-DIAGNOSTIC(30621, Error, externValueCannotHaveInitializer, "an 'extern' variable declaration cannot have a value.")
 DIAGNOSTIC(30622, Error, ambiguousDefaultInitializerForType, "more than one default initializer was found for type '$0'")
 
 // 307xx: parameters
@@ -713,6 +712,7 @@ DIAGNOSTIC(41904, Error, unableToAlignOf, "alignof could not be performed for ty
 
 DIAGNOSTIC(42001, Error, invalidUseOfTorchTensorTypeInDeviceFunc, "invalid use of TorchTensor type in device/kernel functions. use `TensorView` instead.")
 
+DIAGNOSTIC(45001, Error, unresolvedSymbol, "unresolved external symbol '$0'.")
 //
 // 5xxxx - Target code generation.
 //

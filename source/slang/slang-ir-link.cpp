@@ -1425,6 +1425,100 @@ static bool _isHLSLExported(IRInst* inst)
     return false;
 }
 
+static bool doesFuncHaveDefinition(IRFunc* func)
+{
+    if (func->getFirstBlock() != nullptr)
+        return true;
+    for (auto decor : func->getDecorations())
+    {
+        switch (decor->getOp())
+        {
+        case kIROp_IntrinsicOpDecoration:
+        case kIROp_TargetIntrinsicDecoration:
+            return true;
+        default:
+            continue;
+        }
+    }
+    return false;
+}
+
+static bool doesWitnessTableHaveDefinition(IRWitnessTable* wt)
+{
+    auto interfaceType = as<IRInterfaceType>(wt->getConformanceType());
+    if (!interfaceType)
+        return true;
+    auto interfaceRequirementCount = interfaceType->getRequirementCount();
+    if (interfaceRequirementCount == 0)
+        return true;
+    for (auto entry : wt->getChildren())
+    {
+        if (as<IRWitnessTableEntry>(entry))
+            return true;
+    }
+    return false;
+}
+
+static bool doesTargetAllowUnresolvedFuncSymbol(TargetRequest* req)
+{
+    switch (req->getTarget())
+    {
+    case CodeGenTarget::HLSL:
+    case CodeGenTarget::DXIL:
+    case CodeGenTarget::DXILAssembly:
+    case CodeGenTarget::HostCPPSource:
+    case CodeGenTarget::PyTorchCppBinding:
+    case CodeGenTarget::ShaderHostCallable:
+    case CodeGenTarget::ShaderSharedLibrary:
+    case CodeGenTarget::HostHostCallable:
+    case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CUDASource:
+    case CodeGenTarget::SPIRV:
+        if (req->getOptionSet().getBoolOption(CompilerOptionName::IncompleteLibrary))
+            return true;
+    default:
+        return false;
+    }
+}
+
+static void diagnoseUnresolvedSymbols(TargetRequest* req, DiagnosticSink* sink, IRModule* module)
+{
+    for (auto globalSym : module->getGlobalInsts())
+    {
+        if (globalSym->findDecoration<IRImportDecoration>())
+        {
+            for (;;)
+            {
+                if (auto constant = as<IRGlobalConstant>(globalSym))
+                {
+                    if (constant->getOperandCount() == 0)
+                        sink->diagnose(globalSym->sourceLoc, Diagnostics::unresolvedSymbol, globalSym);
+                }
+                else if (auto genericSym = as<IRGeneric>(globalSym))
+                {
+                    globalSym = findGenericReturnVal(genericSym);
+                    continue;
+                }
+                else if (auto funcSym = as<IRFunc>(globalSym))
+                {
+                    if (!doesFuncHaveDefinition(funcSym) && !doesTargetAllowUnresolvedFuncSymbol(req))
+                        sink->diagnose(globalSym->sourceLoc, Diagnostics::unresolvedSymbol, globalSym);
+                }
+                else if (auto witnessSym = as<IRWitnessTable>(globalSym))
+                {
+                    if (!doesWitnessTableHaveDefinition(witnessSym))
+                    {
+                        sink->diagnose(globalSym->sourceLoc, Diagnostics::unresolvedSymbol, witnessSym);
+                        if (auto concreteType = witnessSym->getConcreteType())
+                            sink->diagnose(concreteType->sourceLoc, Diagnostics::seeDeclarationOf, concreteType);
+                    }
+                }
+                break;
+            }
+        }
+    }
+}
+
 LinkedIR linkIR(
     CodeGenContext* codeGenContext)
 {
@@ -1626,6 +1720,12 @@ LinkedIR linkIR(
 
     // Specialize target_switch branches to use the best branch for the target.
     specializeTargetSwitch(targetReq, state->irModule);
+
+    // Diagnose on unresolved symbols if we are compiling into a target that does
+    // not allow incomplete symbols.
+    // At this point, we should not see any [import] symbols that does not have a
+    // definition.
+    diagnoseUnresolvedSymbols(targetReq, codeGenContext->getSink(), state->irModule);
 
     // TODO: *technically* we should consider the case where
     // we have global variables with initializers, since

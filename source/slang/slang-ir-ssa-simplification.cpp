@@ -76,7 +76,7 @@ namespace Slang
         while (changed && iterationCounter < kMaxIterations)
         {
             changed = false;
-            changed |= peepholeOptimize(target, module);
+            changed |= peepholeOptimize(target, module, options.peepholeOptions);
 
             changed |= removeRedundancy(module);
             changed |= simplifyCFG(module, options.cfgOptions);

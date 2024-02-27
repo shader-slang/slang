@@ -4744,7 +4744,10 @@ namespace Slang
                 return rs;
             }
             if (AdvanceIf(this, TokenType::Semicolon))
+            {
+                rs->hasBody = false;
                 return rs;
+            }
             parseDeclBody(this, rs);
             return rs;
         });

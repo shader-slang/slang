@@ -1978,7 +1978,7 @@ namespace Slang
 
         TypeTag getTypeTags(Type* type);
 
-        Type* getBufferElementType(Type* type);
+        Type* getConstantBufferElementType(Type* type);
 
             /// Check whether `subType` is a sub-type of `superTypeDeclRef`,
             /// and return a witness to the sub-type relationship if it holds

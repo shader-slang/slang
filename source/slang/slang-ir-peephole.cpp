@@ -17,6 +17,7 @@ struct PeepholeContext : InstPassBase
     FloatingPointMode floatingPointMode = FloatingPointMode::Precise;
     bool removeOldInst = true;
     bool isInGeneric = false;
+    bool isPrelinking = false;
 
     TargetProgram* targetProgram;
 
@@ -695,6 +696,13 @@ struct PeepholeContext : InstPassBase
             {
                 if (inst->getOperand(0)->getOp() == kIROp_WitnessTable)
                 {
+                    // Don't fold witness lookups prelinking if the witness table is `extern`.
+                    // These witness tables provides `default`s in case they are not
+                    // explicitly specialized via other linked modules, therefore we don't want
+                    // to resolve them too soon before linking.
+                    if (isPrelinking && inst->getOperand(0)->findDecoration<IRUserExternDecoration>())
+                        break;
+
                     auto wt = as<IRWitnessTable>(inst->getOperand(0));
                     auto key = inst->getOperand(1);
                     for (auto item : wt->getChildren())
@@ -1069,10 +1077,11 @@ struct PeepholeContext : InstPassBase
     }
 };
 
-bool peepholeOptimize(TargetProgram* target, IRModule* module)
+bool peepholeOptimize(TargetProgram* target, IRModule* module, PeepholeOptimizationOptions options)
 {
     PeepholeContext context = PeepholeContext(module);
     context.targetProgram = target;
+    context.isPrelinking = options.isPrelinking;
     return context.processModule();
 }
 

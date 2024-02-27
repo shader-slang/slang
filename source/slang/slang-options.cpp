@@ -417,6 +417,8 @@ void initCommandOptions(CommandOptions& options)
         "Generate SPIR-V output direclty rather than by compiling generated GLSL with glslang" },
         { OptionKind::SPIRVCoreGrammarJSON, "-spirv-core-grammar", nullptr,
         "A path to a specific spirv.core.grammar.json to use when generating SPIR-V output" },
+        { OptionKind::IncompleteLibrary, "-incomplete-library", nullptr,
+        "Allow generating code from incomplete libraries with unresolved external functions" },
 #endif
     };
 
@@ -1681,6 +1683,7 @@ SlangResult OptionsParser::_parse(
             case OptionKind::OutputIncludes:
             case OptionKind::PreprocessorOutput:
             case OptionKind::DumpAst:
+            case OptionKind::IncompleteLibrary:
                 linkage->m_optionSet.set(optionKind, true); break;
                 break;
             case OptionKind::NoCodeGen:
