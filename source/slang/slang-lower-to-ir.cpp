@@ -654,15 +654,17 @@ bool isFromStdLib(Decl* decl)
     return false;
 }
 
-bool isImportedDecl(IRGenContext* context, Decl* decl)
+bool isImportedDecl(IRGenContext* context, Decl* decl, bool& outIsExplicitExtern)
 {
     // If the declaration has the extern attribute then it must be imported
     // from another module.
     // Note that `extern` declarations will have a mangled name that does not
     // include the module name so the linking step can resolve them correctly.
     //
+    outIsExplicitExtern = false;
     if (decl->findModifier<ExternAttribute>() || decl->findModifier<ExternModifier>())
     {
+        outIsExplicitExtern = true;
         return true;
     }
 
@@ -671,7 +673,10 @@ bool isImportedDecl(IRGenContext* context, Decl* decl)
         if (as<ModuleDecl>(parent) && parent != context->getMainModuleDecl())
             return true;
         if (parent->findModifier<ExternAttribute>() || parent->findModifier<ExternModifier>())
+        {
+            outIsExplicitExtern = true;
             return true;
+        }
     }
     return false;
 }
@@ -1311,10 +1316,11 @@ static void addLinkageDecoration(
         inst = outerGeneric;
     }
 
-    if (isImportedDecl(context, decl))
+    bool explicitExtern = false;
+    if (isImportedDecl(context, decl, explicitExtern))
     {
         builder->addImportDecoration(inst, mangledName);
-        if (decl->findModifier<ExternModifier>())
+        if (explicitExtern)
             builder->addUserExternDecoration(inst);
     }
     else
@@ -8382,11 +8388,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         addTargetIntrinsicDecorations(nullptr, irFieldKey, fieldDecl);
 
         return LoweredValInfo::simple(irFieldKey);
-    }
-
-    bool isImportedDecl(Decl* decl)
-    {
-        return Slang::isImportedDecl(context, decl);
     }
 
     IRType* maybeGetConstExprType(IRType* type, Decl* decl)

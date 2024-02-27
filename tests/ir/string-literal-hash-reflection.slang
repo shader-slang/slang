@@ -1,4 +1,7 @@
-//TEST:REFLECTION:-stage compute -entry computeMain -target hlsl -no-codegen
+//TEST:REFLECTION(filecheck=CHECK):-stage compute -entry computeMain -target hlsl -no-codegen
+
+// CHECK-DAG: "Hello \t\n\0x083 World": -215446506
+// CHECK-DAG: "Try another": 900483678
 
 import string_literal_module;
 

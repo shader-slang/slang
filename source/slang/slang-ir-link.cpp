@@ -1459,7 +1459,29 @@ static bool doesWitnessTableHaveDefinition(IRWitnessTable* wt)
     return false;
 }
 
-static void diagnoseUnresolvedSymbols(DiagnosticSink* sink, IRModule* module)
+static bool doesTargetAllowUnresolvedFuncSymbol(TargetRequest* req)
+{
+    switch (req->getTarget())
+    {
+    case CodeGenTarget::HLSL:
+    case CodeGenTarget::DXIL:
+    case CodeGenTarget::DXILAssembly:
+    case CodeGenTarget::HostCPPSource:
+    case CodeGenTarget::PyTorchCppBinding:
+    case CodeGenTarget::ShaderHostCallable:
+    case CodeGenTarget::ShaderSharedLibrary:
+    case CodeGenTarget::HostHostCallable:
+    case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CUDASource:
+    case CodeGenTarget::SPIRV:
+        if (req->getOptionSet().getBoolOption(CompilerOptionName::IncompleteLibrary))
+            return true;
+    default:
+        return false;
+    }
+}
+
+static void diagnoseUnresolvedSymbols(TargetRequest* req, DiagnosticSink* sink, IRModule* module)
 {
     for (auto globalSym : module->getGlobalInsts())
     {
@@ -1479,7 +1501,7 @@ static void diagnoseUnresolvedSymbols(DiagnosticSink* sink, IRModule* module)
                 }
                 else if (auto funcSym = as<IRFunc>(globalSym))
                 {
-                    if (!doesFuncHaveDefinition(funcSym))
+                    if (!doesFuncHaveDefinition(funcSym) && !doesTargetAllowUnresolvedFuncSymbol(req))
                         sink->diagnose(globalSym->sourceLoc, Diagnostics::unresolvedSymbol, globalSym);
                 }
                 else if (auto witnessSym = as<IRWitnessTable>(globalSym))
@@ -1699,10 +1721,11 @@ LinkedIR linkIR(
     // Specialize target_switch branches to use the best branch for the target.
     specializeTargetSwitch(targetReq, state->irModule);
 
-    // Diagnose on unresolved symbols.
+    // Diagnose on unresolved symbols if we are compiling into a target that does
+    // not allow incomplete symbols.
     // At this point, we should not see any [import] symbols that does not have a
     // definition.
-    diagnoseUnresolvedSymbols(codeGenContext->getSink(), state->irModule);
+    diagnoseUnresolvedSymbols(targetReq, codeGenContext->getSink(), state->irModule);
 
     // TODO: *technically* we should consider the case where
     // we have global variables with initializers, since

@@ -2907,7 +2907,6 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
         //
         for (auto targetReq : getLinkage()->targets)
         {
-            targetReq->getOptionSet().inheritFrom(getLinkage()->m_optionSet);
             auto targetProgram = m_specializedGlobalAndEntryPointsComponentType->getTargetProgram(targetReq);
             targetProgram->getOrCreateLayout(getSink());
         }
