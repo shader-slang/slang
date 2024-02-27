@@ -12,7 +12,6 @@ Next we will cover the command-line Slang compiler, `slangc`, and how to use it 
 Finally we will discuss the Slang compilation API, which can be used to integrate Slang compilation into an application at runtime, or to build custom tools that implement application-specific compilation policy.
 
 ## Concepts
---------
 
 For simple scenarios it may be enough to think of a shader compiler as a box where source code goes in and compiled kernels come out.
 Most real-time graphics applications end up needing more control over shader compilation, and/or more information about the results of compilation.
