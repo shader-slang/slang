@@ -2371,9 +2371,10 @@ namespace Slang
         return result;
     }
 
-    Expr* SemanticsExprVisitor::convertToLogicOperatorExpr(InvokeExpr* expr)
+    Expr* SemanticsExprVisitor::convertToLogicOperatorExpr(InvokeExpr* expr, bool& isArgumentsChecked)
     {
         LogicOperatorShortCircuitExpr* newExpr = nullptr;
+        isArgumentsChecked = false;
 
         const ReflectClassInfo& classInfo = expr->functionExpr->getClassInfo();
         const ASTNodeType astType = ASTNodeType(classInfo.m_classId);
@@ -2388,23 +2389,32 @@ namespace Slang
                     return nullptr;
                 }
 
+                // We only use short-circuiting in scalar input, will fall back
+                // to non-short-circuiting in vector input.
+                bool shortCircuitSupport = true;
                 for (auto & arg : expr->arguments)
                 {
                     arg = CheckTerm(arg);
-                    // We only use short-circuiting in scalar input, will fall back
-                    // to non-short-circuiting in vector input.
-                    if(as<BasicExpressionType>(arg->type.type))
+                    if(!as<BasicExpressionType>(arg->type.type))
                     {
-                        arg = coerce(CoercionSite::Argument, m_astBuilder->getBoolType(), arg);
-                    }
-                    else
-                    {
-                        return nullptr;
+                        shortCircuitSupport = false;
                     }
                 }
 
+                isArgumentsChecked = true;
+                if (!shortCircuitSupport)
+                {
+                    return nullptr;
+                }
+
+                // We do the cast in the 2nd pass because we want to leave it for 'visitInvokeExpr'
+                // to handle if this expression doesn't support short-circuiting.
+                for (auto & arg : expr->arguments)
+                {
+                    arg = coerce(CoercionSite::Argument, m_astBuilder->getBoolType(), arg);
+                }
+
                 expr->functionExpr = CheckTerm(expr->functionExpr);
-                CheckInvokeExprWithCheckedOperands(expr);
                 newExpr = m_astBuilder->create<LogicOperatorShortCircuitExpr>();
                 if (varExpr->name->text == "&&")
                 {
@@ -2414,7 +2424,7 @@ namespace Slang
                 {
                    newExpr->flavor = LogicOperatorShortCircuitExpr::Flavor::Or;
                 }
-
+                newExpr->loc = expr->loc;
                 newExpr->functionExpr = expr->functionExpr;
                 newExpr->type = m_astBuilder->getBoolType();
                 newExpr->arguments = expr->arguments;
@@ -2432,7 +2442,8 @@ namespace Slang
 
         // if the expression is '&&' or '||', we will convert it
         // to use short-circuit evaluation.
-        Expr* newExpr = convertToLogicOperatorExpr(expr);
+        bool isArgumentsChecked = false;
+        Expr* newExpr = convertToLogicOperatorExpr(expr, isArgumentsChecked);
         if (newExpr != nullptr)
         {
             return newExpr;
@@ -2442,10 +2453,16 @@ namespace Slang
         auto treatAsDifferentiableExpr = m_treatAsDifferentiableExpr;
         m_treatAsDifferentiableExpr = nullptr;
         // Next check the argument expressions
-        for (auto & arg : expr->arguments)
+        // Avoid checking the arguments twice, because the arguments could be
+        // checked in `convertToLogicOperatorExpr` already.
+        if (!isArgumentsChecked)
         {
-            arg = CheckTerm(arg);
+            for (auto & arg : expr->arguments)
+            {
+                arg = CheckTerm(arg);
+            }
         }
+
         m_treatAsDifferentiableExpr = treatAsDifferentiableExpr;
 
         // If we are in a differentiable function, register differential witness tables involved in
