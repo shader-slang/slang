@@ -1395,17 +1395,27 @@ namespace Slang
 
             auto property = m_astBuilder->create<PropertyDecl>();
             property->modifiers = m->modifiers;
-            const auto get = m_astBuilder->create<GetterDecl>();
-            const auto set = m_astBuilder->create<SetterDecl>();
-            addModifier(set, m_astBuilder->create<MutatingAttribute>());
             property->type = as<VarDecl>(m)->type;
             property->loc = m->loc;
             property->nameAndLoc = m->getNameAndLoc();
-            property->addMember(get);
-            property->addMember(set);
-
             property->parentDecl = structDecl;
+            property->ownedScope = m_astBuilder->create<Scope>();
+            property->ownedScope->containerDecl = property;
+            property->ownedScope->parent = getScope(structDecl);
             m = property;
+
+            const auto get = m_astBuilder->create<GetterDecl>();
+            get->ownedScope = m_astBuilder->create<Scope>();
+            get->ownedScope->containerDecl = get;
+            get->ownedScope->parent = getScope(property);
+            property->addMember(get);
+
+            const auto set = m_astBuilder->create<SetterDecl>();
+            addModifier(set, m_astBuilder->create<MutatingAttribute>());
+            set->ownedScope = m_astBuilder->create<Scope>();
+            set->ownedScope->containerDecl = set;
+            set->ownedScope->parent = getScope(property);
+            property->addMember(set);
 
             structDecl->invalidateMemberDictionary();
         }
