@@ -14,7 +14,8 @@ namespace Slang
         if (!firstBlock)
             return;
         auto funcDebugLoc = func->findDecoration<IRDebugLocationDecoration>();
-
+        if (!funcDebugLoc)
+            return;
         List<IRInst*> params;
         for (auto param : firstBlock->getParams())
         {
