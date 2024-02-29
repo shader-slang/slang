@@ -1389,11 +1389,20 @@ struct SPIRVEmitContext
                 bool useForwardDeclaration = (!m_mapIRInstToSpvInst.containsKey(valueType)
                     && as<IRStructType>(valueType)
                     && storageClass == SpvStorageClassPhysicalStorageBuffer);
+                SpvId valueTypeId;
+                if (useForwardDeclaration)
+                {
+                    valueTypeId = getIRInstSpvID(valueType);
+                }
+                else
+                {
+                    auto spvValueType = ensureInst(valueType);
+                    valueTypeId = getID(spvValueType);
+                }
                 auto resultSpvType = emitOpTypePointer(
                     inst,
                     storageClass,
-                    useForwardDeclaration? getIRInstSpvID(valueType) : getID(ensureInst(valueType))
-                );
+                    valueTypeId);
                 if (useForwardDeclaration)
                 {
                     // After everything has been emitted, we will move the pointer definition to the end
@@ -1625,7 +1634,12 @@ struct SPIRVEmitContext
         case kIROp_HLSLTriangleStreamType:
         case kIROp_HLSLLineStreamType:
         case kIROp_HLSLPointStreamType:
-            return nullptr;
+        case kIROp_VerticesType:
+        case kIROp_IndicesType:
+        case kIROp_PrimitivesType:
+            // These types are not used, but maybe referenced by debug variables.
+            // Just emit them as int.
+            return emitOpTypeInt(inst, SpvLiteralInteger::from32(32), SpvLiteralInteger::from32(0));
         default:
             {
                 if (as<IRSPIRVAsmOperand>(inst))
@@ -5121,6 +5135,26 @@ struct SPIRVEmitContext
                 getNonSemanticDebugInfoExtInst(),
                 builder.getStringValue(sbName.getUnownedSlice()),
                 builder.getIntValue(builder.getUIntType(), 64),
+                builder.getIntValue(builder.getUIntType(), 0),
+                builder.getIntValue(builder.getUIntType(), kUnknownPhysicalLayout));
+        }
+        switch (type->getOp())
+        {
+        case kIROp_HLSLTriangleStreamType:
+        case kIROp_HLSLLineStreamType:
+        case kIROp_HLSLPointStreamType:
+        case kIROp_VerticesType:
+        case kIROp_IndicesType:
+        case kIROp_PrimitivesType:
+            // These types are not used, but maybe referenced by debug variables.
+            // Just emit them as int.
+            return emitOpDebugTypeBasic(
+                getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                nullptr,
+                m_voidType,
+                getNonSemanticDebugInfoExtInst(),
+                builder.getStringValue(toSlice("hlsl_handle")),
+                builder.getIntValue(builder.getUIntType(), 32),
                 builder.getIntValue(builder.getUIntType(), 0),
                 builder.getIntValue(builder.getUIntType(), kUnknownPhysicalLayout));
         }

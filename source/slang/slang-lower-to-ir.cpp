@@ -7436,6 +7436,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         addNameHint(context, irParam, decl);
         maybeSetRate(context, irParam, decl);
         addVarDecorations(context, irParam, decl);
+        maybeAddDebugLocationDecoration(context, irParam);
 
         if (decl)
         {
@@ -7591,6 +7592,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         maybeSetRate(context, irGlobal, decl);
 
         addVarDecorations(context, irGlobal, decl);
+        maybeAddDebugLocationDecoration(context, irGlobal);
 
         if (decl)
         {
