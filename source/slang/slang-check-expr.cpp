@@ -1654,12 +1654,10 @@ namespace Slang
         if(_checkForCircularityInConstantFolding(decl, circularityInfo))
             return nullptr;
 
-        // In HLSL, `static const` is used to mark compile-time constant expressions
-        if(!decl->hasModifier<HLSLStaticModifier>())
-            return nullptr;
+        // In HLSL, `const` is used to mark compile-time constant expressions.
         if(!decl->hasModifier<ConstModifier>())
             return nullptr;
-        // Extern static const is not considered compile-time constant by the front-end.
+        // Extern const is not considered compile-time constant by the front-end.
         if (decl->hasModifier<ExternModifier>())
             return nullptr;
 
