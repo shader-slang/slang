@@ -5062,7 +5062,7 @@ struct SPIRVEmitContext
                 m_voidType,
                 getNonSemanticDebugInfoExtInst(),
                 elementType,
-                builder.getIntValue(builder.getUIntType(), getIntVal(vectorType->getElementCount())),
+                builder.getIntValue(builder.getUIntType(), getIntVal(count)),
                 builder.getBoolValue(isColumnMajor));
         }
         else if (auto basicType = as<IRBasicType>(type))
