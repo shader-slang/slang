@@ -3214,13 +3214,28 @@ namespace Slang
         IRInst* args[] = 
         {
             source,
-            getIntValue(getIntType(), lineStart),
-            getIntValue(getIntType(), lineEnd),
-            getIntValue(getIntType(), colStart),
-            getIntValue(getIntType(), colEnd)
+            getIntValue(getUIntType(), lineStart),
+            getIntValue(getUIntType(), lineEnd),
+            getIntValue(getUIntType(), colStart),
+            getIntValue(getUIntType(), colEnd)
         };
         return emitIntrinsicInst(getVoidType(), kIROp_DebugLine, 5, args);
     }
+    IRInst* IRBuilder::emitDebugVar(IRType* type, IRInst* source, IRInst* line, IRInst* col)
+    {
+        IRInst* args[] = { source, line, col };
+        return emitIntrinsicInst(type, kIROp_DebugVar, 3, args);
+    }
+
+    IRInst* IRBuilder::emitDebugValue(IRInst* debugVar, IRInst* debugValue, ArrayView<IRInst*> accessChain)
+    {
+        List<IRInst*> args;
+        args.add(debugVar);
+        args.add(debugValue);
+        args.addRange(accessChain);
+        return emitIntrinsicInst(getVoidType(), kIROp_DebugValue, (UInt)args.getCount(), args.getBuffer());
+    }
+
     IRLiveRangeStart* IRBuilder::emitLiveRangeStart(IRInst* referenced)
     {
         // This instruction doesn't produce any result, 
@@ -8281,28 +8296,7 @@ namespace Slang
     bool isDefinition(
         IRInst* inVal)
     {
-        IRInst* val = inVal;
-        // unwrap any generic declarations to see
-        // the value they return.
-        for(;;)
-        {
-            // An instruciton marked `[import(...)]` cannot
-            // be a definition, since it is claiming that
-            // the actual body comes from another module.
-            //
-            if(val->findDecoration<IRImportDecoration>())
-                return false;
-
-            auto genericInst = as<IRGeneric>(val);
-            if(!genericInst)
-                break;
-
-            auto returnVal = findGenericReturnVal(genericInst);
-            if(!returnVal)
-                break;
-
-            val = returnVal;
-        }
+        IRInst* val = getResolvedInstForDecorations(inVal);
 
         // Some cases of instructions have structural
         // rules about when they are considered to have
@@ -8311,7 +8305,6 @@ namespace Slang
         switch (val->getOp())
         {
         case kIROp_Func:
-        case kIROp_Generic:
             return val->getFirstChild() != nullptr;
 
         case kIROp_GlobalConstant:
@@ -8324,7 +8317,6 @@ namespace Slang
         // In all other cases, if we have an instruciton
         // that has *not* been marked for import, then
         // we consider it to be a definition.
-
         return true;
     }
 

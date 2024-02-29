@@ -24,13 +24,19 @@ struct SPIRVEmitSharedContext
 
     DiagnosticSink* m_sink;
     const SPIRVCoreGrammarInfo* m_grammarInfo;
+    IRInst* m_voidType;
+
     SPIRVEmitSharedContext(IRModule* module, TargetProgram* program, DiagnosticSink* sink)
         : m_irModule(module),
           m_targetProgram(program),
           m_targetRequest(program->getTargetReq()),
           m_sink(sink),
           m_grammarInfo(&module->getSession()->getSPIRVCoreGrammarInfo())
-    {}
+    {
+        IRBuilder builder(module);
+        builder.setInsertInto(module);
+        m_voidType = builder.getVoidType();
+    }
     SpvSnippet* getParsedSpvSnippet(IRTargetIntrinsicDecoration* intrinsic);
 };
 

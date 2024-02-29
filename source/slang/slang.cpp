@@ -4728,6 +4728,8 @@ SpecializedComponentType::SpecializedComponentType(
     , m_specializationInfo(specializationInfo)
     , m_specializationArgs(specializationArgs)
 {
+    m_optionSet.overrideWith(base->getOptionSet());
+
     m_irModule = generateIRForSpecializedComponentType(this, sink);
 
     // We need to account for the fact that a specialized

@@ -4,7 +4,7 @@
 #include <slang-com-ptr.h>
 
 #define GFX_ENABLE_RENDERDOC_INTEGRATION 0
-
+#define GFX_ENABLE_SPIRV_DEBUG 0
 #if GFX_ENABLE_RENDERDOC_INTEGRATION
 #    include "external/renderdoc_app.h"
 #    include <windows.h>
@@ -278,10 +278,25 @@ namespace gfx_test
 
         gfx::D3D12DeviceExtendedDesc extDesc = {};
         extDesc.rootParameterShaderAttributeName = "root";
+        
+        gfx::SlangSessionExtendedDesc slangExtDesc = {};
+        Slang::List<slang::CompilerOptionEntry> entries;
+        slang::CompilerOptionEntry emitSpirvDirectlyEntry;
+        emitSpirvDirectlyEntry.name = slang::CompilerOptionName::EmitSpirvDirectly;
+        emitSpirvDirectlyEntry.value.intValue0 = 1;
+        entries.add(emitSpirvDirectlyEntry);
+#if GFX_ENABLE_SPIRV_DEBUG
+        slang::CompilerOptionEntry debugLevelCompilerOptionEntry;
+        debugLevelCompilerOptionEntry.name = slang::CompilerOptionName::DebugInformation;
+        debugLevelCompilerOptionEntry.value.intValue0 = SLANG_DEBUG_INFO_LEVEL_STANDARD;
+        entries.add(debugLevelCompilerOptionEntry);
+#endif
+        slangExtDesc.compilerOptionEntries = entries.getBuffer();
+        slangExtDesc.compilerOptionEntryCount = (uint32_t)entries.getCount();
 
-        deviceDesc.extendedDescCount = 1;
-        void* extDescPtr = &extDesc;
-        deviceDesc.extendedDescs = &extDescPtr;
+        deviceDesc.extendedDescCount = 2;
+        void* extDescPtrs[2] = { &extDesc, &slangExtDesc };
+        deviceDesc.extendedDescs = extDescPtrs;
 
         // TODO: We should also set the debug callback
         // (And in general reduce the differences (and duplication) between

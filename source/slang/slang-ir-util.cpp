@@ -266,12 +266,38 @@ String dumpIRToString(IRInst* root, IRDumpOptions options)
     return sb.toString();
 }
 
-void copyNameHintDecoration(IRInst* dest, IRInst* src)
+void copyNameHintAndDebugDecorations(IRInst* dest, IRInst* src)
 {
-    auto decor = src->findDecoration<IRNameHintDecoration>();
-    if (decor)
+    IRDecoration* nameHintDecoration = nullptr;
+    IRDecoration* linkageDecoration = nullptr;
+    IRDecoration* debugLocationDecoration = nullptr;
+    for (auto decor = src->getFirstDecoration(); decor; decor = decor->getNextDecoration())
     {
-        cloneDecoration(decor, dest);
+        switch (decor->getOp())
+        {
+        case kIROp_NameHintDecoration:
+            nameHintDecoration = decor;
+            break;
+        case kIROp_ImportDecoration:
+        case kIROp_ExportDecoration:
+            linkageDecoration = decor;
+            break;
+        case kIROp_DebugLocationDecoration:
+            debugLocationDecoration = decor;
+            break;
+        }
+    }
+    if (nameHintDecoration)
+    {
+        cloneDecoration(nameHintDecoration, dest);
+    }
+    if (linkageDecoration)
+    {
+        cloneDecoration(linkageDecoration, dest);
+    }
+    if (debugLocationDecoration)
+    {
+        cloneDecoration(debugLocationDecoration, dest);
     }
 }
 
@@ -554,6 +580,26 @@ IRInst* getRootAddr(IRInst* addr)
         }
         break;
     }
+    return addr;
+}
+
+IRInst* getRootAddr(IRInst* addr, List<IRInst*>& outAccessChain)
+{
+    for (;;)
+    {
+        switch (addr->getOp())
+        {
+        case kIROp_GetElementPtr:
+        case kIROp_FieldAddress:
+            outAccessChain.add(addr->getOperand(1));
+            addr = addr->getOperand(0);
+            continue;
+        default:
+            break;
+        }
+        break;
+    }
+    outAccessChain.reverse();
     return addr;
 }
 

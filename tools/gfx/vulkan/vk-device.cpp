@@ -712,6 +712,11 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
             {
                 deviceExtensions.add(VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME);
             }
+#else
+            if (extensionNames.contains("VK_KHR_external_memory_fd"))
+            {
+                deviceExtensions.add(VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME);
+            }
 #endif
             m_features.add("external-memory");
         }
@@ -928,6 +933,8 @@ SlangResult DeviceImpl::initialize(const Desc& desc)
 
     SLANG_RETURN_ON_FAIL(slangContext.initialize(
         desc.slang,
+        desc.extendedDescCount,
+        desc.extendedDescs,
         SLANG_SPIRV,
         "sm_5_1",
         makeArray(slang::PreprocessorMacroDesc{ "__VK__", "1" }).getView()));
@@ -1468,16 +1475,18 @@ Result DeviceImpl::createTextureResource(
 
     VkExternalMemoryImageCreateInfo externalMemoryImageCreateInfo = {
         VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO };
-#if SLANG_WINDOWS_FAMILY
     VkExternalMemoryHandleTypeFlags extMemoryHandleType =
+#if SLANG_WINDOWS_FAMILY
         VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+#else
+        VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+#endif
     if (descIn.isShared)
     {
         externalMemoryImageCreateInfo.pNext = nullptr;
         externalMemoryImageCreateInfo.handleTypes = extMemoryHandleType;
         imageInfo.pNext = &externalMemoryImageCreateInfo;
     }
-#endif
     SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateImage(m_device, &imageInfo, nullptr, &texture->m_image));
 
     VkMemoryRequirements memRequirements;
@@ -1497,10 +1506,12 @@ Result DeviceImpl::createTextureResource(
 #if SLANG_WINDOWS_FAMILY
     VkExportMemoryWin32HandleInfoKHR exportMemoryWin32HandleInfo = {
         VK_STRUCTURE_TYPE_EXPORT_MEMORY_WIN32_HANDLE_INFO_KHR };
+#endif
     VkExportMemoryAllocateInfoKHR exportMemoryAllocateInfo = {
         VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO_KHR };
     if (descIn.isShared)
     {
+#if SLANG_WINDOWS_FAMILY
         exportMemoryWin32HandleInfo.pNext = nullptr;
         exportMemoryWin32HandleInfo.pAttributes = nullptr;
         exportMemoryWin32HandleInfo.dwAccess =
@@ -1511,10 +1522,10 @@ Result DeviceImpl::createTextureResource(
             extMemoryHandleType & VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT_KHR
             ? &exportMemoryWin32HandleInfo
             : nullptr;
+#endif
         exportMemoryAllocateInfo.handleTypes = extMemoryHandleType;
         allocInfo.pNext = &exportMemoryAllocateInfo;
     }
-#endif
     SLANG_VK_RETURN_ON_FAIL(
         m_api.vkAllocateMemory(m_device, &allocInfo, nullptr, &texture->m_imageMemory));
 
@@ -1731,13 +1742,19 @@ Result DeviceImpl::createBufferResourceImpl(
     RefPtr<BufferResourceImpl> buffer(new BufferResourceImpl(desc, this));
     if (desc.isShared)
     {
+        VkExternalMemoryHandleTypeFlagsKHR extMemHandleType
+#if SLANG_WINDOWS_FAMILY
+            = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+#else
+            = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+#endif
         SLANG_RETURN_ON_FAIL(buffer->m_buffer.init(
             m_api,
             desc.sizeInBytes,
             usage,
             reqMemoryProperties,
             desc.isShared,
-            VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT));
+            extMemHandleType));
     }
     else
     {
