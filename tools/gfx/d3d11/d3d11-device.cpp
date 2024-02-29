@@ -34,6 +34,8 @@ SlangResult DeviceImpl::initialize(const Desc& desc)
 {
     SLANG_RETURN_ON_FAIL(slangContext.initialize(
         desc.slang,
+        desc.extendedDescCount,
+        desc.extendedDescs,
         SLANG_DXBC,
         "sm_5_0",
         makeArray(slang::PreprocessorMacroDesc{ "__D3D11__", "1" }).getView()));

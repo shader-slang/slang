@@ -17,6 +17,7 @@
 #include "slang-ir-autodiff.h"
 #include "slang-ir-inline.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-insert-debug-value-store.h"
 #include "slang-ir-check-differentiability.h"
 #include "slang-ir-missing-return.h"
 #include "slang-ir-sccp.h"
@@ -6298,6 +6299,22 @@ void maybeEmitDebugLine(IRGenContext* context, Stmt* stmt)
     }
 }
 
+void maybeAddDebugLocationDecoration(IRGenContext* context, IRInst* inst)
+{
+    if (!context->includeDebugInfo)
+        return;
+    auto sourceView = context->getLinkage()->getSourceManager()->findSourceView(inst->sourceLoc);
+    if (!sourceView)
+        return;
+    auto source = sourceView->getSourceFile();
+    IRInst* debugSourceInst = nullptr;
+    if (context->shared->mapSourceFileToDebugSourceInst.tryGetValue(source, debugSourceInst))
+    {
+        auto humaneLoc = context->getLinkage()->getSourceManager()->getHumaneLoc(inst->sourceLoc, SourceLocType::Emit);
+        context->irBuilder->addDebugLocationDecoration(inst, debugSourceInst, humaneLoc.line, humaneLoc.column);
+    }
+}
+
 void lowerStmt(
     IRGenContext*   context,
     Stmt*           stmt)
@@ -7777,6 +7794,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
 
         LoweredValInfo varVal = createVar(context, varType, decl);
+        maybeAddDebugLocationDecoration(context, varVal.val);
 
         if( auto initExpr = decl->initExpr )
         {
@@ -8150,6 +8168,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             getSink()->diagnose(decl->loc, Diagnostics::unimplemented, "lower unknown AggType to IR");
             return LoweredValInfo::simple(subBuilder->getVoidType());
         }
+        
+        maybeAddDebugLocationDecoration(context, irAggType);
 
         auto finalFinishedVal = finishOuterGenerics(subBuilder, irAggType, outerGeneric);
 
@@ -9043,7 +9063,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         IRFunc* irFunc = subBuilder->createFunc();
         addNameHint(subContext, irFunc, decl);
         addLinkageDecoration(subContext, irFunc, decl);
-        
+        maybeAddDebugLocationDecoration(subContext, irFunc);
+
         // Register the value now, to avoid any possible infinite recursion when lowering the body or attributes.
         context->setGlobalValue(decl, LoweredValInfo::simple(findOuterMostGeneric(irFunc)));
 
@@ -10339,6 +10360,13 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // normal `call` + `ifElse`, etc.
     lowerErrorHandling(module, compileRequest->getSink());
 
+    // Generate DebugValue insts to store values into debug variables,
+    // if debug symbols are enabled.
+    if (compileRequest->getLinkage()->m_optionSet.getEnumOption<DebugInfoLevel>(CompilerOptionName::DebugInformation) != DebugInfoLevel::None)
+    {
+        insertDebugValueStore(module);
+    }
+
     // Next, attempt to promote local variables to SSA
     // temporaries and do basic simplifications.
     //
@@ -10516,11 +10544,12 @@ struct SpecializedComponentTypeIRGenContext : ComponentTypeVisitor
 
         linkage = componentType->getLinkage();
         session = linkage->getSessionImpl();
-
+        auto option = linkage->m_optionSet;
+        option.overrideWith(componentType->getOptionSet());
         SharedIRGenContext sharedContextStorage(
             session,
             sink,
-            linkage->m_optionSet.shouldObfuscateCode(),
+            option.shouldObfuscateCode(),
             nullptr,
             linkage
         );

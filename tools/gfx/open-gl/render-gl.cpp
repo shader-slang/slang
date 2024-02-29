@@ -2007,6 +2007,8 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::initialize(const Desc& desc)
 {
     SLANG_RETURN_ON_FAIL(slangContext.initialize(
         desc.slang,
+        desc.extendedDescCount,
+        desc.extendedDescs,
         SLANG_GLSL,
         "glsl_440",
         makeArray(

@@ -167,8 +167,10 @@ inline IRInst* unwrapAttributedType(IRInst* type)
 IRType* dropNormAttributes(IRType* const t);
 
 void getTypeNameHint(StringBuilder& sb, IRInst* type);
-void copyNameHintDecoration(IRInst* dest, IRInst* src);
+void copyNameHintAndDebugDecorations(IRInst* dest, IRInst* src);
 IRInst* getRootAddr(IRInst* addrInst);
+IRInst* getRootAddr(IRInst* addrInst, List<IRInst*>& outAccessChain);
+
 bool canAddressesPotentiallyAlias(IRGlobalValueWithCode* func, IRInst* addr1, IRInst* addr2);
 
 String dumpIRToString(

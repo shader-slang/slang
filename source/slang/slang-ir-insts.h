@@ -3006,6 +3006,32 @@ struct IRDebugLine : IRInst
     IRInst* getColEnd() { return getOperand(4); }
 };
 
+struct IRDebugVar : IRInst
+{
+    IR_LEAF_ISA(DebugVar)
+    IRInst* getSource() { return getOperand(0); }
+    IRInst* getLine() { return getOperand(1); }
+    IRInst* getCol() { return getOperand(2); }
+};
+
+struct IRDebugValue : IRInst
+{
+    IR_LEAF_ISA(DebugValue)
+    IRInst* getDebugVar() { return getOperand(0); }
+    IRInst* getValue() { return getOperand(1); }
+    UInt getAccessChainCount() { return getOperandCount() - 2; }
+    IRInst* getAccessChain(UInt index) { return getOperand(2 + index); }
+};
+
+struct IRDebugLocationDecoration : IRDecoration
+{
+    IRInst* getSource() { return getOperand(0); }
+    IRInst* getLine() { return getOperand(1); }
+    IRInst* getCol() { return getOperand(2); }
+
+    IR_LEAF_ISA(DebugLocationDecoration)
+};
+
 struct IRSPIRVAsm;
 
 struct IRSPIRVAsmOperand : IRInst
@@ -3441,6 +3467,8 @@ public:
 
     IRInst* emitDebugSource(UnownedStringSlice fileName, UnownedStringSlice source);
     IRInst* emitDebugLine(IRInst* source, IRIntegerValue lineStart, IRIntegerValue lineEnd, IRIntegerValue colStart, IRIntegerValue colEnd);
+    IRInst* emitDebugVar(IRType* type, IRInst* source, IRInst* line, IRInst* col);
+    IRInst* emitDebugValue(IRInst* debugVar, IRInst* debugValue, ArrayView<IRInst*> accessChain);
 
         /// Emit an LiveRangeStart instruction indicating the referenced item is live following this instruction
     IRLiveRangeStart* emitLiveRangeStart(IRInst* referenced);
@@ -4365,6 +4393,11 @@ public:
     void addExternCDecoration(IRInst* value)
     {
         addDecoration(value, kIROp_ExternCDecoration);
+    }
+
+    void addDebugLocationDecoration(IRInst* value, IRInst* debugSource, IRIntegerValue line, IRIntegerValue col)
+    {
+        addDecoration(value, kIROp_DebugLocationDecoration, debugSource, getIntValue(getUIntType(), line), getIntValue(getUIntType(), col));
     }
 
     void addForceInlineDecoration(IRInst* value)

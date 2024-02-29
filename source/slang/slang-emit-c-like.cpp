@@ -2661,6 +2661,8 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
 
     case kIROp_DebugSource:
     case kIROp_DebugLine:
+    case kIROp_DebugVar:
+    case kIROp_DebugValue:
         break;
 
         // Insts that needs to be emitted as code blocks.

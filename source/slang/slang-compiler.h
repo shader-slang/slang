@@ -531,7 +531,7 @@ namespace Slang
     protected:
         ComponentType(Linkage* linkage);
 
-    private:
+    protected:
         Linkage* m_linkage;
         
         CompilerOptionSet m_optionSet;

@@ -56,7 +56,7 @@ const uint64_t kTimeoutInfinite = 0xFFFFFFFFFFFFFFFF;
 
 enum class StructType
 {
-    D3D12DeviceExtendedDesc, D3D12ExperimentalFeaturesDesc
+    D3D12DeviceExtendedDesc, D3D12ExperimentalFeaturesDesc, SlangSessionExtendedDesc
 };
 
 // TODO: Rename to Stage
@@ -2215,7 +2215,7 @@ public:
         SlangFloatingPointMode floatingPointMode = SLANG_FLOATING_POINT_MODE_DEFAULT;
         SlangOptimizationLevel optimizationLevel = SLANG_OPTIMIZATION_LEVEL_DEFAULT;
         SlangTargetFlags targetFlags = kDefaultTargetFlags;
-        SlangLineDirectiveMode lineDirectiveMode = SLANG_LINE_DIRECTIVE_MODE_DEFAULT;
+        SlangLineDirectiveMode lineDirectiveMode = SLANG_LINE_DIRECTIVE_MODE_DEFAULT;\
     };
 
     struct ShaderCacheDesc
@@ -2716,6 +2716,13 @@ struct D3D12DeviceExtendedDesc
     const char* rootParameterShaderAttributeName = nullptr;
     bool debugBreakOnD3D12Error = false;
     uint32_t highestShaderModel = 0;
+};
+
+struct SlangSessionExtendedDesc
+{
+    StructType structType = StructType::SlangSessionExtendedDesc;
+    uint32_t compilerOptionEntryCount = 0;
+    slang::CompilerOptionEntry* compilerOptionEntries = nullptr;
 };
 
 }

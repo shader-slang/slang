@@ -933,6 +933,8 @@ SlangResult DeviceImpl::initialize(const Desc& desc)
 
     SLANG_RETURN_ON_FAIL(slangContext.initialize(
         desc.slang,
+        desc.extendedDescCount,
+        desc.extendedDescs,
         SLANG_SPIRV,
         "sm_5_1",
         makeArray(slang::PreprocessorMacroDesc{ "__VK__", "1" }).getView()));

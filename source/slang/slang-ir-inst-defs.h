@@ -964,9 +964,11 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// Recognized by SPIRV-emit pass so we can emit a SPIRV `BufferBlock` decoration.
     INST(SPIRVBufferBlockDecoration, spvBufferBlock, 0, 0)
 
+        /// Decorates an inst with a debug source location (IRDebugSource, IRIntLit(line), IRIntLit(col)).
+    INST(DebugLocationDecoration, DebugLocation, 3, 0)
+
         /// Recognized by SPIRV-emit pass so we can emit a SPIRV `Block` decoration.
     INST(SPIRVBlockDecoration, spvBlock, 0, 0)
-
 
     INST_RANGE(Decoration, HighLevelDeclDecoration, SPIRVBlockDecoration)
 
@@ -1111,6 +1113,8 @@ INST(DifferentiableTypeDictionaryItem, DifferentiableTypeDictionaryItem, 0, 0)
 /* DebugInfo */
 INST(DebugSource, DebugSource, 2, HOISTABLE)
 INST(DebugLine, DebugLine, 5, 0)
+INST(DebugVar, DebugVar, 4, 0)
+INST(DebugValue, DebugValue, 2, 0)
 
 /* Inline assembly */
 
