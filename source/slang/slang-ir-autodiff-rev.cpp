@@ -927,16 +927,16 @@ namespace Slang
                 {
                     // Create dOut param. 
                     auto diffParam = builder->emitParam(diffType);
-                    copyNameHintDecoration(diffParam, fwdParam);
+                    copyNameHintAndDebugDecorations(diffParam, fwdParam);
                     result.propagateFuncParams.add(diffParam);
                     primalRefReplacement = builder->emitParam(builder->getOutType(primalType));
-                    copyNameHintDecoration(primalRefReplacement, fwdParam);
+                    copyNameHintAndDebugDecorations(primalRefReplacement, fwdParam);
 
                     // Create a local var for read access in pre-transpose code.
                     // This will the var from which we will fetch the final resulting derivative
                     // after transposition.
                     auto tempVar = nextBlockBuilder.emitVar(diffType);
-                    copyNameHintDecoration(tempVar, fwdParam);
+                    copyNameHintAndDebugDecorations(tempVar, fwdParam);
                     result.propagateFuncSpecificPrimalInsts.add(tempVar);
 
                     // Initialize the var with input diff param at start.
@@ -953,13 +953,13 @@ namespace Slang
                 else
                 {
                     primalRefReplacement = builder->emitParam(outType);
-                    copyNameHintDecoration(primalRefReplacement, fwdParam);
+                    copyNameHintAndDebugDecorations(primalRefReplacement, fwdParam);
                 }
                 result.primalFuncParams.add(primalRefReplacement);
                 
                 // Create a local var for the out param for the primal part of the prop func.
                 auto tempPrimalVar = nextBlockBuilder.emitVar(outType->getValueType());
-                copyNameHintDecoration(tempPrimalVar, fwdParam);
+                copyNameHintAndDebugDecorations(tempPrimalVar, fwdParam);
                 result.mapPrimalSpecificParamToReplacementInPropFunc[primalRefReplacement] = tempPrimalVar;
 
                 instsToRemove.add(fwdParam);
@@ -979,12 +979,12 @@ namespace Slang
 
                     // Create an in param for the prop func.
                     auto propParam = builder->emitParam(inoutType->getValueType());
-                    copyNameHintDecoration(propParam, fwdParam);
+                    copyNameHintAndDebugDecorations(propParam, fwdParam);
                     result.propagateFuncParams.add(propParam);
 
                     // Create a local var for the out param for the primal part of the prop func.
                     auto tempPrimalVar = nextBlockBuilder.emitVar(inoutType->getValueType());
-                    copyNameHintDecoration(tempPrimalVar, fwdParam);
+                    copyNameHintAndDebugDecorations(tempPrimalVar, fwdParam);
 
                     result.propagateFuncSpecificPrimalInsts.add(tempPrimalVar);
                     auto storeInst = nextBlockBuilder.emitStore(tempPrimalVar, propParam);
@@ -1013,11 +1013,11 @@ namespace Slang
                 // Create inout version. 
                 auto inoutDiffPairType = builder->getInOutType(diffPairType);
                 primalRefReplacement = builder->emitParam(primalType);
-                copyNameHintDecoration(primalRefReplacement, fwdParam);
+                copyNameHintAndDebugDecorations(primalRefReplacement, fwdParam);
 
                 result.primalFuncParams.add(primalRefReplacement);
                 auto propParam = builder->emitParam(inoutDiffPairType);
-                copyNameHintDecoration(propParam, fwdParam);
+                copyNameHintAndDebugDecorations(propParam, fwdParam);
                 result.propagateFuncParams.add(propParam);
 
                 // A reference to this parameter from the diff blocks should be replaced with a load
@@ -1049,11 +1049,11 @@ namespace Slang
 
                 // Process differentiable inout parameters.
                 auto primalParam = builder->emitParam(builder->getInOutType(primalType));
-                copyNameHintDecoration(primalParam, fwdParam);
+                copyNameHintAndDebugDecorations(primalParam, fwdParam);
                 result.primalFuncParams.add(primalParam);
 
                 auto diffParam = builder->emitParam(inoutType);
-                copyNameHintDecoration(diffParam, fwdParam);
+                copyNameHintAndDebugDecorations(diffParam, fwdParam);
                 result.propagateFuncParams.add(diffParam);
 
                 // Primal references to this param is the new primal param.
@@ -1071,7 +1071,7 @@ namespace Slang
 
                 // Create a local var for diff read access.
                 auto diffVar = nextBlockBuilder.emitVar(diffType);
-                copyNameHintDecoration(diffVar, fwdParam);
+                copyNameHintAndDebugDecorations(diffVar, fwdParam);
                 result.propagateFuncSpecificPrimalInsts.add(diffVar);
                 diffRefReplacement = diffVar;
 
@@ -1084,7 +1084,7 @@ namespace Slang
                 // Create a local var for diff write access.
                 auto diffWriteVar = nextBlockBuilder.emitVar(diffType);
                 result.propagateFuncSpecificPrimalInsts.add(diffWriteVar);
-                copyNameHintDecoration(diffWriteVar, fwdParam);
+                copyNameHintAndDebugDecorations(diffWriteVar, fwdParam);
 
                 // Initialize write var to 0.
                 auto writeStore = nextBlockBuilder.emitStore(diffWriteVar, initDiff);
@@ -1094,7 +1094,7 @@ namespace Slang
 
                 // Create a local var for the primal logic in the propagate func.
                 auto primalVar = nextBlockBuilder.emitVar(primalType);
-                copyNameHintDecoration(primalVar, fwdParam);
+                copyNameHintAndDebugDecorations(primalVar, fwdParam);
 
                 result.propagateFuncSpecificPrimalInsts.add(primalVar);
                 auto initPrimalVal = nextBlockBuilder.emitDifferentialPairGetPrimal(loadedParam);

@@ -4,7 +4,7 @@
 #include <slang-com-ptr.h>
 
 #define GFX_ENABLE_RENDERDOC_INTEGRATION 0
-
+#define GFX_ENABLE_SPIRV_DEBUG 0
 #if GFX_ENABLE_RENDERDOC_INTEGRATION
 #    include "external/renderdoc_app.h"
 #    include <windows.h>
@@ -55,7 +55,15 @@ namespace gfx_test
         SLANG_RETURN_ON_FAIL(result);
 
         ComPtr<slang::IComponentType> linkedProgram;
-        result = composedProgram->link(linkedProgram.writeRef(), diagnosticsBlob.writeRef());
+        slang::CompilerOptionEntry optionEntry[2];
+        optionEntry[0].name = slang::CompilerOptionName::EmitSpirvDirectly;
+        optionEntry[0].value.kind = slang::CompilerOptionValueKind::Int;
+        optionEntry[0].value.intValue0 = 1;
+        result = composedProgram->linkWithOptions(
+            linkedProgram.writeRef(),
+            1,
+            optionEntry,
+            diagnosticsBlob.writeRef());
         diagnoseIfNeeded(diagnosticsBlob);
         SLANG_RETURN_ON_FAIL(result);
 
@@ -278,10 +286,22 @@ namespace gfx_test
 
         gfx::D3D12DeviceExtendedDesc extDesc = {};
         extDesc.rootParameterShaderAttributeName = "root";
+        
+        gfx::SlangSessionExtendedDesc slangExtDesc = {};
+#if GFX_ENABLE_SPIRV_DEBUG
+        slang::CompilerOptionEntry debugLevelCompilerOptionEntry;
+        debugLevelCompilerOptionEntry.name = slang::CompilerOptionName::DebugInformation;
+        debugLevelCompilerOptionEntry.value.intValue0 = SLANG_DEBUG_INFO_LEVEL_STANDARD;
 
-        deviceDesc.extendedDescCount = 1;
-        void* extDescPtr = &extDesc;
-        deviceDesc.extendedDescs = &extDescPtr;
+        slang::CompilerOptionEntry entries[] = { debugLevelCompilerOptionEntry };
+
+        slangExtDesc.compilerOptionEntries = entries;
+        slangExtDesc.compilerOptionEntryCount = sizeof(entries) / sizeof(slang::CompilerOptionEntry);
+#endif
+
+        deviceDesc.extendedDescCount = 2;
+        void* extDescPtrs[2] = { &extDesc, &slangExtDesc };
+        deviceDesc.extendedDescs = extDescPtrs;
 
         // TODO: We should also set the debug callback
         // (And in general reduce the differences (and duplication) between

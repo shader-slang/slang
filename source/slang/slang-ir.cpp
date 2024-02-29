@@ -3214,13 +3214,28 @@ namespace Slang
         IRInst* args[] = 
         {
             source,
-            getIntValue(getIntType(), lineStart),
-            getIntValue(getIntType(), lineEnd),
-            getIntValue(getIntType(), colStart),
-            getIntValue(getIntType(), colEnd)
+            getIntValue(getUIntType(), lineStart),
+            getIntValue(getUIntType(), lineEnd),
+            getIntValue(getUIntType(), colStart),
+            getIntValue(getUIntType(), colEnd)
         };
         return emitIntrinsicInst(getVoidType(), kIROp_DebugLine, 5, args);
     }
+    IRInst* IRBuilder::emitDebugVar(IRType* type, IRInst* source, IRInst* line, IRInst* col)
+    {
+        IRInst* args[] = { source, line, col };
+        return emitIntrinsicInst(type, kIROp_DebugVar, 3, args);
+    }
+
+    IRInst* IRBuilder::emitDebugValue(IRInst* debugVar, IRInst* debugValue, ArrayView<IRInst*> accessChain)
+    {
+        List<IRInst*> args;
+        args.add(debugVar);
+        args.add(debugValue);
+        args.addRange(accessChain);
+        return emitIntrinsicInst(getVoidType(), kIROp_DebugValue, (UInt)args.getCount(), args.getBuffer());
+    }
+
     IRLiveRangeStart* IRBuilder::emitLiveRangeStart(IRInst* referenced)
     {
         // This instruction doesn't produce any result, 
