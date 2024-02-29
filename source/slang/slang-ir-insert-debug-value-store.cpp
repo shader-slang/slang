@@ -21,7 +21,7 @@ namespace Slang
         {
             params.add(param);
         }
-
+        Index paramIndex = 0;
         for (auto param : params)
         {
             builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
@@ -36,7 +36,8 @@ namespace Slang
                 paramType,
                 funcDebugLoc->getSource(),
                 funcDebugLoc->getLine(),
-                funcDebugLoc->getCol());
+                funcDebugLoc->getCol(),
+                builder.getIntValue(builder.getUIntType(), paramIndex));
             copyNameHintAndDebugDecorations(debugVar, param);
 
             mapVarToDebugVar[param] = debugVar;
@@ -52,6 +53,7 @@ namespace Slang
                 ArrayView<IRInst*> accessChain;
                 builder.emitDebugValue(debugVar, paramVal, accessChain);
             }
+            paramIndex++;
         }
 
         for (auto block : func->getBlocks())
@@ -80,8 +82,11 @@ namespace Slang
         // Collect all stores and insert debug value insts to update debug vars.
         for (auto block : func->getBlocks())
         {
-            for (auto inst = block->getFirstInst(); inst; inst = inst->getNextInst())
+            IRInst* nextInst = nullptr;
+            for (auto inst = block->getFirstInst(); inst; inst = nextInst)
             {
+                nextInst = inst->getNextInst();
+
                 if (auto storeInst = as<IRStore>(inst))
                 {
                     List<IRInst*> accessChain;
@@ -89,8 +94,29 @@ namespace Slang
                     IRInst* debugVar = nullptr;
                     if (mapVarToDebugVar.tryGetValue(varInst, debugVar))
                     {
-                        builder.setInsertBefore(storeInst);
+                        builder.setInsertAfter(storeInst);
                         builder.emitDebugValue(debugVar, storeInst->getVal(), accessChain.getArrayView());
+                    }
+                }
+                else if (auto callInst = as<IRCall>(inst))
+                {
+                    auto funcValue = getResolvedInstForDecorations(callInst->getCallee());
+                    if (!funcValue)
+                        continue;
+                    for (UInt i = 0; i < callInst->getArgCount(); i++)
+                    {
+                        auto arg = callInst->getArg(i);
+                        if (!as<IRPtrTypeBase>(arg->getDataType()))
+                            continue;
+                        List<IRInst*> accessChain;
+                        auto varInst = getRootAddr(arg, accessChain);
+                        IRInst* debugVar = nullptr;
+                        if (mapVarToDebugVar.tryGetValue(varInst, debugVar))
+                        {
+                            builder.setInsertAfter(callInst);
+                            auto loadVal = builder.emitLoad(arg);
+                            builder.emitDebugValue(debugVar, loadVal, accessChain.getArrayView());
+                        }
                     }
                 }
             }

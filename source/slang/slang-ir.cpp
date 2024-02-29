@@ -3221,10 +3221,18 @@ namespace Slang
         };
         return emitIntrinsicInst(getVoidType(), kIROp_DebugLine, 5, args);
     }
-    IRInst* IRBuilder::emitDebugVar(IRType* type, IRInst* source, IRInst* line, IRInst* col)
+    IRInst* IRBuilder::emitDebugVar(IRType* type, IRInst* source, IRInst* line, IRInst* col, IRInst* argIndex)
     {
-        IRInst* args[] = { source, line, col };
-        return emitIntrinsicInst(type, kIROp_DebugVar, 3, args);
+        if (argIndex)
+        {
+            IRInst* args[] = { source, line, col, argIndex };
+            return emitIntrinsicInst(type, kIROp_DebugVar, 4, args);
+        }
+        else
+        {
+            IRInst* args[] = { source, line, col };
+            return emitIntrinsicInst(type, kIROp_DebugVar, 3, args);
+        }
     }
 
     IRInst* IRBuilder::emitDebugValue(IRInst* debugVar, IRInst* debugValue, ArrayView<IRInst*> accessChain)
