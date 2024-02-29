@@ -9123,7 +9123,7 @@ namespace Slang
             // Grow the backing width if necessary
             backingWidth = std::max(thisFieldTypeWidth, backingWidth);
             // Grow the total width
-            totalWidth += thisFieldWidth;
+            totalWidth += int(thisFieldWidth);
             groupInfo.add({memberIndex, int(thisFieldWidth), t, bfm});
         }
         // If the struct ended with a bitpacked member, then make sure we don't forget the last group
