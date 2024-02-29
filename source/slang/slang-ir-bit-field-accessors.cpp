@@ -19,6 +19,36 @@ static IRInst* maybeUnwrapSpecialize(IRInst* inst)
     return inst;
 }
 
+static IRInst* shl(IRBuilder& builder, IRInst* inst, const IRIntegerValue value)
+{
+    if(value == 0)
+        return inst;
+    const auto [width, isSigned] = getIntTypeInfo(inst->getDataType());
+    if(value >= width)
+        return builder.getIntValue(inst->getDataType(), 0);
+    if(value == 0)
+        return inst;
+    return builder.emitShl(inst->getDataType(), inst, builder.getIntValue(builder.getIntType(), value));
+}
+
+static IRInst* shr(IRBuilder& builder, IRInst* inst, const IRIntegerValue value)
+{
+    if(value == 0)
+        return inst;
+    const auto [width, isSigned] = getIntTypeInfo(inst->getDataType());
+    // If it's not signed, then we just shift all the set bits away
+    if(value >= width && !isSigned)
+        return builder.getIntValue(inst->getDataType(), 0);
+    // Since on many platforms bit shifting by the number of bits in the number
+    // is undefined, correct this here assuming that the Slang IR has the same
+    // restriction
+    if(value >= width && isSigned)
+        return builder.emitShr(inst->getDataType(), inst, builder.getIntValue(builder.getIntType(), width-1));
+    if(value == 0)
+        return inst;
+    return builder.emitShr(inst->getDataType(), inst, builder.getIntValue(builder.getIntType(), value));
+}
+
 static void synthesizeBitFieldGetter(IRFunc* func, IRBitFieldAccessorDecoration* dec)
 {
     const auto bitFieldType = func->getResultType();
@@ -47,13 +77,13 @@ static void synthesizeBitFieldGetter(IRFunc* func, IRBitFieldAccessorDecoration*
     const auto backingWidth = getIntTypeInfo(backingType).width;
     const auto fieldWidth = dec->getFieldWidth();
     const auto topOfField = dec->getFieldOffset() + fieldWidth;
-    const auto leftShiftAmount = builder.getIntValue(builder.getIntType(), backingWidth - topOfField);
-    const auto rightShiftAmount = builder.getIntValue(builder.getIntType(), backingWidth - fieldWidth);
+    const auto leftShiftAmount = backingWidth - topOfField;
+    const auto rightShiftAmount = backingWidth - fieldWidth;
     const auto backingValue = builder.emitFieldExtract(backingType, s, dec->getBackingMemberKey());
     const auto castBackingType = builder.getType(getIntTypeOpFromInfo({backingWidth, isSigned}));
     const auto castedBacking = builder.emitCast(castBackingType, backingValue);
-    const auto leftShifted = builder.emitShl(castBackingType, castedBacking, leftShiftAmount);
-    const auto rightShifted = builder.emitShr(castBackingType, leftShifted, rightShiftAmount);
+    const auto leftShifted = shl(builder, castedBacking, leftShiftAmount);
+    const auto rightShifted = shr(builder, leftShifted, rightShiftAmount);
     const auto castedToBitFieldType = builder.emitCast(bitFieldType, rightShifted);
     builder.emitReturn(castedToBitFieldType);
 
@@ -95,7 +125,6 @@ static void synthesizeBitFieldSetter(IRFunc* func, IRBitFieldAccessorDecoration*
 
     const auto fieldWidth = dec->getFieldWidth();
     const auto bottomOfField = dec->getFieldOffset();
-    const auto bottomOfFieldValue = builder.getIntValue(builder.getIntType(), bottomOfField);
     const auto maskBits = setLowBits(fieldWidth) << bottomOfField;
     const auto mask = builder.getIntValue(backingType, maskBits);
     const auto notMask = builder.getIntValue(backingType, ~maskBits);
@@ -103,7 +132,7 @@ static void synthesizeBitFieldSetter(IRFunc* func, IRBitFieldAccessorDecoration*
     const auto backingValue = builder.emitLoad(memberAddr);
     const auto maskedOut = builder.emitBitAnd(backingType, backingValue, notMask);
     const auto castValue = builder.emitCast(backingType, v);
-    const auto shiftedLeft = builder.emitShl(backingType, castValue, bottomOfFieldValue);
+    const auto shiftedLeft = shl(builder, castValue, bottomOfField);
     const auto maskedValue = builder.emitBitAnd(backingType, shiftedLeft, mask);
     const auto combined = builder.emitBitOr(backingType, maskedOut, maskedValue);
     builder.emitStore(memberAddr, combined);
