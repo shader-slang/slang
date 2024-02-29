@@ -9021,7 +9021,7 @@ namespace Slang
                     : BaseType::UInt64;
                 auto backingMember = m_astBuilder->create<VarDecl>();
                 backingMember->type.type = m_astBuilder->getBuiltinType(backingMemberBasicType);
-                backingMember->nameAndLoc.name = getName(String("$bitfield_backing_") + String(backing_nonce));
+                backingMember->nameAndLoc.name = getName(String("$bit_field_backing_") + String(backing_nonce));
                 backing_nonce++;
                 backingMember->initExpr = nullptr;
                 backingMember->parentDecl = structDecl;
