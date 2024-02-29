@@ -1694,6 +1694,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
+    List<IRInst*> m_instsToRemove;
     void processWorkList()
     {
         while (workList.getCount() != 0)
@@ -1806,6 +1807,17 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             case kIROp_SPIRVAsm:
                 processSPIRVAsm(as<IRSPIRVAsm>(inst));
                 break;
+            case kIROp_DebugValue:
+                if (!isSimpleDataType(as<IRDebugValue>(inst)->getDebugVar()->getDataType()))
+                    inst->removeAndDeallocate();
+                break;
+            case kIROp_DebugVar:
+                if (!isSimpleDataType(as<IRDebugVar>(inst)->getDataType()))
+                {
+                    inst->removeFromParent();
+                    m_instsToRemove.add(inst);
+                }
+                break;
             case kIROp_Func:
                 eliminateContinueBlocksInFunc(m_module, as<IRFunc>(inst));
                 [[fallthrough]];
@@ -1852,6 +1864,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             }
         }
         processWorkList();
+
+        for (auto inst : m_instsToRemove)
+            inst->removeAndDeallocate();
 
         // Translate types.
         List<IRHLSLStructuredBufferTypeBase*> instsToProcess;

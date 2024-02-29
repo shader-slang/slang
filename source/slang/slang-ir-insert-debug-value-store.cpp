@@ -6,32 +6,6 @@
 
 namespace Slang
 {
-    bool isValidDebugType(IRType* type)
-    {
-        type = (IRType*)unwrapAttributedType(type);
-        if (as<IRBasicType>(type))
-            return true;
-        switch (type->getOp())
-        {
-        case kIROp_StructType:
-        case kIROp_VectorType:
-        case kIROp_MatrixType:
-        case kIROp_InterfaceType:
-        case kIROp_ExtractExistentialType:
-        case kIROp_OptionalType:
-        case kIROp_ArrayType:
-        case kIROp_UnsizedArrayType:
-        case kIROp_PtrType:
-        case kIROp_HLSLStructuredBufferType:
-        case kIROp_HLSLRWStructuredBufferType:
-        case kIROp_ConstantBufferType:
-        case kIROp_ParameterBlockType:
-        case kIROp_GLSLShaderStorageBufferType:
-            return true;
-        default:
-            return false;
-        }
-    }
     void insertDebugValueStore(IRFunc* func)
     {
         IRBuilder builder(func);
@@ -57,11 +31,6 @@ namespace Slang
             {
                 isRefParam = true;
                 paramType = outType->getValueType();
-            }
-            if (!isValidDebugType(paramType))
-            {
-                paramIndex++;
-                continue;
             }
             auto debugVar = builder.emitDebugVar(
                 paramType,
@@ -97,10 +66,6 @@ namespace Slang
                 {
                     if (auto debugLoc = varInst->findDecoration<IRDebugLocationDecoration>())
                     {
-                        if (!isValidDebugType(varInst->getDataType()))
-                        {
-                            continue;
-                        }
                         builder.setInsertBefore(varInst);
                         auto debugVar = builder.emitDebugVar(
                             tryGetPointedToType(&builder, varInst->getDataType()),
