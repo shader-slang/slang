@@ -31,6 +31,8 @@ jobs:
       uses: microsoft/setup-msbuild@v1
     - name: build slang
       run: |
+        echo %cd%
+        
         .\premake.bat vs2019 --arch=x64 --deps=true --no-progress=true --enable-cuda=true
         
         .\make-slang-tag-version.bat
