@@ -9,6 +9,7 @@
 #include "../core/slang-performance-profiler.h"
 
 #include "slang-check.h"
+#include "slang-ir-bit-field-accessors.h"
 #include "slang-ir-loop-inversion.h"
 #include "slang-ir.h"
 #include "slang-ir-constexpr.h"
@@ -8872,6 +8873,25 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
     }
 
+    void addBitFieldAccessorDecorations(IRInst* irFunc, Decl* decl)
+    {
+        // If this is an accessor under a property we can move the bitfield
+        // modifiers on the property to the accessor function.
+        if(as<AccessorDecl>(decl) && as<PropertyDecl>(decl->parentDecl))
+        {
+            if(const auto bfm = decl->parentDecl->findModifier<BitFieldModifier>())
+            {
+                getBuilder()->addDecoration(
+                    irFunc,
+                    kIROp_BitFieldAccessorDecoration,
+                    getSimpleVal(context, ensureDecl(context, bfm->backingDeclRef.getDecl())),
+                    getBuilder()->getIntValue(getBuilder()->getIntType(), bfm->width),
+                    getBuilder()->getIntValue(getBuilder()->getIntType(), bfm->offset)
+                );
+            }
+        }
+    }
+
         /// Is `decl` a member function (or effectively a member function) when considered as a stdlib declaration?
     bool isStdLibMemberFuncDecl(
         Decl*   inDecl)
@@ -9344,6 +9364,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         addCatchAllIntrinsicDecorationIfNeeded(irFunc, decl);
 
         bool isInline = false;
+
+        addBitFieldAccessorDecorations(irFunc, decl);
 
         for (auto modifier : decl->modifiers)
         {
@@ -10359,6 +10381,9 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // returns a `Result<T,E>` value, translating `tryCall` into
     // normal `call` + `ifElse`, etc.
     lowerErrorHandling(module, compileRequest->getSink());
+
+    // Synthesize some code we want to make sure is inlined and simplified
+    synthesizeBitFieldAccessors(module);
 
     // Generate DebugValue insts to store values into debug variables,
     // if debug symbols are enabled.

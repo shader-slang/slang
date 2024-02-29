@@ -35,6 +35,8 @@ struct  IRFunc;
 struct  IRGlobalValueWithCode;
 struct  IRInst;
 struct  IRModule;
+struct  IRStructField;
+struct  IRStructKey;
 
 typedef unsigned int IROpFlags;
 enum : IROpFlags
@@ -1036,6 +1038,9 @@ struct IntInfo
 
 IntInfo getIntTypeInfo(const IRType* intType);
 
+// left-inverse of getIntTypeInfo
+IROp getIntTypeOpFromInfo(const IntInfo info);
+
 struct FloatInfo
 {
     Int width;
@@ -1045,6 +1050,8 @@ struct FloatInfo
 FloatInfo getFloatingTypeInfo(const IRType* floatType);
 
 bool isIntegralScalarOrCompositeType(IRType* t);
+
+IRStructField* findStructField(IRInst* type, IRStructKey* key);
 
 void findAllInstsBreadthFirst(IRInst* inst, List<IRInst*>& outInsts);
 

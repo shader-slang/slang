@@ -41,6 +41,8 @@ namespace Slang
         return result;
     }
 
+    int getTypeBitSize(Type* t);
+
     // A flat representation of basic types (scalars, vectors and matrices)
     // that can be used as lookup key in caches
     struct BasicTypeKey
