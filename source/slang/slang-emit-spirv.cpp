@@ -1622,7 +1622,7 @@ struct SPIRVEmitContext
                         emitIntConstant(100, builder.getUIntType()),  // ExtDebugInfo version.
                         emitIntConstant(5, builder.getUIntType()),    // DWARF version.
                         result,
-                        emitIntConstant(SpvSourceLanguageSlang, builder.getUIntType()));   // Language, use HLSL's ID for now.
+                        emitIntConstant(SpvSourceLanguageSlang, builder.getUIntType())); // Language.
                     registerDebugInst(moduleInst, translationUnit);
                 }
                 return result;

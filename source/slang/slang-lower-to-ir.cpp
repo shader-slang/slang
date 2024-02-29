@@ -6282,7 +6282,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
     }
 };
 
-void maybeEmitDebugLine(IRGenContext* context, Stmt* stmt)
+void maybeEmitDebugLine(IRGenContext* context, StmtLoweringVisitor& visitor, Stmt* stmt)
 {
     if (!context->includeDebugInfo)
         return;
@@ -6296,6 +6296,7 @@ void maybeEmitDebugLine(IRGenContext* context, Stmt* stmt)
     if (context->shared->mapSourceFileToDebugSourceInst.tryGetValue(source, debugSourceInst))
     {
         auto humaneLoc = context->getLinkage()->getSourceManager()->getHumaneLoc(stmt->loc, SourceLocType::Emit);
+        visitor.startBlockIfNeeded(stmt);
         context->irBuilder->emitDebugLine(debugSourceInst, humaneLoc.line, humaneLoc.line, humaneLoc.column, humaneLoc.column + 1);
     }
 }
@@ -6327,7 +6328,7 @@ void lowerStmt(
 
     try
     {
-        maybeEmitDebugLine(context, stmt);
+        maybeEmitDebugLine(context, visitor, stmt);
         visitor.dispatch(stmt);
     }
     // Don't emit any context message for an explicit `AbortCompilationException`
