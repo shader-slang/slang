@@ -1,4 +1,6 @@
 // slang-check-decl.cpp
+#include "slang-ast-modifier.h"
+#include "slang-ast-support-types.h"
 #include "slang-check-impl.h"
 
 // This file constaints the semantic checking logic and
@@ -34,6 +36,8 @@ namespace Slang
         {
             checkModifiers(decl);
         }
+
+        void visitStructDecl(StructDecl* structDecl);
     };
 
     struct SemanticsDeclScopeWiringVisitor : public SemanticsDeclVisitorBase, public DeclVisitor<SemanticsDeclScopeWiringVisitor>
@@ -63,6 +67,8 @@ namespace Slang
 
         void visitDecl(Decl*) {}
         void visitDeclGroup(DeclGroup*) {}
+
+        void visitStructDecl(StructDecl* structDecl);
 
         void visitFunctionDeclBase(FunctionDeclBase* decl);
 
@@ -1373,6 +1379,47 @@ namespace Slang
         if(!isScalarIntegerType(varDecl->type))
             return;
         tryConstantFoldDeclRef(DeclRef<VarDeclBase>(varDecl), nullptr);
+    }
+
+    void SemanticsDeclModifiersVisitor::visitStructDecl(StructDecl* structDecl)
+    {
+        checkModifiers(structDecl);
+
+        // Replace any bitfield member with a property, do this here before
+        // name lookup to avoid the original var decl being referenced
+        for(auto& m : structDecl->members)
+        {
+            const auto bfm = m->findModifier<BitFieldModifier>();
+            if(!bfm)
+                continue;
+
+            auto property = m_astBuilder->create<PropertyDecl>();
+            property->modifiers = m->modifiers;
+            property->type = as<VarDecl>(m)->type;
+            property->loc = m->loc;
+            property->nameAndLoc = m->getNameAndLoc();
+            property->parentDecl = structDecl;
+            property->ownedScope = m_astBuilder->create<Scope>();
+            property->ownedScope->containerDecl = property;
+            property->ownedScope->parent = getScope(structDecl);
+            m = property;
+
+            const auto get = m_astBuilder->create<GetterDecl>();
+            get->ownedScope = m_astBuilder->create<Scope>();
+            get->ownedScope->containerDecl = get;
+            get->ownedScope->parent = getScope(property);
+            property->addMember(get);
+
+            const auto set = m_astBuilder->create<SetterDecl>();
+            addModifier(set, m_astBuilder->create<MutatingAttribute>());
+            set->ownedScope = m_astBuilder->create<Scope>();
+            set->ownedScope->containerDecl = set;
+            set->ownedScope->parent = getScope(property);
+            property->addMember(set);
+
+            structDecl->invalidateMemberDictionary();
+        }
+        structDecl->buildMemberDictionary();
     }
 
     void SemanticsDeclHeaderVisitor::checkDerivativeMemberAttribute(
@@ -8941,6 +8988,146 @@ namespace Slang
     {
         checkDerivativeOfAttributeImpl<PrimalSubstituteAttribute, PrimalSubstituteExpr>(
             this, funcDecl, attr, DeclAssociationKind::PrimalSubstituteFunc);
+    }
+
+    void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
+    {
+        int backingWidth = 0;
+        [[maybe_unused]]
+        int totalWidth = 0;
+        struct BitFieldInfo
+        {
+            int memberIndex;
+            int bitWidth;
+            Type* memberType;
+            BitFieldModifier* bitFieldModifier;
+        };
+        List<BitFieldInfo> groupInfo;
+
+        int memberIndex = 0;
+        int backing_nonce = 0;
+        const auto dispatchSomeBitPackedMembers = [&](){
+            SLANG_ASSERT(totalWidth <= backingWidth);
+            SLANG_ASSERT(backingWidth <= 64);
+
+            // We're going to insert a backing member to be referenced in
+            // all the bitfield properties
+            if(groupInfo.getCount())
+            {
+                const auto backingMemberBasicType
+                    = backingWidth <= 8 ? BaseType::UInt8
+                    : backingWidth <= 16 ? BaseType::UInt16
+                    : backingWidth <= 32 ? BaseType::UInt
+                    : BaseType::UInt64;
+                auto backingMember = m_astBuilder->create<VarDecl>();
+                backingMember->type.type = m_astBuilder->getBuiltinType(backingMemberBasicType);
+                backingMember->nameAndLoc.name = getName(String("$bit_field_backing_") + String(backing_nonce));
+                backing_nonce++;
+                backingMember->initExpr = nullptr;
+                backingMember->parentDecl = structDecl;
+                const auto backingMemberDeclRef = DeclRef<VarDecl>(backingMember->getDefaultDeclRef());
+
+                int bottomOfMember = 0;
+                for(const auto m : groupInfo)
+                {
+                    SLANG_ASSERT(bottomOfMember <= backingWidth);
+
+                    m.bitFieldModifier->backingDeclRef = backingMemberDeclRef;
+                    m.bitFieldModifier->offset = bottomOfMember;
+
+                    bottomOfMember += m.bitWidth;
+                }
+
+                const auto backingMemberIndex = groupInfo[0].memberIndex;
+                structDecl->members.insert(backingMemberIndex, backingMember);
+                structDecl->invalidateMemberDictionary();
+                ++memberIndex;
+            }
+            structDecl->buildMemberDictionary();
+
+            // Reset everything
+            backingWidth = 0;
+            totalWidth = 0;
+            groupInfo.clear();
+        };
+        for(; memberIndex < structDecl->members.getCount(); ++memberIndex)
+        {
+            const auto& m = structDecl->members[memberIndex];
+
+            // We can trivially skip any non-property decls
+            const auto v = as<PropertyDecl>(m);
+            if(!v)
+            {
+                // If this is a non-bitfield member then finish the current group
+                if(as<VarDecl>(m))
+                    dispatchSomeBitPackedMembers();
+                continue;
+            }
+
+            const auto bfm = m->findModifier<BitFieldModifier>();
+            // If there isn't a bit field modifier, then dispatch the
+            // current group and continue
+            if(!bfm)
+            {
+                dispatchSomeBitPackedMembers();
+                continue;
+            }
+
+            // Verify that this makes sense as a bitfield
+            const auto t = v->type.type->getCanonicalType();
+            SLANG_ASSERT(t);
+            const auto b = as<BasicExpressionType>(t);
+            if(!b)
+            {
+                getSink()->diagnose(v->loc, Diagnostics::bitFieldNonIntegral, t);
+                continue;
+            }
+            const auto baseType = b->getBaseType();
+            const bool isIntegerType = isIntegerBaseType(baseType);
+            if(!isIntegerType)
+            {
+                getSink()->diagnose(v->loc, Diagnostics::bitFieldNonIntegral, t);
+                continue;
+            }
+
+            // The bit width of this member, and the member type width
+            const auto thisFieldWidth = bfm->width;
+            const auto thisFieldTypeWidth = getTypeBitSize(b);
+            SLANG_ASSERT(thisFieldTypeWidth != 0);
+            if(thisFieldWidth > thisFieldTypeWidth)
+            {
+                getSink()->diagnose(
+                    v->loc,
+                    Diagnostics::bitFieldTooWide,
+                    thisFieldWidth,
+                    t,
+                    thisFieldTypeWidth
+                );
+                // Not much we can do with this field, just ignore it
+                continue;
+            }
+
+            // At this point we're sure that we have a bit field,
+            // update our bit packing state
+
+            // If there's a 0 width type, dispatch the current group
+            if(thisFieldWidth == 0)
+                dispatchSomeBitPackedMembers();
+
+            // If this member wouldn't fit into the current group, dispatch
+            // everything so far;
+            if(totalWidth + thisFieldWidth > std::max(thisFieldTypeWidth, backingWidth))
+                dispatchSomeBitPackedMembers();
+
+            // Add this member to the group,
+            // Grow the backing width if necessary
+            backingWidth = std::max(thisFieldTypeWidth, backingWidth);
+            // Grow the total width
+            totalWidth += int(thisFieldWidth);
+            groupInfo.add({memberIndex, int(thisFieldWidth), t, bfm});
+        }
+        // If the struct ended with a bitpacked member, then make sure we don't forget the last group
+        dispatchSomeBitPackedMembers();
     }
 
     void SemanticsDeclAttributesVisitor::visitFunctionDeclBase(FunctionDeclBase* decl)

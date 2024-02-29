@@ -1479,4 +1479,16 @@ class GLSLPatchModifier : public SimpleModifier
     SLANG_AST_CLASS(GLSLPatchModifier)
 };
 
+//
+class BitFieldModifier : public Modifier
+{
+    SLANG_ABSTRACT_AST_CLASS(BitFieldModifier)
+
+    IntegerLiteralValue width;
+
+    // Fields filled during semantic analysis
+    IntegerLiteralValue offset = 0;
+    DeclRef<VarDecl> backingDeclRef;
+};
+
 } // namespace Slang

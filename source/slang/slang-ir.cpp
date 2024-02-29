@@ -7285,6 +7285,19 @@ namespace Slang
         }
     }
 
+    IROp getIntTypeOpFromInfo(const IntInfo info)
+    {
+        switch(info.width)
+        {
+            case 8: return info.isSigned ? kIROp_Int8Type : kIROp_UInt8Type;
+            case 16: return info.isSigned ? kIROp_Int16Type : kIROp_UInt16Type;
+            case 32: return info.isSigned ? kIROp_IntType : kIROp_UIntType;
+            case 64: return info.isSigned ? kIROp_Int64Type : kIROp_UInt64Type;
+            default:
+                SLANG_UNEXPECTED("Unhandled info passed to getIntTypeOpFromInfo");
+        }
+    }
+
     FloatInfo getFloatingTypeInfo(const IRType* floatType)
     {
         switch(floatType->getOp())
@@ -7309,6 +7322,32 @@ namespace Slang
         default:
             return isIntegralType(t);
         }
+    }
+
+    IRStructField* findStructField(IRInst* type, IRStructKey* key)
+    {
+        if (auto irStructType = as<IRStructType>(type))
+        {
+            for (auto field : irStructType->getFields())
+            {
+                if (field->getKey() == key)
+                {
+                    return field;
+                }
+            }
+        }
+        else if (auto irSpecialize = as<IRSpecialize>(type))
+        {
+            if (auto irGeneric = as<IRGeneric>(irSpecialize->getBase()))
+            {
+                if (auto irGenericStructType = as<IRStructType>(findInnerMostGenericReturnVal(irGeneric)))
+                {
+                    return findStructField(irGenericStructType, key);
+                }
+            }
+        }
+
+        return nullptr;
     }
 
     void findAllInstsBreadthFirst(IRInst* inst, List<IRInst*>& outInsts)

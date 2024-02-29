@@ -2970,6 +2970,15 @@ namespace Slang
             semantic->name = parser->ReadToken(TokenType::Identifier);
             return semantic;
         }
+        else if (parser->LookAheadToken(TokenType::IntegerLiteral))
+        {
+            BitFieldModifier* bitWidthMod = parser->astBuilder->create<BitFieldModifier>();
+            parser->FillPosition(bitWidthMod);
+            const auto token = parser->tokenReader.advanceToken();
+            UnownedStringSlice suffix;
+            bitWidthMod->width = getIntegerLiteralValue(token, &suffix);
+            return bitWidthMod;
+        }
         else if (parser->LookAheadToken(TokenType::CompletionRequest))
         {
             HLSLSimpleSemantic* semantic = parser->astBuilder->create<HLSLSimpleSemantic>();
