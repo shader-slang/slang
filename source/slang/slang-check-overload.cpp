@@ -2113,6 +2113,14 @@ namespace Slang
     Expr* SemanticsExprVisitor::visitGenericAppExpr(GenericAppExpr* genericAppExpr)
     {
         // Start by checking the base expression and arguments.
+
+        if (this->m_outerGenericApp == nullptr)
+        {
+            OuterGenericAppInfo outerGenericApp {};
+            auto subContext = withOuterGenericApp(&outerGenericApp);
+            return dispatchExpr(genericAppExpr, subContext);
+        }
+
         auto& baseExpr = genericAppExpr->functionExpr;
         baseExpr = CheckTerm(baseExpr);
         auto& args = genericAppExpr->arguments;

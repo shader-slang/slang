@@ -839,12 +839,43 @@ namespace Slang
             OuterStmtInfo* next;
         };
 
+        struct OuterGenericAppInfo
+        {
+            // Currently, this struct is only used as a flag for the expression visitor
+            // to detect whether the expression is the generic parameter. So we don't need
+            // any actual info here.
+            OuterGenericAppInfo* next = nullptr;
+        };
+
+        struct OuterDeclInfo
+        {
+            // Currently, this struct is only used as a flag for the expression visitor
+            // to detect whether the expression is the static constant. So we don't need
+            // any actual info here.
+            OuterDeclInfo* next = nullptr;
+        };
+
+        OuterDeclInfo* m_outerDecl = nullptr;
         OuterStmtInfo* getOuterStmts() { return m_outerStmts; }
 
         SemanticsContext withOuterStmts(OuterStmtInfo* outerStmts)
         {
             SemanticsContext result(*this);
             result.m_outerStmts = outerStmts;
+            return result;
+        }
+
+        SemanticsContext withOuterGenericApp(OuterGenericAppInfo* outerGenericApp)
+        {
+            SemanticsContext result(*this);
+            result.m_outerGenericApp = outerGenericApp;
+            return result;
+        }
+
+        SemanticsContext withOuterDecl(OuterDeclInfo* m_outerDecl)
+        {
+            SemanticsContext result(*this);
+            result.m_outerDecl = m_outerDecl;
             return result;
         }
 
@@ -930,6 +961,8 @@ namespace Slang
 
             /// The linked list of lexically surrounding statements.
         OuterStmtInfo* m_outerStmts = nullptr;
+
+        OuterGenericAppInfo* m_outerGenericApp = nullptr;
 
             /// The type of a try clause (if any) enclosing current expr.
         TryClauseType m_enclosingTryClauseType = TryClauseType::None;

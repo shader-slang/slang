@@ -2376,6 +2376,13 @@ namespace Slang
         LogicOperatorShortCircuitExpr* newExpr = nullptr;
         isArgumentsChecked = false;
 
+        // If the logic expression is inside the generic parameter list, it cannot support short-circuit
+        // which will generate the ifelse branch.
+        if (m_outerGenericApp != nullptr || m_outerDecl != nullptr)
+        {
+            return nullptr;
+        }
+
         const ReflectClassInfo& classInfo = expr->functionExpr->getClassInfo();
         const ASTNodeType astType = ASTNodeType(classInfo.m_classId);
         if (ASTNodeType::VarExpr == astType)

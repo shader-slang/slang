@@ -310,6 +310,7 @@ namespace Slang
         void visitParamDecl(ParamDecl* paramDecl);
 
         void visitAggTypeDecl(AggTypeDecl* aggTypeDecl);
+
     };
 
     template<typename VisitorType>
@@ -1814,11 +1815,20 @@ namespace Slang
     {
         if (auto initExpr = varDecl->initExpr)
         {
-            // If the variable has an explicit initial-value expression,
-            // then we simply need to check that expression and coerce
-            // it to the type of the variable.
-            //
-            initExpr = CheckTerm(initExpr);
+            if (varDecl->hasModifier<HLSLStaticModifier>())
+            {
+                OuterDeclInfo outerDecl {};
+                auto subContex = withOuterDecl(&outerDecl);
+                initExpr = dispatchExpr(initExpr, subContex);
+            }
+            else
+            {
+                // If the variable has an explicit initial-value expression,
+                // then we simply need to check that expression and coerce
+                // it to the type of the variable.
+                //
+                initExpr = CheckTerm(initExpr);
+            }
             initExpr = coerce(CoercionSite::Initializer, varDecl->type.Ptr(), initExpr);
             varDecl->initExpr = initExpr;
 
