@@ -24,7 +24,7 @@ jobs:
         fetch-depth: '0'
     - uses: actions/checkout@v4
       with:
-        repository: 'https://github.com/shader-slang/VK-GL-CTS'
+        repository: 'shader-slang/VK-GL-CTS'
         submodules: 'true'
         fetch-depth: '0'
     - name: setup-msbuild
