@@ -55,15 +55,7 @@ namespace gfx_test
         SLANG_RETURN_ON_FAIL(result);
 
         ComPtr<slang::IComponentType> linkedProgram;
-        slang::CompilerOptionEntry optionEntry[2];
-        optionEntry[0].name = slang::CompilerOptionName::EmitSpirvDirectly;
-        optionEntry[0].value.kind = slang::CompilerOptionValueKind::Int;
-        optionEntry[0].value.intValue0 = 1;
-        result = composedProgram->linkWithOptions(
-            linkedProgram.writeRef(),
-            1,
-            optionEntry,
-            diagnosticsBlob.writeRef());
+        result = composedProgram->link(linkedProgram.writeRef(), diagnosticsBlob.writeRef());
         diagnoseIfNeeded(diagnosticsBlob);
         SLANG_RETURN_ON_FAIL(result);
 
@@ -288,16 +280,19 @@ namespace gfx_test
         extDesc.rootParameterShaderAttributeName = "root";
         
         gfx::SlangSessionExtendedDesc slangExtDesc = {};
+        Slang::List<slang::CompilerOptionEntry> entries;
+        slang::CompilerOptionEntry emitSpirvDirectlyEntry;
+        emitSpirvDirectlyEntry.name = slang::CompilerOptionName::EmitSpirvDirectly;
+        emitSpirvDirectlyEntry.value.intValue0 = 1;
+        entries.add(emitSpirvDirectlyEntry);
 #if GFX_ENABLE_SPIRV_DEBUG
         slang::CompilerOptionEntry debugLevelCompilerOptionEntry;
         debugLevelCompilerOptionEntry.name = slang::CompilerOptionName::DebugInformation;
         debugLevelCompilerOptionEntry.value.intValue0 = SLANG_DEBUG_INFO_LEVEL_STANDARD;
-
-        slang::CompilerOptionEntry entries[] = { debugLevelCompilerOptionEntry };
-
-        slangExtDesc.compilerOptionEntries = entries;
-        slangExtDesc.compilerOptionEntryCount = sizeof(entries) / sizeof(slang::CompilerOptionEntry);
+        entries.add(debugLevelCompilerOptionEntry);
 #endif
+        slangExtDesc.compilerOptionEntries = entries.getBuffer();
+        slangExtDesc.compilerOptionEntryCount = (uint32_t)entries.getCount();
 
         deviceDesc.extendedDescCount = 2;
         void* extDescPtrs[2] = { &extDesc, &slangExtDesc };

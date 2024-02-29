@@ -17,7 +17,7 @@
 #pragma warning(pop)
 #endif
 
-#define GFX_ENABLE_RENDERDOC_INTEGRATION 1
+#define GFX_ENABLE_RENDERDOC_INTEGRATION 0
 
 #if GFX_ENABLE_RENDERDOC_INTEGRATION
 #    include "external/renderdoc_app.h"
