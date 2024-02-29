@@ -1,10 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK_GLSL): -allow-glsl -stage raygeneration -entry main -target glsl
 //TEST:SIMPLE(filecheck=CHECK_SPV): -allow-glsl -emit-spirv-directly -stage raygeneration -entry main -target spirv-assembly
 
-// note about test: there is currently no framework to test multiple shaders compiling together
-// as such some of the shader logic calls functions without actually useful data checking 
-// (since the data & result would be based off of the auxillary shaders like ray-miss)
-
 layout(binding = 0) uniform accelerationStructureEXT as;
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
@@ -19,6 +15,9 @@ layout(location = 2) rayPayloadEXT vec4 payload;
 // CHECK_GLSL-DAG: hitObjectAttributeNV
 // CHECK_SPV-DAG: HitObjectAttributeNV
 layout(location = 2) hitObjectAttributeNV vec4 attrMain;
+// CHECK_GLSL-DAG: callableDataEXT
+// CHECK_SPV-DAG: CallableDataNV
+layout(location = 0) callableDataEXT vec4 outcall;
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 bool equals(matrix<T, N, M> lhs, matrix<T, N, M> rhs)
@@ -40,13 +39,11 @@ bool equals(matrix<T, N, M> lhs, matrix<T, N, M> rhs)
     return true;
 }
 
-
 bool testHitObjectTraceRay() {
     hitObjectNV hit;
 // CHECK_GLSL-DAG: hitObjectTraceRayNV
 // CHECK_SPV-DAG: OpHitObjectTraceRayNV
     hitObjectTraceRayNV(hit, as, gl_RayFlagsNoneEXT, 0xff, 0, 0, 0, vec3(0.1, 0.1, 0.0), 0.01f, vec3(0, 0, 1), 1e4f, 2);
-
     return true
 // CHECK_GLSL-DAG: hitObjectIsHitNV
 // CHECK_SPV-DAG: OpHitObjectIsHitNV
@@ -132,7 +129,6 @@ bool testHitObjectTraceRayLaunchSubShaders() {
 // CHECK_GLSL-DAG: hitObjectTraceRayNV
 // CHECK_SPV-DAG: OpHitObjectTraceRayNV
     hitObjectTraceRayNV(hit, as, gl_RayFlagsNoneEXT, 0xff, 0, 0, 0, vec3(0.1, 0.1, 0.0), 0.01f, vec3(0, 0, 1), 1e4f, 2);
-
 // CHECK_GLSL-DAG: hitObjectExecuteShaderNV
 // CHECK_SPV-DAG: OpHitObjectExecuteShaderNV
     hitObjectExecuteShaderNV(hit, 2);
@@ -148,7 +144,6 @@ bool testHitObjectTraceRayMotion() {
 // CHECK_GLSL-DAG: hitObjectTraceRayMotionNV
 // CHECK_SPV-DAG: OpHitObjectTraceRayMotionNV
     hitObjectTraceRayMotionNV(hit, as, gl_RayFlagsNoneEXT, 0xff, 0, 0, 0, vec3(0.1, 0.1, 0.0), 0.01f, vec3(0, 0, 1), 1e4f, 0.0f, 2);
-
     return true
 // CHECK_GLSL-DAG: hitObjectIsHitNV
 // CHECK_SPV-DAG: OpHitObjectIsHitNV
@@ -159,12 +154,21 @@ bool testHitObjectTraceRayMotion() {
         ;
 }
 
+bool testTraceRayFunctions() {
+// CHECK_GLSL-DAG: traceRayEXT
+// CHECK_SPV-DAG: OpTraceRayKHR
+    traceRayEXT(as, 0, 0, 0, 0, 0, vec3(0), 0, vec3(0), 0, 2);
+    return true
+        ;
+}
+
 bool testTraceRayCalls() {
     return true
         && testHitObjectTraceRay()
         && testHitObjectTraceRayWithAuxInfo()
         && testHitObjectTraceRayLaunchSubShaders()
         && testHitObjectTraceRayMotion()
+        && testTraceRayFunctions()
         ;
 }
 
@@ -173,7 +177,6 @@ bool testHitObjectRecord() {
 // CHECK_GLSL-DAG: hitObjectRecordHitNV
 // CHECK_SPV-DAG: OpHitObjectRecordHitNV
     hitObjectRecordHitNV(hit, as, 0, 0, 0, gl_HitKindFrontFacingTriangleEXT, 0, 0, vec3(0.1, 0.1, 0.0), 0.01f, vec3(0, 0, 1), 1e4f, 2);
-
     return true
 // CHECK_GLSL-DAG: hitObjectIsHitNV
 // CHECK_SPV-DAG: OpHitObjectIsHitNV
@@ -186,7 +189,6 @@ bool testHitObjectRecordIndex() {
 // CHECK_GLSL-DAG: hitObjectRecordHitWithIndexNV
 // CHECK_SPV-DAG: OpHitObjectRecordHitWithIndexNV
     hitObjectRecordHitWithIndexNV(hit, as, 0, 0, 0, gl_HitKindFrontFacingTriangleEXT, 0, vec3(0.1, 0.1, 0.0), 0.01f, vec3(0, 0, 1), 1e4f, 2);
-
     return true
 // CHECK_GLSL-DAG: hitObjectIsHitNV
 // CHECK_SPV-DAG: OpHitObjectIsHitNV
@@ -199,7 +201,6 @@ bool testHitObjectRecordMotion() {
 // CHECK_GLSL-DAG: hitObjectRecordHitMotionNV
 // CHECK_SPV-DAG: OpHitObjectRecordHitMotionNV
     hitObjectRecordHitMotionNV(hit, as, 0, 0, 0, gl_HitKindFrontFacingTriangleEXT, 0, 0, vec3(0.1, 0.1, 0.0), 0.01f, vec3(0, 0, 1), 1e4f, 0.0f, 2);
-
     return true
 // CHECK_GLSL-DAG: hitObjectIsHitNV
 // CHECK_SPV-DAG: OpHitObjectIsHitNV
@@ -212,7 +213,6 @@ bool testHitObjectRecordIndexMotion() {
 // CHECK_GLSL-DAG: hitObjectRecordHitWithIndexMotionNV
 // CHECK_SPV-DAG: OpHitObjectRecordHitWithIndexMotionNV
     hitObjectRecordHitWithIndexMotionNV(hit, as, 0, 0, 0, gl_HitKindFrontFacingTriangleEXT, 0, vec3(0.1, 0.1, 0.0), 0.01f, vec3(0, 0, 1), 1e4f, 0.0f, 2);
-
     return true
 // CHECK_GLSL-DAG: hitObjectIsHitNV
 // CHECK_SPV-DAG: OpHitObjectIsHitNV
@@ -234,7 +234,6 @@ bool testHitObjectRecordMiss() {
 // CHECK_GLSL-DAG: hitObjectRecordMissNV
 // CHECK_SPV-DAG: OpHitObjectRecordMissNV
     hitObjectRecordMissNV(hit, 0, vec3(0.1, 0.1, 0.0), 0.01f, vec3(0, 0, 1), 1e4f);
-
     return true
 // CHECK_GLSL-DAG: hitObjectIsMissNV
 // CHECK_SPV-DAG: OpHitObjectIsMissNV
@@ -247,7 +246,6 @@ bool testHitObjectRecordMissMotion() {
 // CHECK_GLSL-DAG: hitObjectRecordMissMotionNV
 // CHECK_SPV-DAG: OpHitObjectRecordMissMotionNV
     hitObjectRecordMissMotionNV(hit, 0, vec3(0.1, 0.1, 0.0), 0.01f, vec3(0, 0, 1), 1e4f, 0.0f);
-
     return true
 // CHECK_GLSL-DAG: hitObjectIsMissNV
 // CHECK_SPV-DAG: OpHitObjectIsMissNV
@@ -267,7 +265,6 @@ bool testHitObjectRecordEmpty() {
 // CHECK_GLSL-DAG: hitObjectRecordEmptyNV
 // CHECK_SPV-DAG: OpHitObjectRecordEmptyNV
     hitObjectRecordEmptyNV(hit);
-
     return true
 // CHECK_GLSL-DAG: hitObjectIsEmptyNV
 // CHECK_SPV-DAG: OpHitObjectIsEmptyNV
@@ -287,21 +284,50 @@ bool testTraceRayMotion() {
     traceRayMotionNV(as, gl_RayFlagsNoneEXT, 0xff, 0, 0, 0, vec3(0.1, 0.1, 0.0), 0.01f, vec3(0, 0, 1), 1e4f, 0.0f, 2);
     attrMain = vec4(1); //ensure traceRayMotionNV does not get optimized out 
     return true &&
-        attrMain == vec4(1);
-        
+        attrMain == vec4(1)
+        ;       
+}
+
+bool testPayloadReadWrite() {
+    payload = vec4(2);
+    vec4 read = payload;
+    return true
+        && read != vec4(0)
+        ;
+}
+
+bool testAttributeReadWrite() {
+    attrMain = vec4(2);
+    vec4 read = attrMain;
+    return true
+        && read != vec4(0)
+        ;
+}
+
+bool testCallableReadWrite() {
+    outcall = vec4(2);
+    vec4 read = outcall;
+    return true
+        && read != vec4(0)
+        ;
+}
+
+bool testReadWriteOfObjects(){
+    return true
+        && testPayloadReadWrite()
+        && testAttributeReadWrite()
+        && testCallableReadWrite();
+        ;       
 }
 
 void main()
 {
-    //only checking compile'ing currently, therefore just ensure the code will not optimize out
     outputBuffer.data[0] = true
         && testTraceRayCalls()
         && testRecordHitCalls()
         && testRecordMissCalls()
         && testRecordEmptyCalls()
-        && testTraceRayMotion();
-        ;
-
-    
+        && testTraceRayMotion()
+        && testReadWriteOfObjects();    
     //BUF: 1
 }

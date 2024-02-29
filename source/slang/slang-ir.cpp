@@ -54,8 +54,10 @@ namespace Slang
             case kIROp_TriangleInputPrimitiveTypeDecoration:
             case kIROp_UnsafeForceInlineEarlyDecoration:
             case kIROp_VulkanCallablePayloadDecoration:
+            case kIROp_VulkanCallablePayloadInDecoration:
             case kIROp_VulkanHitAttributesDecoration:
             case kIROp_VulkanRayPayloadDecoration:
+            case kIROp_VulkanRayPayloadInDecoration:
             case kIROp_VulkanHitObjectAttributesDecoration:
             {
                 return true;
@@ -4301,16 +4303,28 @@ namespace Slang
                 {
                     storeLocationToRayPayloadVariable(getIntVal(rayDec->getOperand(0)), i);
                 }
+                else if(auto rayDec = i->findDecoration<IRVulkanRayPayloadInDecoration>())
+                {
+                    storeLocationToRayPayloadVariable(getIntVal(rayDec->getOperand(0)), i);
+                }
                 else if(auto rayDec = i->findDecoration<IRVulkanHitObjectAttributesDecoration>())
                 {
                     storeLocationToRayAttributeVariable(getIntVal(rayDec->getOperand(0)), i);
+                }
+                else if(auto rayDec = i->findDecoration<IRVulkanCallablePayloadDecoration>())
+                {
+                    storeLocationToRayCallableVariable(getIntVal(rayDec->getOperand(0)), i);
+                }
+                else if(auto rayDec = i->findDecoration<IRVulkanCallablePayloadInDecoration>())
+                {
+                    storeLocationToRayCallableVariable(getIntVal(rayDec->getOperand(0)), i);
                 }
             }
 
         }
     }
 
-    IRInst* IRModule::getRayVariableFromLocation(IRInst* payloadVariable, Slang::IROp rayVariableType, DiagnosticSink* sink)
+    IRInst* IRModule::getRayVariableFromLocation(IRInst* payloadVariable, Slang::IROp op, DiagnosticSink* sink)
     {
         IRBuilder builder(payloadVariable);
         IRInst** varLayoutPointsTo;
@@ -4318,17 +4332,17 @@ namespace Slang
         IRIntLit* intLit = as<IRIntLit>(payloadVariable);
         if(intLit){
             intLitValue = intLit->getValue();
-            if (rayVariableType == kIROp_GetRayPayloadVariableFromLocation)
+            if (kIROp_SPIRVAsmOperandRayPayloadFromLocation == op)
             {
-                varLayoutPointsTo = this->getRayPayloadVariableFromLocation(
-                        intLitValue
-                    );
+                varLayoutPointsTo = this->getRayPayloadVariableFromLocation(intLitValue);
             }
-            else if (rayVariableType == kIROp_GetRayAttributeVariableFromLocation)
+            else if (kIROp_SPIRVAsmOperandRayAttributeFromLocation == op)
             {
-                varLayoutPointsTo = this->getRayAttributeVariableFromLocation(
-                        intLitValue
-                    );
+                varLayoutPointsTo = this->getRayAttributeVariableFromLocation(intLitValue);
+            }
+            else if (kIROp_SPIRVAsmOperandRayCallableFromLocation == op)
+            {
+                varLayoutPointsTo = this->getRayCallableVariableFromLocation(intLitValue);
             }
             else
             {
@@ -4381,7 +4395,20 @@ namespace Slang
     {
         return m_RayLocationToAttributes.tryGetValue(location);
     }
+    void IRModule::storeLocationToRayCallableVariable(int location, IRInst* inst)
+    {
+        if (m_RayLocationToCallables.tryGetValue(location) != nullptr) 
+        {
+            m_RayLocationToCallables.remove(location);
+        }
+        m_RayLocationToCallables.add(location, inst);
+    }
+    IRInst** IRModule::getRayCallableVariableFromLocation(int location)
+    {
+        return m_RayLocationToCallables.tryGetValue(location);
+    }
     
+
     IRInst* IRBuilder::addDifferentiableTypeDictionaryDecoration(IRInst* target)
     {
         return addDecoration(target, kIROp_DifferentiableTypeDictionaryDecoration);
@@ -5912,6 +5939,18 @@ namespace Slang
         addInst(i);
         return i;
     }
+    IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandRayCallableFromLocation(IRInst* inst)
+    {
+        SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
+        const auto i = createInst<IRSPIRVAsmOperand>(
+            this,
+            kIROp_SPIRVAsmOperandRayCallableFromLocation,
+            inst->getFullType(),
+            inst
+        );
+        addInst(i);
+        return i;
+    }
     IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandId(IRInst* inst)
     {
         SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
@@ -6941,6 +6980,11 @@ namespace Slang
             return;
         case kIROp_SPIRVAsmOperandRayAttributeFromLocation:
             dump(context, "__rayAttributeFromLocation(");
+            dumpInstExpr(context, inst->getOperand(0));
+            dump(context, ")");
+            return;
+        case kIROp_SPIRVAsmOperandRayCallableFromLocation:
+            dump(context, "__rayCallableFromLocation(");
             dumpInstExpr(context, inst->getOperand(0));
             dump(context, ")");
             return;

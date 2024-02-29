@@ -4218,7 +4218,8 @@ namespace Slang
                         || operand.flavor == SPIRVAsmOperand::ImageType
                         || operand.flavor == SPIRVAsmOperand::SampledImageType
                         || operand.flavor == SPIRVAsmOperand::RayPayloadFromLocation
-                        || operand.flavor == SPIRVAsmOperand::RayAttributeFromLocation)
+                        || operand.flavor == SPIRVAsmOperand::RayAttributeFromLocation
+                        || operand.flavor == SPIRVAsmOperand::RayCallableFromLocation)
                     {
                         // This is a $expr operand, check the expr
                         operand.expr = dispatch(operand.expr);

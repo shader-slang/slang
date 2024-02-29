@@ -4386,18 +4386,7 @@ namespace Slang
         else
         {
             _addModifiers(declToModify, modifiers);
-            if (modifiers.hasModifier<VulkanRayPayloadAttribute>()) 
-            {
-                parser->currentModule->module->storeLocationToRayPayloadType(
-                    ((VulkanRayPayloadAttribute*)modifiers.getModifiersOfType<VulkanRayPayloadAttribute>().begin().current)->location,
-                    as<VarDecl>(declToModify));
-            }
-            if (modifiers.hasModifier<VulkanHitObjectAttributesAttribute>()) 
-            {
-                parser->currentModule->module->storeLocationToRayAttributeType(
-                    ((VulkanHitObjectAttributesAttribute*)modifiers.getModifiersOfType<VulkanHitObjectAttributesAttribute>().begin().current)->location,
-                    as<VarDecl>(declToModify));
-            }        }
+        }
 
         if (containerDecl)
         {
@@ -7032,9 +7021,16 @@ namespace Slang
             return operand;
         }
         else if (AdvanceIf(parser, "__rayAttributeFromLocation")) {
-            // works simmilar to __rayPayloadFromLocation
+            // works similar to __rayPayloadFromLocation
             parser->ReadToken(TokenType::LParent);
             auto operand = SPIRVAsmOperand{ SPIRVAsmOperand::RayAttributeFromLocation, Token{}, parseAtomicExpr(parser) };
+            parser->ReadToken(TokenType::RParent);
+            return operand;
+        }
+        else if (AdvanceIf(parser, "__rayCallableFromLocation")) {
+            // works similar to __rayPayloadFromLocation
+            parser->ReadToken(TokenType::LParent);
+            auto operand = SPIRVAsmOperand{ SPIRVAsmOperand::RayCallableFromLocation, Token{}, parseAtomicExpr(parser) };
             parser->ReadToken(TokenType::RParent);
             return operand;
         }
@@ -7678,7 +7674,7 @@ namespace Slang
         parser->sink->diagnose(token, Diagnostics::invalidCUDASMVersion);
         return nullptr;
     }
-    
+
     static NodeBase* parseLayoutModifier(Parser* parser, void* /*userData*/)
     {
         ModifierListBuilder listBuilder;
@@ -7796,25 +7792,41 @@ namespace Slang
             parser->ReadToken(TokenType::Comma);
         }
 
-        if (parser->LookAheadToken("rayPayloadEXT") || parser->LookAheadToken("rayPayloadNV")) 
+        if (AdvanceIf(parser, "rayPayloadEXT") 
+            || AdvanceIf(parser, "rayPayloadNV")) 
         {
-            parser->ReadToken();
             auto modifier = parser->astBuilder->create<VulkanRayPayloadAttribute>();
             modifier->location = getIntegerLiteralValue(listBuilder.find<GLSLLayoutModifier>()->valToken);
             listBuilder.add(modifier);
         }
-        else if (parser->LookAheadToken("rayPayloadInEXT") || parser->LookAheadToken("rayPayloadInNV")) 
+        else if (AdvanceIf(parser, "rayPayloadInEXT") 
+            || AdvanceIf(parser, "rayPayloadInNV")) 
         {
-            parser->ReadToken();
-            auto modifier = parser->astBuilder->create<VulkanRayPayloadAttribute>();
+            auto modifier = parser->astBuilder->create<VulkanRayPayloadInAttribute>();
             modifier->location = getIntegerLiteralValue(listBuilder.find<GLSLLayoutModifier>()->valToken);
             listBuilder.add(modifier);
         }
-        else if (parser->LookAheadToken("hitObjectAttributeNV")) 
+        else if (AdvanceIf(parser, "hitObjectAttributeNV")) 
         {
-            parser->ReadToken();
             auto modifier = parser->astBuilder->create<VulkanHitObjectAttributesAttribute>();
             modifier->location = getIntegerLiteralValue(listBuilder.find<GLSLLayoutModifier>()->valToken);
+            listBuilder.add(modifier);
+        }
+        else if (AdvanceIf(parser, "callableDataEXT"))
+        {
+            auto modifier = parser->astBuilder->create<VulkanCallablePayloadAttribute>();
+            modifier->location = getIntegerLiteralValue(listBuilder.find<GLSLLayoutModifier>()->valToken);
+            listBuilder.add(modifier);
+        }
+        else if (AdvanceIf(parser, "callableDataInEXT"))
+        {
+            auto modifier = parser->astBuilder->create<VulkanCallablePayloadInAttribute>();
+            modifier->location = getIntegerLiteralValue(listBuilder.find<GLSLLayoutModifier>()->valToken);
+            listBuilder.add(modifier);
+        }
+        else if (AdvanceIf(parser, "shaderRecordEXT"))
+        {
+            auto modifier = parser->astBuilder->create<ShaderRecordAttribute>();
             listBuilder.add(modifier);
         }
 
@@ -7826,6 +7838,12 @@ namespace Slang
         listBuilder.add(parser->astBuilder->create<GLSLLayoutModifierGroupEnd>());
 
         return listBuilder.getFirst();
+    }
+
+    static NodeBase* parseHitAttributeEXTModifier(Parser* parser, void* /*userData*/)
+    {
+        VulkanHitAttributesAttribute* modifier = parser->astBuilder->create<VulkanHitAttributesAttribute>();
+        return modifier;
     }
 
     static NodeBase* parseBuiltinTypeModifier(Parser* parser, void* /*userData*/)
@@ -8055,7 +8073,7 @@ namespace Slang
         // or expect more tokens after the initial keyword.
 
         _makeParseModifier("layout",                parseLayoutModifier),
-
+        _makeParseModifier("hitAttributeEXT",       parseHitAttributeEXTModifier),
         _makeParseModifier("__intrinsic_op",        parseIntrinsicOpModifier),
         _makeParseModifier("__target_intrinsic",    parseTargetIntrinsicModifier),
         _makeParseModifier("__specialized_for_target",    parseSpecializedForTargetModifier),

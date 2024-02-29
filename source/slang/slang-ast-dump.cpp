@@ -668,6 +668,9 @@ struct ASTDumpContext
         case SPIRVAsmOperand::RayAttributeFromLocation:
             m_writer->emit("__rayAttributeFromLocation");
             break;
+        case SPIRVAsmOperand::RayCallableFromLocation:
+            m_writer->emit("__rayCallableFromLocation");
+            break;
         default:
             SLANG_UNREACHABLE("Unhandled case in ast dump for SPIRVAsmOperand");
         }

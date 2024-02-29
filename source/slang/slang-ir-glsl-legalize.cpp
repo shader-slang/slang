@@ -2714,12 +2714,14 @@ void assignRayPayloadHitObjectAttributeLocations(IRModule* module)
             switch (decor->getOp())
             {
             case kIROp_VulkanRayPayloadDecoration:
+            case kIROp_VulkanRayPayloadInDecoration:
                 builder.setInsertBefore(inst);
                 location = builder.getIntValue(builder.getIntType(), rayPayloadCounter);
                 decor->setOperand(0, location);
                 rayPayloadCounter++;
                 goto end;
             case kIROp_VulkanCallablePayloadDecoration:
+            case kIROp_VulkanCallablePayloadInDecoration:
                 builder.setInsertBefore(inst);
                 location = builder.getIntValue(builder.getIntType(), callablePayloadCounter);
                 decor->setOperand(0, location);

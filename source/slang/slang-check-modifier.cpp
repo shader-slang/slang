@@ -688,37 +688,29 @@ namespace Slang
         {
             SLANG_ASSERT(attr->args.getCount() == 1);
             auto val = checkConstantIntVal(attr->args[0]);
-
             if (!val) return false;
-
             rayPayloadAttr->location = (int32_t)val->getValue();
         }
-        else if (auto rayParamToSetGenericAttr = as<SetGenericToRayTracingPayloadWithParamAttribute>(attr))
+        else if (auto rayPayloadInAttr = as<VulkanRayPayloadInAttribute>(attr))
         {
             SLANG_ASSERT(attr->args.getCount() == 1);
             auto val = checkConstantIntVal(attr->args[0]);
-
             if (!val) return false;
-
-            rayParamToSetGenericAttr->paramToFetchGenericTypeFrom = (int32_t)val->getValue();
-        }
-        else if (auto rayParamToSetGenericAttr = as<SetGenericToRayTracingAttributeWithParamAttribute>(attr))
-        {
-            SLANG_ASSERT(attr->args.getCount() == 1);
-            auto val = checkConstantIntVal(attr->args[0]);
-
-            if (!val) return false;
-
-            rayParamToSetGenericAttr->paramToFetchGenericTypeFrom = (int32_t)val->getValue();
+            rayPayloadInAttr->location = (int32_t)val->getValue();
         }
         else if (auto callablePayloadAttr = as<VulkanCallablePayloadAttribute>(attr))
         {
             SLANG_ASSERT(attr->args.getCount() == 1);
             auto val = checkConstantIntVal(attr->args[0]);
-
             if (!val) return false;
-
             callablePayloadAttr->location = (int32_t)val->getValue();
+        }
+        else if (auto callablePayloadInAttr = as<VulkanCallablePayloadInAttribute>(attr))
+        {
+            SLANG_ASSERT(attr->args.getCount() == 1);
+            auto val = checkConstantIntVal(attr->args[0]);
+            if (!val) return false;
+            callablePayloadInAttr->location = (int32_t)val->getValue();
         }
         else if (auto hitObjectAttributesAttr = as<VulkanHitObjectAttributesAttribute>(attr))
         {

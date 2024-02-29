@@ -1,4 +1,3 @@
-// non rigourous simple test since compute can complete a test runtime data (which would be wrong if the functions did not emit) 
 //TEST:SIMPLE(filecheck=CHECK_GLSL): -allow-glsl -stage compute -entry computeMain -target glsl
 //TEST:SIMPLE(filecheck=CHECK_SPV): -allow-glsl -emit-spirv-directly -stage compute -entry computeMain -target spirv-assembly
 
@@ -102,8 +101,6 @@ void computeMain()
         && testProceedRayAuxInfo()
         && testRayTraceGenerate()
         ;
-
-
     // BUF: 1
 }
 

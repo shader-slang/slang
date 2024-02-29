@@ -774,8 +774,14 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             case kIROp_VulkanRayPayloadDecoration:
                 storageClass = SpvStorageClassRayPayloadKHR;
                 break;
+            case kIROp_VulkanRayPayloadInDecoration:
+                storageClass = SpvStorageClassIncomingRayPayloadKHR;
+                break;
             case kIROp_VulkanCallablePayloadDecoration:
                 storageClass = SpvStorageClassCallableDataKHR;
+                break;
+            case kIROp_VulkanCallablePayloadInDecoration:
+                storageClass = SpvStorageClassIncomingCallableDataKHR;
                 break;
             case kIROp_VulkanHitObjectAttributesDecoration:
                 storageClass = SpvStorageClassHitObjectAttributeNV;
@@ -1764,19 +1770,6 @@ void buildEntryPointReferenceGraph(SPIRVEmitSharedContext* context, IRModule* mo
                 break;
             }
             
-            // since glsl late evaluates raytracing objects, we need to assume they 
-            // will all be in use 
-            if(context->m_targetRequest->getLinkage()->getAllowGLSLInput()){
-                for(auto i : module->m_RayLocationToPayloads)
-                {
-                    addToWorkList({ entryPoint, i.second });
-                }
-                for(auto i : module->m_RayLocationToAttributes)
-                {
-                    addToWorkList({ entryPoint, i.second });
-                }
-            }
-
             for (UInt i = 0; i < inst->getOperandCount(); i++)
             {
                 auto operand = inst->getOperand(i);

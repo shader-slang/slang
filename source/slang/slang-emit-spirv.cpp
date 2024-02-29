@@ -2356,14 +2356,6 @@ struct SPIRVEmitContext
                 registerInst(inst, inner);
                 return inner;
             }
-        case kIROp_GetRayPayloadVariableFromLocation: // fallthrough
-        case kIROp_GetRayAttributeVariableFromLocation:
-            {
-                IRInst* variableAtLocation = this->m_irModule->getRayVariableFromLocation(inst->getOperand(0), inst->getOp(), m_sink);
-                auto inner = ensureInst(variableAtLocation);
-                registerInst(inst, inner);
-                return inner;
-            }
         case kIROp_Return:
             if (as<IRReturn>(inst)->getVal()->getOp() == kIROp_VoidLit)
                 return emitOpReturn(parent, inst);
@@ -2962,7 +2954,11 @@ struct SPIRVEmitContext
             }
             break;
 
+        case kIROp_VulkanHitAttributesDecoration:
         case kIROp_VulkanCallablePayloadDecoration:
+        case kIROp_VulkanCallablePayloadInDecoration:
+            ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_ray_tracing"));
+            requireSPIRVCapability(SpvCapabilityRayTracingKHR);
             goto rayExtensionAddition;
         case kIROp_VulkanHitObjectAttributesDecoration:
             // needed since GLSL will not set optypes accordingly, but will keep the decoration 
@@ -2970,11 +2966,12 @@ struct SPIRVEmitContext
             requireSPIRVCapability(SpvCapabilityShaderInvocationReorderNV);
             goto rayExtensionAddition;
         case kIROp_VulkanRayPayloadDecoration:
+        case kIROp_VulkanRayPayloadInDecoration:
             // needed since GLSL will not set optypes accordingly, but will keep the decoration 
             ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_ray_query"));
             requireSPIRVCapability(SpvCapabilityRayQueryKHR);
             goto rayExtensionAddition;
-rayExtensionAddition:
+rayExtensionAddition:;
             emitOpDecorateLocation(getSection(SpvLogicalSectionID::Annotations),
                 decoration,
                 dstID,
@@ -4804,14 +4801,21 @@ rayExtensionAddition:
                 case kIROp_SPIRVAsmOperandRayPayloadFromLocation:
                 {
                     IRInst* opValue = operand->getValue();
-                    IRInst* globalVar = this->m_irModule->getRayVariableFromLocation(opValue, kIROp_GetRayPayloadVariableFromLocation, m_sink);
+                    IRInst* globalVar = this->m_irModule->getRayVariableFromLocation(opValue, kIROp_SPIRVAsmOperandRayPayloadFromLocation, m_sink);
                     emitOperand(ensureInst(globalVar));
                     break;
                 }
                 case kIROp_SPIRVAsmOperandRayAttributeFromLocation:
                 {
                     IRInst* opValue = operand->getValue();
-                    IRInst* globalVar = this->m_irModule->getRayVariableFromLocation(opValue, kIROp_GetRayAttributeVariableFromLocation, m_sink);
+                    IRInst* globalVar = this->m_irModule->getRayVariableFromLocation(opValue, kIROp_SPIRVAsmOperandRayAttributeFromLocation, m_sink);
+                    emitOperand(ensureInst(globalVar));
+                    break;
+                }
+                case kIROp_SPIRVAsmOperandRayCallableFromLocation:
+                {
+                    IRInst* opValue = operand->getValue();
+                    IRInst* globalVar = this->m_irModule->getRayVariableFromLocation(opValue, kIROp_SPIRVAsmOperandRayCallableFromLocation, m_sink);
                     emitOperand(ensureInst(globalVar));
                     break;
                 }
@@ -5102,6 +5106,19 @@ rayExtensionAddition:
     }
 };
 
+void ifGLSLEnsureRayTracingGlobalsEmit(IRModule* module, Slang::TargetRequest* targetRequest, Slang::SPIRVEmitContext* context) {
+    //ensure if glsl all raytracing layout objects are emitted; I assume we should not optimize these out
+    if (targetRequest->getLinkage()->getAllowGLSLInput())
+    {
+        for (auto i : module->m_RayLocationToPayloads)
+            context->ensureInst(i.second);
+        for (auto i : module->m_RayLocationToAttributes)
+            context->ensureInst(i.second);
+        for (auto i : module->m_RayLocationToCallables)
+            context->ensureInst(i.second);
+    }
+}
+
 SlangResult emitSPIRVFromIR(
     CodeGenContext*         codeGenContext,
     IRModule*               irModule,
@@ -5129,7 +5146,10 @@ SlangResult emitSPIRVFromIR(
 
     irModule->trySearchForAndFillAllRayVariables();
     legalizeIRForSPIRV(&context, irModule, irEntryPoints, codeGenContext);
+   
 
+    ifGLSLEnsureRayTracingGlobalsEmit(irModule, targetRequest, &context);
+   
 #if 0
     {
         DiagnosticSinkWriter writer(codeGenContext->getSink());

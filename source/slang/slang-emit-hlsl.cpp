@@ -689,15 +689,6 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             // is already handled by the base `CLikeSourceEmitter`
             return false;
         }
-        case kIROp_GetRayPayloadVariableFromLocation:
-        case kIROp_GetRayAttributeVariableFromLocation:
-        {
-            IRInst* variableAtLocation = this->m_irModule->getRayVariableFromLocation(inst->getOperand(0), inst->getOp(), getSink());
-            m_writer->emit("(");
-            m_writer->emit(getName(variableAtLocation));
-            m_writer->emit(")");
-            return true;
-        }
         break;
 
         default: break;

@@ -1534,7 +1534,11 @@ LinkedIR linkIR(
             {
                 if (0
                     || inst->findDecoration<IRVulkanRayPayloadDecoration>()
+                    || inst->findDecoration<IRVulkanRayPayloadInDecoration>()
                     || inst->findDecoration<IRVulkanHitObjectAttributesDecoration>()
+                    || inst->findDecoration<IRVulkanCallablePayloadDecoration>()
+                    || inst->findDecoration<IRVulkanCallablePayloadInDecoration>()
+                    || inst->findDecoration<IRVulkanHitAttributesDecoration>()
                     )
                 {
                     insertGlobalVar(inst);

@@ -521,9 +521,7 @@ DIAGNOSTIC(39999, Error, expectedIntegerConstantWrongType, "expected integer con
 DIAGNOSTIC(39999, Error, expectedIntegerConstantNotConstant, "expression does not evaluate to a compile-time constant")
 DIAGNOSTIC(39999, Error, expectedIntegerConstantNotLiteral, "could not extract value from integer constant")
 
-DIAGNOSTIC(39999, Error, expectedArgNumberToGenericFromRayTracingWithinArgCount, "param number specified for SetGenericToRayTracingPayloadWithParam ($0) is larger than param count ($1)")
 DIAGNOSTIC(39999, Error, expectedRayTracingPayloadObjectAtLocationButMissing, "raytracing payload expected at location $0 but it is missing")
-DIAGNOSTIC(39999, Error, expectedRayTracingAttributeObjectAtLocationButMissing, "raytracing attribute expected at location $0 but it is missing")
 
 DIAGNOSTIC(39999, Error, noApplicableOverloadForNameWithArgs, "no overload for '$0' applicable to arguments of type $1")
 DIAGNOSTIC(39999, Error, noApplicableWithArgs, "no overload applicable to arguments of type $0")

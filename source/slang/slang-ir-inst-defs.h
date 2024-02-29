@@ -655,9 +655,6 @@ INST(GetOptiXSbtDataPtr, getOptiXSbtDataPointer, 0, 0)
 
 INST(GetVulkanRayTracingPayloadLocation, GetVulkanRayTracingPayloadLocation, 1, 0)
 
-INST(GetRayPayloadVariableFromLocation, GetRayPayloadVariableFromLocation, 1, 0)
-INST(GetRayAttributeVariableFromLocation, GetRayAttributeVariableFromLocation, 1, 0)
-
 INST(MakeArrayList, makeArrayList, 0, 0)
 INST(MakeTensorView, makeTensorView, 0, 0)
 INST(AllocateTorchTensor, allocTorchTensor, 0, 0)
@@ -703,6 +700,7 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(TransitoryDecoration,              transitory,             0, 0)
 
     INST(VulkanRayPayloadDecoration,        vulkanRayPayload,       0, 0)
+    INST(VulkanRayPayloadInDecoration,      vulkanRayPayloadIn,       0, 0)
     INST(VulkanHitAttributesDecoration,     vulkanHitAttributes,    0, 0)
     INST(VulkanHitObjectAttributesDecoration, vulkanHitObjectAttributes, 0, 0)
 
@@ -713,6 +711,7 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
 
     INST(ReadNoneDecoration,                readNone,               0, 0)
     INST(VulkanCallablePayloadDecoration,   vulkanCallablePayload,  0, 0)
+    INST(VulkanCallablePayloadInDecoration, vulkanCallablePayloadIn,  0, 0)
     INST(EarlyDepthStencilDecoration,       earlyDepthStencil,      0, 0)
     INST(GloballyCoherentDecoration,        globallyCoherent,       0, 0)
     INST(PreciseDecoration,                 precise,                0, 0)
@@ -1126,6 +1125,7 @@ INST(SPIRVAsmInst, SPIRVAsmInst, 1, 0)
     //a late resolving type to handle the case of ray objects (resolving late due to constexpr data requirment)
     INST(SPIRVAsmOperandRayPayloadFromLocation, SPIRVAsmOperandRayPayloadFromLocation, 1, 0)
     INST(SPIRVAsmOperandRayAttributeFromLocation, SPIRVAsmOperandRayAttributeFromLocation, 1, 0)
+    INST(SPIRVAsmOperandRayCallableFromLocation, SPIRVAsmOperandRayCallableFromLocation, 1, 0)
     // A named enumerator, the value is stored as a constant operand
     // It may have a second operand, which if present is a type with which to
     // construct a constant id to pass, instead of a literal constant

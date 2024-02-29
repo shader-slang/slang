@@ -9832,7 +9832,8 @@ bool __reportIntersection(float tHit, uint hitKind)
 {
     __target_switch
     {
-    case _GL_EXT_ray_tracing: __intrinsic_asm "reportIntersectionEXT";
+    case _GL_EXT_ray_tracing:
+    case glsl: __intrinsic_asm "reportIntersectionEXT";
     case spirv:
         return spirv_asm {
             result:$$bool = OpReportIntersectionKHR $tHit $hitKind;
@@ -9858,7 +9859,8 @@ void IgnoreHit()
     __target_switch
     {
     case hlsl: __intrinsic_asm "IgnoreHit";
-    case _GL_EXT_ray_tracing: __intrinsic_asm "ignoreIntersectionEXT;";
+    case _GL_EXT_ray_tracing:
+    case glsl: __intrinsic_asm "ignoreIntersectionEXT;";
     case cuda: __intrinsic_asm "optixIgnoreIntersection";
     case spirv: spirv_asm { OpIgnoreIntersectionKHR; %_ = OpLabel };
     }
@@ -9870,7 +9872,8 @@ void AcceptHitAndEndSearch()
     __target_switch
     {
     case hlsl: __intrinsic_asm "AcceptHitAndEndSearch";
-    case _GL_EXT_ray_tracing: __intrinsic_asm "terminateRayEXT;";
+    case _GL_EXT_ray_tracing:
+    case glsl: __intrinsic_asm "terminateRayEXT;";
     case cuda: __intrinsic_asm "optixTerminateRay";
     case spirv: spirv_asm { OpTerminateRayKHR; %_ = OpLabel };
     }
@@ -9890,6 +9893,7 @@ uint3 DispatchRaysIndex()
     {
     case hlsl: __intrinsic_asm "DispatchRaysIndex";
     case _GL_EXT_ray_tracing:
+    case glsl:
     case glsl: 
         __intrinsic_asm "(gl_LaunchIDEXT)";
     case cuda: __intrinsic_asm "optixGetLaunchIndex";
@@ -9908,6 +9912,7 @@ uint3 DispatchRaysDimensions()
     case hlsl:  __intrinsic_asm "DispatchRaysDimensions";
     case _GL_EXT_ray_tracing:
     case glsl:
+    case glsl:
          __intrinsic_asm "(gl_LaunchSizeEXT)";
     case cuda: __intrinsic_asm "optixGetLaunchDimensions";
     case spirv:
@@ -9924,7 +9929,8 @@ float3 WorldRayOrigin()
     __target_switch
     {
     case hlsl:  __intrinsic_asm "WorldRayOrigin";
-    case _GL_EXT_ray_tracing: __intrinsic_asm "(gl_WorldRayOriginEXT)";
+    case _GL_EXT_ray_tracing:
+    case glsl: __intrinsic_asm "(gl_WorldRayOriginEXT)";
     case cuda: __intrinsic_asm "optixGetWorldRayOrigin";
     case spirv:
         return spirv_asm {
@@ -9938,7 +9944,8 @@ float3 WorldRayDirection()
     __target_switch
     {
     case hlsl:  __intrinsic_asm "WorldRayDirection";
-    case _GL_EXT_ray_tracing: __intrinsic_asm "(gl_WorldRayDirectionEXT)";
+    case _GL_EXT_ray_tracing:
+    case glsl: __intrinsic_asm "(gl_WorldRayDirectionEXT)";
     case cuda: __intrinsic_asm "optixGetWorldRayDirection";
     case spirv:
         return spirv_asm {
@@ -9952,7 +9959,8 @@ float RayTMin()
     __target_switch
     {
     case hlsl:  __intrinsic_asm "RayTMin";
-    case _GL_EXT_ray_tracing: __intrinsic_asm "(gl_RayTminEXT)";
+    case _GL_EXT_ray_tracing:
+    case glsl: __intrinsic_asm "(gl_RayTminEXT)";
     case cuda: __intrinsic_asm "optixGetRayTmin";
     case spirv:
         return spirv_asm {
@@ -9976,7 +9984,8 @@ float RayTCurrent()
     __target_switch
     {
     case hlsl:  __intrinsic_asm "RayTCurrent";
-    case _GL_EXT_ray_tracing: __intrinsic_asm "(gl_RayTmaxEXT)";
+    case _GL_EXT_ray_tracing:
+    case glsl: __intrinsic_asm "(gl_RayTmaxEXT)";
     case cuda: __intrinsic_asm "optixGetRayTmax";
     case spirv:
         return spirv_asm {
@@ -9990,7 +9999,8 @@ uint RayFlags()
     __target_switch
     {
     case hlsl:  __intrinsic_asm "RayFlags";
-    case _GL_EXT_ray_tracing: __intrinsic_asm "(gl_IncomingRayFlagsEXT)";
+    case _GL_EXT_ray_tracing:
+    case glsl: __intrinsic_asm "(gl_IncomingRayFlagsEXT)";
     case cuda: __intrinsic_asm "optixGetRayFlags";
     case spirv:
         return spirv_asm {
@@ -10006,7 +10016,8 @@ uint InstanceIndex()
     __target_switch
     {
     case hlsl:  __intrinsic_asm "InstanceIndex";
-    case _GL_EXT_ray_tracing: __intrinsic_asm "(gl_InstanceID)";
+    case _GL_EXT_ray_tracing:
+    case glsl: __intrinsic_asm "(gl_InstanceID)";
     case cuda: __intrinsic_asm "optixGetInstanceIndex";
     case spirv:
         return spirv_asm {
@@ -10020,7 +10031,8 @@ uint InstanceID()
     __target_switch
     {
     case hlsl:  __intrinsic_asm "InstanceID";
-    case _GL_EXT_ray_tracing: __intrinsic_asm "(gl_InstanceCustomIndexEXT)";
+    case _GL_EXT_ray_tracing:
+    case glsl: __intrinsic_asm "(gl_InstanceCustomIndexEXT)";
     case cuda: __intrinsic_asm "optixGetInstanceId";
     case spirv:
         return spirv_asm {
@@ -10034,7 +10046,8 @@ uint PrimitiveIndex()
     __target_switch
     {
     case hlsl:  __intrinsic_asm "PrimitiveIndex";
-    case _GL_EXT_ray_tracing:  __intrinsic_asm "(gl_PrimitiveID)";
+    case _GL_EXT_ray_tracing:
+    case glsl:  __intrinsic_asm "(gl_PrimitiveID)";
     case cuda: __intrinsic_asm "optixGetPrimitiveIndex";
     case spirv:
         return spirv_asm {
@@ -10048,7 +10061,8 @@ float3 ObjectRayOrigin()
     __target_switch
     {
     case hlsl:  __intrinsic_asm "ObjectRayOrigin";
-    case _GL_EXT_ray_tracing: __intrinsic_asm "(gl_ObjectRayOriginEXT)";
+    case _GL_EXT_ray_tracing:
+    case glsl: __intrinsic_asm "(gl_ObjectRayOriginEXT)";
     case cuda: __intrinsic_asm "optixGetObjectRayOrigin";
     case spirv:
         return spirv_asm {
@@ -10062,7 +10076,8 @@ float3 ObjectRayDirection()
     __target_switch
     {
     case hlsl:  __intrinsic_asm "ObjectRayDirection";
-    case _GL_EXT_ray_tracing: __intrinsic_asm "(gl_ObjectRayDirectionEXT)";
+    case _GL_EXT_ray_tracing:
+    case glsl: __intrinsic_asm "(gl_ObjectRayDirectionEXT)";
     case cuda: __intrinsic_asm "optixGetObjectRayDirection";
     case spirv:
         return spirv_asm {
@@ -10078,7 +10093,8 @@ float3x4 ObjectToWorld3x4()
     __target_switch
     {
     case hlsl:  __intrinsic_asm "ObjectToWorld3x4";
-    case _GL_EXT_ray_tracing: __intrinsic_asm "transpose(gl_ObjectToWorldEXT)";
+    case _GL_EXT_ray_tracing:
+    case glsl: __intrinsic_asm "transpose(gl_ObjectToWorldEXT)";
     case spirv:
         return spirv_asm {
             %mat:$$float4x3 = OpLoad builtin(ObjectToWorldKHR:float4x3);
@@ -10092,7 +10108,8 @@ float3x4 WorldToObject3x4()
     __target_switch
     {
     case hlsl:  __intrinsic_asm "WorldToObject3x4";
-    case _GL_EXT_ray_tracing: __intrinsic_asm "transpose(gl_WorldToObjectEXT)";
+    case _GL_EXT_ray_tracing:
+    case glsl: __intrinsic_asm "transpose(gl_WorldToObjectEXT)";
     case spirv:
         return spirv_asm {
             %mat:$$float4x3 = OpLoad builtin(WorldToObjectKHR:float4x3);
@@ -10106,7 +10123,8 @@ float4x3 ObjectToWorld4x3()
     __target_switch
     {
     case hlsl:  __intrinsic_asm "ObjectToWorld4x3";
-    case _GL_EXT_ray_tracing: __intrinsic_asm "(gl_ObjectToWorldEXT)";
+    case _GL_EXT_ray_tracing:
+    case glsl: __intrinsic_asm "(gl_ObjectToWorldEXT)";
     case spirv:
         return spirv_asm {
             result:$$float4x3 = OpLoad builtin(ObjectToWorldKHR:float4x3);
@@ -10119,7 +10137,8 @@ float4x3 WorldToObject4x3()
     __target_switch
     {
     case hlsl:  __intrinsic_asm "WorldToObject4x3";
-    case _GL_EXT_ray_tracing: __intrinsic_asm "(gl_WorldToObjectEXT)";
+    case _GL_EXT_ray_tracing:
+    case glsl: __intrinsic_asm "(gl_WorldToObjectEXT)";
     case spirv:
         return spirv_asm {
             result:$$float4x3 = OpLoad builtin(WorldToObjectKHR:float4x3);
@@ -10165,7 +10184,8 @@ uint HitKind()
     __target_switch
     {
     case hlsl:  __intrinsic_asm "HitKind";
-    case _GL_EXT_ray_tracing:  __intrinsic_asm "(gl_HitKindEXT)";
+    case _GL_EXT_ray_tracing:
+    case glsl:  __intrinsic_asm "(gl_HitKindEXT)";
     case cuda:  __intrinsic_asm "optixGetHitKind";
     case spirv:
         return spirv_asm {
@@ -11008,7 +11028,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     }
 
     __glsl_extension(GL_EXT_ray_query)
-        __glsl_version(460)
+    __glsl_version(460)
     [__NoSideEffect]
     float4x3 CandidateRayObjectToWorld()
     {

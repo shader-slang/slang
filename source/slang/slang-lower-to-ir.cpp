@@ -2132,9 +2132,17 @@ void addVarDecorations(
         {
             builder->addVulkanRayPayloadDecoration(inst, rayPayloadAttr->location);
         }
+        else if(auto rayPayloadAttr = as<VulkanRayPayloadInAttribute>(mod))
+        {
+            builder->addVulkanRayPayloadInDecoration(inst, rayPayloadAttr->location);
+        }
         else if(auto callablePayloadAttr = as<VulkanCallablePayloadAttribute>(mod))
         {
             builder->addVulkanCallablePayloadDecoration(inst, callablePayloadAttr->location);
+        }
+        else if(auto callablePayloadAttr = as<VulkanCallablePayloadInAttribute>(mod))
+        {
+            builder->addVulkanCallablePayloadInDecoration(inst, callablePayloadAttr->location);
         }
         else if (auto hitObjectAttr = as<VulkanHitObjectAttributesAttribute>(mod))
         {
@@ -4065,6 +4073,16 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                         i = getSimpleVal(context, lowerRValueExpr(context, operand.expr));
                     }
                     return builder->emitSPIRVAsmOperandRayAttributeFromLocation(i);
+                }
+            case SPIRVAsmOperand::RayCallableFromLocation:
+                {
+                    IRInst* i;
+                    {
+                        IRBuilderInsertLocScope insertScope(builder);
+                        builder->setInsertBefore(spirvAsmInst);
+                        i = getSimpleVal(context, lowerRValueExpr(context, operand.expr));
+                    }
+                    return builder->emitSPIRVAsmOperandRayCallableFromLocation(i);
                 }
             }
             SLANG_UNREACHABLE("Unhandled case in visitSPIRVAsmExpr");
