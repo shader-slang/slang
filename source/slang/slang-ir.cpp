@@ -4371,11 +4371,7 @@ namespace Slang
     {
         // Try to remove duplicates since IR will try to remove/re-add globals 
         // sometimes to move them around, this case needs to be handled
-        if (m_RayLocationToPayloads.tryGetValue(location) != nullptr) 
-        {
-            m_RayLocationToPayloads.remove(location);
-        }
-        m_RayLocationToPayloads.add(location, inst);
+        m_RayLocationToPayloads.set(location, inst);
     }
     IRInst** IRModule::getRayPayloadVariableFromLocation(int location)
     {
@@ -4385,11 +4381,7 @@ namespace Slang
     }
     void IRModule::storeLocationToRayAttributeVariable(int location, IRInst* inst)
     {
-        if (m_RayLocationToAttributes.tryGetValue(location) != nullptr) 
-        {
-            m_RayLocationToAttributes.remove(location);
-        }
-        m_RayLocationToAttributes.add(location, inst);
+        m_RayLocationToAttributes.set(location, inst);
     }
     IRInst** IRModule::getRayAttributeVariableFromLocation(int location)
     {
@@ -4397,17 +4389,12 @@ namespace Slang
     }
     void IRModule::storeLocationToRayCallableVariable(int location, IRInst* inst)
     {
-        if (m_RayLocationToCallables.tryGetValue(location) != nullptr) 
-        {
-            m_RayLocationToCallables.remove(location);
-        }
-        m_RayLocationToCallables.add(location, inst);
+        m_RayLocationToCallables.set(location, inst);
     }
     IRInst** IRModule::getRayCallableVariableFromLocation(int location)
     {
         return m_RayLocationToCallables.tryGetValue(location);
     }
-    
 
     IRInst* IRBuilder::addDifferentiableTypeDictionaryDecoration(IRInst* target)
     {

@@ -7761,6 +7761,7 @@ namespace Slang
 #define CASE(key, type) if (nameText == #key) { modifier = parser->astBuilder->create<type>(); } else
                 CASE(push_constant, PushConstantAttribute) 
                 CASE(shaderRecordNV, ShaderRecordAttribute)
+                CASE(shaderRecordEXT, ShaderRecordAttribute)
                 CASE(constant_id,   GLSLConstantIDLayoutModifier)
                 CASE(std140, GLSLStd140Modifier)
                 CASE(std430, GLSLStd430Modifier)
@@ -7792,43 +7793,19 @@ namespace Slang
             parser->ReadToken(TokenType::Comma);
         }
 
-        if (AdvanceIf(parser, "rayPayloadEXT") 
-            || AdvanceIf(parser, "rayPayloadNV")) 
-        {
-            auto modifier = parser->astBuilder->create<VulkanRayPayloadAttribute>();
-            modifier->location = getIntegerLiteralValue(listBuilder.find<GLSLLayoutModifier>()->valToken);
-            listBuilder.add(modifier);
-        }
-        else if (AdvanceIf(parser, "rayPayloadInEXT") 
-            || AdvanceIf(parser, "rayPayloadInNV")) 
-        {
-            auto modifier = parser->astBuilder->create<VulkanRayPayloadInAttribute>();
-            modifier->location = getIntegerLiteralValue(listBuilder.find<GLSLLayoutModifier>()->valToken);
-            listBuilder.add(modifier);
-        }
-        else if (AdvanceIf(parser, "hitObjectAttributeNV")) 
-        {
-            auto modifier = parser->astBuilder->create<VulkanHitObjectAttributesAttribute>();
-            modifier->location = getIntegerLiteralValue(listBuilder.find<GLSLLayoutModifier>()->valToken);
-            listBuilder.add(modifier);
-        }
-        else if (AdvanceIf(parser, "callableDataEXT"))
-        {
-            auto modifier = parser->astBuilder->create<VulkanCallablePayloadAttribute>();
-            modifier->location = getIntegerLiteralValue(listBuilder.find<GLSLLayoutModifier>()->valToken);
-            listBuilder.add(modifier);
-        }
-        else if (AdvanceIf(parser, "callableDataInEXT"))
-        {
-            auto modifier = parser->astBuilder->create<VulkanCallablePayloadInAttribute>();
-            modifier->location = getIntegerLiteralValue(listBuilder.find<GLSLLayoutModifier>()->valToken);
-            listBuilder.add(modifier);
-        }
-        else if (AdvanceIf(parser, "shaderRecordEXT"))
-        {
-            auto modifier = parser->astBuilder->create<ShaderRecordAttribute>();
-            listBuilder.add(modifier);
-        }
+#define CASE(key, type) if (AdvanceIf(parser, #key)) { auto modifier = parser->astBuilder->create<type>(); \
+    modifier->location = getIntegerLiteralValue(listBuilder.find<GLSLLayoutModifier>()->valToken); listBuilder.add(modifier); } else
+
+    CASE(rayPayloadEXT, VulkanRayPayloadAttribute)
+    CASE(rayPayloadNV, VulkanRayPayloadAttribute)
+    CASE(rayPayloadInEXT, VulkanRayPayloadInAttribute)
+    CASE(rayPayloadInNV, VulkanRayPayloadInAttribute)
+    CASE(hitObjectAttributeNV, VulkanHitObjectAttributesAttribute)
+    CASE(callableDataEXT, VulkanCallablePayloadAttribute)
+    CASE(callableDataInEXT, VulkanCallablePayloadInAttribute)
+    {}
+    
+#undef CASE
 
         if (numThreadsAttrib)
         {
