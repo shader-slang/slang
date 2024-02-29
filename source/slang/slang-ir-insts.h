@@ -3020,6 +3020,7 @@ struct IRDebugVar : IRInst
     IRInst* getSource() { return getOperand(0); }
     IRInst* getLine() { return getOperand(1); }
     IRInst* getCol() { return getOperand(2); }
+    IRInst* getArgIndex() { return getOperandCount() >= 4 ? getOperand(3) : nullptr; }
 };
 
 struct IRDebugValue : IRInst
@@ -3475,7 +3476,7 @@ public:
 
     IRInst* emitDebugSource(UnownedStringSlice fileName, UnownedStringSlice source);
     IRInst* emitDebugLine(IRInst* source, IRIntegerValue lineStart, IRIntegerValue lineEnd, IRIntegerValue colStart, IRIntegerValue colEnd);
-    IRInst* emitDebugVar(IRType* type, IRInst* source, IRInst* line, IRInst* col);
+    IRInst* emitDebugVar(IRType* type, IRInst* source, IRInst* line, IRInst* col, IRInst* argIndex = nullptr);
     IRInst* emitDebugValue(IRInst* debugVar, IRInst* debugValue, ArrayView<IRInst*> accessChain);
 
         /// Emit an LiveRangeStart instruction indicating the referenced item is live following this instruction

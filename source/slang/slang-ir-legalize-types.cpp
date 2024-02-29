@@ -826,7 +826,8 @@ static LegalVal legalizeDebugVar(IRTypeLegalizationContext* context, LegalType t
             type.getSimple(),
             originalInst->getSource(),
             originalInst->getLine(),
-            originalInst->getCol());
+            originalInst->getCol(),
+            originalInst->getArgIndex());
         copyNameHintAndDebugDecorations(legalVal, originalInst);
         return LegalVal::simple(legalVal);
     }

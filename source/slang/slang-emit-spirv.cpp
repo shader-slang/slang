@@ -4855,16 +4855,10 @@ struct SPIRVEmitContext
             return nullptr;
         IRBuilder builder(debugVar);
         auto name = getName(debugVar);
-        if (!name)
-        {
-            static uint32_t uid = 0;
-            uid++;
-            name = builder.getStringValue((String("unamed_local_var_") + String(uid)).getUnownedSlice());
-        }
         auto debugType = emitDebugType(debugVar->getDataType());
         auto spvLocalVar = emitOpDebugLocalVariable(getSection(SpvLogicalSectionID::ConstantsAndTypes), debugVar, m_voidType, getNonSemanticDebugInfoExtInst(),
             name, debugType, debugVar->getSource(), debugVar->getLine(), debugVar->getCol(), scope,
-            builder.getIntValue(builder.getUIntType(), 0), nullptr);
+            builder.getIntValue(builder.getUIntType(), 0), debugVar->getArgIndex());
         return spvLocalVar;
     }
 
