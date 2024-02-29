@@ -1,0 +1,49 @@
+name: VK-GL-CTS Nightly
+
+on:
+  schedule:
+    - cron: '00 2 * * *'
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  DISABLE_CTS_SLANG: 0
+jobs:
+  build:
+    runs-on: [Windows, self-hosted]
+    timeout-minutes: 100
+    continue-on-error: true
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: 'true'
+        fetch-depth: '0'
+    - uses: actions/checkout@v4
+      with:
+        repository: 'https://github.com/shader-slang/VK-GL-CTS'
+        submodules: 'true'
+        fetch-depth: '0'
+    - name: setup-msbuild
+      uses: microsoft/setup-msbuild@v1
+    - name: build slang
+      run: |
+        .\premake.bat vs2019 --arch=x64 --deps=true --no-progress=true --enable-cuda=true
+        
+        .\make-slang-tag-version.bat
+        
+        MSBuild.exe slang.sln -v:m -m -property:Configuration=Release -property:Platform=x64 -property:WindowsTargetPlatformVersion=10.0.19041.0 -maxcpucount:12
+    - name: build vkcts
+      run: |
+        python external\fetch_sources.py
+
+        cmake . -G"Visual Studio 16"
+        
+        MSBuild.exe dEQP-Core-default.sln -v:m -m -property:Configuration=Release -property:Platform=x64 -property:WindowsTargetPlatformVersion=10.0.19041.0 -maxcpucount:12
+    - name: vkcts run
+      run: |
+        deqp-vk.exe --deqp-archive-dir=. --deqp-caselist-file=vkcts_passingtestlist.txt
+      
