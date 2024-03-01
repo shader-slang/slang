@@ -49,5 +49,6 @@ jobs:
         MSBuild.exe dEQP-Core-default.sln -v:m -m -property:Configuration=Release -property:Platform=x64 -property:WindowsTargetPlatformVersion=10.0.19041.0 -maxcpucount:12
     - name: vkcts run
       run: |
+        echo %cd%
         deqp-vk.exe --deqp-archive-dir=. --deqp-caselist-file=vkcts_passingtestlist.txt
       
