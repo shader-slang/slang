@@ -959,7 +959,7 @@ namespace Slang
         // However, there are few exceptions where we will disable it:
         // 1. the logic expression is inside the generic parameter list.
         // 2. the logic expression is in the init expression of a static const variable.
-        // 3. the logic expression is in the index of array.
+        // 3. the logic expression is in an array size declaration.
         bool m_shouldShortCircuitLogicExpr = true;
     };
 

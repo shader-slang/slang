@@ -1904,13 +1904,21 @@ namespace Slang
 
     Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
     {
-        if (this->m_shouldShortCircuitLogicExpr)
-        {
-            auto subContext = disableShortCircuitLogicalExpr();
-            return dispatchExpr(subscriptExpr, subContext);
-        }
-
         auto baseExpr = checkBaseForMemberExpr(subscriptExpr->baseExpression);
+
+        // If the base expression is a type, it means that this is an array declaration,
+        // then we should disable short-circuit in case there is logical expression in
+        // the subscript
+        auto baseType = baseExpr->type.Ptr();
+        auto baseTypeType = as<TypeType>(baseType);
+        if (baseTypeType)
+        {
+            if (this->m_shouldShortCircuitLogicExpr)
+            {
+                auto subContext = disableShortCircuitLogicalExpr();
+                return dispatchExpr(subscriptExpr, subContext);
+            }
+        }
 
         for (auto& arg : subscriptExpr->indexExprs)
         {
@@ -1926,8 +1934,7 @@ namespace Slang
 
         // Otherwise, we need to look at the type of the base expression,
         // to figure out how subscripting should work.
-        auto baseType = baseExpr->type.Ptr();
-        if (auto baseTypeType = as<TypeType>(baseType))
+        if (baseTypeType)
         {
             // We are trying to "index" into a type, so we have an expression like `float[2]`
             // which should be interpreted as resolving to an array type.
@@ -2396,12 +2403,6 @@ namespace Slang
             VarExpr const* varExpr = as<VarExpr const>(expr->functionExpr);
             if ((varExpr->name->text == "&&") || (varExpr->name->text == "||"))
             {
-                // Don't use short-circuiting in differentiable function
-                if (getParentDifferentiableAttribute())
-                {
-                    return nullptr;
-                }
-
                 // We only use short-circuiting in scalar input, will fall back
                 // to non-short-circuiting in vector input.
                 bool shortCircuitSupport = true;
