@@ -2131,6 +2131,20 @@ struct SPIRVEmitContext
         return varInst;
     }
 
+    String getDebugInfoCommandLineArgumentForEntryPoint(IREntryPointDecoration* entryPointDecor)
+    {
+        StringBuilder sb;
+        sb << "-target spirv ";
+        m_targetProgram->getOptionSet().writeCommandLineArgs(m_targetProgram->getTargetReq()->getSession(), sb);
+        sb << " -stage " << getStageName(entryPointDecor->getProfile().getStage());
+        if (auto entryPointName = as<IRStringLit>(getName(entryPointDecor->getParent())))
+        {
+            sb << " -entry " << entryPointName->getStringSlice();
+        }
+        sb << " -g2";
+        return sb.produceString();
+    }
+
         /// Emit the given `irFunc` to SPIR-V
     SpvInst* emitFunc(IRFunc* irFunc)
     {
@@ -2264,6 +2278,22 @@ struct SPIRVEmitContext
 
             if (funcDebugScope)
             {
+                if (auto entryPointDecor = irFunc->findDecoration<IREntryPointDecoration>())
+                {
+                    if (auto debugScope = findDebugScope(irFunc->getModule()->getModuleInst()))
+                    {
+                        IRBuilder builder(irFunc);
+                        String cmdArgs = getDebugInfoCommandLineArgumentForEntryPoint(entryPointDecor);
+                        emitOpDebugEntryPoint(
+                            getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                            m_voidType,
+                            getNonSemanticDebugInfoExtInst(),
+                            funcDebugScope,
+                            debugScope,
+                            builder.getStringValue(toSlice("slangc")),
+                            builder.getStringValue(cmdArgs.getUnownedSlice()));
+                    }
+                }
                 emitOpDebugScope(spvBlock, nullptr, m_voidType, getNonSemanticDebugInfoExtInst(), funcDebugScope);
             }
 
@@ -2893,7 +2923,6 @@ struct SPIRVEmitContext
                     name,
                     params
                 );
-
                 // Stage specific execution mode and capability declarations.
                 switch (entryPointDecor->getProfile().getStage())
                 {

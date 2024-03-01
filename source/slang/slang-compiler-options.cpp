@@ -20,6 +20,114 @@ namespace Slang
         }
     }
 
+    void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuilder& sb)
+    {
+        for (auto& option : options)
+        {
+            auto optionInfoIndex = globalSession->m_commandOptions.findOptionByUserValue(CommandOptions::UserValue(option.key));
+            if (optionInfoIndex == -1)
+                continue;
+            auto optionInfo = globalSession->m_commandOptions.getOptionAt(optionInfoIndex);
+            auto nameCommaIndex = optionInfo.names.indexOf(',');
+            if (nameCommaIndex == -1) nameCommaIndex = optionInfo.names.getLength();
+            auto name = optionInfo.names.head(nameCommaIndex);
+            switch (option.key)
+            {
+                case CompilerOptionName::Capability:
+                    for (auto v : option.value)
+                    {
+                        sb << " " << optionInfo.names << " " << v.stringValue;
+                    }
+                    break;
+                case CompilerOptionName::Include:
+                    for (auto v : option.value)
+                    {
+                        sb << " -I \"" << v.stringValue << "\"";
+                    }
+                    break;
+                case CompilerOptionName::MacroDefine:
+                    for (auto v : option.value)
+                    {
+                        sb << " -D" << v.stringValue;
+                        if (v.stringValue2.getLength())
+                            sb << "=" << v.stringValue2;
+                    }
+                    break;
+                case CompilerOptionName::VulkanBindShift:  // intValue0 (higher 8 bits): kind; intValue0(higher bits): set; intValue1: shift
+                    for (auto v : option.value)
+                    {
+                        uint8_t kind;
+                        int set, shift;
+                        v.unpackInt3(kind, set, shift);
+                        switch ((HLSLToVulkanLayoutOptions::Kind)(kind))
+                        {
+                        case HLSLToVulkanLayoutOptions::Kind::UnorderedAccess:
+                            sb << " -fvk-u-shift";
+                            break;
+                        case HLSLToVulkanLayoutOptions::Kind::Sampler:
+                            sb << " -fvk-s-shift";
+                            break;
+                        case HLSLToVulkanLayoutOptions::Kind::ShaderResource:
+                            sb << " -fvk-t-shift";
+                            break;
+                        case HLSLToVulkanLayoutOptions::Kind::ConstantBuffer:
+                            sb << " -fvk-b-shift";
+                            break;
+                        default:
+                            continue;
+                        }
+                        sb << " " << shift << " " << set;
+                    }
+                    break;
+                case CompilerOptionName::VulkanBindShiftAll:            // intValue0: set; intValue1: shift
+                    for (auto v : option.value)
+                    {
+                        sb << " -fvk-all-shift " << v.intValue2 << " " << v.intValue;
+                    }
+                    break;
+                case CompilerOptionName::VulkanBindGlobals:          // intValue0: index; intValue1: set
+                    for (auto v : option.value)
+                    {
+                        sb << " " << name << v.intValue << " " << v.intValue2;
+                    }
+                    break;
+                case CompilerOptionName::Optimization:
+                    for (auto v : option.value)
+                    {
+                        sb << " -O" << v.intValue;
+                    }
+                    break;
+                case CompilerOptionName::DownstreamArgs:
+                    for (auto v : option.value)
+                    {
+                        List<UnownedStringSlice> lines;
+                        StringUtil::split(v.stringValue2.getUnownedSlice(), '\n', lines);
+                        for (auto l : lines)
+                        {
+                            sb << " -x" << v.stringValue << " " << l.trim();
+                        }
+                    }
+                    break;
+                case CompilerOptionName::EmitSpirvDirectly:
+                case CompilerOptionName::GLSLForceScalarLayout:
+                case CompilerOptionName::MatrixLayoutRow:
+                case CompilerOptionName::MatrixLayoutColumn:
+                case CompilerOptionName::VulkanInvertY:
+                case CompilerOptionName::VulkanUseEntryPointName:
+                case CompilerOptionName::VulkanUseGLLayout:
+                case CompilerOptionName::VulkanEmitReflection:
+                case CompilerOptionName::EnableEffectAnnotations:
+                case CompilerOptionName::DefaultImageFormatUnknown:
+                case CompilerOptionName::DisableDynamicDispatch:
+                case CompilerOptionName::DisableSpecialization:
+                case CompilerOptionName::DumpIntermediates:
+                    if (option.value.getCount() && option.value[0].intValue != 0)
+                        sb << " " << name;
+                    break;
+            }
+        }
+    }
+
     void CompilerOptionSet::buildHash(DigestBuilder<SHA1>& builder)
     {
         for (auto& kv : options)
