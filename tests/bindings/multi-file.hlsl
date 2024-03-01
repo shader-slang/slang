@@ -1,4 +1,4 @@
-//TEST:COMPARE_HLSL:-no-mangle -profile sm_4_0 -entry main -stage vertex Tests/bindings/multi-file-extra.hlsl -entry main -stage fragment
+//TEST:COMPARE_HLSL:-no-mangle -profile sm_4_0 -entry main1 -stage vertex Tests/bindings/multi-file-extra.hlsl -entry main -stage fragment
 
 // Here we are going to test that we can correctly generating bindings when we
 // are presented with a program spanning multiple input files (and multiple entry points)
@@ -26,7 +26,7 @@ BEGIN_CBUFFER(vertexC)
 }
 END_CBUFFER(vertexC, register(b0))
 
-float4 main() : SV_POSITION
+float4 main1() : SV_POSITION
 {
     // Go ahead and use everything here, just to make sure things got placed correctly
     return use(sharedT, sharedS)
