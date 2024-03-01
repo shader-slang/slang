@@ -2378,7 +2378,7 @@ namespace Slang
 
         // If the logic expression is inside the generic parameter list, it cannot support short-circuit
         // which will generate the ifelse branch.
-        if (m_outerGenericApp != nullptr || m_outerDecl != nullptr)
+        if (!m_shouldShortCircuitLogicExpr)
         {
             return nullptr;
         }

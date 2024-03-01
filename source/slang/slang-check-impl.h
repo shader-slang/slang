@@ -839,21 +839,12 @@ namespace Slang
             OuterStmtInfo* next;
         };
 
-        struct OuterGenericAppInfo
-        {
-            // Currently, this struct is only used as a flag for the expression visitor
-            // to detect whether the expression is the generic parameter. So we don't need
-            // any actual info here.
-            OuterGenericAppInfo* next = nullptr;
-        };
-
-        struct OuterDeclInfo
-        {
-            // Currently, this struct is only used as a flag for the expression visitor
-            // to detect whether the expression is the static constant. So we don't need
-            // any actual info here.
-            OuterDeclInfo* next = nullptr;
-        };
+        // By default, we will support short-circuit evaluation for the logic expression.
+        // However, there are few exceptions where we will disable it:
+        // 1. the logic expression is inside the generic parameter list.
+        // 2. the logic expression is in the init expression of a static const variable.
+        // 3. the logic expression is in the index of array.
+        bool m_shouldShortCircuitLogicExpr = true;
 
         OuterDeclInfo* m_outerDecl = nullptr;
         OuterStmtInfo* getOuterStmts() { return m_outerStmts; }
@@ -865,17 +856,12 @@ namespace Slang
             return result;
         }
 
-        SemanticsContext withOuterGenericApp(OuterGenericAppInfo* outerGenericApp)
+        // Setup the flag to indicate disabling the short-circuiting evaluation
+        // for the logical expressions associted with the subcontext
+        SemanticsContext disableShortCircuitLogicalExpr()
         {
             SemanticsContext result(*this);
-            result.m_outerGenericApp = outerGenericApp;
-            return result;
-        }
-
-        SemanticsContext withOuterDecl(OuterDeclInfo* m_outerDecl)
-        {
-            SemanticsContext result(*this);
-            result.m_outerDecl = m_outerDecl;
+            result.m_shouldShortCircuitLogicExpr = false;
             return result;
         }
 

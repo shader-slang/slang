@@ -2114,10 +2114,11 @@ namespace Slang
     {
         // Start by checking the base expression and arguments.
 
-        if (this->m_outerGenericApp == nullptr)
+        // Disable the short-circuiting logic expression when the experssion is in
+        // the generic parameter.
+        if (this->m_shouldShortCircuitLogicExpr)
         {
-            OuterGenericAppInfo outerGenericApp {};
-            auto subContext = withOuterGenericApp(&outerGenericApp);
+            auto subContext = disableShortCircuitLogicalExpr();
             return dispatchExpr(genericAppExpr, subContext);
         }
 

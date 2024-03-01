@@ -1817,9 +1817,8 @@ namespace Slang
         {
             if (varDecl->hasModifier<HLSLStaticModifier>())
             {
-                OuterDeclInfo outerDecl {};
-                auto subContex = withOuterDecl(&outerDecl);
-                initExpr = dispatchExpr(initExpr, subContex);
+                auto subContext = disableShortCircuitLogicalExpr();
+                initExpr = dispatchExpr(initExpr, subContext);
             }
             else
             {
