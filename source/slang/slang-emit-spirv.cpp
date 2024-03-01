@@ -5088,7 +5088,7 @@ struct SPIRVEmitContext
             return ensureInst(m_voidType);
 
         IRBuilder builder(type);
-        if (auto funcType = as<IRFuncType>(type))
+        if (const auto funcType = as<IRFuncType>(type))
         {
             List<SpvInst*> argTypes;
             return emitOpDebugTypeFunction(
