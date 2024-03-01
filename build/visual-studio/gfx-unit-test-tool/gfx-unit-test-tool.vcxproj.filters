@@ -29,6 +29,9 @@
     <ClCompile Include="..\..\..\tools\gfx-unit-test\compute-smoke.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\compute-trivial.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\tools\gfx-unit-test\copy-texture-tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

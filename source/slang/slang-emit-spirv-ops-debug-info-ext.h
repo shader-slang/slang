@@ -24,6 +24,11 @@ SpvInst* emitOpDebugLine(SpvInstParent* parent, IRInst* inst, const T& idResultT
     return emitInst(parent, inst, SpvOpExtInst, idResultType, kResultID, set, SpvWord(103), source, lineStart, lineEnd, colStart, colEnd);
 }
 
+SpvInst* emitOpDebugEntryPoint(SpvInstParent* parent, IRInst* resultType, SpvInst* set, SpvInst* entryPoint, SpvInst* scope, IRInst* compiler, IRInst* args)
+{
+    return emitInst(parent, nullptr, SpvOpExtInst, resultType, kResultID, set, SpvWord(107), entryPoint, scope, compiler, args);
+}
+
 // https://github.com/KhronosGroup/SPIRV-Registry/blob/main/nonsemantic/NonSemantic.Shader.DebugInfo.100.asciidoc#DebugFunction
 template<typename T>
 SpvInst* emitOpDebugFunction(SpvInstParent* parent, IRInst* inst, const T& idResultType, SpvInst* set, IRInst* name, SpvInst* type, IRInst* source, IRInst* lineStart, IRInst* colStart, SpvInst* scope, IRInst* linkageName, IRInst* flag, IRInst* scopeLine)

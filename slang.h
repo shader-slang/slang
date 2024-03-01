@@ -871,7 +871,7 @@ extern "C"
             Optimization,               // intValue0: OptimizationLevel
             Obfuscate,                  // bool
 
-            VulkanBindShift,            // intValue0 (lower 8 bits): kind; intValue0(higher bits): set; intValue1: shift
+            VulkanBindShift,            // intValue0 (higher 8 bits): kind; intValue0(lower bits): set; intValue1: shift
             VulkanBindGlobals,          // intValue0: index; intValue1: set
             VulkanInvertY,              // bool
             VulkanUseEntryPointName,    // bool
