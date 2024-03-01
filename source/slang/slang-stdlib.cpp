@@ -338,6 +338,7 @@ namespace Slang
 
     ComPtr<ISlangBlob> Session::getGLSLLibraryCode()
     {
+#if !defined(SLANG_DISABLE_STDLIB_SOURCE)
         if (!glslLibraryCode)
         {
             const String path = getStdlibPath();
@@ -345,6 +346,7 @@ namespace Slang
 #include "glsl.meta.slang.h"
             glslLibraryCode = StringBlob::moveCreate(sb);
         }
+#endif
         return glslLibraryCode;
     }
 }
