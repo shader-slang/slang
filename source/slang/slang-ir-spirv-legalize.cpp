@@ -1503,6 +1503,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         case kIROp_Or:
         case kIROp_Not:
         case kIROp_Neg:
+        case kIROp_Div:
         case kIROp_FieldExtract:
         case kIROp_FieldAddress:
         case kIROp_GetElement:
