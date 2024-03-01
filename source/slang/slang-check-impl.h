@@ -839,14 +839,6 @@ namespace Slang
             OuterStmtInfo* next;
         };
 
-        // By default, we will support short-circuit evaluation for the logic expression.
-        // However, there are few exceptions where we will disable it:
-        // 1. the logic expression is inside the generic parameter list.
-        // 2. the logic expression is in the init expression of a static const variable.
-        // 3. the logic expression is in the index of array.
-        bool m_shouldShortCircuitLogicExpr = true;
-
-        OuterDeclInfo* m_outerDecl = nullptr;
         OuterStmtInfo* getOuterStmts() { return m_outerStmts; }
 
         SemanticsContext withOuterStmts(OuterStmtInfo* outerStmts)
@@ -948,8 +940,6 @@ namespace Slang
             /// The linked list of lexically surrounding statements.
         OuterStmtInfo* m_outerStmts = nullptr;
 
-        OuterGenericAppInfo* m_outerGenericApp = nullptr;
-
             /// The type of a try clause (if any) enclosing current expr.
         TryClauseType m_enclosingTryClauseType = TryClauseType::None;
 
@@ -964,6 +954,13 @@ namespace Slang
         ASTBuilder* m_astBuilder = nullptr;
 
         Scope* m_outerScope = nullptr;
+
+        // By default, we will support short-circuit evaluation for the logic expression.
+        // However, there are few exceptions where we will disable it:
+        // 1. the logic expression is inside the generic parameter list.
+        // 2. the logic expression is in the init expression of a static const variable.
+        // 3. the logic expression is in the index of array.
+        bool m_shouldShortCircuitLogicExpr = true;
     };
 
     struct OuterScopeContextRAII

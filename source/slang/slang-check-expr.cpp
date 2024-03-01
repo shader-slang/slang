@@ -1904,6 +1904,12 @@ namespace Slang
 
     Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
     {
+        if (this->m_shouldShortCircuitLogicExpr)
+        {
+            auto subContext = disableShortCircuitLogicalExpr();
+            return dispatchExpr(subscriptExpr, subContext);
+        }
+
         auto baseExpr = checkBaseForMemberExpr(subscriptExpr->baseExpression);
 
         for (auto& arg : subscriptExpr->indexExprs)
