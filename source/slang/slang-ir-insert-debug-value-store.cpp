@@ -130,6 +130,18 @@ namespace Slang
                         setDebugValue(debugVar, varInst, storeInst->getVal(), accessChain.getArrayView());
                     }
                 }
+                else if (auto swizzledStore = as<IRSwizzledStore>(inst))
+                {
+                    List<IRInst*> accessChain;
+                    auto varInst = getRootAddr(swizzledStore->getDest(), accessChain);
+                    IRInst* debugVar = nullptr;
+                    if (mapVarToDebugVar.tryGetValue(varInst, debugVar))
+                    {
+                        builder.setInsertAfter(swizzledStore);
+                        auto loadVal = builder.emitLoad(swizzledStore->getDest());
+                        setDebugValue(debugVar, varInst, loadVal, accessChain.getArrayView());
+                    }
+                }
                 else if (auto callInst = as<IRCall>(inst))
                 {
                     auto funcValue = getResolvedInstForDecorations(callInst->getCallee());
