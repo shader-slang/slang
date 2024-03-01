@@ -1637,9 +1637,7 @@ struct SPIRVEmitContext
         case kIROp_VerticesType:
         case kIROp_IndicesType:
         case kIROp_PrimitivesType:
-            // These types are not used, but maybe referenced by debug variables.
-            // Just emit them as int.
-            return emitOpTypeInt(inst, SpvLiteralInteger::from32(32), SpvLiteralInteger::from32(0));
+            return nullptr;
         default:
             {
                 if (as<IRSPIRVAsmOperand>(inst))
@@ -5164,26 +5162,6 @@ struct SPIRVEmitContext
                 getNonSemanticDebugInfoExtInst(),
                 builder.getStringValue(sbName.getUnownedSlice()),
                 builder.getIntValue(builder.getUIntType(), 64),
-                builder.getIntValue(builder.getUIntType(), 0),
-                builder.getIntValue(builder.getUIntType(), kUnknownPhysicalLayout));
-        }
-        switch (type->getOp())
-        {
-        case kIROp_HLSLTriangleStreamType:
-        case kIROp_HLSLLineStreamType:
-        case kIROp_HLSLPointStreamType:
-        case kIROp_VerticesType:
-        case kIROp_IndicesType:
-        case kIROp_PrimitivesType:
-            // These types are not used, but maybe referenced by debug variables.
-            // Just emit them as int.
-            return emitOpDebugTypeBasic(
-                getSection(SpvLogicalSectionID::ConstantsAndTypes),
-                nullptr,
-                m_voidType,
-                getNonSemanticDebugInfoExtInst(),
-                builder.getStringValue(toSlice("hlsl_handle")),
-                builder.getIntValue(builder.getUIntType(), 32),
                 builder.getIntValue(builder.getUIntType(), 0),
                 builder.getIntValue(builder.getUIntType(), kUnknownPhysicalLayout));
         }
