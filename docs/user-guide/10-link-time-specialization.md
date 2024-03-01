@@ -155,7 +155,7 @@ void main(uint tid : SV_DispatchThreadID)
 }
 ```
 
-Again, we can separately compile these modules into binary forms independently with how they will be specialized.
+Again, we can separately compile these modules into binary forms independently from how they will be specialized.
 To specialize the shader, we can author a third module that provides a definition for the `extern Sampler` type:
 
 ```csharp
@@ -164,7 +164,7 @@ import common;
 export struct Sampler : ISampler = FooSampler;
 ```
 
-The `=` syntax is a syntacic sugar that expands to the following code:
+The `=` syntax is a syntactic sugar that expands to the following code:
 
 ```csharp
 export struct Sampler : ISampler
