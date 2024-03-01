@@ -8875,9 +8875,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     void addBitFieldAccessorDecorations(IRInst* irFunc, Decl* decl)
     {
-        // If this is an accessor under a property we can move the bitfield
-        // modifiers on the property to the accessor function.
-        if(as<AccessorDecl>(decl) && as<PropertyDecl>(decl->parentDecl))
+        // If this is an accessor and the parent is describing some bitfield,
+        // we can move the bitfield modifiers to the accessor function.
+        if(as<AccessorDecl>(decl))
         {
             if(const auto bfm = decl->parentDecl->findModifier<BitFieldModifier>())
             {
