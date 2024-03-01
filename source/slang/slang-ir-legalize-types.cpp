@@ -880,14 +880,12 @@ static LegalVal legalizeDebugValue(IRTypeLegalizationContext* context, LegalVal 
     }
     case LegalType::Flavor::tuple:
     {
-        auto tupleVar = debugVar.getTuple();
-        UInt index = 0;
-        for (auto ee : tupleVar->elements)
+        auto tupleVal = debugValue.getTuple();
+        for (auto ee : tupleVal->elements)
         {
-            auto innerResult = legalizeDebugValue(context, debugVar, debugValue.getTuple()->elements[index].val, originalInst);
+            auto innerResult = legalizeDebugValue(context, debugVar, ee.val, originalInst);
             if (innerResult.flavor != LegalVal::Flavor::none)
                 return innerResult;
-            index++;
         }
         return LegalVal();
     }

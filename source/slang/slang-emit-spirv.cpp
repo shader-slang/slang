@@ -1389,11 +1389,20 @@ struct SPIRVEmitContext
                 bool useForwardDeclaration = (!m_mapIRInstToSpvInst.containsKey(valueType)
                     && as<IRStructType>(valueType)
                     && storageClass == SpvStorageClassPhysicalStorageBuffer);
+                SpvId valueTypeId;
+                if (useForwardDeclaration)
+                {
+                    valueTypeId = getIRInstSpvID(valueType);
+                }
+                else
+                {
+                    auto spvValueType = ensureInst(valueType);
+                    valueTypeId = getID(spvValueType);
+                }
                 auto resultSpvType = emitOpTypePointer(
                     inst,
                     storageClass,
-                    useForwardDeclaration? getIRInstSpvID(valueType) : getID(ensureInst(valueType))
-                );
+                    valueTypeId);
                 if (useForwardDeclaration)
                 {
                     // After everything has been emitted, we will move the pointer definition to the end
@@ -1613,7 +1622,7 @@ struct SPIRVEmitContext
                         emitIntConstant(100, builder.getUIntType()),  // ExtDebugInfo version.
                         emitIntConstant(5, builder.getUIntType()),    // DWARF version.
                         result,
-                        emitIntConstant(6, builder.getUIntType()));   // Language, use HLSL's ID for now.
+                        emitIntConstant(SpvSourceLanguageSlang, builder.getUIntType())); // Language.
                     registerDebugInst(moduleInst, translationUnit);
                 }
                 return result;
@@ -1625,6 +1634,9 @@ struct SPIRVEmitContext
         case kIROp_HLSLTriangleStreamType:
         case kIROp_HLSLLineStreamType:
         case kIROp_HLSLPointStreamType:
+        case kIROp_VerticesType:
+        case kIROp_IndicesType:
+        case kIROp_PrimitivesType:
             return nullptr;
         default:
             {
@@ -2117,6 +2129,20 @@ struct SPIRVEmitContext
         return varInst;
     }
 
+    String getDebugInfoCommandLineArgumentForEntryPoint(IREntryPointDecoration* entryPointDecor)
+    {
+        StringBuilder sb;
+        sb << "-target spirv ";
+        m_targetProgram->getOptionSet().writeCommandLineArgs(m_targetProgram->getTargetReq()->getSession(), sb);
+        sb << " -stage " << getStageName(entryPointDecor->getProfile().getStage());
+        if (auto entryPointName = as<IRStringLit>(getName(entryPointDecor->getParent())))
+        {
+            sb << " -entry " << entryPointName->getStringSlice();
+        }
+        sb << " -g2";
+        return sb.produceString();
+    }
+
         /// Emit the given `irFunc` to SPIR-V
     SpvInst* emitFunc(IRFunc* irFunc)
     {
@@ -2250,6 +2276,22 @@ struct SPIRVEmitContext
 
             if (funcDebugScope)
             {
+                if (auto entryPointDecor = irFunc->findDecoration<IREntryPointDecoration>())
+                {
+                    if (auto debugScope = findDebugScope(irFunc->getModule()->getModuleInst()))
+                    {
+                        IRBuilder builder(irFunc);
+                        String cmdArgs = getDebugInfoCommandLineArgumentForEntryPoint(entryPointDecor);
+                        emitOpDebugEntryPoint(
+                            getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                            m_voidType,
+                            getNonSemanticDebugInfoExtInst(),
+                            funcDebugScope,
+                            debugScope,
+                            builder.getStringValue(toSlice("slangc")),
+                            builder.getStringValue(cmdArgs.getUnownedSlice()));
+                    }
+                }
                 emitOpDebugScope(spvBlock, nullptr, m_voidType, getNonSemanticDebugInfoExtInst(), funcDebugScope);
             }
 

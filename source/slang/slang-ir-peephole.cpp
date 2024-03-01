@@ -1037,6 +1037,40 @@ struct PeepholeContext : InstPassBase
                 }
                 break;
             }
+        case kIROp_Load:
+            {
+                // Load from undef is undef.
+                if (as<IRLoad>(inst)->getPtr()->getOp() == kIROp_undefined)
+                {
+                    IRBuilder builder(module);
+                    builder.setInsertBefore(inst);
+                    auto undef = builder.emitUndefined(inst->getDataType());
+                    inst->replaceUsesWith(undef);
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
+                break;
+            }
+        case kIROp_Store:
+            {
+                // Store undef is no-op.
+                if (as<IRStore>(inst)->getVal()->getOp() == kIROp_undefined)
+                {
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
+                break;
+            }
+        case kIROp_DebugValue:
+            {
+                // Update debug value with undef is no-op.
+                if (as<IRDebugValue>(inst)->getValue()->getOp() == kIROp_undefined)
+                {
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
+                break;
+            }
         default:
             break;
         }

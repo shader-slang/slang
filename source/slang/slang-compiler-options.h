@@ -83,6 +83,8 @@ namespace Slang
         List<slang::CompilerOptionEntry> entries;
         List<String> stringPool;
     };
+    
+    class Session;
 
     struct CompilerOptionSet
     {
@@ -91,6 +93,8 @@ namespace Slang
         void buildHash(DigestBuilder<SHA1>& builder);
 
         static bool allowDuplicate(CompilerOptionName name);
+
+        void writeCommandLineArgs(Session* globalSession, StringBuilder& sb);
 
         OrderedDictionary<CompilerOptionName, List<CompilerOptionValue>> options;
 
@@ -137,18 +141,13 @@ namespace Slang
             {
                 for (auto element : value)
                 {
-                    Index index = -1;
-                    // We don't deduplicate downstream args.
-                    if (name != CompilerOptionName::DownstreamArgs)
-                    {
-                        v->findFirstIndex([&](const CompilerOptionValue& existingVal)
-                            {
-                                if (existingVal.kind == CompilerOptionValueKind::Int)
-                                    return existingVal.intValue == element.intValue;
-                                else
-                                    return existingVal.stringValue == element.stringValue;
-                            });
-                    }
+                    Index index = v->findFirstIndex([&](const CompilerOptionValue& existingVal)
+                        {
+                            if (existingVal.kind == CompilerOptionValueKind::Int)
+                                return existingVal.intValue == element.intValue;
+                            else
+                                return existingVal.stringValue == element.stringValue;
+                        });
                     if (index != -1)
                     {
                         if (replaceDuplicate)
