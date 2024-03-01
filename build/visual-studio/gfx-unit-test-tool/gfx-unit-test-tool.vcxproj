@@ -291,6 +291,7 @@
     <ClCompile Include="..\..\..\tools\gfx-unit-test\buffer-barrier-test.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\clear-texture-test.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\compute-smoke.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\compute-trivial.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\copy-texture-tests.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\create-buffer-from-handle.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\existing-device-handle-test.cpp" />
