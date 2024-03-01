@@ -4342,12 +4342,8 @@ namespace Slang
             }
             else if (kIROp_SPIRVAsmOperandRayCallableFromLocation == op)
             {
+                SLANG_ASSERT(kIROp_SPIRVAsmOperandRayCallableFromLocation == op); //final case
                 varLayoutPointsTo = this->getRayCallableVariableFromLocation(intLitValue);
-            }
-            else
-            {
-                // should be impossible to hit
-                assert(false);
             }
         }
         else{
