@@ -257,12 +257,14 @@ namespace Slang
 
     struct IntrinsicOpInfo { IROp opCode; char const* funcName; char const* opName; char const* interface; unsigned flags; };
 
+    [[maybe_unused]]
     static const IntrinsicOpInfo intrinsicUnaryOps[] = {
         { kIROp_Neg,    "neg",              "-",    "__BuiltinArithmeticType",  ARITHMETIC_MASK },
         { kIROp_Not,    "logicalNot",       "!",    nullptr,                    BOOL_MASK | BOOL_RESULT },
         { kIROp_BitNot, "not",              "~",    "__BuiltinLogicalType",     INT_MASK        },
     };
 
+    [[maybe_unused]]
     static const IntrinsicOpInfo intrinsicBinaryOps[] = {
         {kIROp_Add, "add", "+", "__BuiltinArithmeticType", ARITHMETIC_MASK},
         {kIROp_Sub, "sub", "-", "__BuiltinArithmeticType", ARITHMETIC_MASK},
