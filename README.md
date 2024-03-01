@@ -28,7 +28,7 @@ The Slang system is designed to provide developers of real-time graphics applica
 
 * For applications that want it, Slang provides full reflection information about the parameters of your shader code, with a consistent API across all target platforms and graphics APIs. Unlike some other compilers, Slang does not reorder or drop shader parameters based on how they are used, so you can always see the full picture.
 
-* Full intellisense features in Visual Studio Code and Visual Studio through the Language Server Protocal.
+* Full intellisense features in Visual Studio Code and Visual Studio through the Language Server Protocol.
 
 * Full debugging experience with SPIRV and RenderDoc.
 
