@@ -2921,6 +2921,7 @@ struct SPIRVEmitContext
                     name,
                     params
                 );
+
                 // Stage specific execution mode and capability declarations.
                 switch (entryPointDecor->getProfile().getStage())
                 {
