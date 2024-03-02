@@ -33,6 +33,9 @@ jobs:
         .\make-slang-tag-version.bat
         
         MSBuild.exe slang.sln -v:m -m -property:Configuration=Release -property:Platform=x64 -property:WindowsTargetPlatformVersion=10.0.19041.0 -maxcpucount:12
+
+        #copy ${{ github.workspace }}/bin/windows-x64/release/slang.dll
+        #copy ${{ github.workspace }}/bin/windows-x64/release/slang.dll
     - name: vkcts run
       run: |
         deqp-vk.exe --deqp-archive-dir=. --deqp-caselist-file=vkcts_passingtestlist.txt
