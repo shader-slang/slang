@@ -26,29 +26,19 @@ jobs:
       uses: microsoft/setup-msbuild@v1
     - name: build slang
       run: |
-        echo ${{ github.workspace }}
-        
         .\premake.bat vs2019 --arch=x64 --deps=true --no-progress=true --enable-cuda=true
         
         .\make-slang-tag-version.bat
         
         MSBuild.exe slang.sln -v:m -m -property:Configuration=Release -property:Platform=x64 -property:WindowsTargetPlatformVersion=10.0.19041.0 -maxcpucount:12
-
-        #copy ${{ github.workspace }}/bin/windows-x64/release/slang.dll
-        #copy ${{ github.workspace }}/bin/windows-x64/release/slang.dll
+    - uses: robinraju/release-downloader@v1.7
+      with:
+        latest: true
+        repository: "shader-slang/VK-GL-CTS"
+        fileName: "VK-GL-CTS_WithSlang-0.0.3-win64.zip"
     - name: vkcts run
       run: |
+        Expand-Archive VK-GL-CTS_WithSlang-0.0.3-win64.zip
+        #copy ${{ github.workspace }}/bin/windows-x64/release/slang.dll
+        #copy ${{ github.workspace }}/bin/windows-x64/release/slang.dll
         deqp-vk.exe --deqp-archive-dir=. --deqp-caselist-file=vkcts_passingtestlist.txt
-    - uses: actions/checkout@v4
-      with:
-        repository: 'shader-slang/VK-GL-CTS'
-        submodules: 'true'
-        fetch-depth: '0'
-    - name: build vkcts
-      run: |
-        python external\fetch_sources.py
-
-        cmake . -G"Visual Studio 16"
-        
-        MSBuild.exe dEQP-Core-default.sln -v:m -m -property:Configuration=Release -property:Platform=x64 -property:WindowsTargetPlatformVersion=10.0.19041.0 -maxcpucount:12
-      
