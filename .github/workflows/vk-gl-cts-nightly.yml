@@ -39,6 +39,10 @@ jobs:
     - name: vkcts run
       run: |
         Expand-Archive VK-GL-CTS_WithSlang-0.0.3-win64.zip
-        #copy ${{ github.workspace }}/bin/windows-x64/release/slang.dll
-        #copy ${{ github.workspace }}/bin/windows-x64/release/slang.dll
-        deqp-vk.exe --deqp-archive-dir=. --deqp-caselist-file=vkcts_passingtestlist.txt
+        copy ${{ github.workspace }}\bin\windows-x64\release\slang.dll ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\slang.dll
+
+        copy ${{ github.workspace }}\bin\windows-x64\release\slang-glslang.dll ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\slang-glslang.dll
+
+        copy ${{ github.workspace }}\vkcts_passingtestlist.txt ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\vkcts_passingtestlist.txt
+       
+        ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\deqp-vk.exe --deqp-archive-dir=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64 --deqp-caselist-file=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\vkcts_passingtestlist.txt
