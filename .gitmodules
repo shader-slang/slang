@@ -16,6 +16,7 @@
 [submodule "external/spirv-tools"]
 	path = external/spirv-tools
 	url = https://github.com/shader-slang/SPIRV-Tools.git
+	ignore = all
 [submodule "external/spirv-headers"]
 	path = external/spirv-headers
 	url = https://github.com/KhronosGroup/SPIRV-Headers.git
