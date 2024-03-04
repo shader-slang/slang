@@ -1500,47 +1500,52 @@ void Linkage::buildHash(DigestBuilder<SHA1>& builder, SlangInt targetIndex)
     // Add compiler options, including search path, preprocessor includes, etc.
     m_optionSet.buildHash(builder);
 
+    auto addTargetDigest = [&](TargetRequest* targetReq)
+    {
+        targetReq->getOptionSet().buildHash(builder);
+
+        const PassThroughMode passThroughMode = getDownstreamCompilerRequiredForTarget(targetReq->getTarget());
+        const SourceLanguage sourceLanguage = getDefaultSourceLanguageForDownstreamCompiler(passThroughMode);
+
+        // Add prelude for the given downstream compiler.
+        ComPtr<ISlangBlob> prelude;
+        getGlobalSession()->getLanguagePrelude((SlangSourceLanguage)sourceLanguage, prelude.writeRef());
+        if (prelude)
+        {
+            builder.append(prelude);
+        }
+
+        // TODO: Downstream compilers (specifically dxc) can currently #include additional dependencies.
+        // This is currently the case for NVAPI headers included in the prelude.
+        // These dependencies are currently not picked up by the shader cache which is a significant issue.
+        // This can only be fixed by running the preprocessor in the slang compiler so dxc (or any other
+        // downstream compiler for that matter) isn't resolving any includes implicitly.
+
+        // Add the downstream compiler version (if it exists) to the hash
+        auto downstreamCompiler = getSessionImpl()->getOrLoadDownstreamCompiler(passThroughMode, nullptr);
+        if (downstreamCompiler)
+        {
+            ComPtr<ISlangBlob> versionString;
+            if (SLANG_SUCCEEDED(downstreamCompiler->getVersionString(versionString.writeRef())))
+            {
+                builder.append(versionString);
+            }
+        }
+    };
+
     // Add the target specified by targetIndex
     if (targetIndex == -1)
     {
         // -1 means all targets.
         for (auto targetReq : targets)
         {
-            targetReq->getOptionSet().buildHash(builder);
+            addTargetDigest(targetReq);
         }
     }
     else
     {
         auto targetReq = targets[targetIndex];
-        targetReq->getOptionSet().buildHash(builder);
-    }
-
-    const PassThroughMode passThroughMode = getDownstreamCompilerRequiredForTarget(targetReq->getTarget());
-    const SourceLanguage sourceLanguage = getDefaultSourceLanguageForDownstreamCompiler(passThroughMode);
-
-    // Add prelude for the given downstream compiler.
-    ComPtr<ISlangBlob> prelude;
-    getGlobalSession()->getLanguagePrelude((SlangSourceLanguage)sourceLanguage, prelude.writeRef());
-    if (prelude)
-    {
-        builder.append(prelude);
-    }
-
-    // TODO: Downstream compilers (specifically dxc) can currently #include additional dependencies.
-    // This is currently the case for NVAPI headers included in the prelude.
-    // These dependencies are currently not picked up by the shader cache which is a significant issue.
-    // This can only be fixed by running the preprocessor in the slang compiler so dxc (or any other
-    // downstream compiler for that matter) isn't resolving any includes implicitly.
-
-    // Add the downstream compiler version (if it exists) to the hash
-    auto downstreamCompiler = getSessionImpl()->getOrLoadDownstreamCompiler(passThroughMode, nullptr);
-    if (downstreamCompiler)
-    {
-        ComPtr<ISlangBlob> versionString;
-        if (SLANG_SUCCEEDED(downstreamCompiler->getVersionString(versionString.writeRef())))
-        {
-            builder.append(versionString);
-        }
+        addTargetDigest(targetReq);
     }
 }
 
