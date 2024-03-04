@@ -878,6 +878,18 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::parseCommandLineArguments(
     return SLANG_OK;
 }
 
+SLANG_NO_THROW SlangResult SLANG_MCALL Session::getSessionDescDigest(slang::SessionDesc* sessionDesc, ISlangBlob** outBlob)
+{
+    ComPtr<slang::ISession> tempSession;
+    createSession(*sessionDesc, tempSession.writeRef());
+    auto linkage = static_cast<Linkage*>(tempSession.get());
+    DigestBuilder<SHA1> digestBuilder;
+    linkage->buildHash(digestBuilder, -1);
+    auto blob = digestBuilder.finalize().toBlob();
+    *outBlob = blob.detach();
+    return SLANG_OK;
+}
+
 Profile getEffectiveProfile(EntryPoint* entryPoint, TargetRequest* target)
 {
     auto entryPointProfile = entryPoint->getProfile();
@@ -1489,8 +1501,19 @@ void Linkage::buildHash(DigestBuilder<SHA1>& builder, SlangInt targetIndex)
     m_optionSet.buildHash(builder);
 
     // Add the target specified by targetIndex
-    auto targetReq = targets[targetIndex];
-    targetReq->getOptionSet().buildHash(builder);
+    if (targetIndex == -1)
+    {
+        // -1 means all targets.
+        for (auto targetReq : targets)
+        {
+            targetReq->getOptionSet().buildHash(builder);
+        }
+    }
+    else
+    {
+        auto targetReq = targets[targetIndex];
+        targetReq->getOptionSet().buildHash(builder);
+    }
 
     const PassThroughMode passThroughMode = getDownstreamCompilerRequiredForTarget(targetReq->getTarget());
     const SourceLanguage sourceLanguage = getDefaultSourceLanguageForDownstreamCompiler(passThroughMode);
