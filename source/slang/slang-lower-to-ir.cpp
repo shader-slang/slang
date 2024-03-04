@@ -656,6 +656,16 @@ bool isFromStdLib(Decl* decl)
     return false;
 }
 
+bool isDeclInDifferentModule(IRGenContext* context, Decl* decl)
+{
+    return getModuleDecl(decl) != context->getMainModuleDecl();
+}
+
+bool isForceInlineEarly(Decl* decl)
+{
+    return decl->hasModifier<UnsafeForceInlineEarlyAttribute>();
+}
+
 bool isImportedDecl(IRGenContext* context, Decl* decl, bool& outIsExplicitExtern)
 {
     // If the declaration has the extern attribute then it must be imported
@@ -9131,6 +9141,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // In Slang we currently try not to support forward declarations
             // (although we might have to give in eventually), so
             // this case should really only occur for builtin declarations.
+        }
+        else if (isDeclInDifferentModule(context, decl) && !isForceInlineEarly(decl))
+        {
+
         }
         else if (emitBody)
         {
