@@ -7013,21 +7013,24 @@ namespace Slang
         {
             return SPIRVAsmOperand{ SPIRVAsmOperand::NonSemanticDebugPrintfExtSet, parser->ReadToken() };
         }
-        else if (AdvanceIf(parser, "__rayPayloadFromLocation")) {
+        else if (AdvanceIf(parser, "__rayPayloadFromLocation")) 
+        {
             // reference a magic number to a layout(location) for late compiler resolution of rayPayload objects
             parser->ReadToken(TokenType::LParent);
             auto operand = SPIRVAsmOperand{ SPIRVAsmOperand::RayPayloadFromLocation, Token{}, parseAtomicExpr(parser) };
             parser->ReadToken(TokenType::RParent);
             return operand;
         }
-        else if (AdvanceIf(parser, "__rayAttributeFromLocation")) {
+        else if (AdvanceIf(parser, "__rayAttributeFromLocation")) 
+        {
             // works similar to __rayPayloadFromLocation
             parser->ReadToken(TokenType::LParent);
             auto operand = SPIRVAsmOperand{ SPIRVAsmOperand::RayAttributeFromLocation, Token{}, parseAtomicExpr(parser) };
             parser->ReadToken(TokenType::RParent);
             return operand;
         }
-        else if (AdvanceIf(parser, "__rayCallableFromLocation")) {
+        else if (AdvanceIf(parser, "__rayCallableFromLocation")) 
+        {
             // works similar to __rayPayloadFromLocation
             parser->ReadToken(TokenType::LParent);
             auto operand = SPIRVAsmOperand{ SPIRVAsmOperand::RayCallableFromLocation, Token{}, parseAtomicExpr(parser) };

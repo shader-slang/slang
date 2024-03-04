@@ -9333,7 +9333,6 @@ __generic<T : __BuiltinArithmeticType>
 __target_intrinsic(hlsl)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
-//__target_intrinsic(glsl, "subgroupExclusiveOr($0)")
 __target_intrinsic(cuda, "_wavePrefixOr(, _getMultiPrefixMask(($1).x), $0)")
 T WaveMultiPrefixBitOr(T expr, uint4 mask);
 
@@ -9341,7 +9340,6 @@ __generic<T : __BuiltinArithmeticType, let N : int>
 __target_intrinsic(hlsl)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
-//__target_intrinsic(glsl, "subgroupExclusiveOr($0)")
 __target_intrinsic(cuda, "_wavePrefixOrMultiple(_getMultiPrefixMask(($1).x), $0)")
 vector<T,N> WaveMultiPrefixBitOr(vector<T,N> expr, uint4 mask);
 
@@ -9531,32 +9529,22 @@ static const RAY_FLAG RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES       = 0x200;
 
 __target_intrinsic(hlsl, RayDesc)
 __target_intrinsic(cuda, RayDesc)
-//__target_intrinsic(glsl, RayDesc)
-//__target_intrinsic(spirv, RayDesc)
 struct RayDesc
 {
     __target_intrinsic(hlsl, Origin)
     __target_intrinsic(cuda, Origin)
-    //__target_intrinsic(glsl, Origin)
-    //__target_intrinsic(spirv, Origin)
     float3 Origin;
 
     __target_intrinsic(hlsl, TMin)
     __target_intrinsic(cuda, TMin)
-    //__target_intrinsic(glsl, TMin)
-    //__target_intrinsic(spirv, TMin)
     float  TMin;
 
     __target_intrinsic(hlsl, Direction)
     __target_intrinsic(cuda, Direction)
-    //__target_intrinsic(glsl, Direction)
-    //__target_intrinsic(spirv, Direction)
     float3 Direction;
 
     __target_intrinsic(hlsl, TMax)
     __target_intrinsic(cuda, TMax)
-    //__target_intrinsic(glsl, TMax)
-    //__target_intrinsic(spirv, TMax)
     float  TMax;
 };
 
@@ -9631,7 +9619,8 @@ void CallShader(uint shaderIndex, inout Payload payload)
             static Payload p;
 
             p = payload;
-            spirv_asm {
+            spirv_asm 
+            {
                 OpExecuteCallableKHR $shaderIndex &p
             };
             payload = p;
@@ -9711,7 +9700,8 @@ void TraceRay(
         let direction = Ray.Direction;
         let tmin = Ray.TMin;
         let tmax = Ray.TMax;
-        spirv_asm {
+        spirv_asm 
+        {
             OpTraceRayKHR 
                 /**/ $AccelerationStructure
                 /**/ $RayFlags
@@ -9801,7 +9791,8 @@ void TraceMotionRay(
         let tmax = Ray.TMax;
 
         p = Payload;
-        spirv_asm {
+        spirv_asm 
+        {
             OpCapability RayTracingMotionBlurNV;
             OpExtension "SPV_NV_ray_tracing_motion_blur";
 
@@ -9835,7 +9826,8 @@ bool __reportIntersection(float tHit, uint hitKind)
     case _GL_EXT_ray_tracing:
     case glsl: __intrinsic_asm "reportIntersectionEXT";
     case spirv:
-        return spirv_asm {
+        return spirv_asm 
+        {
             result:$$bool = OpReportIntersectionKHR $tHit $hitKind;
         };
     }
@@ -9862,7 +9854,11 @@ void IgnoreHit()
     case _GL_EXT_ray_tracing:
     case glsl: __intrinsic_asm "ignoreIntersectionEXT;";
     case cuda: __intrinsic_asm "optixIgnoreIntersection";
-    case spirv: spirv_asm { OpIgnoreIntersectionKHR; %_ = OpLabel };
+    case spirv: 
+        spirv_asm 
+        { 
+            OpIgnoreIntersectionKHR; %_ = OpLabel 
+        };
     }
 }
 
@@ -9875,7 +9871,11 @@ void AcceptHitAndEndSearch()
     case _GL_EXT_ray_tracing:
     case glsl: __intrinsic_asm "terminateRayEXT;";
     case cuda: __intrinsic_asm "optixTerminateRay";
-    case spirv: spirv_asm { OpTerminateRayKHR; %_ = OpLabel };
+    case spirv: 
+        spirv_asm 
+        { 
+            OpTerminateRayKHR; %_ = OpLabel 
+        };
     }
 }
 
@@ -9893,12 +9893,12 @@ uint3 DispatchRaysIndex()
     {
     case hlsl: __intrinsic_asm "DispatchRaysIndex";
     case _GL_EXT_ray_tracing:
-    case glsl:
     case glsl: 
         __intrinsic_asm "(gl_LaunchIDEXT)";
     case cuda: __intrinsic_asm "optixGetLaunchIndex";
     case spirv:
-        return spirv_asm {
+        return spirv_asm 
+        {
             result:$$uint3 = OpLoad builtin(LaunchIdKHR:uint3);
         };
     }
@@ -9911,12 +9911,11 @@ uint3 DispatchRaysDimensions()
     {
     case hlsl:  __intrinsic_asm "DispatchRaysDimensions";
     case _GL_EXT_ray_tracing:
-    case glsl:
-    case glsl:
-         __intrinsic_asm "(gl_LaunchSizeEXT)";
+    case glsl: __intrinsic_asm "(gl_LaunchSizeEXT)";
     case cuda: __intrinsic_asm "optixGetLaunchDimensions";
     case spirv:
-        return spirv_asm {
+        return spirv_asm 
+        {
             result:$$uint3 = OpLoad builtin(LaunchSizeKHR:uint3);
         };
     }
@@ -9933,7 +9932,8 @@ float3 WorldRayOrigin()
     case glsl: __intrinsic_asm "(gl_WorldRayOriginEXT)";
     case cuda: __intrinsic_asm "optixGetWorldRayOrigin";
     case spirv:
-        return spirv_asm {
+        return spirv_asm 
+        {
             result:$$float3 = OpLoad builtin(WorldRayOriginKHR:float3);
         };
     }
@@ -9948,7 +9948,8 @@ float3 WorldRayDirection()
     case glsl: __intrinsic_asm "(gl_WorldRayDirectionEXT)";
     case cuda: __intrinsic_asm "optixGetWorldRayDirection";
     case spirv:
-        return spirv_asm {
+        return spirv_asm 
+        {
             result:$$float3 = OpLoad builtin(WorldRayDirectionKHR:float3);
         };
     }
@@ -9963,7 +9964,8 @@ float RayTMin()
     case glsl: __intrinsic_asm "(gl_RayTminEXT)";
     case cuda: __intrinsic_asm "optixGetRayTmin";
     case spirv:
-        return spirv_asm {
+        return spirv_asm 
+        {
             result:$$float = OpLoad builtin(RayTminKHR:float);
         };
     }
@@ -9988,7 +9990,8 @@ float RayTCurrent()
     case glsl: __intrinsic_asm "(gl_RayTmaxEXT)";
     case cuda: __intrinsic_asm "optixGetRayTmax";
     case spirv:
-        return spirv_asm {
+        return spirv_asm 
+        {
             result:$$float = OpLoad builtin(RayTmaxKHR:float);
         };
     }
@@ -10003,7 +10006,8 @@ uint RayFlags()
     case glsl: __intrinsic_asm "(gl_IncomingRayFlagsEXT)";
     case cuda: __intrinsic_asm "optixGetRayFlags";
     case spirv:
-        return spirv_asm {
+        return spirv_asm 
+        {
             result:$$uint = OpLoad builtin(IncomingRayFlagsKHR:uint);
         };
     }
@@ -10020,7 +10024,8 @@ uint InstanceIndex()
     case glsl: __intrinsic_asm "(gl_InstanceID)";
     case cuda: __intrinsic_asm "optixGetInstanceIndex";
     case spirv:
-        return spirv_asm {
+        return spirv_asm 
+        {
             result:$$uint = OpLoad builtin(InstanceId:uint);
         };
     }
@@ -10035,7 +10040,8 @@ uint InstanceID()
     case glsl: __intrinsic_asm "(gl_InstanceCustomIndexEXT)";
     case cuda: __intrinsic_asm "optixGetInstanceId";
     case spirv:
-        return spirv_asm {
+        return spirv_asm 
+        {
             result:$$uint = OpLoad builtin(InstanceCustomIndexKHR:uint);
         };
     }
@@ -10050,7 +10056,8 @@ uint PrimitiveIndex()
     case glsl:  __intrinsic_asm "(gl_PrimitiveID)";
     case cuda: __intrinsic_asm "optixGetPrimitiveIndex";
     case spirv:
-        return spirv_asm {
+        return spirv_asm 
+        {
             result:$$uint = OpLoad builtin(PrimitiveId:uint);
         };
     }
@@ -10065,7 +10072,8 @@ float3 ObjectRayOrigin()
     case glsl: __intrinsic_asm "(gl_ObjectRayOriginEXT)";
     case cuda: __intrinsic_asm "optixGetObjectRayOrigin";
     case spirv:
-        return spirv_asm {
+        return spirv_asm 
+        {
             result:$$float3 = OpLoad builtin(ObjectRayOriginKHR:float3);
         };
     }
@@ -10080,7 +10088,8 @@ float3 ObjectRayDirection()
     case glsl: __intrinsic_asm "(gl_ObjectRayDirectionEXT)";
     case cuda: __intrinsic_asm "optixGetObjectRayDirection";
     case spirv:
-        return spirv_asm {
+        return spirv_asm 
+        {
             result:$$float3 = OpLoad builtin(ObjectRayDirectionKHR:float3);
         };
     }
@@ -10096,7 +10105,8 @@ float3x4 ObjectToWorld3x4()
     case _GL_EXT_ray_tracing:
     case glsl: __intrinsic_asm "transpose(gl_ObjectToWorldEXT)";
     case spirv:
-        return spirv_asm {
+        return spirv_asm 
+        {
             %mat:$$float4x3 = OpLoad builtin(ObjectToWorldKHR:float4x3);
             result:$$float3x4 = OpTranspose %mat;
         };
@@ -10111,7 +10121,8 @@ float3x4 WorldToObject3x4()
     case _GL_EXT_ray_tracing:
     case glsl: __intrinsic_asm "transpose(gl_WorldToObjectEXT)";
     case spirv:
-        return spirv_asm {
+        return spirv_asm 
+        {
             %mat:$$float4x3 = OpLoad builtin(WorldToObjectKHR:float4x3);
             result:$$float3x4 = OpTranspose %mat;
         };
@@ -10126,7 +10137,8 @@ float4x3 ObjectToWorld4x3()
     case _GL_EXT_ray_tracing:
     case glsl: __intrinsic_asm "(gl_ObjectToWorldEXT)";
     case spirv:
-        return spirv_asm {
+        return spirv_asm 
+        {
             result:$$float4x3 = OpLoad builtin(ObjectToWorldKHR:float4x3);
         };
     }
@@ -10140,7 +10152,8 @@ float4x3 WorldToObject4x3()
     case _GL_EXT_ray_tracing:
     case glsl: __intrinsic_asm "(gl_WorldToObjectEXT)";
     case spirv:
-        return spirv_asm {
+        return spirv_asm 
+        {
             result:$$float4x3 = OpLoad builtin(WorldToObjectKHR:float4x3);
         };
     }
@@ -10160,7 +10173,8 @@ float RayCurrentTime()
     case hlsl:  __intrinsic_asm "RayCurrentTime";
     case glsl:  __intrinsic_asm "(gl_CurrentRayTimeNV)";
     case spirv:
-        return spirv_asm {
+        return spirv_asm 
+        {
             result:$$float = OpLoad builtin(CurrentRayTimeNV:float);
         };
     }
@@ -10188,7 +10202,8 @@ uint HitKind()
     case glsl:  __intrinsic_asm "(gl_HitKindEXT)";
     case cuda:  __intrinsic_asm "optixGetHitKind";
     case spirv:
-        return spirv_asm {
+        return spirv_asm 
+        {
             result:$$uint = OpLoad builtin(HitKindKHR:uint);
         };
     }
@@ -12186,7 +12201,8 @@ struct HitObject
         {
         case hlsl: __intrinsic_asm ".GetObjectToWorld";
         case glsl: __intrinsic_asm "hitObjectGetObjectToWorldNV($0)";
-        case spirv: return spirv_asm {
+        case spirv: 
+        return spirv_asm {
                 result:$$float4x3 = OpHitObjectGetObjectToWorldNV &this;
             };
         }
@@ -12201,7 +12217,7 @@ struct HitObject
         case glsl:
             __intrinsic_asm "hitObjectGetCurrentTimeNV($0)";
         case spirv:
-            spirv_asm {
+            return spirv_asm {
                 result:$$float = OpHitObjectGetCurrentTimeNV &this
             };
         }
@@ -12217,7 +12233,7 @@ struct HitObject
         case glsl:
             __intrinsic_asm "hitObjectGetObjectRayOriginNV($0)";
         case spirv:
-            spirv_asm {
+            return spirv_asm {
                 result:$$float3 = OpHitObjectGetObjectRayOriginNV &this
             };
         }

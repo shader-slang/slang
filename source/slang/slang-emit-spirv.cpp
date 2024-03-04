@@ -2688,6 +2688,8 @@ struct SPIRVEmitContext
         // this code path is a catch-all for stuff that only needs to
         // be emitted if the owning instruction gets emitted.
 
+        bool isRayTracingObject = false;
+
         switch( decoration->getOp() )
         {
         default:
@@ -2959,23 +2961,20 @@ struct SPIRVEmitContext
         case kIROp_VulkanCallablePayloadInDecoration:
             ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_ray_tracing"));
             requireSPIRVCapability(SpvCapabilityRayTracingKHR);
-            goto rayExtensionAddition;
+            isRayTracingObject = true;
+            break;
         case kIROp_VulkanHitObjectAttributesDecoration:
             // needed since GLSL will not set optypes accordingly, but will keep the decoration 
             ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_shader_invocation_reorder"));
             requireSPIRVCapability(SpvCapabilityShaderInvocationReorderNV);
-            goto rayExtensionAddition;
+            isRayTracingObject = true;
+            break;
         case kIROp_VulkanRayPayloadDecoration:
         case kIROp_VulkanRayPayloadInDecoration:
             // needed since GLSL will not set optypes accordingly, but will keep the decoration 
             ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_ray_query"));
             requireSPIRVCapability(SpvCapabilityRayQueryKHR);
-            goto rayExtensionAddition;
-rayExtensionAddition:;
-            emitOpDecorateLocation(getSection(SpvLogicalSectionID::Annotations),
-                decoration,
-                dstID,
-                SpvLiteralInteger::from32(int32_t(getIntVal(decoration->getOperand(0)))));
+            isRayTracingObject = true;
             break;
         case kIROp_GloballyCoherentDecoration:
             emitOpDecorate(getSection(SpvLogicalSectionID::Annotations),
@@ -2984,6 +2983,14 @@ rayExtensionAddition:;
                                SpvDecorationCoherent);
             break;
         // ...
+        }
+
+        if(isRayTracingObject)
+        {
+                emitOpDecorateLocation(getSection(SpvLogicalSectionID::Annotations),
+                decoration,
+                dstID,
+                SpvLiteralInteger::from32(int32_t(getIntVal(decoration->getOperand(0)))));
         }
 
         if (shouldEmitSPIRVReflectionInfo())

@@ -4290,7 +4290,8 @@ namespace Slang
     }
 
 
-    void IRModule::trySearchForAndFillAllRayVariables(){
+    void IRModule::trySearchForAndFillAllRayVariables()
+    {
         //instead of forcing order of code, a single pass if needed can be used
         //likley forcing order is a faster and better idea
 

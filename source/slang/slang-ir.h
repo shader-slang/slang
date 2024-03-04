@@ -21,7 +21,6 @@
 #include "slang-type-system-shared.h"
 #include "slang-container-pool.h"
 
-
 namespace Slang {
 
 class   Decl;
@@ -31,6 +30,7 @@ class   Layout;
 class   Type;
 class   Session;
 class   Name;
+struct  DiagnosticSink;
 struct  IRBuilder;
 struct  IRFunc;
 struct  IRGlobalValueWithCode;
@@ -2239,8 +2239,6 @@ struct IRAnalysis
     RefPtr<RefObject> domTree;
     IRDominatorTree* getDominatorTree();
 };
-
-struct DiagnosticSink;
 
 struct IRModule : RefObject
 {
