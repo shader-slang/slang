@@ -2,11 +2,7 @@ name: VK-GL-CTS Nightly
 
 on:
   schedule:
-    - cron: '00 2 * * *'
-  push:
-    branches: [master]
-  pull_request:
-    branches: [master]
+    - cron: '45 11 * * *'
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -39,6 +35,7 @@ jobs:
     - name: vkcts run
       run: |
         Expand-Archive VK-GL-CTS_WithSlang-0.0.3-win64.zip
+        
         copy ${{ github.workspace }}\bin\windows-x64\release\slang.dll ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\slang.dll
 
         copy ${{ github.workspace }}\bin\windows-x64\release\slang-glslang.dll ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\slang-glslang.dll
