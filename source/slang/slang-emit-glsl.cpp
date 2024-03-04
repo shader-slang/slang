@@ -2677,6 +2677,13 @@ void GLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
         break;
     }
 
+    if(auto offsetDec = varDecl->findDecoration<IRGLSLOffsetDecoration>())
+    {
+        m_writer->emit(toSlice("layout(offset = "));
+        m_writer->emit(offsetDec->getOffset()->getValue());
+        m_writer->emit(toSlice(") "));
+    }
+
     if (varDecl->findDecoration<IRGloballyCoherentDecoration>())
     {
         m_writer->emit("coherent\n");

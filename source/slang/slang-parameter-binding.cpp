@@ -934,6 +934,12 @@ static void addExplicitParameterBinding(
 
         if (overlappedVarLayout)
         {
+            //legal if atomicUint
+            if(parameterInfo->varLayout->varDecl.getDecl()->getType()->astNodeType == ASTNodeType::GLSLAtomicUintType
+                && overlappedVarLayout->varDecl.getDecl()->getType()->astNodeType == ASTNodeType::GLSLAtomicUintType)
+            {
+                return;
+            }
             auto paramA = parameterInfo->varLayout->varDecl.getDecl();
             auto paramB = overlappedVarLayout->varDecl.getDecl();
 

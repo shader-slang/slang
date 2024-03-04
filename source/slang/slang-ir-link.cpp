@@ -8,6 +8,7 @@
 #include "slang-ir-string-hash.h"
 #include "slang-ir-autodiff.h"
 #include "slang-ir-specialize-target-switch.h"
+#include "slang-ir-layout.h"
 #include "slang-module-library.h"
 
 #include "../core/slang-performance-profiler.h"
@@ -1519,6 +1520,188 @@ static void diagnoseUnresolvedSymbols(TargetRequest* req, DiagnosticSink* sink, 
     }
 }
 
+void convertAllAtomicUintToStructuredBufferUsages(
+    IRSpecContext* context, 
+    TargetProgram* targetProgram, 
+    IRModule* irModule,
+    Dictionary<int, List<IRInst*>>& bindingToInstMapUnsorted)
+{
+    IRBuilder builder = *context->builder;
+
+    for (auto& bindingToInstList : bindingToInstMapUnsorted)
+    {
+        //I don't need a sorted list, just the max so I can make an array of uint[(maxOffset/4)+1]
+        uint32_t maxOffset = 0;
+        for (auto& i : bindingToInstList.second)
+        {
+            int currOffset = i->findDecoration<IRGLSLOffsetDecoration>()->getOffset()->getValue();
+            maxOffset = (maxOffset < currOffset) ? currOffset : maxOffset;
+        }
+        auto instToSwitch = *bindingToInstList.second.begin();
+        builder.setInsertBefore(instToSwitch);
+        
+        // now we know the max offset and can construct a new storageBuffer with key of type maxOffset/4 (32bit uint)
+        auto elementType = builder.getArrayType(
+            builder.getUIntType(),
+            builder.getIntValue(builder.getUIntType(), uint32_t(maxOffset / 4)+uint32_t(1))
+        );
+
+        // now we make our struct which goes within with some name (does not matter), 
+        StringBuilder nameStruct;
+        nameStruct << "atomic_uints";
+        nameStruct << bindingToInstList.first;
+        nameStruct << "_t";
+        nameStruct << "_paramGroup";
+        auto structType = builder.createStructType();
+        builder.addNameHintDecoration(structType, nameStruct.produceString().getUnownedSlice());
+
+        // our "_data" struct member
+        auto elementBufferKey = builder.createStructKey();
+        builder.addNameHintDecoration(elementBufferKey, UnownedStringSlice("_data"));
+        auto elementBufferType = elementType;
+        auto _dataField = builder.createStructField(structType, elementBufferKey, elementBufferType);
+        
+        // make our valid storage buffer type
+        auto std430 = builder._createInst(sizeof(IRTypeLayoutRules), builder.getType(kIROp_Std430BufferLayoutType), kIROp_Std430BufferLayoutType);
+        IRGLSLShaderStorageBufferType* storageBuffer;
+        {
+            IRInst* ops[] = { structType, std430 };
+            storageBuffer = builder.createGLSLShaderStorableBufferType(2, ops);
+        }
+
+        // link storage buffer to any known atomic_uint
+        instToSwitch->setFullType(storageBuffer);
+        
+        // now we need to make all call's to:
+        // 1. convert all atomic_uint function type parameters to an inout/ptr uint
+        // 2. convert all atomic_uint params inputs into a field->element-addr
+        // based on location(offset) from the atomic_uint->storage_buffer logic above
+        for (auto& i : bindingToInstList.second)
+        {
+            int currOffset = i->findDecoration<IRGLSLOffsetDecoration>()->getOffset()->getValue();
+            // we manage the "next" ptr with a seperate list instance since we don't want to add uses
+            // of an unrelated Call to our elementAddr
+            IRUse* next = nullptr;
+            for (auto use = i->firstUse; use; use = next)
+            {
+                next = use->nextUse;
+                auto user = use->user;
+                
+                switch (user->getOp())
+                {
+                case kIROp_StructFieldLayoutAttr:
+                {
+                    // ignore the def
+                    break;
+                }
+                case kIROp_Call:
+                { 
+
+                    builder.setInsertBefore(user);
+                    auto fieldAddress = builder.emitFieldAddress(
+                        builder.getPtrType(_dataField->getFieldType()),
+                        instToSwitch,
+                        _dataField->getKey()
+                        );
+                    auto elementAddr = builder.emitElementAddress(
+                        builder.getPtrType(builder.getUIntType()),
+                        fieldAddress,
+                        builder.getIntValue(builder.getIntType(), currOffset/4));
+
+                    user->setOperand(1, elementAddr);
+                    auto funcTypeInst = (user->getOperand(0));
+                    auto funcType = funcTypeInst->getFullType();
+                    funcType->getOperand(1)->removeAndDeallocate();
+
+                    auto paramReplacment = builder.getRefType((builder.getUIntType()));
+                    funcType->unsafeSetOperand(1, paramReplacment);
+
+                    for (auto maybeBlock : funcTypeInst->getChildren())
+                    {
+                        switch (maybeBlock->getOp())
+                        {
+                        case kIROp_Block:
+                        {
+                            for (auto maybeParam : maybeBlock->getChildren())
+                            {
+                                if (maybeParam->getOp() == kIROp_Param)
+                                {
+                                    if (maybeParam->getFullType()->getOp() == kIROp_GLSLAtomicUintType)
+                                    {
+                                        // glsl needs an inout param, no ptrs
+                                        // else op will not work on shared memory 
+                                        // (a requirment)
+                                        maybeParam->setFullType(builder.getInOutType(builder.getUIntType()));
+                                    }
+                                }
+                                else if (maybeParam->getOp() == kIROp_SPIRVAsm)
+                                {
+                                    for (auto maybeSpirvOp : maybeParam->getChildren())
+                                    {
+                                        // spirv uses pointers, NOT inout; Access Chains to storage buffers
+                                        // lead to ptr's 
+                                        if (maybeSpirvOp->getOp() == kIROp_SPIRVAsmOperandInst
+                                            && maybeSpirvOp->typeUse.usedValue 
+                                            && maybeSpirvOp->typeUse.usedValue->m_op == kIROp_GLSLAtomicUintType)
+                                        {
+                                            maybeSpirvOp->typeUse.usedValue->removeAndDeallocate();
+                                            maybeSpirvOp->typeUse.usedValue = builder.getPtrType(builder.getUIntType());
+                                        }
+                                    }
+                                }
+                            }
+                            break;
+                        }
+                        };
+                    }
+
+                    break;
+                }
+                }
+            }
+            if (i->typeUse.usedValue->getOp() == kIROp_GLSLAtomicUintType)
+            {
+                i->removeAndDeallocate();
+            }
+        }
+    }
+}
+
+void tryGLSLTypeReplacmentProcessing(IRSpecContext* context, TargetProgram* targetProgram, IRModule* irModule)
+{
+    if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL))
+    {
+        /// do 1 pass and get all data needed to process GLSL inst's that need attention
+        Dictionary<int, List<IRInst*>> bindingToInstMapUnsorted;
+        {
+            for (auto inst : irModule->getGlobalInsts())
+            {
+                if (inst->typeUse.usedValue)
+                {
+                    switch (inst->typeUse.usedValue->getOp())
+                    {
+                    case kIROp_GLSLAtomicUintType:
+                    {
+                        // Atomic_uint are supported by GLSL through converting to a different type (compiler ext)
+                        // not supported by SPIR-V->VK, means we must convert the type ourselves, else SPIR-V + 
+                        // HLSL is going to be impossible to emit as a target
+
+                        // we fetch all global instances to pre-process
+                        auto layout = inst->findDecoration<IRLayoutDecoration>()->getLayout();
+                        auto layoutVal = as<IRVarOffsetAttr>(layout->getOperand(1))->getOffset();
+                        bindingToInstMapUnsorted.getOrAddValue(layoutVal, List<IRInst*>()).add(inst);
+                        break;
+                    }
+                    };
+                }
+            }
+        }
+        ///
+
+        convertAllAtomicUintToStructuredBufferUsages(context, targetProgram, irModule, bindingToInstMapUnsorted);
+    }
+}
+
 LinkedIR linkIR(
     CodeGenContext* codeGenContext)
 {
@@ -1726,6 +1909,11 @@ LinkedIR linkIR(
     // At this point, we should not see any [import] symbols that does not have a
     // definition.
     diagnoseUnresolvedSymbols(targetReq, codeGenContext->getSink(), state->irModule);
+
+    // type-use reformatter of GLSL types (only if compiler is set to AllowGLSL mode)
+    // which are not supported by SPIRV->Vulkan but is supported by GLSL->Vulkan through
+    // compiler magic tricks
+    tryGLSLTypeReplacmentProcessing(context, targetProgram, state->irModule);
 
     // TODO: *technically* we should consider the case where
     // we have global variables with initializers, since

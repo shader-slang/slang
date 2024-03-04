@@ -942,6 +942,8 @@ enum class ShaderParameterKind
     RegisterSpace,
 
     AppendConsumeStructuredBuffer,
+
+    AtomicUint,
 };
 
 struct SimpleLayoutRulesImpl

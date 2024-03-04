@@ -229,6 +229,24 @@ namespace Slang
                 lastErrorLoc = loc;
             }
         }
+
+    public:
+        void setBindingOffset(int binding, int byteOffset)
+        {
+            bindingToByteOffset.set(binding, byteOffset);
+        }
+        int getNextBindingOffset(int binding) 
+        {
+            int& currentOffset = bindingToByteOffset.getOrAddValue(binding, 0);
+            bindingToByteOffset.set(
+                binding,
+                currentOffset+4
+                );
+            return currentOffset;
+        }
+
+    private:
+        Dictionary<int, int> bindingToByteOffset;
     };
 
     // Forward Declarations
@@ -4364,6 +4382,49 @@ namespace Slang
         return attrDecl;
     }
 
+    static void ifGLSLAddSpecialModifiersBasedOnType(
+        Parser* parser,
+        Decl* decl,
+        Modifiers* modifiers)
+    {
+        if (parser->options.allowGLSLInput) 
+        {
+            // we intentionally have findModifier twice since GLSLOffsetLayoutAttribute is rare
+            // better to early leave
+            if (auto bindingMod = modifiers->findModifier<GLSLBindingAttribute>())
+            {
+                if (auto varDeclBase = as<VarDeclBase>(decl))
+                {
+                    if (auto declRefExpr = as<DeclRefExpr>(varDeclBase->type.exp))
+                    {
+                        // here is a problem; we link types into a literal in IR stage post parse
+                        // but, order (top down) mattter when parsing atomic_uint offset
+                        // more over, we can have patterns like: offset = 20, no offset [+4], offset = 16.
+                        // Therefore we must parse all in order. The issue then is will struggle to 
+                        // subsitute atomic_uint for storage buffers...
+                        if (auto name = declRefExpr->name)
+                        {
+                            if (name->text.equals("atomic_uint"))
+                            {
+                                if (!modifiers->findModifier<GLSLOffsetLayoutAttribute>())
+                                {
+                                    int nextOffset = parser->getNextBindingOffset(bindingMod->binding);
+                                    GLSLOffsetLayoutAttribute* modifier = parser->astBuilder->create<GLSLOffsetLayoutAttribute>();
+                                    modifier->keywordName = NULL; //no keyword name given
+                                    modifier->loc = bindingMod->loc; //has no location in file, set to parent binding
+                                    modifier->offset = nextOffset;
+                                    
+                                    Modifiers newModifier;
+                                    newModifier.first = modifier;
+                                    _addModifiers(decl, newModifier);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
     // Finish up work on a declaration that was parsed
     static void CompleteDecl(
         Parser*				parser,
@@ -4402,6 +4463,7 @@ namespace Slang
         }
         else
         {
+            ifGLSLAddSpecialModifiersBasedOnType(parser, declToModify, &modifiers);
             _addModifiers(declToModify, modifiers);
         }
 
@@ -7786,6 +7848,7 @@ namespace Slang
                 CASE(std140, GLSLStd140Modifier)
                 CASE(std430, GLSLStd430Modifier)
                 CASE(scalar, GLSLScalarModifier)
+                CASE(offset, GLSLOffsetLayoutAttribute)
                 CASE(location, GLSLLocationLayoutModifier) 
                 {
                     modifier = parser->astBuilder->create<GLSLUnparsedLayoutModifier>();
@@ -7797,11 +7860,24 @@ namespace Slang
                 modifier->loc = nameAndLoc.loc;
 
                 // Special handling for GLSLLayoutModifier
-                if (auto glslModifier = as<GLSLLayoutModifier>(modifier))
+                if (AdvanceIf(parser, TokenType::OpAssign))
                 {
-                    if (AdvanceIf(parser, TokenType::OpAssign))
+                    if (auto glslModifier = as<GLSLParsedLayoutModifier>(modifier))
                     {
                         glslModifier->valToken = parser->ReadToken(TokenType::IntegerLiteral);
+                    }
+                    //Special handling for GLSLOffsetLayoutAttribute to add to the byte offset tracker at a binding location
+                    else if (auto glslOffset = as<GLSLOffsetLayoutAttribute>(modifier))
+                    {
+                        if (auto binding = listBuilder.find<GLSLBindingAttribute>())
+                        {
+                            glslOffset->offset = getIntegerLiteralValue(parser->ReadToken(TokenType::IntegerLiteral));
+                            parser->setBindingOffset(binding->binding, glslOffset->offset);
+                        }
+                        else
+                        {
+                            parser->diagnose(modifier->loc, Diagnostics::missingLayoutBindingModifier);
+                        }
                     }
                 }
 
@@ -7877,6 +7953,7 @@ namespace Slang
 
         return modifier;
     }
+    
     static NodeBase* parseImplicitConversionModifier(Parser* parser, void* /*userData*/)
     {
         ImplicitConversionModifier* modifier = parser->astBuilder->create<ImplicitConversionModifier>();

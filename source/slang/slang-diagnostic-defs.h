@@ -243,6 +243,8 @@ DIAGNOSTIC(20101, Warning, unintendedEmptyStatement, "potentially unintended emp
 
 DIAGNOSTIC(30102, Error, declNotAllowed, "$0 is not allowed here.")
 
+DIAGNOSTIC(20001, Error, missingLayoutBindingModifier, "Expecting binding modifier with layout")
+
 // 29xxx - Snippet parsing and inline asm
 DIAGNOSTIC(29000, Error, snippetParsingFailed, "unable to parse target intrinsic snippet: $0")
 

@@ -370,6 +370,12 @@ struct IRGLSLLocationDecoration : IRDecoration
     IRIntLit* getLocation() { return cast<IRIntLit>(getOperand(0)); }
 };
 
+struct IRGLSLOffsetDecoration : IRDecoration
+{
+    IR_LEAF_ISA(GLSLOffsetDecoration)
+    IRIntLit* getOffset() { return cast<IRIntLit>(getOperand(0)); }
+};
+
 struct IRNVAPIMagicDecoration : IRDecoration
 {
     enum { kOp = kIROp_NVAPIMagicDecoration };
@@ -3804,6 +3810,7 @@ public:
 
     // Create an initially empty `GLSLShaderStorageBufferType` type.
     IRGLSLShaderStorageBufferType* createGLSLShaderStorableBufferType();
+    IRGLSLShaderStorageBufferType* createGLSLShaderStorableBufferType(UInt operandCount, IRInst* const* operands);
 
     // Create an empty `interface` type.
     IRInterfaceType* createInterfaceType(UInt operandCount, IRInst* const* operands);

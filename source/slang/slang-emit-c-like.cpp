@@ -2610,6 +2610,10 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         }
         break;
     }
+    case kIROp_RequireGLSLExtension:
+    {
+        break; //should already have set requirement; case covered for empty intrinsic block
+    }
     default:
         diagnoseUnhandledInst(inst);
         break;

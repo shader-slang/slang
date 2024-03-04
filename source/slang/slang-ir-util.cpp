@@ -181,6 +181,7 @@ bool isValueType(IRInst* dataType)
     case kIROp_ArrayType:
     case kIROp_FuncType:
     case kIROp_RaytracingAccelerationStructureType:
+    case kIROp_GLSLAtomicUintType:
         return true;
     default:
         // Read-only resource handles are considered as Value type.
@@ -474,6 +475,8 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
     case kIROp_HLSLRasterizerOrderedByteAddressBufferType:
         sb << "RasterizerOrderedByteAddressBuffer";
         break;
+    case kIROp_GLSLAtomicUintType:
+        sb << "AtomicCounter";
     case kIROp_RaytracingAccelerationStructureType:
         sb << "RayTracingAccelerationStructure";
         break;

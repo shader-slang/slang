@@ -166,6 +166,7 @@ INST(Nop, nop, 0, 0)
             INST(HLSLRasterizerOrderedByteAddressBufferType,    RasterizerOrderedByteAddressBuffer, 0, HOISTABLE)
         INST_RANGE(ByteAddressBufferTypeBase, HLSLByteAddressBufferType, HLSLRasterizerOrderedByteAddressBufferType)
         INST(RaytracingAccelerationStructureType, RaytracingAccelerationStructure, 0, HOISTABLE)
+        INST(GLSLAtomicUintType, GLSLAtomicUint, 0, HOISTABLE)
     INST_RANGE(UntypedBufferResourceType, HLSLByteAddressBufferType, RaytracingAccelerationStructureType)
 
     /* HLSLPatchType */
@@ -173,7 +174,7 @@ INST(Nop, nop, 0, 0)
         INST(HLSLOutputPatchType,   OutputPatch,    2, HOISTABLE)
     INST_RANGE(HLSLPatchType, HLSLInputPatchType, HLSLOutputPatchType)
 
-    INST(GLSLInputAttachmentType, GLSLInputAttachment, 0, HOISTABLE)
+    INST(GLSLInputAttachmentType, GLSLInputAttachment, 0, HOISTABLE)    
 
     /* BuiltinGenericType */
         /* HLSLStreamOutputType */
@@ -844,6 +845,7 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(GlobalOutputDecoration, output, 0, 0)
     INST(GlobalInputDecoration, output, 0, 0)
     INST(GLSLLocationDecoration, glslLocation, 1, 0)
+    INST(GLSLOffsetDecoration, glslOffset, 1, 0)
     INST(PayloadDecoration, payload, 0, 0)
 
     /* Mesh Shader outputs */
