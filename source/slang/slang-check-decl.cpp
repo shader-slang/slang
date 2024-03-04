@@ -1816,21 +1816,16 @@ namespace Slang
         if (auto initExpr = varDecl->initExpr)
         {
             // Disable the short-circuiting for static const variable init expression
-            if (varDecl->hasModifier<HLSLStaticModifier>() &&
-                varDecl->hasModifier<ConstModifier>())
-            {
-                auto subContext = disableShortCircuitLogicalExpr();
-                initExpr = dispatchExpr(initExpr, subContext);
-            }
-            else
-            {
+            bool isStaticConst = varDecl->hasModifier<HLSLStaticModifier>() &&
+                varDecl->hasModifier<ConstModifier>();
 
+            auto subVisitor = isStaticConst?
+                    SemanticsVisitor(disableShortCircuitLogicalExpr()) : *this;
                 // If the variable has an explicit initial-value expression,
                 // then we simply need to check that expression and coerce
                 // it to the type of the variable.
                 //
-                initExpr = CheckTerm(initExpr);
-            }
+            initExpr = subVisitor.CheckTerm(initExpr);
 
             initExpr = coerce(CoercionSite::Initializer, varDecl->type.Ptr(), initExpr);
             varDecl->initExpr = initExpr;

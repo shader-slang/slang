@@ -1911,18 +1911,12 @@ namespace Slang
         // the subscript
         auto baseType = baseExpr->type.Ptr();
         auto baseTypeType = as<TypeType>(baseType);
-        if (baseTypeType)
-        {
-            if (this->m_shouldShortCircuitLogicExpr)
-            {
-                auto subContext = disableShortCircuitLogicalExpr();
-                return dispatchExpr(subscriptExpr, subContext);
-            }
-        }
+        auto subVisitor = (baseTypeType && m_shouldShortCircuitLogicExpr)?
+            SemanticsVisitor(disableShortCircuitLogicalExpr()) : *this;
 
         for (auto& arg : subscriptExpr->indexExprs)
         {
-            arg = CheckTerm(arg);
+            arg = subVisitor.CheckTerm(arg);
         }
 
         // If anything went wrong in the base expression,
@@ -2396,11 +2390,8 @@ namespace Slang
             return nullptr;
         }
 
-        const ReflectClassInfo& classInfo = expr->functionExpr->getClassInfo();
-        const ASTNodeType astType = ASTNodeType(classInfo.m_classId);
-        if (ASTNodeType::VarExpr == astType)
+        if (auto varExpr = as<VarExpr>(expr->functionExpr))
         {
-            VarExpr const* varExpr = as<VarExpr const>(expr->functionExpr);
             if ((varExpr->name->text == "&&") || (varExpr->name->text == "||"))
             {
                 // We only use short-circuiting in scalar input, will fall back
@@ -2457,11 +2448,8 @@ namespace Slang
         // if the expression is '&&' or '||', we will convert it
         // to use short-circuit evaluation.
         bool isArgumentsChecked = false;
-        Expr* newExpr = convertToLogicOperatorExpr(expr, isArgumentsChecked);
-        if (newExpr != nullptr)
-        {
+        if (auto newExpr = convertToLogicOperatorExpr(expr, isArgumentsChecked))
             return newExpr;
-        }
 
         expr->functionExpr = CheckTerm(expr->functionExpr);
         auto treatAsDifferentiableExpr = m_treatAsDifferentiableExpr;
