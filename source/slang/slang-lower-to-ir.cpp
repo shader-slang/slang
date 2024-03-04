@@ -6305,7 +6305,10 @@ void maybeEmitDebugLine(IRGenContext* context, StmtLoweringVisitor& visitor, Stm
     IRInst* debugSourceInst = nullptr;
     if (context->shared->mapSourceFileToDebugSourceInst.tryGetValue(source, debugSourceInst))
     {
-        auto humaneLoc = context->getLinkage()->getSourceManager()->getHumaneLoc(stmt->loc, SourceLocType::Emit);
+        // When working with RenderDoc, we need to use actual source loc instead of the nominal one,
+        // since RenderDoc has the builtin support to split a source file into multiple files based on
+        // line directives in the file.
+        auto humaneLoc = context->getLinkage()->getSourceManager()->getHumaneLoc(stmt->loc, SourceLocType::Actual);
         visitor.startBlockIfNeeded(stmt);
         context->irBuilder->emitDebugLine(debugSourceInst, humaneLoc.line, humaneLoc.line, humaneLoc.column, humaneLoc.column + 1);
     }
