@@ -68,16 +68,17 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
         float Object.SampleCmpLevelZero()
     */
     // NOTE: These are having issues with vulkan (glsl)
-#ifndef VK
     val += t1D.SampleCmpLevelZero(shadowSampler, u, 0);
     val += t2D.SampleCmpLevelZero(shadowSampler, float2(u, u), 0);
+    val += t1DArray.SampleCmpLevelZero(shadowSampler, float2(u, u), 0);
     val += tCube.SampleCmpLevelZero(shadowSampler, normalize(float3(u, 1 - u, u)), 0);
+    val += t2DArray.SampleCmpLevelZero(shadowSampler, normalize(float3(u, 1 - u, u)), 0);
+    val += tCubeArray.SampleCmpLevelZero(shadowSampler, normalize(float4(u, 1-u, u, u)), 0);
 
     // Offset variant
     val += t1D.SampleCmpLevelZero(shadowSampler, u, 0, 0);
     val += t2D.SampleCmpLevelZero(shadowSampler, float2(u, u), 0, int2(0, 0));
     // TextureCube does not have an offset version of this
-#endif
 
     /*
         void Object.GetDimensions()
@@ -288,15 +289,15 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 // DX11: 313
 // DX11: 313
 // DX11: 313
-// DX12: 313
-// DX12: 313
-// DX12: 313
-// DX12: 313
-// DX12CS6: 336
-// DX12CS6: 336
-// DX12CS6: 336
-// DX12CS6: 336
-// VK: 331
-// VK: 331
-// VK: 331
-// VK: 331
+// DX12: 316
+// DX12: 316
+// DX12: 316
+// DX12: 316
+// DX12CS6: 339
+// DX12CS6: 339
+// DX12CS6: 339
+// DX12CS6: 339
+// VK: 339
+// VK: 339
+// VK: 339
+// VK: 339
