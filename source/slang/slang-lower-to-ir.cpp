@@ -498,6 +498,7 @@ struct SharedIRGenContext
     Dictionary<Stmt*, IRBlock*> continueLabels;
 
     Dictionary<SourceFile*, IRInst*> mapSourceFileToDebugSourceInst;
+    Dictionary<String, IRInst*> mapSourcePathToDebugSourceInst;
 
     void setGlobalValue(Decl* decl, LoweredValInfo value)
     {
@@ -6366,26 +6367,59 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
     }
 };
 
+IRInst* getOrEmitDebugSource(IRGenContext* context, PathInfo path)
+{
+    if (auto result = context->shared->mapSourcePathToDebugSourceInst.tryGetValue(path.foundPath))
+        return *result;
+
+    ComPtr<ISlangBlob> outBlob;
+    if (path.hasFileFoundPath())
+    {
+        context->getLinkage()->getFileSystemExt()->loadFile(path.foundPath.getBuffer(), outBlob.writeRef());
+    }
+    UnownedStringSlice content;
+    if (outBlob)
+        content = UnownedStringSlice((char*)outBlob->getBufferPointer(), outBlob->getBufferSize());
+    IRBuilder builder(*context->irBuilder);
+    builder.setInsertInto(context->irBuilder->getModule());
+    auto debugSrcInst = builder.emitDebugSource(path.foundPath.getUnownedSlice(), content);
+    context->shared->mapSourcePathToDebugSourceInst[path.foundPath] = debugSrcInst;
+    return debugSrcInst;
+}
+
 void maybeEmitDebugLine(IRGenContext* context, StmtLoweringVisitor& visitor, Stmt* stmt)
 {
     if (!context->includeDebugInfo)
         return;
     if (as<EmptyStmt>(stmt))
         return;
+    auto sourceManager = context->getLinkage()->getSourceManager();
     auto sourceView = context->getLinkage()->getSourceManager()->findSourceView(stmt->loc);
     if (!sourceView)
         return;
-    auto source = sourceView->getSourceFile();
+
     IRInst* debugSourceInst = nullptr;
-    if (context->shared->mapSourceFileToDebugSourceInst.tryGetValue(source, debugSourceInst))
+    auto humaneLoc = context->getLinkage()->getSourceManager()->getHumaneLoc(stmt->loc, SourceLocType::Emit);
+
+    // Do a best-effort attempt to retrieve the nominal source file.
+    auto pathInfo = sourceView->getPathInfo(stmt->loc, SourceLocType::Emit);
+
+    // If the source file path correspond to an existing SourceFile in the source manager, use it.
+    auto source = sourceManager->findSourceFileByPathRecursively(pathInfo.foundPath);
+    if (!source)
+        source = sourceManager->findSourceFile(pathInfo.getMostUniqueIdentity());
+    if (source)
     {
-        // When working with RenderDoc, we need to use actual source loc instead of the nominal one,
-        // since RenderDoc has the builtin support to split a source file into multiple files based on
-        // line directives in the file.
-        auto humaneLoc = context->getLinkage()->getSourceManager()->getHumaneLoc(stmt->loc, SourceLocType::Actual);
-        visitor.startBlockIfNeeded(stmt);
-        context->irBuilder->emitDebugLine(debugSourceInst, humaneLoc.line, humaneLoc.line, humaneLoc.column, humaneLoc.column + 1);
+        context->shared->mapSourceFileToDebugSourceInst.tryGetValue(source, debugSourceInst);
     }
+    // If the source manager does not have an entry for the corresponding file name, make sure we still emit
+    // an source file entry in the spirv module.
+    if (!debugSourceInst)
+    {
+        debugSourceInst = getOrEmitDebugSource(context, pathInfo);
+    }
+    visitor.startBlockIfNeeded(stmt);
+    context->irBuilder->emitDebugLine(debugSourceInst, humaneLoc.line, humaneLoc.line, humaneLoc.column, humaneLoc.column + 1);
 }
 
 void maybeAddDebugLocationDecoration(IRGenContext* context, IRInst* inst)
