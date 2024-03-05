@@ -7839,7 +7839,7 @@ namespace Slang
         }
 
 #define CASE(key, type) if (AdvanceIf(parser, #key)) { auto modifier = parser->astBuilder->create<type>(); \
-    modifier->location = getIntegerLiteralValue(listBuilder.find<GLSLLayoutModifier>()->valToken); listBuilder.add(modifier); } else
+    modifier->location = int(getIntegerLiteralValue(listBuilder.find<GLSLLayoutModifier>()->valToken)); listBuilder.add(modifier); } else
 
     CASE(rayPayloadEXT, VulkanRayPayloadAttribute)
     CASE(rayPayloadNV, VulkanRayPayloadAttribute)
