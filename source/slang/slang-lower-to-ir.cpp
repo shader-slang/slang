@@ -4675,7 +4675,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitAsTypeExpr(AsTypeExpr* expr)
     {
-        auto value = lowerRValueExpr(context, expr->value);
+        auto value = lowerLValueExpr(context, expr->value);
         ExtractedExistentialValInfo* existentialInfo = nullptr;
         auto optType = lowerType(context, expr->type);
         SLANG_RELEASE_ASSERT(optType->getOp() == kIROp_OptionalType);
@@ -4686,8 +4686,8 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         if (expr->witnessArg)
         {
             auto witness = lowerSimpleVal(context, expr->witnessArg);
-            isType = builder->emitIsType(existentialInfo->extractedVal, existentialInfo->witnessTable, targetType, witness);
             existentialInfo = value.getExtractedExistentialValInfo();
+            isType = builder->emitIsType(existentialInfo->extractedVal, existentialInfo->witnessTable, targetType, witness);
         }
         else
         {
