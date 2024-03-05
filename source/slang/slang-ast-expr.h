@@ -431,6 +431,19 @@ class SelectExpr: public OperatorExpr
     SLANG_AST_CLASS(SelectExpr)
 };
 
+class LogicOperatorShortCircuitExpr: public OperatorExpr
+{
+    SLANG_AST_CLASS(LogicOperatorShortCircuitExpr)
+public:
+    enum Flavor
+    {
+        And,    // &&
+        Or,     // ||
+    };
+    Flavor flavor;
+};
+
+
 class GenericAppExpr: public AppExprBase
 {
     SLANG_AST_CLASS(GenericAppExpr)

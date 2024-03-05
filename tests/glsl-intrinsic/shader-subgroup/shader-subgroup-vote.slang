@@ -28,8 +28,8 @@ layout(local_size_x = 32) in;
 __generic<T : __BuiltinLogicalType>
 bool test1AllEqual() {
     return true
-        && subgroupAllEqual(T(1)) == true
-        && subgroupAllEqual(T(gl_GlobalInvocationID.x)) == false
+        & subgroupAllEqual(T(1)) == true
+        & subgroupAllEqual(T(gl_GlobalInvocationID.x)) == false
         ;
 }
 __generic<T : __BuiltinLogicalType, let N : int>
@@ -37,16 +37,16 @@ bool testVAllEqual() {
     typealias gvec = vector<T, N>;
 
     return true
-        && subgroupAllEqual(gvec(T(1))) == true
-        && subgroupAllEqual(gvec(T(gl_GlobalInvocationID.x))) == false
+        & subgroupAllEqual(gvec(T(1))) == true
+        & subgroupAllEqual(gvec(T(gl_GlobalInvocationID.x))) == false
         ;
 }
 
 __generic<T : __BuiltinFloatingPointType>
 bool test1AllEqual() {
     return true
-        && subgroupAllEqual(T(1)) == true
-        && subgroupAllEqual(T(gl_GlobalInvocationID.x)) == false
+        & subgroupAllEqual(T(1)) == true
+        & subgroupAllEqual(T(gl_GlobalInvocationID.x)) == false
         ;
 }
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -54,60 +54,60 @@ bool testVAllEqual() {
     typealias gvec = vector<T, N>;
 
     return true
-        && subgroupAllEqual(gvec(T(1))) == true
-        && subgroupAllEqual(gvec(T(gl_GlobalInvocationID.x))) == false
+        & subgroupAllEqual(gvec(T(1))) == true
+        & subgroupAllEqual(gvec(T(gl_GlobalInvocationID.x))) == false
         ;
 }
 bool testAllEqual() {
     return true
-        && test1AllEqual<float>()
-        && testVAllEqual<float, 2>()
-        && testVAllEqual<float, 3>()
-        && testVAllEqual<float, 4>()
-        && test1AllEqual<double>() // WARNING: intel GPU's lack FP64 support
-        && testVAllEqual<double, 2>()
-        && testVAllEqual<double, 3>()
-        && testVAllEqual<double, 4>()
-        && test1AllEqual<half>() 
-        && testVAllEqual<half, 2>()
-        && testVAllEqual<half, 3>()
-        && testVAllEqual<half, 4>()
-        && test1AllEqual<int>()
-        && testVAllEqual<int, 2>()
-        && testVAllEqual<int, 3>()
-        && testVAllEqual<int, 4>()
-        && test1AllEqual<int8_t>() 
-        && testVAllEqual<int8_t, 2>()
-        && testVAllEqual<int8_t, 3>()
-        && testVAllEqual<int8_t, 4>()
-        && test1AllEqual<int16_t>() 
-        && testVAllEqual<int16_t, 2>()
-        && testVAllEqual<int16_t, 3>()
-        && testVAllEqual<int16_t, 4>()
-        && test1AllEqual<int64_t>() 
-        && testVAllEqual<int64_t, 2>()
-        && testVAllEqual<int64_t, 3>()
-        && testVAllEqual<int64_t, 4>()
-        && test1AllEqual<uint>()
-        && testVAllEqual<uint, 2>()
-        && testVAllEqual<uint, 3>()
-        && testVAllEqual<uint, 4>()
-        && test1AllEqual<uint8_t>() 
-        && testVAllEqual<uint8_t, 2>()
-        && testVAllEqual<uint8_t, 3>()
-        && testVAllEqual<uint8_t, 4>()
-        && test1AllEqual<uint16_t>() 
-        && testVAllEqual<uint16_t, 2>()
-        && testVAllEqual<uint16_t, 3>()
-        && testVAllEqual<uint16_t, 4>()
-        && test1AllEqual<uint64_t>() 
-        && testVAllEqual<uint64_t, 2>()
-        && testVAllEqual<uint64_t, 3>()
-        && testVAllEqual<uint64_t, 4>()
-        && test1AllEqual<bool>()
-        && testVAllEqual<bool, 2>()
-        && testVAllEqual<bool, 3>()
-        && testVAllEqual<bool, 4>()
+        & test1AllEqual<float>()
+        & testVAllEqual<float, 2>()
+        & testVAllEqual<float, 3>()
+        & testVAllEqual<float, 4>()
+        & test1AllEqual<double>() // WARNING: intel GPU's lack FP64 support
+        & testVAllEqual<double, 2>()
+        & testVAllEqual<double, 3>()
+        & testVAllEqual<double, 4>()
+        & test1AllEqual<half>() 
+        & testVAllEqual<half, 2>()
+        & testVAllEqual<half, 3>()
+        & testVAllEqual<half, 4>()
+        & test1AllEqual<int>()
+        & testVAllEqual<int, 2>()
+        & testVAllEqual<int, 3>()
+        & testVAllEqual<int, 4>()
+        & test1AllEqual<int8_t>() 
+        & testVAllEqual<int8_t, 2>()
+        & testVAllEqual<int8_t, 3>()
+        & testVAllEqual<int8_t, 4>()
+        & test1AllEqual<int16_t>() 
+        & testVAllEqual<int16_t, 2>()
+        & testVAllEqual<int16_t, 3>()
+        & testVAllEqual<int16_t, 4>()
+        & test1AllEqual<int64_t>() 
+        & testVAllEqual<int64_t, 2>()
+        & testVAllEqual<int64_t, 3>()
+        & testVAllEqual<int64_t, 4>()
+        & test1AllEqual<uint>()
+        & testVAllEqual<uint, 2>()
+        & testVAllEqual<uint, 3>()
+        & testVAllEqual<uint, 4>()
+        & test1AllEqual<uint8_t>() 
+        & testVAllEqual<uint8_t, 2>()
+        & testVAllEqual<uint8_t, 3>()
+        & testVAllEqual<uint8_t, 4>()
+        & test1AllEqual<uint16_t>() 
+        & testVAllEqual<uint16_t, 2>()
+        & testVAllEqual<uint16_t, 3>()
+        & testVAllEqual<uint16_t, 4>()
+        & test1AllEqual<uint64_t>() 
+        & testVAllEqual<uint64_t, 2>()
+        & testVAllEqual<uint64_t, 3>()
+        & testVAllEqual<uint64_t, 4>()
+        & test1AllEqual<bool>()
+        & testVAllEqual<bool, 2>()
+        & testVAllEqual<bool, 3>()
+        & testVAllEqual<bool, 4>()
         ;
 }
 
