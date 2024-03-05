@@ -31,6 +31,11 @@ namespace Slang
     {
         if (!irObject)
             return;
+        if (as<IRType>(irObject))
+        {
+            getTypeNameHint(sb, irObject);
+            return;
+        }
         if (auto nameHint = irObject->findDecoration<IRNameHintDecoration>())
         {
             sb << nameHint->getName();

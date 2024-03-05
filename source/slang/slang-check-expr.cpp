@@ -3112,8 +3112,12 @@ namespace Slang
         expr->type = m_astBuilder->getBoolType();
         expr->value = originalVal;
 
+        auto valueType = expr->value->type.type;
+        if (auto typeType = as<TypeType>(valueType))
+            valueType = typeType->getType();
+
         // If value is a subtype of `type`, then this expr is always true.
-        if(isSubtype(expr->value->type.type, expr->typeExpr.type))
+        if(isSubtype(valueType, expr->typeExpr.type))
         {
             // Instead of returning a BoolLiteralExpr, we use a field to indicate this scenario,
             // so that the language server can still see the original syntax tree.
@@ -3124,10 +3128,11 @@ namespace Slang
             return expr;
         }
 
-        // Otherwise, we need to ensure the target type is a subtype of value->type.
+        // Otherwise, if the target type is a subtype of value->type, we need to grab the
+        // subtype witness for runtime checks.
 
         expr->value = maybeOpenExistential(originalVal);
-        expr->witnessArg = tryGetSubtypeWitness(expr->typeExpr.type, originalVal->type.type);
+        expr->witnessArg = tryGetSubtypeWitness(expr->typeExpr.type, valueType);
         if (expr->witnessArg)
         {
             // For now we can only support the scenario where `expr->value` is an interface type.
@@ -3136,15 +3141,6 @@ namespace Slang
                 getSink()->diagnose(expr, Diagnostics::isOperatorValueMustBeInterfaceType);
             }
             return expr;
-        }
-
-        if (!as<ErrorType>(expr->typeExpr.type) && !as<ErrorType>(expr->value->type.type))
-        {
-            // The type is not in the same hierarchy, so we evaluate to false.
-            expr->constantVal = m_astBuilder->create<BoolLiteralExpr>();
-            expr->constantVal->type = m_astBuilder->getBoolType();
-            expr->constantVal->value = false;
-            expr->constantVal->loc = expr->loc;
         }
         return expr;
     }
@@ -3170,27 +3166,21 @@ namespace Slang
             return makeOptional;
         }
 
-        // For now we can only support the scenario where `expr->value` is an interface type.
-        if (!isInterfaceType(expr->value->type))
-        {
-            getSink()->diagnose(expr, Diagnostics::isOperatorValueMustBeInterfaceType);
-        }
-
-        expr->typeExpr = typeExpr.exp;
+        // If target type is an interface type, we will obtain the witness here for
+        // runtime casting.
         expr->witnessArg = tryGetSubtypeWitness(typeExpr.type, expr->value->type.type);
         if (expr->witnessArg)
         {
+            // For now we can only support the scenario where `expr->value` is an interface type.
+            if (!isInterfaceType(expr->value->type.type))
+            {
+                getSink()->diagnose(expr, Diagnostics::isOperatorValueMustBeInterfaceType);
+            }
             expr->value = maybeOpenExistential(expr->value);
             return expr;
         }
 
-        if (!as<ErrorType>(typeExpr.type) && !as<ErrorType>(expr->value->type.type))
-        {
-            getSink()->diagnose(expr, Diagnostics::typeNotInTheSameHierarchy, expr->value->type.type, typeExpr.type);
-        }
-
-        expr->type = m_astBuilder->getErrorType();
-        
+        expr->typeExpr = typeExpr.exp;
         return expr;
     }
 

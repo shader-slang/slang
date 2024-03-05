@@ -4314,9 +4314,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                     getBuilder()->emitMakeStruct(irType, args.getCount(), args.getBuffer()));
             }
         }
-
-        SLANG_UNEXPECTED("unexpected type when creating default value");
-        UNREACHABLE_RETURN(LoweredValInfo());
+        return LoweredValInfo::simple(getBuilder()->emitDefaultConstruct(irType));
     }
 
     LoweredValInfo getDefaultVal(DeclRef<VarDeclBase> decl)
@@ -4677,21 +4675,33 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitAsTypeExpr(AsTypeExpr* expr)
     {
-        auto value = lowerLValueExpr(context, expr->value);
-        auto existentialInfo = value.getExtractedExistentialValInfo();
+        auto value = lowerRValueExpr(context, expr->value);
+        ExtractedExistentialValInfo* existentialInfo = nullptr;
         auto optType = lowerType(context, expr->type);
         SLANG_RELEASE_ASSERT(optType->getOp() == kIROp_OptionalType);
         auto targetType = optType->getOperand(0);
-        auto witness = lowerSimpleVal(context, expr->witnessArg);
         auto builder = getBuilder();
         auto var = builder->emitVar(optType);
-        auto isType = builder->emitIsType(existentialInfo->extractedVal, existentialInfo->witnessTable, targetType, witness);
+        IRInst* isType = nullptr;
+        if (expr->witnessArg)
+        {
+            auto witness = lowerSimpleVal(context, expr->witnessArg);
+            isType = builder->emitIsType(existentialInfo->extractedVal, existentialInfo->witnessTable, targetType, witness);
+            existentialInfo = value.getExtractedExistentialValInfo();
+        }
+        else
+        {
+            SLANG_ASSERT(value.val);
+            auto leftType = lowerType(context, expr->value->type);
+            IRInst* args[] = { leftType, targetType };
+            isType = builder->emitIntrinsicInst(builder->getBoolType(), kIROp_TypeEquals, 2, args);
+        }
         IRBlock* trueBlock;
         IRBlock* falseBlock;
         IRBlock* afterBlock;
         builder->emitIfElseWithBlocks(isType, trueBlock, falseBlock, afterBlock);
         builder->setInsertInto(trueBlock);
-        auto irVal = builder->emitReinterpret(targetType, existentialInfo->extractedVal);
+        auto irVal = builder->emitReinterpret(targetType, existentialInfo ? existentialInfo->extractedVal : getSimpleVal(context, value));
         auto optionalVal = builder->emitMakeOptionalValue(optType, irVal);
         builder->emitStore(var, optionalVal);
         builder->emitBranch(afterBlock);
@@ -4711,11 +4721,29 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         {
             return LoweredValInfo::simple(getBuilder()->getBoolValue(expr->constantVal->value));
         }
-        auto value = lowerLValueExpr(context, expr->value);
-        auto type = lowerType(context, expr->type);
-        auto witness = lowerSimpleVal(context, expr->witnessArg);
-        auto existentialInfo = value.getExtractedExistentialValInfo();
-        auto irVal = getBuilder()->emitIsType(existentialInfo->extractedVal, existentialInfo->witnessTable, type, witness);
+        // If expr is a witness, then this is a run-time type check from for an existential type.
+        if (expr->witnessArg)
+        {
+            auto value = lowerLValueExpr(context, expr->value);
+            auto type = lowerType(context, expr->typeExpr.type);
+            auto witness = lowerSimpleVal(context, expr->witnessArg);
+            auto existentialInfo = value.getExtractedExistentialValInfo();
+            auto irVal = getBuilder()->emitIsType(existentialInfo->extractedVal, existentialInfo->witnessTable, type, witness);
+            return LoweredValInfo::simple(irVal);
+        }
+        // For all other cases, we map to a simple type equality check in the IR.
+        IRType* leftType = nullptr;
+        if (auto typeType = as<TypeType>(expr->value->type))
+        {
+            leftType = lowerType(context, typeType->getType());
+        }
+        else
+        {
+            leftType = lowerType(context, expr->value->type);
+        }
+        auto rightType = lowerType(context, expr->typeExpr.type);
+        IRInst* args[] = { leftType, rightType };
+        auto irVal = getBuilder()->emitIntrinsicInst(getBuilder()->getBoolType(), kIROp_TypeEquals, 2, args);
         return LoweredValInfo::simple(irVal);
     }
 
