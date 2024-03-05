@@ -4575,6 +4575,46 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         return LoweredValInfo::simple(result);
     }
 
+    LoweredValInfo visitLogicOperatorShortCircuitExpr(LogicOperatorShortCircuitExpr* expr)
+    {
+        auto builder = context->irBuilder;
+        auto thenBlock = builder->createBlock();
+        auto elseBlock = builder->createBlock();
+        auto afterBlock = builder->createBlock();
+        auto irCond = getSimpleVal(context, lowerRValueExpr(context, expr->arguments[0]));
+
+        // ifElse(<first param>, %true-block, %false-block, %after-block)
+        builder->emitIfElse(irCond, thenBlock, elseBlock, afterBlock);
+
+        // true-block: nonconditionalBranch(%after-block, <second param> : Bool)
+        // true-block: nonconditionalBranch(%after-block, true) for ||
+        builder->insertBlock(thenBlock);
+        builder->setInsertInto(thenBlock);
+        auto trueVal = expr->flavor == LogicOperatorShortCircuitExpr::Flavor::And ?
+            getSimpleVal(context, lowerRValueExpr(context, expr->arguments[1])) :
+            LoweredValInfo::simple(context->irBuilder->getBoolValue(true)).val;
+
+        builder->emitBranch(afterBlock, 1, &trueVal);
+
+        // false-block: nonconditionalBranch(%after-block, false) for &&
+        // false-block: nonconditionalBranch(%after-block, <second param>: Bool) for ||
+        builder->insertBlock(elseBlock);
+        builder->setInsertInto(elseBlock);
+        auto falseVal = expr->flavor == LogicOperatorShortCircuitExpr::Flavor::And ?
+            LoweredValInfo::simple(context->irBuilder->getBoolValue(false)).val :
+            getSimpleVal(context, lowerRValueExpr(context, expr->arguments[1]));
+
+        builder->emitBranch(afterBlock, 1, &falseVal);
+
+        // after-block: return input parameter
+        builder->insertBlock(afterBlock);
+        builder->setInsertInto(afterBlock);
+        auto paramType = lowerType(context, expr->type.type);
+        auto result = builder->emitParam(paramType);
+
+        return LoweredValInfo::simple(result);
+    }
+
     LoweredValInfo visitInvokeExpr(InvokeExpr* expr)
     {
         return sharedLoweringContext.visitInvokeExprImpl(expr, LoweredValInfo(), TryClauseEnvironment());
@@ -5192,6 +5232,12 @@ struct DestinationDrivenRValueExprLoweringVisitor
     }
 
     void visitSelectExpr(SelectExpr* expr)
+    {
+        auto rValue = lowerRValueExpr(context, expr);
+        assign(context, destination, rValue);
+    }
+
+    void visitLogicOperatorShortCircuitExpr(LogicOperatorShortCircuitExpr* expr)
     {
         auto rValue = lowerRValueExpr(context, expr);
         assign(context, destination, rValue);
