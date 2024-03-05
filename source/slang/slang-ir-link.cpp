@@ -1609,7 +1609,7 @@ LinkedIR linkIR(
     // this is because internally they are used by slang functions; these emit later in code gen
     // as a result we emit them now
     // we also emit these early since if these are not at the top of scope, that could be deadly to a compile
-    if (state->targetReq->getLinkage()->getAllowGLSLInput()) 
+    if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL)) 
     {
         auto insertGlobalVar = [&](IRInst* instToAdd)
         {

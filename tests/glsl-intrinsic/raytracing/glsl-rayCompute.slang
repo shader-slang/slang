@@ -34,7 +34,7 @@ bool equals(matrix<T, N, M> lhs, matrix<T, N, M> rhs)
     return true;
 }
 
-uint testAbortRayTrace() {
+bool testAbortRayTrace() {
     RayQuery q;
     rayQueryInitializeEXT(q, scene, gl_RayFlagsNoneEXT, 0xff, vec3(0.1, 0.1, 0.0), 0.01f, vec3(0, 0, 1), 1e4f);
     rayQueryTerminateEXT(q);
@@ -44,7 +44,7 @@ uint testAbortRayTrace() {
         ;
 }
 
-uint testProceedRayTrace() {
+bool testProceedRayTrace() {
     RayQuery q;
     rayQueryInitializeEXT(q, scene, gl_RayFlagsNoneEXT, 0xff, vec3(0.1, 0.1, 0.0), 0.01f, vec3(0, 0, 1), 1e4f);
     rayQueryProceedEXT(q);
@@ -55,7 +55,7 @@ uint testProceedRayTrace() {
         ;
 }
 
-uint testProceedRayAuxInfo() {
+bool testProceedRayAuxInfo() {
     RayQuery q;
     rayQueryInitializeEXT(q, scene, gl_RayFlagsNoneEXT, 0xff, vec3(0.1, 0.1, 0.0), 0.01f, vec3(0, 0, 1), 1e4f);
     rayQueryProceedEXT(q);
@@ -79,7 +79,7 @@ uint testProceedRayAuxInfo() {
         && !equals(rayQueryGetIntersectionWorldToObjectEXT(q, true), mat4x3(0))
         ;
 }
-uint testRayTraceGenerate() {
+bool testRayTraceGenerate() {
     RayQuery q;
     rayQueryInitializeEXT(q, scene, gl_RayFlagsNoneEXT, 0xff, vec3(0.1, 0.1, 0.0), 0.01f, vec3(0, 0, 1), 1e4f);
     rayQueryGenerateIntersectionEXT(q, 0.5);

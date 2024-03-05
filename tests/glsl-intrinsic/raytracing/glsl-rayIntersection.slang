@@ -81,7 +81,7 @@ bool testFunctions() {
     return true
 // CHECK_GLSL-DAG: reportIntersectionEXT
 // CHECK_SPV-DAG: OpReportIntersectionKHR
-        &&reportIntersectionEXT(99, 0);
+        && reportIntersectionEXT(99, 0);
 }
 
 void main()

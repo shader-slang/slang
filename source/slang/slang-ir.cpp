@@ -4338,25 +4338,25 @@ namespace Slang
             checkedForRayVariables = true;
             for(auto i : getGlobalInsts())
             {
-                if(auto rayDec = i->findDecoration<IRVulkanRayPayloadDecoration>())
+                if(auto rayPayload = i->findDecoration<IRVulkanRayPayloadDecoration>())
                 {
-                    storeLocationToRayPayloadVariable(getIntVal(rayDec->getOperand(0)), i);
+                    storeLocationToRayPayloadVariable(int(getIntVal(rayPayload->getOperand(0))), i);
                 }
-                else if(auto rayDec = i->findDecoration<IRVulkanRayPayloadInDecoration>())
+                else if(auto rayPayloadIn = i->findDecoration<IRVulkanRayPayloadInDecoration>())
                 {
-                    storeLocationToRayPayloadVariable(getIntVal(rayDec->getOperand(0)), i);
+                    storeLocationToRayPayloadVariable(int(getIntVal(rayPayloadIn->getOperand(0))), i);
                 }
-                else if(auto rayDec = i->findDecoration<IRVulkanHitObjectAttributesDecoration>())
+                else if(auto hitObject = i->findDecoration<IRVulkanHitObjectAttributesDecoration>())
                 {
-                    storeLocationToRayAttributeVariable(getIntVal(rayDec->getOperand(0)), i);
+                    storeLocationToRayAttributeVariable(int(getIntVal(hitObject->getOperand(0))), i);
                 }
-                else if(auto rayDec = i->findDecoration<IRVulkanCallablePayloadDecoration>())
+                else if(auto callable = i->findDecoration<IRVulkanCallablePayloadDecoration>())
                 {
-                    storeLocationToRayCallableVariable(getIntVal(rayDec->getOperand(0)), i);
+                    storeLocationToRayCallableVariable(int(getIntVal(callable->getOperand(0))), i);
                 }
-                else if(auto rayDec = i->findDecoration<IRVulkanCallablePayloadInDecoration>())
+                else if(auto callableIn = i->findDecoration<IRVulkanCallablePayloadInDecoration>())
                 {
-                    storeLocationToRayCallableVariable(getIntVal(rayDec->getOperand(0)), i);
+                    storeLocationToRayCallableVariable(int(getIntVal(callableIn->getOperand(0))), i);
                 }
             }
 
@@ -4366,11 +4366,11 @@ namespace Slang
     IRInst* IRModule::getRayVariableFromLocation(IRInst* payloadVariable, Slang::IROp op, DiagnosticSink* sink)
     {
         IRBuilder builder(payloadVariable);
-        IRInst** varLayoutPointsTo;
+        IRInst** varLayoutPointsTo = nullptr;
         int intLitValue = -1;
         IRIntLit* intLit = as<IRIntLit>(payloadVariable);
         if(intLit){
-            intLitValue = intLit->getValue();
+            intLitValue = int(intLit->getValue());
             if (kIROp_SPIRVAsmOperandRayPayloadFromLocation == op)
             {
                 varLayoutPointsTo = this->getRayPayloadVariableFromLocation(intLitValue);

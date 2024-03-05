@@ -24,13 +24,13 @@
 namespace Slang {
 
 class   Decl;
+class   DiagnosticSink;
 class   GenericDecl;
 class   FuncType;
 class   Layout;
 class   Type;
 class   Session;
 class   Name;
-struct  DiagnosticSink;
 struct  IRBuilder;
 struct  IRFunc;
 struct  IRGlobalValueWithCode;

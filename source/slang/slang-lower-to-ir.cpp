@@ -2131,17 +2131,17 @@ void addVarDecorations(
         {
             builder->addVulkanRayPayloadDecoration(inst, rayPayloadAttr->location);
         }
-        else if(auto rayPayloadAttr = as<VulkanRayPayloadInAttribute>(mod))
+        else if(auto rayPayloadInAttr = as<VulkanRayPayloadInAttribute>(mod))
         {
-            builder->addVulkanRayPayloadInDecoration(inst, rayPayloadAttr->location);
+            builder->addVulkanRayPayloadInDecoration(inst, rayPayloadInAttr->location);
         }
         else if(auto callablePayloadAttr = as<VulkanCallablePayloadAttribute>(mod))
         {
             builder->addVulkanCallablePayloadDecoration(inst, callablePayloadAttr->location);
         }
-        else if(auto callablePayloadAttr = as<VulkanCallablePayloadInAttribute>(mod))
+        else if(auto callablePayloadInAttr = as<VulkanCallablePayloadInAttribute>(mod))
         {
-            builder->addVulkanCallablePayloadInDecoration(inst, callablePayloadAttr->location);
+            builder->addVulkanCallablePayloadInDecoration(inst, callablePayloadInAttr->location);
         }
         else if (auto hitObjectAttr = as<VulkanHitObjectAttributesAttribute>(mod))
         {

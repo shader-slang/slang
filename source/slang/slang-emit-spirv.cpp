@@ -3210,10 +3210,13 @@ struct SPIRVEmitContext
 
         if(isRayTracingObject)
         {
+            if (decoration->getOperandCount() > 0) {
+                //if not greater than 0, this is not a layout decoration (no val)
                 emitOpDecorateLocation(getSection(SpvLogicalSectionID::Annotations),
-                decoration,
-                dstID,
-                SpvLiteralInteger::from32(int32_t(getIntVal(decoration->getOperand(0)))));
+                    decoration,
+                    dstID,
+                    SpvLiteralInteger::from32(int32_t(getIntVal(decoration->getOperand(0)))));
+            }
         }
 
         if (shouldEmitSPIRVReflectionInfo())

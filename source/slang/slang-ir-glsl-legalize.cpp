@@ -2990,7 +2990,7 @@ void legalizeEntryPointsForGLSL(
     // GLSL should NEVER mangle user declared ray locations; else user setting a location to reference  
     // (GLSL references locations by a constexpr number) could be invalid. Furthermore, we need to fetch
     // types and what location variable is where when we resolve locations to translate GLSL->SPIR-V/HLSL
-    if (!context->getLinkage()->getAllowGLSLInput()) 
+    if (!context->getTargetProgram()->getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL)) 
     {
         assignRayPayloadHitObjectAttributeLocations(module);
     }

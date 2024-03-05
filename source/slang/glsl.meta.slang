@@ -4352,9 +4352,8 @@ public void traceRayMotionNV(
                 /**/ __rayPayloadFromLocation(payload)
         };
     }
-// TODO: implementation of built-in variables; proper tests; these are stubs
-// likley related to the following issue since GLSL adds new 
-// 'system' variables: https://github.com/shader-slang/slang/issues/411
+    }
+}
 
 __generic<T : __BuiltinType>
 [ForceInline]
