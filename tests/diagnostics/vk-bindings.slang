@@ -1,6 +1,6 @@
 // vk-bindings.slang
 
-//DIAGNOSTIC_TEST:SIMPLE:-target spirv
+//DIAGNOSTIC_TEST:SIMPLE:-entry main -target spirv
 
 // D3D `register` without VK binding
 Texture2D t : register(t0);
