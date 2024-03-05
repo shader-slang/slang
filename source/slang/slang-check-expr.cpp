@@ -2378,10 +2378,9 @@ namespace Slang
         return result;
     }
 
-    Expr* SemanticsExprVisitor::convertToLogicOperatorExpr(InvokeExpr* expr, bool& isArgumentsChecked)
+    Expr* SemanticsExprVisitor::convertToLogicOperatorExpr(InvokeExpr* expr)
     {
         LogicOperatorShortCircuitExpr* newExpr = nullptr;
-        isArgumentsChecked = false;
 
         // If the logic expression is inside the generic parameter list, it cannot support short-circuit
         // which will generate the ifelse branch.
@@ -2399,14 +2398,12 @@ namespace Slang
                 bool shortCircuitSupport = true;
                 for (auto & arg : expr->arguments)
                 {
-                    arg = CheckTerm(arg);
                     if(!as<BasicExpressionType>(arg->type.type))
                     {
                         shortCircuitSupport = false;
                     }
                 }
 
-                isArgumentsChecked = true;
                 if (!shortCircuitSupport)
                 {
                     return nullptr;
@@ -2444,27 +2441,20 @@ namespace Slang
         // check the base expression first
         if (!expr->originalFunctionExpr)
             expr->originalFunctionExpr = expr->functionExpr;
-
-        // if the expression is '&&' or '||', we will convert it
-        // to use short-circuit evaluation.
-        bool isArgumentsChecked = false;
-        if (auto newExpr = convertToLogicOperatorExpr(expr, isArgumentsChecked))
-            return newExpr;
-
-        expr->functionExpr = CheckTerm(expr->functionExpr);
         auto treatAsDifferentiableExpr = m_treatAsDifferentiableExpr;
         m_treatAsDifferentiableExpr = nullptr;
         // Next check the argument expressions
-        // Avoid checking the arguments twice, because the arguments could be
-        // checked in `convertToLogicOperatorExpr` already.
-        if (!isArgumentsChecked)
+        for (auto & arg : expr->arguments)
         {
-            for (auto & arg : expr->arguments)
-            {
-                arg = CheckTerm(arg);
-            }
+            arg = CheckTerm(arg);
         }
 
+        // if the expression is '&&' or '||', we will convert it
+        // to use short-circuit evaluation.
+        if (auto newExpr = convertToLogicOperatorExpr(expr))
+            return newExpr;
+
+        expr->functionExpr = CheckTerm(expr->functionExpr);
         m_treatAsDifferentiableExpr = treatAsDifferentiableExpr;
 
         // If we are in a differentiable function, register differential witness tables involved in

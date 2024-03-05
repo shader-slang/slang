@@ -2607,7 +2607,7 @@ namespace Slang
         Val* checkTypeModifier(Modifier* modifier, Type* type);
     private:
         // Convert the logic operator expression to not use 'InvokeExpr' type
-        Expr* convertToLogicOperatorExpr(InvokeExpr* expr, bool& isArgumentsChecked);
+        Expr* convertToLogicOperatorExpr(InvokeExpr* expr);
 
     };
 
