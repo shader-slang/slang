@@ -1599,10 +1599,20 @@ struct SPIRVEmitContext
         case kIROp_DebugSource:
             {
                 ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_non_semantic_info"));
-                // SPIRV does not allow string lits longer than 65535, so we need to split the source string
-                // in OpDebugSourceContinued instructions.
                 auto debugSource = as<IRDebugSource>(inst);
                 auto sourceStr = as<IRStringLit>(debugSource->getSource())->getStringSlice();
+                // If source content is empty, skip the content operand.
+                if (sourceStr.getLength() == 0)
+                {
+                    return emitOpDebugSource(
+                        getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                        inst,
+                        inst->getFullType(),
+                        getNonSemanticDebugInfoExtInst(),
+                        debugSource->getFileName());
+                }
+                // SPIRV does not allow string lits longer than 65535, so we need to split the source string
+                // in OpDebugSourceContinued instructions.
                 auto sourceStrHead = sourceStr.getLength() > 65535 ? sourceStr.head(65535) : sourceStr;
                 auto spvStrHead = emitInst(
                     getSection(SpvLogicalSectionID::DebugStringsAndSource),

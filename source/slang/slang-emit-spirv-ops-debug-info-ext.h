@@ -10,10 +10,13 @@ SpvInst* emitOpDebugCompilationUnit(SpvInstParent* parent, IRInst* inst, const T
 
 // https://github.com/KhronosGroup/SPIRV-Registry/blob/main/nonsemantic/NonSemantic.Shader.DebugInfo.100.asciidoc#DebugSource
 template<typename T>
-SpvInst* emitOpDebugSource(SpvInstParent* parent, IRInst* inst, const T& idResultType, SpvInst* set, IRInst* file, SpvInst* text)
+SpvInst* emitOpDebugSource(SpvInstParent* parent, IRInst* inst, const T& idResultType, SpvInst* set, IRInst* file, SpvInst* text = nullptr)
 {
     static_assert(isSingular<T>);
-    return emitInst(parent, inst, SpvOpExtInst, idResultType, kResultID, set, SpvWord(35), file, text);
+    if (text)
+        return emitInst(parent, inst, SpvOpExtInst, idResultType, kResultID, set, SpvWord(35), file, text);
+    else
+        return emitInst(parent, inst, SpvOpExtInst, idResultType, kResultID, set, SpvWord(35), file);
 }
 
 template<typename T>
