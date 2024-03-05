@@ -310,6 +310,7 @@ namespace Slang
         void visitParamDecl(ParamDecl* paramDecl);
 
         void visitAggTypeDecl(AggTypeDecl* aggTypeDecl);
+
     };
 
     template<typename VisitorType>
@@ -1814,11 +1815,18 @@ namespace Slang
     {
         if (auto initExpr = varDecl->initExpr)
         {
-            // If the variable has an explicit initial-value expression,
-            // then we simply need to check that expression and coerce
-            // it to the type of the variable.
-            //
-            initExpr = CheckTerm(initExpr);
+            // Disable the short-circuiting for static const variable init expression
+            bool isStaticConst = varDecl->hasModifier<HLSLStaticModifier>() &&
+                varDecl->hasModifier<ConstModifier>();
+
+            auto subVisitor = isStaticConst?
+                    SemanticsVisitor(disableShortCircuitLogicalExpr()) : *this;
+                // If the variable has an explicit initial-value expression,
+                // then we simply need to check that expression and coerce
+                // it to the type of the variable.
+                //
+            initExpr = subVisitor.CheckTerm(initExpr);
+
             initExpr = coerce(CoercionSite::Initializer, varDecl->type.Ptr(), initExpr);
             varDecl->initExpr = initExpr;
 
