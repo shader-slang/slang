@@ -2,17 +2,20 @@
 #pragma once
 
 #include "slang-ir-simplify-cfg.h"
+#include "slang-ir-peephole.h"
 
 namespace Slang
 {
     struct IRModule;
     struct IRGlobalValueWithCode;
     class DiagnosticSink;
-    class TargetRequest;
+    class TargetProgram;
 
     struct IRSimplificationOptions
     {
         CFGSimplificationOptions cfgOptions;
+        PeepholeOptimizationOptions peepholeOptions;
+
         static IRSimplificationOptions getDefault()
         {
             IRSimplificationOptions result;
@@ -29,10 +32,10 @@ namespace Slang
 
     // Run a combination of SSA, SCCP, SimplifyCFG, and DeadCodeElimination pass
     // until no more changes are possible.
-    void simplifyIR(TargetRequest* target, IRModule* module, IRSimplificationOptions options, DiagnosticSink* sink = nullptr);
+    void simplifyIR(TargetProgram* target, IRModule* module, IRSimplificationOptions options, DiagnosticSink* sink = nullptr);
 
     // Run simplifications on IR that is out of SSA form.
-    void simplifyNonSSAIR(TargetRequest* target, IRModule* module, IRSimplificationOptions options);
+    void simplifyNonSSAIR(TargetProgram* target, IRModule* module, IRSimplificationOptions options);
 
-    void simplifyFunc(TargetRequest* target, IRGlobalValueWithCode* func, IRSimplificationOptions options, DiagnosticSink* sink = nullptr);
+    void simplifyFunc(TargetProgram* target, IRGlobalValueWithCode* func, IRSimplificationOptions options, DiagnosticSink* sink = nullptr);
 }

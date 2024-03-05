@@ -20,6 +20,7 @@ struct ResourceParameterSpecializationCondition : FunctionCallSpecializeConditio
     // legal for a given target.
 
     TargetRequest* targetRequest = nullptr;
+    TargetProgram* targetProgram = nullptr;
 
     bool doesParamWantSpecialization(IRParam* param, IRInst* arg)
     {
@@ -63,7 +64,7 @@ struct ResourceParameterSpecializationCondition : FunctionCallSpecializeConditio
         //
         if( isKhronosTarget(targetRequest) )
         {
-            if (targetRequest->shouldEmitSPIRVDirectly())
+            if (targetProgram->getOptionSet().shouldEmitSPIRVDirectly())
                 return isIllegalSPIRVParameterType(type, isArray);
             else
                 return isIllegalGLSLParameterType(type);
@@ -90,6 +91,7 @@ bool specializeResourceParameters(
 {
     bool result = false;
     ResourceParameterSpecializationCondition condition;
+    condition.targetProgram = codeGenContext->getTargetProgram();
     condition.targetRequest = codeGenContext->getTargetReq();
     bool changed = true;
     while (changed)
@@ -1186,7 +1188,7 @@ bool specializeResourceUsage(
             // and turned into SSA temporaries. Such optimization may enable
             // the following passes to "see" and specialize more cases.
             //
-            simplifyIR(codeGenContext->getTargetReq(), irModule, IRSimplificationOptions::getFast());
+            simplifyIR(codeGenContext->getTargetProgram(), irModule, IRSimplificationOptions::getFast());
             result |= changed;
         }
         if (unspecializableFuncs.getCount() == 0)
@@ -1206,7 +1208,7 @@ bool specializeResourceUsage(
                 inlineCall(call);
             });
         }
-        simplifyIR(codeGenContext->getTargetReq(), irModule, IRSimplificationOptions::getFast());
+        simplifyIR(codeGenContext->getTargetProgram(), irModule, IRSimplificationOptions::getFast());
     }
     return result;
 }

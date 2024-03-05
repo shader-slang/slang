@@ -27,6 +27,8 @@ docs/design/serialization.md
 // Predeclare
 typedef uint32_t SerialSourceLoc;
 class NodeBase;
+class Val;
+struct ValNodeDesc;
 
 // Pre-declare
 class SerialClasses;
@@ -119,10 +121,22 @@ struct SerialInfo
         uint32_t _pad0;             ///< Necessary, because a node *can* have MAX_ALIGNEMENT
     };
 
+    struct ValEntry : Entry
+    {
+        SerialSubType subType;
+        uint32_t operandCount;
+    };
+
     struct ArrayEntry : Entry
     {
         uint16_t elementSize;
         uint32_t elementCount;
+    };
+
+    struct SerialValOperand
+    {
+        int type;
+        uint64_t payload;
     };
 };
 
@@ -185,6 +199,7 @@ class SerialObjectFactory
 {
 public:
     virtual void* create(SerialTypeKind typeKind, SerialSubType subType) = 0;
+    virtual void* getOrCreateVal(ValNodeDesc&& desc) = 0;
 };
 
 class SerialExtraObjects
@@ -229,6 +244,8 @@ public:
     const void* getArray(SerialIndex index, Index& outCount);
 
     SerialPointer getPointer(SerialIndex index);
+    SerialPointer getValPointer(SerialIndex index);
+
     String getString(SerialIndex index);
     Name* getName(SerialIndex index);
     UnownedStringSlice getStringSlice(SerialIndex index);
@@ -329,7 +346,10 @@ public:
                 /// If set will zero initialize backing memory. This is slower but 
                 /// is desirable to make two serializations of the same thing produce the 
                 /// identical serialized result.
-            ZeroInitialize = 0x1
+            ZeroInitialize = 0x1,
+
+                /// If set will not serialize function body.
+            SkipFunctionBody = 0x2,
         };
     };
 
@@ -342,6 +362,7 @@ public:
         /// Write the object at the pointer
     SerialIndex writeObject(const NodeBase* ptr);
     SerialIndex writeObject(const RefObject* ptr);
+    SerialIndex writeValObject(const Val* ptr);
 
         /// Add an array - may need to convert to serialized format
     template <typename T>

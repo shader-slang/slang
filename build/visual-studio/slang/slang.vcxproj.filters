@@ -72,6 +72,9 @@
     <ClInclude Include="..\..\..\source\slang\slang-check.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-compiler-options.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-compiler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -195,6 +198,9 @@
     <ClInclude Include="..\..\..\source\slang\slang-ir-bind-existentials.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-ir-bit-field-accessors.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ir-byte-address-legalize.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -280,6 +286,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ir-inline.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-ir-insert-debug-value-store.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ir-inst-defs.h">
@@ -743,6 +752,9 @@
     <ClCompile Include="..\..\..\source\slang\slang-check.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-compiler-options.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-compiler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -845,6 +857,9 @@
     <ClCompile Include="..\..\..\source\slang\slang-ir-bind-existentials.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-ir-bit-field-accessors.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-byte-address-legalize.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -933,6 +948,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-inline.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-ir-insert-debug-value-store.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-layout.cpp">

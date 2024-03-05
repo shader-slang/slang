@@ -524,8 +524,17 @@ SLANG_NO_THROW Result SLANG_MCALL RendererBase::createShaderObject(
     ShaderObjectContainerType container,
     IShaderObject** outObject)
 {
+    return createShaderObject2(slangContext.session, type, container, outObject);
+}
+
+SLANG_NO_THROW Result SLANG_MCALL RendererBase::createShaderObject2(
+    slang::ISession* slangSession,
+    slang::TypeReflection* type,
+    ShaderObjectContainerType container,
+    IShaderObject** outObject)
+{
     RefPtr<ShaderObjectLayoutBase> shaderObjectLayout;
-    SLANG_RETURN_ON_FAIL(getShaderObjectLayout(type, container, shaderObjectLayout.writeRef()));
+    SLANG_RETURN_ON_FAIL(getShaderObjectLayout(slangSession, type, container, shaderObjectLayout.writeRef()));
     return createShaderObject(shaderObjectLayout, outObject);
 }
 
@@ -534,8 +543,17 @@ SLANG_NO_THROW Result SLANG_MCALL RendererBase::createMutableShaderObject(
     ShaderObjectContainerType containerType,
     IShaderObject** outObject)
 {
+    return createMutableShaderObject2(slangContext.session, type, containerType, outObject);
+}
+
+SLANG_NO_THROW Result SLANG_MCALL RendererBase::createMutableShaderObject2(
+    slang::ISession* slangSession,
+    slang::TypeReflection* type,
+    ShaderObjectContainerType containerType,
+    IShaderObject** outObject)
+{
     RefPtr<ShaderObjectLayoutBase> shaderObjectLayout;
-    SLANG_RETURN_ON_FAIL(getShaderObjectLayout(type, containerType, shaderObjectLayout.writeRef()));
+    SLANG_RETURN_ON_FAIL(getShaderObjectLayout(slangSession, type, containerType, shaderObjectLayout.writeRef()));
     return createMutableShaderObject(shaderObjectLayout, outObject);
 }
 
@@ -616,7 +634,7 @@ SLANG_NO_THROW Result SLANG_MCALL RendererBase::createShaderObjectFromTypeLayout
     slang::TypeLayoutReflection* typeLayout, IShaderObject** outObject)
 {
     RefPtr<ShaderObjectLayoutBase> shaderObjectLayout;
-    SLANG_RETURN_ON_FAIL(getShaderObjectLayout(typeLayout, shaderObjectLayout.writeRef()));
+    SLANG_RETURN_ON_FAIL(getShaderObjectLayout(slangContext.session, typeLayout, shaderObjectLayout.writeRef()));
     return createShaderObject(shaderObjectLayout, outObject);
 }
 
@@ -624,7 +642,7 @@ SLANG_NO_THROW Result SLANG_MCALL RendererBase::createMutableShaderObjectFromTyp
     slang::TypeLayoutReflection* typeLayout, IShaderObject** outObject)
 {
     RefPtr<ShaderObjectLayoutBase> shaderObjectLayout;
-    SLANG_RETURN_ON_FAIL(getShaderObjectLayout(typeLayout, shaderObjectLayout.writeRef()));
+    SLANG_RETURN_ON_FAIL(getShaderObjectLayout(slangContext.session, typeLayout, shaderObjectLayout.writeRef()));
     return createMutableShaderObject(shaderObjectLayout, outObject);
 }
 
@@ -702,6 +720,7 @@ Result RendererBase::getTextureRowAlignment(Size* outAlignment)
 }
 
 Result RendererBase::getShaderObjectLayout(
+    slang::ISession* session,
     slang::TypeReflection* type,
     ShaderObjectContainerType container,
     ShaderObjectLayoutBase** outLayout)
@@ -709,26 +728,30 @@ Result RendererBase::getShaderObjectLayout(
     switch (container)
     {
     case ShaderObjectContainerType::StructuredBuffer:
-        type = slangContext.session->getContainerType(type, slang::ContainerType::StructuredBuffer);
+        type = session->getContainerType(type, slang::ContainerType::StructuredBuffer);
         break;
     case ShaderObjectContainerType::Array:
-        type = slangContext.session->getContainerType(type, slang::ContainerType::UnsizedArray);
+        type = session->getContainerType(type, slang::ContainerType::UnsizedArray);
         break;
     default:
         break;
     }
 
-    auto typeLayout = slangContext.session->getTypeLayout(type);
-    return getShaderObjectLayout(typeLayout, outLayout);
+    auto typeLayout = session->getTypeLayout(type);
+    SLANG_RETURN_ON_FAIL(getShaderObjectLayout(session, typeLayout, outLayout));
+    (*outLayout)->m_slangSession = session;
+    return SLANG_OK;
 }
 
 Result RendererBase::getShaderObjectLayout(
-    slang::TypeLayoutReflection* typeLayout, ShaderObjectLayoutBase** outLayout)
+    slang::ISession* session,
+    slang::TypeLayoutReflection* typeLayout,
+    ShaderObjectLayoutBase** outLayout)
 {
     RefPtr<ShaderObjectLayoutBase> shaderObjectLayout;
     if (!m_shaderObjectLayoutCache.tryGetValue(typeLayout, shaderObjectLayout))
     {
-        SLANG_RETURN_ON_FAIL(createShaderObjectLayout(typeLayout, shaderObjectLayout.writeRef()));
+        SLANG_RETURN_ON_FAIL(createShaderObjectLayout(session, typeLayout, shaderObjectLayout.writeRef()));
         m_shaderObjectLayoutCache.add(typeLayout, shaderObjectLayout);
     }
     *outLayout = shaderObjectLayout.detach();
@@ -830,9 +853,10 @@ void ShaderCache::addSpecializedPipeline(PipelineKey key, Slang::RefPtr<Pipeline
     specializedPipelines[key] = specializedPipeline;
 }
 
-void ShaderObjectLayoutBase::initBase(RendererBase* renderer, slang::TypeLayoutReflection* elementTypeLayout)
+void ShaderObjectLayoutBase::initBase(RendererBase* renderer, slang::ISession* session, slang::TypeLayoutReflection* elementTypeLayout)
 {
     m_renderer = renderer;
+    m_slangSession = session;
     m_elementTypeLayout = elementTypeLayout;
     m_componentID = m_renderer->shaderCache.getComponentId(m_elementTypeLayout->getType());
 }
@@ -887,15 +911,12 @@ Result ShaderObjectBase::setExistentialHeader(
     // Slang runtime, so we can look up the ID for this particular conformance (which
     // will create it on demand).
     //
-    ComPtr<slang::ISession> slangSession;
-    SLANG_RETURN_ON_FAIL(getRenderer()->getSlangSession(slangSession.writeRef()));
-    //
     // Note: If the type doesn't actually conform to the required interface for
     // this sub-object range, then this is the point where we will detect that
     // fact and error out.
     //
     uint32_t conformanceID = 0xFFFFFFFF;
-    SLANG_RETURN_ON_FAIL(slangSession->getTypeConformanceWitnessSequentialID(
+    SLANG_RETURN_ON_FAIL(getLayoutBase()->m_slangSession->getTypeConformanceWitnessSequentialID(
         concreteType, existentialType, &conformanceID));
     //
     // Once we have the conformance ID, then we can write it into the object

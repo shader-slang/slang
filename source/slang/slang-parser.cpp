@@ -105,7 +105,8 @@ namespace Slang
         int sameTokenPeekedTimes = 0;
 
         Scope* outerScope = nullptr;
-        Scope* currentScope = nullptr;
+        Scope* currentLookupScope = nullptr; // Scope where expr lookup should initiate from.
+        Scope* currentScope = nullptr; // Scope where new decl definitions should be inserted into.
         ModuleDecl* currentModule = nullptr;
 
         bool hasSeenCompletionToken = false;
@@ -126,20 +127,20 @@ namespace Slang
         {
             node->loc = tokenReader.peekLoc();
         }
+
+        void resetLookupScope()
+        {
+            currentLookupScope = currentScope;
+        }
+
         void PushScope(ContainerDecl* containerDecl)
         {
-            // TODO(JS):
-            // 
-            // Previously Scope was ref counted. This meant that if a scope was pushed, but not used when popped
-            // it's memory would be freed.
-            //
-            // Here the memory is consumed and will not be freed until the astBuilder goes out of scope.
-
             Scope* newScope = astBuilder->create<Scope>();
             newScope->containerDecl = containerDecl;
             newScope->parent = currentScope;
             currentScope = newScope;
             containerDecl->ownedScope = newScope;
+            resetLookupScope();
         }
 
         void pushScopeAndSetParent(ContainerDecl* containerDecl)
@@ -151,6 +152,7 @@ namespace Slang
         void PopScope()
         {
             currentScope = currentScope->parent;
+            resetLookupScope();
         }
 
         ModuleDecl* getCurrentModuleDecl()
@@ -1280,21 +1282,24 @@ namespace Slang
         Parser* parser, void* /*userData*/)
     {
         auto decl = parser->astBuilder->create<ModuleDeclarationDecl>();
+        auto moduleDecl = parser->getCurrentModuleDecl();
         if (parser->LookAheadToken(TokenType::Identifier))
         {
             auto nameToken = parser->ReadToken(TokenType::Identifier);
             decl->nameAndLoc.name = parser->getNamePool()->getName(nameToken.getContent());
             decl->nameAndLoc.loc = nameToken.loc;
+            if (moduleDecl) moduleDecl->nameAndLoc = decl->nameAndLoc;
         }
         else if (parser->LookAheadToken(TokenType::StringLiteral))
         {
             auto nameToken = parser->ReadToken(TokenType::StringLiteral);
             decl->nameAndLoc.name = parser->getNamePool()->getName(getStringLiteralTokenValue(nameToken));
             decl->nameAndLoc.loc = nameToken.loc;
+            if (moduleDecl) moduleDecl->nameAndLoc = decl->nameAndLoc;
         }
         else
         {
-            if (auto moduleDecl = parser->getCurrentModuleDecl())
+            if (moduleDecl)
                 decl->nameAndLoc.name = moduleDecl->getName();
             decl->nameAndLoc.loc = parser->tokenReader.peekLoc();
         }
@@ -2551,7 +2556,7 @@ namespace Slang
         Token typeName = parser->ReadToken(TokenType::Identifier);
 
         auto basicType = parser->astBuilder->create<VarExpr>();
-        basicType->scope = parser->currentScope;
+        basicType->scope = parser->currentLookupScope;
         basicType->loc = typeName.loc;
         basicType->name = typeName.getNameOrNull();
 
@@ -2965,6 +2970,15 @@ namespace Slang
             semantic->name = parser->ReadToken(TokenType::Identifier);
             return semantic;
         }
+        else if (parser->LookAheadToken(TokenType::IntegerLiteral))
+        {
+            BitFieldModifier* bitWidthMod = parser->astBuilder->create<BitFieldModifier>();
+            parser->FillPosition(bitWidthMod);
+            const auto token = parser->tokenReader.advanceToken();
+            UnownedStringSlice suffix;
+            bitWidthMod->width = getIntegerLiteralValue(token, &suffix);
+            return bitWidthMod;
+        }
         else if (parser->LookAheadToken(TokenType::CompletionRequest))
         {
             HLSLSimpleSemantic* semantic = parser->astBuilder->create<HLSLSimpleSemantic>();
@@ -3229,6 +3243,9 @@ namespace Slang
                 inheritanceDecl->base = base;
 
                 AddMember(decl, inheritanceDecl);
+                
+                if (parser->pendingModifiers->hasModifier<ExternModifier>())
+                    addModifier(inheritanceDecl, parser->astBuilder->create<ExternModifier>());
 
             } while (AdvanceIf(parser, TokenType::Comma));
         }
@@ -4727,6 +4744,19 @@ namespace Slang
             // We allow for an inheritance clause on a `struct`
             // so that it can conform to interfaces.
             parseOptionalInheritanceClause(this, rs);
+            if (AdvanceIf(this, TokenType::OpAssign))
+            {
+                rs->wrappedType = ParseTypeExp();
+                PushScope(rs);
+                PopScope();
+                ReadToken(TokenType::Semicolon);
+                return rs;
+            }
+            if (AdvanceIf(this, TokenType::Semicolon))
+            {
+                rs->hasBody = false;
+                return rs;
+            }
             parseDeclBody(this, rs);
             return rs;
         });
@@ -5575,9 +5605,9 @@ namespace Slang
     {
         ParamDecl* parameter = astBuilder->create<ParamDecl>();
         parameter->modifiers = ParseModifiers(this);
-
+        currentLookupScope = currentScope->parent;
         _parseTraditionalParamDeclCommonBase(this, parameter, kDeclaratorParseOption_AllowEmpty);
-
+        resetLookupScope();
         return parameter;
     }
 
@@ -6572,11 +6602,9 @@ namespace Slang
 
                 value = _fixIntegerLiteral(suffixBaseType, value, &token, parser->sink);
 
-                ASTBuilder* astBuilder = parser->astBuilder;
-                Type* suffixType = (suffixBaseType == BaseType::Void) ? astBuilder->getErrorType() : astBuilder->getBuiltinType(suffixBaseType);
 
                 constExpr->value = value;
-                constExpr->type = QualType(suffixType);
+                constExpr->suffixType = suffixBaseType;
 
                 return constExpr;
             }
@@ -6686,12 +6714,9 @@ namespace Slang
                     }
                 }
 
-                ASTBuilder* astBuilder = parser->astBuilder;
-
-                Type* suffixType = (suffixBaseType == BaseType::Void) ? astBuilder->getErrorType() : astBuilder->getBuiltinType(suffixBaseType);
 
                 constExpr->value = fixedValue;
-                constExpr->type = QualType(suffixType);
+                constExpr->suffixType = suffixBaseType;
 
                 return constExpr;
             }
@@ -7232,6 +7257,23 @@ namespace Slang
                 break;
             }
         }
+
+        if (ret.opcode.flavor == SPIRVAsmOperand::Flavor::NamedValue
+            && ret.opcode.knownValue == SpvOp(0xffffffff))
+        {
+            if (ret.opcode.token.type == TokenType::IntegerLiteral)
+            {
+                Int intVal = -1;
+                StringUtil::parseInt(ret.opcode.token.getContent(), intVal);
+                ret.opcode.knownValue = (SpvWord)intVal;
+            }
+            else
+            {
+                parser->diagnose(ret.opcode.token, Diagnostics::unrecognizedSPIRVOpcode, ret.opcode.token);
+                return std::nullopt;
+            }
+        }
+
         return ret;
     }
 
@@ -7434,9 +7476,9 @@ namespace Slang
         ContainerDecl*                  parentDecl)
     {
         ParserOptions options = {};
-        options.enableEffectAnnotations = translationUnit->compileRequest->getLinkage()->getEnableEffectAnnotations();
+        options.enableEffectAnnotations = translationUnit->compileRequest->optionSet.getBoolOption(CompilerOptionName::EnableEffectAnnotations);
         options.allowGLSLInput = 
-            translationUnit->compileRequest->getLinkage()->getAllowGLSLInput() ||
+            translationUnit->compileRequest->optionSet.getBoolOption(CompilerOptionName::AllowGLSL) ||
             sourceLanguage == SourceLanguage::GLSL;
         options.isInLanguageServer = translationUnit->compileRequest->getLinkage()->isInLanguageServer();
 

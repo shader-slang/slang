@@ -8,13 +8,13 @@ using namespace Slang;
 namespace cpu
 {
 
-ShaderObjectLayoutImpl::ShaderObjectLayoutImpl(RendererBase* renderer, slang::TypeLayoutReflection* layout)
+ShaderObjectLayoutImpl::ShaderObjectLayoutImpl(RendererBase* renderer, slang::ISession* session, slang::TypeLayoutReflection* layout)
 {
-    initBase(renderer, layout);
+    initBase(renderer, session, layout);
 
     m_subObjectCount = 0;
     m_resourceCount = 0;
-
+    
     m_elementTypeLayout = _unwrapParameterGroups(layout, m_containerType);
     m_size = m_elementTypeLayout->getSize();
 
@@ -104,7 +104,7 @@ ShaderObjectLayoutImpl::ShaderObjectLayoutImpl(RendererBase* renderer, slang::Ty
         if (slangBindingType != slang::BindingType::ExistentialValue)
         {
             subObjectLayout =
-                new ShaderObjectLayoutImpl(renderer, slangLeafTypeLayout->getElementTypeLayout());
+                new ShaderObjectLayoutImpl(renderer, m_slangSession, slangLeafTypeLayout->getElementTypeLayout());
         }
 
         SubObjectRangeInfo subObjectRange;
@@ -130,14 +130,15 @@ const char* EntryPointLayoutImpl::getEntryPointName()
     return m_entryPointLayout->getName();
 }
 
-RootShaderObjectLayoutImpl::RootShaderObjectLayoutImpl(RendererBase* renderer, slang::ProgramLayout* programLayout)
-    : ShaderObjectLayoutImpl(renderer, programLayout->getGlobalParamsTypeLayout())
+RootShaderObjectLayoutImpl::RootShaderObjectLayoutImpl(RendererBase* renderer, slang::ISession* session, slang::ProgramLayout* programLayout)
+    : ShaderObjectLayoutImpl(renderer, session, programLayout->getGlobalParamsTypeLayout())
     , m_programLayout(programLayout)
 {
     for (UInt i =0; i< programLayout->getEntryPointCount(); i++)
     {
         m_entryPointLayouts.add(new EntryPointLayoutImpl(
             renderer,
+            session,
             programLayout->getEntryPointByIndex(i)));
     }
 

@@ -1795,7 +1795,7 @@ void CPPSourceEmitter::_getExportStyle(IRInst* inst, bool& outIsExport, bool& ou
     outIsExport = false;
     outIsExternC = false;
     // Specially handle export, as we don't want to emit it multiple times
-    if (getTargetReq()->isWholeProgramRequest())
+    if (getTargetProgram()->getOptionSet().getBoolOption(CompilerOptionName::GenerateWholeProgram))
     {
         if (auto nameHint = inst->findDecoration<IRNameHintDecoration>())
         {

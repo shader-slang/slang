@@ -8,11 +8,19 @@
 namespace gfx_test
 {
         /// Helper function for print out diagnostic messages output by Slang compiler.
-    void diagnoseIfNeeded(ISlangWriter* diagnosticWriter, slang::IBlob* diagnosticsBlob);
+    void diagnoseIfNeeded(slang::IBlob* diagnosticsBlob);
 
         /// Loads a compute shader module and produces a `gfx::IShaderProgram`.
     Slang::Result loadComputeProgram(
         gfx::IDevice* device,
+        Slang::ComPtr<gfx::IShaderProgram>& outShaderProgram,
+        const char* shaderModuleName,
+        const char* entryPointName,
+        slang::ProgramLayout*& slangReflection);
+
+    Slang::Result loadComputeProgram(
+        gfx::IDevice* device,
+        slang::ISession* slangSession,
         Slang::ComPtr<gfx::IShaderProgram>& outShaderProgram,
         const char* shaderModuleName,
         const char* entryPointName,
@@ -79,6 +87,8 @@ namespace gfx_test
         Slang::RenderApiFlag::Enum api,
         Slang::List<const char*> additionalSearchPaths = {},
         gfx::IDevice::ShaderCacheDesc shaderCache = {});
+    
+    Slang::List<const char*> getSlangSearchPaths();
 
     void initializeRenderDoc();
     void renderDocBeginFrame();

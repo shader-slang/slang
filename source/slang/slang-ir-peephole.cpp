@@ -17,8 +17,9 @@ struct PeepholeContext : InstPassBase
     FloatingPointMode floatingPointMode = FloatingPointMode::Precise;
     bool removeOldInst = true;
     bool isInGeneric = false;
+    bool isPrelinking = false;
 
-    TargetRequest* targetRequest;
+    TargetProgram* targetProgram;
 
     void maybeRemoveOldInst(IRInst* inst)
     {
@@ -581,7 +582,7 @@ struct PeepholeContext : InstPassBase
                 auto ptr = inst->getOperand(0);
                 IRBuilder builder(module);
                 builder.setInsertBefore(inst);
-                auto neq = builder.emitNeq(ptr, builder.getNullVoidPtrValue());
+                auto neq = builder.emitNeq(ptr, builder.getNullPtrValue(ptr->getDataType()));
                 inst->replaceUsesWith(neq);
                 maybeRemoveOldInst(inst);
                 changed = true;
@@ -695,6 +696,13 @@ struct PeepholeContext : InstPassBase
             {
                 if (inst->getOperand(0)->getOp() == kIROp_WitnessTable)
                 {
+                    // Don't fold witness lookups prelinking if the witness table is `extern`.
+                    // These witness tables provides `default`s in case they are not
+                    // explicitly specialized via other linked modules, therefore we don't want
+                    // to resolve them too soon before linking.
+                    if (isPrelinking && inst->getOperand(0)->findDecoration<IRUserExternDecoration>())
+                        break;
+
                     auto wt = as<IRWitnessTable>(inst->getOperand(0));
                     auto key = inst->getOperand(1);
                     for (auto item : wt->getChildren())
@@ -965,13 +973,13 @@ struct PeepholeContext : InstPassBase
             }
         case kIROp_GetNaturalStride:
         {
-            if (targetRequest)
+            if (targetProgram)
             {
                 if (isInGeneric)
                     break;
                 auto type = inst->getOperand(0)->getDataType();
                 IRSizeAndAlignment sizeAlignment;
-                getNaturalSizeAndAlignment(targetRequest, type, &sizeAlignment);
+                getNaturalSizeAndAlignment(targetProgram->getOptionSet(), type, &sizeAlignment);
                 IRBuilder builder(module);
                 builder.setInsertBefore(inst);
                 auto stride = builder.getIntValue(inst->getDataType(), sizeAlignment.getStride());
@@ -1029,6 +1037,40 @@ struct PeepholeContext : InstPassBase
                 }
                 break;
             }
+        case kIROp_Load:
+            {
+                // Load from undef is undef.
+                if (as<IRLoad>(inst)->getPtr()->getOp() == kIROp_undefined)
+                {
+                    IRBuilder builder(module);
+                    builder.setInsertBefore(inst);
+                    auto undef = builder.emitUndefined(inst->getDataType());
+                    inst->replaceUsesWith(undef);
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
+                break;
+            }
+        case kIROp_Store:
+            {
+                // Store undef is no-op.
+                if (as<IRStore>(inst)->getVal()->getOp() == kIROp_undefined)
+                {
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
+                break;
+            }
+        case kIROp_DebugValue:
+            {
+                // Update debug value with undef is no-op.
+                if (as<IRDebugValue>(inst)->getValue()->getOp() == kIROp_undefined)
+                {
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
+                break;
+            }
         default:
             break;
         }
@@ -1069,24 +1111,25 @@ struct PeepholeContext : InstPassBase
     }
 };
 
-bool peepholeOptimize(TargetRequest* target, IRModule* module)
+bool peepholeOptimize(TargetProgram* target, IRModule* module, PeepholeOptimizationOptions options)
 {
     PeepholeContext context = PeepholeContext(module);
-    context.targetRequest = target;
+    context.targetProgram = target;
+    context.isPrelinking = options.isPrelinking;
     return context.processModule();
 }
 
-bool peepholeOptimize(TargetRequest* target, IRInst* func)
+bool peepholeOptimize(TargetProgram* target, IRInst* func)
 {
     PeepholeContext context = PeepholeContext(func->getModule());
-    context.targetRequest = target;
+    context.targetProgram = target;
     return context.processFunc(func);
 }
 
-bool peepholeOptimizeGlobalScope(TargetRequest* target, IRModule* module)
+bool peepholeOptimizeGlobalScope(TargetProgram* target, IRModule* module)
 {
     PeepholeContext context = PeepholeContext(module);
-    context.targetRequest = target;
+    context.targetProgram = target;
 
     bool result = false;
     for (;;)
@@ -1101,13 +1144,13 @@ bool peepholeOptimizeGlobalScope(TargetRequest* target, IRModule* module)
     return result;
 }
 
-bool tryReplaceInstUsesWithSimplifiedValue(TargetRequest* target, IRModule* module, IRInst* inst)
+bool tryReplaceInstUsesWithSimplifiedValue(TargetProgram* target, IRModule* module, IRInst* inst)
 {
     if (inst != tryConstantFoldInst(module, inst))
         return true;
 
     PeepholeContext context = PeepholeContext(inst->getModule());
-    context.targetRequest = target;
+    context.targetProgram = target;
     context.removeOldInst = false;
     context.processInst(inst);
     return context.changed;

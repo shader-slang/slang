@@ -1,4 +1,4 @@
-//TEST:REFLECTION:-profile ps_4_0 -target hlsl -no-codegen
+//TEST:REFLECTION:-profile ps_4_0 -target hlsl -no-codegen -matrix-layout-column-major
 //TEST:REFLECTION:-profile ps_4_0 -target hlsl -no-codegen -matrix-layout-row-major
 
 // Test that we apply matrix layout rules correctly.

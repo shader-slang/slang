@@ -2,7 +2,8 @@
 
 #include "../core/slang-process-util.h"
 #include "../core/slang-string-escape-util.h"
-
+#include "../core/slang-string-util.h"
+#include "../core/slang-type-text-util.h"
 #include "slang-core-diagnostics.h"
 
 namespace Slang {
@@ -63,6 +64,27 @@ bool CommandLineArgs::hasArgs(const char*const* args, Index count) const
     return true;
 }
 
+String CommandLineArgs::serialize()
+{
+    StringBuilder sb;
+    for (auto& arg : m_args)
+        sb << arg.value << "\n";
+    return sb.produceString();
+}
+
+void CommandLineArgs::deserialize(String content)
+{
+    List<UnownedStringSlice> slices;
+    StringUtil::split(content.getUnownedSlice(), '\n', slices);
+    for (auto arg : slices)
+    {
+        Arg v;
+        v.value = arg;
+        v.loc = SourceLoc();
+        m_args.add(v);
+    }
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
                          CommandLineReader
@@ -117,6 +139,24 @@ SlangResult CommandLineReader::expectArg(CommandLineArg& outArg)
                          DownstreamArgs
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+DownstreamArgs::DownstreamArgs(CommandLineContext* context)
+    : m_context(context)
+{
+    // Add all of the possible names we allow for downstream tools
+    {
+        for (Index i = SLANG_PASS_THROUGH_NONE + 1; i < SLANG_PASS_THROUGH_COUNT_OF; ++i)
+        {
+            addName(TypeTextUtil::getPassThroughName(SlangPassThrough(i)));
+        }
+
+        // Generic downstream tool
+        addName("downstream");
+        // Generic downstream linker
+        addName("linker");
+    }
+}
+
 
 Index DownstreamArgs::addName(const String& name)
 {

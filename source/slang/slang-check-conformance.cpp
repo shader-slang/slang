@@ -242,6 +242,57 @@ namespace Slang
         return isSubtype(type, m_astBuilder->getDiffInterfaceType());
     }
 
+    bool SemanticsVisitor::doesTypeHaveTag(Type* type, TypeTag tag)
+    {
+        if (auto arrayType = as<ArrayExpressionType>(type))
+        {
+            return doesTypeHaveTag(arrayType->getElementType(), tag);
+        }
+        if (auto modifiedType = as<ModifiedType>(type))
+        {
+            return doesTypeHaveTag(modifiedType->getBase(), tag);
+        }
+        if (auto declRefType = as<DeclRefType>(type))
+        {
+            if (auto aggTypeDecl = as<AggTypeDecl>(declRefType->getDeclRef()))
+                return aggTypeDecl.getDecl()->hasTag(tag);
+        }
+        return false;
+    }
+
+    TypeTag SemanticsVisitor::getTypeTags(Type* type)
+    {
+        if (auto arrayType = as<ArrayExpressionType>(type))
+        {
+            return getTypeTags(arrayType->getElementType());
+        }
+        if (auto modifiedType = as<ModifiedType>(type))
+        {
+            return getTypeTags(modifiedType->getBase());
+        }
+        if (auto declRefType = as<DeclRefType>(type))
+        {
+            if (auto aggTypeDecl = as<AggTypeDecl>(declRefType->getDeclRef()))
+                return aggTypeDecl.getDecl()->typeTags;
+        }
+        return TypeTag::None;
+    }
+
+
+    Type* SemanticsVisitor::getConstantBufferElementType(Type* type)
+    {
+        if (auto arrType = as<ArrayExpressionType>(type))
+            return getConstantBufferElementType(arrType->getElementType());
+        if (auto modifiedType = as<ModifiedType>(type))
+            return getConstantBufferElementType(modifiedType->getBase());
+        if (auto constantBuffer = as<ConstantBufferType>(type))
+            return constantBuffer->getElementType();
+        if (auto parameterBlock = as<ParameterBlockType>(type))
+            return parameterBlock->getElementType();
+        return nullptr;
+    }
+
+
     SubtypeWitness* SemanticsVisitor::tryGetInterfaceConformanceWitness(
         Type*   type,
         Type*   interfaceType)

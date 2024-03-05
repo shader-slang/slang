@@ -15,9 +15,9 @@ namespace Slang
 {
 
 struct IRModule;
-class TargetRequest;
+class TargetProgram;
 
-void lowerLValueCast(TargetRequest* targetReq, IRModule* module);
+void lowerLValueCast(TargetProgram* target, IRModule* module);
 
 } // namespace Slang
 

@@ -528,6 +528,12 @@ struct IRLinkageDecoration : IRDecoration
     }
 };
 
+struct IRUserExternDecoration : IRDecoration
+{
+    enum { kOp = kIROp_UserExternDecoration };
+    IR_LEAF_ISA(UserExternDecoration)
+};
+
 struct IRImportDecoration : IRLinkageDecoration
 {
     enum { kOp = kIROp_ImportDecoration };
@@ -1234,6 +1240,14 @@ struct IRUnpackAnyValue : IRInst
 {
     IR_LEAF_ISA(UnpackAnyValue)
     IRInst* getValue() { return getOperand(0); }
+};
+
+struct IRBitFieldAccessorDecoration : IRDecoration
+{
+    IR_LEAF_ISA(BitFieldAccessorDecoration);
+    IRStructKey* getBackingMemberKey() { return cast<IRStructKey>(getOperand(0)); }
+    IRIntegerValue getFieldWidth() { return as<IRIntLit>(getOperand(1))->getValue(); }
+    IRIntegerValue getFieldOffset() { return as<IRIntLit>(getOperand(2))->getValue(); }
 };
 
 // Layout decorations
@@ -2218,7 +2232,6 @@ struct IRFieldAddress : IRInst
     IRInst* getBase() { return base.get(); }
     IRInst* getField() { return field.get(); }
     IR_LEAF_ISA(FieldAddress)
-
 };
 
 struct IRGetElement : IRInst
@@ -3003,6 +3016,33 @@ struct IRDebugLine : IRInst
     IRInst* getColEnd() { return getOperand(4); }
 };
 
+struct IRDebugVar : IRInst
+{
+    IR_LEAF_ISA(DebugVar)
+    IRInst* getSource() { return getOperand(0); }
+    IRInst* getLine() { return getOperand(1); }
+    IRInst* getCol() { return getOperand(2); }
+    IRInst* getArgIndex() { return getOperandCount() >= 4 ? getOperand(3) : nullptr; }
+};
+
+struct IRDebugValue : IRInst
+{
+    IR_LEAF_ISA(DebugValue)
+    IRInst* getDebugVar() { return getOperand(0); }
+    IRInst* getValue() { return getOperand(1); }
+    UInt getAccessChainCount() { return getOperandCount() - 2; }
+    IRInst* getAccessChain(UInt index) { return getOperand(2 + index); }
+};
+
+struct IRDebugLocationDecoration : IRDecoration
+{
+    IRInst* getSource() { return getOperand(0); }
+    IRInst* getLine() { return getOperand(1); }
+    IRInst* getCol() { return getOperand(2); }
+
+    IR_LEAF_ISA(DebugLocationDecoration)
+};
+
 struct IRSPIRVAsm;
 
 struct IRSPIRVAsmOperand : IRInst
@@ -3438,6 +3478,8 @@ public:
 
     IRInst* emitDebugSource(UnownedStringSlice fileName, UnownedStringSlice source);
     IRInst* emitDebugLine(IRInst* source, IRIntegerValue lineStart, IRIntegerValue lineEnd, IRIntegerValue colStart, IRIntegerValue colEnd);
+    IRInst* emitDebugVar(IRType* type, IRInst* source, IRInst* line, IRInst* col, IRInst* argIndex = nullptr);
+    IRInst* emitDebugValue(IRInst* debugVar, IRInst* debugValue, ArrayView<IRInst*> accessChain);
 
         /// Emit an LiveRangeStart instruction indicating the referenced item is live following this instruction
     IRLiveRangeStart* emitLiveRangeStart(IRInst* referenced);
@@ -4067,6 +4109,8 @@ public:
         IRInst* sizedType);
 
     IRInst* emitCastPtrToBool(IRInst* val);
+    IRInst* emitCastPtrToInt(IRInst* val);
+    IRInst* emitCastIntToPtr(IRType* ptrType, IRInst* val);
 
     IRGlobalConstant* emitGlobalConstant(
         IRType* type);
@@ -4350,6 +4394,11 @@ public:
         addDecoration(value, kIROp_ExportDecoration, getStringValue(mangledName));
     }
 
+    void addUserExternDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_UserExternDecoration);
+    }
+
     void addExternCppDecoration(IRInst* value, UnownedStringSlice const& mangledName)
     {
         addDecoration(value, kIROp_ExternCppDecoration, getStringValue(mangledName));
@@ -4358,6 +4407,11 @@ public:
     void addExternCDecoration(IRInst* value)
     {
         addDecoration(value, kIROp_ExternCDecoration);
+    }
+
+    void addDebugLocationDecoration(IRInst* value, IRInst* debugSource, IRIntegerValue line, IRIntegerValue col)
+    {
+        addDecoration(value, kIROp_DebugLocationDecoration, debugSource, getIntValue(getUIntType(), line), getIntValue(getUIntType(), col));
     }
 
     void addForceInlineDecoration(IRInst* value)

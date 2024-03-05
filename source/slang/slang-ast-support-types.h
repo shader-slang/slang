@@ -109,6 +109,7 @@ namespace Slang
         kConversionCost_InRangeIntLitSignedToUnsignedConversion = 32,
         kConversionCost_InRangeIntLitUnsignedToSignedConversion = 81,
 
+        kConversionCost_MutablePtrToConstPtr = 20,
 
         // Conversions based on explicit sub-typing relationships are the cheapest
         //
@@ -1501,6 +1502,9 @@ namespace Slang
 
         // The type witnessesd by the witness table (a concrete type).
         Type* witnessedType;
+
+        // Whether or not this witness table is an extern declaration.
+        bool isExtern = false;
 
         // Satisfying values of each requirement.
         List<KeyValuePair<Decl*, RequirementWitness>> m_requirements;

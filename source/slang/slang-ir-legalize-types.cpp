@@ -814,6 +814,86 @@ static LegalVal legalizeLoad(
     }
 }
 
+static LegalVal legalizeDebugVar(IRTypeLegalizationContext* context, LegalType type, IRDebugVar* originalInst)
+{
+    // For now we just discard any special part and keep the ordinary part.
+
+    switch (type.flavor)
+    {
+    case LegalType::Flavor::simple:
+    {
+        auto legalVal = context->builder->emitDebugVar(
+            type.getSimple(),
+            originalInst->getSource(),
+            originalInst->getLine(),
+            originalInst->getCol(),
+            originalInst->getArgIndex());
+        copyNameHintAndDebugDecorations(legalVal, originalInst);
+        return LegalVal::simple(legalVal);
+    }
+    case LegalType::Flavor::none:
+        return LegalVal();
+    case LegalType::Flavor::pair:
+        {
+            auto pairType = type.getPair();
+            auto ordinaryVal = legalizeDebugVar(context, pairType->ordinaryType, originalInst);
+            return ordinaryVal;
+        }
+    case LegalType::Flavor::tuple:
+        {
+            auto tupleType = type.getTuple();
+            for (auto ee : tupleType->elements)
+            {
+                auto innerResult = legalizeDebugVar(context, ee.type, originalInst);
+                if (innerResult.flavor != LegalVal::Flavor::none)
+                    return innerResult;
+            }
+            return LegalVal();
+        }
+    default:
+        return LegalVal();
+    }
+}
+
+static LegalVal legalizeDebugValue(IRTypeLegalizationContext* context, LegalVal debugVar, LegalVal debugValue, IRDebugValue* originalInst)
+{
+    // For now we just discard any special part and keep the ordinary part.
+    List<IRInst*> accessChain;
+    for (UInt i = 0; i < originalInst->getAccessChainCount(); i++)
+    {
+        accessChain.add(originalInst->getAccessChain(i));
+    }
+    switch (debugValue.flavor)
+    {
+    case LegalType::Flavor::simple:
+        return LegalVal::simple(
+            context->builder->emitDebugValue(
+                debugVar.getSimple(),
+                debugValue.getSimple(),
+                accessChain.getArrayView()));
+    case LegalType::Flavor::none:
+        return LegalVal();
+    case LegalType::Flavor::pair:
+    {
+        auto ordinaryVal = legalizeDebugValue(context, debugVar, debugValue.getPair()->ordinaryVal, originalInst);
+        return ordinaryVal;
+    }
+    case LegalType::Flavor::tuple:
+    {
+        auto tupleVal = debugValue.getTuple();
+        for (auto ee : tupleVal->elements)
+        {
+            auto innerResult = legalizeDebugValue(context, debugVar, ee.val, originalInst);
+            if (innerResult.flavor != LegalVal::Flavor::none)
+                return innerResult;
+        }
+        return LegalVal();
+    }
+    default:
+        return LegalVal();
+    }
+}
+
 static LegalVal legalizeStore(
     IRTypeLegalizationContext*    context,
     LegalVal                    legalPtrVal,
@@ -1921,6 +2001,12 @@ static LegalVal legalizeInst(
         return legalizeCall(context, (IRCall*)inst);
     case kIROp_Return:
         return legalizeRetVal(context, args[0], (IRReturn*)inst);
+
+    case kIROp_DebugVar:
+        return legalizeDebugVar(context, type, (IRDebugVar*)inst);
+    case kIROp_DebugValue:
+        return legalizeDebugValue(context, args[0], args[1], (IRDebugValue*)inst);
+
     case kIROp_MakeStruct:
         return legalizeMakeStruct(
             context,
@@ -1939,6 +2025,7 @@ static LegalVal legalizeInst(
         return legalizeDefaultConstruct(
             context,
             type);
+
     case kIROp_unconditionalBranch:
     case kIROp_loop:
         return legalizeUnconditionalBranch(context, args, (IRUnconditionalBranch*)inst);

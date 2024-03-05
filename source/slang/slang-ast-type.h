@@ -535,7 +535,8 @@ class PtrType : public PtrTypeBase
     SLANG_AST_CLASS(PtrType)
 };
 
-// A GPU pointer type that for general readonly memory access.
+// A GPU pointer type into global memory.
+
 class ConstBufferPointerType : public PtrTypeBase
 {
     SLANG_AST_CLASS(ConstBufferPointerType)

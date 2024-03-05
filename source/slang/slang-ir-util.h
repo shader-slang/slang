@@ -87,6 +87,8 @@ inline bool isScalarIntegerType(IRType* type)
 // No side effect can take place through a value of a "Value" type.
 bool isValueType(IRInst* type);
 
+bool isSimpleDataType(IRType* type);
+
 inline bool isChildInstOf(IRInst* inst, IRInst* parent)
 {
     while (inst)
@@ -167,8 +169,10 @@ inline IRInst* unwrapAttributedType(IRInst* type)
 IRType* dropNormAttributes(IRType* const t);
 
 void getTypeNameHint(StringBuilder& sb, IRInst* type);
-void copyNameHintDecoration(IRInst* dest, IRInst* src);
+void copyNameHintAndDebugDecorations(IRInst* dest, IRInst* src);
 IRInst* getRootAddr(IRInst* addrInst);
+IRInst* getRootAddr(IRInst* addrInst, List<IRInst*>& outAccessChain);
+
 bool canAddressesPotentiallyAlias(IRGlobalValueWithCode* func, IRInst* addr1, IRInst* addr2);
 
 String dumpIRToString(
@@ -220,6 +224,8 @@ IRInst* getVulkanPayloadLocation(IRInst* payloadGlobalVar);
 IRInst* getInstInBlock(IRInst* inst);
 
 void removePhiArgs(IRInst* phiParam);
+
+ShortList<IRInst*> getPhiArgs(IRInst* phiParam);
 
 int getParamIndexInBlock(IRParam* paramInst);
 

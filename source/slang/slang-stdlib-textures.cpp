@@ -67,6 +67,7 @@ void TextureTypeInfo::writeFuncBody(
     const String& glsl,
     const String& cuda,
     const String& spirvDefault,
+    const String& spirvRWDefault,
     const String& spirvCombined)
 {
     BraceScope funcScope{i, sb};
@@ -92,7 +93,13 @@ void TextureTypeInfo::writeFuncBody(
         if(spirvDefault.getLength() && spirvCombined.getLength())
         {
             sb << i << "case spirv:\n";
-            sb << i << "if (isCombined != 0)\n";
+            sb << i << "if (access == " << kStdlibResourceAccessReadWrite << ")\n";
+            sb << i << "return spirv_asm\n";
+            {
+                BraceScope spirvRWScope{ i, sb, ";\n" };
+                sb << spirvRWDefault << "\n";
+            }
+            sb << i << "else if (isCombined != 0)\n";
             sb << i << "{\n";
             {
                 sb << i << "return spirv_asm\n";
@@ -117,6 +124,7 @@ void TextureTypeInfo::writeFuncWithSig(
     const String& sig,
     const String& glsl,
     const String& spirvDefault,
+    const String& spirvRWDefault,
     const String& spirvCombined,
     const String& cuda,
     const ReadNoneMode readNoneMode)
@@ -126,7 +134,7 @@ void TextureTypeInfo::writeFuncWithSig(
     sb << i << "[__readNone]\n";
     sb << i << "[ForceInline]\n";
     sb << i << sig << "\n";
-    writeFuncBody(funcName, glsl, cuda, spirvDefault, spirvCombined);
+    writeFuncBody(funcName, glsl, cuda, spirvDefault, spirvRWDefault, spirvCombined);
     sb << "\n";
 }
 
@@ -136,6 +144,7 @@ void TextureTypeInfo::writeFunc(
     const String& params,
     const String& glsl,
     const String& spirvDefault,
+    const String& spirvRWDefault,
     const String& spirvCombined,
     const String& cuda,
     const ReadNoneMode readNoneMode)
@@ -145,6 +154,7 @@ void TextureTypeInfo::writeFunc(
         cat(returnType, " ", funcName, "(", params, ")"),
         glsl,
         spirvDefault,
+        spirvRWDefault,
         spirvCombined,
         cuda,
         readNoneMode
@@ -294,12 +304,12 @@ void TextureTypeInfo::writeGetDimensionFunctions()
             }
 
             // SPIRV ASM generation
-            auto generateSpirvAsm = [&](StringBuilder& spirv, UnownedStringSlice imageVar) 
+            auto generateSpirvAsm = [&](StringBuilder& spirv, bool isRW, UnownedStringSlice imageVar) 
             {
                 spirv << "%vecSize:$$uint";
                 if (sizeDimCount > 1) spirv << sizeDimCount;
                 spirv << " = ";
-                if (isMultisample)
+                if (isMultisample || isRW)
                     spirv << "OpImageQuerySize " << imageVar << ";";
                 else
                     spirv << "OpImageQuerySizeLod " << imageVar <<" $0;";
@@ -380,14 +390,21 @@ void TextureTypeInfo::writeGetDimensionFunctions()
             {
                 spirvCombined << "OpCapability ImageQuery; ";
                 spirvCombined << "%image:__imageType(this) = OpImage $this; ";
-                generateSpirvAsm(spirvCombined, toSlice("%image"));
+                generateSpirvAsm(spirvCombined, false, toSlice("%image"));
             }
 
             StringBuilder spirvDefault;
             {
                 spirvDefault << "OpCapability ImageQuery; ";
-                generateSpirvAsm(spirvDefault, toSlice("$this"));
+                generateSpirvAsm(spirvDefault, false, toSlice("$this"));
             }
+
+            StringBuilder spirvRWDefault;
+            {
+                spirvRWDefault << "OpCapability ImageQuery; ";
+                generateSpirvAsm(spirvRWDefault, true, toSlice("$this"));
+            }
+
             sb << "    __glsl_version(450)\n";
             sb << "    __glsl_extension(GL_EXT_samplerless_texture_functions)\n";
             writeFunc(
@@ -396,6 +413,7 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 params,
                 glsl,
                 spirvDefault,
+                spirvRWDefault,
                 spirvCombined,
                 "",
                 ReadNoneMode::Always);

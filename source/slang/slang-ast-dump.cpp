@@ -343,6 +343,10 @@ struct ASTDumpContext
     {
         m_writer->emit((int)v);
     }
+    void dump(TypeTag tag)
+    {
+        m_writer->emit((int)tag);
+    }
     void dump(const String& string)
     {
         dump(string.getUnownedSlice());
@@ -670,6 +674,8 @@ struct ASTDumpContext
             break;
         case SPIRVAsmOperand::RayCallableFromLocation:
             m_writer->emit("__rayCallableFromLocation");
+        case SPIRVAsmOperand::BuiltinVar:
+            m_writer->emit("builtin");
             break;
         default:
             SLANG_UNREACHABLE("Unhandled case in ast dump for SPIRVAsmOperand");

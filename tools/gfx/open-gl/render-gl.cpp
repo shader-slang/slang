@@ -137,6 +137,7 @@ public:
         IInputLayout** outLayout) override;
 
     virtual Result createShaderObjectLayout(
+        slang::ISession* session,
         slang::TypeLayoutReflection* typeLayout,
         ShaderObjectLayoutBase** outLayout) override;
     virtual Result createShaderObject(ShaderObjectLayoutBase* layout, IShaderObject** outObject) override;
@@ -682,11 +683,12 @@ public:
         struct Builder
         {
         public:
-            Builder(RendererBase* renderer)
-                : m_renderer(renderer)
+            Builder(RendererBase* renderer, slang::ISession* session)
+                : m_renderer(renderer), m_session(session)
             {}
 
             RendererBase* m_renderer;
+            slang::ISession* m_session;
             slang::TypeLayoutReflection* m_elementTypeLayout;
 
             /// The container type of this shader object. When `m_containerType` is
@@ -792,6 +794,7 @@ public:
                     {
                         createForElementType(
                             m_renderer,
+                            m_session,
                             slangLeafTypeLayout->getElementTypeLayout(),
                             subObjectLayout.writeRef());
                     }
@@ -818,10 +821,11 @@ public:
 
         static Result createForElementType(
             RendererBase* renderer,
+            slang::ISession* session,
             slang::TypeLayoutReflection* elementType,
             ShaderObjectLayoutImpl** outLayout)
         {
-            Builder builder(renderer);
+            Builder builder(renderer, session);
             builder.setElementTypeLayout(elementType);
             return builder.build(outLayout);
         }
@@ -851,7 +855,7 @@ public:
         {
             auto renderer = builder->m_renderer;
 
-            initBase(renderer, builder->m_elementTypeLayout);
+            initBase(renderer, builder->m_session, builder->m_elementTypeLayout);
 
             m_bindingRanges = builder->m_bindingRanges;
 
@@ -889,7 +893,7 @@ public:
                 RendererBase* renderer,
                 slang::IComponentType* program,
                 slang::ProgramLayout* programLayout)
-                : Super::Builder(renderer)
+                : Super::Builder(renderer, program->getSession())
                 , m_program(program)
                 , m_programLayout(programLayout)
             {}
@@ -939,7 +943,7 @@ public:
                 auto slangEntryPoint = programLayout->getEntryPointByIndex(e);
                 RefPtr<ShaderObjectLayoutImpl> entryPointLayout;
                 SLANG_RETURN_ON_FAIL(ShaderObjectLayoutImpl::createForElementType(
-                    renderer, slangEntryPoint->getTypeLayout(), entryPointLayout.writeRef()));
+                    renderer, program->getSession(), slangEntryPoint->getTypeLayout(), entryPointLayout.writeRef()));
                 builder.addEntryPoint(slangEntryPoint->getStage(), entryPointLayout);
             }
 
@@ -1426,6 +1430,7 @@ public:
             auto renderer = getRenderer();
             RefPtr<ShaderObjectLayoutImpl> layout;
             SLANG_RETURN_ON_FAIL(renderer->getShaderObjectLayout(
+                m_layout->m_slangSession,
                 extendedType.slangType,
                 m_layout->getContainerType(),
                 (ShaderObjectLayoutBase**)layout.writeRef()));
@@ -2002,6 +2007,8 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::initialize(const Desc& desc)
 {
     SLANG_RETURN_ON_FAIL(slangContext.initialize(
         desc.slang,
+        desc.extendedDescCount,
+        desc.extendedDescs,
         SLANG_GLSL,
         "glsl_440",
         makeArray(
@@ -2898,12 +2905,13 @@ Result GLDevice::createComputePipelineState(const ComputePipelineStateDesc& inDe
 }
 
 Result GLDevice::createShaderObjectLayout(
+    slang::ISession* session,
     slang::TypeLayoutReflection* typeLayout,
     ShaderObjectLayoutBase** outLayout)
 {
     RefPtr<ShaderObjectLayoutImpl> layout;
     SLANG_RETURN_ON_FAIL(ShaderObjectLayoutImpl::createForElementType(
-        this, typeLayout, layout.writeRef()));
+        this, session, typeLayout, layout.writeRef()));
     returnRefPtrMove(outLayout, layout);
     return SLANG_OK;
 }

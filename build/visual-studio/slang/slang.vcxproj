@@ -328,6 +328,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-capability.h" />
     <ClInclude Include="..\..\..\source\slang\slang-check-impl.h" />
     <ClInclude Include="..\..\..\source\slang\slang-check.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-compiler-options.h" />
     <ClInclude Include="..\..\..\source\slang\slang-compiler.h" />
     <ClInclude Include="..\..\..\source\slang\slang-container-pool.h" />
     <ClInclude Include="..\..\..\source\slang\slang-content-assist-info.h" />
@@ -369,6 +370,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ir-autodiff-unzip.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-autodiff.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-bind-existentials.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-bit-field-accessors.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-byte-address-legalize.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-check-differentiability.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-cleanup-void.h" />
@@ -398,6 +400,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ir-glsl-liveness.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-init-local-var.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-inline.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-insert-debug-value-store.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-inst-defs.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-inst-pass-base.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-insts.h" />
@@ -553,6 +556,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-check-stmt.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-check-type.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-check.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-compiler-options.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-compiler.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-container-pool.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-diagnostics.cpp" />
@@ -587,6 +591,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ir-autodiff-unzip.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-autodiff.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-bind-existentials.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-bit-field-accessors.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-byte-address-legalize.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-check-differentiability.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-cleanup-void.cpp" />
@@ -617,6 +622,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ir-glsl-liveness.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-init-local-var.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-inline.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-insert-debug-value-store.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-layout.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-legalize-array-return-type.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-legalize-mesh-outputs.cpp" />

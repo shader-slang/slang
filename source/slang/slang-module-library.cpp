@@ -39,7 +39,7 @@ void* ModuleLibrary::castAs(const Guid& guid)
     return getObject(guid);
 }
 
-SlangResult loadModuleLibrary(const Byte* inBytes, size_t bytesCount, EndToEndCompileRequest* req, ComPtr<IModuleLibrary>& outLibrary)
+SlangResult loadModuleLibrary(const Byte* inBytes, size_t bytesCount, String path, EndToEndCompileRequest* req, ComPtr<IModuleLibrary>& outLibrary)
 {
     auto library = new ModuleLibrary;
     ComPtr<IModuleLibrary> scopeLibrary(library);
@@ -51,10 +51,6 @@ SlangResult loadModuleLibrary(const Byte* inBytes, size_t bytesCount, EndToEndCo
     SLANG_RETURN_ON_FAIL(RiffUtil::read(&memoryStream, riffContainer));
 
     auto linkage = req->getLinkage();
-
-    // TODO(JS): May be better to have a ITypeComponent that encapsulates a collection of modules
-    // For now just add to the linkage
-
     {
         SerialContainerData containerData;
 
@@ -65,15 +61,29 @@ SlangResult loadModuleLibrary(const Byte* inBytes, size_t bytesCount, EndToEndCo
         options.sourceManager = linkage->getSourceManager();
         options.linkage = req->getLinkage();
         options.sink = req->getSink();
+        options.astBuilder = linkage->getASTBuilder();
+        options.modulePath = path;
+        SLANG_RETURN_ON_FAIL(SerialContainerUtil::read(&riffContainer, options, nullptr, containerData));
+        DiagnosticSink sink;
 
-        SLANG_RETURN_ON_FAIL(SerialContainerUtil::read(&riffContainer, options, containerData));
-
-        for (const auto& module : containerData.modules)
+        // Modules in the container should be serialized in its depedency order,
+        // so that we always load the dependencies before the consuming module.
+        for (auto& module : containerData.modules)
         {
             // If the irModule is set, add it
             if (module.irModule)
             {
-                library->m_modules.add(module.irModule);
+                if (module.dependentFiles.getCount() == 0)
+                    return SLANG_FAIL;
+                if (!module.astRootNode)
+                    return SLANG_FAIL;
+                auto loadedModule = linkage->loadDeserializedModule(
+                    as<ModuleDecl>(module.astRootNode)->getName(),
+                    PathInfo::makePath(module.dependentFiles.getFirst()),
+                    module, &sink);
+                if (!loadedModule)
+                    return SLANG_FAIL;
+                library->m_modules.add(loadedModule);
             }
         }
 
@@ -93,7 +103,7 @@ SlangResult loadModuleLibrary(const Byte* inBytes, size_t bytesCount, EndToEndCo
     return SLANG_OK;
 }
 
-SlangResult loadModuleLibrary(ArtifactKeep keep, IArtifact* artifact, EndToEndCompileRequest* req, ComPtr<IModuleLibrary>& outLibrary)
+SlangResult loadModuleLibrary(ArtifactKeep keep, IArtifact* artifact, String path, EndToEndCompileRequest* req, ComPtr<IModuleLibrary>& outLibrary)
 {
     if (auto foundLibrary = findRepresentation<IModuleLibrary>(artifact))
     {
@@ -107,7 +117,7 @@ SlangResult loadModuleLibrary(ArtifactKeep keep, IArtifact* artifact, EndToEndCo
 
     // Load the module
     ComPtr<IModuleLibrary> library;
-    SLANG_RETURN_ON_FAIL(loadModuleLibrary((const Byte*)blob->getBufferPointer(), blob->getBufferSize(), req, library));
+    SLANG_RETURN_ON_FAIL(loadModuleLibrary((const Byte*)blob->getBufferPointer(), blob->getBufferSize(), path, req, library));
     
     if (canKeep(keep))
     {

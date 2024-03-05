@@ -96,32 +96,6 @@ IRInst* lookupForwardDerivativeReference(IRInst* primalFunction)
     return nullptr;
 }
 
-IRStructField* DifferentialPairTypeBuilder::findField(IRInst* type, IRStructKey* key)
-{
-    if (auto irStructType = as<IRStructType>(type))
-    {
-        for (auto field : irStructType->getFields())
-        {
-            if (field->getKey() == key)
-            {
-                return field;
-            }
-        }
-    }
-    else if (auto irSpecialize = as<IRSpecialize>(type))
-    {
-        if (auto irGeneric = as<IRGeneric>(irSpecialize->getBase()))
-        {
-            if (auto irGenericStructType = as<IRStructType>(findInnerMostGenericReturnVal(irGeneric)))
-            {
-                return findField(irGenericStructType, key);
-            }
-        }
-    }
-
-    return nullptr;
-}
-
 IRInst* DifferentialPairTypeBuilder::findSpecializationForParam(IRInst* specializeInst, IRInst* genericParam)
 {
     // Get base generic that's being specialized.
@@ -162,7 +136,7 @@ IRInst* DifferentialPairTypeBuilder::emitFieldAccessor(IRBuilder* builder, IRIns
     if (auto basePairStructType = as<IRStructType>(pairType))
     {
         return as<IRFieldExtract>(builder->emitFieldExtract(
-                findField(basePairStructType, key)->getFieldType(),
+                findStructField(basePairStructType, key)->getFieldType(),
                 baseInst,
                 key
             ));
@@ -178,7 +152,7 @@ IRInst* DifferentialPairTypeBuilder::emitFieldAccessor(IRBuilder* builder, IRIns
                     builder->getPtrType((IRType*)
                         findSpecializationForParam(
                             ptrInnerSpecializedType,
-                            findField(ptrInnerSpecializedType, key)->getFieldType())),
+                            findStructField(ptrInnerSpecializedType, key)->getFieldType())),
                     baseInst,
                     key
                 ));
@@ -188,7 +162,7 @@ IRInst* DifferentialPairTypeBuilder::emitFieldAccessor(IRBuilder* builder, IRIns
         {
             return as<IRFieldAddress>(builder->emitFieldAddress(
                 builder->getPtrType((IRType*)
-                        findField(ptrBaseStructType, key)->getFieldType()),
+                        findStructField(ptrBaseStructType, key)->getFieldType()),
                 baseInst,
                 key));
         }
@@ -204,7 +178,7 @@ IRInst* DifferentialPairTypeBuilder::emitFieldAccessor(IRBuilder* builder, IRIns
             return as<IRFieldExtract>(builder->emitFieldExtract(
                 (IRType*)findSpecializationForParam(
                     specializedType,
-                    findField(genericBasePairStructType, key)->getFieldType()),
+                    findStructField(genericBasePairStructType, key)->getFieldType()),
                 baseInst,
                 key
             ));
@@ -217,7 +191,7 @@ IRInst* DifferentialPairTypeBuilder::emitFieldAccessor(IRBuilder* builder, IRIns
                         builder->getPtrType((IRType*)
                             findSpecializationForParam(
                                 specializedType,
-                                findField(genericPairStructType, key)->getFieldType())),
+                                findStructField(genericPairStructType, key)->getFieldType())),
                         baseInst,
                         key
                     ));
@@ -339,8 +313,8 @@ IRInst* DifferentialPairTypeBuilder::lowerDiffPairType(
     return result;
 }
 
-AutoDiffSharedContext::AutoDiffSharedContext(TargetRequest* target, IRModuleInst* inModuleInst)
-    : moduleInst(inModuleInst), targetRequest(target)
+AutoDiffSharedContext::AutoDiffSharedContext(TargetProgram* target, IRModuleInst* inModuleInst)
+    : moduleInst(inModuleInst), targetProgram(target)
 {
     differentiableInterfaceType = as<IRInterfaceType>(findDifferentiableInterface());
     if (differentiableInterfaceType)
@@ -1979,7 +1953,7 @@ protected:
 };
 
 bool processAutodiffCalls(
-    TargetRequest* target,
+    TargetProgram* target,
     IRModule*                           module,
     DiagnosticSink*                     sink,
     IRAutodiffPassOptions const&)
@@ -2078,7 +2052,7 @@ void releaseNullDifferentialType(AutoDiffSharedContext* context)
     }
 }
 
-bool finalizeAutoDiffPass(TargetRequest* target, IRModule* module)
+bool finalizeAutoDiffPass(TargetProgram* target, IRModule* module)
 {
     bool modified = false;
 

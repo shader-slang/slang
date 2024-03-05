@@ -47,17 +47,17 @@ struct SpecializationContext
     // we are specializing.
     IRModule* module;
     DiagnosticSink* sink;
-    TargetRequest* targetRequest;
+    TargetProgram* targetProgram;
 
     bool changed = false;
 
 
-    SpecializationContext(IRModule* inModule, TargetRequest* target)
+    SpecializationContext(IRModule* inModule, TargetProgram* target)
         : workList(*inModule->getContainerPool().getList<IRInst>())
         , workListSet(*inModule->getContainerPool().getHashSet<IRInst>())
         , cleanInsts(*module->getContainerPool().getHashSet<IRInst>())
         , module(inModule)
-        , targetRequest(target)
+        , targetProgram(target)
     {
     }
 
@@ -1323,12 +1323,23 @@ struct SpecializationContext
         // their replacements.
         //
         IRCloneEnv cloneEnv;
+        cloneEnv.squashChildrenMapping = true;
 
         // We also need some IR building state, for any
         // new instructions we will emit.
         //
         IRBuilder builderStorage(module);
         auto builder = &builderStorage;
+
+        // To get started, we will create the skeleton of the new
+        // specialized function, so newly created insts
+        // will be placed in a proper parent.
+        //
+
+        IRFunc* newFunc = builder->createFunc();
+
+        builder->setInsertInto(newFunc);
+        IRBlock* tempHeaderBlock = builder->emitBlock();
 
         // We will start out by determining what the parameters
         // of the specialized function should be, based on
@@ -1343,7 +1354,6 @@ struct SpecializationContext
         // block, or even a function, to insert them into.
         //
         List<IRParam*> newParams;
-        List<IRInst*> newBodyInsts;
         UInt argCounter = 0;
         for (auto oldParam : oldFunc->getParams())
         {
@@ -1387,7 +1397,6 @@ struct SpecializationContext
                 // correct existential type, and stores the right witness table).
                 //
                 auto newMakeExistential = builder->emitMakeExistential(oldParam->getFullType(), newParam, witnessTable);
-                newBodyInsts.add(newMakeExistential);
                 replacementVal = newMakeExistential;
             }
             else if (auto oldWrapExistential = as<IRWrapExistential>(arg))
@@ -1412,7 +1421,6 @@ struct SpecializationContext
                     newParam,
                     oldWrapExistential->getSlotOperandCount(),
                     oldWrapExistential->getSlotOperands());
-                newBodyInsts.add(newWrapExistential);
                 replacementVal = newWrapExistential;
             }
             else
@@ -1433,24 +1441,6 @@ struct SpecializationContext
             cloneEnv.mapOldValToNew.add(oldParam, replacementVal);
         }
 
-        // Next we will create the skeleton of the new
-        // specialized function, including its type.
-        //
-        // In order to construct the type of the new function, we
-        // need to extract the types of all its parameters.
-        //
-        List<IRType*> newParamTypes;
-        for (auto newParam : newParams)
-        {
-            newParamTypes.add(newParam->getFullType());
-        }
-        IRType* newFuncType = builder->getFuncType(
-            newParamTypes.getCount(),
-            newParamTypes.getBuffer(),
-            oldFunc->getResultType());
-        IRFunc* newFunc = builder->createFunc();
-        newFunc->setFullType(newFuncType);
-
         // The above steps have accomplished the "first phase"
         // of cloning the function (since `IRFunc`s have no
         // operands).
@@ -1465,7 +1455,22 @@ struct SpecializationContext
             oldFunc,
             newFunc);
 
-        // Now that the main body of existing isntructions have
+        //
+        // In order to construct the type of the new function, we
+        // need to extract the types of all its parameters.
+        //
+        List<IRType*> newParamTypes;
+        for (auto newParam : newParams)
+        {
+            newParamTypes.add(newParam->getFullType());
+        }
+        IRType* newFuncType = builder->getFuncType(
+            newParamTypes.getCount(),
+            newParamTypes.getBuffer(),
+            oldFunc->getResultType());
+        newFunc->setFullType(newFuncType);
+
+        // Now that the main body of existing instructions have
         // been cloned into the new function, we can go ahead
         // and insert all the parameters and body instructions
         // we built up into the function at the right place.
@@ -1474,7 +1479,7 @@ struct SpecializationContext
         // block (this was an invariant established before
         // we decided to specialize).
         //
-        auto newEntryBlock = newFunc->getFirstBlock();
+        auto newEntryBlock = as<IRBlock>(cloneEnv.mapOldValToNew[oldFunc->getFirstBlock()]);
         SLANG_ASSERT(newEntryBlock);
 
         // We expect every valid block to have at least one
@@ -1497,10 +1502,16 @@ struct SpecializationContext
         // before the first ordinary instruction (but will come
         // *after* the parameters by the order of these two loops).
         //
-        for (auto newBodyInst : newBodyInsts)
+        for (auto newBodyInst = tempHeaderBlock->getFirstChild(); newBodyInst;)
         {
+            auto next = newBodyInst->next;
             newBodyInst->insertBefore(newFirstOrdinary);
+            newBodyInst = next;
         }
+
+        // After moving all param and existential insts in tempHeaderBlock
+        // it should be empty now and we can remove it.
+        tempHeaderBlock->removeAndDeallocate();
 
         // After all this work we have a valid `newFunc` that has been
         // specialized to match the types at the call site.
@@ -1513,7 +1524,7 @@ struct SpecializationContext
         //
         addToWorkList(newFunc);
 
-        simplifyFunc(targetRequest, newFunc, IRSimplificationOptions::getFast());
+        simplifyFunc(targetProgram, newFunc, IRSimplificationOptions::getFast());
 
         return newFunc;
     }
@@ -1995,11 +2006,6 @@ struct SpecializationContext
         {
             return 2;
         }
-        else if (auto ptrType = as<IRPtrTypeBase>(type))
-        {
-            type = ptrType->getValueType();
-            goto top;
-        }
         else if (auto ptrLikeType = as<IRPointerLikeType>(type))
         {
             type = ptrLikeType->getElementType();
@@ -2237,7 +2243,7 @@ struct SpecializationContext
 };
 
 bool specializeModule(
-    TargetRequest* target,
+    TargetProgram* target,
     IRModule* module,
     DiagnosticSink* sink)
 {
@@ -2377,7 +2383,7 @@ IRInst* specializeGenericImpl(
                 // the same thing.
                 if (auto func = as<IRFunc>(specializedVal))
                 {
-                    simplifyFunc(context->targetRequest, func, IRSimplificationOptions::getFast());
+                    simplifyFunc(context->targetProgram, func, IRSimplificationOptions::getFast());
                 }
 
                 return specializedVal;

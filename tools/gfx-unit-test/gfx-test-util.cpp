@@ -4,7 +4,7 @@
 #include <slang-com-ptr.h>
 
 #define GFX_ENABLE_RENDERDOC_INTEGRATION 0
-
+#define GFX_ENABLE_SPIRV_DEBUG 0
 #if GFX_ENABLE_RENDERDOC_INTEGRATION
 #    include "external/renderdoc_app.h"
 #    include <windows.h>
@@ -31,6 +31,54 @@ namespace gfx_test
     {
         Slang::ComPtr<slang::ISession> slangSession;
         SLANG_RETURN_ON_FAIL(device->getSlangSession(slangSession.writeRef()));
+        Slang::ComPtr<slang::IBlob> diagnosticsBlob;
+        slang::IModule* module = slangSession->loadModule(shaderModuleName, diagnosticsBlob.writeRef());
+        diagnoseIfNeeded(diagnosticsBlob);
+        if (!module)
+            return SLANG_FAIL;
+
+        ComPtr<slang::IEntryPoint> computeEntryPoint;
+        SLANG_RETURN_ON_FAIL(
+            module->findEntryPointByName(entryPointName, computeEntryPoint.writeRef()));
+
+        Slang::List<slang::IComponentType*> componentTypes;
+        componentTypes.add(module);
+        componentTypes.add(computeEntryPoint);
+
+        Slang::ComPtr<slang::IComponentType> composedProgram;
+        SlangResult result = slangSession->createCompositeComponentType(
+            componentTypes.getBuffer(),
+            componentTypes.getCount(),
+            composedProgram.writeRef(),
+            diagnosticsBlob.writeRef());
+        diagnoseIfNeeded(diagnosticsBlob);
+        SLANG_RETURN_ON_FAIL(result);
+
+        ComPtr<slang::IComponentType> linkedProgram;
+        result = composedProgram->link(linkedProgram.writeRef(), diagnosticsBlob.writeRef());
+        diagnoseIfNeeded(diagnosticsBlob);
+        SLANG_RETURN_ON_FAIL(result);
+
+        composedProgram = linkedProgram;
+        slangReflection = composedProgram->getLayout();
+
+        gfx::IShaderProgram::Desc programDesc = {};
+        programDesc.slangGlobalScope = composedProgram.get();
+
+        auto shaderProgram = device->createProgram(programDesc);
+
+        outShaderProgram = shaderProgram;
+        return SLANG_OK;
+    }
+
+    Slang::Result loadComputeProgram(
+        gfx::IDevice* device,
+        slang::ISession* slangSession,
+        Slang::ComPtr<gfx::IShaderProgram>& outShaderProgram,
+        const char* shaderModuleName,
+        const char* entryPointName,
+        slang::ProgramLayout*& slangReflection)
+    {
         Slang::ComPtr<slang::IBlob> diagnosticsBlob;
         slang::IModule* module = slangSession->loadModule(shaderModuleName, diagnosticsBlob.writeRef());
         diagnoseIfNeeded(diagnosticsBlob);
@@ -222,10 +270,7 @@ namespace gfx_test
             SLANG_IGNORE_TEST
         }
         deviceDesc.slang.slangGlobalSession = context->slangGlobalSession;
-        Slang::List<const char*> searchPaths;
-        searchPaths.add("");
-        searchPaths.add("../../tools/gfx-unit-test");
-        searchPaths.add("tools/gfx-unit-test");
+        Slang::List<const char*> searchPaths = getSlangSearchPaths();
         searchPaths.addRange(additionalSearchPaths);
         deviceDesc.slang.searchPaths = searchPaths.getBuffer();
         deviceDesc.slang.searchPathCount = (gfx::GfxCount)searchPaths.getCount();
@@ -233,10 +278,25 @@ namespace gfx_test
 
         gfx::D3D12DeviceExtendedDesc extDesc = {};
         extDesc.rootParameterShaderAttributeName = "root";
+        
+        gfx::SlangSessionExtendedDesc slangExtDesc = {};
+        Slang::List<slang::CompilerOptionEntry> entries;
+        slang::CompilerOptionEntry emitSpirvDirectlyEntry;
+        emitSpirvDirectlyEntry.name = slang::CompilerOptionName::EmitSpirvDirectly;
+        emitSpirvDirectlyEntry.value.intValue0 = 1;
+        entries.add(emitSpirvDirectlyEntry);
+#if GFX_ENABLE_SPIRV_DEBUG
+        slang::CompilerOptionEntry debugLevelCompilerOptionEntry;
+        debugLevelCompilerOptionEntry.name = slang::CompilerOptionName::DebugInformation;
+        debugLevelCompilerOptionEntry.value.intValue0 = SLANG_DEBUG_INFO_LEVEL_STANDARD;
+        entries.add(debugLevelCompilerOptionEntry);
+#endif
+        slangExtDesc.compilerOptionEntries = entries.getBuffer();
+        slangExtDesc.compilerOptionEntryCount = (uint32_t)entries.getCount();
 
-        deviceDesc.extendedDescCount = 1;
-        void* extDescPtr = &extDesc;
-        deviceDesc.extendedDescs = &extDescPtr;
+        deviceDesc.extendedDescCount = 2;
+        void* extDescPtrs[2] = { &extDesc, &slangExtDesc };
+        deviceDesc.extendedDescs = extDescPtrs;
 
         // TODO: We should also set the debug callback
         // (And in general reduce the differences (and duplication) between
@@ -251,6 +311,15 @@ namespace gfx_test
             SLANG_IGNORE_TEST
         }
         return device;
+    }
+
+    Slang::List<const char*> getSlangSearchPaths()
+    {
+        Slang::List<const char*> searchPaths;
+        searchPaths.add("");
+        searchPaths.add("../../tools/gfx-unit-test");
+        searchPaths.add("tools/gfx-unit-test");
+        return searchPaths;
     }
 
 #if GFX_ENABLE_RENDERDOC_INTEGRATION

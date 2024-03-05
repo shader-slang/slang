@@ -52,6 +52,10 @@ struct ASTIterator
         {
             iterator->maybeDispatchCallback(expr);
         }
+        void visitOpenRefExpr(OpenRefExpr* expr)
+        {
+            dispatchIfNotNull(expr->innerExpr);
+        }
         void visitFloatingPointLiteralExpr(FloatingPointLiteralExpr* expr)
         {
             iterator->maybeDispatchCallback(expr);
@@ -475,6 +479,8 @@ void ASTIterator<CallbackFunc, FilterFunc>::visitDecl(DeclBase* decl)
         {
             visitDecl(member);
         }
+        if (auto aggTypeDecl = as<AggTypeDecl>(decl))
+            visitExpr(aggTypeDecl->wrappedType.exp);
     }
     for (auto modifier : decl->modifiers)
     {

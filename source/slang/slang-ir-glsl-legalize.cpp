@@ -929,7 +929,14 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     }
     else if (semanticName == "sv_shadingrate")
     {
-        name = "gl_PrimitiveShadingRateEXT";
+        if (kind == LayoutResourceKind::VaryingInput)
+        {
+            name = "gl_ShadingRateEXT";
+        }
+        else
+        {
+            name = "gl_PrimitiveShadingRateEXT";
+        }
     }
 
     if( name )
@@ -2686,7 +2693,7 @@ void legalizeEntryPointParameterForGLSL(
 
 bool shouldUseOriginalEntryPointName(CodeGenContext* codeGenContext)
 {
-    if (auto hlslOptions = codeGenContext->getTargetReq()->getHLSLToVulkanLayoutOptions())
+    if (auto hlslOptions = codeGenContext->getTargetProgram()->getHLSLToVulkanLayoutOptions())
     {
         if (hlslOptions->getUseOriginalEntryPointName())
         {

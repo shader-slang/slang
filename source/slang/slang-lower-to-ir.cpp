@@ -9,6 +9,7 @@
 #include "../core/slang-performance-profiler.h"
 
 #include "slang-check.h"
+#include "slang-ir-bit-field-accessors.h"
 #include "slang-ir-loop-inversion.h"
 #include "slang-ir.h"
 #include "slang-ir-constexpr.h"
@@ -17,6 +18,7 @@
 #include "slang-ir-autodiff.h"
 #include "slang-ir-inline.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-insert-debug-value-store.h"
 #include "slang-ir-check-differentiability.h"
 #include "slang-ir-missing-return.h"
 #include "slang-ir-sccp.h"
@@ -654,53 +656,30 @@ bool isFromStdLib(Decl* decl)
     return false;
 }
 
-bool isImportedDecl(IRGenContext* context, Decl* decl)
+bool isImportedDecl(IRGenContext* context, Decl* decl, bool& outIsExplicitExtern)
 {
     // If the declaration has the extern attribute then it must be imported
-    // from another module
+    // from another module.
+    // Note that `extern` declarations will have a mangled name that does not
+    // include the module name so the linking step can resolve them correctly.
     //
-    // The [__extern] attribute is a very special case feature (aka "a hack") that allows a symbol to be declared
-    // as if it is part of the current module for AST purposes, but then expects to be imported from another IR module.
-    // For that linkage to work, both the exporting and importing modules must have the same name (which would
-    // usually indicate that they are the same module).
-    //
-    // Note that in practice for matching during linking uses the fully qualified name - including module name.
-    // Thus using extern __attribute isn't useful for symbols that are imported via `import`, only symbols
-    // that notionally come from the same module but are split into separate compilations (as can be done with -module-name)
-    if (decl->findModifier<ExternAttribute>())
+    outIsExplicitExtern = false;
+    if (decl->findModifier<ExternAttribute>() || decl->findModifier<ExternModifier>())
     {
+        outIsExplicitExtern = true;
         return true;
     }
 
-    ModuleDecl* moduleDecl = findModuleDecl(decl);
-    if (!moduleDecl)
-        return false;
-
-#if 0
-    // HACK: don't treat standard library code as
-    // being imported for right now, just because
-    // we don't load its IR in the same way as
-    // for other imports.
-    //
-    // TODO: Fix this the right way, by having standard
-    // library declarations have IR modules that we link
-    // in via the normal means.
-    if (isFromStdLib(decl))
-        return false;
-#endif
-
-    if (moduleDecl != context->getMainModuleDecl())
-        return true;
-
-    return false;
-}
-
-    /// Is `decl` a function that should be force-inlined early in compilation (before linking)?
-static bool isForceInlineEarly(Decl* decl)
-{
-    if(decl->hasModifier<UnsafeForceInlineEarlyAttribute>())
-        return true;
-
+    for (auto parent = decl; parent; parent = parent->parentDecl)
+    {
+        if (as<ModuleDecl>(parent) && parent != context->getMainModuleDecl())
+            return true;
+        if (parent->findModifier<ExternAttribute>() || parent->findModifier<ExternModifier>())
+        {
+            outIsExplicitExtern = true;
+            return true;
+        }
+    }
     return false;
 }
 
@@ -723,6 +702,31 @@ LoweredValInfo emitDeclRef(
     IRGenContext*   context,
     DeclRef<Decl>   declRef,
     IRType*         type);
+
+
+bool isFunctionVarDecl(VarDeclBase* decl)
+{
+    // The immediate parent of a function-scope variable
+    // declaration will be a `ScopeDecl`.
+    //
+    // TODO: right now the parent links for scopes are *not*
+    // set correctly, so we can't just scan up and look
+    // for a function in the parent chain...
+    auto parent = decl->parentDecl;
+    if (as<ScopeDecl>(parent))
+    {
+        return true;
+    }
+    return false;
+}
+
+bool isFunctionStaticVarDecl(VarDeclBase* decl)
+{
+    // Only a variable marked `static` can be static.
+    if (!decl->findModifier<HLSLStaticModifier>())
+        return false;
+    return isFunctionVarDecl(decl);
+}
 
 IRInst* getSimpleVal(IRGenContext* context, LoweredValInfo lowered);
 
@@ -880,14 +884,6 @@ LoweredValInfo emitCallToDeclRef(
             IROp(intrinsicOp),
             argCount,
             args));
-    }
-
-    if( auto ctorDeclRef = funcDeclRef.as<ConstructorDecl>() )
-    {
-        if(!ctorDeclRef.getDecl()->body && isFromStdLib(ctorDeclRef.getDecl()) && !as<InterfaceDecl>(ctorDeclRef.getParent().getDecl()))
-        {
-            SLANG_UNREACHABLE("stdlib error: __init() has no definition.");
-        }
     }
 
     // Fallback case is to emit an actual call.
@@ -1314,9 +1310,12 @@ static void addLinkageDecoration(
         inst = outerGeneric;
     }
 
-    if (isImportedDecl(context, decl))
+    bool explicitExtern = false;
+    if (isImportedDecl(context, decl, explicitExtern))
     {
         builder->addImportDecoration(inst, mangledName);
+        if (explicitExtern)
+            builder->addUserExternDecoration(inst);
     }
     else
     {
@@ -2325,8 +2324,6 @@ static void addNameHint(
     String name = getNameForNameHint(context, decl);
     if(name.getLength() == 0)
         return;
-    if (name == "MyBlockName2")
-        printf("break");
     context->irBuilder->addNameHintDecoration(inst, name.getUnownedSlice());
 }
 
@@ -4310,6 +4307,10 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
             return LoweredValInfo::simple(
                 getBuilder()->emitMakeArrayFromElement(irType, irDefaultElement));
+        }
+        else if (auto ptrType = as<PtrType>(type))
+        {
+            return LoweredValInfo::simple(getBuilder()->getNullPtrValue(irType));
         }
         else if (auto declRefType = as<DeclRefType>(type))
         {
@@ -6319,7 +6320,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
     }
 };
 
-void maybeEmitDebugLine(IRGenContext* context, Stmt* stmt)
+void maybeEmitDebugLine(IRGenContext* context, StmtLoweringVisitor& visitor, Stmt* stmt)
 {
     if (!context->includeDebugInfo)
         return;
@@ -6333,7 +6334,24 @@ void maybeEmitDebugLine(IRGenContext* context, Stmt* stmt)
     if (context->shared->mapSourceFileToDebugSourceInst.tryGetValue(source, debugSourceInst))
     {
         auto humaneLoc = context->getLinkage()->getSourceManager()->getHumaneLoc(stmt->loc, SourceLocType::Emit);
+        visitor.startBlockIfNeeded(stmt);
         context->irBuilder->emitDebugLine(debugSourceInst, humaneLoc.line, humaneLoc.line, humaneLoc.column, humaneLoc.column + 1);
+    }
+}
+
+void maybeAddDebugLocationDecoration(IRGenContext* context, IRInst* inst)
+{
+    if (!context->includeDebugInfo)
+        return;
+    auto sourceView = context->getLinkage()->getSourceManager()->findSourceView(inst->sourceLoc);
+    if (!sourceView)
+        return;
+    auto source = sourceView->getSourceFile();
+    IRInst* debugSourceInst = nullptr;
+    if (context->shared->mapSourceFileToDebugSourceInst.tryGetValue(source, debugSourceInst))
+    {
+        auto humaneLoc = context->getLinkage()->getSourceManager()->getHumaneLoc(inst->sourceLoc, SourceLocType::Emit);
+        context->irBuilder->addDebugLocationDecoration(inst, debugSourceInst, humaneLoc.line, humaneLoc.column);
     }
 }
 
@@ -6348,7 +6366,7 @@ void lowerStmt(
 
     try
     {
-        maybeEmitDebugLine(context, stmt);
+        maybeEmitDebugLine(context, visitor, stmt);
         visitor.dispatch(stmt);
     }
     // Don't emit any context message for an explicit `AbortCompilationException`
@@ -7457,6 +7475,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         addNameHint(context, irParam, decl);
         maybeSetRate(context, irParam, decl);
         addVarDecorations(context, irParam, decl);
+        maybeAddDebugLocationDecoration(context, irParam);
 
         if (decl)
         {
@@ -7482,25 +7501,22 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         NestedContext nested(this);
         auto subBuilder = nested.getBuilder();
         auto subContext = nested.getContext();
-        IRGeneric* outerGeneric = emitOuterGenerics(subContext, decl, decl);
 
-        // TODO(JS): Is this right? 
-        //
-        // If we *are* in a generic, then outputting this in the (current) generic scope would be correct.
-        // If we *aren't* we want to go the level above for insertion
-        //
-        // Just inserting into the parent doesn't work with a generic that holds a function that has a static const
-        // variable.
-        // 
+        IRGeneric* outerGeneric = nullptr;
+
+        // If we are static, then we need to insert the declaration before the parent.
         // This tries to match the behavior of previous `lowerFunctionStaticConstVarDecl` functionality
-        if (!outerGeneric && isFunctionStaticVarDecl(decl))
+        if (isFunctionStaticVarDecl(decl))
         {
             // We need to insert the constant at a level above
             // the function being emitted. This will usually
             // be the global scope, but it might be an outer
             // generic if we are lowering a generic function.
-
-            subBuilder->setInsertInto(subBuilder->getFunc()->getParent());
+            subBuilder->setInsertBefore(subBuilder->getFunc());
+        }
+        else if (!isFunctionVarDecl(decl))
+        {
+            outerGeneric = emitOuterGenerics(subContext, decl, decl);
         }
 
         auto initExpr = decl->initExpr;
@@ -7615,6 +7631,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         maybeSetRate(context, irGlobal, decl);
 
         addVarDecorations(context, irGlobal, decl);
+        maybeAddDebugLocationDecoration(context, irGlobal);
 
         if (decl)
         {
@@ -7625,12 +7642,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // the underlying storage.
         context->setGlobalValue(decl, globalVal);
 
-        if (isImportedDecl(decl))
-        {
-            // Always emit imported declarations as declarations,
-            // and not definitions.
-        }
-        else if( auto initExpr = decl->initExpr )
+        if( auto initExpr = decl->initExpr )
         {
             IRBuilder subBuilderStorage = *getBuilder();
             IRBuilder* subBuilder = &subBuilderStorage;
@@ -7654,27 +7666,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         irGlobal->moveToEnd();
 
         return globalVal;
-    }
-
-    bool isFunctionStaticVarDecl(VarDeclBase* decl)
-    {
-        // Only a variable marked `static` can be static.
-        if(!decl->findModifier<HLSLStaticModifier>())
-            return false;
-
-        // The immediate parent of a function-scope variable
-        // declaration will be a `ScopeDecl`.
-        //
-        // TODO: right now the parent links for scopes are *not*
-        // set correctly, so we can't just scan up and look
-        // for a function in the parent chain...
-        auto parent = decl->parentDecl;
-        if( as<ScopeDecl>(parent) )
-        {
-            return true;
-        }
-
-        return false;
     }
 
     struct NestedContext
@@ -7845,6 +7836,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
 
         LoweredValInfo varVal = createVar(context, varType, decl);
+        maybeAddDebugLocationDecoration(context, varVal.val);
 
         if( auto initExpr = decl->initExpr )
         {
@@ -7922,8 +7914,18 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         UInt operandCount = 0;
         for (auto requirementDecl : decl->members)
         {
+            if (as<SubscriptDecl>(requirementDecl) || as<PropertyDecl>(requirementDecl))
+            {
+                for (auto accessorDecl : as<ContainerDecl>(requirementDecl)->members)
+                {
+                    if (as<AccessorDecl>(accessorDecl))
+                        operandCount++;
+                }
+            }
             if (!shouldDeclBeTreatedAsInterfaceRequirement(requirementDecl))
+            {
                 continue;
+            }
 
             operandCount++;
             // As a special case, any type constraints placed
@@ -7961,29 +7963,26 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
 
         UInt entryIndex = 0;
-
-        for (auto requirementDecl : decl->members)
-        {
-            auto requirementKey = getInterfaceRequirementKey(requirementDecl);
-            if (!requirementKey) continue;
-            auto entry = subBuilder->createInterfaceRequirementEntry(
-                requirementKey,
-                nullptr);
-            if (auto inheritance = as<InheritanceDecl>(requirementDecl))
+        auto addEntry = [&](IRStructKey* requirementKey, Decl* requirementDecl)
             {
-                auto irBaseType = lowerType(context, inheritance->base.type);
-                auto irWitnessTableType = subBuilder->getWitnessTableType(irBaseType);
-                entry->setRequirementVal(irWitnessTableType);
-            }
-            else
-            {
-                IRInst* requirementVal = ensureDecl(subContext, requirementDecl).val;
-                if (requirementVal)
+                auto entry = subBuilder->createInterfaceRequirementEntry(
+                    requirementKey,
+                    nullptr);
+                if (auto inheritance = as<InheritanceDecl>(requirementDecl))
                 {
-                    switch (requirementVal->getOp())
+                    auto irBaseType = lowerType(context, inheritance->base.type);
+                    auto irWitnessTableType = subBuilder->getWitnessTableType(irBaseType);
+                    entry->setRequirementVal(irWitnessTableType);
+                }
+                else
+                {
+                    IRInst* requirementVal = ensureDecl(subContext, requirementDecl).val;
+                    if (requirementVal)
                     {
-                    case kIROp_Func:
-                    case kIROp_Generic:
+                        switch (requirementVal->getOp())
+                        {
+                        case kIROp_Func:
+                        case kIROp_Generic:
                         {
                             // Remove lowered `IRFunc`s since we only care about
                             // function types.
@@ -7991,58 +7990,82 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                             entry->setRequirementVal(reqType);
                             break;
                         }
-                    default:
-                        entry->setRequirementVal(requirementVal);
-                        break;
-                    }
-                    if (requirementDecl->findModifier<HLSLStaticModifier>())
-                    {
-                        getBuilder()->addStaticRequirementDecoration(requirementKey);
+                        default:
+                            entry->setRequirementVal(requirementVal);
+                            break;
+                        }
+                        if (requirementDecl->findModifier<HLSLStaticModifier>())
+                        {
+                            getBuilder()->addStaticRequirementDecoration(requirementKey);
+                        }
                     }
                 }
-            }
-            irInterface->setOperand(entryIndex, entry);
-            entryIndex++;
-            // Add addtional requirements for type constraints placed
-            // on an associated types.
-            if (auto associatedTypeDecl = as<AssocTypeDecl>(requirementDecl))
-            {
-                for (auto constraintDecl : associatedTypeDecl->getMembersOfType<TypeConstraintDecl>())
+                irInterface->setOperand(entryIndex, entry);
+                entryIndex++;
+                // Add addtional requirements for type constraints placed
+                // on an associated types.
+                if (auto associatedTypeDecl = as<AssocTypeDecl>(requirementDecl))
                 {
-                    auto constraintKey = getInterfaceRequirementKey(constraintDecl);
-                    auto constraintInterfaceType =
-                        lowerType(context, constraintDecl->getSup().type);
-                    auto witnessTableType =
-                        getBuilder()->getWitnessTableType(constraintInterfaceType);
+                    for (auto constraintDecl : associatedTypeDecl->getMembersOfType<TypeConstraintDecl>())
+                    {
+                        auto constraintKey = getInterfaceRequirementKey(constraintDecl);
+                        auto constraintInterfaceType =
+                            lowerType(context, constraintDecl->getSup().type);
+                        auto witnessTableType =
+                            getBuilder()->getWitnessTableType(constraintInterfaceType);
 
-                    auto constraintEntry = subBuilder->createInterfaceRequirementEntry(constraintKey,
+                        auto constraintEntry = subBuilder->createInterfaceRequirementEntry(constraintKey,
                             witnessTableType);
-                    irInterface->setOperand(entryIndex, constraintEntry);
-                    entryIndex++;
+                        irInterface->setOperand(entryIndex, constraintEntry);
+                        entryIndex++;
 
-                    context->setValue(constraintDecl, LoweredValInfo::simple(constraintEntry));
+                        context->setValue(constraintDecl, LoweredValInfo::simple(constraintEntry));
+                    }
                 }
+                else
+                {
+                    CallableDecl* callableDecl = nullptr;
+                    if (auto genDecl = as<GenericDecl>(requirementDecl))
+                        callableDecl = as<CallableDecl>(genDecl->inner);
+                    else
+                        callableDecl = as<CallableDecl>(requirementDecl);
+                    if (callableDecl)
+                    {
+                        // Differentiable functions has additional requirements for the derivatives.
+                        for (auto diffDecl : callableDecl->getMembersOfType<DerivativeRequirementReferenceDecl>())
+                        {
+                            auto diffKey = getInterfaceRequirementKey(diffDecl->referencedDecl);
+                            insertRequirementKeyAssociation(diffDecl->referencedDecl, requirementKey, diffKey);
+                        }
+                    }
+                    // Add lowered requirement entry to current decl mapping to prevent
+                    // the function requirements from being lowered again when we get to
+                    // `ensureAllDeclsRec`.
+                    context->setValue(requirementDecl, LoweredValInfo::simple(entry));
+                }
+            };
+        for (auto requirementDecl : decl->members)
+        {
+            auto requirementKey = getInterfaceRequirementKey(requirementDecl);
+            if (!requirementKey)
+            {
+                if (as<PropertyDecl>(requirementDecl) || as<SubscriptDecl>(requirementDecl))
+                {
+                    for (auto member : as<ContainerDecl>(requirementDecl)->members)
+                    {
+                        if (auto accessorDecl = as<AccessorDecl>(member))
+                        {
+                            auto accessorKey = getInterfaceRequirementKey(accessorDecl);
+                            if (accessorKey)
+                                addEntry(accessorKey, accessorDecl);
+                        }
+                    }
+                }
+                continue;
             }
             else
             {
-                CallableDecl* callableDecl = nullptr;
-                if (auto genDecl = as<GenericDecl>(requirementDecl))
-                    callableDecl = as<CallableDecl>(genDecl->inner);
-                else
-                    callableDecl = as<CallableDecl>(requirementDecl);
-                if (callableDecl)
-                {
-                    // Differentiable functions has additional requirements for the derivatives.
-                    for (auto diffDecl : callableDecl->getMembersOfType<DerivativeRequirementReferenceDecl>())
-                    {
-                        auto diffKey = getInterfaceRequirementKey(diffDecl->referencedDecl);
-                        insertRequirementKeyAssociation(diffDecl->referencedDecl, requirementKey, diffKey);
-                    }
-                }
-                // Add lowered requirement entry to current decl mapping to prevent
-                // the function requirements from being lowered again when we get to
-                // `ensureAllDeclsRec`.
-                context->setValue(requirementDecl, LoweredValInfo::simple(entry));
+                addEntry(requirementKey, requirementDecl);
             }
         }
 
@@ -8187,6 +8210,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             getSink()->diagnose(decl->loc, Diagnostics::unimplemented, "lower unknown AggType to IR");
             return LoweredValInfo::simple(subBuilder->getVoidType());
         }
+        
+        maybeAddDebugLocationDecoration(context, irAggType);
 
         auto finalFinishedVal = finishOuterGenerics(subBuilder, irAggType, outerGeneric);
 
@@ -8426,11 +8451,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         addTargetIntrinsicDecorations(nullptr, irFieldKey, fieldDecl);
 
         return LoweredValInfo::simple(irFieldKey);
-    }
-
-    bool isImportedDecl(Decl* decl)
-    {
-        return Slang::isImportedDecl(context, decl);
     }
 
     IRType* maybeGetConstExprType(IRType* type, Decl* decl)
@@ -8894,6 +8914,25 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
     }
 
+    void addBitFieldAccessorDecorations(IRInst* irFunc, Decl* decl)
+    {
+        // If this is an accessor and the parent is describing some bitfield,
+        // we can move the bitfield modifiers to the accessor function.
+        if(as<AccessorDecl>(decl))
+        {
+            if(const auto bfm = decl->parentDecl->findModifier<BitFieldModifier>())
+            {
+                getBuilder()->addDecoration(
+                    irFunc,
+                    kIROp_BitFieldAccessorDecoration,
+                    getSimpleVal(context, ensureDecl(context, bfm->backingDeclRef.getDecl())),
+                    getBuilder()->getIntValue(getBuilder()->getIntType(), bfm->width),
+                    getBuilder()->getIntValue(getBuilder()->getIntType(), bfm->offset)
+                );
+            }
+        }
+    }
+
         /// Is `decl` a member function (or effectively a member function) when considered as a stdlib declaration?
     bool isStdLibMemberFuncDecl(
         Decl*   inDecl)
@@ -9085,7 +9124,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         IRFunc* irFunc = subBuilder->createFunc();
         addNameHint(subContext, irFunc, decl);
         addLinkageDecoration(subContext, irFunc, decl);
-        
+        maybeAddDebugLocationDecoration(subContext, irFunc);
+
         // Register the value now, to avoid any possible infinite recursion when lowering the body or attributes.
         context->setGlobalValue(decl, LoweredValInfo::simple(findOuterMostGeneric(irFunc)));
 
@@ -9123,12 +9163,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // pre-generated IR for the module that defines it (or do some kind
         // of minimal linking to bring in the inline functions).
         //
-        if (isImportedDecl(decl) && !isForceInlineEarly(decl))
-        {
-            // Always emit imported declarations as declarations,
-            // and not definitions.
-        }
-        else if (!decl->body)
+        if (!decl->body)
         {
             // This is a function declaration without a body.
             // In Slang we currently try not to support forward declarations
@@ -9370,6 +9405,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         addCatchAllIntrinsicDecorationIfNeeded(irFunc, decl);
 
         bool isInline = false;
+
+        addBitFieldAccessorDecorations(irFunc, decl);
 
         for (auto modifier : decl->modifiers)
         {
@@ -9825,7 +9862,7 @@ bool canDeclLowerToAGeneric(Decl* decl)
     {
         if (varDecl->hasModifier<HLSLStaticModifier>() && varDecl->hasModifier<ConstModifier>())
         {
-            return true;
+            return !isFunctionVarDecl(varDecl);
         }
     }
     
@@ -10280,7 +10317,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     SharedIRGenContext sharedContextStorage(
         session,
         translationUnit->compileRequest->getSink(),
-        translationUnit->compileRequest->getLinkage()->m_obfuscateCode,
+        translationUnit->compileRequest->optionSet.shouldObfuscateCode(),
         translationUnit->getModuleDecl(),
         translationUnit->compileRequest->getLinkage());
     SharedIRGenContext* sharedContext = &sharedContextStorage;
@@ -10294,7 +10331,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     IRBuilder* builder = &builderStorage;
 
     context->irBuilder = builder;
-    context->includeDebugInfo = compileRequest->getLinkage()->debugInfoLevel != DebugInfoLevel::None;
+    context->includeDebugInfo = compileRequest->getLinkage()->m_optionSet.getDebugInfoLevel() != DebugInfoLevel::None;
 
     // We need to emit IR for all public/exported symbols
     // in the translation unit.
@@ -10386,13 +10423,23 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // normal `call` + `ifElse`, etc.
     lowerErrorHandling(module, compileRequest->getSink());
 
+    // Synthesize some code we want to make sure is inlined and simplified
+    synthesizeBitFieldAccessors(module);
+
+    // Generate DebugValue insts to store values into debug variables,
+    // if debug symbols are enabled.
+    if (compileRequest->getLinkage()->m_optionSet.getEnumOption<DebugInfoLevel>(CompilerOptionName::DebugInformation) != DebugInfoLevel::None)
+    {
+        insertDebugValueStore(module);
+    }
+
     // Next, attempt to promote local variables to SSA
     // temporaries and do basic simplifications.
     //
     constructSSA(module);
     simplifyCFG(module, CFGSimplificationOptions::getDefault());
     applySparseConditionalConstantPropagation(module, compileRequest->getSink());
-    peepholeOptimize(nullptr, module);
+    peepholeOptimize(nullptr, module, PeepholeOptimizationOptions::getPrelinking());
 
     for (auto inst : module->getGlobalInsts())
     {
@@ -10441,7 +10488,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         changed |= constructSSA(module);
         simplifyCFG(module, CFGSimplificationOptions::getDefault());
         changed |= applySparseConditionalConstantPropagation(module, compileRequest->getSink());
-        changed |= peepholeOptimize(nullptr, module);
+        changed |= peepholeOptimize(nullptr, module, PeepholeOptimizationOptions::getPrelinking());
         for (auto inst : module->getGlobalInsts())
         {
             if (auto func = as<IRGlobalValueWithCode>(inst))
@@ -10492,7 +10539,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 
         Linkage* linkage = compileRequest->getLinkage();
 
-        stripOptions.shouldStripNameHints = linkage->m_obfuscateCode;
+        stripOptions.shouldStripNameHints = linkage->m_optionSet.shouldObfuscateCode();
 
         // If we are generating an obfuscated source map, we don't want to strip locs, 
         // we want to generate *new* locs that can be mapped (via source map)
@@ -10516,7 +10563,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         options.keepExportsAlive = true;
         eliminateDeadCode(module, options);
 
-        if (linkage->m_obfuscateCode)
+        if (linkage->m_optionSet.shouldObfuscateCode())
         {
             // The obfuscated source map is stored on the module
             obfuscateModuleLocs(module, compileRequest->getSourceManager());
@@ -10536,7 +10583,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 
     // If we are being asked to dump IR during compilation,
     // then we can dump the initial IR for the module here.
-    if(compileRequest->shouldDumpIR)
+    if(compileRequest->optionSet.shouldDumpIR())
     {
         DiagnosticSinkWriter writer(compileRequest->getSink());
 
@@ -10563,11 +10610,12 @@ struct SpecializedComponentTypeIRGenContext : ComponentTypeVisitor
 
         linkage = componentType->getLinkage();
         session = linkage->getSessionImpl();
-
+        auto option = linkage->m_optionSet;
+        option.overrideWith(componentType->getOptionSet());
         SharedIRGenContext sharedContextStorage(
             session,
             sink,
-            linkage->m_obfuscateCode,
+            option.shouldObfuscateCode(),
             nullptr,
             linkage
         );
@@ -10706,7 +10754,7 @@ struct TypeConformanceIRGenContext
         linkage = typeConformance->getLinkage();
         session = linkage->getSessionImpl();
 
-        SharedIRGenContext sharedContextStorage(session, sink, linkage->m_obfuscateCode, nullptr, linkage);
+        SharedIRGenContext sharedContextStorage(session, sink, linkage->m_optionSet.shouldObfuscateCode(), nullptr, linkage);
         SharedIRGenContext* sharedContext = &sharedContextStorage;
 
         IRGenContext contextStorage(sharedContext, linkage->getASTBuilder());
@@ -11058,7 +11106,7 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
     SharedIRGenContext sharedContextStorage(
         session,
         sink,
-        linkage->m_obfuscateCode,
+        linkage->m_optionSet.shouldObfuscateCode(),
         nullptr,
         linkage);
     auto sharedContext = &sharedContextStorage;
@@ -11153,12 +11201,12 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
     }
 
     // Lets strip and run DCE here
-    if (linkage->m_obfuscateCode)
+    if (linkage->m_optionSet.shouldObfuscateCode())
     {
         IRStripOptions stripOptions;
 
-        stripOptions.shouldStripNameHints = linkage->m_obfuscateCode;
-        stripOptions.stripSourceLocs = linkage->m_obfuscateCode;
+        stripOptions.shouldStripNameHints = true;
+        stripOptions.stripSourceLocs = true;;
 
         stripFrontEndOnlyInstructions(irModule, stripOptions);
 

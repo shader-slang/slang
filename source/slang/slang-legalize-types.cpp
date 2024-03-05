@@ -2,6 +2,7 @@
 #include "slang-legalize-types.h"
 
 #include "slang-ir-insts.h"
+#include "slang-ir-util.h"
 #include "slang-mangle.h"
 
 namespace Slang
@@ -447,11 +448,7 @@ struct TupleTypeBuilder
             IRBuilder* builder = context->getBuilder();
             IRStructType* ordinaryStructType = builder->createStructType();
             ordinaryStructType->sourceLoc = originalStructType->sourceLoc;
-
-            if(auto nameHintDecoration = originalStructType->findDecoration<IRNameHintDecoration>())
-            {
-                builder->addNameHintDecoration(ordinaryStructType, nameHintDecoration->getNameOperand());
-            }
+            copyNameHintAndDebugDecorations(ordinaryStructType, originalStructType);
 
             // The new struct type will appear right after the original in the IR,
             // so that we can be sure any instruction that could reference the

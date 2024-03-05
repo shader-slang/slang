@@ -645,7 +645,7 @@ namespace Slang
         }
     }
 
-    static int getTypeBitSize(Type* t)
+    int getTypeBitSize(Type* t)
     {
         auto basicType = as<BasicExpressionType>(t);
         if (!basicType) return 0;

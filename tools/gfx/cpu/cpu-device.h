@@ -39,6 +39,7 @@ public:
         IResourceView** outView) override;
 
     virtual Result createShaderObjectLayout(
+        slang::ISession* session,
         slang::TypeLayoutReflection* typeLayout,
         ShaderObjectLayoutBase** outLayout) override;
 

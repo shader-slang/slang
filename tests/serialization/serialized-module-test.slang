@@ -9,14 +9,9 @@
 //import serialized_module;
 
 // This is fragile - needs match the definition in serialized_module
-struct Thing
-{
-    int a;
-    int b;
-};
+import serialized_module_shared;
 
-// TODO: need to get the name mangling to line up!
-int foo(Thing thing);
+extern int foo(Thing thing);
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 ], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;

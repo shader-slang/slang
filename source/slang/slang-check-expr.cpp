@@ -248,14 +248,14 @@ namespace Slang
         return SourceLoc();
     }
 
-    void SemanticsVisitor::addSiblingScopeForContainerDecl(ContainerDecl* dest, ContainerDecl* source)
+    void addSiblingScopeForContainerDecl(ASTBuilder* builder, ContainerDecl* dest, ContainerDecl* source)
     {
-        addSiblingScopeForContainerDecl(dest->ownedScope, source);
+        addSiblingScopeForContainerDecl(builder, dest->ownedScope, source);
     }
 
-    void SemanticsVisitor::addSiblingScopeForContainerDecl(Scope* destScope, ContainerDecl* source)
+    void addSiblingScopeForContainerDecl(ASTBuilder* builder, Scope* destScope, ContainerDecl* source)
     {
-        auto subScope = getASTBuilder()->create<Scope>();
+        auto subScope = builder->create<Scope>();
         subScope->containerDecl = source;
 
         subScope->nextSibling = destScope->nextSibling;
@@ -479,7 +479,10 @@ namespace Slang
         derefExpr->base = base;
         derefExpr->type = QualType(elementType);
 
-        derefExpr->type.isLeftValue = base->type.isLeftValue;
+        if (as<PtrType>(base->type))
+            derefExpr->type.isLeftValue = true;
+        else
+            derefExpr->type.isLeftValue = base->type.isLeftValue;
 
         return derefExpr;
     }
@@ -1381,7 +1384,7 @@ namespace Slang
         //
         if(!expr->type.type)
         {
-            expr->type = m_astBuilder->getIntType();
+            expr->type = m_astBuilder->getBuiltinType(expr->suffixType);
         }
         return expr;
     }
@@ -1390,7 +1393,7 @@ namespace Slang
     {
         if(!expr->type.type)
         {
-            expr->type = m_astBuilder->getFloatType();
+            expr->type = m_astBuilder->getBuiltinType(expr->suffixType);
         }
         return expr;
     }
@@ -1651,10 +1654,11 @@ namespace Slang
         if(_checkForCircularityInConstantFolding(decl, circularityInfo))
             return nullptr;
 
-        // In HLSL, `static const` is used to mark compile-time constant expressions
-        if(!decl->hasModifier<HLSLStaticModifier>())
-            return nullptr;
+        // In HLSL, `const` is used to mark compile-time constant expressions.
         if(!decl->hasModifier<ConstModifier>())
+            return nullptr;
+        // Extern const is not considered compile-time constant by the front-end.
+        if (decl->hasModifier<ExternModifier>())
             return nullptr;
 
         if (isInterfaceRequirement(decl))

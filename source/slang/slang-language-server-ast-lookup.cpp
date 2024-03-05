@@ -358,6 +358,11 @@ public:
         return dispatchIfNotNull(expr->baseExpression);
     }
 
+    bool visitOpenRefExpr(OpenRefExpr* expr)
+    {
+        return dispatchIfNotNull(expr->innerExpr);
+    }
+
     bool visitInitializerListExpr(InitializerListExpr* expr)
     {
         for (auto arg : expr->args)
@@ -746,6 +751,12 @@ bool _findAstNodeImpl(ASTLookupContext& context, SyntaxNode* node)
                     if (_findAstNodeImpl(context, member))
                         return true;
                 }
+            }
+            if (auto aggTypeDecl = as<AggTypeDecl>(container))
+            {
+                ASTLookupExprVisitor visitor(&context);
+                if (visitor.dispatchIfNotNull(aggTypeDecl->wrappedType.exp))
+                    return true;
             }
         }
     }

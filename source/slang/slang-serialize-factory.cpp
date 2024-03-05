@@ -45,6 +45,11 @@ void* DefaultSerialObjectFactory::create(SerialTypeKind typeKind, SerialSubType 
     return nullptr;
 }
 
+void* DefaultSerialObjectFactory::getOrCreateVal(ValNodeDesc&& desc)
+{
+    return m_astBuilder->_getOrCreateImpl(_Move(desc));
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ModuleSerialFilter  !!!!!!!!!!!!!!!!!!!!!!!!
 
 SerialIndex ModuleSerialFilter::writePointer(SerialWriter* writer, const RefObject* inPtr)
@@ -65,12 +70,6 @@ SerialIndex ModuleSerialFilter::writePointer(SerialWriter* writer, const NodeBas
     NodeBase* ptr = const_cast<NodeBase*>(inPtr);
     SLANG_ASSERT(ptr);
 
-    // We don't serialize Scope
-    if (as<Scope>(ptr))
-    {
-        writer->setPointerIndex(inPtr, SerialIndex(0));
-        return SerialIndex(0);
-    }
 
     if (Decl* decl = as<Decl>(ptr))
     {
@@ -79,8 +78,14 @@ SerialIndex ModuleSerialFilter::writePointer(SerialWriter* writer, const NodeBas
         {
             ASTBuilder* astBuilder = m_moduleDecl->module->getASTBuilder();
 
-            // It's a reference to a declaration in another module, so first get the symbol name. 
-            String mangledName = getMangledName(astBuilder, decl);
+            // It's a reference to a declaration in another module, so first get the symbol name.
+            // Note that we will always name an import symbol in the form of
+            // <module_name>!<symbol_mangled_name> for serialization.
+            // This is because <symbol_mangled_name> does not necessarily include the name of its
+            // parent module when it is qualified as `extern` or `export`.
+            //
+            String mangledName = getText(moduleDecl->getName()) +"!"+ getMangledName(astBuilder, decl);
+
             // Add as an import symbol
             return writer->addImportSymbol(mangledName);
         }
@@ -90,34 +95,6 @@ SerialIndex ModuleSerialFilter::writePointer(SerialWriter* writer, const NodeBas
             return writer->writeObject(ptr);
         }
     }
-
-    // TODO(JS): If I enable this section then the stdlib doesn't work correctly, it appears to be because of
-    // `addCatchAllIntrinsicDecorationIfNeeded`. If this is enabled when AST is serialized, the 'body' (ie Stmt)
-    // will not be serialized. When serialized back in, it will appear to be a function without a body.
-    // In that case `addCatchAllIntrinsicDecorationIfNeeded` will add an intrinsic which in some cases is incorrect.
-    // This happens during lowering. 
-    //
-    // So it seems the fix is for some other mechanism. Another solution is perhaps to run something like `addCatchAllIntrinsicDecorationIfNeeded`
-    // on the stdlib after compilation, and before serialization. Then removing it from lowering.
-
-#if 0
-    // TODO(JS): What we really want to do here is to ignore bodies functions.
-    // It's not 100% clear if this is even right though - for example does type inference
-    // imply the body is needed to say infer a return type?
-    // Also not clear if statements in other scenarios (if there are others) might need to be kept.
-    //
-    // For now we just ignore all stmts
-
-    // TODO(yong): We should by default serialize everything. The logic to skip bodies need to be
-    // behind a option flag.
-    if (Stmt* stmt = as<Stmt>(ptr))
-    {
-        //
-        writer->setPointerIndex(stmt, SerialIndex(0));
-        return SerialIndex(0);
-    }
-#endif
-
     // For now for everything else just write it
     return writer->writeObject(ptr);
 }

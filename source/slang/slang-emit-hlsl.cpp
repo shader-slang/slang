@@ -756,7 +756,7 @@ static bool _canEmitExport(const Profile& profile)
 /* virtual */void HLSLSourceEmitter::emitFuncDecorationsImpl(IRFunc* func)
 {
     // Specially handle export, as we don't want to emit it multiple times
-    if (getTargetReq()->isWholeProgramRequest() && 
+    if (getTargetProgram()->getOptionSet().getBoolOption(CompilerOptionName::GenerateWholeProgram) && 
         _canEmitExport(m_effectiveProfile))
     {
         for (auto decoration : func->getDecorations())
@@ -1260,7 +1260,7 @@ void HLSLSourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)
     }
 }
 
-void HLSLSourceEmitter::emitFrontMatterImpl(TargetRequest* targetReq) 
+void HLSLSourceEmitter::emitFrontMatterImpl(TargetRequest*) 
 {
     if (m_extensionTracker->m_requiresNVAPI)
     {
@@ -1314,7 +1314,7 @@ void HLSLSourceEmitter::emitFrontMatterImpl(TargetRequest* targetReq)
 
     // Emit any layout declarations
 
-    switch (targetReq->getDefaultMatrixLayoutMode())
+    switch (getTargetProgram()->getOptionSet().getMatrixLayoutMode())
     {
     case kMatrixLayoutMode_RowMajor:
     default:

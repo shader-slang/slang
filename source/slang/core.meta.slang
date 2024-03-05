@@ -624,7 +624,7 @@ ${{{{
     case BaseType::Float:
     case BaseType::Double:
 }}}}
-        [TreatAsDifferentiable]
+        [Differentiable]
         static $(kBaseTypes[tt].name) getPi() { return $(kBaseTypes[tt].name)(3.14159265358979323846264338328); }
 
          __intrinsic_op($(kIROp_Less)) bool lessThan(This other);
@@ -719,19 +719,7 @@ struct Ptr
 
     __subscript(int index) -> T
     {
-        [__unsafeForceInlineEarly]
-        get
-        {
-            return __load(__getElementPtr(this, index));
-        }
-
-        [__unsafeForceInlineEarly]
-        set(T newValue)
-        {
-            __store(__getElementPtr(this, index), newValue);
-        }
-
-        __intrinsic_op($(kIROp_GetElementPtr))
+        __intrinsic_op($(kIROp_GetOffsetPtr))
         ref;
     }
 };
@@ -747,6 +735,12 @@ Ptr<T> __getElementPtr<T>(Ptr<T> ptr, int index);
 
 __intrinsic_op($(kIROp_GetElementPtr))
 Ptr<T> __getElementPtr<T>(Ptr<T> ptr, int64_t index);
+
+__intrinsic_op($(kIROp_GetOffsetPtr))
+Ptr<T> __getOffsetPtr<T>(Ptr<T> ptr, int index);
+
+__intrinsic_op($(kIROp_GetOffsetPtr))
+Ptr<T> __getOffsetPtr<T>(Ptr<T> ptr, int64_t index);
 
 __generic<T>
 __intrinsic_op($(kIROp_Less))
@@ -1003,8 +997,8 @@ extension float : IRangedValue
 
 extension double : IRangedValue
 {
-    static const double maxValue = 179769313486231570814527423731704356798070567525844996598917476803157260780028538760589558632766878171540458953514382464234321326889464182768467546703537516986049910576551282076245490090389328944075868508455133942304583236903222948165808559332123348274797826204144723168738177180919299881250404026184124858368.0;
-    static const double minValue = -179769313486231570814527423731704356798070567525844996598917476803157260780028538760589558632766878171540458953514382464234321326889464182768467546703537516986049910576551282076245490090389328944075868508455133942304583236903222948165808559332123348274797826204144723168738177180919299881250404026184124858368.0;
+    static const double maxValue = bit_cast<double>(0x7fefffffffffffffULL);
+    static const double minValue = bit_cast<double>(0xffefffffffffffffULL);
 }
 
 extension int : IRangedValue
@@ -1543,14 +1537,14 @@ __intrinsic_op(0)
 __prefix Ptr<T> operator&(__ref T value);
 
 __generic<T>
-__intrinsic_op($(kIROp_GetElementPtr))
+__intrinsic_op($(kIROp_GetOffsetPtr))
 Ptr<T> operator+(Ptr<T> value, int64_t offset);
 
 __generic<T>
 [__unsafeForceInlineEarly]
 Ptr<T> operator-(Ptr<T> value, int64_t offset)
 {
-    return __getElementPtr(value, -offset);
+    return __getOffsetPtr(value, -offset);
 }
 
 __generic<T : IArithmetic>

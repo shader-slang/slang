@@ -386,6 +386,8 @@ INST(FieldAddress, get_field_addr, 2, 0)
 
 INST(GetElement, getElement, 2, 0)
 INST(GetElementPtr, getElementPtr, 2, 0)
+// Pointer offset: computes pBase + offset_in_elements
+INST(GetOffsetPtr, getOffsetPtr, 2, 0) 
 INST(GetAddr, getAddr, 1, 0)
 
 // Get an unowned NativeString from a String.
@@ -787,6 +789,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         INST(ExportDecoration, export, 1, 0)
     INST_RANGE(LinkageDecoration, ImportDecoration, ExportDecoration)
 
+        /// Marks an inst as coming from an `extern` symbol defined in the user code.
+    INST(UserExternDecoration, UserExtern, 0, 0)
+
         /// An extern_cpp decoration marks the inst to emit its name without mangling for C++ interop.
     INST(ExternCppDecoration, externCpp, 1, 0)
 
@@ -961,11 +966,17 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// Recognized by SPIRV-emit pass so we can emit a SPIRV `BufferBlock` decoration.
     INST(SPIRVBufferBlockDecoration, spvBufferBlock, 0, 0)
 
+        /// Decorates an inst with a debug source location (IRDebugSource, IRIntLit(line), IRIntLit(col)).
+    INST(DebugLocationDecoration, DebugLocation, 3, 0)
+
         /// Recognized by SPIRV-emit pass so we can emit a SPIRV `Block` decoration.
     INST(SPIRVBlockDecoration, spvBlock, 0, 0)
 
+        /// Marks a function as one which access a bitfield with the specified
+        /// backing value key, width and offset
+    INST(BitFieldAccessorDecoration, BitFieldAccessorDecoration, 3, 0)
 
-    INST_RANGE(Decoration, HighLevelDeclDecoration, SPIRVBlockDecoration)
+    INST_RANGE(Decoration, HighLevelDeclDecoration, BitFieldAccessorDecoration)
 
     //
 
@@ -1013,6 +1024,7 @@ INST(CastPtrToBool, CastPtrToBool, 1, 0)
 INST(CastPtrToInt, CastPtrToInt, 1, 0)
 INST(CastIntToPtr, CastIntToPtr, 1, 0)
 INST(CastToVoid, castToVoid, 1, 0)
+INST(PtrCast, PtrCast, 1, 0)
 
 INST(SizeOf,                            sizeOf,                     1, 0)
 INST(AlignOf,                           alignOf,                    1, 0)
@@ -1107,6 +1119,8 @@ INST(DifferentiableTypeDictionaryItem, DifferentiableTypeDictionaryItem, 0, 0)
 /* DebugInfo */
 INST(DebugSource, DebugSource, 2, HOISTABLE)
 INST(DebugLine, DebugLine, 5, 0)
+INST(DebugVar, DebugVar, 4, 0)
+INST(DebugValue, DebugValue, 2, 0)
 
 /* Inline assembly */
 

@@ -79,6 +79,7 @@ class LiteralExpr : public Expr
     // The token that was used to express the literal. This can be
     // used to get the raw text of the literal, including any suffix.
     Token token;
+    BaseType suffixType = BaseType::Void;
 };
 
 class IntegerLiteralExpr : public LiteralExpr

@@ -30,6 +30,15 @@ struct SerialContainerBinary
     };
 };
 
+struct SerialContainerDataModule
+{
+    RefPtr<IRModule> irModule;              ///< The IR for the module
+    RefPtr<ASTBuilder> astBuilder;          ///< The astBuilder that owns the astRootNode
+    NodeBase* astRootNode = nullptr;        ///< The module decl
+    List<String> dependentFiles;
+    SHA1::Digest digest;
+};
+
 /* Struct that holds all the data that can be held in a 'container' */
 struct SerialContainerData
 {
@@ -48,12 +57,7 @@ struct SerialContainerData
         RefPtr<IRModule> irModule;
     };
 
-    struct Module
-    {
-        RefPtr<IRModule> irModule;              ///< The IR for the module
-        RefPtr<ASTBuilder> astBuilder;          ///< The astBuilder that owns the astRootNode
-        NodeBase* astRootNode = nullptr;        ///< The module decl
-    };
+    typedef SerialContainerDataModule Module;
 
     struct EntryPoint
     {
@@ -92,6 +96,8 @@ struct SerialContainerUtil
         ASTBuilder* astBuilder = nullptr; // Optional. If not provided will create one in SerialContainerData.
         Linkage* linkage = nullptr;
         DiagnosticSink* sink = nullptr;
+        bool readHeaderOnly = false;
+        String modulePath;
     };
 
         /// Add module to outData
@@ -107,7 +113,7 @@ struct SerialContainerUtil
     static SlangResult write(const SerialContainerData& data, const WriteOptions& options, RiffContainer* container);
 
         /// Read the container into outData
-    static SlangResult read(RiffContainer* container, const ReadOptions& options, SerialContainerData& outData);
+    static SlangResult read(RiffContainer* container, const ReadOptions& options, const LoadedModuleDictionary* additionalLoadedModules, SerialContainerData& outData);
 
         /// Verify IR serialization
     static SlangResult verifyIRSerialize(IRModule* module, Session* session, const WriteOptions& options);

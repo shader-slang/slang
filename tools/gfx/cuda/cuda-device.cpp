@@ -142,6 +142,8 @@ SLANG_NO_THROW SlangResult SLANG_MCALL DeviceImpl::initialize(const Desc& desc)
 {
     SLANG_RETURN_ON_FAIL(slangContext.initialize(
         desc.slang,
+        desc.extendedDescCount,
+        desc.extendedDescs,
         SLANG_PTX,
         "sm_5_1",
         makeArray(slang::PreprocessorMacroDesc{ "__CUDA_COMPUTE__", "1" }).getView()));
@@ -908,11 +910,12 @@ SLANG_NO_THROW Result SLANG_MCALL DeviceImpl::createQueryPool(
 }
 
 Result DeviceImpl::createShaderObjectLayout(
+    slang::ISession* session,
     slang::TypeLayoutReflection* typeLayout,
     ShaderObjectLayoutBase** outLayout)
 {
     RefPtr<ShaderObjectLayoutImpl> cudaLayout;
-    cudaLayout = new ShaderObjectLayoutImpl(this, typeLayout);
+    cudaLayout = new ShaderObjectLayoutImpl(this, session, typeLayout);
     returnRefPtrMove(outLayout, cudaLayout);
     return SLANG_OK;
 }

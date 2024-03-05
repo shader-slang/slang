@@ -36,6 +36,7 @@
 #include <limits.h> /* PATH_MAX */
 #include <stdio.h>
 #include <stdlib.h>
+#include <filesystem>
 
 namespace Slang
 {
@@ -658,6 +659,17 @@ namespace Slang
         }
 #   endif
 #endif
+    }
+
+    String Path::getRelativePath(String base, String path)
+    {
+        std::filesystem::path p1(base.getBuffer());
+        std::filesystem::path p2(path.getBuffer());
+        std::error_code ec;
+        auto result = std::filesystem::relative(p2, p1, ec);
+        if (ec)
+            return path;
+        return String(UnownedStringSlice(result.generic_u8string().c_str()));
     }
 
     SlangResult Path::remove(const String& path)

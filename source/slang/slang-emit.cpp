@@ -214,6 +214,7 @@ Result linkAndOptimizeIR(
     auto sink = codeGenContext->getSink();
     auto target = codeGenContext->getTargetFormat();
     auto targetRequest = codeGenContext->getTargetReq();
+    auto targetProgram = codeGenContext->getTargetProgram();
 
     // Get the artifact desc for the target 
     const auto artifactDesc = ArtifactDescUtil::makeDescForCompileTarget(asExternal(target));
@@ -233,7 +234,6 @@ Result linkAndOptimizeIR(
 #if 0
     dumpIRIfEnabled(codeGenContext, irModule, "LINKED");
 #endif
-
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
@@ -351,7 +351,7 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::HostCPPSource:
     {
         lowerComInterfaces(irModule, artifactDesc.style, sink);
-        generateDllImportFuncs(codeGenContext->getTargetReq(), irModule, sink);
+        generateDllImportFuncs(codeGenContext->getTargetProgram(), irModule, sink);
         generateDllExportFuncs(irModule, sink);
         break;
     }
@@ -367,12 +367,12 @@ Result linkAndOptimizeIR(
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
     // Lower all the LValue implict casts (used for out/inout/ref scenarios)
-    lowerLValueCast(targetRequest, irModule);
+    lowerLValueCast(targetProgram, irModule);
 
-    simplifyIR(targetRequest, irModule, IRSimplificationOptions::getDefault(), sink);
+    simplifyIR(targetProgram, irModule, IRSimplificationOptions::getDefault(), sink);
 
     // Fill in default matrix layout into matrix types that left layout unspecified.
-    specializeMatrixLayout(codeGenContext->getTargetReq(), irModule);
+    specializeMatrixLayout(codeGenContext->getTargetProgram(), irModule);
 
     // It's important that this takes place before defunctionalization as we
     // want to be able to easily discover the cooperate and fallback funcitons
@@ -406,14 +406,12 @@ Result linkAndOptimizeIR(
     for (;;)
     {
         bool changed = false;
-        //auto b1 = dumpIRToString(irModule->getModuleInst());
         dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-SPECIALIZE");
         if (!codeGenContext->isSpecializationDisabled())
-            changed |= specializeModule(codeGenContext->getTargetReq(), irModule, codeGenContext->getSink());
+            changed |= specializeModule(targetProgram, irModule, codeGenContext->getSink());
         if (codeGenContext->getSink()->getErrorCount() != 0)
             return SLANG_FAIL;
         dumpIRIfEnabled(codeGenContext, irModule, "AFTER-SPECIALIZE");
-        //auto b2 = dumpIRToString(irModule->getModuleInst());
 
         applySparseConditionalConstantPropagation(irModule, codeGenContext->getSink());
         eliminateDeadCode(irModule);
@@ -427,7 +425,7 @@ Result linkAndOptimizeIR(
         // Unroll loops.
         if (codeGenContext->getSink()->getErrorCount() == 0)
         {
-            if (!unrollLoopsInModule(targetRequest, irModule, codeGenContext->getSink()))
+            if (!unrollLoopsInModule(targetProgram, irModule, codeGenContext->getSink()))
                 return SLANG_FAIL;
         }
 
@@ -440,7 +438,7 @@ Result linkAndOptimizeIR(
 
         dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-AUTODIFF");
         enableIRValidationAtInsert();
-        changed |= processAutodiffCalls(targetRequest, irModule, sink);
+        changed |= processAutodiffCalls(targetProgram, irModule, sink);
         disableIRValidationAtInsert();
         dumpIRIfEnabled(codeGenContext, irModule, "AFTER-AUTODIFF");
 
@@ -448,7 +446,7 @@ Result linkAndOptimizeIR(
             break;
     }
 
-    finalizeAutoDiffPass(targetRequest, irModule);
+    finalizeAutoDiffPass(targetProgram, irModule);
 
     finalizeSpecialization(irModule);
 
@@ -479,11 +477,11 @@ Result linkAndOptimizeIR(
         SLANG_RETURN_ON_FAIL(performStringInlining(irModule, sink));
     }
 
-    lowerReinterpret(targetRequest, irModule, sink);
+    lowerReinterpret(targetProgram, irModule, sink);
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
-    simplifyIR(targetRequest, irModule, IRSimplificationOptions::getFast(), sink);
+    simplifyIR(targetProgram, irModule, IRSimplificationOptions::getFast(), sink);
 
     if (!ArtifactDescUtil::isCpuLikeTarget(artifactDesc))
     {
@@ -495,7 +493,7 @@ Result linkAndOptimizeIR(
     // generics / interface types to ordinary functions and types using
     // function pointers.
     dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-LOWER-GENERICS");
-    lowerGenerics(targetRequest, irModule, sink);
+    lowerGenerics(targetProgram, irModule, sink);
     dumpIRIfEnabled(codeGenContext, irModule, "AFTER-LOWER-GENERICS");
 
     if (sink->getErrorCount() != 0)
@@ -512,7 +510,7 @@ Result linkAndOptimizeIR(
     // up downstream passes like type legalization, so we
     // will run a DCE pass to clean up after the specialization.
     //
-    simplifyIR(targetRequest, irModule, IRSimplificationOptions::getDefault(), sink);
+    simplifyIR(targetProgram, irModule, IRSimplificationOptions::getDefault(), sink);
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
@@ -521,7 +519,7 @@ Result linkAndOptimizeIR(
     // of `RWStructuredBuffer` typed fields now.
     if (target != CodeGenTarget::HLSL)
     {
-        lowerAppendConsumeStructuredBuffers(targetRequest, irModule, sink);
+        lowerAppendConsumeStructuredBuffers(targetProgram, irModule, sink);
     }
 
     // We don't need the legalize pass for C/C++ based types
@@ -598,7 +596,7 @@ Result linkAndOptimizeIR(
     // to see if we can clean up any temporaries created by legalization.
     // (e.g., things that used to be aggregated might now be split up,
     // so that we can work with the individual fields).
-    simplifyIR(targetRequest, irModule, IRSimplificationOptions::getFast(), sink);
+    simplifyIR(targetProgram, irModule, IRSimplificationOptions::getFast(), sink);
 
 #if 0
     dumpIRIfEnabled(codeGenContext, irModule, "AFTER SSA");
@@ -721,7 +719,7 @@ Result linkAndOptimizeIR(
         {
         case CodeGenTarget::HLSL:
             {
-                auto profile = targetRequest->getTargetProfile();
+                auto profile = codeGenContext->getTargetProgram()->getOptionSet().getProfile();
                 if( profile.getFamily() == ProfileFamily::DX )
                 {
                     if(profile.getVersion() <= ProfileVersion::DX_5_0)
@@ -742,7 +740,7 @@ Result linkAndOptimizeIR(
             break;
         }
 
-        legalizeByteAddressBufferOps(session, targetRequest, irModule, byteAddressBufferOptions);
+        legalizeByteAddressBufferOps(session, targetProgram, irModule, byteAddressBufferOptions);
     }
 
     // For CUDA targets only, we will need to turn operations
@@ -909,7 +907,7 @@ Result linkAndOptimizeIR(
     {
         // We need to lower any types used in a buffer resource (e.g. ContantBuffer or StructuredBuffer) into
         // a simple storage type that has target independent layout based on the kind of buffer resource.
-        lowerBufferElementTypeToStorageType(targetRequest, irModule);
+        lowerBufferElementTypeToStorageType(targetProgram, irModule);
     }
 
     // Rewrite functions that return arrays to return them via `out` parameter,
@@ -919,20 +917,21 @@ Result linkAndOptimizeIR(
     if (isKhronosTarget(targetRequest) || target == CodeGenTarget::HLSL)
     {
         legalizeUniformBufferLoad(irModule);
-        if (targetRequest->getHLSLToVulkanLayoutOptions() && targetRequest->getHLSLToVulkanLayoutOptions()->shouldInvertY())
+        if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::VulkanInvertY))
             invertYOfPositionOutput(irModule);
     }
 
     // Lower sizeof/alignof
 
-    lowerSizeOfLike(targetRequest, irModule, sink);
+    lowerSizeOfLike(targetProgram, irModule, sink);
 
     // Lower all bit_cast operations on complex types into leaf-level
     // bit_cast on basic types.
-    lowerBitCast(targetRequest, irModule);
+    lowerBitCast(targetProgram, irModule);
 
+    bool emitSpirvDirectly = targetProgram->getOptionSet().shouldEmitSPIRVDirectly();
 
-    if (isKhronosTarget(targetRequest) && targetRequest->shouldEmitSPIRVDirectly())
+    if (isKhronosTarget(targetRequest) && emitSpirvDirectly)
     {
         performIntrinsicFunctionInlining(irModule);
         eliminateDeadCode(irModule);
@@ -942,7 +941,7 @@ Result linkAndOptimizeIR(
     {
         IRSimplificationOptions simplificationOptions = IRSimplificationOptions::getFast();
         simplificationOptions.cfgOptions.removeTrivialSingleIterationLoops = true;
-        simplifyIR(targetRequest, irModule, simplificationOptions, sink);
+        simplifyIR(targetProgram, irModule, simplificationOptions, sink);
     }
 
     // As a late step, we need to take the SSA-form IR and move things *out*
@@ -971,7 +970,7 @@ Result linkAndOptimizeIR(
 
         // We only want to accumulate locations if liveness tracking is enabled.
         PhiEliminationOptions phiEliminationOptions;
-        if (isKhronosTarget(targetRequest) && targetRequest->shouldEmitSPIRVDirectly())
+        if (isKhronosTarget(targetRequest) && emitSpirvDirectly)
         {
             phiEliminationOptions.eliminateCompositeTypedPhiOnly = false;
             phiEliminationOptions.useRegisterAllocation = true;
@@ -1020,7 +1019,7 @@ Result linkAndOptimizeIR(
     }
 
     // Run a final round of simplifications to clean up unused things after phi-elimination.
-    simplifyNonSSAIR(targetRequest, irModule, IRSimplificationOptions::getFast());
+    simplifyNonSSAIR(targetProgram, irModule, IRSimplificationOptions::getFast());
 
     // We include one final step to (optionally) dump the IR and validate
     // it after all of the optimization passes are complete. This should
@@ -1052,8 +1051,9 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
     auto sourceManager = getSourceManager();
     auto target = getTargetFormat();
     auto targetRequest = getTargetReq();
+    auto targetProgram = getTargetProgram();
 
-    auto lineDirectiveMode = targetRequest->getLineDirectiveMode();
+    auto lineDirectiveMode = targetProgram->getOptionSet().getEnumOption<LineDirectiveMode>(CompilerOptionName::LineDirectiveMode);
     // To try to make the default behavior reasonable, we will
     // always use C-style line directives (to give the user
     // good source locations on error messages from downstream
@@ -1088,7 +1088,7 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
     else
     {
         desc.entryPointStage = Stage::Unknown;
-        desc.effectiveProfile = targetRequest->getTargetProfile();
+        desc.effectiveProfile = targetProgram->getOptionSet().getProfile();
     }
     desc.sourceWriter = &sourceWriter;
 
@@ -1310,8 +1310,7 @@ SlangResult emitSPIRVForEntryPointsDirectly(
         downstreamOptions.sourceArtifacts = makeSlice(artifact.readRef(), 1);
         downstreamOptions.targetType = SLANG_SPIRV;
         downstreamOptions.sourceLanguage = SLANG_SOURCE_LANGUAGE_SPIRV;
-        auto linkage = codeGenContext->getLinkage();
-        switch (linkage->optimizationLevel)
+        switch (codeGenContext->getTargetProgram()->getOptionSet().getEnumOption<OptimizationLevel>(CompilerOptionName::Optimization))
         {
         case OptimizationLevel::None:       downstreamOptions.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::None; break;
         case OptimizationLevel::Default:    downstreamOptions.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::Default;  break;

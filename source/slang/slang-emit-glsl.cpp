@@ -54,7 +54,7 @@ SlangResult GLSLSourceEmitter::init()
         default: break;
     }
 
-    if (getTargetReq()->getForceGLSLScalarBufferLayout())
+    if (getTargetProgram()->getOptionSet().shouldUseScalarLayout())
     {
         m_glslExtensionTracker->requireExtension(
             UnownedStringSlice::fromLiteral("GL_EXT_scalar_block_layout"));
@@ -128,7 +128,7 @@ void GLSLSourceEmitter::_emitGLSLStructuredBuffer(IRGlobalParam* varDecl, IRHLSL
     switch (layoutTypeOp)
     {
     case kIROp_DefaultBufferLayoutType:
-        m_writer->emit(getTargetReq()->getForceGLSLScalarBufferLayout() ? "scalar" : "std430");
+        m_writer->emit(getTargetProgram()->getOptionSet().shouldUseScalarLayout() ? "scalar" : "std430");
         break;
     case kIROp_Std430BufferLayoutType:
         m_writer->emit("std430");
@@ -241,14 +241,14 @@ void GLSLSourceEmitter::emitSSBOHeader(IRGlobalParam* varDecl, IRType* bufferTyp
 
     if (layoutOp == kIROp_DefaultBufferLayoutType)
     {
-        m_writer->emit(getTargetReq()->getForceGLSLScalarBufferLayout() ? "scalar" : "std430");
+        m_writer->emit(getTargetProgram()->getOptionSet().shouldUseScalarLayout() ? "scalar" : "std430");
     }
     else
     {
         switch (layoutOp)
         {
         case kIROp_DefaultBufferLayoutType:
-            m_writer->emit(getTargetReq()->getForceGLSLScalarBufferLayout() ? "scalar" : "std430");
+            m_writer->emit(getTargetProgram()->getOptionSet().shouldUseScalarLayout() ? "scalar" : "std430");
             break;
         case kIROp_Std430BufferLayoutType:
             m_writer->emit("std430");
@@ -391,7 +391,7 @@ void GLSLSourceEmitter::_emitGLSLParameterGroup(IRGlobalParam* varDecl, IRUnifor
     {
         // Is writable
         m_writer->emit("layout(");
-        m_writer->emit(getTargetReq()->getForceGLSLScalarBufferLayout() ? "scalar" : "std430");
+        m_writer->emit(getTargetProgram()->getOptionSet().shouldUseScalarLayout() ? "scalar" : "std430");
         m_writer->emit(") buffer ");
     }
     // TODO: what to do with HLSL `tbuffer` style buffers?
@@ -399,7 +399,7 @@ void GLSLSourceEmitter::_emitGLSLParameterGroup(IRGlobalParam* varDecl, IRUnifor
     {
         // uniform is implicitly read only
         m_writer->emit("layout(");
-        m_writer->emit(getTargetReq()->getForceGLSLScalarBufferLayout() ? "scalar" : "std140");
+        m_writer->emit(getTargetProgram()->getOptionSet().shouldUseScalarLayout() ? "scalar" : "std140");
         m_writer->emit(") uniform ");
     }
 
@@ -2196,7 +2196,7 @@ void GLSLSourceEmitter::emitFrontMatterImpl(TargetRequest* targetReq)
     // calls them, because what they call "columns"
     // are what we call "rows."
     //
-    switch (targetReq->getDefaultMatrixLayoutMode())
+    switch (getTargetProgram()->getOptionSet().getMatrixLayoutMode())
     {
     case kMatrixLayoutMode_RowMajor:
     default:

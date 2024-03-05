@@ -731,6 +731,10 @@ namespace Slang
                     // scope.
                     workList.add(fileDecl);
                 }
+                else if (auto namespaceDecl = as<NamespaceDecl>(globalDecl))
+                {
+                    workList.add(namespaceDecl);
+                }
             }
         }
     }
@@ -905,58 +909,10 @@ namespace Slang
             // should work for typical HLSL code.
             //
             Index translationUnitCount = translationUnits.getCount();
-            for(Index tt = 0; tt < translationUnitCount; ++tt)
+            for (Index tt = 0; tt < translationUnitCount; ++tt)
             {
                 auto translationUnit = translationUnits[tt];
-                for( auto globalDecl : translationUnit->getModuleDecl()->members )
-                {
-                    auto maybeFuncDecl = globalDecl;
-                    if( auto genericDecl = as<GenericDecl>(maybeFuncDecl) )
-                    {
-                        maybeFuncDecl = genericDecl->inner;
-                    }
-
-                    auto funcDecl = as<FuncDecl>(maybeFuncDecl);
-                    if(!funcDecl)
-                        continue;
-
-                    auto entryPointAttr = funcDecl->findModifier<EntryPointAttribute>();
-                    if(!entryPointAttr)
-                        continue;
-
-                    // We've discovered a valid entry point. It is a function (possibly
-                    // generic) that has a `[shader(...)]` attribute to mark it as an
-                    // entry point.
-                    //
-                    // We will now register that entry point as an `EntryPoint`
-                    // with an appropriately chosen profile.
-                    //
-                    // The profile will only include a stage, so that the profile "family"
-                    // and "version" are left unspecified. Downstream code will need
-                    // to be able to handle this case.
-                    //
-                    Profile profile;
-                    profile.setStage(entryPointAttr->stage);
-
-                    RefPtr<EntryPoint> entryPoint = EntryPoint::create(
-                        linkage,
-                        makeDeclRef(funcDecl),
-                        profile);
-
-                    validateEntryPoint(entryPoint, sink);
-
-                    // Note: in the case that the user didn't explicitly
-                    // specify entry points and we are instead compiling
-                    // a shader "library," then we do not want to automatically
-                    // combine the entry points into groups in the generated
-                    // `Program`, since that would be slightly too magical.
-                    //
-                    // Instead, each entry point will end up in a singleton
-                    // group, so that its entry-point parameters lay out
-                    // independent of the others.
-                    //
-                    translationUnit->module->_addEntryPoint(entryPoint);
-                }
+                translationUnit->getModule()->_discoverEntryPoints(sink);
             }
         }
     }

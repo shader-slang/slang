@@ -438,6 +438,10 @@ DIAGNOSTIC(31155, Error, customDerivativeNotAllowedForMemberFunctionsOfDifferent
 DIAGNOSTIC(31200, Warning, deprecatedUsage, "$0 has been deprecated: $1")
 DIAGNOSTIC(31201, Error, modifierNotAllowed, "modifier '$0' is not allowed here.")
 DIAGNOSTIC(31202, Error, duplicateModifier, "modifier '$0' is redundant or conflicting with existing modifier '$1'")
+DIAGNOSTIC(31203, Error, cannotExportIncompleteType, "cannot export incomplete type '$0'")
+DIAGNOSTIC(31204, Error, incompleteTypeCannotBeUsedInBuffer, "incomplete type '$0' cannot be used in a buffer")
+DIAGNOSTIC(31205, Error, incompleteTypeCannotBeUsedInUniformParameter, "incomplete type '$0' cannot be used in a uniform parameter")
+
 // Enums
 
 DIAGNOSTIC(32000, Error, invalidEnumTagType,        "invalid tag type for 'enum': '$0'")
@@ -478,10 +482,9 @@ DIAGNOSTIC(30502, Error, cannotUseInitializerListForVectorOfUnknownSize, "cannot
 DIAGNOSTIC(30503, Error, cannotUseInitializerListForMatrixOfUnknownSize, "cannot use initializer list for matrix of statically unknown size '$0' rows")
 DIAGNOSTIC(30504, Error, cannotUseInitializerListForType, "cannot use initializer list for type '$0'")
 
-// 306xx: variables
-DIAGNOSTIC(30600, Error, varWithoutTypeMustHaveInitializer, "a variable declaration without an initial-value expression must be given an explicit type")
-
-DIAGNOSTIC(30610, Error, ambiguousDefaultInitializerForType, "more than one default initializer was found for type '$0'")
+// 3062x: variables
+DIAGNOSTIC(30620, Error, varWithoutTypeMustHaveInitializer, "a variable declaration without an initial-value expression must be given an explicit type")
+DIAGNOSTIC(30622, Error, ambiguousDefaultInitializerForType, "more than one default initializer was found for type '$0'")
 
 // 307xx: parameters
 DIAGNOSTIC(30700, Error, outputParameterCannotHaveDefaultValue, "an 'out' or 'inout' parameter cannot have a default-value expression")
@@ -514,6 +517,10 @@ DIAGNOSTIC(31100, Error, accessorMustBeInsideSubscriptOrProperty, "an accessor d
 DIAGNOSTIC(31101, Error, nonSetAccessorMustNotHaveParams, "accessors other than 'set' must not have parameters")
 DIAGNOSTIC(31102, Error, setAccessorMayNotHaveMoreThanOneParam, "a 'set' accessor may not have more than one parameter")
 DIAGNOSTIC(31102, Error, setAccessorParamWrongType, "'set' parameter '$0' has type '$1' which does not match the expected type '$2'")
+
+// 313xx: bit fields
+DIAGNOSTIC(31300, Error, bitFieldTooWide, "bit-field size ($0) exceeds the width of its type $1 ($2)")
+DIAGNOSTIC(31301, Error, bitFieldNonIntegral, "bit-field type ($0) must be an integral type")
 
 // 39999 waiting to be placed in the right range
 
@@ -711,6 +718,7 @@ DIAGNOSTIC(41904, Error, unableToAlignOf, "alignof could not be performed for ty
 
 DIAGNOSTIC(42001, Error, invalidUseOfTorchTensorTypeInDeviceFunc, "invalid use of TorchTensor type in device/kernel functions. use `TensorView` instead.")
 
+DIAGNOSTIC(45001, Error, unresolvedSymbol, "unresolved external symbol '$0'.")
 //
 // 5xxxx - Target code generation.
 //
@@ -783,6 +791,8 @@ DIAGNOSTIC(57001, Warning, spirvOptFailed, "spirv-opt failed. $0")
 // GLSL Compatibility
 DIAGNOSTIC(58001, Error, entryPointMustReturnVoidWhenGlobalOutputPresent, "entry point must return 'void' when global output variables are present.")
 DIAGNOSTIC(58002, Error, unhandledGLSLSSBOType, "Unhandled GLSL Shader Storage Buffer Object contents, unsized arrays as a final parameter must be the only parameter")
+
+DIAGNOSTIC(58003, Error, inconsistentPointerAddressSpace, "'$0': use of pointer with inconsistent address space.")
 
 //
 // 8xxxx - Issues specific to a particular library/technology/platform/etc.

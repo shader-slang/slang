@@ -910,6 +910,8 @@ Result DeviceImpl::initialize(const Desc& desc)
     }
     SLANG_RETURN_ON_FAIL(slangContext.initialize(
         desc.slang,
+        desc.extendedDescCount,
+        desc.extendedDescs,
         compileTarget,
         profileName,
         makeArray(slang::PreprocessorMacroDesc{ "__D3D12__", "1" }).getView()));
@@ -2034,11 +2036,13 @@ Result DeviceImpl::createProgram(
 }
 
 Result DeviceImpl::createShaderObjectLayout(
-    slang::TypeLayoutReflection* typeLayout, ShaderObjectLayoutBase** outLayout)
+    slang::ISession* session,
+    slang::TypeLayoutReflection* typeLayout,
+    ShaderObjectLayoutBase** outLayout)
 {
     RefPtr<ShaderObjectLayoutImpl> layout;
     SLANG_RETURN_ON_FAIL(
-        ShaderObjectLayoutImpl::createForElementType(this, typeLayout, layout.writeRef()));
+        ShaderObjectLayoutImpl::createForElementType(this, session, typeLayout, layout.writeRef()));
     returnRefPtrMove(outLayout, layout);
     return SLANG_OK;
 }
