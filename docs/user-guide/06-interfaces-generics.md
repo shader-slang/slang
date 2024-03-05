@@ -671,6 +671,23 @@ void main()
 // "success"
 ```
 
+In addition to casting from an interface type to a concrete type, `as` and `is` operator can be used on generic types as well to cast a generic type into a concrete type. For example:
+```csharp
+T compute<T>(T a1, T a2)
+{
+    if (a1 is float)
+    {
+        return reinterpret<T>((a1 as float).value + (a2 as float).value);
+    }
+    else if (T is int)
+    {
+        return reinterpret<T>((a1 as int).value - (a2 as int).value);
+    }
+    return T();
+}
+// compute(1.0f, 2.0f) == 3.0f
+// compute(3, 1) == 2
+```
 
 Extensions to Interfaces
 -----------------------------
