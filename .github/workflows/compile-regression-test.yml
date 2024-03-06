@@ -1,0 +1,48 @@
+# This is a basic workflow to help you get started with Actions
+
+name: Compile Regression-Test
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: [self-hosted, Windows, regression-test]
+    timeout-minutes: 100
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        configuration: ['Release']
+        platform: ['x64']
+        include:
+          - platform: x64
+            testPlatform: x64
+          - platform: x64
+            testCategory: full
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: 'true'
+        fetch-depth: '0'
+    - name: setup-msbuild
+      uses: microsoft/setup-msbuild@v1
+    - name: build
+      run: |
+        .\premake.bat vs2019 --arch=${{matrix.platform}} --deps=true --no-progress=true --enable-cuda=true
+
+        .\make-slang-tag-version.bat
+
+        MSBuild.exe slang.sln -v:m -m -property:Configuration=${{matrix.configuration}} -property:Platform=${{matrix.platform}} -property:WindowsTargetPlatformVersion=10.0.19041.0 -maxcpucount:12
+
+    - name: Run compile and validation test
+      run: |
+        $gitbash = 'C:\Program Files\git\bin\bash.exe'
+        cp -r 'C:\slang_compile_test_suite_a' .\
+        cd .\slang_compile_test_suite_a
+        & $gitbash compile_all_slang.sh
