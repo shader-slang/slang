@@ -2,8 +2,8 @@ name: VK-GL-CTS Nightly
 
 on:
   schedule:
-    - cron: '45 17 * * *'
-    - cron: '45 16 * * *'
+    - cron: '58 19 * * *'
+    - cron: '58 18 * * *'
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -40,7 +40,7 @@ jobs:
           test-lists/slang-passing-tests.txt
         path: test-lists
         sparse-checkout-cone-mode: false
-    - name: vkcts run
+    - name: vkcts setup
       run: |
         Expand-Archive VK-GL-CTS_WithSlang-0.0.3-win64.zip
         
@@ -48,10 +48,10 @@ jobs:
 
         copy ${{ github.workspace }}\bin\windows-x64\release\slang-glslang.dll ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\slang-glslang.dll
 
-        copy ${{ github.workspace }}\vkcts_passingtestlist.txt ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\vkcts_passingtestlist.txt
+        copy ${{ github.workspace }}\test-lists\test-lists\slang-passing-tests.txt ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\slang-passing-tests.txt
 
         copy ${{ github.workspace }}\bin\windows-x64\release\test-server.exe ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\test-server.exe
-
-        cd ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64
-       
-        deqp-vk.exe --deqp-archive-dir=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64 --deqp-caselist-file=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\vkcts_passingtestlist.txt
+    - name: vkcts run
+      working-directory: ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64
+      run: |
+        .\deqp-vk.exe --deqp-archive-dir=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64 --deqp-caselist-file=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\slang-passing-tests.txt
