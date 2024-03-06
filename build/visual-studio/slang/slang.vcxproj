@@ -470,6 +470,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ir-strip.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-synthesize-active-mask.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-translate-glsl-global-var.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-uniformity.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-use-uninitialized-out-param.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-util.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-validate.h" />
@@ -690,6 +691,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ir-strip.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-synthesize-active-mask.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-translate-glsl-global-var.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-uniformity.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-use-uninitialized-out-param.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-util.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-validate.cpp" />
