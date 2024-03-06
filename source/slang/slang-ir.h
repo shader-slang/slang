@@ -2324,24 +2324,6 @@ public:
         return m_containerPool;
     }
 
-    // Raytracing variables/attributes managment functions
-    bool checkedForRayVariables = false;
-    void trySearchForAndFillAllRayVariables();
-
-    IRInst* getRayVariableFromLocation(IRInst* payloadVariable, Slang::IROp op, DiagnosticSink* sink);
-    
-    void storeLocationToRayPayloadVariable(int location, IRInst* inst);
-    IRInst** getRayPayloadVariableFromLocation(int location);
-    Dictionary<int, IRInst*> m_RayLocationToPayloads;
-
-    void storeLocationToRayAttributeVariable(int location, IRInst* inst);
-    IRInst** getRayAttributeVariableFromLocation(int location);
-    Dictionary<int, IRInst*> m_RayLocationToAttributes;
-
-    void storeLocationToRayCallableVariable(int location, IRInst* inst);
-    IRInst** getRayCallableVariableFromLocation(int location);
-    Dictionary<int, IRInst*> m_RayLocationToCallables;
-
 private:
     IRModule() = delete;
 

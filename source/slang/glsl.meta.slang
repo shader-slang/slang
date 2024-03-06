@@ -2822,8 +2822,8 @@ void setupExtForRayTracingBuiltIn()
     }
 }
 
-[require(glsl)]
-__spirv_version(1.4) [require(spirv)]
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
 public property uint3 gl_LaunchIDNV 
 {
     get 
@@ -2846,8 +2846,8 @@ public property uint3 gl_LaunchIDNV
     }
 }
 
-[require(glsl)]
-__spirv_version(1.4) [require(spirv)]
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
 public property uint3 gl_LaunchIDEXT 
 {
     get 
@@ -2857,8 +2857,8 @@ public property uint3 gl_LaunchIDEXT
     }
 }
 
-[require(glsl)]
-__spirv_version(1.4) [require(spirv)]
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
 public property uint3 gl_LaunchSizeNV 
 {
     get 
@@ -2881,8 +2881,8 @@ public property uint3 gl_LaunchSizeNV
     }
 }
 
-[require(glsl)]
-__spirv_version(1.4) [require(spirv)]
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
 public property uint3 gl_LaunchSizeEXT 
 {
     get 
@@ -2892,8 +2892,8 @@ public property uint3 gl_LaunchSizeEXT
     }
 }
 
-[require(glsl)]
-__spirv_version(1.4) [require(spirv)]
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
 public property int gl_PrimitiveID 
 {
     get 
@@ -2902,8 +2902,9 @@ public property int gl_PrimitiveID
         return PrimitiveIndex();
     }
 }
-[require(glsl)]
-__spirv_version(1.4) [require(spirv)]
+
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
 public property int gl_InstanceID 
 {
     get 
@@ -2912,8 +2913,9 @@ public property int gl_InstanceID
         return InstanceIndex();
     }
 }
-[require(glsl)]
-__spirv_version(1.4) [require(spirv)]
+
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
 public property int gl_InstanceCustomIndexEXT 
 {
     get 
@@ -2922,9 +2924,11 @@ public property int gl_InstanceCustomIndexEXT
         return InstanceID();
     }
 }
-[require(glsl)]
-__spirv_version(1.4) [require(spirv)]
-public property int gl_GeometryIndexEXT {
+
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
+public property int gl_GeometryIndexEXT 
+{
     get
     {
         setupExtForRayTracingBuiltIn();
@@ -2932,36 +2936,43 @@ public property int gl_GeometryIndexEXT {
     }
 }
 
-[require(glsl)]
-__spirv_version(1.4) [require(spirv)]
-public property vec3 gl_WorldRayOriginEXT {
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
+public property vec3 gl_WorldRayOriginEXT 
+{
     get
     {
         setupExtForRayTracingBuiltIn();
         return WorldRayOrigin();
     }
 }
-[require(glsl)]
-__spirv_version(1.4) [require(spirv)]
-public property vec3 gl_WorldRayDirectionEXT {
+
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
+public property vec3 gl_WorldRayDirectionEXT 
+{
     get
     {
         setupExtForRayTracingBuiltIn();
         return WorldRayDirection();
     }
 }
-[require(glsl)]
-__spirv_version(1.4) [require(spirv)]
-public property vec3 gl_ObjectRayOriginEXT {
+
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
+public property vec3 gl_ObjectRayOriginEXT 
+{
     get
     {
         setupExtForRayTracingBuiltIn();
         return ObjectRayOrigin();
     }
 }
-[require(glsl)]
-__spirv_version(1.4) [require(spirv)]
-public property vec3 gl_ObjectRayDirectionEXT {
+
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
+public property vec3 gl_ObjectRayDirectionEXT 
+{
     get
     {
         setupExtForRayTracingBuiltIn();
@@ -2969,27 +2980,32 @@ public property vec3 gl_ObjectRayDirectionEXT {
     }
 }
 
-[require(glsl)]
-__spirv_version(1.4) [require(spirv)]
-public property float gl_RayTminEXT {
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
+public property float gl_RayTminEXT 
+{
     get
     {
         setupExtForRayTracingBuiltIn();
         return RayTMin();
     }
 }
-[require(glsl)]
-__spirv_version(1.4) [require(spirv)]
-public property float gl_RayTmaxEXT {
+
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
+public property float gl_RayTmaxEXT 
+{
     get
     {
         setupExtForRayTracingBuiltIn();
         return RayTCurrent();
     }
 }
-[require(glsl)]
-__spirv_version(1.4) [require(spirv)]
-public property uint gl_IncomingRayFlagsEXT {
+
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
+public property uint gl_IncomingRayFlagsEXT 
+{
     get
     {
         setupExtForRayTracingBuiltIn();
@@ -2997,9 +3013,10 @@ public property uint gl_IncomingRayFlagsEXT {
     }
 }
 
-[require(glsl)]
-__spirv_version(1.4) [require(spirv)]
-public property float gl_HitTEXT {
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
+public property float gl_HitTEXT 
+{
     get
     {
         setupExtForRayTracingBuiltIn();
@@ -3019,9 +3036,11 @@ public property float gl_HitTEXT {
         }
     }
 }
-[require(glsl)]
-__spirv_version(1.4) [require(spirv)]
-public property uint gl_HitKindEXT {
+
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
+public property uint gl_HitKindEXT 
+{
     get
     {
         setupExtForRayTracingBuiltIn();
@@ -3029,9 +3048,10 @@ public property uint gl_HitKindEXT {
     }
 }
 
-[require(glsl)]
-__spirv_version(1.4) [require(spirv)]
-public property mat4x3 gl_ObjectToWorldEXT {
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
+public property mat4x3 gl_ObjectToWorldEXT 
+{
     get
     {
         setupExtForRayTracingBuiltIn();
@@ -3052,9 +3072,11 @@ public property mat4x3 gl_ObjectToWorldEXT {
         }
     }
 }
-[require(glsl)]
-__spirv_version(1.4) [require(spirv)]
-public property mat3x4 gl_ObjectToWorld3x4EXT {
+
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
+public property mat3x4 gl_ObjectToWorld3x4EXT 
+{
     get
     {
         setupExtForRayTracingBuiltIn();
@@ -3074,9 +3096,11 @@ public property mat3x4 gl_ObjectToWorld3x4EXT {
         }
     }
 }
-[require(glsl)]
-__spirv_version(1.4) [require(spirv)]
-public property mat4x3 gl_WorldToObjectEXT {
+
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
+public property mat4x3 gl_WorldToObjectEXT 
+{
     get
     {
         setupExtForRayTracingBuiltIn();
@@ -3097,9 +3121,11 @@ public property mat4x3 gl_WorldToObjectEXT {
         }
     }
 }
-[require(glsl)]
-__spirv_version(1.4) [require(spirv)]
-public property mat3x4 gl_WorldToObject3x4EXT {
+
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
+public property mat3x4 gl_WorldToObject3x4EXT 
+{
     get
     {
         setupExtForRayTracingBuiltIn();
@@ -3122,10 +3148,9 @@ public property mat3x4 gl_WorldToObject3x4EXT {
 
 // GL_EXT_ray_tracing functions
 
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
-__glsl_version(460)
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
 public void traceRayEXT(
     accelerationStructureEXT topLevel,
     uint rayFlags,
@@ -3177,19 +3202,17 @@ public void traceRayEXT(
     }
 }
 
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
-__glsl_version(460)
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
 public bool reportIntersectionEXT(float hitT, uint hitKind)
 {
     return __reportIntersection(hitT, hitKind);
 }
 
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
-__glsl_version(460)
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
 public void executeCallableEXT(
     uint sbtRecordIndex, 
     int callable /*callableDataEXT and callableDataInEXT*/)
@@ -3237,10 +3260,10 @@ public const uint gl_RayQueryCandidateIntersectionAABBEXT = 1U;
 
 // GL_EXT_ray_query functions
 
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
-__glsl_version(460)
+[require(glsl, rayquery)]
+[require(spirv, rayquery)]
+[ForceInline]
 public void rayQueryInitializeEXT(
     inout rayQueryEXT q,
     accelerationStructureEXT topLevel,
@@ -3254,49 +3277,50 @@ public void rayQueryInitializeEXT(
         { origin, tMin, direction, tMax });
 }
 
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
-__glsl_version(460)
+[require(glsl, rayquery)]
+[require(spirv, rayquery)]
 [ForceInline]
-public bool rayQueryProceedEXT(inout rayQueryEXT q){
+public bool rayQueryProceedEXT(inout rayQueryEXT q)
+{
     return q.Proceed();
 }
 
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
-__glsl_version(460)
+[require(glsl, rayquery)]
+[require(spirv, rayquery)]
 [mutating]
+[ForceInline]
 public void rayQueryTerminateEXT(inout rayQueryEXT q)
 {
     q.Abort();
 }
 
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
-__glsl_version(460)
+[require(glsl, rayquery)]
+[require(spirv, rayquery)]
+[ForceInline]
 public void rayQueryGenerateIntersectionEXT(inout rayQueryEXT q, float tHit)
 {
     q.CommitProceduralPrimitiveHit(tHit);
 }
 
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
-__glsl_version(460)
+[require(glsl, rayquery)]
+[require(spirv, rayquery)]
 [ForceInline]
-public void rayQueryConfirmIntersectionEXT(inout rayQueryEXT q){
+public void rayQueryConfirmIntersectionEXT(inout rayQueryEXT q)
+{
     q.CommitNonOpaqueTriangleHit();
 }
 
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
-__glsl_version(460)
+[require(glsl, rayquery)]
+[require(spirv, rayquery)]
 [__NoSideEffect]
-public uint rayQueryGetIntersectionTypeEXT(rayQueryEXT q, bool committed){
+[ForceInline]
+public uint rayQueryGetIntersectionTypeEXT(rayQueryEXT q, bool committed)
+{
     if (committed)
     {
         return q.CommittedStatus();
@@ -3307,46 +3331,46 @@ public uint rayQueryGetIntersectionTypeEXT(rayQueryEXT q, bool committed){
     }
 }
 
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
-__glsl_version(460)
+[require(glsl, rayquery)]
+[require(spirv, rayquery)]
+[ForceInline]
 public float rayQueryGetRayTMinEXT(rayQueryEXT q)
 {
     return q.RayTMin();
 }
 
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
-__glsl_version(460)
+[require(glsl, rayquery)]
+[require(spirv, rayquery)]
+[ForceInline]
 public uint rayQueryGetRayFlagsEXT(rayQueryEXT q)
 {
     return q.RayFlags();
 }
 
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
-__glsl_version(460)
+[require(glsl, rayquery)]
+[require(spirv, rayquery)]
+[ForceInline]
 public vec3 rayQueryGetWorldRayOriginEXT(rayQueryEXT q)
 {
     return q.WorldRayOrigin();
 }
 
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
-__glsl_version(460)
+[require(glsl, rayquery)]
+[require(spirv, rayquery)]
+[ForceInline]
 public vec3 rayQueryGetWorldRayDirectionEXT(rayQueryEXT q)
 {
     return q.WorldRayDirection();
 }
 
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
-    __glsl_version(460)
+[require(glsl, rayquery)]
+[require(spirv, rayquery)]
+[ForceInline]
 public float rayQueryGetIntersectionTEXT(rayQueryEXT q, bool committed) 
 {
     if (committed) 
@@ -3359,10 +3383,10 @@ public float rayQueryGetIntersectionTEXT(rayQueryEXT q, bool committed)
     }
 }
 
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
-__glsl_version(460)
+[require(glsl, rayquery)]
+[require(spirv, rayquery)]
+[ForceInline]
 public int rayQueryGetIntersectionInstanceCustomIndexEXT(rayQueryEXT q, bool committed) 
 {
     if (committed) 
@@ -3375,10 +3399,10 @@ public int rayQueryGetIntersectionInstanceCustomIndexEXT(rayQueryEXT q, bool com
     }
 }
 
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
-__glsl_version(460)
+[require(glsl, rayquery)]
+[require(spirv, rayquery)]
+[ForceInline]
 public int rayQueryGetIntersectionInstanceIdEXT(rayQueryEXT q, bool committed) 
 {
     if (committed) 
@@ -3391,10 +3415,10 @@ public int rayQueryGetIntersectionInstanceIdEXT(rayQueryEXT q, bool committed)
     }
 }
 
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
-__glsl_version(460)
+[require(glsl, rayquery)]
+[require(spirv, rayquery)]
+[ForceInline]
 public uint rayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetEXT(rayQueryEXT q, bool committed) 
 {
     if (committed) 
@@ -3407,10 +3431,10 @@ public uint rayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetEXT(ray
     }
 }
 
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
-__glsl_version(460)
+[require(glsl, rayquery)]
+[require(spirv, rayquery)]
+[ForceInline]
 public int rayQueryGetIntersectionGeometryIndexEXT(rayQueryEXT q, bool committed) 
 {
     if (committed) 
@@ -3423,10 +3447,10 @@ public int rayQueryGetIntersectionGeometryIndexEXT(rayQueryEXT q, bool committed
     }
 }
 
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
-__glsl_version(460)
+[require(glsl, rayquery)]
+[require(spirv, rayquery)]
+[ForceInline]
 public int rayQueryGetIntersectionPrimitiveIndexEXT(rayQueryEXT q, bool committed) 
 {
     if (committed) 
@@ -3439,10 +3463,10 @@ public int rayQueryGetIntersectionPrimitiveIndexEXT(rayQueryEXT q, bool committe
     }
 }
 
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
-__glsl_version(460)
+[require(glsl, rayquery)]
+[require(spirv, rayquery)]
+[ForceInline]
 public vec2 rayQueryGetIntersectionBarycentricsEXT(rayQueryEXT q, bool committed) 
 {
     if (committed) 
@@ -3455,10 +3479,10 @@ public vec2 rayQueryGetIntersectionBarycentricsEXT(rayQueryEXT q, bool committed
     }
 }
 
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
-__glsl_version(460)
+[require(glsl, rayquery)]
+[require(spirv, rayquery)]
+[ForceInline]
 public bool rayQueryGetIntersectionFrontFaceEXT(rayQueryEXT q, bool committed) 
 {
     if (committed) 
@@ -3471,20 +3495,18 @@ public bool rayQueryGetIntersectionFrontFaceEXT(rayQueryEXT q, bool committed)
     }
 }
 
-
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
-__glsl_version(460)
+[require(glsl, rayquery)]
+[require(spirv, rayquery)]
+[ForceInline]
 public bool rayQueryGetIntersectionCandidateAABBOpaqueEXT(rayQueryEXT q) 
 {
     return q.CandidateProceduralPrimitiveNonOpaque();
 }
 
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
-__glsl_extension(GL_EXT_ray_query)
-__glsl_version(460)
+[require(glsl, rayquery)]
+[require(spirv, rayquery)]
+[ForceInline]
 public vec3 rayQueryGetIntersectionObjectRayDirectionEXT(rayQueryEXT q, bool committed) 
 {
     if (committed) 
@@ -3497,10 +3519,10 @@ public vec3 rayQueryGetIntersectionObjectRayDirectionEXT(rayQueryEXT q, bool com
     }
 }
 
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
-__glsl_version(460)
+[require(glsl, rayquery)]
+[require(spirv, rayquery)]
+[ForceInline]
 public vec3 rayQueryGetIntersectionObjectRayOriginEXT(rayQueryEXT q, bool committed) 
 {
     if (committed) 
@@ -3513,10 +3535,10 @@ public vec3 rayQueryGetIntersectionObjectRayOriginEXT(rayQueryEXT q, bool commit
     }
 }
 
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
-__glsl_version(460)
+[require(glsl, rayquery)]
+[require(spirv, rayquery)]
+[ForceInline]
 public mat4x3 rayQueryGetIntersectionObjectToWorldEXT(rayQueryEXT q, bool committed) 
 {
     if (committed) 
@@ -3529,10 +3551,10 @@ public mat4x3 rayQueryGetIntersectionObjectToWorldEXT(rayQueryEXT q, bool commit
     }
 }
 
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_query)
-__glsl_version(460)
+[require(glsl, rayquery)]
+[require(spirv, rayquery)]
+[ForceInline]
 public mat4x3 rayQueryGetIntersectionWorldToObjectEXT(rayQueryEXT q, bool committed) 
 {
     if (committed) 
@@ -3547,12 +3569,12 @@ public mat4x3 rayQueryGetIntersectionWorldToObjectEXT(rayQueryEXT q, bool commit
 
 /// GL_NV_shader_invocation_reorder
 
-[__requiresNVAPI]
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+[require(glsl, ser)]
+[require(spirv, ser)]
+[ForceInline]
 public void hitObjectTraceRayNV(
     inout hitObjectNV hitObject,
     accelerationStructureEXT topLevel,
@@ -3607,13 +3629,13 @@ public void hitObjectTraceRayNV(
     }
 }
 
-[__requiresNVAPI]
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-__glsl_extension(GLSL_NV_ray_tracing_motion_blur)
+__glsl_extension(GL_NV_ray_tracing_motion_blur)
+[require(glsl, ser_motion)]
+[require(spirv, ser_motion)]
+[ForceInline]
 public void hitObjectTraceRayMotionNV(
     inout hitObjectNV hitObject, 
     accelerationStructureEXT topLevel,
@@ -3673,12 +3695,12 @@ public void hitObjectTraceRayMotionNV(
     }
 }
 
-[__requiresNVAPI]
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+[require(glsl, ser)]
+[require(spirv, ser)]
+[ForceInline]
 public void hitObjectRecordHitNV(
     inout hitObjectNV hitObject,
     accelerationStructureEXT topLevel,
@@ -3692,7 +3714,8 @@ public void hitObjectRecordHitNV(
     float Tmin,
     vec3 direction,
     float Tmax,
-    constexpr int attributeLocation){
+    constexpr int attributeLocation)
+    {
     __target_switch
     {
     case glsl:
@@ -3735,13 +3758,13 @@ public void hitObjectRecordHitNV(
     }
 }
 
-[__requiresNVAPI]
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-__glsl_extension(GLSL_NV_ray_tracing_motion_blur)
+__glsl_extension(GL_NV_ray_tracing_motion_blur)
+[require(glsl, ser_motion)]
+[require(spirv, ser_motion)]
+[ForceInline]
 public void hitObjectRecordHitMotionNV(
     inout hitObjectNV hitObject,
     accelerationStructureEXT topLevel,
@@ -3756,7 +3779,8 @@ public void hitObjectRecordHitMotionNV(
     vec3 direction,
     float Tmax,
     float currentTime,
-    constexpr int attributeLocation){
+    constexpr int attributeLocation)
+    {
     __target_switch
     {
     case glsl:
@@ -3801,12 +3825,12 @@ public void hitObjectRecordHitMotionNV(
     }
 }
 
-[__requiresNVAPI]
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+[require(glsl, ser)]
+[require(spirv, ser)]
+[ForceInline]
 public void hitObjectRecordHitWithIndexNV(
     inout hitObjectNV hitObject,
     accelerationStructureEXT topLevel,
@@ -3861,13 +3885,13 @@ public void hitObjectRecordHitWithIndexNV(
     }
 }
 
-[__requiresNVAPI]
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-__glsl_extension(GLSL_NV_ray_tracing_motion_blur)
+__glsl_extension(GL_NV_ray_tracing_motion_blur)
+[require(glsl, ser_motion)]
+[require(spirv, ser_motion)]
+[ForceInline]
 public void hitObjectRecordHitWithIndexMotionNV(
     inout hitObjectNV hitObject,
     accelerationStructureEXT topLevel,
@@ -3881,10 +3905,8 @@ public void hitObjectRecordHitWithIndexMotionNV(
     vec3 direction,
     float Tmax,
     float currentTime,
-    constexpr int attributeLocation){
-
-    
-
+    constexpr int attributeLocation)
+    {
     __target_switch
     {
     case glsl:
@@ -3929,32 +3951,33 @@ public void hitObjectRecordHitWithIndexMotionNV(
     }
 }
 
-[__requiresNVAPI]
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+[require(glsl, ser)]
+[require(spirv, ser)]
+[ForceInline]
 public void hitObjectRecordMissNV(
     inout hitObjectNV hitObject, 
     uint sbtRecordIndex, 
     vec3 origin,
     float Tmin,
     vec3 direction,
-    float Tmax){
+    float Tmax)
+{
     hitObject = HitObject::MakeMiss(
         sbtRecordIndex,
         { origin, Tmin, direction, Tmax }
         );
 }
 
-[__requiresNVAPI]
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-__glsl_extension(GLSL_NV_ray_tracing_motion_blur)
+__glsl_extension(GL_NV_ray_tracing_motion_blur)
+[require(glsl, ser_motion)]
+[require(spirv, ser_motion)]
+[ForceInline]
 public void hitObjectRecordMissMotionNV(
     inout hitObjectNV hitObject, 
     uint sbtRecordIndex, 
@@ -3962,7 +3985,8 @@ public void hitObjectRecordMissMotionNV(
     float Tmin,
     vec3 direction,
     float Tmax,
-    float currentTime){
+    float currentTime)
+{
     hitObject = HitObject::MakeMotionMiss(
         sbtRecordIndex,
         { origin, Tmin, direction, Tmax },
@@ -3970,25 +3994,27 @@ public void hitObjectRecordMissMotionNV(
         );
 }
 
-[__requiresNVAPI]
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-public void hitObjectRecordEmptyNV(hitObjectNV hitObject){
+[require(glsl, ser)]
+[require(spirv, ser)]
+[ForceInline]
+public void hitObjectRecordEmptyNV(hitObjectNV hitObject)
+{
     hitObject = HitObject::MakeNop();
 }
 
-[__requiresNVAPI]
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+[require(glsl, ser)]
+[require(spirv, ser)]
+[ForceInline]
 public void hitObjectExecuteShaderNV(
     inout hitObjectNV hitObject, 
-    constexpr int payload){    
+    constexpr int payload)
+{    
     __target_switch 
     {
     case glsl:
@@ -4005,183 +4031,185 @@ public void hitObjectExecuteShaderNV(
     }
 }
 
-[__requiresNVAPI]
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-public bool hitObjectIsEmptyNV(hitObjectNV hitObject){
+[require(glsl, ser)]
+[require(spirv, ser)]
+[ForceInline]
+public bool hitObjectIsEmptyNV(hitObjectNV hitObject)
+{
     return hitObject.IsNop();
 }
 
-[__requiresNVAPI]
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-public bool hitObjectIsMissNV(hitObjectNV hitObject){
+[require(glsl, ser)]
+[require(spirv, ser)]
+[ForceInline]
+public bool hitObjectIsMissNV(hitObjectNV hitObject)
+{
     return hitObject.IsMiss();
 }
 
-[__requiresNVAPI]
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-public bool hitObjectIsHitNV(hitObjectNV hitObject){
+[require(glsl, ser)]
+[require(spirv, ser)]
+[ForceInline]
+public bool hitObjectIsHitNV(hitObjectNV hitObject)
+{
     return hitObject.IsHit();
 }
 
-[__requiresNVAPI]
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+[require(glsl, ser)]
+[require(spirv, ser)]
+[ForceInline]
 public float hitObjectGetRayTMinNV(hitObjectNV hitObject)
 {
     return hitObject.GetRayDesc().TMin;  
 }
 
-[__requiresNVAPI]
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+[require(glsl, ser)]
+[require(spirv, ser)]
+[ForceInline]
 public float hitObjectGetRayTMaxNV(hitObjectNV hitObject)
 {
     return hitObject.GetRayDesc().TMax; 
 }
 
-[__requiresNVAPI]
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+[require(glsl, ser)]
+[require(spirv, ser)]
+[ForceInline]
 public vec3 hitObjectGetWorldRayOriginNV(hitObjectNV hitObject)
 {
     return hitObject.GetRayDesc().Origin;
 }
 
-[__requiresNVAPI]
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+[require(glsl, ser)]
+[require(spirv, ser)]
+[ForceInline]
 public vec3 hitObjectGetWorldRayDirectionNV(hitObjectNV hitObject)
 {
     return hitObject.GetRayDesc().Direction; 
 }
 
-[__requiresNVAPI]
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-public vec3 hitObjectGetObjectRayOriginNV(hitObjectNV hitObject){
+[require(glsl, ser)]
+[require(spirv, ser)]
+[ForceInline]
+public vec3 hitObjectGetObjectRayOriginNV(hitObjectNV hitObject)
+{
     return hitObject.GetObjectRayOrigin();
 }
 
-[__requiresNVAPI]
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+[require(glsl, ser)]
+[require(spirv, ser)]
+[ForceInline]
 public vec3 hitObjectGetObjectRayDirectionNV(hitObjectNV hitObject)
 {
     return hitObject.GetObjectRayDirection();
 }
 
-[__requiresNVAPI]
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-public mat4x3 hitObjectGetObjectToWorldNV(hitObjectNV hitObject){
+[require(glsl, ser)]
+[require(spirv, ser)]
+[ForceInline]
+public mat4x3 hitObjectGetObjectToWorldNV(hitObjectNV hitObject)
+{
     return transpose(hitObject.GetObjectToWorld());
 }
 
-[__requiresNVAPI]
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+[require(glsl, ser)]
+[require(spirv, ser)]
+[ForceInline]
 public mat4x3 hitObjectGetWorldToObjectNV(hitObjectNV hitObject)
 {
     return transpose(hitObject.GetWorldToObject()); 
 }
 
-[__requiresNVAPI]
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+[require(glsl, ser)]
+[require(spirv, ser)]
+[ForceInline]
 public int hitObjectGetInstanceCustomIndexNV(hitObjectNV hitObject)
 {
     return hitObject.GetInstanceID();
 }
 
-[__requiresNVAPI]
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+[require(glsl, ser)]
+[require(spirv, ser)]
+[ForceInline]
 public int hitObjectGetInstanceIdNV(hitObjectNV hitObject)
 {
     return hitObject.GetInstanceIndex();
 }
 
-[__requiresNVAPI]
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
-__glsl_extension(GL_EXT_ray_tracing)
-__glsl_extension(GL_NV_shader_invocation_reorder)
-__glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+[require(glsl, ser)]
+[require(spirv, ser)]
+[ForceInline]
 public int hitObjectGetGeometryIndexNV(hitObjectNV hitObject)
 {
     return hitObject.GetGeometryIndex();
 }
 
-[__requiresNVAPI]
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+[require(glsl, ser)]
+[require(spirv, ser)]
+[ForceInline]
 public int hitObjectGetPrimitiveIndexNV(hitObjectNV hitObject)
 {
     return hitObject.GetPrimitiveIndex();
 }
 
-[__requiresNVAPI]
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+[require(glsl, ser)]
+[require(spirv, ser)]
+[ForceInline]
 public uint hitObjectGetHitKindNV(hitObjectNV hitObject)
 {
     return hitObject.GetHitKind();
 }
 
-[__requiresNVAPI]
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+[require(glsl, ser)]
+[require(spirv, ser)]
+[ForceInline]
 public void hitObjectGetAttributesNV(
     inout hitObjectNV hitObject, 
     constexpr int attributeLocation)
@@ -4203,77 +4231,76 @@ public void hitObjectGetAttributesNV(
     }
 }
 
-[__requiresNVAPI]
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+[require(glsl, ser)]
+[require(spirv, ser)]
+[ForceInline]
 public uvec2 hitObjectGetShaderRecordBufferHandleNV(hitObjectNV hitObject)
 {
     return hitObject.GetShaderRecordBufferHandle();
 }
 
-[__requiresNVAPI]
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-public uint hitObjectGetShaderBindingTableRecordIndexNV(hitObjectNV hitObject){
+[require(glsl, ser)]
+[require(spirv, ser)]
+[ForceInline]
+public uint hitObjectGetShaderBindingTableRecordIndexNV(hitObjectNV hitObject)
+{
     return hitObject.GetShaderTableIndex();
 }
 
-[__requiresNVAPI]
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+[require(glsl, ser)]
+[require(spirv, ser)]
+[ForceInline]
 public float hitObjectGetCurrentTimeNV(hitObjectNV hitObject)
 {
     return hitObject.GetCurrentTime();
 }
 
-[__requiresNVAPI]
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-public void reorderThreadNV(uint hint, uint bits){
+[require(glsl, ser)]
+[require(spirv, ser)]
+[ForceInline]
+public void reorderThreadNV(uint hint, uint bits)
+{
     ReorderThread(hint, bits);
 }
 
-[__requiresNVAPI]
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-public void reorderThreadNV(hitObjectNV hitObject){
+[require(glsl, ser)]
+[require(spirv, ser)]
+[ForceInline]
+public void reorderThreadNV(hitObjectNV hitObject)
+{
     ReorderThread(hitObject);
 }
 
-[__requiresNVAPI]
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-public void reorderThreadNV(hitObjectNV hitObject, uint hint, uint bits){
+[require(glsl, ser)]
+[require(spirv, ser)]
+[ForceInline]
+public void reorderThreadNV(hitObjectNV hitObject, uint hint, uint bits)
+{
     ReorderThread(hitObject, hint, bits);
 }
 
 /// GL_NV_ray_tracing_motion_blur
 
-[__requiresNVAPI]
-__spirv_version(1.4) [require(spirv)]
-__glsl_extension(GL_NV_ray_tracing_motion_blur) 
-__glsl_extension(GL_NV_shader_invocation_reorder)
-__glsl_extension(GL_EXT_ray_tracing) 
-[require(glsl)]
-__spirv_version(1.4) [require(spirv)]
+[require(glsl, raytracing_motionblur)]
+[require(spirv, raytracing_motionblur)]
 public property float gl_CurrentRayTimeNV
 {
     get
@@ -4293,12 +4320,11 @@ public property float gl_CurrentRayTimeNV
     }
 }
 
-[__requiresNVAPI]
-__spirv_version(1.4) [require(spirv)]
-[require(glsl)]
-__glsl_extension(GL_NV_ray_tracing_motion_blur)
-__glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GL_EXT_ray_tracing) 
+__glsl_extension(GL_NV_ray_tracing_motion_blur)
+[require(glsl, raytracing_motionblur)]
+[require(spirv, raytracing_motionblur)]
+[ForceInline]
 public void traceRayMotionNV(
     accelerationStructureEXT topLevel,
     uint rayFlags,
@@ -4805,13 +4831,15 @@ __spirv_version(1.3) [require(spirv)]
     {
     case glsl: __intrinsic_asm "subgroupAnd($0)";
     case spirv:
-        if (__isBool<T>()) {
+        if (__isBool<T>()) 
+        {
             return spirv_asm {
                 OpCapability GroupNonUniformArithmetic;
                 OpGroupNonUniformLogicalAnd $$T result Subgroup 0 $value
             };
         }
-        else {
+        else 
+        {
             return spirv_asm {
                 OpCapability GroupNonUniformArithmetic;
                 OpGroupNonUniformBitwiseAnd $$T result Subgroup 0 $value
@@ -4830,13 +4858,15 @@ __spirv_version(1.3) [require(spirv)]
     {
     case glsl: __intrinsic_asm "subgroupOr($0)";
     case spirv:
-        if (__isBool<T>()) {
+        if (__isBool<T>()) 
+        {
             return spirv_asm {
                 OpCapability GroupNonUniformArithmetic;
                 OpGroupNonUniformLogicalOr $$T result Subgroup 0 $value
             };
         }
-        else {
+        else 
+        {
             return spirv_asm {
                 OpCapability GroupNonUniformArithmetic;
                 OpGroupNonUniformBitwiseOr $$T result Subgroup 0 $value
@@ -4855,13 +4885,15 @@ __spirv_version(1.3) [require(spirv)]
     {
     case glsl: __intrinsic_asm "subgroupXor($0)";
     case spirv:
-        if (__isBool<T>()) {
+        if (__isBool<T>()) 
+        {
             return spirv_asm {
                 OpCapability GroupNonUniformArithmetic;
                 OpGroupNonUniformLogicalXor $$T result Subgroup 0 $value
             };
         }
-        else {
+        else 
+        {
             return spirv_asm {
                 OpCapability GroupNonUniformArithmetic;
                 OpGroupNonUniformBitwiseXor $$T result Subgroup 0 $value
@@ -4960,13 +4992,15 @@ __spirv_version(1.3) [require(spirv)]
     {
     case glsl: __intrinsic_asm "subgroupInclusiveAnd($0)";
     case spirv:
-        if (__isBool<T>()) {
+        if (__isBool<T>()) 
+        {
             return spirv_asm {
                 OpCapability GroupNonUniformArithmetic;
                 OpGroupNonUniformLogicalAnd $$T result Subgroup InclusiveScan $value
             };
         }
-        else {
+        else 
+        {
             return spirv_asm {
                 OpCapability GroupNonUniformArithmetic;
                 OpGroupNonUniformBitwiseAnd $$T result Subgroup InclusiveScan $value
@@ -4985,13 +5019,15 @@ __spirv_version(1.3) [require(spirv)]
     {
     case glsl: __intrinsic_asm "subgroupInclusiveOr($0)";
     case spirv:
-        if (__isBool<T>()) {
+        if (__isBool<T>()) 
+        {
             return spirv_asm {
                 OpCapability GroupNonUniformArithmetic;
                 OpGroupNonUniformLogicalOr $$T result Subgroup InclusiveScan $value
             };
         }
-        else {
+        else 
+        {
             return spirv_asm {
                 OpCapability GroupNonUniformArithmetic;
                 OpGroupNonUniformBitwiseOr $$T result Subgroup InclusiveScan $value
@@ -5172,13 +5208,15 @@ __spirv_version(1.3) [require(spirv)]
     {
     case glsl: __intrinsic_asm "subgroupAnd($0)";
     case spirv:
-        if (__isBool<T>()) {
+        if (__isBool<T>()) 
+        {
             return spirv_asm {
                 OpCapability GroupNonUniformArithmetic;
                 OpGroupNonUniformLogicalAnd $$vector<T,N> result Subgroup 0 $value
             };
         }
-        else {
+        else 
+        {
             return spirv_asm {
                 OpCapability GroupNonUniformArithmetic;
                 OpGroupNonUniformBitwiseAnd $$vector<T,N> result Subgroup 0 $value
@@ -5198,13 +5236,15 @@ __spirv_version(1.3) [require(spirv)]
     {
     case glsl: __intrinsic_asm "subgroupOr($0)";
     case spirv:
-        if (__isBool<T>()) {
+        if (__isBool<T>()) 
+        {
             return spirv_asm {
                 OpCapability GroupNonUniformArithmetic;
                 OpGroupNonUniformLogicalOr $$vector<T,N> result Subgroup 0 $value
             };
         }
-        else {
+        else 
+        {
             return spirv_asm {
                 OpCapability GroupNonUniformArithmetic;
                 OpGroupNonUniformBitwiseOr $$vector<T,N> result Subgroup 0 $value
@@ -5224,13 +5264,15 @@ __spirv_version(1.3) [require(spirv)]
     {
     case glsl: __intrinsic_asm "subgroupXor($0)";
     case spirv:
-        if (__isBool<T>()) {
+        if (__isBool<T>()) 
+        {
             return spirv_asm {
                 OpCapability GroupNonUniformArithmetic;
                 OpGroupNonUniformLogicalXor $$vector<T,N> result Subgroup 0 $value
             };
         }
-        else {
+        else 
+        {
             return spirv_asm {
                 OpCapability GroupNonUniformArithmetic;
                 OpGroupNonUniformBitwiseXor $$vector<T,N> result Subgroup 0 $value

@@ -43,6 +43,11 @@ bool equals(matrix<T, N, M> lhs, matrix<T, N, M> rhs)
 }
 
 bool testVars() {
+    hitAttr = vec4(1);
+    payload = vec4(1);
+    attrMain = vec4(1);
+    incall = vec2(1);
+    
     return true
 // CHECK_GLSL-DAG: gl_PrimitiveID
 // CHECK_SPV-DAG: PrimitiveId

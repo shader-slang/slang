@@ -215,7 +215,8 @@ struct CollectOptixEntryPointUniformParams : PerEntryPointPass {
         {
             collectedParam->insertBefore(entryPointFunc->getFirstBlock()->getFirstChild());
         }
-        else {
+        else 
+        {
             // If we didn't find a uniform parameter, we can safely return now.
             return;
         }

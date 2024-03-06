@@ -17,6 +17,8 @@ layout(location = 2) rayPayloadInEXT vec4 payload;
 layout(location = 2) hitObjectAttributeNV vec4 attrMain;
 
 bool testVars() {
+    payload = vec4(1);
+    attrMain = vec4(1);
     return true
 // CHECK_GLSL-DAG: gl_LaunchIDNV
 // CHECK_SPV-DAG-N: LaunchIdNV

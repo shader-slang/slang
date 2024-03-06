@@ -5426,27 +5426,6 @@ struct SPIRVEmitContext
 
                     break;
                 }
-                case kIROp_SPIRVAsmOperandRayPayloadFromLocation:
-                {
-                    IRInst* opValue = operand->getValue();
-                    IRInst* globalVar = this->m_irModule->getRayVariableFromLocation(opValue, kIROp_SPIRVAsmOperandRayPayloadFromLocation, m_sink);
-                    emitOperand(ensureInst(globalVar));
-                    break;
-                }
-                case kIROp_SPIRVAsmOperandRayAttributeFromLocation:
-                {
-                    IRInst* opValue = operand->getValue();
-                    IRInst* globalVar = this->m_irModule->getRayVariableFromLocation(opValue, kIROp_SPIRVAsmOperandRayAttributeFromLocation, m_sink);
-                    emitOperand(ensureInst(globalVar));
-                    break;
-                }
-                case kIROp_SPIRVAsmOperandRayCallableFromLocation:
-                {
-                    IRInst* opValue = operand->getValue();
-                    IRInst* globalVar = this->m_irModule->getRayVariableFromLocation(opValue, kIROp_SPIRVAsmOperandRayCallableFromLocation, m_sink);
-                    emitOperand(ensureInst(globalVar));
-                    break;
-                }
                 case kIROp_SPIRVAsmOperandResult:
                 {
                     SLANG_ASSERT(isLast);
@@ -5734,19 +5713,6 @@ struct SPIRVEmitContext
     }
 };
 
-void ifGLSLEnsureRayTracingGlobalsEmit(IRModule* module, Slang::TargetProgram* targetProgram, Slang::SPIRVEmitContext* context) {
-    //ensure if glsl all raytracing layout objects are emitted; I assume we should not optimize these out
-    if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL))
-    {
-        for (auto i : module->m_RayLocationToPayloads)
-            context->ensureInst(i.second);
-        for (auto i : module->m_RayLocationToAttributes)
-            context->ensureInst(i.second);
-        for (auto i : module->m_RayLocationToCallables)
-            context->ensureInst(i.second);
-    }
-}
-
 SlangResult emitSPIRVFromIR(
     CodeGenContext*         codeGenContext,
     IRModule*               irModule,
@@ -5772,11 +5738,7 @@ SlangResult emitSPIRVFromIR(
     SPIRVEmitContext context(irModule, codeGenContext->getTargetProgram(), sink);
     legalizeIRForSPIRV(&context, irModule, irEntryPoints, codeGenContext);
 
-    irModule->trySearchForAndFillAllRayVariables();
     legalizeIRForSPIRV(&context, irModule, irEntryPoints, codeGenContext);
-   
-
-    ifGLSLEnsureRayTracingGlobalsEmit(irModule, codeGenContext->getTargetProgram(), &context);
    
 #if 0
     {

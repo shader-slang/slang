@@ -1621,16 +1621,19 @@ LinkedIR linkIR(
         {
             for (auto inst : irModule->getGlobalInsts())
             {
-                if (0
-                    || inst->findDecoration<IRVulkanRayPayloadDecoration>()
-                    || inst->findDecoration<IRVulkanRayPayloadInDecoration>()
-                    || inst->findDecoration<IRVulkanHitObjectAttributesDecoration>()
-                    || inst->findDecoration<IRVulkanCallablePayloadDecoration>()
-                    || inst->findDecoration<IRVulkanCallablePayloadInDecoration>()
-                    || inst->findDecoration<IRVulkanHitAttributesDecoration>()
-                    )
+                for (auto decoration : inst->getDecorations())
                 {
-                    insertGlobalVar(inst);
+                    auto op = decoration->getOp();
+                    if (0
+                        || op == kIROp_VulkanRayPayloadDecoration
+                        || op == kIROp_VulkanRayPayloadInDecoration
+                        || op == kIROp_VulkanHitObjectAttributesDecoration
+                        || op == kIROp_VulkanCallablePayloadDecoration
+                        || op == kIROp_VulkanCallablePayloadInDecoration
+                        || op == kIROp_VulkanHitAttributesDecoration)
+                    {
+                        insertGlobalVar(inst);
+                    }
                 }
             }
         }
