@@ -2,8 +2,8 @@ name: VK-GL-CTS Nightly
 
 on:
   schedule:
-    - cron: '30 15 * * *'
-    - cron: '33 14 * * *'
+    - cron: '45 17 * * *'
+    - cron: '45 16 * * *'
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -38,6 +38,7 @@ jobs:
         repository: "shader-slang/VK-GL-CTS"
         sparse-checkout: |
           test-lists/slang-passing-tests.txt
+        path: test-lists
         sparse-checkout-cone-mode: false
     - name: vkcts run
       run: |
