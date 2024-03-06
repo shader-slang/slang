@@ -2,9 +2,7 @@ name: VK-GL-CTS Nightly
 
 on:
   schedule:
-    - cron: '00 01 * * *'
-    - cron: '15 01 * * *'
-    - cron: '15 02 * * *'
+    - cron: '30 15 * * *'
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -34,6 +32,12 @@ jobs:
         latest: true
         repository: "shader-slang/VK-GL-CTS"
         fileName: "VK-GL-CTS_WithSlang-0.0.3-win64.zip"
+    - uses: actions/checkout@v4
+      with:
+        repository: "shader-slang/VK-GL-CTS"
+        sparse-checkout: |
+          test-lists/slang-passing-tests.txt
+        sparse-checkout-cone-mode: false
     - name: vkcts run
       run: |
         Expand-Archive VK-GL-CTS_WithSlang-0.0.3-win64.zip
@@ -45,5 +49,7 @@ jobs:
         copy ${{ github.workspace }}\vkcts_passingtestlist.txt ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\vkcts_passingtestlist.txt
 
         copy ${{ github.workspace }}\bin\windows-x64\release\test-server.exe ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\test-server.exe
+
+        cd ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64
        
-        ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\deqp-vk.exe --deqp-archive-dir=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64 --deqp-caselist-file=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\vkcts_passingtestlist.txt
+        deqp-vk.exe --deqp-archive-dir=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64 --deqp-caselist-file=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\vkcts_passingtestlist.txt
