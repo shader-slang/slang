@@ -848,6 +848,15 @@ namespace Slang
             return result;
         }
 
+        // Setup the flag to indicate disabling the short-circuiting evaluation
+        // for the logical expressions associted with the subcontext
+        SemanticsContext disableShortCircuitLogicalExpr()
+        {
+            SemanticsContext result(*this);
+            result.m_shouldShortCircuitLogicExpr = false;
+            return result;
+        }
+
         TryClauseType getEnclosingTryClauseType() { return m_enclosingTryClauseType; }
 
         SemanticsContext withEnclosingTryClauseType(TryClauseType tryClauseType)
@@ -945,6 +954,13 @@ namespace Slang
         ASTBuilder* m_astBuilder = nullptr;
 
         Scope* m_outerScope = nullptr;
+
+        // By default, we will support short-circuit evaluation for the logic expression.
+        // However, there are few exceptions where we will disable it:
+        // 1. the logic expression is inside the generic parameter list.
+        // 2. the logic expression is in the init expression of a static const variable.
+        // 3. the logic expression is in an array size declaration.
+        bool m_shouldShortCircuitLogicExpr = true;
     };
 
     struct OuterScopeContextRAII
@@ -2589,6 +2605,9 @@ namespace Slang
 
             /// Perform semantic checking on a `modifier` that is being applied to the given `type`
         Val* checkTypeModifier(Modifier* modifier, Type* type);
+    private:
+        // Convert the logic operator expression to not use 'InvokeExpr' type
+        Expr* convertToLogicOperatorExpr(InvokeExpr* expr);
 
     };
 

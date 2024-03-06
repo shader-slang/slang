@@ -946,8 +946,14 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
     }
 
     Stage impliedStage = Stage::Unknown;
-    SlangSourceLanguage sourceLanguage = langOverride == SourceLanguage::Unknown ? findSourceLanguageFromPath(path, impliedStage) : SlangSourceLanguage(langOverride);
-
+    SlangSourceLanguage sourceLanguage = SlangSourceLanguage(langOverride);
+    if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
+    {
+        if (m_requestImpl->getLinkage()->m_optionSet.hasOption(CompilerOptionName::Language))
+            sourceLanguage = SlangSourceLanguage(m_requestImpl->getLinkage()->m_optionSet.getEnumOption<SlangSourceLanguage>(CompilerOptionName::Language));
+        else
+            sourceLanguage = findSourceLanguageFromPath(path, impliedStage);
+    }
     if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
     {
         m_requestImpl->getSink()->diagnose(SourceLoc(), Diagnostics::cannotDeduceSourceLanguage, inPath);
@@ -1888,7 +1894,9 @@ SlangResult OptionsParser::_parse(
 
                 RawTarget rawTarget;
                 rawTarget.format = CodeGenTarget(format);
-
+                // Silently allow redundant targets if it is the same as the last specified target.
+                if (m_rawTargets.getCount() != 0 && m_rawTargets.getLast().format == rawTarget.format)
+                    break;
                 m_rawTargets.add(rawTarget);
                 break;
             }
@@ -1991,7 +1999,9 @@ SlangResult OptionsParser::_parse(
                 RawEntryPoint rawEntryPoint;
                 rawEntryPoint.name = name.value;
                 rawEntryPoint.translationUnitIndex = m_currentTranslationUnitIndex;
-
+                // Silently allow duplicate entrypoints if it is the same as the last specified one.
+                if (m_rawEntryPoints.getCount() != 0 && m_rawEntryPoints.getLast().name == rawEntryPoint.name)
+                    break;
                 m_rawEntryPoints.add(rawEntryPoint);
                 break;
             }
@@ -2032,6 +2042,7 @@ SlangResult OptionsParser::_parse(
                         SLANG_RETURN_ON_FAIL(addInputPath(m_reader.getValueAndAdvance().getBuffer(), sourceLanguage));
                     }
                 }
+                linkage->m_optionSet.add(CompilerOptionName::Language, (int)sourceLanguage);
                 break;
             }
             case OptionKind::PassThrough:
@@ -2762,6 +2773,7 @@ SlangResult OptionsParser::_parse(
 
             if (impliedFormat == CodeGenTarget::Unknown)
             {
+                
                 // If we hit this case, then it means that we need to pick the
                 // target to assocaite with this output based on its implied
                 // format, but the file path doesn't direclty imply a format
@@ -2810,8 +2822,14 @@ SlangResult OptionsParser::_parse(
                         if (getCurrentTarget()->optionSet.shouldEmitSPIRVDirectly())
                         {
                             rawOutput.isWholeProgram = true;
+                            break;
                         }
-                        break;
+                        else if (m_rawEntryPoints.getCount() != 0)
+                        {
+                            rawOutput.entryPointIndex = (int)m_rawEntryPoints.getCount() - 1;
+                            break;
+                        }
+                        [[fallthrough]];
                     default:
                         m_sink->diagnose(SourceLoc(), Diagnostics::cannotMatchOutputFileToEntryPoint, rawOutput.path);
                         break;

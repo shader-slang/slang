@@ -361,6 +361,21 @@ float4 myPackedVector = reinterpret<float4>(myVal);
 
 `reinterpret` can pack any type into any other type as long as the target type is no smaller than the source type.
 
+## Pointers
+
+Slang supports pointers when generating code for SPIRV, C++ and CUDA targets. The syntax for pointers is similar to C, with the exception that operator `.` can also be used to dereference a member. Slang currently does not support the `->` operator.
+For example:
+```csharp
+int test(MyType* pObj)
+{
+    MyType* pNext = pObj + 1;
+    MyType* pNext = &pNext[1];
+    return pNext.a + (*pNext).a + pNext[0].a;
+}
+```
+
+Pointer types can also be specified using the generic syntax: `Ptr<MyType>` is equivalent to `MyType*`.
+
 ## `struct` inheritance (limited)
 
 Slang supports a limited form of inheritance. A derived `struct` type has all the members defined in the base type it is inherited from:

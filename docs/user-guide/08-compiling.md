@@ -657,7 +657,7 @@ meanings of their `CompilerOptionValue` encodings.
 | LineDirectiveMode | Specifies the line directive mode to use the generated textual code such as HLSL or CUDA. `intValue0` encodes an value defined in the  `SlangLineDirectiveMode` enum. |
 | Optimization | Specifies the optimization level. `intValue0` encodes the value for the setting defined in the `SlangOptimizationLevel` enum. |
 | Obfuscate | Specifies whether or not to turn on obfuscation. When obfuscation is on, Slang will strip variable and function names from the target code and replace them with hash values. `intValue0` encodes a bool value for the setting. |
-| VulkanBindShift | Specifies the `-fvk-bind-shift` option. `intValue0` (lower 8 bits): kind, `intValue0` (higher bits): set; `intValue1`: shift. |
+| VulkanBindShift | Specifies the `-fvk-bind-shift` option. `intValue0` (higher 8 bits): kind, `intValue0` (lower bits): set; `intValue1`: shift. |
 | VulkanBindGlobals | Specifies the `-fvk-bind-globals` option. `intValue0`: index, `intValue`: set. |
 | VulkanInvertY | Specifies the `-fvk-invert-y` option. `intValue0` specifies a bool value for the setting. |
 | VulkanUseEntryPointName | When set, will keep the original name of entrypoints as they are defined in the source instead of renaming them to `main`. `intValue0` specifies a bool value for the setting. |
@@ -676,3 +676,9 @@ meanings of their `CompilerOptionValue` encodings.
 | VulkanBindShiftAll | Specifies the `-fvk-bind-shift` option for all spaces. `intValue0`: kind, `intValue1`: shift. |
 | GenerateWholeProgram | When set will emit target code for the entire program instead of for a specific entrypoint. `intValue0` specifies a bool value for the setting. |
 | UseUpToDateBinaryModule | When set will only load precompiled modules if it is up-to-date with its source. `intValue0` specifies a bool value for the setting. |
+
+## Debugging
+
+Slang's SPIRV backend supports generating debug information using the [NonSemantic Shader DebugInfo Instructions](https://github.com/KhronosGroup/SPIRV-Registry/blob/main/nonsemantic/NonSemantic.Shader.DebugInfo.100.asciidoc).
+To enable debugging information when targing SPIRV, specify the `-emit-spirv-directly` and the `-g2` argument when using `slangc` tool, or set `EmitSpirvDirectly` to `1` and `DebugInformation` to `SLANG_DEBUG_INFO_LEVEL_STANDARD` when using the API.
+Debugging support has been tested with RenderDoc.

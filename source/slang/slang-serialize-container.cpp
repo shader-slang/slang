@@ -121,21 +121,6 @@ namespace Slang {
     return SLANG_OK;
 }
 
-
-static SlangResult _addModuleRecursive(HashSet<Module*>& processedModuleSet, const SerialContainerUtil::WriteOptions& options, SerialContainerData& container, Module* module)
-{
-    if (processedModuleSet.contains(module))
-        return SLANG_OK;
-    for (auto m : module->getModuleDependencies())
-    {
-        if (m != module)
-            _addModuleRecursive(processedModuleSet, options, container, m);
-    }
-    processedModuleSet.add(module);
-    return SerialContainerUtil::addModuleToData(module, options, container);
-}
-
-
 /* static */SlangResult SerialContainerUtil::addFrontEndRequestToData(FrontEndCompileRequest* frontEndReq, const WriteOptions& options, SerialContainerData& outData)
 {
     // Go through translation units, adding modules

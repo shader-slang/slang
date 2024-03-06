@@ -197,6 +197,39 @@ bool isValueType(IRInst* dataType)
     }
 }
 
+bool isSimpleDataType(IRType* type)
+{
+    type = (IRType*)unwrapAttributedType(type);
+    if (as<IRBasicType>(type))
+        return true;
+    switch (type->getOp())
+    {
+    case kIROp_StructType:
+    {
+        auto structType = as<IRStructType>(type);
+        for (auto field : structType->getFields())
+        {
+            if (!isSimpleDataType(field->getFieldType()))
+                return false;
+        }
+        return true;
+        break;
+    }
+    case kIROp_Param:
+    case kIROp_VectorType:
+    case kIROp_MatrixType:
+    case kIROp_InterfaceType:
+    case kIROp_AnyValueType:
+        return true;
+    case kIROp_ArrayType:
+    case kIROp_UnsizedArrayType:
+    case kIROp_PtrType:
+        return isSimpleDataType((IRType*)type->getOperand(0));
+    default:
+        return false;
+    }
+}
+
 IRInst* hoistValueFromGeneric(IRBuilder& inBuilder, IRInst* value, IRInst*& outSpecializedVal, bool replaceExistingValue)
 {
     auto outerGeneric = as<IRGeneric>(findOuterGeneric(value));

@@ -871,7 +871,7 @@ extern "C"
             Optimization,               // intValue0: OptimizationLevel
             Obfuscate,                  // bool
 
-            VulkanBindShift,            // intValue0 (lower 8 bits): kind; intValue0(higher bits): set; intValue1: shift
+            VulkanBindShift,            // intValue0 (higher 8 bits): kind; intValue0(lower bits): set; intValue1: shift
             VulkanBindGlobals,          // intValue0: index; intValue1: set
             VulkanInvertY,              // bool
             VulkanUseEntryPointName,    // bool
@@ -3737,6 +3737,10 @@ namespace slang
             */
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL parseCommandLineArguments(
             int argc, const char* const* argv, SessionDesc* outSessionDesc, ISlangUnknown** outAuxAllocation) = 0;
+
+            /** Computes a digest that uniquely identifies the session description.
+            */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getSessionDescDigest(SessionDesc* sessionDesc, ISlangBlob** outBlob) = 0;
     };
 
     #define SLANG_UUID_IGlobalSession IGlobalSession::getTypeGuid()

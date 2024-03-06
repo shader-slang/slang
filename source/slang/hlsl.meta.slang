@@ -1596,6 +1596,13 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,form
         }
     }
 
+    [__readNone]
+    [ForceInline]
+    T Load(vector<int, Shape.dimensions + isArray + 1> locationAndSampleIndex)
+    {
+        return Load(__vectorReshape<Shape.dimensions + isArray>(locationAndSampleIndex), locationAndSampleIndex[Shape.dimensions + isArray]);
+    }
+
     __glsl_extension(GL_EXT_samplerless_texture_functions)
     [__readNone]
     [ForceInline]

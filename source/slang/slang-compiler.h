@@ -1835,7 +1835,7 @@ namespace Slang
         // Updates the supplied builder with linkage-related information, which includes preprocessor
         // defines, the compiler version, and other compiler options. This is then merged with the hash
         // produced for the program to produce a key that can be used with the shader cache.
-        void buildHash(DigestBuilder<SHA1>& builder, SlangInt targetIndex);
+        void buildHash(DigestBuilder<SHA1>& builder, SlangInt targetIndex = -1);
 
         void addTarget(
             slang::TargetDesc const& desc);
@@ -3002,6 +3002,8 @@ namespace Slang
 
         SLANG_NO_THROW SlangResult SLANG_MCALL parseCommandLineArguments(
             int argc, const char* const* argv, slang::SessionDesc* outSessionDesc, ISlangUnknown** outAllocation) override;
+
+        SLANG_NO_THROW SlangResult SLANG_MCALL getSessionDescDigest(slang::SessionDesc* sessionDesc, ISlangBlob** outBlob) override;
 
             /// Get the downstream compiler for a transition
         IDownstreamCompiler* getDownstreamCompiler(CodeGenTarget source, CodeGenTarget target);

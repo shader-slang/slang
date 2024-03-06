@@ -958,8 +958,14 @@ struct PeepholeContext : InstPassBase
             }
         case kIROp_TypeEquals:
             {
-                auto left = inst->getOperand(0)->getDataType();
-                auto right = inst->getOperand(1)->getDataType();
+                auto getTypeFromOperand = [](IRInst* operand) -> IRType*
+                {
+                    if (as<IRTypeType>(operand->getFullType()) || !operand->getFullType())
+                        return (IRType*)operand;
+                    return operand->getFullType();
+                };
+                auto left = getTypeFromOperand(inst->getOperand(0));
+                auto right = getTypeFromOperand(inst->getOperand(1));
                 if (isConcreteType(left) && isConcreteType(right))
                 {
                     IRBuilder builder(module);
@@ -1032,6 +1038,40 @@ struct PeepholeContext : InstPassBase
                         break;
                     }
                     inst->replaceUsesWith(builder.getBoolValue(result));
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
+                break;
+            }
+        case kIROp_Load:
+            {
+                // Load from undef is undef.
+                if (as<IRLoad>(inst)->getPtr()->getOp() == kIROp_undefined)
+                {
+                    IRBuilder builder(module);
+                    builder.setInsertBefore(inst);
+                    auto undef = builder.emitUndefined(inst->getDataType());
+                    inst->replaceUsesWith(undef);
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
+                break;
+            }
+        case kIROp_Store:
+            {
+                // Store undef is no-op.
+                if (as<IRStore>(inst)->getVal()->getOp() == kIROp_undefined)
+                {
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
+                break;
+            }
+        case kIROp_DebugValue:
+            {
+                // Update debug value with undef is no-op.
+                if (as<IRDebugValue>(inst)->getValue()->getOp() == kIROp_undefined)
+                {
                     maybeRemoveOldInst(inst);
                     changed = true;
                 }

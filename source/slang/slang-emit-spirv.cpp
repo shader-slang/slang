@@ -1389,11 +1389,20 @@ struct SPIRVEmitContext
                 bool useForwardDeclaration = (!m_mapIRInstToSpvInst.containsKey(valueType)
                     && as<IRStructType>(valueType)
                     && storageClass == SpvStorageClassPhysicalStorageBuffer);
+                SpvId valueTypeId;
+                if (useForwardDeclaration)
+                {
+                    valueTypeId = getIRInstSpvID(valueType);
+                }
+                else
+                {
+                    auto spvValueType = ensureInst(valueType);
+                    valueTypeId = getID(spvValueType);
+                }
                 auto resultSpvType = emitOpTypePointer(
                     inst,
                     storageClass,
-                    useForwardDeclaration? getIRInstSpvID(valueType) : getID(ensureInst(valueType))
-                );
+                    valueTypeId);
                 if (useForwardDeclaration)
                 {
                     // After everything has been emitted, we will move the pointer definition to the end
@@ -1591,13 +1600,49 @@ struct SPIRVEmitContext
             {
                 ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_non_semantic_info"));
                 auto debugSource = as<IRDebugSource>(inst);
+                auto sourceStr = as<IRStringLit>(debugSource->getSource())->getStringSlice();
+                // If source content is empty, skip the content operand.
+                if (sourceStr.getLength() == 0)
+                {
+                    return emitOpDebugSource(
+                        getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                        inst,
+                        inst->getFullType(),
+                        getNonSemanticDebugInfoExtInst(),
+                        debugSource->getFileName());
+                }
+                // SPIRV does not allow string lits longer than 65535, so we need to split the source string
+                // in OpDebugSourceContinued instructions.
+                auto sourceStrHead = sourceStr.getLength() > 65535 ? sourceStr.head(65535) : sourceStr;
+                auto spvStrHead = emitInst(
+                    getSection(SpvLogicalSectionID::DebugStringsAndSource),
+                    nullptr,
+                    SpvOpString,
+                    kResultID,
+                    SpvLiteralBits::fromUnownedStringSlice(sourceStrHead));
+
                 auto result = emitOpDebugSource(
                     getSection(SpvLogicalSectionID::ConstantsAndTypes),
                     inst,
                     inst->getFullType(),
                     getNonSemanticDebugInfoExtInst(),
                     debugSource->getFileName(),
-                    debugSource->getSource());
+                    spvStrHead);
+
+                for (Index start = 65535; start < sourceStr.getLength(); start += 65535)
+                {
+                    auto slice = sourceStr.tail(start);
+                    slice = slice.getLength() > 65535 ? slice.head(65535) : slice;
+                    auto sliceSpvStr = emitInst(
+                        getSection(SpvLogicalSectionID::DebugStringsAndSource),
+                        nullptr,
+                        SpvOpString,
+                        kResultID,
+                        SpvLiteralBits::fromUnownedStringSlice(slice));
+                    emitOpDebugSourceContinued(getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                        nullptr, m_voidType, getNonSemanticDebugInfoExtInst(), sliceSpvStr);
+                }
+
                 auto moduleInst = inst->getModule()->getModuleInst();
                 if (!m_defaultDebugSource)
                     m_defaultDebugSource = debugSource;
@@ -1613,18 +1658,23 @@ struct SPIRVEmitContext
                         emitIntConstant(100, builder.getUIntType()),  // ExtDebugInfo version.
                         emitIntConstant(5, builder.getUIntType()),    // DWARF version.
                         result,
-                        emitIntConstant(6, builder.getUIntType()));   // Language, use HLSL's ID for now.
+                        emitIntConstant(SpvSourceLanguageSlang, builder.getUIntType())); // Language.
                     registerDebugInst(moduleInst, translationUnit);
                 }
                 return result;
             }
         case kIROp_GetStringHash:
             return emitGetStringHash(inst);
+        case kIROp_AttributedType:
+            return ensureInst(as<IRAttributedType>(inst)->getBaseType());
         case kIROp_AllocateOpaqueHandle:
             return nullptr;
         case kIROp_HLSLTriangleStreamType:
         case kIROp_HLSLLineStreamType:
         case kIROp_HLSLPointStreamType:
+        case kIROp_VerticesType:
+        case kIROp_IndicesType:
+        case kIROp_PrimitivesType:
             return nullptr;
         default:
             {
@@ -1748,7 +1798,7 @@ struct SPIRVEmitContext
 
         //
 
-        const auto sampledType = inst->getElementType();
+        IRInst* sampledType = inst->getElementType();
         SpvDim dim = SpvDim1D; // Silence uninitialized warnings from msvc...
         switch(inst->GetBaseShape())
         {
@@ -1788,6 +1838,57 @@ struct SPIRVEmitContext
         }
 
         SpvImageFormat format = getSpvImageFormat(inst);
+        // If format is unknown, we need to deduce the format if there is
+        // unorm or snorm attributes on the sampled type.
+        if (auto attribType = as<IRAttributedType>(sampledType))
+        {
+            sampledType = unwrapAttributedType(sampledType);
+            if (format == SpvImageFormatUnknown)
+            {
+                IRIntegerValue vectorSize = 1;
+                if (auto vecType = as<IRVectorType>(sampledType))
+                    vectorSize = getIntVal(vecType->getElementCount());
+
+                for (auto attr : attribType->getAllAttrs())
+                {
+                    switch (attr->getOp())
+                    {
+                    case kIROp_UNormAttr:
+                        switch (vectorSize)
+                        {
+                        case 1:
+                            format = SpvImageFormatR8;
+                            break;
+                        case 2:
+                            format = SpvImageFormatRg8;
+                            break;
+                        case 3:
+                            format = SpvImageFormatRgba8;
+                            break;
+                        case 4:
+                            format = SpvImageFormatRgba8;
+                            break;
+                        }
+                    case kIROp_SNormAttr:
+                        switch (vectorSize)
+                        {
+                        case 1:
+                            format = SpvImageFormatR8Snorm;
+                            break;
+                        case 2:
+                            format = SpvImageFormatRg8Snorm;
+                            break;
+                        case 3:
+                            format = SpvImageFormatRgba8Snorm;
+                            break;
+                        case 4:
+                            format = SpvImageFormatRgba8Snorm;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
 
         //
         // Capabilities, according to section 3.8
@@ -1844,7 +1945,7 @@ struct SPIRVEmitContext
         {
             auto imageType = emitOpTypeImage(
                 nullptr,
-                dropVector(sampledType),
+                dropVector((IRType*)sampledType),
                 dim,
                 SpvLiteralInteger::from32(depth),
                 SpvLiteralInteger::from32(arrayed),
@@ -1859,7 +1960,7 @@ struct SPIRVEmitContext
 
         return emitOpTypeImage(
             assignee,
-            dropVector(sampledType),
+            dropVector((IRType*)sampledType),
             dim,
             SpvLiteralInteger::from32(depth),
             SpvLiteralInteger::from32(arrayed),
@@ -2117,6 +2218,20 @@ struct SPIRVEmitContext
         return varInst;
     }
 
+    String getDebugInfoCommandLineArgumentForEntryPoint(IREntryPointDecoration* entryPointDecor)
+    {
+        StringBuilder sb;
+        sb << "-target spirv ";
+        m_targetProgram->getOptionSet().writeCommandLineArgs(m_targetProgram->getTargetReq()->getSession(), sb);
+        sb << " -stage " << getStageName(entryPointDecor->getProfile().getStage());
+        if (auto entryPointName = as<IRStringLit>(getName(entryPointDecor->getParent())))
+        {
+            sb << " -entry " << entryPointName->getStringSlice();
+        }
+        sb << " -g2";
+        return sb.produceString();
+    }
+
         /// Emit the given `irFunc` to SPIR-V
     SpvInst* emitFunc(IRFunc* irFunc)
     {
@@ -2250,6 +2365,22 @@ struct SPIRVEmitContext
 
             if (funcDebugScope)
             {
+                if (auto entryPointDecor = irFunc->findDecoration<IREntryPointDecoration>())
+                {
+                    if (auto debugScope = findDebugScope(irFunc->getModule()->getModuleInst()))
+                    {
+                        IRBuilder builder(irFunc);
+                        String cmdArgs = getDebugInfoCommandLineArgumentForEntryPoint(entryPointDecor);
+                        emitOpDebugEntryPoint(
+                            getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                            m_voidType,
+                            getNonSemanticDebugInfoExtInst(),
+                            funcDebugScope,
+                            debugScope,
+                            builder.getStringValue(toSlice("slangc")),
+                            builder.getStringValue(cmdArgs.getUnownedSlice()));
+                    }
+                }
                 emitOpDebugScope(spvBlock, nullptr, m_voidType, getNonSemanticDebugInfoExtInst(), funcDebugScope);
             }
 
@@ -3285,19 +3416,39 @@ struct SPIRVEmitContext
         }
     }
 
-    Dictionary<SpvBuiltIn, SpvInst*> m_builtinGlobalVars;
+    struct BuiltinSpvVarKey
+    {
+        SpvBuiltIn builtinName;
+        SpvStorageClass storageClass = SpvStorageClassInput;
+        BuiltinSpvVarKey() = default;
+        BuiltinSpvVarKey(SpvBuiltIn builtin, SpvStorageClass storageClass)
+            : builtinName(builtin), storageClass(storageClass)
+        {
+        }
+        bool operator==(const BuiltinSpvVarKey& other) const
+        {
+            return builtinName == other.builtinName && storageClass == other.storageClass;
+        }
+        HashCode getHashCode() const
+        {
+            return combineHash(Slang::getHashCode(builtinName), Slang::getHashCode(storageClass));
+        }
+    };
+    Dictionary<BuiltinSpvVarKey, SpvInst*> m_builtinGlobalVars;
 
     SpvInst* getBuiltinGlobalVar(IRType* type, SpvBuiltIn builtinVal)
     {
         SpvInst* result = nullptr;
-        if (m_builtinGlobalVars.tryGetValue(builtinVal, result))
+        auto ptrType = as<IRPtrTypeBase>(type);
+        SLANG_ASSERT(ptrType && "`getBuiltinGlobalVar`: `type` must be ptr type.");
+        auto storageClass = static_cast<SpvStorageClass>(ptrType->getAddressSpace());
+        auto key = BuiltinSpvVarKey(builtinVal, storageClass);
+        if (m_builtinGlobalVars.tryGetValue(key, result))
         {
             return result;
         }
         IRBuilder builder(m_irModule);
         builder.setInsertBefore(type);
-        auto ptrType = as<IRPtrTypeBase>(type);
-        SLANG_ASSERT(ptrType && "`getBuiltinGlobalVar`: `type` must be ptr type.");
         auto varInst = emitOpVariable(
             getSection(SpvLogicalSectionID::GlobalVariables),
             nullptr,
@@ -3310,7 +3461,7 @@ struct SPIRVEmitContext
             varInst,
             builtinVal
         );
-        m_builtinGlobalVars[builtinVal] = varInst;
+        m_builtinGlobalVars[key] = varInst;
         return varInst;
     }
 
@@ -4947,7 +5098,7 @@ struct SPIRVEmitContext
             return ensureInst(m_voidType);
 
         IRBuilder builder(type);
-        if (auto funcType = as<IRFuncType>(type))
+        if (const auto funcType = as<IRFuncType>(type))
         {
             List<SpvInst*> argTypes;
             return emitOpDebugTypeFunction(
@@ -5062,7 +5213,7 @@ struct SPIRVEmitContext
                 m_voidType,
                 getNonSemanticDebugInfoExtInst(),
                 elementType,
-                builder.getIntValue(builder.getUIntType(), getIntVal(vectorType->getElementCount())),
+                builder.getIntValue(builder.getUIntType(), getIntVal(count)),
                 builder.getBoolValue(isColumnMajor));
         }
         else if (auto basicType = as<IRBasicType>(type))
@@ -5407,9 +5558,9 @@ struct SPIRVEmitContext
                 // Otherwise, we are truncating a vector to a smaller vector
                 else
                 {
-                    const auto toVector = cast<IRVectorType>(toType);
+                    const auto toVector = cast<IRVectorType>(unwrapAttributedType(toType));
                     const auto toVectorSize = getIntVal(toVector->getElementCount());
-                    const auto fromVector = cast<IRVectorType>(fromType);
+                    const auto fromVector = cast<IRVectorType>(unwrapAttributedType(fromType));
                     const auto fromVectorSize = getIntVal(fromVector->getElementCount());
                     if(toVectorSize > fromVectorSize)
                         m_sink->diagnose(inst, Diagnostics::spirvInvalidTruncate);

@@ -87,6 +87,8 @@ inline bool isScalarIntegerType(IRType* type)
 // No side effect can take place through a value of a "Value" type.
 bool isValueType(IRInst* type);
 
+bool isSimpleDataType(IRType* type);
+
 inline bool isChildInstOf(IRInst* inst, IRInst* parent)
 {
     while (inst)
