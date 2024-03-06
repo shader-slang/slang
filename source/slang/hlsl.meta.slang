@@ -11083,6 +11083,7 @@ ${{{{
 }}}}
 
     __glsl_extension(GL_EXT_ray_query)
+    __glsl_extension(GL_EXT_ray_tracing_position_fetch)
     [require(glsl, rayquery_pos)]
     [__NoSideEffect]
     void __glslGetIntersectionTriangleVertexPositions$(ccName)(out float3 arr[3])
