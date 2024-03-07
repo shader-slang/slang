@@ -1077,6 +1077,22 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         processGetElementPtrImpl(gepInst, gepInst->getBase(), gepInst->getIndex());
     }
 
+    void processMeshOutputGetElementPtr(IRMeshOutputRef* gepInst)
+    {
+        processGetElementPtrImpl(gepInst, gepInst->getBase(), gepInst->getIndex());
+    }
+
+    void processMeshOutputSet(IRMeshOutputSet* setInst)
+    {
+        IRBuilder builder(m_sharedContext->m_irModule);
+        builder.setInsertBefore(setInst);
+        const auto p = builder.emitElementAddress(setInst->getBase(), setInst->getIndex());
+        const auto s = builder.emitStore(p, setInst->getElementValue());
+        setInst->removeAndDeallocate();
+        addToWorkList(p);
+        addToWorkList(s);
+    }
+
     void processGetOffsetPtr(IRInst* offsetPtrInst)
     {
         auto ptrOperandType = as<IRPtrType>(offsetPtrInst->getOperand(0)->getDataType());
@@ -1765,7 +1781,13 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 processImageSubscript(as<IRImageSubscript>(inst));
                 break;
             case kIROp_RWStructuredBufferGetElementPtr:
-                processRWStructuredBufferGetElementPtr(as<IRRWStructuredBufferGetElementPtr>(inst));
+                processRWStructuredBufferGetElementPtr(cast<IRRWStructuredBufferGetElementPtr>(inst));
+                break;
+            case kIROp_MeshOutputRef:
+                processMeshOutputGetElementPtr(cast<IRMeshOutputRef>(inst));
+                break;
+            case kIROp_MeshOutputSet:
+                processMeshOutputSet(cast<IRMeshOutputSet>(inst));
                 break;
             case kIROp_RWStructuredBufferLoad:
             case kIROp_StructuredBufferLoad:

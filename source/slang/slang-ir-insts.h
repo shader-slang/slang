@@ -1362,6 +1362,7 @@ struct IRGLPositionOutputDecoration : public IRDecoration
 struct IRMeshOutputRef : public IRInst
 {
     IR_LEAF_ISA(MeshOutputRef)
+    IRInst* getBase() { return getOperand(0); }
     IRInst* getIndex() { return getOperand(1); }
     IRInst* getOutputType() { return cast<IRPtrTypeBase>(getFullType())->getValueType(); }
 };
