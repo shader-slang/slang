@@ -1206,10 +1206,11 @@ void HLSLSourceEmitter::emitMeshShaderModifiersImpl(IRInst* varInst)
 {
     if(auto modifier = varInst->findDecoration<IRMeshOutputDecoration>())
     {
+        // DXC requires that mesh payload parameters have "out" specified
         const char* s =
-              as<IRVerticesDecoration>(modifier)   ? "vertices "
-            : as<IRIndicesDecoration>(modifier)    ? "indices "
-            : as<IRPrimitivesDecoration>(modifier) ? "primitives "
+              as<IRVerticesDecoration>(modifier)   ? "out vertices "
+            : as<IRIndicesDecoration>(modifier)    ? "out indices "
+            : as<IRPrimitivesDecoration>(modifier) ? "out primitives "
             : nullptr;
         SLANG_ASSERT(s && "Unhandled type of mesh output decoration");
         m_writer->emit(s);
