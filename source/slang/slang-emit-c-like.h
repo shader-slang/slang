@@ -531,6 +531,10 @@ public:
         // Sort witnessTable entries according to the order defined in the witnessed interface type.
     List<IRWitnessTableEntry*> getSortedWitnessTableEntries(IRWitnessTable* witnessTable);
 
+    // Special handling for swizzleStore call, save the right-handside vector to a temporary variable
+    // first, then assign the corresponding elements to the left-handside vector one by one.
+    void _emitSwizzleStorePerElement(IRInst* inst);
+
     CodeGenContext* m_codeGenContext = nullptr;
     IRModule* m_irModule = nullptr;
 
