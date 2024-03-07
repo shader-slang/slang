@@ -71,6 +71,7 @@
 #include "slang-ir-string-hash.h"
 #include "slang-ir-simplify-for-emit.h"
 #include "slang-ir-pytorch-cpp-binding.h"
+#include "slang-ir-uniformity.h"
 #include "slang-ir-vk-invert-y.h"
 #include "slang-legalize-types.h"
 #include "slang-lower-to-ir.h"
@@ -370,6 +371,13 @@ Result linkAndOptimizeIR(
     lowerLValueCast(targetProgram, irModule);
 
     simplifyIR(targetProgram, irModule, IRSimplificationOptions::getDefault(), sink);
+
+    if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::ValidateUniformity))
+    {
+        validateUniformity(irModule, sink);
+        if (sink->getErrorCount() != 0)
+            return SLANG_FAIL;
+    }
 
     // Fill in default matrix layout into matrix types that left layout unspecified.
     specializeMatrixLayout(codeGenContext->getTargetProgram(), irModule);

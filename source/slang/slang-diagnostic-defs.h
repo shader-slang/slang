@@ -716,6 +716,10 @@ DIAGNOSTIC(41904, Error, unableToAlignOf, "alignof could not be performed for ty
 DIAGNOSTIC(42001, Error, invalidUseOfTorchTensorTypeInDeviceFunc, "invalid use of TorchTensor type in device/kernel functions. use `TensorView` instead.")
 
 DIAGNOSTIC(45001, Error, unresolvedSymbol, "unresolved external symbol '$0'.")
+
+DIAGNOSTIC(41201, Warning, expectDynamicUniformArgument, "argument for '$0' is not a dynamic uniform.")
+DIAGNOSTIC(41201, Warning, expectDynamicUniformValue, "value stored at this location must be dynamic uniform.")
+
 //
 // 5xxxx - Target code generation.
 //

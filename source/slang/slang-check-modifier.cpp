@@ -1083,6 +1083,7 @@ namespace Slang
         case ASTNodeType::HLSLCentroidModifier:
         case ASTNodeType::PerVertexModifier:
         case ASTNodeType::HLSLUniformModifier:
+        case ASTNodeType::DynamicUniformModifier:
             return (as<VarDeclBase>(decl) && (isGlobalDecl(decl) || as<StructDecl>(getParentDecl(decl)))) || as<ParamDecl>(decl);
 
         case ASTNodeType::HLSLSemantic:

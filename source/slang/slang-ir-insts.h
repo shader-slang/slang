@@ -685,6 +685,8 @@ struct IROffsetDecoration : IRDecoration
     IRIntegerValue getOffset() { return getOffsetOperand()->getValue(); }
 };
 
+IR_SIMPLE_DECORATION(DynamicUniformDecoration)
+
 struct IRBuiltinDecoration : IRDecoration
 {
     enum
@@ -4617,6 +4619,11 @@ public:
     void addNonCopyableTypeDecoration(IRInst* value)
     {
         addDecoration(value, kIROp_NonCopyableTypeDecoration);
+    }
+
+    void addDynamicUniformDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_DynamicUniformDecoration);
     }
 
         /// Add a decoration that indicates that the given `inst` depends on the given `dependency`.
