@@ -246,6 +246,9 @@
     <ClInclude Include="..\..\..\source\slang\slang-ir-dominators.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-ir-early-intrinsic-simplification.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ir-eliminate-multilevel-break.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -648,9 +651,6 @@
     <ClInclude Include="..\..\..\source\slang\slang-workspace-version.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\source\slang\slang-ir-early-intrinsic-simplification.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\prelude\slang-cpp-host-prelude.h.cpp">
@@ -909,6 +909,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-dominators.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-ir-early-intrinsic-simplification.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-eliminate-multilevel-break.cpp">
@@ -1305,9 +1308,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\source\slang\slang-ir-early-intrinsic-simplification.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
