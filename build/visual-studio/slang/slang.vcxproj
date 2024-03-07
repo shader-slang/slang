@@ -521,7 +521,6 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-value-reflect.h" />
     <ClInclude Include="..\..\..\source\slang\slang-visitor.h" />
     <ClInclude Include="..\..\..\source\slang\slang-workspace-version.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-early-intrinsic-simplification.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\prelude\slang-cpp-host-prelude.h.cpp" />
@@ -743,7 +742,6 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-value-reflect.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-workspace-version.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-early-intrinsic-simplification.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\source\slang\core.meta.slang" />
