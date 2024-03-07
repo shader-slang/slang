@@ -11369,6 +11369,8 @@ struct HitObject
     [require(spirv, ser)]
     [require(hlsl, ser)]
     [ForceInline]
+    __specialized_for_target(hlsl)
+    __specialized_for_target(glsl)
     static HitObject TraceRay<payload_t>(
         RaytracingAccelerationStructure AccelerationStructure,
         uint RayFlags,
@@ -11464,6 +11466,7 @@ struct HitObject
     [require(spirv, ser_motion)]
     [require(hlsl, ser_motion)]
     [ForceInline]
+    __specialized_for_target(glsl)
     static HitObject TraceMotionRay<payload_t>( 
         RaytracingAccelerationStructure AccelerationStructure, 
         uint RayFlags, 
@@ -12456,7 +12459,7 @@ struct HitObject
     /// 
 
     __glsl_extension(GL_NV_shader_invocation_reorder)
-
+    __glsl_extension(GL_EXT_ray_tracing)
     [require(glsl, ser)]
     __target_intrinsic(glsl, "hitObjectRecordMissNV")
     static void __glslMakeMiss(
@@ -12469,7 +12472,8 @@ struct HitObject
 
     // "void hitObjectRecordMissNV(hitObjectNV, uint, vec3, float, vec3, float);"
     __glsl_extension(GL_NV_shader_invocation_reorder)
-    [require(glsl, ser_motion)]
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_NV_ray_tracing_motion_blur)    [require(glsl, ser_motion)]
     __target_intrinsic(glsl, "hitObjectRecordMissMotionNV")
     static void __glslMakeMotionMiss(
         out HitObject hitObj,
@@ -12480,37 +12484,44 @@ struct HitObject
         float TMax, 
         float CurrentTime);
 
+    __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser)]
     __target_intrinsic(glsl, "hitObjectRecordEmptyNV")
     static void __glslMakeNop(out HitObject hitObj);
 
+    __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser)]
     __target_intrinsic(glsl, "hitObjectGetObjectRayDirectionNV($0)")
     float3 __glslGetRayDirection();
     
+    __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser)]
     __target_intrinsic(glsl, "hitObjectGetWorldRayDirectionNV($0)")
     float3 __glslGetRayWorldDirection();
 
+    __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser)]
     __target_intrinsic(glsl, "hitObjectGetWorldRayOriginNV($0)")
     float3 __glslGetRayWorldOrigin();
 
+    __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser)]
     __target_intrinsic(glsl, "hitObjectGetRayTMaxNV($0)")
     float __glslGetTMax();
 
+    __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser)]
     __target_intrinsic(glsl, "hitObjectGetRayTMinNV($0)")
     float __glslGetTMin();
 
     // "void hitObjectRecordHitWithIndexNV(hitObjectNV, accelerationStructureEXT,int,int,int,uint,uint,vec3,float,vec3,float,int);"
+    __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser)]
     __target_intrinsic(glsl, "hitObjectRecordHitWithIndexNV")
@@ -12529,7 +12540,9 @@ struct HitObject
         int attributeLocation);
 
     //  "void hitObjectRecordHitWithIndexMotionNV(hitObjectNV, accelerationStructureEXT,int,int,int,uint,uint,vec3,float,vec3,float,float,int);"
+    __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
+    __glsl_extension(GL_NV_ray_tracing_motion_blur)
     [require(glsl, ser_motion)]
     __target_intrinsic(glsl, "hitObjectRecordHitWithIndexMotionNV")
     static void __glslMakeMotionHitWithIndex(
@@ -12548,6 +12561,7 @@ struct HitObject
         int attributeLocation);
 
     // "void hitObjectRecordHitNV(hitObjectNV,accelerationStructureEXT,int,int,int,uint,uint,uint,vec3,float,vec3,float,int);"
+    __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser)]
     __target_intrinsic(glsl, "hitObjectRecordHitNV")
@@ -12567,6 +12581,7 @@ struct HitObject
         int attributeLocation);
 
         // "void hitObjectRecordHitMotionNV(hitObjectNV,accelerationStructureEXT,int,int,int,uint,uint,uint,vec3,float,vec3,float,float,int);"
+    __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
     [require(glsl, ser_motion)]
@@ -12588,11 +12603,13 @@ struct HitObject
         int attributeLocation);
 
     
+    __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser)]
     __target_intrinsic(glsl, "hitObjectGetAttributesNV($0, $1)")
     void __glslGetAttributes(int attributeLocation);
 
+    __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser)]
     __target_intrinsic(glsl, "hitObjectTraceRayNV")
@@ -12610,6 +12627,7 @@ struct HitObject
         float Tmax,
         int payload);
 
+    __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
     [require(glsl, ser_motion)]
