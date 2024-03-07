@@ -9655,6 +9655,7 @@ void TraceRay(
 //
 // https://github.com/KhronosGroup/GLSL/blob/master/extensions/nv/GLSL_NV_ray_tracing_motion_blur.txt
 
+__glsl_extension(GL_NV_ray_tracing_motion_blur)
 __target_intrinsic(glsl, "traceRayMotionNV")
 [require(glsl, raytracing_motionblur)]
 void __traceMotionRay(
@@ -9810,7 +9811,6 @@ void AcceptHitAndEndSearch()
 
 // 10.4.1 - Ray Dispatch System Values
 
-__spirv_version(1.4) [require(spirv)]
 uint3 DispatchRaysIndex()
 {
     __target_switch
@@ -9826,7 +9826,6 @@ uint3 DispatchRaysIndex()
     }
 }
 
-__spirv_version(1.4) [require(spirv)]
 uint3 DispatchRaysDimensions()
 {
     __target_switch
@@ -11369,8 +11368,6 @@ struct HitObject
     [require(spirv, ser)]
     [require(hlsl, ser)]
     [ForceInline]
-    __specialized_for_target(hlsl)
-    __specialized_for_target(glsl)
     static HitObject TraceRay<payload_t>(
         RaytracingAccelerationStructure AccelerationStructure,
         uint RayFlags,
@@ -11462,11 +11459,7 @@ struct HitObject
 
         /// Executes motion ray traversal (including anyhit and intersection shaders) like TraceRay, but returns the
         /// resulting hit information as a HitObject and does not trigger closesthit or miss shaders.
-    [require(glsl, ser_motion)]
-    [require(spirv, ser_motion)]
-    [require(hlsl, ser_motion)]
     [ForceInline]
-    __specialized_for_target(glsl)
     static HitObject TraceMotionRay<payload_t>( 
         RaytracingAccelerationStructure AccelerationStructure, 
         uint RayFlags, 
@@ -11877,6 +11870,7 @@ struct HitObject
         /// Creates a HitObject representing a miss based on values explicitly passed as arguments, without
         /// tracing a ray. The provided shader table index must reference a valid miss record in the shader
         /// table.
+    [__requiresNVAPI]
     [require(glsl, ser)]
     [require(spirv, ser)]
     [require(hlsl, ser)]
@@ -11958,6 +11952,7 @@ struct HitObject
         /// ReorderThread will group NOP hit objects together. This can be useful in some reordering
         /// scenarios where future control flow for some threads is known to process neither a hit nor a
         /// miss.
+    [__requiresNVAPI]
     [require(glsl, ser)]
     [require(spirv, ser)]
     [require(hlsl, ser)]
@@ -11983,6 +11978,7 @@ struct HitObject
 
         /// Invokes closesthit or miss shading for the specified hit object. In case of a NOP HitObject, no
         /// shader is invoked.
+    [__requiresNVAPI]
     [require(glsl, ser)]
     [require(spirv, ser)]
     [require(hlsl, ser)]
@@ -12032,6 +12028,7 @@ struct HitObject
     }
 
         /// Returns true if the HitObject encodes a miss, otherwise returns false.
+    [__requiresNVAPI]
     [require(glsl, ser)]
     [require(spirv, ser)]
     [require(hlsl, ser)]
@@ -12053,6 +12050,7 @@ struct HitObject
     }
 
         /// Returns true if the HitObject encodes a hit, otherwise returns false.
+    [__requiresNVAPI]
     [require(glsl, ser)]
     [require(spirv, ser)]
     [require(hlsl, ser)]
@@ -12074,6 +12072,7 @@ struct HitObject
     }
 
         /// Returns true if the HitObject encodes a nop, otherwise returns false.
+    [__requiresNVAPI]
     [require(glsl, ser)]
     [require(spirv, ser)]
     [require(hlsl, ser)]
@@ -12095,6 +12094,7 @@ struct HitObject
     }
 
         /// Queries ray properties from HitObject. Valid if the hit object represents a hit or a miss.
+    [__requiresNVAPI]
     [require(glsl, ser)]
     [require(spirv, ser)]
     [require(hlsl, ser)]
@@ -12125,6 +12125,8 @@ struct HitObject
     }
 
         /// Queries shader table index from HitObject. Valid if the hit object represents a hit or a miss.
+    [__requiresNVAPI]
+    __glsl_extension(GL_EXT_ray_tracing)
     [require(glsl, ser)]
     [require(spirv, ser)]
     [require(hlsl, ser)]
@@ -12146,6 +12148,8 @@ struct HitObject
     }
 
         /// Returns the instance index of a hit. Valid if the hit object represents a hit.
+    [__requiresNVAPI]
+    __glsl_extension(GL_EXT_ray_tracing)
     [require(glsl, ser)]
     [require(spirv, ser)]
     [require(hlsl, ser)]
@@ -12167,6 +12171,8 @@ struct HitObject
     }
 
         /// Returns the instance ID of a hit. Valid if the hit object represents a hit.
+    [__requiresNVAPI]
+    __glsl_extension(GL_EXT_ray_tracing)
     [require(glsl, ser)]
     [require(spirv, ser)]
     [require(hlsl, ser)]
@@ -12188,6 +12194,8 @@ struct HitObject
     }
 
         /// Returns the geometry index of a hit. Valid if the hit object represents a hit.
+    [__requiresNVAPI]
+    __glsl_extension(GL_EXT_ray_tracing)
     [require(glsl, ser)]
     [require(spirv, ser)]
     [require(hlsl, ser)]
@@ -12209,6 +12217,8 @@ struct HitObject
     }
 
         /// Returns the primitive index of a hit. Valid if the hit object represents a hit.
+    [__requiresNVAPI]
+    __glsl_extension(GL_EXT_ray_tracing)
     [require(glsl, ser)]
     [require(spirv, ser)]
     [require(hlsl, ser)]
@@ -12230,6 +12240,8 @@ struct HitObject
     }
 
         /// Returns the hit kind. Valid if the hit object represents a hit.
+    [__requiresNVAPI]
+    __glsl_extension(GL_EXT_ray_tracing)
     [require(glsl, ser)]
     [require(spirv, ser)]
     [require(hlsl, ser)]
@@ -12250,6 +12262,8 @@ struct HitObject
         }
     }
 
+    [__requiresNVAPI]
+    __glsl_extension(GL_EXT_ray_tracing)
     [require(glsl, ser)]
     [require(spirv, ser)]
     [require(hlsl, ser)]
@@ -12270,6 +12284,8 @@ struct HitObject
         }
     }
 
+    [__requiresNVAPI]
+    __glsl_extension(GL_EXT_ray_tracing)
     [require(glsl, ser)]
     [require(spirv, ser)]
     [require(hlsl, ser)]
@@ -12404,6 +12420,7 @@ struct HitObject
         /// Loads a root constant from the local root table referenced by the hit object. Valid if the hit object
         /// represents a hit or a miss. RootConstantOffsetInBytes must be a multiple of 4.
     __target_intrinsic(hlsl)
+    [__requiresNVAPI]
     [require(hlsl, ser)]
     uint LoadLocalRootTableConstant(uint RootConstantOffsetInBytes);
 
@@ -12412,10 +12429,12 @@ struct HitObject
     /// 
 
     __target_intrinsic(hlsl, "NvGetAttributesFromHitObject($0, $1)")
+    [__requiresNVAPI]
     [require(hlsl, ser)]
     void __hlslGetAttributesFromHitObject<T>(out T t);
 
     __target_intrinsic(hlsl, "NvMakeHitWithRecordIndex")
+    [__requiresNVAPI]
     [require(hlsl, ser)]
     static void __hlslMakeHitWithRecordIndex<attr_t>(
         uint HitGroupRecordIndex, 
@@ -12429,6 +12448,7 @@ struct HitObject
         out HitObject hitObj);
 
     __target_intrinsic(hlsl, "NvMakeHit")
+    [__requiresNVAPI]
     [require(hlsl, ser)]
     static void __hlslMakeHit<attr_t>(RaytracingAccelerationStructure AccelerationStructure, 
         uint InstanceIndex, 
@@ -12442,6 +12462,7 @@ struct HitObject
         out HitObject hitObj);
 
     __target_intrinsic(hlsl, "NvTraceRayHitObject")
+    [__requiresNVAPI]
     [require(hlsl, ser)]
     static void __hlslTraceRay<payload_t>( 
         RaytracingAccelerationStructure AccelerationStructure, 
@@ -12647,6 +12668,7 @@ struct HitObject
         float currentTime,
         int payload);
 
+    __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser)]
     __target_intrinsic(glsl, "hitObjectExecuteShaderNV")
@@ -12662,6 +12684,8 @@ struct HitObject
     /// NumCoherenceHintBits.
     /// Where possible, reordering will also attempt to retain locality in the thread’s launch indices
     /// (DispatchRaysIndex in DXR).
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 [require(glsl, ser)]
 [require(spirv, ser)]
@@ -12697,6 +12721,9 @@ void ReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
     /// same shader ID. (Miss shaders and NOP HitObjects are grouped separately). Within each of these
     /// groups, it will attempt to order threads by the value of their coherence hints. And within ranges
     /// of equal coherence hints, it will attempt to maximize locality in 3D space of the ray hit (if any).
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 [require(glsl, ser)]
 [require(spirv, ser)]
@@ -12722,6 +12749,9 @@ void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHi
     /// void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHintBitsFromLSB );
     /// ```
     /// With CoherenceHint and NumCoherenceHintBitsFromLSB as 0, meaning they are ignored.
+
+[__requiresNVAPI]
+__glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 [require(glsl, ser)]
 [require(spirv, ser)]
