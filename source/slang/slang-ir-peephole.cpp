@@ -958,8 +958,14 @@ struct PeepholeContext : InstPassBase
             }
         case kIROp_TypeEquals:
             {
-                auto left = inst->getOperand(0)->getDataType();
-                auto right = inst->getOperand(1)->getDataType();
+                auto getTypeFromOperand = [](IRInst* operand) -> IRType*
+                {
+                    if (as<IRTypeType>(operand->getFullType()) || !operand->getFullType())
+                        return (IRType*)operand;
+                    return operand->getFullType();
+                };
+                auto left = getTypeFromOperand(inst->getOperand(0));
+                auto right = getTypeFromOperand(inst->getOperand(1));
                 if (isConcreteType(left) && isConcreteType(right))
                 {
                     IRBuilder builder(module);

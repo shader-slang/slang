@@ -53,6 +53,8 @@ We also provide a few [examples](examples/) of how to integrate Slang into a ren
 These examples use a graphics layer that we include with Slang called "GFX" which is an abstraction library of various graphics APIs (D3D11, D2D12, OpenGL, Vulkan, CUDA, and the CPU) to support cross-platform applications using GPU graphics and compute capabilities. 
 If you'd like to learn more about GFX, see the [GFX User Guide](https://shader-slang.com/slang/gfx-user-guide/index.html).
 
+Additionally, we recommend checking out [Vulkan Mini Examples](https://github.com/nvpro-samples/vk_mini_samples/) for more examples of using Slang's language features available on Vulkan, such as pointers and the ray tracing intrinsics.
+
 Contributing
 ------------
 

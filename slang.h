@@ -3737,6 +3737,10 @@ namespace slang
             */
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL parseCommandLineArguments(
             int argc, const char* const* argv, SessionDesc* outSessionDesc, ISlangUnknown** outAuxAllocation) = 0;
+
+            /** Computes a digest that uniquely identifies the session description.
+            */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getSessionDescDigest(SessionDesc* sessionDesc, ISlangBlob** outBlob) = 0;
     };
 
     #define SLANG_UUID_IGlobalSession IGlobalSession::getTypeGuid()

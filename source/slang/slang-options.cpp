@@ -2822,8 +2822,14 @@ SlangResult OptionsParser::_parse(
                         if (getCurrentTarget()->optionSet.shouldEmitSPIRVDirectly())
                         {
                             rawOutput.isWholeProgram = true;
+                            break;
                         }
-                        break;
+                        else if (m_rawEntryPoints.getCount() != 0)
+                        {
+                            rawOutput.entryPointIndex = (int)m_rawEntryPoints.getCount() - 1;
+                            break;
+                        }
+                        [[fallthrough]];
                     default:
                         m_sink->diagnose(SourceLoc(), Diagnostics::cannotMatchOutputFileToEntryPoint, rawOutput.path);
                         break;

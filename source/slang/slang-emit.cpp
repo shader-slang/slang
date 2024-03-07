@@ -479,6 +479,8 @@ Result linkAndOptimizeIR(
     }
 
     lowerReinterpret(targetProgram, irModule, sink);
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
