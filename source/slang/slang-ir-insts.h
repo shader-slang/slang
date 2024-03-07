@@ -1361,10 +1361,17 @@ struct IRGLPositionOutputDecoration : public IRDecoration
 
 struct IRMeshOutputRef : public IRInst
 {
-    enum { kOp = kIROp_MeshOutputRef };
     IR_LEAF_ISA(MeshOutputRef)
     IRInst* getIndex() { return getOperand(1); }
     IRInst* getOutputType() { return cast<IRPtrTypeBase>(getFullType())->getValueType(); }
+};
+
+struct IRMeshOutputSet : public IRInst
+{
+    IR_LEAF_ISA(MeshOutputSet)
+    IRInst* getBase() { return getOperand(0); }
+    IRInst* getIndex() { return getOperand(1); }
+    IRInst* getElementValue() { return getOperand(2); }
 };
 
     /// An attribute that can be attached to another instruction as an operand.
