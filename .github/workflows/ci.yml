@@ -72,7 +72,6 @@ jobs:
         uses: ./.github/actions/common-setup
         with:
           os: ${{matrix.os}}
-          runs-on: ${{matrix.runs-on}}
           compiler: ${{matrix.compiler}}
           platform: ${{matrix.platform}}
           config: ${{matrix.config}}
