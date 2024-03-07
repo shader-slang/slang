@@ -2353,8 +2353,8 @@ static void legalizeMeshOutputParam(
                 IRInst* index;
                 if(const auto p = as<IRGetElementPtr>(u))
                     index = p->getIndex();
-                else if(const auto p = as<IRMeshOutputRef>(u))
-                    index = p->getIndex();
+                else if(const auto m = as<IRMeshOutputRef>(u))
+                    index = m->getIndex();
                 else
                     SLANG_UNEXPECTED("Illegal use of mesh output parameter");
                 auto e = builder->emitElementAddress(builder->getPtrType(meshOutputBlockType), blockParam, index);
