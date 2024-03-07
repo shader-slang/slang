@@ -12,60 +12,50 @@ jobs:
   build:
     strategy:
       matrix:
-        # Until we switch to CMake fully, just run something minimal
+        os: [linux, macos, windows]
+        compiler: ['gcc', 'clang', 'cl']
+        config: ['debug', 'release']
+        platform: ['x64']
+        full-gpu-tests: [false]
+        exclude:
+          # Exclude invalid or undesired os/compiler
+          - { os: linux, compiler: cl }
+          - { os: macos, compiler: cl }
+          - { os: macos, compiler: gcc }
+          - { os: windows, compiler: gcc }
+          - { os: windows, compiler: clang }
+          # or os/config combinations
+          - { os: macos, config: debug }
         include:
+          - { os: linux, runs-on: ubuntu-20.04 }
+          - { os: windows, runs-on: windows-latest }
+          - { os: macos, runs-on: macos-latest }
+          # Set a test category depending on the config, smoke by default,
+          # quick or full conditionally otherwise
+          - test-category: smoke
+          - { os: windows, test-category: quick }
+          - { config: release, test-category: full }
+          # Only CL has werror
+          - warnings-as-errors: false
+          - { compiler: cl, warnings-as-errors: true }
+          # Self-hosted aarch64 build
           - os: linux
             compiler: gcc
-            platform: x64
-            config: debug
+            platform: aarch64
+            config: release
             warnings-as-errors: false
             test-category: smoke
             full-gpu-tests: false
-            runs-on: ubuntu-20.04
-        # os: [linux, macos, windows]
-        # compiler: ['gcc', 'clang', 'cl']
-        # config: ['debug', 'release']
-        # platform: ['x64']
-        # full-gpu-tests: [false]
-        # exclude:
-        #   # Exclude invalid or undesired os/compiler
-        #   - { os: linux, compiler: cl }
-        #   - { os: macos, compiler: cl }
-        #   - { os: macos, compiler: gcc }
-        #   - { os: windows, compiler: gcc }
-        #   - { os: windows, compiler: clang }
-        #   # or os/config combinations
-        #   - { os: macos, config: debug }
-        # include:
-        #   - { os: linux, runs-on: ubuntu-20.04 }
-        #   - { os: windows, runs-on: windows-latest }
-        #   - { os: macos, runs-on: macos-latest }
-        #   # Set a test category depending on the config, smoke by default,
-        #   # quick or full conditionally otherwise
-        #   - test-category: smoke
-        #   - { os: windows, test-category: quick }
-        #   - { config: release, test-category: full }
-        #   # Only CL has werror
-        #   - warnings-as-errors: false
-        #   - { compiler: cl, warnings-as-errors: true }
-        #   # Self-hosted aarch64 build
-        #   - os: linux
-        #     compiler: gcc
-        #     platform: aarch64
-        #     config: release
-        #     warnings-as-errors: false
-        #     test-category: smoke
-        #     full-gpu-tests: false
-        #     runs-on: [self-hosted, Linux, ARM64]
-        #   # Self-hosted full gpu build
-        #   - os: windows
-        #     compiler: cl
-        #     platform: x64
-        #     config: release
-        #     warnings-as-errors: false
-        #     test-category: full
-        #     full-gpu-tests: true
-        #     runs-on: [Windows, self-hosted]
+            runs-on: [self-hosted, Linux, ARM64]
+          # Self-hosted full gpu build
+          - os: windows
+            compiler: cl
+            platform: x64
+            config: release
+            warnings-as-errors: false
+            test-category: full
+            full-gpu-tests: true
+            runs-on: [Windows, self-hosted]
       fail-fast: false
     runs-on: ${{ matrix.runs-on }}
 
