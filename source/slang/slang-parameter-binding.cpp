@@ -2272,6 +2272,13 @@ static RefPtr<TypeLayout> computeEntryPointParameterTypeLayout(
             state.directionMask |= kEntryPointParameterDirection_Output;
         }
 
+        // For the purposes of type layout, mesh shader outputs are always
+        // treated as output only, despite missing an 'out' modifier
+        if(as<MeshOutputType>(paramDeclRef.getDecl()->getType()))
+        {
+            state.directionMask = kEntryPointParameterDirection_Output;
+        }
+
         return processEntryPointVaryingParameterDecl(
             context,
             paramDeclRef.getDecl(),
