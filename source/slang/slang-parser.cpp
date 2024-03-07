@@ -231,13 +231,13 @@ namespace Slang
         }
 
     public:
-        void setBindingOffset(int binding, int byteOffset)
+        void setBindingOffset(int binding, int64_t byteOffset)
         {
             bindingToByteOffset.set(binding, byteOffset);
         }
-        const int getNextBindingOffset(int binding) 
+        const int64_t getNextBindingOffset(int binding) 
         {
-            const int currentOffset = bindingToByteOffset.getOrAddValue(binding, 0);
+            const int64_t currentOffset = bindingToByteOffset.getOrAddValue(binding, 0);
             bindingToByteOffset.set(
                 binding,
                 currentOffset+4
@@ -246,7 +246,7 @@ namespace Slang
         }
 
     private:
-        Dictionary<int, int> bindingToByteOffset;
+        Dictionary<int, int64_t> bindingToByteOffset;
     };
 
     // Forward Declarations
@@ -4406,7 +4406,7 @@ namespace Slang
                         {
                             if (!modifiers->findModifier<GLSLOffsetLayoutAttribute>())
                             {
-                                const int nextOffset = parser->getNextBindingOffset(bindingMod->binding);
+                                const int64_t nextOffset = parser->getNextBindingOffset(bindingMod->binding);
                                 GLSLOffsetLayoutAttribute* modifier = parser->astBuilder->create<GLSLOffsetLayoutAttribute>();
                                 modifier->keywordName = NULL; //no keyword name given
                                 modifier->loc = bindingMod->loc; //has no location in file, set to parent binding
@@ -7873,7 +7873,7 @@ namespace Slang
                         if (auto binding = listBuilder.find<GLSLBindingAttribute>())
                         {
                             parser->ReadToken(TokenType::OpAssign);
-                            glslOffset->offset = uint32_t(getIntegerLiteralValue(parser->ReadToken(TokenType::IntegerLiteral)));
+                            glslOffset->offset = int64_t(getIntegerLiteralValue(parser->ReadToken(TokenType::IntegerLiteral)));
                             parser->setBindingOffset(binding->binding, glslOffset->offset);
                         }
                         else

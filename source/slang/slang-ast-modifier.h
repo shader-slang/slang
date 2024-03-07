@@ -738,7 +738,7 @@ class GLSLOffsetLayoutAttribute : public Attribute
 {
     SLANG_AST_CLASS(GLSLOffsetLayoutAttribute)
 
-    int32_t offset;
+    int64_t offset;
 };
 
 class GLSLSimpleIntegerLayoutAttribute : public Attribute 

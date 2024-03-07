@@ -1529,16 +1529,16 @@ void convertAtomicToStorageBuffer(
     for (auto& bindingToInstList : bindingToInstMapUnsorted)
     {
         //I don't need a sorted list, just the max so I can make an array of uint[(maxOffset/4)+1]
-        uint32_t maxOffset = 0;
+        int64_t maxOffset = 0;
         for (auto& i : bindingToInstList.second)
         {
-            uint32_t currOffset = uint32_t(i->findDecoration<IRGLSLOffsetDecoration>()->getOffset()->getValue());
+            int64_t currOffset = int64_t(i->findDecoration<IRGLSLOffsetDecoration>()->getOffset()->getValue());
             maxOffset = (maxOffset < currOffset) ? currOffset : maxOffset;
         }
         auto instToSwitch = *bindingToInstList.second.begin();
         builder.setInsertBefore(instToSwitch);
         
-        // now we know the max offset and can construct a new storageBuffer with key of type maxOffset/4 (32bit uint)
+        // now we know the max offset and can construct a new storageBuffer with key of type maxOffset/4 (32bit uint per atomic_uint)
         auto elementType = builder.getArrayType(
             builder.getUIntType(),
             builder.getIntValue(builder.getUIntType(), (maxOffset / sizeof(uint32_t))+1)
@@ -1575,7 +1575,7 @@ void convertAtomicToStorageBuffer(
         // field->element-addr based on location(offset) from the atomic_uint->storage_buffer logic above
         for (auto& i : bindingToInstList.second)
         {
-            int currOffset = uint32_t(i->findDecoration<IRGLSLOffsetDecoration>()->getOffset()->getValue());
+            int64_t currOffset = int64_t(i->findDecoration<IRGLSLOffsetDecoration>()->getOffset()->getValue());
             // we manage the "next" ptr with a seperate list instance since we don't want to add uses
             // of an unrelated Call to our elementAddr
             IRUse* next = nullptr;
