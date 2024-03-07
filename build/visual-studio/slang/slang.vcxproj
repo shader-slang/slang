@@ -386,6 +386,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ir-dll-export.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-dll-import.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-dominators.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-early-intrinsic-simplification.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-eliminate-multilevel-break.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-eliminate-phis.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-entry-point-pass.h" />
@@ -608,6 +609,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ir-dll-export.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-dll-import.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-dominators.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-early-intrinsic-simplification.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-eliminate-multilevel-break.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-eliminate-phis.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-entry-point-pass.cpp" />
