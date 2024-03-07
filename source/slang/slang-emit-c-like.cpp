@@ -2839,6 +2839,20 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
             m_writer->emit(";\n");
         }
         break;
+    case kIROp_MeshOutputSet:
+        {
+            auto ii = (IRMeshOutputSet*)inst;
+            auto subscriptOuter = getInfo(EmitOp::General);
+            auto subscriptPrec = getInfo(EmitOp::Postfix);
+            emitOperand(ii->getBase(), leftSide(subscriptOuter, subscriptPrec));
+            m_writer->emit("[");
+            emitOperand(ii->getIndex(), getInfo(EmitOp::General));
+            m_writer->emit("]");
+            m_writer->emit(" = ");
+            emitOperand(ii->getElementValue(), getInfo(EmitOp::General));
+            m_writer->emit(";\n");
+        }
+        break;
     }
 }
 
