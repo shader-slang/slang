@@ -1,26 +1,17 @@
-//TEST:SIMPLE(filecheck=CHECK_GLSL): -allow-glsl -stage intersection -entry main -target glsl
-//TEST:SIMPLE(filecheck=CHECK_SPV): -allow-glsl -emit-spirv-directly -stage intersection -entry main -target spirv-assembly
+//TEST:SIMPLE(filecheck=CHECK_GLSL): -stage intersection -entry main -target glsl -allow-glsl 
+//TEST:SIMPLE(filecheck=CHECK_SPV): -stage intersection -entry main -target spirv-assembly -emit-spirv-directly -allow-glsl 
 
 layout(binding = 0) uniform accelerationStructureEXT as;
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 buffer MyBlockName
-{
+{ 
     uint data[];
 } outputBuffer;
 
-//COM: CHECK_GLSL-DAG: hitAttributeEXT
-//COM: CHECK_SPV-DAG: HitAttributeNV
+//CHECK_GLSL-DAG: hitAttributeEXT
+//CHECK_SPV-DAG: HitAttributeNV
 hitAttributeEXT vec4 hitAttr;
-// CHECK_GLSL-DAG: rayPayloadInEXT
-// CHECK_SPV-DAG: IncomingRayPayloadNV
-layout(location = 2) rayPayloadInEXT vec4 payload;
-// CHECK_GLSL-DAG: hitObjectAttributeNV
-// CHECK_SPV-DAG: HitObjectAttributeNV
-layout(location = 2) hitObjectAttributeNV vec4 attrMain;
-// CHECK_GLSL-DAG: callableDataInEXT
-// CHECK_SPV-DAG: IncomingCallableDataNV
-layout(location = 1) callableDataInEXT vec2 incall;
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 bool equals(matrix<T, N, M> lhs, matrix<T, N, M> rhs)
@@ -44,9 +35,6 @@ bool equals(matrix<T, N, M> lhs, matrix<T, N, M> rhs)
 
 bool testVars() {
     hitAttr = vec4(1);
-    payload = vec4(1);
-    attrMain = vec4(1);
-    incall = vec2(1);
     
     return true
 // CHECK_GLSL-DAG: gl_PrimitiveID
