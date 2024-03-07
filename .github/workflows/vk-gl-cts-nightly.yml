@@ -2,8 +2,9 @@ name: VK-GL-CTS Nightly
 
 on:
   schedule:
-    - cron: '07 18 * * *'
-    - cron: '07 17 * * *'
+    - cron: '24 19 * * *'
+    - cron: '24 18 * * *'
+    - cron: '24 17 * * *'
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
