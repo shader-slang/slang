@@ -127,6 +127,8 @@ INST(Nop, nop, 0, 0)
     INST(ComPtrType, ComPtr, 1, HOISTABLE)
     // A NativePtr<T> type represents a native pointer to a managed resource.
     INST(NativePtrType, NativePtr, 1, HOISTABLE)
+    // An AtomicUint is a placeholder type for a storage buffer, and will be mangled during compiling.
+    INST(GLSLAtomicUintType, GLSLAtomicUint, 0, HOISTABLE)
 
     /* SamplerStateTypeBase */
         INST(SamplerStateType, SamplerState, 0, HOISTABLE)
@@ -166,7 +168,6 @@ INST(Nop, nop, 0, 0)
             INST(HLSLRasterizerOrderedByteAddressBufferType,    RasterizerOrderedByteAddressBuffer, 0, HOISTABLE)
         INST_RANGE(ByteAddressBufferTypeBase, HLSLByteAddressBufferType, HLSLRasterizerOrderedByteAddressBufferType)
         INST(RaytracingAccelerationStructureType, RaytracingAccelerationStructure, 0, HOISTABLE)
-        INST(GLSLAtomicUintType, GLSLAtomicUint, 0, HOISTABLE)
     INST_RANGE(UntypedBufferResourceType, HLSLByteAddressBufferType, RaytracingAccelerationStructureType)
 
     /* HLSLPatchType */
@@ -174,7 +175,7 @@ INST(Nop, nop, 0, 0)
         INST(HLSLOutputPatchType,   OutputPatch,    2, HOISTABLE)
     INST_RANGE(HLSLPatchType, HLSLInputPatchType, HLSLOutputPatchType)
 
-    INST(GLSLInputAttachmentType, GLSLInputAttachment, 0, HOISTABLE)    
+    INST(GLSLInputAttachmentType, GLSLInputAttachment, 0, HOISTABLE)
 
     /* BuiltinGenericType */
         /* HLSLStreamOutputType */

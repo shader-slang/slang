@@ -4967,9 +4967,8 @@ __glsl_version(430) [require(glsl)]
     }
 }
 
-__spirv_version(1.0)[require(spirv)]
 __glsl_version(430) [require(glsl)]
-[ForceInline] public uint atomicCounterDecrement(atomic_uint c)
+[ForceInline] public uint atomicCounterDecrement_GLSL_wrapper(atomic_uint c)
 {
     __target_switch
     {
@@ -4977,20 +4976,12 @@ __glsl_version(430) [require(glsl)]
     {
         __intrinsic_asm "atomicExchange($0,$0-1)";
     }
-    case spirv:
-    {
-        return spirv_asm
-        {
-            OpExtension "SPV_KHR_shader_atomic_counter_ops";
-            OpAtomicISub $$uint result $c Device UniformMemory 1
-        };
     }
-    }   
 }
 
 __spirv_version(1.0)[require(spirv)]
 __glsl_version(430) [require(glsl)]
-public uint atomicCounter(atomic_uint c)
+[ForceInline] public uint atomicCounter(atomic_uint c)
 {
     __target_switch
     {
@@ -5010,6 +5001,30 @@ public uint atomicCounter(atomic_uint c)
 
 __spirv_version(1.0)[require(spirv)]
 __glsl_version(430) [require(glsl)]
+[ForceInline] public uint atomicCounterDecrement(atomic_uint c)
+{
+    __target_switch
+    {
+    case glsl:
+    {
+        atomicCounterDecrement_GLSL_wrapper(c);
+        return atomicCounter(c);
+    }
+    case spirv:
+    {
+        // spirv OpAtomicIDecrement returns pre-sub-1, glsl returns the new value
+        // we want a discarded side effect and then return the new value
+        return spirv_asm
+        {
+            %discardedValue:$$uint = OpAtomicIDecrement $c Device UniformMemory;
+            OpLoad $$uint result $c
+        };
+    }
+    }   
+}
+
+__spirv_version(1.0)[require(spirv)]
+__glsl_version(430) [require(glsl)]
 [ForceInline] public uint atomicCounterAdd(atomic_uint c, uint data)
 {
     __target_switch
@@ -5019,7 +5034,6 @@ __glsl_version(430) [require(glsl)]
     {
         return spirv_asm
         {
-            OpExtension "SPV_KHR_shader_atomic_counter_ops";
             OpAtomicIAdd $$uint result $c Device UniformMemory $data
         };
     }
@@ -5040,7 +5054,6 @@ __glsl_version(430) [require(glsl)]
     {
         return spirv_asm
         {
-            OpExtension "SPV_KHR_shader_atomic_counter_ops";
             OpAtomicISub $$uint result $c Device UniformMemory $data
         };
     }
@@ -5058,7 +5071,6 @@ __glsl_version(430) [require(glsl)]
     {
         return spirv_asm
         {
-            OpExtension "SPV_KHR_shader_atomic_counter_ops";
             OpAtomicUMin $$uint result $c Device UniformMemory $data
         };
     }
@@ -5076,7 +5088,6 @@ __glsl_version(430) [require(glsl)]
     {
         return spirv_asm
         {
-            OpExtension "SPV_KHR_shader_atomic_counter_ops";
             OpAtomicUMax $$uint result $c Device UniformMemory $data
         };
     }
@@ -5094,7 +5105,6 @@ __glsl_version(430) [require(glsl)]
     {
         return spirv_asm
         {
-            OpExtension "SPV_KHR_shader_atomic_counter_ops";
             OpAtomicAnd $$uint result $c Device UniformMemory $data
         };
     }
@@ -5112,7 +5122,6 @@ __glsl_version(430) [require(glsl)]
     {
         return spirv_asm
         {
-            OpExtension "SPV_KHR_shader_atomic_counter_ops";
             OpAtomicOr $$uint result $c Device UniformMemory $data
         };
     }
@@ -5130,7 +5139,6 @@ __glsl_version(430) [require(glsl)]
     {
         return spirv_asm
         {
-            OpExtension "SPV_KHR_shader_atomic_counter_ops";
             OpAtomicXor $$uint result $c Device UniformMemory $data
         };
     }
@@ -5148,7 +5156,6 @@ __glsl_version(430) [require(glsl)]
     {
         return spirv_asm
         {
-            OpExtension "SPV_KHR_shader_atomic_counter_ops";
             OpAtomicExchange $$uint result $c Device UniformMemory $data
         };
     }
@@ -5166,7 +5173,6 @@ __glsl_version(430) [require(glsl)]
     {
         return spirv_asm
         {
-            OpExtension "SPV_KHR_shader_atomic_counter_ops";
             OpAtomicCompareExchange $$uint result $c Device UniformMemory UniformMemory $data $compare
         };
     }

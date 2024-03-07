@@ -4416,6 +4416,11 @@ public:
         addDecoration(value, kIROp_DebugLocationDecoration, debugSource, getIntValue(getUIntType(), line), getIntValue(getUIntType(), col));
     }
 
+    void addUnsafeForceInlineDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_UnsafeForceInlineEarlyDecoration);
+    }
+
     void addForceInlineDecoration(IRInst* value)
     {
         addDecoration(value, kIROp_ForceInlineDecoration);

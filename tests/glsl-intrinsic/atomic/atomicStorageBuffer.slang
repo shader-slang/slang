@@ -1,13 +1,13 @@
 //TEST:SIMPLE(filecheck=CHECK_GLSL):  -allow-glsl -stage compute -entry computeMain -target glsl -DTARGET_GLSL
 //TEST:SIMPLE(filecheck=CHECK_SPV):  -allow-glsl -stage compute -entry computeMain -target spirv -emit-spirv-directly -DTARGET_SPIRV
-
-// currently tests do not handle atomic_uint well
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly 
 #version 430
 
-
-//#define TEST_when_shader_atomic_float2_is_available
+// float2 is currently a very new extension; most hardware lacks 
+// this extension and will fail the test if attempting to use atomic_float2 
+// operations
+// #define TEST_when_shader_atomic_float2_is_available
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 buffer MyBlockName
@@ -15,43 +15,43 @@ buffer MyBlockName
     uint data[1];
 } outputBuffer;
 
-//TEST_INPUT:ubuffer(data=[0], stride=4):out,name=int32Buffer
+//TEST_INPUT:ubuffer(data=[0], stride=4):name=int32Buffer
 buffer MyBlockName1
 {
     int data[1];
 } int32Buffer;
 
-//TEST_INPUT:ubuffer(data=[0 0], stride=8):out,name=int64Buffer
+//TEST_INPUT:ubuffer(data=[0 0], stride=8):name=int64Buffer
 buffer MyBlockName2
 {
     uint64_t data[1];
 } int64Buffer;
 
-//TEST_INPUT:ubuffer(data=[0], stride=4):out,name=uint32Buffer
+//TEST_INPUT:ubuffer(data=[0], stride=4):name=uint32Buffer
 buffer MyBlockName3
 {
     uint data[1];
 } uint32Buffer;
 
-//TEST_INPUT:ubuffer(data=[0 0], stride=8):out,name=uint64Buffer
+//TEST_INPUT:ubuffer(data=[0 0], stride=8):name=uint64Buffer
 buffer MyBlockName4
 {
     uint64_t data[1];
 } uint64Buffer;
 
-//TEST_INPUT:ubuffer(data=[0.0f], stride=2):out,name=float16Buffer
+//TEST_INPUT:ubuffer(data=[0.0], stride=2):name=float16Buffer
 buffer MyBlockName5
 {
     half data[1];
 } float16Buffer;
 
-//TEST_INPUT:ubuffer(data=[0.0f], stride=2):out,name=float32Buffer
+//TEST_INPUT:ubuffer(data=[0.0], stride=2):name=float32Buffer
 buffer MyBlockName6
 {
     float data[1];
 } float32Buffer;
 
-//TEST_INPUT:ubuffer(data=[0 0], stride=8):out,name=float64Buffer
+//TEST_INPUT:ubuffer(data=[0.0 0.0], stride=8):name=float64Buffer
 buffer MyBlockName7
 {
     double data[1];
@@ -292,9 +292,8 @@ bool testAtomicFloat64()
 layout(local_size_x = 1) in;
 void computeMain()
 {
-    // testing has the following pattern in groups:
-    // set, op, test
-    // this is to remove dependency on other ops when testing
+    // testing has the following pattern in 3 lines per operation:
+    // set the value, operation on value, test the result
     outputBuffer.data[0] = true
             && testAtomicInt32()
             && testAtomicInt64()
@@ -304,14 +303,6 @@ void computeMain()
             && testAtomicFloat32()
             && testAtomicFloat64()
             ;    
-    // to ensure these buffers don't mess-up result
-    int32Buffer.data[0] = 2;
-    int64Buffer.data[0] = 2;
-    uint32Buffer.data[0] = 2;
-    uint64Buffer.data[0] = 2;
-    float16Buffer.data[0] = half(2.0f);
-    float32Buffer.data[0] = float(2.0f);
-    float64Buffer.data[0] = double(2.0);
     // CHECK_GLSL: void main(
     // CHECK_SPV: OpEntryPoint
     // BUF: 1

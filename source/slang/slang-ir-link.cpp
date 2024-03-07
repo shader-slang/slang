@@ -1520,10 +1520,8 @@ static void diagnoseUnresolvedSymbols(TargetRequest* req, DiagnosticSink* sink, 
     }
 }
 
-void convertAllAtomicUintToStructuredBufferUsages(
+void convertAtomicToStorageBuffer(
     IRSpecContext* context, 
-    TargetProgram* targetProgram, 
-    IRModule* irModule,
     Dictionary<int, List<IRInst*>>& bindingToInstMapUnsorted)
 {
     IRBuilder builder = *context->builder;
@@ -1534,7 +1532,7 @@ void convertAllAtomicUintToStructuredBufferUsages(
         uint32_t maxOffset = 0;
         for (auto& i : bindingToInstList.second)
         {
-            int currOffset = i->findDecoration<IRGLSLOffsetDecoration>()->getOffset()->getValue();
+            uint32_t currOffset = uint32_t(i->findDecoration<IRGLSLOffsetDecoration>()->getOffset()->getValue());
             maxOffset = (maxOffset < currOffset) ? currOffset : maxOffset;
         }
         auto instToSwitch = *bindingToInstList.second.begin();
@@ -1543,7 +1541,7 @@ void convertAllAtomicUintToStructuredBufferUsages(
         // now we know the max offset and can construct a new storageBuffer with key of type maxOffset/4 (32bit uint)
         auto elementType = builder.getArrayType(
             builder.getUIntType(),
-            builder.getIntValue(builder.getUIntType(), uint32_t(maxOffset / 4)+uint32_t(1))
+            builder.getIntValue(builder.getUIntType(), (maxOffset / sizeof(uint32_t))+1)
         );
 
         // now we make our struct which goes within with some name (does not matter), 
@@ -1573,12 +1571,11 @@ void convertAllAtomicUintToStructuredBufferUsages(
         instToSwitch->setFullType(storageBuffer);
         
         // now we need to make all call's to:
-        // 1. convert all atomic_uint function type parameters to an inout/ptr uint
-        // 2. convert all atomic_uint params inputs into a field->element-addr
-        // based on location(offset) from the atomic_uint->storage_buffer logic above
+        // 1. convert all atomic_uint function type parameters to a inlined call of atomic_uint->inout int ref of 
+        // field->element-addr based on location(offset) from the atomic_uint->storage_buffer logic above
         for (auto& i : bindingToInstList.second)
         {
-            int currOffset = i->findDecoration<IRGLSLOffsetDecoration>()->getOffset()->getValue();
+            int currOffset = uint32_t(i->findDecoration<IRGLSLOffsetDecoration>()->getOffset()->getValue());
             // we manage the "next" ptr with a seperate list instance since we don't want to add uses
             // of an unrelated Call to our elementAddr
             IRUse* next = nullptr;
@@ -1596,7 +1593,6 @@ void convertAllAtomicUintToStructuredBufferUsages(
                 }
                 case kIROp_Call:
                 { 
-
                     builder.setInsertBefore(user);
                     auto fieldAddress = builder.emitFieldAddress(
                         builder.getPtrType(_dataField->getFieldType()),
@@ -1611,49 +1607,10 @@ void convertAllAtomicUintToStructuredBufferUsages(
                     user->setOperand(1, elementAddr);
                     auto funcTypeInst = (user->getOperand(0));
                     auto funcType = funcTypeInst->getFullType();
-                    funcType->getOperand(1)->removeAndDeallocate();
 
-                    auto paramReplacment = builder.getRefType((builder.getUIntType()));
-                    funcType->unsafeSetOperand(1, paramReplacment);
-
-                    for (auto maybeBlock : funcTypeInst->getChildren())
-                    {
-                        switch (maybeBlock->getOp())
-                        {
-                        case kIROp_Block:
-                        {
-                            for (auto maybeParam : maybeBlock->getChildren())
-                            {
-                                if (maybeParam->getOp() == kIROp_Param)
-                                {
-                                    if (maybeParam->getFullType()->getOp() == kIROp_GLSLAtomicUintType)
-                                    {
-                                        // glsl needs an inout param, no ptrs
-                                        // else op will not work on shared memory 
-                                        // (a requirment)
-                                        maybeParam->setFullType(builder.getInOutType(builder.getUIntType()));
-                                    }
-                                }
-                                else if (maybeParam->getOp() == kIROp_SPIRVAsm)
-                                {
-                                    for (auto maybeSpirvOp : maybeParam->getChildren())
-                                    {
-                                        // spirv uses pointers, NOT inout; Access Chains to storage buffers
-                                        // lead to ptr's 
-                                        if (maybeSpirvOp->getOp() == kIROp_SPIRVAsmOperandInst
-                                            && maybeSpirvOp->typeUse.usedValue 
-                                            && maybeSpirvOp->typeUse.usedValue->m_op == kIROp_GLSLAtomicUintType)
-                                        {
-                                            maybeSpirvOp->typeUse.usedValue->removeAndDeallocate();
-                                            maybeSpirvOp->typeUse.usedValue = builder.getPtrType(builder.getUIntType());
-                                        }
-                                    }
-                                }
-                            }
-                            break;
-                        }
-                        };
-                    }
+                    auto paramReplacment = builder.getInOutType(builder.getUIntType());
+                    funcType->getOperand(1)->replaceUsesWith(paramReplacment);
+                    builder.addForceInlineDecoration(funcTypeInst);
 
                     break;
                 }
@@ -1669,36 +1626,37 @@ void convertAllAtomicUintToStructuredBufferUsages(
 
 void tryGLSLTypeReplacmentProcessing(IRSpecContext* context, TargetProgram* targetProgram, IRModule* irModule)
 {
+    // this is an issolated boolean operation since this operation can be moved to different
+    // parts of Slang and may likley need to be moved at some point
     if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL))
     {
         /// do 1 pass and get all data needed to process GLSL inst's that need attention
         Dictionary<int, List<IRInst*>> bindingToInstMapUnsorted;
+        for (auto inst : irModule->getGlobalInsts())
         {
-            for (auto inst : irModule->getGlobalInsts())
+            if (inst->typeUse.usedValue)
             {
-                if (inst->typeUse.usedValue)
+                switch (inst->typeUse.usedValue->getOp())
                 {
-                    switch (inst->typeUse.usedValue->getOp())
-                    {
-                    case kIROp_GLSLAtomicUintType:
-                    {
-                        // Atomic_uint are supported by GLSL through converting to a different type (compiler ext)
-                        // not supported by SPIR-V->VK, means we must convert the type ourselves, else SPIR-V + 
-                        // HLSL is going to be impossible to emit as a target
+                case kIROp_GLSLAtomicUintType:
+                {
+                    // Atomic_uint are supported by GLSL through converting to a different type (compiler ext)
+                    // not supported by SPIR-V->VK, means we must convert the type ourselves, else SPIR-V + 
+                    // HLSL is going to be impossible to emit as a target
 
-                        // we fetch all global instances to pre-process
-                        auto layout = inst->findDecoration<IRLayoutDecoration>()->getLayout();
-                        auto layoutVal = as<IRVarOffsetAttr>(layout->getOperand(1))->getOffset();
-                        bindingToInstMapUnsorted.getOrAddValue(layoutVal, List<IRInst*>()).add(inst);
-                        break;
-                    }
-                    };
+                    // we fetch all global instances to pre-process
+                    auto layout = inst->findDecoration<IRLayoutDecoration>()->getLayout();
+                    auto layoutVal = as<IRVarOffsetAttr>(layout->getOperand(1));
+                    assert(layoutVal != nullptr);
+                    bindingToInstMapUnsorted.getOrAddValue(uint32_t(layoutVal->getOffset()), List<IRInst*>()).add(inst);
+                    break;
                 }
+                };
             }
         }
         ///
-
-        convertAllAtomicUintToStructuredBufferUsages(context, targetProgram, irModule, bindingToInstMapUnsorted);
+        
+        convertAtomicToStorageBuffer(context, bindingToInstMapUnsorted);
     }
 }
 

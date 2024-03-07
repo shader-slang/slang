@@ -3866,7 +3866,7 @@ static TypeLayoutResult _createTypeLayout(
             type,
             rules);
     }
-    else if (auto atomicType = as <GLSLAtomicUintType>(type))
+    else if (auto atomicType = as<GLSLAtomicUintType>(type))
     {
         ShaderParameterKind kind = ShaderParameterKind::AtomicUint;
         return createSimpleTypeLayout(

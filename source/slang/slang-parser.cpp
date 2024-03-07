@@ -235,9 +235,9 @@ namespace Slang
         {
             bindingToByteOffset.set(binding, byteOffset);
         }
-        int getNextBindingOffset(int binding) 
+        const int getNextBindingOffset(int binding) 
         {
-            int& currentOffset = bindingToByteOffset.getOrAddValue(binding, 0);
+            const int currentOffset = bindingToByteOffset.getOrAddValue(binding, 0);
             bindingToByteOffset.set(
                 binding,
                 currentOffset+4
@@ -4382,42 +4382,39 @@ namespace Slang
         return attrDecl;
     }
 
-    static void ifGLSLAddSpecialModifiersBasedOnType(
+    static void addSpecialGLSLModifiersBasedOnType(
         Parser* parser,
         Decl* decl,
         Modifiers* modifiers)
     {
-        if (parser->options.allowGLSLInput) 
+        // we intentionally have findModifier twice since GLSLOffsetLayoutAttribute is rare
+        // better to early leave
+        if (auto bindingMod = modifiers->findModifier<GLSLBindingAttribute>())
         {
-            // we intentionally have findModifier twice since GLSLOffsetLayoutAttribute is rare
-            // better to early leave
-            if (auto bindingMod = modifiers->findModifier<GLSLBindingAttribute>())
+            if (auto varDeclBase = as<VarDeclBase>(decl))
             {
-                if (auto varDeclBase = as<VarDeclBase>(decl))
+                if (auto declRefExpr = as<DeclRefExpr>(varDeclBase->type.exp))
                 {
-                    if (auto declRefExpr = as<DeclRefExpr>(varDeclBase->type.exp))
+                    // here is a problem; we link types into a literal in IR stage post parse
+                    // but, order (top down) mattter when parsing atomic_uint offset
+                    // more over, we can have patterns like: offset = 20, no offset [+4], offset = 16.
+                    // Therefore we must parse all in order. The issue then is will struggle to 
+                    // subsitute atomic_uint for storage buffers...
+                    if (auto name = declRefExpr->name)
                     {
-                        // here is a problem; we link types into a literal in IR stage post parse
-                        // but, order (top down) mattter when parsing atomic_uint offset
-                        // more over, we can have patterns like: offset = 20, no offset [+4], offset = 16.
-                        // Therefore we must parse all in order. The issue then is will struggle to 
-                        // subsitute atomic_uint for storage buffers...
-                        if (auto name = declRefExpr->name)
+                        if (name->text.equals("atomic_uint"))
                         {
-                            if (name->text.equals("atomic_uint"))
+                            if (!modifiers->findModifier<GLSLOffsetLayoutAttribute>())
                             {
-                                if (!modifiers->findModifier<GLSLOffsetLayoutAttribute>())
-                                {
-                                    int nextOffset = parser->getNextBindingOffset(bindingMod->binding);
-                                    GLSLOffsetLayoutAttribute* modifier = parser->astBuilder->create<GLSLOffsetLayoutAttribute>();
-                                    modifier->keywordName = NULL; //no keyword name given
-                                    modifier->loc = bindingMod->loc; //has no location in file, set to parent binding
-                                    modifier->offset = nextOffset;
-                                    
-                                    Modifiers newModifier;
-                                    newModifier.first = modifier;
-                                    _addModifiers(decl, newModifier);
-                                }
+                                const int nextOffset = parser->getNextBindingOffset(bindingMod->binding);
+                                GLSLOffsetLayoutAttribute* modifier = parser->astBuilder->create<GLSLOffsetLayoutAttribute>();
+                                modifier->keywordName = NULL; //no keyword name given
+                                modifier->loc = bindingMod->loc; //has no location in file, set to parent binding
+                                modifier->offset = nextOffset;
+                                
+                                Modifiers newModifier;
+                                newModifier.first = modifier;
+                                _addModifiers(decl, newModifier);
                             }
                         }
                     }
@@ -4463,7 +4460,10 @@ namespace Slang
         }
         else
         {
-            ifGLSLAddSpecialModifiersBasedOnType(parser, declToModify, &modifiers);
+            if (parser->options.allowGLSLInput)
+            {
+                addSpecialGLSLModifiersBasedOnType(parser, declToModify, &modifiers);
+            }
             _addModifiers(declToModify, modifiers);
         }
 
@@ -7859,11 +7859,12 @@ namespace Slang
                 modifier->keywordName = nameAndLoc.name;
                 modifier->loc = nameAndLoc.loc;
 
-                // Special handling for GLSLLayoutModifier
-                if (AdvanceIf(parser, TokenType::OpAssign))
+                if (parser->tokenReader.peekTokenType() == TokenType::OpAssign)
                 {
+                    // Special handling for GLSLLayoutModifier
                     if (auto glslModifier = as<GLSLParsedLayoutModifier>(modifier))
                     {
+                        parser->ReadToken(TokenType::OpAssign);
                         glslModifier->valToken = parser->ReadToken(TokenType::IntegerLiteral);
                     }
                     //Special handling for GLSLOffsetLayoutAttribute to add to the byte offset tracker at a binding location
@@ -7871,7 +7872,8 @@ namespace Slang
                     {
                         if (auto binding = listBuilder.find<GLSLBindingAttribute>())
                         {
-                            glslOffset->offset = getIntegerLiteralValue(parser->ReadToken(TokenType::IntegerLiteral));
+                            parser->ReadToken(TokenType::OpAssign);
+                            glslOffset->offset = uint32_t(getIntegerLiteralValue(parser->ReadToken(TokenType::IntegerLiteral)));
                             parser->setBindingOffset(binding->binding, glslOffset->offset);
                         }
                         else
