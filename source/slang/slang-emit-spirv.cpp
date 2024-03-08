@@ -5832,14 +5832,23 @@ SlangResult emitSPIRVFromIR(
     }
 
     // Move forward delcared pointers to the end.
-    for (auto ptrType : context.m_forwardDeclaredPointers)
+    do
     {
-        auto spvPtrType = context.m_mapIRInstToSpvInst[ptrType];
-        context.ensureInst(ptrType->getValueType());
-        auto parent = spvPtrType->parent;
-        spvPtrType->removeFromParent();
-        parent->addInst(spvPtrType);
-    }
+        auto fwdPointers = context.m_forwardDeclaredPointers;
+        context.m_forwardDeclaredPointers.clear();
+
+        for (auto ptrType : fwdPointers)
+        {
+            auto spvPtrType = context.m_mapIRInstToSpvInst[ptrType];
+            // When we emit a pointee type, we may introduce new
+            // forward-declared pointer types, so we need to
+            // keep iterating until we have emitted all of them.
+            context.ensureInst(ptrType->getValueType());
+            auto parent = spvPtrType->parent;
+            spvPtrType->removeFromParent();
+            parent->addInst(spvPtrType);
+        }
+    } while (context.m_forwardDeclaredPointers.getCount() != 0);
 
     context.emitFrontMatter();
 
