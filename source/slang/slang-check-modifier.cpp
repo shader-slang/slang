@@ -351,6 +351,10 @@ namespace Slang
                     }
                     value = intValue;
                 }
+                else
+                {
+                    value = m_astBuilder->getIntVal(m_astBuilder->getIntType(), 1);
+                }
                 values[i] = value;
             }
 
@@ -1350,6 +1354,10 @@ namespace Slang
                         }
                     }
                     value = intValue;
+                }
+                else
+                {
+                    value = m_astBuilder->getIntVal(m_astBuilder->getIntType(), 1);
                 }
                 values[i] = value;
             }
