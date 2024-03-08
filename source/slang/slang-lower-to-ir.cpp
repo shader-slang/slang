@@ -7113,9 +7113,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     {
                         getBuilder()->addNumThreadsDecoration(
                             d,
-                            layoutLocalSizeAttr->x,
-                            layoutLocalSizeAttr->y,
-                            layoutLocalSizeAttr->z
+                            getSimpleVal(context, lowerVal(context, layoutLocalSizeAttr->x)),
+                            getSimpleVal(context, lowerVal(context, layoutLocalSizeAttr->y)),
+                            getSimpleVal(context, lowerVal(context, layoutLocalSizeAttr->z))
                         );
                     }
                 }
@@ -9534,9 +9534,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 getBuilder()->addNumThreadsDecoration(
                     irFunc,
-                    numThreadsAttr->x,
-                    numThreadsAttr->y,
-                    numThreadsAttr->z
+                    getSimpleVal(context, lowerVal(context, numThreadsAttr->x)),
+                    getSimpleVal(context, lowerVal(context, numThreadsAttr->y)),
+                    getSimpleVal(context, lowerVal(context, numThreadsAttr->z))
                 );
             }
             else if (as<ReadNoneAttribute>(modifier))
