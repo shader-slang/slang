@@ -1934,7 +1934,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 // After legalizing the control flow, we need to sort our blocks to ensure this is true.
                 sortBlocksInFunc(func);
             }
-
+            
             if (isInlinableGlobalInst(globalInst))
             {
                 for (auto use = globalInst->firstUse; use; use = use->nextUse)
