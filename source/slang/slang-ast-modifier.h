@@ -634,6 +634,10 @@ class AttributeUsageAttribute : public Attribute
     SyntaxClass<NodeBase> targetSyntaxClass;
 };
 
+class NonDynamicUniformAttribute : public Attribute
+{
+    SLANG_AST_CLASS(NonDynamicUniformAttribute)
+};
 
 class RequireCapabilityAttribute : public Attribute
 {
@@ -780,9 +784,9 @@ class GLSLLayoutLocalSizeAttribute : public Attribute
     //
     // TODO: These should be accessors that use the
     // ordinary `args` list, rather than side data.
-    int32_t x;
-    int32_t y;
-    int32_t z;
+    IntVal* x;
+    IntVal* y;
+    IntVal* z;
 };
 
 // TODO: for attributes that take arguments, the syntax node
@@ -835,9 +839,9 @@ class NumThreadsAttribute : public Attribute
     //
     // TODO: These should be accessors that use the
     // ordinary `args` list, rather than side data.
-    int32_t x;
-    int32_t y;
-    int32_t z;
+    IntVal* x;
+    IntVal* y;
+    IntVal* z;
 };
 
 class MaxVertexCountAttribute : public Attribute 
@@ -1491,13 +1495,18 @@ class GLSLPatchModifier : public SimpleModifier
 //
 class BitFieldModifier : public Modifier
 {
-    SLANG_ABSTRACT_AST_CLASS(BitFieldModifier)
+    SLANG_AST_CLASS(BitFieldModifier)
 
     IntegerLiteralValue width;
 
     // Fields filled during semantic analysis
     IntegerLiteralValue offset = 0;
     DeclRef<VarDecl> backingDeclRef;
+};
+
+class DynamicUniformModifier : public Modifier
+{
+    SLANG_AST_CLASS(DynamicUniformModifier)
 };
 
 } // namespace Slang

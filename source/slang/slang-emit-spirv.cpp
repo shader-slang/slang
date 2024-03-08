@@ -3486,6 +3486,17 @@ struct SPIRVEmitContext
             varInst,
             builtinVal
         );
+        
+        if (storageClass == SpvStorageClassInput ||
+            storageClass == SpvStorageClassOutput)
+        {
+            switch (builtinVal)
+            {
+            case SpvBuiltInPrimitiveId:
+                _maybeEmitInterpolationModifierDecoration(IRInterpolationMode::NoInterpolation, varInst);
+                break;
+            }
+        }
         m_builtinGlobalVars[key] = varInst;
         return varInst;
     }
@@ -3590,6 +3601,37 @@ struct SPIRVEmitContext
                 }
                 else if (semanticName == "sv_primitiveid")
                 {
+                    auto entryPoints = m_referencingEntryPoints.tryGetValue(inst);
+                    // SPIRV requires `Geometry` capability being declared for a fragment
+                    // shader, if that shader uses sv_primitiveid.
+                    // We will check if this builtin is used by non-ray-tracing, non-geometry or
+                    // non-tessellation shader stages, and if so include a declaration of
+                    // Geometry capability.
+                    bool needGeometryCapability = true;
+                    if (entryPoints)
+                    {
+                        for (auto entryPoint : *entryPoints)
+                        {
+                            if (auto entryPointDecor = entryPoint->findDecoration<IREntryPointDecoration>())
+                            {
+                                switch (entryPointDecor->getProfile().getStage())
+                                {
+                                case Stage::Geometry:
+                                case Stage::Intersection:
+                                case Stage::Mesh:
+                                case Stage::Amplification:
+                                case Stage::AnyHit:
+                                case Stage::ClosestHit:
+                                case Stage::Hull:
+                                case Stage::Domain:
+                                    needGeometryCapability = false;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if (needGeometryCapability)
+                        requireSPIRVCapability(SpvCapabilityGeometry);
                     return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPrimitiveId);
                 }
                 else if (semanticName == "sv_rendertargetarrayindex")
