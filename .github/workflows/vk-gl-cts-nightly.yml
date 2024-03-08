@@ -1,8 +1,8 @@
 name: VK-GL-CTS Nightly
 
 on:
-  push:
-    branches: [master]
+  pull_request:
+    branches: [ master ]
   #schedule:
     #- cron: '00 21 * * *'
 concurrency:
