@@ -637,12 +637,13 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
 
         if( kind == LayoutResourceKind::VaryingInput )
         {
-            name = "gl_SampleMaskIn[0]";
+            name = "gl_SampleMaskIn";
         }
         else
         {
-            name = "gl_SampleMask[0]";
+            name = "gl_SampleMask";
         }
+        arrayIndex = 0;
     }
     else if(semanticName == "sv_innercoverage")
     {
@@ -891,6 +892,7 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         //
 
         name = "gl_PositionPerViewNV[1]";
+        arrayIndex = 1;
 
 //            shared->requiresCopyGLPositionToPositionPerView = true;
     }
