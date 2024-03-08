@@ -1161,7 +1161,18 @@ slang::IModule* Linkage::loadModuleFromBlob(
 
     try
     {
-        auto name = getNamePool()->getName(moduleName);
+        auto getDigestStr = [](auto x)
+            {
+                DigestBuilder<SHA1> digestBuilder;
+                digestBuilder.append(x);
+                return digestBuilder.finalize().toString();
+            };
+
+        String moduleNameStr = moduleName;
+        if (!moduleName)
+            moduleNameStr = getDigestStr(source);
+
+        auto name = getNamePool()->getName(moduleNameStr);
         RefPtr<LoadedModule> loadedModule;
         if (mapNameToLoadedModules.tryGetValue(name, loadedModule))
         {
@@ -1171,9 +1182,7 @@ slang::IModule* Linkage::loadModuleFromBlob(
         if (pathStr.getLength() == 0)
         {
             // If path is empty, use a digest from source as path.
-            DigestBuilder<SHA1> digestBuilder;
-            digestBuilder.append(source);
-            pathStr = digestBuilder.finalize().toString();
+            pathStr = getDigestStr(source);
         }
         auto pathInfo = PathInfo::makeFromString(pathStr);
         if (File::exists(pathStr))
