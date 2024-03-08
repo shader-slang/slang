@@ -353,7 +353,7 @@ namespace Slang
                         // or this reference is ill-formed.
                         ensureDecl(valParamRef, DeclCheckState::DefinitionChecked);
                         ConstantFoldingCircularityInfo newCircularityInfo(valParamRef.getDecl(), nullptr);
-                        auto defaultVal = tryConstantFoldExpr(valParamRef.substitute(m_astBuilder, valParamRef.getDecl()->initExpr), &newCircularityInfo);
+                        auto defaultVal = tryConstantFoldExpr(valParamRef.substitute(m_astBuilder, valParamRef.getDecl()->initExpr), ConstantFoldingKind::CompileTime, &newCircularityInfo);
                         if (!defaultVal)
                             return false;
                         checkedArgs.add(defaultVal);
@@ -2113,6 +2113,15 @@ namespace Slang
     Expr* SemanticsExprVisitor::visitGenericAppExpr(GenericAppExpr* genericAppExpr)
     {
         // Start by checking the base expression and arguments.
+
+        // Disable the short-circuiting logic expression when the experssion is in
+        // the generic parameter.
+        if (this->m_shouldShortCircuitLogicExpr)
+        {
+            auto subContext = disableShortCircuitLogicalExpr();
+            return dispatchExpr(genericAppExpr, subContext);
+        }
+
         auto& baseExpr = genericAppExpr->functionExpr;
         baseExpr = CheckTerm(baseExpr);
         auto& args = genericAppExpr->arguments;

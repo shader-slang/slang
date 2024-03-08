@@ -31,9 +31,9 @@ layout(local_size_x = 32) in;
 __generic<T : __BuiltinLogicalType>
 bool test1ShuffleX() {
     return true
-        && subgroupShuffle(T(1), 1) == T(1)
+        & subgroupShuffle(T(1), 1) == T(1)
 #ifdef TEST_when_subgroupShuffleXor_is_implemented
-        && subgroupShuffleXor(T(1), 1) == T(1)
+        & subgroupShuffleXor(T(1), 1) == T(1)
 #endif // #ifdef TEST_when_subgroupShuffleXor_is_implemented
         ;
 }
@@ -42,9 +42,9 @@ bool testVShuffleX() {
     typealias gvec = vector<T, N>;
 
     return true
-        && subgroupShuffle(gvec(T(1)), 1) == gvec(T(1))
+        & subgroupShuffle(gvec(T(1)), 1) == gvec(T(1))
 #ifdef TEST_when_subgroupShuffleXor_is_implemented
-        && subgroupShuffleXor(gvec(T(1)), 1) == gvec(T(1))
+        & subgroupShuffleXor(gvec(T(1)), 1) == gvec(T(1))
 #endif // #ifdef TEST_when_subgroupShuffleXor_is_implemented
         ;
 }
@@ -52,10 +52,10 @@ bool testVShuffleX() {
 __generic<T : __BuiltinFloatingPointType>
 bool test1ShuffleX() {
     return true
-        && subgroupShuffle(T(1), 1) == T(1)
-#if !defined(TARGET_CUDA) && !defined(TARGET_HLSL)
-        && subgroupShuffleXor(T(1), 1) == T(1)
-#endif // #if !defined(TARGET_CUDA) && !defined(TARGET_HLSL)
+        & subgroupShuffle(T(1), 1) == T(1)
+#if !defined(TARGET_CUDA) & !defined(TARGET_HLSL)
+        & subgroupShuffleXor(T(1), 1) == T(1)
+#endif // #if !defined(TARGET_CUDA) & !defined(TARGET_HLSL)
         ;
 }
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -63,62 +63,62 @@ bool testVShuffleX() {
     typealias gvec = vector<T, N>;
 
     return true
-        && subgroupShuffle(gvec(T(1)), 1) == gvec(T(1))
-#if !defined(TARGET_CUDA) && !defined(TARGET_HLSL)
-        && subgroupShuffleXor(gvec(T(1)), 1) == gvec(T(1))
-#endif // #if !defined(TARGET_CUDA) && !defined(TARGET_HLSL)
+        & subgroupShuffle(gvec(T(1)), 1) == gvec(T(1))
+#if !defined(TARGET_CUDA) & !defined(TARGET_HLSL)
+        & subgroupShuffleXor(gvec(T(1)), 1) == gvec(T(1))
+#endif // #if !defined(TARGET_CUDA) & !defined(TARGET_HLSL)
         ;
 }
 bool testShuffleX() {
     return true
-        && test1ShuffleX<float>()
-        && testVShuffleX<float, 2>()
-        && testVShuffleX<float, 3>()
-        && testVShuffleX<float, 4>()
-        && test1ShuffleX<double>() // WARNING: intel GPU's lack FP64 support
-        && testVShuffleX<double, 2>()
-        && testVShuffleX<double, 3>()
-        && testVShuffleX<double, 4>()
-        && test1ShuffleX<half>() 
-        && testVShuffleX<half, 2>()
-        && testVShuffleX<half, 3>()
-        && testVShuffleX<half, 4>()
-        && test1ShuffleX<int>()
-        && testVShuffleX<int, 2>()
-        && testVShuffleX<int, 3>()
-        && testVShuffleX<int, 4>()
-        && test1ShuffleX<int8_t>() 
-        && testVShuffleX<int8_t, 2>()
-        && testVShuffleX<int8_t, 3>()
-        && testVShuffleX<int8_t, 4>()
-        && test1ShuffleX<int16_t>() 
-        && testVShuffleX<int16_t, 2>()
-        && testVShuffleX<int16_t, 3>()
-        && testVShuffleX<int16_t, 4>()
-        && test1ShuffleX<int64_t>() 
-        && testVShuffleX<int64_t, 2>()
-        && testVShuffleX<int64_t, 3>()
-        && testVShuffleX<int64_t, 4>()
-        && test1ShuffleX<uint>()
-        && testVShuffleX<uint, 2>()
-        && testVShuffleX<uint, 3>()
-        && testVShuffleX<uint, 4>()
-        && test1ShuffleX<uint8_t>() 
-        && testVShuffleX<uint8_t, 2>()
-        && testVShuffleX<uint8_t, 3>()
-        && testVShuffleX<uint8_t, 4>()
-        && test1ShuffleX<uint16_t>() 
-        && testVShuffleX<uint16_t, 2>()
-        && testVShuffleX<uint16_t, 3>()
-        && testVShuffleX<uint16_t, 4>()
-        && test1ShuffleX<uint64_t>() 
-        && testVShuffleX<uint64_t, 2>()
-        && testVShuffleX<uint64_t, 3>()
-        && testVShuffleX<uint64_t, 4>()
-        && test1ShuffleX<bool>()
-        && testVShuffleX<bool, 2>()
-        && testVShuffleX<bool, 3>()
-        && testVShuffleX<bool, 4>()
+        & test1ShuffleX<float>()
+        & testVShuffleX<float, 2>()
+        & testVShuffleX<float, 3>()
+        & testVShuffleX<float, 4>()
+        & test1ShuffleX<double>() // WARNING: intel GPU's lack FP64 support
+        & testVShuffleX<double, 2>()
+        & testVShuffleX<double, 3>()
+        & testVShuffleX<double, 4>()
+        & test1ShuffleX<half>() 
+        & testVShuffleX<half, 2>()
+        & testVShuffleX<half, 3>()
+        & testVShuffleX<half, 4>()
+        & test1ShuffleX<int>()
+        & testVShuffleX<int, 2>()
+        & testVShuffleX<int, 3>()
+        & testVShuffleX<int, 4>()
+        & test1ShuffleX<int8_t>() 
+        & testVShuffleX<int8_t, 2>()
+        & testVShuffleX<int8_t, 3>()
+        & testVShuffleX<int8_t, 4>()
+        & test1ShuffleX<int16_t>() 
+        & testVShuffleX<int16_t, 2>()
+        & testVShuffleX<int16_t, 3>()
+        & testVShuffleX<int16_t, 4>()
+        & test1ShuffleX<int64_t>() 
+        & testVShuffleX<int64_t, 2>()
+        & testVShuffleX<int64_t, 3>()
+        & testVShuffleX<int64_t, 4>()
+        & test1ShuffleX<uint>()
+        & testVShuffleX<uint, 2>()
+        & testVShuffleX<uint, 3>()
+        & testVShuffleX<uint, 4>()
+        & test1ShuffleX<uint8_t>() 
+        & testVShuffleX<uint8_t, 2>()
+        & testVShuffleX<uint8_t, 3>()
+        & testVShuffleX<uint8_t, 4>()
+        & test1ShuffleX<uint16_t>() 
+        & testVShuffleX<uint16_t, 2>()
+        & testVShuffleX<uint16_t, 3>()
+        & testVShuffleX<uint16_t, 4>()
+        & test1ShuffleX<uint64_t>() 
+        & testVShuffleX<uint64_t, 2>()
+        & testVShuffleX<uint64_t, 3>()
+        & testVShuffleX<uint64_t, 4>()
+        & test1ShuffleX<bool>()
+        & testVShuffleX<bool, 2>()
+        & testVShuffleX<bool, 3>()
+        & testVShuffleX<bool, 4>()
         ;
 }
 
@@ -127,7 +127,7 @@ void computeMain()
 {
 
     outputBuffer.data[0] = true
-        && testShuffleX()
+        & testShuffleX()
         ;
 
     // CHECK_GLSL: void main(

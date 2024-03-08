@@ -498,6 +498,7 @@ struct SharedIRGenContext
     Dictionary<Stmt*, IRBlock*> continueLabels;
 
     Dictionary<SourceFile*, IRInst*> mapSourceFileToDebugSourceInst;
+    Dictionary<String, IRInst*> mapSourcePathToDebugSourceInst;
 
     void setGlobalValue(Decl* decl, LoweredValInfo value)
     {
@@ -654,6 +655,16 @@ bool isFromStdLib(Decl* decl)
             return true;
     }
     return false;
+}
+
+bool isDeclInDifferentModule(IRGenContext* context, Decl* decl)
+{
+    return getModuleDecl(decl) != context->getMainModuleDecl();
+}
+
+bool isForceInlineEarly(Decl* decl)
+{
+    return decl->hasModifier<UnsafeForceInlineEarlyAttribute>();
 }
 
 bool isImportedDecl(IRGenContext* context, Decl* decl, bool& outIsExplicitExtern)
@@ -2175,6 +2186,10 @@ void addVarDecorations(
         else if (auto hlslSemantic = as< HLSLSimpleSemantic>(mod))
         {
             builder->addSemanticDecoration(inst, hlslSemantic->name.getContent());
+        }
+        else if (auto dynamicUniform = as<DynamicUniformModifier>(mod))
+        {
+            builder->addDynamicUniformDecoration(inst);
         }
         // TODO: what are other modifiers we need to propagate through?
     }
@@ -4304,9 +4319,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                     getBuilder()->emitMakeStruct(irType, args.getCount(), args.getBuffer()));
             }
         }
-
-        SLANG_UNEXPECTED("unexpected type when creating default value");
-        UNREACHABLE_RETURN(LoweredValInfo());
+        return LoweredValInfo::simple(getBuilder()->emitDefaultConstruct(irType));
     }
 
     LoweredValInfo getDefaultVal(DeclRef<VarDeclBase> decl)
@@ -4565,6 +4578,46 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         return LoweredValInfo::simple(result);
     }
 
+    LoweredValInfo visitLogicOperatorShortCircuitExpr(LogicOperatorShortCircuitExpr* expr)
+    {
+        auto builder = context->irBuilder;
+        auto thenBlock = builder->createBlock();
+        auto elseBlock = builder->createBlock();
+        auto afterBlock = builder->createBlock();
+        auto irCond = getSimpleVal(context, lowerRValueExpr(context, expr->arguments[0]));
+
+        // ifElse(<first param>, %true-block, %false-block, %after-block)
+        builder->emitIfElse(irCond, thenBlock, elseBlock, afterBlock);
+
+        // true-block: nonconditionalBranch(%after-block, <second param> : Bool)
+        // true-block: nonconditionalBranch(%after-block, true) for ||
+        builder->insertBlock(thenBlock);
+        builder->setInsertInto(thenBlock);
+        auto trueVal = expr->flavor == LogicOperatorShortCircuitExpr::Flavor::And ?
+            getSimpleVal(context, lowerRValueExpr(context, expr->arguments[1])) :
+            LoweredValInfo::simple(context->irBuilder->getBoolValue(true)).val;
+
+        builder->emitBranch(afterBlock, 1, &trueVal);
+
+        // false-block: nonconditionalBranch(%after-block, false) for &&
+        // false-block: nonconditionalBranch(%after-block, <second param>: Bool) for ||
+        builder->insertBlock(elseBlock);
+        builder->setInsertInto(elseBlock);
+        auto falseVal = expr->flavor == LogicOperatorShortCircuitExpr::Flavor::And ?
+            LoweredValInfo::simple(context->irBuilder->getBoolValue(false)).val :
+            getSimpleVal(context, lowerRValueExpr(context, expr->arguments[1]));
+
+        builder->emitBranch(afterBlock, 1, &falseVal);
+
+        // after-block: return input parameter
+        builder->insertBlock(afterBlock);
+        builder->setInsertInto(afterBlock);
+        auto paramType = lowerType(context, expr->type.type);
+        auto result = builder->emitParam(paramType);
+
+        return LoweredValInfo::simple(result);
+    }
+
     LoweredValInfo visitInvokeExpr(InvokeExpr* expr)
     {
         return sharedLoweringContext.visitInvokeExprImpl(expr, LoweredValInfo(), TryClauseEnvironment());
@@ -4668,20 +4721,32 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitAsTypeExpr(AsTypeExpr* expr)
     {
         auto value = lowerLValueExpr(context, expr->value);
-        auto existentialInfo = value.getExtractedExistentialValInfo();
+        ExtractedExistentialValInfo* existentialInfo = nullptr;
         auto optType = lowerType(context, expr->type);
         SLANG_RELEASE_ASSERT(optType->getOp() == kIROp_OptionalType);
         auto targetType = optType->getOperand(0);
-        auto witness = lowerSimpleVal(context, expr->witnessArg);
         auto builder = getBuilder();
         auto var = builder->emitVar(optType);
-        auto isType = builder->emitIsType(existentialInfo->extractedVal, existentialInfo->witnessTable, targetType, witness);
+        IRInst* isType = nullptr;
+        if (expr->witnessArg)
+        {
+            auto witness = lowerSimpleVal(context, expr->witnessArg);
+            existentialInfo = value.getExtractedExistentialValInfo();
+            isType = builder->emitIsType(existentialInfo->extractedVal, existentialInfo->witnessTable, targetType, witness);
+        }
+        else
+        {
+            SLANG_ASSERT(value.val);
+            auto leftType = lowerType(context, expr->value->type);
+            IRInst* args[] = { leftType, targetType };
+            isType = builder->emitIntrinsicInst(builder->getBoolType(), kIROp_TypeEquals, 2, args);
+        }
         IRBlock* trueBlock;
         IRBlock* falseBlock;
         IRBlock* afterBlock;
         builder->emitIfElseWithBlocks(isType, trueBlock, falseBlock, afterBlock);
         builder->setInsertInto(trueBlock);
-        auto irVal = builder->emitReinterpret(targetType, existentialInfo->extractedVal);
+        auto irVal = builder->emitReinterpret(targetType, existentialInfo ? existentialInfo->extractedVal : getSimpleVal(context, value));
         auto optionalVal = builder->emitMakeOptionalValue(optType, irVal);
         builder->emitStore(var, optionalVal);
         builder->emitBranch(afterBlock);
@@ -4701,11 +4766,29 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         {
             return LoweredValInfo::simple(getBuilder()->getBoolValue(expr->constantVal->value));
         }
-        auto value = lowerLValueExpr(context, expr->value);
-        auto type = lowerType(context, expr->type);
-        auto witness = lowerSimpleVal(context, expr->witnessArg);
-        auto existentialInfo = value.getExtractedExistentialValInfo();
-        auto irVal = getBuilder()->emitIsType(existentialInfo->extractedVal, existentialInfo->witnessTable, type, witness);
+        // If expr is a witness, then this is a run-time type check from for an existential type.
+        if (expr->witnessArg)
+        {
+            auto value = lowerLValueExpr(context, expr->value);
+            auto type = lowerType(context, expr->typeExpr.type);
+            auto witness = lowerSimpleVal(context, expr->witnessArg);
+            auto existentialInfo = value.getExtractedExistentialValInfo();
+            auto irVal = getBuilder()->emitIsType(existentialInfo->extractedVal, existentialInfo->witnessTable, type, witness);
+            return LoweredValInfo::simple(irVal);
+        }
+        // For all other cases, we map to a simple type equality check in the IR.
+        IRType* leftType = nullptr;
+        if (auto typeType = as<TypeType>(expr->value->type))
+        {
+            leftType = lowerType(context, typeType->getType());
+        }
+        else
+        {
+            leftType = lowerType(context, expr->value->type);
+        }
+        auto rightType = lowerType(context, expr->typeExpr.type);
+        IRInst* args[] = { leftType, rightType };
+        auto irVal = getBuilder()->emitIntrinsicInst(getBuilder()->getBoolType(), kIROp_TypeEquals, 2, args);
         return LoweredValInfo::simple(irVal);
     }
 
@@ -5182,6 +5265,12 @@ struct DestinationDrivenRValueExprLoweringVisitor
     }
 
     void visitSelectExpr(SelectExpr* expr)
+    {
+        auto rValue = lowerRValueExpr(context, expr);
+        assign(context, destination, rValue);
+    }
+
+    void visitLogicOperatorShortCircuitExpr(LogicOperatorShortCircuitExpr* expr)
     {
         auto rValue = lowerRValueExpr(context, expr);
         assign(context, destination, rValue);
@@ -6282,23 +6371,59 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
     }
 };
 
+IRInst* getOrEmitDebugSource(IRGenContext* context, PathInfo path)
+{
+    if (auto result = context->shared->mapSourcePathToDebugSourceInst.tryGetValue(path.foundPath))
+        return *result;
+
+    ComPtr<ISlangBlob> outBlob;
+    if (path.hasFileFoundPath())
+    {
+        context->getLinkage()->getFileSystemExt()->loadFile(path.foundPath.getBuffer(), outBlob.writeRef());
+    }
+    UnownedStringSlice content;
+    if (outBlob)
+        content = UnownedStringSlice((char*)outBlob->getBufferPointer(), outBlob->getBufferSize());
+    IRBuilder builder(*context->irBuilder);
+    builder.setInsertInto(context->irBuilder->getModule());
+    auto debugSrcInst = builder.emitDebugSource(path.foundPath.getUnownedSlice(), content);
+    context->shared->mapSourcePathToDebugSourceInst[path.foundPath] = debugSrcInst;
+    return debugSrcInst;
+}
+
 void maybeEmitDebugLine(IRGenContext* context, StmtLoweringVisitor& visitor, Stmt* stmt)
 {
     if (!context->includeDebugInfo)
         return;
     if (as<EmptyStmt>(stmt))
         return;
+    auto sourceManager = context->getLinkage()->getSourceManager();
     auto sourceView = context->getLinkage()->getSourceManager()->findSourceView(stmt->loc);
     if (!sourceView)
         return;
-    auto source = sourceView->getSourceFile();
+
     IRInst* debugSourceInst = nullptr;
-    if (context->shared->mapSourceFileToDebugSourceInst.tryGetValue(source, debugSourceInst))
+    auto humaneLoc = context->getLinkage()->getSourceManager()->getHumaneLoc(stmt->loc, SourceLocType::Emit);
+
+    // Do a best-effort attempt to retrieve the nominal source file.
+    auto pathInfo = sourceView->getPathInfo(stmt->loc, SourceLocType::Emit);
+
+    // If the source file path correspond to an existing SourceFile in the source manager, use it.
+    auto source = sourceManager->findSourceFileByPathRecursively(pathInfo.foundPath);
+    if (!source)
+        source = sourceManager->findSourceFile(pathInfo.getMostUniqueIdentity());
+    if (source)
     {
-        auto humaneLoc = context->getLinkage()->getSourceManager()->getHumaneLoc(stmt->loc, SourceLocType::Emit);
-        visitor.startBlockIfNeeded(stmt);
-        context->irBuilder->emitDebugLine(debugSourceInst, humaneLoc.line, humaneLoc.line, humaneLoc.column, humaneLoc.column + 1);
+        context->shared->mapSourceFileToDebugSourceInst.tryGetValue(source, debugSourceInst);
     }
+    // If the source manager does not have an entry for the corresponding file name, make sure we still emit
+    // an source file entry in the spirv module.
+    if (!debugSourceInst)
+    {
+        debugSourceInst = getOrEmitDebugSource(context, pathInfo);
+    }
+    visitor.startBlockIfNeeded(stmt);
+    context->irBuilder->emitDebugLine(debugSourceInst, humaneLoc.line, humaneLoc.line, humaneLoc.column, humaneLoc.column + 1);
 }
 
 void maybeAddDebugLocationDecoration(IRGenContext* context, IRInst* inst)
@@ -6988,9 +7113,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     {
                         getBuilder()->addNumThreadsDecoration(
                             d,
-                            layoutLocalSizeAttr->x,
-                            layoutLocalSizeAttr->y,
-                            layoutLocalSizeAttr->z
+                            getSimpleVal(context, lowerVal(context, layoutLocalSizeAttr->x)),
+                            getSimpleVal(context, lowerVal(context, layoutLocalSizeAttr->y)),
+                            getSimpleVal(context, lowerVal(context, layoutLocalSizeAttr->z))
                         );
                     }
                 }
@@ -8255,9 +8380,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 fieldKey,
                 fieldType);
 
-            if (auto packOffsetModifier = fieldDecl->findModifier<HLSLPackOffsetSemantic>())
+            for (auto mod : fieldDecl->modifiers)
             {
-                lowerPackOffsetModifier(fieldKey, packOffsetModifier);
+                if (auto packOffsetModifier = as<HLSLPackOffsetSemantic>(mod))
+                {
+                    lowerPackOffsetModifier(fieldKey, packOffsetModifier);
+                }
+                else if (auto dynamicUniformModifer = as<DynamicUniformModifier>(mod))
+                {
+                    subBuilder->addDynamicUniformDecoration(fieldKey);
+                }
             }
         }
 
@@ -8878,9 +9010,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     void addBitFieldAccessorDecorations(IRInst* irFunc, Decl* decl)
     {
-        // If this is an accessor under a property we can move the bitfield
-        // modifiers on the property to the accessor function.
-        if(as<AccessorDecl>(decl) && as<PropertyDecl>(decl->parentDecl))
+        // If this is an accessor and the parent is describing some bitfield,
+        // we can move the bitfield modifiers to the accessor function.
+        if(as<AccessorDecl>(decl))
         {
             if(const auto bfm = decl->parentDecl->findModifier<BitFieldModifier>())
             {
@@ -9131,6 +9263,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // In Slang we currently try not to support forward declarations
             // (although we might have to give in eventually), so
             // this case should really only occur for builtin declarations.
+        }
+        else if (isDeclInDifferentModule(context, decl) && !isForceInlineEarly(decl))
+        {
+
         }
         else if (emitBody)
         {
@@ -9398,9 +9534,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 getBuilder()->addNumThreadsDecoration(
                     irFunc,
-                    numThreadsAttr->x,
-                    numThreadsAttr->y,
-                    numThreadsAttr->z
+                    getSimpleVal(context, lowerVal(context, numThreadsAttr->x)),
+                    getSimpleVal(context, lowerVal(context, numThreadsAttr->y)),
+                    getSimpleVal(context, lowerVal(context, numThreadsAttr->z))
                 );
             }
             else if (as<ReadNoneAttribute>(modifier))
@@ -9544,6 +9680,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 getBuilder()->addRequireSPIRVVersionDecoration(irFunc, spvVersion->version);
             else if (auto cudasmVersion = as<RequiredCUDASMVersionModifier>(modifier))
                 getBuilder()->addRequireCUDASMVersionDecoration(irFunc, cudasmVersion->version);
+            else if (auto nonUniform= as<NonDynamicUniformAttribute>(modifier))
+                getBuilder()->addDecoration(irFunc, kIROp_NonDynamicUniformReturnDecoration);
         }
 
         if (!isInline)

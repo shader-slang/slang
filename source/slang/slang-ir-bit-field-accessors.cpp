@@ -5,20 +5,6 @@
 
 namespace Slang
 {
-static IRInst* maybeUnwrapGeneric(IRInst* inst)
-{
-    if(const auto g = as<IRGeneric>(inst))
-        return findInnerMostGenericReturnVal(g);
-    return inst;
-}
-
-static IRInst* maybeUnwrapSpecialize(IRInst* inst)
-{
-    if(const auto g = as<IRSpecialize>(inst))
-        return maybeUnwrapGeneric(maybeUnwrapSpecialize(g->getBase()));
-    return inst;
-}
-
 static IRInst* shl(IRBuilder& builder, IRInst* inst, const IRIntegerValue value)
 {
     if(value == 0)
@@ -55,7 +41,7 @@ static void synthesizeBitFieldGetter(IRFunc* func, IRBitFieldAccessorDecoration*
     SLANG_ASSERT(isIntegralType(bitFieldType));
     SLANG_ASSERT(func->getParamCount() == 1);
     const auto structParamType = func->getParamType(0);
-    const auto structType = as<IRStructType>(maybeUnwrapSpecialize(structParamType));
+    const auto structType = as<IRStructType>(getResolvedInstForDecorations(structParamType));
     SLANG_ASSERT(structType);
 
     const auto backingMember = findStructField(structType, dec->getBackingMemberKey());
@@ -102,7 +88,7 @@ static void synthesizeBitFieldSetter(IRFunc* func, IRBitFieldAccessorDecoration*
     const auto ptrType = as<IRPtrTypeBase>(func->getParamType(0));
     SLANG_ASSERT(ptrType);
     const auto structParamType = ptrType->getValueType();
-    const auto structType = as<IRStructType>(maybeUnwrapSpecialize(structParamType));
+    const auto structType = as<IRStructType>(getResolvedInstForDecorations(structParamType));
     SLANG_ASSERT(structType);
     const auto bitFieldType = func->getParamType(1);
     SLANG_ASSERT(isIntegralType(bitFieldType));
@@ -145,7 +131,7 @@ void synthesizeBitFieldAccessors(IRModule* module)
 {
     for(const auto inst : module->getModuleInst()->getGlobalInsts())
     {
-        const auto func = as<IRFunc>(maybeUnwrapGeneric(inst));
+        const auto func = as<IRFunc>(getResolvedInstForDecorations(inst));
         if(!func)
             continue;
         const auto bfd = func->findDecoration<IRBitFieldAccessorDecoration>();

@@ -8025,6 +8025,7 @@ namespace Slang
         _makeParseModifier("uniform",       HLSLUniformModifier::kReflectClassInfo),
         _makeParseModifier("volatile",      HLSLVolatileModifier::kReflectClassInfo),
         _makeParseModifier("export",        HLSLExportModifier::kReflectClassInfo),
+        _makeParseModifier("dynamic_uniform", DynamicUniformModifier::kReflectClassInfo),
 
         // Modifiers for geometry shader input
         _makeParseModifier("point",         HLSLPointModifier::kReflectClassInfo),

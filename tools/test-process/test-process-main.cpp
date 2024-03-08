@@ -80,7 +80,6 @@ static SlangResult _outputReflect()
 
     List<Byte> buffer;
 
-    Index lineCount = 0;
     Index startIndex = 0; 
 
     while (true)
@@ -106,8 +105,6 @@ static SlangResult _outputReflect()
             // Write the text to the output stream
             fwrite(line.begin(), 1, line.getLength(), fileOut);
             fputc('\n', fileOut);
-            
-            lineCount++;
 
             // Move the start index forward
             const Index newStartIndex = slice.begin() ? Index(slice.begin() - (const char*)buffer.getBuffer()) : buffer.getCount();

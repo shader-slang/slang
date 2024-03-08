@@ -878,6 +878,18 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::parseCommandLineArguments(
     return SLANG_OK;
 }
 
+SLANG_NO_THROW SlangResult SLANG_MCALL Session::getSessionDescDigest(slang::SessionDesc* sessionDesc, ISlangBlob** outBlob)
+{
+    ComPtr<slang::ISession> tempSession;
+    createSession(*sessionDesc, tempSession.writeRef());
+    auto linkage = static_cast<Linkage*>(tempSession.get());
+    DigestBuilder<SHA1> digestBuilder;
+    linkage->buildHash(digestBuilder, -1);
+    auto blob = digestBuilder.finalize().toBlob();
+    *outBlob = blob.detach();
+    return SLANG_OK;
+}
+
 Profile getEffectiveProfile(EntryPoint* entryPoint, TargetRequest* target)
 {
     auto entryPointProfile = entryPoint->getProfile();
@@ -1149,13 +1161,29 @@ slang::IModule* Linkage::loadModuleFromBlob(
 
     try
     {
-        auto name = getNamePool()->getName(moduleName);
+        auto getDigestStr = [](auto x)
+            {
+                DigestBuilder<SHA1> digestBuilder;
+                digestBuilder.append(x);
+                return digestBuilder.finalize().toString();
+            };
+
+        String moduleNameStr = moduleName;
+        if (!moduleName)
+            moduleNameStr = getDigestStr(source);
+
+        auto name = getNamePool()->getName(moduleNameStr);
         RefPtr<LoadedModule> loadedModule;
         if (mapNameToLoadedModules.tryGetValue(name, loadedModule))
         {
             return loadedModule;
         }
         String pathStr = path;
+        if (pathStr.getLength() == 0)
+        {
+            // If path is empty, use a digest from source as path.
+            pathStr = getDigestStr(source);
+        }
         auto pathInfo = PathInfo::makeFromString(pathStr);
         if (File::exists(pathStr))
         {
@@ -1191,6 +1219,16 @@ SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModuleFromSource(
     slang::IBlob** outDiagnostics)
 {
     return loadModuleFromBlob(moduleName, path, source, ModuleBlobType::Source, outDiagnostics);
+}
+
+SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModuleFromSourceString(
+    const char* moduleName,
+    const char* path,
+    const char* source,
+    slang::IBlob** outDiagnostics)
+{
+    auto sourceBlob = StringBlob::create(UnownedStringSlice(source));
+    return loadModuleFromSource(moduleName, path, sourceBlob.get(), outDiagnostics);
 }
 
 SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModuleFromIRBlob(
@@ -1488,36 +1526,52 @@ void Linkage::buildHash(DigestBuilder<SHA1>& builder, SlangInt targetIndex)
     // Add compiler options, including search path, preprocessor includes, etc.
     m_optionSet.buildHash(builder);
 
-    // Add the target specified by targetIndex
-    auto targetReq = targets[targetIndex];
-    targetReq->getOptionSet().buildHash(builder);
-
-    const PassThroughMode passThroughMode = getDownstreamCompilerRequiredForTarget(targetReq->getTarget());
-    const SourceLanguage sourceLanguage = getDefaultSourceLanguageForDownstreamCompiler(passThroughMode);
-
-    // Add prelude for the given downstream compiler.
-    ComPtr<ISlangBlob> prelude;
-    getGlobalSession()->getLanguagePrelude((SlangSourceLanguage)sourceLanguage, prelude.writeRef());
-    if (prelude)
+    auto addTargetDigest = [&](TargetRequest* targetReq)
     {
-        builder.append(prelude);
-    }
+        targetReq->getOptionSet().buildHash(builder);
 
-    // TODO: Downstream compilers (specifically dxc) can currently #include additional dependencies.
-    // This is currently the case for NVAPI headers included in the prelude.
-    // These dependencies are currently not picked up by the shader cache which is a significant issue.
-    // This can only be fixed by running the preprocessor in the slang compiler so dxc (or any other
-    // downstream compiler for that matter) isn't resolving any includes implicitly.
+        const PassThroughMode passThroughMode = getDownstreamCompilerRequiredForTarget(targetReq->getTarget());
+        const SourceLanguage sourceLanguage = getDefaultSourceLanguageForDownstreamCompiler(passThroughMode);
 
-    // Add the downstream compiler version (if it exists) to the hash
-    auto downstreamCompiler = getSessionImpl()->getOrLoadDownstreamCompiler(passThroughMode, nullptr);
-    if (downstreamCompiler)
-    {
-        ComPtr<ISlangBlob> versionString;
-        if (SLANG_SUCCEEDED(downstreamCompiler->getVersionString(versionString.writeRef())))
+        // Add prelude for the given downstream compiler.
+        ComPtr<ISlangBlob> prelude;
+        getGlobalSession()->getLanguagePrelude((SlangSourceLanguage)sourceLanguage, prelude.writeRef());
+        if (prelude)
         {
-            builder.append(versionString);
+            builder.append(prelude);
         }
+
+        // TODO: Downstream compilers (specifically dxc) can currently #include additional dependencies.
+        // This is currently the case for NVAPI headers included in the prelude.
+        // These dependencies are currently not picked up by the shader cache which is a significant issue.
+        // This can only be fixed by running the preprocessor in the slang compiler so dxc (or any other
+        // downstream compiler for that matter) isn't resolving any includes implicitly.
+
+        // Add the downstream compiler version (if it exists) to the hash
+        auto downstreamCompiler = getSessionImpl()->getOrLoadDownstreamCompiler(passThroughMode, nullptr);
+        if (downstreamCompiler)
+        {
+            ComPtr<ISlangBlob> versionString;
+            if (SLANG_SUCCEEDED(downstreamCompiler->getVersionString(versionString.writeRef())))
+            {
+                builder.append(versionString);
+            }
+        }
+    };
+
+    // Add the target specified by targetIndex
+    if (targetIndex == -1)
+    {
+        // -1 means all targets.
+        for (auto targetReq : targets)
+        {
+            addTargetDigest(targetReq);
+        }
+    }
+    else
+    {
+        auto targetReq = targets[targetIndex];
+        addTargetDigest(targetReq);
     }
 }
 

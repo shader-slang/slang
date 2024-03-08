@@ -314,7 +314,7 @@ String getDeclSignatureString(DeclRef<Decl> declRef, WorkspaceVersion* version)
                 SemanticsVisitor semanticsVisitor(&semanticContext);
                 if (auto intVal = semanticsVisitor.tryFoldIntegerConstantExpression(
                         declRef.substitute(version->linkage->getASTBuilder(), varDecl->initExpr),
-                        nullptr))
+                        SemanticsVisitor::ConstantFoldingKind::LinkTime, nullptr))
                 {
                     if (auto constantInt = as<ConstantIntVal>(intVal))
                     {

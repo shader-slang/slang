@@ -1411,6 +1411,7 @@ namespace Slang
 
     IntVal* SemanticsVisitor::tryConstantFoldExpr(
         SubstExpr<InvokeExpr>           invokeExpr,
+        ConstantFoldingKind             kind,
         ConstantFoldingCircularityInfo* circularityInfo)
     {
         // We need all the operands to the expression
@@ -1448,7 +1449,7 @@ namespace Slang
         for(Index a = 0; a < argCount; ++a)
         {
             auto argExpr = getArg(invokeExpr, a);
-            auto argVal = tryFoldIntegerConstantExpression(argExpr, circularityInfo);
+            auto argVal = tryFoldIntegerConstantExpression(argExpr, kind, circularityInfo);
             if (!argVal)
                 return nullptr;
 
@@ -1647,6 +1648,7 @@ namespace Slang
 
     IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
         DeclRef<VarDeclBase> const&     declRef,
+        ConstantFoldingKind             kind,
         ConstantFoldingCircularityInfo* circularityInfo)
     {
         auto decl = declRef.getDecl();
@@ -1657,9 +1659,17 @@ namespace Slang
         // In HLSL, `const` is used to mark compile-time constant expressions.
         if(!decl->hasModifier<ConstModifier>())
             return nullptr;
-        // Extern const is not considered compile-time constant by the front-end.
         if (decl->hasModifier<ExternModifier>())
-            return nullptr;
+        {
+            // Extern const is not considered compile-time constant by the front-end.
+            if (kind == ConstantFoldingKind::CompileTime)
+                return nullptr;
+            // But if we are OK with link-time constants, we can still fold it into a val.
+            auto rs = m_astBuilder->getOrCreate<GenericParamIntVal>(
+                declRef.substitute(m_astBuilder, declRef.getDecl()->getType()),
+                declRef);
+            return rs;
+        }
 
         if (isInterfaceRequirement(decl))
         {
@@ -1678,11 +1688,12 @@ namespace Slang
 
         ensureDecl(declRef.getDecl(), DeclCheckState::DefinitionChecked);
         ConstantFoldingCircularityInfo newCircularityInfo(decl, circularityInfo);
-        return tryConstantFoldExpr(getInitExpr(m_astBuilder, declRef), &newCircularityInfo);
+        return tryConstantFoldExpr(getInitExpr(m_astBuilder, declRef), kind, &newCircularityInfo);
     }
 
     IntVal* SemanticsVisitor::tryConstantFoldExpr(
         SubstExpr<Expr>                 expr,
+        ConstantFoldingKind             kind,
         ConstantFoldingCircularityInfo* circularityInfo)
     {
         
@@ -1738,7 +1749,7 @@ namespace Slang
             // are defined in a way that can be used as a constant expression:
             if(auto varRef = declRef.as<VarDeclBase>())
             {
-                return tryConstantFoldDeclRef(varRef, circularityInfo);
+                return tryConstantFoldDeclRef(varRef, kind, circularityInfo);
             }
             else if(auto enumRef = declRef.as<EnumCaseDecl>())
             {
@@ -1750,7 +1761,7 @@ namespace Slang
                         return nullptr;
 
                     ConstantFoldingCircularityInfo newCircularityInfo(enumCaseDecl, circularityInfo);
-                    return tryConstantFoldExpr(tagExpr, &newCircularityInfo);
+                    return tryConstantFoldExpr(tagExpr, kind, &newCircularityInfo);
                 }
             }
         }
@@ -1762,7 +1773,7 @@ namespace Slang
                 return nullptr;
             if (!isScalarIntegerType(substType))
                 return nullptr;
-            auto val = tryConstantFoldExpr(getArg(castExpr, 0), circularityInfo);
+            auto val = tryConstantFoldExpr(getArg(castExpr, 0), kind, circularityInfo);
             if (val)
             {
                 if (!castExpr.getExpr()->type)
@@ -1777,7 +1788,7 @@ namespace Slang
         }
         else if (auto invokeExpr = expr.as<InvokeExpr>())
         {
-            auto val = tryConstantFoldExpr(invokeExpr, circularityInfo);
+            auto val = tryConstantFoldExpr(invokeExpr, kind, circularityInfo);
             if (val)
                 return val;
         }
@@ -1803,6 +1814,7 @@ namespace Slang
 
     IntVal* SemanticsVisitor::tryFoldIntegerConstantExpression(
         SubstExpr<Expr>                 expr,
+        ConstantFoldingKind             kind,
         ConstantFoldingCircularityInfo* circularityInfo)
     {
         // Check if type is acceptable for an integer constant expression
@@ -1812,10 +1824,10 @@ namespace Slang
 
         // Consider operations that we might be able to constant-fold...
         //
-        return tryConstantFoldExpr(expr, circularityInfo);
+        return tryConstantFoldExpr(expr, kind, circularityInfo);
     }
 
-    IntVal* SemanticsVisitor::CheckIntegerConstantExpression(Expr* inExpr, IntegerConstantExpressionCoercionType coercionType, Type* expectedType, DiagnosticSink* sink)
+    IntVal* SemanticsVisitor::CheckIntegerConstantExpression(Expr* inExpr, IntegerConstantExpressionCoercionType coercionType, Type* expectedType, ConstantFoldingKind kind, DiagnosticSink* sink)
     {
         // No need to issue further errors if the expression didn't even type-check.
         if(IsErrorExpr(inExpr)) return nullptr;
@@ -1840,7 +1852,7 @@ namespace Slang
         // No need to issue further errors if the type coercion failed.
         if(IsErrorExpr(expr)) return nullptr;
 
-        auto result = tryFoldIntegerConstantExpression(expr, nullptr);
+        auto result = tryFoldIntegerConstantExpression(expr, kind, nullptr);
         if (!result && sink)
         {
             sink->diagnose(expr, Diagnostics::expectedIntegerConstantNotConstant);
@@ -1848,12 +1860,12 @@ namespace Slang
         return result;
     }
 
-    IntVal* SemanticsVisitor::CheckIntegerConstantExpression(Expr* inExpr, IntegerConstantExpressionCoercionType coercionType, Type* expectedType)
+    IntVal* SemanticsVisitor::CheckIntegerConstantExpression(Expr* inExpr, IntegerConstantExpressionCoercionType coercionType, Type* expectedType, ConstantFoldingKind kind)
     {
-        return CheckIntegerConstantExpression(inExpr, coercionType, expectedType, getSink());
+        return CheckIntegerConstantExpression(inExpr, coercionType, expectedType, kind, getSink());
     }
 
-    IntVal* SemanticsVisitor::CheckEnumConstantExpression(Expr* expr)
+    IntVal* SemanticsVisitor::CheckEnumConstantExpression(Expr* expr, ConstantFoldingKind kind)
     {
         // No need to issue further errors if the expression didn't even type-check.
         if(IsErrorExpr(expr)) return nullptr;
@@ -1861,7 +1873,7 @@ namespace Slang
         // No need to issue further errors if the type coercion failed.
         if(IsErrorExpr(expr)) return nullptr;
 
-        auto result = tryConstantFoldExpr(expr, nullptr);
+        auto result = tryConstantFoldExpr(expr, kind, nullptr);
         if (!result)
         {
             getSink()->diagnose(expr, Diagnostics::expectedIntegerConstantNotConstant);
@@ -1906,9 +1918,17 @@ namespace Slang
     {
         auto baseExpr = checkBaseForMemberExpr(subscriptExpr->baseExpression);
 
+        // If the base expression is a type, it means that this is an array declaration,
+        // then we should disable short-circuit in case there is logical expression in
+        // the subscript
+        auto baseType = baseExpr->type.Ptr();
+        auto baseTypeType = as<TypeType>(baseType);
+        auto subVisitor = (baseTypeType && m_shouldShortCircuitLogicExpr)?
+            SemanticsVisitor(disableShortCircuitLogicalExpr()) : *this;
+
         for (auto& arg : subscriptExpr->indexExprs)
         {
-            arg = CheckTerm(arg);
+            arg = subVisitor.CheckTerm(arg);
         }
 
         // If anything went wrong in the base expression,
@@ -1920,8 +1940,7 @@ namespace Slang
 
         // Otherwise, we need to look at the type of the base expression,
         // to figure out how subscripting should work.
-        auto baseType = baseExpr->type.Ptr();
-        if (auto baseTypeType = as<TypeType>(baseType))
+        if (baseTypeType)
         {
             // We are trying to "index" into a type, so we have an expression like `float[2]`
             // which should be interpreted as resolving to an array type.
@@ -1929,7 +1948,7 @@ namespace Slang
             IntVal* elementCount = nullptr;
             if (subscriptExpr->indexExprs.getCount() == 1)
             {
-                elementCount = CheckIntegerConstantExpression(subscriptExpr->indexExprs[0], IntegerConstantExpressionCoercionType::AnyInteger, nullptr);
+                elementCount = CheckIntegerConstantExpression(subscriptExpr->indexExprs[0], IntegerConstantExpressionCoercionType::AnyInteger, nullptr, ConstantFoldingKind::LinkTime);
             }
             else if (subscriptExpr->indexExprs.getCount() != 0)
             {
@@ -2371,12 +2390,69 @@ namespace Slang
         return result;
     }
 
+    Expr* SemanticsExprVisitor::convertToLogicOperatorExpr(InvokeExpr* expr)
+    {
+        LogicOperatorShortCircuitExpr* newExpr = nullptr;
+
+        // If the logic expression is inside the generic parameter list, it cannot support short-circuit
+        // which will generate the ifelse branch.
+        if (!m_shouldShortCircuitLogicExpr)
+        {
+            return nullptr;
+        }
+
+        if (auto varExpr = as<VarExpr>(expr->functionExpr))
+        {
+            if ((varExpr->name->text == "&&") || (varExpr->name->text == "||"))
+            {
+                // We only use short-circuiting in scalar input, will fall back
+                // to non-short-circuiting in vector input.
+                bool shortCircuitSupport = true;
+                for (auto & arg : expr->arguments)
+                {
+                    if(!as<BasicExpressionType>(arg->type.type))
+                    {
+                        shortCircuitSupport = false;
+                    }
+                }
+
+                if (!shortCircuitSupport)
+                {
+                    return nullptr;
+                }
+
+                // We do the cast in the 2nd pass because we want to leave it for 'visitInvokeExpr'
+                // to handle if this expression doesn't support short-circuiting.
+                for (auto & arg : expr->arguments)
+                {
+                    arg = coerce(CoercionSite::Argument, m_astBuilder->getBoolType(), arg);
+                }
+
+                expr->functionExpr = CheckTerm(expr->functionExpr);
+                newExpr = m_astBuilder->create<LogicOperatorShortCircuitExpr>();
+                if (varExpr->name->text == "&&")
+                {
+                   newExpr->flavor = LogicOperatorShortCircuitExpr::Flavor::And;
+                }
+                else
+                {
+                   newExpr->flavor = LogicOperatorShortCircuitExpr::Flavor::Or;
+                }
+                newExpr->loc = expr->loc;
+                newExpr->functionExpr = expr->functionExpr;
+                newExpr->type = m_astBuilder->getBoolType();
+                newExpr->arguments = expr->arguments;
+            }
+        }
+
+        return newExpr;
+    }
+
     Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
     {
         // check the base expression first
         if (!expr->originalFunctionExpr)
             expr->originalFunctionExpr = expr->functionExpr;
-        expr->functionExpr = CheckTerm(expr->functionExpr);
         auto treatAsDifferentiableExpr = m_treatAsDifferentiableExpr;
         m_treatAsDifferentiableExpr = nullptr;
         // Next check the argument expressions
@@ -2384,6 +2460,13 @@ namespace Slang
         {
             arg = CheckTerm(arg);
         }
+
+        // if the expression is '&&' or '||', we will convert it
+        // to use short-circuit evaluation.
+        if (auto newExpr = convertToLogicOperatorExpr(expr))
+            return newExpr;
+
+        expr->functionExpr = CheckTerm(expr->functionExpr);
         m_treatAsDifferentiableExpr = treatAsDifferentiableExpr;
 
         // If we are in a differentiable function, register differential witness tables involved in
@@ -3112,8 +3195,12 @@ namespace Slang
         expr->type = m_astBuilder->getBoolType();
         expr->value = originalVal;
 
+        auto valueType = expr->value->type.type;
+        if (auto typeType = as<TypeType>(valueType))
+            valueType = typeType->getType();
+
         // If value is a subtype of `type`, then this expr is always true.
-        if(isSubtype(expr->value->type.type, expr->typeExpr.type))
+        if(isSubtype(valueType, expr->typeExpr.type))
         {
             // Instead of returning a BoolLiteralExpr, we use a field to indicate this scenario,
             // so that the language server can still see the original syntax tree.
@@ -3124,10 +3211,11 @@ namespace Slang
             return expr;
         }
 
-        // Otherwise, we need to ensure the target type is a subtype of value->type.
+        // Otherwise, if the target type is a subtype of value->type, we need to grab the
+        // subtype witness for runtime checks.
 
         expr->value = maybeOpenExistential(originalVal);
-        expr->witnessArg = tryGetSubtypeWitness(expr->typeExpr.type, originalVal->type.type);
+        expr->witnessArg = tryGetSubtypeWitness(expr->typeExpr.type, valueType);
         if (expr->witnessArg)
         {
             // For now we can only support the scenario where `expr->value` is an interface type.
@@ -3136,15 +3224,6 @@ namespace Slang
                 getSink()->diagnose(expr, Diagnostics::isOperatorValueMustBeInterfaceType);
             }
             return expr;
-        }
-
-        if (!as<ErrorType>(expr->typeExpr.type) && !as<ErrorType>(expr->value->type.type))
-        {
-            // The type is not in the same hierarchy, so we evaluate to false.
-            expr->constantVal = m_astBuilder->create<BoolLiteralExpr>();
-            expr->constantVal->type = m_astBuilder->getBoolType();
-            expr->constantVal->value = false;
-            expr->constantVal->loc = expr->loc;
         }
         return expr;
     }
@@ -3170,27 +3249,21 @@ namespace Slang
             return makeOptional;
         }
 
-        // For now we can only support the scenario where `expr->value` is an interface type.
-        if (!isInterfaceType(expr->value->type))
-        {
-            getSink()->diagnose(expr, Diagnostics::isOperatorValueMustBeInterfaceType);
-        }
-
-        expr->typeExpr = typeExpr.exp;
+        // If target type is an interface type, we will obtain the witness here for
+        // runtime casting.
         expr->witnessArg = tryGetSubtypeWitness(typeExpr.type, expr->value->type.type);
         if (expr->witnessArg)
         {
+            // For now we can only support the scenario where `expr->value` is an interface type.
+            if (!isInterfaceType(expr->value->type.type))
+            {
+                getSink()->diagnose(expr, Diagnostics::isOperatorValueMustBeInterfaceType);
+            }
             expr->value = maybeOpenExistential(expr->value);
             return expr;
         }
 
-        if (!as<ErrorType>(typeExpr.type) && !as<ErrorType>(expr->value->type.type))
-        {
-            getSink()->diagnose(expr, Diagnostics::typeNotInTheSameHierarchy, expr->value->type.type, typeExpr.type);
-        }
-
-        expr->type = m_astBuilder->getErrorType();
-        
+        expr->typeExpr = typeExpr.exp;
         return expr;
     }
 
