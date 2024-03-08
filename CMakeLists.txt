@@ -458,6 +458,8 @@ if(SLANG_ENABLE_GFX)
             core
             imgui
             $<$<BOOL:${SLANG_ENABLE_XLIB}>:X11::X11>
+            "$<$<PLATFORM_ID:Darwin>:-framework Cocoa>"
+            "$<$<PLATFORM_ID:Darwin>:-framework QuartzCore>"
             ${CMAKE_DL_LIBS}
             LINK_WITH_FRAMEWORK
             Cocoa
