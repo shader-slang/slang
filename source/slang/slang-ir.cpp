@@ -5077,8 +5077,6 @@ namespace Slang
 
     IRInst* IRBuilder::addNumThreadsDecoration(IRInst* inst, IRInst* x, IRInst* y, IRInst* z)
     {
-        IRType* intType = getIntType();
-
         IRInst* operands[3] = {
             x,
             y,

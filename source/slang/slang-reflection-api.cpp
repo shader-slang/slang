@@ -2812,11 +2812,11 @@ SLANG_API void spReflectionEntryPoint_getComputeThreadGroupSize(
     if (numThreadsAttribute)
     {
         if (auto cint = as<ConstantIntVal>(numThreadsAttribute->x))
-            sizeAlongAxis[0] = cint->getValue();
+            sizeAlongAxis[0] = (SlangUInt)cint->getValue();
         if (auto cint = as<ConstantIntVal>(numThreadsAttribute->y))
-            sizeAlongAxis[1] = cint->getValue();
+            sizeAlongAxis[1] = (SlangUInt)cint->getValue();
         if (auto cint = as<ConstantIntVal>(numThreadsAttribute->z))
-            sizeAlongAxis[2] = cint->getValue();
+            sizeAlongAxis[2] = (SlangUInt)cint->getValue();
     }
 
     //
