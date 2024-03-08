@@ -2811,9 +2811,12 @@ SLANG_API void spReflectionEntryPoint_getComputeThreadGroupSize(
     auto numThreadsAttribute = entryPointFunc.getDecl()->findModifier<NumThreadsAttribute>();
     if (numThreadsAttribute)
     {
-        sizeAlongAxis[0] = numThreadsAttribute->x;
-        sizeAlongAxis[1] = numThreadsAttribute->y;
-        sizeAlongAxis[2] = numThreadsAttribute->z;
+        if (auto cint = as<ConstantIntVal>(numThreadsAttribute->x))
+            sizeAlongAxis[0] = cint->getValue();
+        if (auto cint = as<ConstantIntVal>(numThreadsAttribute->y))
+            sizeAlongAxis[1] = cint->getValue();
+        if (auto cint = as<ConstantIntVal>(numThreadsAttribute->z))
+            sizeAlongAxis[2] = cint->getValue();
     }
 
     //

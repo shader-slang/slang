@@ -1379,7 +1379,7 @@ namespace Slang
         //
         if(!isScalarIntegerType(varDecl->type))
             return;
-        tryConstantFoldDeclRef(DeclRef<VarDeclBase>(varDecl), nullptr);
+        tryConstantFoldDeclRef(DeclRef<VarDeclBase>(varDecl), ConstantFoldingKind::LinkTime, nullptr);
     }
 
     void SemanticsDeclModifiersVisitor::visitStructDecl(StructDecl* structDecl)
@@ -1900,6 +1900,32 @@ namespace Slang
                 varDecl->initExpr = CompleteOverloadCandidate(overloadContext, *overloadContext.bestCandidate);
             }
         }
+
+        if (auto parentDecl = as<AggTypeDecl>(getParentDecl(varDecl)))
+        {
+            auto typeTags = getTypeTags(varDecl->getType());
+            parentDecl->addTag(typeTags);
+            if ((int)typeTags & (int)TypeTag::Unsized)
+            {
+                // Unsized decl must appear as the last member of the struct.
+                for (auto memberIdx = parentDecl->members.getCount() - 1; memberIdx >= 0; memberIdx--)
+                {
+                    if (parentDecl->members[memberIdx] == varDecl)
+                    {
+                        break;
+                    }
+                    if (auto memberVarDecl = as<VarDeclBase>(parentDecl->members[memberIdx]))
+                    {
+                        if (!memberVarDecl->hasModifier<HLSLStaticModifier>())
+                        {
+                            getSink()->diagnose(varDecl, Diagnostics::unsizedMemberMustAppearLast);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+        
         if (auto elementType = getConstantBufferElementType(varDecl->getType()))
         {
             if (doesTypeHaveTag(elementType, TypeTag::Incomplete))
@@ -2841,7 +2867,7 @@ namespace Slang
                 return false;
         }
 
-        auto satisfyingVal = tryConstantFoldDeclRef(satisfyingMemberDeclRef, nullptr);
+        auto satisfyingVal = tryConstantFoldDeclRef(satisfyingMemberDeclRef, ConstantFoldingKind::LinkTime, nullptr);
         if (satisfyingVal)
         {
             witnessTable->add(
@@ -5925,7 +5951,7 @@ namespace Slang
                 // the tag value for a successor case that doesn't
                 // provide an explicit tag.
 
-                IntVal* explicitTagVal = tryConstantFoldExpr(explicitTagValExpr, nullptr);
+                IntVal* explicitTagVal = tryConstantFoldExpr(explicitTagValExpr, ConstantFoldingKind::CompileTime, nullptr);
                 if(explicitTagVal)
                 {
                     if(auto constIntVal = as<ConstantIntVal>(explicitTagVal))
@@ -5992,7 +6018,7 @@ namespace Slang
             // We want to enforce that this is an integer constant
             // expression, but we don't actually care to retain
             // the value.
-            CheckIntegerConstantExpression(initExpr, IntegerConstantExpressionCoercionType::AnyInteger, nullptr);
+            CheckIntegerConstantExpression(initExpr, IntegerConstantExpressionCoercionType::AnyInteger, nullptr, ConstantFoldingKind::CompileTime);
 
             decl->tagExpr = initExpr;
         }
@@ -6906,6 +6932,7 @@ namespace Slang
             indexExpr->indexExprs[0],
             IntegerConstantExpressionCoercionType::AnyInteger,
             nullptr,
+            ConstantFoldingKind::LinkTime,
             getSink());
 
         Type* d = m_astBuilder->getMeshOutputTypeFromModifier(modifier, base, index);

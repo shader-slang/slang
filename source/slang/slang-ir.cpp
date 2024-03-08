@@ -5075,14 +5075,14 @@ namespace Slang
             getIntValue(getIntType(), (IRIntegerValue)mode));
     }
 
-    IRInst* IRBuilder::addNumThreadsDecoration(IRInst* inst, Int x, Int y, Int z)
+    IRInst* IRBuilder::addNumThreadsDecoration(IRInst* inst, IRInst* x, IRInst* y, IRInst* z)
     {
         IRType* intType = getIntType();
 
         IRInst* operands[3] = {
-            getIntValue(intType, x),
-            getIntValue(intType, y),
-            getIntValue(intType, z)
+            x,
+            y,
+            z
         };
 
         return addDecoration(inst, kIROp_NumThreadsDecoration, operands, 3);

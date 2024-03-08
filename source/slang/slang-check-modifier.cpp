@@ -12,13 +12,20 @@
 
 namespace Slang
 {
+    IntVal* SemanticsVisitor::checkLinkTimeConstantIntVal(
+        Expr* expr)
+    {
+        expr = CheckExpr(expr);
+        return CheckIntegerConstantExpression(expr, IntegerConstantExpressionCoercionType::AnyInteger, nullptr, ConstantFoldingKind::LinkTime);
+    }
+
     ConstantIntVal* SemanticsVisitor::checkConstantIntVal(
         Expr*    expr)
     {
         // First type-check the expression as normal
         expr = CheckExpr(expr);
 
-        auto intVal = CheckIntegerConstantExpression(expr, IntegerConstantExpressionCoercionType::AnyInteger, nullptr);
+        auto intVal = CheckIntegerConstantExpression(expr, IntegerConstantExpressionCoercionType::AnyInteger, nullptr, ConstantFoldingKind::CompileTime);
         if(!intVal)
             return nullptr;
 
@@ -37,7 +44,7 @@ namespace Slang
         // First type-check the expression as normal
         expr = CheckExpr(expr);
 
-        auto intVal = CheckEnumConstantExpression(expr);
+        auto intVal = CheckEnumConstantExpression(expr, ConstantFoldingKind::CompileTime);
         if(!intVal)
             return nullptr;
 
@@ -320,26 +327,29 @@ namespace Slang
         {
             SLANG_ASSERT(attr->args.getCount() == 3);
 
-            int32_t values[3];
+            IntVal* values[3];
 
             for (int i = 0; i < 3; ++i)
             {
-                int32_t value = 1;
+                IntVal* value = nullptr;
 
                 auto arg = attr->args[i];
                 if (arg)
                 {
-                    auto intValue = checkConstantIntVal(arg);
+                    auto intValue = checkLinkTimeConstantIntVal(arg);
                     if (!intValue)
                     {
                         return false;
                     }
-                    if (intValue->getValue() < 1)
+                    if (auto constIntVal = as<ConstantIntVal>(intValue))
                     {
-                        getSink()->diagnose(attr, Diagnostics::nonPositiveNumThreads, intValue->getValue());
-                        return false;
+                        if (constIntVal->getValue() < 1)
+                        {
+                            getSink()->diagnose(attr, Diagnostics::nonPositiveNumThreads, constIntVal->getValue());
+                            return false;
+                        }
                     }
-                    value = int32_t(intValue->getValue());
+                    value = intValue;
                 }
                 values[i] = value;
             }
@@ -1317,11 +1327,11 @@ namespace Slang
         {
             SLANG_ASSERT(attr->args.getCount() == 3);
 
-            int32_t values[3];
+            IntVal* values[3];
 
             for (int i = 0; i < 3; ++i)
             {
-                int32_t value = 1;
+                IntVal* value = nullptr;
 
                 auto arg = attr->args[i];
                 if (arg)
@@ -1331,12 +1341,15 @@ namespace Slang
                     {
                         return nullptr;
                     }
-                    if (intValue->getValue() < 1)
+                    if (auto cintVal = as<ConstantIntVal>(intValue))
                     {
-                        getSink()->diagnose(attr, Diagnostics::nonPositiveNumThreads, intValue->getValue());
-                        return nullptr;
+                        if (cintVal->getValue() < 1)
+                        {
+                            getSink()->diagnose(attr, Diagnostics::nonPositiveNumThreads, cintVal->getValue());
+                            return nullptr;
+                        }
                     }
-                    value = int32_t(intValue->getValue());
+                    value = intValue;
                 }
                 values[i] = value;
             }

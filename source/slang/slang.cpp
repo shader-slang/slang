@@ -1168,6 +1168,13 @@ slang::IModule* Linkage::loadModuleFromBlob(
             return loadedModule;
         }
         String pathStr = path;
+        if (pathStr.getLength() == 0)
+        {
+            // If path is empty, use a digest from source as path.
+            DigestBuilder<SHA1> digestBuilder;
+            digestBuilder.append(source);
+            pathStr = digestBuilder.finalize().toString();
+        }
         auto pathInfo = PathInfo::makeFromString(pathStr);
         if (File::exists(pathStr))
         {
@@ -1203,6 +1210,16 @@ SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModuleFromSource(
     slang::IBlob** outDiagnostics)
 {
     return loadModuleFromBlob(moduleName, path, source, ModuleBlobType::Source, outDiagnostics);
+}
+
+SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModuleFromSourceString(
+    const char* moduleName,
+    const char* path,
+    const char* source,
+    slang::IBlob** outDiagnostics)
+{
+    auto sourceBlob = StringBlob::create(UnownedStringSlice(source));
+    return loadModuleFromSource(moduleName, path, sourceBlob.get(), outDiagnostics);
 }
 
 SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModuleFromIRBlob(

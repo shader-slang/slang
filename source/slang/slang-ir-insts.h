@@ -3533,7 +3533,7 @@ public:
 
     IRInst* addFloatingModeOverrideDecoration(IRInst* dest, FloatingPointMode mode);
 
-    IRInst* addNumThreadsDecoration(IRInst* inst, Int x, Int y, Int z);
+    IRInst* addNumThreadsDecoration(IRInst* inst, IRInst* x, IRInst* y, IRInst* z);
 
     IRInst* emitSpecializeInst(
         IRType*         type,
