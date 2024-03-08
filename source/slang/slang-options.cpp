@@ -2833,7 +2833,10 @@ SlangResult OptionsParser::_parse(
                         }
                         [[fallthrough]];
                     default:
-                        m_sink->diagnose(SourceLoc(), Diagnostics::cannotMatchOutputFileToEntryPoint, rawOutput.path);
+                        if (rawOutput.path.getLength() != 0)
+                        {
+                            m_sink->diagnose(SourceLoc(), Diagnostics::cannotMatchOutputFileToEntryPoint, rawOutput.path);
+                        }
                         break;
                 }
             }

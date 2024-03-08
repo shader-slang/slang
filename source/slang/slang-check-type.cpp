@@ -142,6 +142,7 @@ namespace Slang
             genericParamType ? IntegerConstantExpressionCoercionType::SpecificType
                              : IntegerConstantExpressionCoercionType::AnyInteger,
             genericParamType,
+            ConstantFoldingKind::LinkTime,
             sink);
         if(val) return val;
 

@@ -79,6 +79,8 @@ namespace gfx_test
             R"(
                 export static const bool turnOnFeature = true;
                 export static const float constValue = 2.0;
+                export static const int numthread = 1;
+                export static const int arraySize = 4;
             )"));
 
         ComputePipelineStateDesc pipelineDesc = {};

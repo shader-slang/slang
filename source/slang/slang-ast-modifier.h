@@ -784,9 +784,9 @@ class GLSLLayoutLocalSizeAttribute : public Attribute
     //
     // TODO: These should be accessors that use the
     // ordinary `args` list, rather than side data.
-    int32_t x;
-    int32_t y;
-    int32_t z;
+    IntVal* x;
+    IntVal* y;
+    IntVal* z;
 };
 
 // TODO: for attributes that take arguments, the syntax node
@@ -839,9 +839,9 @@ class NumThreadsAttribute : public Attribute
     //
     // TODO: These should be accessors that use the
     // ordinary `args` list, rather than side data.
-    int32_t x;
-    int32_t y;
-    int32_t z;
+    IntVal* x;
+    IntVal* y;
+    IntVal* z;
 };
 
 class MaxVertexCountAttribute : public Attribute 
