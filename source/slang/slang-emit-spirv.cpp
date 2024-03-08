@@ -3465,11 +3465,9 @@ struct SPIRVEmitContext
         if (storageClass == SpvStorageClassInput ||
             storageClass == SpvStorageClassOutput)
         {
-            switch (builtinVal)
+            if (isIntegralScalarOrCompositeType(ptrType->getValueType()))
             {
-            case SpvBuiltInPrimitiveId:
                 _maybeEmitInterpolationModifierDecoration(IRInterpolationMode::NoInterpolation, varInst);
-                break;
             }
         }
         m_builtinGlobalVars[key] = varInst;
