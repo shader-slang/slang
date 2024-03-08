@@ -192,10 +192,10 @@ namespace Slang
         checkLoopInDifferentiableFunc(stmt);
     }
 
-    Expr* SemanticsVisitor::checkExpressionAndExpectIntegerConstant(Expr* expr, IntVal** outIntVal)
+    Expr* SemanticsVisitor::checkExpressionAndExpectIntegerConstant(Expr* expr, IntVal** outIntVal, ConstantFoldingKind kind)
     {
         expr = CheckExpr(expr);
-        auto intVal = CheckIntegerConstantExpression(expr, IntegerConstantExpressionCoercionType::AnyInteger, nullptr);
+        auto intVal = CheckIntegerConstantExpression(expr, IntegerConstantExpressionCoercionType::AnyInteger, nullptr, kind);
         if (outIntVal)
             *outIntVal = intVal;
         return expr;
@@ -214,7 +214,7 @@ namespace Slang
 
         if (stmt->rangeBeginExpr)
         {
-            stmt->rangeBeginExpr = checkExpressionAndExpectIntegerConstant(stmt->rangeBeginExpr, &rangeBeginVal);
+            stmt->rangeBeginExpr = checkExpressionAndExpectIntegerConstant(stmt->rangeBeginExpr, &rangeBeginVal, ConstantFoldingKind::LinkTime);
         }
         else
         {
@@ -222,7 +222,7 @@ namespace Slang
             rangeBeginVal = rangeBeginConst;
         }
 
-        stmt->rangeEndExpr = checkExpressionAndExpectIntegerConstant(stmt->rangeEndExpr, &rangeEndVal);
+        stmt->rangeEndExpr = checkExpressionAndExpectIntegerConstant(stmt->rangeEndExpr, &rangeEndVal, ConstantFoldingKind::LinkTime);
 
         stmt->rangeBeginVal = rangeBeginVal;
         stmt->rangeEndVal = rangeEndVal;
@@ -428,7 +428,7 @@ namespace Slang
             return;
 
         auto initialLitVal =
-            as<ConstantIntVal>(tryFoldIntegerConstantExpression(initialVal, nullptr));
+            as<ConstantIntVal>(tryFoldIntegerConstantExpression(initialVal, ConstantFoldingKind::CompileTime, nullptr));
 
         ConstantIntVal* finalVal = nullptr;
         auto binaryExpr = as<InfixExpr>(stmt->predicateExpression);
@@ -456,7 +456,7 @@ namespace Slang
             return;
         if (!rightCompareOperand)
             return;
-        if (auto rightVal = tryFoldIntegerConstantExpression(binaryExpr->arguments[1], nullptr))
+        if (auto rightVal = tryFoldIntegerConstantExpression(binaryExpr->arguments[1], ConstantFoldingKind::CompileTime, nullptr))
         {
             auto leftVar = as<VarExpr>(leftCompareOperand);
             if (!leftVar)
@@ -464,7 +464,7 @@ namespace Slang
             predicateVar = leftVar->declRef;
             finalVal = as<ConstantIntVal>(rightVal);
         }
-        else if (auto leftVal = tryFoldIntegerConstantExpression(binaryExpr->arguments[0], nullptr))
+        else if (auto leftVal = tryFoldIntegerConstantExpression(binaryExpr->arguments[0], ConstantFoldingKind::CompileTime, nullptr))
         {
             auto rightVar = as<VarExpr>(rightCompareOperand);
             if (!rightVar)
@@ -543,7 +543,7 @@ namespace Slang
             return;
         if (opSideEffectExpr->arguments.getCount() == 2)
         {
-            auto stepVal = tryFoldIntegerConstantExpression(opSideEffectExpr->arguments[1], nullptr);
+            auto stepVal = tryFoldIntegerConstantExpression(opSideEffectExpr->arguments[1], ConstantFoldingKind::CompileTime, nullptr);
             if (!stepVal)
                 return;
             if (auto constantIntVal = as<ConstantIntVal>(stepVal))

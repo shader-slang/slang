@@ -1,17 +1,22 @@
 extern static const bool turnOnFeature;
 extern static const float constValue;
+extern static const int numthread = -1;
+extern static const int arraySize = -1;
 
 // Main entry-point. Write some value into buffer depending on link
 // time constant.
 [shader("compute")]
-[numthreads(4, 1, 1)]
+[numthreads(numthread, 1, 1)]
 void computeMain(
     uint3 sv_dispatchThreadID: SV_DispatchThreadID,
     uniform RWStructuredBuffer<float> buffer)
 {
+    int array[arraySize];
+
+    array[sv_dispatchThreadID.x] = sv_dispatchThreadID.x;
     if (turnOnFeature)
     {
-        buffer[0] = constValue;
+        buffer[array[0]] = constValue;
     }
     else
     {

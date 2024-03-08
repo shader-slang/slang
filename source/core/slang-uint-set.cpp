@@ -27,7 +27,7 @@ UIntSet& UIntSet::operator=(const UIntSet& other)
     return *this;
 }
 
-HashCode UIntSet::getHashCode()
+HashCode UIntSet::getHashCode() const
 {
     int rs = 0;
     for (auto val : m_buffer)

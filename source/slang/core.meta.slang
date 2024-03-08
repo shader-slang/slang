@@ -2308,7 +2308,8 @@ int __naturalStrideOf()
     return __naturalStrideOf_impl(__declVal<T>());
 }
 
-
+__intrinsic_op($(kIROp_TreatAsDynamicUniform))
+T asDynamicUniform<T>(T v);
 
 // Binding Attributes
 
@@ -2555,3 +2556,6 @@ attribute_syntax [PreferCheckpoint] : PreferCheckpointAttribute;
 
 __attributeTarget(DeclBase)
 attribute_syntax [KnownBuiltin(name : String)] : KnownBuiltinAttribute;
+
+__attributeTarget(FunctionDeclBase)
+attribute_syntax [NonUniformReturn] : NonDynamicUniformAttribute;

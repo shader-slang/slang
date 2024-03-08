@@ -924,6 +924,7 @@ extern "C"
             FileSystem,
             Heterogeneous,
             NoMangle,
+            ValidateUniformity,
             AllowGLSL,
 
             // Internal
@@ -4648,6 +4649,14 @@ namespace slang
             */
         virtual SLANG_NO_THROW bool SLANG_MCALL isBinaryModuleUpToDate(
             const char* modulePath, slang::IBlob* binaryModuleBlob) = 0;
+
+            /** Load a module from a string.
+            */
+        virtual SLANG_NO_THROW IModule* SLANG_MCALL loadModuleFromSourceString(
+            const char* moduleName,
+            const char* path,
+            const char* string,
+            slang::IBlob** outDiagnostics = nullptr) = 0;
     };
 
     #define SLANG_UUID_ISession ISession::getTypeGuid()

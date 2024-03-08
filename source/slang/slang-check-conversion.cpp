@@ -1163,7 +1163,7 @@ namespace Slang
                     bool shouldEmitGeneralWarning = true;
                     if (isScalarIntegerType(toType))
                     {
-                        if (auto intVal = tryFoldIntegerConstantExpression(fromExpr, nullptr))
+                        if (auto intVal = tryFoldIntegerConstantExpression(fromExpr, ConstantFoldingKind::CompileTime, nullptr))
                         {
                             if (auto val = as<ConstantIntVal>(intVal))
                             {

@@ -1738,6 +1738,10 @@ Result DeviceImpl::createBufferResourceImpl(
         reqMemoryProperties =
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
     }
+    else
+    {
+        reqMemoryProperties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+    }
 
     RefPtr<BufferResourceImpl> buffer(new BufferResourceImpl(desc, this));
     if (desc.isShared)

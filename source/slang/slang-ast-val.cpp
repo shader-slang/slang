@@ -229,6 +229,11 @@ Val* GenericParamIntVal::_substituteImplOverride(ASTBuilder* /* astBuilder */, S
     return this;
 }
 
+bool GenericParamIntVal::_isLinkTimeValOverride()
+{
+    return getDeclRef().getDecl()->hasModifier<ExternModifier>();
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ErrorIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 void ErrorIntVal::_toTextOverride(StringBuilder& out)
@@ -1494,6 +1499,11 @@ Val* PolynomialIntVal::_resolveImplOverride()
         return builder.getIntVal(getType());
 
     return this;
+}
+
+bool IntVal::isLinkTimeVal()
+{
+    SLANG_AST_NODE_VIRTUAL_CALL(IntVal, isLinkTimeVal, ());
 }
 
 } // namespace Slang
