@@ -9535,7 +9535,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 getBuilder()->addNumThreadsDecoration(
                     irFunc,
                     getSimpleVal(context, lowerVal(context, numThreadsAttr->x)),
-                    getSimpleVal(context, lowerVal(context, numThreadsAttr->x)),
+                    getSimpleVal(context, lowerVal(context, numThreadsAttr->y)),
                     getSimpleVal(context, lowerVal(context, numThreadsAttr->z))
                 );
             }
