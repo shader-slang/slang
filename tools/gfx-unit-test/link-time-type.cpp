@@ -16,7 +16,7 @@ namespace gfx_test
         slang::ProgramLayout*& slangReflection)
     {
         const char* moduleInterfaceSrc = R"(
-            interface IBase
+            interface IBase : IDifferentiable
             {
                 float getBaseValue();
             }

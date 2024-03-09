@@ -40,8 +40,13 @@ void unpinWitnessTables(IRModule* module)
         auto witnessTable = as<IRWitnessTable>(inst);
         if (!witnessTable)
             continue;
-        while (auto decor = witnessTable->findDecoration<IRKeepAliveDecoration>())
-            decor->removeAndDeallocate();
+
+        // If a witness table is not used for dynamic dispatch, unpin it.
+        if (!witnessTable->findDecoration<IRDynamicDispatchWitnessDecoration>())
+        {
+            while (auto decor = witnessTable->findDecoration<IRKeepAliveDecoration>())
+                decor->removeAndDeallocate();
+        }
     }
 }
 
