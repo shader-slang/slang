@@ -491,6 +491,10 @@ Result linkAndOptimizeIR(
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
+    // If we have any witness tables that are marked as `KeepAlive`, unpin them
+    // now since we have finished using them.
+    unpinWitnessTables(irModule);
+
     simplifyIR(targetProgram, irModule, IRSimplificationOptions::getFast(), sink);
 
     if (!ArtifactDescUtil::isCpuLikeTarget(artifactDesc))

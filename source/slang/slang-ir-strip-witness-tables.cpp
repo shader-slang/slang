@@ -33,4 +33,16 @@ void stripWitnessTables(IRModule* module)
     }
 }
 
+void unpinWitnessTables(IRModule* module)
+{
+    for (auto inst : module->getGlobalInsts())
+    {
+        auto witnessTable = as<IRWitnessTable>(inst);
+        if (!witnessTable)
+            continue;
+        while (auto decor = witnessTable->findDecoration<IRKeepAliveDecoration>())
+            decor->removeAndDeallocate();
+    }
+}
+
 }
