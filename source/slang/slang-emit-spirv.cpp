@@ -3461,17 +3461,6 @@ struct SPIRVEmitContext
             varInst,
             builtinVal
         );
-        
-        if (storageClass == SpvStorageClassInput ||
-            storageClass == SpvStorageClassOutput)
-        {
-            switch (builtinVal)
-            {
-            case SpvBuiltInPrimitiveId:
-                _maybeEmitInterpolationModifierDecoration(IRInterpolationMode::NoInterpolation, varInst);
-                break;
-            }
-        }
         m_builtinGlobalVars[key] = varInst;
         return varInst;
     }
@@ -5740,6 +5729,22 @@ struct SPIRVEmitContext
     }
 };
 
+bool isInstUsedInStage(SPIRVEmitContext& context, IRInst* inst, Stage s)
+{
+    auto* referencingEntryPoints = context.m_referencingEntryPoints.tryGetValue(inst);
+    if (!referencingEntryPoints)
+        return false;
+    for (auto entryPoint : *referencingEntryPoints)
+    {
+        if (auto entryPointDecor = entryPoint->findDecoration<IREntryPointDecoration>())
+        {
+            if (entryPointDecor->getProfile().getStage() == s)
+                return true;
+        }
+    }
+    return false;
+}
+
 SlangResult emitSPIRVFromIR(
     CodeGenContext*         codeGenContext,
     IRModule*               irModule,
@@ -5802,6 +5807,29 @@ SlangResult emitSPIRVFromIR(
     for (auto irEntryPoint : irEntryPoints)
     {
         context.ensureInst(irEntryPoint);
+    }
+
+    // Declare integral input builtins as Flat if necessary.
+    for (auto globalInst : context.m_irModule->getGlobalInsts())
+    {
+        if (globalInst->getOp() != kIROp_GlobalVar &&
+            globalInst->getOp() != kIROp_GlobalParam)
+            continue;
+        auto spvVar = context.m_mapIRInstToSpvInst.tryGetValue(globalInst);
+        if (!spvVar)
+            continue;
+        auto ptrType = as<IRPtrType>(globalInst->getDataType());
+        if (!ptrType)
+            continue;
+        auto addrSpace = ptrType->getAddressSpace();
+        if (addrSpace == SpvStorageClassInput)
+        {
+            if (isIntegralScalarOrCompositeType(ptrType->getValueType()))
+            {
+                if (isInstUsedInStage(context, globalInst, Stage::Fragment))
+                    context._maybeEmitInterpolationModifierDecoration(IRInterpolationMode::NoInterpolation, *spvVar);
+            }
+        }
     }
 
     // Move forward delcared pointers to the end.
