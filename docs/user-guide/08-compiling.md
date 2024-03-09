@@ -676,7 +676,7 @@ meanings of their `CompilerOptionValue` encodings.
 | VulkanBindShiftAll | Specifies the `-fvk-bind-shift` option for all spaces. `intValue0`: kind, `intValue1`: shift. |
 | GenerateWholeProgram | When set will emit target code for the entire program instead of for a specific entrypoint. `intValue0` specifies a bool value for the setting. |
 | UseUpToDateBinaryModule | When set will only load precompiled modules if it is up-to-date with its source. `intValue0` specifies a bool value for the setting. |
-
+| ValidateUniformity | When set will perform [uniformity analysis](a1-05-uniformity.md).
 ## Debugging
 
 Slang's SPIRV backend supports generating debug information using the [NonSemantic Shader DebugInfo Instructions](https://github.com/KhronosGroup/SPIRV-Registry/blob/main/nonsemantic/NonSemantic.Shader.DebugInfo.100.asciidoc).
