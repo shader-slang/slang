@@ -49,8 +49,7 @@ namespace gfx_test
         )";
         const char* module1Src = R"(
             import ifoo;
-            export struct Foo : IFoo = FooImpl;
-        )";
+            export struct Foo : IFoo = FooImpl;)";
         Slang::ComPtr<slang::ISession> slangSession;
         SLANG_RETURN_ON_FAIL(device->getSlangSession(slangSession.writeRef()));
         Slang::ComPtr<slang::IBlob> diagnosticsBlob;
