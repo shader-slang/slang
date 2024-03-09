@@ -719,8 +719,8 @@ DIAGNOSTIC(42001, Error, invalidUseOfTorchTensorTypeInDeviceFunc, "invalid use o
 
 DIAGNOSTIC(45001, Error, unresolvedSymbol, "unresolved external symbol '$0'.")
 
-DIAGNOSTIC(41201, Warning, expectDynamicUniformArgument, "argument for '$0' is not a dynamic uniform.")
-DIAGNOSTIC(41201, Warning, expectDynamicUniformValue, "value stored at this location must be dynamic uniform.")
+DIAGNOSTIC(41201, Warning, expectDynamicUniformArgument, "argument for '$0' might not be a dynamic uniform, use `asDynamicUniform()` to silence this warning.")
+DIAGNOSTIC(41201, Warning, expectDynamicUniformValue, "value stored at this location must be dynamic uniform, use `asDynamicUniform()` to silence this warning.")
 
 //
 // 5xxxx - Target code generation.
