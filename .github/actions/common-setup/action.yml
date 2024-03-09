@@ -5,8 +5,6 @@ description: Performs setup common to all our actions
 inputs:
   os:
     required: true
-  runs-on:
-    required: true
   compiler:
     required: true
   platform:
@@ -40,10 +38,13 @@ runs:
         # infer C++ compiler
         CXX=${CXX/gcc/g++}
         CXX=${CXX/clang/clang++}
-        # Correct version on older ubuntu
-        if [[ "${{inputs.runs-on}}" == ubuntu-20.04 ]]; then
-          CC=${CC/gcc/gcc-10}
-          CXX=${CXX/g++/g++-10}
+        # Correct gcc version on older ubuntu
+        if [ "${{inputs.os}}" == "linux" ]; then
+          gcc_version=$(gcc -dumpversion | cut -d'.' -f1)
+          if [ "$gcc_version" -lt 10 ]; then
+            CC=${CC/gcc/gcc-10}
+            CXX=${CXX/g++/g++-10}
+          fi
         fi
         # Export
         echo "CC=$CC" >> "$GITHUB_ENV"
