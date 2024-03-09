@@ -18,6 +18,7 @@ namespace gfx_test
         const char* moduleInterfaceSrc = R"(
             interface IBase : IDifferentiable
             {
+                [Differentiable]
                 float getBaseValue();
             }
             interface IFoo : IBase
@@ -33,6 +34,7 @@ namespace gfx_test
                 static const int offset = -1;
                 [mutating] void setValue(float v) { val = v; }
                 float getValue() { return val + 1.0; }
+                [Differentiable]
                 float getBaseValue() { return val; }
                 property float val2 {
                     get { return val + 2.0; }
