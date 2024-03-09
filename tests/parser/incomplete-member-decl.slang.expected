@@ -3,7 +3,6 @@ standard error = {
 tests/parser/incomplete-member-decl.slang(19): error 20001: unexpected identifier, expected '('
     int MyType<X> inner;
                   ^~~~~
-tests/parser/incomplete-member-decl.slang(20): error 20001: unexpected end of file, expected identifier
 }
 standard output = {
 }
