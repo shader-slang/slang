@@ -708,6 +708,11 @@ struct IRSequentialIDDecoration : IRDecoration
     IRIntegerValue getSequentialID() { return getSequentialIDOperand()->getValue(); }
 };
 
+struct IRDynamicDispatchWitnessDecoration : IRDecoration
+{
+    IR_LEAF_ISA(DynamicDispatchWitnessDecoration)
+};
+
 struct IRAutoDiffOriginalValueDecoration : IRDecoration
 {
     enum
@@ -4690,6 +4695,11 @@ public:
     void addSequentialIDDecoration(IRInst* inst, IRIntegerValue id)
     {
         addDecoration(inst, kIROp_SequentialIDDecoration, getIntValue(getUIntType(), id));
+    }
+
+    void addDynamicDispatchWitnessDecoration(IRInst* inst)
+    {
+        addDecoration(inst, kIROp_DynamicDispatchWitnessDecoration);
     }
 
     void addVulkanRayPayloadDecoration(IRInst* inst, int location)

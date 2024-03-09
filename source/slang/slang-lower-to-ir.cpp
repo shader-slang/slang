@@ -10872,7 +10872,7 @@ struct TypeConformanceIRGenContext
         auto witness = lowerSimpleVal(context, typeConformance->getSubtypeWitness());
         builder->addKeepAliveDecoration(witness);
         builder->addHLSLExportDecoration(witness);
-
+        builder->addDynamicDispatchWitnessDecoration(witness);
         if (conformanceIdOverride != -1)
         {
             builder->addSequentialIDDecoration(witness, conformanceIdOverride);
