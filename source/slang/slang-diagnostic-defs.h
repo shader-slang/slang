@@ -276,6 +276,7 @@ DIAGNOSTIC(30007, Error, functionReturnTypeMismatch, "expression type '$0' does 
 DIAGNOSTIC(30008, Error, variableNameAlreadyDefined, "variable $0 already defined.")
 DIAGNOSTIC(30009, Error, invalidTypeVoid, "invalid type 'void'.")
 DIAGNOSTIC(30010, Error, whilePredicateTypeError2, "'while': expression must evaluate to int.")
+DIAGNOSTIC(30011, Error, readingFromWriteOnly, "right of '=' is writeonly (cannot be used for reading). Check modifiers.")
 DIAGNOSTIC(30011, Error, assignNonLValue, "left of '=' is not an l-value.")
 DIAGNOSTIC(30012, Error, noApplicationUnaryOperator, "no overload found for operator $0 ($1).")
 DIAGNOSTIC(30012, Error, noOverloadFoundForBinOperatorOnTypes, "no overload found for operator $0  ($1, $2).")

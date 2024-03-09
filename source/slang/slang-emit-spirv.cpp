@@ -3197,9 +3197,33 @@ struct SPIRVEmitContext
             break;
         case kIROp_GloballyCoherentDecoration:
             emitOpDecorate(getSection(SpvLogicalSectionID::Annotations),
-                               decoration,
-                               dstID,
-                               SpvDecorationCoherent);
+                decoration,
+                dstID,
+                SpvDecorationCoherent);
+            break;
+        case kIROp_GLSLVolatileDecoration:
+            emitOpDecorate(getSection(SpvLogicalSectionID::Annotations),
+                decoration,
+                dstID,
+                SpvDecorationVolatile);
+            break;
+        case kIROp_GLSLRestrictDecoration:
+            emitOpDecorate(getSection(SpvLogicalSectionID::Annotations),
+                decoration,
+                dstID,
+                SpvDecorationRestrict);
+            break;
+        case kIROp_GLSLReadOnlyDecoration:
+            emitOpDecorate(getSection(SpvLogicalSectionID::Annotations),
+                decoration,
+                dstID,
+                SpvDecorationNonWritable); 
+            break;
+        case kIROp_GLSLWriteOnlyDecoration:
+            emitOpDecorate(getSection(SpvLogicalSectionID::Annotations),
+                decoration,
+                dstID,
+                SpvDecorationNonReadable);
             break;
         // ...
         }

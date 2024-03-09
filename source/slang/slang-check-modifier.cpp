@@ -986,6 +986,8 @@ namespace Slang
         case ASTNodeType::RayPayloadReadSemantic:
         case ASTNodeType::RayPayloadWriteSemantic:
         case ASTNodeType::GloballyCoherentModifier:
+        case ASTNodeType::GLSLVolatileModifier:
+        case ASTNodeType::GLSLRestrictModifier:
         case ASTNodeType::PreciseModifier:
         case ASTNodeType::IntrinsicOpModifier:
         case ASTNodeType::InlineModifier:
@@ -1062,15 +1064,21 @@ namespace Slang
         case ASTNodeType::RefModifier:
         case ASTNodeType::ConstRefModifier:
         case ASTNodeType::GLSLBufferModifier:
-        case ASTNodeType::GLSLWriteOnlyModifier:
-        case ASTNodeType::GLSLReadOnlyModifier:
         case ASTNodeType::GLSLPatchModifier:
         case ASTNodeType::RayPayloadAccessSemantic:
         case ASTNodeType::RayPayloadReadSemantic:
         case ASTNodeType::RayPayloadWriteSemantic:
             return (as<VarDeclBase>(decl) && isGlobalDecl(decl)) || as<ParamDecl>(decl) || as<GLSLInterfaceBlockDecl>(decl);
 
+
+        //buffer block, members in block, globals, param,
+        case ASTNodeType::GLSLWriteOnlyModifier:
+        case ASTNodeType::GLSLReadOnlyModifier:
+        case ASTNodeType::GLSLVolatileModifier:
+        case ASTNodeType::GLSLRestrictModifier:
         case ASTNodeType::GloballyCoherentModifier:
+            return as<VarDecl>(decl) && (isGlobalDecl(decl) || as<ParamDecl>(decl) || as<StructDecl>(getParentDecl(decl)) || as<GLSLInterfaceBlockDecl>(decl));
+
         case ASTNodeType::HLSLVolatileModifier:
             return as<VarDecl>(decl) && (isGlobalDecl(decl) || as<StructDecl>(getParentDecl(decl)) || as<GLSLInterfaceBlockDecl>(decl));
 

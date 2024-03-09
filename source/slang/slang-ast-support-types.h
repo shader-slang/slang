@@ -541,8 +541,10 @@ namespace Slang
     {
         SLANG_VALUE_CLASS(QualType) 
 
-        Type*	type = nullptr;
+        Type*	        type = nullptr;
         bool	        isLeftValue;
+        bool            hasReadOnlyOnTarget = false;
+        bool	        isWriteOnly = false;
 
         QualType()
             : isLeftValue(false)

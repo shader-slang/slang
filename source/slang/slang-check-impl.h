@@ -2460,6 +2460,7 @@ namespace Slang
             IntVal*				baseElementCount);
 
             /// Perform semantic checking of an assignment where the operands have already been checked.
+        bool isWriteOnlyExpr(Expr* expr);
         Expr* checkAssignWithCheckedOperands(AssignExpr* expr);
 
         // Look up a static member

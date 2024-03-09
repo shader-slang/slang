@@ -34,7 +34,7 @@ protected:
     virtual void emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, IRIntegerValue addressSpace) SLANG_OVERRIDE;
     virtual void emitInterpolationModifiersImpl(IRInst* varInst, IRType* valueType, IRVarLayout* layout) SLANG_OVERRIDE;
     virtual void emitPackOffsetModifier(IRInst* varInst, IRType* valueType, IRPackOffsetDecoration* decoration) SLANG_OVERRIDE;
-
+    virtual void emitMemoryQualifiers(IRInst* varInst) SLANG_OVERRIDE;
     virtual void emitMeshShaderModifiersImpl(IRInst* varInst) SLANG_OVERRIDE;
     virtual void emitSimpleTypeImpl(IRType* type) SLANG_OVERRIDE;
     virtual void emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount) SLANG_OVERRIDE;
@@ -56,6 +56,7 @@ protected:
     virtual void emitSimpleValueImpl(IRInst* inst) SLANG_OVERRIDE;
     virtual void emitLoopControlDecorationImpl(IRLoopControlDecoration* decl) SLANG_OVERRIDE;
 
+    void _emitMemoryQualifierDecorations(IRInst* varDecl);
     void _emitGLSLTextureOrTextureSamplerType(IRTextureTypeBase* type, char const* baseName);
     void _emitGLSLStructuredBuffer(IRGlobalParam* varDecl, IRHLSLStructuredBufferTypeBase* structuredBufferType);
 

@@ -412,6 +412,10 @@ namespace Slang
                 expr->declRef = declRef;
                 expr->memberOperatorLoc = _getMemberOpLoc(originalExpr);
 
+                // if any member says the following value is a write only,
+                // we must declare the variable as a write only
+                expr->type.isWriteOnly = baseExpr->type.isWriteOnly || expr->type.isWriteOnly;
+
                 // When referring to a member through an expression,
                 // the result is only an l-value if both the base
                 // expression and the member agree that it should be.
@@ -424,7 +428,8 @@ namespace Slang
                     // One exception to this is if we're reading the contents
                     // of a GLSL buffer interface block which isn't marked as
                     // read_only
-                    expr->type.isLeftValue = isMutableGLSLBufferBlockVarExpr(baseExpr);
+                    //note: mutable only if child is not read-only and you are not read-only as well
+                    expr->type.isLeftValue = isMutableGLSLBufferBlockVarExpr(baseExpr) && (expr->type.hasReadOnlyOnTarget == false);
                 }
                 else
                 {
@@ -2061,8 +2066,20 @@ namespace Slang
         }
     }
 
+    bool SemanticsVisitor::isWriteOnlyExpr(Expr* expr)
+    {
+        if (auto declRef = as<DeclRefType>(expr->type.type))
+        {
+            return declRef->getDeclRefBase()->getDecl()->hasModifier<GLSLWriteOnlyModifier>();
+        }
+        return false;
+    }
+
     Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
     {
+        if (expr->right->type.isWriteOnly)
+            getSink()->diagnose(expr, Diagnostics::readingFromWriteOnly);
+
         expr->left = maybeOpenRef(expr->left);
         auto type = expr->left->type;
         auto right = maybeOpenRef(expr->right);
@@ -3265,6 +3282,8 @@ namespace Slang
             {
                 auto elementType = QualType(pointerLikeType->getElementType());
                 elementType.isLeftValue = baseType.isLeftValue;
+                elementType.hasReadOnlyOnTarget = baseType.hasReadOnlyOnTarget;
+                elementType.isWriteOnly = baseType.isWriteOnly;
 
                 auto derefExpr = m_astBuilder->create<DerefExpr>();
                 derefExpr->base = expr;

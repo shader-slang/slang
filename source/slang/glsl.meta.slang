@@ -2788,6 +2788,402 @@ public vec4 shadow2DProjLod(sampler2DShadow sampler, vec4 coord, float lod)
 }
 
 //
+// image type
+//
+
+public const int GL_TEXTURE_CUBE_MAP_POSITIVE_X = 0;
+public const int GL_TEXTURE_CUBE_MAP_NEGATIVE_X = 1;
+public const int GL_TEXTURE_CUBE_MAP_POSITIVE_Y = 2;
+public const int GL_TEXTURE_CUBE_MAP_NEGATIVE_Y = 3;
+public const int GL_TEXTURE_CUBE_MAP_POSITIVE_Z = 4;
+public const int GL_TEXTURE_CUBE_MAP_NEGATIVE_Z = 5;
+
+__generic<T : __BuiltinType>
+[ForceInline] void typeRequireChecks_image_atomic_teir1() 
+{
+    __target_switch
+    {
+    case glsl:
+    {
+        if (__type_equals<T, float>()) 
+            __requireGLSLExtension("GLSL_EXT_shader_atomic_float");  
+    }
+    case spirv:
+        return; 
+    }
+}
+
+__generic<T : __BuiltinType>
+[ForceInline] void typeRequireChecks_image_atomic_teir2() 
+{
+    __target_switch
+    {
+    case glsl:
+    {
+        if (__type_equals<T, float>()) 
+            __requireGLSLExtension("GLSL_EXT_shader_atomic_float2");  
+    }
+    case spirv:
+        return; 
+    }
+}
+
+${{{{
+{
+    struct typeWithPrefix_t
+    {
+        const char *prefix;
+        const char *type;
+        bool isInt;
+        const char *SPVTypePrefix;
+        const char *SPVSubTypePrefix;
+        const char *SPVAtomicSuffix;
+    } typeWithPrefix[] =
+        {
+            { "", "float", 0, "F", "F", "EXT" },
+            { "u", "uint", 1, "I", "U", "" },
+            { "i", "int", 1, "I", "S", "" },
+            { "u64", "uint64_t", 1, "I", "U", "" },
+            { "i64", "int64_t", 1, "I", "S", "" },
+        };
+    struct shapeType_t
+    {
+        const char *suffix;
+        const char *dim;
+        int dimI;
+        const char *shape;
+        int isArray;
+        int isMS;
+        bool isDuplicate;
+    } shapeType[] =
+        {
+            { "1D", "1", 1, "__Shape1D", 0, 0, 0},
+
+            { "2D", "2", 2, "__Shape2D", 0, 0, 0 },
+            { "3D", "3", 3, "__Shape3D", 0, 0, 0 },
+            { "Cube", "3", 3, "__ShapeCube", 0, 0, 0 },
+            { "2DRect", "2", 2, "__Shape2D", 0, 0, 1 },
+            { "1DArray", "1", 1, "__Shape1D", 1, 0, 0 },
+
+            { "2DArray", "2", 2, "__Shape2D", 1, 0, 0 },
+            { "CubeArray", "3", 3, "__ShapeCube", 1, 0, 0 },
+            { "Buffer", "1", 1, "__ShapeBuffer", 0, 0, 0 },
+            { "2DMS", "2", 2, "__Shape2D", 0, 1, 0 },
+            { "2DMSArray", "2", 2, "__Shape2D", 1, 1, 0},
+        };
+    for (int typeIter = 0; typeIter < 5; typeIter++)
+    {
+        typeWithPrefix_t targetType = typeWithPrefix[typeIter];
+        for (int shapeIter = 0; shapeIter < sizeof(shapeType)/sizeof(shapeType_t); shapeIter++)
+        {
+            shapeType_t targetShape = shapeType[shapeIter];
+            StringBuilder fullTypeNameBuilder;
+            fullTypeNameBuilder << targetType.prefix << "image" << targetShape.suffix;
+            auto fullTypeName = fullTypeNameBuilder.toString(); 
+
+            // figure out what int/ivec related to the imageSize of this type
+            StringBuilder intOrVecTypeBuilder;
+            if (targetShape.dimI == 1)
+                intOrVecTypeBuilder << "int";
+            else 
+                intOrVecTypeBuilder << "ivec" << targetShape.dimI;
+            auto intOrVecType = intOrVecTypeBuilder.toString();
+            // 
+
+            // https://www.khronos.org/opengl/wiki/Image_Load_Store#Image_operations
+            // this is essentially a macro for the params IMAGE_COORD represents, int or ivec[size]
+            StringBuilder IMAGE_COORDBuilder;
+            int paramC = targetShape.dimI + targetShape.isArray;
+            if (paramC == 1)
+                IMAGE_COORDBuilder << "int";
+            else
+                IMAGE_COORDBuilder << "ivec" << paramC;
+            IMAGE_COORDBuilder << " P";
+            if (targetShape.isMS)
+            {
+                IMAGE_COORDBuilder << ", int sample";
+            }
+            auto IMAGE_COORD = IMAGE_COORDBuilder.toString();
+            StringBuilder IMAGE_PARAMSBuilder;
+            IMAGE_PARAMSBuilder << fullTypeName << " image," << IMAGE_COORD;
+            auto IMAGE_PARAMS = IMAGE_PARAMSBuilder.toString();
+
+            StringBuilder SPV_PREFIX_IMAGE_PARAMSBuilder;
+            StringBuilder SPV_SUFFIX_IMAGE_PARAMSBuilder;
+            StringBuilder SPV_ATOMIC_MAKE_A_SAMPLED_VARBuilder; // for atomics edge case of sample = 0
+            SPV_PREFIX_IMAGE_PARAMSBuilder << "$image $P";
+            SPV_SUFFIX_IMAGE_PARAMSBuilder;
+            if (targetShape.isMS)
+            {
+                SPV_SUFFIX_IMAGE_PARAMSBuilder << " Sample $sample";
+                SPV_ATOMIC_MAKE_A_SAMPLED_VARBuilder << "";
+            }
+            else
+            {
+                SPV_ATOMIC_MAKE_A_SAMPLED_VARBuilder << "let sample = 0;";
+            }
+
+            auto SPV_PREFIX_IMAGE_PARAMS = SPV_PREFIX_IMAGE_PARAMSBuilder.toString();
+            auto SPV_SUFFIX_IMAGE_PARAMS = SPV_SUFFIX_IMAGE_PARAMSBuilder.toString();
+            auto SPV_ATOMIC_MAKE_A_SAMPLED_VAR = SPV_ATOMIC_MAKE_A_SAMPLED_VARBuilder.toString();
+            //
+
+            // figure out texel type to load with -- needed for spirv
+            StringBuilder texelTypeBuilder;
+            if (targetShape.dimI == 1)
+                texelTypeBuilder << targetType.type;
+            else
+                texelTypeBuilder << targetType.prefix << "vec" << targetShape.dimI;
+            auto texelType = texelTypeBuilder.toString();
+}}}}
+
+// will be set from modifiers?
+${{{{
+            if (typeIter == 3 || typeIter == 4)
+            {
+}}}}
+            __glsl_extension(GLSL_EXT_shader_image_int64)
+${{{{
+            }
+}}}}
+            __generic<let format:int=0, let access:int=0>
+            public typealias $(fullTypeName) = __TextureImpl<
+                $(targetType.type),
+                $(targetShape.shape),
+                $(targetShape.isArray), // isArray
+                $(targetShape.isMS), // isMS
+                0, //sampleCount
+                access, // access
+                0, // isShadow
+                0, // isCombined
+                format
+            >;
+
+${{{{
+    // if 2DRect, skip, we only need an alias since same as regular tex-2d
+    if (targetShape.isDuplicate)
+        continue;
+}}}}
+
+            $(intOrVecType) imageSize($(fullTypeName) image)
+            {
+                __target_switch
+                {
+                case glsl: __intrinsic_asm "imageSize($*0)";
+                case spirv:
+                    return spirv_asm 
+                    {
+                        OpCapability ImageQuery;
+                        result:$$$(intOrVecType) = OpImageQuerySize $image;
+                    };
+                }
+            }
+
+            $(targetType.prefix)vec4 imageLoad($(IMAGE_PARAMS))
+            {
+                __target_switch
+                {
+                case glsl: __intrinsic_asm "imageLoad($*0)";
+                case spirv:
+                {
+                    return spirv_asm 
+                    {
+                        result:$$$(targetType.prefix)vec4 = OpImageRead $(SPV_PREFIX_IMAGE_PARAMS) $(SPV_SUFFIX_IMAGE_PARAMS);
+                    };
+                }
+                }
+            }
+
+            void imageStore($(IMAGE_PARAMS), $(targetType.prefix)vec4 data)
+            {
+                __target_switch
+                {
+                case glsl: __intrinsic_asm "imageStore($*0)";
+                case spirv:
+                {
+                    $(texelType) texel;
+                    return spirv_asm 
+                    {
+                        OpImageWrite $(SPV_PREFIX_IMAGE_PARAMS) $data $(SPV_SUFFIX_IMAGE_PARAMS);
+                    };
+                }
+                }
+            }
+
+
+${{{{
+            if (targetShape.isMS == 1)
+            {
+}}}}
+                int imageSamples($(fullTypeName) image)
+                {
+                    __target_switch
+                    {
+                    case glsl: __intrinsic_asm "imageSamples($*0)";
+                    case spirv:
+                        return spirv_asm 
+                        {
+                            OpCapability ImageQuery;
+                            result:$$int = OpImageQuerySamples $image;
+                        };
+                    }
+                }
+${{{{
+            }
+            if (targetShape.dimI == 1)
+            {
+}}}}
+                $(targetType.type) imageAtomicAdd($(IMAGE_PARAMS), $(targetType.type) data)
+                {
+                    typeRequireChecks_image_atomic_teir1<$(targetType.type)>();
+                    __target_switch
+                    {
+                    case glsl: __intrinsic_asm "imageAtomicAdd($*0)";
+                    case spirv:
+                    {
+                        $(SPV_ATOMIC_MAKE_A_SAMPLED_VAR);
+                        return spirv_asm 
+                        {
+                            OpCapability ImageQuery;
+                            %ptr = OpImageTexelPointer $image $P $sample;
+                            result:$$$(targetType.type) = OpAtomic$(targetType.SPVTypePrefix)Add$(targetType.SPVAtomicSuffix) %ptr Device ImageMemory $data
+                        };
+                    }
+                    }
+                }
+                $(targetType.type) imageAtomicExchange($(IMAGE_PARAMS), $(targetType.type) data)
+                {
+                    typeRequireChecks_image_atomic_teir1<$(targetType.type)>();
+                    __target_switch
+                    {
+                    case glsl: __intrinsic_asm "imageAtomicExchange($*0)";
+                    case spirv:
+                    {
+                        $(SPV_ATOMIC_MAKE_A_SAMPLED_VAR);
+                        return spirv_asm 
+                        {
+                            OpCapability ImageQuery;
+                            %ptr = OpImageTexelPointer $image $P $sample;
+                            result:$$$(targetType.type) = OpAtomicExchange %ptr Device ImageMemory $data
+                        };
+                    }
+                    }
+                }
+                $(targetType.type) imageAtomicMin($(IMAGE_PARAMS), $(targetType.type) data)
+                {
+                    typeRequireChecks_image_atomic_teir2<$(targetType.type)>();
+                    __target_switch
+                    {
+                    case glsl: __intrinsic_asm "imageAtomicMin($*0)";
+                    case spirv:
+                    {
+                        $(SPV_ATOMIC_MAKE_A_SAMPLED_VAR);
+                        return spirv_asm 
+                        {
+                            OpCapability ImageQuery;
+                            %ptr = OpImageTexelPointer $image $P $sample;
+                            result:$$$(targetType.type) = OpAtomic$(targetType.SPVSubTypePrefix)Min$(targetType.SPVAtomicSuffix) %ptr Device ImageMemory $data
+                        };
+                    }
+                    }
+                }
+                $(targetType.type) imageAtomicMax($(IMAGE_PARAMS), $(targetType.type) data)
+                {
+                    typeRequireChecks_image_atomic_teir2<$(targetType.type)>();
+                    __target_switch
+                    {
+                    case glsl: __intrinsic_asm "imageAtomicMax($*0)";
+                    case spirv:
+                    {
+                        $(SPV_ATOMIC_MAKE_A_SAMPLED_VAR);
+                        return spirv_asm 
+                        {
+                            OpCapability ImageQuery;
+                            %ptr = OpImageTexelPointer $image $P $sample;
+                            result:$$$(targetType.type) = OpAtomic$(targetType.SPVSubTypePrefix)Max$(targetType.SPVAtomicSuffix) %ptr Device ImageMemory $data
+                        };
+                    }
+                    }
+                }
+${{{{
+                if (!targetType.isInt)
+                    continue;
+}}}}
+                $(targetType.type) imageAtomicAnd($(IMAGE_PARAMS), $(targetType.type) data)
+                {
+                    __target_switch
+                    {
+                    case glsl: __intrinsic_asm "imageAtomicAnd($*0)";
+                    case spirv:
+                    {
+                        $(SPV_ATOMIC_MAKE_A_SAMPLED_VAR);
+                        return spirv_asm 
+                        {
+                            OpCapability ImageQuery;
+                            %ptr = OpImageTexelPointer $image $P $sample;
+                            result:$$$(targetType.type) = OpAtomicAnd %ptr Device ImageMemory $data
+                        };
+                    }
+                    }
+                }
+                $(targetType.type) imageAtomicOr($(IMAGE_PARAMS), $(targetType.type) data)
+                {
+                    __target_switch
+                    {
+                    case glsl: __intrinsic_asm "imageAtomicOr($*0)";
+                    case spirv:
+                    {
+                        $(SPV_ATOMIC_MAKE_A_SAMPLED_VAR);
+                        return spirv_asm 
+                        {
+                            OpCapability ImageQuery;
+                            %ptr = OpImageTexelPointer $image $P $sample;
+                            result:$$$(targetType.type) = OpAtomicOr %ptr Device ImageMemory $data
+                        };
+                    }
+                    }
+                }
+                $(targetType.type) imageAtomicXor($(IMAGE_PARAMS), $(targetType.type) data)
+                {
+                    __target_switch
+                    {
+                    case glsl: __intrinsic_asm "imageAtomicXor($*0)";
+                    case spirv:
+                    {
+                        $(SPV_ATOMIC_MAKE_A_SAMPLED_VAR);
+                        return spirv_asm 
+                        {
+                            OpCapability ImageQuery;
+                            %ptr = OpImageTexelPointer $image $P $sample;
+                            result:$$$(targetType.type) = OpAtomicXor %ptr Device ImageMemory $data
+                        };
+                    }
+                    }
+                }
+                $(targetType.type) imageAtomicCompSwap($(IMAGE_PARAMS), $(targetType.type) compare, $(targetType.type) data)
+                {
+                    __target_switch
+                    {
+                    case glsl: __intrinsic_asm "imageAtomicCompSwap($*0)";
+                    case spirv:
+                    {
+                        $(SPV_ATOMIC_MAKE_A_SAMPLED_VAR);
+                        return spirv_asm 
+                        {
+                            OpCapability ImageQuery;
+                            %ptr = OpImageTexelPointer $image $P $sample;
+                            result:$$$(targetType.type) = OpAtomicCompareExchange %ptr Device ImageMemory ImageMemory $data $compare
+                        };
+                    }
+                    }
+                }
+${{{{
+            }
+        }
+    }
+}
+}}}}
+//
 // Ray tracing
 //
 

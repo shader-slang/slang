@@ -2183,6 +2183,23 @@ void addVarDecorations(
             builder->addDecoration(inst, kIROp_GLSLLocationDecoration,
                 builder->getIntValue(builder->getIntType(), stringToInt(glslLocationMod->valToken.getContent())));
         }
+        else if (as<GLSLVolatileModifier>(mod))
+        {
+            builder->addSimpleDecoration<IRGLSLVolatileDecoration>(inst);
+        }
+        else if (as<GLSLRestrictModifier>(mod))
+        {
+            builder->addSimpleDecoration<IRGLSLRestrictDecoration>(inst);
+        }
+        else if (as<GLSLReadOnlyModifier>(mod))
+        {
+            builder->addSimpleDecoration<IRGLSLReadOnlyDecoration>(inst);
+        }
+        else if (as<GLSLWriteOnlyModifier>(mod))
+        {
+            builder->addSimpleDecoration<IRGLSLWriteOnlyDecoration>(inst);
+        }
+
         else if (auto hlslSemantic = as< HLSLSimpleSemantic>(mod))
         {
             builder->addSemanticDecoration(inst, hlslSemantic->name.getContent());
