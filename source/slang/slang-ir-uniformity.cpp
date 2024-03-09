@@ -310,6 +310,9 @@ namespace Slang
                             auto ifElse = as<IRIfElse>(user);
                             visitControlDependentBlock(ifElse->getTrueBlock());
                             visitControlDependentBlock(ifElse->getFalseBlock());
+                            // Mark phi nodes as non-uniform if any of its incoming values are non-uniform.
+                            for (auto param : ifElse->getAfterBlock()->getParams())
+                                addToWorkList(param);
                             break;
                         }
                         case kIROp_Switch:
@@ -318,6 +321,9 @@ namespace Slang
                             for (UInt c = 0; c < switchInst->getCaseCount(); c++)
                                 visitControlDependentBlock(switchInst->getCaseLabel(c));
                             visitControlDependentBlock(switchInst->getDefaultLabel());
+                            // Mark phi nodes as non-uniform if any of its incoming values are non-uniform.
+                            for (auto param : switchInst->getBreakLabel()->getParams())
+                                addToWorkList(param);
                             break;
                         }
                         case kIROp_Call:
