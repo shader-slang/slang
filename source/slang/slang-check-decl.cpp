@@ -1538,7 +1538,6 @@ namespace Slang
 
                 varDecl->initExpr = initExpr;
                 varDecl->type.type = initExpr->type;
-
                 _validateCircularVarDefinition(varDecl);
             }
             
@@ -1599,6 +1598,19 @@ namespace Slang
                 varDecl->type.type = newMatrixType;
                 if (varDecl->initExpr)
                     varDecl->initExpr = coerce(CoercionSite::Initializer, varDecl->type, varDecl->initExpr);
+            }
+        }
+
+        if (varDecl->initExpr)
+        {
+            if (as<BasicExpressionType>(varDecl->type.type))
+            {
+                auto parentDecl = getParentDecl(varDecl);
+                if (varDecl->findModifier<ConstModifier>() &&
+                    (as<NamespaceDeclBase>(parentDecl) || as<FileDecl>(parentDecl) || varDecl->findModifier<HLSLStaticModifier>()))
+                {
+                    varDecl->val = tryConstantFoldExpr(varDecl->initExpr, ConstantFoldingKind::LinkTime, nullptr);
+                }
             }
         }
 
