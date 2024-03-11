@@ -3103,6 +3103,19 @@ struct SPIRVEmitContext
             break;
         case kIROp_StreamOutputTypeDecoration:
             {
+                // SPIRV requires MaxVertexCount decoration to appear before OutputTopologyDecoration,
+                // so we emit them here.
+                if (auto maxVertexCount = decoration->getParent()->findDecoration<IRMaxVertexCountDecoration>())
+                {
+                    auto section = getSection(SpvLogicalSectionID::ExecutionModes);
+                    emitOpExecutionModeOutputVertices(
+                        section,
+                        maxVertexCount,
+                        dstID,
+                        SpvLiteralInteger::from32(int32_t(getIntVal(maxVertexCount->getCount())))
+                    );
+                }
+
                 auto decor = as<IRStreamOutputTypeDecoration>(decoration);
                 IRType* type = decor->getStreamType();
 
@@ -3144,18 +3157,6 @@ struct SPIRVEmitContext
 
         case kIROp_OutputTopologyDecoration:
             {
-                // SPIRV requires MaxVertexCount decoration to appear before OutputTopologyDecoration,
-                // so we emit them here.
-                if (auto maxVertexCount = decoration->getParent()->findDecoration<IRMaxVertexCountDecoration>())
-                {
-                    auto section = getSection(SpvLogicalSectionID::ExecutionModes);
-                    emitOpExecutionModeOutputVertices(
-                        section,
-                        decoration,
-                        dstID,
-                        SpvLiteralInteger::from32(int32_t(getIntVal(maxVertexCount->getCount())))
-                    );
-                }
                 const auto o = cast<IROutputTopologyDecoration>(decoration);
                 const auto t = o->getTopology()->getStringSlice();
                 const auto m =
