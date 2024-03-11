@@ -4981,7 +4981,7 @@ struct SPIRVEmitContext
             const auto lVec = as<IRVectorType>(l->getDataType());
             auto r = operands[1];
             const auto rVec = as<IRVectorType>(r->getDataType());
-            if (op == kIROp_Mul)
+            if (op == kIROp_Mul && isFloatingPoint)
             {
                 if (lVec && !rVec)
                 {
