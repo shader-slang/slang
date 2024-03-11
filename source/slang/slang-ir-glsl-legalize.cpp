@@ -637,12 +637,13 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
 
         if( kind == LayoutResourceKind::VaryingInput )
         {
-            name = "gl_SampleMaskIn[0]";
+            name = "gl_SampleMaskIn";
         }
         else
         {
-            name = "gl_SampleMask[0]";
+            name = "gl_SampleMask";
         }
+        arrayIndex = 0;
     }
     else if(semanticName == "sv_innercoverage")
     {
@@ -891,6 +892,7 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         //
 
         name = "gl_PositionPerViewNV[1]";
+        arrayIndex = 1;
 
 //            shared->requiresCopyGLPositionToPositionPerView = true;
     }
@@ -1594,7 +1596,12 @@ ScalarizedVal adaptType(
             return adaptType(builder, loaded, toType, fromType);
         }
         break;
-
+    case ScalarizedVal::Flavor::arrayIndex:
+        {
+            auto element = builder->emitElementExtract(val.irValue, as<ScalarizedArrayIndexValImpl>(val.impl)->index);
+            return adaptType(builder, element, toType, fromType);
+        }
+        break;
     default:
         SLANG_UNEXPECTED("unimplemented");
         UNREACHABLE_RETURN(ScalarizedVal());
@@ -1788,7 +1795,7 @@ ScalarizedVal getSubscriptVal(
 
             resultAdapter->val = getSubscriptVal(
                 builder,
-                elementType,
+                inputAdapter->actualType,
                 inputAdapter->val,
                 indexVal);
             return ScalarizedVal::typeAdapter(resultAdapter);

@@ -492,6 +492,11 @@ Result linkAndOptimizeIR(
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
+    // If we have any witness tables that are marked as `KeepAlive`, 
+    // but are not used for dynamic dispatch, unpin them so we don't
+    // do unnecessary work to lower them.
+    unpinWitnessTables(irModule);
+
     simplifyIR(targetProgram, irModule, IRSimplificationOptions::getFast(), sink);
 
     if (!ArtifactDescUtil::isCpuLikeTarget(artifactDesc))

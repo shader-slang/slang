@@ -16,6 +16,10 @@ struct B
     int a;
     int c;
     dynamic_uniform int d;
+    dynamic_uniform int d1;
+    dynamic_uniform int d2;
+    dynamic_uniform int d3;
+    dynamic_uniform int d4;
 }
 
 int getBa(B obj)
@@ -55,11 +59,32 @@ void main(int tid: SV_DispatchThreadID)
     // CHECK-DAG: ([[# @LINE+1]]): warning 41201
     obj.d = ff;
 
+    int t = 0;
+    if (tid == 0)
+        t = 1;
+
+    // CHECK-DAG: ([[# @LINE+1]]): warning 41201
+    obj.d1 = t;
+
+    int u = 0;
+    if (ub.a == 0)
+        u = 1;
+    // CHECK-NOT: ([[# @LINE+1]]): warning 41201
+    obj.d2 = u;
+
+    int vv = 0;
+    if (tid == 0)
+        vv = 2;
+    else
+        vv = 2;
+    // CHECK-NOT: ([[# @LINE+1]]): warning 41201
+    obj.d3 = vv;
+
     // CHECK-NOT: ([[# @LINE+1]]): warning 41201
     expectUniform(getBdFromInout(obj));
     
     // CHECK-NOT: ([[# @LINE+1]]): warning 41201
-    obj.d = d; // OK
+    obj.d4 = d; // OK
 
     // CHECK-NOT: ([[# @LINE+1]]): warning 41201
     expectUniform(d);
