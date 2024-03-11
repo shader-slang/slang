@@ -660,6 +660,7 @@ meanings of their `CompilerOptionValue` encodings.
 | VulkanBindShift | Specifies the `-fvk-bind-shift` option. `intValue0` (higher 8 bits): kind, `intValue0` (lower bits): set; `intValue1`: shift. |
 | VulkanBindGlobals | Specifies the `-fvk-bind-globals` option. `intValue0`: index, `intValue`: set. |
 | VulkanInvertY | Specifies the `-fvk-invert-y` option. `intValue0` specifies a bool value for the setting. |
+| VulkanUseDxPositionW | Specifies the `-fvk-use-dx-position-w` option. `intValue0` specifies a bool value for the setting. |
 | VulkanUseEntryPointName | When set, will keep the original name of entrypoints as they are defined in the source instead of renaming them to `main`. `intValue0` specifies a bool value for the setting. |
 | VulkanUseGLLayout | When set, will use std430 layout instead of D3D buffer layout for raw buffer load/stores. `intValue0` specifies a bool value for the setting. |
 | VulkanEmitReflection | Specifies the `-fspv-reflect` option. When set will include additional reflection instructions in the output SPIRV. `intValue0` specifies a bool value for the setting. |

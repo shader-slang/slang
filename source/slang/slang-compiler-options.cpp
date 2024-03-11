@@ -113,6 +113,7 @@ namespace Slang
                 case CompilerOptionName::MatrixLayoutRow:
                 case CompilerOptionName::MatrixLayoutColumn:
                 case CompilerOptionName::VulkanInvertY:
+                case CompilerOptionName::VulkanUseDxPositionW:
                 case CompilerOptionName::VulkanUseEntryPointName:
                 case CompilerOptionName::VulkanUseGLLayout:
                 case CompilerOptionName::VulkanEmitReflection:

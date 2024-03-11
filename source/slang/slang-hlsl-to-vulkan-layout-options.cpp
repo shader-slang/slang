@@ -53,7 +53,6 @@ void HLSLToVulkanLayoutOptions::loadFromOptionSet(CompilerOptionSet& optionSet)
             m_globalsBinding.set = (*bindGlobals)[0].intValue2;
         }
     }
-    m_invertY = optionSet.getBoolOption(CompilerOptionName::VulkanInvertY);
     m_useGLLayout = optionSet.getBoolOption(CompilerOptionName::VulkanUseGLLayout);
     m_useOriginalEntryPointName = optionSet.getBoolOption(CompilerOptionName::VulkanUseEntryPointName);
 
@@ -123,7 +122,7 @@ Index HLSLToVulkanLayoutOptions::getShift(Kind kind, Index set) const
 
 bool HLSLToVulkanLayoutOptions::hasState() const
 {
-    return canInferBindings() || hasGlobalsBinding() || shouldInvertY() || getUseOriginalEntryPointName()
+    return canInferBindings() || hasGlobalsBinding() || getUseOriginalEntryPointName()
         || shouldUseGLLayout() || shouldEmitSPIRVReflectionInfo();
 }
 

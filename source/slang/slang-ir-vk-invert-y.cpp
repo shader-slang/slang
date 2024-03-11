@@ -56,4 +56,36 @@ void invertYOfPositionOutput(IRModule* module)
     }
 }
 
+
+static IRInst* _invertWOfVector(IRBuilder& builder, IRInst* originalVector)
+{
+    auto vectorType = as<IRVectorType>(originalVector->getDataType());
+    SLANG_ASSERT(vectorType);
+    UInt elementIndexW = 3;
+    auto originalW = builder.emitSwizzle(vectorType->getElementType(), originalVector, 1, &elementIndexW);
+    auto rcpW = builder.emitDiv(originalW->getDataType(), builder.getFloatValue(originalW->getDataType(), 1.0), originalW);
+    auto newVal = builder.emitSwizzleSet(originalVector->getDataType(), originalVector, rcpW, 1, &elementIndexW);
+    return newVal;
+}
+
+// Find inputs of SV_Position and rcp the w coordinates of it right after the read.
+void rcpWOfPositionInput(IRModule* module)
+{
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        if (globalInst->findDecoration<IRGLPositionInputDecoration>())
+        {
+            // Find all loads and replace them with reciprocals.
+            IRBuilder builder(module);
+            traverseUses(globalInst, [&](IRUse* use)
+                {
+                    // Get the inverted vector.
+                    builder.setInsertBefore(use->getUser());
+                    auto invertedVal = _invertWOfVector(builder, globalInst);
+                    // Replace original uses with the invertex vector.
+                    builder.replaceOperand(use, invertedVal);
+                });
+        }
+    }
+}
 }

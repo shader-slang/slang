@@ -874,6 +874,7 @@ extern "C"
             VulkanBindShift,            // intValue0 (higher 8 bits): kind; intValue0(lower bits): set; intValue1: shift
             VulkanBindGlobals,          // intValue0: index; intValue1: set
             VulkanInvertY,              // bool
+            VulkanUseDxPositionW,       // bool
             VulkanUseEntryPointName,    // bool
             VulkanUseGLLayout,          // bool
             VulkanEmitReflection,       // bool
