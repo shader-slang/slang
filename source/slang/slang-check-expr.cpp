@@ -4208,11 +4208,18 @@ namespace Slang
         }
     }
 
+    bool ensureValidModifiersForFuncParam(TypeExp* expr)
+    {
+        return true;
+    }
     Expr* SemanticsExprVisitor::visitFuncTypeExpr(FuncTypeExpr* expr)
     {
         // The input and output to a function type must both be types
-        for(auto& t : expr->parameters)
+        for (auto& t : expr->parameters)
+        {
             t = CheckProperType(t);
+            ensureValidModifiersForFuncParam(&t);
+        }
         expr->result = CheckProperType(expr->result);
 
         // TODO: Kind checking? Where are we stopping someone passing

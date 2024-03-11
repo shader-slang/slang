@@ -1077,7 +1077,12 @@ namespace Slang
         case ASTNodeType::GLSLVolatileModifier:
         case ASTNodeType::GLSLRestrictModifier:
         case ASTNodeType::GloballyCoherentModifier:
-            return as<VarDecl>(decl) && (isGlobalDecl(decl) || as<ParamDecl>(decl) || as<StructDecl>(getParentDecl(decl)) || as<GLSLInterfaceBlockDecl>(decl));
+        {
+            auto param = as<ParamDecl>(decl);
+            return as<VarDecl>(decl) && (isGlobalDecl(decl) || as<StructDecl>(getParentDecl(decl)) || param || as<GLSLInterfaceBlockDecl>(decl))
+                || (param && isGLSLInput)
+                ;
+        }
 
         case ASTNodeType::HLSLVolatileModifier:
             return as<VarDecl>(decl) && (isGlobalDecl(decl) || as<StructDecl>(getParentDecl(decl)) || as<GLSLInterfaceBlockDecl>(decl));

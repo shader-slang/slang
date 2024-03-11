@@ -7726,6 +7726,8 @@ namespace Slang
             glslMod->loc = parser->tokenReader.peekLoc();
             listBuilder.add(glslMod);
         }
+        else
+            parser->sink->diagnose(parser->tokenReader.peekLoc(), Diagnostics::glslTokenOnly, getName(parser, "coherent"));
         return listBuilder.getFirst();
     }
     static NodeBase* parseRestrictModifier(Parser* parser, void* /*userData*/)
@@ -7739,6 +7741,8 @@ namespace Slang
             glslMod->loc = parser->tokenReader.peekLoc();
             listBuilder.add(glslMod);
         }
+        else
+            parser->sink->diagnose(parser->tokenReader.peekLoc(), Diagnostics::glslTokenOnly, getName(parser, "restrict"));
         return listBuilder.getFirst();
     }
     static NodeBase* parseReadonlyModifier(Parser* parser, void* /*userData*/)
@@ -7752,6 +7756,8 @@ namespace Slang
             glslMod->loc = parser->tokenReader.peekLoc();
             listBuilder.add(glslMod);
         }
+        else
+            parser->sink->diagnose(parser->tokenReader.peekLoc(), Diagnostics::glslTokenOnly, getName(parser, "readonly"));
         return listBuilder.getFirst();
     }
     static NodeBase* parseWriteonlyModifier(Parser* parser, void* /*userData*/)
@@ -7765,6 +7771,8 @@ namespace Slang
             glslMod->loc = parser->tokenReader.peekLoc();
             listBuilder.add(glslMod);
         }
+        else
+            parser->sink->diagnose(parser->tokenReader.peekLoc(), Diagnostics::glslTokenOnly, getName(parser, "writeonly"));
         return listBuilder.getFirst();
     }
 
@@ -7773,6 +7781,8 @@ namespace Slang
         ModifierListBuilder listBuilder;
 
         GLSLLayoutLocalSizeAttribute* numThreadsAttrib = nullptr;
+
+        ImageFormat format;
 
         listBuilder.add(parser->astBuilder->create<GLSLLayoutModifierGroupBegin>());
         
@@ -7847,6 +7857,14 @@ namespace Slang
                     }
                 }
             }
+            else if(findImageFormatByName(
+                nameText.getUnownedSlice(),
+                &format))
+            {
+                auto attr = parser->astBuilder->create<FormatAttribute>();
+                attr->format = format;
+                listBuilder.add(attr);
+            }
             else
             {
                 Modifier* modifier = nullptr;
@@ -7868,13 +7886,10 @@ namespace Slang
                 modifier->keywordName = nameAndLoc.name;
                 modifier->loc = nameAndLoc.loc;
 
-                // Special handling for GLSLLayoutModifier
                 if (auto glslModifier = as<GLSLLayoutModifier>(modifier))
                 {
-                    if (AdvanceIf(parser, TokenType::OpAssign))
-                    {
-                        glslModifier->valToken = parser->ReadToken(TokenType::IntegerLiteral);
-                    }
+                    parser->ReadToken(TokenType::OpAssign);
+                    glslModifier->valToken = parser->ReadToken(TokenType::IntegerLiteral);
                 }
 
                 listBuilder.add(modifier);

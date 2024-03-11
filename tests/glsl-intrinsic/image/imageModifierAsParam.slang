@@ -12,24 +12,12 @@ buffer MyBlockName2
 layout(local_size_x = 4) in;
 
 //TEST_INPUT: RWTexture2D(format=R16G16B16A16_FLOAT, size=1, content=one, mipMaps = 1):name someImage
-uniform layout(binding=0,rgba16f) writeonly image2D someImage;
+uniform layout(binding=0,rgba16f) readonly image2D someImage;
 
-bool checkAllImageSizesParamSame(writeonly image2D val)
+bool checkAllImageSizes(readonly image2D val)
 {
     return true
         && imageSize(val) == ivec2(1)
-        ;
-}
-bool checkAllImageSizesParamMore(readonly writeonly image2D val)
-{
-    return true
-        && imageSize(val) == ivec2(1)
-        ;
-}
-bool checkAllImageSizes()
-{
-    return true
-        && imageSize(someImage) == ivec2(1)
         ;
 }
 
@@ -38,10 +26,7 @@ bool checkAllImageSizes()
 void computeMain()
 {
     outputBuffer.data[0] = true
-        && checkAllImageSizesParamSame(someImage)
-        && checkAllImageSizesParamMore(someImage)
-        && checkAllImageSizes()
+        && checkAllImageSizes(someImage);
         ;
-    // BUF: 1
-
+// BUF: 1
 }

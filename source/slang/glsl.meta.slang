@@ -2946,14 +2946,14 @@ ${{{{
 ${{{{
             }
 }}}}
-            __generic<let format:int=0, let access:int=0>
+            __generic<let format:int=0>
             public typealias $(fullTypeName) = __TextureImpl<
                 $(targetType.type),
                 $(targetShape.shape),
                 $(targetShape.isArray), // isArray
                 $(targetShape.isMS), // isMS
                 0, //sampleCount
-                access, // access
+                1, // access -- 0 refers to read only TYPE, not modifier
                 0, // isShadow
                 0, // isCombined
                 format
@@ -2965,7 +2965,9 @@ ${{{{
         continue;
 }}}}
 
-            $(intOrVecType) imageSize($(fullTypeName) image)
+            [require(spirv)]
+            [require(glsl)]
+            [ForceInline] public $(intOrVecType) imageSize(readonly writeonly $(fullTypeName) image)
             {
                 __target_switch
                 {
@@ -2978,8 +2980,9 @@ ${{{{
                     };
                 }
             }
-
-            $(targetType.prefix)vec4 imageLoad($(IMAGE_PARAMS))
+            [require(spirv)]
+            [require(glsl)]
+            [ForceInline] public $(targetType.prefix)vec4 imageLoad(readonly $(IMAGE_PARAMS))
             {
                 __target_switch
                 {
@@ -2993,8 +2996,9 @@ ${{{{
                 }
                 }
             }
-
-            void imageStore($(IMAGE_PARAMS), $(targetType.prefix)vec4 data)
+            [require(spirv)]
+            [require(glsl)]
+            [ForceInline] public void imageStore(writeonly $(IMAGE_PARAMS), $(targetType.prefix)vec4 data)
             {
                 __target_switch
                 {
@@ -3015,7 +3019,9 @@ ${{{{
             if (targetShape.isMS == 1)
             {
 }}}}
-                int imageSamples($(fullTypeName) image)
+                [require(spirv)]
+                [require(glsl)]
+                [ForceInline] public int imageSamples(readonly writeonly $(fullTypeName) image)
                 {
                     __target_switch
                     {
@@ -3033,7 +3039,9 @@ ${{{{
             if (targetShape.dimI == 1)
             {
 }}}}
-                $(targetType.type) imageAtomicAdd($(IMAGE_PARAMS), $(targetType.type) data)
+                [require(spirv)]
+                [require(glsl)]
+                [ForceInline] public $(targetType.type) imageAtomicAdd($(IMAGE_PARAMS), $(targetType.type) data)
                 {
                     typeRequireChecks_image_atomic_teir1<$(targetType.type)>();
                     __target_switch
@@ -3051,7 +3059,9 @@ ${{{{
                     }
                     }
                 }
-                $(targetType.type) imageAtomicExchange($(IMAGE_PARAMS), $(targetType.type) data)
+                [require(spirv)]
+                [require(glsl)]
+                [ForceInline] public $(targetType.type) imageAtomicExchange($(IMAGE_PARAMS), $(targetType.type) data)
                 {
                     typeRequireChecks_image_atomic_teir1<$(targetType.type)>();
                     __target_switch
@@ -3069,7 +3079,9 @@ ${{{{
                     }
                     }
                 }
-                $(targetType.type) imageAtomicMin($(IMAGE_PARAMS), $(targetType.type) data)
+                [require(spirv)]
+                [require(glsl)]
+                [ForceInline] public $(targetType.type) imageAtomicMin($(IMAGE_PARAMS), $(targetType.type) data)
                 {
                     typeRequireChecks_image_atomic_teir2<$(targetType.type)>();
                     __target_switch
@@ -3087,7 +3099,9 @@ ${{{{
                     }
                     }
                 }
-                $(targetType.type) imageAtomicMax($(IMAGE_PARAMS), $(targetType.type) data)
+                [require(spirv)]
+                [require(glsl)]
+                [ForceInline] public $(targetType.type) imageAtomicMax($(IMAGE_PARAMS), $(targetType.type) data)
                 {
                     typeRequireChecks_image_atomic_teir2<$(targetType.type)>();
                     __target_switch
@@ -3109,7 +3123,9 @@ ${{{{
                 if (!targetType.isInt)
                     continue;
 }}}}
-                $(targetType.type) imageAtomicAnd($(IMAGE_PARAMS), $(targetType.type) data)
+                [require(spirv)]
+                [require(glsl)]
+                [ForceInline] public $(targetType.type) imageAtomicAnd($(IMAGE_PARAMS), $(targetType.type) data)
                 {
                     __target_switch
                     {
@@ -3126,7 +3142,9 @@ ${{{{
                     }
                     }
                 }
-                $(targetType.type) imageAtomicOr($(IMAGE_PARAMS), $(targetType.type) data)
+                [require(spirv)]
+                [require(glsl)]
+                [ForceInline] public $(targetType.type) imageAtomicOr($(IMAGE_PARAMS), $(targetType.type) data)
                 {
                     __target_switch
                     {
@@ -3143,7 +3161,9 @@ ${{{{
                     }
                     }
                 }
-                $(targetType.type) imageAtomicXor($(IMAGE_PARAMS), $(targetType.type) data)
+                [require(spirv)]
+                [require(glsl)]
+                [ForceInline] public $(targetType.type) imageAtomicXor($(IMAGE_PARAMS), $(targetType.type) data)
                 {
                     __target_switch
                     {
@@ -3160,7 +3180,9 @@ ${{{{
                     }
                     }
                 }
-                $(targetType.type) imageAtomicCompSwap($(IMAGE_PARAMS), $(targetType.type) compare, $(targetType.type) data)
+                [require(spirv)]
+                [require(glsl)]
+                [ForceInline] public $(targetType.type) imageAtomicCompSwap($(IMAGE_PARAMS), $(targetType.type) compare, $(targetType.type) data)
                 {
                     __target_switch
                     {
@@ -4975,7 +4997,6 @@ __spirv_version(1.3) [require(spirv)]
     shader_subgroup_preamble<T>();
     return QuadReadAcrossDiagonal(value);
 }
-
 
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_quad) [require(glsl)] 
