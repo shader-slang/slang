@@ -3663,7 +3663,11 @@ struct SPIRVEmitContext
                 {
                     requireSPIRVCapability(SpvCapabilityFragmentShadingRateKHR);
                     ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_fragment_shading_rate"));
-                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPrimitiveShadingRateKHR);
+                    auto importDecor = inst->findDecoration<IRImportDecoration>();
+                    if (importDecor && importDecor->getMangledName() == "gl_PrimitiveShadingRateEXT")
+                        return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPrimitiveShadingRateKHR);
+                    else
+                        return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInShadingRateKHR);
                 }
                 SLANG_UNREACHABLE("Unimplemented system value in spirv emit.");
             }
