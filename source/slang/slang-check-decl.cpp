@@ -3559,24 +3559,24 @@ namespace Slang
                 auto noDiffThisAttr = m_astBuilder->create<NoDiffThisAttribute>();
                 addModifier(synFuncDecl, noDiffThisAttr);
             }
-            if (requiredMemberDeclRef.getDecl()->hasModifier<ForwardDifferentiableAttribute>())
-            {
-                auto attr = m_astBuilder->create<ForwardDifferentiableAttribute>();
-                addModifier(synFuncDecl, attr);
-            }
-            if (requiredMemberDeclRef.getDecl()->hasModifier<BackwardDifferentiableAttribute>())
-            {
-                auto attr = m_astBuilder->create<BackwardDifferentiableAttribute>();
-                addModifier(synFuncDecl, attr);
-            }
-            // The visibility of synthesized decl should be the min of the parent decl and the requirement.
-            if (requiredMemberDeclRef.getDecl()->findModifier<VisibilityModifier>())
-            {
-                auto requirementVisibility = getDeclVisibility(requiredMemberDeclRef.getDecl());
-                auto thisVisibility = getDeclVisibility(context->parentDecl);
-                auto visibility = Math::Min(thisVisibility, requirementVisibility);
-                addVisibilityModifier(m_astBuilder, synFuncDecl, visibility);
-            }
+        }
+        if (requiredMemberDeclRef.getDecl()->hasModifier<ForwardDifferentiableAttribute>())
+        {
+            auto attr = m_astBuilder->create<ForwardDifferentiableAttribute>();
+            addModifier(synFuncDecl, attr);
+        }
+        if (requiredMemberDeclRef.getDecl()->hasModifier<BackwardDifferentiableAttribute>())
+        {
+            auto attr = m_astBuilder->create<BackwardDifferentiableAttribute>();
+            addModifier(synFuncDecl, attr);
+        }
+        // The visibility of synthesized decl should be the min of the parent decl and the requirement.
+        if (requiredMemberDeclRef.getDecl()->findModifier<VisibilityModifier>())
+        {
+            auto requirementVisibility = getDeclVisibility(requiredMemberDeclRef.getDecl());
+            auto thisVisibility = getDeclVisibility(context->parentDecl);
+            auto visibility = Math::Min(thisVisibility, requirementVisibility);
+            addVisibilityModifier(m_astBuilder, synFuncDecl, visibility);
         }
 
         return synFuncDecl;
