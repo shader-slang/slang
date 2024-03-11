@@ -7760,6 +7760,12 @@ namespace Slang
     
     static NodeBase* parseLayoutModifier(Parser* parser, void* /*userData*/)
     {
+#define readElseErrorIfNextTokenIsNotAssign(modToCheck) \
+            { \
+                if (parser->tokenReader.peekTokenType() != TokenType::OpAssign) { parser->diagnose(modToCheck->loc, Diagnostics::unexpectedTokenExpectedTokenType, parser->tokenReader.peekTokenType(), TokenType::OpAssign); break;} \
+                else { parser->ReadToken(TokenType::OpAssign); } \
+            }
+
         ModifierListBuilder listBuilder;
 
         GLSLLayoutLocalSizeAttribute* numThreadsAttrib = nullptr;
@@ -7817,7 +7823,7 @@ namespace Slang
                     listBuilder.add(attr);
                 }
 
-                parser->ReadToken(TokenType::OpAssign);
+                readElseErrorIfNextTokenIsNotAssign(attr);
 
                 // If the token asked for is not returned found will put in recovering state, and return token found
                 Token valToken = parser->ReadToken(TokenType::IntegerLiteral);
@@ -7859,28 +7865,24 @@ namespace Slang
                 modifier->keywordName = nameAndLoc.name;
                 modifier->loc = nameAndLoc.loc;
 
-                if (parser->tokenReader.peekTokenType() == TokenType::OpAssign)
+
+                // Special handling for GLSLLayoutModifier
+                if (auto glslModifier = as<GLSLParsedLayoutModifier>(modifier))
                 {
-                    // Special handling for GLSLLayoutModifier
-                    if (auto glslModifier = as<GLSLParsedLayoutModifier>(modifier))
+                    readElseErrorIfNextTokenIsNotAssign(modifier);
+                    glslModifier->valToken = parser->ReadToken(TokenType::IntegerLiteral);
+                }
+                //Special handling for GLSLOffsetLayoutAttribute to add to the byte offset tracker at a binding location
+                else if (auto glslOffset = as<GLSLOffsetLayoutAttribute>(modifier))
+                {
+                    if (auto binding = listBuilder.find<GLSLBindingAttribute>())
                     {
-                        parser->ReadToken(TokenType::OpAssign);
-                        glslModifier->valToken = parser->ReadToken(TokenType::IntegerLiteral);
+                        readElseErrorIfNextTokenIsNotAssign(modifier);
+                        glslOffset->offset = int64_t(getIntegerLiteralValue(parser->ReadToken(TokenType::IntegerLiteral)));
+                        parser->setBindingOffset(binding->binding, glslOffset->offset);
                     }
-                    //Special handling for GLSLOffsetLayoutAttribute to add to the byte offset tracker at a binding location
-                    else if (auto glslOffset = as<GLSLOffsetLayoutAttribute>(modifier))
-                    {
-                        if (auto binding = listBuilder.find<GLSLBindingAttribute>())
-                        {
-                            parser->ReadToken(TokenType::OpAssign);
-                            glslOffset->offset = int64_t(getIntegerLiteralValue(parser->ReadToken(TokenType::IntegerLiteral)));
-                            parser->setBindingOffset(binding->binding, glslOffset->offset);
-                        }
-                        else
-                        {
-                            parser->diagnose(modifier->loc, Diagnostics::missingLayoutBindingModifier);
-                        }
-                    }
+                    else
+                        parser->diagnose(modifier->loc, Diagnostics::missingLayoutBindingModifier);
                 }
 
                 listBuilder.add(modifier);
@@ -7899,6 +7901,8 @@ namespace Slang
         listBuilder.add(parser->astBuilder->create<GLSLLayoutModifierGroupEnd>());
 
         return listBuilder.getFirst();
+
+#undef readElseErrorIfNextTokenIsNotAssign
     }
 
     static NodeBase* parseBuiltinTypeModifier(Parser* parser, void* /*userData*/)
