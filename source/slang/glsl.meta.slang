@@ -4768,7 +4768,7 @@ struct TypeClassSubclass {
     const char *subclassType;
     const char *suffix;
 }; 
-const TypeClassSubclass atomics[6] =
+const TypeClassSubclass atomics[7] =
     {
         { 
             "uint", "I", "U", "",
