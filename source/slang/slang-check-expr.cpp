@@ -1424,6 +1424,8 @@ namespace Slang
         if (!funcDeclRefExpr) return nullptr;
 
         auto funcDeclRef = getDeclRef(m_astBuilder, funcDeclRefExpr);
+        if (!funcDeclRef)
+            return nullptr;
         auto intrinsicMod = funcDeclRef.getDecl()->findModifier<IntrinsicOpModifier>();
         auto implicitCast = funcDeclRef.getDecl()->findModifier<ImplicitConversionModifier>();
         if (!intrinsicMod && !implicitCast)
