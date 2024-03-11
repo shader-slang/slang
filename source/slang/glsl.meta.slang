@@ -4578,13 +4578,13 @@ __spirv_version(1.3) [require(spirv)]
 
 //// GLSL atomic
 
-// this is actaully just a fancy storage buffer, and will be 
-// converted into one as such
+// The following type internally is a Shader Storage Buffer 
+// as per GL_EXT_vulkan_glsl_relaxed
 __magic_type(GLSLAtomicUintType)
 __intrinsic_type($(kIROp_GLSLAtomicUintType))
 public struct atomic_uint{};
 
-// teir of float refers to atomic extension support of float1 or float2.
+// tier of float refers to atomic extension support of float1 or float2.
 // if we are inside a atomic_float function we will run the check for float1 teir
 // types and operations to enable the according ext needed for these operations
 
@@ -4767,7 +4767,8 @@ struct TypeClassSubclass {
     const char* classType;
     const char *subclassType;
     const char *suffix;
-} atomics[] =
+}; 
+const TypeClassSubclass atomics[6] =
     {
         { 
             "uint", "I", "U", "",
@@ -4968,7 +4969,7 @@ __glsl_version(430) [require(glsl)]
 }
 
 __glsl_version(430) [require(glsl)]
-[ForceInline] public uint atomicCounterDecrement_GLSL_wrapper(atomic_uint c)
+[ForceInline] public uint atomicCounterDecrement_GLSL_helper(atomic_uint c)
 {
     __target_switch
     {
@@ -5007,7 +5008,7 @@ __glsl_version(430) [require(glsl)]
     {
     case glsl:
     {
-        atomicCounterDecrement_GLSL_wrapper(c);
+        atomicCounterDecrement_GLSL_helper(c);
         return atomicCounter(c);
     }
     case spirv:

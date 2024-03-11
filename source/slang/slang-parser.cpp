@@ -237,10 +237,15 @@ namespace Slang
         }
         const int64_t getNextBindingOffset(int binding) 
         {
-            const int64_t currentOffset = bindingToByteOffset.getOrAddValue(binding, 0);
+            int64_t currentOffset;
+            if (bindingToByteOffset.addIfNotExists(binding, 0))
+                currentOffset = 0;
+            else
+                currentOffset = bindingToByteOffset.getValue(binding) + sizeof(uint32_t);
+            
             bindingToByteOffset.set(
                 binding,
-                currentOffset+4
+                currentOffset + sizeof(uint32_t)
                 );
             return currentOffset;
         }
@@ -4389,35 +4394,33 @@ namespace Slang
     {
         // we intentionally have findModifier twice since GLSLOffsetLayoutAttribute is rare
         // better to early leave
-        if (auto bindingMod = modifiers->findModifier<GLSLBindingAttribute>())
+        auto bindingMod = modifiers->findModifier<GLSLBindingAttribute>();
+        if (!bindingMod) return;
+        auto varDeclBase = as<VarDeclBase>(decl);
+        if (!varDeclBase) return;
+        auto declRefExpr = as<DeclRefExpr>(varDeclBase->type.exp);
+        if (!declRefExpr) return;
+
+        // here is a problem; we link types into a literal in IR stage post parse
+        // but, order (top down) mattter when parsing atomic_uint offset
+        // more over, we can have patterns like: offset = 20, no offset [+4], offset = 16.
+        // Therefore we must parse all in order. The issue then is we will struggle to 
+        // subsitute atomic_uint for storage buffers...
+        if (auto name = declRefExpr->name)
         {
-            if (auto varDeclBase = as<VarDeclBase>(decl))
+            if (name->text.equals("atomic_uint"))
             {
-                if (auto declRefExpr = as<DeclRefExpr>(varDeclBase->type.exp))
+                if (!modifiers->findModifier<GLSLOffsetLayoutAttribute>())
                 {
-                    // here is a problem; we link types into a literal in IR stage post parse
-                    // but, order (top down) mattter when parsing atomic_uint offset
-                    // more over, we can have patterns like: offset = 20, no offset [+4], offset = 16.
-                    // Therefore we must parse all in order. The issue then is will struggle to 
-                    // subsitute atomic_uint for storage buffers...
-                    if (auto name = declRefExpr->name)
-                    {
-                        if (name->text.equals("atomic_uint"))
-                        {
-                            if (!modifiers->findModifier<GLSLOffsetLayoutAttribute>())
-                            {
-                                const int64_t nextOffset = parser->getNextBindingOffset(bindingMod->binding);
-                                GLSLOffsetLayoutAttribute* modifier = parser->astBuilder->create<GLSLOffsetLayoutAttribute>();
-                                modifier->keywordName = NULL; //no keyword name given
-                                modifier->loc = bindingMod->loc; //has no location in file, set to parent binding
-                                modifier->offset = nextOffset;
-                                
-                                Modifiers newModifier;
-                                newModifier.first = modifier;
-                                _addModifiers(decl, newModifier);
-                            }
-                        }
-                    }
+                    const int64_t nextOffset = parser->getNextBindingOffset(bindingMod->binding);
+                    GLSLOffsetLayoutAttribute* modifier = parser->astBuilder->create<GLSLOffsetLayoutAttribute>();
+                    modifier->keywordName = NULL; //no keyword name given
+                    modifier->loc = bindingMod->loc; //has no location in file, set to parent binding
+                    modifier->offset = nextOffset;
+
+                    Modifiers newModifier;
+                    newModifier.first = modifier;
+                    _addModifiers(decl, newModifier);
                 }
             }
         }

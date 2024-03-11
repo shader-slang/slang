@@ -57,234 +57,306 @@ buffer MyBlockName7
     double data[1];
 } float64Buffer;
 
+// added to tests `out TYPE data` due to Slang bug
+bool i32_init(int val, out int data)
+{
+    data = val;
+    return true;
+}
+bool i32_expect(int val)
+{
+    return int32Buffer.data[0] == val;
+}
 bool testAtomicInt32()
 {
     return true
-        && (int32Buffer.data[0] = 5) == 5
+
+        && i32_init(5, int32Buffer.data[0])
         && atomicAdd(int32Buffer.data[0], 1) == 5
-        && int32Buffer.data[0] == 6
+        && i32_expect(6)
 
-        && (int32Buffer.data[0] = 5) == 5
+        && i32_init(5, int32Buffer.data[0])
         && atomicMin(int32Buffer.data[0], 1) == 5
-        && int32Buffer.data[0] == 1
+        && i32_expect(1)
 
-        && (int32Buffer.data[0] = 5) == 5
+        && i32_init(5, int32Buffer.data[0])
         && atomicMax(int32Buffer.data[0], 1) == 5
-        && int32Buffer.data[0] == 5
+        && i32_expect(5)
 
-        && (int32Buffer.data[0] = 5) == 5
+        && i32_init(5, int32Buffer.data[0])
         && atomicExchange(int32Buffer.data[0], 2) == 5
-        && int32Buffer.data[0] == 2
+        && i32_expect(2)
 
-        && (int32Buffer.data[0] = 5) == 5
+        && i32_init(5, int32Buffer.data[0])
         && atomicAnd(int32Buffer.data[0], 1) == 5
-        && int32Buffer.data[0] == 1
+        && i32_expect(1)
 
-        && (int32Buffer.data[0] = 5) == 5
+        && i32_init(5, int32Buffer.data[0])
         && atomicOr(int32Buffer.data[0], 2) == 5
-        && int32Buffer.data[0] == 7
+        && i32_expect(7)
 
-        && (int32Buffer.data[0] = 5) == 5
+        && i32_init(5, int32Buffer.data[0])
         && atomicXor(int32Buffer.data[0], 3) == 5
-        && int32Buffer.data[0] == 6
+        && i32_expect(6)
 
-        && (int32Buffer.data[0] = 5) == 5
+        && i32_init(5, int32Buffer.data[0])
         && atomicCompSwap(int32Buffer.data[0], 5, 2) == 5
-        && int32Buffer.data[0] == 2
+        && i32_expect(2)
 
-        && (int32Buffer.data[0] = 5) == 5
+        && i32_init(5, int32Buffer.data[0])
         && atomicCompSwap(int32Buffer.data[0], 4, 2) == 5
-        && int32Buffer.data[0] == 5
+        && i32_expect(5)
         ;
+}
+
+bool i64_init(int64_t val, out int64_t data)
+{
+    data = val;
+    return true;
+}
+bool i64_expect(int64_t val)
+{   
+    return int64Buffer.data[0] == val;
 }
 bool testAtomicInt64()
 {
     return true
-        && (int64Buffer.data[0] = 5) == 5
+
+        && i64_init(5, int64Buffer.data[0])
         && atomicAdd(int64Buffer.data[0], 1) == 5
-        && int64Buffer.data[0] == 6
+        && i64_expect(6)
 
-        && (int64Buffer.data[0] = 5) == 5
+        && i64_init(5, int64Buffer.data[0])
         && atomicMin(int64Buffer.data[0], 1) == 5
-        && int64Buffer.data[0] == 1
+        && i64_expect(1)
 
-        && (int64Buffer.data[0] = 5) == 5
+        && i64_init(5, int64Buffer.data[0])
         && atomicMax(int64Buffer.data[0], 1) == 5
-        && int64Buffer.data[0] == 5
+        && i64_expect(5)
 
-        && (int64Buffer.data[0] = 5) == 5
+        && i64_init(5, int64Buffer.data[0])
         && atomicExchange(int64Buffer.data[0], 2) == 5
-        && int64Buffer.data[0] == 2
+        && i64_expect(2)
 
-        && (int64Buffer.data[0] = 5) == 5
+        && i64_init(5, int64Buffer.data[0])
         && atomicAnd(int64Buffer.data[0], 1) == 5
-        && int64Buffer.data[0] == 1
+        && i64_expect(1)
 
-        && (int64Buffer.data[0] = 5) == 5
+        && i64_init(5, int64Buffer.data[0])
         && atomicOr(int64Buffer.data[0], 2) == 5
-        && int64Buffer.data[0] == 7
+        && i64_expect(7)
 
-        && (int64Buffer.data[0] = 5) == 5
+        && i64_init(5, int64Buffer.data[0])
         && atomicXor(int64Buffer.data[0], 3) == 5
-        && int64Buffer.data[0] == 6
+        && i64_expect(6)
 
-        && (int64Buffer.data[0] = 5) == 5
+        && i64_init(5, int64Buffer.data[0])
         && atomicCompSwap(int64Buffer.data[0], 5, 2) == 5
-        && int64Buffer.data[0] == 2
+        && i64_expect(2)
 
-        && (int64Buffer.data[0] = 5) == 5
+        && i64_init(5, int64Buffer.data[0])
         && atomicCompSwap(int64Buffer.data[0], 4, 2) == 5
-        && int64Buffer.data[0] == 5
+        && i64_expect(5)
         ;
+}
+
+bool u32_init(uint val, out uint data)
+{
+    data = val;
+    return true;
+}
+bool u32_expect(uint val)
+{   
+    return uint32Buffer.data[0] == val;
 }
 bool testAtomicUint32()
 {
     return true
-        && (uint32Buffer.data[0] = 5) == 5
+
+        && u32_init(5, uint32Buffer.data[0])
         && atomicAdd(uint32Buffer.data[0], 1) == 5
-        && uint32Buffer.data[0] == 6
+        && u32_expect(6)
 
-        && (uint32Buffer.data[0] = 5) == 5
+        && u32_init(5, uint32Buffer.data[0])
         && atomicMin(uint32Buffer.data[0], 1) == 5
-        && uint32Buffer.data[0] == 1
+        && u32_expect(1)
 
-        && (uint32Buffer.data[0] = 5) == 5
+        && u32_init(5, uint32Buffer.data[0])
         && atomicMax(uint32Buffer.data[0], 1) == 5
-        && uint32Buffer.data[0] == 5
+        && u32_expect(5)
 
-        && (uint32Buffer.data[0] = 5) == 5
+        && u32_init(5, uint32Buffer.data[0])
         && atomicExchange(uint32Buffer.data[0], 2) == 5
-        && uint32Buffer.data[0] == 2
+        && u32_expect(2)
 
-        && (uint32Buffer.data[0] = 5) == 5
+        && u32_init(5, uint32Buffer.data[0])
         && atomicAnd(uint32Buffer.data[0], 1) == 5
-        && uint32Buffer.data[0] == 1
+        && u32_expect(1)
 
-        && (uint32Buffer.data[0] = 5) == 5
+        && u32_init(5, uint32Buffer.data[0])
         && atomicOr(uint32Buffer.data[0], 2) == 5
-        && uint32Buffer.data[0] == 7
+        && u32_expect(7)
 
-        && (uint32Buffer.data[0] = 5) == 5
+        && u32_init(5, uint32Buffer.data[0])
         && atomicXor(uint32Buffer.data[0], 3) == 5
-        && uint32Buffer.data[0] == 6
+        && u32_expect(6)
 
-        && (uint32Buffer.data[0] = 5) == 5
+        && u32_init(5, uint32Buffer.data[0])
         && atomicCompSwap(uint32Buffer.data[0], 5, 2) == 5
-        && uint32Buffer.data[0] == 2
+        && u32_expect(2)
 
-        && (uint32Buffer.data[0] = 5) == 5
+        && u32_init(5, uint32Buffer.data[0])
         && atomicCompSwap(uint32Buffer.data[0], 4, 2) == 5
-        && uint32Buffer.data[0] == 5
+        && u32_expect(5)
         ;
+}
+
+bool u64_init(uint64_t val, out uint64_t data)
+{
+    data = val;
+    return true;
+}
+bool u64_expect(uint64_t val)
+{   
+    return uint64Buffer.data[0] == val;
 }
 bool testAtomicUint64()
 {
     return true
-        && (uint64Buffer.data[0] = 5) == 5
+
+        && u64_init(5, uint64Buffer.data[0])
         && atomicAdd(uint64Buffer.data[0], 1) == 5
-        && uint64Buffer.data[0] == 6
+        && u64_expect(6)
 
-        && (uint64Buffer.data[0] = 5) == 5
+        && u64_init(5, uint64Buffer.data[0])
         && atomicMin(uint64Buffer.data[0], 1) == 5
-        && uint64Buffer.data[0] == 1
+        && u64_expect(1)
 
-        && (uint64Buffer.data[0] = 5) == 5
+        && u64_init(5, uint64Buffer.data[0])
         && atomicMax(uint64Buffer.data[0], 1) == 5
-        && uint64Buffer.data[0] == 5
+        && u64_expect(5)
 
-        && (uint64Buffer.data[0] = 5) == 5
+        && u64_init(5, uint64Buffer.data[0])
         && atomicExchange(uint64Buffer.data[0], 2) == 5
-        && uint64Buffer.data[0] == 2
+        && u64_expect(2)
 
-        && (uint64Buffer.data[0] = 5) == 5
+        && u64_init(5, uint64Buffer.data[0])
         && atomicAnd(uint64Buffer.data[0], 1) == 5
-        && uint64Buffer.data[0] == 1
+        && u64_expect(1)
 
-        && (uint64Buffer.data[0] = 5) == 5
+        && u64_init(5, uint64Buffer.data[0])
         && atomicOr(uint64Buffer.data[0], 2) == 5
-        && uint64Buffer.data[0] == 7
+        && u64_expect(7)
 
-        && (uint64Buffer.data[0] = 5) == 5
+        && u64_init(5, uint64Buffer.data[0])
         && atomicXor(uint64Buffer.data[0], 3) == 5
-        && uint64Buffer.data[0] == 6
+        && u64_expect(6)
 
-        && (uint64Buffer.data[0] = 5) == 5
+        && u64_init(5, uint64Buffer.data[0])
         && atomicCompSwap(uint64Buffer.data[0], 5, 2) == 5
-        && uint64Buffer.data[0] == 2
+        && u64_expect(2)
 
-        && (uint64Buffer.data[0] = 5) == 5
+        && u64_init(5, uint64Buffer.data[0])
         && atomicCompSwap(uint64Buffer.data[0], 4, 2) == 5
-        && uint64Buffer.data[0] == 5
+        && u64_expect(5)
         ;
 }
 
+bool f16_init(half val, out half data)
+{
+    data = val;
+    return true;
+}
+bool f16_expect(half val)
+{   
+    return float16Buffer.data[0] == val;
+}
 bool testAtomicFloat16()
 {
     return true
+
 #ifdef TEST_when_shader_atomic_float2_is_available
-        && (float16Buffer.data[0] = half(5)) == half(5)
+        && f16_init(5, float16Buffer.data[0])
         && atomicAdd(float16Buffer.data[0], half(1)) == half(5)
-        && float16Buffer.data[0] == half(6)
+        && f16_expect(6)
 
-        && (float16Buffer.data[0] = half(5)) == half(5)
+        && f16_init(5, float16Buffer.data[0])
         && atomicMin(float16Buffer.data[0], half(1)) == half(5)
-        && float16Buffer.data[0] == half(1)
+        && f16_expect(1)
 
-        && (float16Buffer.data[0] = half(5)) == half(5)
+        && f16_init(5, float16Buffer.data[0])
         && atomicMax(float16Buffer.data[0], half(1)) == half(5)
-        && float16Buffer.data[0] == half(5)
+        && f16_expect(5)
 
-        && (float16Buffer.data[0] = half(5)) == half(5)
+        && f16_init(5, float16Buffer.data[0])
         && atomicExchange(float16Buffer.data[0], half(2)) == half(5)
-        && float16Buffer.data[0] == half(2)
+        && f16_expect(2)
 #endif // TEST_when_shader_atomic_float2_is_available
         ;
 }
 
+bool f32_init(float val, out float data)
+{
+    data = val;
+    return true;
+}
+bool f32_expect(float val)
+{   
+    return float32Buffer.data[0] == val;
+}
 bool testAtomicFloat32()
 {
     return true
 
-        && (float32Buffer.data[0] = float(5)) == float(5)
+        && f32_init(5, float32Buffer.data[0])
         && atomicAdd(float32Buffer.data[0], float(1)) == float(5)
-        && float32Buffer.data[0] == float(6)
+        && f32_expect(6)
 
 #ifdef TEST_when_shader_atomic_float2_is_available
-        && (float32Buffer.data[0] = float(5)) == float(5)
+        && f32_init(5, float32Buffer.data[0])
         && atomicMin(float32Buffer.data[0], float(1)) == float(5)
-        && float32Buffer.data[0] == float(1)
+        && f32_expect(1)
 
-        && (float32Buffer.data[0] = float(5)) == float(5)
+        && f32_init(5, float32Buffer.data[0])
         && atomicMax(float32Buffer.data[0], float(1)) == float(5)
-        && float32Buffer.data[0] == float(5)
+        && f32_expect(5)
 
-        && (float32Buffer.data[0] = float(5)) == float(5)
+        && f32_init(5, float32Buffer.data[0])
         && atomicExchange(float32Buffer.data[0], float(2)) == float(5)
-        && float32Buffer.data[0] == float(2)
+        && f32_expect(2)
 #endif // TEST_when_shader_atomic_float2_is_available
         ;
 }
 
+bool f64_init(double val, out double data)
+{
+    data = val;
+    return true;
+}
+bool f64_expect(double val)
+{   
+    return float64Buffer.data[0] == val;
+}
 bool testAtomicFloat64()
 {
     return true
 
-        && (float64Buffer.data[0] = double(5)) == double(5)
+        && f64_init(5, float64Buffer.data[0])
         && atomicAdd(float64Buffer.data[0], double(1)) == double(5)
-        && float64Buffer.data[0] == double(6)
+        && f64_expect(6)
 
 #ifdef TEST_when_shader_atomic_float2_is_available
-        && (float64Buffer.data[0] = double(5)) == double(5)
+        && f64_init(5, float64Buffer.data[0])
         && atomicMin(float64Buffer.data[0], double(1)) == double(5)
-        && float64Buffer.data[0] == double(1)
+        && f64_expect(1)
 
-        && (float64Buffer.data[0] = double(5)) == double(5)
+        && f64_init(5, float64Buffer.data[0])
         && atomicMax(float64Buffer.data[0], double(1)) == double(5)
-        && float64Buffer.data[0] == double(5)
+        && f64_expect(5)
 
-        && (float64Buffer.data[0] = double(5)) == double(5)
+        && f64_init(5, float64Buffer.data[0])
         && atomicExchange(float64Buffer.data[0], double(2)) == double(5)
-        && float64Buffer.data[0] == double(2)
+        && f64_expect(2)
 #endif // TEST_when_shader_atomic_float2_is_available
         ;
 }
