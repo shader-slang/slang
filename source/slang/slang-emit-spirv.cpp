@@ -3096,24 +3096,24 @@ struct SPIRVEmitContext
             break;
         case kIROp_StreamOutputTypeDecoration:
             {
-                for (auto inputDecor : decoration->parent->getDecorations())
+                for (auto inputDecor : decoration->getParent()->getDecorations())
                 {
                     switch (inputDecor->getOp())
                     {
                     case kIROp_TriangleInputPrimitiveTypeDecoration:
-                        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, SpvExecutionModeTriangles);
+                        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), inputDecor, dstID, SpvExecutionModeTriangles);
                         break;
                     case kIROp_LineInputPrimitiveTypeDecoration:
-                        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, SpvExecutionModeInputLines);
+                        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), inputDecor, dstID, SpvExecutionModeInputLines);
                         break;
                     case kIROp_LineAdjInputPrimitiveTypeDecoration:
-                        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, SpvExecutionModeInputLinesAdjacency);
+                        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), inputDecor, dstID, SpvExecutionModeInputLinesAdjacency);
                         break;
                     case kIROp_PointInputPrimitiveTypeDecoration:
-                        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, SpvExecutionModeInputPoints);
+                        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), inputDecor, dstID, SpvExecutionModeInputPoints);
                         break;
                     case kIROp_TriangleAdjInputPrimitiveTypeDecoration:
-                        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, SpvExecutionModeInputTrianglesAdjacency);
+                        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), inputDecor, dstID, SpvExecutionModeInputTrianglesAdjacency);
                         break;
                     }
                 }
