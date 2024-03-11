@@ -1,8 +1,9 @@
 //TEST:SIMPLE(filecheck=CHECK):-target spirv -emit-spirv-directly -entry main -stage geometry
 
-// Make sure OutputTriangleStrip always appears after OutputVertices,
+// Make sure InputPoints always appears before OutputVertices and OutputTriangleStrip,
 // otherwise, the shader won't work correctly.
 
+// CHECK: OpExecutionMode {{.*}} InputPoints
 // CHECK: OpExecutionMode {{.*}} OutputVertices 4
 // CHECK: OpExecutionMode {{.*}} OutputTriangleStrip
 
