@@ -3087,22 +3087,36 @@ struct SPIRVEmitContext
             }
             break;
         case kIROp_TriangleInputPrimitiveTypeDecoration:
-            emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, SpvExecutionModeTriangles);
-            break;
         case kIROp_LineInputPrimitiveTypeDecoration:
-            emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, SpvExecutionModeInputLines);
-            break;
         case kIROp_LineAdjInputPrimitiveTypeDecoration:
-            emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, SpvExecutionModeInputLinesAdjacency);
-            break;
         case kIROp_PointInputPrimitiveTypeDecoration:
-            emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, SpvExecutionModeInputPoints);
-            break;
         case kIROp_TriangleAdjInputPrimitiveTypeDecoration:
-            emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, SpvExecutionModeInputTrianglesAdjacency);
+            // Defer this until we see kIROp_StreamOutputTypeDecoration because the driver wants to see
+            // them before the output.
             break;
         case kIROp_StreamOutputTypeDecoration:
             {
+                for (auto inputDecor : decoration->parent->getDecorations())
+                {
+                    switch (inputDecor->getOp())
+                    {
+                    case kIROp_TriangleInputPrimitiveTypeDecoration:
+                        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, SpvExecutionModeTriangles);
+                        break;
+                    case kIROp_LineInputPrimitiveTypeDecoration:
+                        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, SpvExecutionModeInputLines);
+                        break;
+                    case kIROp_LineAdjInputPrimitiveTypeDecoration:
+                        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, SpvExecutionModeInputLinesAdjacency);
+                        break;
+                    case kIROp_PointInputPrimitiveTypeDecoration:
+                        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, SpvExecutionModeInputPoints);
+                        break;
+                    case kIROp_TriangleAdjInputPrimitiveTypeDecoration:
+                        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, SpvExecutionModeInputTrianglesAdjacency);
+                        break;
+                    }
+                }
                 // SPIRV requires MaxVertexCount decoration to appear before OutputTopologyDecoration,
                 // so we emit them here.
                 if (auto maxVertexCount = decoration->getParent()->findDecoration<IRMaxVertexCountDecoration>())
