@@ -934,6 +934,8 @@ Result linkAndOptimizeIR(
         legalizeUniformBufferLoad(irModule);
         if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::VulkanInvertY))
             invertYOfPositionOutput(irModule);
+        if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::VulkanUseDxPositionW))
+            rcpWOfPositionInput(irModule);
     }
 
     // Lower sizeof/alignof
