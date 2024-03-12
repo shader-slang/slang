@@ -166,6 +166,23 @@ RefPtr<TupleLegalElementWrappingObj> LegalElementWrapping::getTuple() const
 
 //
 
+bool isRaytracingObject(IRInst* inst)
+{
+    for (auto dec : inst->getDecorations())
+    {
+        switch (dec->getOp())
+        {
+        case kIROp_VulkanRayPayloadDecoration:
+        case kIROp_VulkanRayPayloadInDecoration:
+        case kIROp_VulkanHitObjectAttributesDecoration:
+        case kIROp_VulkanCallablePayloadDecoration:
+        case kIROp_VulkanCallablePayloadInDecoration:
+        case kIROp_VulkanHitAttributesDecoration:
+            return true;
+        };
+    }
+    return false;
+}
 bool isResourceType(IRType* type)
 {
     while (auto arrayType = as<IRArrayTypeBase>(type))

@@ -2715,51 +2715,108 @@ bool shouldUseOriginalEntryPointName(CodeGenContext* codeGenContext)
     return false;
 }
 
-void assignRayPayloadHitObjectAttributeLocations(IRModule* module)
+void getAllNullLocationRayObjectsAndUsedLocations(
+    IRModule* module,
+    List<IRInst*>* nullRayObjects,
+    HashSet<int>* rayPayload,
+    HashSet<int>* callablePayload,
+    HashSet<int>* hitObjectAttribute)
 {
-    IRIntegerValue rayPayloadCounter = 0;
-    IRIntegerValue callablePayloadCounter = 0;
-    IRIntegerValue hitObjectAttributeCounter = 0;
-
-    IRBuilder builder(module);
     for (auto inst : module->getGlobalInsts())
     {
-        auto globalVar = as<IRGlobalVar>(inst);
-        if (!globalVar)
-            continue;
-        IRInst* location = nullptr;
-        for (auto decor : globalVar->getDecorations())
+        auto instOp = inst->getOp();
+        IRIntegerValue intLitVal = NULL;
+        if (instOp != kIROp_GlobalParam && instOp != kIROp_GlobalVar) continue;
+        for (auto decor : inst->getDecorations())
         {
             switch (decor->getOp())
             {
             case kIROp_VulkanRayPayloadDecoration:
             case kIROp_VulkanRayPayloadInDecoration:
-                if (as<IRIntLit>(decor->getOperand(0))->getValue() >= 0) goto end;
+                intLitVal = as<IRIntLit>(decor->getOperand(0))->getValue();
+                if (intLitVal == -1) { nullRayObjects->add(inst); goto getAllNullLocationRayObjectsAndUsedLocations_end; }
+                rayPayload->add(intLitVal);
+                goto getAllNullLocationRayObjectsAndUsedLocations_end;
+            case kIROp_VulkanCallablePayloadDecoration:
+            case kIROp_VulkanCallablePayloadInDecoration:
+                intLitVal = as<IRIntLit>(decor->getOperand(0))->getValue();
+                if (intLitVal == -1) { nullRayObjects->add(inst); goto getAllNullLocationRayObjectsAndUsedLocations_end; }
+                callablePayload->add(intLitVal);
+                goto getAllNullLocationRayObjectsAndUsedLocations_end;
+            case kIROp_VulkanHitObjectAttributesDecoration:
+                intLitVal = as<IRIntLit>(decor->getOperand(0))->getValue();
+                if (intLitVal == -1) { nullRayObjects->add(inst); goto getAllNullLocationRayObjectsAndUsedLocations_end; }
+                hitObjectAttribute->add(intLitVal);
+                goto getAllNullLocationRayObjectsAndUsedLocations_end;
+            }
+        }    
+    getAllNullLocationRayObjectsAndUsedLocations_end:;
+    }
+}
+void assignRayPayloadHitObjectAttributeLocations(IRModule* module)
+{
+    List<IRInst*> nullRayObjects;
+    HashSet<int> rayPayloadLocations;
+    HashSet<int> callablePayloadLocations;
+    HashSet<int> hitObjectAttributeLocations;
+    getAllNullLocationRayObjectsAndUsedLocations(module, &nullRayObjects, &rayPayloadLocations, &callablePayloadLocations, &hitObjectAttributeLocations);
+
+    IRIntegerValue rayPayloadCounter = 0;
+    IRIntegerValue callablePayloadCounter = 0;
+    IRIntegerValue hitObjectAttributeCounter = 0;
+
+    IRBuilder builder(module);
+    for (auto inst : nullRayObjects)
+    {
+        IRInst* location = nullptr;
+        IRIntegerValue intLitVal = NULL;
+        for (auto decor : inst->getDecorations())
+        {
+            switch (decor->getOp())
+            {
+            case kIROp_VulkanRayPayloadDecoration:
+            case kIROp_VulkanRayPayloadInDecoration:
+                intLitVal = as<IRIntLit>(decor->getOperand(0))->getValue();
+                if (intLitVal >= 0) goto assignRayPayloadHitObjectAttributeLocations_end;
+                while(rayPayloadLocations.contains(rayPayloadCounter))
+                {
+                    rayPayloadCounter++;
+                }
                 builder.setInsertBefore(inst);
                 location = builder.getIntValue(builder.getIntType(), rayPayloadCounter);
                 decor->setOperand(0, location);
                 rayPayloadCounter++;
-                goto end;
+                goto assignRayPayloadHitObjectAttributeLocations_end;
             case kIROp_VulkanCallablePayloadDecoration:
             case kIROp_VulkanCallablePayloadInDecoration:
-                if (as<IRIntLit>(decor->getOperand(0))->getValue() >= 0) goto end;
+                intLitVal = as<IRIntLit>(decor->getOperand(0))->getValue();
+                if (intLitVal >= 0) goto assignRayPayloadHitObjectAttributeLocations_end;
+                while (callablePayloadLocations.contains(callablePayloadCounter))
+                {
+                    callablePayloadCounter++;
+                }
                 builder.setInsertBefore(inst);
                 location = builder.getIntValue(builder.getIntType(), callablePayloadCounter);
                 decor->setOperand(0, location);
                 callablePayloadCounter++;
-                goto end;
+                goto assignRayPayloadHitObjectAttributeLocations_end;
             case kIROp_VulkanHitObjectAttributesDecoration:
-                if (as<IRIntLit>(decor->getOperand(0))->getValue() >= 0) goto end;
+                intLitVal = as<IRIntLit>(decor->getOperand(0))->getValue();
+                if (intLitVal >= 0) goto assignRayPayloadHitObjectAttributeLocations_end;
+                while (hitObjectAttributeLocations.contains(hitObjectAttributeCounter))
+                {
+                    hitObjectAttributeCounter++;
+                }
                 builder.setInsertBefore(inst);
                 location = builder.getIntValue(builder.getIntType(), hitObjectAttributeCounter);
                 decor->setOperand(0, location);
                 hitObjectAttributeCounter++;
-                goto end;
+                goto assignRayPayloadHitObjectAttributeLocations_end;
             default:
                 break;
             }
         }
-    end:;
+    assignRayPayloadHitObjectAttributeLocations_end:;
     }
 }
 

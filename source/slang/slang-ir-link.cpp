@@ -4,6 +4,7 @@
 #include "slang-capability.h"
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
+#include "slang-legalize-types.h"
 #include "slang-mangle.h"
 #include "slang-ir-string-hash.h"
 #include "slang-ir-autodiff.h"
@@ -12,6 +13,7 @@
 
 #include "../core/slang-performance-profiler.h"
 #include "../compiler-core/slang-artifact.h"
+
 
 namespace Slang
 {
@@ -1606,16 +1608,15 @@ LinkedIR linkIR(
 
     context->builder->setInsertInto(context->getModule()->getModuleInst());
 
-    // we emit these early since if these are not at the top of scope, that will be deadly to a compile; 
-    // stdlib functions can use raypayload items, and if we just emit them whenever, it is possible the 
-    // intrinsic resolution will happen above our payload declaration
+    // it is possible that these objects are never referenced; unless they are 
+    // cloned here they may not appear in the IR for code emitting stage
     if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL)) 
     {
         auto insertGlobalVar = [&](IRInst* instToAdd)
         {
             auto clone = cloneValue(context, instToAdd);
-            if (!instToAdd->findDecorationImpl(kIROp_KeepAliveDecoration)) context->builder->addKeepAliveDecoration(instToAdd);
-            context->builder->addInst(clone);
+            if (!clone->findDecorationImpl(kIROp_KeepAliveDecoration)) context->builder->addKeepAliveDecoration(clone);
+
         };
         for (IRModule* irModule : irModules)
         {
@@ -1623,14 +1624,7 @@ LinkedIR linkIR(
             {
                 for (auto decoration : inst->getDecorations())
                 {
-                    auto op = decoration->getOp();
-                    if (0
-                        || op == kIROp_VulkanRayPayloadDecoration
-                        || op == kIROp_VulkanRayPayloadInDecoration
-                        || op == kIROp_VulkanHitObjectAttributesDecoration
-                        || op == kIROp_VulkanCallablePayloadDecoration
-                        || op == kIROp_VulkanCallablePayloadInDecoration
-                        || op == kIROp_VulkanHitAttributesDecoration)
+                    if (isRaytracingObject(inst))
                     {
                         insertGlobalVar(inst);
                     }

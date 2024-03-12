@@ -4248,7 +4248,18 @@ void CLikeSourceEmitter::computeEmitActions(IRModule* module, List<EmitAction>& 
             ensureGlobalInst(&ctx, inst, EmitAction::Level::Definition);
         }
     }
-
+    for (auto inst : module->getGlobalInsts())
+    {
+        // After emitting all structure types we need to emit all raytracing objects to
+        // ensure they are emitted before the layout location is referenced, otherwise,
+        // this can be a compile error if layout is emitted after location is referenced
+        // this is required since in GLSL, it is likley in a programs life time a raytracing
+        // object will never be referenced by name
+        if (isRaytracingObject(inst))
+        {
+            ensureGlobalInst(&ctx, inst, EmitAction::Level::Definition);
+        }
+    }
     for(auto inst : module->getGlobalInsts())
     {
         if( as<IRType>(inst) )

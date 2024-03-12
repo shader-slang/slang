@@ -721,6 +721,8 @@ void legalizeEmptyTypes(
     IRModule* module,
     DiagnosticSink* sink);
 
+bool isRaytracingObject(IRInst* inst);
+
 bool isResourceType(IRType* type);
 
 
