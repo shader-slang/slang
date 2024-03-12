@@ -41,7 +41,7 @@ Result VKBufferHandleRAII::init(
         bufferCreateInfo.pNext = &externalMemoryBufferCreateInfo;
     }
 
-    SLANG_VK_CHECK(api.vkCreateBuffer(api.m_device, &bufferCreateInfo, nullptr, &m_buffer));
+    SLANG_VK_RETURN_ON_FAIL(api.vkCreateBuffer(api.m_device, &bufferCreateInfo, nullptr, &m_buffer));
 
     VkMemoryRequirements memoryReqs = {};
     api.vkGetBufferMemoryRequirements(api.m_device, m_buffer, &memoryReqs);
@@ -87,8 +87,8 @@ Result VKBufferHandleRAII::init(
         allocateInfo.pNext = &flagInfo;
     }
 
-    SLANG_VK_CHECK(api.vkAllocateMemory(api.m_device, &allocateInfo, nullptr, &m_memory));
-    SLANG_VK_CHECK(api.vkBindBufferMemory(api.m_device, m_buffer, m_memory, 0));
+    SLANG_VK_RETURN_ON_FAIL(api.vkAllocateMemory(api.m_device, &allocateInfo, nullptr, &m_memory));
+    SLANG_VK_RETURN_ON_FAIL(api.vkBindBufferMemory(api.m_device, m_buffer, m_memory, 0));
 
     return SLANG_OK;
 }

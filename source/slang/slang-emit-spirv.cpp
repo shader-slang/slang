@@ -4981,6 +4981,18 @@ struct SPIRVEmitContext
             const auto lVec = as<IRVectorType>(l->getDataType());
             auto r = operands[1];
             const auto rVec = as<IRVectorType>(r->getDataType());
+            if (op == kIROp_Mul && isFloatingPoint)
+            {
+                if (lVec && !rVec)
+                {
+                    return emitInst(parent, instToRegister, SpvOpVectorTimesScalar, type, kResultID, operands);
+                }
+                else if (!lVec && rVec)
+                {
+                    IRInst* newOperands[2] = { operands[1], operands[0] };
+                    return emitInst(parent, instToRegister, SpvOpVectorTimesScalar, type, kResultID, ArrayView<IRInst*>(newOperands, 2));
+                }
+            }
             const auto go = [&](const auto l, const auto r) {
                 return emitInst(parent, instToRegister, opCode, type, kResultID, l, r);
             };
