@@ -2825,13 +2825,17 @@ public uint rayQueryGetIntersectionTypeEXT(rayQueryEXT q, bool committed)
     return 0;
 }
 
+// TODO: implementation of built-in variables; proper tests; these are stubs
+// likley related to the following issue since GLSL adds new 
+// 'system' variables: https://github.com/shader-slang/slang/issues/411
+
 __generic<T : __BuiltinType>
-void shader_subgroup_preamble() 
-{
+[ForceInline]
+void typeRequireChecks_shader_subgroup_GLSL() {
+    // the following is a seperate function call, since else the `__requireGLSLExtension` and associated __intrinsic_asm is ignored if the calling function also calls an __intrinsic_asm
     __target_switch
     {
     case glsl:
-    {
         if (__type_equals<T, half>()
             || __type_equals<T, float16_t>()
             ) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
@@ -2844,21 +2848,54 @@ void shader_subgroup_preamble()
         else if (__type_equals<T, uint64_t>()
             || __type_equals<T, int64_t>()
             ) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_int64");
+
+        __intrinsic_asm "";
     }
+}
+
+__generic<T : __BuiltinType>
+void shader_subgroup_preamble() {
+    // checks needed for shader_subgroup functions; __requireGLSLExtension does not work 
+    // (does not add the ext specified correctly to the compile output; using extended type
+    // will result in error for using the type)
+    __target_switch
+    {
+    case glsl:
+        typeRequireChecks_shader_subgroup_GLSL<T>();
     case spirv:
         return;
     }
 
 } 
 
+// GL_KHR_shader_subgroup_basic Built-in Variables
+
+void requireGLSLExtForSubgroupBasicBuiltin() {
+    __target_switch
+    {
+    case glsl:
+        __requireGLSLExtension("GL_KHR_shader_subgroup_basic");
+        __intrinsic_asm "";
+    }
+}
+
 __spirv_version(1.3) 
 void setupExtForSubgroupBasicBuiltIn() {
     __target_switch
     {
     case glsl:
-        __requireGLSLExtension("GL_KHR_shader_subgroup_basic");
+        requireGLSLExtForSubgroupBasicBuiltin();
     case spirv:
         return;
+    }
+}
+
+void requireGLSLExtForSubgroupBallotBuiltin() {
+    __target_switch
+    {
+    case glsl:
+        __requireGLSLExtension("GL_KHR_shader_subgroup_ballot");
+        __intrinsic_asm "";
     }
 }
 
@@ -2867,7 +2904,7 @@ void setupExtForSubgroupBallotBuiltIn() {
     __target_switch
     {
     case glsl:
-        __requireGLSLExtension("GL_KHR_shader_subgroup_ballot");
+        requireGLSLExtForSubgroupBallotBuiltin();
     case spirv:
         return;
     }
@@ -3051,6 +3088,7 @@ __spirv_version(1.3) [require(spirv)]
             OpCapability Shader;
             OpControlBarrier Subgroup Subgroup AcquireRelease|SubgroupMemory|ImageMemory|UniformMemory
         };
+
     }
 }
 
@@ -3071,6 +3109,7 @@ __spirv_version(1.3) [require(spirv)]
             OpCapability Shader;
             OpMemoryBarrier Subgroup AcquireRelease|SubgroupMemory|ImageMemory|UniformMemory
         };
+
     }
 }
 
@@ -3113,6 +3152,7 @@ __spirv_version(1.3) [require(spirv)]
         spirv_asm {
             OpMemoryBarrier Subgroup AcquireRelease|ImageMemory
         };
+
     }
 }
 
@@ -3134,6 +3174,7 @@ __spirv_version(1.3) [require(spirv)]
             // WorkgroupMemory is the next level of granularity 
             OpMemoryBarrier Subgroup AcquireRelease|WorkgroupMemory
         };
+
     }
 }
 
@@ -4767,34 +4808,34 @@ struct TypeClassSubclass {
     const char* classType;
     const char *subclassType;
     const char *suffix;
+    const int isFloat;
 }; 
-const TypeClassSubclass atomics[7] =
+const TypeClassSubclass atomics[] =
     {
         { 
-            "uint", "I", "U", "",
+            "uint", "I", "U", "", 0
         },
         { 
-            "uint64_t", "I", "U", "",
+            "uint64_t", "I", "U", "", 0
         },
         { 
-            "int", "I", "S", "",
+            "int", "I", "S", "", 0
         },
         { 
-            "int64_t", "I", "S", "",
+            "int64_t", "I", "S", "", 0
         },
         { 
-            "float16_t", "F", "F", "EXT"
+            "float16_t", "F", "F", "EXT", 1
         },
         { 
-            "float", "F", "F", "EXT"
+            "float", "F", "F", "EXT", 1
         },
         { 
-            "double", "F", "F", "EXT"
+            "double", "F", "F", "EXT", 1
         },
     };
-for (int i = 0; i < 7; i++) 
+for (auto item : atomics) 
 {
-    TypeClassSubclass item = atomics[i];
 }}}}
 
 __spirv_version(1.0)[require(spirv)]
@@ -4865,11 +4906,8 @@ __glsl_version(430) [require(glsl)]
 }
 
 ${{{{
-if(0
-    || i == 3
-    || i == 4
-    || i == 5
-    ) continue;
+if(item.isFloat) 
+    continue;
 }}}}
 
 __spirv_version(1.0)[require(spirv)]

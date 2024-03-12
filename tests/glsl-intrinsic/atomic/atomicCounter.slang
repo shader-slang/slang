@@ -43,10 +43,12 @@ bool counterAsParam(atomic_uint param)
         ;
 }
 
+// GLSL_CHECK-LABEL: bool testAtomicUint
+// SPV_CHECK-LABEL: testAtomicUint
 bool testAtomicUint()
 {
-    // ensure the code emits for `one` index into [3] for 12/4
-    // CHECK_GLSL-DAG: {{.*}}_data_0[3]{{.*}}
+// ensure the code emits for `one` index into [3] for 12/4
+// CHECK_GLSL-DAG: {{.*}}_data_0[3]{{.*}}
     return true
     
         && atomicCounterExchange(one, 5) != 100

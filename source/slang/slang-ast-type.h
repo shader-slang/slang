@@ -252,6 +252,7 @@ class RaytracingAccelerationStructureType : public UntypedBufferResourceType
     SLANG_AST_CLASS(RaytracingAccelerationStructureType)
 };
 
+
 class HLSLAppendStructuredBufferType : public HLSLStructuredBufferTypeBase 
 {
     SLANG_AST_CLASS(HLSLAppendStructuredBufferType)
@@ -340,6 +341,7 @@ class GLSLInputAttachmentType : public BuiltinType
 {
     SLANG_AST_CLASS(GLSLInputAttachmentType)
 };
+
 
 // Base class for types used when desugaring parameter block
 // declarations, includeing HLSL `cbuffer` or GLSL `uniform` blocks.
