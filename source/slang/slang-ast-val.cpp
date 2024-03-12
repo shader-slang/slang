@@ -7,6 +7,7 @@
 #include "slang-diagnostics.h"
 #include "slang-syntax.h"
 #include "slang-ast-val.h"
+#include "slang-mangle.h"
 
 namespace Slang {
 
@@ -232,6 +233,15 @@ Val* GenericParamIntVal::_substituteImplOverride(ASTBuilder* /* astBuilder */, S
 bool GenericParamIntVal::_isLinkTimeValOverride()
 {
     return getDeclRef().getDecl()->hasModifier<ExternModifier>();
+}
+
+Val* GenericParamIntVal::_linkTimeResolveOverride(Dictionary<String, IntVal*>& map)
+{
+    auto name = getMangledName(getCurrentASTBuilder(), getDeclRef().declRefBase);
+    IntVal* v;
+    if (map.tryGetValue(name, v))
+        return v;
+    return this;
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ErrorIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1088,6 +1098,15 @@ Val* TypeCastIntVal::tryFoldImpl(ASTBuilder* astBuilder, Type* resultType, Val* 
     return nullptr;
 }
 
+Val* TypeCastIntVal::_linkTimeResolveOverride(Dictionary<String, IntVal*>& map)
+{
+    auto intValBase = as<IntVal>(getBase());
+    if (!intValBase)
+        return this;
+    auto resolvedBase = intValBase->linkTimeResolve(map);
+    return tryFoldImpl(getCurrentASTBuilder(), getType(), resolvedBase, nullptr);
+}
+
 Val* TypeCastIntVal::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
 {
     int diff = 0;
@@ -1310,6 +1329,14 @@ Val* FuncCallIntVal::tryFoldImpl(ASTBuilder* astBuilder, Type* resultType, DeclR
     return nullptr;
 }
 
+Val* FuncCallIntVal::_linkTimeResolveOverride(Dictionary<String, IntVal*>& map)
+{
+    List<IntVal*> newArgs;
+    for (auto arg : getArgs())
+        newArgs.add(as<IntVal>(arg->linkTimeResolve(map)));
+    return tryFoldImpl(getCurrentASTBuilder(), getType(), getFuncDeclRef(), newArgs, nullptr);
+}
+
 Val* FuncCallIntVal::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
 {
     int diff = 0;
@@ -1504,6 +1531,11 @@ Val* PolynomialIntVal::_resolveImplOverride()
 bool IntVal::isLinkTimeVal()
 {
     SLANG_AST_NODE_VIRTUAL_CALL(IntVal, isLinkTimeVal, ());
+}
+
+Val* IntVal::linkTimeResolve(Dictionary<String, IntVal*>& mapMangledNameToVal)
+{
+    SLANG_AST_NODE_VIRTUAL_CALL(IntVal, linkTimeResolve, (mapMangledNameToVal));
 }
 
 } // namespace Slang

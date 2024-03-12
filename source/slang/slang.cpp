@@ -2137,7 +2137,7 @@ Type* ComponentType::getTypeFromString(
     // the modules that were directly or
     // indirectly referenced.
     //
-    Scope* scope = _createScopeForLegacyLookup(astBuilder);
+    Scope* scope = _getOrCreateScopeForLegacyLookup(astBuilder);
 
     auto linkage = getLinkage();
 
@@ -2152,6 +2152,76 @@ Type* ComponentType::getTypeFromString(
         m_types[typeStr] = type;
     }
     return type;
+}
+
+static void collectExportedConstantInContainer(
+    Dictionary<String, IntVal*>& dict,
+    ASTBuilder* builder,
+    ContainerDecl* containerDecl)
+{
+    for (auto m : containerDecl->members)
+    {
+        auto varMember = as<VarDeclBase>(m);
+        if (!varMember)
+            continue;
+        if (!varMember->val)
+            continue;
+        bool isExported = false;
+        bool isConst = true;
+        bool isExtern = false;
+        for (auto modifier : m->modifiers)
+        {
+            if (as<HLSLExportModifier>(modifier))
+                isExported = true;
+            if (as<ExternAttribute>(modifier) || as<ExternModifier>(modifier))
+            {
+                isExtern = true;
+                isExported = true;
+            }
+            if (as<ConstModifier>(modifier))
+                isConst = true;
+            if (isExported && isConst)
+                break;
+        }
+        if (isExported && isConst)
+        {
+            auto mangledName = getMangledName(builder, m);
+            if (isExtern && dict.containsKey(mangledName))
+                continue;
+            dict[mangledName] = varMember->val;
+        }
+    }
+
+    for (auto member : containerDecl->members)
+    {
+        if (as<NamespaceDecl>(member) || as<FileDecl>(member))
+        {
+            collectExportedConstantInContainer(dict, builder, (ContainerDecl*)member);
+        }
+    }
+}
+
+Dictionary<String, IntVal*>& ComponentType::getMangledNameToIntValMap()
+{
+    if (m_mapMangledNameToIntVal)
+    {
+        return *m_mapMangledNameToIntVal;
+    }
+    m_mapMangledNameToIntVal = std::make_unique<Dictionary<String, IntVal*>>();
+    auto astBuilder = getLinkage()->getASTBuilder();
+    SLANG_AST_BUILDER_RAII(astBuilder);
+    Scope* scope = _getOrCreateScopeForLegacyLookup(astBuilder);
+    for (; scope; scope = scope->nextSibling)
+    {
+        if (scope->containerDecl)
+            collectExportedConstantInContainer(*m_mapMangledNameToIntVal, astBuilder, scope->containerDecl);
+    }
+    return *m_mapMangledNameToIntVal;
+}
+
+ConstantIntVal* ComponentType::tryFoldIntVal(IntVal* intVal)
+{
+    return as<ConstantIntVal>(intVal->linkTimeResolve(getMangledNameToIntValMap()));
 }
 
 CompileRequestBase::CompileRequestBase(
