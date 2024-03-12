@@ -19,17 +19,17 @@ void computeMain()
 
 // SPIRV-DAG: OpExtension "SPV_GOOGLE_user_type"
 
-// SPIRV-DAG: OpDecorate %mTexture UserTypeGOOGLE "texture2d"
-// SPIRV-DAG: OpDecorate %mTexture UserSemantic "MY_HLSL_SEMANTIC"
+// SPIRV-DAG: OpDecorateString %mTexture UserTypeGOOGLE "texture2d"
+// SPIRV-DAG: OpDecorateString %mTexture UserSemantic "MY_HLSL_SEMANTIC"
 
-// SPIRV-DAG: OpDecorate %myBuffer UserTypeGOOGLE "structuredbuffer:<MyElement>"
-// SPIRV-DAG: OpDecorate %myBuffer UserSemantic "MY_HLSL_SEMANTIC1"
+// SPIRV-DAG: OpDecorateString %myBuffer UserTypeGOOGLE "structuredbuffer:<MyElement>"
+// SPIRV-DAG: OpDecorateString %myBuffer UserSemantic "MY_HLSL_SEMANTIC1"
 
-// SPIRV-DAG: OpDecorate %myAppendBuffer_counter UserTypeGOOGLE "appendstructuredbuffer:<float>"
-// SPIRV-DAG: OpDecorate %myAppendBuffer_counter UserSemantic "MY_HLSL_SEMANTIC2"
+// SPIRV-DAG: OpDecorateString %myAppendBuffer_counter UserTypeGOOGLE "appendstructuredbuffer:<float>"
+// SPIRV-DAG: OpDecorateString %myAppendBuffer_counter UserSemantic "MY_HLSL_SEMANTIC2"
 
-// SPIRV-DAG: OpDecorate %myAppendBuffer_elements UserTypeGOOGLE "appendstructuredbuffer:<float>"
-// SPIRV-DAG: OpDecorate %myAppendBuffer_elements UserSemantic "MY_HLSL_SEMANTIC2"
+// SPIRV-DAG: OpDecorateString %myAppendBuffer_elements UserTypeGOOGLE "appendstructuredbuffer:<float>"
+// SPIRV-DAG: OpDecorateString %myAppendBuffer_elements UserSemantic "MY_HLSL_SEMANTIC2"
 // SPIRV-DAG: OpDecorateId %myAppendBuffer_elements CounterBuffer %myAppendBuffer_counter
 
-// SPIRV-DAG: OpDecorate %bw UserTypeGOOGLE "byteaddressbuffer"
+// SPIRV-DAG: OpDecorateString %bw UserTypeGOOGLE "byteaddressbuffer"
