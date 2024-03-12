@@ -95,6 +95,9 @@ class VarDeclBase : public Decl
 
     // Initializer expression (optional)
     Expr* initExpr = nullptr;
+
+    // Folded IntVal if the initializer is a constant integer.
+    IntVal* val = nullptr;
 };
 
 // Ordinary potentially-mutable variables (locals, globals, and member variables)

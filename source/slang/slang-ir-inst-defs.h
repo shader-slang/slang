@@ -861,6 +861,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(GLSLPrimitivesRateDecoration, perprimitive, 0, 0)
         // Marks an inst that represents the gl_Position output.
     INST(GLPositionOutputDecoration, PositionOutput, 0, 0)
+        // Marks an inst that represents the gl_Position input.
+    INST(GLPositionInputDecoration, PositionInput, 0, 0)
+
 
     /* StageAccessDecoration */
         INST(StageReadAccessDecoration, stageReadAccess, 0, 0)

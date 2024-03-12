@@ -1368,6 +1368,11 @@ struct IRGLPositionOutputDecoration : public IRDecoration
     IR_LEAF_ISA(GLPositionOutputDecoration)
 };
 
+struct IRGLPositionInputDecoration : public IRDecoration
+{
+    IR_LEAF_ISA(GLPositionInputDecoration)
+};
+
 struct IRMeshOutputRef : public IRInst
 {
     enum { kOp = kIROp_MeshOutputRef };
@@ -4301,6 +4306,11 @@ public:
     void addGLPositionOutputDecoration(IRInst* value)
     {
         addDecoration(value, kIROp_GLPositionOutputDecoration);
+    }
+
+    void addGLPositionInputDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_GLPositionInputDecoration);
     }
 
     void addInterpolationModeDecoration(IRInst* value, IRInterpolationMode mode)

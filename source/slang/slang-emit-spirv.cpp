@@ -3076,16 +3076,9 @@ struct SPIRVEmitContext
             }
             break;
         case kIROp_MaxVertexCountDecoration:
-            {
-                auto section = getSection(SpvLogicalSectionID::ExecutionModes);
-                auto maxVertexCount = cast<IRMaxVertexCountDecoration>(decoration);
-                emitOpExecutionModeOutputVertices(
-                    section,
-                    decoration,
-                    dstID,
-                    SpvLiteralInteger::from32(int32_t(getIntVal(maxVertexCount->getCount())))
-                );
-            }
+            // Don't do anything here, instead wait until we see OutputTopologyDecoration
+            // and emit them together to ensure MaxVertexCount always appears before OutputTopology,
+            // which seemed to be required by SPIRV.
             break;
         case kIROp_InstanceDecoration:
             {
@@ -3096,22 +3089,49 @@ struct SPIRVEmitContext
             }
             break;
         case kIROp_TriangleInputPrimitiveTypeDecoration:
-            emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, SpvExecutionModeTriangles);
-            break;
         case kIROp_LineInputPrimitiveTypeDecoration:
-            emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, SpvExecutionModeInputLines);
-            break;
         case kIROp_LineAdjInputPrimitiveTypeDecoration:
-            emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, SpvExecutionModeInputLinesAdjacency);
-            break;
         case kIROp_PointInputPrimitiveTypeDecoration:
-            emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, SpvExecutionModeInputPoints);
-            break;
         case kIROp_TriangleAdjInputPrimitiveTypeDecoration:
-            emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, SpvExecutionModeInputTrianglesAdjacency);
+            // Defer this until we see kIROp_StreamOutputTypeDecoration because the driver wants to see
+            // them before the output.
             break;
         case kIROp_StreamOutputTypeDecoration:
             {
+                for (auto inputDecor : decoration->getParent()->getDecorations())
+                {
+                    switch (inputDecor->getOp())
+                    {
+                    case kIROp_TriangleInputPrimitiveTypeDecoration:
+                        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), inputDecor, dstID, SpvExecutionModeTriangles);
+                        break;
+                    case kIROp_LineInputPrimitiveTypeDecoration:
+                        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), inputDecor, dstID, SpvExecutionModeInputLines);
+                        break;
+                    case kIROp_LineAdjInputPrimitiveTypeDecoration:
+                        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), inputDecor, dstID, SpvExecutionModeInputLinesAdjacency);
+                        break;
+                    case kIROp_PointInputPrimitiveTypeDecoration:
+                        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), inputDecor, dstID, SpvExecutionModeInputPoints);
+                        break;
+                    case kIROp_TriangleAdjInputPrimitiveTypeDecoration:
+                        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), inputDecor, dstID, SpvExecutionModeInputTrianglesAdjacency);
+                        break;
+                    }
+                }
+                // SPIRV requires MaxVertexCount decoration to appear before OutputTopologyDecoration,
+                // so we emit them here.
+                if (auto maxVertexCount = decoration->getParent()->findDecoration<IRMaxVertexCountDecoration>())
+                {
+                    auto section = getSection(SpvLogicalSectionID::ExecutionModes);
+                    emitOpExecutionModeOutputVertices(
+                        section,
+                        maxVertexCount,
+                        dstID,
+                        SpvLiteralInteger::from32(int32_t(getIntVal(maxVertexCount->getCount())))
+                    );
+                }
+
                 auto decor = as<IRStreamOutputTypeDecoration>(decoration);
                 IRType* type = decor->getStreamType();
 

@@ -660,6 +660,7 @@ meanings of their `CompilerOptionValue` encodings.
 | VulkanBindShift | Specifies the `-fvk-bind-shift` option. `intValue0` (higher 8 bits): kind, `intValue0` (lower bits): set; `intValue1`: shift. |
 | VulkanBindGlobals | Specifies the `-fvk-bind-globals` option. `intValue0`: index, `intValue`: set. |
 | VulkanInvertY | Specifies the `-fvk-invert-y` option. `intValue0` specifies a bool value for the setting. |
+| VulkanUseDxPositionW | Specifies the `-fvk-use-dx-position-w` option. `intValue0` specifies a bool value for the setting. |
 | VulkanUseEntryPointName | When set, will keep the original name of entrypoints as they are defined in the source instead of renaming them to `main`. `intValue0` specifies a bool value for the setting. |
 | VulkanUseGLLayout | When set, will use std430 layout instead of D3D buffer layout for raw buffer load/stores. `intValue0` specifies a bool value for the setting. |
 | VulkanEmitReflection | Specifies the `-fspv-reflect` option. When set will include additional reflection instructions in the output SPIRV. `intValue0` specifies a bool value for the setting. |
@@ -676,7 +677,8 @@ meanings of their `CompilerOptionValue` encodings.
 | VulkanBindShiftAll | Specifies the `-fvk-bind-shift` option for all spaces. `intValue0`: kind, `intValue1`: shift. |
 | GenerateWholeProgram | When set will emit target code for the entire program instead of for a specific entrypoint. `intValue0` specifies a bool value for the setting. |
 | UseUpToDateBinaryModule | When set will only load precompiled modules if it is up-to-date with its source. `intValue0` specifies a bool value for the setting. |
-| ValidateUniformity | When set will perform [uniformity analysis](a1-05-uniformity.md).
+| ValidateUniformity | When set will perform [uniformity analysis](a1-05-uniformity.md).|
+
 ## Debugging
 
 Slang's SPIRV backend supports generating debug information using the [NonSemantic Shader DebugInfo Instructions](https://github.com/KhronosGroup/SPIRV-Registry/blob/main/nonsemantic/NonSemantic.Shader.DebugInfo.100.asciidoc).

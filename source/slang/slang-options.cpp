@@ -399,6 +399,7 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::VulkanBindGlobals, "-fvk-bind-globals", "-fvk-bind-globals <N> <descriptor-set>",
         "Places the $Globals cbuffer at descriptor set <descriptor-set> and binding <N>."},
         { OptionKind::VulkanInvertY, "-fvk-invert-y", nullptr, "Negates (additively inverts) SV_Position.y before writing to stage output."},
+        { OptionKind::VulkanUseDxPositionW, "-fvk-use-dx-position-w", nullptr, "Reciprocates (multiplicatively inverts) SV_Position.w after reading from stage input. For use in fragment shaders only."},
         { OptionKind::VulkanUseEntryPointName, "-fvk-use-entrypoint-name", nullptr, "Uses the entrypoint name from the source instead of 'main' in the spirv output."},
         { OptionKind::VulkanUseGLLayout, "-fvk-use-gl-layout", nullptr, "Use std430 layout instead of D3D buffer layout for raw buffer load/stores."},
         { OptionKind::VulkanEmitReflection, "-fspv-reflect", nullptr, "Include reflection decorations in the resulting SPIRV for shader parameters."},
@@ -1681,6 +1682,7 @@ SlangResult OptionsParser::_parse(
             case OptionKind::ValidateIr:
             case OptionKind::DumpIr:
             case OptionKind::VulkanInvertY:
+            case OptionKind::VulkanUseDxPositionW:
             case OptionKind::VulkanUseEntryPointName:
             case OptionKind::VulkanUseGLLayout:
             case OptionKind::VulkanEmitReflection:

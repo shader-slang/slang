@@ -20,6 +20,8 @@ namespace gfx_test
             {
                 [Differentiable]
                 float getBaseValue();
+                [Differentiable]
+                static float getBaseValueS();
             }
             interface IFoo : IBase
             {
@@ -36,6 +38,8 @@ namespace gfx_test
                 float getValue() { return val + 1.0; }
                 [Differentiable]
                 float getBaseValue() { return val; }
+                [Differentiable]
+                static float getBaseValueS() { return 0.0; }
                 property float val2 {
                     get { return val + 2.0; }
                     set { val = newValue; }

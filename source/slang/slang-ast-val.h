@@ -144,6 +144,8 @@ class IntVal : public Val
 
     bool isLinkTimeVal();
     bool _isLinkTimeValOverride() { return false; }
+    Val* linkTimeResolve(Dictionary<String, IntVal*>& mapMangledNameToVal);
+    Val* _linkTimeResolveOverride(Dictionary<String, IntVal*>&) { return this; }
 };
 
 // Trivial case of a value that is just a constant integer
@@ -180,6 +182,7 @@ class GenericParamIntVal : public IntVal
     }
 
     bool _isLinkTimeValOverride();
+    Val* _linkTimeResolveOverride(Dictionary<String, IntVal*>& map);
 };
 
 class TypeCastIntVal : public IntVal
@@ -204,6 +207,9 @@ class TypeCastIntVal : public IntVal
             return intBase->isLinkTimeVal();
         return false;
     }
+
+    Val* _linkTimeResolveOverride(Dictionary<String, IntVal*>& map);
+
 };
 
 // An compile time int val as result of some general computation.
@@ -238,6 +244,8 @@ class FuncCallIntVal : public IntVal
         }
         return false;
     }
+
+    Val* _linkTimeResolveOverride(Dictionary<String, IntVal*>& map);
 };
 
 class WitnessLookupIntVal : public IntVal

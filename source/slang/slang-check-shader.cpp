@@ -1305,7 +1305,7 @@ namespace Slang
             sink);
     }
 
-    Scope* ComponentType::_createScopeForLegacyLookup(ASTBuilder* astBuilder)
+    Scope* ComponentType::_getOrCreateScopeForLegacyLookup(ASTBuilder* astBuilder)
     {
         // The shape of this logic is dictated by the legacy
         // behavior for name-based lookup/parsing of types
@@ -1316,6 +1316,8 @@ namespace Slang
         // definitions (that scope is necessary because
         // it defines keywords like `true` and `false`).
         //
+        if (m_lookupScope)
+            return m_lookupScope;
 
         Scope* scope = astBuilder->create<Scope>();
         scope->parent = getLinkage()->getSessionImpl()->slangLanguageScope;
@@ -1338,7 +1340,7 @@ namespace Slang
                 scope->nextSibling = moduleScope;
             }
         }
-
+        m_lookupScope = scope;
         return scope;
     }
 
@@ -1359,7 +1361,7 @@ namespace Slang
         // We create the scopes on the linkages ASTBuilder. We might want to create a temporary ASTBuilder,
         // and let that memory get freed, but is like this because it's not clear if the scopes in ASTNode members
         // will dangle if we do.
-        Scope* scope = unspecialiedProgram->_createScopeForLegacyLookup(endToEndReq->getLinkage()->getASTBuilder());
+        Scope* scope = unspecialiedProgram->_getOrCreateScopeForLegacyLookup(endToEndReq->getLinkage()->getASTBuilder());
 
         // We are going to do some semantic checking, so we need to
         // set up a `SemanticsVistitor` that we can use.

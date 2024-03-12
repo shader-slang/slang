@@ -2718,6 +2718,7 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
     auto entryPointType = DeclRefType::create(astBuilder, entryPointFuncDeclRef);
 
     entryPointLayout->entryPoint = entryPointFuncDeclRef;
+    entryPointLayout->program = context->getTargetProgram()->getProgram();
 
     // For the duration of our parameter collection work we will
     // establish this entry point as the current one in the context.

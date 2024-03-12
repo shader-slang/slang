@@ -793,6 +793,8 @@ public:
     // The corresponding function declaration
     DeclRef<FuncDecl> entryPoint;
 
+    ComponentType* program = nullptr;
+
     DeclRef<FuncDecl> getFuncDeclRef() { return entryPoint; }
     FuncDecl* getFuncDecl() { return entryPoint.getDecl(); }
 

@@ -335,6 +335,7 @@ enum GLSLSystemValueKind
 {
     General,
     PositionOutput,
+    PositionInput,
 };
 
 struct GLSLSystemValueInfo
@@ -569,6 +570,7 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
             && kind == LayoutResourceKind::VaryingInput )
         {
             name = "gl_FragCoord";
+            systemValueKind = GLSLSystemValueKind::PositionInput;
         }
         else if( stage == Stage::Geometry
             && kind == LayoutResourceKind::VaryingInput )
@@ -1007,6 +1009,9 @@ void createVarLayoutForLegalizedGlobalParam(
         {
         case GLSLSystemValueKind::PositionOutput:
             builder->addGLPositionOutputDecoration(globalParam);
+            break;
+        case GLSLSystemValueKind::PositionInput:
+            builder->addGLPositionInputDecoration(globalParam);
             break;
         default:
             break;
