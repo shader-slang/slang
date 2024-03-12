@@ -1606,16 +1606,15 @@ LinkedIR linkIR(
 
     context->builder->setInsertInto(context->getModule()->getModuleInst());
 
-    // Raypayload/related objects found under GLSL are likley never referenced
-    // this is because internally they are used by slang functions; these emit later in code gen
-    // as a result we emit them now
-    // we also emit these early since if these are not at the top of scope, that could be deadly to a compile
+    // we emit these early since if these are not at the top of scope, that will be deadly to a compile; 
+    // stdlib functions can use raypayload items, and if we just emit them whenever, it is possible the 
+    // intrinsic resolution will happen above our payload declaration
     if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL)) 
     {
         auto insertGlobalVar = [&](IRInst* instToAdd)
         {
             auto clone = cloneValue(context, instToAdd);
-            if (!clone->findDecorationImpl(kIROp_KeepAliveDecoration)) context->builder->addKeepAliveDecoration(clone);
+            if (!instToAdd->findDecorationImpl(kIROp_KeepAliveDecoration)) context->builder->addKeepAliveDecoration(instToAdd);
             context->builder->addInst(clone);
         };
         for (IRModule* irModule : irModules)

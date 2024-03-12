@@ -2734,6 +2734,7 @@ void assignRayPayloadHitObjectAttributeLocations(IRModule* module)
             {
             case kIROp_VulkanRayPayloadDecoration:
             case kIROp_VulkanRayPayloadInDecoration:
+                if (as<IRIntLit>(decor->getOperand(0))->getValue() >= 0) goto end;
                 builder.setInsertBefore(inst);
                 location = builder.getIntValue(builder.getIntType(), rayPayloadCounter);
                 decor->setOperand(0, location);
@@ -2741,12 +2742,14 @@ void assignRayPayloadHitObjectAttributeLocations(IRModule* module)
                 goto end;
             case kIROp_VulkanCallablePayloadDecoration:
             case kIROp_VulkanCallablePayloadInDecoration:
+                if (as<IRIntLit>(decor->getOperand(0))->getValue() >= 0) goto end;
                 builder.setInsertBefore(inst);
                 location = builder.getIntValue(builder.getIntType(), callablePayloadCounter);
                 decor->setOperand(0, location);
                 callablePayloadCounter++;
                 goto end;
             case kIROp_VulkanHitObjectAttributesDecoration:
+                if (as<IRIntLit>(decor->getOperand(0))->getValue() >= 0) goto end;
                 builder.setInsertBefore(inst);
                 location = builder.getIntValue(builder.getIntType(), hitObjectAttributeCounter);
                 decor->setOperand(0, location);
@@ -2998,6 +3001,7 @@ void legalizeEntryPointsForGLSL(
     {
         legalizeEntryPointForGLSL(session, module, func, context, glslExtensionTracker);
     }
+    assignRayPayloadHitObjectAttributeLocations(module);
 }
 
 void legalizeConstantBufferLoadForGLSL(IRModule* module)
