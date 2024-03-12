@@ -3246,7 +3246,7 @@ struct SPIRVEmitContext
                         decoration,
                         dstID,
                         SpvDecorationUserTypeGOOGLE,
-                        cast<IRUserTypeNameDecoration>(decoration)->getUserTypeName()->getStringSlice());
+                        String(cast<IRUserTypeNameDecoration>(decoration)->getUserTypeName()->getStringSlice()).toLower().getUnownedSlice());
                 }
                 break;
             case kIROp_CounterBufferDecoration:
