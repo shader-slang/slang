@@ -235,7 +235,7 @@ namespace Slang
         {
             bindingToByteOffset.set(binding, byteOffset);
         }
-        const int64_t getNextBindingOffset(int binding) 
+        int64_t getNextBindingOffset(int binding) 
         {
             int64_t currentOffset;
             if (bindingToByteOffset.addIfNotExists(binding, 0))
@@ -4392,14 +4392,12 @@ namespace Slang
         Decl* decl,
         Modifiers* modifiers)
     {
-        // we intentionally have findModifier twice since GLSLOffsetLayoutAttribute is rare
-        // better to early leave
-        auto bindingMod = modifiers->findModifier<GLSLBindingAttribute>();
-        if (!bindingMod) return;
         auto varDeclBase = as<VarDeclBase>(decl);
         if (!varDeclBase) return;
         auto declRefExpr = as<DeclRefExpr>(varDeclBase->type.exp);
         if (!declRefExpr) return;
+        auto bindingMod = modifiers->findModifier<GLSLBindingAttribute>();
+        if (!bindingMod) return;
 
         // here is a problem; we link types into a literal in IR stage post parse
         // but, order (top down) mattter when parsing atomic_uint offset
@@ -7879,7 +7877,9 @@ namespace Slang
                         parser->setBindingOffset(binding->binding, glslOffset->offset);
                     }
                     else
+                    { 
                         parser->diagnose(modifier->loc, Diagnostics::missingLayoutBindingModifier);
+                    }
                 }
 
                 listBuilder.add(modifier);
@@ -7954,7 +7954,6 @@ namespace Slang
 
         return modifier;
     }
-    
     static NodeBase* parseImplicitConversionModifier(Parser* parser, void* /*userData*/)
     {
         ImplicitConversionModifier* modifier = parser->astBuilder->create<ImplicitConversionModifier>();

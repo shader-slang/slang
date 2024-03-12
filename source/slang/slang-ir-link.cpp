@@ -1622,7 +1622,7 @@ void convertAtomicToStorageBuffer(
     }
 }
 
-void GLSLTypeReplacmentProcessing(IRSpecContext* context, TargetProgram* targetProgram, IRModule* irModule)
+void GLSLReplaceAtomicUint(IRSpecContext* context, TargetProgram* targetProgram, IRModule* irModule)
 {
     if (!targetProgram->getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL)) return;
     
@@ -1863,7 +1863,7 @@ LinkedIR linkIR(
     // type-use reformatter of GLSL types (only if compiler is set to AllowGLSL mode)
     // which are not supported by SPIRV->Vulkan but is supported by GLSL->Vulkan through
     // compiler magic tricks
-    GLSLTypeReplacmentProcessing(context, targetProgram, state->irModule);
+    GLSLReplaceAtomicUint(context, targetProgram, state->irModule);
 
     // TODO: *technically* we should consider the case where
     // we have global variables with initializers, since

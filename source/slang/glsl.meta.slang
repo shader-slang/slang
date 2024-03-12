@@ -4623,14 +4623,16 @@ __spirv_version(1.3) [require(spirv)]
 // as per GL_EXT_vulkan_glsl_relaxed
 __magic_type(GLSLAtomicUintType)
 __intrinsic_type($(kIROp_GLSLAtomicUintType))
-public struct atomic_uint{};
+public struct atomic_uint
+{
+};
 
 // tier of float refers to atomic extension support of float1 or float2.
-// if we are inside a atomic_float function we will run the check for float1 teir
+// if we are inside a atomic_float function we will run the check for float1 tier
 // types and operations to enable the according ext needed for these operations
 
 __generic<T : __BuiltinType>
-[ForceInline] void typeRequireChecks_atomic_using_float0_teir() 
+[ForceInline] void typeRequireChecks_atomic_using_float0_tier() 
 {
     __target_switch
     {
@@ -4644,7 +4646,7 @@ __generic<T : __BuiltinType>
     }
 }
 __generic<T : __BuiltinType>
-[ForceInline] void typeRequireChecks_atomic_using_float1_teir() 
+[ForceInline] void typeRequireChecks_atomic_using_float1_tier() 
 {
     __target_switch
     {
@@ -4667,7 +4669,7 @@ __generic<T : __BuiltinType>
     }
 }
 __generic<T : __BuiltinType>
-[ForceInline] void typeRequireChecks_atomic_using_float2_teir() 
+[ForceInline] void typeRequireChecks_atomic_using_float2_tier() 
 {
     __target_switch
     {
@@ -4802,36 +4804,34 @@ __generic<T : __BuiltinType>
 }
 
 ${{{{
-
-struct TypeClassSubclass {
+static const struct {
     const char* name;
     const char* classType;
     const char *subclassType;
     const char *suffix;
-    const int isFloat;
-}; 
-const TypeClassSubclass atomics[] =
+    const bool isFloat;
+} atomics[] =
     {
         { 
-            "uint", "I", "U", "", 0
+            "uint", "I", "U", "", false
         },
         { 
-            "uint64_t", "I", "U", "", 0
+            "uint64_t", "I", "U", "", false
         },
         { 
-            "int", "I", "S", "", 0
+            "int", "I", "S", "", false
         },
         { 
-            "int64_t", "I", "S", "", 0
+            "int64_t", "I", "S", "", false
         },
         { 
-            "float16_t", "F", "F", "EXT", 1
+            "float16_t", "F", "F", "EXT", true
         },
         { 
-            "float", "F", "F", "EXT", 1
+            "float", "F", "F", "EXT", true
         },
         { 
-            "double", "F", "F", "EXT", 1
+            "double", "F", "F", "EXT", true
         },
     };
 for (auto item : atomics) 
@@ -4842,7 +4842,7 @@ __spirv_version(1.0)[require(spirv)]
 __glsl_version(430) [require(glsl)]
 [ForceInline] public $(item.name) atomicAdd(inout $(item.name) mem, $(item.name) data)
 {
-    typeRequireChecks_atomic_using_float1_teir<$(item.name)>();
+    typeRequireChecks_atomic_using_float1_tier<$(item.name)>();
     typeRequireChecks_atomic_using_add<$(item.name)>();
     __target_switch
     {
@@ -4859,7 +4859,7 @@ __spirv_version(1.0)[require(spirv)]
 __glsl_version(430) [require(glsl)]
 [ForceInline] public $(item.name) atomicMin(inout $(item.name) mem, $(item.name) data)
 {
-    typeRequireChecks_atomic_using_float2_teir<$(item.name)>();
+    typeRequireChecks_atomic_using_float2_tier<$(item.name)>();
     typeRequireChecks_atomic_using_MinMax<$(item.name)>();
     __target_switch
     {
@@ -4876,7 +4876,7 @@ __spirv_version(1.0)[require(spirv)]
 __glsl_version(430) [require(glsl)]
 [ForceInline] public $(item.name) atomicMax(inout $(item.name) mem, $(item.name) data)
 {
-    typeRequireChecks_atomic_using_float2_teir<$(item.name)>();
+    typeRequireChecks_atomic_using_float2_tier<$(item.name)>();
     typeRequireChecks_atomic_using_MinMax<$(item.name)>();
     __target_switch
     {
@@ -4893,7 +4893,7 @@ __spirv_version(1.0)[require(spirv)]
 __glsl_version(430) [require(glsl)]
 [ForceInline] public $(item.name) atomicExchange(inout $(item.name) mem, $(item.name) data)
 {
-    typeRequireChecks_atomic_using_float1_teir<$(item.name)>();
+    typeRequireChecks_atomic_using_float1_tier<$(item.name)>();
     __target_switch
     {
     case glsl: __intrinsic_asm "atomicExchange($0, $1)";
@@ -4914,7 +4914,7 @@ __spirv_version(1.0)[require(spirv)]
 __glsl_version(430) [require(glsl)]
 [ForceInline] public $(item.name) atomicAnd(inout $(item.name) mem, $(item.name) data)
 {
-    typeRequireChecks_atomic_using_float0_teir<$(item.name)>();
+    typeRequireChecks_atomic_using_float0_tier<$(item.name)>();
     typeRequireChecks_atomic_using_Logical_CAS<$(item.name)>();
     __target_switch
     {
@@ -4934,7 +4934,7 @@ __spirv_version(1.0)[require(spirv)]
 __glsl_version(430) [require(glsl)]
 [ForceInline] public $(item.name) atomicOr(inout $(item.name) mem, $(item.name) data)
 {
-    typeRequireChecks_atomic_using_float0_teir<$(item.name)>();
+    typeRequireChecks_atomic_using_float0_tier<$(item.name)>();
     typeRequireChecks_atomic_using_Logical_CAS<$(item.name)>();
     __target_switch
     {
@@ -4951,7 +4951,7 @@ __spirv_version(1.0)[require(spirv)]
 __glsl_version(430) [require(glsl)]
 [ForceInline] public $(item.name) atomicXor(inout $(item.name) mem, $(item.name) data)
 {
-    typeRequireChecks_atomic_using_float0_teir<$(item.name)>();
+    typeRequireChecks_atomic_using_float0_tier<$(item.name)>();
     typeRequireChecks_atomic_using_Logical_CAS<$(item.name)>();
     __target_switch
     {
@@ -4968,7 +4968,7 @@ __spirv_version(1.0)[require(spirv)]
 __glsl_version(430) [require(glsl)]
 [ForceInline] public $(item.name) atomicCompSwap(inout $(item.name) mem, $(item.name) compare, $(item.name) data)
 {
-    typeRequireChecks_atomic_using_float0_teir<$(item.name)>();
+    typeRequireChecks_atomic_using_float0_tier<$(item.name)>();
     typeRequireChecks_atomic_using_Logical_CAS<$(item.name)>();
     __target_switch
     {
@@ -4985,9 +4985,9 @@ ${{{{
 }
 }}}}
 
-// all atomic_uint functions are HEAVILY mangled at compile time, 
-// all types are converted into 'inout uint' to the referenced 
-// layout(offset) of the related inputted atomic_uint
+// all atomic_uint functions are mangled at compile time, 
+// all types are converted into a field address of a 'uint'
+// relative to the layout(offset) of the atomic_uint 
 __spirv_version(1.0)[require(spirv)]
 __glsl_version(430) [require(glsl)]
 [ForceInline] public uint atomicCounterIncrement(atomic_uint c)
