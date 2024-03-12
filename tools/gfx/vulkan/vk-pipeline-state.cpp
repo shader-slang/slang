@@ -284,7 +284,7 @@ Result PipelineStateImpl::createVKGraphicsPipelineState()
     }
     else
     {
-        SLANG_VK_CHECK(m_device->m_api.vkCreateGraphicsPipelines(
+        SLANG_VK_RETURN_ON_FAIL(m_device->m_api.vkCreateGraphicsPipelines(
             m_device->m_device, pipelineCache, 1, &pipelineInfo, nullptr, &m_pipeline));
     }
 
@@ -316,7 +316,7 @@ Result PipelineStateImpl::createVKComputePipelineState()
     else
     {
         VkPipelineCache pipelineCache = VK_NULL_HANDLE;
-        SLANG_VK_CHECK(m_device->m_api.vkCreateComputePipelines(
+        SLANG_VK_RETURN_ON_FAIL(m_device->m_api.vkCreateComputePipelines(
             m_device->m_device, pipelineCache, 1, &computePipelineInfo, nullptr, &m_pipeline));
     }
     return SLANG_OK;
@@ -455,7 +455,7 @@ Result RayTracingPipelineStateImpl::createVKRayTracingPipelineState()
     }
 
     VkPipelineCache pipelineCache = VK_NULL_HANDLE;
-    SLANG_VK_CHECK(m_device->m_api.vkCreateRayTracingPipelinesKHR(
+    SLANG_VK_RETURN_ON_FAIL(m_device->m_api.vkCreateRayTracingPipelinesKHR(
         m_device->m_device,
         VK_NULL_HANDLE,
         pipelineCache,
