@@ -2919,6 +2919,24 @@ struct SPIRVEmitContext
         }
     }
 
+    // Make user type name conform to `SPV_GOOGLE_user_type` spec.
+    // https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/GOOGLE/SPV_GOOGLE_user_type.asciidoc
+    String legalizeUserTypeName(UnownedStringSlice typeName)
+    {
+        String result = typeName;
+        auto index = typeName.indexOf('<');
+        if (index == -1)
+            index = typeName.getLength();
+        StringBuilder sb;
+        sb << String(typeName.head(index)).toLower();
+        if (index != typeName.getLength())
+        {
+            sb << ":";
+            sb << typeName.tail(index);
+        }
+        return sb.produceString();
+    }
+
         /// Emit an appropriate SPIR-V decoration for the given IR `decoration`, if necessary and possible.
         ///
         /// The given `dstID` should be the `<id>` of the SPIR-V instruction being decorated,
@@ -3246,7 +3264,7 @@ struct SPIRVEmitContext
                         decoration,
                         dstID,
                         SpvDecorationUserTypeGOOGLE,
-                        String(cast<IRUserTypeNameDecoration>(decoration)->getUserTypeName()->getStringSlice()).toLower().getUnownedSlice());
+                        legalizeUserTypeName(cast<IRUserTypeNameDecoration>(decoration)->getUserTypeName()->getStringSlice()).getUnownedSlice());
                 }
                 break;
             case kIROp_CounterBufferDecoration:
