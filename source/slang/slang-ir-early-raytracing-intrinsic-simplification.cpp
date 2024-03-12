@@ -1,5 +1,5 @@
-// slang-ir-ssa-simplification.cpp
-#include "slang-ir-early-intrinsic-simplification.h"
+// slang-ir-early-raytracing-intrinsic-simplification.cpp
+#include "slang-ir-early-raytracing-intrinsic-simplification.h"
 #include "slang-ir.h"
 #include "../core/slang-performance-profiler.h"
 #include "slang-ir-util.h"
@@ -7,7 +7,7 @@
 namespace Slang
 {
     // ONLY should be used in this compilation unit
-    struct cacheOfDataToReplaceOps
+    struct CacheOfDataToReplaceOps
     {
         TargetProgram* target;
         IRModule* module;
@@ -109,7 +109,7 @@ namespace Slang
             }
         }
 
-        cacheOfDataToReplaceOps(TargetProgram* target, IRModule* module, DiagnosticSink* sink)
+        CacheOfDataToReplaceOps(TargetProgram* target, IRModule* module, DiagnosticSink* sink)
         {
             this->target = target;
             this->module = module;
@@ -117,7 +117,7 @@ namespace Slang
         }
     };
 
-    void recurseInFuncForOpsToReplace(IRInst* parent, cacheOfDataToReplaceOps* cache)
+    void recurseInFuncForOpsToReplace(IRInst* parent, CacheOfDataToReplaceOps* cache)
     {
 
         if (as<IRSPIRVAsm>(parent))
@@ -147,7 +147,7 @@ namespace Slang
             recurseInFuncForOpsToReplace(i, cache);
     }
 
-    void recurseAllOpsToReplace(cacheOfDataToReplaceOps* cache)
+    void recurseAllOpsToReplace(CacheOfDataToReplaceOps* cache)
     {
         for (auto func : cache->funcsToSearch)
         {
@@ -155,10 +155,10 @@ namespace Slang
         }
     }
 
-    void simplifyIntrinsicsEarly(TargetProgram* target, IRModule* module, DiagnosticSink* sink)
+    void replaceLocationIntrinsicsWithRaytracingObject(TargetProgram* target, IRModule* module, DiagnosticSink* sink)
     {
         //currently only applies to GLSL syntax
-        cacheOfDataToReplaceOps cache = cacheOfDataToReplaceOps(target, module, sink);
+        CacheOfDataToReplaceOps cache = CacheOfDataToReplaceOps(target, module, sink);
         cache.searchForGlobalsDataNeededInPass();
 
         if (target->getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL))

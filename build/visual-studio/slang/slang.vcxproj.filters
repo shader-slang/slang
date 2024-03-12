@@ -246,7 +246,7 @@
     <ClInclude Include="..\..\..\source\slang\slang-ir-dominators.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\source\slang\slang-ir-early-intrinsic-simplification.h">
+    <ClInclude Include="..\..\..\source\slang\slang-ir-early-raytracing-intrinsic-simplification.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ir-eliminate-multilevel-break.h">
@@ -914,7 +914,7 @@
     <ClCompile Include="..\..\..\source\slang\slang-ir-dominators.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\source\slang\slang-ir-early-intrinsic-simplification.cpp">
+    <ClCompile Include="..\..\..\source\slang\slang-ir-early-raytracing-intrinsic-simplification.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-eliminate-multilevel-break.cpp">

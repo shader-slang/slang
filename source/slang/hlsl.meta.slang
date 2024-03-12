@@ -9518,6 +9518,7 @@ struct BuiltInTriangleIntersectionAttributes
 // `CallShader()` for GLSL-based targets.
 //
 __target_intrinsic(_GL_EXT_ray_tracing, "executeCallableEXT")
+[require(glsl, raytracing)]
 void __executeCallable(uint shaderIndex, int payloadLocation);
 
 // Next is the custom intrinsic that will compute the payload location
@@ -9533,6 +9534,9 @@ int __callablePayloadLocation(__ref Payload payload);
 // GLSL equivalent.
 //
 __generic<Payload>
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
+[require(hlsl, raytracing)]
 void CallShader(uint shaderIndex, inout Payload payload)
 {
     __target_switch
@@ -9564,7 +9568,9 @@ void CallShader(uint shaderIndex, inout Payload payload)
 
 // 10.3.2
 
+
 __target_intrinsic(_GL_EXT_ray_tracing, "traceRayEXT")
+[require(glsl, raytracing)]
 void __traceRay(
     RaytracingAccelerationStructure AccelerationStructure,
     uint                            RayFlags,
@@ -9589,6 +9595,9 @@ __generic<Payload>
 __intrinsic_op($(kIROp_GetVulkanRayTracingPayloadLocation))
 int __rayPayloadLocation(__ref Payload payload);
 
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
+[require(hlsl, raytracing)]
 __generic<payload_t>
 void TraceRay(
     RaytracingAccelerationStructure AccelerationStructure,
@@ -9677,6 +9686,9 @@ void __traceMotionRay(
     float                           CurrentTime,
     int                             PayloadLocation);
 
+[require(glsl, raytracing_motionblur)]
+[require(spirv, raytracing_motionblur)]
+[require(hlsl, raytracing_motionblur)]
 __generic<payload_t>
 void TraceMotionRay(
     RaytracingAccelerationStructure AccelerationStructure,
@@ -9750,8 +9762,11 @@ void TraceMotionRay(
 
 // 10.3.3
 __target_intrinsic(hlsl)
+[require(hlsl, raytracing)]
 bool ReportHit<A>(float tHit, uint hitKind, A attributes);
 
+[require(spirv, raytracing)]
+[require(glsl, raytracing)]
 bool __reportIntersection(float tHit, uint hitKind)
 {
     __target_switch
@@ -9778,6 +9793,9 @@ bool ReportHit(float tHit, uint hitKind, A attributes)
 }
 
 // 10.3.4
+[require(hlsl, raytracing)]
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
 void IgnoreHit()
 {
     __target_switch
@@ -9794,6 +9812,9 @@ void IgnoreHit()
 }
 
 // 10.3.5
+[require(hlsl, raytracing)]
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
 void AcceptHitAndEndSearch()
 {
     __target_switch
@@ -9817,6 +9838,9 @@ void AcceptHitAndEndSearch()
 // 10.4.1 - Ray Dispatch System Values
 
 [NonUniformReturn]
+[require(hlsl, raytracing)]
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
 uint3 DispatchRaysIndex()
 {
     __target_switch
@@ -9832,6 +9856,9 @@ uint3 DispatchRaysIndex()
     }
 }
 
+[require(hlsl, raytracing)]
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
 uint3 DispatchRaysDimensions()
 {
     __target_switch
@@ -9850,6 +9877,9 @@ uint3 DispatchRaysDimensions()
 // 10.4.2 - Ray System Values
 
 [NonUniformReturn]
+[require(hlsl, raytracing)]
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
 float3 WorldRayOrigin()
 {
     __target_switch
@@ -9866,6 +9896,9 @@ float3 WorldRayOrigin()
 }
 
 [NonUniformReturn]
+[require(hlsl, raytracing)]
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
 float3 WorldRayDirection()
 {
     __target_switch
@@ -9882,6 +9915,9 @@ float3 WorldRayDirection()
 }
 
 [NonUniformReturn]
+[require(hlsl, raytracing)]
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
 float RayTMin()
 {
     __target_switch
@@ -9908,6 +9944,9 @@ float RayTMin()
 // to the appropriate Vulkan stages.
 //
 [NonUniformReturn]
+[require(hlsl, raytracing)]
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
 float RayTCurrent()
 {
     __target_switch
@@ -9923,6 +9962,9 @@ float RayTCurrent()
     }
 }
 
+[require(hlsl, raytracing)]
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
 uint RayFlags()
 {
     __target_switch
@@ -9941,6 +9983,9 @@ uint RayFlags()
 // 10.4.3 - Primitive/Object Space System Values
 
 [NonUniformReturn]
+[require(hlsl, raytracing)]
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
 uint InstanceIndex()
 {
     __target_switch
@@ -9957,6 +10002,9 @@ uint InstanceIndex()
 }
 
 [NonUniformReturn]
+[require(hlsl, raytracing)]
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
 uint InstanceID()
 {
     __target_switch
@@ -9973,6 +10021,9 @@ uint InstanceID()
 }
 
 [NonUniformReturn]
+[require(hlsl, raytracing)]
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
 uint PrimitiveIndex()
 {
     __target_switch
@@ -9989,6 +10040,9 @@ uint PrimitiveIndex()
 }
 
 [NonUniformReturn]
+[require(hlsl, raytracing)]
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
 float3 ObjectRayOrigin()
 {
     __target_switch
@@ -10005,6 +10059,9 @@ float3 ObjectRayOrigin()
 }
 
 [NonUniformReturn]
+[require(hlsl, raytracing)]
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
 float3 ObjectRayDirection()
 {
     __target_switch
@@ -10023,6 +10080,9 @@ float3 ObjectRayDirection()
 // TODO: optix has an optixGetObjectToWorldTransformMatrix function that returns 12
 // floats by reference.
 [NonUniformReturn]
+[require(hlsl, raytracing)]
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
 float3x4 ObjectToWorld3x4()
 {
     __target_switch
@@ -10039,6 +10099,9 @@ float3x4 ObjectToWorld3x4()
 }
 
 [NonUniformReturn]
+[require(hlsl, raytracing)]
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
 float3x4 WorldToObject3x4()
 {
     __target_switch
@@ -10055,6 +10118,9 @@ float3x4 WorldToObject3x4()
 }
 
 [NonUniformReturn]
+[require(hlsl, raytracing)]
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
 float4x3 ObjectToWorld4x3()
 {
     __target_switch
@@ -10070,6 +10136,9 @@ float4x3 ObjectToWorld4x3()
 }
 
 [NonUniformReturn]
+[require(hlsl, raytracing)]
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
 float4x3 WorldToObject4x3()
 {
     __target_switch
@@ -10091,6 +10160,9 @@ float4x3 WorldToObject4x3()
 __glsl_extension(GL_NV_ray_tracing_motion_blur)
 __glsl_extension(GL_EXT_ray_tracing)
 [NonUniformReturn]
+[require(hlsl, raytracing_motionblur)]
+[require(glsl, raytracing_motionblur)]
+[require(spirv, raytracing_motionblur)]
 float RayCurrentTime()
 {
     __target_switch
@@ -10119,6 +10191,9 @@ float RayCurrentTime()
 
 // 10.4.4 - Hit Specific System values
 [NonUniformReturn]
+[require(hlsl, raytracing)]
+[require(glsl, raytracing)]
+[require(spirv, raytracing)]
 uint HitKind()
 {
     __target_switch
@@ -11154,6 +11229,7 @@ ${{{{
     __glsl_extension(GL_EXT_ray_query)
     [require(glsl, rayquery)]
     [require(spirv, rayquery)]
+    [require(hlsl, rayquery)]
     [__NoSideEffect]
     [NonUniformReturn]
     float3x4 $(ccName)$(matName)3x4()
@@ -11175,6 +11251,7 @@ ${{{{
     __glsl_extension(GL_EXT_ray_query)
     [require(glsl, rayquery)]
     [require(spirv, rayquery)]
+    [require(hlsl, rayquery)]
     [__readNone]
     [NonUniformReturn]
     float4x3 $(ccName)$(matName)4x3()
@@ -11219,6 +11296,7 @@ ${{{{
     __glsl_extension(GL_EXT_ray_query)
     [require(glsl, rayquery)]
     [require(spirv, rayquery)]
+    [require(hlsl, rayquery)]
     [__NoSideEffect]
     [NonUniformReturn]
     $(method.type) $(ccName)$(method.hlslName)()
@@ -11245,6 +11323,7 @@ ${{{{
     __glsl_extension(GL_EXT_ray_query)
     [require(glsl, rayquery)]
     [require(spirv, rayquery)]
+    [require(hlsl, rayquery)]
     [__NoSideEffect]
     [NonUniformReturn]
     uint RayFlags()
@@ -11264,6 +11343,7 @@ ${{{{
     __glsl_extension(GL_EXT_ray_query)
     [require(glsl, rayquery)]
     [require(spirv, rayquery)]
+    [require(hlsl, rayquery)]
     [__NoSideEffect]
     [NonUniformReturn]
     float3 WorldRayOrigin()
@@ -11283,6 +11363,7 @@ ${{{{
     __glsl_extension(GL_EXT_ray_query)
     [require(glsl, rayquery)]
     [require(spirv, rayquery)]
+    [require(hlsl, rayquery)]
     [__NoSideEffect]
     [NonUniformReturn]
     float3 WorldRayDirection()
@@ -11302,6 +11383,7 @@ ${{{{
     __glsl_extension(GL_EXT_ray_query)
     [require(glsl, rayquery)]
     [require(spirv, rayquery)]
+    [require(hlsl, rayquery)]
     [__NoSideEffect]
     [NonUniformReturn]
     float RayTMin()
@@ -11494,6 +11576,9 @@ struct HitObject
         /// Executes motion ray traversal (including anyhit and intersection shaders) like TraceRay, but returns the
         /// resulting hit information as a HitObject and does not trigger closesthit or miss shaders.
     [ForceInline]
+    [require(glsl, ser_motion)]
+    [require(spirv, ser_motion)]
+    [require(hlsl, ser_motion)]
     static HitObject TraceMotionRay<payload_t>( 
         RaytracingAccelerationStructure AccelerationStructure, 
         uint RayFlags, 
@@ -12528,7 +12613,8 @@ struct HitObject
     // "void hitObjectRecordMissNV(hitObjectNV, uint, vec3, float, vec3, float);"
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_NV_ray_tracing_motion_blur)    [require(glsl, ser_motion)]
+    __glsl_extension(GL_NV_ray_tracing_motion_blur)    
+    [require(glsl, ser_motion)]
     __target_intrinsic(glsl, "hitObjectRecordMissMotionNV")
     static void __glslMakeMotionMiss(
         out HitObject hitObj,

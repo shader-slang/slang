@@ -1,4 +1,4 @@
-// slang-ir-ssa-simplification.h
+// slang-ir-early-raytracing-intrinsic-simplification.h
 #pragma once
 
 #include "slang-ir.h"
@@ -11,5 +11,5 @@ namespace Slang
     class DiagnosticSink;
     class TargetProgram;
 
-    void simplifyIntrinsicsEarly(TargetProgram* target, IRModule* module, DiagnosticSink* sink);
+    void replaceLocationIntrinsicsWithRaytracingObject(TargetProgram* target, IRModule* module, DiagnosticSink* sink);
 }

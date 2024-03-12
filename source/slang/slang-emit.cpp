@@ -17,7 +17,7 @@
 #include "slang-ir-defunctionalization.h"
 #include "slang-ir-dll-export.h"
 #include "slang-ir-dll-import.h"
-#include "slang-ir-early-intrinsic-simplification.h"
+#include "slang-ir-early-raytracing-intrinsic-simplification.h"
 #include "slang-ir-eliminate-phis.h"
 #include "slang-ir-eliminate-multilevel-break.h"
 #include "slang-ir-entry-point-uniforms.h"
@@ -1034,7 +1034,7 @@ Result linkAndOptimizeIR(
         }
     }
 
-    simplifyIntrinsicsEarly(targetProgram, irModule, sink);
+    replaceLocationIntrinsicsWithRaytracingObject(targetProgram, irModule, sink);
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
     // Run a final round of simplifications to clean up unused things after phi-elimination.
