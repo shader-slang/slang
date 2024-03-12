@@ -33,6 +33,7 @@
 #include "slang-ir-legalize-varying-params.h"
 #include "slang-ir-link.h"
 #include "slang-ir-com-interface.h"
+#include "slang-ir-user-type-hint.h"
 #include "slang-ir-lower-append-consume-structured-buffer.h"
 #include "slang-ir-lower-binding-query.h"
 #include "slang-ir-lower-generics.h"
@@ -537,6 +538,8 @@ Result linkAndOptimizeIR(
     {
         lowerAppendConsumeStructuredBuffers(targetProgram, irModule, sink);
     }
+
+    addUserTypeHintDecorations(irModule);
 
     // We don't need the legalize pass for C/C++ based types
     if(options.shouldLegalizeExistentialAndResourceTypes )

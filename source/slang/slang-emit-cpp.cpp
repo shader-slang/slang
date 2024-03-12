@@ -313,6 +313,29 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
             out << ">";
             return SLANG_OK;
         }
+        case kIROp_Specialize:
+        {
+            auto inner = getResolvedInstForDecorations(type);
+            if (auto targetIntrinsic = findBestTargetIntrinsicDecoration(inner, getTargetCaps()))
+            {
+                out << targetIntrinsic->getDefinition();
+                out << "<";
+                for (UInt i = 1; i < type->getOperandCount(); i++)
+                {
+                    if (i > 1) out << ", ";
+                    auto elementType = (IRType*)type->getOperand(i);
+                    SLANG_RETURN_ON_FAIL(calcTypeName(elementType, target, out));
+                }
+                out << ">";
+                return SLANG_OK;
+            }
+        }
+        case kIROp_IntLit:
+        {
+            auto intLit = as<IRIntLit>(type);
+            out << intLit->getValue();
+            return SLANG_OK;
+        }
         default:
         {
             if (isNominalOp(type->getOp()))

@@ -2919,6 +2919,24 @@ struct SPIRVEmitContext
         }
     }
 
+    // Make user type name conform to `SPV_GOOGLE_user_type` spec.
+    // https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/GOOGLE/SPV_GOOGLE_user_type.asciidoc
+    String legalizeUserTypeName(UnownedStringSlice typeName)
+    {
+        String result = typeName;
+        auto index = typeName.indexOf('<');
+        if (index == -1)
+            index = typeName.getLength();
+        StringBuilder sb;
+        sb << String(typeName.head(index)).toLower();
+        if (index != typeName.getLength())
+        {
+            sb << ":";
+            sb << typeName.tail(index);
+        }
+        return sb.produceString();
+    }
+
         /// Emit an appropriate SPIR-V decoration for the given IR `decoration`, if necessary and possible.
         ///
         /// The given `dstID` should be the `<id>` of the SPIR-V instruction being decorated,
@@ -3271,7 +3289,7 @@ struct SPIRVEmitContext
                         decoration,
                         dstID,
                         SpvDecorationUserTypeGOOGLE,
-                        cast<IRUserTypeNameDecoration>(decoration)->getUserTypeName()->getStringSlice());
+                        legalizeUserTypeName(cast<IRUserTypeNameDecoration>(decoration)->getUserTypeName()->getStringSlice()).getUnownedSlice());
                 }
                 break;
             case kIROp_CounterBufferDecoration:
@@ -5006,6 +5024,18 @@ struct SPIRVEmitContext
             const auto lVec = as<IRVectorType>(l->getDataType());
             auto r = operands[1];
             const auto rVec = as<IRVectorType>(r->getDataType());
+            if (op == kIROp_Mul && isFloatingPoint)
+            {
+                if (lVec && !rVec)
+                {
+                    return emitInst(parent, instToRegister, SpvOpVectorTimesScalar, type, kResultID, operands);
+                }
+                else if (!lVec && rVec)
+                {
+                    IRInst* newOperands[2] = { operands[1], operands[0] };
+                    return emitInst(parent, instToRegister, SpvOpVectorTimesScalar, type, kResultID, ArrayView<IRInst*>(newOperands, 2));
+                }
+            }
             const auto go = [&](const auto l, const auto r) {
                 return emitInst(parent, instToRegister, opCode, type, kResultID, l, r);
             };
