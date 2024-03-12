@@ -1616,7 +1616,6 @@ LinkedIR linkIR(
         {
             auto clone = cloneValue(context, instToAdd);
             if (!clone->findDecorationImpl(kIROp_KeepAliveDecoration)) context->builder->addKeepAliveDecoration(clone);
-
         };
         for (IRModule* irModule : irModules)
         {

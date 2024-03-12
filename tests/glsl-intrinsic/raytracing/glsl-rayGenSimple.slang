@@ -1,6 +1,9 @@
 //TEST:SIMPLE(filecheck=CHECK_GLSL): -allow-glsl -stage raygeneration -entry main -target glsl
 //TEST:SIMPLE(filecheck=CHECK_SPV): -allow-glsl -emit-spirv-directly -stage raygeneration -entry main -target spirv-assembly
 
+// CHECK_GLSL-DAG: hitObjectAttributeNV
+// CHECK_SPV-DAG: HitObjectAttributeNV
+
 layout(binding = 0) uniform accelerationStructureEXT as;
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
@@ -9,8 +12,7 @@ buffer MyBlockName
     uint data[];
 } outputBuffer;
 
-// CHECK_GLSL-DAG: hitObjectAttributeNV
-// CHECK_SPV-DAG: HitObjectAttributeNV
+layout(location = 2) hitObjectAttributeNV vec4 attrMain;
 
 bool testHitObjectRecord() {
     hitObjectNV hit;
@@ -23,8 +25,6 @@ bool testHitObjectRecord() {
            && hitObjectIsHitNV(hit) == true
         ;
 }
-//intentionally placing in a bad position
-layout(location = 2) hitObjectAttributeNV vec4 attrMain;
 
 void main()
 {
