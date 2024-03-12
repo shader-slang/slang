@@ -733,7 +733,7 @@ SpvInst* emitOpMemberDecorateString(
 )
 {
     static_assert(isSingular<T>);
-    return emitInst(parent, inst, SpvOpDecorate, target, index, decoration, text);
+    return emitInst(parent, inst, SpvOpMemberDecorate, target, index, decoration, text);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpDecorate
