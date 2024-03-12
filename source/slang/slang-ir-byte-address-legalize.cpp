@@ -759,6 +759,8 @@ struct ByteAddressBufferLegalizationContext
         auto structuredBufferParam = paramBuilder.createGlobalParam(structuredBufferParamType);
         if (auto nameHint = byteAddressBufferParam->findDecoration<IRNameHintDecoration>())
             paramBuilder.addNameHintDecoration(structuredBufferParam, nameHint->getName());
+        if (auto typeHint = byteAddressBufferParam->findDecoration<IRUserTypeNameDecoration>())
+            paramBuilder.addUserTypeNameDecoration(structuredBufferParam, typeHint->getUserTypeName());
 
         // The new parameter needs to be given a layout to match the existing
         // parameter, so that it is given the same `binding` in the generated code.

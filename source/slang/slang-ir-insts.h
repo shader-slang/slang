@@ -4293,6 +4293,11 @@ public:
         addNameHintDecoration(value, getStringValue(text));
     }
 
+    void addUserTypeNameDecoration(IRInst* value, IRStringLit* name)
+    {
+        addDecoration(value, kIROp_UserTypeNameDecoration, name);
+    }
+
     void addBinaryInterfaceTypeDecoration(IRInst* value)
     {
         addDecoration(value, kIROp_BinaryInterfaceTypeDecoration);
