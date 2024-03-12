@@ -335,6 +335,7 @@ enum GLSLSystemValueKind
 {
     General,
     PositionOutput,
+    PositionInput,
 };
 
 struct GLSLSystemValueInfo
@@ -569,6 +570,7 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
             && kind == LayoutResourceKind::VaryingInput )
         {
             name = "gl_FragCoord";
+            systemValueKind = GLSLSystemValueKind::PositionInput;
         }
         else if( stage == Stage::Geometry
             && kind == LayoutResourceKind::VaryingInput )
@@ -637,12 +639,13 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
 
         if( kind == LayoutResourceKind::VaryingInput )
         {
-            name = "gl_SampleMaskIn[0]";
+            name = "gl_SampleMaskIn";
         }
         else
         {
-            name = "gl_SampleMask[0]";
+            name = "gl_SampleMask";
         }
+        arrayIndex = 0;
     }
     else if(semanticName == "sv_innercoverage")
     {
@@ -891,6 +894,7 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         //
 
         name = "gl_PositionPerViewNV[1]";
+        arrayIndex = 1;
 
 //            shared->requiresCopyGLPositionToPositionPerView = true;
     }
@@ -1005,6 +1009,9 @@ void createVarLayoutForLegalizedGlobalParam(
         {
         case GLSLSystemValueKind::PositionOutput:
             builder->addGLPositionOutputDecoration(globalParam);
+            break;
+        case GLSLSystemValueKind::PositionInput:
+            builder->addGLPositionInputDecoration(globalParam);
             break;
         default:
             break;
@@ -1594,7 +1601,12 @@ ScalarizedVal adaptType(
             return adaptType(builder, loaded, toType, fromType);
         }
         break;
-
+    case ScalarizedVal::Flavor::arrayIndex:
+        {
+            auto element = builder->emitElementExtract(val.irValue, as<ScalarizedArrayIndexValImpl>(val.impl)->index);
+            return adaptType(builder, element, toType, fromType);
+        }
+        break;
     default:
         SLANG_UNEXPECTED("unimplemented");
         UNREACHABLE_RETURN(ScalarizedVal());
@@ -1788,7 +1800,7 @@ ScalarizedVal getSubscriptVal(
 
             resultAdapter->val = getSubscriptVal(
                 builder,
-                elementType,
+                inputAdapter->actualType,
                 inputAdapter->val,
                 indexVal);
             return ScalarizedVal::typeAdapter(resultAdapter);

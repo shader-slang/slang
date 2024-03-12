@@ -5,6 +5,7 @@ namespace Slang
 {
     struct IRModule;
     void invertYOfPositionOutput(IRModule* module);
+    void rcpWOfPositionInput(IRModule* module);
 }
 
 #endif

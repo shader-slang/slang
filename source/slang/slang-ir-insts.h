@@ -708,6 +708,11 @@ struct IRSequentialIDDecoration : IRDecoration
     IRIntegerValue getSequentialID() { return getSequentialIDOperand()->getValue(); }
 };
 
+struct IRDynamicDispatchWitnessDecoration : IRDecoration
+{
+    IR_LEAF_ISA(DynamicDispatchWitnessDecoration)
+};
+
 struct IRAutoDiffOriginalValueDecoration : IRDecoration
 {
     enum
@@ -1359,6 +1364,11 @@ struct IRGLSLPrimitivesRateDecoration : public IRDecoration
 struct IRGLPositionOutputDecoration : public IRDecoration
 {
     IR_LEAF_ISA(GLPositionOutputDecoration)
+};
+
+struct IRGLPositionInputDecoration : public IRDecoration
+{
+    IR_LEAF_ISA(GLPositionInputDecoration)
 };
 
 struct IRMeshOutputRef : public IRInst
@@ -4292,6 +4302,11 @@ public:
         addDecoration(value, kIROp_GLPositionOutputDecoration);
     }
 
+    void addGLPositionInputDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_GLPositionInputDecoration);
+    }
+
     void addInterpolationModeDecoration(IRInst* value, IRInterpolationMode mode)
     {
         addDecoration(value, kIROp_InterpolationModeDecoration, getIntValue(getIntType(), IRIntegerValue(mode)));
@@ -4690,6 +4705,11 @@ public:
     void addSequentialIDDecoration(IRInst* inst, IRIntegerValue id)
     {
         addDecoration(inst, kIROp_SequentialIDDecoration, getIntValue(getUIntType(), id));
+    }
+
+    void addDynamicDispatchWitnessDecoration(IRInst* inst)
+    {
+        addDecoration(inst, kIROp_DynamicDispatchWitnessDecoration);
     }
 
     void addVulkanRayPayloadDecoration(IRInst* inst, int location)

@@ -3074,16 +3074,9 @@ struct SPIRVEmitContext
             }
             break;
         case kIROp_MaxVertexCountDecoration:
-            {
-                auto section = getSection(SpvLogicalSectionID::ExecutionModes);
-                auto maxVertexCount = cast<IRMaxVertexCountDecoration>(decoration);
-                emitOpExecutionModeOutputVertices(
-                    section,
-                    decoration,
-                    dstID,
-                    SpvLiteralInteger::from32(int32_t(getIntVal(maxVertexCount->getCount())))
-                );
-            }
+            // Don't do anything here, instead wait until we see OutputTopologyDecoration
+            // and emit them together to ensure MaxVertexCount always appears before OutputTopology,
+            // which seemed to be required by SPIRV.
             break;
         case kIROp_InstanceDecoration:
             {
@@ -3094,22 +3087,49 @@ struct SPIRVEmitContext
             }
             break;
         case kIROp_TriangleInputPrimitiveTypeDecoration:
-            emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, SpvExecutionModeTriangles);
-            break;
         case kIROp_LineInputPrimitiveTypeDecoration:
-            emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, SpvExecutionModeInputLines);
-            break;
         case kIROp_LineAdjInputPrimitiveTypeDecoration:
-            emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, SpvExecutionModeInputLinesAdjacency);
-            break;
         case kIROp_PointInputPrimitiveTypeDecoration:
-            emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, SpvExecutionModeInputPoints);
-            break;
         case kIROp_TriangleAdjInputPrimitiveTypeDecoration:
-            emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, SpvExecutionModeInputTrianglesAdjacency);
+            // Defer this until we see kIROp_StreamOutputTypeDecoration because the driver wants to see
+            // them before the output.
             break;
         case kIROp_StreamOutputTypeDecoration:
             {
+                for (auto inputDecor : decoration->getParent()->getDecorations())
+                {
+                    switch (inputDecor->getOp())
+                    {
+                    case kIROp_TriangleInputPrimitiveTypeDecoration:
+                        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), inputDecor, dstID, SpvExecutionModeTriangles);
+                        break;
+                    case kIROp_LineInputPrimitiveTypeDecoration:
+                        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), inputDecor, dstID, SpvExecutionModeInputLines);
+                        break;
+                    case kIROp_LineAdjInputPrimitiveTypeDecoration:
+                        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), inputDecor, dstID, SpvExecutionModeInputLinesAdjacency);
+                        break;
+                    case kIROp_PointInputPrimitiveTypeDecoration:
+                        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), inputDecor, dstID, SpvExecutionModeInputPoints);
+                        break;
+                    case kIROp_TriangleAdjInputPrimitiveTypeDecoration:
+                        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), inputDecor, dstID, SpvExecutionModeInputTrianglesAdjacency);
+                        break;
+                    }
+                }
+                // SPIRV requires MaxVertexCount decoration to appear before OutputTopologyDecoration,
+                // so we emit them here.
+                if (auto maxVertexCount = decoration->getParent()->findDecoration<IRMaxVertexCountDecoration>())
+                {
+                    auto section = getSection(SpvLogicalSectionID::ExecutionModes);
+                    emitOpExecutionModeOutputVertices(
+                        section,
+                        maxVertexCount,
+                        dstID,
+                        SpvLiteralInteger::from32(int32_t(getIntVal(maxVertexCount->getCount())))
+                    );
+                }
+
                 auto decor = as<IRStreamOutputTypeDecoration>(decoration);
                 IRType* type = decor->getStreamType();
 
@@ -3461,17 +3481,6 @@ struct SPIRVEmitContext
             varInst,
             builtinVal
         );
-        
-        if (storageClass == SpvStorageClassInput ||
-            storageClass == SpvStorageClassOutput)
-        {
-            switch (builtinVal)
-            {
-            case SpvBuiltInPrimitiveId:
-                _maybeEmitInterpolationModifierDecoration(IRInterpolationMode::NoInterpolation, varInst);
-                break;
-            }
-        }
         m_builtinGlobalVars[key] = varInst;
         return varInst;
     }
@@ -3674,7 +3683,11 @@ struct SPIRVEmitContext
                 {
                     requireSPIRVCapability(SpvCapabilityFragmentShadingRateKHR);
                     ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_fragment_shading_rate"));
-                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPrimitiveShadingRateKHR);
+                    auto importDecor = inst->findDecoration<IRImportDecoration>();
+                    if (importDecor && importDecor->getMangledName() == "gl_PrimitiveShadingRateEXT")
+                        return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPrimitiveShadingRateKHR);
+                    else
+                        return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInShadingRateKHR);
                 }
                 SLANG_UNREACHABLE("Unimplemented system value in spirv emit.");
             }
@@ -5740,6 +5753,22 @@ struct SPIRVEmitContext
     }
 };
 
+bool isInstUsedInStage(SPIRVEmitContext& context, IRInst* inst, Stage s)
+{
+    auto* referencingEntryPoints = context.m_referencingEntryPoints.tryGetValue(inst);
+    if (!referencingEntryPoints)
+        return false;
+    for (auto entryPoint : *referencingEntryPoints)
+    {
+        if (auto entryPointDecor = entryPoint->findDecoration<IREntryPointDecoration>())
+        {
+            if (entryPointDecor->getProfile().getStage() == s)
+                return true;
+        }
+    }
+    return false;
+}
+
 SlangResult emitSPIRVFromIR(
     CodeGenContext*         codeGenContext,
     IRModule*               irModule,
@@ -5802,6 +5831,29 @@ SlangResult emitSPIRVFromIR(
     for (auto irEntryPoint : irEntryPoints)
     {
         context.ensureInst(irEntryPoint);
+    }
+
+    // Declare integral input builtins as Flat if necessary.
+    for (auto globalInst : context.m_irModule->getGlobalInsts())
+    {
+        if (globalInst->getOp() != kIROp_GlobalVar &&
+            globalInst->getOp() != kIROp_GlobalParam)
+            continue;
+        auto spvVar = context.m_mapIRInstToSpvInst.tryGetValue(globalInst);
+        if (!spvVar)
+            continue;
+        auto ptrType = as<IRPtrType>(globalInst->getDataType());
+        if (!ptrType)
+            continue;
+        auto addrSpace = ptrType->getAddressSpace();
+        if (addrSpace == SpvStorageClassInput)
+        {
+            if (isIntegralScalarOrCompositeType(ptrType->getValueType()))
+            {
+                if (isInstUsedInStage(context, globalInst, Stage::Fragment))
+                    context._maybeEmitInterpolationModifierDecoration(IRInterpolationMode::NoInterpolation, *spvVar);
+            }
+        }
     }
 
     // Move forward delcared pointers to the end.

@@ -43,7 +43,7 @@ SLANG_FORCE_INLINE float _bitCastUIntToFloat(uint32_t ui) { Union32 u; u.u = ui;
 
 
 // This impl is based on FloatToHalf that is in Slang codebase
-uint32_t f32tof16(const float value)
+SLANG_FORCE_INLINE uint32_t f32tof16(const float value)
 {
     const uint32_t inBits = _bitCastFloatToUInt(value);
 
@@ -97,7 +97,7 @@ uint32_t f32tof16(const float value)
 
 static const float g_f16tof32Magic = _bitCastIntToFloat((127 + (127 - 15)) << 23);
 
-float f16tof32(const uint32_t value)
+SLANG_FORCE_INLINE float f16tof32(const uint32_t value)
 {
     const uint32_t sign = (value & 0x8000) << 16;
     uint32_t exponent = (value & 0x7c00) >> 10;
@@ -469,7 +469,7 @@ SLANG_FORCE_INLINE int64_t I64_max(int64_t a, int64_t b) { return a > b ? a : b;
 #       include <intrin.h>
 #   endif
 
-void InterlockedAdd(uint32_t* dest, uint32_t value, uint32_t* oldValue)
+SLANG_FORCE_INLINE void InterlockedAdd(uint32_t* dest, uint32_t value, uint32_t* oldValue)
 {
 #   ifdef _WIN32
     *oldValue = _InterlockedExchangeAdd((long*)dest, (long)value);

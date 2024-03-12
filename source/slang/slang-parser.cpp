@@ -2724,7 +2724,8 @@ namespace Slang
         {
             if(typeSpec.decl)
             {
-                if(peekToken(parser).flags & TokenFlag::AtStartOfLine)
+                if( peekToken(parser).type == TokenType::EndOfFile ||
+                    (peekToken(parser).flags & TokenFlag::AtStartOfLine))
                 {
                     // The token after the `}` is at the start of its
                     // own line, which means it can't be on the same line.
@@ -4453,7 +4454,7 @@ namespace Slang
         parser->pendingModifiers = &modifiers;
 
         auto loc = parser->tokenReader.peekLoc();
-
+        auto ptoken = parser->tokenReader.peekToken();
         switch (peekTokenType(parser))
         {
         case TokenType::Identifier:
