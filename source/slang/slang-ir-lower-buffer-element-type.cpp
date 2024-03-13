@@ -24,9 +24,10 @@ namespace Slang
 
         SlangMatrixLayoutMode defaultMatrixLayout = SLANG_MATRIX_LAYOUT_ROW_MAJOR;
         TargetProgram* target;
+        bool lowerBufferPointer = false;
 
-        LoweredElementTypeContext(TargetProgram* target, SlangMatrixLayoutMode inDefaultMatrixLayout)
-            : target(target), defaultMatrixLayout(inDefaultMatrixLayout)
+        LoweredElementTypeContext(TargetProgram* target, bool lowerBufferPointer, SlangMatrixLayoutMode inDefaultMatrixLayout)
+            : target(target), defaultMatrixLayout(inDefaultMatrixLayout), lowerBufferPointer(lowerBufferPointer)
         {}
 
         IRFunc* createMatrixUnpackFunc(
@@ -521,14 +522,20 @@ namespace Slang
             for (auto globalInst : module->getGlobalInsts())
             {
                 IRType* elementType = nullptr;
-                if (auto structBuffer = as<IRHLSLStructuredBufferTypeBase>(globalInst))
-                    elementType = structBuffer->getElementType();
-                else if (auto constBuffer = as<IRUniformParameterGroupType>(globalInst))
-                    elementType = constBuffer->getElementType();
-                else if (auto ptrType = as<IRPtrType>(globalInst))
+                if (lowerBufferPointer)
                 {
-                    if (ptrType->getAddressSpace() == SpvStorageClassPhysicalStorageBuffer)
-                        elementType = ptrType->getValueType();
+                    if (auto ptrType = as<IRPtrType>(globalInst))
+                    {
+                        if (ptrType->getAddressSpace() == SpvStorageClassPhysicalStorageBuffer)
+                            elementType = ptrType->getValueType();
+                    }
+                }
+                else
+                {
+                    if (auto structBuffer = as<IRHLSLStructuredBufferTypeBase>(globalInst))
+                        elementType = structBuffer->getElementType();
+                    else if (auto constBuffer = as<IRUniformParameterGroupType>(globalInst))
+                        elementType = constBuffer->getElementType();
                 }
                 if (as<IRTextureBufferType>(globalInst))
                     continue;
@@ -814,12 +821,12 @@ namespace Slang
         }
     };
 
-    void lowerBufferElementTypeToStorageType(TargetProgram* target, IRModule* module)
+    void lowerBufferElementTypeToStorageType(TargetProgram* target, IRModule* module, bool lowerBufferPointer)
     {
         SlangMatrixLayoutMode defaultMatrixMode = (SlangMatrixLayoutMode)target->getOptionSet().getMatrixLayoutMode();
         if (defaultMatrixMode == SLANG_MATRIX_LAYOUT_MODE_UNKNOWN)
             defaultMatrixMode = SLANG_MATRIX_LAYOUT_ROW_MAJOR;
-        LoweredElementTypeContext context(target, defaultMatrixMode);
+        LoweredElementTypeContext context(target, lowerBufferPointer, defaultMatrixMode);
         context.processModule(module);
     }
 

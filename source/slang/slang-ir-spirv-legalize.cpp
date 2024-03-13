@@ -1944,7 +1944,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // so we need to update the function types to match that.
         updateFunctionTypes();
 
-        lowerBufferElementTypeToStorageType(m_sharedContext->m_targetProgram, m_module);
+        // Lower all loads/stores from buffer pointers to use correct storage types.
+        lowerBufferElementTypeToStorageType(m_sharedContext->m_targetProgram, m_module, true);
     }
 
     void updateFunctionTypes()
