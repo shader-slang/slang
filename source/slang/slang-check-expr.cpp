@@ -4164,15 +4164,39 @@ namespace Slang
         List<Val*> modifierVals;
         for( auto modifier : expr->modifiers )
         {
+            if (auto matrixLayoutModifier = as<MatrixLayoutModifier>(modifier))
+            {
+                if (auto matrixType = as<MatrixExpressionType>(baseType))
+                {
+                    if (as<ColumnMajorLayoutModifier>(matrixLayoutModifier))
+                    {
+                        baseType = m_astBuilder->getMatrixType(matrixType->getElementType(), matrixType->getRowCount(), matrixType->getColumnCount(),
+                            m_astBuilder->getIntVal(m_astBuilder->getIntType(), kMatrixLayoutMode_ColumnMajor));
+                    }
+                    else
+                    {
+                        baseType = m_astBuilder->getMatrixType(matrixType->getElementType(), matrixType->getRowCount(), matrixType->getColumnCount(),
+                                                       m_astBuilder->getIntVal(m_astBuilder->getIntType(), kMatrixLayoutMode_RowMajor));
+                    }
+                    expr->type = m_astBuilder->getTypeType(baseType);
+                }
+                else
+                {
+                    getSink()->diagnose(matrixLayoutModifier, Diagnostics::matrixLayoutModifierOnNonMatrixType, baseType);
+                }
+                continue;
+            }
             auto modifierVal = checkTypeModifier(modifier, baseType);
             if(!modifierVal)
                 continue;
             modifierVals.add(modifierVal);
         }
 
-        auto modifiedType = m_astBuilder->getModifiedType(baseType, modifierVals);
-        expr->type = m_astBuilder->getTypeType(modifiedType);
-
+        if (modifierVals.getCount())
+        {
+            auto modifiedType = m_astBuilder->getModifiedType(baseType, modifierVals);
+            expr->type = m_astBuilder->getTypeType(modifiedType);
+        }
         return expr;
     }
 

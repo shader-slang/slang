@@ -32,6 +32,9 @@
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-crypto.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-default-matrix-layout.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-file-system.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

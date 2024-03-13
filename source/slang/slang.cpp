@@ -594,17 +594,6 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
     slang::SessionDesc desc = makeFromSizeVersioned<slang::SessionDesc>((uint8_t*)&inDesc);
 
     RefPtr<Linkage> linkage = new Linkage(this, astBuilder, getBuiltinLinkage());
-    linkage->m_optionSet.load(desc.compilerOptionEntryCount, desc.compilerOptionEntries);
-
-    {
-        const Int targetCount = desc.targetCount;
-        const uint8_t* targetDescPtr = reinterpret_cast<const uint8_t*>(desc.targets);
-        for (Int ii = 0; ii < targetCount; ++ii, targetDescPtr += _getStructureSize(targetDescPtr))
-        {
-            const auto targetDesc = makeFromSizeVersioned<slang::TargetDesc>(targetDescPtr);
-            linkage->addTarget(targetDesc);
-        }
-    }
 
     linkage->setMatrixLayoutMode(desc.defaultMatrixLayoutMode);
 
@@ -630,6 +619,19 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
     {
         linkage->m_optionSet.set(CompilerOptionName::EnableEffectAnnotations, desc.enableEffectAnnotations);
     }
+
+    linkage->m_optionSet.load(desc.compilerOptionEntryCount, desc.compilerOptionEntries);
+
+    {
+        const Int targetCount = desc.targetCount;
+        const uint8_t* targetDescPtr = reinterpret_cast<const uint8_t*>(desc.targets);
+        for (Int ii = 0; ii < targetCount; ++ii, targetDescPtr += _getStructureSize(targetDescPtr))
+        {
+            const auto targetDesc = makeFromSizeVersioned<slang::TargetDesc>(targetDescPtr);
+            linkage->addTarget(targetDesc);
+        }
+    }
+
     *outSession = asExternal(linkage.detach());
     return SLANG_OK;
 }
