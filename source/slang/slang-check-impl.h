@@ -1586,6 +1586,12 @@ namespace Slang
             Dictionary<DeclRef<InterfaceDecl>, RefPtr<WitnessTable>>    mapInterfaceToWitnessTable;
         };
 
+        void addModifiersToSynthesizedDecl(
+            ConformanceCheckingContext* context,
+            DeclRef<Decl> requirement,
+            FunctionDeclBase* synthesized,
+            ThisExpr* &synThis);
+
         FuncDecl* synthesizeMethodSignatureForRequirementWitness(
             ConformanceCheckingContext* context,
             DeclRef<FuncDecl> requiredMemberDeclRef,
@@ -1612,6 +1618,12 @@ namespace Slang
             ConformanceCheckingContext* context,
             LookupResult const&         lookupResult,
             DeclRef<FuncDecl>           requiredMemberDeclRef,
+            RefPtr<WitnessTable>        witnessTable);
+
+        bool trySynthesizeConstructorRequirementWitness(
+            ConformanceCheckingContext* context,
+            LookupResult const&         lookupResult,
+            DeclRef<ConstructorDecl>    requiredMemberDeclRef,
             RefPtr<WitnessTable>        witnessTable);
 
             /// Attempt to synthesize a property that can satisfy `requiredMemberDeclRef` using `lookupResult`.

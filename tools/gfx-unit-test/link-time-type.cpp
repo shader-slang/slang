@@ -19,6 +19,8 @@ namespace gfx_test
             interface IBase : IDifferentiable
             {
                 [Differentiable]
+                __init();
+                [Differentiable]
                 float getBaseValue();
                 [Differentiable]
                 static float getBaseValueS();
@@ -44,6 +46,8 @@ namespace gfx_test
                     get { return val + 2.0; }
                     set { val = newValue; }
                 }
+                [Differentiable]
+                __init() { val = 0.0; }
             };
         )";
         const char* module0Src = R"(
