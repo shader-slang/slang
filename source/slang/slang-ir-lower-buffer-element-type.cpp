@@ -526,7 +526,10 @@ namespace Slang
                 else if (auto constBuffer = as<IRUniformParameterGroupType>(globalInst))
                     elementType = constBuffer->getElementType();
                 else if (auto ptrType = as<IRPtrType>(globalInst))
-                    elementType = ptrType->getValueType();
+                {
+                    if (ptrType->getAddressSpace() == SpvStorageClassPhysicalStorageBuffer)
+                        elementType = ptrType->getValueType();
+                }
                 if (as<IRTextureBufferType>(globalInst))
                     continue;
                 if (!as<IRStructType>(elementType) && !as<IRMatrixType>(elementType) && !as<IRArrayType>(elementType) && !as<IRBoolType>(elementType))

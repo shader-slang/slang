@@ -20,6 +20,7 @@
 #include "slang-ir-peephole.h"
 #include "slang-ir-redundancy-removal.h"
 #include "slang-ir-loop-unroll.h"
+#include "slang-ir-lower-buffer-element-type.h"
 
 namespace Slang
 {
@@ -1853,8 +1854,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
     void processModule()
     {
-        //convertCompositeTypeParametersToPointers(m_module);
-
         // Process global params before anything else, so we don't generate inefficient
         // array marhalling code for array-typed global params.
         for (auto globalInst : m_module->getGlobalInsts())
@@ -1944,6 +1943,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // Some legalization processing may change the function parameter types,
         // so we need to update the function types to match that.
         updateFunctionTypes();
+
+        lowerBufferElementTypeToStorageType(m_sharedContext->m_targetProgram, m_module);
     }
 
     void updateFunctionTypes()
