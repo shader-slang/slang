@@ -3504,6 +3504,60 @@ namespace Slang
         }
     }
 
+    void SemanticsVisitor::addRequiredParamsToSynthesizedDecl(
+        DeclRef<CallableDecl> requirement,
+        CallableDecl* synthesized,
+        List<Expr*>& synArgs)
+    {
+        // Our synthesized method will have parameters matching the names
+        // and types of those on the requirement, and it will use expressions
+        // that reference those parametesr as arguments for the call expresison
+        // that makes up the body.
+        //
+        for (auto paramDeclRef : getParameters(m_astBuilder, requirement))
+        {
+            auto paramType = getType(m_astBuilder, paramDeclRef);
+
+            // For each parameter of the requirement, we create a matching
+            // parameter (same name and type) for the synthesized method.
+            //
+            auto synParamDecl = m_astBuilder->create<ParamDecl>();
+            synParamDecl->nameAndLoc = paramDeclRef.getDecl()->nameAndLoc;
+            synParamDecl->type.type = paramType;
+
+            // We need to add the parameter as a child declaration of
+            // the method we are building.
+            //
+            synParamDecl->parentDecl = synthesized;
+            synthesized->members.add(synParamDecl);
+
+            // For each paramter, we will create an argument expression
+            // for the call in the function body.
+            //
+            auto synArg = m_astBuilder->create<VarExpr>();
+            synArg->declRef = makeDeclRef(synParamDecl);
+            synArg->type = paramType;
+            synArgs.add(synArg);
+
+            // Add modifiers
+            for (auto modifier : paramDeclRef.getDecl()->modifiers)
+            {
+                if (as<NoDiffModifier>(modifier))
+                {
+                    auto noDiffModifier = m_astBuilder->create<NoDiffModifier>();
+                    noDiffModifier->keywordName = getSession()->getNameObj("no_diff");
+                    addModifier(synParamDecl, noDiffModifier);
+                }
+                else if (as<InOutModifier>(modifier) || as<OutModifier>(modifier) || as<ConstRefModifier>(modifier) || as<RefModifier>(modifier))
+                {
+                    auto clonedModifier = (Modifier*)m_astBuilder->createByNodeType(modifier->astNodeType);
+                    clonedModifier->keywordName = modifier->keywordName;
+                    addModifier(synParamDecl, clonedModifier);
+                }
+            }
+        }
+    }
+
     FuncDecl* SemanticsVisitor::synthesizeMethodSignatureForRequirementWitness(
         ConformanceCheckingContext* context,
         DeclRef<FuncDecl> requiredMemberDeclRef,
@@ -3549,54 +3603,7 @@ namespace Slang
         auto resultType = getResultType(m_astBuilder, requiredMemberDeclRef);
         synFuncDecl->returnType.type = resultType;
 
-        // Our synthesized method will have parameters matching the names
-        // and types of those on the requirement, and it will use expressions
-        // that reference those parametesr as arguments for the call expresison
-        // that makes up the body.
-        //
-        for (auto paramDeclRef : getParameters(m_astBuilder, requiredMemberDeclRef))
-        {
-            auto paramType = getType(m_astBuilder, paramDeclRef);
-
-            // For each parameter of the requirement, we create a matching
-            // parameter (same name and type) for the synthesized method.
-            //
-            auto synParamDecl = m_astBuilder->create<ParamDecl>();
-            synParamDecl->nameAndLoc = paramDeclRef.getDecl()->nameAndLoc;
-            synParamDecl->type.type = paramType;
-
-            // We need to add the parameter as a child declaration of
-            // the method we are building.
-            //
-            synParamDecl->parentDecl = synFuncDecl;
-            synFuncDecl->members.add(synParamDecl);
-
-            // For each paramter, we will create an argument expression
-            // for the call in the function body.
-            //
-            auto synArg = m_astBuilder->create<VarExpr>();
-            synArg->declRef = makeDeclRef(synParamDecl);
-            synArg->type = paramType;
-            synArgs.add(synArg);
-
-            // Add modifiers
-            for (auto modifier : paramDeclRef.getDecl()->modifiers)
-            {
-                if (as<NoDiffModifier>(modifier))
-                {
-                    auto noDiffModifier = m_astBuilder->create<NoDiffModifier>();
-                    noDiffModifier->keywordName = getSession()->getNameObj("no_diff");
-                    addModifier(synParamDecl, noDiffModifier);
-                }
-                else if (as<InOutModifier>(modifier) || as<OutModifier>(modifier) || as<ConstRefModifier>(modifier) || as<RefModifier>(modifier))
-                {
-                    auto clonedModifier = (Modifier*)m_astBuilder->createByNodeType(modifier->astNodeType);
-                    clonedModifier->keywordName = modifier->keywordName;
-                    addModifier(synParamDecl, clonedModifier);
-                }
-            }
-        }
-
+        addRequiredParamsToSynthesizedDecl(requiredMemberDeclRef, synFuncDecl, synArgs);
         addModifiersToSynthesizedDecl(context, requiredMemberDeclRef, synFuncDecl, synThis);
         
         return synFuncDecl;
@@ -3873,10 +3880,6 @@ namespace Slang
     {
         SLANG_UNUSED(satisfyingMemberLookupResult);
 
-        // For now we can't synthesize constructors with parameters.
-        if (requiredMemberDeclRef.getDecl()->getParameters().isNonEmpty())
-            return false;
-
         bool isInWrapperType = isWrapperTypeDecl(context->parentDecl);
         if (!isInWrapperType)
         {
@@ -3893,6 +3896,9 @@ namespace Slang
         auto ctorName = getName("$init");
         ctorDecl->nameAndLoc.name = ctorName;
         ctorDecl->nameAndLoc.loc = ctorDecl->loc;
+        
+        List<Expr*> synArgs;
+        addRequiredParamsToSynthesizedDecl(requiredMemberDeclRef, ctorDecl, synArgs);
 
         ThisExpr* synThis = nullptr;
         addModifiersToSynthesizedDecl(context, requiredMemberDeclRef, ctorDecl, synThis);
@@ -3927,6 +3933,7 @@ namespace Slang
                     LookupMask::Function,
                     LookupOptions::IgnoreBaseInterfaces);
                 temp->functionExpr = createLookupResultExpr(ctorName, lookupResult, nullptr, context->parentDecl->loc, nullptr);
+                temp->arguments.addRange(synArgs);
                 auto resolvedVar = ResolveInvoke(temp);
                 if (!resolvedVar)
                     return false;
@@ -3937,6 +3944,7 @@ namespace Slang
                 auto stmt = m_astBuilder->create<ExpressionStmt>();
                 stmt->expression = assign;
                 seqStmt->stmts.add(stmt);
+                break;
             }
         }
 

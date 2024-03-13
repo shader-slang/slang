@@ -19,7 +19,7 @@ namespace gfx_test
             interface IBase : IDifferentiable
             {
                 [Differentiable]
-                __init();
+                __init(int x);
                 [Differentiable]
                 float getBaseValue();
                 [Differentiable]
@@ -47,7 +47,7 @@ namespace gfx_test
                     set { val = newValue; }
                 }
                 [Differentiable]
-                __init() { val = 0.0; }
+                __init(int x) { val = x; }
             };
         )";
         const char* module0Src = R"(
@@ -57,7 +57,7 @@ namespace gfx_test
             [numthreads(1,1,1)]
             void computeMain(uniform RWStructuredBuffer<float> buffer)
             {
-                Foo foo;
+                Foo foo = Foo(0);
                 foo.setValue(3.0);
                 buffer[0] = foo.getValue() + foo.val2 + Foo.offset + foo.getBaseValue();
             }

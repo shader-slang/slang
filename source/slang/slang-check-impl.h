@@ -1592,6 +1592,11 @@ namespace Slang
             FunctionDeclBase* synthesized,
             ThisExpr* &synThis);
 
+        void addRequiredParamsToSynthesizedDecl(
+            DeclRef<CallableDecl> requirement,
+            CallableDecl* synthesized,
+            List<Expr*>& synArgs);
+
         FuncDecl* synthesizeMethodSignatureForRequirementWitness(
             ConformanceCheckingContext* context,
             DeclRef<FuncDecl> requiredMemberDeclRef,
