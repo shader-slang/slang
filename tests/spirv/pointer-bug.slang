@@ -7,7 +7,7 @@ struct Params {
   Foo *foo;
 };
 
-// CHECK: %_ptr_PhysicalStorageBuffer_Foo = OpTypePointer PhysicalStorageBuffer %Foo
+// CHECK: OpTypePointer PushConstant %_ptr_PhysicalStorageBuffer_Foo_natural
 
 [[vk::push_constant]] Params params;
 
