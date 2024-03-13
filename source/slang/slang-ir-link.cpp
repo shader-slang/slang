@@ -1621,12 +1621,9 @@ LinkedIR linkIR(
         {
             for (auto inst : irModule->getGlobalInsts())
             {
-                for (auto decoration : inst->getDecorations())
+                if (isRaytracingObject(inst))
                 {
-                    if (isRaytracingObject(inst))
-                    {
-                        insertGlobalVar(inst);
-                    }
+                    insertGlobalVar(inst);
                 }
             }
         }
