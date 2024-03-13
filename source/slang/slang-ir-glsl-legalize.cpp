@@ -2718,9 +2718,9 @@ bool shouldUseOriginalEntryPointName(CodeGenContext* codeGenContext)
 void getAllNullLocationRayObjectsAndUsedLocations(
     IRModule* module,
     List<IRInst*>* nullRayObjects,
-    HashSet<int>* rayPayload,
-    HashSet<int>* callablePayload,
-    HashSet<int>* hitObjectAttribute)
+    HashSet<IRIntegerValue>* rayPayload,
+    HashSet<IRIntegerValue>* callablePayload,
+    HashSet<IRIntegerValue>* hitObjectAttribute)
 {
     for (auto inst : module->getGlobalInsts())
     {
@@ -2756,9 +2756,9 @@ void getAllNullLocationRayObjectsAndUsedLocations(
 void assignRayPayloadHitObjectAttributeLocations(IRModule* module)
 {
     List<IRInst*> nullRayObjects;
-    HashSet<int> rayPayloadLocations;
-    HashSet<int> callablePayloadLocations;
-    HashSet<int> hitObjectAttributeLocations;
+    HashSet<IRIntegerValue> rayPayloadLocations;
+    HashSet<IRIntegerValue> callablePayloadLocations;
+    HashSet<IRIntegerValue> hitObjectAttributeLocations;
     getAllNullLocationRayObjectsAndUsedLocations(module, &nullRayObjects, &rayPayloadLocations, &callablePayloadLocations, &hitObjectAttributeLocations);
 
     IRIntegerValue rayPayloadCounter = 0;
