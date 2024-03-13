@@ -3858,6 +3858,14 @@ static TypeLayoutResult _createTypeLayout(
             type,
             rules);
     }
+    else if (auto atomicType = as<GLSLAtomicUintType>(type))
+    {
+        ShaderParameterKind kind = ShaderParameterKind::AtomicUint;
+        return createSimpleTypeLayout(
+            rules->GetObjectLayout(kind, context.objectLayoutOptions),
+            type,
+            rules);
+    }
 
     // TODO: need a better way to handle this stuff...
 #define CASE(TYPE, KIND)                                                \

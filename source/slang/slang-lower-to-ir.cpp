@@ -2183,6 +2183,11 @@ void addVarDecorations(
             builder->addDecoration(inst, kIROp_GLSLLocationDecoration,
                 builder->getIntValue(builder->getIntType(), stringToInt(glslLocationMod->valToken.getContent())));
         }
+        else if (auto glslOffsetMod = as<GLSLOffsetLayoutAttribute>(mod))
+        {
+            builder->addDecoration(inst, kIROp_GLSLOffsetDecoration,
+                builder->getIntValue(builder->getIntType(), glslOffsetMod->offset));
+        }
         else if (auto hlslSemantic = as< HLSLSimpleSemantic>(mod))
         {
             builder->addSemanticDecoration(inst, hlslSemantic->name.getContent());

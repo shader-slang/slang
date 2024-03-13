@@ -737,6 +737,14 @@ class GLSLBindingAttribute : public Attribute
     int32_t set = 0;
 };
 
+
+class GLSLOffsetLayoutAttribute : public Attribute 
+{
+    SLANG_AST_CLASS(GLSLOffsetLayoutAttribute)
+
+    int64_t offset;
+};
+
 class GLSLSimpleIntegerLayoutAttribute : public Attribute 
 {
     SLANG_AST_CLASS(GLSLSimpleIntegerLayoutAttribute)

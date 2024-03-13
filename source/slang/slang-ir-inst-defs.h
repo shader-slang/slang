@@ -127,6 +127,8 @@ INST(Nop, nop, 0, 0)
     INST(ComPtrType, ComPtr, 1, HOISTABLE)
     // A NativePtr<T> type represents a native pointer to a managed resource.
     INST(NativePtrType, NativePtr, 1, HOISTABLE)
+    // An AtomicUint is a placeholder type for a storage buffer, and will be mangled during compiling.
+    INST(GLSLAtomicUintType, GLSLAtomicUint, 0, HOISTABLE)
 
     /* SamplerStateTypeBase */
         INST(SamplerStateType, SamplerState, 0, HOISTABLE)
@@ -848,6 +850,7 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(GlobalOutputDecoration, output, 0, 0)
     INST(GlobalInputDecoration, output, 0, 0)
     INST(GLSLLocationDecoration, glslLocation, 1, 0)
+    INST(GLSLOffsetDecoration, glslOffset, 1, 0)
     INST(PayloadDecoration, payload, 0, 0)
 
     /* Mesh Shader outputs */
