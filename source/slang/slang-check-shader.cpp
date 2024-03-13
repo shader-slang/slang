@@ -1216,16 +1216,36 @@ namespace Slang
                 auto specializationArg = args[ii];
                 genericArgs.add(specializationArg.val);
             }
-            ASTBuilder* astBuilder = getLinkage()->getASTBuilder();
-
+            auto astBuilder = getLinkage()->getASTBuilder();
             for (auto constraintDecl : getMembersOfType<GenericTypeConstraintDecl>(
                      getLinkage()->getASTBuilder(), DeclRef<ContainerDecl>(genericDeclRef)))
             {
                 DeclRef<GenericTypeConstraintDecl> constraintDeclRef = astBuilder->getDirectDeclRef(constraintDecl.getDecl());
+                int argIndex = -1;
+                int ii = 0;
+                for (auto member : genericDeclRef.getDecl()->members)
+                {
+                    if (member == constraintDeclRef.getDecl())
+                    {
+                        argIndex = ii;
+                        break;
+                    }
+                    ii++;
+                }
+                if (argIndex == -1)
+                {
+                    SLANG_ASSERT(!"generic parameter not found in generic decl");
+                    continue;
+                }
 
-                auto sub = getSub(astBuilder, constraintDeclRef);
+                auto sub = as<Type>(args[argIndex].val);
+                if (!sub)
+                {
+                    sink->diagnose(constraintDecl, Diagnostics::expectedTypeForSpecializationArg, argIndex);
+                    continue;
+                }
+
                 auto sup = getSup(astBuilder, constraintDeclRef);
-
                 auto subTypeWitness = visitor.isSubtype(sub, sup);
                 if(subTypeWitness)
                 {
