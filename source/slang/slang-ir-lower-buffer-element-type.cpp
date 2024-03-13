@@ -681,11 +681,12 @@ namespace Slang
                                 break;
                             case kIROp_Call:
                                 {
-                                    // If a structured buffer typed value is used directly as an argument,
+                                    // If a structured buffer or pointer typed value is used directly as an argument,
                                     // we don't need to do any marshalling here.
                                     if (as<IRHLSLStructuredBufferTypeBase>(ptrVal->getDataType()))
                                         break;
-
+                                    if (lowerBufferPointer && as<IRPtrType>(ptrVal->getDataType()))
+                                        break;
                                     // If we are calling a function with an l-value pointer from buffer access,
                                     // we need to materialize the object as a local variable, and pass the address
                                     // of the local variable to the function.
