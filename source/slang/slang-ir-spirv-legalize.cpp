@@ -1945,6 +1945,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         updateFunctionTypes();
 
         // Lower all loads/stores from buffer pointers to use correct storage types.
+        // We didn't do the lowering for buffer pointers because we don't know which pointer
+        // types are actual storage buffer pointers until we propagated the address space of
+        // pointers in this pass. In the future we should consider separate out IRAddress as
+        // the type for IRVar, and use IRPtrType to dedicate pointers in user code, so we can
+        // safely lower the pointer load stores early together with other buffer types.
         lowerBufferElementTypeToStorageType(m_sharedContext->m_targetProgram, m_module, true);
     }
 
