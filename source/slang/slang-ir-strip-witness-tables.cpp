@@ -33,4 +33,21 @@ void stripWitnessTables(IRModule* module)
     }
 }
 
+void unpinWitnessTables(IRModule* module)
+{
+    for (auto inst : module->getGlobalInsts())
+    {
+        auto witnessTable = as<IRWitnessTable>(inst);
+        if (!witnessTable)
+            continue;
+
+        // If a witness table is not used for dynamic dispatch, unpin it.
+        if (!witnessTable->findDecoration<IRDynamicDispatchWitnessDecoration>())
+        {
+            while (auto decor = witnessTable->findDecoration<IRKeepAliveDecoration>())
+                decor->removeAndDeallocate();
+        }
+    }
+}
+
 }

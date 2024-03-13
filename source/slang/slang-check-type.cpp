@@ -33,6 +33,10 @@ namespace Slang
         {
             return ptrType->getValueType();
         }
+        else if (auto refType = as<RefType>(type))
+        {
+            return refType->getValueType();
+        }
         return nullptr;
     }
 
@@ -142,6 +146,7 @@ namespace Slang
             genericParamType ? IntegerConstantExpressionCoercionType::SpecificType
                              : IntegerConstantExpressionCoercionType::AnyInteger,
             genericParamType,
+            ConstantFoldingKind::LinkTime,
             sink);
         if(val) return val;
 

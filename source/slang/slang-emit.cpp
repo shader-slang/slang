@@ -32,6 +32,7 @@
 #include "slang-ir-legalize-varying-params.h"
 #include "slang-ir-link.h"
 #include "slang-ir-com-interface.h"
+#include "slang-ir-user-type-hint.h"
 #include "slang-ir-lower-append-consume-structured-buffer.h"
 #include "slang-ir-lower-binding-query.h"
 #include "slang-ir-lower-generics.h"
@@ -71,6 +72,7 @@
 #include "slang-ir-string-hash.h"
 #include "slang-ir-simplify-for-emit.h"
 #include "slang-ir-pytorch-cpp-binding.h"
+#include "slang-ir-uniformity.h"
 #include "slang-ir-vk-invert-y.h"
 #include "slang-legalize-types.h"
 #include "slang-lower-to-ir.h"
@@ -371,6 +373,13 @@ Result linkAndOptimizeIR(
 
     simplifyIR(targetProgram, irModule, IRSimplificationOptions::getDefault(), sink);
 
+    if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::ValidateUniformity))
+    {
+        validateUniformity(irModule, sink);
+        if (sink->getErrorCount() != 0)
+            return SLANG_FAIL;
+    }
+
     // Fill in default matrix layout into matrix types that left layout unspecified.
     specializeMatrixLayout(codeGenContext->getTargetProgram(), irModule);
 
@@ -483,6 +492,11 @@ Result linkAndOptimizeIR(
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
+    // If we have any witness tables that are marked as `KeepAlive`, 
+    // but are not used for dynamic dispatch, unpin them so we don't
+    // do unnecessary work to lower them.
+    unpinWitnessTables(irModule);
+
     simplifyIR(targetProgram, irModule, IRSimplificationOptions::getFast(), sink);
 
     if (!ArtifactDescUtil::isCpuLikeTarget(artifactDesc))
@@ -523,6 +537,8 @@ Result linkAndOptimizeIR(
     {
         lowerAppendConsumeStructuredBuffers(targetProgram, irModule, sink);
     }
+
+    addUserTypeHintDecorations(irModule);
 
     // We don't need the legalize pass for C/C++ based types
     if(options.shouldLegalizeExistentialAndResourceTypes )
@@ -921,6 +937,8 @@ Result linkAndOptimizeIR(
         legalizeUniformBufferLoad(irModule);
         if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::VulkanInvertY))
             invertYOfPositionOutput(irModule);
+        if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::VulkanUseDxPositionW))
+            rcpWOfPositionInput(irModule);
     }
 
     // Lower sizeof/alignof

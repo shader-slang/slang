@@ -1482,6 +1482,9 @@ namespace Slang
 
         void checkGenericDeclHeader(GenericDecl* genericDecl);
 
+        IntVal* checkLinkTimeConstantIntVal(
+            Expr* expr);
+
         ConstantIntVal* checkConstantIntVal(
             Expr*    expr);
 
@@ -1808,7 +1811,12 @@ namespace Slang
 
         Expr* checkPredicateExpr(Expr* expr);
 
-        Expr* checkExpressionAndExpectIntegerConstant(Expr* expr, IntVal** outIntVal);
+        enum class ConstantFoldingKind
+        {
+            CompileTime,
+            LinkTime,
+        };
+        Expr* checkExpressionAndExpectIntegerConstant(Expr* expr, IntVal** outIntVal, ConstantFoldingKind kind);
 
         IntegerLiteralValue GetMinBound(IntVal* val);
 
@@ -1845,15 +1853,16 @@ namespace Slang
                 /// The rest of the links in the chain of declarations being folded
             ConstantFoldingCircularityInfo* next = nullptr;
         };
-
             /// Try to apply front-end constant folding to determine the value of `invokeExpr`.
         IntVal* tryConstantFoldExpr(
             SubstExpr<InvokeExpr>           invokeExpr,
+            ConstantFoldingKind             kind,
             ConstantFoldingCircularityInfo* circularityInfo);
 
             /// Try to apply front-end constant folding to determine the value of `expr`.
         IntVal* tryConstantFoldExpr(
             SubstExpr<Expr>                 expr,
+            ConstantFoldingKind             kind,
             ConstantFoldingCircularityInfo* circularityInfo);
 
         bool _checkForCircularityInConstantFolding(
@@ -1863,6 +1872,7 @@ namespace Slang
             /// Try to resolve a compile-time constant `IntVal` from the given `declRef`.
         IntVal* tryConstantFoldDeclRef(
             DeclRef<VarDeclBase> const&     declRef,
+            ConstantFoldingKind             kind,
             ConstantFoldingCircularityInfo* circularityInfo);
 
             /// Try to extract the value of an integer constant expression, either
@@ -1871,6 +1881,7 @@ namespace Slang
             ///
         IntVal* tryFoldIntegerConstantExpression(
             SubstExpr<Expr>                 expr,
+            ConstantFoldingKind             kind,
             ConstantFoldingCircularityInfo* circularityInfo);
 
         // Enforce that an expression resolves to an integer constant, and get its value
@@ -1879,10 +1890,10 @@ namespace Slang
             SpecificType,
             AnyInteger
         };
-        IntVal* CheckIntegerConstantExpression(Expr* inExpr, IntegerConstantExpressionCoercionType coercionType, Type* expectedType);
-        IntVal* CheckIntegerConstantExpression(Expr* inExpr, IntegerConstantExpressionCoercionType coercionType, Type* expectedType, DiagnosticSink* sink);
+        IntVal* CheckIntegerConstantExpression(Expr* inExpr, IntegerConstantExpressionCoercionType coercionType, Type* expectedType, ConstantFoldingKind kind);
+        IntVal* CheckIntegerConstantExpression(Expr* inExpr, IntegerConstantExpressionCoercionType coercionType, Type* expectedType, ConstantFoldingKind kind, DiagnosticSink* sink);
 
-        IntVal* CheckEnumConstantExpression(Expr* expr);
+        IntVal* CheckEnumConstantExpression(Expr* expr, ConstantFoldingKind kind);
 
 
         Expr* CheckSimpleSubscriptExpr(

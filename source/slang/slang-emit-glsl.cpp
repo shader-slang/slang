@@ -928,6 +928,14 @@ void GLSLSourceEmitter::_maybeEmitGLSLBuiltin(IRGlobalParam* var, UnownedStringS
             m_writer->emit(";\n\n");
         }
     }
+    else if (name == "gl_ShadingRateEXT")
+    {
+        _requireGLSLExtension(toSlice("GL_EXT_fragment_shading_rate"));
+    }
+    else if (name == "gl_PrimitiveShadingRateEXT")
+    {
+        _requireGLSLExtension(toSlice("GL_EXT_fragment_shading_rate_primitive"));
+    }
 }
 
 void GLSLSourceEmitter::_requireBaseType(BaseType baseType)

@@ -1610,14 +1610,6 @@ static LayoutSize GetElementCount(IntVal* val)
     }
     else if (const auto polyIntVal = as<PolynomialIntVal>(val))
     {
-        // TODO: We want to treat the case where the number of
-        // elements in an array depends on a generic parameter
-        // much like the case where the number of elements is
-        // unbounded, *but* we can't just blindly do that because
-        // an API might disallow unbounded arrays in various
-        // cases where a generic bound might work (because
-        // any concrete specialization will have a finite bound...)
-        //
         return 0;
     }
     SLANG_UNEXPECTED("unhandled integer literal kind");

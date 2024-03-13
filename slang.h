@@ -874,6 +874,7 @@ extern "C"
             VulkanBindShift,            // intValue0 (higher 8 bits): kind; intValue0(lower bits): set; intValue1: shift
             VulkanBindGlobals,          // intValue0: index; intValue1: set
             VulkanInvertY,              // bool
+            VulkanUseDxPositionW,       // bool
             VulkanUseEntryPointName,    // bool
             VulkanUseGLLayout,          // bool
             VulkanEmitReflection,       // bool
@@ -924,6 +925,7 @@ extern "C"
             FileSystem,
             Heterogeneous,
             NoMangle,
+            ValidateUniformity,
             AllowGLSL,
 
             // Internal
@@ -4648,6 +4650,14 @@ namespace slang
             */
         virtual SLANG_NO_THROW bool SLANG_MCALL isBinaryModuleUpToDate(
             const char* modulePath, slang::IBlob* binaryModuleBlob) = 0;
+
+            /** Load a module from a string.
+            */
+        virtual SLANG_NO_THROW IModule* SLANG_MCALL loadModuleFromSourceString(
+            const char* moduleName,
+            const char* path,
+            const char* string,
+            slang::IBlob** outDiagnostics = nullptr) = 0;
     };
 
     #define SLANG_UUID_ISession ISession::getTypeGuid()

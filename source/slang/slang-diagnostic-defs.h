@@ -325,6 +325,8 @@ DIAGNOSTIC(30066, Error, classCanOnlyBeInitializedWithNew, "a class can only be 
 DIAGNOSTIC(30067, Error, mutatingMethodOnFunctionInputParameterError, "mutating method '$0' called on `in` parameter '$1'; changes will not be visible to caller. copy the parameter into a local variable if this behavior is intended")
 DIAGNOSTIC(30068, Warning, mutatingMethodOnFunctionInputParameterWarning, "mutating method '$0' called on `in` parameter '$1'; changes will not be visible to caller. copy the parameter into a local variable if this behavior is intended")
 
+DIAGNOSTIC(30070, Error, unsizedMemberMustAppearLast, "unsized member can only appear as the last member in a composite type.")
+
 DIAGNOSTIC(30100, Error, staticRefToNonStaticMember, "type '$0' cannot be used to refer to non-static member '$1'")
 
 DIAGNOSTIC(30200, Error, redeclaration, "declaration of '$0' conflicts with existing declaration")
@@ -662,6 +664,7 @@ DIAGNOSTIC(39024, Warning, cannotInferVulkanBindingWithoutRegisterModifier, "sha
 
 DIAGNOSTIC(39025, Error, conflictingVulkanInferredBindingForParameter, "conflicting vulkan inferred binding for parameter '$0' overlap is $1 and $2")
 
+DIAGNOSTIC(39026, Error, matrixLayoutModifierOnNonMatrixType, "matrix layout modifier cannot be used on non-matrix type '$0'.")
 //
 
 // 4xxxx - IL code generation.
@@ -718,6 +721,10 @@ DIAGNOSTIC(41904, Error, unableToAlignOf, "alignof could not be performed for ty
 DIAGNOSTIC(42001, Error, invalidUseOfTorchTensorTypeInDeviceFunc, "invalid use of TorchTensor type in device/kernel functions. use `TensorView` instead.")
 
 DIAGNOSTIC(45001, Error, unresolvedSymbol, "unresolved external symbol '$0'.")
+
+DIAGNOSTIC(41201, Warning, expectDynamicUniformArgument, "argument for '$0' might not be a dynamic uniform, use `asDynamicUniform()` to silence this warning.")
+DIAGNOSTIC(41201, Warning, expectDynamicUniformValue, "value stored at this location must be dynamic uniform, use `asDynamicUniform()` to silence this warning.")
+
 //
 // 5xxxx - Target code generation.
 //

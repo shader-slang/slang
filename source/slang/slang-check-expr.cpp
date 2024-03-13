@@ -1411,6 +1411,7 @@ namespace Slang
 
     IntVal* SemanticsVisitor::tryConstantFoldExpr(
         SubstExpr<InvokeExpr>           invokeExpr,
+        ConstantFoldingKind             kind,
         ConstantFoldingCircularityInfo* circularityInfo)
     {
         // We need all the operands to the expression
@@ -1423,6 +1424,8 @@ namespace Slang
         if (!funcDeclRefExpr) return nullptr;
 
         auto funcDeclRef = getDeclRef(m_astBuilder, funcDeclRefExpr);
+        if (!funcDeclRef)
+            return nullptr;
         auto intrinsicMod = funcDeclRef.getDecl()->findModifier<IntrinsicOpModifier>();
         auto implicitCast = funcDeclRef.getDecl()->findModifier<ImplicitConversionModifier>();
         if (!intrinsicMod && !implicitCast)
@@ -1448,7 +1451,7 @@ namespace Slang
         for(Index a = 0; a < argCount; ++a)
         {
             auto argExpr = getArg(invokeExpr, a);
-            auto argVal = tryFoldIntegerConstantExpression(argExpr, circularityInfo);
+            auto argVal = tryFoldIntegerConstantExpression(argExpr, kind, circularityInfo);
             if (!argVal)
                 return nullptr;
 
@@ -1647,6 +1650,7 @@ namespace Slang
 
     IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
         DeclRef<VarDeclBase> const&     declRef,
+        ConstantFoldingKind             kind,
         ConstantFoldingCircularityInfo* circularityInfo)
     {
         auto decl = declRef.getDecl();
@@ -1657,9 +1661,17 @@ namespace Slang
         // In HLSL, `const` is used to mark compile-time constant expressions.
         if(!decl->hasModifier<ConstModifier>())
             return nullptr;
-        // Extern const is not considered compile-time constant by the front-end.
         if (decl->hasModifier<ExternModifier>())
-            return nullptr;
+        {
+            // Extern const is not considered compile-time constant by the front-end.
+            if (kind == ConstantFoldingKind::CompileTime)
+                return nullptr;
+            // But if we are OK with link-time constants, we can still fold it into a val.
+            auto rs = m_astBuilder->getOrCreate<GenericParamIntVal>(
+                declRef.substitute(m_astBuilder, declRef.getDecl()->getType()),
+                declRef);
+            return rs;
+        }
 
         if (isInterfaceRequirement(decl))
         {
@@ -1678,11 +1690,12 @@ namespace Slang
 
         ensureDecl(declRef.getDecl(), DeclCheckState::DefinitionChecked);
         ConstantFoldingCircularityInfo newCircularityInfo(decl, circularityInfo);
-        return tryConstantFoldExpr(getInitExpr(m_astBuilder, declRef), &newCircularityInfo);
+        return tryConstantFoldExpr(getInitExpr(m_astBuilder, declRef), kind, &newCircularityInfo);
     }
 
     IntVal* SemanticsVisitor::tryConstantFoldExpr(
         SubstExpr<Expr>                 expr,
+        ConstantFoldingKind             kind,
         ConstantFoldingCircularityInfo* circularityInfo)
     {
         
@@ -1738,7 +1751,7 @@ namespace Slang
             // are defined in a way that can be used as a constant expression:
             if(auto varRef = declRef.as<VarDeclBase>())
             {
-                return tryConstantFoldDeclRef(varRef, circularityInfo);
+                return tryConstantFoldDeclRef(varRef, kind, circularityInfo);
             }
             else if(auto enumRef = declRef.as<EnumCaseDecl>())
             {
@@ -1750,7 +1763,7 @@ namespace Slang
                         return nullptr;
 
                     ConstantFoldingCircularityInfo newCircularityInfo(enumCaseDecl, circularityInfo);
-                    return tryConstantFoldExpr(tagExpr, &newCircularityInfo);
+                    return tryConstantFoldExpr(tagExpr, kind, &newCircularityInfo);
                 }
             }
         }
@@ -1762,7 +1775,7 @@ namespace Slang
                 return nullptr;
             if (!isScalarIntegerType(substType))
                 return nullptr;
-            auto val = tryConstantFoldExpr(getArg(castExpr, 0), circularityInfo);
+            auto val = tryConstantFoldExpr(getArg(castExpr, 0), kind, circularityInfo);
             if (val)
             {
                 if (!castExpr.getExpr()->type)
@@ -1777,7 +1790,7 @@ namespace Slang
         }
         else if (auto invokeExpr = expr.as<InvokeExpr>())
         {
-            auto val = tryConstantFoldExpr(invokeExpr, circularityInfo);
+            auto val = tryConstantFoldExpr(invokeExpr, kind, circularityInfo);
             if (val)
                 return val;
         }
@@ -1803,6 +1816,7 @@ namespace Slang
 
     IntVal* SemanticsVisitor::tryFoldIntegerConstantExpression(
         SubstExpr<Expr>                 expr,
+        ConstantFoldingKind             kind,
         ConstantFoldingCircularityInfo* circularityInfo)
     {
         // Check if type is acceptable for an integer constant expression
@@ -1812,10 +1826,10 @@ namespace Slang
 
         // Consider operations that we might be able to constant-fold...
         //
-        return tryConstantFoldExpr(expr, circularityInfo);
+        return tryConstantFoldExpr(expr, kind, circularityInfo);
     }
 
-    IntVal* SemanticsVisitor::CheckIntegerConstantExpression(Expr* inExpr, IntegerConstantExpressionCoercionType coercionType, Type* expectedType, DiagnosticSink* sink)
+    IntVal* SemanticsVisitor::CheckIntegerConstantExpression(Expr* inExpr, IntegerConstantExpressionCoercionType coercionType, Type* expectedType, ConstantFoldingKind kind, DiagnosticSink* sink)
     {
         // No need to issue further errors if the expression didn't even type-check.
         if(IsErrorExpr(inExpr)) return nullptr;
@@ -1840,7 +1854,7 @@ namespace Slang
         // No need to issue further errors if the type coercion failed.
         if(IsErrorExpr(expr)) return nullptr;
 
-        auto result = tryFoldIntegerConstantExpression(expr, nullptr);
+        auto result = tryFoldIntegerConstantExpression(expr, kind, nullptr);
         if (!result && sink)
         {
             sink->diagnose(expr, Diagnostics::expectedIntegerConstantNotConstant);
@@ -1848,12 +1862,12 @@ namespace Slang
         return result;
     }
 
-    IntVal* SemanticsVisitor::CheckIntegerConstantExpression(Expr* inExpr, IntegerConstantExpressionCoercionType coercionType, Type* expectedType)
+    IntVal* SemanticsVisitor::CheckIntegerConstantExpression(Expr* inExpr, IntegerConstantExpressionCoercionType coercionType, Type* expectedType, ConstantFoldingKind kind)
     {
-        return CheckIntegerConstantExpression(inExpr, coercionType, expectedType, getSink());
+        return CheckIntegerConstantExpression(inExpr, coercionType, expectedType, kind, getSink());
     }
 
-    IntVal* SemanticsVisitor::CheckEnumConstantExpression(Expr* expr)
+    IntVal* SemanticsVisitor::CheckEnumConstantExpression(Expr* expr, ConstantFoldingKind kind)
     {
         // No need to issue further errors if the expression didn't even type-check.
         if(IsErrorExpr(expr)) return nullptr;
@@ -1861,7 +1875,7 @@ namespace Slang
         // No need to issue further errors if the type coercion failed.
         if(IsErrorExpr(expr)) return nullptr;
 
-        auto result = tryConstantFoldExpr(expr, nullptr);
+        auto result = tryConstantFoldExpr(expr, kind, nullptr);
         if (!result)
         {
             getSink()->diagnose(expr, Diagnostics::expectedIntegerConstantNotConstant);
@@ -1936,7 +1950,7 @@ namespace Slang
             IntVal* elementCount = nullptr;
             if (subscriptExpr->indexExprs.getCount() == 1)
             {
-                elementCount = CheckIntegerConstantExpression(subscriptExpr->indexExprs[0], IntegerConstantExpressionCoercionType::AnyInteger, nullptr);
+                elementCount = CheckIntegerConstantExpression(subscriptExpr->indexExprs[0], IntegerConstantExpressionCoercionType::AnyInteger, nullptr, ConstantFoldingKind::LinkTime);
             }
             else if (subscriptExpr->indexExprs.getCount() != 0)
             {
@@ -4150,15 +4164,39 @@ namespace Slang
         List<Val*> modifierVals;
         for( auto modifier : expr->modifiers )
         {
+            if (auto matrixLayoutModifier = as<MatrixLayoutModifier>(modifier))
+            {
+                if (auto matrixType = as<MatrixExpressionType>(baseType))
+                {
+                    if (as<ColumnMajorLayoutModifier>(matrixLayoutModifier))
+                    {
+                        baseType = m_astBuilder->getMatrixType(matrixType->getElementType(), matrixType->getRowCount(), matrixType->getColumnCount(),
+                            m_astBuilder->getIntVal(m_astBuilder->getIntType(), kMatrixLayoutMode_ColumnMajor));
+                    }
+                    else
+                    {
+                        baseType = m_astBuilder->getMatrixType(matrixType->getElementType(), matrixType->getRowCount(), matrixType->getColumnCount(),
+                                                       m_astBuilder->getIntVal(m_astBuilder->getIntType(), kMatrixLayoutMode_RowMajor));
+                    }
+                    expr->type = m_astBuilder->getTypeType(baseType);
+                }
+                else
+                {
+                    getSink()->diagnose(matrixLayoutModifier, Diagnostics::matrixLayoutModifierOnNonMatrixType, baseType);
+                }
+                continue;
+            }
             auto modifierVal = checkTypeModifier(modifier, baseType);
             if(!modifierVal)
                 continue;
             modifierVals.add(modifierVal);
         }
 
-        auto modifiedType = m_astBuilder->getModifiedType(baseType, modifierVals);
-        expr->type = m_astBuilder->getTypeType(modifiedType);
-
+        if (modifierVals.getCount())
+        {
+            auto modifiedType = m_astBuilder->getModifiedType(baseType, modifierVals);
+            expr->type = m_astBuilder->getTypeType(modifiedType);
+        }
         return expr;
     }
 

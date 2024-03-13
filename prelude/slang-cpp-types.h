@@ -5,6 +5,9 @@
 namespace SLANG_PRELUDE_NAMESPACE {
 #endif
 
+#ifndef SLANG_FORCE_INLINE
+#    define SLANG_FORCE_INLINE inline
+#endif
 
 #include "slang-cpp-types-core.h"
 

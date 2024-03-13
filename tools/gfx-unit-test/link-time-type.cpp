@@ -16,7 +16,14 @@ namespace gfx_test
         slang::ProgramLayout*& slangReflection)
     {
         const char* moduleInterfaceSrc = R"(
-            interface IFoo
+            interface IBase : IDifferentiable
+            {
+                [Differentiable]
+                float getBaseValue();
+                [Differentiable]
+                static float getBaseValueS();
+            }
+            interface IFoo : IBase
             {
                 static const int offset;
                 [mutating] void setValue(float v);
@@ -29,6 +36,10 @@ namespace gfx_test
                 static const int offset = -1;
                 [mutating] void setValue(float v) { val = v; }
                 float getValue() { return val + 1.0; }
+                [Differentiable]
+                float getBaseValue() { return val; }
+                [Differentiable]
+                static float getBaseValueS() { return 0.0; }
                 property float val2 {
                     get { return val + 2.0; }
                     set { val = newValue; }
@@ -44,13 +55,12 @@ namespace gfx_test
             {
                 Foo foo;
                 foo.setValue(3.0);
-                buffer[0] = foo.getValue() + foo.val2 + Foo.offset;
+                buffer[0] = foo.getValue() + foo.val2 + Foo.offset + foo.getBaseValue();
             }
         )";
         const char* module1Src = R"(
             import ifoo;
-            export struct Foo : IFoo = FooImpl;
-        )";
+            export struct Foo : IFoo = FooImpl;)";
         Slang::ComPtr<slang::ISession> slangSession;
         SLANG_RETURN_ON_FAIL(device->getSlangSession(slangSession.writeRef()));
         Slang::ComPtr<slang::IBlob> diagnosticsBlob;
@@ -170,7 +180,7 @@ namespace gfx_test
         compareComputeResult(
             device,
             numbersBuffer,
-            Slang::makeArray<float>(8.0));
+            Slang::makeArray<float>(11.0));
     }
 
     SLANG_UNIT_TEST(linkTimeTypeD3D12)

@@ -12,3 +12,4 @@ In this chapter:
 2. [Using Slang to write PyTorch kernels](a1-02-slangpy.md)
 3. [Obfuscation](a1-03-obfuscation.md)
 4. [Interoperation with target-specific code](a1-04-interop.md)
+5. [Uniformity Analysis](a1-05-uniformity.md)

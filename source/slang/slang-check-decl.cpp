@@ -311,6 +311,8 @@ namespace Slang
 
         void visitAggTypeDecl(AggTypeDecl* aggTypeDecl);
 
+        SemanticsContext registerDifferentiableTypesForFunc(FunctionDeclBase* funcDecl);
+
     };
 
     template<typename VisitorType>
@@ -1379,7 +1381,7 @@ namespace Slang
         //
         if(!isScalarIntegerType(varDecl->type))
             return;
-        tryConstantFoldDeclRef(DeclRef<VarDeclBase>(varDecl), nullptr);
+        tryConstantFoldDeclRef(DeclRef<VarDeclBase>(varDecl), ConstantFoldingKind::LinkTime, nullptr);
     }
 
     void SemanticsDeclModifiersVisitor::visitStructDecl(StructDecl* structDecl)
@@ -1536,7 +1538,6 @@ namespace Slang
 
                 varDecl->initExpr = initExpr;
                 varDecl->type.type = initExpr->type;
-
                 _validateCircularVarDefinition(varDecl);
             }
             
@@ -1597,6 +1598,19 @@ namespace Slang
                 varDecl->type.type = newMatrixType;
                 if (varDecl->initExpr)
                     varDecl->initExpr = coerce(CoercionSite::Initializer, varDecl->type, varDecl->initExpr);
+            }
+        }
+
+        if (varDecl->initExpr)
+        {
+            if (as<BasicExpressionType>(varDecl->type.type))
+            {
+                auto parentDecl = getParentDecl(varDecl);
+                if (varDecl->findModifier<ConstModifier>() &&
+                    (as<NamespaceDeclBase>(parentDecl) || as<FileDecl>(parentDecl) || varDecl->findModifier<HLSLStaticModifier>()))
+                {
+                    varDecl->val = tryConstantFoldExpr(varDecl->initExpr, ConstantFoldingKind::LinkTime, nullptr);
+                }
             }
         }
 
@@ -1900,6 +1914,32 @@ namespace Slang
                 varDecl->initExpr = CompleteOverloadCandidate(overloadContext, *overloadContext.bestCandidate);
             }
         }
+
+        if (auto parentDecl = as<AggTypeDecl>(getParentDecl(varDecl)))
+        {
+            auto typeTags = getTypeTags(varDecl->getType());
+            parentDecl->addTag(typeTags);
+            if ((int)typeTags & (int)TypeTag::Unsized)
+            {
+                // Unsized decl must appear as the last member of the struct.
+                for (auto memberIdx = parentDecl->members.getCount() - 1; memberIdx >= 0; memberIdx--)
+                {
+                    if (parentDecl->members[memberIdx] == varDecl)
+                    {
+                        break;
+                    }
+                    if (auto memberVarDecl = as<VarDeclBase>(parentDecl->members[memberIdx]))
+                    {
+                        if (!memberVarDecl->hasModifier<HLSLStaticModifier>())
+                        {
+                            getSink()->diagnose(varDecl, Diagnostics::unsizedMemberMustAppearLast);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+        
         if (auto elementType = getConstantBufferElementType(varDecl->getType()))
         {
             if (doesTypeHaveTag(elementType, TypeTag::Incomplete))
@@ -2841,7 +2881,7 @@ namespace Slang
                 return false;
         }
 
-        auto satisfyingVal = tryConstantFoldDeclRef(satisfyingMemberDeclRef, nullptr);
+        auto satisfyingVal = tryConstantFoldDeclRef(satisfyingMemberDeclRef, ConstantFoldingKind::LinkTime, nullptr);
         if (satisfyingVal)
         {
             witnessTable->add(
@@ -3531,24 +3571,24 @@ namespace Slang
                 auto noDiffThisAttr = m_astBuilder->create<NoDiffThisAttribute>();
                 addModifier(synFuncDecl, noDiffThisAttr);
             }
-            if (requiredMemberDeclRef.getDecl()->hasModifier<ForwardDifferentiableAttribute>())
-            {
-                auto attr = m_astBuilder->create<ForwardDifferentiableAttribute>();
-                addModifier(synFuncDecl, attr);
-            }
-            if (requiredMemberDeclRef.getDecl()->hasModifier<BackwardDifferentiableAttribute>())
-            {
-                auto attr = m_astBuilder->create<BackwardDifferentiableAttribute>();
-                addModifier(synFuncDecl, attr);
-            }
-            // The visibility of synthesized decl should be the min of the parent decl and the requirement.
-            if (requiredMemberDeclRef.getDecl()->findModifier<VisibilityModifier>())
-            {
-                auto requirementVisibility = getDeclVisibility(requiredMemberDeclRef.getDecl());
-                auto thisVisibility = getDeclVisibility(context->parentDecl);
-                auto visibility = Math::Min(thisVisibility, requirementVisibility);
-                addVisibilityModifier(m_astBuilder, synFuncDecl, visibility);
-            }
+        }
+        if (requiredMemberDeclRef.getDecl()->hasModifier<ForwardDifferentiableAttribute>())
+        {
+            auto attr = m_astBuilder->create<ForwardDifferentiableAttribute>();
+            addModifier(synFuncDecl, attr);
+        }
+        if (requiredMemberDeclRef.getDecl()->hasModifier<BackwardDifferentiableAttribute>())
+        {
+            auto attr = m_astBuilder->create<BackwardDifferentiableAttribute>();
+            addModifier(synFuncDecl, attr);
+        }
+        // The visibility of synthesized decl should be the min of the parent decl and the requirement.
+        if (requiredMemberDeclRef.getDecl()->findModifier<VisibilityModifier>())
+        {
+            auto requirementVisibility = getDeclVisibility(requiredMemberDeclRef.getDecl());
+            auto thisVisibility = getDeclVisibility(context->parentDecl);
+            auto visibility = Math::Min(thisVisibility, requirementVisibility);
+            addVisibilityModifier(m_astBuilder, synFuncDecl, visibility);
         }
 
         return synFuncDecl;
@@ -3634,9 +3674,12 @@ namespace Slang
         // the work of constructing our synthesized method.
         //
 
+        bool isInWrapperType = isWrapperTypeDecl(context->parentDecl);
+
         // First, we check that the differentiabliity of the method matches the requirement,
         // and we don't attempt to synthesize a method if they don't match.
-        if (getShared()->getFuncDifferentiableLevel(
+        if (!isInWrapperType &&
+            getShared()->getFuncDifferentiableLevel(
                 as<FunctionDeclBase>(lookupResult.item.declRef.getDecl()))
             < getShared()->getFuncDifferentiableLevel(
                 as<FunctionDeclBase>(requiredMemberDeclRef.getDecl())))
@@ -3663,7 +3706,7 @@ namespace Slang
         auto synBase = m_astBuilder->create<OverloadedExpr>();
         synBase->name = requiredMemberDeclRef.getDecl()->getName();
 
-        if (isWrapperTypeDecl(context->parentDecl))
+        if (isInWrapperType)
         {
             auto aggTypeDecl = as<AggTypeDecl>(context->parentDecl);
             synBase->lookupResult2 = lookUpMember(
@@ -3675,6 +3718,10 @@ namespace Slang
                 LookupMask::Default,
                 LookupOptions::IgnoreBaseInterfaces);
             addModifier(synFuncDecl, m_astBuilder->create<ForceInlineAttribute>());
+
+            synFuncDecl->parentDecl = aggTypeDecl;
+            SemanticsDeclBodyVisitor bodyVisitor(withParentFunc(synFuncDecl));
+            bodyVisitor.registerDifferentiableTypesForFunc(synFuncDecl);
         }
         else
         {
@@ -3688,7 +3735,7 @@ namespace Slang
         //
         if (synThis)
         {
-            if (isWrapperTypeDecl(context->parentDecl))
+            if (isInWrapperType)
             {
                 // If this is a wrapper type, then use the inner
                 // object as the actual this parameter for the redirected
@@ -3697,6 +3744,8 @@ namespace Slang
                 innerExpr->scope = synThis->scope;
                 innerExpr->name = getName("inner");
                 synBase->base = CheckExpr(innerExpr);
+                SemanticsDeclBodyVisitor bodyVisitor(withParentFunc(synFuncDecl));
+                bodyVisitor.maybeRegisterDifferentiableType(m_astBuilder, synBase->base->type);
             }
             else
             {
@@ -5925,7 +5974,7 @@ namespace Slang
                 // the tag value for a successor case that doesn't
                 // provide an explicit tag.
 
-                IntVal* explicitTagVal = tryConstantFoldExpr(explicitTagValExpr, nullptr);
+                IntVal* explicitTagVal = tryConstantFoldExpr(explicitTagValExpr, ConstantFoldingKind::CompileTime, nullptr);
                 if(explicitTagVal)
                 {
                     if(auto constIntVal = as<ConstantIntVal>(explicitTagVal))
@@ -5992,7 +6041,7 @@ namespace Slang
             // We want to enforce that this is an integer constant
             // expression, but we don't actually care to retain
             // the value.
-            CheckIntegerConstantExpression(initExpr, IntegerConstantExpressionCoercionType::AnyInteger, nullptr);
+            CheckIntegerConstantExpression(initExpr, IntegerConstantExpressionCoercionType::AnyInteger, nullptr, ConstantFoldingKind::CompileTime);
 
             decl->tagExpr = initExpr;
         }
@@ -6040,7 +6089,7 @@ namespace Slang
         checkVisibility(decl);
     }
 
-    void SemanticsDeclBodyVisitor::visitFunctionDeclBase(FunctionDeclBase* decl)
+    SemanticsContext SemanticsDeclBodyVisitor::registerDifferentiableTypesForFunc(FunctionDeclBase* decl)
     {
         auto newContext = withParentFunc(decl);
         if (newContext.getParentDifferentiableAttribute())
@@ -6060,7 +6109,12 @@ namespace Slang
             }
             m_parentDifferentiableAttr = oldAttr;
         }
+        return newContext;
+    }
 
+    void SemanticsDeclBodyVisitor::visitFunctionDeclBase(FunctionDeclBase* decl)
+    {
+        auto newContext = registerDifferentiableTypesForFunc(decl);
         if (const auto body = decl->body)
         {
             checkStmt(decl->body, newContext);
@@ -6906,6 +6960,7 @@ namespace Slang
             indexExpr->indexExprs[0],
             IntegerConstantExpressionCoercionType::AnyInteger,
             nullptr,
+            ConstantFoldingKind::LinkTime,
             getSink());
 
         Type* d = m_astBuilder->getMeshOutputTypeFromModifier(modifier, base, index);
