@@ -460,7 +460,15 @@ namespace Slang
 
         LoweredElementTypeInfo getLoweredTypeInfo(IRType* type, IRTypeLayoutRules* rules)
         {
+            // If `type` is already a lowered type, no more lowering is required.
             LoweredElementTypeInfo info;
+            if (auto pInfo = mapLoweredTypeToInfo->tryGetValue(type))
+            {
+                info.originalType = type;
+                info.loweredType = type;
+                return info;
+            }
+
             if (loweredTypeInfo[(int)rules->ruleName].tryGetValue(type, info))
                 return info;
             info = getLoweredTypeInfoImpl(type, rules);
@@ -517,6 +525,8 @@ namespace Slang
                     elementType = structBuffer->getElementType();
                 else if (auto constBuffer = as<IRUniformParameterGroupType>(globalInst))
                     elementType = constBuffer->getElementType();
+                else if (auto ptrType = as<IRPtrType>(globalInst))
+                    elementType = ptrType->getValueType();
                 if (as<IRTextureBufferType>(globalInst))
                     continue;
                 if (!as<IRStructType>(elementType) && !as<IRMatrixType>(elementType) && !as<IRArrayType>(elementType) && !as<IRBoolType>(elementType))
@@ -654,6 +664,7 @@ namespace Slang
                                 }
                                 break;
                             case kIROp_RWStructuredBufferGetElementPtr:
+                            case kIROp_GetOffsetPtr:
                                 ptrValsWorkList.add(user);
                                 break;
                             case kIROp_StructuredBufferGetDimensions:
@@ -681,7 +692,6 @@ namespace Slang
                                 }
                                 break;
                             default:
-                                SLANG_UNREACHABLE("unhandled inst of a buffer/pointer value that needs storage lowering.");
                                 break;
                             }
                         });
@@ -853,6 +863,8 @@ namespace Slang
         case kIROp_ConstantBufferType:
         case kIROp_ParameterBlockType:
             return IRTypeLayoutRules::getStd140();
+        case kIROp_PtrType:
+            return IRTypeLayoutRules::getNatural();
         }
         return IRTypeLayoutRules::getNatural();
     }
