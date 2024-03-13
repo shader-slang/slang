@@ -4834,7 +4834,7 @@ static const struct {
             "double", "F", "F", "EXT", true
         },
     };
-for (auto item : atomics) 
+for (const auto& item : atomics) 
 {
 }}}}
 
