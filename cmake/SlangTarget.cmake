@@ -54,6 +54,8 @@ function(slang_add_target dir type)
         EXTRA_COMPILE_DEFINITIONS_PUBLIC
         # Targets with which to link privately
         LINK_WITH_PRIVATE
+        # Frameworks with which to link privately
+        LINK_WITH_FRAMEWORK
         # Targets whose headers we use, but don't link with
         INCLUDE_FROM_PRIVATE
         # Any include directories other targets need to use this target
@@ -207,6 +209,12 @@ function(slang_add_target dir type)
     # Link and include from dependencies
     #
     target_link_libraries(${target} PRIVATE ${ARG_LINK_WITH_PRIVATE})
+
+    if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
+        foreach(link_framework ${ARG_LINK_WITH_FRAMEWORK})
+            target_link_libraries(${target} PRIVATE "-framework ${link_framework}")
+        endforeach()
+    endif()
 
     foreach(include_from ${ARG_INCLUDE_FROM_PRIVATE})
         target_include_directories(
