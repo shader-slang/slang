@@ -44,5 +44,6 @@ void main(int id : SV_DispatchThreadID)
     if (pData1 > pData)
     {
         funcThatTakesPointer(buffer[0].pNext);
+        output[1] = (*buffer[0].pNext).data;
     }
 }

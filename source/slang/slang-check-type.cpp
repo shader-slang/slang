@@ -33,6 +33,10 @@ namespace Slang
         {
             return ptrType->getValueType();
         }
+        else if (auto refType = as<RefType>(type))
+        {
+            return refType->getValueType();
+        }
         return nullptr;
     }
 
