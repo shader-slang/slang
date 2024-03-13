@@ -7863,16 +7863,18 @@ namespace Slang
 
 
                 // Special handling for GLSLLayoutModifier
-                if (auto glslModifier = as<GLSLParsedLayoutModifier>(modifier))
+                if (auto glslModifier = as<GLSLLayoutModifier>(modifier))
                 {
-                    parser->ReadToken(TokenType::OpAssign);
-                    glslModifier->valToken = parser->ReadToken(TokenType::IntegerLiteral);
+                    // not all GLSLLayoutModifier subtypes have an OpAssign after
+                    if (AdvanceIf(parser, TokenType::OpAssign))
+                        glslModifier->valToken = parser->ReadToken(TokenType::IntegerLiteral);
                 }
                 //Special handling for GLSLOffsetLayoutAttribute to add to the byte offset tracker at a binding location
                 else if (auto glslOffset = as<GLSLOffsetLayoutAttribute>(modifier))
                 {
                     if (auto binding = listBuilder.find<GLSLBindingAttribute>())
                     {
+                        // all GLSLOffsetLayoutAttribute have an OpAssign with value token
                         parser->ReadToken(TokenType::OpAssign);
                         glslOffset->offset = int64_t(getIntegerLiteralValue(parser->ReadToken(TokenType::IntegerLiteral)));
                         parser->setBindingOffset(binding->binding, glslOffset->offset);
