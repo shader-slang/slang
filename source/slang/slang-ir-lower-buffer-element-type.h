@@ -15,7 +15,7 @@ namespace Slang
     // This pass needs to take place after type legalization, and before array return type lowering
     // because it may create functions that returns array typed values.
     //
-    void lowerBufferElementTypeToStorageType(TargetProgram* target, IRModule* module);
+    void lowerBufferElementTypeToStorageType(TargetProgram* target, IRModule* module, bool lowerBufferPointer = false);
 
 
     // Returns the type layout rules should be used for a buffer resource type.

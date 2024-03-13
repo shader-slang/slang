@@ -21,6 +21,11 @@ int* funcThatReturnsPointer(PP* p)
     return &p.data;
 }
 
+void funcWithInOutParam(inout PP p)
+{
+    p.data = 0;
+}
+
 // CHECK: OpEntryPoint
 
 StructuredBuffer<Data> buffer;
@@ -44,5 +49,7 @@ void main(int id : SV_DispatchThreadID)
     if (pData1 > pData)
     {
         funcThatTakesPointer(buffer[0].pNext);
+        output[1] = (*buffer[0].pNext).data;
     }
+    funcWithInOutParam(*buffer[0].pNext);
 }
