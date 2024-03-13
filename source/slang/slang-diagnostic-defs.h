@@ -238,12 +238,11 @@ DIAGNOSTIC(20012, Error, invalidSPIRVVersion, "Expecting SPIR-V version as eithe
 DIAGNOSTIC(20013, Error, invalidCUDASMVersion, "Expecting CUDA SM version as either 'major.minor', or quoted if has patch (eg for '7.0' or \"7.0\"')")
 DIAGNOSTIC(20014, Error, classIsReservedKeyword, "'class' is a reserved keyword in this context; use 'struct' instead.")
 DIAGNOSTIC(20015, Error, unknownSPIRVCapability, "unknown SPIR-V capability '$0'.")
+DIAGNOSTIC(20016, Error, missingLayoutBindingModifier, "Expecting 'binding' modifier in the layout qualifier here")
 
 DIAGNOSTIC(20101, Warning, unintendedEmptyStatement, "potentially unintended empty statement at this location; use {} instead.")
 
 DIAGNOSTIC(30102, Error, declNotAllowed, "$0 is not allowed here.")
-
-DIAGNOSTIC(20001, Error, missingLayoutBindingModifier, "Expecting 'binding' modifier in the layout qualifier here")
 
 // 29xxx - Snippet parsing and inline asm
 DIAGNOSTIC(29000, Error, snippetParsingFailed, "unable to parse target intrinsic snippet: $0")
