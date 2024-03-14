@@ -12,7 +12,7 @@ Slang provides low-level interoperation mechanisms to allow developers to use ta
 - `spirv_asm` construct to define inline SPIRV assembly blocks.
 
 > #### Note
-> The language mechanisms described in this chapter is considered internal compiler features.
+> The language mechanisms described in this chapter are considered internal compiler features.
 > The compiler does not provide comprehensive checks around their uses. These mechanisms are also subject
 > to breaking changes in future releases.
 
