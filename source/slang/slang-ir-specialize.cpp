@@ -2381,9 +2381,12 @@ IRInst* specializeGenericImpl(
                 // further specializations from the specialized function will have as simple specialization 
                 // arguments as possible to avoid creating specializations that eventually simplified into 
                 // the same thing.
-                if (auto func = as<IRFunc>(specializedVal))
+                if (context)
                 {
-                    simplifyFunc(context->targetProgram, func, IRSimplificationOptions::getFast());
+                    if (auto func = as<IRFunc>(specializedVal))
+                    {
+                        simplifyFunc(context->targetProgram, func, IRSimplificationOptions::getFast());
+                    }
                 }
 
                 return specializedVal;

@@ -107,6 +107,40 @@ public in uvec3 gl_WorkGroupID : SV_GroupID;
 public in uvec3 gl_LocalInvocationIndex : SV_GroupIndex;
 public in uvec3 gl_LocalInvocationID : SV_GroupThreadID;
 
+[require(glsl)]
+[require(spirv)]
+public property uint3 gl_NumWorkGroups {
+
+    get {
+        __target_switch
+        {
+        case glsl:
+            __intrinsic_asm "(gl_NumWorkGroups)";
+        case spirv:
+            return spirv_asm {
+                    result:$$uint3 = OpLoad builtin(NumWorkgroups:uint3);
+                };
+        }
+    }
+}
+
+[require(glsl)]
+[require(spirv)]
+public property uint3 gl_WorkGroupSize {
+
+    get {
+        __target_switch
+        {
+        case glsl:
+            __intrinsic_asm "(gl_WorkGroupSize)";
+        case spirv:
+            return spirv_asm {
+                    result:$$uint3 = OpLoad builtin(WorkgroupSize:uint3);
+                };
+        }
+    }
+}
+
 // TODO: define overload for tessellation control stage.
 public in int gl_InvocationID : SV_GSInstanceID;
 
