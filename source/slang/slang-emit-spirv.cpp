@@ -5848,9 +5848,7 @@ SlangResult emitSPIRVFromIR(
 
     SPIRVEmitContext context(irModule, codeGenContext->getTargetProgram(), sink);
     legalizeIRForSPIRV(&context, irModule, irEntryPoints, codeGenContext);
-
-    legalizeIRForSPIRV(&context, irModule, irEntryPoints, codeGenContext);
-   
+    
 #if 0
     {
         DiagnosticSinkWriter writer(codeGenContext->getSink());
