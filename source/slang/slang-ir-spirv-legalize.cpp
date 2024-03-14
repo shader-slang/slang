@@ -2031,7 +2031,7 @@ void legalizeSPIRV(SPIRVEmitSharedContext* sharedContext, IRModule* module)
     context.processModule();
 }
 
-void buildEntryPointReferenceGraph(SPIRVEmitSharedContext* context, IRModule* module)
+void buildEntryPointReferenceGraph(Dictionary<IRInst*, HashSet<IRFunc*>>& referencingEntryPoints, IRModule* module)
 {
     struct WorkItem
     {
@@ -2056,13 +2056,13 @@ void buildEntryPointReferenceGraph(SPIRVEmitSharedContext* context, IRModule* mo
 
     auto registerEntryPointReference = [&](IRFunc* entryPoint, IRInst* inst)
         {
-            if (auto set = context->m_referencingEntryPoints.tryGetValue(inst))
+            if (auto set = referencingEntryPoints.tryGetValue(inst))
                 set->add(entryPoint);
             else
             {
                 HashSet<IRFunc*> newSet;
                 newSet.add(entryPoint);
-                context->m_referencingEntryPoints.add(inst, _Move(newSet));
+                referencingEntryPoints.add(inst, _Move(newSet));
             }
         };
     auto visit = [&](IRFunc* entryPoint, IRInst* inst)
@@ -2176,7 +2176,7 @@ void legalizeIRForSPIRV(
     SLANG_UNUSED(entryPoints);
     legalizeSPIRV(context, module);
     simplifyIRForSpirvLegalization(context->m_targetProgram, codeGenContext->getSink(), module);
-    buildEntryPointReferenceGraph(context, module);
+    buildEntryPointReferenceGraph(context->m_referencingEntryPoints, module);
 }
 
 } // namespace Slang
