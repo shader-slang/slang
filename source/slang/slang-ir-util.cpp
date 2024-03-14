@@ -689,6 +689,7 @@ bool isPtrLikeOrHandleType(IRInst* type)
     case kIROp_PtrType:
     case kIROp_RefType:
     case kIROp_ConstRefType:
+    case kIROp_GLSLShaderStorageBufferType:
         return true;
     }
     return false;
@@ -1175,6 +1176,11 @@ bool isGlobalOrUnknownMutableAddress(IRGlobalValueWithCode* parentFunc, IRInst* 
 
     if (root)
     {
+        if (as<IRGLSLShaderStorageBufferType>(root->getDataType()))
+        {
+            // A storage buffer is mutable, so we need to treat it as a mutable address.
+            return true;
+        }
         // If this is a global readonly resource, it is not a mutable address.
         if (as<IRParameterGroupType>(root->getDataType()))
         {

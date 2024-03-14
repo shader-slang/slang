@@ -1755,7 +1755,7 @@ namespace Slang
                     !varDecl->findModifier<OutModifier>() &&
                     !varDecl->findModifier<GLSLBufferModifier>())
                 {
-                    if (!as<ResourceType>(varDecl->type) && !as<PointerLikeType>(varDecl->type))
+                    if (!isUniformParameterType(varDecl->type))
                     {
                         auto staticModifier = m_astBuilder->create<HLSLStaticModifier>();
                         addModifier(varDecl, staticModifier);
