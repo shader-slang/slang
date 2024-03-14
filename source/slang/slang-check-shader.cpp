@@ -318,6 +318,8 @@ namespace Slang
             return true;
         if (as<UniformParameterGroupType>(type))
             return true;
+        if (as< GLSLShaderStorageBufferType>(type))
+            return true;
         if (as<SamplerStateType>(type))
             return true;
         return false;
