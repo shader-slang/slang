@@ -2345,6 +2345,9 @@ attribute_syntax [spv_target_env_1_3] : SPIRVTargetEnv13Attribute;
 __attributeTarget(VarDeclBase)
 attribute_syntax [disable_array_flattening] : DisableArrayFlatteningAttribute;
 
+__attributeTarget(EnumDecl)
+attribute_syntax [UnscopedEnum] : UnscopedEnumAttribute;
+
 // Statement Attributes
 
 __attributeTarget(LoopStmt)
