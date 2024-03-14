@@ -2017,6 +2017,7 @@ namespace Slang
         SubtypeWitness* checkAndConstructSubtypeWitness(Type* subType, Type* superType);
 
         bool isInterfaceType(Type* type);
+        bool isValidGenericConstraintType(Type* type);
 
         bool isTypeDifferentiable(Type* type);
 

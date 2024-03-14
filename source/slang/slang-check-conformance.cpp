@@ -237,6 +237,15 @@ namespace Slang
         return false;
     }
 
+    bool SemanticsVisitor::isValidGenericConstraintType(Type* type)
+    {
+        if (auto andType = as<AndType>(type))
+        {
+            return isValidGenericConstraintType(andType->getLeft()) && isValidGenericConstraintType(andType->getRight());
+        }
+        return isInterfaceType(type);
+    }
+
     bool SemanticsVisitor::isTypeDifferentiable(Type* type)
     {
         return isSubtype(type, m_astBuilder->getDiffInterfaceType());
