@@ -2206,6 +2206,10 @@ namespace Slang
         CheckConstraintSubType(decl->sub);
         decl->sub = TranslateTypeNodeForced(decl->sub);
         decl->sup = TranslateTypeNodeForced(decl->sup);
+        if (!isValidGenericConstraintType(decl->sup) && !as<ErrorType>(decl->sub.type))
+        {
+            getSink()->diagnose(decl->sup.exp, Diagnostics::invalidTypeForConstraint, decl->sup);
+        }
     }
 
     void SemanticsDeclHeaderVisitor::visitGenericTypeParamDecl(GenericTypeParamDecl* decl)
