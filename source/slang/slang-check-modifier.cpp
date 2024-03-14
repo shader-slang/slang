@@ -998,6 +998,7 @@ namespace Slang
         case ASTNodeType::GLSLParsedLayoutModifier:
         case ASTNodeType::GLSLConstantIDLayoutModifier:
         case ASTNodeType::GLSLLocationLayoutModifier:
+        case ASTNodeType::GLSLOffsetLayoutAttribute:
         case ASTNodeType::GLSLUnparsedLayoutModifier:
         case ASTNodeType::GLSLLayoutModifierGroupMarker:
         case ASTNodeType::GLSLLayoutModifierGroupBegin:
@@ -1073,6 +1074,7 @@ namespace Slang
         case ASTNodeType::GLSLParsedLayoutModifier:
         case ASTNodeType::GLSLConstantIDLayoutModifier:
         case ASTNodeType::GLSLLocationLayoutModifier:
+        case ASTNodeType::GLSLOffsetLayoutAttribute:
         case ASTNodeType::GLSLUnparsedLayoutModifier:
         case ASTNodeType::GLSLLayoutModifierGroupMarker:
         case ASTNodeType::GLSLLayoutModifierGroupBegin:

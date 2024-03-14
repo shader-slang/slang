@@ -372,6 +372,12 @@ struct IRGLSLLocationDecoration : IRDecoration
     IRIntLit* getLocation() { return cast<IRIntLit>(getOperand(0)); }
 };
 
+struct IRGLSLOffsetDecoration : IRDecoration
+{
+    IR_LEAF_ISA(GLSLOffsetDecoration)
+    IRIntLit* getOffset() { return cast<IRIntLit>(getOperand(0)); }
+};
+
 struct IRNVAPIMagicDecoration : IRDecoration
 {
     enum { kOp = kIROp_NVAPIMagicDecoration };
@@ -3818,6 +3824,7 @@ public:
 
     // Create an initially empty `GLSLShaderStorageBufferType` type.
     IRGLSLShaderStorageBufferType* createGLSLShaderStorableBufferType();
+    IRGLSLShaderStorageBufferType* createGLSLShaderStorableBufferType(UInt operandCount, IRInst* const* operands);
 
     // Create an empty `interface` type.
     IRInterfaceType* createInterfaceType(UInt operandCount, IRInst* const* operands);
@@ -4435,6 +4442,11 @@ public:
     void addDebugLocationDecoration(IRInst* value, IRInst* debugSource, IRIntegerValue line, IRIntegerValue col)
     {
         addDecoration(value, kIROp_DebugLocationDecoration, debugSource, getIntValue(getUIntType(), line), getIntValue(getUIntType(), col));
+    }
+
+    void addUnsafeForceInlineDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_UnsafeForceInlineEarlyDecoration);
     }
 
     void addForceInlineDecoration(IRInst* value)

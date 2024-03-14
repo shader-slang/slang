@@ -4496,6 +4496,18 @@ namespace Slang
         return ssboType;
     }
 
+    IRGLSLShaderStorageBufferType* IRBuilder::createGLSLShaderStorableBufferType(UInt operandCount, IRInst* const* operands)
+    {
+        IRGLSLShaderStorageBufferType* ssboType = createInst<IRGLSLShaderStorageBufferType>(
+            this,
+            kIROp_GLSLShaderStorageBufferType,
+            getTypeKind(),
+            operandCount,
+            operands);
+        addGlobalValue(this, ssboType);
+        return ssboType;
+    }
+
     IRInterfaceType* IRBuilder::createInterfaceType(UInt operandCount, IRInst* const* operands)
     {
         IRInterfaceType* interfaceType = createInst<IRInterfaceType>(

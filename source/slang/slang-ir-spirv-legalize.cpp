@@ -275,6 +275,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         switch (type->getOp())
         {
         case kIROp_RaytracingAccelerationStructureType:
+        case kIROp_GLSLAtomicUintType:
         case kIROp_RayQueryType:
             return true;
         default:
