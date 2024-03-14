@@ -11,6 +11,11 @@ Slang provides low-level interoperation mechanisms to allow developers to use ta
 - `__target_switch` construct to use different implementations for different targets.
 - `spirv_asm` construct to define inline SPIRV assembly blocks.
 
+> #### Note
+> The language mechanisms described in this chapter is considered internal compiler features.
+> The compiler does not provide comprehensive checks around their uses. These mechanisms are also subject
+> to breaking changes in future releases.
+
 ## Defining Intrinsic Functions for Textual Targets
 
 When using Slang to generate code for a textual target, e.g. HLSL, GLSL, CUDA or C++, you can use `__intrinsic_asm` to define what code to generate for an invocation to an intrinsic function. For example, the following Slang code defines an intrinsic function `myPrint`, that when called, will produce a call to `printf` in the target code:
