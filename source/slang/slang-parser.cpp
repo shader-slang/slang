@@ -7886,10 +7886,13 @@ namespace Slang
                 modifier->keywordName = nameAndLoc.name;
                 modifier->loc = nameAndLoc.loc;
 
+                // Special handling for GLSLLayoutModifier
                 if (auto glslModifier = as<GLSLLayoutModifier>(modifier))
                 {
-                    parser->ReadToken(TokenType::OpAssign);
-                    glslModifier->valToken = parser->ReadToken(TokenType::IntegerLiteral);
+                    if (AdvanceIf(parser, TokenType::OpAssign))
+                    {
+                        glslModifier->valToken = parser->ReadToken(TokenType::IntegerLiteral);
+                    }
                 }
 
                 listBuilder.add(modifier);

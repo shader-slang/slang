@@ -57,7 +57,8 @@ FOREACH_BASE_TYPE(DEFINE_BASE_TYPE)
     const int kStdlibTextureAccessParameterIndex = 5;
     const int kStdlibTextureIsShadowParameterIndex = 6;
     const int kStdlibTextureIsCombinedParameterIndex = 7;
-    const int kStdlibTextureFormatParameterIndex = 8;
+    const int kStdlibTextureIsRectParameterIndex = 8;
+    const int kStdlibTextureFormatParameterIndex = 9;
 }
 
 #endif

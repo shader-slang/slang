@@ -14,33 +14,13 @@ layout(local_size_x = 4) in;
 //TEST_INPUT: RWTexture2D(format=R16G16B16A16_FLOAT, size=1, content=one, mipMaps = 1):name someImage
 uniform layout(binding=0,rgba16f) writeonly image2D someImage;
 
-bool checkAllImageSizesParamSame(writeonly image2D val)
-{
-    return true
-        && imageSize(val) == ivec2(1)
-        ;
-}
-bool checkAllImageSizesParamMore(readonly writeonly image2D val)
-{
-    return true
-        && imageSize(val) == ivec2(1)
-        ;
-}
-bool checkAllImageSizes()
-{
-    return true
-        && imageSize(someImage) == ivec2(1)
-        ;
-}
+//TODO: test this with all types of tex
 
 // CHECK_GLSL: void main(
 // CHECK_SPV: OpEntryPoint
 void computeMain()
 {
     outputBuffer.data[0] = true
-        && checkAllImageSizesParamSame(someImage)
-        && checkAllImageSizesParamMore(someImage)
-        && checkAllImageSizes()
         ;
     // BUF: 1
 

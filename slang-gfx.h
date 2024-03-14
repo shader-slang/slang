@@ -2724,5 +2724,4 @@ struct SlangSessionExtendedDesc
     uint32_t compilerOptionEntryCount = 0;
     slang::CompilerOptionEntry* compilerOptionEntries = nullptr;
 };
-
 }

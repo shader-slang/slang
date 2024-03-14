@@ -10,6 +10,8 @@
 
 namespace Slang {
 
+    bool isOpenGLTarget(TargetRequest*);
+
 // Forward declarations
 
 enum class BaseType;

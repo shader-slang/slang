@@ -11,6 +11,7 @@
 #include "slang-ir-spirv-legalize.h"
 #include "slang-spirv-val.h"
 #include "slang-lookup-spirv.h"
+#include "slang-type-layout.h"
 #include "spirv/unified1/spirv.h"
 #include "../core/slang-memory-arena.h"
 #include <type_traits>
@@ -1806,7 +1807,11 @@ struct SPIRVEmitContext
                 dim = SpvDim1D;
                 break;
             case SLANG_TEXTURE_2D:
-                dim = SpvDim2D;
+                if(inst->isRect() && isOpenGLTarget(this->m_targetRequest))
+                    dim = SpvDimRect;                
+                else    
+                    dim = SpvDim2D;
+
                 break;
             case SLANG_TEXTURE_3D:
                 dim = SpvDim3D;
@@ -1895,6 +1900,7 @@ struct SPIRVEmitContext
         //
         // SPIR-V requires that the sampled/rw info on the image isn't unknown
         SLANG_ASSERT(sampled == sampledImage || sampled == readWriteImage);
+        if(isMultisampled) requireSPIRVCapability(SpvCapabilityStorageImageMultisample);
         switch(dim)
         {
         case SpvDim1D:
@@ -1914,6 +1920,7 @@ struct SPIRVEmitContext
             break;
         case SpvDimRect:
             requireSPIRVCapability(sampled == sampledImage ? SpvCapabilitySampledRect : SpvCapabilityImageRect);
+            
             break;
         case SpvDimBuffer:
             requireSPIRVCapability(sampled == sampledImage ? SpvCapabilitySampledBuffer : SpvCapabilityImageBuffer);
@@ -5476,6 +5483,7 @@ struct SPIRVEmitContext
                         textureInst->getAccessInst(),
                         textureInst->getIsShadowInst(),
                         builder.getIntValue(builder.getIntType(), (operand->getOp() == kIROp_SPIRVAsmOperandSampledImageType ? 1 : 0)),
+                        textureInst->getIsRectInst(),
                         textureInst->getFormatInst());
                     emitOperand(ensureInst(imageType));
                     break;

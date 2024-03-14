@@ -1627,6 +1627,104 @@ Result DeviceImpl::createTextureResource(
             VK_IMAGE_LAYOUT_UNDEFINED,
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
+
+
+        // early return if ms-texture
+        if(desc.sampleDesc.numSamples != 1)
+        {
+            // For simplicity sake, handle senario where buffer is 1 color
+            // else we would need to make a compute shader and dispatch 
+            // with logic to handle per array element of a MS array
+            // the conversion code is not correct for larger types, but 
+            // this is also fine for testing purposes
+            FormatInfo formatInfo;
+            gfxGetFormatInfo(desc.format, &formatInfo);
+
+            uint32_t data = 0;
+            VkClearColorValue clearColor;
+            switch(formatInfo.channelType)
+            {
+            case SLANG_SCALAR_TYPE_INT32: 
+                memcpy(&data, initData->data, sizeof(data)); 
+                break;
+            case SLANG_SCALAR_TYPE_UINT32: 
+                memcpy(&data, initData->data, sizeof(data)); 
+            case SLANG_SCALAR_TYPE_INT64: 
+            {
+                int32_t tmpData = int32_t(((int64_t*)initData->data)[0]);
+                memcpy(&data, &tmpData, sizeof(data));
+                break;
+            }
+            case SLANG_SCALAR_TYPE_UINT64: 
+            {
+                uint32_t tmpData = uint32_t(((uint64_t*)initData->data)[0]);
+                memcpy(&data, &tmpData, sizeof(data));
+                break;
+            }
+            case SLANG_SCALAR_TYPE_FLOAT16: 
+            {
+                float tmpData = HalfToFloat(((uint16_t*)initData->data)[0]);
+                memcpy(&data, &tmpData, sizeof(data));
+                break;
+            }
+            case SLANG_SCALAR_TYPE_FLOAT32: 
+            {
+                float tmpData = float(((float*)initData->data)[0]);
+                memcpy(&data, &tmpData, sizeof(data));
+                break;
+            }
+            case SLANG_SCALAR_TYPE_FLOAT64:
+            {
+                float tmpData = float(((double*)initData->data)[0]);
+                memcpy(&data, &tmpData, sizeof(data));
+                break;
+            }
+            case SLANG_SCALAR_TYPE_INT8: 
+            {
+                int32_t tmpData = int32_t(((int8_t*)initData->data)[0]);
+                memcpy(&data, &tmpData, sizeof(data));
+                break;
+            }
+            case SLANG_SCALAR_TYPE_UINT8: 
+            {
+                uint32_t tmpData = uint32_t(((uint8_t*)initData->data)[0]);
+                memcpy(&data, &tmpData, sizeof(data));
+                break;
+            }
+            case SLANG_SCALAR_TYPE_INT16: 
+            {
+                int32_t tmpData = int32_t(((int32_t*)initData->data)[0]);
+                memcpy(&data, &tmpData, sizeof(data));
+                break;
+            }
+            case SLANG_SCALAR_TYPE_UINT16: 
+            {
+                uint32_t tmpData = uint32_t(((uint16_t*)initData->data)[0]);
+                memcpy(&data, &tmpData, sizeof(data));
+                break;
+            }
+            };
+            uint32_t data_arr[4] = {data, data, data, data};
+            memcpy(clearColor.uint32, data_arr, sizeof(VkClearColorValue));
+
+
+            VkImageSubresourceRange range{};
+            range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            range.baseMipLevel = 0;
+            range.levelCount = VK_REMAINING_MIP_LEVELS;
+            range.baseArrayLayer = 0;
+            range.layerCount = VK_REMAINING_ARRAY_LAYERS;
+
+            m_api.vkCmdClearColorImage(
+                commandBuffer,
+                texture->m_image,
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                &clearColor,
+                1,
+                &range
+                );
+        }
+        else
         {
             Offset srcOffset = 0;
             for (int i = 0; i < arraySize; ++i)
@@ -1674,6 +1772,7 @@ Result DeviceImpl::createTextureResource(
             }
         }
         auto defaultLayout = VulkanUtil::getImageLayoutFromState(desc.defaultState);
+
         _transitionImageLayout(
             texture->m_image,
             format,
@@ -2139,6 +2238,18 @@ Result DeviceImpl::createBufferView(
                 info.buffer = resourceImpl->m_buffer.m_buffer;
                 info.offset = offset;
                 info.range = size;
+                VkBufferUsageFlags2CreateInfoKHR bufferViewUsage;
+                if (desc.type == IResourceView::Type::UnorderedAccess)
+                {
+                    bufferViewUsage = {};
+                    bufferViewUsage.sType = VK_STRUCTURE_TYPE_BUFFER_USAGE_FLAGS_2_CREATE_INFO_KHR;
+                    bufferViewUsage.usage = VK_FORMAT_FEATURE_UNIFORM_TEXEL_BUFFER_BIT;
+                    info.pNext = &bufferViewUsage;
+                }
+                else if (desc.type == IResourceView::Type::ShaderResource)
+                {
+
+                }
 
                 SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateBufferView(m_device, &info, nullptr, &view));
             }

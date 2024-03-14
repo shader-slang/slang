@@ -112,6 +112,18 @@ namespace renderer_test
                 else
                     val->textureDesc.content = InputTextureContent::Gradient;
             }
+            else if (word == "sampleCount")
+            {
+                parser.Read("=");
+                auto contentWord = parser.ReadWord();
+                if(contentWord == "one") val->textureDesc.sampleCount = InputTextureSampleCount::one;
+                else if(contentWord == "two") val->textureDesc.sampleCount = InputTextureSampleCount::two;
+                else if(contentWord == "four") val->textureDesc.sampleCount = InputTextureSampleCount::four;
+                else if(contentWord == "eight") val->textureDesc.sampleCount = InputTextureSampleCount::eight;
+                else if(contentWord == "sixteen") val->textureDesc.sampleCount = InputTextureSampleCount::sixteen;
+                else if(contentWord == "thirtyTwo") val->textureDesc.sampleCount = InputTextureSampleCount::thirtyTwo;
+                else if(contentWord == "sixtyFour") val->textureDesc.sampleCount = InputTextureSampleCount::sixtyFour;
+            }
             else if(word == "mipMaps")
             {
                 parser.Read("=");
@@ -688,6 +700,13 @@ namespace renderer_test
                 maybeParseOptions(parser, val.Ptr());
                 return val;
             }
+            else if (parser.AdvanceIf("RWTextureBuffer"))
+            {
+                RefPtr<ShaderInputLayout::BufferVal> val = new ShaderInputLayout::BufferVal;
+                val->bufferDesc.type = InputBufferType::StorageBuffer;
+                maybeParseOptions(parser, val.Ptr());
+                return val;
+            }
             else if (parser.AdvanceIf("Sampler"))
             {
                 RefPtr<ShaderInputLayout::SamplerVal> val = new ShaderInputLayout::SamplerVal;
@@ -1100,7 +1119,80 @@ namespace renderer_test
         return SLANG_OK;
     }
 
+    template<typename T>
+    void generateTextureDataWithTargetTStorage(TextureData& output, const InputTextureDesc& desc, gfx::FormatInfo& formatInfo)
+    {
+        TextureData work;
+        generateTextureDataRGB8(work, desc);
 
+        output.init(desc.format);
+
+        output.m_textureSize = work.m_textureSize;
+        output.m_mipLevels = work.m_mipLevels;
+        output.m_arraySize = work.m_arraySize;
+
+        List<TextureData::Slice>& dstSlices = output.m_slices;
+
+        Index numSlices = work.m_slices.getCount();
+        dstSlices.setCount(numSlices);
+
+        for (int i = 0; i < numSlices; ++i)
+        {
+            const TextureData::Slice& srcSlice = work.m_slices[i];
+
+            const Index pixelCount = srcSlice.valuesCount;
+            const uint8_t* srcPixels = (const uint8_t*)srcSlice.values;
+
+            T* dstPixels = (T*)output.setSliceCount(i, pixelCount);
+
+            switch (formatInfo.channelCount)
+            {
+            case 1:
+            {
+                for (Index j = 0; j < pixelCount; ++j, srcPixels += 4, dstPixels++)
+                {
+                    // Copy out r
+                    dstPixels[0] = T(srcPixels[0] * (1.0f / 255));
+                }
+                break;
+            }
+            case 2:
+            {
+                for (Index j = 0; j < pixelCount; ++j, srcPixels += 4, dstPixels += 2)
+                {
+                    // Copy out rg
+                    dstPixels[0] = T(srcPixels[0] * (1.0f / 255));
+                    dstPixels[1] = T(srcPixels[1] * (1.0f / 255));
+                }
+                break;
+            }
+            case 3:
+            {
+                for (Index j = 0; j < pixelCount; ++j, srcPixels += 4, dstPixels += 3)
+                {
+                    // Copy out rgb
+                    dstPixels[0] = T(srcPixels[0] * (1.0f / 255));
+                    dstPixels[1] = T(srcPixels[1] * (1.0f / 255));
+                    dstPixels[2] = T(srcPixels[2] * (1.0f / 255));
+                }
+                break;
+            }
+            case 4:
+            {
+
+                for (Index j = 0; j < pixelCount; ++j, srcPixels += 4, dstPixels += 4)
+                {
+                    // Copy out rgba
+                    dstPixels[0] = T(srcPixels[0] * (1.0f / 255));
+                    dstPixels[1] = T(srcPixels[1] * (1.0f / 255));
+                    dstPixels[2] = T(srcPixels[2] * (1.0f / 255));
+                    dstPixels[3] = T(srcPixels[3] * (1.0f / 255));
+                }
+                break;
+            }
+            }
+        }
+    }
     void generateTextureData(TextureData& output, const InputTextureDesc& desc)
     {
         gfx::FormatInfo formatInfo;
@@ -1194,76 +1286,51 @@ namespace renderer_test
             case Format::R32G32B32A32_FLOAT:
             case Format::D32_FLOAT:
             {
-                TextureData work;
-                generateTextureDataRGB8(work, desc);
-
-                output.init(desc.format);
-
-                output.m_textureSize = work.m_textureSize;
-                output.m_mipLevels = work.m_mipLevels;
-                output.m_arraySize = work.m_arraySize;
-
-                List<TextureData::Slice>& dstSlices = output.m_slices;
-
-                Index numSlices = work.m_slices.getCount();
-                dstSlices.setCount(numSlices);
-
-                for (int i = 0; i < numSlices; ++i)
-                {
-                    const TextureData::Slice& srcSlice = work.m_slices[i];
-
-                    const Index pixelCount = srcSlice.valuesCount;
-                    const uint8_t* srcPixels = (const uint8_t*)srcSlice.values;
-
-                    float* dstPixels = (float*)output.setSliceCount(i, pixelCount);
-
-                    switch (formatInfo.channelCount)
-                    {
-                        case 1:
-                        {
-                            for (Index j = 0; j < pixelCount; ++j, srcPixels += 4, dstPixels++)
-                            {
-                                // Copy out r
-                                dstPixels[0] = srcPixels[0] * (1.0f / 255);
-                            }
-                            break;
-                        }
-                        case 2:
-                        {
-                            for (Index j = 0; j < pixelCount; ++j, srcPixels += 4, dstPixels += 2)
-                            {
-                                // Copy out rg
-                                dstPixels[0] = srcPixels[0] * (1.0f / 255);
-                                dstPixels[1] = srcPixels[1] * (1.0f / 255);
-                            }
-                            break;
-                        }
-                        case 3:
-                        {
-                            for (Index j = 0; j < pixelCount; ++j, srcPixels += 4, dstPixels += 3)
-                            {
-                                // Copy out rgb
-                                dstPixels[0] = srcPixels[0] * (1.0f / 255);
-                                dstPixels[1] = srcPixels[1] * (1.0f / 255);
-                                dstPixels[2] = srcPixels[2] * (1.0f / 255);
-                            }
-                            break;
-                        }
-                        case 4:
-                        {
-
-                            for (Index j = 0; j < pixelCount; ++j, srcPixels += 4, dstPixels += 4)
-                            {
-                                // Copy out rgba
-                                dstPixels[0] = srcPixels[0] * (1.0f / 255);
-                                dstPixels[1] = srcPixels[1] * (1.0f / 255);
-                                dstPixels[2] = srcPixels[2] * (1.0f / 255);
-                                dstPixels[3] = srcPixels[3] * (1.0f / 255);
-                            }
-                            break;
-                        }
-                    }
-                }
+                generateTextureDataWithTargetTStorage<float>(output, desc, formatInfo);
+                break;
+            }
+            case Format::R32_UINT:
+            case Format::R32G32_UINT:
+            case Format::R32G32B32_UINT:
+            case Format::R32G32B32A32_UINT:
+            {
+                generateTextureDataWithTargetTStorage<uint32_t>(output, desc, formatInfo);
+                break;
+            }
+            case Format::R16_UINT:
+            case Format::R16G16_UINT:
+            case Format::R16G16B16A16_UINT:
+            {
+                generateTextureDataWithTargetTStorage<uint16_t>(output, desc, formatInfo);
+                break;
+            }
+            case Format::R8_UINT:
+            case Format::R8G8_UINT:
+            case Format::R8G8B8A8_UINT:
+            {
+                generateTextureDataWithTargetTStorage<uint8_t>(output, desc, formatInfo);
+                break;
+            }
+            case Format::R32_SINT:
+            case Format::R32G32_SINT:
+            case Format::R32G32B32_SINT:
+            case Format::R32G32B32A32_SINT:
+            {
+                generateTextureDataWithTargetTStorage<int32_t>(output, desc, formatInfo);
+                break;
+            }
+            case Format::R16_SINT:
+            case Format::R16G16_SINT:
+            case Format::R16G16B16A16_SINT:
+            {
+                generateTextureDataWithTargetTStorage<int16_t>(output, desc, formatInfo);
+                break;
+            }
+            case Format::R8_SINT:
+            case Format::R8G8_SINT:
+            case Format::R8G8B8A8_SINT:
+            {
+                generateTextureDataWithTargetTStorage<int8_t>(output, desc, formatInfo);
                 break;
             }
             default:
