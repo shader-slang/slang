@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   build:
-    runs-on: [Windows, self-hosted, perf]
+    runs-on: [Windows, self-hosted]
     timeout-minutes: 100
     continue-on-error: true
     strategy:
