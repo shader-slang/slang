@@ -74,6 +74,6 @@ jobs:
         $filename = '${{ fromJson(steps.download.outputs.downloaded_files)[0] }}'
         Expand-Archive $filename -DestinationPath .\falcor-perf-test
         $env:PATH += ";.\bin\windows-${{matrix.testPlatform}}\${{matrix.configuration}}";
-        .\falcor-perf-test\bin\Release\falcor_perftest.exe > test_results.txt
+        .\falcor-perf-test\bin\Release\falcor_perftest.exe > .\test_results.txt
         
-        python falcor-compile-time-extract-results.py test_results.txt
+        python .\falcor-compile-time-extract-results.py test_results.txt
