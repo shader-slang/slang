@@ -713,6 +713,10 @@ class CallAttribute : public Attribute
 };
                // `[call]`
 
+class UnscopedEnumAttribute : public Attribute
+{
+    SLANG_AST_CLASS(UnscopedEnumAttribute)
+};
 
 // [[vk_push_constant]] [[push_constant]]
 class PushConstantAttribute : public Attribute 
