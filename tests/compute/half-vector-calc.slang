@@ -29,7 +29,7 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
     
     // Unary
     v2 = +v2.yxwz;
-    v2 = -v2.zwxy;
+    v2.xyz = -v2.zwx;
     
     // Scalar vector 
     v1 = v1 + v2.x;

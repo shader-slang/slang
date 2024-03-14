@@ -2315,7 +2315,8 @@ int __naturalStrideOf()
     return __naturalStrideOf_impl(__declVal<T>());
 }
 
-
+__intrinsic_op($(kIROp_TreatAsDynamicUniform))
+T asDynamicUniform<T>(T v);
 
 // Binding Attributes
 
@@ -2350,6 +2351,9 @@ attribute_syntax [spv_target_env_1_3] : SPIRVTargetEnv13Attribute;
 
 __attributeTarget(VarDeclBase)
 attribute_syntax [disable_array_flattening] : DisableArrayFlatteningAttribute;
+
+__attributeTarget(EnumDecl)
+attribute_syntax [UnscopedEnum] : UnscopedEnumAttribute;
 
 // Statement Attributes
 
@@ -2562,3 +2566,6 @@ attribute_syntax [PreferCheckpoint] : PreferCheckpointAttribute;
 
 __attributeTarget(DeclBase)
 attribute_syntax [KnownBuiltin(name : String)] : KnownBuiltinAttribute;
+
+__attributeTarget(FunctionDeclBase)
+attribute_syntax [NonUniformReturn] : NonDynamicUniformAttribute;

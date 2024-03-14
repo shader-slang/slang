@@ -263,6 +263,11 @@ class HLSLConsumeStructuredBufferType : public HLSLStructuredBufferTypeBase
     SLANG_AST_CLASS(HLSLConsumeStructuredBufferType)
 };
 
+class GLSLAtomicUintType : public BuiltinType
+{
+    SLANG_AST_CLASS(GLSLAtomicUintType)
+};
+
 class HLSLPatchType : public BuiltinType 
 {
     SLANG_AST_CLASS(HLSLPatchType)

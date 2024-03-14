@@ -237,6 +237,15 @@ namespace Slang
         return false;
     }
 
+    bool SemanticsVisitor::isValidGenericConstraintType(Type* type)
+    {
+        if (auto andType = as<AndType>(type))
+        {
+            return isValidGenericConstraintType(andType->getLeft()) && isValidGenericConstraintType(andType->getRight());
+        }
+        return isInterfaceType(type);
+    }
+
     bool SemanticsVisitor::isTypeDifferentiable(Type* type)
     {
         return isSubtype(type, m_astBuilder->getDiffInterfaceType());
@@ -264,13 +273,35 @@ namespace Slang
     {
         if (auto arrayType = as<ArrayExpressionType>(type))
         {
-            return getTypeTags(arrayType->getElementType());
+            auto typeTag = getTypeTags(arrayType->getElementType());
+            bool sized = false;
+            if (auto cint = as<ConstantIntVal>(arrayType->getElementCount()))
+            {
+                if (cint->getValue() != kUnsizedArrayMagicLength)
+                {
+                    sized = true;
+                }
+            }
+            else if (auto intVal = arrayType->getElementCount())
+            {
+                sized = !intVal->isLinkTimeVal();
+            }
+            if (!sized)
+                typeTag = (TypeTag)((int)typeTag | (int)TypeTag::Unsized);
+
+            return typeTag;
         }
         if (auto modifiedType = as<ModifiedType>(type))
         {
             return getTypeTags(modifiedType->getBase());
         }
-        if (auto declRefType = as<DeclRefType>(type))
+        if (auto parameterGroupType = as<UniformParameterGroupType>(type))
+        {
+            auto elementTags = getTypeTags(parameterGroupType->getElementType());
+            elementTags = (TypeTag)((int)elementTags & ~(int)TypeTag::Unsized);
+            return elementTags;
+        }
+        else if (auto declRefType = as<DeclRefType>(type))
         {
             if (auto aggTypeDecl = as<AggTypeDecl>(declRefType->getDeclRef()))
                 return aggTypeDecl.getDecl()->typeTags;

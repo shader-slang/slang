@@ -229,6 +229,29 @@ namespace Slang
                 lastErrorLoc = loc;
             }
         }
+
+    public:
+        void setBindingOffset(int binding, int64_t byteOffset)
+        {
+            bindingToByteOffset.set(binding, byteOffset);
+        }
+        int64_t getNextBindingOffset(int binding) 
+        {
+            int64_t currentOffset;
+            if (bindingToByteOffset.addIfNotExists(binding, 0))
+                currentOffset = 0;
+            else
+                currentOffset = bindingToByteOffset.getValue(binding) + sizeof(uint32_t);
+            
+            bindingToByteOffset.set(
+                binding,
+                currentOffset + sizeof(uint32_t)
+                );
+            return currentOffset;
+        }
+
+    private:
+        Dictionary<int, int64_t> bindingToByteOffset;
     };
 
     // Forward Declarations
@@ -2724,7 +2747,8 @@ namespace Slang
         {
             if(typeSpec.decl)
             {
-                if(peekToken(parser).flags & TokenFlag::AtStartOfLine)
+                if( peekToken(parser).type == TokenType::EndOfFile ||
+                    (peekToken(parser).flags & TokenFlag::AtStartOfLine))
                 {
                     // The token after the `}` is at the start of its
                     // own line, which means it can't be on the same line.
@@ -4364,6 +4388,42 @@ namespace Slang
         return attrDecl;
     }
 
+    static void addSpecialGLSLModifiersBasedOnType(
+        Parser* parser,
+        Decl* decl,
+        Modifiers* modifiers)
+    {
+        auto varDeclBase = as<VarDeclBase>(decl);
+        if (!varDeclBase) return;
+        auto declRefExpr = as<DeclRefExpr>(varDeclBase->type.exp);
+        if (!declRefExpr) return;
+        auto bindingMod = modifiers->findModifier<GLSLBindingAttribute>();
+        if (!bindingMod) return;
+
+        // here is a problem; we link types into a literal in IR stage post parse
+        // but, order (top down) mattter when parsing atomic_uint offset
+        // more over, we can have patterns like: offset = 20, no offset [+4], offset = 16.
+        // Therefore we must parse all in order. The issue then is we will struggle to 
+        // subsitute atomic_uint for storage buffers...
+        if (auto name = declRefExpr->name)
+        {
+            if (name->text.equals("atomic_uint"))
+            {
+                if (!modifiers->findModifier<GLSLOffsetLayoutAttribute>())
+                {
+                    const int64_t nextOffset = parser->getNextBindingOffset(bindingMod->binding);
+                    GLSLOffsetLayoutAttribute* modifier = parser->astBuilder->create<GLSLOffsetLayoutAttribute>();
+                    modifier->keywordName = NULL; //no keyword name given
+                    modifier->loc = bindingMod->loc; //has no location in file, set to parent binding
+                    modifier->offset = nextOffset;
+
+                    Modifiers newModifier;
+                    newModifier.first = modifier;
+                    _addModifiers(decl, newModifier);
+                }
+            }
+        }
+    }
     // Finish up work on a declaration that was parsed
     static void CompleteDecl(
         Parser*				parser,
@@ -4402,6 +4462,10 @@ namespace Slang
         }
         else
         {
+            if (parser->options.allowGLSLInput)
+            {
+                addSpecialGLSLModifiersBasedOnType(parser, declToModify, &modifiers);
+            }
             _addModifiers(declToModify, modifiers);
         }
 
@@ -4453,7 +4517,7 @@ namespace Slang
         parser->pendingModifiers = &modifiers;
 
         auto loc = parser->tokenReader.peekLoc();
-
+        auto ptoken = parser->tokenReader.peekToken();
         switch (peekTokenType(parser))
         {
         case TokenType::Identifier:
@@ -7786,6 +7850,7 @@ namespace Slang
                 CASE(std140, GLSLStd140Modifier)
                 CASE(std430, GLSLStd430Modifier)
                 CASE(scalar, GLSLScalarModifier)
+                CASE(offset, GLSLOffsetLayoutAttribute)
                 CASE(location, GLSLLocationLayoutModifier) 
                 {
                     modifier = parser->astBuilder->create<GLSLUnparsedLayoutModifier>();
@@ -7796,12 +7861,27 @@ namespace Slang
                 modifier->keywordName = nameAndLoc.name;
                 modifier->loc = nameAndLoc.loc;
 
+
                 // Special handling for GLSLLayoutModifier
                 if (auto glslModifier = as<GLSLLayoutModifier>(modifier))
                 {
+                    // not all GLSLLayoutModifier subtypes have an OpAssign after
                     if (AdvanceIf(parser, TokenType::OpAssign))
-                    {
                         glslModifier->valToken = parser->ReadToken(TokenType::IntegerLiteral);
+                }
+                //Special handling for GLSLOffsetLayoutAttribute to add to the byte offset tracker at a binding location
+                else if (auto glslOffset = as<GLSLOffsetLayoutAttribute>(modifier))
+                {
+                    if (auto binding = listBuilder.find<GLSLBindingAttribute>())
+                    {
+                        // all GLSLOffsetLayoutAttribute have an OpAssign with value token
+                        parser->ReadToken(TokenType::OpAssign);
+                        glslOffset->offset = int64_t(getIntegerLiteralValue(parser->ReadToken(TokenType::IntegerLiteral)));
+                        parser->setBindingOffset(binding->binding, glslOffset->offset);
+                    }
+                    else
+                    { 
+                        parser->diagnose(modifier->loc, Diagnostics::missingLayoutBindingModifier);
                     }
                 }
 
@@ -8025,6 +8105,7 @@ namespace Slang
         _makeParseModifier("uniform",       HLSLUniformModifier::kReflectClassInfo),
         _makeParseModifier("volatile",      HLSLVolatileModifier::kReflectClassInfo),
         _makeParseModifier("export",        HLSLExportModifier::kReflectClassInfo),
+        _makeParseModifier("dynamic_uniform", DynamicUniformModifier::kReflectClassInfo),
 
         // Modifiers for geometry shader input
         _makeParseModifier("point",         HLSLPointModifier::kReflectClassInfo),

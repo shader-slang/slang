@@ -404,6 +404,9 @@ namespace Slang
             String const&   typeStr,
             DiagnosticSink* sink);
 
+        Dictionary<String, IntVal*>& getMangledNameToIntValMap();
+        ConstantIntVal* tryFoldIntVal(IntVal* intVal);
+
             /// Get a list of modules that this component type depends on.
             ///
         virtual List<Module*> const& getModuleDependencies() = 0;
@@ -526,7 +529,7 @@ namespace Slang
             /// This facility is only needed to support legacy APIs for string-based lookup
             /// and parsing via Slang reflection, and is not recommended for future APIs to use.
             ///
-        Scope* _createScopeForLegacyLookup(ASTBuilder* astBuilder);
+        Scope* _getOrCreateScopeForLegacyLookup(ASTBuilder* astBuilder);
 
     protected:
         ComponentType(Linkage* linkage);
@@ -544,6 +547,9 @@ namespace Slang
         // TODO: Remove this. Type lookup should only be supported on `Module`s.
         //
         Dictionary<String, Type*> m_types;
+
+        Scope* m_lookupScope = nullptr;
+        std::unique_ptr<Dictionary<String, IntVal*>> m_mapMangledNameToIntVal;
     };
 
         /// A component type built up from other component types.
@@ -1788,6 +1794,11 @@ namespace Slang
             const char* moduleName,
             const char* path,
             slang::IBlob* source,
+            slang::IBlob** outDiagnostics = nullptr) override;
+        SLANG_NO_THROW slang::IModule* SLANG_MCALL loadModuleFromSourceString(
+            const char* moduleName,
+            const char* path,
+            const char* string,
             slang::IBlob** outDiagnostics = nullptr) override;
         SLANG_NO_THROW SlangResult SLANG_MCALL createCompositeComponentType(
             slang::IComponentType* const*   componentTypes,

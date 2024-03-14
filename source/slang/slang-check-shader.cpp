@@ -318,6 +318,8 @@ namespace Slang
             return true;
         if (as<UniformParameterGroupType>(type))
             return true;
+        if (as< GLSLShaderStorageBufferType>(type))
+            return true;
         if (as<SamplerStateType>(type))
             return true;
         return false;
@@ -1216,16 +1218,36 @@ namespace Slang
                 auto specializationArg = args[ii];
                 genericArgs.add(specializationArg.val);
             }
-            ASTBuilder* astBuilder = getLinkage()->getASTBuilder();
-
+            auto astBuilder = getLinkage()->getASTBuilder();
             for (auto constraintDecl : getMembersOfType<GenericTypeConstraintDecl>(
                      getLinkage()->getASTBuilder(), DeclRef<ContainerDecl>(genericDeclRef)))
             {
                 DeclRef<GenericTypeConstraintDecl> constraintDeclRef = astBuilder->getDirectDeclRef(constraintDecl.getDecl());
+                int argIndex = -1;
+                int ii = 0;
+                for (auto member : genericDeclRef.getDecl()->members)
+                {
+                    if (member == constraintDeclRef.getDecl())
+                    {
+                        argIndex = ii;
+                        break;
+                    }
+                    ii++;
+                }
+                if (argIndex == -1)
+                {
+                    SLANG_ASSERT(!"generic parameter not found in generic decl");
+                    continue;
+                }
 
-                auto sub = getSub(astBuilder, constraintDeclRef);
+                auto sub = as<Type>(args[argIndex].val);
+                if (!sub)
+                {
+                    sink->diagnose(constraintDecl, Diagnostics::expectedTypeForSpecializationArg, argIndex);
+                    continue;
+                }
+
                 auto sup = getSup(astBuilder, constraintDeclRef);
-
                 auto subTypeWitness = visitor.isSubtype(sub, sup);
                 if(subTypeWitness)
                 {
@@ -1305,7 +1327,7 @@ namespace Slang
             sink);
     }
 
-    Scope* ComponentType::_createScopeForLegacyLookup(ASTBuilder* astBuilder)
+    Scope* ComponentType::_getOrCreateScopeForLegacyLookup(ASTBuilder* astBuilder)
     {
         // The shape of this logic is dictated by the legacy
         // behavior for name-based lookup/parsing of types
@@ -1316,6 +1338,8 @@ namespace Slang
         // definitions (that scope is necessary because
         // it defines keywords like `true` and `false`).
         //
+        if (m_lookupScope)
+            return m_lookupScope;
 
         Scope* scope = astBuilder->create<Scope>();
         scope->parent = getLinkage()->getSessionImpl()->slangLanguageScope;
@@ -1338,7 +1362,7 @@ namespace Slang
                 scope->nextSibling = moduleScope;
             }
         }
-
+        m_lookupScope = scope;
         return scope;
     }
 
@@ -1359,7 +1383,7 @@ namespace Slang
         // We create the scopes on the linkages ASTBuilder. We might want to create a temporary ASTBuilder,
         // and let that memory get freed, but is like this because it's not clear if the scopes in ASTNode members
         // will dangle if we do.
-        Scope* scope = unspecialiedProgram->_createScopeForLegacyLookup(endToEndReq->getLinkage()->getASTBuilder());
+        Scope* scope = unspecialiedProgram->_getOrCreateScopeForLegacyLookup(endToEndReq->getLinkage()->getASTBuilder());
 
         // We are going to do some semantic checking, so we need to
         // set up a `SemanticsVistitor` that we can use.

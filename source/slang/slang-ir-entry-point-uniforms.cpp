@@ -161,6 +161,8 @@ bool isVaryingParameter(IRTypeLayout* typeLayout)
 
 bool isVaryingParameter(IRVarLayout* varLayout)
 {
+    if (!varLayout)
+        return false;
     return isVaryingParameter(varLayout->getTypeLayout());
 }
 

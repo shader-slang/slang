@@ -238,6 +238,7 @@ DIAGNOSTIC(20012, Error, invalidSPIRVVersion, "Expecting SPIR-V version as eithe
 DIAGNOSTIC(20013, Error, invalidCUDASMVersion, "Expecting CUDA SM version as either 'major.minor', or quoted if has patch (eg for '7.0' or \"7.0\"')")
 DIAGNOSTIC(20014, Error, classIsReservedKeyword, "'class' is a reserved keyword in this context; use 'struct' instead.")
 DIAGNOSTIC(20015, Error, unknownSPIRVCapability, "unknown SPIR-V capability '$0'.")
+DIAGNOSTIC(20016, Error, missingLayoutBindingModifier, "Expecting 'binding' modifier in the layout qualifier here")
 
 DIAGNOSTIC(20101, Warning, unintendedEmptyStatement, "potentially unintended empty statement at this location; use {} instead.")
 
@@ -322,6 +323,8 @@ DIAGNOSTIC(30066, Error, classCanOnlyBeInitializedWithNew, "a class can only be 
 
 DIAGNOSTIC(30067, Error, mutatingMethodOnFunctionInputParameterError, "mutating method '$0' called on `in` parameter '$1'; changes will not be visible to caller. copy the parameter into a local variable if this behavior is intended")
 DIAGNOSTIC(30068, Warning, mutatingMethodOnFunctionInputParameterWarning, "mutating method '$0' called on `in` parameter '$1'; changes will not be visible to caller. copy the parameter into a local variable if this behavior is intended")
+
+DIAGNOSTIC(30070, Error, unsizedMemberMustAppearLast, "unsized member can only appear as the last member in a composite type.")
 
 DIAGNOSTIC(30100, Error, staticRefToNonStaticMember, "type '$0' cannot be used to refer to non-static member '$1'")
 
@@ -473,6 +476,7 @@ DIAGNOSTIC(39901, Fatal , cannotProcessInclude, "internal compiler error: cannot
 
 // 304xx: generics
 DIAGNOSTIC(30400, Error, genericTypeNeedsArgs, "generic type '$0' used without argument")
+DIAGNOSTIC(30401, Error, invalidTypeForConstraint, "type '$0' cannot be used as a constraint.")
 
 // 305xx: initializer lists
 DIAGNOSTIC(30500, Error, tooManyInitializers, "too many initializers (expected $0, got $1)")
@@ -660,6 +664,7 @@ DIAGNOSTIC(39024, Warning, cannotInferVulkanBindingWithoutRegisterModifier, "sha
 
 DIAGNOSTIC(39025, Error, conflictingVulkanInferredBindingForParameter, "conflicting vulkan inferred binding for parameter '$0' overlap is $1 and $2")
 
+DIAGNOSTIC(39026, Error, matrixLayoutModifierOnNonMatrixType, "matrix layout modifier cannot be used on non-matrix type '$0'.")
 //
 
 // 4xxxx - IL code generation.
@@ -716,6 +721,10 @@ DIAGNOSTIC(41904, Error, unableToAlignOf, "alignof could not be performed for ty
 DIAGNOSTIC(42001, Error, invalidUseOfTorchTensorTypeInDeviceFunc, "invalid use of TorchTensor type in device/kernel functions. use `TensorView` instead.")
 
 DIAGNOSTIC(45001, Error, unresolvedSymbol, "unresolved external symbol '$0'.")
+
+DIAGNOSTIC(41201, Warning, expectDynamicUniformArgument, "argument for '$0' might not be a dynamic uniform, use `asDynamicUniform()` to silence this warning.")
+DIAGNOSTIC(41201, Warning, expectDynamicUniformValue, "value stored at this location must be dynamic uniform, use `asDynamicUniform()` to silence this warning.")
+
 //
 // 5xxxx - Target code generation.
 //
