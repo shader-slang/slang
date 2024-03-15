@@ -2206,6 +2206,10 @@ namespace Slang
         CheckConstraintSubType(decl->sub);
         decl->sub = TranslateTypeNodeForced(decl->sub);
         decl->sup = TranslateTypeNodeForced(decl->sup);
+        if (!isValidGenericConstraintType(decl->sup) && !as<ErrorType>(decl->sub.type))
+        {
+            getSink()->diagnose(decl->sup.exp, Diagnostics::invalidTypeForConstraint, decl->sup);
+        }
     }
 
     void SemanticsDeclHeaderVisitor::visitGenericTypeParamDecl(GenericTypeParamDecl* decl)
@@ -7028,7 +7032,9 @@ namespace Slang
         {
             return;
         }
-        if(!varDecl->findModifier<OutModifier>())
+        // HLSL requires an 'out' modifier here, but since we don't operate
+        // under such strict compatability we can just not warn here.
+        if(!varDecl->findModifier<OutModifier>() && modifier)
         {
             getSink()->diagnose(varDecl, Diagnostics::meshOutputMustBeOut);
         }

@@ -1187,7 +1187,15 @@ namespace Slang
             // the right syntax class to instantiate.
             //
 
-            return checkAttribute(hlslUncheckedAttribute, syntaxNode);
+            auto checkedAttr = checkAttribute(hlslUncheckedAttribute, syntaxNode);
+
+            if (as<UnscopedEnumAttribute>(checkedAttr))
+            {
+                if (auto parentDecl = as<ContainerDecl>(getParentDecl(as<Decl>(syntaxNode))))
+                    parentDecl->invalidateMemberDictionary();
+                return getASTBuilder()->create<TransparentModifier>();
+            }
+            return checkedAttr;
         }
 
         if (auto decl = as<Decl>(syntaxNode))

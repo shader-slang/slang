@@ -13,7 +13,6 @@ using namespace Slang;
 namespace cuda
 {
 SLANG_FORCE_INLINE bool _isError(CUresult result) { return result != 0; }
-SLANG_FORCE_INLINE bool _isError(cudaError_t result) { return result != 0; }
 
 // A enum used to control if errors are reported on failure of CUDA call.
 enum class CUDAReportStyle
@@ -45,7 +44,6 @@ struct CUDAErrorInfo
 // If this code path is enabled, CUDA errors will be reported directly to StdWriter::out stream.
 
 SlangResult _handleCUDAError(CUresult cuResult, const char* file, int line);
-SlangResult _handleCUDAError(cudaError_t error, const char* file, int line);
 
 #    define SLANG_CUDA_HANDLE_ERROR(x) _handleCUDAError(x, __FILE__, __LINE__)
 
@@ -99,7 +97,7 @@ void _optixLogCallback(unsigned int level, const char* tag, const char* message,
 
 #    endif
 
-AdapterLUID getAdapterLUID(int device);
+AdapterLUID getAdapterLUID(int deviceIndex);
 
 } // namespace cuda
 #endif

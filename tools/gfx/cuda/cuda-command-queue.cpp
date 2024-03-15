@@ -104,11 +104,10 @@ void CommandQueueImpl::dispatchCompute(int x, int y, int z)
             "SLANG_globalParams");
 
         CUdeviceptr globalParamsCUDAData = (CUdeviceptr)currentRootObject->getBuffer();
-        cudaMemcpyAsync(
-            (void*)globalParamsSymbol,
-            (void*)globalParamsCUDAData,
+        cuMemcpyAsync(
+            (CUdeviceptr)globalParamsSymbol,
+            (CUdeviceptr)globalParamsCUDAData,
             globalParamsSymbolSize,
-            cudaMemcpyDefault,
             0);
     }
     //
@@ -155,17 +154,19 @@ void CommandQueueImpl::copyBuffer(
 {
     auto dstImpl = static_cast<BufferResourceImpl*>(dst);
     auto srcImpl = static_cast<BufferResourceImpl*>(src);
-    cudaMemcpy(
-        (uint8_t*)dstImpl->m_cudaMemory + dstOffset,
-        (uint8_t*)srcImpl->m_cudaMemory + srcOffset,
-        size,
-        cudaMemcpyDefault);
+    cuMemcpy(
+        (CUdeviceptr)((uint8_t*)dstImpl->m_cudaMemory + dstOffset),
+        (CUdeviceptr)((uint8_t*)srcImpl->m_cudaMemory + srcOffset),
+        size);
 }
 
 void CommandQueueImpl::uploadBufferData(IBufferResource* dst, size_t offset, size_t size, void* data)
 {
     auto dstImpl = static_cast<BufferResourceImpl*>(dst);
-    cudaMemcpy((uint8_t*)dstImpl->m_cudaMemory + offset, data, size, cudaMemcpyDefault);
+    cuMemcpy(
+        (CUdeviceptr)((uint8_t*)dstImpl->m_cudaMemory + offset),
+        (CUdeviceptr)data,
+        size);
 }
 
 void CommandQueueImpl::writeTimestamp(IQueryPool* pool, SlangInt index)

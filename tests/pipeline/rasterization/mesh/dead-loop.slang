@@ -1,9 +1,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -mesh -output-using-type -dx12 -use-dxil -profile sm_6_6 -render-features mesh-shader
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -mesh -output-using-type -vk -profile glsl_450+spirv_1_4 -render-features mesh-shader
 
-// To test a simple mesh shader, we'll generate 4 triangles, the vertices of
-// each one will hold the triangle index and a value (the square). The fragment
-// shader will write the value to the specified index of the output buffer.
+// See https://github.com/shader-slang/slang/issues/3401
 
 // CHECK:      0
 // CHECK-NEXT: 1
@@ -19,10 +17,6 @@ cbuffer Uniforms
 	float4x4 modelViewProjection;
 }
 
-//
-// Mesh shader
-//
-
 const static float2 positions[3] = {
   float2(0.0, -0.5),
   float2(0.5, 0.5),
@@ -34,7 +28,6 @@ const static float3 colors[3] = {
   float3(0.0, 1.0, 1.0),
   float3(1.0, 0.0, 1.0)
 };
-
 struct Vertex
 {
   float4 pos : SV_Position;
@@ -47,7 +40,8 @@ const static uint MAX_VERTS = 12;
 const static uint MAX_PRIMS = 4;
 
 [outputtopology("triangle")]
-[numthreads(12, 1, 1)]
+[shader("mesh")]
+[numthreads(3, 1, 1)]
 void meshMain(
     in uint tig : SV_GroupIndex,
     OutputVertices<Vertex, MAX_VERTS> verts,
@@ -57,14 +51,16 @@ void meshMain(
     const uint numPrimitives = 4;
     SetMeshOutputCounts(numVertices, numPrimitives);
 
-    if(tig < numVertices)
+    for(uint i = tig; i < numVertices; ++i)
     {
-        const int tri = tig / 3;
-        verts[tig] = {float4(positions[tig % 3], 0, 1), colors[tig % 3], tri, tri*tri};
+        const int tri = i / 3;
+        verts[i] = {float4(positions[i % 3], 0, 1), colors[i % 3], tri, tri*tri};
     }
 
-    if(tig < numPrimitives)
-        triangles[tig] = tig * 3 + uint3(0,1,2);
+    for(uint i = tig; i < numPrimitives; ++i)
+    {
+        triangles[i] = i * 3 + uint3(0,1,2);
+    }
 }
 
 //
