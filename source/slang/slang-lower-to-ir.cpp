@@ -2141,26 +2141,38 @@ void addVarDecorations(
         else if(auto rayPayloadAttr = as<VulkanRayPayloadAttribute>(mod))
         {
             builder->addVulkanRayPayloadDecoration(inst, rayPayloadAttr->location);
+            // may not be referenced; adding HLSL export modifier force emits
+            builder->addHLSLExportDecoration(inst);
         }
         else if(auto rayPayloadInAttr = as<VulkanRayPayloadInAttribute>(mod))
         {
             builder->addVulkanRayPayloadInDecoration(inst, rayPayloadInAttr->location);
+            // may not be referenced; adding HLSL export modifier force emits
+            builder->addHLSLExportDecoration(inst);
         }
         else if(auto callablePayloadAttr = as<VulkanCallablePayloadAttribute>(mod))
         {
             builder->addVulkanCallablePayloadDecoration(inst, callablePayloadAttr->location);
+            // may not be referenced; adding HLSL export modifier force emits
+            builder->addHLSLExportDecoration(inst);
         }
         else if(auto callablePayloadInAttr = as<VulkanCallablePayloadInAttribute>(mod))
         {
             builder->addVulkanCallablePayloadInDecoration(inst, callablePayloadInAttr->location);
+            // may not be referenced; adding HLSL export modifier force emits
+            builder->addHLSLExportDecoration(inst);
         }
         else if (auto hitObjectAttr = as<VulkanHitObjectAttributesAttribute>(mod))
         {
             builder->addVulkanHitObjectAttributesDecoration(inst, hitObjectAttr->location);
+            // may not be referenced; adding HLSL export modifier force emits
+            builder->addHLSLExportDecoration(inst);
         }
         else if (as<VulkanHitAttributesAttribute>(mod))
         {
             builder->addSimpleDecoration<IRVulkanHitAttributesDecoration>(inst);
+            // may not be referenced; adding HLSL export modifier force emits
+            builder->addHLSLExportDecoration(inst);
         }
         else if(as<GloballyCoherentModifier>(mod))
         {

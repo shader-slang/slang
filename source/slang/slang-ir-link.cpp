@@ -1740,26 +1740,6 @@ LinkedIR linkIR(
 
     context->builder->setInsertInto(context->getModule()->getModuleInst());
 
-    // it is possible that these objects are never referenced; unless they are 
-    // cloned here they may not appear in the IR for code emitting stage
-    if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL)) 
-    {
-        auto insertGlobalVar = [&](IRInst* instToAdd)
-        {
-            auto clone = cloneValue(context, instToAdd);
-            if (!clone->findDecorationImpl(kIROp_KeepAliveDecoration)) context->builder->addKeepAliveDecoration(clone);
-        };
-        for (IRModule* irModule : irModules)
-        {
-            for (auto inst : irModule->getGlobalInsts())
-            {
-                if (isRaytracingObject(inst))
-                {
-                    insertGlobalVar(inst);
-                }
-            }
-        }
-    }
 
     // Next, we make sure to clone the global value for
     // the entry point function itself, and rely on
