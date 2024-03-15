@@ -2409,6 +2409,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         break;
     }
     case kIROp_GetElement:
+    case kIROp_MeshOutputRef:
     case kIROp_GetElementPtr:
     case kIROp_ImageSubscript:
         // HACK: deal with translation of GLSL geometry shader input arrays.
@@ -2899,6 +2900,20 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
                     m_writer->emit("]");
                 }
             }
+            m_writer->emit(" = ");
+            emitOperand(ii->getElementValue(), getInfo(EmitOp::General));
+            m_writer->emit(";\n");
+        }
+        break;
+    case kIROp_MeshOutputSet:
+        {
+            auto ii = (IRMeshOutputSet*)inst;
+            auto subscriptOuter = getInfo(EmitOp::General);
+            auto subscriptPrec = getInfo(EmitOp::Postfix);
+            emitOperand(ii->getBase(), leftSide(subscriptOuter, subscriptPrec));
+            m_writer->emit("[");
+            emitOperand(ii->getIndex(), getInfo(EmitOp::General));
+            m_writer->emit("]");
             m_writer->emit(" = ");
             emitOperand(ii->getElementValue(), getInfo(EmitOp::General));
             m_writer->emit(";\n");

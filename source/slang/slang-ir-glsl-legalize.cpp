@@ -2106,106 +2106,118 @@ static void legalizeMeshOutputParam(
     // the writes may only be writing to parts of the output struct, or may not
     // be writes at all (i.e. being passed as an out paramter).
     //
-    traverseUsers(g, [&](IRInst* u)
+    std::function<void(ScalarizedVal&, IRInst*)> assignUses =
+        [&](ScalarizedVal& d, IRInst* a)
     {
-        auto l = as<IRLoad>(u);
-        SLANG_ASSERT(l && "Mesh Output sentinel parameter wasn't used in a load");
-
-        std::function<void(ScalarizedVal&, IRInst*)> assignUses =
-            [&](ScalarizedVal& d, IRInst* a)
+        // If we're just writing to an address, we can seamlessly
+        // replace it with the address to the SOA representation.
+        // GLSL's `out` function parameters have copy-out semantics, so
+        // this is all above board.
+        if(d.flavor == ScalarizedVal::Flavor::address)
         {
-            // If we're just writing to an address, we can seamlessly
-            // replace it with the address to the SOA representation.
-            // GLSL's `out` function parameters have copy-out semantics, so
-            // this is all above board.
-            if(d.flavor == ScalarizedVal::Flavor::address)
-            {
-                IRBuilderInsertLocScope locScope{builder};
-                builder->setInsertBefore(a);
-                a->replaceUsesWith(d.irValue);
-                a->removeAndDeallocate();
-                return;
-            }
-            // Otherwise, go through the uses one by one and see what we can do
-            traverseUsers(a, [&](IRInst* s)
-            {
-                IRBuilderInsertLocScope locScope{builder};
-                builder->setInsertBefore(s);
-                if(auto m = as<IRFieldAddress>(s))
-                {
-                    auto key = as<IRStructKey>(m->getField());
-                    SLANG_ASSERT(key && "Result of getField wasn't a struct key");
-
-                    auto d_ = extractField(builder, d, kMaxUInt, key);
-                    assignUses(d_, m);
-                }
-                else if(auto g = as<IRGetElementPtr>(s))
-                {
-                    // Writing to something like `struct Vertex{ Foo foo[10]; }`
-                    // This case is also what's taken in the initial
-                    // traversal, as every mesh output is an array.
-                    auto elemType = composeGetters<IRType>(
-                        g,
-                        &IRInst::getFullType,
-                        &IRPtrTypeBase::getValueType);
-                    auto d_ = getSubscriptVal(builder, elemType, d, g->getIndex());
-                    assignUses(d_, g);
-                }
-                else if(auto store = as<IRStore>(s))
-                {
-                    // Store using the SOA representation
-
-                    assign(
-                        builder,
-                        d,
-                        ScalarizedVal::value(store->getVal()));
-
-                    // Stores aren't used, safe to remove here without checking
-                    store->removeAndDeallocate();
-                }
-                else if(auto c = as<IRCall>(s))
-                {
-                    // Translate
-                    //   foo(vertices[n])
-                    // to
-                    //   tmp
-                    //   foo(tmp)
-                    //   vertices[n] = tmp;
-                    //
-                    // This has copy-out semantics, which is really the
-                    // best we can hope for without going and
-                    // specializing foo.
-                    auto ptr = as<IRPtrTypeBase>(a->getFullType());
-                    SLANG_ASSERT(ptr && "Mesh output parameter was passed by value");
-                    auto t = ptr->getValueType();
-                    auto tmp = builder->emitVar(t);
-                    for(UInt i = 0; i < c->getOperandCount(); i++)
-                    {
-                        if(c->getOperand(i) == a)
-                        {
-                            c->setOperand(i, tmp);
-                        }
-                    }
-                    builder->setInsertAfter(c);
-                    assign(builder, d,
-                            ScalarizedVal::value(builder->emitLoad(tmp)));
-                }
-                else if(const auto swiz = as<IRSwizzledStore>(s))
-                {
-                    SLANG_UNEXPECTED("Swizzled store to a non-address ScalarizedVal");
-                }
-                else
-                {
-                    SLANG_UNEXPECTED("Unhandled use of mesh output parameter during GLSL legalization");
-                }
-            });
-
-            SLANG_ASSERT(!a->hasUses());
+            IRBuilderInsertLocScope locScope{builder};
+            builder->setInsertBefore(a);
+            a->replaceUsesWith(d.irValue);
             a->removeAndDeallocate();
-        };
+            return;
+        }
+        // Otherwise, go through the uses one by one and see what we can do
+        traverseUsers(a, [&](IRInst* s)
+        {
+            IRBuilderInsertLocScope locScope{builder};
+            builder->setInsertBefore(s);
+            if(auto m = as<IRFieldAddress>(s))
+            {
+                auto key = as<IRStructKey>(m->getField());
+                SLANG_ASSERT(key && "Result of getField wasn't a struct key");
 
-        assignUses(globalOutputVal, l);
-    });
+                auto d_ = extractField(builder, d, kMaxUInt, key);
+                assignUses(d_, m);
+            }
+            else if(auto ref = as<IRMeshOutputRef>(s))
+            {
+                auto elemType = composeGetters<IRType>(
+                    ref,
+                    &IRInst::getFullType,
+                    &IRPtrTypeBase::getValueType);
+                auto d_ = getSubscriptVal(builder, elemType, d, ref->getIndex());
+                assignUses(d_, ref);
+            }
+            else if(auto set = as<IRMeshOutputSet>(s))
+            {
+                auto elemType = composeGetters<IRType>(
+                    set,
+                    &IRInst::getFullType,
+                    &IRPtrTypeBase::getValueType);
+                auto d_ = getSubscriptVal(builder, elemType, d, set->getIndex());
+                assign(builder, d_, ScalarizedVal::value(set->getElementValue()));
+                set->removeAndDeallocate();
+            }
+            else if(auto g = as<IRGetElementPtr>(s))
+            {
+                // Writing to something like `struct Vertex{ Foo foo[10]; }`
+                // This case is also what's taken in the initial
+                // traversal, as every mesh output is an array.
+                auto elemType = composeGetters<IRType>(
+                    g,
+                    &IRInst::getFullType,
+                    &IRPtrTypeBase::getValueType);
+                auto d_ = getSubscriptVal(builder, elemType, d, g->getIndex());
+                assignUses(d_, g);
+            }
+            else if(auto store = as<IRStore>(s))
+            {
+                // Store using the SOA representation
+
+                assign(
+                    builder,
+                    d,
+                    ScalarizedVal::value(store->getVal()));
+
+                // Stores aren't used, safe to remove here without checking
+                store->removeAndDeallocate();
+            }
+            else if(auto c = as<IRCall>(s))
+            {
+                // Translate
+                //   foo(vertices[n])
+                // to
+                //   tmp
+                //   foo(tmp)
+                //   vertices[n] = tmp;
+                //
+                // This has copy-out semantics, which is really the
+                // best we can hope for without going and
+                // specializing foo.
+                auto ptr = as<IRPtrTypeBase>(a->getFullType());
+                SLANG_ASSERT(ptr && "Mesh output parameter was passed by value");
+                auto t = ptr->getValueType();
+                auto tmp = builder->emitVar(t);
+                for(UInt i = 0; i < c->getOperandCount(); i++)
+                {
+                    if(c->getOperand(i) == a)
+                    {
+                        c->setOperand(i, tmp);
+                    }
+                }
+                builder->setInsertAfter(c);
+                assign(builder, d,
+                        ScalarizedVal::value(builder->emitLoad(tmp)));
+            }
+            else if(const auto swiz = as<IRSwizzledStore>(s))
+            {
+                SLANG_UNEXPECTED("Swizzled store to a non-address ScalarizedVal");
+            }
+            else
+            {
+                SLANG_UNEXPECTED("Unhandled use of mesh output parameter during GLSL legalization");
+            }
+        });
+
+        SLANG_ASSERT(!a->hasUses());
+        a->removeAndDeallocate();
+    };
+    assignUses(globalOutputVal, g);
 
     //
     // GLSL requires that builtins are written to a block named
@@ -2348,15 +2360,18 @@ static void legalizeMeshOutputParam(
         {
             traverseUsers(builtin.param, [&](IRInst* u)
             {
-                auto p = as<IRGetElementPtr>(u);
-                SLANG_ASSERT(p && "Mesh Output sentinel parameter wasn't used as an array");
-
                 IRBuilderInsertLocScope locScope{builder};
-                builder->setInsertBefore(p);
-                auto e = builder->emitElementAddress(builder->getPtrType(meshOutputBlockType), blockParam, p->getIndex());
+                builder->setInsertBefore(u);
+                IRInst* index;
+                if(const auto p = as<IRGetElementPtr>(u))
+                    index = p->getIndex();
+                else if(const auto m = as<IRMeshOutputRef>(u))
+                    index = m->getIndex();
+                else
+                    SLANG_UNEXPECTED("Illegal use of mesh output parameter");
+                auto e = builder->emitElementAddress(builder->getPtrType(meshOutputBlockType), blockParam, index);
                 auto a = builder->emitFieldAddress(builder->getPtrType(builtin.type), e, builtin.key);
-
-                p->replaceUsesWith(a);
+                u->replaceUsesWith(a);
             });
         }
     }
@@ -2461,7 +2476,7 @@ void legalizeEntryPointParameterForGLSL(
     // - Geometry shader output streams
     // - Mesh shader outputs
     // - Mesh shader payload input
-    if (auto paramPtrType = as<IROutTypeBase>(paramType))
+    if (auto paramPtrType = as<IRPtrTypeBase>(paramType))
     {
         valueType = paramPtrType->getValueType();
     }

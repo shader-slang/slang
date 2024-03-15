@@ -7032,7 +7032,9 @@ namespace Slang
         {
             return;
         }
-        if(!varDecl->findModifier<OutModifier>())
+        // HLSL requires an 'out' modifier here, but since we don't operate
+        // under such strict compatability we can just not warn here.
+        if(!varDecl->findModifier<OutModifier>() && modifier)
         {
             getSink()->diagnose(varDecl, Diagnostics::meshOutputMustBeOut);
         }

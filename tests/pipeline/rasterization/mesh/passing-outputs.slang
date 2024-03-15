@@ -28,7 +28,7 @@ struct Vertex
     Texes  ts  : Coord;
 };
 
-void everything<let N : uint>(out Vertices<Vertex, N> vs)
+void everything<let N : uint>(OutputVertices<Vertex, N> vs)
 {
     vs[0] = {float4(0), float3(1)};
 }
@@ -56,32 +56,32 @@ void write_struct(out Texes t)
 }
 
 // Split out the things to test to avoid main becoming an unreadable jumble
-void a<let N : uint>(out Vertices<Vertex, N> vs)
+void a<let N : uint>(OutputVertices<Vertex, N> vs)
 {
     // Test passing a reference to the entire array
     everything(vs);
 }
 
-void b<let N : uint>(out Vertices<Vertex, N> vs)
+void b<let N : uint>(OutputVertices<Vertex, N> vs)
 {
     // test passing two references to the same element
     just_two(vs[0], vs[0]);
 }
 
-void c<let N : uint>(out Vertices<Vertex, N> vs, uint tig)
+void c<let N : uint>(OutputVertices<Vertex, N> vs, uint tig)
 {
     // Test passing a reference to an element
     just_one(vs[tig]);
 }
 
-void d<let N : uint>(out Vertices<Vertex, N> vs, uint tig)
+void d<let N : uint>(OutputVertices<Vertex, N> vs, uint tig)
 {
     // Test passing references to different elements (to check that the operand
     // rewriting doesn't mess the order)
     just_two(vs[tig], vs[0]);
 }
 
-void e<let N : uint>(out Vertices<Vertex, N> vs, uint tig)
+void e<let N : uint>(OutputVertices<Vertex, N> vs, uint tig)
 {
     // Test passing a scalar member and a struct member and a struct member's member
     part_of_one(vs[tig].pos);
@@ -93,8 +93,8 @@ void e<let N : uint>(out Vertices<Vertex, N> vs, uint tig)
 [numthreads(3, 1, 1)]
 void main(
     in uint tig : SV_GroupIndex,
-    out Vertices<Vertex, MAX_VERTS> verts,
-    out Indices<uint3, MAX_PRIMS> triangles
+    OutputVertices<Vertex, MAX_VERTS> verts,
+    OutputIndices<uint3, MAX_PRIMS> triangles
     )
 {
     const uint numVertices = 3;

@@ -478,6 +478,7 @@ INST(AtomicCounterDecrement, AtomicCounterDecrement, 1, 0)
 INST(GetNaturalStride, getNaturalStride, 1, 0)
 
 INST(MeshOutputRef, meshOutputRef, 2, 0)
+INST(MeshOutputSet, meshOutputSet, 3, 0)
 
 // Construct a vector from a scalar
 //
