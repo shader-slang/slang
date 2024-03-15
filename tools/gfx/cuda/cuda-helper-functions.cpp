@@ -39,11 +39,6 @@ SlangResult _handleCUDAError(CUresult cuResult, const char* file, int line)
     return info.handle();
 }
 
-SlangResult _handleCUDAError(cudaError_t error, const char* file, int line)
-{
-    return CUDAErrorInfo(file, line, cudaGetErrorName(error), cudaGetErrorString(error)).handle();
-}
-
 #    ifdef RENDER_TEST_OPTIX
 
 static bool _isError(OptixResult result)
@@ -71,39 +66,39 @@ void _optixLogCallback(unsigned int level, const char* tag, const char* message,
 #       endif
 #    endif
 
-AdapterLUID getAdapterLUID(int device)
+AdapterLUID getAdapterLUID(int deviceIndex)
 {
+    CUdevice device;
+    cuDeviceGet(&device, deviceIndex);
     AdapterLUID luid = {};
-#if SLANG_WIN32 || SLANG_WIN64
-    // LUID reported by CUDA is undefined i not on windows platform.
-    cudaDeviceProp prop;
-    cudaGetDeviceProperties(&prop, device);
-    SLANG_ASSERT(sizeof(AdapterLUID) >= sizeof(cudaDeviceProp::luid));
-    memcpy(&luid, prop.luid, sizeof(cudaDeviceProp::luid));
-#else
-    SLANG_ASSERT(sizeof(AdapterLUID) >= sizeof(int));
-    memcpy(&luid, &device, sizeof(int));
-#endif
+    unsigned int deviceNodeMask;
+    cuDeviceGetLuid((char*)&luid, &deviceNodeMask, device);
     return luid;
+}
+
+Result SLANG_MCALL getAdapters(List<AdapterInfo>& outAdapters)
+{
+    int deviceCount;
+    SLANG_CUDA_RETURN_ON_FAIL(cuDeviceGetCount(&deviceCount));
+    for (int deviceIndex = 0; deviceIndex < deviceCount; deviceIndex++)
+    {
+        CUdevice device;
+        SLANG_CUDA_RETURN_ON_FAIL(cuDeviceGet(&device, deviceIndex));
+
+        AdapterInfo info = {};
+        SLANG_CUDA_RETURN_ON_FAIL(cuDeviceGetName(info.name, sizeof(info.name), device));
+        info.luid = getAdapterLUID(deviceIndex);
+        outAdapters.add(info);
+    }
+
+    return SLANG_OK;
 }
 
 } // namespace cuda
 
 Result SLANG_MCALL getCUDAAdapters(List<AdapterInfo>& outAdapters)
 {
-    int deviceCount;
-    cudaGetDeviceCount(&deviceCount);
-    for (int device = 0; device < deviceCount; device++)
-    {
-        cudaDeviceProp prop;
-        cudaGetDeviceProperties(&prop, device);
-        AdapterInfo info = {};
-        memcpy(info.name, prop.name, Math::Min(strlen(prop.name), sizeof(AdapterInfo::name) - 1));
-        info.luid = cuda::getAdapterLUID(device);
-        outAdapters.add(info);
-    }
-
-    return SLANG_OK;
+    return cuda::getAdapters(outAdapters);
 }
 
 Result SLANG_MCALL createCUDADevice(const IDevice::Desc* desc, IDevice** outDevice)

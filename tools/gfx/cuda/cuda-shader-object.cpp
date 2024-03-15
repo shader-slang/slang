@@ -37,7 +37,7 @@ Result ShaderObjectData::setCount(Index count)
         m_bufferResource = new BufferResourceImpl(desc);
         if (count)
         {
-            SLANG_CUDA_RETURN_ON_FAIL(cudaMalloc(&m_bufferResource->m_cudaMemory, (size_t)count));
+            SLANG_CUDA_RETURN_ON_FAIL(cuMemAlloc((CUdeviceptr*)&m_bufferResource->m_cudaMemory, (size_t)count));
         }
         IResourceView::Desc viewDesc = {};
         viewDesc.type = IResourceView::Type::UnorderedAccess;
@@ -51,17 +51,16 @@ Result ShaderObjectData::setCount(Index count)
         void* newMemory = nullptr;
         if (count)
         {
-            SLANG_CUDA_RETURN_ON_FAIL(cudaMalloc(&newMemory, (size_t)count));
+            SLANG_CUDA_RETURN_ON_FAIL(cuMemAlloc((CUdeviceptr*)&newMemory, (size_t)count));
         }
         if (oldSize)
         {
-            SLANG_CUDA_RETURN_ON_FAIL(cudaMemcpy(
-                newMemory,
-                m_bufferResource->m_cudaMemory,
-                Math::Min((size_t)count, oldSize),
-                cudaMemcpyDefault));
+            SLANG_CUDA_RETURN_ON_FAIL(cuMemcpy(
+                (CUdeviceptr)newMemory,
+                (CUdeviceptr)m_bufferResource->m_cudaMemory,
+                Math::Min((size_t)count, oldSize)));
         }
-        cudaFree(m_bufferResource->m_cudaMemory);
+        cuMemFree((CUdeviceptr)m_bufferResource->m_cudaMemory);
         m_bufferResource->m_cudaMemory = newMemory;
         m_bufferResource->getDesc()->sizeInBytes = count;
     }
@@ -189,8 +188,10 @@ SLANG_NO_THROW Result SLANG_MCALL
 {
     Size temp = m_data.getCount() - (Size)offset.uniformOffset;
     size = Math::Min(size, temp);
-    SLANG_CUDA_RETURN_ON_FAIL(cudaMemcpy(
-        (uint8_t*)m_data.getBuffer() + offset.uniformOffset, data, size, cudaMemcpyDefault));
+    SLANG_CUDA_RETURN_ON_FAIL(cuMemcpy(
+        (CUdeviceptr)((uint8_t*)m_data.getBuffer() + offset.uniformOffset),
+        (CUdeviceptr)data,
+        size));
     return SLANG_OK;
 }
 

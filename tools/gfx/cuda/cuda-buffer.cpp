@@ -15,7 +15,7 @@ BufferResourceImpl::~BufferResourceImpl()
 {
     if (m_cudaMemory)
     {
-        SLANG_CUDA_ASSERT_ON_FAIL(cudaFree(m_cudaMemory));
+        SLANG_CUDA_ASSERT_ON_FAIL(cuMemFree((CUdeviceptr)m_cudaMemory));
     }
 }
 
