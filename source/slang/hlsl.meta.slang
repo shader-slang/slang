@@ -148,6 +148,7 @@ interface __ITextureShape
 {
     static const int flavor;
     static const int dimensions;
+    static const int dimensionsWithArray;
     static const int planeDimensions;
 }
 [sealed]
@@ -161,6 +162,7 @@ struct __Shape1D : __ITextureShape1D2D3D
 {
     static const int flavor = $(SLANG_TEXTURE_1D);
     static const int dimensions = 1;
+    static const int dimensionsWithArray = 1;
     static const int planeDimensions = 1;
 }
 __magic_type(TextureShape2DType)
@@ -169,6 +171,7 @@ struct __Shape2D : __ITextureShape1D2D3D
 {
     static const int flavor = $(SLANG_TEXTURE_2D);
     static const int dimensions = 2;
+    static const int dimensionsWithArray = 2;
     static const int planeDimensions = 2;
 }
 __magic_type(TextureShape3DType)
@@ -177,6 +180,7 @@ struct __Shape3D : __ITextureShape1D2D3D
 {
     static const int flavor = $(SLANG_TEXTURE_3D);
     static const int dimensions = 3;
+    static const int dimensionsWithArray = 4; // not applicable
     static const int planeDimensions = 3;
 }
 __magic_type(TextureShapeCubeType)
@@ -185,6 +189,7 @@ struct __ShapeCube : __ITextureShape
 {
     static const int flavor = $(SLANG_TEXTURE_CUBE);
     static const int dimensions = 3;
+    static const int dimensionsWithArray = 3;
     static const int planeDimensions = 2;
 }
 __magic_type(TextureShapeBufferType)
@@ -193,6 +198,7 @@ struct __ShapeBuffer : __ITextureShape
 {
     static const int flavor = $(SLANG_TEXTURE_BUFFER);
     static const int dimensions = 1;
+    static const int dimensionsWithArray = 2; // not applicable 
     static const int planeDimensions = 1;
 }
 __intrinsic_op(vectorReshape)
@@ -1683,6 +1689,7 @@ ${{{{
         const char* glslIntrinsicMS = "$cimageLoad($0, $1, $2)$z";
         const char* glslIntrinsicMSOffset = "$cimageLoad($0, ($1)+($3), $2)$z";
 }}}}
+
 __generic<T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let isRect:int, let format:int>
 extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow,0,isRect,format>
 {

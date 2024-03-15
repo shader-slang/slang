@@ -4301,6 +4301,7 @@ namespace Slang
                     else if(operand.flavor == SPIRVAsmOperand::SlangValue
                         || operand.flavor == SPIRVAsmOperand::SlangImmediateValue
                         || operand.flavor == SPIRVAsmOperand::SlangValueAddr
+                        || operand.flavor == SPIRVAsmOperand::ImagePointer
                         || operand.flavor == SPIRVAsmOperand::ImageType
                         || operand.flavor == SPIRVAsmOperand::SampledImageType)
                     {

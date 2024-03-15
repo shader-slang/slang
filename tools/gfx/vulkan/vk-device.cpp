@@ -483,6 +483,12 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         extendedFeatures.atomicFloatFeatures.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &extendedFeatures.atomicFloatFeatures;
 
+        // Image Int64 Atomic
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT.html
+        
+        extendedFeatures.imageInt64AtomicFeatures.pNext = deviceFeatures2.pNext;
+        deviceFeatures2.pNext = &extendedFeatures.imageInt64AtomicFeatures;
+
         // mesh shader features
         extendedFeatures.meshShaderFeatures.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &extendedFeatures.meshShaderFeatures;
@@ -566,6 +572,13 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
             shaderBufferFloat32AtomicAdd,
             VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME,
             "atomic-float"
+        );
+
+        SIMPLE_EXTENSION_FEATURE(
+            extendedFeatures.imageInt64AtomicFeatures,
+            shaderImageInt64Atomics,
+            VK_EXT_SHADER_IMAGE_ATOMIC_INT64_EXTENSION_NAME,
+            "image-atomic-int64"
         );
 
         SIMPLE_EXTENSION_FEATURE(
@@ -2239,16 +2252,17 @@ Result DeviceImpl::createBufferView(
                 info.offset = offset;
                 info.range = size;
                 VkBufferUsageFlags2CreateInfoKHR bufferViewUsage;
+                bufferViewUsage = {};
+                bufferViewUsage.sType = VK_STRUCTURE_TYPE_BUFFER_USAGE_FLAGS_2_CREATE_INFO_KHR;
+                info.pNext = &bufferViewUsage;
                 if (desc.type == IResourceView::Type::UnorderedAccess)
                 {
-                    bufferViewUsage = {};
-                    bufferViewUsage.sType = VK_STRUCTURE_TYPE_BUFFER_USAGE_FLAGS_2_CREATE_INFO_KHR;
-                    bufferViewUsage.usage = VK_FORMAT_FEATURE_UNIFORM_TEXEL_BUFFER_BIT;
+                    bufferViewUsage.usage = VK_FORMAT_FEATURE_STORAGE_TEXEL_BUFFER_BIT;
                     info.pNext = &bufferViewUsage;
                 }
                 else if (desc.type == IResourceView::Type::ShaderResource)
                 {
-
+                    bufferViewUsage.usage = VK_FORMAT_FEATURE_UNIFORM_TEXEL_BUFFER_BIT;
                 }
 
                 SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateBufferView(m_device, &info, nullptr, &view));

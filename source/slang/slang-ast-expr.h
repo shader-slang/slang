@@ -675,6 +675,7 @@ public:
         SlangImmediateValue,
         SlangType,
         SampledType, // __sampledType(T), this becomes a 4 vector of the component type of T
+        ImagePointer, 
         ImageType, // __imageType(texture), returns the equivalaent OpTypeImage of a given texture typed value.
         SampledImageType, // __sampledImageType(texture), returns the equivalent OpTypeSampledImage of a given texture typed value.
         TruncateMarker, // __truncate, an invented instruction which coerces to the result type by truncating the element count

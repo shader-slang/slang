@@ -2107,7 +2107,7 @@ IRType* lowerType(
 }
 
 
-void checkToAddMemoryQualifiers(
+void addMemoryQualifierDecorations(
     IRGenContext* context,
     IRInst* inst,
     Modifier* mod,
@@ -2228,7 +2228,7 @@ void addVarDecorations(
         }
         else
         {
-            checkToAddMemoryQualifiers(context, inst, mod, false);
+            addMemoryQualifierDecorations(context, inst, mod, false);
         }
         // TODO: what are other modifiers we need to propagate through?
     }
@@ -2607,10 +2607,10 @@ void compareParamToArgMemoryQualifier(
             UnownedStringSlice target;
             op_this = mod_this->getOp();
             bool findOpInParam = false;
-            if (op_this == kIROp_GloballyCoherentDecoration) { findOpInParam = true; target = UnownedStringSlice("coherent"); }
-            else if (op_this == kIROp_GLSLVolatileDecoration) { findOpInParam = true; target = UnownedStringSlice("volatile"); }
-            else if (op_this == kIROp_GLSLRestrictDecoration) { findOpInParam = true; target = UnownedStringSlice("restrict"); }
-            else if (op_this == kIROp_GLSLReadOnlyDecoration) { findOpInParam = true; target = UnownedStringSlice("readonly"); }
+            //if (op_this == kIROp_GloballyCoherentDecoration) { findOpInParam = true; target = UnownedStringSlice("coherent"); }
+            //else if (op_this == kIROp_GLSLVolatileDecoration) { findOpInParam = true; target = UnownedStringSlice("volatile"); }
+            //else if (op_this == kIROp_GLSLRestrictDecoration) { findOpInParam = true; target = UnownedStringSlice("restrict"); }
+            if (op_this == kIROp_GLSLReadOnlyDecoration) { findOpInParam = true; target = UnownedStringSlice("readonly"); }
             else if (op_this == kIROp_GLSLWriteOnlyDecoration) { findOpInParam = true; target = UnownedStringSlice("writeonly"); }
             if (findOpInParam)
             {
@@ -3206,7 +3206,7 @@ void _lowerFuncDeclBaseTypeInfo(
                 else
                 {
                     //add all aux decorations tied to a param variable 
-                    checkToAddMemoryQualifiers(context, irParamType, mod, true);
+                    addMemoryQualifierDecorations(context, irParamType, mod, true);
                 }
             }
         }
@@ -4130,6 +4130,16 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                     }
                     return builder->emitSPIRVAsmOperandSampledType(i);
                 }
+            case SPIRVAsmOperand::ImagePointer:
+            {
+                IRInst* i;
+                {
+                    IRBuilderInsertLocScope insertScope(builder);
+                    builder->setInsertBefore(spirvAsmInst);
+                    i = getSimpleVal(context, lowerRValueExpr(context, operand.expr));
+                }
+                return builder->emitSPIRVAsmOperandImagePointer(i);
+            }
             case SPIRVAsmOperand::ImageType:
             {
                 IRInst* i;

@@ -4153,6 +4153,7 @@ public:
     IRSPIRVAsmOperand* emitSPIRVAsmOperandGLSL450Set();
     IRSPIRVAsmOperand* emitSPIRVAsmOperandDebugPrintfSet();
     IRSPIRVAsmOperand* emitSPIRVAsmOperandSampledType(IRType* elementType);
+    IRSPIRVAsmOperand* emitSPIRVAsmOperandImagePointer(IRInst* element);
     IRSPIRVAsmOperand* emitSPIRVAsmOperandImageType(IRInst* element);
     IRSPIRVAsmOperand* emitSPIRVAsmOperandSampledImageType(IRInst* element);
     IRSPIRVAsmOperand* emitSPIRVAsmOperandTruncate();

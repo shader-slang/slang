@@ -117,7 +117,6 @@ using Slang::Result;
         ResourceState::CopySource,
         ResourceState::UnorderedAccess,
         ResourceState::ShaderResource);
-
     ComPtr<IBufferResource> bufferResource = device->createBufferResource(srcDesc, initData);
     if (!bufferResource)
     {

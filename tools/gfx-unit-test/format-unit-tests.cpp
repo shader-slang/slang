@@ -338,6 +338,20 @@ namespace gfx_test
         }
 
         {
+            uint32_t texData[] = { 255u, 0u, 0u, 255u,
+                                   255u, 255u, 127u, 127u };
+            ITextureResource::SubresourceData subData = { (void*)texData, 16, 0 };
+            
+            auto texView = createTexView(device, size, gfx::Format::R64_UINT, &subData);
+            setUpAndRunTest(device, texView, uintBufferView, "copyTexUint5");
+            compareComputeResult(
+                device,
+                uintResults,
+                Slang::makeArray<uint32_t>(255u, 0u, 0u, 255u,
+                                           255u, 255u, 127u, 127u));
+        }
+
+        {
             uint32_t texData[] = { 255u, 0u, 0u, 255u, 0u, 255u, 0u, 255u,
                                    0u, 0u, 255u, 255u, 127u, 127u, 127u, 255u };
             ITextureResource::SubresourceData subData = { (void*)texData, 32, 0 };
@@ -471,6 +485,20 @@ namespace gfx_test
                 device,
                 uintResults,
                 Slang::makeArray<uint32_t>(255u, 0u, 127u, 73u));
+        }
+
+        {
+            int32_t texData[] = { 255, 0, 0, 255,
+                                  255, 255, 127, 127 };
+            ITextureResource::SubresourceData subData = { (void*)texData, 16, 0 };
+
+            auto texView = createTexView(device, size, gfx::Format::R64_SINT, &subData);
+            setUpAndRunTest(device, texView, intBufferView, "copyTexInt5");
+            compareComputeResult(
+                device,
+                intResults,
+                Slang::makeArray<int32_t>(255, 0, 0, 255,
+                                          255, 255, 127, 127));
         }
 
         {

@@ -5469,6 +5469,16 @@ struct SPIRVEmitContext
                     emitOperand(ensureInst(sampledType));
                     break;
                 }
+                case kIROp_SPIRVAsmOperandImagePointer:
+                {
+                    // we directly emit the global Image Pointer by taking the 'was to be loaded' pointer
+                    // and just emit'ing it. Slang tries to force a OpLoad-OpStore pattern by default,
+                    // we have a rare case of just the actual global decl; this is a less hacky way of doing what 
+                    // kIROp_ImageSubscript wants to acomplish since our senario allows this
+                    assert(operand->getValue()->getOp() == kIROp_Load);
+                    emitOperand(operand->getValue()->getOperand(0));
+                    break;
+                }
                 case kIROp_SPIRVAsmOperandImageType:
                 case kIROp_SPIRVAsmOperandSampledImageType:
                 {

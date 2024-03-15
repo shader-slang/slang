@@ -1280,6 +1280,11 @@ namespace renderer_test
                 }
                 break;
             }
+            case Format::R64_UINT:
+            {
+                generateTextureDataWithTargetTStorage<uint64_t>(output, desc, formatInfo);
+                break;
+            }
             case Format::R32_FLOAT:
             case Format::R32G32_FLOAT:
             case Format::R32G32B32_FLOAT:
@@ -1309,6 +1314,11 @@ namespace renderer_test
             case Format::R8G8B8A8_UINT:
             {
                 generateTextureDataWithTargetTStorage<uint8_t>(output, desc, formatInfo);
+                break;
+            }
+            case Format::R64_SINT:
+            {
+                generateTextureDataWithTargetTStorage<int64_t>(output, desc, formatInfo);
                 break;
             }
             case Format::R32_SINT:
