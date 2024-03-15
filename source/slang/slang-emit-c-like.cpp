@@ -4260,9 +4260,18 @@ void CLikeSourceEmitter::computeEmitActions(IRModule* module, List<EmitAction>& 
         // this can be a compile error if layout is emitted after location is referenced
         // this is required since in GLSL, it is likley in a programs life time a raytracing
         // object will never be referenced by name
-        if (isRaytracingObject(inst))
+        for (auto dec : inst->getDecorations())
         {
-            ensureGlobalInst(&ctx, inst, EmitAction::Level::Definition);
+            switch (dec->getOp())
+            {
+            case kIROp_VulkanRayPayloadDecoration:
+            case kIROp_VulkanRayPayloadInDecoration:
+            case kIROp_VulkanHitObjectAttributesDecoration:
+            case kIROp_VulkanCallablePayloadDecoration:
+            case kIROp_VulkanCallablePayloadInDecoration:
+            case kIROp_VulkanHitAttributesDecoration:
+                ensureGlobalInst(&ctx, inst, EmitAction::Level::Definition);
+            };
         }
     }
     for(auto inst : module->getGlobalInsts())
