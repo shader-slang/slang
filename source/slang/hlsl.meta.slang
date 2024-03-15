@@ -10598,7 +10598,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         __target_switch
         {
         case hlsl: __intrinsic_asm ".CandidateProceduralPrimitiveNonOpaque";
-        case glsl: __intrinsic_asm "(!rayQueryGetIntersectionCandidateAABBOpaqueEXT($0, false))";
+        case glsl: __intrinsic_asm "(!rayQueryGetIntersectionCandidateAABBOpaqueEXT($0))";
         case spirv:
             uint iCandidateOrCommitted = 0;
             return spirv_asm
