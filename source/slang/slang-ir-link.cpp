@@ -15,7 +15,6 @@
 #include "../core/slang-performance-profiler.h"
 #include "../compiler-core/slang-artifact.h"
 
-
 namespace Slang
 {
 

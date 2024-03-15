@@ -8568,7 +8568,6 @@ namespace Slang
         case DeclCheckState::ModifiersChecked:
             SemanticsDeclModifiersVisitor(shared).dispatch(decl);
             break;
-
         case DeclCheckState::ScopesWired:
             SemanticsDeclScopeWiringVisitor(shared).dispatch(decl);
             break;

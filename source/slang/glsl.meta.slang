@@ -4865,15 +4865,13 @@ __spirv_version(1.3) [require(spirv)]
     {
     case glsl: __intrinsic_asm "subgroupAnd($0)";
     case spirv:
-        if (__isBool<T>()) 
-        {
+        if (__isBool<T>()) {
             return spirv_asm {
                 OpCapability GroupNonUniformArithmetic;
                 OpGroupNonUniformLogicalAnd $$T result Subgroup 0 $value
             };
         }
-        else 
-        {
+        else {
             return spirv_asm {
                 OpCapability GroupNonUniformArithmetic;
                 OpGroupNonUniformBitwiseAnd $$T result Subgroup 0 $value
@@ -4892,15 +4890,13 @@ __spirv_version(1.3) [require(spirv)]
     {
     case glsl: __intrinsic_asm "subgroupOr($0)";
     case spirv:
-        if (__isBool<T>()) 
-        {
+        if (__isBool<T>()) {
             return spirv_asm {
                 OpCapability GroupNonUniformArithmetic;
                 OpGroupNonUniformLogicalOr $$T result Subgroup 0 $value
             };
         }
-        else 
-        {
+        else {
             return spirv_asm {
                 OpCapability GroupNonUniformArithmetic;
                 OpGroupNonUniformBitwiseOr $$T result Subgroup 0 $value
@@ -4919,15 +4915,13 @@ __spirv_version(1.3) [require(spirv)]
     {
     case glsl: __intrinsic_asm "subgroupXor($0)";
     case spirv:
-        if (__isBool<T>()) 
-        {
+        if (__isBool<T>()) {
             return spirv_asm {
                 OpCapability GroupNonUniformArithmetic;
                 OpGroupNonUniformLogicalXor $$T result Subgroup 0 $value
             };
         }
-        else 
-        {
+        else {
             return spirv_asm {
                 OpCapability GroupNonUniformArithmetic;
                 OpGroupNonUniformBitwiseXor $$T result Subgroup 0 $value
@@ -5026,15 +5020,13 @@ __spirv_version(1.3) [require(spirv)]
     {
     case glsl: __intrinsic_asm "subgroupInclusiveAnd($0)";
     case spirv:
-        if (__isBool<T>()) 
-        {
+        if (__isBool<T>()) {
             return spirv_asm {
                 OpCapability GroupNonUniformArithmetic;
                 OpGroupNonUniformLogicalAnd $$T result Subgroup InclusiveScan $value
             };
         }
-        else 
-        {
+        else {
             return spirv_asm {
                 OpCapability GroupNonUniformArithmetic;
                 OpGroupNonUniformBitwiseAnd $$T result Subgroup InclusiveScan $value
@@ -5053,15 +5045,13 @@ __spirv_version(1.3) [require(spirv)]
     {
     case glsl: __intrinsic_asm "subgroupInclusiveOr($0)";
     case spirv:
-        if (__isBool<T>()) 
-        {
+        if (__isBool<T>()) {
             return spirv_asm {
                 OpCapability GroupNonUniformArithmetic;
                 OpGroupNonUniformLogicalOr $$T result Subgroup InclusiveScan $value
             };
         }
-        else 
-        {
+        else {
             return spirv_asm {
                 OpCapability GroupNonUniformArithmetic;
                 OpGroupNonUniformBitwiseOr $$T result Subgroup InclusiveScan $value
@@ -5242,15 +5232,13 @@ __spirv_version(1.3) [require(spirv)]
     {
     case glsl: __intrinsic_asm "subgroupAnd($0)";
     case spirv:
-        if (__isBool<T>()) 
-        {
+        if (__isBool<T>()) {
             return spirv_asm {
                 OpCapability GroupNonUniformArithmetic;
                 OpGroupNonUniformLogicalAnd $$vector<T,N> result Subgroup 0 $value
             };
         }
-        else 
-        {
+        else {
             return spirv_asm {
                 OpCapability GroupNonUniformArithmetic;
                 OpGroupNonUniformBitwiseAnd $$vector<T,N> result Subgroup 0 $value
@@ -5270,15 +5258,13 @@ __spirv_version(1.3) [require(spirv)]
     {
     case glsl: __intrinsic_asm "subgroupOr($0)";
     case spirv:
-        if (__isBool<T>()) 
-        {
+        if (__isBool<T>()) {
             return spirv_asm {
                 OpCapability GroupNonUniformArithmetic;
                 OpGroupNonUniformLogicalOr $$vector<T,N> result Subgroup 0 $value
             };
         }
-        else 
-        {
+        else {
             return spirv_asm {
                 OpCapability GroupNonUniformArithmetic;
                 OpGroupNonUniformBitwiseOr $$vector<T,N> result Subgroup 0 $value
@@ -5298,15 +5284,13 @@ __spirv_version(1.3) [require(spirv)]
     {
     case glsl: __intrinsic_asm "subgroupXor($0)";
     case spirv:
-        if (__isBool<T>()) 
-        {
+        if (__isBool<T>()) {
             return spirv_asm {
                 OpCapability GroupNonUniformArithmetic;
                 OpGroupNonUniformLogicalXor $$vector<T,N> result Subgroup 0 $value
             };
         }
-        else 
-        {
+        else {
             return spirv_asm {
                 OpCapability GroupNonUniformArithmetic;
                 OpGroupNonUniformBitwiseXor $$vector<T,N> result Subgroup 0 $value

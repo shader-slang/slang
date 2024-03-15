@@ -1186,6 +1186,7 @@ INST(SPIRVAsmInst, SPIRVAsmInst, 1, 0)
 
     // A type function which returns the equivalent OpTypeImage type of sampled image value
     INST(SPIRVAsmOperandSampledImageType, __sampledImageType, 1, HOISTABLE)
+
 INST_RANGE(SPIRVAsmOperand, SPIRVAsmOperandLiteral, SPIRVAsmOperandSampledImageType)
 
 

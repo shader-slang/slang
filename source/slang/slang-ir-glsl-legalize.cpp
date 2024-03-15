@@ -3058,6 +3058,7 @@ void legalizeEntryPointsForGLSL(
     {
         legalizeEntryPointForGLSL(session, module, func, context, glslExtensionTracker);
     }
+
     assignRayPayloadHitObjectAttributeLocations(module);
 }
 

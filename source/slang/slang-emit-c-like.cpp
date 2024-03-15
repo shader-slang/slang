@@ -4252,6 +4252,7 @@ void CLikeSourceEmitter::computeEmitActions(IRModule* module, List<EmitAction>& 
             ensureGlobalInst(&ctx, inst, EmitAction::Level::Definition);
         }
     }
+
     for (auto inst : module->getGlobalInsts())
     {
         // After emitting all structure types we need to emit all raytracing objects to

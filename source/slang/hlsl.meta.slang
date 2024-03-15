@@ -9267,6 +9267,7 @@ __generic<T : __BuiltinArithmeticType>
 __target_intrinsic(hlsl)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+//__target_intrinsic(glsl, "subgroupExclusiveOr($0)")
 __target_intrinsic(cuda, "_wavePrefixOr(, _getMultiPrefixMask(($1).x), $0)")
 T WaveMultiPrefixBitOr(T expr, uint4 mask);
 
@@ -9274,6 +9275,7 @@ __generic<T : __BuiltinArithmeticType, let N : int>
 __target_intrinsic(hlsl)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+//__target_intrinsic(glsl, "subgroupExclusiveOr($0)")
 __target_intrinsic(cuda, "_wavePrefixOrMultiple(_getMultiPrefixMask(($1).x), $0)")
 vector<T,N> WaveMultiPrefixBitOr(vector<T,N> expr, uint4 mask);
 
@@ -10497,7 +10499,6 @@ static const CANDIDATE_TYPE CANDIDATE_PROCEDURAL_PRIMITIVE = 1;
 // In Slang, a parameter like `q` above should be declared `inout`.
 // HLSL does not care about whether `q` is declared `inout` or not.
 //
-
 //cannot use a cap for struct with unequal target support
 //since it will propegate rules to children
 __glsl_extension(GL_EXT_ray_query)
@@ -10509,6 +10510,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     //
     __intrinsic_op($(kIROp_AllocateOpaqueHandle))
     __init();
+
 
     __target_intrinsic(glsl, "rayQueryInitializeEXT($0, $1, $2, $3, $4, $5, $6, $7)")
     __glsl_extension(GL_EXT_ray_query)
@@ -10753,7 +10755,6 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
             };
         }
     }
-
     __glsl_extension(GL_EXT_ray_query)
     [require(glsl, rayquery)]
     [require(spirv, rayquery)]
@@ -11875,7 +11876,7 @@ struct HitObject
             __glslMakeHitWithIndex(
                 __return_val,
                 AccelerationStructure,
-                InstanceIndex, ///? Same as instanceid ?
+                InstanceIndex,              ///? Same as instanceid ?
                 PrimitiveIndex,
                 GeometryIndex,
                 HitKind,                    /// Assuming HitKinds are compatible
@@ -11942,7 +11943,7 @@ struct HitObject
             __glslMakeMotionHitWithIndex(
                 __return_val,
                 AccelerationStructure,
-                InstanceIndex, ///? Same as instanceid ?
+                InstanceIndex,              ///? Same as instanceid ?
                 PrimitiveIndex, 
                 GeometryIndex,
                 HitKind,                    /// Assuming HitKinds are compatible

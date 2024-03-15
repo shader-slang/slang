@@ -2108,7 +2108,6 @@ void buildEntryPointReferenceGraph(SPIRVEmitSharedContext* context, IRModule* mo
                 }
                 break;
             }
-            
             for (UInt i = 0; i < inst->getOperandCount(); i++)
             {
                 auto operand = inst->getOperand(i);
@@ -2128,8 +2127,6 @@ void buildEntryPointReferenceGraph(SPIRVEmitSharedContext* context, IRModule* mo
         if (globalInst->getOp() == kIROp_Func && globalInst->findDecoration<IREntryPointDecoration>())
         {
             visit(as<IRFunc>(globalInst), globalInst);
-
-            // force add all raytracing objects to entry point; may be referenced and resolved
         }
     }
     for (Index i = 0; i < workList.getCount(); i++)

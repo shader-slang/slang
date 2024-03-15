@@ -4336,6 +4336,7 @@ namespace Slang
     {
         return addDecoration(target, kIROp_DifferentiableTypeDictionaryDecoration);
     }
+
     IRInst* IRBuilder::addDifferentiableTypeEntry(IRInst* dictDecoration, IRInst* irType, IRInst* conformanceWitness)
     {
         auto oldLoc = this->getInsertLoc();
@@ -5848,7 +5849,7 @@ namespace Slang
     IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandLiteral(IRInst* literal)
     {
         SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
-        auto i = createInst<IRSPIRVAsmOperand>(
+        const auto i = createInst<IRSPIRVAsmOperand>(
             this,
             kIROp_SPIRVAsmOperandLiteral,
             literal->getFullType(),
@@ -5861,7 +5862,7 @@ namespace Slang
     IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandInst(IRInst* inst)
     {
         SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
-        auto i = createInst<IRSPIRVAsmOperand>(
+        const auto i = createInst<IRSPIRVAsmOperand>(
             this,
             kIROp_SPIRVAsmOperandInst,
             inst->getFullType(),
@@ -5870,6 +5871,7 @@ namespace Slang
         addInst(i);
         return i;
     }
+
     IRSPIRVAsmOperand* IRBuilder::createSPIRVAsmOperandInst(IRInst* inst)
     {
         SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
@@ -5920,7 +5922,7 @@ namespace Slang
     IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandId(IRInst* inst)
     {
         SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
-        auto i = createInst<IRSPIRVAsmOperand>(
+        const auto i = createInst<IRSPIRVAsmOperand>(
             this,
             kIROp_SPIRVAsmOperandId,
             inst->getFullType(),
@@ -5933,7 +5935,7 @@ namespace Slang
     IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandResult()
     {
         SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
-        auto i = createInst<IRSPIRVAsmOperand>(
+        const auto i = createInst<IRSPIRVAsmOperand>(
             this,
             kIROp_SPIRVAsmOperandResult,
             getVoidType()
@@ -5945,7 +5947,7 @@ namespace Slang
     IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandEnum(IRInst* inst)
     {
         SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
-        auto i = createInst<IRSPIRVAsmOperand>(
+        const auto i = createInst<IRSPIRVAsmOperand>(
             this,
             kIROp_SPIRVAsmOperandEnum,
             inst->getFullType(),
@@ -5958,7 +5960,7 @@ namespace Slang
     IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandEnum(IRInst* inst, IRType* constantType)
     {
         SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
-        auto i = createInst<IRSPIRVAsmOperand>(
+        const auto i = createInst<IRSPIRVAsmOperand>(
             this,
             kIROp_SPIRVAsmOperandEnum,
             inst->getFullType(),
@@ -5972,7 +5974,7 @@ namespace Slang
     IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandBuiltinVar(IRInst* type, IRInst* builtinKind)
     {
         SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
-        auto i = createInst<IRSPIRVAsmOperand>(
+        const auto i = createInst<IRSPIRVAsmOperand>(
             this,
             kIROp_SPIRVAsmOperandBuiltinVar,
             (IRType*)type,
@@ -5985,7 +5987,7 @@ namespace Slang
     IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandGLSL450Set()
     {
         SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
-        auto i = createInst<IRSPIRVAsmOperand>(
+        const auto i = createInst<IRSPIRVAsmOperand>(
             this,
             kIROp_SPIRVAsmOperandGLSL450Set,
             getVoidType()
@@ -5997,7 +5999,7 @@ namespace Slang
     IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandDebugPrintfSet()
     {
         SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
-        auto i = createInst<IRSPIRVAsmOperand>(
+        const auto i = createInst<IRSPIRVAsmOperand>(
             this,
             kIROp_SPIRVAsmOperandDebugPrintfSet,
             getVoidType()
@@ -6009,7 +6011,7 @@ namespace Slang
     IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandSampledType(IRType* elementType)
     {
         SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
-        auto i = createInst<IRSPIRVAsmOperand>(
+        const auto i = createInst<IRSPIRVAsmOperand>(
             this,
             kIROp_SPIRVAsmOperandSampledType,
             getTypeType(),
@@ -6022,7 +6024,7 @@ namespace Slang
     IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandImageType(IRInst* element)
     {
         SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
-        auto i = createInst<IRSPIRVAsmOperand>(
+        const auto i = createInst<IRSPIRVAsmOperand>(
             this,
             kIROp_SPIRVAsmOperandImageType,
             getTypeType(),
@@ -6035,7 +6037,7 @@ namespace Slang
     IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandSampledImageType(IRInst* element)
     {
         SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
-        auto i = createInst<IRSPIRVAsmOperand>(
+        const auto i = createInst<IRSPIRVAsmOperand>(
             this,
             kIROp_SPIRVAsmOperandSampledImageType,
             getTypeType(),
@@ -6048,7 +6050,7 @@ namespace Slang
     IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandTruncate()
     {
         SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
-        auto i = createInst<IRSPIRVAsmOperand>(
+        const auto i = createInst<IRSPIRVAsmOperand>(
             this,
             kIROp_SPIRVAsmOperandTruncate,
             getVoidType()
@@ -6060,7 +6062,7 @@ namespace Slang
     IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandEntryPoint()
     {
         SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
-        auto i = createInst<IRSPIRVAsmOperand>(
+        const auto i = createInst<IRSPIRVAsmOperand>(
             this,
             kIROp_SPIRVAsmOperandEntryPoint,
             getVoidType()
@@ -6073,7 +6075,7 @@ namespace Slang
     {
         SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
         operands.insert(0, opcode);
-        auto i = createInst<IRSPIRVAsmInst>(
+        const auto i = createInst<IRSPIRVAsmInst>(
             this,
             kIROp_SPIRVAsmInst,
             getVoidType(),
@@ -6106,7 +6108,7 @@ namespace Slang
         const auto sbt = cast<IRHLSLRWStructuredBufferType>(structuredBuffer->getDataType());
         const auto t = getPtrType(sbt->getElementType());
         IRInst* const operands[2] = {structuredBuffer, index};
-        auto i = createInst<IRRWStructuredBufferGetElementPtr>(
+        const auto i = createInst<IRRWStructuredBufferGetElementPtr>(
             this,
             kIROp_RWStructuredBufferGetElementPtr,
             t,

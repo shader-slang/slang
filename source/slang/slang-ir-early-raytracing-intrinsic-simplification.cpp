@@ -132,12 +132,11 @@ namespace Slang
                 {
                     auto op = i->getOperand(0);
                     IRInst* globalVar = cache->getRayVariableFromLocation(op, i->getOp());
-                    auto builder = IRBuilder(i->getParent());
-                    builder.setInsertInto(i->getParent());
-                    auto spirvASM = builder.createSPIRVAsmOperandInst(globalVar);
-                    i->setFullType(spirvASM->getFullType());
-                    i->setOperand(0, spirvASM->getOperand(0));
-                    i->m_op = kIROp_SPIRVAsmOperandInst;
+                    auto builder = IRBuilder(i);
+                    builder.setInsertBefore(i);
+                    auto spirvASM = builder.emitSPIRVAsmOperandInst(globalVar);
+                    i->replaceUsesWith(spirvASM);
+                    i->removeAndDeallocate();
                     break;
                 }
                 };

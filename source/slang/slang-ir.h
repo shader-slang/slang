@@ -2323,7 +2323,6 @@ public:
     {
         return m_containerPool;
     }
-
 private:
     IRModule() = delete;
 
@@ -2361,6 +2360,7 @@ private:
     ComPtr<IBoxValue<SourceMap>> m_obfuscatedSourceMap;
 
     Dictionary<IRInst*, IRAnalysis> m_mapInstToAnalysis;
+
 };
 
 

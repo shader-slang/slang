@@ -702,7 +702,9 @@ namespace Slang
         {
             SLANG_ASSERT(attr->args.getCount() == 1);
             auto val = checkConstantIntVal(attr->args[0]);
+
             if (!val) return false;
+
             rayPayloadAttr->location = (int32_t)val->getValue();
         }
         else if (auto rayPayloadInAttr = as<VulkanRayPayloadInAttribute>(attr))
@@ -716,7 +718,9 @@ namespace Slang
         {
             SLANG_ASSERT(attr->args.getCount() == 1);
             auto val = checkConstantIntVal(attr->args[0]);
+
             if (!val) return false;
+
             callablePayloadAttr->location = (int32_t)val->getValue();
         }
         else if (auto callablePayloadInAttr = as<VulkanCallablePayloadInAttribute>(attr))

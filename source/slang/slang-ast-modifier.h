@@ -903,6 +903,7 @@ class VulkanRayPayloadInAttribute : public Attribute
 
     int location;
 };
+
 // A `[__vulkanCallablePayload(location)]` attribute, which is used in the
 // standard library implementation to indicate that a variable
 // actually represents the input/output interface for a Vulkan

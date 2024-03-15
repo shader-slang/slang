@@ -2956,7 +2956,6 @@ struct SPIRVEmitContext
         // We will continue to use the Slang terminology here, since
         // this code path is a catch-all for stuff that only needs to
         // be emitted if the owning instruction gets emitted.
-
         bool isRayTracingObject = false;
 
         switch( decoration->getOp() )
