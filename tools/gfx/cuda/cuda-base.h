@@ -4,7 +4,6 @@
 
 #ifdef GFX_ENABLE_CUDA
 #include <cuda.h>
-#include <cuda_runtime_api.h>
 #include "core/slang-basic.h"
 #include "core/slang-blob.h"
 #include "core/slang-std-writers.h"
