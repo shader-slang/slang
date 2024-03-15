@@ -746,7 +746,7 @@ SLANG_NO_THROW Result SLANG_MCALL DeviceImpl::createBufferResource(
     SLANG_CUDA_RETURN_ON_FAIL(cuMemAllocManaged(
         (CUdeviceptr*)(&resource->m_cudaMemory),
         desc.sizeInBytes,
-        0));
+        CU_MEM_ATTACH_GLOBAL));
     if (initData)
     {
         SLANG_CUDA_RETURN_ON_FAIL(cuMemcpy(
