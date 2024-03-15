@@ -1,7 +1,7 @@
 import os, sys, re, time, json, argparse
 try:
     # Open file containing stdout of results
-    with open(sys.argv[1], "r") as fp:
+    with open(sys.argv[1], "rt", encoding="utf-16") as fp:
         data = fp.read()
     # Unique ID for the current test results. Format: YYYYmmddHHMMSS (YearMonthDayHourMinuteSecond)
     results_id = time.strftime(r"%Y%m%d%H%M%S", time.localtime()) 
@@ -19,7 +19,7 @@ try:
     rtn_json[results_id]["spirv-generation"] = {sg[0][1]: float(sg[0][2]), sg[1][1]: float(sg[1][2])}
     rtn_json[results_id]["spirv-compilation"] = {sc[0][1]: float(sc[0][2]), sc[1][1]: float(sc[1][2])}
 
-    with open(os.path.join(".", "temp", f"{results_id}_falcor-compile-time_nightly.json"), "wt", encoding="utf-8") as fp:
+    with open(os.path.join(f"{results_id}_falcor-compile-time_nightly.json"), "wt", encoding="utf-8") as fp:
         json.dump(rtn_json, fp, indent=2)
 
     print(json.dumps(rtn_json, indent=2))
