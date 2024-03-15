@@ -24,6 +24,7 @@
 namespace Slang {
 
 class   Decl;
+class   DiagnosticSink;
 class   GenericDecl;
 class   FuncType;
 class   Layout;

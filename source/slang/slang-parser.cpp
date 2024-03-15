@@ -7109,6 +7109,30 @@ namespace Slang
         {
             return SPIRVAsmOperand{ SPIRVAsmOperand::NonSemanticDebugPrintfExtSet, parser->ReadToken() };
         }
+        else if (AdvanceIf(parser, "__rayPayloadFromLocation")) 
+        {
+            // reference a magic number to a layout(location) for late compiler resolution of rayPayload objects
+            parser->ReadToken(TokenType::LParent);
+            auto operand = SPIRVAsmOperand{ SPIRVAsmOperand::RayPayloadFromLocation, Token{}, parseAtomicExpr(parser) };
+            parser->ReadToken(TokenType::RParent);
+            return operand;
+        }
+        else if (AdvanceIf(parser, "__rayAttributeFromLocation")) 
+        {
+            // works similar to __rayPayloadFromLocation
+            parser->ReadToken(TokenType::LParent);
+            auto operand = SPIRVAsmOperand{ SPIRVAsmOperand::RayAttributeFromLocation, Token{}, parseAtomicExpr(parser) };
+            parser->ReadToken(TokenType::RParent);
+            return operand;
+        }
+        else if (AdvanceIf(parser, "__rayCallableFromLocation")) 
+        {
+            // works similar to __rayPayloadFromLocation
+            parser->ReadToken(TokenType::LParent);
+            auto operand = SPIRVAsmOperand{ SPIRVAsmOperand::RayCallableFromLocation, Token{}, parseAtomicExpr(parser) };
+            parser->ReadToken(TokenType::RParent);
+            return operand;
+        }
         // A regular identifier
         else if(parser->LookAheadToken(TokenType::Identifier))
         {
@@ -7943,6 +7967,7 @@ namespace Slang
 #define CASE(key, type) if (nameText == #key) { modifier = parser->astBuilder->create<type>(); } else
                 CASE(push_constant, PushConstantAttribute) 
                 CASE(shaderRecordNV, ShaderRecordAttribute)
+                CASE(shaderRecordEXT, ShaderRecordAttribute)
                 CASE(constant_id,   GLSLConstantIDLayoutModifier)
                 CASE(std140, GLSLStd140Modifier)
                 CASE(std430, GLSLStd430Modifier)
@@ -7990,6 +8015,20 @@ namespace Slang
             parser->ReadToken(TokenType::Comma);
         }
 
+#define CASE(key, type) if (AdvanceIf(parser, #key)) { auto modifier = parser->astBuilder->create<type>(); \
+    modifier->location = int(getIntegerLiteralValue(listBuilder.find<GLSLLayoutModifier>()->valToken)); listBuilder.add(modifier); } else
+
+    CASE(rayPayloadEXT, VulkanRayPayloadAttribute)
+    CASE(rayPayloadNV, VulkanRayPayloadAttribute)
+    CASE(rayPayloadInEXT, VulkanRayPayloadInAttribute)
+    CASE(rayPayloadInNV, VulkanRayPayloadInAttribute)
+    CASE(hitObjectAttributeNV, VulkanHitObjectAttributesAttribute)
+    CASE(callableDataEXT, VulkanCallablePayloadAttribute)
+    CASE(callableDataInEXT, VulkanCallablePayloadInAttribute)
+    {}
+    
+#undef CASE
+
         if (numThreadsAttrib)
         {
             listBuilder.add(numThreadsAttrib);
@@ -7998,6 +8037,12 @@ namespace Slang
         listBuilder.add(parser->astBuilder->create<GLSLLayoutModifierGroupEnd>());
 
         return listBuilder.getFirst();
+    }
+
+    static NodeBase* parseHitAttributeEXTModifier(Parser* parser, void* /*userData*/)
+    {
+        VulkanHitAttributesAttribute* modifier = parser->astBuilder->create<VulkanHitAttributesAttribute>();
+        return modifier;
     }
 
     static NodeBase* parseBuiltinTypeModifier(Parser* parser, void* /*userData*/)
@@ -8232,7 +8277,7 @@ namespace Slang
         // or expect more tokens after the initial keyword.
 
         _makeParseModifier("layout",                parseLayoutModifier),
-
+        _makeParseModifier("hitAttributeEXT",       parseHitAttributeEXTModifier),
         _makeParseModifier("__intrinsic_op",        parseIntrinsicOpModifier),
         _makeParseModifier("__target_intrinsic",    parseTargetIntrinsicModifier),
         _makeParseModifier("__specialized_for_target",    parseSpecializedForTargetModifier),

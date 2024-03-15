@@ -683,6 +683,9 @@ public:
         BuiltinVar,
         GLSL450Set,
         NonSemanticDebugPrintfExtSet,
+        RayPayloadFromLocation, //insert from scope of all payloads in the spir-v shader the payload identified by the integer value provided
+        RayAttributeFromLocation,
+        RayCallableFromLocation,
     };
 
     // The flavour and token describes how this was parsed

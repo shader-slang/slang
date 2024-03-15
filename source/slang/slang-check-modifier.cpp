@@ -707,6 +707,13 @@ namespace Slang
 
             rayPayloadAttr->location = (int32_t)val->getValue();
         }
+        else if (auto rayPayloadInAttr = as<VulkanRayPayloadInAttribute>(attr))
+        {
+            SLANG_ASSERT(attr->args.getCount() == 1);
+            auto val = checkConstantIntVal(attr->args[0]);
+            if (!val) return false;
+            rayPayloadInAttr->location = (int32_t)val->getValue();
+        }
         else if (auto callablePayloadAttr = as<VulkanCallablePayloadAttribute>(attr))
         {
             SLANG_ASSERT(attr->args.getCount() == 1);
@@ -715,6 +722,13 @@ namespace Slang
             if (!val) return false;
 
             callablePayloadAttr->location = (int32_t)val->getValue();
+        }
+        else if (auto callablePayloadInAttr = as<VulkanCallablePayloadInAttribute>(attr))
+        {
+            SLANG_ASSERT(attr->args.getCount() == 1);
+            auto val = checkConstantIntVal(attr->args[0]);
+            if (!val) return false;
+            callablePayloadInAttr->location = (int32_t)val->getValue();
         }
         else if (auto hitObjectAttributesAttr = as<VulkanHitObjectAttributesAttribute>(attr))
         {

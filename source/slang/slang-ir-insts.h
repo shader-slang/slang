@@ -280,11 +280,13 @@ bool isSimpleDecoration(IROp op);
 /// a vulkan ray payload, and should have a location assigned
 /// to it.
 IR_SIMPLE_DECORATION(VulkanRayPayloadDecoration)
+IR_SIMPLE_DECORATION(VulkanRayPayloadInDecoration)
 
 /// A decoration that indicates that a variable represents
 /// a vulkan callable shader payload, and should have a location assigned
 /// to it.
 IR_SIMPLE_DECORATION(VulkanCallablePayloadDecoration)
+IR_SIMPLE_DECORATION(VulkanCallablePayloadInDecoration)
 
 /// A decoration that indicates that a variable represents
 /// vulkan hit attributes, and should have a location assigned
@@ -4172,6 +4174,10 @@ public:
 
     IRSPIRVAsmOperand* emitSPIRVAsmOperandLiteral(IRInst* literal);
     IRSPIRVAsmOperand* emitSPIRVAsmOperandInst(IRInst* inst);
+    IRSPIRVAsmOperand* createSPIRVAsmOperandInst(IRInst* inst);
+    IRSPIRVAsmOperand* emitSPIRVAsmOperandRayPayloadFromLocation(IRInst* inst);
+    IRSPIRVAsmOperand* emitSPIRVAsmOperandRayAttributeFromLocation(IRInst* inst);
+    IRSPIRVAsmOperand* emitSPIRVAsmOperandRayCallableFromLocation(IRInst* inst);
     IRSPIRVAsmOperand* emitSPIRVAsmOperandId(IRInst* inst);
     IRSPIRVAsmOperand* emitSPIRVAsmOperandResult();
     IRSPIRVAsmOperand* emitSPIRVAsmOperandEnum(IRInst* inst);
@@ -4748,9 +4754,19 @@ public:
         addDecoration(inst, kIROp_VulkanRayPayloadDecoration, getIntValue(getIntType(), location));
     }
 
+    void addVulkanRayPayloadInDecoration(IRInst* inst, int location)
+    {
+        addDecoration(inst, kIROp_VulkanRayPayloadInDecoration, getIntValue(getIntType(), location));
+    }
+    
     void addVulkanCallablePayloadDecoration(IRInst* inst, int location)
     {
         addDecoration(inst, kIROp_VulkanCallablePayloadDecoration, getIntValue(getIntType(), location));
+    }
+
+    void addVulkanCallablePayloadInDecoration(IRInst* inst, int location)
+    {
+        addDecoration(inst, kIROp_VulkanCallablePayloadInDecoration, getIntValue(getIntType(), location));
     }
 
     void addVulkanHitObjectAttributesDecoration(IRInst* inst, int location)
