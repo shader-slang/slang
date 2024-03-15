@@ -4,6 +4,7 @@
 #include "slang-capability.h"
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
+#include "slang-legalize-types.h"
 #include "slang-mangle.h"
 #include "slang-ir-string-hash.h"
 #include "slang-ir-autodiff.h"
