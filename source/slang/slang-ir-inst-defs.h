@@ -127,6 +127,8 @@ INST(Nop, nop, 0, 0)
     INST(ComPtrType, ComPtr, 1, HOISTABLE)
     // A NativePtr<T> type represents a native pointer to a managed resource.
     INST(NativePtrType, NativePtr, 1, HOISTABLE)
+    // An AtomicUint is a placeholder type for a storage buffer, and will be mangled during compiling.
+    INST(GLSLAtomicUintType, GLSLAtomicUint, 0, HOISTABLE)
 
     /* SamplerStateTypeBase */
         INST(SamplerStateType, SamplerState, 0, HOISTABLE)
@@ -477,6 +479,7 @@ INST(AtomicCounterDecrement, AtomicCounterDecrement, 1, 0)
 INST(GetNaturalStride, getNaturalStride, 1, 0)
 
 INST(MeshOutputRef, meshOutputRef, 2, 0)
+INST(MeshOutputSet, meshOutputSet, 3, 0)
 
 // Construct a vector from a scalar
 //
@@ -816,6 +819,7 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(AnyValueSizeDecoration, AnyValueSize, 1, 0)
     INST(SpecializeDecoration, SpecializeDecoration, 0, 0)
     INST(SequentialIDDecoration, SequentialIDDecoration, 1, 0)
+    INST(DynamicDispatchWitnessDecoration, DynamicDispatchWitnessDecoration, 0, 0)
     INST(StaticRequirementDecoration, StaticRequirementDecoration, 0, 0)
     INST(DispatchFuncDecoration, DispatchFuncDecoration, 1, 0)
     INST(TypeConstraintDecoration, TypeConstraintDecoration, 1, 0)
@@ -839,6 +843,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         // Marks a type to be non copyable, causing SSA pass to skip turning variables of the the type into SSA values.
     INST(NonCopyableTypeDecoration, nonCopyable, 0, 0)
 
+        // Marks a value to be dynamically uniform.
+    INST(DynamicUniformDecoration, DynamicUniform, 0, 0)
+
         /// A call to the decorated function should always be folded into its use site.
     INST(AlwaysFoldIntoUseSiteDecoration, alwaysFold, 0, 0)
 
@@ -849,8 +856,8 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(GLSLRestrictDecoration, glslRestrict, 1, 0)
     INST(GLSLReadOnlyDecoration, glslReadonly, 1, 0)
     INST(GLSLWriteOnlyDecoration, glslWriteonly, 1, 0)
-
     INST(PayloadDecoration, payload, 0, 0)
+    INST(GLSLOffsetDecoration, glslOffset, 1, 0)
 
     /* Mesh Shader outputs */
         INST(VerticesDecoration, vertices, 1, 0)
@@ -861,6 +868,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(GLSLPrimitivesRateDecoration, perprimitive, 0, 0)
         // Marks an inst that represents the gl_Position output.
     INST(GLPositionOutputDecoration, PositionOutput, 0, 0)
+        // Marks an inst that represents the gl_Position input.
+    INST(GLPositionInputDecoration, PositionInput, 0, 0)
+
 
     /* StageAccessDecoration */
         INST(StageReadAccessDecoration, stageReadAccess, 0, 0)
@@ -957,6 +967,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
 
     INST_RANGE(CheckpointHintDecoration, PreferCheckpointDecoration, PreferRecomputeDecoration)
 
+        /// Marks a function whose return value is never dynamic uniform.
+    INST(NonDynamicUniformReturnDecoration, NonDynamicUniformReturnDecoration, 0, 0)
+
         /// Marks a class type as a COM interface implementation, which enables
         /// the witness table to be easily picked up by emit.
     INST(COMWitnessDecoration, COMWitnessDecoration, 1, 0)
@@ -1029,6 +1042,7 @@ INST(CastPtrToInt, CastPtrToInt, 1, 0)
 INST(CastIntToPtr, CastIntToPtr, 1, 0)
 INST(CastToVoid, castToVoid, 1, 0)
 INST(PtrCast, PtrCast, 1, 0)
+INST(TreatAsDynamicUniform, TreatAsDynamicUniform, 1, 0)
 
 INST(SizeOf,                            sizeOf,                     1, 0)
 INST(AlignOf,                           alignOf,                    1, 0)

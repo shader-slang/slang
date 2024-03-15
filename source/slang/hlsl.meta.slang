@@ -6453,6 +6453,7 @@ uint NonUniformResourceIndex(uint index)
 __glsl_extension(GL_EXT_nonuniform_qualifier)
 [__readNone]
 [ForceInline]
+[NonUniformReturn]
 int NonUniformResourceIndex(int index)
 {
     __target_switch
@@ -8760,6 +8761,7 @@ bool WaveActiveAnyTrue(bool condition)
 
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
+[NonUniformReturn]
 uint4 WaveActiveBallot(bool condition)
 {
     __target_switch
@@ -8787,6 +8789,7 @@ uint WaveActiveCountBits(bool value)
 
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
+[NonUniformReturn]
 uint WaveGetLaneCount()
 {
     __target_switch
@@ -8805,6 +8808,7 @@ uint WaveGetLaneCount()
 
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
+[NonUniformReturn]
 uint WaveGetLaneIndex()
 {
     __target_switch
@@ -8823,6 +8827,7 @@ uint WaveGetLaneIndex()
 
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
+[NonUniformReturn]
 bool WaveIsFirstLane()
 {
     __target_switch
@@ -9832,6 +9837,7 @@ void AcceptHitAndEndSearch()
 
 // 10.4.1 - Ray Dispatch System Values
 
+[NonUniformReturn]
 uint3 DispatchRaysIndex()
 {
     __target_switch
@@ -9862,6 +9868,7 @@ uint3 DispatchRaysDimensions()
 
 // 10.4.2 - Ray System Values
 
+[NonUniformReturn]
 float3 WorldRayOrigin()
 {
     __target_switch
@@ -9876,6 +9883,7 @@ float3 WorldRayOrigin()
     }
 }
 
+[NonUniformReturn]
 float3 WorldRayDirection()
 {
     __target_switch
@@ -9890,6 +9898,7 @@ float3 WorldRayDirection()
     }
 }
 
+[NonUniformReturn]
 float RayTMin()
 {
     __target_switch
@@ -9914,6 +9923,7 @@ float RayTMin()
 // we should simply provide two overloads here, specialized
 // to the appropriate Vulkan stages.
 //
+[NonUniformReturn]
 float RayTCurrent()
 {
     __target_switch
@@ -9944,6 +9954,7 @@ uint RayFlags()
 
 // 10.4.3 - Primitive/Object Space System Values
 
+[NonUniformReturn]
 uint InstanceIndex()
 {
     __target_switch
@@ -9958,6 +9969,7 @@ uint InstanceIndex()
     }
 }
 
+[NonUniformReturn]
 uint InstanceID()
 {
     __target_switch
@@ -9972,6 +9984,7 @@ uint InstanceID()
     }
 }
 
+[NonUniformReturn]
 uint PrimitiveIndex()
 {
     __target_switch
@@ -9986,6 +9999,7 @@ uint PrimitiveIndex()
     }
 }
 
+[NonUniformReturn]
 float3 ObjectRayOrigin()
 {
     __target_switch
@@ -10000,6 +10014,7 @@ float3 ObjectRayOrigin()
     }
 }
 
+[NonUniformReturn]
 float3 ObjectRayDirection()
 {
     __target_switch
@@ -10016,6 +10031,7 @@ float3 ObjectRayDirection()
 
 // TODO: optix has an optixGetObjectToWorldTransformMatrix function that returns 12
 // floats by reference.
+[NonUniformReturn]
 float3x4 ObjectToWorld3x4()
 {
     __target_switch
@@ -10030,6 +10046,7 @@ float3x4 ObjectToWorld3x4()
     }
 }
 
+[NonUniformReturn]
 float3x4 WorldToObject3x4()
 {
     __target_switch
@@ -10044,6 +10061,7 @@ float3x4 WorldToObject3x4()
     }
 }
 
+[NonUniformReturn]
 float4x3 ObjectToWorld4x3()
 {
     __target_switch
@@ -10057,6 +10075,7 @@ float4x3 ObjectToWorld4x3()
     }
 }
 
+[NonUniformReturn]
 float4x3 WorldToObject4x3()
 {
     __target_switch
@@ -10077,6 +10096,7 @@ float4x3 WorldToObject4x3()
 __glsl_version(460)
 __glsl_extension(GL_NV_ray_tracing_motion_blur)
 __glsl_extension(GL_EXT_ray_tracing)
+[NonUniformReturn]
 float RayCurrentTime()
 {
     __target_switch
@@ -10099,10 +10119,11 @@ float RayCurrentTime()
 // declarations, so that users can know they aren't coding
 // against the final spec?
 //
-float3x4 ObjectToWorld() { return ObjectToWorld3x4(); }
-float3x4 WorldToObject() { return WorldToObject3x4(); }
+[NonUniformReturn] float3x4 ObjectToWorld() { return ObjectToWorld3x4(); }
+[NonUniformReturn] float3x4 WorldToObject() { return WorldToObject3x4(); }
 
 // 10.4.4 - Hit Specific System values
+[NonUniformReturn]
 uint HitKind()
 {
     __target_switch
@@ -10300,6 +10321,7 @@ extension __TextureImpl<T,__Shape2D, 1, 0, 0, $(kStdlibResourceAccessFeedback), 
 
 // Get the index of the geometry that was hit in an intersection, any-hit, or closest-hit shader
 __glsl_extension(GL_EXT_ray_tracing)
+[NonUniformReturn]
 uint GeometryIndex()
 {
     __target_switch
@@ -10562,6 +10584,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
     [__NoSideEffect]
+    [NonUniformReturn]
     CANDIDATE_TYPE CandidateType()
     {
         __target_switch
@@ -10580,6 +10603,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
     [__NoSideEffect]
+    [NonUniformReturn]
     COMMITTED_STATUS CommittedStatus()
     {
         __target_switch
@@ -10598,6 +10622,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
     [__NoSideEffect]
+    [NonUniformReturn]
     bool CandidateProceduralPrimitiveNonOpaque()
     {
         __target_switch
@@ -10617,6 +10642,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
     [__NoSideEffect]
+    [NonUniformReturn]
     float CandidateTriangleRayT()
     {
         __target_switch
@@ -10634,6 +10660,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
     [__NoSideEffect]
+    [NonUniformReturn]
     float CommittedRayT()
     {
         __target_switch
@@ -10705,6 +10732,7 @@ ${{{{
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
     [__NoSideEffect]
+    [NonUniformReturn]
     float3x4 $(ccName)$(matName)3x4()
     {
         __target_switch
@@ -10723,6 +10751,7 @@ ${{{{
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
     [__readNone]
+    [NonUniformReturn]
     float4x3 $(ccName)$(matName)4x3()
     {
         __target_switch
@@ -10764,6 +10793,7 @@ ${{{{
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
     [__NoSideEffect]
+    [NonUniformReturn]
     $(method.type) $(ccName)$(method.hlslName)()
     {
         __target_switch
@@ -10787,6 +10817,7 @@ ${{{{
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
     [__NoSideEffect]
+    [NonUniformReturn]
     uint RayFlags()
     {
         __target_switch
@@ -10803,6 +10834,7 @@ ${{{{
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
     [__NoSideEffect]
+    [NonUniformReturn]
     float3 WorldRayOrigin()
     {
         __target_switch
@@ -10819,6 +10851,7 @@ ${{{{
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
     [__NoSideEffect]
+    [NonUniformReturn]
     float3 WorldRayDirection()
     {
         __target_switch
@@ -10835,6 +10868,7 @@ ${{{{
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
     [__NoSideEffect]
+    [NonUniformReturn]
     float RayTMin()
     {
         __target_switch
@@ -12112,6 +12146,7 @@ void debugBreak();
 [__requiresNVAPI]
 __glsl_extension(GL_EXT_shader_realtime_clock)
 [require(shaderclock)]
+[NonUniformReturn]
 uint getRealtimeClockLow()
 {
     __target_switch
@@ -12130,12 +12165,14 @@ uint getRealtimeClockLow()
 }
 
 __target_intrinsic(cpp, "std::chrono::high_resolution_clock::now().time_since_epoch().count()")
-__target_intrinsic(cuda, "clock64")
+    __target_intrinsic(cuda, "clock64")
+[NonUniformReturn]
 int64_t __cudaCppGetRealtimeClock();
 
 [__requiresNVAPI]
 __glsl_extension(GL_EXT_shader_realtime_clock)
 [require(shaderclock)]
+[NonUniformReturn]
 uint2 getRealtimeClock()
 {
     __target_switch
@@ -12164,14 +12201,17 @@ uint2 getRealtimeClock()
 
 __target_intrinsic(cuda, "(threadIdx)")
 [__readNone]
+[NonUniformReturn]
 uint3 cudaThreadIdx();
 
 __target_intrinsic(cuda, "(blockIdx)")
 [__readNone]
+[NonUniformReturn]
 uint3 cudaBlockIdx();
 
 __target_intrinsic(cuda, "(blockDim)")
 [__readNone]
+[NonUniformReturn]
 uint3 cudaBlockDim();
 
 //

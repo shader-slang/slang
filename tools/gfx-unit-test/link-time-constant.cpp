@@ -79,7 +79,13 @@ namespace gfx_test
             R"(
                 export static const bool turnOnFeature = true;
                 export static const float constValue = 2.0;
+                export static const int numthread = 2;
+                export static const int arraySize = 4;
             )"));
+        
+        SlangUInt threadGroupSizes[3];
+        slangReflection->findEntryPointByName("computeMain")->getComputeThreadGroupSize(3, threadGroupSizes);
+        SLANG_CHECK(threadGroupSizes[0] == 2 && threadGroupSizes[1] == 1 && threadGroupSizes[2] == 1);
 
         ComputePipelineStateDesc pipelineDesc = {};
         pipelineDesc.program = shaderProgram.get();

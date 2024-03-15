@@ -18,11 +18,11 @@ namespace Slang
         auto structType = builder.createStructType();
         StringBuilder nameSb;
         if (type->getOp() == kIROp_HLSLAppendStructuredBufferType)
-            nameSb << "AppendStructuredBuffer_";
+            nameSb << "AppendStructuredBuffer<";
         else
-            nameSb << "ConsumeStructuredBuffer_";
+            nameSb << "ConsumeStructuredBuffer<";
         getTypeNameHint(nameSb, elementType);
-        nameSb << "_t";
+        nameSb << ">";
         builder.addNameHintDecoration(structType, nameSb.produceString().getUnownedSlice());
 
         auto elementBufferKey = builder.createStructKey();

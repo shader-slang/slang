@@ -181,6 +181,7 @@ bool isValueType(IRInst* dataType)
     case kIROp_ArrayType:
     case kIROp_FuncType:
     case kIROp_RaytracingAccelerationStructureType:
+    case kIROp_GLSLAtomicUintType:
         return true;
     default:
         // Read-only resource handles are considered as Value type.
@@ -507,6 +508,8 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
     case kIROp_HLSLRasterizerOrderedByteAddressBufferType:
         sb << "RasterizerOrderedByteAddressBuffer";
         break;
+    case kIROp_GLSLAtomicUintType:
+        sb << "AtomicCounter";
     case kIROp_RaytracingAccelerationStructureType:
         sb << "RayTracingAccelerationStructure";
         break;
@@ -686,6 +689,7 @@ bool isPtrLikeOrHandleType(IRInst* type)
     case kIROp_PtrType:
     case kIROp_RefType:
     case kIROp_ConstRefType:
+    case kIROp_GLSLShaderStorageBufferType:
         return true;
     }
     return false;
@@ -1172,6 +1176,11 @@ bool isGlobalOrUnknownMutableAddress(IRGlobalValueWithCode* parentFunc, IRInst* 
 
     if (root)
     {
+        if (as<IRGLSLShaderStorageBufferType>(root->getDataType()))
+        {
+            // A storage buffer is mutable, so we need to treat it as a mutable address.
+            return true;
+        }
         // If this is a global readonly resource, it is not a mutable address.
         if (as<IRParameterGroupType>(root->getDataType()))
         {

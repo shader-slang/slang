@@ -2222,9 +2222,18 @@ void addVarDecorations(
             builder->addDecoration(inst, kIROp_GLSLLocationDecoration,
                 builder->getIntValue(builder->getIntType(), stringToInt(glslLocationMod->valToken.getContent())));
         }
+        else if (auto glslOffsetMod = as<GLSLOffsetLayoutAttribute>(mod))
+        {
+            builder->addDecoration(inst, kIROp_GLSLOffsetDecoration,
+                builder->getIntValue(builder->getIntType(), glslOffsetMod->offset));
+        }
         else if (auto hlslSemantic = as< HLSLSimpleSemantic>(mod))
         {
             builder->addSemanticDecoration(inst, hlslSemantic->name.getContent());
+        }
+        else if (auto dynamicUniform = as<DynamicUniformModifier>(mod))
+        {
+            builder->addDynamicUniformDecoration(inst);
         }
         else
         {
@@ -7223,9 +7232,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     {
                         getBuilder()->addNumThreadsDecoration(
                             d,
-                            layoutLocalSizeAttr->x,
-                            layoutLocalSizeAttr->y,
-                            layoutLocalSizeAttr->z
+                            getSimpleVal(context, lowerVal(context, layoutLocalSizeAttr->x)),
+                            getSimpleVal(context, lowerVal(context, layoutLocalSizeAttr->y)),
+                            getSimpleVal(context, lowerVal(context, layoutLocalSizeAttr->z))
                         );
                     }
                 }
@@ -8490,9 +8499,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 fieldKey,
                 fieldType);
 
-            if (auto packOffsetModifier = fieldDecl->findModifier<HLSLPackOffsetSemantic>())
+            for (auto mod : fieldDecl->modifiers)
             {
-                lowerPackOffsetModifier(fieldKey, packOffsetModifier);
+                if (auto packOffsetModifier = as<HLSLPackOffsetSemantic>(mod))
+                {
+                    lowerPackOffsetModifier(fieldKey, packOffsetModifier);
+                }
+                else if (auto dynamicUniformModifer = as<DynamicUniformModifier>(mod))
+                {
+                    subBuilder->addDynamicUniformDecoration(fieldKey);
+                }
             }
         }
 
@@ -9636,9 +9652,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 getBuilder()->addNumThreadsDecoration(
                     irFunc,
-                    numThreadsAttr->x,
-                    numThreadsAttr->y,
-                    numThreadsAttr->z
+                    getSimpleVal(context, lowerVal(context, numThreadsAttr->x)),
+                    getSimpleVal(context, lowerVal(context, numThreadsAttr->y)),
+                    getSimpleVal(context, lowerVal(context, numThreadsAttr->z))
                 );
             }
             else if (as<ReadNoneAttribute>(modifier))
@@ -9782,6 +9798,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 getBuilder()->addRequireSPIRVVersionDecoration(irFunc, spvVersion->version);
             else if (auto cudasmVersion = as<RequiredCUDASMVersionModifier>(modifier))
                 getBuilder()->addRequireCUDASMVersionDecoration(irFunc, cudasmVersion->version);
+            else if (auto nonUniform= as<NonDynamicUniformAttribute>(modifier))
+                getBuilder()->addDecoration(irFunc, kIROp_NonDynamicUniformReturnDecoration);
         }
 
         if (!isInline)
@@ -10972,7 +10990,7 @@ struct TypeConformanceIRGenContext
         auto witness = lowerSimpleVal(context, typeConformance->getSubtypeWitness());
         builder->addKeepAliveDecoration(witness);
         builder->addHLSLExportDecoration(witness);
-
+        builder->addDynamicDispatchWitnessDecoration(witness);
         if (conformanceIdOverride != -1)
         {
             builder->addSequentialIDDecoration(witness, conformanceIdOverride);

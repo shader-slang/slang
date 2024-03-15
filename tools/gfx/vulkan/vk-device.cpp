@@ -476,19 +476,22 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         extendedFeatures.clockFeatures.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &extendedFeatures.clockFeatures;
 
-        // Atomic Float
+        // Atomic Float 
         // To detect atomic float we need
         // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPhysicalDeviceShaderAtomicFloatFeaturesEXT.html
 
         extendedFeatures.atomicFloatFeatures.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &extendedFeatures.atomicFloatFeatures;
 
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT.html
+        extendedFeatures.atomicFloat2Features.pNext = deviceFeatures2.pNext;
+        deviceFeatures2.pNext = &extendedFeatures.atomicFloat2Features;
+
         // Image Int64 Atomic
-        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT.html
-        
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT.html        
         extendedFeatures.imageInt64AtomicFeatures.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &extendedFeatures.imageInt64AtomicFeatures;
-
+        
         // mesh shader features
         extendedFeatures.meshShaderFeatures.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &extendedFeatures.meshShaderFeatures;
@@ -549,7 +552,7 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         // SIMPLE_EXTENSION_FEATURE(struct, feature member name, extension
         // name, features...) will check for the presence of the boolean
         // feature member in struct and the availability of the extensions. If
-        // they are both present then the extensions are addded, the struct
+        // they are both present then the extensions are added, the struct
         // linked into the deviceCreateInfo chain and the features added to the
         // supported features list.
 #define SIMPLE_EXTENSION_FEATURE(s, m, e, ...) \
@@ -569,9 +572,16 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
 
         SIMPLE_EXTENSION_FEATURE(
             extendedFeatures.atomicFloatFeatures,
-            shaderBufferFloat32AtomicAdd,
+            shaderBufferFloat32Atomics,
             VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME,
             "atomic-float"
+        );
+
+        SIMPLE_EXTENSION_FEATURE(
+            extendedFeatures.atomicFloat2Features,
+            shaderBufferFloat16Atomics,
+            VK_EXT_SHADER_ATOMIC_FLOAT_2_EXTENSION_NAME,
+            "atomic-float-2"
         );
 
         SIMPLE_EXTENSION_FEATURE(
@@ -1849,6 +1859,10 @@ Result DeviceImpl::createBufferResourceImpl(
     {
         reqMemoryProperties =
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+    }
+    else
+    {
+        reqMemoryProperties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
     }
 
     RefPtr<BufferResourceImpl> buffer(new BufferResourceImpl(desc, this));

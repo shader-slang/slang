@@ -107,6 +107,40 @@ public in uvec3 gl_WorkGroupID : SV_GroupID;
 public in uvec3 gl_LocalInvocationIndex : SV_GroupIndex;
 public in uvec3 gl_LocalInvocationID : SV_GroupThreadID;
 
+[require(glsl)]
+[require(spirv)]
+public property uint3 gl_NumWorkGroups {
+
+    get {
+        __target_switch
+        {
+        case glsl:
+            __intrinsic_asm "(gl_NumWorkGroups)";
+        case spirv:
+            return spirv_asm {
+                    result:$$uint3 = OpLoad builtin(NumWorkgroups:uint3);
+                };
+        }
+    }
+}
+
+[require(glsl)]
+[require(spirv)]
+public property uint3 gl_WorkGroupSize {
+
+    get {
+        __target_switch
+        {
+        case glsl:
+            __intrinsic_asm "(gl_WorkGroupSize)";
+        case spirv:
+            return spirv_asm {
+                    result:$$uint3 = OpLoad builtin(WorkgroupSize:uint3);
+                };
+        }
+    }
+}
+
 // TODO: define overload for tessellation control stage.
 public in int gl_InvocationID : SV_GSInstanceID;
 
@@ -5089,4 +5123,605 @@ __spirv_version(1.3) [require(spirv)]
 {
     shader_subgroup_preamble<T>();
     return QuadReadAcrossDiagonal(value);
+}
+
+//// GLSL atomic
+
+// The following type internally is a Shader Storage Buffer 
+// as per GL_EXT_vulkan_glsl_relaxed
+__magic_type(GLSLAtomicUintType)
+__intrinsic_type($(kIROp_GLSLAtomicUintType))
+public struct atomic_uint
+{
+};
+
+// tier of float refers to atomic extension support of float1 or float2.
+// if we are inside a atomic_float function we will run the check for float1 tier
+// types and operations to enable the according ext needed for these operations
+
+__generic<T : __BuiltinType>
+[ForceInline] void typeRequireChecks_atomic_using_float0_tier() 
+{
+    __target_switch
+    {
+    case glsl:
+    {
+        if (__type_equals<T, uint64_t>() || __type_equals<T, int64_t>()) 
+            __requireGLSLExtension("GL_EXT_shader_atomic_int64");  
+    }
+    case spirv:
+        return; 
+    }
+}
+__generic<T : __BuiltinType>
+[ForceInline] void typeRequireChecks_atomic_using_float1_tier() 
+{
+    __target_switch
+    {
+    case glsl:
+    {
+        if (__type_equals<T, float>()) 
+            __requireGLSLExtension("GL_EXT_shader_atomic_float");
+        else if (__type_equals<T, half>() || __type_equals<T, float16_t>())
+        {
+            __requireGLSLExtension("GL_EXT_shader_atomic_float2");
+            __requireGLSLExtension("GL_EXT_shader_explicit_arithmetic_types");
+        }
+        else if (__type_equals<T, double>()) 
+            __requireGLSLExtension("GL_EXT_shader_atomic_float");
+        else if (__type_equals<T, uint64_t>() || __type_equals<T, int64_t>())
+            __requireGLSLExtension("GL_EXT_shader_atomic_int64");
+    }
+    case spirv:
+        return;
+    }
+}
+__generic<T : __BuiltinType>
+[ForceInline] void typeRequireChecks_atomic_using_float2_tier() 
+{
+    __target_switch
+    {
+    case glsl:
+    {    
+        if (__type_equals<T, float>()) 
+            __requireGLSLExtension("GL_EXT_shader_atomic_float2");
+        else if (__type_equals<T, half>() || __type_equals<T, float16_t>())
+        {
+            __requireGLSLExtension("GL_EXT_shader_atomic_float2");
+            __requireGLSLExtension("GL_EXT_shader_explicit_arithmetic_types");
+        }
+        else if (__type_equals<T, double>()) 
+            __requireGLSLExtension("GL_EXT_shader_atomic_float2");
+        else if (__type_equals<T, uint64_t>() || __type_equals<T, int64_t>()) 
+             __requireGLSLExtension("GL_EXT_shader_atomic_int64");        
+    }
+    case spirv: 
+        return; 
+    }
+}
+
+__generic<T : __BuiltinType>
+void typeRequireChecks_atomic_using_add()
+{
+    __target_switch
+    {
+    case glsl:
+        return;
+    case spirv:
+    {
+        if (__type_equals<T, float>())
+        {
+            spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_atomic_float_add"; 
+                OpCapability AtomicFloat32AddEXT
+            };
+        }
+        else if (__type_equals<T, half>() 
+            || __type_equals<T, float16_t>())
+        {
+            spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_atomic_float_add"; 
+                OpCapability AtomicFloat16AddEXT
+            };
+        }
+        else if (__type_equals<T, double>())
+        {
+            spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_atomic_float_add"; 
+                OpCapability AtomicFloat64AddEXT
+            };
+        }
+        else if (__type_equals<T, uint64_t>()
+            || __type_equals<T, int64_t>())
+        {
+            spirv_asm
+            {
+                OpCapability Int64Atomics
+            };
+        }
+    }    
+    }
+}
+__generic<T : __BuiltinType>
+void typeRequireChecks_atomic_using_MinMax()
+{
+    __target_switch
+    {
+    case glsl:
+        return;
+    case spirv:
+    {
+        if (__type_equals<T, float>())
+        {
+            spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_atomic_float_add"; 
+                OpCapability AtomicFloat32MinMaxEXT
+            };
+        }
+        else if (__type_equals<T, half>() 
+            || __type_equals<T, float16_t>())
+        {
+            spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_atomic_float_add"; 
+                OpCapability AtomicFloat16MinMaxEXT
+            };
+        }
+        else if (__type_equals<T, double>())
+        {
+            spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_atomic_float_add"; 
+                OpCapability AtomicFloat64MinMaxEXT
+            };
+        }
+        else if (__type_equals<T, uint64_t>()
+            || __type_equals<T, int64_t>())
+        {
+            spirv_asm
+            { 
+                OpCapability Int64Atomics
+            };
+        }
+    }
+    }
+}
+__generic<T : __BuiltinType>
+[ForceInline] void typeRequireChecks_atomic_using_Logical_CAS() 
+{
+    __target_switch
+    {
+    case glsl:
+        return;
+    case spirv:
+    {
+        if (__type_equals<T, uint64_t>()
+            || __type_equals<T, int64_t>())
+        {
+            spirv_asm
+            { 
+                OpCapability Int64Atomics
+            };
+        }
+    }
+    }
+}
+
+${{{{
+static const struct {
+    const char* name;
+    const char* classType;
+    const char *subclassType;
+    const char *suffix;
+    const bool isFloat;
+} atomics[] =
+    {
+        { 
+            "uint", "I", "U", "", false
+        },
+        { 
+            "uint64_t", "I", "U", "", false
+        },
+        { 
+            "int", "I", "S", "", false
+        },
+        { 
+            "int64_t", "I", "S", "", false
+        },
+        { 
+            "float16_t", "F", "F", "EXT", true
+        },
+        { 
+            "float", "F", "F", "EXT", true
+        },
+        { 
+            "double", "F", "F", "EXT", true
+        },
+    };
+for (const auto& item : atomics) 
+{
+}}}}
+
+__spirv_version(1.0)[require(spirv)]
+__glsl_version(430) [require(glsl)]
+[ForceInline] public $(item.name) atomicAdd(inout $(item.name) mem, $(item.name) data)
+{
+    typeRequireChecks_atomic_using_float1_tier<$(item.name)>();
+    typeRequireChecks_atomic_using_add<$(item.name)>();
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "atomicAdd($0, $1)";
+    case spirv:
+        return spirv_asm
+        {
+            OpAtomic$(item.classType)Add$(item.suffix) $$$(item.name) result &mem Device UniformMemory $data
+        };
+    }
+}
+
+__spirv_version(1.0)[require(spirv)]
+__glsl_version(430) [require(glsl)]
+[ForceInline] public $(item.name) atomicMin(inout $(item.name) mem, $(item.name) data)
+{
+    typeRequireChecks_atomic_using_float2_tier<$(item.name)>();
+    typeRequireChecks_atomic_using_MinMax<$(item.name)>();
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "atomicMin($0, $1)";
+    case spirv:
+        return spirv_asm
+        {
+            OpAtomic$(item.subclassType)Min$(item.suffix) $$$(item.name) result &mem Device UniformMemory $data
+        };
+    }
+}
+
+__spirv_version(1.0)[require(spirv)]
+__glsl_version(430) [require(glsl)]
+[ForceInline] public $(item.name) atomicMax(inout $(item.name) mem, $(item.name) data)
+{
+    typeRequireChecks_atomic_using_float2_tier<$(item.name)>();
+    typeRequireChecks_atomic_using_MinMax<$(item.name)>();
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "atomicMax($0, $1)";
+    case spirv:
+        return spirv_asm
+        {
+            OpAtomic$(item.subclassType)Max$(item.suffix) $$$(item.name) result &mem Device UniformMemory $data
+        };
+    }
+}
+
+__spirv_version(1.0)[require(spirv)]
+__glsl_version(430) [require(glsl)]
+[ForceInline] public $(item.name) atomicExchange(inout $(item.name) mem, $(item.name) data)
+{
+    typeRequireChecks_atomic_using_float1_tier<$(item.name)>();
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "atomicExchange($0, $1)";
+    case spirv:
+        return spirv_asm
+        {
+            OpAtomicExchange $$$(item.name) result &mem Device UniformMemory $data
+        };
+    }
+}
+
+${{{{
+if(item.isFloat) 
+    continue;
+}}}}
+
+__spirv_version(1.0)[require(spirv)]
+__glsl_version(430) [require(glsl)]
+[ForceInline] public $(item.name) atomicAnd(inout $(item.name) mem, $(item.name) data)
+{
+    typeRequireChecks_atomic_using_float0_tier<$(item.name)>();
+    typeRequireChecks_atomic_using_Logical_CAS<$(item.name)>();
+    __target_switch
+    {
+    case glsl:
+    {
+        __intrinsic_asm "atomicAnd($0, $1)";
+    }
+    case spirv:
+        return spirv_asm
+        {
+            OpAtomicAnd $$$(item.name) result &mem Device UniformMemory $data
+        };
+    }
+}
+
+__spirv_version(1.0)[require(spirv)]
+__glsl_version(430) [require(glsl)]
+[ForceInline] public $(item.name) atomicOr(inout $(item.name) mem, $(item.name) data)
+{
+    typeRequireChecks_atomic_using_float0_tier<$(item.name)>();
+    typeRequireChecks_atomic_using_Logical_CAS<$(item.name)>();
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "atomicOr($0, $1)";
+    case spirv:
+        return spirv_asm
+        {
+            OpAtomicOr $$$(item.name) result &mem Device UniformMemory $data
+        };
+    }
+}
+
+__spirv_version(1.0)[require(spirv)]
+__glsl_version(430) [require(glsl)]
+[ForceInline] public $(item.name) atomicXor(inout $(item.name) mem, $(item.name) data)
+{
+    typeRequireChecks_atomic_using_float0_tier<$(item.name)>();
+    typeRequireChecks_atomic_using_Logical_CAS<$(item.name)>();
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "atomicXor($0, $1)";
+    case spirv:
+        return spirv_asm
+        {
+            OpAtomicXor $$$(item.name) result &mem Device UniformMemory $data
+        };
+    }
+}
+
+__spirv_version(1.0)[require(spirv)]
+__glsl_version(430) [require(glsl)]
+[ForceInline] public $(item.name) atomicCompSwap(inout $(item.name) mem, $(item.name) compare, $(item.name) data)
+{
+    typeRequireChecks_atomic_using_float0_tier<$(item.name)>();
+    typeRequireChecks_atomic_using_Logical_CAS<$(item.name)>();
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "atomicCompSwap($0, $1, $2)";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$$(item.name) = OpAtomicCompareExchange &mem Device None None $data $compare
+        };
+    }
+}
+
+${{{{
+}
+}}}}
+
+// all atomic_uint functions are mangled at compile time, 
+// all types are converted into a field address of a 'uint'
+// relative to the layout(offset) of the atomic_uint 
+__spirv_version(1.0)[require(spirv)]
+__glsl_version(430) [require(glsl)]
+[ForceInline] public uint atomicCounterIncrement(atomic_uint c)
+{
+
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "atomicAdd($0, 1)";
+    case spirv:
+    {
+        return spirv_asm
+        {
+            OpAtomicIIncrement $$uint result $c Device UniformMemory
+        };
+    }
+    }
+}
+
+__glsl_version(430) [require(glsl)]
+[ForceInline] public uint atomicCounterDecrement_GLSL_helper(atomic_uint c)
+{
+    __target_switch
+    {
+    case glsl:
+    {
+        __intrinsic_asm "atomicExchange($0,$0-1)";
+    }
+    }
+}
+
+__spirv_version(1.0)[require(spirv)]
+__glsl_version(430) [require(glsl)]
+[ForceInline] public uint atomicCounter(atomic_uint c)
+{
+    __target_switch
+    {
+    case glsl:
+    {
+        __intrinsic_asm "($0)";
+    }
+    case spirv:
+    {
+        return spirv_asm
+        {
+            OpLoad $$uint result $c 
+        };
+    }
+    }
+}
+
+__spirv_version(1.0)[require(spirv)]
+__glsl_version(430) [require(glsl)]
+[ForceInline] public uint atomicCounterDecrement(atomic_uint c)
+{
+    __target_switch
+    {
+    case glsl:
+    {
+        atomicCounterDecrement_GLSL_helper(c);
+        return atomicCounter(c);
+    }
+    case spirv:
+    {
+        // spirv OpAtomicIDecrement returns pre-sub-1, glsl returns the new value
+        // we want a discarded side effect and then return the new value
+        return spirv_asm
+        {
+            %discardedValue:$$uint = OpAtomicIDecrement $c Device UniformMemory;
+            OpLoad $$uint result $c
+        };
+    }
+    }   
+}
+
+__spirv_version(1.0)[require(spirv)]
+__glsl_version(430) [require(glsl)]
+[ForceInline] public uint atomicCounterAdd(atomic_uint c, uint data)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "atomicAdd($0, $1)";
+    case spirv:
+    {
+        return spirv_asm
+        {
+            OpAtomicIAdd $$uint result $c Device UniformMemory $data
+        };
+    }
+    }
+}
+
+__spirv_version(1.0)[require(spirv)]
+__glsl_version(430) [require(glsl)]
+[ForceInline] public uint atomicCounterSubtract(atomic_uint c, uint data)
+{
+    __target_switch
+    {
+    case glsl:
+    {
+        __intrinsic_asm "atomicExchange($0,$0-$1)";
+    }
+    case spirv:
+    {
+        return spirv_asm
+        {
+            OpAtomicISub $$uint result $c Device UniformMemory $data
+        };
+    }
+    }   
+}
+
+__spirv_version(1.0)[require(spirv)]
+__glsl_version(430) [require(glsl)]
+[ForceInline] public uint atomicCounterMin(atomic_uint c, uint data)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "atomicMin($0, $1)";
+    case spirv:
+    {
+        return spirv_asm
+        {
+            OpAtomicUMin $$uint result $c Device UniformMemory $data
+        };
+    }
+    }
+}
+
+__spirv_version(1.0)[require(spirv)]
+__glsl_version(430) [require(glsl)]
+[ForceInline] public uint atomicCounterMax(atomic_uint c, uint data)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "atomicMax($0, $1)";
+    case spirv:
+    {
+        return spirv_asm
+        {
+            OpAtomicUMax $$uint result $c Device UniformMemory $data
+        };
+    }
+    }
+}
+
+__spirv_version(1.0)[require(spirv)]
+__glsl_version(430) [require(glsl)]
+[ForceInline] public uint atomicCounterAnd(atomic_uint c, uint data)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "atomicAnd($0, $1)";
+    case spirv:
+    {
+        return spirv_asm
+        {
+            OpAtomicAnd $$uint result $c Device UniformMemory $data
+        };
+    }
+    }   
+}
+
+__spirv_version(1.0)[require(spirv)]
+__glsl_version(430) [require(glsl)]
+[ForceInline] public uint atomicCounterOr(atomic_uint c, uint data)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "atomicOr($0, $1)";
+    case spirv:
+    {
+        return spirv_asm
+        {
+            OpAtomicOr $$uint result $c Device UniformMemory $data
+        };
+    }
+    }
+}
+
+__spirv_version(1.0)[require(spirv)]
+__glsl_version(430) [require(glsl)]
+[ForceInline] public uint atomicCounterXor(atomic_uint c, uint data)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "atomicXor($0, $1)";
+    case spirv:
+    {
+        return spirv_asm
+        {
+            OpAtomicXor $$uint result $c Device UniformMemory $data
+        };
+    }
+    }
+}
+
+__spirv_version(1.0)[require(spirv)]
+__glsl_version(430) [require(glsl)]
+[ForceInline] public uint atomicCounterExchange(atomic_uint c, uint data)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "atomicExchange($0, $1)";
+    case spirv:
+    {
+        return spirv_asm
+        {
+            OpAtomicExchange $$uint result $c Device UniformMemory $data
+        };
+    }
+    }
+}
+
+__spirv_version(1.0)[require(spirv)]
+__glsl_version(430) [require(glsl)]
+[ForceInline] public uint atomicCounterCompSwap(atomic_uint c, uint compare, uint data)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "atomicCompSwap($0, $1, $2)";
+    case spirv:
+    {
+        return spirv_asm
+        {
+            OpAtomicCompareExchange $$uint result $c Device UniformMemory UniformMemory $data $compare
+        };
+    }
+    }
 }

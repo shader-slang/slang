@@ -648,7 +648,8 @@ static void _lookUpMembersInValue(
     // in the *type* of that value.
     //
     auto valueType = getTypeForDeclRef(astBuilder, valueDeclRef, SourceLoc());
-
+    if (auto typeType = as<TypeType>(valueType))
+        valueType = typeType->getType();
     return _lookUpMembersInType(astBuilder, name, valueType, request, ioResult, breadcrumbs);
 }
 

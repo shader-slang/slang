@@ -399,6 +399,7 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::VulkanBindGlobals, "-fvk-bind-globals", "-fvk-bind-globals <N> <descriptor-set>",
         "Places the $Globals cbuffer at descriptor set <descriptor-set> and binding <N>."},
         { OptionKind::VulkanInvertY, "-fvk-invert-y", nullptr, "Negates (additively inverts) SV_Position.y before writing to stage output."},
+        { OptionKind::VulkanUseDxPositionW, "-fvk-use-dx-position-w", nullptr, "Reciprocates (multiplicatively inverts) SV_Position.w after reading from stage input. For use in fragment shaders only."},
         { OptionKind::VulkanUseEntryPointName, "-fvk-use-entrypoint-name", nullptr, "Uses the entrypoint name from the source instead of 'main' in the spirv output."},
         { OptionKind::VulkanUseGLLayout, "-fvk-use-gl-layout", nullptr, "Use std430 layout instead of D3D buffer layout for raw buffer load/stores."},
         { OptionKind::VulkanEmitReflection, "-fspv-reflect", nullptr, "Include reflection decorations in the resulting SPIRV for shader parameters."},
@@ -516,6 +517,7 @@ void initCommandOptions(CommandOptions& options)
         "Set the filesystem hook to use for a compile request."},
         { OptionKind::Heterogeneous, "-heterogeneous", nullptr, "Output heterogeneity-related code." },
         { OptionKind::NoMangle, "-no-mangle", nullptr, "Do as little mangling of names as possible." },
+        { OptionKind::ValidateUniformity, "-validate-uniformity", nullptr, "Perform uniformity validation analysis." },
         { OptionKind::AllowGLSL, "-allow-glsl", nullptr, "Enable GLSL as an input language." },
     };
     _addOptions(makeConstArrayView(experimentalOpts), options);
@@ -1664,6 +1666,7 @@ SlangResult OptionsParser::_parse(
         switch (optionKind)
         {
             case OptionKind::NoMangle:
+            case OptionKind::ValidateUniformity:
             case OptionKind::AllowGLSL:
             case OptionKind::EmitIr:
             case OptionKind::DumpIntermediates:
@@ -1679,6 +1682,7 @@ SlangResult OptionsParser::_parse(
             case OptionKind::ValidateIr:
             case OptionKind::DumpIr:
             case OptionKind::VulkanInvertY:
+            case OptionKind::VulkanUseDxPositionW:
             case OptionKind::VulkanUseEntryPointName:
             case OptionKind::VulkanUseGLLayout:
             case OptionKind::VulkanEmitReflection:
@@ -2831,7 +2835,10 @@ SlangResult OptionsParser::_parse(
                         }
                         [[fallthrough]];
                     default:
-                        m_sink->diagnose(SourceLoc(), Diagnostics::cannotMatchOutputFileToEntryPoint, rawOutput.path);
+                        if (rawOutput.path.getLength() != 0)
+                        {
+                            m_sink->diagnose(SourceLoc(), Diagnostics::cannotMatchOutputFileToEntryPoint, rawOutput.path);
+                        }
                         break;
                 }
             }

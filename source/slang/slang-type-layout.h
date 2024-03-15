@@ -795,6 +795,8 @@ public:
     // The corresponding function declaration
     DeclRef<FuncDecl> entryPoint;
 
+    ComponentType* program = nullptr;
+
     DeclRef<FuncDecl> getFuncDeclRef() { return entryPoint; }
     FuncDecl* getFuncDecl() { return entryPoint.getDecl(); }
 
@@ -944,6 +946,8 @@ enum class ShaderParameterKind
     RegisterSpace,
 
     AppendConsumeStructuredBuffer,
+
+    AtomicUint,
 };
 
 struct SimpleLayoutRulesImpl

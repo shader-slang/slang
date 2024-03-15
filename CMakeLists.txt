@@ -96,7 +96,7 @@ option(SLANG_ENABLE_TESTS "Enable test targets, requires SLANG_ENABLE_GFX, SLANG
 option(SLANG_ENABLE_EXAMPLES "Enable example targets, requires SLANG_ENABLE_GFX" ON)
 
 enum_option(
-    SLANG_LIB_TYPE 
+    SLANG_LIB_TYPE
     # Default
     SHARED
     "How to build the slang lib:"
@@ -458,9 +458,10 @@ if(SLANG_ENABLE_GFX)
             core
             imgui
             $<$<BOOL:${SLANG_ENABLE_XLIB}>:X11::X11>
-            $<$<PLATFORM_ID:Darwin>:-framework Cocoa>
-            $<$<PLATFORM_ID:Darwin>:-framework QuartzCore>
             ${CMAKE_DL_LIBS}
+            LINK_WITH_FRAMEWORK
+            Cocoa
+            QuartzCore
         EXTRA_COMPILE_DEFINITIONS_PRIVATE
             $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB>
         INCLUDE_FROM_PRIVATE gfx
@@ -480,7 +481,10 @@ if(SLANG_ENABLE_GFX)
             slang
             Vulkan-Headers
             $<$<BOOL:${SLANG_ENABLE_XLIB}>:X11::X11>
-            $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cudart;CUDA::cuda_driver>
+            $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
+        LINK_WITH_FRAMEWORK
+            Cocoa
+            QuartzCore
         EXTRA_COMPILE_DEFINITIONS_PRIVATE
             $<$<BOOL:${SLANG_ENABLE_CUDA}>:GFX_ENABLE_CUDA>
             $<$<BOOL:${SLANG_ENABLE_OPTIX}>:GFX_OPTIX>
@@ -642,7 +646,7 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_GFX AND SLANG_ENABLE_SLANGD AND SLANG_ENA
             gfx
             gfx-util
             platform
-            $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cudart;CUDA::cuda_driver>
+            $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
         EXTRA_COMPILE_DEFINITIONS_PRIVATE
             $<$<BOOL:${SLANG_ENABLE_CUDA}>:RENDER_TEST_CUDA>
             $<$<BOOL:${SLANG_ENABLE_OPTIX}>:RENDER_TEST_OPTIX>
@@ -672,7 +676,7 @@ if (SLANG_ENABLE_EXAMPLES AND SLANG_ENABLE_GFX)
             slang
             gfx
             platform
-            $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cudart;CUDA::cuda_driver>
+            $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
         FOLDER examples
     )
 
@@ -694,7 +698,7 @@ if (SLANG_ENABLE_EXAMPLES AND SLANG_ENABLE_GFX)
                 gfx
                 gfx-util
                 platform
-                $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cudart;CUDA::cuda_driver>
+                $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
             EXTRA_COMPILE_DEFINITIONS_PRIVATE
                 $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB>
             REQUIRED_BY all-examples

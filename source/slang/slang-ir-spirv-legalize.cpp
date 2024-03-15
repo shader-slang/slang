@@ -20,6 +20,7 @@
 #include "slang-ir-peephole.h"
 #include "slang-ir-redundancy-removal.h"
 #include "slang-ir-loop-unroll.h"
+#include "slang-ir-lower-buffer-element-type.h"
 
 namespace Slang
 {
@@ -274,6 +275,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         switch (type->getOp())
         {
         case kIROp_RaytracingAccelerationStructureType:
+        case kIROp_GLSLAtomicUintType:
         case kIROp_RayQueryType:
             return true;
         default:
@@ -497,21 +499,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
     void processGlobalParam(IRGlobalParam* inst)
     {
-        if (inst->getDataType())
-        {
-            // Preserve the original type name as a decoration before we do any type lowering.
-            // This is needed to implement -fspv-reflect, which allows the compiler to output the
-            // original user-friendly type name of each shader parameter as a SPIRV decoration.
-            //
-            StringBuilder sb;
-            getTypeNameHint(sb, inst->getDataType());
-            if (sb.getLength())
-            {
-                IRBuilder builder(inst);
-                builder.addDecoration(inst, kIROp_UserTypeNameDecoration, builder.getStringValue(sb.produceString().getUnownedSlice()));
-            }
-        }
-
         // If the param is a texture, infer its format.
         if (auto textureType = as<IRTextureTypeBase>(unwrapArray(inst->getDataType())))
         {
@@ -1076,6 +1063,22 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     void processRWStructuredBufferGetElementPtr(IRRWStructuredBufferGetElementPtr* gepInst)
     {
         processGetElementPtrImpl(gepInst, gepInst->getBase(), gepInst->getIndex());
+    }
+
+    void processMeshOutputGetElementPtr(IRMeshOutputRef* gepInst)
+    {
+        processGetElementPtrImpl(gepInst, gepInst->getBase(), gepInst->getIndex());
+    }
+
+    void processMeshOutputSet(IRMeshOutputSet* setInst)
+    {
+        IRBuilder builder(m_sharedContext->m_irModule);
+        builder.setInsertBefore(setInst);
+        const auto p = builder.emitElementAddress(setInst->getBase(), setInst->getIndex());
+        const auto s = builder.emitStore(p, setInst->getElementValue());
+        setInst->removeAndDeallocate();
+        addToWorkList(p);
+        addToWorkList(s);
     }
 
     void processGetOffsetPtr(IRInst* offsetPtrInst)
@@ -1766,7 +1769,13 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 processImageSubscript(as<IRImageSubscript>(inst));
                 break;
             case kIROp_RWStructuredBufferGetElementPtr:
-                processRWStructuredBufferGetElementPtr(as<IRRWStructuredBufferGetElementPtr>(inst));
+                processRWStructuredBufferGetElementPtr(cast<IRRWStructuredBufferGetElementPtr>(inst));
+                break;
+            case kIROp_MeshOutputRef:
+                processMeshOutputGetElementPtr(cast<IRMeshOutputRef>(inst));
+                break;
+            case kIROp_MeshOutputSet:
+                processMeshOutputSet(cast<IRMeshOutputSet>(inst));
                 break;
             case kIROp_RWStructuredBufferLoad:
             case kIROp_StructuredBufferLoad:
@@ -1869,8 +1878,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
     void processModule()
     {
-        //convertCompositeTypeParametersToPointers(m_module);
-
         // Process global params before anything else, so we don't generate inefficient
         // array marhalling code for array-typed global params.
         for (auto globalInst : m_module->getGlobalInsts())
@@ -1935,7 +1942,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 // After legalizing the control flow, we need to sort our blocks to ensure this is true.
                 sortBlocksInFunc(func);
             }
-
+            
             if (isInlinableGlobalInst(globalInst))
             {
                 for (auto use = globalInst->firstUse; use; use = use->nextUse)
@@ -1960,6 +1967,14 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // Some legalization processing may change the function parameter types,
         // so we need to update the function types to match that.
         updateFunctionTypes();
+
+        // Lower all loads/stores from buffer pointers to use correct storage types.
+        // We didn't do the lowering for buffer pointers because we don't know which pointer
+        // types are actual storage buffer pointers until we propagated the address space of
+        // pointers in this pass. In the future we should consider separate out IRAddress as
+        // the type for IRVar, and use IRPtrType to dedicate pointers in user code, so we can
+        // safely lower the pointer load stores early together with other buffer types.
+        lowerBufferElementTypeToStorageType(m_sharedContext->m_targetProgram, m_module, true);
     }
 
     void updateFunctionTypes()
@@ -2039,7 +2054,7 @@ void legalizeSPIRV(SPIRVEmitSharedContext* sharedContext, IRModule* module)
     context.processModule();
 }
 
-void buildEntryPointReferenceGraph(SPIRVEmitSharedContext* context, IRModule* module)
+void buildEntryPointReferenceGraph(Dictionary<IRInst*, HashSet<IRFunc*>>& referencingEntryPoints, IRModule* module)
 {
     struct WorkItem
     {
@@ -2064,13 +2079,13 @@ void buildEntryPointReferenceGraph(SPIRVEmitSharedContext* context, IRModule* mo
 
     auto registerEntryPointReference = [&](IRFunc* entryPoint, IRInst* inst)
         {
-            if (auto set = context->m_referencingEntryPoints.tryGetValue(inst))
+            if (auto set = referencingEntryPoints.tryGetValue(inst))
                 set->add(entryPoint);
             else
             {
                 HashSet<IRFunc*> newSet;
                 newSet.add(entryPoint);
-                context->m_referencingEntryPoints.add(inst, _Move(newSet));
+                referencingEntryPoints.add(inst, _Move(newSet));
             }
         };
     auto visit = [&](IRFunc* entryPoint, IRInst* inst)
@@ -2184,7 +2199,7 @@ void legalizeIRForSPIRV(
     SLANG_UNUSED(entryPoints);
     legalizeSPIRV(context, module);
     simplifyIRForSpirvLegalization(context->m_targetProgram, codeGenContext->getSink(), module);
-    buildEntryPointReferenceGraph(context, module);
+    buildEntryPointReferenceGraph(context->m_referencingEntryPoints, module);
 }
 
 } // namespace Slang

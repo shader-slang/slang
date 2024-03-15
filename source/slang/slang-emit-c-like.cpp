@@ -34,6 +34,9 @@
 
 namespace Slang {
 
+bool isCPUTarget(TargetRequest* targetReq);
+bool isCUDATarget(TargetRequest* targetReq);
+
 struct CLikeSourceEmitter::ComputeEmitActionsContext
 {
     IRInst*             moduleInst;
@@ -349,6 +352,43 @@ void CLikeSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
             _emitType(attributedType->getBaseType(), &attributedDeclarator);
         }
         break;
+    }
+}
+
+void CLikeSourceEmitter::_emitSwizzleStorePerElement(IRInst* inst)
+{
+    auto subscriptOuter = getInfo(EmitOp::General);
+    auto subscriptPrec = getInfo(EmitOp::Postfix);
+
+    auto ii = cast<IRSwizzledStore>(inst);
+
+    UInt elementCount = ii->getElementCount();
+    UInt dstIndex = 0;
+    for (UInt ee = 0; ee < elementCount; ++ee)
+    {
+        bool needCloseSubscript = maybeEmitParens(subscriptOuter, subscriptPrec);
+
+        emitDereferenceOperand(ii->getDest(), leftSide(subscriptOuter, subscriptPrec));
+        m_writer->emit(".");
+
+        IRInst* irElementIndex = ii->getElementIndex(ee);
+        SLANG_RELEASE_ASSERT(irElementIndex->getOp() == kIROp_IntLit);
+
+        IRConstant* irConst = (IRConstant*)irElementIndex;
+
+        UInt elementIndex = (UInt)irConst->value.intVal;
+        SLANG_RELEASE_ASSERT(elementIndex < 4);
+
+        char const* kComponents[] = { "x", "y", "z", "w" };
+        m_writer->emit(kComponents[elementIndex]);
+
+        maybeCloseParens(needCloseSubscript);
+
+        m_writer->emit(" = ");
+        emitOperand(ii->getSource(), getInfo(EmitOp::General));
+        m_writer->emit(".");
+        m_writer->emit(kComponents[dstIndex++]);
+        m_writer->emit(";\n");
     }
 }
 
@@ -1494,6 +1534,19 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
             }
         }
     }
+
+    // For cuda and cpu targets don't support swizzle on the left-hand-side
+    // variable, e.g. vec4.xy = vec2 is not allowed.
+    // Therefore, we don't want to fold the right-hand-side expression.
+    // Instead, the right-hand-side expression should be generated as a separable
+    // statement and stored in a temporary varible, then assign to the left-hand-side
+    // variable per element. E.g. vec4.x = vec2.x; vec4.y = vec2.y.
+    if (as<IRSwizzledStore>(user))
+    {
+        if (isCPUTarget(getTargetReq()) || isCUDATarget(getTargetReq()))
+           return false;
+    }
+
     // We'd like to figure out if it is safe to fold our instruction into `user`
 
     // First, let's make sure they are in the same block/parent:
@@ -2356,6 +2409,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         break;
     }
     case kIROp_GetElement:
+    case kIROp_MeshOutputRef:
     case kIROp_GetElementPtr:
     case kIROp_ImageSubscript:
         // HACK: deal with translation of GLSL geometry shader input arrays.
@@ -2610,6 +2664,10 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         }
         break;
     }
+    case kIROp_RequireGLSLExtension:
+    {
+        break; //should already have set requirement; case covered for empty intrinsic block
+    }
     default:
         diagnoseUnhandledInst(inst);
         break;
@@ -2760,32 +2818,41 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
 
     case kIROp_SwizzledStore:
         {
-            auto subscriptOuter = getInfo(EmitOp::General);
-            auto subscriptPrec = getInfo(EmitOp::Postfix);
-            bool needCloseSubscript = maybeEmitParens(subscriptOuter, subscriptPrec);
-
-
-            auto ii = cast<IRSwizzledStore>(inst);
-            emitDereferenceOperand(ii->getDest(), leftSide(subscriptOuter, subscriptPrec));
-            m_writer->emit(".");
-            UInt elementCount = ii->getElementCount();
-            for (UInt ee = 0; ee < elementCount; ++ee)
+            // cpp and cuda target don't support swizzle on the left handside, so we
+            // have to assign the element one by one.
+            if (isCPUTarget(getTargetReq()) || isCUDATarget(getTargetReq()))
             {
-                IRInst* irElementIndex = ii->getElementIndex(ee);
-                SLANG_RELEASE_ASSERT(irElementIndex->getOp() == kIROp_IntLit);
-                IRConstant* irConst = (IRConstant*)irElementIndex;
-
-                UInt elementIndex = (UInt)irConst->value.intVal;
-                SLANG_RELEASE_ASSERT(elementIndex < 4);
-
-                char const* kComponents[] = { "x", "y", "z", "w" };
-                m_writer->emit(kComponents[elementIndex]);
+                _emitSwizzleStorePerElement(inst);
             }
-            maybeCloseParens(needCloseSubscript);
+            else
+            {
 
-            m_writer->emit(" = ");
-            emitOperand(ii->getSource(), getInfo(EmitOp::General));
-            m_writer->emit(";\n");
+                auto subscriptOuter = getInfo(EmitOp::General);
+                auto subscriptPrec = getInfo(EmitOp::Postfix);
+                bool needCloseSubscript = maybeEmitParens(subscriptOuter, subscriptPrec);
+
+                auto ii = cast<IRSwizzledStore>(inst);
+                emitDereferenceOperand(ii->getDest(), leftSide(subscriptOuter, subscriptPrec));
+                m_writer->emit(".");
+                UInt elementCount = ii->getElementCount();
+                for (UInt ee = 0; ee < elementCount; ++ee)
+                {
+                    IRInst* irElementIndex = ii->getElementIndex(ee);
+                    SLANG_RELEASE_ASSERT(irElementIndex->getOp() == kIROp_IntLit);
+                    IRConstant* irConst = (IRConstant*)irElementIndex;
+
+                    UInt elementIndex = (UInt)irConst->value.intVal;
+                    SLANG_RELEASE_ASSERT(elementIndex < 4);
+
+                    char const* kComponents[] = { "x", "y", "z", "w" };
+                    m_writer->emit(kComponents[elementIndex]);
+                }
+                maybeCloseParens(needCloseSubscript);
+
+                m_writer->emit(" = ");
+                emitOperand(ii->getSource(), getInfo(EmitOp::General));
+                m_writer->emit(";\n");
+            }
         }
         break;
 
@@ -2833,6 +2900,20 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
                     m_writer->emit("]");
                 }
             }
+            m_writer->emit(" = ");
+            emitOperand(ii->getElementValue(), getInfo(EmitOp::General));
+            m_writer->emit(";\n");
+        }
+        break;
+    case kIROp_MeshOutputSet:
+        {
+            auto ii = (IRMeshOutputSet*)inst;
+            auto subscriptOuter = getInfo(EmitOp::General);
+            auto subscriptPrec = getInfo(EmitOp::Postfix);
+            emitOperand(ii->getBase(), leftSide(subscriptOuter, subscriptPrec));
+            m_writer->emit("[");
+            emitOperand(ii->getIndex(), getInfo(EmitOp::General));
+            m_writer->emit("]");
             m_writer->emit(" = ");
             emitOperand(ii->getElementValue(), getInfo(EmitOp::General));
             m_writer->emit(";\n");

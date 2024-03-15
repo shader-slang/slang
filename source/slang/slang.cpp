@@ -594,17 +594,6 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
     slang::SessionDesc desc = makeFromSizeVersioned<slang::SessionDesc>((uint8_t*)&inDesc);
 
     RefPtr<Linkage> linkage = new Linkage(this, astBuilder, getBuiltinLinkage());
-    linkage->m_optionSet.load(desc.compilerOptionEntryCount, desc.compilerOptionEntries);
-
-    {
-        const Int targetCount = desc.targetCount;
-        const uint8_t* targetDescPtr = reinterpret_cast<const uint8_t*>(desc.targets);
-        for (Int ii = 0; ii < targetCount; ++ii, targetDescPtr += _getStructureSize(targetDescPtr))
-        {
-            const auto targetDesc = makeFromSizeVersioned<slang::TargetDesc>(targetDescPtr);
-            linkage->addTarget(targetDesc);
-        }
-    }
 
     linkage->setMatrixLayoutMode(desc.defaultMatrixLayoutMode);
 
@@ -630,6 +619,19 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
     {
         linkage->m_optionSet.set(CompilerOptionName::EnableEffectAnnotations, desc.enableEffectAnnotations);
     }
+
+    linkage->m_optionSet.load(desc.compilerOptionEntryCount, desc.compilerOptionEntries);
+
+    {
+        const Int targetCount = desc.targetCount;
+        const uint8_t* targetDescPtr = reinterpret_cast<const uint8_t*>(desc.targets);
+        for (Int ii = 0; ii < targetCount; ++ii, targetDescPtr += _getStructureSize(targetDescPtr))
+        {
+            const auto targetDesc = makeFromSizeVersioned<slang::TargetDesc>(targetDescPtr);
+            linkage->addTarget(targetDesc);
+        }
+    }
+
     *outSession = asExternal(linkage.detach());
     return SLANG_OK;
 }
@@ -1161,13 +1163,29 @@ slang::IModule* Linkage::loadModuleFromBlob(
 
     try
     {
-        auto name = getNamePool()->getName(moduleName);
+        auto getDigestStr = [](auto x)
+            {
+                DigestBuilder<SHA1> digestBuilder;
+                digestBuilder.append(x);
+                return digestBuilder.finalize().toString();
+            };
+
+        String moduleNameStr = moduleName;
+        if (!moduleName)
+            moduleNameStr = getDigestStr(source);
+
+        auto name = getNamePool()->getName(moduleNameStr);
         RefPtr<LoadedModule> loadedModule;
         if (mapNameToLoadedModules.tryGetValue(name, loadedModule))
         {
             return loadedModule;
         }
         String pathStr = path;
+        if (pathStr.getLength() == 0)
+        {
+            // If path is empty, use a digest from source as path.
+            pathStr = getDigestStr(source);
+        }
         auto pathInfo = PathInfo::makeFromString(pathStr);
         if (File::exists(pathStr))
         {
@@ -1203,6 +1221,16 @@ SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModuleFromSource(
     slang::IBlob** outDiagnostics)
 {
     return loadModuleFromBlob(moduleName, path, source, ModuleBlobType::Source, outDiagnostics);
+}
+
+SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModuleFromSourceString(
+    const char* moduleName,
+    const char* path,
+    const char* source,
+    slang::IBlob** outDiagnostics)
+{
+    auto sourceBlob = StringBlob::create(UnownedStringSlice(source));
+    return loadModuleFromSource(moduleName, path, sourceBlob.get(), outDiagnostics);
 }
 
 SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModuleFromIRBlob(
@@ -2111,7 +2139,7 @@ Type* ComponentType::getTypeFromString(
     // the modules that were directly or
     // indirectly referenced.
     //
-    Scope* scope = _createScopeForLegacyLookup(astBuilder);
+    Scope* scope = _getOrCreateScopeForLegacyLookup(astBuilder);
 
     auto linkage = getLinkage();
 
@@ -2126,6 +2154,76 @@ Type* ComponentType::getTypeFromString(
         m_types[typeStr] = type;
     }
     return type;
+}
+
+static void collectExportedConstantInContainer(
+    Dictionary<String, IntVal*>& dict,
+    ASTBuilder* builder,
+    ContainerDecl* containerDecl)
+{
+    for (auto m : containerDecl->members)
+    {
+        auto varMember = as<VarDeclBase>(m);
+        if (!varMember)
+            continue;
+        if (!varMember->val)
+            continue;
+        bool isExported = false;
+        bool isConst = true;
+        bool isExtern = false;
+        for (auto modifier : m->modifiers)
+        {
+            if (as<HLSLExportModifier>(modifier))
+                isExported = true;
+            if (as<ExternAttribute>(modifier) || as<ExternModifier>(modifier))
+            {
+                isExtern = true;
+                isExported = true;
+            }
+            if (as<ConstModifier>(modifier))
+                isConst = true;
+            if (isExported && isConst)
+                break;
+        }
+        if (isExported && isConst)
+        {
+            auto mangledName = getMangledName(builder, m);
+            if (isExtern && dict.containsKey(mangledName))
+                continue;
+            dict[mangledName] = varMember->val;
+        }
+    }
+
+    for (auto member : containerDecl->members)
+    {
+        if (as<NamespaceDecl>(member) || as<FileDecl>(member))
+        {
+            collectExportedConstantInContainer(dict, builder, (ContainerDecl*)member);
+        }
+    }
+}
+
+Dictionary<String, IntVal*>& ComponentType::getMangledNameToIntValMap()
+{
+    if (m_mapMangledNameToIntVal)
+    {
+        return *m_mapMangledNameToIntVal;
+    }
+    m_mapMangledNameToIntVal = std::make_unique<Dictionary<String, IntVal*>>();
+    auto astBuilder = getLinkage()->getASTBuilder();
+    SLANG_AST_BUILDER_RAII(astBuilder);
+    Scope* scope = _getOrCreateScopeForLegacyLookup(astBuilder);
+    for (; scope; scope = scope->nextSibling)
+    {
+        if (scope->containerDecl)
+            collectExportedConstantInContainer(*m_mapMangledNameToIntVal, astBuilder, scope->containerDecl);
+    }
+    return *m_mapMangledNameToIntVal;
+}
+
+ConstantIntVal* ComponentType::tryFoldIntVal(IntVal* intVal)
+{
+    return as<ConstantIntVal>(intVal->linkTimeResolve(getMangledNameToIntValMap()));
 }
 
 CompileRequestBase::CompileRequestBase(
@@ -3418,7 +3516,7 @@ bool Linkage::isBeingImported(Module* module)
     // and then appending `.slang`.
     //
     // For example, `foo_bar` becomes `foo-bar.slang`.
-String getFileNameFromModuleName(Name* name)
+String getFileNameFromModuleName(Name* name, bool translateUnderScore)
 {
     String fileName;
     if (!getText(name).getUnownedSlice().endsWithCaseInsensitive(".slang"))
@@ -3426,7 +3524,7 @@ String getFileNameFromModuleName(Name* name)
         StringBuilder sb;
         for (auto c : getText(name))
         {
-            if (c == '_')
+            if (translateUnderScore && c == '_')
                 c = '-';
 
             sb.append(c);
@@ -3493,61 +3591,65 @@ RefPtr<Module> Linkage::findOrImportModule(
     PathInfo pathIncludedFromInfo = getSourceManager()->getPathInfo(loc, SourceLocType::Actual);
     PathInfo filePathInfo;
 
-    auto moduleSourceFileName = getFileNameFromModuleName(name);
 
     // Look for a precompiled module first, if not exist, load from source.
     for (int checkBinaryModule = 1; checkBinaryModule >= 0; checkBinaryModule--)
     {
-        String fileName;
-        if (checkBinaryModule == 1)
-            fileName = Path::replaceExt(moduleSourceFileName, "slang-module");
-        else
-            fileName = moduleSourceFileName;
-
-        ComPtr<ISlangBlob> fileContents;
-
-        // We have to load via the found path - as that is how file was originally loaded
-        if (SLANG_FAILED(includeSystem.findFile(fileName, pathIncludedFromInfo.foundPath, filePathInfo)))
+        // Try without translating `_` to `-` first, if that fails, try translating.
+        for (int translateUnderScore = 0; translateUnderScore <= 1; translateUnderScore++)
         {
-            if (name && name->text == "glsl")
-            {
-                // This is a builtin glsl module, just load it from embedded definition.
-                fileContents = getSessionImpl()->getGLSLLibraryCode();
-                filePathInfo = PathInfo::makeFromString("glsl");
-                checkBinaryModule = 0;
-            }
+            auto moduleSourceFileName = getFileNameFromModuleName(name, translateUnderScore == 1);
+            String fileName;
+            if (checkBinaryModule == 1)
+                fileName = Path::replaceExt(moduleSourceFileName, "slang-module");
             else
+                fileName = moduleSourceFileName;
+
+            ComPtr<ISlangBlob> fileContents;
+
+            // We have to load via the found path - as that is how file was originally loaded
+            if (SLANG_FAILED(includeSystem.findFile(fileName, pathIncludedFromInfo.foundPath, filePathInfo)))
+            {
+                if (name && name->text == "glsl")
+                {
+                    // This is a builtin glsl module, just load it from embedded definition.
+                    fileContents = getSessionImpl()->getGLSLLibraryCode();
+                    filePathInfo = PathInfo::makeFromString("glsl");
+                    checkBinaryModule = 0;
+                }
+                else
+                {
+                    continue;
+                }
+            }
+
+            // Maybe this was loaded previously at a different relative name?
+            if (mapPathToLoadedModule.tryGetValue(filePathInfo.getMostUniqueIdentity(), loadedModule))
+                return loadedModule;
+
+            // Try to load it
+            if (!fileContents && SLANG_FAILED(includeSystem.loadFile(filePathInfo, fileContents)))
             {
                 continue;
             }
+
+            // We've found a file that we can load for the given module, so
+            // go ahead and perform the module-load action
+            auto resultModule = loadModule(
+                name,
+                filePathInfo,
+                fileContents,
+                loc,
+                sink,
+                loadedModules,
+                (checkBinaryModule == 1 ? ModuleBlobType::IR : ModuleBlobType::Source));
+            if (resultModule)
+                return resultModule;
         }
-
-        // Maybe this was loaded previously at a different relative name?
-        if (mapPathToLoadedModule.tryGetValue(filePathInfo.getMostUniqueIdentity(), loadedModule))
-            return loadedModule;
-
-        // Try to load it
-        if (!fileContents && SLANG_FAILED(includeSystem.loadFile(filePathInfo, fileContents)))
-        {
-            continue;
-        }
-
-        // We've found a file that we can load for the given module, so
-        // go ahead and perform the module-load action
-        auto resultModule = loadModule(
-            name,
-            filePathInfo,
-            fileContents,
-            loc,
-            sink,
-            loadedModules,
-            (checkBinaryModule == 1 ? ModuleBlobType::IR : ModuleBlobType::Source));
-        if (resultModule)
-            return resultModule;
     }
 
     // Error: we cannot find the file.
-    sink->diagnose(loc, Diagnostics::cannotOpenFile, moduleSourceFileName);
+    sink->diagnose(loc, Diagnostics::cannotOpenFile, getFileNameFromModuleName(name, false));
     mapNameToLoadedModules[name] = nullptr;
     return nullptr;
 }
@@ -3617,32 +3719,38 @@ SLANG_NO_THROW bool SLANG_MCALL Linkage::isBinaryModuleUpToDate(const char* modu
 
 SourceFile* Linkage::findFile(Name* name, SourceLoc loc, IncludeSystem& outIncludeSystem)
 {
-    auto fileName = getFileNameFromModuleName(name);
-
-    // Next, try to find the file of the given name,
-    // using our ordinary include-handling logic.
-
-    auto searchDirs = getSearchDirectories();
-    outIncludeSystem = IncludeSystem(&searchDirs, getFileSystemExt(), getSourceManager());
-
-    // Get the original path info
-    PathInfo pathIncludedFromInfo = getSourceManager()->getPathInfo(loc, SourceLocType::Actual);
-    PathInfo filePathInfo;
-
-    ComPtr<ISlangBlob> fileContents;
-
-    // We have to load via the found path - as that is how file was originally loaded
-    if (SLANG_FAILED(outIncludeSystem.findFile(fileName, pathIncludedFromInfo.foundPath, filePathInfo)))
+    auto impl = [&](bool translateUnderScore)->SourceFile*
     {
-        return nullptr;
-    }
-    // Otherwise, try to load it.
-    SourceFile* sourceFile;
-    if (SLANG_FAILED(outIncludeSystem.loadFile(filePathInfo, fileContents, sourceFile)))
-    {
-        return nullptr;
-    }
-    return sourceFile;
+        auto fileName = getFileNameFromModuleName(name, translateUnderScore);
+
+        // Next, try to find the file of the given name,
+        // using our ordinary include-handling logic.
+
+        auto searchDirs = getSearchDirectories();
+        outIncludeSystem = IncludeSystem(&searchDirs, getFileSystemExt(), getSourceManager());
+
+        // Get the original path info
+        PathInfo pathIncludedFromInfo = getSourceManager()->getPathInfo(loc, SourceLocType::Actual);
+        PathInfo filePathInfo;
+
+        ComPtr<ISlangBlob> fileContents;
+
+        // We have to load via the found path - as that is how file was originally loaded
+        if (SLANG_FAILED(outIncludeSystem.findFile(fileName, pathIncludedFromInfo.foundPath, filePathInfo)))
+        {
+            return nullptr;
+        }
+        // Otherwise, try to load it.
+        SourceFile* sourceFile;
+        if (SLANG_FAILED(outIncludeSystem.loadFile(filePathInfo, fileContents, sourceFile)))
+        {
+            return nullptr;
+        }
+        return sourceFile;
+    };
+    if (auto rs = impl(false))
+        return rs;
+    return impl(true);
 }
 
 Linkage::IncludeResult Linkage::findAndIncludeFile(Module* module, TranslationUnitRequest* translationUnit, Name* name, SourceLoc const& loc, DiagnosticSink* sink)

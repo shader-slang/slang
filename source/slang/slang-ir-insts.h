@@ -374,6 +374,12 @@ struct IRGLSLLocationDecoration : IRDecoration
     IRIntLit* getLocation() { return cast<IRIntLit>(getOperand(0)); }
 };
 
+struct IRGLSLOffsetDecoration : IRDecoration
+{
+    IR_LEAF_ISA(GLSLOffsetDecoration)
+    IRIntLit* getOffset() { return cast<IRIntLit>(getOperand(0)); }
+};
+
 struct IRNVAPIMagicDecoration : IRDecoration
 {
     enum { kOp = kIROp_NVAPIMagicDecoration };
@@ -689,6 +695,8 @@ struct IROffsetDecoration : IRDecoration
     IRIntegerValue getOffset() { return getOffsetOperand()->getValue(); }
 };
 
+IR_SIMPLE_DECORATION(DynamicUniformDecoration)
+
 struct IRBuiltinDecoration : IRDecoration
 {
     enum
@@ -708,6 +716,11 @@ struct IRSequentialIDDecoration : IRDecoration
 
     IRIntLit* getSequentialIDOperand() { return cast<IRIntLit>(getOperand(0)); }
     IRIntegerValue getSequentialID() { return getSequentialIDOperand()->getValue(); }
+};
+
+struct IRDynamicDispatchWitnessDecoration : IRDecoration
+{
+    IR_LEAF_ISA(DynamicDispatchWitnessDecoration)
 };
 
 struct IRAutoDiffOriginalValueDecoration : IRDecoration
@@ -1363,12 +1376,25 @@ struct IRGLPositionOutputDecoration : public IRDecoration
     IR_LEAF_ISA(GLPositionOutputDecoration)
 };
 
+struct IRGLPositionInputDecoration : public IRDecoration
+{
+    IR_LEAF_ISA(GLPositionInputDecoration)
+};
+
 struct IRMeshOutputRef : public IRInst
 {
-    enum { kOp = kIROp_MeshOutputRef };
     IR_LEAF_ISA(MeshOutputRef)
+    IRInst* getBase() { return getOperand(0); }
     IRInst* getIndex() { return getOperand(1); }
     IRInst* getOutputType() { return cast<IRPtrTypeBase>(getFullType())->getValueType(); }
+};
+
+struct IRMeshOutputSet : public IRInst
+{
+    IR_LEAF_ISA(MeshOutputSet)
+    IRInst* getBase() { return getOperand(0); }
+    IRInst* getIndex() { return getOperand(1); }
+    IRInst* getElementValue() { return getOperand(2); }
 };
 
     /// An attribute that can be attached to another instruction as an operand.
@@ -3536,7 +3562,7 @@ public:
 
     IRInst* addFloatingModeOverrideDecoration(IRInst* dest, FloatingPointMode mode);
 
-    IRInst* addNumThreadsDecoration(IRInst* inst, Int x, Int y, Int z);
+    IRInst* addNumThreadsDecoration(IRInst* inst, IRInst* x, IRInst* y, IRInst* z);
 
     IRInst* emitSpecializeInst(
         IRType*         type,
@@ -3809,6 +3835,7 @@ public:
 
     // Create an initially empty `GLSLShaderStorageBufferType` type.
     IRGLSLShaderStorageBufferType* createGLSLShaderStorableBufferType();
+    IRGLSLShaderStorageBufferType* createGLSLShaderStorableBufferType(UInt operandCount, IRInst* const* operands);
 
     // Create an empty `interface` type.
     IRInterfaceType* createInterfaceType(UInt operandCount, IRInst* const* operands);
@@ -4281,6 +4308,11 @@ public:
         addNameHintDecoration(value, getStringValue(text));
     }
 
+    void addUserTypeNameDecoration(IRInst* value, IRStringLit* name)
+    {
+        addDecoration(value, kIROp_UserTypeNameDecoration, name);
+    }
+
     void addBinaryInterfaceTypeDecoration(IRInst* value)
     {
         addDecoration(value, kIROp_BinaryInterfaceTypeDecoration);
@@ -4294,6 +4326,11 @@ public:
     void addGLPositionOutputDecoration(IRInst* value)
     {
         addDecoration(value, kIROp_GLPositionOutputDecoration);
+    }
+
+    void addGLPositionInputDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_GLPositionInputDecoration);
     }
 
     void addInterpolationModeDecoration(IRInst* value, IRInterpolationMode mode)
@@ -4413,6 +4450,11 @@ public:
     void addDebugLocationDecoration(IRInst* value, IRInst* debugSource, IRIntegerValue line, IRIntegerValue col)
     {
         addDecoration(value, kIROp_DebugLocationDecoration, debugSource, getIntValue(getUIntType(), line), getIntValue(getUIntType(), col));
+    }
+
+    void addUnsafeForceInlineDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_UnsafeForceInlineEarlyDecoration);
     }
 
     void addForceInlineDecoration(IRInst* value)
@@ -4625,6 +4667,11 @@ public:
         addDecoration(value, kIROp_NonCopyableTypeDecoration);
     }
 
+    void addDynamicUniformDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_DynamicUniformDecoration);
+    }
+
         /// Add a decoration that indicates that the given `inst` depends on the given `dependency`.
         ///
         /// This decoration can be used to ensure that a value that an instruction
@@ -4689,6 +4736,11 @@ public:
     void addSequentialIDDecoration(IRInst* inst, IRIntegerValue id)
     {
         addDecoration(inst, kIROp_SequentialIDDecoration, getIntValue(getUIntType(), id));
+    }
+
+    void addDynamicDispatchWitnessDecoration(IRInst* inst)
+    {
+        addDecoration(inst, kIROp_DynamicDispatchWitnessDecoration);
     }
 
     void addVulkanRayPayloadDecoration(IRInst* inst, int location)

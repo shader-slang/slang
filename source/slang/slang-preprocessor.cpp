@@ -2994,10 +2994,25 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
     AdvanceRawToken(context);
 
     Token pathToken;
-    if(!Expect(context, TokenType::StringLiteral, Diagnostics::expectedTokenInPreprocessorDirective, &pathToken))
-        return;
-
-    String path = getFileNameTokenValue(pathToken);
+    String path;
+    if (PeekRawTokenType(context) == TokenType::OpLess)
+    {
+        StringBuilder pathSB;
+        Expect(context, TokenType::OpLess, Diagnostics::expectedTokenInPreprocessorDirective, &pathToken);
+        while (PeekRawTokenType(context) != TokenType::OpGreater &&
+            PeekRawTokenType(context) != TokenType::EndOfFile)
+        {
+            pathSB << AdvanceRawToken(context).getContent();
+        }
+        if (!Expect(context, TokenType::OpGreater, Diagnostics::expectedTokenInPreprocessorDirective))
+            return;
+        path = pathSB.produceString();
+    }
+    else
+    {
+        Expect(context, TokenType::StringLiteral, Diagnostics::expectedTokenInPreprocessorDirective, &pathToken);
+        path = getFileNameTokenValue(pathToken);
+    }
 
     auto directiveLoc = GetDirectiveLoc(context);
     

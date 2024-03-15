@@ -2926,6 +2926,24 @@ struct SPIRVEmitContext
         }
     }
 
+    // Make user type name conform to `SPV_GOOGLE_user_type` spec.
+    // https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/GOOGLE/SPV_GOOGLE_user_type.asciidoc
+    String legalizeUserTypeName(UnownedStringSlice typeName)
+    {
+        String result = typeName;
+        auto index = typeName.indexOf('<');
+        if (index == -1)
+            index = typeName.getLength();
+        StringBuilder sb;
+        sb << String(typeName.head(index)).toLower();
+        if (index != typeName.getLength())
+        {
+            sb << ":";
+            sb << typeName.tail(index);
+        }
+        return sb.produceString();
+    }
+
         /// Emit an appropriate SPIR-V decoration for the given IR `decoration`, if necessary and possible.
         ///
         /// The given `dstID` should be the `<id>` of the SPIR-V instruction being decorated,
@@ -3081,16 +3099,9 @@ struct SPIRVEmitContext
             }
             break;
         case kIROp_MaxVertexCountDecoration:
-            {
-                auto section = getSection(SpvLogicalSectionID::ExecutionModes);
-                auto maxVertexCount = cast<IRMaxVertexCountDecoration>(decoration);
-                emitOpExecutionModeOutputVertices(
-                    section,
-                    decoration,
-                    dstID,
-                    SpvLiteralInteger::from32(int32_t(getIntVal(maxVertexCount->getCount())))
-                );
-            }
+            // Don't do anything here, instead wait until we see OutputTopologyDecoration
+            // and emit them together to ensure MaxVertexCount always appears before OutputTopology,
+            // which seemed to be required by SPIRV.
             break;
         case kIROp_InstanceDecoration:
             {
@@ -3101,22 +3112,49 @@ struct SPIRVEmitContext
             }
             break;
         case kIROp_TriangleInputPrimitiveTypeDecoration:
-            emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, SpvExecutionModeTriangles);
-            break;
         case kIROp_LineInputPrimitiveTypeDecoration:
-            emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, SpvExecutionModeInputLines);
-            break;
         case kIROp_LineAdjInputPrimitiveTypeDecoration:
-            emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, SpvExecutionModeInputLinesAdjacency);
-            break;
         case kIROp_PointInputPrimitiveTypeDecoration:
-            emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, SpvExecutionModeInputPoints);
-            break;
         case kIROp_TriangleAdjInputPrimitiveTypeDecoration:
-            emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), decoration, dstID, SpvExecutionModeInputTrianglesAdjacency);
+            // Defer this until we see kIROp_StreamOutputTypeDecoration because the driver wants to see
+            // them before the output.
             break;
         case kIROp_StreamOutputTypeDecoration:
             {
+                for (auto inputDecor : decoration->getParent()->getDecorations())
+                {
+                    switch (inputDecor->getOp())
+                    {
+                    case kIROp_TriangleInputPrimitiveTypeDecoration:
+                        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), inputDecor, dstID, SpvExecutionModeTriangles);
+                        break;
+                    case kIROp_LineInputPrimitiveTypeDecoration:
+                        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), inputDecor, dstID, SpvExecutionModeInputLines);
+                        break;
+                    case kIROp_LineAdjInputPrimitiveTypeDecoration:
+                        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), inputDecor, dstID, SpvExecutionModeInputLinesAdjacency);
+                        break;
+                    case kIROp_PointInputPrimitiveTypeDecoration:
+                        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), inputDecor, dstID, SpvExecutionModeInputPoints);
+                        break;
+                    case kIROp_TriangleAdjInputPrimitiveTypeDecoration:
+                        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes), inputDecor, dstID, SpvExecutionModeInputTrianglesAdjacency);
+                        break;
+                    }
+                }
+                // SPIRV requires MaxVertexCount decoration to appear before OutputTopologyDecoration,
+                // so we emit them here.
+                if (auto maxVertexCount = decoration->getParent()->findDecoration<IRMaxVertexCountDecoration>())
+                {
+                    auto section = getSection(SpvLogicalSectionID::ExecutionModes);
+                    emitOpExecutionModeOutputVertices(
+                        section,
+                        maxVertexCount,
+                        dstID,
+                        SpvLiteralInteger::from32(int32_t(getIntVal(maxVertexCount->getCount())))
+                    );
+                }
+
                 auto decor = as<IRStreamOutputTypeDecoration>(decoration);
                 IRType* type = decor->getStreamType();
 
@@ -3257,7 +3295,7 @@ struct SPIRVEmitContext
                         decoration,
                         dstID,
                         SpvDecorationUserTypeGOOGLE,
-                        cast<IRUserTypeNameDecoration>(decoration)->getUserTypeName()->getStringSlice());
+                        legalizeUserTypeName(cast<IRUserTypeNameDecoration>(decoration)->getUserTypeName()->getStringSlice()).getUnownedSlice());
                 }
                 break;
             case kIROp_CounterBufferDecoration:
@@ -3596,6 +3634,37 @@ struct SPIRVEmitContext
                 }
                 else if (semanticName == "sv_primitiveid")
                 {
+                    auto entryPoints = m_referencingEntryPoints.tryGetValue(inst);
+                    // SPIRV requires `Geometry` capability being declared for a fragment
+                    // shader, if that shader uses sv_primitiveid.
+                    // We will check if this builtin is used by non-ray-tracing, non-geometry or
+                    // non-tessellation shader stages, and if so include a declaration of
+                    // Geometry capability.
+                    bool needGeometryCapability = true;
+                    if (entryPoints)
+                    {
+                        for (auto entryPoint : *entryPoints)
+                        {
+                            if (auto entryPointDecor = entryPoint->findDecoration<IREntryPointDecoration>())
+                            {
+                                switch (entryPointDecor->getProfile().getStage())
+                                {
+                                case Stage::Geometry:
+                                case Stage::Intersection:
+                                case Stage::Mesh:
+                                case Stage::Amplification:
+                                case Stage::AnyHit:
+                                case Stage::ClosestHit:
+                                case Stage::Hull:
+                                case Stage::Domain:
+                                    needGeometryCapability = false;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if (needGeometryCapability)
+                        requireSPIRVCapability(SpvCapabilityGeometry);
                     return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPrimitiveId);
                 }
                 else if (semanticName == "sv_rendertargetarrayindex")
@@ -3663,7 +3732,11 @@ struct SPIRVEmitContext
                 {
                     requireSPIRVCapability(SpvCapabilityFragmentShadingRateKHR);
                     ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_fragment_shading_rate"));
-                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPrimitiveShadingRateKHR);
+                    auto importDecor = inst->findDecoration<IRImportDecoration>();
+                    if (importDecor && importDecor->getMangledName() == "gl_PrimitiveShadingRateEXT")
+                        return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPrimitiveShadingRateKHR);
+                    else
+                        return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInShadingRateKHR);
                 }
                 SLANG_UNREACHABLE("Unimplemented system value in spirv emit.");
             }
@@ -4957,6 +5030,18 @@ struct SPIRVEmitContext
             const auto lVec = as<IRVectorType>(l->getDataType());
             auto r = operands[1];
             const auto rVec = as<IRVectorType>(r->getDataType());
+            if (op == kIROp_Mul && isFloatingPoint)
+            {
+                if (lVec && !rVec)
+                {
+                    return emitInst(parent, instToRegister, SpvOpVectorTimesScalar, type, kResultID, operands);
+                }
+                else if (!lVec && rVec)
+                {
+                    IRInst* newOperands[2] = { operands[1], operands[0] };
+                    return emitInst(parent, instToRegister, SpvOpVectorTimesScalar, type, kResultID, ArrayView<IRInst*>(newOperands, 2));
+                }
+            }
             const auto go = [&](const auto l, const auto r) {
                 return emitInst(parent, instToRegister, opCode, type, kResultID, l, r);
             };
@@ -5740,6 +5825,22 @@ struct SPIRVEmitContext
     }
 };
 
+bool isInstUsedInStage(SPIRVEmitContext& context, IRInst* inst, Stage s)
+{
+    auto* referencingEntryPoints = context.m_referencingEntryPoints.tryGetValue(inst);
+    if (!referencingEntryPoints)
+        return false;
+    for (auto entryPoint : *referencingEntryPoints)
+    {
+        if (auto entryPointDecor = entryPoint->findDecoration<IREntryPointDecoration>())
+        {
+            if (entryPointDecor->getProfile().getStage() == s)
+                return true;
+        }
+    }
+    return false;
+}
+
 SlangResult emitSPIRVFromIR(
     CodeGenContext*         codeGenContext,
     IRModule*               irModule,
@@ -5804,15 +5905,47 @@ SlangResult emitSPIRVFromIR(
         context.ensureInst(irEntryPoint);
     }
 
-    // Move forward delcared pointers to the end.
-    for (auto ptrType : context.m_forwardDeclaredPointers)
+    // Declare integral input builtins as Flat if necessary.
+    for (auto globalInst : context.m_irModule->getGlobalInsts())
     {
-        auto spvPtrType = context.m_mapIRInstToSpvInst[ptrType];
-        context.ensureInst(ptrType->getValueType());
-        auto parent = spvPtrType->parent;
-        spvPtrType->removeFromParent();
-        parent->addInst(spvPtrType);
+        if (globalInst->getOp() != kIROp_GlobalVar &&
+            globalInst->getOp() != kIROp_GlobalParam)
+            continue;
+        auto spvVar = context.m_mapIRInstToSpvInst.tryGetValue(globalInst);
+        if (!spvVar)
+            continue;
+        auto ptrType = as<IRPtrType>(globalInst->getDataType());
+        if (!ptrType)
+            continue;
+        auto addrSpace = ptrType->getAddressSpace();
+        if (addrSpace == SpvStorageClassInput)
+        {
+            if (isIntegralScalarOrCompositeType(ptrType->getValueType()))
+            {
+                if (isInstUsedInStage(context, globalInst, Stage::Fragment))
+                    context._maybeEmitInterpolationModifierDecoration(IRInterpolationMode::NoInterpolation, *spvVar);
+            }
+        }
     }
+
+    // Move forward delcared pointers to the end.
+    do
+    {
+        auto fwdPointers = context.m_forwardDeclaredPointers;
+        context.m_forwardDeclaredPointers.clear();
+
+        for (auto ptrType : fwdPointers)
+        {
+            auto spvPtrType = context.m_mapIRInstToSpvInst[ptrType];
+            // When we emit a pointee type, we may introduce new
+            // forward-declared pointer types, so we need to
+            // keep iterating until we have emitted all of them.
+            context.ensureInst(ptrType->getValueType());
+            auto parent = spvPtrType->parent;
+            spvPtrType->removeFromParent();
+            parent->addInst(spvPtrType);
+        }
+    } while (context.m_forwardDeclaredPointers.getCount() != 0);
 
     context.emitFrontMatter();
 

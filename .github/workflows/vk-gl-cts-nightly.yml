@@ -1,0 +1,56 @@
+name: VK-GL-CTS Nightly
+
+on:
+  schedule:
+    - cron: '00 07 * * *'
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  DISABLE_CTS_SLANG: 0
+jobs:
+  build:
+    runs-on: [Windows, self-hosted]
+    timeout-minutes: 100
+    continue-on-error: true
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: 'true'
+        fetch-depth: '0'
+    - name: setup-msbuild
+      uses: microsoft/setup-msbuild@v1
+    - name: build slang
+      run: |
+        .\premake.bat vs2019 --arch=x64 --deps=true --no-progress=true --enable-cuda=true
+        
+        .\make-slang-tag-version.bat
+        
+        MSBuild.exe slang.sln -v:m -m -property:Configuration=Release -property:Platform=x64 -property:WindowsTargetPlatformVersion=10.0.19041.0 -maxcpucount:12
+    - uses: robinraju/release-downloader@v1.7
+      with:
+        latest: true
+        repository: "shader-slang/VK-GL-CTS"
+        fileName: "VK-GL-CTS_WithSlang-0.0.3-win64.zip"
+    - uses: actions/checkout@v4
+      with:
+        repository: "shader-slang/VK-GL-CTS"
+        sparse-checkout: |
+          test-lists/slang-passing-tests.txt
+        path: test-lists
+        sparse-checkout-cone-mode: false
+    - name: vkcts setup
+      run: |
+        Expand-Archive VK-GL-CTS_WithSlang-0.0.3-win64.zip
+        
+        copy ${{ github.workspace }}\bin\windows-x64\release\slang.dll ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\slang.dll
+
+        copy ${{ github.workspace }}\bin\windows-x64\release\slang-glslang.dll ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\slang-glslang.dll
+
+        copy ${{ github.workspace }}\test-lists\test-lists\slang-passing-tests.txt ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\slang-passing-tests.txt
+
+        copy ${{ github.workspace }}\bin\windows-x64\release\test-server.exe ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\test-server.exe
+    - name: vkcts run
+      working-directory: ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64
+      run: |
+        .\deqp-vk.exe --deqp-archive-dir=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64 --deqp-caselist-file=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\slang-passing-tests.txt

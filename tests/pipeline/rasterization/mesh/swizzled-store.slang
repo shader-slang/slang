@@ -11,8 +11,8 @@ const static uint MAX_PRIMS = 1;
 [numthreads(3, 1, 1)]
 void main(
     in uint tig : SV_GroupIndex,
-    out Vertices<float4, MAX_VERTS> verts : SV_Position,
-    out Indices<uint3, MAX_PRIMS> triangles
+    OutputVertices<float4, MAX_VERTS> verts : SV_Position,
+    OutputIndices<uint3, MAX_PRIMS> triangles
     )
 {
     const uint numVertices = 3;
