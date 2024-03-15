@@ -489,6 +489,12 @@ void GLSLSourceEmitter::_emitGLSLImageFormatModifier(IRInst* var, IRTextureType*
         }
         else
         {
+            auto formatInfo = getImageFormatInfo(format);
+            if (formatInfo.scalarType == SLANG_SCALAR_TYPE_UINT64 || formatInfo.scalarType == SLANG_SCALAR_TYPE_INT64)
+            {
+                _requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_EXT_shader_image_int64"));
+                _requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_EXT_shader_atomic_int64"));
+            }
             // If there is an explicit format specified, then we
             // should emit a `layout` modifier using the GLSL name
             // for the format.

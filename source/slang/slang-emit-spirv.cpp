@@ -1766,6 +1766,37 @@ struct SPIRVEmitContext
         }
     }
 
+    void setImageFormatCapabilityAndExtension(SpvImageFormat format, SpvCapability_ setCapabilityMask)
+    {
+        switch (format)
+        {
+        case SpvImageFormatUnknown:
+        case SpvImageFormatRgba32f:
+        case SpvImageFormatRgba16f:
+        case SpvImageFormatR32f:
+        case SpvImageFormatRgba8:
+        case SpvImageFormatRgba8Snorm:
+        case SpvImageFormatRgba32i:
+        case SpvImageFormatRgba16i:
+        case SpvImageFormatRgba8i:
+        case SpvImageFormatR32i:
+        case SpvImageFormatRgba32ui:
+        case SpvImageFormatRgba16ui:
+        case SpvImageFormatRgba8ui:
+        case SpvImageFormatR32ui:
+            if(setCapabilityMask == SpvCapabilityShader) return;
+            requireSPIRVCapability(SpvCapabilityShader);
+        case SpvImageFormatR64ui:
+        case SpvImageFormatR64i:
+            if(setCapabilityMask == SpvCapabilityInt64ImageEXT) return;
+            ensureExtensionDeclaration(UnownedStringSlice("SPV_EXT_shader_image_int64"));
+            requireSPIRVCapability(SpvCapabilityInt64ImageEXT);
+        default:
+            if(setCapabilityMask == SpvCapabilityStorageImageExtendedFormats) return;
+            requireSPIRVCapability(SpvCapabilityStorageImageExtendedFormats);
+        }
+    }
+
     SpvInst* ensureTextureType(IRInst* assignee, IRTextureTypeBase* inst)
     {
         // Some untyped constants from OpTypeImage
@@ -1940,9 +1971,7 @@ struct SPIRVEmitContext
             requireSPIRVCapability(SpvCapabilityStorageImageWriteWithoutFormat);
         }
         
-        auto formatCapability = getImageFormatCapability(format);
-        if (formatCapability != SpvCapabilityShader)
-            requireSPIRVCapability(formatCapability);
+        setImageFormatCapabilityAndExtension(format, SpvCapabilityShader);
 
         //
         // The op itself

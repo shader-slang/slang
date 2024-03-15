@@ -2866,10 +2866,17 @@ __generic<T : __BuiltinType>
     case glsl:
     {
         if (__type_equals<T, float>()) 
-            __requireGLSLExtension("GLSL_EXT_shader_atomic_float");  
+            __requireGLSLExtension("GL_EXT_shader_atomic_float");  
     }
     case spirv:
-        return; 
+        if (__type_equals<T, float>())
+        {
+            spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_atomic_float_add";
+                OpCapability AtomicFloat32AddEXT
+            };
+        }
     }
 }
 
@@ -2881,10 +2888,17 @@ __generic<T : __BuiltinType>
     case glsl:
     {
         if (__type_equals<T, float>()) 
-            __requireGLSLExtension("GLSL_EXT_shader_atomic_float2");  
+            __requireGLSLExtension("GL_EXT_shader_atomic_float2");  
     }
     case spirv:
-        return; 
+        if (__type_equals<T, float>())
+        {
+            spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_atomic_float_min_max";
+                OpCapability AtomicFloat32AddEXT
+            };
+        }
     }
 }
 
@@ -2899,8 +2913,6 @@ __generic<T : __BuiltinType>
         {
             spirv_asm
             {
-                OpExtension "SPV_EXT_shader_image_int64";
-                OpCapability Int64ImageEXT;
                 OpCapability Int64Atomics;
             };
         }
@@ -3019,15 +3031,6 @@ ${{{{
             auto SPV_DEFAULT_SAMPLE_VAR_IF_MISSING = SPV_DEFAULT_SAMPLE_VAR_IF_MISSINGBuilder.toString(); 
 }}}}
 
-// will be set from modifiers?
-${{{{
-            if (targetType.isI64)
-            {
-}}}}
-            __glsl_extension(GLSL_EXT_shader_image_int64)
-${{{{
-            }
-}}}}
             __generic<let format:int=0>
             public typealias $(fullTypeName) = __TextureImpl<
                 $(targetType.type),

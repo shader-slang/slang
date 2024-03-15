@@ -2271,12 +2271,12 @@ Result DeviceImpl::createBufferView(
                 info.pNext = &bufferViewUsage;
                 if (desc.type == IResourceView::Type::UnorderedAccess)
                 {
-                    bufferViewUsage.usage = VK_FORMAT_FEATURE_STORAGE_TEXEL_BUFFER_BIT;
+                    bufferViewUsage.usage = VK_BUFFER_USAGE_2_STORAGE_TEXEL_BUFFER_BIT_KHR;
                     info.pNext = &bufferViewUsage;
                 }
                 else if (desc.type == IResourceView::Type::ShaderResource)
                 {
-                    bufferViewUsage.usage = VK_FORMAT_FEATURE_UNIFORM_TEXEL_BUFFER_BIT;
+                    bufferViewUsage.usage = VK_BUFFER_USAGE_2_UNIFORM_TEXEL_BUFFER_BIT_KHR;
                 }
 
                 SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateBufferView(m_device, &info, nullptr, &view));
