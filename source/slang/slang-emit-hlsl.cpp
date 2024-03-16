@@ -3,6 +3,7 @@
 
 #include "../core/slang-writer.h"
 
+#include "slang-ir-util.h"
 #include "slang-emit-source-writer.h"
 #include "slang-mangled-lexer.h"
 
@@ -987,7 +988,6 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             case kIROp_HLSLRWByteAddressBufferType:                 m_writer->emit("RWByteAddressBuffer");                break;
             case kIROp_HLSLRasterizerOrderedByteAddressBufferType:  m_writer->emit("RasterizerOrderedByteAddressBuffer"); break;
             case kIROp_RaytracingAccelerationStructureType:         m_writer->emit("RaytracingAccelerationStructure");    break;
-
             default:
                 SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled buffer type");
                 break;

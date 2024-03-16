@@ -17,6 +17,7 @@
 #include "slang-ir-defunctionalization.h"
 #include "slang-ir-dll-export.h"
 #include "slang-ir-dll-import.h"
+#include "slang-ir-early-raytracing-intrinsic-simplification.h"
 #include "slang-ir-eliminate-phis.h"
 #include "slang-ir-eliminate-multilevel-break.h"
 #include "slang-ir-entry-point-uniforms.h"
@@ -242,7 +243,7 @@ Result linkAndOptimizeIR(
     // If the user specified the flag that they want us to dump
     // IR, then do it here, for the target-specific, but
     // un-specialized IR.
-    dumpIRIfEnabled(codeGenContext, irModule);
+    dumpIRIfEnabled(codeGenContext, irModule, "POST IR VALIDATION");
 
     if(!isKhronosTarget(targetRequest))
         lowerGLSLShaderStorageBufferObjectsToStructuredBuffers(irModule, sink);
@@ -1037,6 +1038,9 @@ Result linkAndOptimizeIR(
             applyGLSLLiveness(irModule);
         }
     }
+
+    replaceLocationIntrinsicsWithRaytracingObject(targetProgram, irModule, sink);
+    validateIRModuleIfEnabled(codeGenContext, irModule);
 
     // Run a final round of simplifications to clean up unused things after phi-elimination.
     simplifyNonSSAIR(targetProgram, irModule, IRSimplificationOptions::getFast());

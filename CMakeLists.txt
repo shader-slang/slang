@@ -481,7 +481,7 @@ if(SLANG_ENABLE_GFX)
             slang
             Vulkan-Headers
             $<$<BOOL:${SLANG_ENABLE_XLIB}>:X11::X11>
-            $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cudart;CUDA::cuda_driver>
+            $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
         LINK_WITH_FRAMEWORK
             Cocoa
             QuartzCore
@@ -646,7 +646,7 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_GFX AND SLANG_ENABLE_SLANGD AND SLANG_ENA
             gfx
             gfx-util
             platform
-            $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cudart;CUDA::cuda_driver>
+            $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
         EXTRA_COMPILE_DEFINITIONS_PRIVATE
             $<$<BOOL:${SLANG_ENABLE_CUDA}>:RENDER_TEST_CUDA>
             $<$<BOOL:${SLANG_ENABLE_OPTIX}>:RENDER_TEST_OPTIX>
@@ -676,7 +676,7 @@ if (SLANG_ENABLE_EXAMPLES AND SLANG_ENABLE_GFX)
             slang
             gfx
             platform
-            $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cudart;CUDA::cuda_driver>
+            $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
         FOLDER examples
     )
 
@@ -698,7 +698,7 @@ if (SLANG_ENABLE_EXAMPLES AND SLANG_ENABLE_GFX)
                 gfx
                 gfx-util
                 platform
-                $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cudart;CUDA::cuda_driver>
+                $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
             EXTRA_COMPILE_DEFINITIONS_PRIVATE
                 $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB>
             REQUIRED_BY all-examples

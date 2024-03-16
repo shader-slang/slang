@@ -901,7 +901,12 @@ class VulkanRayPayloadAttribute : public Attribute
 
     int location;
 };
+class VulkanRayPayloadInAttribute : public Attribute 
+{
+    SLANG_AST_CLASS(VulkanRayPayloadInAttribute)
 
+    int location;
+};
 
 // A `[__vulkanCallablePayload(location)]` attribute, which is used in the
 // standard library implementation to indicate that a variable
@@ -913,7 +918,12 @@ class VulkanCallablePayloadAttribute : public Attribute
 
     int location;
 };
+class VulkanCallablePayloadInAttribute : public Attribute 
+{
+    SLANG_AST_CLASS(VulkanCallablePayloadInAttribute)
 
+    int location;
+};
 
 // A `[__vulkanHitAttributes]` attribute, which is used in the
 // standard library implementation to indicate that a variable
