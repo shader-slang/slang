@@ -3537,7 +3537,7 @@ void CLikeSourceEmitter::emitStructDeclarationsBlock(IRStructType* structType, b
                 emitPackOffsetModifier(fieldKey, fieldType, packOffsetDecoration);
             }
         }
-        if(isAllowGLSL())
+        if(this->getTargetProgram()->getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL))
         {
             emitMemoryQualifiers(fieldKey);
         }

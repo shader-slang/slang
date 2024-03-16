@@ -412,8 +412,9 @@ namespace Slang
                 expr->declRef = declRef;
                 expr->memberOperatorLoc = _getMemberOpLoc(originalExpr);
 
-                // if any member says the following value is a write only,
-                // we must declare the variable as a write only
+                // If any member declares the following value is a
+                // write only, we must declare the parent as a write
+                // only to avoid modifying the child
                 expr->type.isWriteOnly = baseExpr->type.isWriteOnly || expr->type.isWriteOnly;
 
                 // When referring to a member through an expression,
@@ -428,7 +429,6 @@ namespace Slang
                     // One exception to this is if we're reading the contents
                     // of a GLSL buffer interface block which isn't marked as
                     // read_only
-                    //note: mutable only if child is not read-only and you are not read-only as well
                     expr->type.isLeftValue = isMutableGLSLBufferBlockVarExpr(baseExpr) && (expr->type.hasReadOnlyOnTarget == false);
                 }
                 else
@@ -2078,15 +2078,6 @@ namespace Slang
                 getSink()->diagnoseWithoutSourceView(thisExpr, Diagnostics::thisIsImmutableByDefault);
             }
         }
-    }
-
-    bool SemanticsVisitor::isWriteOnlyExpr(Expr* expr)
-    {
-        if (auto declRef = as<DeclRefType>(expr->type.type))
-        {
-            return declRef->getDeclRefBase()->getDecl()->hasModifier<GLSLWriteOnlyModifier>();
-        }
-        return false;
     }
 
     Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
@@ -4249,10 +4240,8 @@ namespace Slang
     Expr* SemanticsExprVisitor::visitFuncTypeExpr(FuncTypeExpr* expr)
     {
         // The input and output to a function type must both be types
-        for (auto& t : expr->parameters)
-        {
+        for(auto& t : expr->parameters)
             t = CheckProperType(t);
-        }
         expr->result = CheckProperType(expr->result);
 
         // TODO: Kind checking? Where are we stopping someone passing
@@ -4339,12 +4328,12 @@ namespace Slang
                     else if(operand.flavor == SPIRVAsmOperand::SlangValue
                         || operand.flavor == SPIRVAsmOperand::SlangImmediateValue
                         || operand.flavor == SPIRVAsmOperand::SlangValueAddr
-                        || operand.flavor == SPIRVAsmOperand::ImagePointer
                         || operand.flavor == SPIRVAsmOperand::ImageType
                         || operand.flavor == SPIRVAsmOperand::SampledImageType
                         || operand.flavor == SPIRVAsmOperand::RayPayloadFromLocation
                         || operand.flavor == SPIRVAsmOperand::RayAttributeFromLocation
-                        || operand.flavor == SPIRVAsmOperand::RayCallableFromLocation)
+                        || operand.flavor == SPIRVAsmOperand::RayCallableFromLocation
+                        || operand.flavor == SPIRVAsmOperand::ImagePointer)
                     {
                         // This is a $expr operand, check the expr
                         operand.expr = dispatch(operand.expr);

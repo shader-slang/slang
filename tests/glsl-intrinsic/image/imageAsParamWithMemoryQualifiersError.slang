@@ -11,7 +11,7 @@ layout(local_size_x = 4) in;
 //TEST_INPUT: RWTexture2D(format=R16G16B16A16_FLOAT, size=1, content=one, mipMaps = 1):name someImage
 uniform layout(binding=0,rgba16f) readonly image2D someImage;
 
-// CHECK: error 30048 
+// CHECK: error 30048
 bool checkAllImageSizes(writeonly image2D val)
 {
     return true

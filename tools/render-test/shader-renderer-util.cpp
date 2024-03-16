@@ -31,6 +31,7 @@ using Slang::Result;
 
     // Default to R8G8B8A8_UNORM
     const Format format = (inputDesc.format == Format::Unknown) ? Format::R8G8B8A8_UNORM : inputDesc.format;
+
     textureResourceDesc.sampleDesc = ITextureResource::SampleDesc{inputDesc.sampleCount, 0};
     textureResourceDesc.format = format;
     textureResourceDesc.numMipLevels = texData.m_mipLevels;
@@ -117,6 +118,7 @@ using Slang::Result;
         ResourceState::CopySource,
         ResourceState::UnorderedAccess,
         ResourceState::ShaderResource);
+
     ComPtr<IBufferResource> bufferResource = device->createBufferResource(srcDesc, initData);
     if (!bufferResource)
     {

@@ -1839,10 +1839,9 @@ struct SPIRVEmitContext
                 break;
             case SLANG_TEXTURE_2D:
                 if(inst->isRect() && isOpenGLTarget(this->m_targetRequest))
-                    dim = SpvDimRect;                
-                else    
+                    dim = SpvDimRect;
+                else
                     dim = SpvDim2D;
-
                 break;
             case SLANG_TEXTURE_3D:
                 dim = SpvDim3D;
@@ -1951,7 +1950,6 @@ struct SPIRVEmitContext
             break;
         case SpvDimRect:
             requireSPIRVCapability(sampled == sampledImage ? SpvCapabilitySampledRect : SpvCapabilityImageRect);
-            
             break;
         case SpvDimBuffer:
             requireSPIRVCapability(sampled == sampledImage ? SpvCapabilitySampledBuffer : SpvCapabilityImageBuffer);
@@ -3284,9 +3282,9 @@ struct SPIRVEmitContext
             break;
         case kIROp_GloballyCoherentDecoration:
             emitOpDecorate(getSection(SpvLogicalSectionID::Annotations),
-                decoration,
-                dstID,
-                SpvDecorationCoherent);
+                               decoration,
+                               dstID,
+                               SpvDecorationCoherent);
             break;
         case kIROp_GLSLVolatileDecoration:
             emitOpDecorate(getSection(SpvLogicalSectionID::Annotations),
@@ -3304,7 +3302,7 @@ struct SPIRVEmitContext
             emitOpDecorate(getSection(SpvLogicalSectionID::Annotations),
                 decoration,
                 dstID,
-                SpvDecorationNonWritable); 
+                SpvDecorationNonWritable);
             break;
         case kIROp_GLSLWriteOnlyDecoration:
             emitOpDecorate(getSection(SpvLogicalSectionID::Annotations),
@@ -5611,8 +5609,7 @@ struct SPIRVEmitContext
                 {
                     // we directly emit the global Image Pointer by taking the 'was to be loaded' pointer
                     // and just emit'ing it. Slang tries to force a OpLoad-OpStore pattern by default,
-                    // we have a rare case of just the actual global decl; this is a less hacky way of doing what 
-                    // kIROp_ImageSubscript wants to acomplish since our senario allows this
+                    // we have a rare case of just the actual global decl being required
                     assert(operand->getValue()->getOp() == kIROp_Load);
                     emitOperand(operand->getValue()->getOperand(0));
                     break;

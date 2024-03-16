@@ -17,172 +17,172 @@ buffer MyBlockName2
 
 layout(local_size_x = 1) in;
 
-//TEST_INPUT: RWTexture1D(format=R64_SINT, size=4, content=one, mipMaps = 1):name i_1d
-uniform layout(binding=0,r64i) i64image1D i_1d;
+//TEST_INPUT: RWTexture1D(format=R64_SINT, size=4, content=one, mipMaps = 1):name image_1d
+uniform layout(binding=0,r64i) i64image1D image_1d;
 #ifdef TEST_when_hardware_supports_i64_and_u64_buffers
-//COM:TEST_INPUT: RWTextureBuffer(format=R64_INT, stride=8, data=[0 1 0 1 0 1 0 1]):name i_ib
-uniform layout(binding=1,r64i) i64imageBuffer i_ib;
+//COM:TEST_INPUT: RWTextureBuffer(format=R64_INT, stride=8, data=[0 1 0 1 0 1 0 1]):name image_buffer
+uniform layout(binding=1,r64i) i64imageBuffer image_buffer;
 #endif // #ifdef TEST_when_hardware_supports_i64_and_u64_buffers
-//TEST_INPUT: RWTexture1D(format=R64_SINT, size=4, content=one, mipMaps = 1, arrayLength=2):name i_1da
-uniform layout(binding=2,r64i) i64image1DArray i_1da;
-//TEST_INPUT: RWTexture2D(format=R64_SINT, size=4, content=one, mipMaps = 1):name i_2d
-uniform layout(binding=3,r64i) i64image2D i_2d;
-//TEST_INPUT: RWTexture2D(format=R64_SINT, size=4, content=one, mipMaps = 1):name i_2dr
-uniform layout(binding=4,r64i) i64image2DRect i_2dr;
-//TEST_INPUT: RWTexture2D(format=R64_SINT, size=4, content=one, mipMaps = 1, arrayLength=2):name i_2da
-uniform layout(binding=6,r64i) i64image2DArray i_2da;
-//TEST_INPUT: RWTexture3D(format=R64_SINT, size=4, content=one, mipMaps = 1):name i_3d
-uniform layout(binding=7,r64i) i64image3D i_3d;
-//TEST_INPUT: RWTextureCube(format=R64_SINT, size=4, content=one, mipMaps = 1):name i_c
-uniform layout(binding=8,r64i) i64imageCube i_c;
-//TEST_INPUT: RWTextureCube(format=R64_SINT, size=4, content=one, mipMaps = 1, arrayLength=2):name i_ca
-uniform layout(binding=9,r64i) i64imageCubeArray i_ca;
-#ifdef test_when_hardware_supports_i64_and_u64_sampled_textures  
-//COM:TEST_INPUT: RWTexture2D(format=R64_SINT, size=4, content=one, mipMaps = 1, sampleCount = two):name i_2dms
-uniform layout(binding=5,r64i) i64image2DMS i_2dms;
-//COM:TEST_INPUT: RWTexture2D(format=R64_SINT, size=4, content=one, mipMaps = 1, arrayLength=2, sampleCount = two):name i_2dmsa
-uniform layout(binding=10,r64i) i64image2DMSArray i_2dmsa;
-#endif // #ifdef test_when_hardware_supports_i64_and_u64_sampled_textures  
+//TEST_INPUT: RWTexture1D(format=R64_SINT, size=4, content=one, mipMaps = 1, arrayLength=2):name image_1dArray
+uniform layout(binding=2,r64i) i64image1DArray image_1dArray;
+//TEST_INPUT: RWTexture2D(format=R64_SINT, size=4, content=one, mipMaps = 1):name image_2d
+uniform layout(binding=3,r64i) i64image2D image_2d;
+//TEST_INPUT: RWTexture2D(format=R64_SINT, size=4, content=one, mipMaps = 1):name image_2dRect
+uniform layout(binding=4,r64i) i64image2DRect image_2dRect;
+//TEST_INPUT: RWTexture2D(format=R64_SINT, size=4, content=one, mipMaps = 1, arrayLength=2):name image_2dArray
+uniform layout(binding=6,r64i) i64image2DArray image_2dArray;
+//TEST_INPUT: RWTexture3D(format=R64_SINT, size=4, content=one, mipMaps = 1):name image_3d
+uniform layout(binding=7,r64i) i64image3D image_3d;
+//TEST_INPUT: RWTextureCube(format=R64_SINT, size=4, content=one, mipMaps = 1):name image_cube
+uniform layout(binding=8,r64i) i64imageCube image_cube;
+//TEST_INPUT: RWTextureCube(format=R64_SINT, size=4, content=one, mipMaps = 1, arrayLength=2):name image_cubeArray
+uniform layout(binding=9,r64i) i64imageCubeArray image_cubeArray;
+#ifdef test_when_hardware_supports_i64_and_u64_sampled_textures
+//COM:TEST_INPUT: RWTexture2D(format=R64_SINT, size=4, content=one, mipMaps = 1, sampleCount = two):name image_2dMultiSample
+uniform layout(binding=5,r64i) i64image2DMS image_2dMultiSample;
+//COM:TEST_INPUT: RWTexture2D(format=R64_SINT, size=4, content=one, mipMaps = 1, arrayLength=2, sampleCount = two):name image_2dMultiSampleArray
+uniform layout(binding=10,r64i) i64image2DMSArray image_2dMultiSampleArray;
+#endif // #ifdef test_when_hardware_supports_i64_and_u64_sampled_textures
 
 bool checkAllImageSize()
 {
     return true
-        && imageSize(i_1d) == int(4)
+        && imageSize(image_1d) == int(4)
 #ifdef TEST_when_hardware_supports_i64_and_u64_buffers
-        && imageSize(i_ib) == int(4)
+        && imageSize(image_buffer) == int(4)
 #endif // #ifdef TEST_when_hardware_supports_i64_and_u64_buffers
-        && imageSize(i_1da) == ivec2(4, 2)
-        && imageSize(i_2d) == ivec2(4)
-        && imageSize(i_2da) == ivec3(4, 4, 2)
-        && imageSize(i_2dr) == ivec2(4)
-        && imageSize(i_3d) == ivec3(4)
-        && imageSize(i_c) == ivec2(4)
-        && imageSize(i_ca) == ivec3(4, 4, 2)
+        && imageSize(image_1dArray) == ivec2(4, 2)
+        && imageSize(image_2d) == ivec2(4)
+        && imageSize(image_2dArray) == ivec3(4, 4, 2)
+        && imageSize(image_2dRect) == ivec2(4)
+        && imageSize(image_3d) == ivec3(4)
+        && imageSize(image_cube) == ivec2(4)
+        && imageSize(image_cubeArray) == ivec3(4, 4, 2)
 #ifdef test_when_hardware_supports_i64_and_u64_sampled_textures
-        && imageSize(i_2dms) == ivec2(4)
-        && imageSize(i_2dmsa) == ivec3(4, 4, 2)
+        && imageSize(image_2dMultiSample) == ivec2(4)
+        && imageSize(image_2dMultiSampleArray) == ivec3(4, 4, 2)
 #endif // #ifdef test_when_hardware_supports_i64_and_u64_sampled_textures
         ;
 }
 bool checkAllImageLoad()
 {
     return true
-        && imageLoad(i_1d, 0).x == i64vec4(1).x
+        && imageLoad(image_1d, 0).x == i64vec4(1).x
 #ifdef TEST_when_hardware_supports_i64_and_u64_buffers
-        && imageLoad(i_ib, 0).x == i64vec4(1).x
+        && imageLoad(image_buffer, 0).x == i64vec4(1).x
 #endif // #ifdef TEST_when_hardware_supports_i64_and_u64_buffers
-        && imageLoad(i_1da, ivec2(0)).x == i64vec4(1).x
-        && imageLoad(i_2d, ivec2(0)).x == i64vec4(1).x
-        && imageLoad(i_2dr, ivec2(0)).x == i64vec4(1).x
-        && imageLoad(i_2da, ivec3(0)).x == i64vec4(1).x
-        && imageLoad(i_3d, ivec3(0)).x == i64vec4(1).x
-        && imageLoad(i_c, ivec3(0)).x == i64vec4(1).x
-        && imageLoad(i_ca, ivec3(0)).x == i64vec4(1).x
-        && imageLoad(i_ca, ivec3(0)).x == i64vec4(1).x
+        && imageLoad(image_1dArray, ivec2(0)).x == i64vec4(1).x
+        && imageLoad(image_2d, ivec2(0)).x == i64vec4(1).x
+        && imageLoad(image_2dRect, ivec2(0)).x == i64vec4(1).x
+        && imageLoad(image_2dArray, ivec3(0)).x == i64vec4(1).x
+        && imageLoad(image_3d, ivec3(0)).x == i64vec4(1).x
+        && imageLoad(image_cube, ivec3(0)).x == i64vec4(1).x
+        && imageLoad(image_cubeArray, ivec3(0)).x == i64vec4(1).x
+        && imageLoad(image_cubeArray, ivec3(0)).x == i64vec4(1).x
 #ifdef test_when_hardware_supports_i64_and_u64_sampled_textures
-        && imageLoad(i_2dms, ivec2(0), 1).x == i64vec4(1).x
-        && imageLoad(i_2dmsa, ivec3(0), 1).x == i64vec4(1).x
+        && imageLoad(image_2dMultiSample, ivec2(0), 1).x == i64vec4(1).x
+        && imageLoad(image_2dMultiSampleArray, ivec3(0), 1).x == i64vec4(1).x
 #endif // #ifdef test_when_hardware_supports_i64_and_u64_sampled_textures
         ;
 }
 bool resetAllImageValues()
 {
-    imageStore(i_1d, 0,i64vec4(1));
+    imageStore(image_1d, 0,i64vec4(1));
 #ifdef TEST_when_hardware_supports_i64_and_u64_buffers
-    imageStore(i_ib, 0,i64vec4(1));
+    imageStore(image_buffer, 0,i64vec4(1));
 #endif // #ifdef TEST_when_hardware_supports_i64_and_u64_buffers
-    imageStore(i_1da, ivec2(0),i64vec4(1));
-    imageStore(i_2d, ivec2(0),i64vec4(1));
-    imageStore(i_2dr, ivec2(0),i64vec4(1));
-    imageStore(i_2da, ivec3(0),i64vec4(1));
-    imageStore(i_3d, ivec3(0),i64vec4(1));
-    imageStore(i_c, ivec3(0),i64vec4(1));
-    imageStore(i_ca, ivec3(0),i64vec4(1));
+    imageStore(image_1dArray, ivec2(0),i64vec4(1));
+    imageStore(image_2d, ivec2(0),i64vec4(1));
+    imageStore(image_2dRect, ivec2(0),i64vec4(1));
+    imageStore(image_2dArray, ivec3(0),i64vec4(1));
+    imageStore(image_3d, ivec3(0),i64vec4(1));
+    imageStore(image_cube, ivec3(0),i64vec4(1));
+    imageStore(image_cubeArray, ivec3(0),i64vec4(1));
 #ifdef test_when_hardware_supports_i64_and_u64_sampled_textures
-    imageStore(i_2dms, ivec2(0), 1, i64vec4(1));
-    imageStore(i_2dmsa, ivec3(0), 1,i64vec4(1));
+    imageStore(image_2dMultiSample, ivec2(0), 1, i64vec4(1));
+    imageStore(image_2dMultiSampleArray, ivec3(0), 1,i64vec4(1));
 #endif // #ifdef test_when_hardware_supports_i64_and_u64_sampled_textures
     return true;
 }
-int64_t load_1d()
+int64_t load_image_1d()
 {
-    return imageLoad(i_1d, 0).x;
+    return imageLoad(image_1d, 0).x;
 }
 #ifdef TEST_when_hardware_supports_i64_and_u64_buffers
-int64_t load_ib()
+int64_t load_image_buffer()
 {
-    return imageLoad(i_ib, 0).x;
+    return imageLoad(image_buffer, 0).x;
 }
 #endif // #ifdef TEST_when_hardware_supports_i64_and_u64_buffers
-int64_t load_1da()
+int64_t load_image_1dArray()
 {
-    return imageLoad(i_1da, ivec2(0)).x;
+    return imageLoad(image_1dArray, ivec2(0)).x;
 }
-int64_t load_2d()
+int64_t load_image_2d()
 {
-    return imageLoad(i_2d, ivec2(0)).x;
+    return imageLoad(image_2d, ivec2(0)).x;
 }
-int64_t load_2dr()
+int64_t load_image_2dRect()
 {
-    return imageLoad(i_2dr, ivec2(0)).x;
+    return imageLoad(image_2dRect, ivec2(0)).x;
 }
-int64_t load_2da()
+int64_t load_image_2dArray()
 {
-    return imageLoad(i_2da, ivec3(0)).x;
+    return imageLoad(image_2dArray, ivec3(0)).x;
 }
-int64_t load_3d()
+int64_t load_image_3d()
 {
-    return imageLoad(i_3d, ivec3(0)).x; 
+    return imageLoad(image_3d, ivec3(0)).x;
 }
-int64_t load_c()
+int64_t load_image_cube()
 {
-    return imageLoad(i_c, ivec3(0)).x;
+    return imageLoad(image_cube, ivec3(0)).x;
 }
-int64_t load_ca()
+int64_t load_image_cubeArray()
 {
-    return imageLoad(i_ca, ivec3(0)).x;     
+    return imageLoad(image_cubeArray, ivec3(0)).x;
 }
 #ifdef test_when_hardware_supports_i64_and_u64_sampled_textures
-int64_t load_2dms()
+int64_t load_image_2dMultiSample()
 {
-    return imageLoad(i_2dms, ivec2(0), 1).x;
+    return imageLoad(image_2dMultiSample, ivec2(0), 1).x;
 }
-int64_t load_2dmsa()
+int64_t load_image_2dMultiSampleArray()
 {
-    return imageLoad(i_2dmsa, ivec3(0), 1).x;      
+    return imageLoad(image_2dMultiSampleArray, ivec3(0), 1).x;
 }
 #endif // #ifdef test_when_hardware_supports_i64_and_u64_sampled_textures
 
-// requires ImageLoad test to pass 
+// requires ImageLoad test to pass
 bool checkAllImageStore()
 {
     bool loadCheck = true;
 
-    imageStore(i_1d, 0,i64vec4(0));
-    loadCheck = loadCheck && load_1d() == 0;
+    imageStore(image_1d, 0,i64vec4(0));
+    loadCheck = loadCheck && load_image_1d() == 0;
 #ifdef TEST_when_hardware_supports_i64_and_u64_buffers
-    imageStore(i_ib, 0,i64vec4(0));
-    loadCheck = loadCheck && load_ib() == 0;
+    imageStore(image_buffer, 0,i64vec4(0));
+    loadCheck = loadCheck && load_image_buffer() == 0;
 #endif // #ifdef TEST_when_hardware_supports_i64_and_u64_buffers
-    imageStore(i_1da, ivec2(0),i64vec4(0));
-    loadCheck = loadCheck && load_1da() == 0;
-    imageStore(i_2d, ivec2(0),i64vec4(0));
-    loadCheck = loadCheck && load_2d() == 0;
-    imageStore(i_2dr, ivec2(0),i64vec4(0));
-    loadCheck = loadCheck && load_2dr() == 0;
-    imageStore(i_2da, ivec3(0),i64vec4(0));
-    loadCheck = loadCheck && load_2da() == 0;
-    imageStore(i_3d, ivec3(0),i64vec4(0));
-    loadCheck = loadCheck && load_3d() == 0;
-    imageStore(i_c, ivec3(0),i64vec4(0));
-    loadCheck = loadCheck && load_c() == 0;
-    imageStore(i_ca, ivec3(0),i64vec4(0));
-    loadCheck = loadCheck && load_ca() == 0;
+    imageStore(image_1dArray, ivec2(0),i64vec4(0));
+    loadCheck = loadCheck && load_image_1dArray() == 0;
+    imageStore(image_2d, ivec2(0),i64vec4(0));
+    loadCheck = loadCheck && load_image_2d() == 0;
+    imageStore(image_2dRect, ivec2(0),i64vec4(0));
+    loadCheck = loadCheck && load_image_2dRect() == 0;
+    imageStore(image_2dArray, ivec3(0),i64vec4(0));
+    loadCheck = loadCheck && load_image_2dArray() == 0;
+    imageStore(image_3d, ivec3(0),i64vec4(0));
+    loadCheck = loadCheck && load_image_3d() == 0;
+    imageStore(image_cube, ivec3(0),i64vec4(0));
+    loadCheck = loadCheck && load_image_cube() == 0;
+    imageStore(image_cubeArray, ivec3(0),i64vec4(0));
+    loadCheck = loadCheck && load_image_cubeArray() == 0;
 #ifdef test_when_hardware_supports_i64_and_u64_sampled_textures
-    imageStore(i_2dms, ivec2(0), 1, i64vec4(0));
-    loadCheck = loadCheck && load_2dms() == 0;
-    imageStore(i_2dmsa, ivec3(0), 1,i64vec4(0));
-    loadCheck = loadCheck && load_2dmsa() == 0;
+    imageStore(image_2dMultiSample, ivec2(0), 1, i64vec4(0));
+    loadCheck = loadCheck && load_image_2dMultiSample() == 0;
+    imageStore(image_2dMultiSampleArray, ivec3(0), 1,i64vec4(0));
+    loadCheck = loadCheck && load_image_2dMultiSampleArray() == 0;
 #endif // #ifdef test_when_hardware_supports_i64_and_u64_sampled_textures
     resetAllImageValues();
     return loadCheck;
@@ -193,8 +193,8 @@ bool checkAllImageSamples()
     resetAllImageValues();
     return true
 #ifdef test_when_hardware_supports_i64_and_u64_sampled_textures
-        && imageSamples(i_2dms) == 2
-        && imageSamples(i_2dmsa) == 2
+        && imageSamples(image_2dMultiSample) == 2
+        && imageSamples(image_2dMultiSampleArray) == 2
 #endif // #ifdef test_when_hardware_supports_i64_and_u64_sampled_textures
         ;
 }
@@ -202,31 +202,31 @@ bool checkAllImageAtomicAdd()
 {
     resetAllImageValues();
     return true
-        && imageAtomicAdd(i_1d, 0, 0) == 1
-        && load_1d() == 1
+        && imageAtomicAdd(image_1d, 0, 0) == 1
+        && load_image_1d() == 1
 #ifdef TEST_when_hardware_supports_i64_and_u64_buffers
-        && imageAtomicAdd(i_ib, 0, 2) == 1
-        && load_ib() == 3
+        && imageAtomicAdd(image_buffer, 0, 2) == 1
+        && load_image_buffer() == 3
 #endif // #ifdef TEST_when_hardware_supports_i64_and_u64_buffers
-        && imageAtomicAdd(i_1da, ivec2(0), 0) == 1
-        && load_1da() == 1
-        && imageAtomicAdd(i_2d, ivec2(0), 2) == 1
-        && load_2d() == 3
-        && imageAtomicAdd(i_2dr, ivec2(0), 2) == 1
-        && load_2dr() == 3
-        && imageAtomicAdd(i_2da, ivec3(0), 0) == 1
-        && load_2da() == 1
-        && imageAtomicAdd(i_3d, ivec3(0), 2) == 1
-        && load_3d() == 3
-        && imageAtomicAdd(i_c, ivec3(0), 2) == 1
-        && load_c() == 3
-        && imageAtomicAdd(i_ca, ivec3(0), 2) == 1
-        && load_ca() == 3
+        && imageAtomicAdd(image_1dArray, ivec2(0), 0) == 1
+        && load_image_1dArray() == 1
+        && imageAtomicAdd(image_2d, ivec2(0), 2) == 1
+        && load_image_2d() == 3
+        && imageAtomicAdd(image_2dRect, ivec2(0), 2) == 1
+        && load_image_2dRect() == 3
+        && imageAtomicAdd(image_2dArray, ivec3(0), 0) == 1
+        && load_image_2dArray() == 1
+        && imageAtomicAdd(image_3d, ivec3(0), 2) == 1
+        && load_image_3d() == 3
+        && imageAtomicAdd(image_cube, ivec3(0), 2) == 1
+        && load_image_cube() == 3
+        && imageAtomicAdd(image_cubeArray, ivec3(0), 2) == 1
+        && load_image_cubeArray() == 3
 #ifdef test_when_hardware_supports_i64_and_u64_sampled_textures
-        && imageAtomicAdd(i_2dms, ivec2(0), 1, 2) == 1
-        && load_2dms() == 3
-        && imageAtomicAdd(i_2dmsa, ivec3(0), 1, 2) == 1
-        && load_2dmsa() == 3
+        && imageAtomicAdd(image_2dMultiSample, ivec2(0), 1, 2) == 1
+        && load_image_2dMultiSample() == 3
+        && imageAtomicAdd(image_2dMultiSampleArray, ivec3(0), 1, 2) == 1
+        && load_image_2dMultiSampleArray() == 3
 #endif // #ifdef test_when_hardware_supports_i64_and_u64_sampled_textures
         ;
 }
@@ -234,31 +234,31 @@ bool checkAllImageAtomicExchange()
 {
     resetAllImageValues();
     return true
-        && imageAtomicExchange(i_1d, 0, 0) == 1
-        && load_1d() == 0
+        && imageAtomicExchange(image_1d, 0, 0) == 1
+        && load_image_1d() == 0
 #ifdef TEST_when_hardware_supports_i64_and_u64_buffers
-        && imageAtomicExchange(i_ib, 0, 2) == 1
-        && load_ib() == 2
+        && imageAtomicExchange(image_buffer, 0, 2) == 1
+        && load_image_buffer() == 2
 #endif // #ifdef TEST_when_hardware_supports_i64_and_u64_buffers
-        && imageAtomicExchange(i_1da, ivec2(0), 0) == 1
-        && load_1da() == 0
-        && imageAtomicExchange(i_2d, ivec2(0), 2) == 1
-        && load_2d() == 2
-        && imageAtomicExchange(i_2dr, ivec2(0), 2) == 1
-        && load_2dr() == 2
-        && imageAtomicExchange(i_2da, ivec3(0), 0) == 1
-        && load_2da() == 0
-        && imageAtomicExchange(i_3d, ivec3(0), 2) == 1
-        && load_3d() == 2
-        && imageAtomicExchange(i_c, ivec3(0), 2) == 1
-        && load_c() == 2
-        && imageAtomicExchange(i_ca, ivec3(0), 2) == 1
-        && load_ca() == 2
+        && imageAtomicExchange(image_1dArray, ivec2(0), 0) == 1
+        && load_image_1dArray() == 0
+        && imageAtomicExchange(image_2d, ivec2(0), 2) == 1
+        && load_image_2d() == 2
+        && imageAtomicExchange(image_2dRect, ivec2(0), 2) == 1
+        && load_image_2dRect() == 2
+        && imageAtomicExchange(image_2dArray, ivec3(0), 0) == 1
+        && load_image_2dArray() == 0
+        && imageAtomicExchange(image_3d, ivec3(0), 2) == 1
+        && load_image_3d() == 2
+        && imageAtomicExchange(image_cube, ivec3(0), 2) == 1
+        && load_image_cube() == 2
+        && imageAtomicExchange(image_cubeArray, ivec3(0), 2) == 1
+        && load_image_cubeArray() == 2
 #ifdef test_when_hardware_supports_i64_and_u64_sampled_textures
-        && imageAtomicExchange(i_2dms, ivec2(0), 1, 2) == 1
-        && load_2dms() == 2
-        && imageAtomicExchange(i_2dmsa, ivec3(0), 1, 2) == 1
-        && load_2dmsa() == 2
+        && imageAtomicExchange(image_2dMultiSample, ivec2(0), 1, 2) == 1
+        && load_image_2dMultiSample() == 2
+        && imageAtomicExchange(image_2dMultiSampleArray, ivec3(0), 1, 2) == 1
+        && load_image_2dMultiSampleArray() == 2
 #endif // #ifdef test_when_hardware_supports_i64_and_u64_sampled_textures
         ;
 }
@@ -266,31 +266,31 @@ bool checkAllImageAtomicMin()
 {
     resetAllImageValues();
     return true
-        && imageAtomicMin(i_1d, 0, 0) == 1
-        && load_1d() == 0
+        && imageAtomicMin(image_1d, 0, 0) == 1
+        && load_image_1d() == 0
 #ifdef TEST_when_hardware_supports_i64_and_u64_buffers
-        && imageAtomicMin(i_ib, 0, 2) == 1
-        && load_ib() == 1
+        && imageAtomicMin(image_buffer, 0, 2) == 1
+        && load_image_buffer() == 1
 #endif // #ifdef TEST_when_hardware_supports_i64_and_u64_buffers
-        && imageAtomicMin(i_1da, ivec2(0), 0) == 1
-        && load_1da() == 0
-        && imageAtomicMin(i_2d, ivec2(0), 2) == 1
-        && load_2d() == 1
-        && imageAtomicMin(i_2dr, ivec2(0), 2) == 1
-        && load_2dr() == 1
-        && imageAtomicMin(i_2da, ivec3(0), 0) == 1
-        && load_2da() == 0
-        && imageAtomicMin(i_3d, ivec3(0), 2) == 1
-        && load_3d() == 1
-        && imageAtomicMin(i_c, ivec3(0), 2) == 1
-        && load_c() == 1
-        && imageAtomicMin(i_ca, ivec3(0), 2) == 1
-        && load_ca() == 1
+        && imageAtomicMin(image_1dArray, ivec2(0), 0) == 1
+        && load_image_1dArray() == 0
+        && imageAtomicMin(image_2d, ivec2(0), 2) == 1
+        && load_image_2d() == 1
+        && imageAtomicMin(image_2dRect, ivec2(0), 2) == 1
+        && load_image_2dRect() == 1
+        && imageAtomicMin(image_2dArray, ivec3(0), 0) == 1
+        && load_image_2dArray() == 0
+        && imageAtomicMin(image_3d, ivec3(0), 2) == 1
+        && load_image_3d() == 1
+        && imageAtomicMin(image_cube, ivec3(0), 2) == 1
+        && load_image_cube() == 1
+        && imageAtomicMin(image_cubeArray, ivec3(0), 2) == 1
+        && load_image_cubeArray() == 1
 #ifdef test_when_hardware_supports_i64_and_u64_sampled_textures
-        && imageAtomicMin(i_2dms, ivec2(0), 1, 2) == 1
-        && load_2dms() == 1
-        && imageAtomicMin(i_2dmsa, ivec3(0), 1, 2) == 1
-        && load_2dmsa() == 1
+        && imageAtomicMin(image_2dMultiSample, ivec2(0), 1, 2) == 1
+        && load_image_2dMultiSample() == 1
+        && imageAtomicMin(image_2dMultiSampleArray, ivec3(0), 1, 2) == 1
+        && load_image_2dMultiSampleArray() == 1
 #endif // #ifdef test_when_hardware_supports_i64_and_u64_sampled_textures
         ;
 }
@@ -298,31 +298,31 @@ bool checkAllImageAtomicMax()
 {
     resetAllImageValues();
     return true
-        && imageAtomicMax(i_1d, 0, 0) == 1
-        && load_1d() == 1
+        && imageAtomicMax(image_1d, 0, 0) == 1
+        && load_image_1d() == 1
 #ifdef TEST_when_hardware_supports_i64_and_u64_buffers
-        && imageAtomicMax(i_ib, 0, 2) == 1
-        && load_ib() == 2
+        && imageAtomicMax(image_buffer, 0, 2) == 1
+        && load_image_buffer() == 2
 #endif // #ifdef TEST_when_hardware_supports_i64_and_u64_buffers
-        && imageAtomicMax(i_1da, ivec2(0), 0) == 1
-        && load_1da() == 1
-        && imageAtomicMax(i_2d, ivec2(0), 2) == 1
-        && load_2d() == 2
-        && imageAtomicMax(i_2dr, ivec2(0), 2) == 1
-        && load_2dr() == 2
-        && imageAtomicMax(i_2da, ivec3(0), 0) == 1
-        && load_2da() == 1
-        && imageAtomicMax(i_3d, ivec3(0), 2) == 1
-        && load_3d() == 2
-        && imageAtomicMax(i_c, ivec3(0), 2) == 1
-        && load_c() == 2
-        && imageAtomicMax(i_ca, ivec3(0), 2) == 1
-        && load_ca() == 2
+        && imageAtomicMax(image_1dArray, ivec2(0), 0) == 1
+        && load_image_1dArray() == 1
+        && imageAtomicMax(image_2d, ivec2(0), 2) == 1
+        && load_image_2d() == 2
+        && imageAtomicMax(image_2dRect, ivec2(0), 2) == 1
+        && load_image_2dRect() == 2
+        && imageAtomicMax(image_2dArray, ivec3(0), 0) == 1
+        && load_image_2dArray() == 1
+        && imageAtomicMax(image_3d, ivec3(0), 2) == 1
+        && load_image_3d() == 2
+        && imageAtomicMax(image_cube, ivec3(0), 2) == 1
+        && load_image_cube() == 2
+        && imageAtomicMax(image_cubeArray, ivec3(0), 2) == 1
+        && load_image_cubeArray() == 2
 #ifdef test_when_hardware_supports_i64_and_u64_sampled_textures
-        && imageAtomicMax(i_2dms, ivec2(0), 1, 2) == 1
-        && load_2dms() == 2
-        && imageAtomicMax(i_2dmsa, ivec3(0), 1, 2) == 1
-        && load_2dmsa() == 2
+        && imageAtomicMax(image_2dMultiSample, ivec2(0), 1, 2) == 1
+        && load_image_2dMultiSample() == 2
+        && imageAtomicMax(image_2dMultiSampleArray, ivec3(0), 1, 2) == 1
+        && load_image_2dMultiSampleArray() == 2
 #endif // #ifdef test_when_hardware_supports_i64_and_u64_sampled_textures
         ;
 }
@@ -330,31 +330,31 @@ bool checkAllImageAtomicAnd()
 {
     resetAllImageValues();
     return true
-        && imageAtomicAnd(i_1d, 0, 1) == 1
-        && load_1d() == 1
+        && imageAtomicAnd(image_1d, 0, 1) == 1
+        && load_image_1d() == 1
 #ifdef TEST_when_hardware_supports_i64_and_u64_buffers
-        && imageAtomicAnd(i_ib, 0, 2) == 1
-        && load_ib() == 0
+        && imageAtomicAnd(image_buffer, 0, 2) == 1
+        && load_image_buffer() == 0
 #endif // #ifdef TEST_when_hardware_supports_i64_and_u64_buffers
-        && imageAtomicAnd(i_1da, ivec2(0), 1) == 1
-        && load_1da() == 1
-        && imageAtomicAnd(i_2d, ivec2(0), 2) == 1
-        && load_2d() == 0
-        && imageAtomicAnd(i_2dr, ivec2(0), 2) == 1
-        && load_2dr() == 0
-        && imageAtomicAnd(i_2da, ivec3(0), 1) == 1
-        && load_2da() == 1
-        && imageAtomicAnd(i_3d, ivec3(0), 2) == 1
-        && load_3d() == 0
-        && imageAtomicAnd(i_c, ivec3(0), 2) == 1
-        && load_c() == 0
-        && imageAtomicAnd(i_ca, ivec3(0), 2) == 1
-        && load_ca() == 0
+        && imageAtomicAnd(image_1dArray, ivec2(0), 1) == 1
+        && load_image_1dArray() == 1
+        && imageAtomicAnd(image_2d, ivec2(0), 2) == 1
+        && load_image_2d() == 0
+        && imageAtomicAnd(image_2dRect, ivec2(0), 2) == 1
+        && load_image_2dRect() == 0
+        && imageAtomicAnd(image_2dArray, ivec3(0), 1) == 1
+        && load_image_2dArray() == 1
+        && imageAtomicAnd(image_3d, ivec3(0), 2) == 1
+        && load_image_3d() == 0
+        && imageAtomicAnd(image_cube, ivec3(0), 2) == 1
+        && load_image_cube() == 0
+        && imageAtomicAnd(image_cubeArray, ivec3(0), 2) == 1
+        && load_image_cubeArray() == 0
 #ifdef test_when_hardware_supports_i64_and_u64_sampled_textures
-        && imageAtomicAnd(i_2dms, ivec2(0), 1, 2) == 1
-        && load_2dms() == 0
-        && imageAtomicAnd(i_2dmsa, ivec3(0), 1, 2) == 1
-        && load_2dmsa() == 0
+        && imageAtomicAnd(image_2dMultiSample, ivec2(0), 1, 2) == 1
+        && load_image_2dMultiSample() == 0
+        && imageAtomicAnd(image_2dMultiSampleArray, ivec3(0), 1, 2) == 1
+        && load_image_2dMultiSampleArray() == 0
 #endif // #ifdef test_when_hardware_supports_i64_and_u64_sampled_textures
         ;
 }
@@ -362,31 +362,31 @@ bool checkAllImageAtomicOr()
 {
     resetAllImageValues();
     return true
-        && imageAtomicOr(i_1d, 0, 1) == 1
-        && load_1d() == 1
+        && imageAtomicOr(image_1d, 0, 1) == 1
+        && load_image_1d() == 1
 #ifdef TEST_when_hardware_supports_i64_and_u64_buffers
-        && imageAtomicOr(i_ib, 0, 2) == 1
-        && load_ib() == 3
+        && imageAtomicOr(image_buffer, 0, 2) == 1
+        && load_image_buffer() == 3
 #endif // #ifdef TEST_when_hardware_supports_i64_and_u64_buffers
-        && imageAtomicOr(i_1da, ivec2(0), 1) == 1
-        && load_1da() == 1
-        && imageAtomicOr(i_2d, ivec2(0), 2) == 1
-        && load_2d() == 3
-        && imageAtomicOr(i_2dr, ivec2(0), 2) == 1
-        && load_2dr() == 3
-        && imageAtomicOr(i_2da, ivec3(0), 1) == 1
-        && load_2da() == 1
-        && imageAtomicOr(i_3d, ivec3(0), 2) == 1
-        && load_3d() == 3
-        && imageAtomicOr(i_c, ivec3(0), 2) == 1
-        && load_c() == 3
-        && imageAtomicOr(i_ca, ivec3(0), 2) == 1
-        && load_ca() == 3
+        && imageAtomicOr(image_1dArray, ivec2(0), 1) == 1
+        && load_image_1dArray() == 1
+        && imageAtomicOr(image_2d, ivec2(0), 2) == 1
+        && load_image_2d() == 3
+        && imageAtomicOr(image_2dRect, ivec2(0), 2) == 1
+        && load_image_2dRect() == 3
+        && imageAtomicOr(image_2dArray, ivec3(0), 1) == 1
+        && load_image_2dArray() == 1
+        && imageAtomicOr(image_3d, ivec3(0), 2) == 1
+        && load_image_3d() == 3
+        && imageAtomicOr(image_cube, ivec3(0), 2) == 1
+        && load_image_cube() == 3
+        && imageAtomicOr(image_cubeArray, ivec3(0), 2) == 1
+        && load_image_cubeArray() == 3
 #ifdef test_when_hardware_supports_i64_and_u64_sampled_textures
-        && imageAtomicOr(i_2dms, ivec2(0), 1, 2) == 1
-        && load_2dms() == 3
-        && imageAtomicOr(i_2dmsa, ivec3(0), 1, 2) == 1
-        && load_2dmsa() == 3
+        && imageAtomicOr(image_2dMultiSample, ivec2(0), 1, 2) == 1
+        && load_image_2dMultiSample() == 3
+        && imageAtomicOr(image_2dMultiSampleArray, ivec3(0), 1, 2) == 1
+        && load_image_2dMultiSampleArray() == 3
 #endif // #ifdef test_when_hardware_supports_i64_and_u64_sampled_textures
         ;
 }
@@ -394,31 +394,31 @@ bool checkAllImageAtomicXor()
 {
     resetAllImageValues();
     return true
-        && imageAtomicXor(i_1d, 0, 1) == 1
-        && load_1d() == 0
+        && imageAtomicXor(image_1d, 0, 1) == 1
+        && load_image_1d() == 0
 #ifdef TEST_when_hardware_supports_i64_and_u64_buffers
-        && imageAtomicXor(i_ib, 0, 2) == 1
-        && load_ib() == 3
+        && imageAtomicXor(image_buffer, 0, 2) == 1
+        && load_image_buffer() == 3
 #endif // #ifdef TEST_when_hardware_supports_i64_and_u64_buffers
-        && imageAtomicXor(i_1da, ivec2(0), 1) == 1
-        && load_1da() == 0
-        && imageAtomicXor(i_2d, ivec2(0), 2) == 1
-        && load_2d() == 3
-        && imageAtomicXor(i_2dr, ivec2(0), 2) == 1
-        && load_2dr() == 3
-        && imageAtomicXor(i_2da, ivec3(0), 1) == 1
-        && load_2da() == 0
-        && imageAtomicXor(i_3d, ivec3(0), 2) == 1
-        && load_3d() == 3
-        && imageAtomicXor(i_c, ivec3(0), 2) == 1
-        && load_c() == 3
-        && imageAtomicXor(i_ca, ivec3(0), 2) == 1
-        && load_ca() == 3
+        && imageAtomicXor(image_1dArray, ivec2(0), 1) == 1
+        && load_image_1dArray() == 0
+        && imageAtomicXor(image_2d, ivec2(0), 2) == 1
+        && load_image_2d() == 3
+        && imageAtomicXor(image_2dRect, ivec2(0), 2) == 1
+        && load_image_2dRect() == 3
+        && imageAtomicXor(image_2dArray, ivec3(0), 1) == 1
+        && load_image_2dArray() == 0
+        && imageAtomicXor(image_3d, ivec3(0), 2) == 1
+        && load_image_3d() == 3
+        && imageAtomicXor(image_cube, ivec3(0), 2) == 1
+        && load_image_cube() == 3
+        && imageAtomicXor(image_cubeArray, ivec3(0), 2) == 1
+        && load_image_cubeArray() == 3
 #ifdef test_when_hardware_supports_i64_and_u64_sampled_textures
-        && imageAtomicXor(i_2dms, ivec2(0), 1, 2) == 1
-        && load_2dms() == 3
-        && imageAtomicXor(i_2dmsa, ivec3(0), 1, 2) == 1
-        && load_2dmsa() == 3
+        && imageAtomicXor(image_2dMultiSample, ivec2(0), 1, 2) == 1
+        && load_image_2dMultiSample() == 3
+        && imageAtomicXor(image_2dMultiSampleArray, ivec3(0), 1, 2) == 1
+        && load_image_2dMultiSampleArray() == 3
 #endif // #ifdef test_when_hardware_supports_i64_and_u64_sampled_textures
         ;
 }
@@ -426,31 +426,31 @@ bool checkAllImageAtomicCompSwap()
 {
     resetAllImageValues();
     return true
-        && imageAtomicCompSwap(i_1d, 0, 0, 2) == 1
-        && load_1d() == 1
+        && imageAtomicCompSwap(image_1d, 0, 0, 2) == 1
+        && load_image_1d() == 1
 #ifdef TEST_when_hardware_supports_i64_and_u64_buffers
-        && imageAtomicCompSwap(i_ib, 0, 1, 2) == 1
-        && load_ib() == 2
+        && imageAtomicCompSwap(image_buffer, 0, 1, 2) == 1
+        && load_image_buffer() == 2
 #endif // #ifdef TEST_when_hardware_supports_i64_and_u64_buffers
-        && imageAtomicCompSwap(i_1da, ivec2(0), 0, 2) == 1
-        && load_1da() == 1
-        && imageAtomicCompSwap(i_2d, ivec2(0), 1, 2) == 1
-        && load_2d() == 2
-        && imageAtomicCompSwap(i_2dr, ivec2(0), 1, 2) == 1
-        && load_2dr() == 2
-        && imageAtomicCompSwap(i_2da, ivec3(0), 0, 2) == 1
-        && load_2da() == 1
-        && imageAtomicCompSwap(i_3d, ivec3(0), 1, 2) == 1
-        && load_3d() == 2
-        && imageAtomicCompSwap(i_c, ivec3(0), 1, 2) == 1
-        && load_c() == 2
-        && imageAtomicCompSwap(i_ca, ivec3(0), 1, 2) == 1
-        && load_ca() == 2
+        && imageAtomicCompSwap(image_1dArray, ivec2(0), 0, 2) == 1
+        && load_image_1dArray() == 1
+        && imageAtomicCompSwap(image_2d, ivec2(0), 1, 2) == 1
+        && load_image_2d() == 2
+        && imageAtomicCompSwap(image_2dRect, ivec2(0), 1, 2) == 1
+        && load_image_2dRect() == 2
+        && imageAtomicCompSwap(image_2dArray, ivec3(0), 0, 2) == 1
+        && load_image_2dArray() == 1
+        && imageAtomicCompSwap(image_3d, ivec3(0), 1, 2) == 1
+        && load_image_3d() == 2
+        && imageAtomicCompSwap(image_cube, ivec3(0), 1, 2) == 1
+        && load_image_cube() == 2
+        && imageAtomicCompSwap(image_cubeArray, ivec3(0), 1, 2) == 1
+        && load_image_cubeArray() == 2
 #ifdef test_when_hardware_supports_i64_and_u64_sampled_textures
-        && imageAtomicCompSwap(i_2dms, ivec2(0), 1, 1, 2) == 1
-        && load_2dms() == 2
-        && imageAtomicCompSwap(i_2dmsa, ivec3(0), 1, 1, 2) == 1
-        && load_2dmsa() == 2
+        && imageAtomicCompSwap(image_2dMultiSample, ivec2(0), 1, 1, 2) == 1
+        && load_image_2dMultiSample() == 2
+        && imageAtomicCompSwap(image_2dMultiSampleArray, ivec3(0), 1, 1, 2) == 1
+        && load_image_2dMultiSampleArray() == 2
 #endif // #ifdef test_when_hardware_supports_i64_and_u64_sampled_textures
         ;
 }
@@ -458,17 +458,17 @@ bool imageOperations()
 {
     return true
         && checkAllImageSize()
-        //&& checkAllImageLoad()
-        //&& checkAllImageStore()
-        //&& checkAllImageSamples()
-        //&& checkAllImageAtomicAdd()
-        //&& checkAllImageAtomicExchange()
-        //&& checkAllImageAtomicMin()
-        //&& checkAllImageAtomicMax()
-        //&& checkAllImageAtomicAnd()
-        //&& checkAllImageAtomicOr()
-        //&& checkAllImageAtomicXor()
-        //&& checkAllImageAtomicCompSwap()
+        && checkAllImageLoad()
+        && checkAllImageStore()
+        && checkAllImageSamples()
+        && checkAllImageAtomicAdd()
+        && checkAllImageAtomicExchange()
+        && checkAllImageAtomicMin()
+        && checkAllImageAtomicMax()
+        && checkAllImageAtomicAnd()
+        && checkAllImageAtomicOr()
+        && checkAllImageAtomicXor()
+        && checkAllImageAtomicCompSwap()
         ;
 }
 

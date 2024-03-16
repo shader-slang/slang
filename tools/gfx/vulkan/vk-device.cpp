@@ -488,10 +488,10 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         deviceFeatures2.pNext = &extendedFeatures.atomicFloat2Features;
 
         // Image Int64 Atomic
-        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT.html        
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT.html
         extendedFeatures.imageInt64AtomicFeatures.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &extendedFeatures.imageInt64AtomicFeatures;
-        
+
         // mesh shader features
         extendedFeatures.meshShaderFeatures.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &extendedFeatures.meshShaderFeatures;
@@ -1650,47 +1650,41 @@ Result DeviceImpl::createTextureResource(
             VK_IMAGE_LAYOUT_UNDEFINED,
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-
-
-        // early return if ms-texture
         if(desc.sampleDesc.numSamples != 1)
         {
-            // For simplicity sake, handle senario where buffer is 1 color
-            // else we would need to make a compute shader and dispatch 
-            // with logic to handle per array element of a MS array
-            // the conversion code is not correct for larger types, but 
-            // this is also fine for testing purposes
+            // Handle senario where texture is sampled. We cannot use
+            // a simple buffer copy for sampled textures. ClearColorImage
+            // is not data accurate but it is fine for testing & works.
             FormatInfo formatInfo;
             gfxGetFormatInfo(desc.format, &formatInfo);
-
             uint32_t data = 0;
             VkClearColorValue clearColor;
             switch(formatInfo.channelType)
             {
-            case SLANG_SCALAR_TYPE_INT32: 
-                memcpy(&data, initData->data, sizeof(data)); 
+            case SLANG_SCALAR_TYPE_INT32:
+                memcpy(&data, initData->data, sizeof(data));
                 break;
-            case SLANG_SCALAR_TYPE_UINT32: 
-                memcpy(&data, initData->data, sizeof(data)); 
-            case SLANG_SCALAR_TYPE_INT64: 
+            case SLANG_SCALAR_TYPE_UINT32:
+                memcpy(&data, initData->data, sizeof(data));
+            case SLANG_SCALAR_TYPE_INT64:
             {
                 int32_t tmpData = int32_t(((int64_t*)initData->data)[0]);
                 memcpy(&data, &tmpData, sizeof(data));
                 break;
             }
-            case SLANG_SCALAR_TYPE_UINT64: 
+            case SLANG_SCALAR_TYPE_UINT64:
             {
                 uint32_t tmpData = uint32_t(((uint64_t*)initData->data)[0]);
                 memcpy(&data, &tmpData, sizeof(data));
                 break;
             }
-            case SLANG_SCALAR_TYPE_FLOAT16: 
+            case SLANG_SCALAR_TYPE_FLOAT16:
             {
                 float tmpData = HalfToFloat(((uint16_t*)initData->data)[0]);
                 memcpy(&data, &tmpData, sizeof(data));
                 break;
             }
-            case SLANG_SCALAR_TYPE_FLOAT32: 
+            case SLANG_SCALAR_TYPE_FLOAT32:
             {
                 float tmpData = float(((float*)initData->data)[0]);
                 memcpy(&data, &tmpData, sizeof(data));
@@ -1702,25 +1696,25 @@ Result DeviceImpl::createTextureResource(
                 memcpy(&data, &tmpData, sizeof(data));
                 break;
             }
-            case SLANG_SCALAR_TYPE_INT8: 
+            case SLANG_SCALAR_TYPE_INT8:
             {
                 int32_t tmpData = int32_t(((int8_t*)initData->data)[0]);
                 memcpy(&data, &tmpData, sizeof(data));
                 break;
             }
-            case SLANG_SCALAR_TYPE_UINT8: 
+            case SLANG_SCALAR_TYPE_UINT8:
             {
                 uint32_t tmpData = uint32_t(((uint8_t*)initData->data)[0]);
                 memcpy(&data, &tmpData, sizeof(data));
                 break;
             }
-            case SLANG_SCALAR_TYPE_INT16: 
+            case SLANG_SCALAR_TYPE_INT16:
             {
                 int32_t tmpData = int32_t(((int32_t*)initData->data)[0]);
                 memcpy(&data, &tmpData, sizeof(data));
                 break;
             }
-            case SLANG_SCALAR_TYPE_UINT16: 
+            case SLANG_SCALAR_TYPE_UINT16:
             {
                 uint32_t tmpData = uint32_t(((uint16_t*)initData->data)[0]);
                 memcpy(&data, &tmpData, sizeof(data));
@@ -1729,7 +1723,6 @@ Result DeviceImpl::createTextureResource(
             };
             uint32_t data_arr[4] = {data, data, data, data};
             memcpy(clearColor.uint32, data_arr, sizeof(VkClearColorValue));
-
 
             VkImageSubresourceRange range{};
             range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -1744,8 +1737,7 @@ Result DeviceImpl::createTextureResource(
                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                 &clearColor,
                 1,
-                &range
-                );
+                &range);
         }
         else
         {
@@ -1795,7 +1787,6 @@ Result DeviceImpl::createTextureResource(
             }
         }
         auto defaultLayout = VulkanUtil::getImageLayoutFromState(desc.defaultState);
-
         _transitionImageLayout(
             texture->m_image,
             format,

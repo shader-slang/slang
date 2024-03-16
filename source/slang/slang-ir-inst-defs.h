@@ -854,12 +854,12 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(GlobalOutputDecoration, output, 0, 0)
     INST(GlobalInputDecoration, output, 0, 0)
     INST(GLSLLocationDecoration, glslLocation, 1, 0)
+    INST(GLSLOffsetDecoration, glslOffset, 1, 0)
     INST(GLSLVolatileDecoration, glslVolatile, 1, 0)
     INST(GLSLRestrictDecoration, glslRestrict, 1, 0)
     INST(GLSLReadOnlyDecoration, glslReadonly, 1, 0)
     INST(GLSLWriteOnlyDecoration, glslWriteonly, 1, 0)
     INST(PayloadDecoration, payload, 0, 0)
-    INST(GLSLOffsetDecoration, glslOffset, 1, 0)
 
     /* Mesh Shader outputs */
         INST(VerticesDecoration, vertices, 1, 0)
@@ -1187,7 +1187,7 @@ INST(SPIRVAsmInst, SPIRVAsmInst, 1, 0)
     // this component type
     INST(SPIRVAsmOperandSampledType, __sampledType, 1, HOISTABLE)
 
-    // A type function which returns an appropriate OpPointerType aquired from an image
+    // A type function which returns the global var OpPointerType of an image
     INST(SPIRVAsmOperandImagePointer, __imagePointer, 1, HOISTABLE)
 
     // A type function which returns the equivalent OpTypeImage type of sampled image value

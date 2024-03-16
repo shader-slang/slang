@@ -2106,49 +2106,6 @@ IRType* lowerType(
     return (IRType*) getSimpleVal(context, visitor.dispatchType(type));
 }
 
-
-void addMemoryQualifierDecorations(
-    IRGenContext* context,
-    IRInst* inst,
-    Modifier* mod,
-    bool isParamType)
-{
-    bool setMod = false;
-    auto builder = context->irBuilder;
-    if (as<GloballyCoherentModifier>(mod))
-    {
-        setMod = true;
-        builder->addSimpleDecoration<IRGloballyCoherentDecoration>(inst);
-    }
-    else if (as<GLSLVolatileModifier>(mod))
-    {
-        setMod = true;
-        builder->addSimpleDecoration<IRGLSLVolatileDecoration>(inst);
-    }
-    else if (as<GLSLRestrictModifier>(mod))
-    {
-        setMod = true;
-        builder->addSimpleDecoration<IRGLSLRestrictDecoration>(inst);
-    }
-    else if (as<GLSLReadOnlyModifier>(mod))
-    {
-        setMod = true;
-        builder->addSimpleDecoration<IRGLSLReadOnlyDecoration>(inst);
-    }
-    else if (as<GLSLWriteOnlyModifier>(mod))
-    {
-        setMod = true;
-        builder->addSimpleDecoration<IRGLSLWriteOnlyDecoration>(inst);
-    }
-    if (isParamType && setMod)
-    {
-        if (inst->getOp() != kIROp_TextureType)
-        {
-            context->getSink()->diagnose(mod->getKeywordNameAndLoc().loc, Diagnostics::memoryQualifierNotAllowedOnANonImageTypeParam, mod);
-        }
-    }
-}
-
 void addVarDecorations(
     IRGenContext*   context,
     IRInst*         inst,
@@ -2157,6 +2114,7 @@ void addVarDecorations(
     auto builder = context->irBuilder;
     for(Modifier* mod : decl->modifiers)
     {
+        bool setMemoryQualifier = false;
         if(as<HLSLNoInterpolationModifier>(mod))
         {
             builder->addInterpolationModeDecoration(inst, IRInterpolationMode::NoInterpolation);
@@ -2255,10 +2213,34 @@ void addVarDecorations(
         {
             builder->addDynamicUniformDecoration(inst);
         }
-        else
+        else if (as<GloballyCoherentModifier>(mod))
         {
-            addMemoryQualifierDecorations(context, inst, mod, false);
+            setMemoryQualifier = true;
+            builder->addSimpleDecoration<IRGloballyCoherentDecoration>(inst);
         }
+        else if (as<GLSLVolatileModifier>(mod))
+        {
+            setMemoryQualifier = true;
+            builder->addSimpleDecoration<IRGLSLVolatileDecoration>(inst);
+        }
+        else if (as<GLSLRestrictModifier>(mod))
+        {
+            setMemoryQualifier = true;
+            builder->addSimpleDecoration<IRGLSLRestrictDecoration>(inst);
+        }
+        else if (as<GLSLReadOnlyModifier>(mod))
+        {
+            setMemoryQualifier = true;
+            builder->addSimpleDecoration<IRGLSLReadOnlyDecoration>(inst);
+        }
+        else if (as<GLSLWriteOnlyModifier>(mod))
+        {
+            setMemoryQualifier = true;
+            builder->addSimpleDecoration<IRGLSLWriteOnlyDecoration>(inst);
+        }
+        if (setMemoryQualifier && inst->getOp() == kIROp_Param && inst->getDataType()->getOp() != kIROp_TextureType)
+            context->getSink()->diagnose(mod->getKeywordNameAndLoc().loc, Diagnostics::memoryQualifierNotAllowedOnANonImageTypeParameter, mod);
+
         // TODO: what are other modifiers we need to propagate through?
     }
     if(auto t = composeGetters<IRMeshOutputType>(inst->getFullType(), &IROutTypeBase::getValueType))
@@ -2615,52 +2597,72 @@ void addArg(
     }
 }
 
-
-// if a arg has a memory qualifier, the 
-// parameter type must have equal or more
-// memory qualifiers
-void compareParamToArgMemoryQualifier(
+void compareParamToArgumentMemoryQualifier(
     IRGenContext* context,
-    IRType* paramType,
+    ParamDecl* param,
     Expr* argExpr,
     LoweredValInfo& loweredArg)
 {
+    if (param == nullptr)
+        return;
+
     auto val = loweredArg.val;
-    if ((loweredArg.flavor == LoweredValInfo::Flavor::Simple || loweredArg.flavor == LoweredValInfo::Flavor::Ptr) 
-        && val->getFullType()->getOp() >= kIROp_FirstTextureTypeBase && val->getFullType()->getOp() <= kIROp_LastTextureTypeBase)
+    if (!((loweredArg.flavor == LoweredValInfo::Flavor::Simple
+        || loweredArg.flavor == LoweredValInfo::Flavor::Ptr)
+        && val->getFullType()->getOp() >= kIROp_FirstTextureTypeBase
+        && val->getFullType()->getOp() <= kIROp_LastTextureTypeBase))
+        return;
+
+    IROp opThis;
+    ASTNodeType foundOp;
+    for (auto modThis : val->getDecorations())
     {
-        IROp op_this;
-        IROp op_param;
-        for (auto mod_this : val->getDecorations())
+        UnownedStringSlice target;
+        opThis = modThis->getOp();
+        foundOp = ASTNodeType::NodeBase;
+        if (opThis == kIROp_GloballyCoherentDecoration)
         {
-            UnownedStringSlice target;
-            op_this = mod_this->getOp();
-            bool findOpInParam = false;
-            //if (op_this == kIROp_GloballyCoherentDecoration) { findOpInParam = true; target = UnownedStringSlice("coherent"); }
-            //else if (op_this == kIROp_GLSLVolatileDecoration) { findOpInParam = true; target = UnownedStringSlice("volatile"); }
-            //else if (op_this == kIROp_GLSLRestrictDecoration) { findOpInParam = true; target = UnownedStringSlice("restrict"); }
-            if (op_this == kIROp_GLSLReadOnlyDecoration) { findOpInParam = true; target = UnownedStringSlice("readonly"); }
-            else if (op_this == kIROp_GLSLWriteOnlyDecoration) { findOpInParam = true; target = UnownedStringSlice("writeonly"); }
-            if (findOpInParam)
+            foundOp = ASTNodeType::GloballyCoherentModifier;
+            target = UnownedStringSlice("coherent");
+        }
+        else if (opThis == kIROp_GLSLVolatileDecoration)
+        {
+            foundOp = ASTNodeType::GLSLVolatileModifier;
+            target = UnownedStringSlice("volatile");
+        }
+        else if (opThis == kIROp_GLSLRestrictDecoration)
+        {
+            foundOp = ASTNodeType::GLSLRestrictModifier;
+            target = UnownedStringSlice("restrict");
+        }
+        if (opThis == kIROp_GLSLReadOnlyDecoration)
+        {
+            foundOp = ASTNodeType::GLSLReadOnlyModifier;
+            target = UnownedStringSlice("readonly");
+        }
+        else if (opThis == kIROp_GLSLWriteOnlyDecoration)
+        {
+            foundOp = ASTNodeType::GLSLWriteOnlyModifier;
+            target = UnownedStringSlice("writeonly");
+        }
+
+        if (foundOp == ASTNodeType::NodeBase)
+            continue;
+
+        for (auto modParam : param->modifiers)
+        {
+            if (modParam->astNodeType == foundOp)
             {
-                for (auto mod_param : paramType->getDecorations())
-                {
-                    op_param = mod_param->getOp();
-                    if (op_param == op_this)
-                    {
-                        findOpInParam = false;
-                        break;
-                    }
-                }
-                if (findOpInParam)
-                {
-                    // did not find the memory qualifier from arg type, in param type
-                    context->getSink()->diagnose(
-                        argExpr, Diagnostics::argumentHasMoreMemoryQualifiersThanParam,
-                        target);
-                }
+                foundOp = ASTNodeType::NodeBase;
+                break;
             }
         }
+
+        if (foundOp == ASTNodeType::NodeBase)
+            continue;
+
+        context->getSink()->diagnose(
+            argExpr, Diagnostics::argumentHasMoreMemoryQualifiersThanParam, target);
     }
 }
 
@@ -2677,20 +2679,13 @@ void compareParamToArgMemoryQualifier(
     ///
 void addCallArgsForParam(
     IRGenContext*           context,
+    ParamDecl*              param,
     IRType*                 paramType,
     ParameterDirection      paramDirection,
     Expr*                   argExpr,
     List<IRInst*>*          ioArgs,
     List<OutArgumentFixup>* ioFixups)
 {
-    LoweredValInfo loweredArg = lowerLValueExpr(context, argExpr);
-
-    compareParamToArgMemoryQualifier(
-        context,
-        paramType,
-        argExpr,
-        loweredArg);
-    
     switch(paramDirection)
     {
     case kParameterDirection_Ref:
@@ -2698,12 +2693,24 @@ void addCallArgsForParam(
     case kParameterDirection_Out:
     case kParameterDirection_InOut:
         {
+            LoweredValInfo loweredArg = lowerLValueExpr(context, argExpr);
+            compareParamToArgumentMemoryQualifier(
+                context,
+                param,
+                argExpr,
+                loweredArg);
             addArg(context, ioArgs, ioFixups, loweredArg, paramType, paramDirection, argExpr->loc);
         }
         break;
 
     default:
         {
+            LoweredValInfo loweredArg = lowerRValueExpr(context, argExpr);
+            compareParamToArgumentMemoryQualifier(
+                context,
+                param,
+                argExpr,
+                loweredArg);
             addInArg(context, ioArgs, loweredArg);
         }
         break;
@@ -3217,28 +3224,22 @@ void _lowerFuncDeclBaseTypeInfo(
         // If the parameter was explicitly marked as being a compile-time
         // constant (`constexpr`), then attach that information to its
         // IR-level type explicitly.
-        if (paramInfo.decl)
+        if( paramInfo.decl )
         {
-            for (auto mod : paramInfo.decl->modifiers)
-            {
-                irParamType = maybeGetConstExprType(builder, irParamType, paramInfo.decl);
-
-                if (paramInfo.decl->hasModifier<HLSLGroupSharedModifier>())
-                {
-                    irParamType = builder->getRateQualifiedType(builder->getGroupSharedRate(), irParamType);
-                }
-                // The 'payload' parameter is a read-only groupshared value
-                else if (paramInfo.decl->hasModifier<HLSLPayloadModifier>())
-                {
-                    irParamType = builder->getRateQualifiedType(builder->getGroupSharedRate(), irParamType);
-                }
-                else
-                {
-                    //add all aux decorations tied to a param variable 
-                    addMemoryQualifierDecorations(context, irParamType, mod, true);
-                }
-            }
+            irParamType = maybeGetConstExprType(builder, irParamType, paramInfo.decl);
         }
+
+        if (paramInfo.decl && paramInfo.decl->hasModifier<HLSLGroupSharedModifier>())
+        {
+            irParamType = builder->getRateQualifiedType(builder->getGroupSharedRate(), irParamType);
+        }
+
+        // The 'payload' parameter is a read-only groupshared value
+        if(paramInfo.decl && paramInfo.decl->hasModifier<HLSLPayloadModifier>())
+        {
+            irParamType = builder->getRateQualifiedType(builder->getGroupSharedRate(), irParamType);
+        }
+
         paramTypes.add(irParamType);
     }
 
@@ -3470,7 +3471,7 @@ struct ExprLoweringContext
         if (argIndex < argCount)
         {
             auto argExpr = expr->arguments[argIndex];
-            addCallArgsForParam(context, paramType, paramDirection, argExpr, ioArgs, ioFixups);
+            addCallArgsForParam(context, paramDeclRef.getDecl(), paramType, paramDirection, argExpr, ioArgs, ioFixups);
         }
         else
         {
@@ -3501,7 +3502,7 @@ struct ExprLoweringContext
 
             _lowerSubstitutionEnv(subContext, argExpr.getSubsts() ? argExpr.getSubsts().declRef : nullptr);
 
-            addCallArgsForParam(subContext, paramType, paramDirection, argExpr.getExpr(), ioArgs, ioFixups);
+            addCallArgsForParam(subContext, paramDeclRef.getDecl(), paramType, paramDirection, argExpr.getExpr(), ioArgs, ioFixups);
 
             // TODO: The approach we are taking here to default arguments
             // is simplistic, and has consequences for the front-end as
@@ -3726,6 +3727,7 @@ struct ExprLoweringContext
                 auto irThisType = lowerType(context, thisType);
                 addCallArgsForParam(
                     context,
+                    nullptr,
                     irThisType,
                     getThisParamDirection(funcDeclRef.getDecl(), kParameterDirection_In),
                     baseExpr,
@@ -4160,15 +4162,15 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                     return builder->emitSPIRVAsmOperandSampledType(i);
                 }
             case SPIRVAsmOperand::ImagePointer:
-            {
-                IRInst* i;
                 {
-                    IRBuilderInsertLocScope insertScope(builder);
-                    builder->setInsertBefore(spirvAsmInst);
-                    i = getSimpleVal(context, lowerRValueExpr(context, operand.expr));
+                    IRInst* i;
+                    {
+                        IRBuilderInsertLocScope insertScope(builder);
+                        builder->setInsertBefore(spirvAsmInst);
+                        i = getSimpleVal(context, lowerRValueExpr(context, operand.expr));
+                    }
+                    return builder->emitSPIRVAsmOperandImagePointer(i);
                 }
-                return builder->emitSPIRVAsmOperandImagePointer(i);
-            }
             case SPIRVAsmOperand::ImageType:
             {
                 IRInst* i;
@@ -9368,6 +9370,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo lowerFuncDeclInContext(IRGenContext* subContext, IRBuilder* subBuilder, FunctionDeclBase* decl, bool emitBody = true)
     {
+
         IRGeneric* outerGeneric = nullptr;
         
         if (auto derivativeRequirement = as<DerivativeRequirementDecl>(decl))

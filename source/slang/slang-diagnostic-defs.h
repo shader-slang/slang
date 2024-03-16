@@ -243,7 +243,6 @@ DIAGNOSTIC(20017, Error, glslTokenOnly, "$0 is only allowed in 'allowGLSL' compi
 
 DIAGNOSTIC(20101, Warning, unintendedEmptyStatement, "potentially unintended empty statement at this location; use {} instead.")
 
-
 DIAGNOSTIC(30102, Error, declNotAllowed, "$0 is not allowed here.")
 
 // 29xxx - Snippet parsing and inline asm
@@ -279,7 +278,6 @@ DIAGNOSTIC(30007, Error, functionReturnTypeMismatch, "expression type '$0' does 
 DIAGNOSTIC(30008, Error, variableNameAlreadyDefined, "variable $0 already defined.")
 DIAGNOSTIC(30009, Error, invalidTypeVoid, "invalid type 'void'.")
 DIAGNOSTIC(30010, Error, whilePredicateTypeError2, "'while': expression must evaluate to int.")
-DIAGNOSTIC(30011, Error, readingFromWriteOnly, "right of '=' is writeonly (cannot be used for reading). Check modifiers.")
 DIAGNOSTIC(30011, Error, assignNonLValue, "left of '=' is not an l-value.")
 DIAGNOSTIC(30012, Error, noApplicationUnaryOperator, "no overload found for operator $0 ($1).")
 DIAGNOSTIC(30012, Error, noOverloadFoundForBinOperatorOnTypes, "no overload found for operator $0  ($1, $2).")
@@ -358,6 +356,8 @@ DIAGNOSTIC(30098, Error, nonStaticMemberFunctionNotAllowedAsDiffOperand, "non-st
 
 DIAGNOSTIC(30099, Error, sizeOfArgumentIsInvalid, "argument to sizeof is invalid")
 
+DIAGNOSTIC(30101, Error, readingFromWriteOnly, "right of '=' is writeonly (cannot be used for reading). Check modifiers.")
+
 // Include
 DIAGNOSTIC(30500, Error, includedFileMissingImplementing, "missing 'implementing' declaration in the included source file '$0'.")
 DIAGNOSTIC(30501, Error, includedFileMissingImplementingDoYouMeanImport, "missing 'implementing' declaration in the included source file '$0'. The file declares that it defines module '$1', do you mean 'import' instead?")
@@ -378,7 +378,7 @@ DIAGNOSTIC(36005, Error, invalidVisibilityModifierOnTypeOfDecl, "visibility modi
 DIAGNOSTIC(36100, Error, conflictingCapabilityDueToUseOfDecl, "'$0' requires capability '$1' that is conflicting with the '$2''s current capability requirement '$3'.")
 DIAGNOSTIC(36101, Error, conflictingCapabilityDueToStatement, "statement requires capability '$0' that is conflicting with the '$1''s current capability requirement '$2'.")
 DIAGNOSTIC(36102, Error, conflictingCapabilityDueToStatementEnclosingFunc, "statement requires capability '$0' that is conflicting with the current function's capability requirement '$1'.")
-DIAGNOSTIC(36103, Error, missingCapabilityRequirementOnPublicDecl, "public symbol '$0' is missing capability requirement declaration, the symbol is assumed to require inferred capabilities '$1'.")
+DIAGNOSTIC(36103, Warning, missingCapabilityRequirementOnPublicDecl, "public symbol '$0' is missing capability requirement declaration, the symbol is assumed to require inferred capabilities '$1'.")
 DIAGNOSTIC(36104, Error, useOfUndeclaredCapability, "'$0' uses undeclared capability '$1'.")
 DIAGNOSTIC(36104, Error, useOfUndeclaredCapabilityOfInterfaceRequirement, "'$0' uses capability '$1' that is missing from the interface requirement.")
 DIAGNOSTIC(36105, Error, unknownCapability, "unknown capability name '$0'.")
@@ -447,7 +447,7 @@ DIAGNOSTIC(31202, Error, duplicateModifier, "modifier '$0' is redundant or confl
 DIAGNOSTIC(31203, Error, cannotExportIncompleteType, "cannot export incomplete type '$0'")
 DIAGNOSTIC(31204, Error, incompleteTypeCannotBeUsedInBuffer, "incomplete type '$0' cannot be used in a buffer")
 DIAGNOSTIC(31205, Error, incompleteTypeCannotBeUsedInUniformParameter, "incomplete type '$0' cannot be used in a uniform parameter")
-DIAGNOSTIC(31206, Error, memoryQualifierNotAllowedOnANonImageTypeParam, "modifier $0 is not allowed on a non image type parameter.")
+DIAGNOSTIC(31206, Error, memoryQualifierNotAllowedOnANonImageTypeParameter, "modifier $0 is not allowed on a non image type parameter.")
 
 // Enums
 

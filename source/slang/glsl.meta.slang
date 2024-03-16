@@ -1714,6 +1714,19 @@ public float texture(sampler2DShadow sampler, vec3 p, float bias)
 }
 
 [ForceInline]
+public float texture(sampler2DRectShadow sampler, vec3 p)
+{
+    return sampler.SampleCmp(p.xy, p.z);
+}
+
+[ForceInline]
+public float texture(sampler2DRectShadow sampler, vec3 p, float bias)
+{
+    // TODO: Need to apply bias
+    return sampler.SampleCmp(p.xy, p.z);
+}
+
+[ForceInline]
 public float texture(samplerCubeShadow sampler, vec4 p)
 {
     return sampler.SampleCmp(p.xyz, p.w);
@@ -1813,6 +1826,34 @@ public vector<T,4> textureProj(Sampler2D<vector<T,N>> sampler, vec4 p, float bia
 
 __generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
+public vector<T,4> textureProj(Sampler2DRect<vector<T,N>> sampler, vec3 p)
+{
+    return texture(sampler, p.xy / p.z);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProj(Sampler2DRect<vector<T,N>> sampler, vec3 p, float bias)
+{
+    return texture(sampler, p.xy / p.z, bias);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProj(Sampler2DRect<vector<T,N>> sampler, vec4 p)
+{
+    return texture(sampler, p.xy / p.w);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProj(Sampler2DRect<vector<T,N>> sampler, vec4 p, float bias)
+{
+    return texture(sampler, p.xy / p.w, bias);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
 public vector<T,4> textureProj(Sampler3D<vector<T,N>> sampler, vec4 p)
 {
     return texture(sampler, p.xyz / p.w);
@@ -1845,6 +1886,18 @@ public float textureProj(sampler2DShadow sampler, vec4 p)
 
 [ForceInline]
 public float textureProj(sampler2DShadow sampler, vec4 p, float bias)
+{
+    return texture(sampler, p.xyz / p.w, bias);
+}
+
+[ForceInline]
+public float textureProj(sampler2DRectShadow sampler, vec4 p)
+{
+    return texture(sampler, p.xyz / p.w);
+}
+
+[ForceInline]
+public float textureProj(sampler2DRectShadow sampler, vec4 p, float bias)
 {
     return texture(sampler, p.xyz / p.w, bias);
 }
@@ -1886,6 +1939,13 @@ public float textureLod(sampler2DShadow sampler, vec3 p, float lod)
 }
 
 [ForceInline]
+public float textureLod(sampler2DRectShadow sampler, vec3 p, float lod)
+{
+    // TODO: Need to apply lod
+    return sampler.SampleCmp(p.xy, p.z);
+}
+
+[ForceInline]
 public float textureLod(sampler1DShadow sampler, vec3 p, float lod)
 {
     // TODO: Need to apply lod
@@ -1919,6 +1979,13 @@ public vector<T,4> textureOffset(Sampler2D<vector<T,N>> sampler, vec2 p, constex
 
 __generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
+public vector<T,4> textureOffset(Sampler2DRect<vector<T,N>> sampler, vec2 p, constexpr ivec2 offset, float bias = 0.0)
+{
+    return __vectorReshape<4>(sampler.SampleBias(p, bias, offset));
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
 public vector<T,4> textureOffset(Sampler3D<vector<T,N>> sampler, vec3 p, constexpr ivec3 offset, float bias = 0.0)
 {
     return __vectorReshape<4>(sampler.SampleBias(p, bias, offset));
@@ -1926,6 +1993,13 @@ public vector<T,4> textureOffset(Sampler3D<vector<T,N>> sampler, vec3 p, constex
 
 [ForceInline]
 public float textureOffset(sampler2DShadow sampler, vec3 p, constexpr ivec2 offset, float bias = 0.0)
+{
+    // TODO: Need to apply bias
+    return sampler.SampleCmp(p.xy, p.z, offset);
+}
+
+[ForceInline]
+public float textureOffset(sampler2DRectShadow sampler, vec3 p, constexpr ivec2 offset, float bias = 0.0)
 {
     // TODO: Need to apply bias
     return sampler.SampleCmp(p.xy, p.z, offset);
@@ -2114,6 +2188,20 @@ public vector<T,4> textureProjOffset(Sampler2D<vector<T,N>> sampler, vec4 p, con
 
 __generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
+public vector<T,4> textureProjOffset(Sampler2DRect<vector<T,N>> sampler, vec3 p, constexpr ivec2 offset, float bias = 0.0)
+{
+    return textureOffset(sampler, p.xy / p.z, offset, bias);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProjOffset(Sampler2DRect<vector<T,N>> sampler, vec4 p, constexpr ivec2 offset, float bias = 0.0)
+{
+    return textureOffset(sampler, p.xy / p.w, offset, bias);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
 public vector<T,4> textureProjOffset(Sampler3D<vector<T,N>> sampler, vec4 p, constexpr ivec3 offset, float bias = 0.0)
 {
     return textureOffset(sampler, p.xyz / p.w, offset, bias);
@@ -2127,6 +2215,12 @@ public float textureProjOffset(sampler1DShadow sampler, vec4 p, constexpr int of
 
 [ForceInline]
 public float textureProjOffset(sampler2DShadow sampler, vec4 p, constexpr ivec2 offset, float bias = 0.0)
+{
+    return textureOffset(sampler, p.xyz / p.w, offset, bias);
+}
+
+[ForceInline]
+public float textureProjOffset(sampler2DRectShadow sampler, vec4 p, constexpr ivec2 offset, float bias = 0.0)
 {
     return textureOffset(sampler, p.xyz / p.w, offset, bias);
 }
@@ -2175,6 +2269,13 @@ public float textureLodOffset(sampler2DShadow sampler, vec3 p, float lod, conste
 }
 
 [ForceInline]
+public float textureLodOffset(sampler2DRectShadow sampler, vec3 p, float lod, constexpr ivec2 offset)
+{
+    // TODO: Need to apply lod
+    return sampler.SampleCmpLevelZero(p.xy, p.z, offset);
+}
+
+[ForceInline]
 public float textureLodOffset(sampler1DArrayShadow sampler, vec3 p, float lod, constexpr int offset)
 {
     // TODO: Need to apply lod
@@ -2215,6 +2316,20 @@ public vector<T,4> textureProjLod(Sampler2D<vector<T,N>> sampler, vec4 p, float 
 
 __generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
+public vector<T,4> textureProjLod(Sampler2DRect<vector<T,N>> sampler, vec3 p, float lod)
+{
+    return textureLod(sampler, p.xy / p.z, lod);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProjLod(Sampler2DRect<vector<T,N>> sampler, vec4 p, float lod)
+{
+    return textureLod(sampler, p.xy / p.w, lod);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
 public vector<T,4> textureProjLod(Sampler3D<vector<T,N>> sampler, vec4 p, float lod)
 {
     return textureLod(sampler, p.xyz / p.w, lod);
@@ -2228,6 +2343,12 @@ public float textureProjLod(sampler1DShadow sampler, vec4 p, float lod)
 
 [ForceInline]
 public float textureProjLod(sampler2DShadow sampler, vec4 p, float lod)
+{
+    return textureLod(sampler, p.xyz / p.w, lod);
+}
+
+[ForceInline]
+public float textureProjLod(sampler2DRectShadow sampler, vec4 p, float lod)
 {
     return textureLod(sampler, p.xyz / p.w, lod);
 }
@@ -2266,6 +2387,20 @@ public vector<T,4> textureProjLodOffset(Sampler2D<vector<T,N>> sampler, vec4 p, 
 
 __generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
+public vector<T,4> textureProjLodOffset(Sampler2DRect<vector<T,N>> sampler, vec3 p, float lod, constexpr ivec2 offset)
+{
+    return textureLodOffset(sampler, p.xy / p.z, lod, offset);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProjLodOffset(Sampler2DRect<vector<T,N>> sampler, vec4 p, float lod, constexpr ivec2 offset)
+{
+    return textureLodOffset(sampler, p.xy / p.w, lod, offset);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
 public vector<T,4> textureProjLodOffset(Sampler3D<vector<T,N>> sampler, vec4 p, float lod, constexpr ivec3 offset)
 {
     return textureLodOffset(sampler, p.xyz / p.w, lod, offset);
@@ -2279,6 +2414,12 @@ public float textureProjLodOffset(sampler1DShadow sampler, vec4 p, float lod, co
 
 [ForceInline]
 public float textureProjLodOffset(sampler2DShadow sampler, vec4 p, float lod, constexpr ivec2 offset)
+{
+    return textureLodOffset(sampler, p.xyz / p.w, lod, offset);
+}
+
+[ForceInline]
+public float textureProjLodOffset(sampler2DRectShadow sampler, vec4 p, float lod, constexpr ivec2 offset)
 {
     return textureLodOffset(sampler, p.xyz / p.w, lod, offset);
 }
@@ -2328,6 +2469,13 @@ public float textureGrad(sampler1DArrayShadow sampler, vec3 p, float dPdx, float
 
 [ForceInline]
 public float textureGrad(sampler2DShadow sampler, vec3 p, vec2 dPdx, vec2 dPdy)
+{
+    // TODO: Not implemented on HLSL side yet.
+    return 0;
+}
+
+[ForceInline]
+public float textureGrad(sampler2DRectShadow sampler, vec3 p, vec2 dPdx, vec2 dPdy)
 {
     // TODO: Not implemented on HLSL side yet.
     return 0;
@@ -2391,6 +2539,13 @@ public float textureGradOffset(sampler2DShadow sampler, vec3 p, vec2 dPdx, vec2 
 }
 
 [ForceInline]
+public float textureGradOffset(sampler2DRectShadow sampler, vec3 p, vec2 dPdx, vec2 dPdy, constexpr ivec2 offset)
+{
+    // TODO: Not implemented on HLSL side yet.
+    return 0;
+}
+
+[ForceInline]
 public float textureGradOffset(sampler1DArrayShadow sampler, vec3 p, float dPdx, float dPdy, constexpr int offset)
 {
     // TODO: Not implemented on HLSL side yet.
@@ -2438,6 +2593,20 @@ public vector<T,4> textureProjGrad(Sampler2D<vector<T,N>> sampler, vec4 p, vec2 
 
 __generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
+public vector<T,4> textureProjGrad(Sampler2DRect<vector<T,N>> sampler, vec3 p, vec2 dPdx, vec2 dPdy)
+{
+    return textureGrad(sampler, p.xy / p.z, dPdx, dPdy);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProjGrad(Sampler2DRect<vector<T,N>> sampler, vec4 p, vec2 dPdx, vec2 dPdy)
+{
+    return textureGrad(sampler, p.xy / p.w, dPdx, dPdy);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
 public vector<T,4> textureProjGrad(Sampler3D<vector<T,N>> sampler, vec4 p, vec3 dPdx, vec3 dPdy)
 {
     return textureGrad(sampler, p.xyz / p.w, dPdx, dPdy);
@@ -2451,6 +2620,12 @@ public float textureProjGrad(sampler1DShadow sampler, vec4 p, float dPdx, float 
 
 [ForceInline]
 public float textureProjGrad(sampler2DShadow sampler, vec4 p, vec2 dPdx, vec2 dPdy)
+{
+    return textureGrad(sampler, p.xyz / p.w, dPdx, dPdy);
+}
+
+[ForceInline]
+public float textureProjGrad(sampler2DRectShadow sampler, vec4 p, vec2 dPdx, vec2 dPdy)
 {
     return textureGrad(sampler, p.xyz / p.w, dPdx, dPdy);
 }
@@ -2489,6 +2664,20 @@ public vector<T,4> textureProjGradOffset(Sampler2D<vector<T,N>> sampler, vec4 p,
 
 __generic<T:__BuiltinArithmeticType, let N:int>
 [ForceInline]
+public vector<T,4> textureProjGradOffset(Sampler2DRect<vector<T,N>> sampler, vec3 p, vec2 dPdx, vec2 dPdy, constexpr ivec2 offset)
+{
+    return textureGradOffset(sampler, p.xy / p.z, dPdx, dPdy, offset);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
+public vector<T,4> textureProjGradOffset(Sampler2DRect<vector<T,N>> sampler, vec4 p, vec2 dPdx, vec2 dPdy, constexpr ivec2 offset)
+{
+    return textureGradOffset(sampler, p.xy / p.w, dPdx, dPdy, offset);
+}
+
+__generic<T:__BuiltinArithmeticType, let N:int>
+[ForceInline]
 public vector<T,4> textureProjGradOffset(Sampler3D<vector<T,N>> sampler, vec4 p, vec3 dPdx, vec3 dPdy, constexpr ivec3 offset)
 {
     return textureGradOffset(sampler, p.xyz / p.w, dPdx, dPdy, offset);
@@ -2502,6 +2691,12 @@ public float textureProjGradOffset(sampler1DShadow sampler, vec4 p, float dPdx, 
 
 [ForceInline]
 public float textureProjGradOffset(sampler2DShadow sampler, vec4 p, vec2 dPdx, vec2 dPdy, constexpr ivec2 offset)
+{
+    return textureGradOffset(sampler, p.xyz / p.w, dPdx, dPdy, offset);
+}
+
+[ForceInline]
+public float textureProjGradOffset(sampler2DRectShadow sampler, vec4 p, vec2 dPdx, vec2 dPdy, constexpr ivec2 offset)
 {
     return textureGradOffset(sampler, p.xyz / p.w, dPdx, dPdy, offset);
 }
@@ -2847,20 +3042,24 @@ public vec4 shadow2DProjLod(sampler2DShadow sampler, vec4 coord, float lod)
     return textureProjLod(sampler, coord, lod);
 }
 
+//// gimageDim Implementation
 
-//
-// image type
-//
+public const int GL_TEXTURE_CUBE_MAP_POSITIVE_X = 0;
+public const int GL_TEXTURE_CUBE_MAP_NEGATIVE_X = 1;
+public const int GL_TEXTURE_CUBE_MAP_POSITIVE_Y = 2;
+public const int GL_TEXTURE_CUBE_MAP_NEGATIVE_Y = 3;
+public const int GL_TEXTURE_CUBE_MAP_POSITIVE_Z = 4;
+public const int GL_TEXTURE_CUBE_MAP_NEGATIVE_Z = 5;
 
 __generic<T : __BuiltinType>
-[ForceInline] void typeRequireChecks_image_atomic_teir1() 
+[ForceInline] void typeRequireChecks_image_atomic_teir1()
 {
     __target_switch
     {
     case glsl:
     {
-        if (__type_equals<T, float>()) 
-            __requireGLSLExtension("GL_EXT_shader_atomic_float");  
+        if (__type_equals<T, float>())
+            __requireGLSLExtension("GL_EXT_shader_atomic_float");
     }
     case spirv:
         if (__type_equals<T, float>())
@@ -2875,14 +3074,14 @@ __generic<T : __BuiltinType>
 }
 
 __generic<T : __BuiltinType>
-[ForceInline] void typeRequireChecks_image_atomic_teir2() 
+[ForceInline] void typeRequireChecks_image_atomic_teir2()
 {
     __target_switch
     {
     case glsl:
     {
-        if (__type_equals<T, float>()) 
-            __requireGLSLExtension("GL_EXT_shader_atomic_float2");  
+        if (__type_equals<T, float>())
+            __requireGLSLExtension("GL_EXT_shader_atomic_float2");
     }
     case spirv:
         if (__type_equals<T, float>())
@@ -2890,14 +3089,14 @@ __generic<T : __BuiltinType>
             spirv_asm
             {
                 OpExtension "SPV_EXT_shader_atomic_float_min_max";
-                OpCapability AtomicFloat32AddEXT
+                OpCapability AtomicFloat32MinMaxEXT
             };
         }
     }
 }
 
 __generic<T : __BuiltinType>
-[ForceInline] void typeRequireChecks_image_atomic_int64() 
+[ForceInline] void typeRequireChecks_image_atomic_int64()
 {
     __target_switch
     {
@@ -2907,7 +3106,7 @@ __generic<T : __BuiltinType>
         {
             spirv_asm
             {
-                OpCapability Int64Atomics;
+                OpCapability Int64Atomics
             };
         }
         return;
@@ -2921,375 +3120,366 @@ ${{{{
         const char *prefix;
         const char *type;
         bool isInt;
-        bool isI64;
         const char *SPVTypePrefix;
         const char *SPVSubTypePrefix;
         const char *SPVAtomicSuffix;
-    } 
+    }
     static const typeWithPrefix[] =
         {
-            { "", "float", 0, 0, "F", "F", "EXT"},
-            { "u", "uint", 1, 0, "I", "U", ""},
-            { "i", "int", 1, 0, "I", "S", ""},
-            { "u64", "uint64_t", 1, 1, "I", "U", ""},
-            { "i64", "int64_t", 1, 1, "I", "S", ""},
+            { "", "float", false, "F", "F", "EXT"},
+            { "u", "uint", true, "I", "U", ""},
+            { "i", "int", true, "I", "S", ""},
+            { "u64", "uint64_t", true, "I", "U", ""},
+            { "i64", "int64_t", true, "I", "S", ""},
         };
     struct shapeTypeInfo
     {
         const char *suffix;
-        int dimTex;
-        int dimIndexer;
-        int dimI;
+        int imageSizeIVecDim;
+        int imageCoordIVecIndexerDim;
         const char *shape;
         int isArray;
         int isMS;
         bool isRect;
-        bool first;
-    } 
+    }
     static const shapeType[] =
         {
-            { "1D", 1, 1, 1, "__Shape1D", 0, 0, 0, true},
+            { "1D", 1, 1,"__Shape1D", 0, 0, 0},
 
-            { "2D", 2, 2, 2, "__Shape2D", 0, 0, 0, false},
-            { "3D", 3, 3, 3, "__Shape3D", 0, 0, 0, false},
-            { "Cube", 2, 3, 3, "__ShapeCube", 0, 0, 0, false},
-            { "2DRect", 2, 2, 2, "__Shape2D", 0, 0, 1, false},
-            { "1DArray", 2, 2, 1, "__Shape1D", 1, 0, 0, false},
+            { "2D", 2, 2, "__Shape2D", 0, 0, 0},
+            { "3D", 3, 3, "__Shape3D", 0, 0, 0},
+            { "Cube", 2, 3, "__ShapeCube", 0, 0, 0},
+            { "2DRect", 2, 2, "__Shape2D", 0, 0, 1},
+            { "1DArray", 2, 2, "__Shape1D", 1, 0, 0},
 
-            { "2DArray", 3, 3, 2, "__Shape2D", 1, 0, 0, false},
-            { "CubeArray", 3, 3, 3, "__ShapeCube", 1, 0, 0, false},
-            { "Buffer", 1, 1, 1, "__ShapeBuffer", 0, 0, 0, false},
-            { "2DMS", 2, 2, 2, "__Shape2D", 0, 1, 0, false},
-            { "2DMSArray", 3, 3, 2, "__Shape2D", 1, 1, 0, false},
+            { "2DArray", 3, 3, "__Shape2D", 1, 0, 0},
+            { "CubeArray", 3, 3, "__ShapeCube", 1, 0, 0},
+            { "Buffer", 1, 1, "__ShapeBuffer", 0, 0, 0},
+            { "2DMS", 2, 2, "__Shape2D", 0, 1, 0},
+            { "2DMSArray", 3, 3, "__Shape2D", 1, 1, 0},
         };
     for (const auto& targetType : typeWithPrefix)
+    for (const auto& targetShape : shapeType)
     {
-        for (const auto& targetShape : shapeType)
+        // gimageDim is the format of image buffers, we
+        // need to resolve a type name from the format:
+        // targetType.prefix is the 'g'
+        // targetShape.suffix is the 'Dim'
+        StringBuilder fullTypeNameBuilder;
+        fullTypeNameBuilder << targetType.prefix << "image" << targetShape.suffix;
+        auto fullTypeName = fullTypeNameBuilder.toString();
+
+        // We need a string to resolve for the imageSize return type
+        // since each shape has a different return which may not be
+        // a vec
+        StringBuilder imageSizeIntOrIVecBuilder;
+        if (targetShape.imageSizeIVecDim == 1)
+            imageSizeIntOrIVecBuilder << "int";
+        else
+            imageSizeIntOrIVecBuilder << "ivec" << targetShape.imageSizeIVecDim;
+        auto imageSizeIntOrIVec = imageSizeIntOrIVecBuilder.toString();
+
+        // Following OpenGL/Vulkan semantics, IMAGE_PARAMS string represents
+        // the changing list of parameters per gimageDim type
+        // https://registry.khronos.org/OpenGL/specs/gl/GLSLangSpec.4.60.pdf
+        StringBuilder IMAGE_PARAMSBuilder;
+        IMAGE_PARAMSBuilder << fullTypeName << " image,";
+        int paramC = targetShape.imageCoordIVecIndexerDim;
+        if (paramC == 1)
+            IMAGE_PARAMSBuilder << "int";
+        else
+            IMAGE_PARAMSBuilder << "ivec" << paramC;
+        IMAGE_PARAMSBuilder << " P";
+        if (targetShape.isMS)
         {
-            StringBuilder fullTypeNameBuilder;
-            fullTypeNameBuilder << targetType.prefix << "image" << targetShape.suffix;
-            auto fullTypeName = fullTypeNameBuilder.toString(); 
+            IMAGE_PARAMSBuilder << ", int sample";
+        }
+        auto IMAGE_PARAMS = IMAGE_PARAMSBuilder.toString();
 
-            //int or vec related to the dim of our texture
-            StringBuilder texelTypeBuilder;
-            if (targetShape.dimI == 1)
-                texelTypeBuilder << targetType.type;
-            else
-                texelTypeBuilder << targetType.prefix << "vec" << targetShape.dimI;
-            auto texelType = texelTypeBuilder.toString();
+        // SPIR-V requires a 'sample' parameter for all texture
+        // functions. We need to handle a dynamic creation of
+        // 'sample' if 'sample' parameter is not in IMAGE_PARAMS
+        StringBuilder SPV_PREFIX_IMAGE_PARAMSBuilder;
+        StringBuilder SPV_SUFFIX_IMAGE_PARAMSBuilder;
+        StringBuilder SPV_DEFAULT_SAMPLE_VAR_IF_MISSINGBuilder;
 
-            // figure out what int/ivec related to the imageSize of this type
-            StringBuilder intOrVecTypeBuilder;
-            if (targetShape.dimTex == 1)
-                intOrVecTypeBuilder << "int";
-            else 
-                intOrVecTypeBuilder << "ivec" << targetShape.dimTex;
-            auto intOrVecType = intOrVecTypeBuilder.toString();
-            // 
+        SPV_PREFIX_IMAGE_PARAMSBuilder << "$image $P";
+        SPV_SUFFIX_IMAGE_PARAMSBuilder;
+        if (targetShape.isMS)
+        {
+            SPV_SUFFIX_IMAGE_PARAMSBuilder << " Sample $sample";
+        }
+        else
+        {
+            SPV_DEFAULT_SAMPLE_VAR_IF_MISSINGBuilder << "let sample = 0;";
+        }
 
-            // https://www.khronos.org/opengl/wiki/Image_Load_Store#Image_operations
-            // this is essentially a macro for the params IMAGE_COORD represents, int or ivec[size]
-            StringBuilder IMAGE_COORDBuilder;
-            int paramC = targetShape.dimIndexer;
-            if (paramC == 1)
-                IMAGE_COORDBuilder << "int";
-            else
-                IMAGE_COORDBuilder << "ivec" << paramC;
-            IMAGE_COORDBuilder << " P";
-            if (targetShape.isMS)
-            {
-                IMAGE_COORDBuilder << ", int sample";
-            }
-            auto IMAGE_COORD = IMAGE_COORDBuilder.toString();
-            StringBuilder IMAGE_PARAMSBuilder;
-            IMAGE_PARAMSBuilder << fullTypeName << " image," << IMAGE_COORD;
-            auto IMAGE_PARAMS = IMAGE_PARAMSBuilder.toString();
-
-            StringBuilder SPV_PREFIX_IMAGE_PARAMSBuilder;
-            StringBuilder SPV_SUFFIX_IMAGE_PARAMSBuilder;
-            StringBuilder SPV_DEFAULT_SAMPLE_VAR_IF_MISSINGBuilder;
-            
-            SPV_PREFIX_IMAGE_PARAMSBuilder << "$image $P";
-            SPV_SUFFIX_IMAGE_PARAMSBuilder;
-            if (targetShape.isMS)
-            {
-                SPV_SUFFIX_IMAGE_PARAMSBuilder << " Sample $sample";
-            }
-            else
-            {
-                SPV_DEFAULT_SAMPLE_VAR_IF_MISSINGBuilder << "let sample = 0;";
-            }
-            
-            auto SPV_PREFIX_IMAGE_PARAMS = SPV_PREFIX_IMAGE_PARAMSBuilder.toString();
-            auto SPV_SUFFIX_IMAGE_PARAMS = SPV_SUFFIX_IMAGE_PARAMSBuilder.toString();
-            auto SPV_DEFAULT_SAMPLE_VAR_IF_MISSING = SPV_DEFAULT_SAMPLE_VAR_IF_MISSINGBuilder.toString(); 
+        auto SPV_PREFIX_IMAGE_PARAMS = SPV_PREFIX_IMAGE_PARAMSBuilder.toString();
+        auto SPV_SUFFIX_IMAGE_PARAMS = SPV_SUFFIX_IMAGE_PARAMSBuilder.toString();
+        auto SPV_DEFAULT_SAMPLE_VAR_IF_MISSING = SPV_DEFAULT_SAMPLE_VAR_IF_MISSINGBuilder.toString();
 }}}}
-
-            __generic<let format:int=0>
-            public typealias $(fullTypeName) = __TextureImpl<
-                $(targetType.type),
-                $(targetShape.shape),
-                $(targetShape.isArray), // isArray
-                $(targetShape.isMS), // isMS
-                0, //sampleCount
-                1, // access -- 0 refers to read only TYPE, not modifier
-                0, // isShadow
-                0, // isCombined
-                $(targetShape.isRect),
-                format
-            >;
-
-            [require(spirv)]
-            [require(glsl)]
-            [ForceInline] public $(intOrVecType) imageSize(readonly writeonly $(fullTypeName) image)
+        __generic<let format:int=0>
+        public typealias $(fullTypeName) = __TextureImpl<
+            $(targetType.type),
+            $(targetShape.shape),
+            $(targetShape.isArray), // isArray
+            $(targetShape.isMS), // isMS
+            0, // sampleCount
+            1, // access
+            0, // isShadow
+            0, // isCombined
+            $(targetShape.isRect),
+            format
+        >;
+        [require(spirv)]
+        [require(glsl)]
+        [ForceInline] public $(imageSizeIntOrIVec) imageSize(readonly writeonly $(fullTypeName) image)
+        {
+            __target_switch
             {
-                __target_switch
+            case glsl: __intrinsic_asm "imageSize($*0)";
+            case spirv:
+                return spirv_asm
                 {
-                case glsl: __intrinsic_asm "imageSize($*0)";
-                case spirv:
-                    return spirv_asm 
-                    {
-                        OpCapability ImageQuery;
-                        result:$$$(intOrVecType) = OpImageQuerySize $image;
-                    };
-                }
+                    OpCapability ImageQuery;
+                    result:$$$(imageSizeIntOrIVec) = OpImageQuerySize $image;
+                };
             }
-            [require(spirv)]
-            [require(glsl)]
-            [ForceInline] public $(targetType.prefix)vec4 imageLoad(readonly $(IMAGE_PARAMS))
+        }
+        [require(spirv)]
+        [require(glsl)]
+        [ForceInline] public $(targetType.prefix)vec4 imageLoad(readonly $(IMAGE_PARAMS))
+        {
+            __target_switch
             {
-                __target_switch
-                {
-                case glsl: __intrinsic_asm "imageLoad($*0)";
-                case spirv:
-                {   
-                    $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
-                    return spirv_asm 
-                    {
-                        result:$$$(targetType.prefix)vec4 = OpImageRead $(SPV_PREFIX_IMAGE_PARAMS) $(SPV_SUFFIX_IMAGE_PARAMS);
-                    };
-                }
-                }
-            }
-            [require(spirv)]
-            [require(glsl)]
-            [ForceInline] public void imageStore(writeonly $(IMAGE_PARAMS), $(targetType.prefix)vec4 data)
+            case glsl: __intrinsic_asm "imageLoad($*0)";
+            case spirv:
             {
-                __target_switch
+                $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                return spirv_asm
                 {
-                case glsl: __intrinsic_asm "imageStore($*0)";
-                case spirv:
-                {
-                    $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
-                    return spirv_asm 
-                    {
-                        OpImageWrite $(SPV_PREFIX_IMAGE_PARAMS) $data $(SPV_SUFFIX_IMAGE_PARAMS);
-                    };
-                }
-                }
+                    result:$$$(targetType.prefix)vec4 = OpImageRead $(SPV_PREFIX_IMAGE_PARAMS) $(SPV_SUFFIX_IMAGE_PARAMS);
+                };
             }
+            }
+        }
+        [require(spirv)]
+        [require(glsl)]
+        [ForceInline] public void imageStore(writeonly $(IMAGE_PARAMS), $(targetType.prefix)vec4 data)
+        {
+            __target_switch
+            {
+            case glsl: __intrinsic_asm "imageStore($*0)";
+            case spirv:
+            {
+                $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                return spirv_asm
+                {
+                    OpImageWrite $(SPV_PREFIX_IMAGE_PARAMS) $data $(SPV_SUFFIX_IMAGE_PARAMS);
+                };
+            }
+            }
+        }
 
 ${{{{
-            if (targetShape.isMS)
-            {
+        if (targetShape.isMS)
+        {
 }}}}
-                [require(spirv)]
-                [require(glsl)]
-                [ForceInline] public int imageSamples(readonly writeonly $(fullTypeName) image)
-                {
-                    __target_switch
-                    {
-                    case glsl: __intrinsic_asm "imageSamples($*0)";
-                    case spirv:
-                        return spirv_asm 
-                        {
-                            OpCapability ImageQuery;
-                            result:$$int = OpImageQuerySamples $image;
-                        };
-                    }
-                }
-${{{{
-            }
-}}}}
-            // TODO: ensure format is r32f, r32i, r32ui, r64ui, r64i
             [require(spirv)]
             [require(glsl)]
-            [ForceInline] public $(targetType.type) imageAtomicAdd($(IMAGE_PARAMS), $(targetType.type) data)
+            [ForceInline] public int imageSamples(readonly writeonly $(fullTypeName) image)
             {
-                typeRequireChecks_image_atomic_teir1<$(targetType.type)>();
                 __target_switch
                 {
-                case glsl: __intrinsic_asm "imageAtomicAdd($*0)";
+                case glsl: __intrinsic_asm "imageSamples($*0)";
                 case spirv:
-                {
-                    typeRequireChecks_image_atomic_int64<$(targetType.type)>();
-                    $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
                     return spirv_asm
                     {
                         OpCapability ImageQuery;
-                        %ptrType = OpTypePointer Image $$$(targetType.type);
-                        %ptr:%ptrType = OpImageTexelPointer __imagePointer(image) $P $sample;
-                        result:$$$(targetType.type) = OpAtomic$(targetType.SPVTypePrefix)Add$(targetType.SPVAtomicSuffix) %ptr Device None $data
+                        result:$$int = OpImageQuerySamples $image;
                     };
-                }
-                }
-            }
-            [require(spirv)]
-            [require(glsl)]
-            [ForceInline] public $(targetType.type) imageAtomicExchange($(IMAGE_PARAMS), $(targetType.type) data)
-            {
-                typeRequireChecks_image_atomic_teir1<$(targetType.type)>();
-                __target_switch
-                {
-                case glsl: __intrinsic_asm "imageAtomicExchange($*0)";
-                case spirv:
-                {
-                    typeRequireChecks_image_atomic_int64<$(targetType.type)>();
-                    $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
-                    return spirv_asm 
-                    {
-                        OpCapability ImageQuery;
-                        %ptrType = OpTypePointer Image $$$(targetType.type);
-                        %ptr:%ptrType = OpImageTexelPointer __imagePointer(image) $P $sample;
-                        result:$$$(targetType.type) = OpAtomicExchange %ptr Device ImageMemory $data
-                    };
-                }
-                }
-            }
-            [require(spirv)]
-            [require(glsl)]
-            [ForceInline] public $(targetType.type) imageAtomicMin($(IMAGE_PARAMS), $(targetType.type) data)
-            {
-                typeRequireChecks_image_atomic_teir2<$(targetType.type)>();
-                __target_switch
-                {
-                case glsl: __intrinsic_asm "imageAtomicMin($*0)";
-                case spirv:
-                {
-                    typeRequireChecks_image_atomic_int64<$(targetType.type)>();
-                    $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
-                    return spirv_asm 
-                    {
-                        OpCapability ImageQuery;
-                        %ptrType = OpTypePointer Image $$$(targetType.type);
-                        %ptr:%ptrType = OpImageTexelPointer __imagePointer(image) $P $sample;
-                        result:$$$(targetType.type) = OpAtomic$(targetType.SPVSubTypePrefix)Min$(targetType.SPVAtomicSuffix) %ptr Device ImageMemory $data
-                    };
-                }
-                }
-            }
-            [require(spirv)]
-            [require(glsl)]
-            [ForceInline] public $(targetType.type) imageAtomicMax($(IMAGE_PARAMS), $(targetType.type) data)
-            {
-                typeRequireChecks_image_atomic_teir2<$(targetType.type)>();
-                __target_switch
-                {
-                case glsl: __intrinsic_asm "imageAtomicMax($*0)";
-                case spirv:
-                {
-                    typeRequireChecks_image_atomic_int64<$(targetType.type)>();
-                    $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
-                    return spirv_asm 
-                    {
-                        OpCapability ImageQuery;
-                        %ptrType = OpTypePointer Image $$$(targetType.type);
-                        %ptr:%ptrType = OpImageTexelPointer __imagePointer(image) $P $sample;
-                        result:$$$(targetType.type) = OpAtomic$(targetType.SPVSubTypePrefix)Max$(targetType.SPVAtomicSuffix) %ptr Device ImageMemory $data
-                    };
-                }
-                }
-            }
-${{{{
-            if (!targetType.isInt)
-                continue;
-}}}}
-            [require(spirv)]
-            [require(glsl)]
-            [ForceInline] public $(targetType.type) imageAtomicAnd($(IMAGE_PARAMS), $(targetType.type) data)
-            {
-                __target_switch
-                {
-                case glsl: __intrinsic_asm "imageAtomicAnd($*0)";
-                case spirv:
-                {
-                    typeRequireChecks_image_atomic_int64<$(targetType.type)>();
-                    $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
-                    return spirv_asm 
-                    {
-                        OpCapability ImageQuery;
-                        %ptrType = OpTypePointer Image $$$(targetType.type);
-                        %ptr:%ptrType = OpImageTexelPointer __imagePointer(image) $P $sample;
-                        result:$$$(targetType.type) = OpAtomicAnd %ptr Device ImageMemory $data
-                    };
-                }
-                }
-            }
-            [require(spirv)]
-            [require(glsl)]
-            [ForceInline] public $(targetType.type) imageAtomicOr($(IMAGE_PARAMS), $(targetType.type) data)
-            {
-                __target_switch
-                {
-                case glsl: __intrinsic_asm "imageAtomicOr($*0)";
-                case spirv:
-                {
-                    typeRequireChecks_image_atomic_int64<$(targetType.type)>();
-                    $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
-                    return spirv_asm 
-                    {
-                        OpCapability ImageQuery;
-                        %ptrType = OpTypePointer Image $$$(targetType.type);
-                        %ptr:%ptrType = OpImageTexelPointer __imagePointer(image) $P $sample;
-                        result:$$$(targetType.type) = OpAtomicOr %ptr Device ImageMemory $data
-                    };
-                }
-                }
-            }
-            [require(spirv)]
-            [require(glsl)]
-            [ForceInline] public $(targetType.type) imageAtomicXor($(IMAGE_PARAMS), $(targetType.type) data)
-            {
-                __target_switch
-                {
-                case glsl: __intrinsic_asm "imageAtomicXor($*0)";
-                case spirv:
-                {
-                    typeRequireChecks_image_atomic_int64<$(targetType.type)>();
-                    $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
-                    return spirv_asm 
-                    {
-                        OpCapability ImageQuery;
-                        %ptrType = OpTypePointer Image $$$(targetType.type);
-                        %ptr:%ptrType = OpImageTexelPointer __imagePointer(image) $P $sample;
-                        result:$$$(targetType.type) = OpAtomicXor %ptr Device ImageMemory $data
-                    };
-                }
-                }
-            }
-            [require(spirv)]
-            [require(glsl)]
-            [ForceInline] public $(targetType.type) imageAtomicCompSwap($(IMAGE_PARAMS), $(targetType.type) compare, $(targetType.type) data)
-            {
-                __target_switch
-                {
-                case glsl: __intrinsic_asm "imageAtomicCompSwap($*0)";
-                case spirv:
-                {
-                    typeRequireChecks_image_atomic_int64<$(targetType.type)>();
-                    $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
-                    return spirv_asm 
-                    {
-                        OpCapability ImageQuery;
-                        %ptrType = OpTypePointer Image $$$(targetType.type);
-                        %ptr:%ptrType = OpImageTexelPointer __imagePointer(image) $P $sample;
-                        result:$$$(targetType.type) = OpAtomicCompareExchange %ptr Device ImageMemory ImageMemory $data $compare
-                    };
-                }
                 }
             }
 ${{{{
         }
+}}}}
+        [require(spirv)]
+        [require(glsl)]
+        [ForceInline] public $(targetType.type) imageAtomicAdd($(IMAGE_PARAMS), $(targetType.type) data)
+        {
+            typeRequireChecks_image_atomic_teir1<$(targetType.type)>();
+            __target_switch
+            {
+            case glsl: __intrinsic_asm "imageAtomicAdd($*0)";
+            case spirv:
+            {
+                typeRequireChecks_image_atomic_int64<$(targetType.type)>();
+                $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                return spirv_asm
+                {
+                    OpCapability ImageQuery;
+                    %ptrType = OpTypePointer Image $$$(targetType.type);
+                    %ptr:%ptrType = OpImageTexelPointer __imagePointer(image) $P $sample;
+                    result:$$$(targetType.type) = OpAtomic$(targetType.SPVTypePrefix)Add$(targetType.SPVAtomicSuffix) %ptr Device None $data
+                };
+            }
+            }
+        }
+        [require(spirv)]
+        [require(glsl)]
+        [ForceInline] public $(targetType.type) imageAtomicExchange($(IMAGE_PARAMS), $(targetType.type) data)
+        {
+            typeRequireChecks_image_atomic_teir1<$(targetType.type)>();
+            __target_switch
+            {
+            case glsl: __intrinsic_asm "imageAtomicExchange($*0)";
+            case spirv:
+            {
+                typeRequireChecks_image_atomic_int64<$(targetType.type)>();
+                $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                return spirv_asm
+                {
+                    OpCapability ImageQuery;
+                    %ptrType = OpTypePointer Image $$$(targetType.type);
+                    %ptr:%ptrType = OpImageTexelPointer __imagePointer(image) $P $sample;
+                    result:$$$(targetType.type) = OpAtomicExchange %ptr Device ImageMemory $data
+                };
+            }
+            }
+        }
+        [require(spirv)]
+        [require(glsl)]
+        [ForceInline] public $(targetType.type) imageAtomicMin($(IMAGE_PARAMS), $(targetType.type) data)
+        {
+            typeRequireChecks_image_atomic_teir2<$(targetType.type)>();
+            __target_switch
+            {
+            case glsl: __intrinsic_asm "imageAtomicMin($*0)";
+            case spirv:
+            {
+                typeRequireChecks_image_atomic_int64<$(targetType.type)>();
+                $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                return spirv_asm
+                {
+                    OpCapability ImageQuery;
+                    %ptrType = OpTypePointer Image $$$(targetType.type);
+                    %ptr:%ptrType = OpImageTexelPointer __imagePointer(image) $P $sample;
+                    result:$$$(targetType.type) = OpAtomic$(targetType.SPVSubTypePrefix)Min$(targetType.SPVAtomicSuffix) %ptr Device ImageMemory $data
+                };
+            }
+            }
+        }
+        [require(spirv)]
+        [require(glsl)]
+        [ForceInline] public $(targetType.type) imageAtomicMax($(IMAGE_PARAMS), $(targetType.type) data)
+        {
+            typeRequireChecks_image_atomic_teir2<$(targetType.type)>();
+            __target_switch
+            {
+            case glsl: __intrinsic_asm "imageAtomicMax($*0)";
+            case spirv:
+            {
+                typeRequireChecks_image_atomic_int64<$(targetType.type)>();
+                $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                return spirv_asm
+                {
+                    OpCapability ImageQuery;
+                    %ptrType = OpTypePointer Image $$$(targetType.type);
+                    %ptr:%ptrType = OpImageTexelPointer __imagePointer(image) $P $sample;
+                    result:$$$(targetType.type) = OpAtomic$(targetType.SPVSubTypePrefix)Max$(targetType.SPVAtomicSuffix) %ptr Device ImageMemory $data
+                };
+            }
+            }
+        }
+${{{{
+        if (!targetType.isInt)
+            continue;
+}}}}
+        [require(spirv)]
+        [require(glsl)]
+        [ForceInline] public $(targetType.type) imageAtomicAnd($(IMAGE_PARAMS), $(targetType.type) data)
+        {
+            __target_switch
+            {
+            case glsl: __intrinsic_asm "imageAtomicAnd($*0)";
+            case spirv:
+            {
+                typeRequireChecks_image_atomic_int64<$(targetType.type)>();
+                $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                return spirv_asm
+                {
+                    OpCapability ImageQuery;
+                    %ptrType = OpTypePointer Image $$$(targetType.type);
+                    %ptr:%ptrType = OpImageTexelPointer __imagePointer(image) $P $sample;
+                    result:$$$(targetType.type) = OpAtomicAnd %ptr Device ImageMemory $data
+                };
+            }
+            }
+        }
+        [require(spirv)]
+        [require(glsl)]
+        [ForceInline] public $(targetType.type) imageAtomicOr($(IMAGE_PARAMS), $(targetType.type) data)
+        {
+            __target_switch
+            {
+            case glsl: __intrinsic_asm "imageAtomicOr($*0)";
+            case spirv:
+            {
+                typeRequireChecks_image_atomic_int64<$(targetType.type)>();
+                $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                return spirv_asm
+                {
+                    OpCapability ImageQuery;
+                    %ptrType = OpTypePointer Image $$$(targetType.type);
+                    %ptr:%ptrType = OpImageTexelPointer __imagePointer(image) $P $sample;
+                    result:$$$(targetType.type) = OpAtomicOr %ptr Device ImageMemory $data
+                };
+            }
+            }
+        }
+        [require(spirv)]
+        [require(glsl)]
+        [ForceInline] public $(targetType.type) imageAtomicXor($(IMAGE_PARAMS), $(targetType.type) data)
+        {
+            __target_switch
+            {
+            case glsl: __intrinsic_asm "imageAtomicXor($*0)";
+            case spirv:
+            {
+                typeRequireChecks_image_atomic_int64<$(targetType.type)>();
+                $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                return spirv_asm
+                {
+                    OpCapability ImageQuery;
+                    %ptrType = OpTypePointer Image $$$(targetType.type);
+                    %ptr:%ptrType = OpImageTexelPointer __imagePointer(image) $P $sample;
+                    result:$$$(targetType.type) = OpAtomicXor %ptr Device ImageMemory $data
+                };
+            }
+            }
+        }
+        [require(spirv)]
+        [require(glsl)]
+        [ForceInline] public $(targetType.type) imageAtomicCompSwap($(IMAGE_PARAMS), $(targetType.type) compare, $(targetType.type) data)
+        {
+            __target_switch
+            {
+            case glsl: __intrinsic_asm "imageAtomicCompSwap($*0)";
+            case spirv:
+            {
+                typeRequireChecks_image_atomic_int64<$(targetType.type)>();
+                $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                return spirv_asm
+                {
+                    OpCapability ImageQuery;
+                    %ptrType = OpTypePointer Image $$$(targetType.type);
+                    %ptr:%ptrType = OpImageTexelPointer __imagePointer(image) $P $sample;
+                    result:$$$(targetType.type) = OpAtomicCompareExchange %ptr Device ImageMemory ImageMemory $data $compare
+                };
+            }
+            }
+        }
+${{{{
     }
 }
 }}}}
@@ -3297,13 +3487,6 @@ ${{{{
 //// RayTracing
 
 // Ray Tracing variables
-
-public const int GL_TEXTURE_CUBE_MAP_POSITIVE_X = 0;
-public const int GL_TEXTURE_CUBE_MAP_NEGATIVE_X = 1;
-public const int GL_TEXTURE_CUBE_MAP_POSITIVE_Y = 2;
-public const int GL_TEXTURE_CUBE_MAP_NEGATIVE_Y = 3;
-public const int GL_TEXTURE_CUBE_MAP_POSITIVE_Z = 4;
-public const int GL_TEXTURE_CUBE_MAP_NEGATIVE_Z = 5;
 
 public typealias rayQueryEXT = RayQuery;
 public typealias accelerationStructureEXT = RaytracingAccelerationStructure;
@@ -6644,6 +6827,7 @@ __spirv_version(1.3) [require(spirv)]
     shader_subgroup_preamble<T>();
     return QuadReadAcrossDiagonal(value);
 }
+
 
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_quad) [require(glsl)] 

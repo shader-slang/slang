@@ -245,7 +245,8 @@ struct VulkanExtendedFeatureProperties
     };
     // Atomic Float features
     VkPhysicalDeviceShaderAtomicFloatFeaturesEXT atomicFloatFeatures = {
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_FLOAT_FEATURES_EXT};
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_FLOAT_FEATURES_EXT
+    };
     VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT atomicFloat2Features = {
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_FLOAT_2_FEATURES_EXT
     };

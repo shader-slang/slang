@@ -1,8 +1,5 @@
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -allow-glsl -target glsl
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -allow-glsl -target spirv -emit-spirv-directly
-#version 430
-precision highp float;
-precision highp int;
 
 readonly writeonly buffer MyBlockName3
 {
@@ -23,10 +20,10 @@ buffer dontOptimizeOutBlock
 layout(local_size_x = 1) in;
 void computeMain()
 {
-//CHECK: error 30011
+//CHECK: error 30101
     optimizeBlock.data1 = inputBuffer1.data1;
-//CHECK: error 30011
+//CHECK: error 30101
     optimizeBlock.data2 = inputBuffer2.data1;
-//CHECK: error 30011
+//CHECK: error 30101
     int a = inputBuffer2.data1;
 }

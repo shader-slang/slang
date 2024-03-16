@@ -10,8 +10,6 @@
 
 namespace Slang {
 
-    bool isOpenGLTarget(TargetRequest*);
-
 // Forward declarations
 
 enum class BaseType;
@@ -1369,6 +1367,7 @@ IRVarLayout* applyOffsetToVarLayout(
 
 bool canTypeDirectlyUseRegisterSpace(TypeLayout* layout);
 
+bool isOpenGLTarget(TargetRequest*);
 }
 
 #endif

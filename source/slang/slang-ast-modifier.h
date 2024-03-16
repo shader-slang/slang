@@ -581,21 +581,6 @@ class HLSLVolatileModifier : public Modifier
     SLANG_AST_CLASS(HLSLVolatileModifier)
 };
 
-//note: GloballyCoherentModifier handles `coherent` modifier
-//note: GLSLReadOnlyModifier handles 'readonly' modifier
-//note: GLSLWriteOnlyModifier handles 'writeonly' modifier
-
-// GLSL `volatile` modifier
-class GLSLVolatileModifier : public Modifier 
-{
-    SLANG_AST_CLASS(GLSLVolatileModifier)
-};
-
-// GLSL `restrict` modifier
-class GLSLRestrictModifier : public Modifier 
-{
-    SLANG_AST_CLASS(GLSLRestrictModifier)
-};
 
 class AttributeTargetModifier : public Modifier 
 {
@@ -1513,6 +1498,16 @@ class GLSLWriteOnlyModifier : public SimpleModifier
 class GLSLReadOnlyModifier : public SimpleModifier
 {
     SLANG_AST_CLASS(GLSLReadOnlyModifier)
+};
+
+class GLSLVolatileModifier : public Modifier
+{
+    SLANG_AST_CLASS(GLSLVolatileModifier)
+};
+
+class GLSLRestrictModifier : public Modifier
+{
+    SLANG_AST_CLASS(GLSLRestrictModifier)
 };
 
 class GLSLPatchModifier : public SimpleModifier

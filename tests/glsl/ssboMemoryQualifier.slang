@@ -1,8 +1,5 @@
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK-GLSL): -stage compute -entry computeMain -allow-glsl -target glsl
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK-SPV): -stage compute -entry computeMain -allow-glsl -target spirv -emit-spirv-directly
-#version 430
-precision highp float;
-precision highp int;
 
 volatile buffer MyBlockName1
 {

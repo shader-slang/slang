@@ -1010,13 +1010,13 @@ namespace Slang
         case ASTNodeType::GLSLBufferModifier:
         case ASTNodeType::GLSLWriteOnlyModifier:
         case ASTNodeType::GLSLReadOnlyModifier:
+        case ASTNodeType::GLSLVolatileModifier:
+        case ASTNodeType::GLSLRestrictModifier:
         case ASTNodeType::GLSLPatchModifier:
         case ASTNodeType::RayPayloadAccessSemantic:
         case ASTNodeType::RayPayloadReadSemantic:
         case ASTNodeType::RayPayloadWriteSemantic:
         case ASTNodeType::GloballyCoherentModifier:
-        case ASTNodeType::GLSLVolatileModifier:
-        case ASTNodeType::GLSLRestrictModifier:
         case ASTNodeType::PreciseModifier:
         case ASTNodeType::IntrinsicOpModifier:
         case ASTNodeType::InlineModifier:
@@ -1100,18 +1100,18 @@ namespace Slang
         case ASTNodeType::RayPayloadWriteSemantic:
             return (as<VarDeclBase>(decl) && isGlobalDecl(decl)) || as<ParamDecl>(decl) || as<GLSLInterfaceBlockDecl>(decl);
 
-
-        //buffer block, members in block, globals, param,
         case ASTNodeType::GLSLWriteOnlyModifier:
         case ASTNodeType::GLSLReadOnlyModifier:
         case ASTNodeType::GLSLVolatileModifier:
         case ASTNodeType::GLSLRestrictModifier:
+        {
+            return (as<VarDeclBase>(decl) && (isGlobalDecl(decl)) || as<ParamDecl>(decl) || as<GLSLInterfaceBlockDecl>(decl))
+                || as<StructDecl>(getParentDecl(decl)) && isGLSLInput;
+        }
         case ASTNodeType::GloballyCoherentModifier:
         {
-            auto param = as<ParamDecl>(decl);
-            return as<VarDecl>(decl) && (isGlobalDecl(decl) || as<StructDecl>(getParentDecl(decl)) || param || as<GLSLInterfaceBlockDecl>(decl))
-                || (param && isGLSLInput)
-                ;
+            return (isGlobalDecl(decl) && ((as<VarDeclBase>(decl) && isGLSLInput) || as<VarDecl>(decl))) || as<ParamDecl>(decl) && isGLSLInput
+                || as<StructDecl>(getParentDecl(decl)) || as<GLSLInterfaceBlockDecl>(decl);
         }
 
         case ASTNodeType::HLSLVolatileModifier:

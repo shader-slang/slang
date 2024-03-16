@@ -7790,84 +7790,84 @@ namespace Slang
         parser->sink->diagnose(token, Diagnostics::invalidCUDASMVersion);
         return nullptr;
     }
-    
+
     static NodeBase* parseVolatileModifier(Parser* parser, void* /*userData*/)
     {
         ModifierListBuilder listBuilder;
-        
-        {
-            auto hlslMod = parser->astBuilder->create<HLSLVolatileModifier>();
-            hlslMod->keywordName = getName(parser, "volatile");
-            hlslMod->loc = parser->tokenReader.peekLoc();
-            listBuilder.add(hlslMod);
-        }
-        if (parser->options.allowGLSLInput)
-        {
-            auto glslMod = parser->astBuilder->create<GLSLVolatileModifier>();
-            glslMod->keywordName = getName(parser, "volatile");
-            glslMod->loc = parser->tokenReader.peekLoc();
-            listBuilder.add(glslMod);
-        }
+
+        auto hlslMod = parser->astBuilder->create<HLSLVolatileModifier>();
+        hlslMod->keywordName = getName(parser, "volatile");
+        hlslMod->loc = parser->tokenReader.peekLoc();
+        listBuilder.add(hlslMod);
+
+        if (!parser->options.allowGLSLInput)
+            return listBuilder.getFirst();
+
+        auto glslMod = parser->astBuilder->create<GLSLVolatileModifier>();
+        glslMod->keywordName = getName(parser, "volatile");
+        glslMod->loc = parser->tokenReader.peekLoc();
+        listBuilder.add(glslMod);
+
         return listBuilder.getFirst();
     }
+
     static NodeBase* parseCoherentModifier(Parser* parser, void* /*userData*/)
     {
         ModifierListBuilder listBuilder;
 
-        if (parser->options.allowGLSLInput)
-        {
-            auto glslMod = parser->astBuilder->create<GloballyCoherentModifier>();
-            glslMod->keywordName = getName(parser, "coherent");
-            glslMod->loc = parser->tokenReader.peekLoc();
-            listBuilder.add(glslMod);
-        }
-        else
+        if (!parser->options.allowGLSLInput)
             parser->sink->diagnose(parser->tokenReader.peekLoc(), Diagnostics::glslTokenOnly, getName(parser, "coherent"));
+
+        auto glslMod = parser->astBuilder->create<GloballyCoherentModifier>();
+        glslMod->keywordName = getName(parser, "coherent");
+        glslMod->loc = parser->tokenReader.peekLoc();
+        listBuilder.add(glslMod);
+
         return listBuilder.getFirst();
     }
+
     static NodeBase* parseRestrictModifier(Parser* parser, void* /*userData*/)
     {
         ModifierListBuilder listBuilder;
 
-        if (parser->options.allowGLSLInput)
-        {
-            auto glslMod = parser->astBuilder->create<GLSLRestrictModifier>();
-            glslMod->keywordName = getName(parser, "restrict");
-            glslMod->loc = parser->tokenReader.peekLoc();
-            listBuilder.add(glslMod);
-        }
-        else
-            parser->sink->diagnose(parser->tokenReader.peekLoc(), Diagnostics::glslTokenOnly, getName(parser, "restrict"));
+        if (!parser->options.allowGLSLInput)
+            parser->sink->diagnose(parser->tokenReader.peekLoc(), Diagnostics::glslTokenOnly, getName(parser, "coherent"));
+
+        auto glslMod = parser->astBuilder->create<GLSLRestrictModifier>();
+        glslMod->keywordName = getName(parser, "restrict");
+        glslMod->loc = parser->tokenReader.peekLoc();
+        listBuilder.add(glslMod);
+
         return listBuilder.getFirst();
     }
+
     static NodeBase* parseReadonlyModifier(Parser* parser, void* /*userData*/)
     {
         ModifierListBuilder listBuilder;
 
-        if (parser->options.allowGLSLInput)
-        {
-            auto glslMod = parser->astBuilder->create<GLSLReadOnlyModifier>();
-            glslMod->keywordName = getName(parser, "readonly");
-            glslMod->loc = parser->tokenReader.peekLoc();
-            listBuilder.add(glslMod);
-        }
-        else
-            parser->sink->diagnose(parser->tokenReader.peekLoc(), Diagnostics::glslTokenOnly, getName(parser, "readonly"));
+        if (!parser->options.allowGLSLInput)
+            parser->sink->diagnose(parser->tokenReader.peekLoc(), Diagnostics::glslTokenOnly, getName(parser, "coherent"));
+
+        auto glslMod = parser->astBuilder->create<GLSLReadOnlyModifier>();
+        glslMod->keywordName = getName(parser, "readonly");
+        glslMod->loc = parser->tokenReader.peekLoc();
+        listBuilder.add(glslMod);
+
         return listBuilder.getFirst();
     }
+
     static NodeBase* parseWriteonlyModifier(Parser* parser, void* /*userData*/)
     {
         ModifierListBuilder listBuilder;
 
-        if (parser->options.allowGLSLInput)
-        {
-            auto glslMod = parser->astBuilder->create<GLSLWriteOnlyModifier>();
-            glslMod->keywordName = getName(parser, "writeonly");
-            glslMod->loc = parser->tokenReader.peekLoc();
-            listBuilder.add(glslMod);
-        }
-        else
-            parser->sink->diagnose(parser->tokenReader.peekLoc(), Diagnostics::glslTokenOnly, getName(parser, "writeonly"));
+        if (!parser->options.allowGLSLInput)
+            parser->sink->diagnose(parser->tokenReader.peekLoc(), Diagnostics::glslTokenOnly, getName(parser, "coherent"));
+
+        auto glslMod = parser->astBuilder->create<GLSLWriteOnlyModifier>();
+        glslMod->keywordName = getName(parser, "writeonly");
+        glslMod->loc = parser->tokenReader.peekLoc();
+        listBuilder.add(glslMod);
+
         return listBuilder.getFirst();
     }
 
@@ -7952,9 +7952,7 @@ namespace Slang
                     }
                 }
             }
-            else if(findImageFormatByName(
-                nameText.getUnownedSlice(),
-                &format))
+            else if(findImageFormatByName(nameText.getUnownedSlice(), &format))
             {
                 auto attr = parser->astBuilder->create<FormatAttribute>();
                 attr->format = format;

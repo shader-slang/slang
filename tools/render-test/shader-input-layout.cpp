@@ -116,13 +116,20 @@ namespace renderer_test
             {
                 parser.Read("=");
                 auto contentWord = parser.ReadWord();
-                if(contentWord == "one") val->textureDesc.sampleCount = InputTextureSampleCount::one;
-                else if(contentWord == "two") val->textureDesc.sampleCount = InputTextureSampleCount::two;
-                else if(contentWord == "four") val->textureDesc.sampleCount = InputTextureSampleCount::four;
-                else if(contentWord == "eight") val->textureDesc.sampleCount = InputTextureSampleCount::eight;
-                else if(contentWord == "sixteen") val->textureDesc.sampleCount = InputTextureSampleCount::sixteen;
-                else if(contentWord == "thirtyTwo") val->textureDesc.sampleCount = InputTextureSampleCount::thirtyTwo;
-                else if(contentWord == "sixtyFour") val->textureDesc.sampleCount = InputTextureSampleCount::sixtyFour;
+                if(contentWord == "one")
+                    val->textureDesc.sampleCount = InputTextureSampleCount::One;
+                else if(contentWord == "two")
+                    val->textureDesc.sampleCount = InputTextureSampleCount::Two;
+                else if(contentWord == "four")
+                    val->textureDesc.sampleCount = InputTextureSampleCount::Four;
+                else if(contentWord == "eight")
+                    val->textureDesc.sampleCount = InputTextureSampleCount::Eight;
+                else if(contentWord == "sixteen")
+                    val->textureDesc.sampleCount = InputTextureSampleCount::Sixteen;
+                else if(contentWord == "thirtyTwo")
+                    val->textureDesc.sampleCount = InputTextureSampleCount::ThirtyTwo;
+                else if(contentWord == "sixtyFour")
+                    val->textureDesc.sampleCount = InputTextureSampleCount::SixtyFour;
             }
             else if(word == "mipMaps")
             {
@@ -645,6 +652,13 @@ namespace renderer_test
                 maybeParseOptions(parser, val.Ptr());
                 return val;
             }
+            else if (parser.AdvanceIf("RWTextureBuffer"))
+            {
+                RefPtr<ShaderInputLayout::BufferVal> val = new ShaderInputLayout::BufferVal;
+                val->bufferDesc.type = InputBufferType::StorageBuffer;
+                maybeParseOptions(parser, val.Ptr());
+                return val;
+            }
             else if (parser.AdvanceIf("Texture2D"))
             {
                 RefPtr<ShaderInputLayout::TextureVal> val = new ShaderInputLayout::TextureVal;
@@ -697,13 +711,6 @@ namespace renderer_test
                 val->textureDesc.dimension = 2;
                 val->textureDesc.isCube = true;
                 val->textureDesc.isRWTexture = true;
-                maybeParseOptions(parser, val.Ptr());
-                return val;
-            }
-            else if (parser.AdvanceIf("RWTextureBuffer"))
-            {
-                RefPtr<ShaderInputLayout::BufferVal> val = new ShaderInputLayout::BufferVal;
-                val->bufferDesc.type = InputBufferType::StorageBuffer;
                 maybeParseOptions(parser, val.Ptr());
                 return val;
             }
@@ -1144,7 +1151,6 @@ namespace renderer_test
             const uint8_t* srcPixels = (const uint8_t*)srcSlice.values;
 
             T* dstPixels = (T*)output.setSliceCount(i, pixelCount);
-
             switch (formatInfo.channelCount)
             {
             case 1:
@@ -1179,7 +1185,6 @@ namespace renderer_test
             }
             case 4:
             {
-
                 for (Index j = 0; j < pixelCount; ++j, srcPixels += 4, dstPixels += 4)
                 {
                     // Copy out rgba
@@ -1197,7 +1202,6 @@ namespace renderer_test
     {
         gfx::FormatInfo formatInfo;
         gfxGetFormatInfo(desc.format, &formatInfo);
-
         switch (desc.format)
         {
             case Format::R8G8B8A8_UNORM:
@@ -1231,12 +1235,12 @@ namespace renderer_test
                     const uint8_t* srcPixels = (const uint8_t*)srcSlice.values;
 
                     int16_t* dstPixels = (int16_t*)output.setSliceCount(i, pixelCount);
-                    
+
                     switch (formatInfo.channelCount)
                     {
                         case 1:
                         {
-                            for (Index j = 0; j < pixelCount; ++j, srcPixels += 4, dstPixels += 1)
+                            for (Index j = 0; j < pixelCount; ++j, srcPixels += 4, dstPixels++)
                             {
                                 // Copy out r
                                 dstPixels[0] = FloatToHalf(srcPixels[0] * (1.0f / 255));

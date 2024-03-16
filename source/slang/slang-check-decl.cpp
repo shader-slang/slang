@@ -944,28 +944,23 @@ namespace Slang
                 }
             }
 
-            //ensures child of struct is set read-only or not
+            // Ensures child of struct is set read-only or not
             bool isWriteOnly = false;
             {
-                auto checkMod = [&](Decl* decl)
+                for (auto mod : varDeclRef.getDecl()->modifiers)
                 {
-                    for (auto mod : decl->modifiers)
+                    if (as<GLSLReadOnlyModifier>(mod))
                     {
-                        if (as<GLSLReadOnlyModifier>(mod))
-                        {
-                            isLValue = false;
-                            qualType.hasReadOnlyOnTarget = true;
-                            if (isLValue == false && isWriteOnly) break;
-                        }
-                        if (as<GLSLWriteOnlyModifier>(mod))
-                        {
-                            isWriteOnly = true;
-                            if (isLValue == false && isWriteOnly) break;
-                        }
+                        isLValue = false;
+                        qualType.hasReadOnlyOnTarget = true;
+                        if (isLValue == false && isWriteOnly) break;
                     }
-                };
-                checkMod(varDeclRef.getDecl());
-                
+                    if (as<GLSLWriteOnlyModifier>(mod))
+                    {
+                        isWriteOnly = true;
+                        if (isLValue == false && isWriteOnly) break;
+                    }
+                }
             }
 
             qualType.isLeftValue = isLValue;
@@ -1865,6 +1860,7 @@ namespace Slang
                 // it to the type of the variable.
                 //
             initExpr = subVisitor.CheckTerm(initExpr);
+
             if (initExpr->type.isWriteOnly)
                 getSink()->diagnose(initExpr, Diagnostics::readingFromWriteOnly);
             initExpr = coerce(CoercionSite::Initializer, varDecl->type.Ptr(), initExpr);
