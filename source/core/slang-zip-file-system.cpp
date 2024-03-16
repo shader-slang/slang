@@ -12,7 +12,7 @@
 
 #include "slang-implicit-directory-collector.h"
 
-#include <miniz.h>
+#include "miniz.h"
 
 namespace Slang
 {

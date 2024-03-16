@@ -13,6 +13,7 @@ using namespace Slang;
 Result SLANG_MCALL createD3D11Device(const IDevice::Desc* desc, IDevice** outDevice);
 Result SLANG_MCALL createD3D12Device(const IDevice::Desc* desc, IDevice** outDevice);
 Result SLANG_MCALL createVKDevice(const IDevice::Desc* desc, IDevice** outDevice);
+Result SLANG_MCALL createMetalDevice(const IDevice::Desc* desc, IDevice** outDevice);
 Result SLANG_MCALL createCUDADevice(const IDevice::Desc* desc, IDevice** outDevice);
 Result SLANG_MCALL createCPUDevice(const IDevice::Desc* desc, IDevice** outDevice);
 
@@ -328,7 +329,16 @@ extern "C"
                 return SLANG_FAIL;
             }
             break;
-#elif (SLANG_LINUX_FAMILY || SLANG_APPLE_FAMILY) && !defined(__CYGWIN__)
+#elif SLANG_APPLE_FAMILY
+        case DeviceType::Default:
+        {
+            return createMetalDevice(desc, outDevice);
+        }
+        case DeviceType::Vulkan:
+        {
+            return createVKDevice(desc, outDevice);
+        }
+#elif SLANG_LINUX_FAMILY && !defined(__CYGWIN__)
         case DeviceType::Default:
         case DeviceType::Vulkan:
         {

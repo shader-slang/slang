@@ -303,7 +303,6 @@ if(SLANG_ENABLE_SLANGD)
         tools/slangd
         EXECUTABLE
         LINK_WITH_PRIVATE
-            core
             slang
             slang-reflect-headers
             slang-capability-defs
@@ -474,9 +473,10 @@ if(SLANG_ENABLE_GFX)
             imgui
             $<$<BOOL:${SLANG_ENABLE_XLIB}>:X11::X11>
             ${CMAKE_DL_LIBS}
-            LINK_WITH_FRAMEWORK
+        LINK_WITH_FRAMEWORK
             Cocoa
             QuartzCore
+            Foundation
         EXTRA_COMPILE_DEFINITIONS_PRIVATE
             $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB>
         INCLUDE_FROM_PRIVATE gfx
@@ -500,6 +500,8 @@ if(SLANG_ENABLE_GFX)
         LINK_WITH_FRAMEWORK
             Cocoa
             QuartzCore
+            Metal
+            MetalKit
         EXTRA_COMPILE_DEFINITIONS_PRIVATE
             $<$<BOOL:${SLANG_ENABLE_CUDA}>:GFX_ENABLE_CUDA>
             $<$<BOOL:${SLANG_ENABLE_OPTIX}>:GFX_OPTIX>
@@ -515,6 +517,9 @@ if(SLANG_ENABLE_GFX)
         INSTALL
         FOLDER gfx
     )
+    if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
+        target_include_directories(gfx PRIVATE external/metal-cpp external/metal-cpp-extensions)
+    endif()
     set(modules_dest_dir $<TARGET_FILE_DIR:slang-test>)
     add_custom_target(
         copy-gfx-slang-modules
@@ -687,11 +692,16 @@ if (SLANG_ENABLE_EXAMPLES AND SLANG_ENABLE_GFX)
         STATIC
         EXCLUDE_FROM_ALL
         LINK_WITH_PRIVATE
-            core
             slang
             gfx
             platform
-            $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
+            $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cudart;CUDA::cuda_driver>
+        LINK_WITH_FRAMEWORK
+            Metal
+            MetalKit
+            AppKit
+            Foundation
+            QuartzCore
         FOLDER examples
     )
 
@@ -709,10 +719,8 @@ if (SLANG_ENABLE_EXAMPLES AND SLANG_ENABLE_GFX)
         slang_add_target(
             ${dir}
             EXECUTABLE
-            EXCLUDE_FROM_ALL
             USE_FEWER_WARNINGS
             LINK_WITH_PRIVATE
-                core
                 example-base
                 slang
                 gfx
@@ -721,6 +729,12 @@ if (SLANG_ENABLE_EXAMPLES AND SLANG_ENABLE_GFX)
                 $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
             EXTRA_COMPILE_DEFINITIONS_PRIVATE
                 $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB>
+            LINK_WITH_FRAMEWORK
+                Metal
+                MetalKit
+                AppKit
+                Foundation
+                QuartzCore
             REQUIRED_BY all-examples
             FOLDER examples
             DEBUG_DIR ${debug_dir}

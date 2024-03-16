@@ -174,7 +174,7 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         Array<const char*, 7> instanceExtensions;
 
 #if SLANG_APPLE_FAMILY
-        instanceExtensions.add(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+        //instanceExtensions.add(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
 #endif
         instanceExtensions.add(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
         instanceExtensions.add(VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME);

@@ -538,12 +538,12 @@ public:
 
     SLANG_NO_THROW slang::TypeLayoutReflection* SLANG_MCALL getElementTypeLayout() SLANG_OVERRIDE
     {
-        return m_layout->getElementTypeLayout();
+        return m_layout ? m_layout->getElementTypeLayout() : nullptr;
     }
 
     virtual SLANG_NO_THROW ShaderObjectContainerType SLANG_MCALL getContainerType() SLANG_OVERRIDE
     {
-        return m_layout->getContainerType();
+        return m_layout ? m_layout->getContainerType() : ShaderObjectContainerType::None;
     }
 
     virtual SLANG_NO_THROW Result SLANG_MCALL getCurrentVersion(
