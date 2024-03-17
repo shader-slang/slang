@@ -598,7 +598,7 @@ The `kernelBlob` output is a `slang::IBlob` that can be used to access the gener
 In many cases `kernelBlob->getBufferPointer()` can be passed directly to the appropriate graphics API to load kernel code onto a GPU.
 
 
-## <a id="multithreading"/>Multithreading
+## Multithreading
 
 The only functions which are currently thread safe are 
 
