@@ -832,8 +832,14 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             case kIROp_VulkanRayPayloadDecoration:
                 storageClass = SpvStorageClassRayPayloadKHR;
                 break;
+            case kIROp_VulkanRayPayloadInDecoration:
+                storageClass = SpvStorageClassIncomingRayPayloadKHR;
+                break;
             case kIROp_VulkanCallablePayloadDecoration:
                 storageClass = SpvStorageClassCallableDataKHR;
+                break;
+            case kIROp_VulkanCallablePayloadInDecoration:
+                storageClass = SpvStorageClassIncomingCallableDataKHR;
                 break;
             case kIROp_VulkanHitObjectAttributesDecoration:
                 storageClass = SpvStorageClassHitObjectAttributeNV;

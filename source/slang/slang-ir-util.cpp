@@ -1093,7 +1093,9 @@ IRInst* getVulkanPayloadLocation(IRInst* payloadGlobalVar)
         switch (decor->getOp())
         {
         case kIROp_VulkanRayPayloadDecoration:
+        case kIROp_VulkanRayPayloadInDecoration:
         case kIROp_VulkanCallablePayloadDecoration:
+        case kIROp_VulkanCallablePayloadInDecoration:
         case kIROp_VulkanHitObjectAttributesDecoration:
             return decor->getOperand(0);
         default:

@@ -2234,6 +2234,11 @@ Result DeviceImpl::createProgram(
         shaderProgram->linkedProgram->getLayout(),
         shaderProgram->m_rootObjectLayout.writeRef());
 
+    if (!shaderProgram->isSpecializable())
+    {
+        SLANG_RETURN_ON_FAIL(shaderProgram->compileShaders(this));
+    }
+
     returnComPtr(outProgram, shaderProgram);
     return SLANG_OK;
 }

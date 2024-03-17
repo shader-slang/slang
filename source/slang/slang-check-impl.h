@@ -2437,6 +2437,12 @@ namespace Slang
             Expr*	baseExpr,
             OverloadResolveContext&			context);
 
+        template<class T>
+        void trySetGenericToRayTracingWithParamAttribute(
+            LookupResultItem                genericItem,
+            DeclRef<GenericDecl>            genericDeclRef,
+            OverloadResolveContext&         context);
+
             // Add overload candidates based on use of `genericDeclRef`
             // in an ordinary function-call context (that is, where it
             // has been applied to arguments using `()` and not `<>`).
