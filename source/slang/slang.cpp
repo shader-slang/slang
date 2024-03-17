@@ -3699,7 +3699,7 @@ bool Linkage::isBinaryModuleUpToDate(String fromPath, RiffContainer* container)
             // If we cannot find the source file from `fromPath`,
             // try again from the module's source file path.
             if (moduleHeader.dependentFiles.getCount() != 0)
-                sourceFile = loadSourceFile(moduleHeader.dependentFiles.getFirst(), file);
+                sourceFile = loadSourceFile(Path::getParentDirectory(moduleHeader.dependentFiles.getFirst()), file);
         }
         if (!sourceFile)
             return false;

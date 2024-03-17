@@ -92,6 +92,15 @@ namespace Slang {
             Path::getCanonical(canonicalModulePath, canonicalModulePath);
             moduleDir = Path::getParentDirectory(canonicalModulePath);
         }
+        String linkageRoot = ".";
+        if (auto linkage = module->getLinkage())
+        {
+            auto searchDirs = module->getLinkage()->getSearchDirectories().searchDirectories;
+            if (searchDirs.getCount() != 0)
+                linkageRoot = searchDirs[0].path;
+        }
+        Path::getCanonical(linkageRoot, linkageRoot);
+
         for (auto file : fileDependencies)
         {
             digestBuilder.append(file->getDigest());
@@ -99,7 +108,8 @@ namespace Slang {
             {
                 if (file->getPathInfo().foundPath == canonicalModulePath)
                 {
-                    dstModule.dependentFiles.add(Path::getFileName(canonicalModulePath));
+                    auto relativeModulePath = Path::getRelativePath(linkageRoot, canonicalModulePath);
+                    dstModule.dependentFiles.add(relativeModulePath);
                 }
                 else
                 {
