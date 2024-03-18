@@ -207,6 +207,9 @@
     <ClInclude Include="..\..\..\source\slang\slang-ir-check-differentiability.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-ir-check-unsupported-inst.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ir-cleanup-void.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -873,6 +876,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-check-differentiability.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-ir-check-unsupported-inst.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-cleanup-void.cpp">

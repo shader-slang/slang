@@ -8,6 +8,7 @@
 #include "slang-ir-any-value-inference.h"
 #include "slang-ir-bind-existentials.h"
 #include "slang-ir-byte-address-legalize.h"
+#include "slang-ir-check-unsupported-inst.h"
 #include "slang-ir-collect-global-uniforms.h"
 #include "slang-ir-cleanup-void.h"
 #include "slang-ir-composite-reg-to-mem.h"
@@ -1061,7 +1062,9 @@ Result linkAndOptimizeIR(
 
     outLinkedIR.metadata = metadata;
 
-    return SLANG_OK;
+    checkUnsupportedInst(codeGenContext->getTargetReq(), irModule, sink);
+
+    return sink->getErrorCount() == 0 ? SLANG_OK : SLANG_FAIL;
 }
 
 SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outArtifact)
