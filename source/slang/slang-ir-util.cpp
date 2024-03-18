@@ -230,6 +230,18 @@ bool isSimpleDataType(IRType* type)
     }
 }
 
+SourceLoc findFirstUseLoc(IRInst* inst)
+{
+    for (auto use = inst->firstUse; use; use = use->nextUse)
+    {
+        if (use->getUser()->sourceLoc.isValid())
+        {
+            return use->getUser()->sourceLoc;
+        }
+    }
+    return inst->sourceLoc;
+}
+
 IRInst* hoistValueFromGeneric(IRBuilder& inBuilder, IRInst* value, IRInst*& outSpecializedVal, bool replaceExistingValue)
 {
     auto outerGeneric = as<IRGeneric>(findOuterGeneric(value));
@@ -582,14 +594,20 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
         getTypeNameHint(sb, as<IRRateQualifiedType>(type)->getValueType());
         break;
     case kIROp_VectorType:
+        sb << "vector<";
         getTypeNameHint(sb, type->getOperand(0));
+        sb << ",";
         getTypeNameHint(sb, as<IRVectorType>(type)->getElementCount());
+        sb << ">";
         break;
     case kIROp_MatrixType:
+        sb << "matrix<";
         getTypeNameHint(sb, type->getOperand(0));
+        sb << ",";
         getTypeNameHint(sb, as<IRMatrixType>(type)->getRowCount());
-        sb << "x";
+        sb << ",";
         getTypeNameHint(sb, as<IRMatrixType>(type)->getColumnCount());
+        sb << ">";
         break;
     case kIROp_IntLit:
         sb << as<IRIntLit>(type)->getValue();
