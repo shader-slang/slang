@@ -17,6 +17,8 @@ namespace Slang
                 if (!callInst)
                     continue;
                 auto callee = as<IRFunc>(callInst->getCallee());
+                if (!callee)
+                    continue;
                 if (!callStack.add(callee))
                 {
                     sink->diagnose(callInst, Diagnostics::unsupportedRecursion, callee);
