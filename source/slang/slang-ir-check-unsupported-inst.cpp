@@ -7,7 +7,7 @@ namespace Slang
 {
     bool isCPUTarget(TargetRequest* targetReq);
 
-    void checkRecursionImpl(HashSet<IRFunc*>& checkedFuncs, HashSet<IRFunc*>& callStack, IRFunc* func, DiagnosticSink* sink)
+    bool checkRecursionImpl(HashSet<IRFunc*>& checkedFuncs, HashSet<IRFunc*>& callStack, IRFunc* func, DiagnosticSink* sink)
     {
         for (auto use = func->firstUse; use; use = use->nextUse)
         {
@@ -17,17 +17,19 @@ namespace Slang
             auto caller = as<IRFunc>(getParentFunc(callInst));
             if (!caller)
                 continue;
+            if (!callStack.add(caller))
+            {
+                sink->diagnose(callInst, Diagnostics::unsupportedRecursion, caller);
+                return false;
+            }
             if (checkedFuncs.add(caller))
             {
-                if (!callStack.add(caller))
-                {
-                    sink->diagnose(callInst, Diagnostics::unsupportedRecursion, caller);
-                    return;
-                }
-                checkRecursionImpl(checkedFuncs, callStack, caller, sink);
+                if (!checkRecursionImpl(checkedFuncs, callStack, caller, sink))
+                    return false;
                 callStack.remove(caller);
             }
         }
+        return true;
     }
 
     void checkRecursion(HashSet<IRFunc*>& checkedFuncs, IRFunc* func, DiagnosticSink* sink)
@@ -35,6 +37,7 @@ namespace Slang
         HashSet<IRFunc*> callStack;
         if (checkedFuncs.add(func))
         {
+            callStack.add(func);
             checkRecursionImpl(checkedFuncs, callStack, func, sink);
         }
     }
