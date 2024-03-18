@@ -486,6 +486,7 @@ SlangResult Session::_readBuiltinModule(ISlangFileSystem* fileSystem, Scope* sco
     {
         RefPtr<Module> module(new Module(linkage, srcModule.astBuilder));
         module->setName(moduleName);
+        module->setDigest(srcModule.digest);
 
         ModuleDecl* moduleDecl = as<ModuleDecl>(srcModule.astRootNode);
         // Set the module back reference on the decl
@@ -3922,7 +3923,27 @@ ISlangUnknown* Module::getInterface(const Guid& guid)
 
 void Module::buildHash(DigestBuilder<SHA1>& builder)
 {
-    SLANG_UNUSED(builder);
+    builder.append(computeDigest());
+}
+
+SHA1::Digest Module::computeDigest()
+{
+    if (m_digest == SHA1::Digest())
+    {
+        DigestBuilder<SHA1> digestBuilder;
+        auto version = String(getBuildTagString());
+        digestBuilder.append(version);
+        getOptionSet().buildHash(digestBuilder);
+
+        auto fileDependencies = getFileDependencies();
+
+        for (auto file : fileDependencies)
+        {
+            digestBuilder.append(file->getDigest());
+        }
+        m_digest = digestBuilder.finalize();
+    }
+    return m_digest;
 }
 
 void Module::addModuleDependency(Module* module)
@@ -4244,12 +4265,6 @@ SLANG_NO_THROW void SLANG_MCALL ComponentType::getEntryPointHash(
     // Consequently, any encoding differences as a result of different compiler versions
     // will already be reflected in the resulting hash.
     getLinkage()->buildHash(builder, targetIndex);
-
-    // Enumerate all file dependencies and add them to the hash.
-    for (SourceFile* sourceFile : getFileDependencies())
-    {
-        builder.append(sourceFile->getDigest());
-    }
 
     buildHash(builder);
 
@@ -5239,7 +5254,7 @@ void Linkage::prepareDeserializedModule(SerialContainerData::Module& moduleEntry
         }
     }
     module->setPathInfo(filePathInfo);
-
+    module->setDigest(moduleEntry.digest);
     module->_collectShaderParams();
     module->_discoverEntryPoints(sink);
 

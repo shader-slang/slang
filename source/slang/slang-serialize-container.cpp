@@ -80,41 +80,84 @@ namespace Slang {
             dstModule.irModule = module->getIRModule();
             SLANG_ASSERT(dstModule.irModule);
         }
-        DigestBuilder<SHA1> digestBuilder;
-        auto version = String(getBuildTagString());
-        digestBuilder.append(version);
-        module->getOptionSet().buildHash(digestBuilder);
+
+        // Here we assume that the first file in the file dependencies is the module's file path.
+        // We store the module's file path as a relative path with respect to the first search
+        // directory that contains the module, and store the paths of dependent files as relative
+        // paths with respect to the module's path.
+
+        // First, we try to extract the module's main file path from the file dependency list.
         auto fileDependencies = module->getFileDependencies();
         String canonicalModulePath, moduleDir;
-        if (auto modulePath = module->getFilePath())
+        if (fileDependencies.getCount() != 0)
         {
-            canonicalModulePath = modulePath;
-            Path::getCanonical(canonicalModulePath, canonicalModulePath);
-            moduleDir = Path::getParentDirectory(canonicalModulePath);
+            IncludeSystem includeSystem(
+                &module->getLinkage()->getSearchDirectories(),
+                module->getLinkage()->getFileSystemExt(),
+                module->getLinkage()->getSourceManager());
+            PathInfo outFoundSourcePath;
+            // If we can find the first file, use that as the module's path.
+            if (SLANG_SUCCEEDED(includeSystem.findFile(fileDependencies[0]->getPathInfo().foundPath, "", outFoundSourcePath)))
+            {
+                canonicalModulePath = outFoundSourcePath.foundPath;
+                Path::getCanonical(canonicalModulePath, canonicalModulePath);
+                moduleDir = Path::getParentDirectory(canonicalModulePath);
+            }
         }
+
+        // If we can't find the module's path from the file dependencies list above,
+        // use the file path stored on the module as a fallback.
+        // Note that if the module is loaded from a binary precompiled module,
+        // this path will be pointing to that binary file instead of the original source file.
+        if (!canonicalModulePath.getLength())
+        {
+            if (auto modulePath = module->getFilePath())
+            {
+                canonicalModulePath = modulePath;
+                Path::getCanonical(canonicalModulePath, canonicalModulePath);
+                moduleDir = Path::getParentDirectory(canonicalModulePath);
+            }
+        }
+
+        // Find the first search directory that contains the module's main file path,
+        // so we can store the module's path (the first entry in the dependent files list)
+        // as a relative path with respect to that directory.
+
         String linkageRoot = ".";
         if (auto linkage = module->getLinkage())
         {
-            auto searchDirs = module->getLinkage()->getSearchDirectories().searchDirectories;
-            if (searchDirs.getCount() != 0)
-                linkageRoot = searchDirs[0].path;
+            for (const auto& searchDir : linkage->getSearchDirectories().searchDirectories)
+            {
+                String fullSearchDir;
+                Path::getCanonical(searchDir.path, fullSearchDir);
+                String relativePath = Path::getRelativePath(fullSearchDir, canonicalModulePath);
+                if (!Path::hasRelativeElement(relativePath))
+                {
+                    linkageRoot = searchDir.path;
+                    break;
+                }
+            }
         }
         Path::getCanonical(linkageRoot, linkageRoot);
 
         for (auto file : fileDependencies)
         {
-            digestBuilder.append(file->getDigest());
             if (file->getPathInfo().hasFoundPath())
             {
-                if (file->getPathInfo().foundPath == canonicalModulePath)
+                String canonicalFilePath = file->getPathInfo().foundPath;
+                Path::getCanonical(file->getPathInfo().foundPath, canonicalFilePath);
+
+                // If the dependnet file is the same as the module's file path, store it as a relative path
+                // with respect to the search directory discovered above.
+                if (canonicalFilePath == canonicalModulePath)
                 {
                     auto relativeModulePath = Path::getRelativePath(linkageRoot, canonicalModulePath);
                     dstModule.dependentFiles.add(relativeModulePath);
                 }
                 else
                 {
-                    String canonicalFilePath = file->getPathInfo().foundPath;
-                    Path::getCanonical(file->getPathInfo().foundPath, canonicalFilePath);
+                    // For all other dependnet files, store them as relative paths with respect
+                    // to the module's path.
                     canonicalFilePath = Path::getRelativePath(moduleDir, canonicalFilePath);
                     dstModule.dependentFiles.add(canonicalFilePath);
                 }
@@ -124,7 +167,7 @@ namespace Slang {
                 dstModule.dependentFiles.add(file->getPathInfo().getMostUniqueIdentity());
             }
         }
-        dstModule.digest = digestBuilder.finalize();
+        dstModule.digest = module->computeDigest();
         outData.modules.add(dstModule);
     }
 
