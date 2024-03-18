@@ -23,18 +23,18 @@ namespace Slang
                 auto callInst = as<IRCall>(use->getUser());
                 if (!callInst)
                     continue;
-                auto callee = as<IRFunc>(callInst->getCallee());
-                if (!callee)
+                auto caller = as<IRFunc>(getParentFunc(callInst));
+                if (!caller)
                     continue;
-                if (visitedFuncs.contains(callee))
+                if (visitedFuncs.contains(caller))
                 {
-                    sink->diagnose(callInst, Diagnostics::unsupportedRecursion, callee);
+                    sink->diagnose(callInst, Diagnostics::unsupportedRecursion, caller);
                     continue;
                 }
-                else if (checkedFuncs.add(callee))
+                else if (checkedFuncs.add(caller))
                 {
-                    workList.add(callee);
-                    visitedFuncs.add(callee);
+                    workList.add(caller);
+                    visitedFuncs.add(caller);
                 }
             }
         }
