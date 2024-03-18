@@ -1374,7 +1374,6 @@ SIMPLE_IR_TYPE(BasicBlockType, Type)
 
 struct IRResourceTypeBase : IRType
 {
-    IRInst* getIsRectInst() { return getOperand(kStdlibTextureIsRectParameterIndex); }
     IRInst* getShapeInst() { return getOperand(kStdlibTextureShapeParameterIndex); }
     IRInst* getIsArrayInst() { return getOperand(kStdlibTextureIsArrayParameterIndex); }
     IRInst* getIsMultisampleInst() { return getOperand(kStdlibTextureIsMultisampleParameterIndex); }
@@ -1402,7 +1401,6 @@ struct IRResourceTypeBase : IRType
             return SLANG_RESOURCE_NONE;
         }
     }
-    bool isRect() { return getIntVal(getIsRectInst()) != 0; }
     bool isFeedback() { return getIntVal(getAccessInst()) == kStdlibResourceAccessFeedback; }
     bool isMultisample() { return getIntVal(getIsMultisampleInst()) != 0; }
     bool isArray() { return getIntVal(getIsArrayInst()) != 0; }
@@ -1439,7 +1437,7 @@ struct IRResourceType : IRResourceTypeBase
 {
     IRType* getElementType() { return (IRType*)getOperand(0); }
     IRInst* getSampleCount() { return getSampleCountInst(); }
-    bool hasFormat() { return getOperandCount() >= 10; }
+    bool hasFormat() { return getOperandCount() >= 9; }
     IRIntegerValue getFormat() { return getIntVal(getFormatInst()); }
 
     IR_PARENT_ISA(ResourceType)

@@ -9,7 +9,6 @@
 
 #include "slang-legalize-types.h"
 #include "slang-ir-layout.h"
-#include "slang-type-layout.h"
 #include "slang/slang-ir.h"
 
 #include <assert.h>
@@ -796,13 +795,6 @@ void GLSLSourceEmitter::_emitGLSLTextureOrTextureSamplerType(IRTextureTypeBase* 
             break;
     }
 
-    if(type->isRect())
-    {
-        // gimageRect is only valid for OpenGL targets,
-        // otherwise we treat it as a 2D image
-        if(isOpenGLTarget(this->getTargetReq()))
-            m_writer->emit("Rect");
-    }
     if (type->isMultisample())
     {
         m_writer->emit("MS");

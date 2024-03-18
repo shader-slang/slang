@@ -3381,7 +3381,6 @@ public:
         IRInst* access,
         IRInst* isShadow,
         IRInst* isCombined,
-        IRInst* isRect,
         IRInst* format);
     IRComPtrType* getComPtrType(IRType* valueType);
 

@@ -2830,9 +2830,9 @@ namespace Slang
         return (IRPtrType*)getType(op, 2, operands);
     }
 
-    IRTextureTypeBase* IRBuilder::getTextureType(IRType* elementType, IRInst* shape, IRInst* isArray, IRInst* isMS, IRInst* sampleCount, IRInst* access, IRInst* isShadow, IRInst* isCombined, IRInst* isRect, IRInst* format)
+    IRTextureTypeBase* IRBuilder::getTextureType(IRType* elementType, IRInst* shape, IRInst* isArray, IRInst* isMS, IRInst* sampleCount, IRInst* access, IRInst* isShadow, IRInst* isCombined, IRInst* format)
     {
-        IRInst* args[] = {(IRInst*)elementType, shape, isArray, isMS, sampleCount, access, isShadow, isCombined, isRect, format};
+        IRInst* args[] = {(IRInst*)elementType, shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format};
         return as<IRTextureTypeBase>(emitIntrinsicInst(getTypeKind(), kIROp_TextureType, (UInt)(sizeof(args)/sizeof(IRInst*)), args));
     }
 

@@ -1367,7 +1367,6 @@ IRVarLayout* applyOffsetToVarLayout(
 
 bool canTypeDirectlyUseRegisterSpace(TypeLayout* layout);
 
-bool isOpenGLTarget(TargetRequest*);
 }
 
 #endif

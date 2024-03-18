@@ -452,7 +452,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 textureType->getAccessInst(),
                 textureType->getIsShadowInst(),
                 textureType->getIsCombinedInst(),
-                textureType->getIsRectInst(),
                 formatArg);
 
             if (textureInst->getFullType() == textureType)

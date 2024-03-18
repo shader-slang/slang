@@ -11,7 +11,6 @@
 #include "slang-ir-spirv-legalize.h"
 #include "slang-spirv-val.h"
 #include "slang-lookup-spirv.h"
-#include "slang-type-layout.h"
 #include "spirv/unified1/spirv.h"
 #include "../core/slang-memory-arena.h"
 #include <type_traits>
@@ -1838,10 +1837,7 @@ struct SPIRVEmitContext
                 dim = SpvDim1D;
                 break;
             case SLANG_TEXTURE_2D:
-                if(inst->isRect() && isOpenGLTarget(this->m_targetRequest))
-                    dim = SpvDimRect;
-                else
-                    dim = SpvDim2D;
+                dim = SpvDim2D;
                 break;
             case SLANG_TEXTURE_3D:
                 dim = SpvDim3D;
@@ -5607,7 +5603,7 @@ struct SPIRVEmitContext
                 }
                 case kIROp_SPIRVAsmOperandImagePointer:
                 {
-                    // we directly emit the global Image Pointer by taking the 'was to be loaded' pointer
+                    // We directly emit the global Image Pointer by taking the 'was to be loaded' pointer
                     // and just emit'ing it. Slang tries to force a OpLoad-OpStore pattern by default,
                     // we have a rare case of just the actual global decl being required
                     assert(operand->getValue()->getOp() == kIROp_Load);
@@ -5628,7 +5624,6 @@ struct SPIRVEmitContext
                         textureInst->getAccessInst(),
                         textureInst->getIsShadowInst(),
                         builder.getIntValue(builder.getIntType(), (operand->getOp() == kIROp_SPIRVAsmOperandSampledImageType ? 1 : 0)),
-                        textureInst->getIsRectInst(),
                         textureInst->getFormatInst());
                     emitOperand(ensureInst(imageType));
                     break;

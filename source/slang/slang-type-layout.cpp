@@ -1702,7 +1702,7 @@ static SimpleLayoutInfo _getParameterGroupLayoutInfo(
     }
 }
 
-bool isOpenGLTarget(TargetRequest*)
+static bool isOpenGLTarget(TargetRequest*)
 {
     // We aren't officially supporting OpenGL right now
     return false;
