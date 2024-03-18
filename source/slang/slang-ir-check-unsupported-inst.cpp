@@ -5,8 +5,45 @@
 
 namespace Slang
 {
-    void checkUnsupportedInst(IRModule* module, DiagnosticSink* sink)
+    bool isCPUTarget(TargetRequest* targetReq);
+
+    void checkRecursion(HashSet<IRFunc*>& checkedFuncs, IRFunc* func, DiagnosticSink* sink)
     {
+        HashSet<IRFunc*> visitedFuncs;
+        List<IRFunc*> workList;
+        if (visitedFuncs.add(func) && checkedFuncs.add(func))
+        {
+            workList.add(func);
+        }
+        for (Index i = 0; i < workList.getCount(); i++)
+        {
+            func = workList[i];
+            for (auto use = func->firstUse; use; use = use->nextUse)
+            {
+                auto callInst = as<IRCall>(use->getUser());
+                if (!callInst)
+                    continue;
+                auto callee = as<IRFunc>(callInst->getCallee());
+                if (!callee)
+                    continue;
+                if (visitedFuncs.contains(callee))
+                {
+                    sink->diagnose(callInst, Diagnostics::unsupportedRecursion, callee);
+                    continue;
+                }
+                else if (checkedFuncs.add(callee))
+                {
+                    workList.add(callee);
+                    visitedFuncs.add(callee);
+                }
+            }
+        }
+    }
+
+    void checkUnsupportedInst(TargetRequest* target, IRModule* module, DiagnosticSink* sink)
+    {
+        HashSet<IRFunc*> checkedFuncsForRecursionDetection;
+
         for (auto globalInst : module->getGlobalInsts())
         {
             switch (globalInst->getOp())
@@ -20,6 +57,9 @@ namespace Slang
                     }
                     break;
                 }
+            case kIROp_Func:
+                if (!isCPUTarget(target))
+                    checkRecursion(checkedFuncsForRecursionDetection, as<IRFunc>(globalInst), sink);
             default:
                 break;
             }

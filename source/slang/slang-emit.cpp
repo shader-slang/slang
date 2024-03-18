@@ -1062,7 +1062,7 @@ Result linkAndOptimizeIR(
 
     outLinkedIR.metadata = metadata;
 
-    checkUnsupportedInst(irModule, sink);
+    checkUnsupportedInst(codeGenContext->getTargetReq(), irModule, sink);
 
     return sink->getErrorCount() == 0 ? SLANG_OK : SLANG_FAIL;
 }
