@@ -9,24 +9,23 @@ namespace Slang
 
     bool checkRecursionImpl(HashSet<IRFunc*>& checkedFuncs, HashSet<IRFunc*>& callStack, IRFunc* func, DiagnosticSink* sink)
     {
-        for (auto use = func->firstUse; use; use = use->nextUse)
+        for (auto block : func->getBlocks())
         {
-            auto callInst = as<IRCall>(use->getUser());
-            if (!callInst)
-                continue;
-            auto caller = as<IRFunc>(getParentFunc(callInst));
-            if (!caller)
-                continue;
-            if (!callStack.add(caller))
+            for (auto inst : block->getChildren())
             {
-                sink->diagnose(callInst, Diagnostics::unsupportedRecursion, caller);
-                return false;
-            }
-            if (checkedFuncs.add(caller))
-            {
-                if (!checkRecursionImpl(checkedFuncs, callStack, caller, sink))
+                auto callInst = as<IRCall>(inst);
+                if (!callInst)
+                    continue;
+                auto callee = as<IRFunc>(callInst->getCallee());
+                if (!checkedFuncs.add(callee))
+                    continue;
+                if (!callStack.add(callee))
+                {
+                    sink->diagnose(callInst, Diagnostics::unsupportedRecursion, callee);
                     return false;
-                callStack.remove(caller);
+                }
+                checkRecursionImpl(checkedFuncs, callStack, callee, sink);
+                callStack.remove(callee);
             }
         }
         return true;
