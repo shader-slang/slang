@@ -71,7 +71,7 @@ In the simple case, we can query this information directly:
 ```c++
 slang::ParameterCategory category = parameter->getCategory();
 unsigned index = parameter->getBindingIndex();
-unsigned space = parameter->getBindingSpace() + parameter->getOffset(SLANG_PARAMETER_CATEGORY_REGISTER_SPACE);
+unsigned space = parameter->getBindingSpace() + parameter->getOffset(SLANG_PARAMETER_CATEGORY_SUB_ELEMENT_REGISTER_SPACE);
 ```
 
 For a simple global-scope "resource" parameter (e.g., HLSL `Texture2D t : register(t3)`) the `category` tells what kind of resource the parameter consumes (e.g., `slang::ParameterCategory::ShaderResource`), the `index` gives the register number (`3`), and `space` gives the register "space" (`0`) as added for D3D12.
@@ -95,7 +95,7 @@ for(unsigned cc = 0; cc < categoryCount; cc++)
 
 	size_t offsetForCategory = parameter->getOffset(category);
 	size_t spaceForCategory = parameter->getBindingSpace(category)
-		+ parameter->getOffset(SLANG_PARAMETER_CATEGORY_REGISTER_SPACE);
+		+ parameter->getOffset(SLANG_PARAMETER_CATEGORY_SUB_ELEMENT_REGISTER_SPACE);
 
 	// ...
 }
