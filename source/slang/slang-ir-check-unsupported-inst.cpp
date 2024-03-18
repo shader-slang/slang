@@ -17,13 +17,13 @@ namespace Slang
                 if (!callInst)
                     continue;
                 auto callee = as<IRFunc>(callInst->getCallee());
-                if (!checkedFuncs.add(callee))
-                    continue;
                 if (!callStack.add(callee))
                 {
                     sink->diagnose(callInst, Diagnostics::unsupportedRecursion, callee);
                     return false;
                 }
+                if (!checkedFuncs.add(callee))
+                    continue;
                 checkRecursionImpl(checkedFuncs, callStack, callee, sink);
                 callStack.remove(callee);
             }
