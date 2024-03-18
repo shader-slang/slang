@@ -2894,7 +2894,7 @@ __generic<T : __BuiltinType>
 
 ${{{{
 {
-    struct imageTypeInfo
+    struct ImageTypeInfo
     {
         const char *prefix;
         const char *type;
@@ -2903,7 +2903,7 @@ ${{{{
         const char *SPVSubTypePrefix;
         const char *SPVAtomicSuffix;
     }
-    static const typeWithPrefix[] =
+    static const kTypeWithPrefix[] =
         {
             { "", "float", false, "F", "F", "EXT"},
             { "u", "uint", true, "I", "U", ""},
@@ -2911,7 +2911,7 @@ ${{{{
             { "u64", "uint64_t", true, "I", "U", ""},
             { "i64", "int64_t", true, "I", "S", ""},
         };
-    struct shapeTypeInfo
+    struct ShapeTypeInfo
     {
         const char *suffix;
         int imageSizeIVecDim;
@@ -2921,7 +2921,7 @@ ${{{{
         int isMS;
         bool isRect;
     }
-    static const shapeType[] =
+    static const kShapeType[] =
         {
             { "1D", 1, 1,"__Shape1D", 0, 0, 0},
 
@@ -2937,8 +2937,8 @@ ${{{{
             { "2DMS", 2, 2, "__Shape2D", 0, 1, 0},
             { "2DMSArray", 3, 3, "__Shape2D", 1, 1, 0},
         };
-    for (const auto& targetType : typeWithPrefix)
-    for (const auto& targetShape : shapeType)
+    for (const auto& targetType : kTypeWithPrefix)
+    for (const auto& targetShape : kShapeType)
     {
         // gimageDim is the format of image buffers, we
         // need to resolve a type name from the format:
