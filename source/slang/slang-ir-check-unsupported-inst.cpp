@@ -22,9 +22,8 @@ namespace Slang
                     sink->diagnose(callInst, Diagnostics::unsupportedRecursion, callee);
                     return false;
                 }
-                if (!checkedFuncs.add(callee))
-                    continue;
-                checkRecursionImpl(checkedFuncs, callStack, callee, sink);
+                if (checkedFuncs.add(callee))
+                    checkRecursionImpl(checkedFuncs, callStack, callee, sink);
                 callStack.remove(callee);
             }
         }
