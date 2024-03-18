@@ -51,6 +51,6 @@ void computeMain()
 
 // SPIRV: OpEntryPoint GLCompute
 
-// SPIRV-DAG: %[[STRUCTNAME:[A-Za-z0-9_]+]]  = OpTypeStruct %int %_Array_natural_int32
+// SPIRV-DAG: %[[STRUCTNAME:[A-Za-z0-9_]+]]  = OpTypeStruct %int %_Array_natural_vector_int_3_2
 
 // SPIRV-DAG: OpMemberDecorate %[[STRUCTNAME:[A-Za-z0-9_]+]] 1 Offset 4

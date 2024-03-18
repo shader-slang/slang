@@ -7,36 +7,35 @@ namespace Slang
 {
     bool isCPUTarget(TargetRequest* targetReq);
 
-    void checkRecursion(HashSet<IRFunc*>& checkedFuncs, IRFunc* func, DiagnosticSink* sink)
+    void checkRecursionImpl(HashSet<IRFunc*>& checkedFuncs, HashSet<IRFunc*>& callStack, IRFunc* func, DiagnosticSink* sink)
     {
-        HashSet<IRFunc*> visitedFuncs;
-        List<IRFunc*> workList;
-        if (visitedFuncs.add(func) && checkedFuncs.add(func))
+        for (auto use = func->firstUse; use; use = use->nextUse)
         {
-            workList.add(func);
-        }
-        for (Index i = 0; i < workList.getCount(); i++)
-        {
-            func = workList[i];
-            for (auto use = func->firstUse; use; use = use->nextUse)
+            auto callInst = as<IRCall>(use->getUser());
+            if (!callInst)
+                continue;
+            auto caller = as<IRFunc>(getParentFunc(callInst));
+            if (!caller)
+                continue;
+            if (checkedFuncs.add(caller))
             {
-                auto callInst = as<IRCall>(use->getUser());
-                if (!callInst)
-                    continue;
-                auto caller = as<IRFunc>(getParentFunc(callInst));
-                if (!caller)
-                    continue;
-                if (visitedFuncs.contains(caller))
+                if (!callStack.add(caller))
                 {
                     sink->diagnose(callInst, Diagnostics::unsupportedRecursion, caller);
-                    continue;
+                    return;
                 }
-                else if (checkedFuncs.add(caller))
-                {
-                    workList.add(caller);
-                    visitedFuncs.add(caller);
-                }
+                checkRecursionImpl(checkedFuncs, callStack, caller, sink);
+                callStack.remove(caller);
             }
+        }
+    }
+
+    void checkRecursion(HashSet<IRFunc*>& checkedFuncs, IRFunc* func, DiagnosticSink* sink)
+    {
+        HashSet<IRFunc*> callStack;
+        if (checkedFuncs.add(func))
+        {
+            checkRecursionImpl(checkedFuncs, callStack, func, sink);
         }
     }
 
