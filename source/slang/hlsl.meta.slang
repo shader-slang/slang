@@ -13994,3 +13994,327 @@ struct ConstBufferPointer
         }
     }
 }
+
+/// HLSL Fragment Processing Derivatives
+
+[__NoSideEffect]
+[ForceInline]
+float ddx(float p)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "ddx($0)";
+    case glsl: __intrinsic_asm "dFdx($0)";
+    case spirv:
+    {
+        return spirv_asm
+        {
+            OpDPdx $$float result $p;
+        };
+    }
+    }
+}
+__generic<let N : int>
+[__NoSideEffect]
+[ForceInline]
+vector<float, N> ddx(vector<float, N> p)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "ddx($0)";
+    case glsl: __intrinsic_asm "dFdx($0)";
+    case spirv:
+    {
+        return spirv_asm
+        {
+            OpDPdx $$float result $p;
+        };
+    }
+    }
+}
+__generic<let N : int, let M : int>
+[__NoSideEffect]
+[ForceInline]
+matrix<float, N, M> ddx(matrix<float, N, M> p)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "ddx($0)";
+    }
+}
+
+[__NoSideEffect]
+[ForceInline]
+float ddy(float p)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "ddy($0)";
+    case glsl: __intrinsic_asm "dFdy($0)";
+    case spirv:
+    {
+        return spirv_asm
+        {
+            OpDPdy $$float result $p;
+        };
+    }
+    }
+}
+__generic<let N : int>
+[__NoSideEffect]
+[ForceInline]
+vector<float, N> ddy(float p)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "ddy($0)";
+    case glsl: __intrinsic_asm "dFdy($0)";
+    case spirv:
+    {
+        return spirv_asm
+        {
+            OpDPdy $$float result $p;
+        };
+    }
+    }
+}
+__generic<let N : int, let M : int>
+[__NoSideEffect]
+[ForceInline]
+matrix<float, N, M> ddy(matrix<float, N, M> p)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "ddy($0)";
+    }
+}
+
+[__NoSideEffect]
+[ForceInline]
+float ddx_fine(float p)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "ddx_fine($0)";
+    case glsl: __intrinsic_asm "dFdxFine($0)";
+    case spirv:
+    {
+        return spirv_asm
+        {
+            OpDPdxFine $$float result $p;
+        };
+    }
+    }
+}
+__generic<let N : int>
+[__NoSideEffect]
+[ForceInline]
+vector<float, N> ddx_fine(vector<float, N> p)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "ddx_fine($0)";
+    case glsl: __intrinsic_asm "dFdxFine($0)";
+    case spirv:
+    {
+        return spirv_asm
+        {
+            OpDPdxFine $$float result $p;
+        };
+    }
+    }
+}
+__generic<let N : int, let M : int>
+[__NoSideEffect]
+[ForceInline]
+matrix<float, N, M> ddx_fine(matrix<float, N, M> p)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "ddx_fine($0)";
+    }
+}
+
+[__NoSideEffect]
+[ForceInline]
+float ddy_fine(float p)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "ddy_fine($0)";
+    case glsl: __intrinsic_asm "dFdyFine($0)";
+    case spirv:
+    {
+        return spirv_asm
+        {
+            OpDPdyFine $$float result $p;
+        };
+    }
+    }
+}
+__generic<let N : int>
+[__NoSideEffect]
+[ForceInline]
+vector<float, N> ddy_fine(vector<float, N> p)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "ddy_fine($0)";
+    case glsl: __intrinsic_asm "dFdyFine($0)";
+    case spirv:
+    {
+        return spirv_asm
+        {
+            OpDPdyFine $$float result $p;
+        };
+    }
+    }
+}
+__generic<let N : int, let M : int>
+[__NoSideEffect]
+[ForceInline]
+matrix<float, N, M> ddy_fine(matrix<float, N, M> p)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "ddy_fine($0)";
+    }
+}
+
+[__NoSideEffect]
+[ForceInline]
+float ddx_coarse(float p)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "ddx_coarse($0)";
+    case glsl: __intrinsic_asm "dFdxCoarse($0)";
+    case spirv:
+    {
+        return spirv_asm
+        {
+            OpDPdxCoarse $$float result $p;
+        };
+    }
+    }
+}
+__generic<let N : int>
+[__NoSideEffect]
+[ForceInline]
+vector<float, N> ddx_coarse(vector<float, N> p)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "ddx_coarse($0)";
+    case glsl: __intrinsic_asm "dFdxCoarse($0)";
+    case spirv:
+    {
+        return spirv_asm
+        {
+            OpDPdxCoarse $$float result $p;
+        };
+    }
+    }
+}
+__generic<let N : int, let M : int>
+[__NoSideEffect]
+[ForceInline]
+matrix<float, N, M> ddx_coarse(matrix<float, N, M> p)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "ddx_coarse($0)";
+    }
+}
+
+[__NoSideEffect]
+[ForceInline]
+float ddy_coarse(float p)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "ddy_coarse($0)";
+    case glsl: __intrinsic_asm "dFdyCoarse($0)";
+    case spirv:
+    {
+        return spirv_asm
+        {
+            OpDPdyCoarse $$float result $p;
+        };
+    }
+    }
+}
+__generic<let N : int>
+[__NoSideEffect]
+[ForceInline]
+vector<float, N> ddy_coarse(vector<float, N> p)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "ddy_coarse($0)";
+    case glsl: __intrinsic_asm "dFdyCoarse($0)";
+    case spirv:
+    {
+        return spirv_asm
+        {
+            OpDPdyCoarse $$float result $p;
+        };
+    }
+    }
+}
+__generic<let N : int, let M : int>
+[__NoSideEffect]
+[ForceInline]
+matrix<float, N, M> ddy_coarse(matrix<float, N, M> p)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "ddy_coarse($0)";
+    }
+}
+
+[__NoSideEffect]
+[ForceInline]
+float fwidth(float p)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "fwidth($0)";
+    case glsl: __intrinsic_asm "fwidth($0)";
+    case spirv:
+    {
+        return spirv_asm
+        {
+            OpFwidth $$float result $p;
+        };
+    }
+    }
+}
+__generic<let N : int>
+[__NoSideEffect]
+[ForceInline]
+vector<float, N> fwidth(vector<float, N> p)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "fwidth($0)";
+    case glsl: __intrinsic_asm "fwidth($0)";
+    case spirv:
+    {
+        return spirv_asm
+        {
+            OpFwidth $$float result $p;
+        };
+    }
+    }
+}
+__generic<let N : int, let M : int>
+[__NoSideEffect]
+[ForceInline]
+matrix<float, N, M> fwidth(matrix<float, N, M> p)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "fwidth($0)";
+    }
+}

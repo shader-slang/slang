@@ -6803,3 +6803,584 @@ __glsl_version(430) [require(glsl)]
     }
     }
 }
+
+
+/// Section 8.13. Geometry Shader Functions
+
+[ForceInline]
+public void EmitStreamVertex(int stream)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "EmitStreamVertex($0)";
+    case spirv:
+    {
+        spirv_asm
+        {
+            OpCapability GeometryStreams;
+            OpEmitStreamVertex $stream
+        };
+    }
+    }
+}
+[ForceInline]
+public void EndStreamPrimitive(int stream)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "EndStreamPrimitive($0)";
+    case spirv:
+    {
+        spirv_asm
+        {
+            OpCapability GeometryStreams;
+            OpEndStreamPrimitive $stream
+        };
+    }
+    }
+}
+[ForceInline]
+public void EmitVertex()
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "EmitVertex($0)";
+    case spirv:
+    {
+        spirv_asm
+        {
+            OpCapability Geometry;
+            OpEmitVertex
+        };
+    }
+    }
+}
+[ForceInline]
+public void EndPrimitive()
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "EndPrimitive($0)";
+    case spirv:
+    {
+        spirv_asm
+        {
+            OpCapability Geometry;
+            OpEndPrimitive
+        };
+    }
+    }
+}
+
+/// Section 8.14. Fragment Processing Functions
+
+[ForceInline]
+public float dFdx(float p)
+{
+    return ddx(p);
+}
+__generic<let N : int>
+[ForceInline]
+public vector<float,N> dFdx(vector<float,N> p)
+{
+    return ddx(p);
+}
+
+[ForceInline]
+public float dFdy(float p)
+{
+    return ddy(p);
+}
+__generic<let N : int>
+[ForceInline]
+public vector<float,N> dFdy(vector<float,N> p)
+{
+    return ddy(p);
+}
+
+[ForceInline]
+public float dFdxFine(float p)
+{
+    return ddx_fine(p);
+}
+__generic<let N : int>
+[ForceInline]
+public vector<float,N> dFdxFine(vector<float,N> p)
+{
+    return ddx_fine(p);
+}
+
+[ForceInline]
+public float dFdyFine(float p)
+{
+    return ddy_fine(p);
+}
+__generic<let N : int>
+[ForceInline]
+public vector<float,N> dFdyFine(vector<float,N> p)
+{
+    return ddy_fine(p);
+}
+
+[ForceInline]
+public float dFdxCoarse(float p)
+{
+    return ddx_coarse(p);
+}
+__generic<let N : int>
+[ForceInline]
+public vector<float,N> dFdxCoarse(vector<float,N> p)
+{
+    return ddx_coarse(p);
+}
+
+[ForceInline]
+public float dFdyCoarse(float p)
+{
+    return ddy_coarse(p);
+}
+__generic<let N : int>
+[ForceInline]
+public vector<float,N> dFdyCoarse(vector<float,N> p)
+{
+    return ddy_coarse(p);
+}
+
+[ForceInline]
+public float fwidth(float p)
+{
+    return fwidth(p);
+}
+__generic<let N : int>
+[ForceInline]
+public vector<float,N> fwidth(vector<float,N> p)
+{
+    return fwidth(p);
+}
+
+[ForceInline]
+public float fwidthFine(float p)
+{
+    __target_switch
+    {
+    case hlsl:
+    {
+        return abs(ddx_fine(p)) + abs(ddy_fine(p));
+    }
+    case glsl: __intrinsic_asm "fwidthFine($0)";
+    case spirv:
+    {
+        return spirv_asm
+        {
+            OpFwidthFine $$T result $p;
+        };
+    }
+    }
+}
+__generic<let N : int>
+[ForceInline]
+public vector<float,N> fwidthFine(vector<float, N> p)
+{
+    __target_switch
+    {
+    case hlsl:
+    {
+        return abs(ddx_fine(p)) + abs(ddy_fine(p));
+    }
+    case glsl: __intrinsic_asm "fwidthFine($0)";
+    case spirv:
+    {
+        return spirv_asm
+        {
+            OpFwidthFine $$T result $p;
+        };
+    }
+    }
+}
+
+[ForceInline]
+public float fwidthCoarse(float p)
+{
+    __target_switch
+    {
+    case hlsl:
+    {
+        return abs(ddx_coarse(p)) + abs(ddy_coarse(p));
+    }
+    case glsl: __intrinsic_asm "fwidthCoarse($0)";
+    case spirv:
+    {
+        return spirv_asm
+        {
+            OpFwidthCoarse $$T result $p;
+        };
+    }
+    }
+}
+__generic<let N : int>
+[ForceInline]
+public vector<float,N> fwidthCoarse(vector<float,N> p)
+{
+    __target_switch
+    {
+    case hlsl:
+    {
+        return abs(ddx_coarse(p)) + abs(ddy_coarse(p));
+    }
+    case glsl: __intrinsic_asm "fwidthCoarse($0)";
+    case spirv:
+    {
+        return spirv_asm
+        {
+            OpFwidthCoarse $$T result $p;
+        };
+    }
+    }
+}
+
+[ForceInline]
+public float interpolateAtCentroid(float interpolant)
+{
+    return EvaluateAttributeAtCentroid(interpolant);
+}
+[ForceInline]
+public vec2 interpolateAtCentroid(vec2 interpolant)
+{
+    return EvaluateAttributeAtCentroid(interpolant);
+}
+[ForceInline]
+public vec3 interpolateAtCentroid(vec3 interpolant)
+{
+    return EvaluateAttributeAtCentroid(interpolant);
+}
+[ForceInline]
+public vec4 interpolateAtCentroid(vec4 interpolant)
+{
+    return EvaluateAttributeAtCentroid(interpolant);
+}
+
+[ForceInline]
+public float interpolateAtSample(float interpolant, int sample)
+{
+    return EvaluateAttributeAtSample(interpolant, sample);
+}
+[ForceInline]
+[ForceInline]
+public vec2 interpolateAtSample(vec2 interpolant, int sample)
+{
+    return EvaluateAttributeAtSample(interpolant, sample);
+}
+[ForceInline]
+public vec3 interpolateAtSample(vec3 interpolant, int sample)
+{
+    return EvaluateAttributeAtSample(interpolant, sample);
+}
+[ForceInline]
+public vec4 interpolateAtSample(vec4 interpolant, int sample)
+{
+    return EvaluateAttributeAtSample(interpolant, sample);
+}
+
+[ForceInline]
+public float interpolateAtOffset(float interpolant, vec2 offset)
+{
+    return EvaluateAttributeAtOffset(interpolant, sample);
+}
+[ForceInline]
+public vec2 interpolateAtOffset(vec2 interpolant, vec2 offset)
+{
+    return EvaluateAttributeAtOffset(interpolant, sample);
+}
+[ForceInline]
+public vec3 interpolateAtOffset(vec3 interpolant, vec2 offset)
+{
+    return EvaluateAttributeAtOffset(interpolant, sample);
+}
+[ForceInline]
+public vec4 interpolateAtOffset(vec4 interpolant, vec2 offset)
+{
+    return EvaluateAttributeAtOffset(interpolant, sample);
+}
+
+/// Section 8.15. Noise Functions (deprecated)
+
+[deprecated("Always returns 0")]
+[ForceInline]
+public float noise1(float x)
+{
+    return 0.0f;
+}
+[deprecated("Always returns 0")]
+__generic<let N : int>
+[ForceInline]
+public float noise1(vector<float,N> x)
+{
+    return 0.0f;
+}
+
+[deprecated("Always returns 0")]
+[ForceInline]
+public vec2 noise2(float x)
+{
+    return vec2(0.0f);
+}
+[deprecated("Always returns 0")]
+__generic<let N : int>
+[ForceInline]
+public vec2 noise2(vector<float,N> x)
+{
+    return vec2(0.0f);
+}
+
+[deprecated("Always returns 0")]
+[ForceInline]
+public vec3 noise3(float x)
+{
+    return vec3(0.0f);
+}
+[deprecated("Always returns 0")]
+__generic<let N : int>
+[ForceInline]
+public vec3 noise3(vector<float,N> x)
+{
+    return vec3(0.0f);
+}
+
+[deprecated("Always returns 0")]
+[ForceInline]
+public vec4 noise4(float x)
+{
+    return vec4(0.0f);
+}
+
+[deprecated("Always returns 0")]
+__generic<let N : int>
+[ForceInline]
+public vec4 noise4(vector<float,N> x)
+{
+    return vec4(0.0f);
+}
+
+/// Section 8.16. Shader Invocation Control Functions
+
+// TODO: for tessellation control shader: barrier() function may only 
+// be placed inside the main() of the shader and may not be called within 
+// control flow
+
+[ForceInline]
+public void barrier()
+{
+    __target_switch()
+    {
+    case hlsl:
+    {
+        GroupMemoryBarrier();
+        DeviceMemoryBarrier();
+    }
+    case glsl: __target_intrinsic "barrier()";
+    case spirv:
+    {
+        spirv_asm
+        {
+            OpControlBarrier TessellationControl Device CrossWorkgroupMemory|UniformMemory
+        }
+    }
+    }
+}
+
+/// Section 8.17. Shader Memory Control Functions
+
+[ForceInline]
+public void memoryBarrier()
+{
+    __target_switch()
+    {
+    case hlsl: __target_intrinsic "AllMemoryBarrier()"
+    case glsl: __target_intrinsic "memoryBarrier()";
+    case spirv:
+    {
+        spirv_asm
+        {
+            OpCapability Shader;
+            OpMemoryBarrier Invocation AcquireRelease|WorkgroupMemory|ImageMemory|UniformMemory
+        }
+    }
+    }
+}
+[ForceInline]
+public void memoryBarrierAtomicCounter()
+{
+    __target_switch()
+    {
+    case hlsl: __target_intrinsic "AllMemoryBarrier()"
+    case glsl: __target_intrinsic "memoryBarrierAtomicCounter()";
+    case spirv:
+    {
+        spirv_asm
+        {
+            OpCapability Shader;
+            OpMemoryBarrier Invocation AcquireRelease
+        }
+    }
+    }
+}
+[ForceInline]
+public void memoryBarrierBuffer()
+{
+    __target_switch()
+    {
+    case hlsl: __target_intrinsic "DeviceMemoryBarrier()"
+    case glsl: __target_intrinsic "memoryBarrierBuffer()";
+    case spirv:
+    {
+        spirv_asm
+        {
+            OpCapability Shader;
+            OpMemoryBarrier Invocation UniformMemory
+        }
+    }
+    }
+}
+// TODO only compute shader
+[ForceInline]
+public void memoryBarrierShared()
+{
+    __target_switch()
+    {
+    case hlsl: __target_intrinsic "GroupMemoryBarrier()"
+    case glsl: __target_intrinsic "memoryBarrierShared()";
+    case spirv:
+    {
+        spirv_asm
+        {
+            OpCapability Shader;
+            OpMemoryBarrier Invocation WorkgroupMemory
+        }
+    }
+    }
+}
+[ForceInline]
+public void memoryBarrierImage()
+{
+    __target_switch()
+    {
+    case hlsl: __target_intrinsic "DeviceMemoryBarrier()"
+    case glsl: __target_intrinsic "memoryBarrierImage()";
+    case spirv:
+    {
+        spirv_asm
+        {
+            OpMemoryBarrier Invocation ImageMemory
+        }
+    }
+    }
+}
+// TODO only compute shader
+[ForceInline]
+public void groupMemoryBarrier()
+{
+    __target_switch()
+    {
+    case hlsl: __target_intrinsic "GroupMemoryBarrier()"
+    case glsl: __target_intrinsic "groupMemoryBarrier()";
+    case spirv:
+    {
+        spirv_asm
+        {
+            OpMemoryBarrier Workgroup AcquireRelease|WorkgroupMemory|ImageMemory|UniformMemory
+        }
+    }
+    }
+}
+
+/// Section 8.18. Subpass-Input Functions
+
+__magic_type(SubpassInputType)
+__intrinsic_type($(kIROp_SubpassInputType))
+struct SubPassType<T, let isMS:int>
+{
+};
+
+// TODO: fragment shader only
+${{{{
+struct SubpassLoadEntriesType
+{
+    const char* typeName;
+    const char* prefix;
+}
+const SubpassLoadEntriesType kSubpassLoadEntries[] =
+    {
+        { "float" "" },
+        { "uint", "u" }
+        { "int", "i" }
+    }
+for (const auto& subpassLoadEntry : kSubpassLoadEntries)
+{
+}}}}
+
+    typealias $(subpassLoadEntry.prefix)subpassInput = SubpassLoadEntriesType<$(subpassLoadEntry.typeName),0>;
+    typealias $(subpassLoadEntry.prefix)subpassInput = SubpassLoadEntriesType<$(subpassLoadEntry.typeName),1>;
+
+    [ForceInline]
+    public $(subpassLoadEntry.prefix)vec4 subpassLoad($(subpassLoadEntry.prefix)subpassInput subpass)
+    {
+
+    }
+    //TODO: fragment shader only
+    [ForceInline]
+    public $(subpassLoadEntry.prefix)vec4 subpassLoad($(subpassLoadEntry.prefix)subpassInputMS subpass, int sample)
+    {
+
+    }
+${{{{
+}
+}}}}
+/// Section 8.19. Shader Invocation Group Functions
+[ForceInline]
+public bool anyInvocation(bool value)
+{
+    __target_switch()
+    {
+    case glsl: __target_intrinsic "anyInvocation($0)";
+    case spirv:
+    {
+        spirv_asm
+        {
+            OpCapability Groups;
+            OpGroupAny $$bool result Invocation $value
+            }
+    }
+    }
+}
+[ForceInline]
+public bool allInvocations(bool value)
+{
+    __target_switch()
+    {
+    case glsl: __target_intrinsic "allInvocations($0)";
+    case spirv:
+    {
+        spirv_asm
+        {
+            OpCapability Groups;
+            OpGroupAll $$bool result Invocation $value
+        }
+    }
+    }
+}
+[ForceInline]
+public bool allInvocationsEqual(bool value)
+{
+    __target_switch()
+    {
+    case glsl: __target_intrinsic "allInvocationsEqual($0)";
+    case spirv:
+    {
+        spirv_asm
+        {
+            OpCapability Groups;
+            OpGroupEqual $$bool result Invocation $value
+        }
+    }
+    }
+}
