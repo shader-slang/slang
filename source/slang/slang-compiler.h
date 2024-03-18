@@ -1389,6 +1389,9 @@ namespace Slang
 
         virtual void buildHash(DigestBuilder<SHA1>& builder) SLANG_OVERRIDE;
 
+        void setDigest(SHA1::Digest const& digest) { m_digest = digest; }
+        SHA1::Digest computeDigest();
+
             /// Create a module (initially empty).
         Module(Linkage* linkage, ASTBuilder* astBuilder = nullptr);
 
@@ -1508,6 +1511,9 @@ namespace Slang
         SpecializationParams m_specializationParams;
 
         List<Module*> m_requirements;
+
+        // A digest that uniquely identifies the contents of the module.
+        SHA1::Digest m_digest;
 
         // List of modules this module depends on
         ModuleDependencyList m_moduleDependencyList;
