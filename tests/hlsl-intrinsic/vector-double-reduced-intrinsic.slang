@@ -62,7 +62,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     ft += sign(f - 0.5l);
     
     ft += saturate(f * 4 - 2.0l);
-       
+
     ft += abs(f * 4 - 2.0l);
            
     ft += min(0.5l, f);

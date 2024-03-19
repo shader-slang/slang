@@ -87,6 +87,9 @@ void test1(inout FloatMatrix ft, inout FloatMatrix f, int idx)
     ft += sqrt(f);
     ft += rsqrt(makeFloatMatrix(1.0f) + f);
 
+    ft += cbrt(makeFloatMatrix(idx)) * 10;
+    ft += rcbrt(makeFloatMatrix(idx)) * 10;
+
     ft += exp2(f);
     ft += exp(f);
 

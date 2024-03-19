@@ -7052,6 +7052,55 @@ matrix<T, N, M> sqrt(matrix<T, N, M> x)
     MATRIX_MAP_UNARY(T, N, M, sqrt, x);
 }
 
+// Cube root
+__generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(cuda, "$P_cbrt($0)")
+[__readNone]
+T cbrt(T x)
+{
+    return pow(x, T(1) / T(3));
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+[__readNone]
+vector<T, N> cbrt(vector<T, N> x)
+{
+    VECTOR_MAP_UNARY(T, N, cbrt, x);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+[__readNone]
+matrix<T, N, M> cbrt(matrix<T, N, M> x)
+{
+    MATRIX_MAP_UNARY(T, N, M, cbrt, x);
+}
+
+__generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(cuda, "$P_rcbrt($0)")
+[__readNone, Differentiable]
+T rcbrt(T x)
+{
+    return pow(x, T(-1) / T(3));
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+[__readNone]
+vector<T, N> rcbrt(vector<T, N> x)
+{
+    VECTOR_MAP_UNARY(T, N, rcbrt, x);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+[__readNone]
+matrix<T, N, M> rcbrt(matrix<T, N, M> x)
+{
+    MATRIX_MAP_UNARY(T, N, M, rcbrt, x);
+}
+
 // Step function
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
