@@ -993,11 +993,18 @@ void CPPSourceEmitter::emitSimpleValueImpl(IRInst* inst)
             }
             default:
             {
-                m_writer->emit(constantInst->value.floatVal);
-
+                IRType* type = constantInst->getDataType();
+                switch (type->getOp())
+                {
+                    case kIROp_DoubleType:
+                        m_writer->emit(double(((IRConstant*)inst)->value.floatVal));
+                        break;
+                    default:
+                        m_writer->emit(float(((IRConstant*)inst)->value.floatVal));
+                        break;
+                }
                 // If the literal is a float, then we need to add 'f' at end, as
                 // without literal suffix the value defaults to double.
-                IRType* type = constantInst->getDataType();
                 if (type && type->getOp() == kIROp_FloatType)
                 {
                     m_writer->emitChar('f');
