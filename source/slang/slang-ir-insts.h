@@ -375,7 +375,7 @@ struct IRGLSLLocationDecoration : IRDecoration
 struct IRGLSLInputAttachmentIndexDecoration : IRDecoration
 {
     IR_LEAF_ISA(GLSLInputAttachmentIndexDecoration)
-        IRIntLit* getIndex() { return cast<IRIntLit>(getOperand(0)); }
+    IRIntLit* getIndex() { return cast<IRIntLit>(getOperand(0)); }
 };
 
 struct IRGLSLOffsetDecoration : IRDecoration
@@ -1456,16 +1456,6 @@ struct IRVarOffsetAttr : public IRLayoutResourceInfoAttr
         if(auto spaceInst = getSpaceInst())
             return UInt(getIntVal(spaceInst));
         return 0;
-    }
-
-    UInt getInputAttachmentIndex()
-    {
-
-    }
-
-    bool hasInputAttachmentIndex()
-    {
-
     }
 };
 

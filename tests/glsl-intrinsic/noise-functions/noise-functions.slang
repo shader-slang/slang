@@ -4,7 +4,7 @@
 // CHECK: warning 31200
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
-buffer MyBlockName2 
+buffer MyBlockName2
 {
     uint data[];
 } outputBuffer;

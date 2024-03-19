@@ -192,16 +192,16 @@ __intrinsic_type($(kIROp_TextureShapeBufferType))
 struct __ShapeBuffer : __ITextureShape
 {
     static const int flavor = $(SLANG_TEXTURE_BUFFER);
-    static const int dimensions = 4;
-    static const int planeDimensions = 4;
+    static const int dimensions = 1;
+    static const int planeDimensions = 1;
 }
 __magic_type(TextureShapeSubpassType)
 __intrinsic_type($(kIROp_TextureShapeSubpassType))
 struct __ShapeSubpass : __ITextureShape
 {
     static const int flavor = $(SLANG_TEXTURE_SUBPASS);
-    static const int dimensions = 1;
-    static const int planeDimensions = 1;
+    static const int dimensions = 4;
+    static const int planeDimensions = 4;
 }
 __intrinsic_op(vectorReshape)
 vector<T,N> __vectorReshape<let N : int, T, let M : int>(vector<T,M> vin);

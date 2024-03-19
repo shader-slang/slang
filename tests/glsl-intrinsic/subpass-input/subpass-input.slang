@@ -58,7 +58,6 @@ void main() {
 // CHECK_GLSL-CHECK: subpassLoad
 // CHECK_SPV: OpImageRead
 // CHECK_GLSL-CHECK: subpassLoad
-
     outColor = vec4(true
         && subpassLoad(subpass) == vec4(1)
         && subpassLoad(subpassMS, 0) == vec4(1)

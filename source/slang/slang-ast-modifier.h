@@ -243,7 +243,7 @@ class GLSLLocationLayoutModifier : public GLSLParsedLayoutModifier
     SLANG_AST_CLASS(GLSLLocationLayoutModifier)
 };
 
-class GLSLInputAttachmentIndexAttribute : public GLSLParsedLayoutModifier 
+class GLSLInputAttachmentIndexAttribute : public GLSLParsedLayoutModifier
 {
     SLANG_AST_CLASS(GLSLInputAttachmentIndexAttribute)
 };
@@ -766,6 +766,7 @@ class GLSLLocationAttribute : public GLSLSimpleIntegerLayoutAttribute
 {
     SLANG_AST_CLASS(GLSLLocationAttribute)
 };
+
 
 // [[vk_index]]
 class GLSLIndexAttribute : public GLSLSimpleIntegerLayoutAttribute 

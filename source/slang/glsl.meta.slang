@@ -6804,82 +6804,6 @@ __glsl_version(430) [require(glsl)]
     }
 }
 
-
-/// Section 8.13. Geometry Shader Functions
-
-__glsl_version(430) [require(glsl)]
-__spirv_version(1.0) [require(spirv)]
-[ForceInline]
-public void EmitStreamVertex(int stream)
-{
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "EmitStreamVertex($0)";
-    case spirv:
-    {
-        spirv_asm
-        {
-            OpCapability GeometryStreams;
-            OpEmitStreamVertex $stream
-        };
-    }
-    }
-}
-__glsl_version(430) [require(glsl)]
-__spirv_version(1.0) [require(spirv)]
-[ForceInline]
-public void EndStreamPrimitive(int stream)
-{
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "EndStreamPrimitive($0)";
-    case spirv:
-    {
-        spirv_asm
-        {
-            OpCapability GeometryStreams;
-            OpEndStreamPrimitive $stream
-        };
-    }
-    }
-}
-__glsl_version(430) [require(glsl)]
-__spirv_version(1.0) [require(spirv)]
-[ForceInline]
-public void EmitVertex()
-{
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "EmitVertex($0)";
-    case spirv:
-    {
-        spirv_asm
-        {
-            OpCapability Geometry;
-            OpEmitVertex
-        };
-    }
-    }
-}
-__glsl_version(430) [require(glsl)]
-__spirv_version(1.0) [require(spirv)]
-[ForceInline]
-public void EndPrimitive()
-{
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "EndPrimitive($0)";
-    case spirv:
-    {
-        spirv_asm
-        {
-            OpCapability Geometry;
-            OpEndPrimitive
-        };
-    }
-    }
-}
-
 /// Section 8.14. Fragment Processing Functions
 
 [require(hlsl, sm_4_0)]
@@ -7091,7 +7015,7 @@ public float interpolateAtCentroid(float interpolant)
     __target_switch
     {
     case hlsl:
-    { 
+    {
         return EvaluateAttributeAtCentroid(interpolant);
     }
     case glsl: __intrinsic_asm "interpolateAtCentroid($0)";
@@ -7266,7 +7190,6 @@ public vec4 noise4(float x)
 {
     return vec4(0.0f);
 }
-
 [deprecated("Always returns 0")]
 __generic<let N : int>
 [ForceInline]
@@ -7277,9 +7200,9 @@ public vec4 noise4(vector<float,N> x)
 
 /// Section 8.16. Shader Invocation Control Functions
 
-// TODO: for tessellation control shader: barrier() function may only 
-// be placed inside the main() of the shader and may not be called within 
-// control flow. 
+// TODO: for tessellation control shader: barrier() function may only
+// be placed inside the main() of the shader and may not be called within
+// control flow.
 // TODO: if called after a return, error.
 
 [require(hlsl, sm_5_0)]
@@ -7328,8 +7251,7 @@ public void memoryBarrier()
     }
     }
 }
-
-// Does not exist in vulkan; the equivlent is now `memoryBarrierBuffer` 
+// Does not exist in vulkan; the equivlent is now `memoryBarrierBuffer`
 // for vulkan since atomic_counter is a wrapped storage buffer object
 [require(hlsl, sm_5_0)]
 __glsl_version(430) [require(glsl)]
@@ -7449,7 +7371,7 @@ const SubpassLoadEntriesType kSubpassLoadEntries[] =
     };
 for (const auto& subpassLoadEntry : kSubpassLoadEntries)
 {
-}}}}    
+}}}}
     public typealias $(subpassLoadEntry.prefix)subpassInput = __TextureImpl<
         $(subpassLoadEntry.typeName),
         __ShapeSubpass,

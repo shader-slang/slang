@@ -750,8 +750,7 @@ void GLSLSourceEmitter::_emitGLSLTextureOrTextureSamplerType(IRTextureTypeBase* 
         _emitGLSLTypePrefix(type->getElementType(), true);
     }
 
-    auto baseShape = type->GetBaseShape();
-    if(baseShape == SLANG_TEXTURE_SUBPASS)
+    if(type->GetBaseShape() == SLANG_TEXTURE_SUBPASS)
     {
         m_writer->emit("subpassInput");
         if (type->isMultisample())
@@ -759,7 +758,7 @@ void GLSLSourceEmitter::_emitGLSLTextureOrTextureSamplerType(IRTextureTypeBase* 
         return;
     }
     m_writer->emit(baseName);
-    switch (baseShape)
+    switch (type->GetBaseShape())
     {
         case SLANG_TEXTURE_1D:		m_writer->emit("1D");		break;
         case SLANG_TEXTURE_2D:		m_writer->emit("2D");		break;

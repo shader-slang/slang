@@ -358,7 +358,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         {
             // If the texture has no format decoration, try to infer it from the type if not a subpass.
             if (textureType->GetBaseShape() == SLANG_TEXTURE_SUBPASS) return;
-
             auto elementType = textureType->getElementType();
             Int vectorWidth = 1;
             if (auto elementVecType = as<IRVectorType>(elementType))

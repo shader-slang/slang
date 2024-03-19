@@ -354,7 +354,6 @@ struct UsedRangeSet : RefObject
     // been claimed, for each resource type
     UsedRanges usedResourceRanges[kLayoutResourceKindCount];
     UsedRanges usedResourceRangesInputAttachmentIndex[kLayoutResourceKindCount];
-
 };
 
 // Information on a single parameter
@@ -898,7 +897,7 @@ static void addExplicitParameterBinding(
         // incoming...
         if( bindingInfo.count != count
             || bindingInfo.index != semanticInfo.index
-            || bindingInfo.space != semanticInfo.space)
+            || bindingInfo.space != semanticInfo.space )
         {
             getSink(context)->diagnose(varDecl, Diagnostics::conflictingExplicitBindingsForParameter, getReflectionName(varDecl));
         }
@@ -939,15 +938,14 @@ static void addExplicitParameterBinding(
                 parameterInfo->varLayout,
                 semanticInfo.index,
                 semanticInfo.index + count);
-
             if(semanticInfo.hasInputAttachmentIndex)
                 overlappedVarLayoutInputAttachmentIndex = usedRangeSet->usedResourceRangesInputAttachmentIndex[(int)semanticInfo.kind].Add(
                     parameterInfo->varLayout,
                     semanticInfo.inputAttachmentIndex,
                     semanticInfo.inputAttachmentIndex + 1);
-
         }
-        if (!overlappedVarLayout) 
+
+        if (!overlappedVarLayout)
             overlappedVarLayout = overlappedVarLayoutInputAttachmentIndex;
         if (overlappedVarLayout)
         {
