@@ -192,6 +192,14 @@ __intrinsic_type($(kIROp_TextureShapeBufferType))
 struct __ShapeBuffer : __ITextureShape
 {
     static const int flavor = $(SLANG_TEXTURE_BUFFER);
+    static const int dimensions = 4;
+    static const int planeDimensions = 4;
+}
+__magic_type(TextureShapeSubpassType)
+__intrinsic_type($(kIROp_TextureShapeSubpassType))
+struct __ShapeSubpass : __ITextureShape
+{
+    static const int flavor = $(SLANG_TEXTURE_SUBPASS);
     static const int dimensions = 1;
     static const int planeDimensions = 1;
 }
@@ -14270,51 +14278,5 @@ matrix<float, N, M> ddy_coarse(matrix<float, N, M> p)
     __target_switch
     {
     case hlsl: __intrinsic_asm "ddy_coarse($0)";
-    }
-}
-
-[__NoSideEffect]
-[ForceInline]
-float fwidth(float p)
-{
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "fwidth($0)";
-    case glsl: __intrinsic_asm "fwidth($0)";
-    case spirv:
-    {
-        return spirv_asm
-        {
-            OpFwidth $$float result $p;
-        };
-    }
-    }
-}
-__generic<let N : int>
-[__NoSideEffect]
-[ForceInline]
-vector<float, N> fwidth(vector<float, N> p)
-{
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "fwidth($0)";
-    case glsl: __intrinsic_asm "fwidth($0)";
-    case spirv:
-    {
-        return spirv_asm
-        {
-            OpFwidth $$float result $p;
-        };
-    }
-    }
-}
-__generic<let N : int, let M : int>
-[__NoSideEffect]
-[ForceInline]
-matrix<float, N, M> fwidth(matrix<float, N, M> p)
-{
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "fwidth($0)";
     }
 }

@@ -143,6 +143,10 @@ class TextureShapeBufferType : public TextureShapeType
 {
     SLANG_AST_CLASS(TextureShapeBufferType)
 };
+class TextureShapeSubpassType : public TextureShapeType
+{
+    SLANG_AST_CLASS(TextureShapeSubpassType)
+};
 
 // Resources that contain "elements" that can be fetched
 class ResourceType : public BuiltinType 

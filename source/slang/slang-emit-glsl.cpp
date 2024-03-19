@@ -750,8 +750,16 @@ void GLSLSourceEmitter::_emitGLSLTextureOrTextureSamplerType(IRTextureTypeBase* 
         _emitGLSLTypePrefix(type->getElementType(), true);
     }
 
+    auto baseShape = type->GetBaseShape();
+    if(baseShape == SLANG_TEXTURE_SUBPASS)
+    {
+        m_writer->emit("subpassInput");
+        if (type->isMultisample())
+            m_writer->emit("MS");
+        return;
+    }
     m_writer->emit(baseName);
-    switch (type->GetBaseShape())
+    switch (baseShape)
     {
         case SLANG_TEXTURE_1D:		m_writer->emit("1D");		break;
         case SLANG_TEXTURE_2D:		m_writer->emit("2D");		break;
@@ -2645,10 +2653,17 @@ void GLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
     for (auto decoration : varDecl->getDecorations())
     {
         UnownedStringSlice prefix;
-        UnownedStringSlice postfix = toSlice("EXT");
+        UnownedStringSlice postfix;
         if (as<IRVulkanHitAttributesDecoration>(decoration))
         {
             prefix = toSlice("hitAttribute");
+            postfix = toSlice("EXT");
+        }
+        else if (auto glslInputAttachment = as<IRGLSLInputAttachmentIndexDecoration>(decoration))
+        {
+            m_writer->emit(toSlice("layout(input_attachment_index = "));
+            m_writer->emit(glslInputAttachment->getIndex()->getValue());
+            m_writer->emit(toSlice(")"));
         }
         else
         {
@@ -2656,22 +2671,27 @@ void GLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
             switch (decoration->getOp())
             {
             case kIROp_VulkanCallablePayloadDecoration:
+                postfix = toSlice("EXT");
                 prefix = toSlice("callableData");
                 locationValue = getIntVal(decoration->getOperand(0));
                 break;
             case kIROp_VulkanCallablePayloadInDecoration:
+                postfix = toSlice("EXT");
                 prefix = toSlice("callableDataIn");
                 locationValue = getIntVal(decoration->getOperand(0));
                 break;
             case kIROp_VulkanRayPayloadDecoration:
+                postfix = toSlice("EXT");
                 prefix = toSlice("rayPayload");
                 locationValue = getIntVal(decoration->getOperand(0));
                 break;
             case kIROp_VulkanRayPayloadInDecoration:
+                postfix = toSlice("EXT");
                 prefix = toSlice("rayPayloadIn");
                 locationValue = getIntVal(decoration->getOperand(0));
                 break;
             case kIROp_VulkanHitObjectAttributesDecoration:
+                postfix = toSlice("EXT");
                 prefix = toSlice("hitObjectAttribute");
                 postfix = toSlice("NV");
                 locationValue = getIntVal(decoration->getOperand(0));
@@ -2684,7 +2704,6 @@ void GLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
             m_writer->emit(toSlice(")\n"));
         }
 
-        SLANG_ASSERT(prefix.getLength());
         m_writer->emit(prefix);
         m_writer->emit(postfix);
         m_writer->emit(toSlice("\n"));

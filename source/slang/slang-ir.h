@@ -1397,6 +1397,8 @@ struct IRResourceTypeBase : IRType
             return SLANG_TEXTURE_CUBE;
         case kIROp_TextureShapeBufferType:
             return SLANG_TEXTURE_BUFFER;
+        case kIROp_TextureShapeSubpassType:
+            return SLANG_TEXTURE_SUBPASS;
         default:
             return SLANG_RESOURCE_NONE;
         }

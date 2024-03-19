@@ -6807,6 +6807,8 @@ __glsl_version(430) [require(glsl)]
 
 /// Section 8.13. Geometry Shader Functions
 
+__glsl_version(430) [require(glsl)]
+__spirv_version(1.0) [require(spirv)]
 [ForceInline]
 public void EmitStreamVertex(int stream)
 {
@@ -6823,6 +6825,8 @@ public void EmitStreamVertex(int stream)
     }
     }
 }
+__glsl_version(430) [require(glsl)]
+__spirv_version(1.0) [require(spirv)]
 [ForceInline]
 public void EndStreamPrimitive(int stream)
 {
@@ -6839,6 +6843,8 @@ public void EndStreamPrimitive(int stream)
     }
     }
 }
+__glsl_version(430) [require(glsl)]
+__spirv_version(1.0) [require(spirv)]
 [ForceInline]
 public void EmitVertex()
 {
@@ -6855,6 +6861,8 @@ public void EmitVertex()
     }
     }
 }
+__glsl_version(430) [require(glsl)]
+__spirv_version(1.0) [require(spirv)]
 [ForceInline]
 public void EndPrimitive()
 {
@@ -6874,11 +6882,17 @@ public void EndPrimitive()
 
 /// Section 8.14. Fragment Processing Functions
 
+[require(hlsl, sm_4_0)]
+__glsl_version(430) [require(glsl)]
+__spirv_version(1.0) [require(spirv)]
 [ForceInline]
 public float dFdx(float p)
 {
     return ddx(p);
 }
+[require(hlsl, sm_4_0)]
+__glsl_version(430) [require(glsl)]
+__spirv_version(1.0) [require(spirv)]
 __generic<let N : int>
 [ForceInline]
 public vector<float,N> dFdx(vector<float,N> p)
@@ -6886,11 +6900,17 @@ public vector<float,N> dFdx(vector<float,N> p)
     return ddx(p);
 }
 
+[require(hlsl, sm_4_0)]
+__glsl_version(430) [require(glsl)]
+__spirv_version(1.0) [require(spirv)]
 [ForceInline]
 public float dFdy(float p)
 {
     return ddy(p);
 }
+[require(hlsl, sm_4_0)]
+__glsl_version(430) [require(glsl)]
+__spirv_version(1.0) [require(spirv)]
 __generic<let N : int>
 [ForceInline]
 public vector<float,N> dFdy(vector<float,N> p)
@@ -6898,11 +6918,17 @@ public vector<float,N> dFdy(vector<float,N> p)
     return ddy(p);
 }
 
+[require(hlsl, sm_4_0)]
+__glsl_version(430) [require(glsl)]
+__spirv_version(1.0) [require(spirv)]
 [ForceInline]
 public float dFdxFine(float p)
 {
     return ddx_fine(p);
 }
+[require(hlsl, sm_4_0)]
+__glsl_version(430) [require(glsl)]
+__spirv_version(1.0) [require(spirv)]
 __generic<let N : int>
 [ForceInline]
 public vector<float,N> dFdxFine(vector<float,N> p)
@@ -6910,11 +6936,17 @@ public vector<float,N> dFdxFine(vector<float,N> p)
     return ddx_fine(p);
 }
 
+[require(hlsl, sm_4_0)]
+__glsl_version(430) [require(glsl)]
+__spirv_version(1.0) [require(spirv)]
 [ForceInline]
 public float dFdyFine(float p)
 {
     return ddy_fine(p);
 }
+[require(hlsl, sm_4_0)]
+__glsl_version(430) [require(glsl)]
+__spirv_version(1.0) [require(spirv)]
 __generic<let N : int>
 [ForceInline]
 public vector<float,N> dFdyFine(vector<float,N> p)
@@ -6922,11 +6954,17 @@ public vector<float,N> dFdyFine(vector<float,N> p)
     return ddy_fine(p);
 }
 
+[require(hlsl, sm_4_0)]
+__glsl_version(430) [require(glsl)]
+__spirv_version(1.0) [require(spirv)]
 [ForceInline]
 public float dFdxCoarse(float p)
 {
     return ddx_coarse(p);
 }
+[require(hlsl, sm_4_0)]
+__glsl_version(430) [require(glsl)]
+__spirv_version(1.0) [require(spirv)]
 __generic<let N : int>
 [ForceInline]
 public vector<float,N> dFdxCoarse(vector<float,N> p)
@@ -6934,11 +6972,17 @@ public vector<float,N> dFdxCoarse(vector<float,N> p)
     return ddx_coarse(p);
 }
 
+[require(hlsl, sm_4_0)]
+__glsl_version(430) [require(glsl)]
+__spirv_version(1.0) [require(spirv)]
 [ForceInline]
 public float dFdyCoarse(float p)
 {
     return ddy_coarse(p);
 }
+[require(hlsl, sm_4_0)]
+__glsl_version(430) [require(glsl)]
+__spirv_version(1.0) [require(spirv)]
 __generic<let N : int>
 [ForceInline]
 public vector<float,N> dFdyCoarse(vector<float,N> p)
@@ -6946,18 +6990,9 @@ public vector<float,N> dFdyCoarse(vector<float,N> p)
     return ddy_coarse(p);
 }
 
-[ForceInline]
-public float fwidth(float p)
-{
-    return fwidth(p);
-}
-__generic<let N : int>
-[ForceInline]
-public vector<float,N> fwidth(vector<float,N> p)
-{
-    return fwidth(p);
-}
-
+[require(hlsl, sm_4_0)]
+__glsl_version(430) [require(glsl)]
+__spirv_version(1.0) [require(spirv)]
 [ForceInline]
 public float fwidthFine(float p)
 {
@@ -6972,11 +7007,14 @@ public float fwidthFine(float p)
     {
         return spirv_asm
         {
-            OpFwidthFine $$T result $p;
+            OpFwidthFine $$float result $p;
         };
     }
     }
 }
+[require(hlsl, sm_4_0)]
+__glsl_version(430) [require(glsl)]
+__spirv_version(1.0) [require(spirv)]
 __generic<let N : int>
 [ForceInline]
 public vector<float,N> fwidthFine(vector<float, N> p)
@@ -6992,12 +7030,15 @@ public vector<float,N> fwidthFine(vector<float, N> p)
     {
         return spirv_asm
         {
-            OpFwidthFine $$T result $p;
+            OpFwidthFine $$vector<float,N> result $p;
         };
     }
     }
 }
 
+[require(hlsl, sm_4_0)]
+__glsl_version(430) [require(glsl)]
+__spirv_version(1.0) [require(spirv)]
 [ForceInline]
 public float fwidthCoarse(float p)
 {
@@ -7012,11 +7053,14 @@ public float fwidthCoarse(float p)
     {
         return spirv_asm
         {
-            OpFwidthCoarse $$T result $p;
+            OpFwidthCoarse $$float result $p;
         };
     }
     }
 }
+[require(hlsl, sm_4_0)]
+__glsl_version(430) [require(glsl)]
+__spirv_version(1.0) [require(spirv)]
 __generic<let N : int>
 [ForceInline]
 public vector<float,N> fwidthCoarse(vector<float,N> p)
@@ -7032,74 +7076,144 @@ public vector<float,N> fwidthCoarse(vector<float,N> p)
     {
         return spirv_asm
         {
-            OpFwidthCoarse $$T result $p;
+            OpFwidthCoarse $$vector<float,N> result $p;
         };
     }
     }
 }
 
+[require(hlsl, sm_5_0)]
+__glsl_version(430) [require(glsl)]
+__spirv_version(1.0) [require(spirv)]
 [ForceInline]
 public float interpolateAtCentroid(float interpolant)
 {
-    return EvaluateAttributeAtCentroid(interpolant);
+    __target_switch
+    {
+    case hlsl:
+    { 
+        return EvaluateAttributeAtCentroid(interpolant);
+    }
+    case glsl: __intrinsic_asm "interpolateAtCentroid($0)";
+    case spirv:
+    {
+        return spirv_asm
+        {
+            OpCapability InterpolationFunction;
+            OpExtInst $$float result glsl450 InterpolateAtCentroid $interpolant
+        };
+    }
+    }
 }
+[require(hlsl, sm_5_0)]
+__glsl_version(430) [require(glsl)]
+__spirv_version(1.0) [require(spirv)]
+__generic<let N : int>
 [ForceInline]
-public vec2 interpolateAtCentroid(vec2 interpolant)
+public vector<float,N> interpolateAtCentroid(vector<float,N> interpolant)
 {
-    return EvaluateAttributeAtCentroid(interpolant);
-}
-[ForceInline]
-public vec3 interpolateAtCentroid(vec3 interpolant)
-{
-    return EvaluateAttributeAtCentroid(interpolant);
-}
-[ForceInline]
-public vec4 interpolateAtCentroid(vec4 interpolant)
-{
-    return EvaluateAttributeAtCentroid(interpolant);
+    __target_switch
+    {
+    case hlsl:
+    {
+        return EvaluateAttributeAtCentroid(interpolant);
+    }
+    case glsl: __intrinsic_asm "interpolateAtCentroid($0)";
+    case spirv:
+    {
+        return spirv_asm
+        {
+            OpCapability InterpolationFunction;
+            OpExtInst $$vector<float,N> result glsl450 InterpolateAtCentroid $interpolant
+        };
+    }
+    }
 }
 
+[require(hlsl, sm_5_0)]
+__glsl_version(430) [require(glsl)]
+__spirv_version(1.0) [require(spirv)]
 [ForceInline]
 public float interpolateAtSample(float interpolant, int sample)
 {
-    return EvaluateAttributeAtSample(interpolant, sample);
+    __target_switch
+    {
+    case hlsl:
+    {
+        return EvaluateAttributeAtSample(interpolant, sample);
+    }
+    case glsl: __intrinsic_asm "interpolateAtSample($0,$1)";
+    case spirv:
+    {
+        return spirv_asm
+        {
+            OpCapability InterpolationFunction;
+            OpExtInst $$float result glsl450 InterpolateAtSample $interpolant $sample
+        };
+    }
+    }
 }
+[require(hlsl, sm_5_0)]
+__glsl_version(430) [require(glsl)]
+__spirv_version(1.0) [require(spirv)]
+__generic<let N : int>
 [ForceInline]
-[ForceInline]
-public vec2 interpolateAtSample(vec2 interpolant, int sample)
+public vector<float,N> interpolateAtSample(vector<float,N> interpolant, int sample)
 {
-    return EvaluateAttributeAtSample(interpolant, sample);
-}
-[ForceInline]
-public vec3 interpolateAtSample(vec3 interpolant, int sample)
-{
-    return EvaluateAttributeAtSample(interpolant, sample);
-}
-[ForceInline]
-public vec4 interpolateAtSample(vec4 interpolant, int sample)
-{
-    return EvaluateAttributeAtSample(interpolant, sample);
+    __target_switch
+    {
+    case hlsl:
+    {
+        return EvaluateAttributeAtSample(interpolant, sample);
+    }
+    case glsl: __intrinsic_asm "interpolateAtSample($0,$1)";
+    case spirv:
+    {
+        return spirv_asm
+        {
+            OpCapability InterpolationFunction;
+            OpExtInst $$vector<float,N> result glsl450 InterpolateAtSample $interpolant $sample
+        };
+    }
+    }
 }
 
+__glsl_version(430) [require(glsl)]
+__spirv_version(1.0) [require(spirv)]
 [ForceInline]
 public float interpolateAtOffset(float interpolant, vec2 offset)
 {
-    return EvaluateAttributeAtOffset(interpolant, sample);
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "interpolateAtOffset($0,$1)";
+    case spirv:
+    {
+        return spirv_asm
+        {
+            OpCapability InterpolationFunction;
+            OpExtInst $$float result glsl450 78 $interpolant $offset
+        };
+    }
+    }
 }
+__glsl_version(430) [require(glsl)]
+__spirv_version(1.0) [require(spirv)]
+__generic<let N : int>
 [ForceInline]
-public vec2 interpolateAtOffset(vec2 interpolant, vec2 offset)
+public vector<float,N> interpolateAtOffset(vector<float,N> interpolant, vec2 offset)
 {
-    return EvaluateAttributeAtOffset(interpolant, sample);
-}
-[ForceInline]
-public vec3 interpolateAtOffset(vec3 interpolant, vec2 offset)
-{
-    return EvaluateAttributeAtOffset(interpolant, sample);
-}
-[ForceInline]
-public vec4 interpolateAtOffset(vec4 interpolant, vec2 offset)
-{
-    return EvaluateAttributeAtOffset(interpolant, sample);
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "interpolateAtOffset($0,$1)";
+    case spirv:
+    {
+        return spirv_asm
+        {
+            OpCapability InterpolationFunction;
+            OpExtInst $$vector<float,N> result glsl450 78 $interpolant $offset
+        };
+    }
+    }
 }
 
 /// Section 8.15. Noise Functions (deprecated)
@@ -7165,222 +7279,288 @@ public vec4 noise4(vector<float,N> x)
 
 // TODO: for tessellation control shader: barrier() function may only 
 // be placed inside the main() of the shader and may not be called within 
-// control flow
+// control flow. 
+// TODO: if called after a return, error.
 
+[require(hlsl, sm_5_0)]
+__glsl_version(430) [require(glsl)]
+__spirv_version(1.0) [require(spirv)]
 [ForceInline]
 public void barrier()
 {
-    __target_switch()
+    __target_switch
     {
     case hlsl:
     {
         GroupMemoryBarrier();
         DeviceMemoryBarrier();
     }
-    case glsl: __target_intrinsic "barrier()";
+    case glsl: __intrinsic_asm "barrier()";
     case spirv:
     {
         spirv_asm
         {
-            OpControlBarrier TessellationControl Device CrossWorkgroupMemory|UniformMemory
-        }
+            OpControlBarrier Workgroup Device CrossWorkgroupMemory
+        };
     }
     }
 }
 
 /// Section 8.17. Shader Memory Control Functions
 
+[require(hlsl, sm_5_0)]
+__glsl_version(430) [require(glsl)]
+__spirv_version(1.0) [require(spirv)]
 [ForceInline]
 public void memoryBarrier()
 {
-    __target_switch()
+    __target_switch
     {
-    case hlsl: __target_intrinsic "AllMemoryBarrier()"
-    case glsl: __target_intrinsic "memoryBarrier()";
+    case hlsl: __intrinsic_asm "AllMemoryBarrier()";
+    case glsl: __intrinsic_asm "memoryBarrier()";
     case spirv:
     {
         spirv_asm
         {
             OpCapability Shader;
             OpMemoryBarrier Invocation AcquireRelease|WorkgroupMemory|ImageMemory|UniformMemory
-        }
+        };
     }
     }
 }
+
+// Does not exist in vulkan; the equivlent is now `memoryBarrierBuffer` 
+// for vulkan since atomic_counter is a wrapped storage buffer object
+[require(hlsl, sm_5_0)]
+__glsl_version(430) [require(glsl)]
+__spirv_version(1.0) [require(spirv)]
 [ForceInline]
 public void memoryBarrierAtomicCounter()
 {
-    __target_switch()
+    __target_switch
     {
-    case hlsl: __target_intrinsic "AllMemoryBarrier()"
-    case glsl: __target_intrinsic "memoryBarrierAtomicCounter()";
+    case hlsl: __intrinsic_asm "AllMemoryBarrier()";
+    case glsl: __intrinsic_asm "memoryBarrierBuffer()";
     case spirv:
     {
         spirv_asm
         {
             OpCapability Shader;
             OpMemoryBarrier Invocation AcquireRelease
-        }
+        };
     }
     }
 }
+[require(hlsl, sm_5_0)]
+__glsl_version(430) [require(glsl)]
+__spirv_version(1.0) [require(spirv)]
 [ForceInline]
 public void memoryBarrierBuffer()
 {
-    __target_switch()
+    __target_switch
     {
-    case hlsl: __target_intrinsic "DeviceMemoryBarrier()"
-    case glsl: __target_intrinsic "memoryBarrierBuffer()";
+    case hlsl: __intrinsic_asm "DeviceMemoryBarrier()";
+    case glsl: __intrinsic_asm "memoryBarrierBuffer()";
     case spirv:
     {
         spirv_asm
         {
             OpCapability Shader;
             OpMemoryBarrier Invocation UniformMemory
-        }
+        };
     }
     }
 }
-// TODO only compute shader
+// TODO only allow in compute shader
+[require(hlsl, sm_5_0)]
+__glsl_version(430) [require(glsl)]
+__spirv_version(1.0) [require(spirv)]
 [ForceInline]
 public void memoryBarrierShared()
 {
-    __target_switch()
+    __target_switch
     {
-    case hlsl: __target_intrinsic "GroupMemoryBarrier()"
-    case glsl: __target_intrinsic "memoryBarrierShared()";
+    case hlsl: __intrinsic_asm "GroupMemoryBarrier()";
+    case glsl: __intrinsic_asm "memoryBarrierShared()";
     case spirv:
     {
         spirv_asm
         {
             OpCapability Shader;
             OpMemoryBarrier Invocation WorkgroupMemory
-        }
+        };
     }
     }
 }
+[require(hlsl, sm_5_0)]
+__glsl_version(430) [require(glsl)]
+__spirv_version(1.0) [require(spirv)]
 [ForceInline]
 public void memoryBarrierImage()
 {
-    __target_switch()
+    __target_switch
     {
-    case hlsl: __target_intrinsic "DeviceMemoryBarrier()"
-    case glsl: __target_intrinsic "memoryBarrierImage()";
+    case hlsl: __intrinsic_asm "DeviceMemoryBarrier()";
+    case glsl: __intrinsic_asm "memoryBarrierImage()";
     case spirv:
     {
         spirv_asm
         {
             OpMemoryBarrier Invocation ImageMemory
-        }
+        };
     }
     }
 }
-// TODO only compute shader
+// TODO only allow in compute shader
+[require(hlsl, sm_5_0)]
+__glsl_version(430) [require(glsl)]
+__spirv_version(1.0) [require(spirv)]
 [ForceInline]
 public void groupMemoryBarrier()
 {
-    __target_switch()
+    __target_switch
     {
-    case hlsl: __target_intrinsic "GroupMemoryBarrier()"
-    case glsl: __target_intrinsic "groupMemoryBarrier()";
+    case hlsl: __intrinsic_asm "GroupMemoryBarrier()";
+    case glsl: __intrinsic_asm "groupMemoryBarrier()";
     case spirv:
     {
         spirv_asm
         {
             OpMemoryBarrier Workgroup AcquireRelease|WorkgroupMemory|ImageMemory|UniformMemory
-        }
+        };
     }
     }
 }
 
 /// Section 8.18. Subpass-Input Functions
 
-__magic_type(SubpassInputType)
-__intrinsic_type($(kIROp_SubpassInputType))
-struct SubPassType<T, let isMS:int>
-{
-};
-
-// TODO: fragment shader only
+// TODO: only allow in fragment shader
 ${{{{
 struct SubpassLoadEntriesType
 {
     const char* typeName;
     const char* prefix;
-}
+};
 const SubpassLoadEntriesType kSubpassLoadEntries[] =
     {
-        { "float" "" },
-        { "uint", "u" }
-        { "int", "i" }
-    }
+        { "float", "" },
+        { "uint", "u" },
+        { "int", "i" },
+    };
 for (const auto& subpassLoadEntry : kSubpassLoadEntries)
 {
-}}}}
-
-    typealias $(subpassLoadEntry.prefix)subpassInput = SubpassLoadEntriesType<$(subpassLoadEntry.typeName),0>;
-    typealias $(subpassLoadEntry.prefix)subpassInput = SubpassLoadEntriesType<$(subpassLoadEntry.typeName),1>;
-
+}}}}    
+    public typealias $(subpassLoadEntry.prefix)subpassInput = __TextureImpl<
+        $(subpassLoadEntry.typeName),
+        __ShapeSubpass,
+        0, // isArray
+        0, // isMS
+        0, // sampleCount
+        $(kStdlibResourceAccessReadWrite), // access
+        0, // isShadow
+        0, // isCombined
+        0  // format
+    >;
+    __generic<let sampleCount:int=0>
+    public typealias $(subpassLoadEntry.prefix)subpassInputMS = __TextureImpl<
+        $(subpassLoadEntry.typeName),
+        __ShapeSubpass,
+        0, // isArray
+        1, // isMS
+        sampleCount, // sampleCount
+        $(kStdlibResourceAccessReadWrite), // access
+        0, // isShadow
+        0, // isCombined
+        0  // format
+    >;
+    __glsl_version(430) [require(glsl)]
+    __spirv_version(1.0) [require(spirv)]
     [ForceInline]
     public $(subpassLoadEntry.prefix)vec4 subpassLoad($(subpassLoadEntry.prefix)subpassInput subpass)
     {
-
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "subpassLoad($0)";
+        case spirv:
+        {
+            let zeroVec = ivec2(0);
+            return spirv_asm
+            {
+                OpCapability StorageImageReadWithoutFormat;
+                result:$$$(subpassLoadEntry.prefix)vec4 = OpImageRead $subpass $zeroVec
+            };
+        }
+        }
     }
-    //TODO: fragment shader only
+    __glsl_version(430) [require(glsl)]
+    __spirv_version(1.0) [require(spirv)]
     [ForceInline]
     public $(subpassLoadEntry.prefix)vec4 subpassLoad($(subpassLoadEntry.prefix)subpassInputMS subpass, int sample)
     {
-
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "subpassLoad($0)";
+        case spirv:
+        {
+            let zeroVec = ivec2(0);
+            return spirv_asm
+            {
+                OpCapability StorageImageReadWithoutFormat;
+                result:$$$(subpassLoadEntry.prefix)vec4 = OpImageRead $subpass $zeroVec Sample $sample
+            };
+        }
+        }
     }
 ${{{{
 }
 }}}}
+
 /// Section 8.19. Shader Invocation Group Functions
+
+// .*Invocation compiles into SubgroupVoteKHR operations.
+// instead, we directly emit the non depricated alternative
+__glsl_version(460) [require(glsl)]
+__spirv_version(1.3) [require(spirv)]
 [ForceInline]
 public bool anyInvocation(bool value)
 {
-    __target_switch()
+    __target_switch
     {
-    case glsl: __target_intrinsic "anyInvocation($0)";
+    case glsl:
+    case hlsl:
     case spirv:
     {
-        spirv_asm
-        {
-            OpCapability Groups;
-            OpGroupAny $$bool result Invocation $value
-            }
+        return WaveActiveAnyTrue(value);
     }
     }
 }
+__glsl_version(460) [require(glsl)]
+__spirv_version(1.3) [require(spirv)]
 [ForceInline]
 public bool allInvocations(bool value)
 {
-    __target_switch()
+    __target_switch
     {
-    case glsl: __target_intrinsic "allInvocations($0)";
+    case glsl:
+    case hlsl:
     case spirv:
     {
-        spirv_asm
-        {
-            OpCapability Groups;
-            OpGroupAll $$bool result Invocation $value
-        }
+        return WaveActiveAllTrue(value);
     }
     }
 }
+__glsl_version(460) [require(glsl)]
+__spirv_version(1.3) [require(spirv)]
 [ForceInline]
 public bool allInvocationsEqual(bool value)
 {
-    __target_switch()
+    __target_switch
     {
-    case glsl: __target_intrinsic "allInvocationsEqual($0)";
+    case glsl:
+    case hlsl:
     case spirv:
     {
-        spirv_asm
-        {
-            OpCapability Groups;
-            OpGroupEqual $$bool result Invocation $value
-        }
+        return WaveActiveAllEqual(value);
     }
     }
 }

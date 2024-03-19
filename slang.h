@@ -2143,11 +2143,12 @@ extern "C"
         SLANG_TEXTURE_3D                    = 0x03,
         SLANG_TEXTURE_CUBE                  = 0x04,
         SLANG_TEXTURE_BUFFER                = 0x05,
+        SLANG_TEXTURE_SUBPASS               = 0x06,
 
-        SLANG_STRUCTURED_BUFFER             = 0x06,
-        SLANG_BYTE_ADDRESS_BUFFER           = 0x07,
-        SLANG_RESOURCE_UNKNOWN              = 0x08,
-        SLANG_ACCELERATION_STRUCTURE        = 0x09,
+        SLANG_STRUCTURED_BUFFER             = 0x07,
+        SLANG_BYTE_ADDRESS_BUFFER           = 0x08,
+        SLANG_RESOURCE_UNKNOWN              = 0x09,
+        SLANG_ACCELERATION_STRUCTURE        = 0x0A,
 
         SLANG_RESOURCE_EXT_SHAPE_MASK       = 0xF0,
 
@@ -2162,6 +2163,7 @@ extern "C"
 
         SLANG_TEXTURE_2D_MULTISAMPLE        = SLANG_TEXTURE_2D | SLANG_TEXTURE_MULTISAMPLE_FLAG,
         SLANG_TEXTURE_2D_MULTISAMPLE_ARRAY  = SLANG_TEXTURE_2D | SLANG_TEXTURE_MULTISAMPLE_FLAG | SLANG_TEXTURE_ARRAY_FLAG,
+        SLANG_TEXTURE_SUBPASS_MULTISAMPLE   = SLANG_TEXTURE_SUBPASS | SLANG_TEXTURE_MULTISAMPLE_FLAG,
     };
 #endif
     typedef unsigned int SlangResourceAccessIntegral;

@@ -783,6 +783,8 @@ SlangResourceShape ResourceType::getBaseShape()
         return SLANG_TEXTURE_CUBE;
     else if (as<TextureShapeBufferType>(shape))
         return SLANG_TEXTURE_BUFFER;
+    else if (as<TextureShapeSubpassType>(shape))
+        return SLANG_TEXTURE_SUBPASS;
 
     return SLANG_RESOURCE_NONE;
 }
@@ -914,6 +916,8 @@ void ResourceType::_toTextOverride(StringBuilder& out)
             {
                 if (shape == SLANG_TEXTURE_BUFFER)
                     resultSB << "Buffer";
+                else if (shape == SLANG_TEXTURE_SUBPASS)
+                    resultSB << "Subpass";
                 else
                     resultSB << "Texture";
             }

@@ -147,6 +147,7 @@ INST(Nop, nop, 0, 0)
     INST(TextureShape3DType, TextureShape1DType, 0, HOISTABLE)
     INST(TextureShapeCubeType, TextureShape1DType, 0, HOISTABLE)
     INST(TextureShapeBufferType, TextureShapeBufferType, 0, HOISTABLE)
+    INST(TextureShapeSubpassType, TextureShapeSubpassType, 0, HOISTABLE)
 
     // TODO: Why do we have all this hierarchy here, when everything
     // that actually matters is currently nested under `TextureTypeBase`?
@@ -853,6 +854,7 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(GlobalOutputDecoration, output, 0, 0)
     INST(GlobalInputDecoration, output, 0, 0)
     INST(GLSLLocationDecoration, glslLocation, 1, 0)
+    INST(GLSLInputAttachmentIndexDecoration, glslInputAttachmentIndex, 1, 0)
     INST(GLSLOffsetDecoration, glslOffset, 1, 0)
     INST(PayloadDecoration, payload, 0, 0)
 

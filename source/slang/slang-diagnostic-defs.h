@@ -443,6 +443,7 @@ DIAGNOSTIC(31202, Error, duplicateModifier, "modifier '$0' is redundant or confl
 DIAGNOSTIC(31203, Error, cannotExportIncompleteType, "cannot export incomplete type '$0'")
 DIAGNOSTIC(31204, Error, incompleteTypeCannotBeUsedInBuffer, "incomplete type '$0' cannot be used in a buffer")
 DIAGNOSTIC(31205, Error, incompleteTypeCannotBeUsedInUniformParameter, "incomplete type '$0' cannot be used in a uniform parameter")
+DIAGNOSTIC(31206, Error, InputAttachmentIndexOnlyAllowedOnSubpass, "input_attachment_index is only allowed on subpass images.")
 
 // Enums
 

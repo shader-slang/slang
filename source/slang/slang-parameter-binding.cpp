@@ -333,6 +333,8 @@ struct ParameterBindingInfo
 {
     size_t              space = 0;
     size_t              index = 0;
+    bool                hasInputAttachmentIndex = false;
+    size_t              inputAttachmentIndex = 0;
     LayoutSize          count = 0;
 };
 
@@ -351,6 +353,8 @@ struct UsedRangeSet : RefObject
     // Information on what ranges of "registers" have already
     // been claimed, for each resource type
     UsedRanges usedResourceRanges[kLayoutResourceKindCount];
+    UsedRanges usedResourceRangesInputAttachmentIndex[kLayoutResourceKindCount];
+
 };
 
 // Information on a single parameter
@@ -471,6 +475,8 @@ struct LayoutSemanticInfo
     UInt                space;
     UInt                index;
 
+    bool                hasInputAttachmentIndex = false;
+    size_t              inputAttachmentIndex = 0;
     // TODO: need to deal with component-granularity binding...
 };
 
@@ -892,7 +898,7 @@ static void addExplicitParameterBinding(
         // incoming...
         if( bindingInfo.count != count
             || bindingInfo.index != semanticInfo.index
-            || bindingInfo.space != semanticInfo.space )
+            || bindingInfo.space != semanticInfo.space)
         {
             getSink(context)->diagnose(varDecl, Diagnostics::conflictingExplicitBindingsForParameter, getReflectionName(varDecl));
         }
@@ -905,8 +911,11 @@ static void addExplicitParameterBinding(
         bindingInfo.count = count;
         bindingInfo.index = semanticInfo.index;
         bindingInfo.space = semanticInfo.space;
+        bindingInfo.hasInputAttachmentIndex = semanticInfo.hasInputAttachmentIndex;
+        bindingInfo.inputAttachmentIndex = semanticInfo.inputAttachmentIndex;
 
         VarLayout* overlappedVarLayout = nullptr;
+        VarLayout* overlappedVarLayoutInputAttachmentIndex = nullptr;
         if( kind == LayoutResourceKind::RegisterSpace || kind == LayoutResourceKind::SubElementRegisterSpace )
         {
             // Parameter is being bound to an entire space, so we
@@ -930,8 +939,16 @@ static void addExplicitParameterBinding(
                 parameterInfo->varLayout,
                 semanticInfo.index,
                 semanticInfo.index + count);
-        }
 
+            if(semanticInfo.hasInputAttachmentIndex)
+                overlappedVarLayoutInputAttachmentIndex = usedRangeSet->usedResourceRangesInputAttachmentIndex[(int)semanticInfo.kind].Add(
+                    parameterInfo->varLayout,
+                    semanticInfo.inputAttachmentIndex,
+                    semanticInfo.inputAttachmentIndex + 1);
+
+        }
+        if (!overlappedVarLayout) 
+            overlappedVarLayout = overlappedVarLayoutInputAttachmentIndex;
         if (overlappedVarLayout)
         {
             //legal if atomicUint
@@ -1071,6 +1088,15 @@ static void addExplicitParameterBindings_GLSL(
     LayoutSemanticInfo semanticInfo;
     semanticInfo.index = 0;
     semanticInfo.space = 0;
+    semanticInfo.hasInputAttachmentIndex = false;
+    semanticInfo.inputAttachmentIndex = 0;
+
+    // Try to find `input_attachment_index`
+    if (auto attr = varDecl.getDecl()->findModifier<GLSLInputAttachmentIndexAttribute>())
+    {
+        semanticInfo.hasInputAttachmentIndex = true;
+        semanticInfo.inputAttachmentIndex = stringToInt(attr->valToken.getContent());
+    }
 
     if( (foundResInfo = typeLayout->FindResourceInfo(LayoutResourceKind::DescriptorTableSlot)) != nullptr )
     {

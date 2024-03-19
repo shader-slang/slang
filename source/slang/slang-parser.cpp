@@ -7876,7 +7876,8 @@ namespace Slang
                 CASE(std430, GLSLStd430Modifier)
                 CASE(scalar, GLSLScalarModifier)
                 CASE(offset, GLSLOffsetLayoutAttribute)
-                CASE(location, GLSLLocationLayoutModifier) 
+                CASE(location, GLSLLocationLayoutModifier)
+                CASE(input_attachment_index, GLSLInputAttachmentIndexAttribute) 
                 {
                     modifier = parser->astBuilder->create<GLSLUnparsedLayoutModifier>();
                 }
