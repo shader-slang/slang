@@ -80,5 +80,10 @@ jobs:
         Expand-Archive $filename -DestinationPath .\falcor-perf-test
         $env:PATH += ";.\bin\windows-${{matrix.testPlatform}}\${{matrix.configuration}}";
         .\falcor-perf-test\bin\Release\falcor_perftest.exe > .\test_results.txt
-        
+
+    - name: process falcor results
+        python -m pip install --upgrade pip
+        pip install gspread oauth2client
+        env:
+            google_drive: ${{ secrets.google_drive }}
         python .\falcor-compile-time-extract-results.py .\test_results.txt
