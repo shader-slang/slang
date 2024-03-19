@@ -6,35 +6,54 @@
 
 namespace Slang
 {
+    void buildEntryPointReferenceGraph(Dictionary<IRInst*, HashSet<IRFunc*>>& referencingEntryPoints, IRModule* module);
+
     struct GlobalVarTranslationContext
     {
         CodeGenContext* context;
 
         void processModule(IRModule* module)
         {
-            List<IRInst*> outputVars;
-            List<IRInst*> inputVars;
+            Dictionary<IRInst*, HashSet<IRFunc*>> referencingEntryPoints;
+            buildEntryPointReferenceGraph(referencingEntryPoints, module);
+
             List<IRInst*> entryPoints;
             for (auto inst : module->getGlobalInsts())
             {
-                if (inst->findDecoration<IRGlobalOutputDecoration>())
-                    outputVars.add(inst);
-                if (inst->findDecoration<IRGlobalInputDecoration>())
-                    inputVars.add(inst);
-                if (inst->findDecoration<IREntryPointDecoration>())
+                if (inst->getOp() == kIROp_Func && inst->findDecoration<IREntryPointDecoration>())
                     entryPoints.add(inst);
             }
 
             IRBuilder builder(module);
 
-            bool hasInput = inputVars.getCount() != 0;
-            bool hasOutput = outputVars.getCount() != 0;
-
-            if (!hasInput && !hasOutput)
-                return;
-
             for (auto entryPoint : entryPoints)
             {
+                List<IRInst*> outputVars;
+                List<IRInst*> inputVars;
+                for (auto inst : module->getGlobalInsts())
+                {
+                    if (auto referencingEntryPointSet = referencingEntryPoints.tryGetValue(inst))
+                    {
+                        if (referencingEntryPointSet->contains((IRFunc*)entryPoint))
+                        {
+                            if (inst->findDecoration<IRGlobalOutputDecoration>())
+                            {
+                                outputVars.add(inst);
+                            }
+                            if (inst->findDecoration<IRGlobalInputDecoration>())
+                            {
+                                inputVars.add(inst);
+                            }
+                        }
+                    }
+                }
+
+                bool hasInput = inputVars.getCount() != 0;
+                bool hasOutput = outputVars.getCount() != 0;
+
+                if (!hasInput && !hasOutput)
+                    continue;
+
                 auto entryPointFunc = as<IRFunc>(entryPoint);
                 if (!entryPointFunc)
                     continue;
@@ -62,7 +81,6 @@ namespace Slang
                     }
                     auto field = builder.createStructField(inputStructType, key, inputType);
                     IRTypeLayout::Builder fieldTypeLayout(&builder);
-                    fieldTypeLayout.addResourceUsage(LayoutResourceKind::VaryingInput, LayoutSize(1));
                     IRVarLayout::Builder varLayoutBuilder(&builder, fieldTypeLayout.build());
                     varLayoutBuilder.setStage(entryPointDecor->getProfile().getStage());
                     if (auto locationDecoration = input->findDecoration<IRGLSLLocationDecoration>())
@@ -75,6 +93,7 @@ namespace Slang
                     }
                     else
                     {
+                        fieldTypeLayout.addResourceUsage(LayoutResourceKind::VaryingInput, LayoutSize(1));
                         if (entryPointDecor->getProfile().getStage() == Stage::Fragment)
                         {
                             varLayoutBuilder.setUserSemantic("COLOR", inputVarIndex);
@@ -132,7 +151,6 @@ namespace Slang
                         auto ptrType = as<IRPtrTypeBase>(output->getDataType());
                         builder.createStructField(resultType, key, ptrType->getValueType());
                         IRTypeLayout::Builder fieldTypeLayout(&builder);
-                        fieldTypeLayout.addResourceUsage(LayoutResourceKind::VaryingOutput, LayoutSize(1));
                         IRVarLayout::Builder varLayoutBuilder(&builder, fieldTypeLayout.build());
                         varLayoutBuilder.setStage(entryPointDecor->getProfile().getStage());
                         if (auto semanticDecor = output->findDecoration<IRSemanticDecoration>())
@@ -141,6 +159,8 @@ namespace Slang
                         }
                         else
                         {
+                            fieldTypeLayout.addResourceUsage(LayoutResourceKind::VaryingOutput, LayoutSize(1));
+
                             if (auto locationDecoration = output->findDecoration<IRGLSLLocationDecoration>())
                             {
                                 varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::VaryingOutput)->offset = (UInt)getIntVal(locationDecoration->getLocation());
@@ -204,7 +224,6 @@ namespace Slang
 
     void translateGLSLGlobalVar(CodeGenContext* context, IRModule* module)
     {
-        
         GlobalVarTranslationContext ctx;
         ctx.context = context;
         ctx.processModule(module);

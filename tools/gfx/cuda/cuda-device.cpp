@@ -70,22 +70,21 @@ SlangResult DeviceImpl::_findMaxFlopsDeviceIndex(int* outDeviceIndex)
     int devicesProhibited = 0;
 
     uint64_t maxComputePerf = 0;
-    SLANG_CUDA_RETURN_ON_FAIL(cudaGetDeviceCount(&deviceCount));
+    SLANG_CUDA_RETURN_ON_FAIL(cuDeviceGetCount(&deviceCount));
 
     // Find the best CUDA capable GPU device
     for (int currentDevice = 0; currentDevice < deviceCount; ++currentDevice)
     {
+        CUdevice device;
+        SLANG_CUDA_RETURN_ON_FAIL(cuDeviceGet(&device, currentDevice));
         int computeMode = -1, major = 0, minor = 0;
-        SLANG_CUDA_RETURN_ON_FAIL(
-            cudaDeviceGetAttribute(&computeMode, cudaDevAttrComputeMode, currentDevice));
-        SLANG_CUDA_RETURN_ON_FAIL(
-            cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, currentDevice));
-        SLANG_CUDA_RETURN_ON_FAIL(
-            cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, currentDevice));
+        SLANG_CUDA_RETURN_ON_FAIL(cuDeviceGetAttribute(&computeMode, CU_DEVICE_ATTRIBUTE_COMPUTE_MODE, device));
+        SLANG_CUDA_RETURN_ON_FAIL(cuDeviceGetAttribute(&major, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR, device));
+        SLANG_CUDA_RETURN_ON_FAIL(cuDeviceGetAttribute(&minor, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR, device));
 
         // If this GPU is not running on Compute Mode prohibited,
         // then we can add it to the list
-        if (computeMode != cudaComputeModeProhibited)
+        if (computeMode != CU_COMPUTEMODE_PROHIBITED)
         {
             if (major == 9999 && minor == 9999)
             {
@@ -97,10 +96,8 @@ SlangResult DeviceImpl::_findMaxFlopsDeviceIndex(int* outDeviceIndex)
             }
 
             int multiProcessorCount = 0, clockRate = 0;
-            SLANG_CUDA_RETURN_ON_FAIL(cudaDeviceGetAttribute(
-                &multiProcessorCount, cudaDevAttrMultiProcessorCount, currentDevice));
-            SLANG_CUDA_RETURN_ON_FAIL(
-                cudaDeviceGetAttribute(&clockRate, cudaDevAttrClockRate, currentDevice));
+            SLANG_CUDA_RETURN_ON_FAIL(cuDeviceGetAttribute(&multiProcessorCount, CU_DEVICE_ATTRIBUTE_MULTIPROCESSOR_COUNT, device));
+            SLANG_CUDA_RETURN_ON_FAIL(cuDeviceGetAttribute(&clockRate, CU_DEVICE_ATTRIBUTE_CLOCK_RATE, device));
             uint64_t compute_perf = uint64_t(multiProcessorCount) * smPerMultiproc * clockRate;
 
             if (compute_perf > maxComputePerf)
@@ -172,8 +169,6 @@ SLANG_NO_THROW SlangResult SLANG_MCALL DeviceImpl::initialize(const Desc& desc)
         SLANG_RETURN_ON_FAIL(_findMaxFlopsDeviceIndex(&m_deviceIndex));
     }
 
-    SLANG_CUDA_RETURN_WITH_REPORT_ON_FAIL(cudaSetDevice(m_deviceIndex), reportType);
-
     m_context = new CUDAContext();
 
     SLANG_CUDA_RETURN_ON_FAIL(cuDeviceGet(&m_device, m_deviceIndex));
@@ -192,9 +187,6 @@ SLANG_NO_THROW SlangResult SLANG_MCALL DeviceImpl::initialize(const Desc& desc)
         m_features.add("has-ptr");
     }
 
-    cudaDeviceProp deviceProps;
-    cudaGetDeviceProperties(&deviceProps, m_deviceIndex);
-
     // Initialize DeviceInfo
     {
         m_info.deviceType = DeviceType::CUDA;
@@ -203,32 +195,53 @@ SLANG_NO_THROW SlangResult SLANG_MCALL DeviceImpl::initialize(const Desc& desc)
         m_info.apiName = "CUDA";
         static const float kIdentity[] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
         ::memcpy(m_info.identityProjectionMatrix, kIdentity, sizeof(kIdentity));
-        m_adapterName = deviceProps.name;
+        char deviceName[256];
+        cuDeviceGetName(deviceName, sizeof(deviceName), m_device);
+        m_adapterName = deviceName;
         m_info.adapterName = m_adapterName.begin();
         m_info.timestampFrequency = 1000000;
     }
 
     // Get device limits.
     {
+        CUresult lastResult = CUDA_SUCCESS;
+        auto getAttribute = [&](CUdevice_attribute attribute) -> int
+        {
+            int value;
+            CUresult result = cuDeviceGetAttribute(&value, attribute, m_device);
+            if (result != CUDA_SUCCESS)
+                lastResult = result;
+            return value;
+        };
+
         DeviceLimits limits = {};
-        limits.maxTextureDimension1D = deviceProps.maxSurface1D;
-        limits.maxTextureDimension2D = Math::Min(deviceProps.maxSurface2D[0], deviceProps.maxSurface2D[1]);
-        limits.maxTextureDimension3D = Math::Min(deviceProps.maxSurface3D[0], Math::Min(deviceProps.maxSurface3D[1], deviceProps.maxSurface3D[2]));
-        limits.maxTextureDimensionCube = deviceProps.maxSurfaceCubemap;
-        limits.maxTextureArrayLayers = Math::Min(deviceProps.maxSurface1DLayered[1], deviceProps.maxSurface2DLayered[2]);
+
+        limits.maxTextureDimension1D = getAttribute(CU_DEVICE_ATTRIBUTE_MAXIMUM_SURFACE1D_WIDTH);
+        limits.maxTextureDimension2D = Math::Min(
+            getAttribute(CU_DEVICE_ATTRIBUTE_MAXIMUM_SURFACE2D_WIDTH),
+            getAttribute(CU_DEVICE_ATTRIBUTE_MAXIMUM_SURFACE2D_HEIGHT));
+        limits.maxTextureDimension3D = Math::Min(
+            getAttribute(CU_DEVICE_ATTRIBUTE_MAXIMUM_SURFACE3D_WIDTH),
+            Math::Min(
+                getAttribute(CU_DEVICE_ATTRIBUTE_MAXIMUM_SURFACE3D_HEIGHT),
+                getAttribute(CU_DEVICE_ATTRIBUTE_MAXIMUM_SURFACE3D_DEPTH)));
+        limits.maxTextureDimensionCube = getAttribute(CU_DEVICE_ATTRIBUTE_MAXIMUM_SURFACECUBEMAP_WIDTH);
+        limits.maxTextureArrayLayers = Math::Min(
+            getAttribute(CU_DEVICE_ATTRIBUTE_MAXIMUM_SURFACE1D_LAYERED_LAYERS),
+            getAttribute(CU_DEVICE_ATTRIBUTE_MAXIMUM_SURFACE2D_LAYERED_LAYERS));
 
         // limits.maxVertexInputElements
         // limits.maxVertexInputElementOffset
         // limits.maxVertexStreams
         // limits.maxVertexStreamStride
 
-        limits.maxComputeThreadsPerGroup = deviceProps.maxThreadsPerBlock;
-        limits.maxComputeThreadGroupSize[0] = deviceProps.maxThreadsDim[0];
-        limits.maxComputeThreadGroupSize[1] = deviceProps.maxThreadsDim[1];
-        limits.maxComputeThreadGroupSize[2] = deviceProps.maxThreadsDim[2];
-        limits.maxComputeDispatchThreadGroups[0] = deviceProps.maxGridSize[0];
-        limits.maxComputeDispatchThreadGroups[1] = deviceProps.maxGridSize[1];
-        limits.maxComputeDispatchThreadGroups[2] = deviceProps.maxGridSize[2];
+        limits.maxComputeThreadsPerGroup = getAttribute(CU_DEVICE_ATTRIBUTE_MAX_THREADS_PER_BLOCK);
+        limits.maxComputeThreadGroupSize[0] = getAttribute(CU_DEVICE_ATTRIBUTE_MAX_BLOCK_DIM_X);
+        limits.maxComputeThreadGroupSize[1] = getAttribute(CU_DEVICE_ATTRIBUTE_MAX_BLOCK_DIM_Y);
+        limits.maxComputeThreadGroupSize[2] = getAttribute(CU_DEVICE_ATTRIBUTE_MAX_BLOCK_DIM_Z);
+        limits.maxComputeDispatchThreadGroups[0] = getAttribute(CU_DEVICE_ATTRIBUTE_MAX_GRID_DIM_X);
+        limits.maxComputeDispatchThreadGroups[1] = getAttribute(CU_DEVICE_ATTRIBUTE_MAX_GRID_DIM_Y);
+        limits.maxComputeDispatchThreadGroups[2] = getAttribute(CU_DEVICE_ATTRIBUTE_MAX_GRID_DIM_Z);
 
         // limits.maxViewports
         // limits.maxViewportDimensions
@@ -237,6 +250,8 @@ SLANG_NO_THROW SlangResult SLANG_MCALL DeviceImpl::initialize(const Desc& desc)
         // limits.maxShaderVisibleSamplers
 
         m_info.limits = limits;
+
+        SLANG_CUDA_RETURN_ON_FAIL(lastResult);
     }
 
     return SLANG_OK;
@@ -728,10 +743,16 @@ SLANG_NO_THROW Result SLANG_MCALL DeviceImpl::createBufferResource(
     auto desc = fixupBufferDesc(descIn);
     RefPtr<BufferResourceImpl> resource = new BufferResourceImpl(desc);
     resource->m_cudaContext = m_context;
-    SLANG_CUDA_RETURN_ON_FAIL(cudaMallocManaged(&resource->m_cudaMemory, desc.sizeInBytes));
+    SLANG_CUDA_RETURN_ON_FAIL(cuMemAllocManaged(
+        (CUdeviceptr*)(&resource->m_cudaMemory),
+        desc.sizeInBytes,
+        CU_MEM_ATTACH_GLOBAL));
     if (initData)
     {
-        SLANG_CUDA_RETURN_ON_FAIL(cudaMemcpy(resource->m_cudaMemory, initData, desc.sizeInBytes, cudaMemcpyDefault));
+        SLANG_CUDA_RETURN_ON_FAIL(cuMemcpy(
+            (CUdeviceptr)resource->m_cudaMemory,
+            (CUdeviceptr)initData,
+            desc.sizeInBytes));
     }
     returnComPtr(outResource, resource);
     return SLANG_OK;
@@ -755,28 +776,28 @@ SLANG_NO_THROW Result SLANG_MCALL DeviceImpl::createBufferFromSharedHandle(
     // "external memory" object, which represents the relationship
     // with another API's objects. In order to create this external
     // memory association, we first need to fill in a descriptor struct.
-    cudaExternalMemoryHandleDesc externalMemoryHandleDesc;
+    CUDA_EXTERNAL_MEMORY_HANDLE_DESC externalMemoryHandleDesc;
     memset(&externalMemoryHandleDesc, 0, sizeof(externalMemoryHandleDesc));
     switch (handle.api)
     {
     case InteropHandleAPI::D3D12:
-        externalMemoryHandleDesc.type = cudaExternalMemoryHandleTypeD3D12Resource;
+        externalMemoryHandleDesc.type = CU_EXTERNAL_MEMORY_HANDLE_TYPE_D3D12_RESOURCE;
         break;
     case InteropHandleAPI::Vulkan:
-        externalMemoryHandleDesc.type = cudaExternalMemoryHandleTypeOpaqueWin32;
+        externalMemoryHandleDesc.type = CU_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32;
         break;
     default:
         return SLANG_FAIL;
     }
     externalMemoryHandleDesc.handle.win32.handle = (void*)handle.handleValue;
     externalMemoryHandleDesc.size = desc.sizeInBytes;
-    externalMemoryHandleDesc.flags = cudaExternalMemoryDedicated;
+    externalMemoryHandleDesc.flags = CUDA_EXTERNAL_MEMORY_DEDICATED;
 
     // Once we have filled in the descriptor, we can request
     // that CUDA create the required association between the
     // external buffer and its own memory.
-    cudaExternalMemory_t externalMemory;
-    SLANG_CUDA_RETURN_ON_FAIL(cudaImportExternalMemory(&externalMemory, &externalMemoryHandleDesc));
+    CUexternalMemory externalMemory;
+    SLANG_CUDA_RETURN_ON_FAIL(cuImportExternalMemory(&externalMemory, &externalMemoryHandleDesc));
     resource->m_cudaExternalMemory = externalMemory;
 
     // The CUDA "external memory" handle is not itself a device
@@ -786,13 +807,13 @@ SLANG_NO_THROW Result SLANG_MCALL DeviceImpl::createBufferFromSharedHandle(
     // Just as for the external memory, we fill in a descriptor
     // structure (although in this case we only need to specify
     // the size).
-    cudaExternalMemoryBufferDesc bufferDesc;
+    CUDA_EXTERNAL_MEMORY_BUFFER_DESC bufferDesc;
     memset(&bufferDesc, 0, sizeof(bufferDesc));
     bufferDesc.size = desc.sizeInBytes;
 
     // Finally, we can "map" the buffer to get a device address.
     void* deviceAddress;
-    SLANG_CUDA_RETURN_ON_FAIL(cudaExternalMemoryGetMappedBuffer(&deviceAddress, externalMemory, &bufferDesc));
+    SLANG_CUDA_RETURN_ON_FAIL(cuExternalMemoryGetMappedBuffer((CUdeviceptr*)&deviceAddress, externalMemory, &bufferDesc));
     resource->m_cudaMemory = deviceAddress;
 
     returnComPtr(outResource, resource);
@@ -833,7 +854,7 @@ SLANG_NO_THROW Result SLANG_MCALL DeviceImpl::createTextureFromSharedHandle(
     }
     externalMemoryHandleDesc.handle.win32.handle = (void*)handle.handleValue;
     externalMemoryHandleDesc.size = size;
-    externalMemoryHandleDesc.flags = cudaExternalMemoryDedicated;
+    externalMemoryHandleDesc.flags = CUDA_EXTERNAL_MEMORY_DEDICATED;
 
     CUexternalMemory externalMemory;
     SLANG_CUDA_RETURN_ON_FAIL(cuImportExternalMemory(&externalMemory, &externalMemoryHandleDesc));
@@ -1165,11 +1186,10 @@ SLANG_NO_THROW Result SLANG_MCALL DeviceImpl::readBufferResource(
     List<uint8_t> blobData;
 
     blobData.setCount((Index)size);
-    cudaMemcpy(
-        blobData.getBuffer(),
-        (uint8_t*)bufferImpl->m_cudaMemory + offset,
-        size,
-        cudaMemcpyDefault);
+    cuMemcpy(
+        (CUdeviceptr)blobData.getBuffer(),
+        (CUdeviceptr)((uint8_t*)bufferImpl->m_cudaMemory + offset),
+        size);
 
     auto blob = ListBlob::moveCreate(blobData);
 

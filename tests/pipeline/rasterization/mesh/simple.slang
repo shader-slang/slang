@@ -50,8 +50,8 @@ const static uint MAX_PRIMS = 4;
 [numthreads(12, 1, 1)]
 void meshMain(
     in uint tig : SV_GroupIndex,
-    out Vertices<Vertex, MAX_VERTS> verts,
-    out Indices<uint3, MAX_PRIMS> triangles)
+    OutputVertices<Vertex, MAX_VERTS> verts,
+    OutputIndices<uint3, MAX_PRIMS> triangles)
 {
     const uint numVertices = 12;
     const uint numPrimitives = 4;

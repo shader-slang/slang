@@ -2409,6 +2409,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         break;
     }
     case kIROp_GetElement:
+    case kIROp_MeshOutputRef:
     case kIROp_GetElementPtr:
     case kIROp_ImageSubscript:
         // HACK: deal with translation of GLSL geometry shader input arrays.
@@ -2663,6 +2664,10 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         }
         break;
     }
+    case kIROp_RequireGLSLExtension:
+    {
+        break; //should already have set requirement; case covered for empty intrinsic block
+    }
     default:
         diagnoseUnhandledInst(inst);
         break;
@@ -2895,6 +2900,20 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
                     m_writer->emit("]");
                 }
             }
+            m_writer->emit(" = ");
+            emitOperand(ii->getElementValue(), getInfo(EmitOp::General));
+            m_writer->emit(";\n");
+        }
+        break;
+    case kIROp_MeshOutputSet:
+        {
+            auto ii = (IRMeshOutputSet*)inst;
+            auto subscriptOuter = getInfo(EmitOp::General);
+            auto subscriptPrec = getInfo(EmitOp::Postfix);
+            emitOperand(ii->getBase(), leftSide(subscriptOuter, subscriptPrec));
+            m_writer->emit("[");
+            emitOperand(ii->getIndex(), getInfo(EmitOp::General));
+            m_writer->emit("]");
             m_writer->emit(" = ");
             emitOperand(ii->getElementValue(), getInfo(EmitOp::General));
             m_writer->emit(";\n");
@@ -4249,6 +4268,27 @@ void CLikeSourceEmitter::computeEmitActions(IRModule* module, List<EmitAction>& 
         }
     }
 
+    for (auto inst : module->getGlobalInsts())
+    {
+        // After emitting all structure types we need to emit all raytracing objects to
+        // ensure they are emitted before the layout location is referenced, otherwise,
+        // this can be a compile error if layout is emitted after location is referenced
+        // this is required since in GLSL, it is likley in a programs life time a raytracing
+        // object will never be referenced by name
+        for (auto dec : inst->getDecorations())
+        {
+            switch (dec->getOp())
+            {
+            case kIROp_VulkanRayPayloadDecoration:
+            case kIROp_VulkanRayPayloadInDecoration:
+            case kIROp_VulkanHitObjectAttributesDecoration:
+            case kIROp_VulkanCallablePayloadDecoration:
+            case kIROp_VulkanCallablePayloadInDecoration:
+            case kIROp_VulkanHitAttributesDecoration:
+                ensureGlobalInst(&ctx, inst, EmitAction::Level::Definition);
+            };
+        }
+    }
     for(auto inst : module->getGlobalInsts())
     {
         if( as<IRType>(inst) )

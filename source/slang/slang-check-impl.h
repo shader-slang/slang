@@ -1586,6 +1586,17 @@ namespace Slang
             Dictionary<DeclRef<InterfaceDecl>, RefPtr<WitnessTable>>    mapInterfaceToWitnessTable;
         };
 
+        void addModifiersToSynthesizedDecl(
+            ConformanceCheckingContext* context,
+            DeclRef<Decl> requirement,
+            FunctionDeclBase* synthesized,
+            ThisExpr* &synThis);
+
+        void addRequiredParamsToSynthesizedDecl(
+            DeclRef<CallableDecl> requirement,
+            CallableDecl* synthesized,
+            List<Expr*>& synArgs);
+
         FuncDecl* synthesizeMethodSignatureForRequirementWitness(
             ConformanceCheckingContext* context,
             DeclRef<FuncDecl> requiredMemberDeclRef,
@@ -1612,6 +1623,12 @@ namespace Slang
             ConformanceCheckingContext* context,
             LookupResult const&         lookupResult,
             DeclRef<FuncDecl>           requiredMemberDeclRef,
+            RefPtr<WitnessTable>        witnessTable);
+
+        bool trySynthesizeConstructorRequirementWitness(
+            ConformanceCheckingContext* context,
+            LookupResult const&         lookupResult,
+            DeclRef<ConstructorDecl>    requiredMemberDeclRef,
             RefPtr<WitnessTable>        witnessTable);
 
             /// Attempt to synthesize a property that can satisfy `requiredMemberDeclRef` using `lookupResult`.
@@ -2000,6 +2017,7 @@ namespace Slang
         SubtypeWitness* checkAndConstructSubtypeWitness(Type* subType, Type* superType);
 
         bool isInterfaceType(Type* type);
+        bool isValidGenericConstraintType(Type* type);
 
         bool isTypeDifferentiable(Type* type);
 
@@ -2418,6 +2436,12 @@ namespace Slang
         void AddGenericOverloadCandidates(
             Expr*	baseExpr,
             OverloadResolveContext&			context);
+
+        template<class T>
+        void trySetGenericToRayTracingWithParamAttribute(
+            LookupResultItem                genericItem,
+            DeclRef<GenericDecl>            genericDeclRef,
+            OverloadResolveContext&         context);
 
             // Add overload candidates based on use of `genericDeclRef`
             // in an ordinary function-call context (that is, where it

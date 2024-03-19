@@ -530,7 +530,7 @@ function addCUDAIfEnabled()
         filter {}
         includedirs { cudaPath .. "/include" }
         includedirs { cudaPath .. "/include", cudaPath .. "/common/inc" }
-        links { "cuda", "cudart" }
+        links { "cuda" }
         if optixPath then
             defines { "RENDER_TEST_OPTIX" }
             includedirs { optixPath .. "include/" }
@@ -557,7 +557,7 @@ function addCUDAIfEnabled()
             filter { "platforms:x64" }
             libdirs { cudaPath .. "/lib64/" }
             filter {}
-            links { "cuda", "cudart" }
+            links { "cuda" }
         else
             print "Error: CUDA is enabled but --cuda-sdk-path is not specified."
         end

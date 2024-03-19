@@ -73,8 +73,8 @@ void meshMain(
     // Check that we correctly generate the specific 'in payload' that HLSL
     // requires:
     // HLSL: , in payload MeshPayload
-    out Vertices<Vertex, MAX_VERTS> verts,
-    out Indices<uint3, MAX_PRIMS> triangles)
+    OutputVertices<Vertex, MAX_VERTS> verts,
+    OutputIndices<uint3, MAX_PRIMS> triangles)
 {
     const uint numVertices = 12;
     const uint numPrimitives = 4;

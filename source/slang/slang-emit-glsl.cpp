@@ -2659,8 +2659,16 @@ void GLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
                 prefix = toSlice("callableData");
                 locationValue = getIntVal(decoration->getOperand(0));
                 break;
+            case kIROp_VulkanCallablePayloadInDecoration:
+                prefix = toSlice("callableDataIn");
+                locationValue = getIntVal(decoration->getOperand(0));
+                break;
             case kIROp_VulkanRayPayloadDecoration:
                 prefix = toSlice("rayPayload");
+                locationValue = getIntVal(decoration->getOperand(0));
+                break;
+            case kIROp_VulkanRayPayloadInDecoration:
+                prefix = toSlice("rayPayloadIn");
                 locationValue = getIntVal(decoration->getOperand(0));
                 break;
             case kIROp_VulkanHitObjectAttributesDecoration:

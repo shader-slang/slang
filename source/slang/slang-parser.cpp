@@ -229,6 +229,29 @@ namespace Slang
                 lastErrorLoc = loc;
             }
         }
+
+    public:
+        void setBindingOffset(int binding, int64_t byteOffset)
+        {
+            bindingToByteOffset.set(binding, byteOffset);
+        }
+        int64_t getNextBindingOffset(int binding) 
+        {
+            int64_t currentOffset;
+            if (bindingToByteOffset.addIfNotExists(binding, 0))
+                currentOffset = 0;
+            else
+                currentOffset = bindingToByteOffset.getValue(binding) + sizeof(uint32_t);
+            
+            bindingToByteOffset.set(
+                binding,
+                currentOffset + sizeof(uint32_t)
+                );
+            return currentOffset;
+        }
+
+    private:
+        Dictionary<int, int64_t> bindingToByteOffset;
     };
 
     // Forward Declarations
@@ -4365,6 +4388,42 @@ namespace Slang
         return attrDecl;
     }
 
+    static void addSpecialGLSLModifiersBasedOnType(
+        Parser* parser,
+        Decl* decl,
+        Modifiers* modifiers)
+    {
+        auto varDeclBase = as<VarDeclBase>(decl);
+        if (!varDeclBase) return;
+        auto declRefExpr = as<DeclRefExpr>(varDeclBase->type.exp);
+        if (!declRefExpr) return;
+        auto bindingMod = modifiers->findModifier<GLSLBindingAttribute>();
+        if (!bindingMod) return;
+
+        // here is a problem; we link types into a literal in IR stage post parse
+        // but, order (top down) mattter when parsing atomic_uint offset
+        // more over, we can have patterns like: offset = 20, no offset [+4], offset = 16.
+        // Therefore we must parse all in order. The issue then is we will struggle to 
+        // subsitute atomic_uint for storage buffers...
+        if (auto name = declRefExpr->name)
+        {
+            if (name->text.equals("atomic_uint"))
+            {
+                if (!modifiers->findModifier<GLSLOffsetLayoutAttribute>())
+                {
+                    const int64_t nextOffset = parser->getNextBindingOffset(bindingMod->binding);
+                    GLSLOffsetLayoutAttribute* modifier = parser->astBuilder->create<GLSLOffsetLayoutAttribute>();
+                    modifier->keywordName = NULL; //no keyword name given
+                    modifier->loc = bindingMod->loc; //has no location in file, set to parent binding
+                    modifier->offset = nextOffset;
+
+                    Modifiers newModifier;
+                    newModifier.first = modifier;
+                    _addModifiers(decl, newModifier);
+                }
+            }
+        }
+    }
     // Finish up work on a declaration that was parsed
     static void CompleteDecl(
         Parser*				parser,
@@ -4403,6 +4462,10 @@ namespace Slang
         }
         else
         {
+            if (parser->options.allowGLSLInput)
+            {
+                addSpecialGLSLModifiersBasedOnType(parser, declToModify, &modifiers);
+            }
             _addModifiers(declToModify, modifiers);
         }
 
@@ -7039,6 +7102,30 @@ namespace Slang
         {
             return SPIRVAsmOperand{ SPIRVAsmOperand::NonSemanticDebugPrintfExtSet, parser->ReadToken() };
         }
+        else if (AdvanceIf(parser, "__rayPayloadFromLocation")) 
+        {
+            // reference a magic number to a layout(location) for late compiler resolution of rayPayload objects
+            parser->ReadToken(TokenType::LParent);
+            auto operand = SPIRVAsmOperand{ SPIRVAsmOperand::RayPayloadFromLocation, Token{}, parseAtomicExpr(parser) };
+            parser->ReadToken(TokenType::RParent);
+            return operand;
+        }
+        else if (AdvanceIf(parser, "__rayAttributeFromLocation")) 
+        {
+            // works similar to __rayPayloadFromLocation
+            parser->ReadToken(TokenType::LParent);
+            auto operand = SPIRVAsmOperand{ SPIRVAsmOperand::RayAttributeFromLocation, Token{}, parseAtomicExpr(parser) };
+            parser->ReadToken(TokenType::RParent);
+            return operand;
+        }
+        else if (AdvanceIf(parser, "__rayCallableFromLocation")) 
+        {
+            // works similar to __rayPayloadFromLocation
+            parser->ReadToken(TokenType::LParent);
+            auto operand = SPIRVAsmOperand{ SPIRVAsmOperand::RayCallableFromLocation, Token{}, parseAtomicExpr(parser) };
+            parser->ReadToken(TokenType::RParent);
+            return operand;
+        }
         // A regular identifier
         else if(parser->LookAheadToken(TokenType::Identifier))
         {
@@ -7783,10 +7870,12 @@ namespace Slang
 #define CASE(key, type) if (nameText == #key) { modifier = parser->astBuilder->create<type>(); } else
                 CASE(push_constant, PushConstantAttribute) 
                 CASE(shaderRecordNV, ShaderRecordAttribute)
+                CASE(shaderRecordEXT, ShaderRecordAttribute)
                 CASE(constant_id,   GLSLConstantIDLayoutModifier)
                 CASE(std140, GLSLStd140Modifier)
                 CASE(std430, GLSLStd430Modifier)
                 CASE(scalar, GLSLScalarModifier)
+                CASE(offset, GLSLOffsetLayoutAttribute)
                 CASE(location, GLSLLocationLayoutModifier) 
                 {
                     modifier = parser->astBuilder->create<GLSLUnparsedLayoutModifier>();
@@ -7797,12 +7886,27 @@ namespace Slang
                 modifier->keywordName = nameAndLoc.name;
                 modifier->loc = nameAndLoc.loc;
 
+
                 // Special handling for GLSLLayoutModifier
                 if (auto glslModifier = as<GLSLLayoutModifier>(modifier))
                 {
+                    // not all GLSLLayoutModifier subtypes have an OpAssign after
                     if (AdvanceIf(parser, TokenType::OpAssign))
-                    {
                         glslModifier->valToken = parser->ReadToken(TokenType::IntegerLiteral);
+                }
+                //Special handling for GLSLOffsetLayoutAttribute to add to the byte offset tracker at a binding location
+                else if (auto glslOffset = as<GLSLOffsetLayoutAttribute>(modifier))
+                {
+                    if (auto binding = listBuilder.find<GLSLBindingAttribute>())
+                    {
+                        // all GLSLOffsetLayoutAttribute have an OpAssign with value token
+                        parser->ReadToken(TokenType::OpAssign);
+                        glslOffset->offset = int64_t(getIntegerLiteralValue(parser->ReadToken(TokenType::IntegerLiteral)));
+                        parser->setBindingOffset(binding->binding, glslOffset->offset);
+                    }
+                    else
+                    { 
+                        parser->diagnose(modifier->loc, Diagnostics::missingLayoutBindingModifier);
                     }
                 }
 
@@ -7814,6 +7918,20 @@ namespace Slang
             parser->ReadToken(TokenType::Comma);
         }
 
+#define CASE(key, type) if (AdvanceIf(parser, #key)) { auto modifier = parser->astBuilder->create<type>(); \
+    modifier->location = int(getIntegerLiteralValue(listBuilder.find<GLSLLayoutModifier>()->valToken)); listBuilder.add(modifier); } else
+
+    CASE(rayPayloadEXT, VulkanRayPayloadAttribute)
+    CASE(rayPayloadNV, VulkanRayPayloadAttribute)
+    CASE(rayPayloadInEXT, VulkanRayPayloadInAttribute)
+    CASE(rayPayloadInNV, VulkanRayPayloadInAttribute)
+    CASE(hitObjectAttributeNV, VulkanHitObjectAttributesAttribute)
+    CASE(callableDataEXT, VulkanCallablePayloadAttribute)
+    CASE(callableDataInEXT, VulkanCallablePayloadInAttribute)
+    {}
+    
+#undef CASE
+
         if (numThreadsAttrib)
         {
             listBuilder.add(numThreadsAttrib);
@@ -7822,6 +7940,12 @@ namespace Slang
         listBuilder.add(parser->astBuilder->create<GLSLLayoutModifierGroupEnd>());
 
         return listBuilder.getFirst();
+    }
+
+    static NodeBase* parseHitAttributeEXTModifier(Parser* parser, void* /*userData*/)
+    {
+        VulkanHitAttributesAttribute* modifier = parser->astBuilder->create<VulkanHitAttributesAttribute>();
+        return modifier;
     }
 
     static NodeBase* parseBuiltinTypeModifier(Parser* parser, void* /*userData*/)
@@ -8052,7 +8176,7 @@ namespace Slang
         // or expect more tokens after the initial keyword.
 
         _makeParseModifier("layout",                parseLayoutModifier),
-
+        _makeParseModifier("hitAttributeEXT",       parseHitAttributeEXTModifier),
         _makeParseModifier("__intrinsic_op",        parseIntrinsicOpModifier),
         _makeParseModifier("__target_intrinsic",    parseTargetIntrinsicModifier),
         _makeParseModifier("__specialized_for_target",    parseSpecializedForTargetModifier),

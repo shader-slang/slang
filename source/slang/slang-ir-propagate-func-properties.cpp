@@ -11,6 +11,7 @@ class FuncPropertyPropagationContext
 {
 public:
     virtual bool canProcess(IRFunc* f) = 0;
+    virtual bool isInitialFunc(IRFunc* f) = 0;
     virtual bool propagate(IRBuilder& builder, IRFunc* func) = 0;
 };
 
@@ -53,6 +54,19 @@ static bool isKnownOpCodeWithSideEffect(IROp op)
 class ReadNoneFuncPropertyPropagationContext : public FuncPropertyPropagationContext
 {
 public:
+    virtual bool isInitialFunc(IRFunc* f) override
+    {
+        // If the func has already been marked with any decorations, skip.
+        for (auto decoration : f->getDecorations())
+        {
+            switch (decoration->getOp())
+            {
+            case kIROp_ReadNoneDecoration:
+                return true;
+            }
+        }
+        return false;
+    }
     virtual bool canProcess(IRFunc* f) override
     {
         // If the func has already been marked with any decorations, skip.
@@ -193,7 +207,7 @@ bool propagateFuncPropertiesImpl(IRModule* module, FuncPropertyPropagationContex
             }
             if (auto func = as<IRFunc>(inst))
             {
-                if (context->canProcess(func))
+                if (context->isInitialFunc(func))
                 {
                     addCallersToWorkList(func);
                 }
@@ -257,7 +271,20 @@ public:
         }
         return true;
     }
-
+    virtual bool isInitialFunc(IRFunc* f) override
+    {
+        // If the func has already been marked with any decorations, skip.
+        for (auto decoration : f->getDecorations())
+        {
+            switch (decoration->getOp())
+            {
+            case kIROp_ReadNoneDecoration:
+            case kIROp_NoSideEffectDecoration:
+                return true;
+            }
+        }
+        return false;
+    }
     virtual bool propagate(IRBuilder& builder, IRFunc* f) override
     {
         bool hasSideEffectCall = false;

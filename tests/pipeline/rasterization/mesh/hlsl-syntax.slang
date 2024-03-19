@@ -26,7 +26,7 @@ const static uint MAX_VERTS = 3;
 const static uint MAX_PRIMS = 1;
 
 // Test that we can convert the HLSL Syntax to the typed syntax
-void foo(uint tig, out Vertices<Vertex, MAX_VERTS> verts)
+void foo(uint tig, OutputVertices<Vertex, MAX_VERTS> verts)
 {
     if(tig < 3) {
         verts[tig] = {float4(positions[tig], 0, 1), colors[tig]};

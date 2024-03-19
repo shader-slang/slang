@@ -181,6 +181,7 @@ bool isValueType(IRInst* dataType)
     case kIROp_ArrayType:
     case kIROp_FuncType:
     case kIROp_RaytracingAccelerationStructureType:
+    case kIROp_GLSLAtomicUintType:
         return true;
     default:
         // Read-only resource handles are considered as Value type.
@@ -227,6 +228,18 @@ bool isSimpleDataType(IRType* type)
     default:
         return false;
     }
+}
+
+SourceLoc findFirstUseLoc(IRInst* inst)
+{
+    for (auto use = inst->firstUse; use; use = use->nextUse)
+    {
+        if (use->getUser()->sourceLoc.isValid())
+        {
+            return use->getUser()->sourceLoc;
+        }
+    }
+    return inst->sourceLoc;
 }
 
 IRInst* hoistValueFromGeneric(IRBuilder& inBuilder, IRInst* value, IRInst*& outSpecializedVal, bool replaceExistingValue)
@@ -507,6 +520,8 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
     case kIROp_HLSLRasterizerOrderedByteAddressBufferType:
         sb << "RasterizerOrderedByteAddressBuffer";
         break;
+    case kIROp_GLSLAtomicUintType:
+        sb << "AtomicCounter";
     case kIROp_RaytracingAccelerationStructureType:
         sb << "RayTracingAccelerationStructure";
         break;
@@ -579,14 +594,20 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
         getTypeNameHint(sb, as<IRRateQualifiedType>(type)->getValueType());
         break;
     case kIROp_VectorType:
+        sb << "vector<";
         getTypeNameHint(sb, type->getOperand(0));
+        sb << ",";
         getTypeNameHint(sb, as<IRVectorType>(type)->getElementCount());
+        sb << ">";
         break;
     case kIROp_MatrixType:
+        sb << "matrix<";
         getTypeNameHint(sb, type->getOperand(0));
+        sb << ",";
         getTypeNameHint(sb, as<IRMatrixType>(type)->getRowCount());
-        sb << "x";
+        sb << ",";
         getTypeNameHint(sb, as<IRMatrixType>(type)->getColumnCount());
+        sb << ">";
         break;
     case kIROp_IntLit:
         sb << as<IRIntLit>(type)->getValue();
@@ -686,6 +707,7 @@ bool isPtrLikeOrHandleType(IRInst* type)
     case kIROp_PtrType:
     case kIROp_RefType:
     case kIROp_ConstRefType:
+    case kIROp_GLSLShaderStorageBufferType:
         return true;
     }
     return false;
@@ -1089,7 +1111,9 @@ IRInst* getVulkanPayloadLocation(IRInst* payloadGlobalVar)
         switch (decor->getOp())
         {
         case kIROp_VulkanRayPayloadDecoration:
+        case kIROp_VulkanRayPayloadInDecoration:
         case kIROp_VulkanCallablePayloadDecoration:
+        case kIROp_VulkanCallablePayloadInDecoration:
         case kIROp_VulkanHitObjectAttributesDecoration:
             return decor->getOperand(0);
         default:
@@ -1172,6 +1196,11 @@ bool isGlobalOrUnknownMutableAddress(IRGlobalValueWithCode* parentFunc, IRInst* 
 
     if (root)
     {
+        if (as<IRGLSLShaderStorageBufferType>(root->getDataType()))
+        {
+            // A storage buffer is mutable, so we need to treat it as a mutable address.
+            return true;
+        }
         // If this is a global readonly resource, it is not a mutable address.
         if (as<IRParameterGroupType>(root->getDataType()))
         {

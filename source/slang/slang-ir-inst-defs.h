@@ -127,6 +127,8 @@ INST(Nop, nop, 0, 0)
     INST(ComPtrType, ComPtr, 1, HOISTABLE)
     // A NativePtr<T> type represents a native pointer to a managed resource.
     INST(NativePtrType, NativePtr, 1, HOISTABLE)
+    // An AtomicUint is a placeholder type for a storage buffer, and will be mangled during compiling.
+    INST(GLSLAtomicUintType, GLSLAtomicUint, 0, HOISTABLE)
 
     /* SamplerStateTypeBase */
         INST(SamplerStateType, SamplerState, 0, HOISTABLE)
@@ -476,6 +478,7 @@ INST(AtomicCounterDecrement, AtomicCounterDecrement, 1, 0)
 INST(GetNaturalStride, getNaturalStride, 1, 0)
 
 INST(MeshOutputRef, meshOutputRef, 2, 0)
+INST(MeshOutputSet, meshOutputSet, 3, 0)
 
 // Construct a vector from a scalar
 //
@@ -702,6 +705,7 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(TransitoryDecoration,              transitory,             0, 0)
 
     INST(VulkanRayPayloadDecoration,        vulkanRayPayload,       0, 0)
+    INST(VulkanRayPayloadInDecoration,      vulkanRayPayloadIn,       0, 0)
     INST(VulkanHitAttributesDecoration,     vulkanHitAttributes,    0, 0)
     INST(VulkanHitObjectAttributesDecoration, vulkanHitObjectAttributes, 0, 0)
 
@@ -712,6 +716,7 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
 
     INST(ReadNoneDecoration,                readNone,               0, 0)
     INST(VulkanCallablePayloadDecoration,   vulkanCallablePayload,  0, 0)
+    INST(VulkanCallablePayloadInDecoration, vulkanCallablePayloadIn,  0, 0)
     INST(EarlyDepthStencilDecoration,       earlyDepthStencil,      0, 0)
     INST(GloballyCoherentDecoration,        globallyCoherent,       0, 0)
     INST(PreciseDecoration,                 precise,                0, 0)
@@ -848,6 +853,7 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(GlobalOutputDecoration, output, 0, 0)
     INST(GlobalInputDecoration, output, 0, 0)
     INST(GLSLLocationDecoration, glslLocation, 1, 0)
+    INST(GLSLOffsetDecoration, glslOffset, 1, 0)
     INST(PayloadDecoration, payload, 0, 0)
 
     /* Mesh Shader outputs */
@@ -1144,7 +1150,11 @@ INST(SPIRVAsmInst, SPIRVAsmInst, 1, 0)
     // A reference to a slang IRInst, either a value or a type
     // This isn't hoistable, as we sometimes need to change the used value and
     // instructions around the specific asm block
-    INST(SPIRVAsmOperandInst, SPIRVAsmOperandInst, 1, 0)
+    INST(SPIRVAsmOperandInst, SPIRVAsmOperandInst, 1, 0)    
+    //a late resolving type to handle the case of ray objects (resolving late due to constexpr data requirment)
+    INST(SPIRVAsmOperandRayPayloadFromLocation, SPIRVAsmOperandRayPayloadFromLocation, 1, 0)
+    INST(SPIRVAsmOperandRayAttributeFromLocation, SPIRVAsmOperandRayAttributeFromLocation, 1, 0)
+    INST(SPIRVAsmOperandRayCallableFromLocation, SPIRVAsmOperandRayCallableFromLocation, 1, 0)
     // A named enumerator, the value is stored as a constant operand
     // It may have a second operand, which if present is a type with which to
     // construct a constant id to pass, instead of a literal constant

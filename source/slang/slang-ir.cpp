@@ -74,8 +74,10 @@ namespace Slang
             case kIROp_TriangleInputPrimitiveTypeDecoration:
             case kIROp_UnsafeForceInlineEarlyDecoration:
             case kIROp_VulkanCallablePayloadDecoration:
+            case kIROp_VulkanCallablePayloadInDecoration:
             case kIROp_VulkanHitAttributesDecoration:
             case kIROp_VulkanRayPayloadDecoration:
+            case kIROp_VulkanRayPayloadInDecoration:
             case kIROp_VulkanHitObjectAttributesDecoration:
             {
                 return true;
@@ -4495,6 +4497,18 @@ namespace Slang
         return ssboType;
     }
 
+    IRGLSLShaderStorageBufferType* IRBuilder::createGLSLShaderStorableBufferType(UInt operandCount, IRInst* const* operands)
+    {
+        IRGLSLShaderStorageBufferType* ssboType = createInst<IRGLSLShaderStorageBufferType>(
+            this,
+            kIROp_GLSLShaderStorageBufferType,
+            getTypeKind(),
+            operandCount,
+            operands);
+        addGlobalValue(this, ssboType);
+        return ssboType;
+    }
+
     IRInterfaceType* IRBuilder::createInterfaceType(UInt operandCount, IRInst* const* operands)
     {
         IRInterfaceType* interfaceType = createInst<IRInterfaceType>(
@@ -5858,6 +5872,53 @@ namespace Slang
         return i;
     }
 
+    IRSPIRVAsmOperand* IRBuilder::createSPIRVAsmOperandInst(IRInst* inst)
+    {
+        SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
+        auto i = createInst<IRSPIRVAsmOperand>(
+            this,
+            kIROp_SPIRVAsmOperandInst,
+            inst->getFullType(),
+            inst
+            );
+        return i;
+    }
+    IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandRayPayloadFromLocation(IRInst* inst)
+    {
+        SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
+        auto i = createInst<IRSPIRVAsmOperand>(
+            this,
+            kIROp_SPIRVAsmOperandRayPayloadFromLocation,
+            inst->getFullType(),
+            inst
+        );
+        addInst(i);
+        return i;
+    }
+    IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandRayAttributeFromLocation(IRInst* inst)
+    {
+        SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
+        auto i = createInst<IRSPIRVAsmOperand>(
+            this,
+            kIROp_SPIRVAsmOperandRayAttributeFromLocation,
+            inst->getFullType(),
+            inst
+        );
+        addInst(i);
+        return i;
+    }
+    IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandRayCallableFromLocation(IRInst* inst)
+    {
+        SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
+        auto i = createInst<IRSPIRVAsmOperand>(
+            this,
+            kIROp_SPIRVAsmOperandRayCallableFromLocation,
+            inst->getFullType(),
+            inst
+        );
+        addInst(i);
+        return i;
+    }
     IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandId(IRInst* inst)
     {
         SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
@@ -6879,6 +6940,21 @@ namespace Slang
             return;
         case kIROp_SPIRVAsmOperandInst:
             dumpInstExpr(context, inst->getOperand(0));
+            return;
+        case kIROp_SPIRVAsmOperandRayPayloadFromLocation:
+            dump(context, "__rayPayloadFromLocation(");
+            dumpInstExpr(context, inst->getOperand(0));
+            dump(context, ")");
+            return;
+        case kIROp_SPIRVAsmOperandRayAttributeFromLocation:
+            dump(context, "__rayAttributeFromLocation(");
+            dumpInstExpr(context, inst->getOperand(0));
+            dump(context, ")");
+            return;
+        case kIROp_SPIRVAsmOperandRayCallableFromLocation:
+            dump(context, "__rayCallableFromLocation(");
+            dumpInstExpr(context, inst->getOperand(0));
+            dump(context, ")");
             return;
         case kIROp_SPIRVAsmOperandId:
             dump(context, "%");

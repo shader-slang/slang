@@ -3,6 +3,7 @@
 
 #include "../core/slang-writer.h"
 
+#include "slang-ir-util.h"
 #include "slang-emit-source-writer.h"
 #include "slang-mangled-lexer.h"
 
@@ -987,7 +988,6 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             case kIROp_HLSLRWByteAddressBufferType:                 m_writer->emit("RWByteAddressBuffer");                break;
             case kIROp_HLSLRasterizerOrderedByteAddressBufferType:  m_writer->emit("RasterizerOrderedByteAddressBuffer"); break;
             case kIROp_RaytracingAccelerationStructureType:         m_writer->emit("RaytracingAccelerationStructure");    break;
-
             default:
                 SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled buffer type");
                 break;
@@ -1206,10 +1206,11 @@ void HLSLSourceEmitter::emitMeshShaderModifiersImpl(IRInst* varInst)
 {
     if(auto modifier = varInst->findDecoration<IRMeshOutputDecoration>())
     {
+        // DXC requires that mesh payload parameters have "out" specified
         const char* s =
-              as<IRVerticesDecoration>(modifier)   ? "vertices "
-            : as<IRIndicesDecoration>(modifier)    ? "indices "
-            : as<IRPrimitivesDecoration>(modifier) ? "primitives "
+              as<IRVerticesDecoration>(modifier)   ? "out vertices "
+            : as<IRIndicesDecoration>(modifier)    ? "out indices "
+            : as<IRPrimitivesDecoration>(modifier) ? "out primitives "
             : nullptr;
         SLANG_ASSERT(s && "Unhandled type of mesh output decoration");
         m_writer->emit(s);
