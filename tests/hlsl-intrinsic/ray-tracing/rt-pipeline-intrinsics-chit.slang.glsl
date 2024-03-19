@@ -16,7 +16,7 @@ struct CallableParams_0
 };
 
 
-#line 9611 1
+#line 9549 1
 layout(location = 0)
 callableDataEXT
 CallableParams_0 p_0;
@@ -29,19 +29,19 @@ struct RayPayload_0
 };
 
 
-#line 9764 1
+#line 9711 1
 layout(location = 0)
 rayPayloadEXT
 RayPayload_0 p_1;
 
 
-#line 9676
+#line 9620
 layout(location = 1)
 rayPayloadEXT
 RayPayload_0 p_2;
 
 
-#line 9533
+#line 9467
 struct RayDesc_0
 {
     vec3 Origin_0;
@@ -51,34 +51,34 @@ struct RayDesc_0
 };
 
 
-#line 9659
+#line 9603
 void TraceRay_0(accelerationStructureEXT AccelerationStructure_0, uint RayFlags_0, uint InstanceInclusionMask_0, uint RayContributionToHitGroupIndex_0, uint MultiplierForGeometryContributionToHitGroupIndex_0, uint MissShaderIndex_0, RayDesc_0 Ray_0, inout RayPayload_0 Payload_0)
 {
 
-#line 9678
+#line 9622
     p_2 = Payload_0;
     traceRayEXT(AccelerationStructure_0, RayFlags_0, InstanceInclusionMask_0, RayContributionToHitGroupIndex_0, MultiplierForGeometryContributionToHitGroupIndex_0, MissShaderIndex_0, Ray_0.Origin_0, Ray_0.TMin_0, Ray_0.Direction_0, Ray_0.TMax_0, 1);
 
-#line 9691
+#line 9635
     Payload_0 = p_2;
 
-#line 9720
+#line 9665
     return;
 }
 
 
-#line 9747
+#line 9694
 void TraceMotionRay_0(accelerationStructureEXT AccelerationStructure_1, uint RayFlags_1, uint InstanceInclusionMask_1, uint RayContributionToHitGroupIndex_1, uint MultiplierForGeometryContributionToHitGroupIndex_1, uint MissShaderIndex_1, RayDesc_0 Ray_1, float CurrentTime_0, inout RayPayload_0 Payload_1)
 {
 
-#line 9766
+#line 9713
     p_1 = Payload_1;
     traceRayMotionNV(AccelerationStructure_1, RayFlags_1, InstanceInclusionMask_1, RayContributionToHitGroupIndex_1, MultiplierForGeometryContributionToHitGroupIndex_1, MissShaderIndex_1, Ray_1.Origin_0, Ray_1.TMin_0, Ray_1.Direction_0, Ray_1.TMax_0, CurrentTime_0, 0);
 
-#line 9780
+#line 9727
     Payload_1 = p_1;
 
-#line 9814
+#line 9762
     return;
 }
 
@@ -267,8 +267,29 @@ float CheckHitSpecificSystemValues_0()
     uint hitKind_0 = ((gl_HitKindEXT));
 
 #line 118
+    bool _S8;
+    if(hitKind_0 == 254U)
+    {
+
+#line 119
+        _S8 = true;
+
+#line 119
+    }
+    else
+    {
+
+#line 119
+        _S8 = hitKind_0 == 255U;
+
+#line 119
+    }
+
+#line 119
     float val_33;
-    if(hitKind_0 == 254U || hitKind_0 == 255U)
+
+#line 119
+    if(_S8)
     {
 
 #line 119
@@ -295,79 +316,79 @@ float CheckSysValueIntrinsics_0()
 {
 
 
-    float _S8 = CheckRayDispatchValues_0();
-    float _S9 = CheckRaySystemValues_0();
+    float _S9 = CheckRayDispatchValues_0();
+    float _S10 = CheckRaySystemValues_0();
 
 #line 188
-    float val_34 = _S8 + _S9;
-    float _S10 = CheckObjectSpaceSystemValues_0();
+    float val_34 = _S9 + _S10;
+    float _S11 = CheckObjectSpaceSystemValues_0();
 
 #line 189
-    float val_35 = val_34 + _S10;
-    float _S11 = CheckHitSpecificSystemValues_0();
+    float val_35 = val_34 + _S11;
+    float _S12 = CheckHitSpecificSystemValues_0();
 
-    return val_35 + _S11;
+    return val_35 + _S12;
 }
 
 
-#line 9603 1
+#line 9541 1
 void CallShader_0(uint shaderIndex_0, inout CallableParams_0 payload_1)
 {
 
-#line 9613
+#line 9551
     p_0 = payload_1;
     executeCallableEXT(shaderIndex_0, 0);
     payload_1 = p_0;
 
-#line 9629
+#line 9568
     return;
 }
 
 
-#line 9629
-rayPayloadInEXT RayPayload_0 _S12;
+#line 9568
+rayPayloadInEXT RayPayload_0 _S13;
 
 
-#line 9569
+#line 9503
 struct BuiltInTriangleIntersectionAttributes_0
 {
     vec2 barycentrics_0;
 };
 
 
-#line 9569
-hitAttributeEXT BuiltInTriangleIntersectionAttributes_0 _S13;
+#line 9503
+hitAttributeEXT BuiltInTriangleIntersectionAttributes_0 _S14;
 
 
 #line 196 0
 void main()
 {
-    uvec3 _S14 = ((gl_LaunchIDEXT));
+    uvec3 _S15 = ((gl_LaunchIDEXT));
 
 #line 198
-    uvec2 _S15 = _S14.xy;
+    uvec2 _S16 = _S15.xy;
 
 #line 198
-    uvec3 _S16 = ((gl_LaunchSizeEXT));
+    uvec3 _S17 = ((gl_LaunchSizeEXT));
 
 #line 198
-    uvec2 _S17 = _S15 / _S16.xy;
+    uvec2 _S18 = _S16 / _S17.xy;
 
 #line 198
-    vec2 dir_0 = vec2(_S17) * 2.0 - 1.0;
-    uvec3 _S18 = ((gl_LaunchSizeEXT));
+    vec2 dir_0 = vec2(_S18) * 2.0 - 1.0;
+    uvec3 _S19 = ((gl_LaunchSizeEXT));
 
 #line 199
-    uint _S19 = _S18.x;
+    uint _S20 = _S19.x;
 
 #line 199
-    uvec3 _S20 = ((gl_LaunchSizeEXT));
+    uvec3 _S21 = ((gl_LaunchSizeEXT));
 
 #line 199
-    uint _S21 = _S19 / _S20.y;
+    uint _S22 = _S20 / _S21.y;
 
 #line 199
-    float aspectRatio_0 = float(_S21);
+    float aspectRatio_0 = float(_S22);
 
     RayDesc_0 rayDesc_1;
     rayDesc_1.Origin_0 = vec3(0.0, 0.0, 0.0);
@@ -380,15 +401,15 @@ void main()
 
 
 
-    float _S22 = CheckTraceRay_0(payload_2, rayDesc_1);
+    float _S23 = CheckTraceRay_0(payload_2, rayDesc_1);
 
-    float _S23 = CheckSysValueIntrinsics_0();
+    float _S24 = CheckSysValueIntrinsics_0();
 
-    float _S24 = _S13.barycentrics_0.x;
+    float _S25 = _S14.barycentrics_0.x;
 
 #line 216
-    float _S25 = _S13.barycentrics_0.y;
-    float val_36 = _S22 + _S23 + (1.0 - _S24 - _S25) + _S24 + _S25;
+    float _S26 = _S14.barycentrics_0.y;
+    float val_36 = _S23 + _S24 + (1.0 - _S25 - _S26) + _S25 + _S26;
 
     CallableParams_0 params_0;
     CallShader_0(0U, params_0);

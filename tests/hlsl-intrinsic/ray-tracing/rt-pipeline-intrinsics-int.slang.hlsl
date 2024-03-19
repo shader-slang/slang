@@ -185,20 +185,71 @@ struct MyAttributes_0
 
         float rayTMin_1 = RayTMin();
         float rayTMax_0 = RayTCurrent();
-        bool _S16 = rayTMin_1 <= t1_0 && t1_0 < rayTMax_0;
+        bool _S16 = rayTMin_1 <= t1_0;
 
 #line 141
-        if(_S16 || rayTMin_1 <= t2_0 && t2_0 < rayTMax_0)
+        bool _S17;
+
+#line 141
+        if(_S16)
+        {
+
+#line 141
+            _S17 = t1_0 < rayTMax_0;
+
+#line 141
+        }
+        else
+        {
+
+#line 141
+            _S17 = false;
+
+#line 141
+        }
+
+#line 141
+        if(_S17)
+        {
+
+#line 141
+            _S17 = true;
+
+#line 141
+        }
+        else
+        {
+
+#line 141
+            if(rayTMin_1 <= t2_0)
+            {
+
+#line 141
+                _S17 = t2_0 < rayTMax_0;
+
+#line 141
+            }
+            else
+            {
+
+#line 141
+                _S17 = false;
+
+#line 141
+            }
+
+#line 141
+        }
+
+#line 141
+        if(_S17)
         {
             IDs_0.attr_0 = val_14;
-
-#line 143
-            float _S17;
             if(_S16)
             {
 
 #line 144
-                _S17 = t1_0;
+                _S17 = t1_0 < rayTMax_0;
 
 #line 144
             }
@@ -206,13 +257,34 @@ struct MyAttributes_0
             {
 
 #line 144
-                _S17 = t2_0;
+                _S17 = false;
 
 #line 144
             }
 
 #line 144
-            bool _S18 = ReportHit(_S17, 0U, IDs_0);
+            float _S18;
+
+#line 144
+            if(_S17)
+            {
+
+#line 144
+                _S18 = t1_0;
+
+#line 144
+            }
+            else
+            {
+
+#line 144
+                _S18 = t2_0;
+
+#line 144
+            }
+
+#line 144
+            bool _S19 = ReportHit(_S18, 0U, IDs_0);
 
 #line 141
         }

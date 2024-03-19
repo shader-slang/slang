@@ -10,7 +10,7 @@ struct MyAttributes_0
 };
 
 
-#line 9838 1
+#line 9790 1
 hitAttributeEXT
 MyAttributes_0 a_0;
 
@@ -147,15 +147,15 @@ float CheckSysValueIntrinsics_0()
 }
 
 
-#line 9818 1
+#line 9767 1
 bool ReportHit_0(float tHit_0, uint hitKind_0, MyAttributes_0 attributes_0)
 {
 
-#line 9840
+#line 9792
     a_0 = attributes_0;
     bool _S9 = reportIntersectionEXT(tHit_0, hitKind_0);
 
-#line 9841
+#line 9793
     return _S9;
 }
 
@@ -204,20 +204,71 @@ void main()
 
         float rayTMin_1 = ((gl_RayTminEXT));
         float rayTMax_0 = ((gl_RayTmaxEXT));
-        bool _S17 = rayTMin_1 <= t1_0 && t1_0 < rayTMax_0;
+        bool _S17 = rayTMin_1 <= t1_0;
 
 #line 141
-        if(_S17 || rayTMin_1 <= t2_0 && t2_0 < rayTMax_0)
+        bool _S18;
+
+#line 141
+        if(_S17)
+        {
+
+#line 141
+            _S18 = t1_0 < rayTMax_0;
+
+#line 141
+        }
+        else
+        {
+
+#line 141
+            _S18 = false;
+
+#line 141
+        }
+
+#line 141
+        if(_S18)
+        {
+
+#line 141
+            _S18 = true;
+
+#line 141
+        }
+        else
+        {
+
+#line 141
+            if(rayTMin_1 <= t2_0)
+            {
+
+#line 141
+                _S18 = t2_0 < rayTMax_0;
+
+#line 141
+            }
+            else
+            {
+
+#line 141
+                _S18 = false;
+
+#line 141
+            }
+
+#line 141
+        }
+
+#line 141
+        if(_S18)
         {
             IDs_0.attr_0 = val_14;
-
-#line 143
-            float _S18;
             if(_S17)
             {
 
 #line 144
-                _S18 = t1_0;
+                _S18 = t1_0 < rayTMax_0;
 
 #line 144
             }
@@ -225,13 +276,34 @@ void main()
             {
 
 #line 144
-                _S18 = t2_0;
+                _S18 = false;
 
 #line 144
             }
 
 #line 144
-            bool _S19 = ReportHit_0(_S18, 0U, IDs_0);
+            float _S19;
+
+#line 144
+            if(_S18)
+            {
+
+#line 144
+                _S19 = t1_0;
+
+#line 144
+            }
+            else
+            {
+
+#line 144
+                _S19 = t2_0;
+
+#line 144
+            }
+
+#line 144
+            bool _S20 = ReportHit_0(_S19, 0U, IDs_0);
 
 #line 141
         }

@@ -127,8 +127,29 @@ float CheckHitSpecificSystemValues_0()
     uint hitKind_0 = ((gl_HitKindEXT));
 
 #line 107
+    bool _S6;
+    if(hitKind_0 == 254U)
+    {
+
+#line 108
+        _S6 = true;
+
+#line 108
+    }
+    else
+    {
+
+#line 108
+        _S6 = hitKind_0 == 255U;
+
+#line 108
+    }
+
+#line 108
     float val_13;
-    if(hitKind_0 == 254U || hitKind_0 == 255U)
+
+#line 108
+    if(_S6)
     {
 
 #line 108
@@ -153,18 +174,18 @@ float CheckSysValueIntrinsics_0()
 {
 
 
-    float _S6 = CheckRayDispatchValues_0();
-    float _S7 = CheckRaySystemValues_0();
+    float _S7 = CheckRayDispatchValues_0();
+    float _S8 = CheckRaySystemValues_0();
 
 #line 121
-    float val_14 = _S6 + _S7;
-    float _S8 = CheckObjectSpaceSystemValues_0();
+    float val_14 = _S7 + _S8;
+    float _S9 = CheckObjectSpaceSystemValues_0();
 
 #line 122
-    float val_15 = val_14 + _S8;
-    float _S9 = CheckHitSpecificSystemValues_0();
+    float val_15 = val_14 + _S9;
+    float _S10 = CheckHitSpecificSystemValues_0();
 
-    return val_15 + _S9;
+    return val_15 + _S10;
 }
 
 
@@ -176,18 +197,18 @@ struct RayPayload_0
 
 
 #line 129
-rayPayloadInEXT RayPayload_0 _S10;
+rayPayloadInEXT RayPayload_0 _S11;
 
 
-#line 9569 1
+#line 9503 1
 struct BuiltInTriangleIntersectionAttributes_0
 {
     vec2 barycentrics_0;
 };
 
 
-#line 9569
-hitAttributeEXT BuiltInTriangleIntersectionAttributes_0 _S11;
+#line 9503
+hitAttributeEXT BuiltInTriangleIntersectionAttributes_0 _S12;
 
 
 #line 129 0
@@ -195,28 +216,28 @@ void main()
 {
 
 
-    float _S12 = CheckSysValueIntrinsics_0();
+    float _S13 = CheckSysValueIntrinsics_0();
 
-    float _S13 = _S11.barycentrics_0.x;
+    float _S14 = _S12.barycentrics_0.x;
 
 #line 135
-    float _S14 = _S11.barycentrics_0.y;
-    float val_16 = _S12 + (1.0 - _S13 - _S14) + _S13 + _S14;
+    float _S15 = _S12.barycentrics_0.y;
+    float val_16 = _S13 + (1.0 - _S14 - _S15) + _S14 + _S15;
 
-    vec3 _S15 = ((gl_ObjectRayOriginEXT));
-
-#line 138
-    vec3 _S16 = ((gl_ObjectRayDirectionEXT));
+    vec3 _S16 = ((gl_ObjectRayOriginEXT));
 
 #line 138
-    float _S17 = ((gl_RayTmaxEXT));
+    vec3 _S17 = ((gl_ObjectRayDirectionEXT));
 
 #line 138
-    vec3 hitLocation_0 = _S15 + _S16 * _S17;
+    float _S18 = ((gl_RayTmaxEXT));
+
+#line 138
+    vec3 hitLocation_0 = _S16 + _S17 * _S18;
 
     if(hitLocation_0.x > 0.0)
     {
-        _S10.RayHitT_0 = val_16;
+        _S11.RayHitT_0 = val_16;
         terminateRayEXT;;
 
 #line 140
@@ -227,7 +248,7 @@ void main()
 
         if(hitLocation_0.y < 0.0)
         {
-            _S10.RayHitT_0 = val_16;
+            _S11.RayHitT_0 = val_16;
             ignoreIntersectionEXT;;
 
 #line 145
@@ -237,7 +258,7 @@ void main()
     }
 
 #line 151
-    _S10.RayHitT_0 = val_16;
+    _S11.RayHitT_0 = val_16;
     return;
 }
 
