@@ -114,7 +114,6 @@ void GLSLSourceEmitter::_requireGLSLVersion(int version)
     }
 }
 
-
 void GLSLSourceEmitter::_emitMemoryQualifierDecorations(IRInst* varDecl)
 {
     for (auto decoration : varDecl->getDecorations())

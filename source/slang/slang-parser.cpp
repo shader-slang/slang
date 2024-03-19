@@ -7870,7 +7870,7 @@ namespace Slang
 
         return listBuilder.getFirst();
     }
-
+    
     static NodeBase* parseLayoutModifier(Parser* parser, void* /*userData*/)
     {
         ModifierListBuilder listBuilder;

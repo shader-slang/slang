@@ -21,6 +21,7 @@ struct Uniforms
 };
 ConstantBuffer<Uniforms> ubo;
 
+
 layout(rgba32f)
 RWTexture2D<float4> outputImage;
 

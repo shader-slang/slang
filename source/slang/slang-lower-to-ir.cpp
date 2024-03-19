@@ -2175,6 +2175,11 @@ void addVarDecorations(
             // may not be referenced; adding HLSL export modifier force emits
             builder->addHLSLExportDecoration(inst);
         }
+        else if(as<GloballyCoherentModifier>(mod))
+        {
+            setMemoryQualifier = true;
+            builder->addSimpleDecoration<IRGloballyCoherentDecoration>(inst);
+        }
         else if(as<PreciseModifier>(mod))
         {
             builder->addSimpleDecoration<IRPreciseDecoration>(inst);
@@ -2212,11 +2217,6 @@ void addVarDecorations(
         else if (auto dynamicUniform = as<DynamicUniformModifier>(mod))
         {
             builder->addDynamicUniformDecoration(inst);
-        }
-        else if (as<GloballyCoherentModifier>(mod))
-        {
-            setMemoryQualifier = true;
-            builder->addSimpleDecoration<IRGloballyCoherentDecoration>(inst);
         }
         else if (as<GLSLVolatileModifier>(mod))
         {

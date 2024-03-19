@@ -1129,6 +1129,7 @@ namespace renderer_test
     template<typename T>
     void generateTextureDataWithTargetTStorage(TextureData& output, const InputTextureDesc& desc, gfx::FormatInfo& formatInfo)
     {
+        // the following function assumes input of 0 or 1 since our testing framework only tests with 0 or 1
         TextureData work;
         generateTextureDataRGB8(work, desc);
 
@@ -1155,7 +1156,7 @@ namespace renderer_test
             {
             case 1:
             {
-                for (Index j = 0; j < pixelCount; ++j, srcPixels += 4, dstPixels++)
+                for (Index j = 0; j < pixelCount; ++j, srcPixels += 4, dstPixels += 1)
                 {
                     // Copy out r
                     dstPixels[0] = T(srcPixels[0] * (1.0f / 255));
@@ -1202,6 +1203,7 @@ namespace renderer_test
     {
         gfx::FormatInfo formatInfo;
         gfxGetFormatInfo(desc.format, &formatInfo);
+
         switch (desc.format)
         {
             case Format::R8G8B8A8_UNORM:
@@ -1234,8 +1236,8 @@ namespace renderer_test
                     const Index pixelCount = srcSlice.valuesCount;
                     const uint8_t* srcPixels = (const uint8_t*)srcSlice.values;
 
-                    int16_t* dstPixels = (int16_t*)output.setSliceCount(i, pixelCount);
 
+                    int16_t* dstPixels = (int16_t*)output.setSliceCount(i, pixelCount);
                     switch (formatInfo.channelCount)
                     {
                         case 1:
@@ -1270,6 +1272,7 @@ namespace renderer_test
                         }
                         case 4:
                         {
+
                             for (Index j = 0; j < pixelCount; ++j, srcPixels += 4, dstPixels += 4)
                             {
                                 // Copy out rgba
