@@ -373,6 +373,8 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ir-bit-field-accessors.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-byte-address-legalize.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-check-differentiability.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-check-recursive-type.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-check-unsupported-inst.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-cleanup-void.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-clone.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-collect-global-uniforms.h" />
@@ -597,6 +599,8 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ir-bit-field-accessors.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-byte-address-legalize.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-check-differentiability.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-check-recursive-type.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-check-unsupported-inst.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-cleanup-void.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-clone.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-collect-global-uniforms.cpp" />
