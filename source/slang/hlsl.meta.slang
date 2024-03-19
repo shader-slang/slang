@@ -6296,7 +6296,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "($1 * $0)")
 __target_intrinsic(spirv, "OpMatrixTimesMatrix resultType resultId _1 _0")
 [__readNone]
-matrix<T,R,C> mul(matrix<T,R,N> right, matrix<T,N,C> left)
+matrix<T,R,C> mul(matrix<T,R,N> left, matrix<T,N,C> right)
 {
     matrix<T,R,C> result;
     for( int r = 0; r < R; ++r)
@@ -6315,7 +6315,7 @@ __generic<T : __BuiltinIntegerType, let R : int, let N : int, let C : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "($1 * $0)")
 [__readNone]
-matrix<T,R,C> mul(matrix<T,R,N> right, matrix<T,N,C> left)
+matrix<T,R,C> mul(matrix<T,R,N> left, matrix<T,N,C> right)
 {
     matrix<T,R,C> result;
     for( int r = 0; r < R; ++r)
@@ -6334,7 +6334,7 @@ __generic<T : __BuiltinLogicalType, let R : int, let N : int, let C : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "($1 * $0)")
 [__readNone]
-matrix<T,R,C> mul(matrix<T,R,N> right, matrix<T,N,C> left)
+matrix<T,R,C> mul(matrix<T,R,N> left, matrix<T,N,C> right)
 {
     matrix<T,R,C> result;
     for( int r = 0; r < R; ++r)
