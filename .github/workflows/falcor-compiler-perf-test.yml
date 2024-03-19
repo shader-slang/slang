@@ -30,9 +30,6 @@ jobs:
       with:
         submodules: 'true'
         fetch-depth: '0'
-    - name: secret setup
-      env:
-            google_drive: ${{ secrets.google_drive }}
     - name: setup-msbuild
       uses: microsoft/setup-msbuild@v1
     - name: build
@@ -85,6 +82,8 @@ jobs:
         .\falcor-perf-test\bin\Release\falcor_perftest.exe > .\test_results.txt
 
     - name: process falcor results
+      env:
+        google_drive: ${{ secrets.google_drive }}
       run: |
         python -m pip install --upgrade pip
         pip install gspread oauth2client
