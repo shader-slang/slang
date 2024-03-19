@@ -14,6 +14,7 @@
 #include "slang-ir-composite-reg-to-mem.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-diff-call.h"
+#include "slang-ir-check-recursive-type.h"
 #include "slang-ir-autodiff.h"
 #include "slang-ir-defunctionalization.h"
 #include "slang-ir-dll-export.h"
@@ -475,6 +476,7 @@ Result linkAndOptimizeIR(
         break;
     }
 
+    checkForRecursiveTypes(irModule, sink);
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 
