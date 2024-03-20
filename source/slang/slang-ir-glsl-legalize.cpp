@@ -2495,76 +2495,50 @@ void legalizeEntryPointParameterForGLSL(
             stage,
             pp);
 
-        // TODO: a GS output stream might be passed into other
+        // A GS output stream might be passed into other
         // functions, so that we should really be modifying
         // any function that has one of these in its parameter
-        // list (and in the limit we should be leagalizing any
-        // type that nests these...).
+        // list.
         //
-        // For now we will just try to deal with `Append` calls
-        // directly in this function.
-
-        for( auto bb = func->getFirstBlock(); bb; bb = bb->getNextBlock() )
+        HashSet<IRInst*> workListSet;
+        List<IRFunc*> workList;
+        workList.add(func);
+        workListSet.add(func);
+        for (Index i = 0; i < workList.getCount(); i++)
         {
-            for( auto ii = bb->getFirstInst(); ii; ii = ii->getNextInst() )
+            auto f = workList[i];
+            for (auto bb = f->getFirstBlock(); bb; bb = bb->getNextBlock())
             {
-                // Is it a call?
-                if(ii->getOp() != kIROp_Call)
-                    continue;
-
-                // Is it calling the append operation?
-                auto callee = ii->getOperand(0);
-                for(;;)
+                for (auto ii = bb->getFirstInst(); ii; ii = ii->getNextInst())
                 {
-                    // If the instruction is `specialize(X,...)` then
-                    // we want to look at `X`, and if it is `generic { ... return R; }`
-                    // then we want to look at `R`. We handle this
-                    // iteratively here.
-                    //
-                    // TODO: This idiom seems to come up enough that we
-                    // should probably have a dedicated convenience routine
-                    // for this.
-                    //
-                    // Alternatively, we could switch the IR encoding so
-                    // that decorations are added to the generic instead of the
-                    // value it returns.
-                    //
-                    switch(callee->getOp())
-                    {
-                    case kIROp_Specialize:
-                        {
-                            callee = cast<IRSpecialize>(callee)->getOperand(0);
-                            continue;
-                        }
+                    // Is it a call?
+                    if (ii->getOp() != kIROp_Call)
+                        continue;
 
-                    case kIROp_Generic:
+                    // Is it calling the append operation?
+                    auto callee = getResolvedInstForDecorations(ii->getOperand(0));
+                    if (callee->getOp() != kIROp_Func)
+                        continue;
+
+                    if (getBuiltinFuncName(callee) != UnownedStringSlice::fromLiteral("GeometryStreamAppend"))
+                    {
+                        for (UInt a = 1; a < ii->getOperandCount(); a++)
                         {
-                            auto genericResult = findGenericReturnVal(cast<IRGeneric>(callee));
-                            if(genericResult)
+                            if (as<IRHLSLStreamOutputType>(ii->getOperand(a)->getDataType()))
                             {
-                                callee = genericResult;
-                                continue;
+                                if (workListSet.add(callee))
+                                    workList.add(as<IRFunc>(callee));
                             }
                         }
-
-                    default:
-                        break;
+                        continue;
                     }
-                    break;
+
+                    // Okay, we have a declaration, and we want to modify it!
+
+                    builder->setInsertBefore(ii);
+
+                    assign(builder, globalOutputVal, ScalarizedVal::value(ii->getOperand(2)));
                 }
-                if(callee->getOp() != kIROp_Func)
-                    continue;
-
-                if (getBuiltinFuncName(callee) != UnownedStringSlice::fromLiteral("GeometryStreamAppend"))
-                {
-                    continue;
-                }
-
-                // Okay, we have a declaration, and we want to modify it!
-
-                builder->setInsertBefore(ii);
-
-                assign(builder, globalOutputVal, ScalarizedVal::value(ii->getOperand(2)));
             }
         }
 
