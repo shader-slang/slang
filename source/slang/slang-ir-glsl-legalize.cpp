@@ -2522,12 +2522,15 @@ void legalizeEntryPointParameterForGLSL(
 
                     if (getBuiltinFuncName(callee) != UnownedStringSlice::fromLiteral("GeometryStreamAppend"))
                     {
+                        // If we are calling a function that takes a output stream as a parameter,
+                        // we need to add it to the work list to be processed.
                         for (UInt a = 1; a < ii->getOperandCount(); a++)
                         {
                             if (as<IRHLSLStreamOutputType>(ii->getOperand(a)->getDataType()))
                             {
                                 if (workListSet.add(callee))
                                     workList.add(as<IRFunc>(callee));
+                                break;
                             }
                         }
                         continue;
