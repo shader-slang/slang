@@ -1,6 +1,9 @@
-//TEST:CROSS_COMPILE:-target spirv-assembly -entry main -stage anyhit -profile glsl_460+GL_EXT_ray_tracing
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-assembly -entry main -stage anyhit -profile glsl_460+GL_EXT_ray_tracing
 //   Motion rays not supported on HLSL impl currently, so disable with NOMOTION define:
-//TEST:CROSS_COMPILE:-target dxil-assembly -entry main -stage anyhit -profile sm_6_5 -DNOMOTION
+//TEST:SIMPLE(filecheck=DXIL):-target dxil-assembly -entry main -stage anyhit -profile sm_6_5 -DNOMOTION
+
+// SPIRV: OpEntryPoint
+// DXIL: main
 
 struct RayPayload
 {
