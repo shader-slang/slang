@@ -42,7 +42,6 @@ public:
     void emit(UInt64 value);
 
     void emit(double value);
-    void emit(float value);
 
     void emitChar(char c);
 
@@ -103,7 +102,6 @@ protected:
         /// Calculate the current location in the ouput
     void _calcLocation(Index& outLineIndex, Index& outColumnIndex);
 
-    void _emitFloatingPointLiteral(double value, int maxDigits10);
     // The string of code we've built so far.
     // TODO(JS): We could store the text in chunks, and then only sew together into one buffer
     // when we are done. Doing so would not require copies/reallocs until the full buffer has been

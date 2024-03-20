@@ -226,16 +226,6 @@ void SourceWriter::emit(UInt64 value)
 
 void SourceWriter::emit(double value)
 {
-    _emitFloatingPointLiteral(value, std::numeric_limits<double>::max_digits10);
-}
-
-void SourceWriter::emit(float value)
-{
-    _emitFloatingPointLiteral(value, std::numeric_limits<float>::max_digits10);
-}
-
-void SourceWriter::_emitFloatingPointLiteral(double value, int maxDigits10)
-{
     // There are a few different requirements here that we need to deal with:
     //
     // 1) We need to print something that is valid syntax in the target language
@@ -269,7 +259,7 @@ void SourceWriter::_emitFloatingPointLiteral(double value, int maxDigits10)
             std::ios::scientific : std::ios::fixed;
 
     stream.setf(flags, std::ios::floatfield);
-    stream.precision(maxDigits10);
+    stream.precision(std::numeric_limits<double>::max_digits10);
     stream << value;
     auto str = stream.str();
 

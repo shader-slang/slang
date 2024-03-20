@@ -1206,18 +1206,7 @@ void CLikeSourceEmitter::emitSimpleValueImpl(IRInst* inst)
     }
 
     case kIROp_FloatLit:
-        {
-            IRBasicType* type = as<IRBasicType>(inst->getDataType());
-            switch (type->getOp())
-            {
-                case kIROp_DoubleType:
-                    m_writer->emit(double(((IRConstant*)inst)->value.floatVal));
-                    break;
-                default:
-                    m_writer->emit(float(((IRConstant*)inst)->value.floatVal));
-                    break;
-            }
-        }
+        m_writer->emit(((IRConstant*) inst)->value.floatVal);
         break;
 
     case kIROp_BoolLit:
