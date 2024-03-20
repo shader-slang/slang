@@ -3457,20 +3457,20 @@ namespace Slang
                     namespaceDecl = parser->astBuilder->create<NamespaceDecl>();
                     namespaceDecl->nameAndLoc = nameAndLoc;
                     namespaceDecl->loc = nameAndLoc.loc;
+                    if (parentDecl)
+                    {
+                        if (auto parentNamespace = as<NamespaceDecl>(parentDecl))
+                        {
+                            parser->PushScope(parentDecl);
+                            nestedNamespaceDecls.add(parentNamespace);
+                        }
+                        AddMember(parentDecl, namespaceDecl);
+                    }
                 }
             }
             if (!result)
             {
                 result = namespaceDecl;
-            }
-            else if (parentDecl)
-            {
-                if (auto parentNamespace = as<NamespaceDecl>(parentDecl))
-                {
-                    parser->PushScope(parentDecl);
-                    nestedNamespaceDecls.add(parentNamespace);
-                }
-                AddMember(parentDecl, namespaceDecl);
             }
 
             parentDecl = namespaceDecl;
