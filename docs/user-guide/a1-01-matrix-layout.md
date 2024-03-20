@@ -150,10 +150,9 @@ globalSession->createSession(slangSessionDesc, &session);
 
 This makes Slang treat all matrices as in `column-major` layout, and for example emitting `column_major` qualifier in resulting HLSL code.
 
-Alternatively the default layout can be set via
+Alternatively the default layout can be set by
 
-* `setMatrixLayoutMode`/`spSetMatrixLayoutMode` API calls
-* `-matrix-layout-row-major` or `-matrix-layout-column-major` command line options
-  * or via `spProcessCommandLineArguments`/`processCommandLineArguments`
+* Including a `CompilerOptionName::MatrixLayoutColumn` or `CompilerOptionName::MatrixLayoutRow` entry in `SessionDesc::compilerOptionEntries`.
+* Setting `-matrix-layout-row-major` or `-matrix-layout-column-major` command line options to `slangc`.
 
 
