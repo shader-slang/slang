@@ -457,8 +457,12 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
     {
         auto srcManager = options.linkage->getSourceManager();
         auto modulePathInfo = PathInfo::makePath(options.modulePath);
-        auto srcFile = srcManager->createSourceFileWithString(modulePathInfo, String());
-        srcManager->addSourceFile(options.modulePath, srcFile);
+        auto srcFile = srcManager->findSourceFileByPathRecursively(modulePathInfo.foundPath);
+        if (!srcFile)
+        {
+            srcFile = srcManager->createSourceFileWithString(modulePathInfo, String());
+            srcManager->addSourceFile(options.modulePath, srcFile);
+        }
         auto srcView = srcManager->createSourceView(srcFile, &modulePathInfo, SourceLoc());
         binaryModuleLoc = srcView->getRange().begin;
     }
