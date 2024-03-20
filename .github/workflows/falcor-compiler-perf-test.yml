@@ -81,9 +81,10 @@ jobs:
         $env:PATH += ";.\bin\windows-${{matrix.testPlatform}}\${{matrix.configuration}}";
         .\falcor-perf-test\bin\Release\falcor_perftest.exe > .\test_results.txt
 
-    - name: process falcor results
+    - name: env setup
       env:
         slang_verif_svc: ${{ secrets.slang_verif_svc }}
+        
     - if: ${{ github.event_name == "pull_request" }}
       name: IF
       env:
@@ -94,7 +95,7 @@ jobs:
       env:
         github_sha: ${{ github.sha }}
 
-        
+    - name: process falcor results
       run: |
         python -m pip install --upgrade pip
         pip install gspread oauth2client
