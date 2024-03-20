@@ -6020,6 +6020,7 @@ namespace Slang
         addInst(i);
         return i;
     }
+
     IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandImagePointer(IRInst* element)
     {
         SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
