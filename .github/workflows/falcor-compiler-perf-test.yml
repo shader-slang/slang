@@ -83,7 +83,7 @@ jobs:
 
     - name: process falcor results
       env:
-        slang_verif_svc: ${{ secrets.slang_verif_svc }}
+        slang_verif_svc: ${{ secrets.slang_verif_svc_cred }}
         github_sha: ${{ github.sha }}
 
       run: |
