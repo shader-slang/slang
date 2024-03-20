@@ -11,9 +11,14 @@ buffer MyBlockName
     uvec4 idata[2];
 } keepAliveBuffer;
 
-layout (location = 0) out ivec4 outColor;
+layout(location = 0) out ivec4 outColorActual;
 
-bool testFragmentProcessingFunctionsScalar()
+layout (location = 0) in float inDataV1;
+layout (location = 1) in vec2 inDataV2;
+layout (location = 2) in vec3 inDataV3;
+layout (location = 3) in vec4 inDataV4;
+
+bool testFragmentProcessingDerivativeFunctionsScalar()
 {
 // CHECK_SPV: OpDPdx
 // CHECK_GLSL-DAG: dFdx
@@ -49,13 +54,10 @@ bool testFragmentProcessingFunctionsScalar()
         && fwidth(1.0f) != -1.0f
         && fwidthFine(1.0f) != -1.0f
         && fwidthCoarse(1.0f) != -1.0f
-        && interpolateAtCentroid(1.0f) != -1.0f
-        && interpolateAtSample(1.0f, 0) != -1.0f
-        && interpolateAtOffset(1.0f, vec2(0.0f)) != -1.0f
         ;
 }
 __generic<let N:int>
-bool testFragmentProcessingFunctionsVector()
+bool testFragmentProcessingDerivativeFunctionsVector()
 {
 // CHECK_SPV: OpDPdx
 // CHECK_GLSL-DAG: dFdx
@@ -91,25 +93,40 @@ bool testFragmentProcessingFunctionsVector()
         && fwidth(vector<float,N>(1.0f)) != vector<float,N>(-1.0f)
         && fwidthFine(vector<float,N>(1.0f)) != vector<float,N>(-1.0f)
         && fwidthCoarse(vector<float,N>(1.0f)) != vector<float,N>(-1.0f)
-        && interpolateAtCentroid(vector<float,N>(1.0f)) != vector<float,N>(-1.0f)
-        && interpolateAtSample(vector<float,N>(1.0f), 0) != vector<float,N>(-1.0f)
-        && interpolateAtOffset(vector<float,N>(1.0f), vec2(0.0f)) != vector<float,N>(-1.0f)
+        ;
+}
+bool testFragmentProcessingInterpolateFunctions()
+{
+    return true
+        && interpolateAtCentroid(inDataV1) != -1.0f
+        && interpolateAtSample(inDataV1, 0) != -1.0f
+        && interpolateAtOffset(inDataV1, vec2(0.0f)) != -1.0f
+        && interpolateAtCentroid(inDataV2) != vector<float,2>(-1.0f)
+        && interpolateAtSample(inDataV2, 0) != vector<float,2>(-1.0f)
+        && interpolateAtOffset(inDataV2, vec2(0.0f)) != vector<float,2>(-1.0f)
+        && interpolateAtCentroid(inDataV3) != vector<float,3>(-1.0f)
+        && interpolateAtSample(inDataV3, 0) != vector<float,3>(-1.0f)
+        && interpolateAtOffset(inDataV3, vec2(0.0f)) != vector<float,3>(-1.0f)
+        && interpolateAtCentroid(inDataV4) != vector<float,4>(-1.0f)
+        && interpolateAtSample(inDataV4, 0) != vector<float,4>(-1.0f)
+        && interpolateAtOffset(inDataV4, vec2(0.0f)) != vector<float,4>(-1.0f)
         ;
 }
 bool testFragmentProcessingFunctions()
 {
     return true
-        && testFragmentProcessingFunctionsScalar()
-        && testFragmentProcessingFunctionsVector<2>()
-        && testFragmentProcessingFunctionsVector<3>()
-        && testFragmentProcessingFunctionsVector<4>()
+        && testFragmentProcessingDerivativeFunctionsScalar()
+        && testFragmentProcessingDerivativeFunctionsVector<2>()
+        && testFragmentProcessingDerivativeFunctionsVector<3>()
+        && testFragmentProcessingDerivativeFunctionsVector<4>()
+        && testFragmentProcessingInterpolateFunctions()
         ;
     ;
 }
 
 void main() {
     
-    outColor = ivec4(true
+    outColorActual = ivec4(true
         && testFragmentProcessingFunctions()
         );
 }

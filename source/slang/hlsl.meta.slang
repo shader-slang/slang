@@ -14035,7 +14035,7 @@ vector<float, N> ddx(vector<float, N> p)
     {
         return spirv_asm
         {
-            OpDPdx $$float result $p;
+            OpDPdx $$vector<float, N> result $p;
         };
     }
     }
@@ -14071,7 +14071,7 @@ float ddy(float p)
 __generic<let N : int>
 [__NoSideEffect]
 [ForceInline]
-vector<float, N> ddy(float p)
+vector<float, N> ddy(vector<float, N> p)
 {
     __target_switch
     {
@@ -14081,7 +14081,7 @@ vector<float, N> ddy(float p)
     {
         return spirv_asm
         {
-            OpDPdy $$float result $p;
+            OpDPdy $$vector<float, N> result $p;
         };
     }
     }
@@ -14109,6 +14109,7 @@ float ddx_fine(float p)
     {
         return spirv_asm
         {
+            OpCapability DerivativeControl;
             OpDPdxFine $$float result $p;
         };
     }
@@ -14127,7 +14128,8 @@ vector<float, N> ddx_fine(vector<float, N> p)
     {
         return spirv_asm
         {
-            OpDPdxFine $$float result $p;
+            OpCapability DerivativeControl;
+            OpDPdxFine $$vector<float, N> result $p;
         };
     }
     }
@@ -14155,6 +14157,7 @@ float ddy_fine(float p)
     {
         return spirv_asm
         {
+            OpCapability DerivativeControl;
             OpDPdyFine $$float result $p;
         };
     }
@@ -14173,7 +14176,8 @@ vector<float, N> ddy_fine(vector<float, N> p)
     {
         return spirv_asm
         {
-            OpDPdyFine $$float result $p;
+            OpCapability DerivativeControl;
+            OpDPdyFine $$vector<float, N> result $p;
         };
     }
     }
@@ -14201,6 +14205,7 @@ float ddx_coarse(float p)
     {
         return spirv_asm
         {
+            OpCapability DerivativeControl;
             OpDPdxCoarse $$float result $p;
         };
     }
@@ -14219,7 +14224,8 @@ vector<float, N> ddx_coarse(vector<float, N> p)
     {
         return spirv_asm
         {
-            OpDPdxCoarse $$float result $p;
+            OpCapability DerivativeControl;
+            OpDPdxCoarse $$vector<float, N> result $p;
         };
     }
     }
@@ -14247,6 +14253,7 @@ float ddy_coarse(float p)
     {
         return spirv_asm
         {
+            OpCapability DerivativeControl;
             OpDPdyCoarse $$float result $p;
         };
     }
@@ -14265,7 +14272,8 @@ vector<float, N> ddy_coarse(vector<float, N> p)
     {
         return spirv_asm
         {
-            OpDPdyCoarse $$float result $p;
+            OpCapability DerivativeControl;
+            OpDPdyCoarse $$vector<float, N> result $p;
         };
     }
     }

@@ -6819,7 +6819,7 @@ __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
 __generic<let N : int>
 [ForceInline]
-public vector<float,N> dFdx(vector<float,N> p)
+public vector<float, N> dFdx(vector<float, N> p)
 {
     return ddx(p);
 }
@@ -6837,7 +6837,7 @@ __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
 __generic<let N : int>
 [ForceInline]
-public vector<float,N> dFdy(vector<float,N> p)
+public vector<float, N> dFdy(vector<float, N> p)
 {
     return ddy(p);
 }
@@ -6855,7 +6855,7 @@ __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
 __generic<let N : int>
 [ForceInline]
-public vector<float,N> dFdxFine(vector<float,N> p)
+public vector<float, N> dFdxFine(vector<float, N> p)
 {
     return ddx_fine(p);
 }
@@ -6873,7 +6873,7 @@ __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
 __generic<let N : int>
 [ForceInline]
-public vector<float,N> dFdyFine(vector<float,N> p)
+public vector<float, N> dFdyFine(vector<float, N> p)
 {
     return ddy_fine(p);
 }
@@ -6891,7 +6891,7 @@ __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
 __generic<let N : int>
 [ForceInline]
-public vector<float,N> dFdxCoarse(vector<float,N> p)
+public vector<float, N> dFdxCoarse(vector<float, N> p)
 {
     return ddx_coarse(p);
 }
@@ -6909,7 +6909,7 @@ __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
 __generic<let N : int>
 [ForceInline]
-public vector<float,N> dFdyCoarse(vector<float,N> p)
+public vector<float, N> dFdyCoarse(vector<float, N> p)
 {
     return ddy_coarse(p);
 }
@@ -6931,6 +6931,7 @@ public float fwidthFine(float p)
     {
         return spirv_asm
         {
+            OpCapability DerivativeControl;
             OpFwidthFine $$float result $p;
         };
     }
@@ -6941,7 +6942,7 @@ __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
 __generic<let N : int>
 [ForceInline]
-public vector<float,N> fwidthFine(vector<float, N> p)
+public vector<float, N> fwidthFine(vector<float, N> p)
 {
     __target_switch
     {
@@ -6954,7 +6955,8 @@ public vector<float,N> fwidthFine(vector<float, N> p)
     {
         return spirv_asm
         {
-            OpFwidthFine $$vector<float,N> result $p;
+            OpCapability DerivativeControl;
+            OpFwidthFine $$vector<float, N> result $p;
         };
     }
     }
@@ -6977,6 +6979,7 @@ public float fwidthCoarse(float p)
     {
         return spirv_asm
         {
+            OpCapability DerivativeControl;
             OpFwidthCoarse $$float result $p;
         };
     }
@@ -6987,7 +6990,7 @@ __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
 __generic<let N : int>
 [ForceInline]
-public vector<float,N> fwidthCoarse(vector<float,N> p)
+public vector<float, N> fwidthCoarse(vector<float, N> p)
 {
     __target_switch
     {
@@ -7000,16 +7003,18 @@ public vector<float,N> fwidthCoarse(vector<float,N> p)
     {
         return spirv_asm
         {
-            OpFwidthCoarse $$vector<float,N> result $p;
+            OpCapability DerivativeControl;
+            OpFwidthCoarse $$vector<float, N> result $p;
         };
     }
     }
 }
 
+//TODO: Somehow require an input variable
 [require(hlsl, sm_5_0)]
 __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
-[ForceInline]
+[__unsafeForceInlineEarly]
 public float interpolateAtCentroid(float interpolant)
 {
     __target_switch
@@ -7024,7 +7029,7 @@ public float interpolateAtCentroid(float interpolant)
         return spirv_asm
         {
             OpCapability InterpolationFunction;
-            OpExtInst $$float result glsl450 InterpolateAtCentroid $interpolant
+            OpExtInst $$float result glsl450 InterpolateAtCentroid __immediatelyResolve(interpolant)
         };
     }
     }
@@ -7033,8 +7038,8 @@ public float interpolateAtCentroid(float interpolant)
 __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
 __generic<let N : int>
-[ForceInline]
-public vector<float,N> interpolateAtCentroid(vector<float,N> interpolant)
+[__unsafeForceInlineEarly]
+public vector<float, N> interpolateAtCentroid(vector<float, N> interpolant)
 {
     __target_switch
     {
@@ -7048,7 +7053,7 @@ public vector<float,N> interpolateAtCentroid(vector<float,N> interpolant)
         return spirv_asm
         {
             OpCapability InterpolationFunction;
-            OpExtInst $$vector<float,N> result glsl450 InterpolateAtCentroid $interpolant
+            OpExtInst $$vector<float, N> result glsl450 InterpolateAtCentroid __immediatelyResolve(interpolant)
         };
     }
     }
@@ -7057,7 +7062,7 @@ public vector<float,N> interpolateAtCentroid(vector<float,N> interpolant)
 [require(hlsl, sm_5_0)]
 __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
-[ForceInline]
+[__unsafeForceInlineEarly]
 public float interpolateAtSample(float interpolant, int sample)
 {
     __target_switch
@@ -7072,7 +7077,7 @@ public float interpolateAtSample(float interpolant, int sample)
         return spirv_asm
         {
             OpCapability InterpolationFunction;
-            OpExtInst $$float result glsl450 InterpolateAtSample $interpolant $sample
+            OpExtInst $$float result glsl450 InterpolateAtSample __immediatelyResolve(interpolant) $sample
         };
     }
     }
@@ -7081,8 +7086,8 @@ public float interpolateAtSample(float interpolant, int sample)
 __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
 __generic<let N : int>
-[ForceInline]
-public vector<float,N> interpolateAtSample(vector<float,N> interpolant, int sample)
+[__unsafeForceInlineEarly]
+public vector<float, N> interpolateAtSample(vector<float, N> interpolant, int sample)
 {
     __target_switch
     {
@@ -7096,7 +7101,7 @@ public vector<float,N> interpolateAtSample(vector<float,N> interpolant, int samp
         return spirv_asm
         {
             OpCapability InterpolationFunction;
-            OpExtInst $$vector<float,N> result glsl450 InterpolateAtSample $interpolant $sample
+            OpExtInst $$vector<float, N> result glsl450 InterpolateAtSample __immediatelyResolve(interpolant) $sample
         };
     }
     }
@@ -7104,7 +7109,7 @@ public vector<float,N> interpolateAtSample(vector<float,N> interpolant, int samp
 
 __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
-[ForceInline]
+[__unsafeForceInlineEarly]
 public float interpolateAtOffset(float interpolant, vec2 offset)
 {
     __target_switch
@@ -7115,7 +7120,7 @@ public float interpolateAtOffset(float interpolant, vec2 offset)
         return spirv_asm
         {
             OpCapability InterpolationFunction;
-            OpExtInst $$float result glsl450 78 $interpolant $offset
+            OpExtInst $$float result glsl450 78 __immediatelyResolve(interpolant) $offset
         };
     }
     }
@@ -7123,8 +7128,8 @@ public float interpolateAtOffset(float interpolant, vec2 offset)
 __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
 __generic<let N : int>
-[ForceInline]
-public vector<float,N> interpolateAtOffset(vector<float,N> interpolant, vec2 offset)
+[__unsafeForceInlineEarly]
+public vector<float, N> interpolateAtOffset(vector<float, N> interpolant, vec2 offset)
 {
     __target_switch
     {
@@ -7134,7 +7139,7 @@ public vector<float,N> interpolateAtOffset(vector<float,N> interpolant, vec2 off
         return spirv_asm
         {
             OpCapability InterpolationFunction;
-            OpExtInst $$vector<float,N> result glsl450 78 $interpolant $offset
+            OpExtInst $$vector<float, N> result glsl450 78 __immediatelyResolve(interpolant) $offset
         };
     }
     }
@@ -7151,7 +7156,7 @@ public float noise1(float x)
 [deprecated("Always returns 0")]
 __generic<let N : int>
 [ForceInline]
-public float noise1(vector<float,N> x)
+public float noise1(vector<float, N> x)
 {
     return 0.0f;
 }
@@ -7165,7 +7170,7 @@ public vec2 noise2(float x)
 [deprecated("Always returns 0")]
 __generic<let N : int>
 [ForceInline]
-public vec2 noise2(vector<float,N> x)
+public vec2 noise2(vector<float, N> x)
 {
     return vec2(0.0f);
 }
@@ -7179,7 +7184,7 @@ public vec3 noise3(float x)
 [deprecated("Always returns 0")]
 __generic<let N : int>
 [ForceInline]
-public vec3 noise3(vector<float,N> x)
+public vec3 noise3(vector<float, N> x)
 {
     return vec3(0.0f);
 }
@@ -7193,7 +7198,7 @@ public vec4 noise4(float x)
 [deprecated("Always returns 0")]
 __generic<let N : int>
 [ForceInline]
-public vec4 noise4(vector<float,N> x)
+public vec4 noise4(vector<float, N> x)
 {
     return vec4(0.0f);
 }

@@ -4024,6 +4024,16 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 }
                 return builder->emitSPIRVAsmOperandEnum(i);
             }
+            case SPIRVAsmOperand::ImmediatelyResolve:
+            {
+                IRInst* i;
+                {
+                    IRBuilderInsertLocScope insertScope(builder);
+                    builder->setInsertBefore(spirvAsmInst);
+                    i = getSimpleVal(context, lowerRValueExpr(context, operand.expr));
+                }
+                return builder->emitSPIRVAsmOperandImmediatelyResolve(i);
+            }
             case SPIRVAsmOperand::SlangValueAddr:
                 {
                     IRInst* i;

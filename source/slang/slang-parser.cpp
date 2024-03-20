@@ -7059,6 +7059,11 @@ namespace Slang
             return SPIRVAsmOperand{SPIRVAsmOperand::SampledType, Token{}, typeExpr};
         }
         // The __imageType function
+        if (AdvanceIf(parser, "__immediatelyResolve"))
+        {
+            Expr* expr = parseAtomicExpr(parser);
+            return SPIRVAsmOperand{ SPIRVAsmOperand::ImmediatelyResolve, Token{}, expr };
+        }
         if (AdvanceIf(parser, "__imageType"))
         {
             parser->ReadToken(TokenType::LParent);
