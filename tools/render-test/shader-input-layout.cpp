@@ -1126,8 +1126,38 @@ namespace renderer_test
         return SLANG_OK;
     }
 
+    void loadDataIntoHalf(uint16_t& out, const uint8_t& in)
+    {
+        out = FloatToHalf((float(in) / 255.0f));
+    }
+    void loadDataIntoFloat(float& out, const uint8_t& in)
+    {
+        out = (float(in)/255.0f);
+    }
     template<typename T>
-    void generateTextureDataWithTargetTStorage(TextureData& output, const InputTextureDesc& desc, gfx::FormatInfo& formatInfo)
+    void loadDataIntoUint(T& out, const uint8_t& in)
+    {
+        out = T(in);
+    }
+    template<typename T>
+    void loadDataIntoInt(T& out, const uint8_t& in)
+    {
+        // well define int8_t = uint8_t
+        if constexpr (std::is_same<int8_t, T>())
+        {
+            if (in > 127)
+            {
+                out = T(127);
+                return;
+            }
+        }
+        
+        out = T(in);
+    }
+
+    // T for type to return, F for function pointer to operate on uint8->T
+    template<typename T, typename F>
+    void generateTextureDataWithTargetTStorage(TextureData& output, const InputTextureDesc& desc, gfx::FormatInfo& formatInfo, F loadUint8ToT)
     {
         // the following function assumes input of 0 or 1 since our testing framework only tests with 0 or 1
         TextureData work;
@@ -1159,7 +1189,7 @@ namespace renderer_test
                 for (Index j = 0; j < pixelCount; ++j, srcPixels += 4, dstPixels += 1)
                 {
                     // Copy out r
-                    dstPixels[0] = T(srcPixels[0] * (1.0f / 255));
+                    loadUint8ToT(dstPixels[0], srcPixels[0]);
                 }
                 break;
             }
@@ -1168,8 +1198,8 @@ namespace renderer_test
                 for (Index j = 0; j < pixelCount; ++j, srcPixels += 4, dstPixels += 2)
                 {
                     // Copy out rg
-                    dstPixels[0] = T(srcPixels[0] * (1.0f / 255));
-                    dstPixels[1] = T(srcPixels[1] * (1.0f / 255));
+                    loadUint8ToT(dstPixels[0], srcPixels[0]);
+                    loadUint8ToT(dstPixels[1], srcPixels[1]);
                 }
                 break;
             }
@@ -1178,9 +1208,9 @@ namespace renderer_test
                 for (Index j = 0; j < pixelCount; ++j, srcPixels += 4, dstPixels += 3)
                 {
                     // Copy out rgb
-                    dstPixels[0] = T(srcPixels[0] * (1.0f / 255));
-                    dstPixels[1] = T(srcPixels[1] * (1.0f / 255));
-                    dstPixels[2] = T(srcPixels[2] * (1.0f / 255));
+                    loadUint8ToT(dstPixels[0], srcPixels[0]);
+                    loadUint8ToT(dstPixels[1], srcPixels[1]);
+                    loadUint8ToT(dstPixels[2], srcPixels[2]);
                 }
                 break;
             }
@@ -1189,10 +1219,10 @@ namespace renderer_test
                 for (Index j = 0; j < pixelCount; ++j, srcPixels += 4, dstPixels += 4)
                 {
                     // Copy out rgba
-                    dstPixels[0] = T(srcPixels[0] * (1.0f / 255));
-                    dstPixels[1] = T(srcPixels[1] * (1.0f / 255));
-                    dstPixels[2] = T(srcPixels[2] * (1.0f / 255));
-                    dstPixels[3] = T(srcPixels[3] * (1.0f / 255));
+                    loadUint8ToT(dstPixels[0], srcPixels[0]);
+                    loadUint8ToT(dstPixels[1], srcPixels[1]);
+                    loadUint8ToT(dstPixels[2], srcPixels[2]);
+                    loadUint8ToT(dstPixels[3], srcPixels[3]);
                 }
                 break;
             }
@@ -1215,81 +1245,12 @@ namespace renderer_test
             case Format::R16G16_FLOAT:
             case Format::R16G16B16A16_FLOAT:
             {
-                TextureData work;
-                generateTextureDataRGB8(work, desc);
-
-                output.init(desc.format);
-
-                output.m_textureSize = work.m_textureSize;
-                output.m_mipLevels = work.m_mipLevels;
-                output.m_arraySize = work.m_arraySize;
-
-                List<TextureData::Slice>& dstSlices = output.m_slices;
-
-                Index numSlices = work.m_slices.getCount();
-                dstSlices.setCount(numSlices);
-
-                for (int i = 0; i < numSlices; ++i)
-                {
-                    const TextureData::Slice& srcSlice = work.m_slices[i];
-
-                    const Index pixelCount = srcSlice.valuesCount;
-                    const uint8_t* srcPixels = (const uint8_t*)srcSlice.values;
-
-
-                    int16_t* dstPixels = (int16_t*)output.setSliceCount(i, pixelCount);
-                    switch (formatInfo.channelCount)
-                    {
-                        case 1:
-                        {
-                            for (Index j = 0; j < pixelCount; ++j, srcPixels += 4, dstPixels++)
-                            {
-                                // Copy out r
-                                dstPixels[0] = FloatToHalf(srcPixels[0] * (1.0f / 255));
-                            }
-                            break;
-                        }
-                        case 2:
-                        {
-                            for (Index j = 0; j < pixelCount; ++j, srcPixels += 4, dstPixels += 2)
-                            {
-                                // Copy out rg
-                                dstPixels[0] = FloatToHalf(srcPixels[0] * (1.0f / 255));
-                                dstPixels[1] = FloatToHalf(srcPixels[1] * (1.0f / 255));
-                            }
-                            break;
-                        }
-                        case 3:
-                        {
-                            for (Index j = 0; j < pixelCount; ++j, srcPixels += 4, dstPixels += 3)
-                            {
-                                // Copy out rgb
-                                dstPixels[0] = FloatToHalf(srcPixels[0] * (1.0f / 255));
-                                dstPixels[1] = FloatToHalf(srcPixels[1] * (1.0f / 255));
-                                dstPixels[2] = FloatToHalf(srcPixels[2] * (1.0f / 255));
-                            }
-                            break;
-                        }
-                        case 4:
-                        {
-
-                            for (Index j = 0; j < pixelCount; ++j, srcPixels += 4, dstPixels += 4)
-                            {
-                                // Copy out rgba
-                                dstPixels[0] = FloatToHalf(srcPixels[0] * (1.0f / 255));
-                                dstPixels[1] = FloatToHalf(srcPixels[1] * (1.0f / 255));
-                                dstPixels[2] = FloatToHalf(srcPixels[2] * (1.0f / 255));
-                                dstPixels[3] = FloatToHalf(srcPixels[3] * (1.0f / 255));
-                            }
-                            break;
-                        }
-                    }
-                }
+                generateTextureDataWithTargetTStorage<uint16_t>(output, desc, formatInfo, loadDataIntoHalf); // FloatToHalf
                 break;
             }
             case Format::R64_UINT:
             {
-                generateTextureDataWithTargetTStorage<uint64_t>(output, desc, formatInfo);
+                generateTextureDataWithTargetTStorage<uint64_t>(output, desc, formatInfo, loadDataIntoUint<uint64_t>);
                 break;
             }
             case Format::R32_FLOAT:
@@ -1298,7 +1259,7 @@ namespace renderer_test
             case Format::R32G32B32A32_FLOAT:
             case Format::D32_FLOAT:
             {
-                generateTextureDataWithTargetTStorage<float>(output, desc, formatInfo);
+                generateTextureDataWithTargetTStorage<float>(output, desc, formatInfo, loadDataIntoFloat);
                 break;
             }
             case Format::R32_UINT:
@@ -1306,26 +1267,26 @@ namespace renderer_test
             case Format::R32G32B32_UINT:
             case Format::R32G32B32A32_UINT:
             {
-                generateTextureDataWithTargetTStorage<uint32_t>(output, desc, formatInfo);
+                generateTextureDataWithTargetTStorage<uint32_t>(output, desc, formatInfo, loadDataIntoUint<uint32_t>);
                 break;
             }
             case Format::R16_UINT:
             case Format::R16G16_UINT:
             case Format::R16G16B16A16_UINT:
             {
-                generateTextureDataWithTargetTStorage<uint16_t>(output, desc, formatInfo);
+                generateTextureDataWithTargetTStorage<uint16_t>(output, desc, formatInfo, loadDataIntoUint<uint16_t>);
                 break;
             }
             case Format::R8_UINT:
             case Format::R8G8_UINT:
             case Format::R8G8B8A8_UINT:
             {
-                generateTextureDataWithTargetTStorage<uint8_t>(output, desc, formatInfo);
+                generateTextureDataWithTargetTStorage<uint8_t>(output, desc, formatInfo, loadDataIntoUint<uint8_t>);
                 break;
             }
             case Format::R64_SINT:
             {
-                generateTextureDataWithTargetTStorage<int64_t>(output, desc, formatInfo);
+                generateTextureDataWithTargetTStorage<int64_t>(output, desc, formatInfo, loadDataIntoInt<int64_t>);
                 break;
             }
             case Format::R32_SINT:
@@ -1333,21 +1294,21 @@ namespace renderer_test
             case Format::R32G32B32_SINT:
             case Format::R32G32B32A32_SINT:
             {
-                generateTextureDataWithTargetTStorage<int32_t>(output, desc, formatInfo);
+                generateTextureDataWithTargetTStorage<int32_t>(output, desc, formatInfo, loadDataIntoInt<int32_t>);
                 break;
             }
             case Format::R16_SINT:
             case Format::R16G16_SINT:
             case Format::R16G16B16A16_SINT:
             {
-                generateTextureDataWithTargetTStorage<int16_t>(output, desc, formatInfo);
+                generateTextureDataWithTargetTStorage<int16_t>(output, desc, formatInfo, loadDataIntoInt<int16_t>);
                 break;
             }
             case Format::R8_SINT:
             case Format::R8G8_SINT:
             case Format::R8G8B8A8_SINT:
             {
-                generateTextureDataWithTargetTStorage<int8_t>(output, desc, formatInfo);
+                generateTextureDataWithTargetTStorage<int8_t>(output, desc, formatInfo, loadDataIntoInt<int8_t>);
                 break;
             }
             default:
@@ -1383,6 +1344,37 @@ namespace renderer_test
 
         output.init(Format::R8G8B8A8_UNORM);
 
+        enum class SimpleScalarType {
+            kUint,
+            kInt,
+            kFloat,
+        };
+        SimpleScalarType type;
+        gfx::FormatInfo formatInfo;
+        gfxGetFormatInfo(inputDesc.format, &formatInfo);
+        switch (formatInfo.channelType)
+        {
+        case SLANG_SCALAR_TYPE_UINT64:
+        case SLANG_SCALAR_TYPE_UINT32:
+        case SLANG_SCALAR_TYPE_UINT16:
+        case SLANG_SCALAR_TYPE_UINT8:
+            type = SimpleScalarType::kUint;
+            break;
+        case SLANG_SCALAR_TYPE_INT64:
+        case SLANG_SCALAR_TYPE_INT32:
+        case SLANG_SCALAR_TYPE_INT16:
+        case SLANG_SCALAR_TYPE_INT8:
+            type =  SimpleScalarType::kInt;
+            break;
+        case SLANG_SCALAR_TYPE_FLOAT64:
+        case SLANG_SCALAR_TYPE_FLOAT32:
+        case SLANG_SCALAR_TYPE_FLOAT16:
+            type = SimpleScalarType::kFloat;
+            break;
+        default:
+            type = SimpleScalarType::kUint;
+            break;
+        }
         //List<List<unsigned int>>& dataBuffer = output.dataBuffer;
         int arraySize = arrLen;
         if (inputDesc.isCube)
@@ -1411,36 +1403,68 @@ namespace renderer_test
 
                 uint32_t* dst = (uint32_t*)output.setSliceCount(slice, bufferLen);
 
-                _iteratePixels(inputDesc.dimension, size, dst, [&](int x, int y, int z) -> unsigned int
-                {
-                    if (inputDesc.content == InputTextureContent::Zero)
-                    {
-                        return 0x0;
-                    }
-                    else if (inputDesc.content == InputTextureContent::One)
-                    {
-                        return 0xFFFFFFFF;
-                    }
-                    else if (inputDesc.content == InputTextureContent::Gradient)
-                    {
-                        unsigned char r = (unsigned char)(x / (float)(size - 1) * 255.0f);
-                        unsigned char g = (unsigned char)(y / (float)(size - 1) * 255.0f);
-                        unsigned char b = (unsigned char)(z / (float)(size - 1) * 255.0f);
-                        return 0xFF000000 + r + (g << 8) + (b << 16);
-                    }
-                    else if (inputDesc.content == InputTextureContent::ChessBoard)
-                    {
-                        unsigned int xSig = x < (size >> 1) ? 1 : 0;
-                        unsigned int ySig = y < (size >> 1) ? 1 : 0;
-                        unsigned int zSig = z < (size >> 1) ? 1 : 0;
-                        auto sig = xSig ^ ySig ^ zSig;
-                        if (sig)
-                            return 0xFFFFFFFF;
-                        else
-                            return 0xFF808080;
-                    }
-                    return 0x0;
-                });
+                if (type == SimpleScalarType::kFloat)
+                    _iteratePixels(inputDesc.dimension, size, dst, [&](int x, int y, int z) -> unsigned int
+                        {
+                            if (inputDesc.content == InputTextureContent::Zero)
+                            {
+                                return 0x0;
+                            }
+                            else if (inputDesc.content == InputTextureContent::One)
+                            {
+                                return 0xFFFFFFFF;
+                            }
+                            else if (inputDesc.content == InputTextureContent::Gradient)
+                            {
+                                unsigned char r = (unsigned char)(x / (float)(size - 1) * 255.0f);
+                                unsigned char g = (unsigned char)(y / (float)(size - 1) * 255.0f);
+                                unsigned char b = (unsigned char)(z / (float)(size - 1) * 255.0f);
+                                return 0xFF000000 + r + (g << 8) + (b << 16);
+                            }
+                            else if (inputDesc.content == InputTextureContent::ChessBoard)
+                            {
+                                unsigned int xSig = x < (size >> 1) ? 1 : 0;
+                                unsigned int ySig = y < (size >> 1) ? 1 : 0;
+                                unsigned int zSig = z < (size >> 1) ? 1 : 0;
+                                auto sig = xSig ^ ySig ^ zSig;
+                                if (sig)
+                                    return 0xFFFFFFFF;
+                                else
+                                    return 0xFF808080;
+                            }
+                            return 0x0;
+                        });
+                else if (type == SimpleScalarType::kUint || type == SimpleScalarType::kInt)
+                    _iteratePixels(inputDesc.dimension, size, dst, [&](int x, int y, int z) -> unsigned int
+                        {
+                            if (inputDesc.content == InputTextureContent::Zero)
+                            {
+                                return 0x0;
+                            }
+                            else if (inputDesc.content == InputTextureContent::One)
+                            {
+                                return 0x01010101;
+                            }
+                            else if (inputDesc.content == InputTextureContent::Gradient)
+                            {
+                                unsigned char r = (unsigned char)(x / (float)(size - 1));
+                                unsigned char g = (unsigned char)(y / (float)(size - 1));
+                                unsigned char b = (unsigned char)(z / (float)(size - 1));
+                                return 0x01000000 + r + (g << 8) + (b << 16);
+                            }
+                            else if (inputDesc.content == InputTextureContent::ChessBoard)
+                            {
+                                unsigned int xSig = x < (size >> 1) ? 1 : 0;
+                                unsigned int ySig = y < (size >> 1) ? 1 : 0;
+                                unsigned int zSig = z < (size >> 1) ? 1 : 0;
+                                auto sig = xSig ^ ySig ^ zSig;
+                                if (sig)
+                                    return 0x01010101;
+                                else
+                                    return 0x0;
+                            }
+                            return 0x0;
+                        });
                 slice++;
             }
         }

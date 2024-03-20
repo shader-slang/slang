@@ -11,7 +11,7 @@
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 buffer MyBlockName2
 {
-    uint data[];
+    uint data[1];
 } outputBuffer;
 
 layout(local_size_x = 1) in;
@@ -58,18 +58,18 @@ bool checkAllImageSize()
 bool checkAllImageLoad()
 {
     return true
-        && imageLoad(image_1d, 0).x == vec4(1).x
-        && imageLoad(image_buffer, 0).x == vec4(1).x
-        && imageLoad(image_1dArray, ivec2(0)).x == vec4(1).x
-        && imageLoad(image_2d, ivec2(0)).x == vec4(1).x
-        && imageLoad(image_2dRect, ivec2(0)).x == vec4(1).x
-        && imageLoad(image_2dMultiSample, ivec2(0), 1).x == vec4(1).x
-        && imageLoad(image_2dArray, ivec3(0)).x == vec4(1).x
-        && imageLoad(image_3d, ivec3(0)).x == vec4(1).x
-        && imageLoad(image_cube, ivec3(0)).x == vec4(1).x
-        && imageLoad(image_cubeArray, ivec3(0)).x == vec4(1).x
-        && imageLoad(image_cubeArray, ivec3(0)).x == vec4(1).x
-        && imageLoad(image_2dMultiSampleArray, ivec3(0), 1).x == vec4(1).x
+        && imageLoad(image_1d, 0).x == 1
+        && imageLoad(image_buffer, 0).x == 1
+        && imageLoad(image_1dArray, ivec2(0)).x == 1
+        && imageLoad(image_2d, ivec2(0)).x == 1
+        && imageLoad(image_2dRect, ivec2(0)).x == 1
+        && imageLoad(image_2dMultiSample, ivec2(0), 1).x == 1
+        && imageLoad(image_2dArray, ivec3(0)).x == 1
+        && imageLoad(image_3d, ivec3(0)).x == 1
+        && imageLoad(image_cube, ivec3(0)).x == 1
+        && imageLoad(image_cubeArray, ivec3(0)).x == 1
+        && imageLoad(image_cubeArray, ivec3(0)).x == 1
+        && imageLoad(image_2dMultiSampleArray, ivec3(0), 1).x == 1
         ;
 }
 bool resetAllImageValues()
@@ -159,7 +159,6 @@ bool checkAllImageStore()
     loadCheck = loadCheck && load_image_2dMultiSampleArray() == 0;
     resetAllImageValues();
     return loadCheck;
-        ;
 }
 bool checkAllImageSamples()
 {
@@ -283,9 +282,12 @@ bool checkAllImageAtomicMax()
         ;
 }
 #endif // #ifdef TEST_when_shader_atomic_float2_is_available
-bool imageOperations()
+
+// CHECK_GLSL: void main(
+// CHECK_SPV: OpEntryPoint
+void computeMain()
 {
-    return true
+    outputBuffer.data[0] = true
         && checkAllImageSize()
         && checkAllImageLoad()
         && checkAllImageStore()
@@ -296,15 +298,6 @@ bool imageOperations()
         && checkAllImageAtomicMin()
         && checkAllImageAtomicMax()
 #endif // #ifdef TEST_when_shader_atomic_float2_is_available
-        ;
-}
-
-// CHECK_GLSL: void main(
-// CHECK_SPV: OpEntryPoint
-void computeMain()
-{
-    outputBuffer.data[0] = true
-        && imageOperations()
         ;
     // BUF: 1
 }

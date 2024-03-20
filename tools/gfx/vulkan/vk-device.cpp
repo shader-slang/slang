@@ -1662,67 +1662,68 @@ Result DeviceImpl::createTextureResource(
             switch(formatInfo.channelType)
             {
             case SLANG_SCALAR_TYPE_INT32:
-                memcpy(&data, initData->data, sizeof(data));
+                for(int i = 0; i < 4; i++)
+                    clearColor.int32[i] = *reinterpret_cast<int32_t*>(const_cast<void*>(initData->data));
                 break;
             case SLANG_SCALAR_TYPE_UINT32:
-                memcpy(&data, initData->data, sizeof(data));
+                for(int i = 0; i < 4; i++)
+                    clearColor.uint32[i] = *reinterpret_cast<uint32_t*>(const_cast<void*>(initData->data));                break;
+                break;
             case SLANG_SCALAR_TYPE_INT64:
             {
-                int32_t tmpData = int32_t(((int64_t*)initData->data)[0]);
-                memcpy(&data, &tmpData, sizeof(data));
+                for(int i = 0; i < 4; i++)
+                    clearColor.int32[i] = int32_t(*reinterpret_cast<int64_t*>(const_cast<void*>(initData->data)));
                 break;
             }
             case SLANG_SCALAR_TYPE_UINT64:
             {
-                uint32_t tmpData = uint32_t(((uint64_t*)initData->data)[0]);
-                memcpy(&data, &tmpData, sizeof(data));
+                for(int i = 0; i < 4; i++)
+                    clearColor.uint32[i] = uint32_t(*reinterpret_cast<uint64_t*>(const_cast<void*>(initData->data)));
                 break;
             }
             case SLANG_SCALAR_TYPE_FLOAT16:
             {
-                float tmpData = HalfToFloat(((uint16_t*)initData->data)[0]);
-                memcpy(&data, &tmpData, sizeof(data));
+                for(int i = 0; i < 4; i++)
+                    clearColor.float32[i] = HalfToFloat(*reinterpret_cast<uint16_t*>(const_cast<void*>(initData->data)));
                 break;
             }
             case SLANG_SCALAR_TYPE_FLOAT32:
             {
-                float tmpData = float(((float*)initData->data)[0]);
-                memcpy(&data, &tmpData, sizeof(data));
+                for(int i = 0; i < 4; i++)
+                    clearColor.float32[i] = (*reinterpret_cast<float*>(const_cast<void*>(initData->data)));
                 break;
             }
             case SLANG_SCALAR_TYPE_FLOAT64:
             {
-                float tmpData = float(((double*)initData->data)[0]);
-                memcpy(&data, &tmpData, sizeof(data));
+                for(int i = 0; i < 4; i++)
+                    clearColor.float32[i] = float(*reinterpret_cast<double*>(const_cast<void*>(initData->data)));
                 break;
             }
             case SLANG_SCALAR_TYPE_INT8:
             {
-                int32_t tmpData = int32_t(((int8_t*)initData->data)[0]);
-                memcpy(&data, &tmpData, sizeof(data));
+                for(int i = 0; i < 4; i++)
+                    clearColor.int32[i] = int32_t(*reinterpret_cast<int8_t*>(const_cast<void*>(initData->data)));
                 break;
             }
             case SLANG_SCALAR_TYPE_UINT8:
             {
-                uint32_t tmpData = uint32_t(((uint8_t*)initData->data)[0]);
-                memcpy(&data, &tmpData, sizeof(data));
+                for(int i = 0; i < 4; i++)
+                    clearColor.uint32[i] = uint32_t(*reinterpret_cast<uint8_t*>(const_cast<void*>(initData->data)));
                 break;
             }
             case SLANG_SCALAR_TYPE_INT16:
             {
-                int32_t tmpData = int32_t(((int32_t*)initData->data)[0]);
-                memcpy(&data, &tmpData, sizeof(data));
+                for(int i = 0; i < 4; i++)
+                    clearColor.int32[i] = int32_t(*reinterpret_cast<int16_t*>(const_cast<void*>(initData->data)));
                 break;
             }
             case SLANG_SCALAR_TYPE_UINT16:
             {
-                uint32_t tmpData = uint32_t(((uint16_t*)initData->data)[0]);
-                memcpy(&data, &tmpData, sizeof(data));
+                for(int i = 0; i < 4; i++)
+                    clearColor.uint32[i] = uint32_t(*reinterpret_cast<uint16_t*>(const_cast<void*>(initData->data)));
                 break;
             }
             };
-            uint32_t data_arr[4] = {data, data, data, data};
-            memcpy(clearColor.uint32, data_arr, sizeof(VkClearColorValue));
 
             VkImageSubresourceRange range{};
             range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -2263,12 +2264,13 @@ Result DeviceImpl::createBufferView(
                 if (desc.type == IResourceView::Type::UnorderedAccess)
                 {
                     bufferViewUsage.usage = VK_BUFFER_USAGE_2_STORAGE_TEXEL_BUFFER_BIT_KHR;
-                    info.pNext = &bufferViewUsage;
                 }
                 else if (desc.type == IResourceView::Type::ShaderResource)
                 {
                     bufferViewUsage.usage = VK_BUFFER_USAGE_2_UNIFORM_TEXEL_BUFFER_BIT_KHR;
                 }
+                else
+                    assert(!"unhandled");
 
                 SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateBufferView(m_device, &info, nullptr, &view));
             }

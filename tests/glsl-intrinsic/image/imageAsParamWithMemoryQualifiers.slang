@@ -6,7 +6,7 @@
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 buffer MyBlockName2
 {
-    uint data[];
+    uint data[1];
 } outputBuffer;
 
 layout(local_size_x = 4) in;
