@@ -1785,14 +1785,17 @@ struct SPIRVEmitContext
         case SpvImageFormatR32ui:
             if(setCapabilityMask == SpvCapabilityShader) return;
             requireSPIRVCapability(SpvCapabilityShader);
+            return;
         case SpvImageFormatR64ui:
         case SpvImageFormatR64i:
             if(setCapabilityMask == SpvCapabilityInt64ImageEXT) return;
             ensureExtensionDeclaration(UnownedStringSlice("SPV_EXT_shader_image_int64"));
             requireSPIRVCapability(SpvCapabilityInt64ImageEXT);
+            return;
         default:
             if(setCapabilityMask == SpvCapabilityStorageImageExtendedFormats) return;
             requireSPIRVCapability(SpvCapabilityStorageImageExtendedFormats);
+            return;
         }
     }
 
@@ -1926,7 +1929,8 @@ struct SPIRVEmitContext
         //
         // SPIR-V requires that the sampled/rw info on the image isn't unknown
         SLANG_ASSERT(sampled == sampledImage || sampled == readWriteImage);
-        if(isMultisampled) requireSPIRVCapability(SpvCapabilityStorageImageMultisample);
+        if(isMultisampled) 
+            requireSPIRVCapability(SpvCapabilityStorageImageMultisample);
         switch(dim)
         {
         case SpvDim1D:

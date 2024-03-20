@@ -2609,8 +2609,7 @@ void compareParamToArgumentMemoryQualifier(
     auto val = loweredArg.val;
     if (!((loweredArg.flavor == LoweredValInfo::Flavor::Simple
         || loweredArg.flavor == LoweredValInfo::Flavor::Ptr)
-        && val->getFullType()->getOp() >= kIROp_FirstTextureTypeBase
-        && val->getFullType()->getOp() <= kIROp_LastTextureTypeBase))
+        && val->getFullType()->getOp() == kIROp_TextureType))
         return;
 
     IROp opThis;

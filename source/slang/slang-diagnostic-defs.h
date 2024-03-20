@@ -356,7 +356,7 @@ DIAGNOSTIC(30098, Error, nonStaticMemberFunctionNotAllowedAsDiffOperand, "non-st
 
 DIAGNOSTIC(30099, Error, sizeOfArgumentIsInvalid, "argument to sizeof is invalid")
 
-DIAGNOSTIC(30101, Error, readingFromWriteOnly, "right of '=' is writeonly (cannot be used for reading). Check modifiers.")
+DIAGNOSTIC(30101, Error, readingFromWriteOnly, "cannot read from writeonly, check modifiers.")
 
 // Include
 DIAGNOSTIC(30500, Error, includedFileMissingImplementing, "missing 'implementing' declaration in the included source file '$0'.")

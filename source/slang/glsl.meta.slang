@@ -2831,7 +2831,7 @@ public const int GL_TEXTURE_CUBE_MAP_POSITIVE_Z = 4;
 public const int GL_TEXTURE_CUBE_MAP_NEGATIVE_Z = 5;
 
 __generic<T : __BuiltinType>
-[ForceInline] void typeRequireChecks_image_atomic_teir1()
+[ForceInline] void typeRequireChecks_image_atomic_tier1()
 {
     __target_switch
     {
@@ -2853,7 +2853,7 @@ __generic<T : __BuiltinType>
 }
 
 __generic<T : __BuiltinType>
-[ForceInline] void typeRequireChecks_image_atomic_teir2()
+[ForceInline] void typeRequireChecks_image_atomic_tier2()
 {
     __target_switch
     {
@@ -3092,7 +3092,7 @@ ${{{{
         [require(glsl)]
         [ForceInline] public $(targetType.type) imageAtomicAdd($(IMAGE_PARAMS), $(targetType.type) data)
         {
-            typeRequireChecks_image_atomic_teir1<$(targetType.type)>();
+            typeRequireChecks_image_atomic_tier1<$(targetType.type)>();
             __target_switch
             {
             case glsl: __intrinsic_asm "imageAtomicAdd($*0)";
@@ -3114,7 +3114,7 @@ ${{{{
         [require(glsl)]
         [ForceInline] public $(targetType.type) imageAtomicExchange($(IMAGE_PARAMS), $(targetType.type) data)
         {
-            typeRequireChecks_image_atomic_teir1<$(targetType.type)>();
+            typeRequireChecks_image_atomic_tier1<$(targetType.type)>();
             __target_switch
             {
             case glsl: __intrinsic_asm "imageAtomicExchange($*0)";
@@ -3136,7 +3136,7 @@ ${{{{
         [require(glsl)]
         [ForceInline] public $(targetType.type) imageAtomicMin($(IMAGE_PARAMS), $(targetType.type) data)
         {
-            typeRequireChecks_image_atomic_teir2<$(targetType.type)>();
+            typeRequireChecks_image_atomic_tier2<$(targetType.type)>();
             __target_switch
             {
             case glsl: __intrinsic_asm "imageAtomicMin($*0)";
@@ -3158,7 +3158,7 @@ ${{{{
         [require(glsl)]
         [ForceInline] public $(targetType.type) imageAtomicMax($(IMAGE_PARAMS), $(targetType.type) data)
         {
-            typeRequireChecks_image_atomic_teir2<$(targetType.type)>();
+            typeRequireChecks_image_atomic_tier2<$(targetType.type)>();
             __target_switch
             {
             case glsl: __intrinsic_asm "imageAtomicMax($*0)";

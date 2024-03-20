@@ -142,6 +142,11 @@ INST(Nop, nop, 0, 0)
 
     INST(TextureFootprintType, TextureFootprintType, 1, HOISTABLE)
 
+    INST(TextureShape1DType, TextureShape1DType, 0, HOISTABLE)
+    INST(TextureShape2DType, TextureShape1DType, 0, HOISTABLE)
+    INST(TextureShape3DType, TextureShape1DType, 0, HOISTABLE)
+    INST(TextureShapeCubeType, TextureShape1DType, 0, HOISTABLE)
+    INST(TextureShapeBufferType, TextureShapeBufferType, 0, HOISTABLE)
 
     // TODO: Why do we have all this hierarchy here, when everything
     // that actually matters is currently nested under `TextureTypeBase`?
@@ -150,11 +155,6 @@ INST(Nop, nop, 0, 0)
             /* TextureTypeBase */
                 /* TextureType */
                 INST(TextureType, TextureType, 8, HOISTABLE)
-                INST(TextureShape1DType, TextureShape1DType, 0, HOISTABLE)
-                INST(TextureShape2DType, TextureShape1DType, 0, HOISTABLE)
-                INST(TextureShape3DType, TextureShape1DType, 0, HOISTABLE)
-                INST(TextureShapeCubeType, TextureShape1DType, 0, HOISTABLE)
-                INST(TextureShapeBufferType, TextureShapeBufferType, 0, HOISTABLE)
                 /* GLSLImageType */
                 INST(GLSLImageType, GLSLImageType, 0, USE_OTHER | HOISTABLE)
             INST_RANGE(TextureTypeBase, TextureType, GLSLImageType)
