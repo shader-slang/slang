@@ -31,14 +31,15 @@ scope = [
         'https://www.googleapis.com/auth/drive.file'
         ]
 
-creds_str = os.environ[ 'google_drive' ]
+github_sha = os.environ[ 'github_sha' ]
+creds_str = os.environ[ 'slang_verif_svc' ]
 
 creds_dict = eval(creds_str)
 
 creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 client = gspread.authorize(creds)
 
-sheet = client.open("slangtest").sheet1
+sheet = client.open("Falcor Nightly Perf Results").sheet1
 python_sheet = sheet.get_all_records()
 
 num_rows = len(python_sheet)
@@ -47,6 +48,8 @@ sheet_row = []
 sheet_index = num_rows + 2
     
 for date_key in rtn_json.keys():
+    sheet_row.append(str(date_key))
+    sheet_row.append(github_sha)
     for result_key in rtn_json[date_key].keys():
         for flow_key in rtn_json[date_key][result_key].keys():
             sheet_row.append(rtn_json[date_key][result_key][flow_key])
