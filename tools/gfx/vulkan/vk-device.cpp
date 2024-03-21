@@ -2257,23 +2257,23 @@ Result DeviceImpl::createBufferView(
                 info.buffer = resourceImpl->m_buffer.m_buffer;
                 info.offset = offset;
                 info.range = size;
-                //VkBufferUsageFlags2CreateInfoKHR bufferViewUsage{};
-                //bufferViewUsage.sType = VK_STRUCTURE_TYPE_BUFFER_USAGE_FLAGS_2_CREATE_INFO_KHR;
+                VkBufferUsageFlags2CreateInfoKHR bufferViewUsage{};
+                bufferViewUsage.sType = VK_STRUCTURE_TYPE_BUFFER_USAGE_FLAGS_2_CREATE_INFO_KHR;
 
-                //if (desc.type == IResourceView::Type::UnorderedAccess)
-                //{
-                //    info.pNext = &bufferViewUsage;
-                //    bufferViewUsage.usage = VK_BUFFER_USAGE_2_STORAGE_TEXEL_BUFFER_BIT_KHR;
-                //}
-                //else if (desc.type == IResourceView::Type::ShaderResource)
-                //{
-                //    info.pNext = &bufferViewUsage;
-                //    bufferViewUsage.usage = VK_BUFFER_USAGE_2_UNIFORM_TEXEL_BUFFER_BIT_KHR;
-                //}
-                //else
-                //{
-                //    assert(!"unhandled");
-                //}
+                if (desc.type == IResourceView::Type::UnorderedAccess)
+                {
+                    info.pNext = &bufferViewUsage;
+                    bufferViewUsage.usage = VK_BUFFER_USAGE_2_STORAGE_TEXEL_BUFFER_BIT_KHR;
+                }
+                else if (desc.type == IResourceView::Type::ShaderResource)
+                {
+                    info.pNext = &bufferViewUsage;
+                    bufferViewUsage.usage = VK_BUFFER_USAGE_2_UNIFORM_TEXEL_BUFFER_BIT_KHR;
+                }
+                else
+                {
+                    assert(!"unhandled");
+                }
 
                 SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateBufferView(m_device, &info, nullptr, &view));
             }
