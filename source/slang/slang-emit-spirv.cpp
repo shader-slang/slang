@@ -3068,6 +3068,12 @@ struct SPIRVEmitContext
                 case Stage::Callable:
                     requireSPIRVCapability(SpvCapabilityRayTracingKHR);
                     ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_ray_tracing"));
+                    break;
+                case Stage::Mesh:
+                case Stage::Amplification:
+                    requireSPIRVCapability(SpvCapabilityMeshShadingEXT);
+                    ensureExtensionDeclaration(UnownedStringSlice("SPV_EXT_mesh_shader"));
+                    break;
                 default:
                     break;
                 }

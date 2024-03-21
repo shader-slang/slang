@@ -1,7 +1,10 @@
 // array-of-buffers.slang
 
-//TEST:CROSS_COMPILE:-target spirv-assembly -entry main -stage fragment
-//TEST:CROSS_COMPILE:-target dxil-assembly  -entry main -stage fragment -profile sm_6_0
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-assembly -entry main -stage fragment
+//TEST:SIMPLE(filecheck=DXIL):-target dxil-assembly  -entry main -stage fragment -profile sm_6_0
+
+// SPIRV: OpEntryPoint
+// DXIL: define void @main()
 
 // This test ensures that we cross-compile arrays of structured/constant
 // buffers into appropriate GLSL, where these are not first-class types.
