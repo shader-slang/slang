@@ -143,6 +143,9 @@ namespace Slang
         // Default case (usable for user-defined conversions)
         kConversionCost_Default = 500,
 
+	// Cost of converting an integer to int16_t
+        kConversionCost_IntegerToShort = 700,
+
         // Catch-all for conversions that should be discouraged
         // (i.e., that really shouldn't be made implicitly)
         //
