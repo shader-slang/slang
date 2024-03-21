@@ -20,6 +20,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-insert-debug-value-store.h"
 #include "slang-ir-check-differentiability.h"
+#include "slang-ir-check-recursive-type.h"
 #include "slang-ir-missing-return.h"
 #include "slang-ir-sccp.h"
 #include "slang-ir-ssa.h"
@@ -10674,6 +10675,9 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     checkForUsingUninitializedOutParams(module, compileRequest->getSink());
 
     checkForMissingReturns(module, compileRequest->getSink());
+
+    // We don't allow recursive types.
+    checkForRecursiveTypes(module, compileRequest->getSink());
 
     // Check for invalid differentiable function body.
     checkAutoDiffUsages(module, compileRequest->getSink());

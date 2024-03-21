@@ -260,6 +260,12 @@ namespace Slang
             for (Index i = 0; i < n; ++i)
                 emitVal(context, modifiedType->getModifier(i));
         }
+        else if (auto andType = as<AndType>(type))
+        {
+            emitRaw(context, "Ta");
+            emitType(context, andType->getLeft());
+            emitType(context, andType->getRight());
+        }
         else
         {
             SLANG_UNEXPECTED("unimplemented case in type mangling");
@@ -601,10 +607,18 @@ namespace Slang
             emitQualifiedName(context, makeDeclRef(innerDecl), true);
             return;
         }
-        else if (as<ForwardDerivativeRequirementDecl>(decl))
+        else if (auto fwdReq = as<ForwardDerivativeRequirementDecl>(decl))
+        {
             emitRaw(context, "FwdReq_");
-        else if (as<BackwardDerivativeRequirementDecl>(decl))
+            emitQualifiedName(context, fwdReq->originalRequirementDecl, true);
+            return;
+        }
+        else if (auto bwdReq = as<BackwardDerivativeRequirementDecl>(decl))
+        {
             emitRaw(context, "BwdReq_");
+            emitQualifiedName(context, bwdReq->originalRequirementDecl, true);
+            return;
+        }
         else
         {
             // TODO: handle other cases

@@ -692,6 +692,7 @@ DIAGNOSTIC(40010, Note, seeInterfaceUsage, "see usage of interface '$0'.")
 
 DIAGNOSTIC(40011, Error, unconstrainedGenericParameterNotAllowedInDynamicFunction, "unconstrained generic paramter '$0' is not allowed in a dynamic function.")
 
+
 DIAGNOSTIC(40020, Error, cannotUnrollLoop, "loop does not terminate within the limited number of iterations, unrolling is aborted.")
 
 DIAGNOSTIC(40030, Fatal, functionNeverReturnsFatal, "function '$0' never returns, compilation ceased.")
@@ -699,6 +700,7 @@ DIAGNOSTIC(40030, Fatal, functionNeverReturnsFatal, "function '$0' never returns
 // 41000 - IR-level validation issues
 
 DIAGNOSTIC(41000, Warning, unreachableCode, "unreachable code detected")
+DIAGNOSTIC(41001, Error, recursiveType, "type '$0' contains cyclic reference to itself.")
 
 DIAGNOSTIC(41010, Warning, missingReturn, "control flow may reach end of non-'void' function")
 DIAGNOSTIC(41015, Error, usingUninitializedValue, "use of uninitialized value '$0'")
@@ -793,6 +795,8 @@ DIAGNOSTIC(54004, Warning, unnecessaryHLSLMeshOutputModifier, "Unnecessary HLSL 
 DIAGNOSTIC(55101, Error, invalidTorchKernelReturnType, "'$0' is not a valid return type for a pytorch kernel function.")
 DIAGNOSTIC(55102, Error, invalidTorchKernelParamType, "'$0' is not a valid parameter type for a pytorch kernel function.")
 
+DIAGNOSTIC(55200, Error, unsupportedBuiltinType, "'$0' is not a supported builtin type for the target.")
+DIAGNOSTIC(55201, Error, unsupportedRecursion, "recursion detected in call to '$0', but the current code generation target does not allow recursion.")
 DIAGNOSTIC(56001, Error, unableToAutoMapCUDATypeToHostType, "Could not automatically map '$0' to a host type. Automatic binding generation failed for '$1'")
 
 DIAGNOSTIC(57001, Warning, spirvOptFailed, "spirv-opt failed. $0")

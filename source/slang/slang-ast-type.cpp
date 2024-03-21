@@ -108,7 +108,7 @@ Val* DeclRefType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSe
     // If this declref type is a direct reference to ThisType or a Generic parameter,
     // and `subst` provides an argument for it, then we should just return that argument.
     //
-    if (as<DirectDeclRef>(substDeclRef.declRefBase))
+    if (as<DirectDeclRef>(substDeclRef.declRefBase) || as<MemberDeclRef>(substDeclRef.declRefBase))
     {
         if (as<ThisTypeDecl>(substDeclRef.getDecl()))
         {

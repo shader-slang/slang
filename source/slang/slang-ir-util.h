@@ -89,6 +89,8 @@ bool isValueType(IRInst* type);
 
 bool isSimpleDataType(IRType* type);
 
+SourceLoc findFirstUseLoc(IRInst* inst);
+
 inline bool isChildInstOf(IRInst* inst, IRInst* parent)
 {
     while (inst)
