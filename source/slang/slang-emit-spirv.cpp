@@ -1816,6 +1816,7 @@ struct SPIRVEmitContext
                 break;
             case SLANG_TEXTURE_BUFFER:
                 dim = SpvDimBuffer;
+                break;
             case SLANG_TEXTURE_SUBPASS:
                 dim = SpvDimSubpassData;
                 break;
