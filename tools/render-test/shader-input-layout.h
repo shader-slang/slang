@@ -31,16 +31,6 @@ enum class InputTextureContent
     Zero, One, ChessBoard, Gradient
 };
 
-enum InputTextureSampleCount
-{
-    One = 1,
-    Two = 2,
-    Four = 4,
-    Eight = 8,
-    Sixteen = 16,
-    ThirtyTwo = 32,
-    SixtyFour = 64,
-};
 struct InputTextureDesc
 {
     int dimension = 2;
@@ -51,7 +41,6 @@ struct InputTextureDesc
     int size = 4;
     int mipMapCount = 0;            ///< 0 means the maximum number of mips will be bound
 
-    InputTextureSampleCount sampleCount = InputTextureSampleCount::One;
     Format format = Format::R8G8B8A8_UNORM;            
 
     InputTextureContent content = InputTextureContent::One;
