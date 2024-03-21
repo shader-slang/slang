@@ -560,6 +560,8 @@ The details of how Slang computes layout, what guarantees it makes, and how to i
 Because the layout computed for shader parameters may depend on the compilation target, the `getLayout()` method actually takes a `targetIndex` parameter that is the zero-based index of the target for which layout information is being queried.
 This parameter defaults to zero as a convenience for the common case where applications use only a single compilation target at runtime.
 
+See [Using the Reflection API] chapter for more details on the reflection API.
+
 ### Linking
 
 Before generating code, you must link the program to resolve all cross-module references. This can be done by calling
@@ -594,6 +596,26 @@ linkedProgram->getEntryPointCode(
 Any diagnostic messages related to back-end code generation (for example, if the chosen entry point requires features not available on the chosen target) will be written to `diagnostics`.
 The `kernelBlob` output is a `slang::IBlob` that can be used to access the generated code (whether binary or textual).
 In many cases `kernelBlob->getBufferPointer()` can be passed directly to the appropriate graphics API to load kernel code onto a GPU.
+
+
+## Multithreading
+
+The only functions which are currently thread safe are 
+
+```C++
+SlangSession* spCreateSession(const char* deprecated);
+SlangResult slang_createGlobalSession(SlangInt apiVersion, slang::IGlobalSession** outGlobalSession);
+SlangResult slang_createGlobalSessionWithoutStdLib(SlangInt apiVersion, slang::IGlobalSession** outGlobalSession);
+ISlangBlob* slang_getEmbeddedStdLib();
+SlangResult slang::createGlobalSession(slang::IGlobalSession** outGlobalSession);
+const char* spGetBuildTagString();
+```
+
+This assumes Slang has been built with the C++ multithreaded runtime, as is the default.
+
+All other functions and methods are not [reentrant](https://en.wikipedia.org/wiki/Reentrancy_(computing)) and can only execute on a single thread. More precisely function and methods can only be called on a *single* thread at *any one time*. This means for example a global session can be used across multiple threads, as long as some synchronisation enforces that only one thread can be in a Slang call at any one time.
+
+Much of the Slang API is available through [COM interfaces](https://en.wikipedia.org/wiki/Component_Object_Model). In strict COM interfaces should be atomically reference counted. Currently *MOST* Slang API COM interfaces are *NOT* atomic reference counted. One exception is the `ISlangSharedLibrary` interface when produced from [host-callable](cpu-target.md#host-callable). It is atomically reference counted, allowing it to persist and be used beyond the original compilation and be freed on a different thread. 
 
 
 ## Compiler Options

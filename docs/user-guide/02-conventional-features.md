@@ -158,8 +158,18 @@ enum Channel
 }
 ```
 
-> #### Note ####
-> Unlike C/C++, `enum` types in Slang are always scoped (like `enum class` in C++). You can write `enum class` in Slang if it makes you happy, but it isn't required.
+Unlike C/C++, `enum` types in Slang are always scoped by default (like `enum class` in C++). You can write `enum class` in Slang if it makes you happy, but it isn't required. If you want a `enum` type to be unscoped, you can use the `[UnscopedEnum]` attribute:
+```csharp
+[[UnscopedEnum]
+enum Channel
+{
+    Red, Green, Blue
+}
+void test(Channel c)
+{
+    if (c == Red) { /*...*/ }
+}
+```
 
 ### Opaque Types
 

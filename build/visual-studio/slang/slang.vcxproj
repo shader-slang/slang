@@ -373,6 +373,8 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ir-bit-field-accessors.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-byte-address-legalize.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-check-differentiability.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-check-recursive-type.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-check-unsupported-inst.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-cleanup-void.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-clone.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-collect-global-uniforms.h" />
@@ -386,6 +388,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ir-dll-export.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-dll-import.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-dominators.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-early-raytracing-intrinsic-simplification.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-eliminate-multilevel-break.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-eliminate-phis.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-entry-point-pass.h" />
@@ -472,6 +475,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ir-translate-glsl-global-var.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-uniformity.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-use-uninitialized-out-param.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-user-type-hint.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-util.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-validate.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-vk-invert-y.h" />
@@ -595,6 +599,8 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ir-bit-field-accessors.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-byte-address-legalize.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-check-differentiability.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-check-recursive-type.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-check-unsupported-inst.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-cleanup-void.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-clone.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-collect-global-uniforms.cpp" />
@@ -609,6 +615,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ir-dll-export.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-dll-import.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-dominators.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-early-raytracing-intrinsic-simplification.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-eliminate-multilevel-break.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-eliminate-phis.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-entry-point-pass.cpp" />
@@ -693,6 +700,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ir-translate-glsl-global-var.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-uniformity.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-use-uninitialized-out-param.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-user-type-hint.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-util.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-validate.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-vk-invert-y.cpp" />

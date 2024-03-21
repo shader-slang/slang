@@ -20,6 +20,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-insert-debug-value-store.h"
 #include "slang-ir-check-differentiability.h"
+#include "slang-ir-check-recursive-type.h"
 #include "slang-ir-missing-return.h"
 #include "slang-ir-sccp.h"
 #include "slang-ir-ssa.h"
@@ -2141,18 +2142,38 @@ void addVarDecorations(
         else if(auto rayPayloadAttr = as<VulkanRayPayloadAttribute>(mod))
         {
             builder->addVulkanRayPayloadDecoration(inst, rayPayloadAttr->location);
+            // may not be referenced; adding HLSL export modifier force emits
+            builder->addHLSLExportDecoration(inst);
+        }
+        else if(auto rayPayloadInAttr = as<VulkanRayPayloadInAttribute>(mod))
+        {
+            builder->addVulkanRayPayloadInDecoration(inst, rayPayloadInAttr->location);
+            // may not be referenced; adding HLSL export modifier force emits
+            builder->addHLSLExportDecoration(inst);
         }
         else if(auto callablePayloadAttr = as<VulkanCallablePayloadAttribute>(mod))
         {
             builder->addVulkanCallablePayloadDecoration(inst, callablePayloadAttr->location);
+            // may not be referenced; adding HLSL export modifier force emits
+            builder->addHLSLExportDecoration(inst);
+        }
+        else if(auto callablePayloadInAttr = as<VulkanCallablePayloadInAttribute>(mod))
+        {
+            builder->addVulkanCallablePayloadInDecoration(inst, callablePayloadInAttr->location);
+            // may not be referenced; adding HLSL export modifier force emits
+            builder->addHLSLExportDecoration(inst);
         }
         else if (auto hitObjectAttr = as<VulkanHitObjectAttributesAttribute>(mod))
         {
             builder->addVulkanHitObjectAttributesDecoration(inst, hitObjectAttr->location);
+            // may not be referenced; adding HLSL export modifier force emits
+            builder->addHLSLExportDecoration(inst);
         }
         else if (as<VulkanHitAttributesAttribute>(mod))
         {
             builder->addSimpleDecoration<IRVulkanHitAttributesDecoration>(inst);
+            // may not be referenced; adding HLSL export modifier force emits
+            builder->addHLSLExportDecoration(inst);
         }
         else if(as<GloballyCoherentModifier>(mod))
         {
@@ -2182,6 +2203,11 @@ void addVarDecorations(
         {
             builder->addDecoration(inst, kIROp_GLSLLocationDecoration,
                 builder->getIntValue(builder->getIntType(), stringToInt(glslLocationMod->valToken.getContent())));
+        }
+        else if (auto glslOffsetMod = as<GLSLOffsetLayoutAttribute>(mod))
+        {
+            builder->addDecoration(inst, kIROp_GLSLOffsetDecoration,
+                builder->getIntValue(builder->getIntType(), glslOffsetMod->offset));
         }
         else if (auto hlslSemantic = as< HLSLSimpleSemantic>(mod))
         {
@@ -4057,6 +4083,36 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             case SPIRVAsmOperand::EntryPoint:
                 {
                     return builder->emitSPIRVAsmOperandEntryPoint();
+                }
+            case SPIRVAsmOperand::RayPayloadFromLocation:
+                {
+                    IRInst* i;
+                    {
+                        IRBuilderInsertLocScope insertScope(builder);
+                        builder->setInsertBefore(spirvAsmInst);
+                        i = getSimpleVal(context, lowerRValueExpr(context, operand.expr));
+                    }
+                    return builder->emitSPIRVAsmOperandRayPayloadFromLocation(i);
+                }
+            case SPIRVAsmOperand::RayAttributeFromLocation:
+                {
+                    IRInst* i;
+                    {
+                        IRBuilderInsertLocScope insertScope(builder);
+                        builder->setInsertBefore(spirvAsmInst);
+                        i = getSimpleVal(context, lowerRValueExpr(context, operand.expr));
+                    }
+                    return builder->emitSPIRVAsmOperandRayAttributeFromLocation(i);
+                }
+            case SPIRVAsmOperand::RayCallableFromLocation:
+                {
+                    IRInst* i;
+                    {
+                        IRBuilderInsertLocScope insertScope(builder);
+                        builder->setInsertBefore(spirvAsmInst);
+                        i = getSimpleVal(context, lowerRValueExpr(context, operand.expr));
+                    }
+                    return builder->emitSPIRVAsmOperandRayCallableFromLocation(i);
                 }
             }
             SLANG_UNREACHABLE("Unhandled case in visitSPIRVAsmExpr");
@@ -10609,6 +10665,9 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     checkForUsingUninitializedOutParams(module, compileRequest->getSink());
 
     checkForMissingReturns(module, compileRequest->getSink());
+
+    // We don't allow recursive types.
+    checkForRecursiveTypes(module, compileRequest->getSink());
 
     // Check for invalid differentiable function body.
     checkAutoDiffUsages(module, compileRequest->getSink());

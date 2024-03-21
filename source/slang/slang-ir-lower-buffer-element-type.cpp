@@ -24,9 +24,10 @@ namespace Slang
 
         SlangMatrixLayoutMode defaultMatrixLayout = SLANG_MATRIX_LAYOUT_ROW_MAJOR;
         TargetProgram* target;
+        bool lowerBufferPointer = false;
 
-        LoweredElementTypeContext(TargetProgram* target, SlangMatrixLayoutMode inDefaultMatrixLayout)
-            : target(target), defaultMatrixLayout(inDefaultMatrixLayout)
+        LoweredElementTypeContext(TargetProgram* target, bool lowerBufferPointer, SlangMatrixLayoutMode inDefaultMatrixLayout)
+            : target(target), defaultMatrixLayout(inDefaultMatrixLayout), lowerBufferPointer(lowerBufferPointer)
         {}
 
         IRFunc* createMatrixUnpackFunc(
@@ -460,7 +461,15 @@ namespace Slang
 
         LoweredElementTypeInfo getLoweredTypeInfo(IRType* type, IRTypeLayoutRules* rules)
         {
+            // If `type` is already a lowered type, no more lowering is required.
             LoweredElementTypeInfo info;
+            if (auto pInfo = mapLoweredTypeToInfo->tryGetValue(type))
+            {
+                info.originalType = type;
+                info.loweredType = type;
+                return info;
+            }
+
             if (loweredTypeInfo[(int)rules->ruleName].tryGetValue(type, info))
                 return info;
             info = getLoweredTypeInfoImpl(type, rules);
@@ -513,10 +522,21 @@ namespace Slang
             for (auto globalInst : module->getGlobalInsts())
             {
                 IRType* elementType = nullptr;
-                if (auto structBuffer = as<IRHLSLStructuredBufferTypeBase>(globalInst))
-                    elementType = structBuffer->getElementType();
-                else if (auto constBuffer = as<IRUniformParameterGroupType>(globalInst))
-                    elementType = constBuffer->getElementType();
+                if (lowerBufferPointer)
+                {
+                    if (auto ptrType = as<IRPtrType>(globalInst))
+                    {
+                        if (ptrType->getAddressSpace() == SpvStorageClassPhysicalStorageBuffer)
+                            elementType = ptrType->getValueType();
+                    }
+                }
+                else
+                {
+                    if (auto structBuffer = as<IRHLSLStructuredBufferTypeBase>(globalInst))
+                        elementType = structBuffer->getElementType();
+                    else if (auto constBuffer = as<IRUniformParameterGroupType>(globalInst))
+                        elementType = constBuffer->getElementType();
+                }
                 if (as<IRTextureBufferType>(globalInst))
                     continue;
                 if (!as<IRStructType>(elementType) && !as<IRMatrixType>(elementType) && !as<IRArrayType>(elementType) && !as<IRBoolType>(elementType))
@@ -631,7 +651,7 @@ namespace Slang
                                         for (UInt i = 0; i < user->getOperandCount(); i++)
                                             args.add(user->getOperand(i));
                                         auto newArrayPtrVal = builder.emitFieldAddress(
-                                            builder.getPtrType(loweredElementTypeInfo.loweredInnerArrayType),
+                                            getLoweredPtrLikeType(ptrVal->getDataType(), loweredElementTypeInfo.loweredInnerArrayType),
                                             ptrVal,
                                             loweredElementTypeInfo.loweredInnerStructKey);
                                         builder.replaceOperand(use, newArrayPtrVal);
@@ -654,17 +674,19 @@ namespace Slang
                                 }
                                 break;
                             case kIROp_RWStructuredBufferGetElementPtr:
+                            case kIROp_GetOffsetPtr:
                                 ptrValsWorkList.add(user);
                                 break;
                             case kIROp_StructuredBufferGetDimensions:
                                 break;
                             case kIROp_Call:
                                 {
-                                    // If a structured buffer typed value is used directly as an argument,
+                                    // If a structured buffer or pointer typed value is used directly as an argument,
                                     // we don't need to do any marshalling here.
                                     if (as<IRHLSLStructuredBufferTypeBase>(ptrVal->getDataType()))
                                         break;
-
+                                    if (lowerBufferPointer && as<IRPtrType>(ptrVal->getDataType()))
+                                        break;
                                     // If we are calling a function with an l-value pointer from buffer access,
                                     // we need to materialize the object as a local variable, and pass the address
                                     // of the local variable to the function.
@@ -681,7 +703,6 @@ namespace Slang
                                 }
                                 break;
                             default:
-                                SLANG_UNREACHABLE("unhandled inst of a buffer/pointer value that needs storage lowering.");
                                 break;
                             }
                         });
@@ -724,7 +745,7 @@ namespace Slang
                             {
                                 IRInst* resultInst = nullptr;
                                 auto dataPtr = builder.emitFieldAddress(
-                                    builder.getPtrType(matrixTypeInfo->loweredInnerArrayType),
+                                    getLoweredPtrLikeType(majorAddr->getDataType(), matrixTypeInfo->loweredInnerArrayType),
                                     majorGEP->getBase(),
                                     matrixTypeInfo->loweredInnerStructKey);
                                 if (getIntVal(matrixType->getLayout()) == SLANG_MATRIX_LAYOUT_COLUMN_MAJOR)
@@ -753,7 +774,7 @@ namespace Slang
                                 if (storeInst->getOperand(0) != majorAddr)
                                     break;
                                 auto dataPtr = builder.emitFieldAddress(
-                                    builder.getPtrType(matrixTypeInfo->loweredInnerArrayType),
+                                    getLoweredPtrLikeType(majorAddr->getDataType(), matrixTypeInfo->loweredInnerArrayType),
                                     majorGEP->getBase(),
                                     matrixTypeInfo->loweredInnerStructKey);
                                 if (getIntVal(matrixType->getLayout()) == SLANG_MATRIX_LAYOUT_COLUMN_MAJOR)
@@ -783,7 +804,7 @@ namespace Slang
                                     Swap(rowIndex, colIndex);
                                 }
                                 auto dataPtr = builder.emitFieldAddress(
-                                    builder.getPtrType(matrixTypeInfo->loweredInnerArrayType),
+                                    getLoweredPtrLikeType(majorAddr->getDataType(), matrixTypeInfo->loweredInnerArrayType),
                                     majorGEP->getBase(),
                                     matrixTypeInfo->loweredInnerStructKey);
                                 auto vectorAddr = builder.emitElementAddress(dataPtr, rowIndex);
@@ -801,12 +822,12 @@ namespace Slang
         }
     };
 
-    void lowerBufferElementTypeToStorageType(TargetProgram* target, IRModule* module)
+    void lowerBufferElementTypeToStorageType(TargetProgram* target, IRModule* module, bool lowerBufferPointer)
     {
         SlangMatrixLayoutMode defaultMatrixMode = (SlangMatrixLayoutMode)target->getOptionSet().getMatrixLayoutMode();
         if (defaultMatrixMode == SLANG_MATRIX_LAYOUT_MODE_UNKNOWN)
             defaultMatrixMode = SLANG_MATRIX_LAYOUT_ROW_MAJOR;
-        LoweredElementTypeContext context(target, defaultMatrixMode);
+        LoweredElementTypeContext context(target, lowerBufferPointer, defaultMatrixMode);
         context.processModule(module);
     }
 
@@ -853,6 +874,8 @@ namespace Slang
         case kIROp_ConstantBufferType:
         case kIROp_ParameterBlockType:
             return IRTypeLayoutRules::getStd140();
+        case kIROp_PtrType:
+            return IRTypeLayoutRules::getNatural();
         }
         return IRTypeLayoutRules::getNatural();
     }

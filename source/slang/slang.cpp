@@ -486,6 +486,7 @@ SlangResult Session::_readBuiltinModule(ISlangFileSystem* fileSystem, Scope* sco
     {
         RefPtr<Module> module(new Module(linkage, srcModule.astBuilder));
         module->setName(moduleName);
+        module->setDigest(srcModule.digest);
 
         ModuleDecl* moduleDecl = as<ModuleDecl>(srcModule.astRootNode);
         // Set the module back reference on the decl
@@ -594,17 +595,6 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
     slang::SessionDesc desc = makeFromSizeVersioned<slang::SessionDesc>((uint8_t*)&inDesc);
 
     RefPtr<Linkage> linkage = new Linkage(this, astBuilder, getBuiltinLinkage());
-    linkage->m_optionSet.load(desc.compilerOptionEntryCount, desc.compilerOptionEntries);
-
-    {
-        const Int targetCount = desc.targetCount;
-        const uint8_t* targetDescPtr = reinterpret_cast<const uint8_t*>(desc.targets);
-        for (Int ii = 0; ii < targetCount; ++ii, targetDescPtr += _getStructureSize(targetDescPtr))
-        {
-            const auto targetDesc = makeFromSizeVersioned<slang::TargetDesc>(targetDescPtr);
-            linkage->addTarget(targetDesc);
-        }
-    }
 
     linkage->setMatrixLayoutMode(desc.defaultMatrixLayoutMode);
 
@@ -630,6 +620,19 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
     {
         linkage->m_optionSet.set(CompilerOptionName::EnableEffectAnnotations, desc.enableEffectAnnotations);
     }
+
+    linkage->m_optionSet.load(desc.compilerOptionEntryCount, desc.compilerOptionEntries);
+
+    {
+        const Int targetCount = desc.targetCount;
+        const uint8_t* targetDescPtr = reinterpret_cast<const uint8_t*>(desc.targets);
+        for (Int ii = 0; ii < targetCount; ++ii, targetDescPtr += _getStructureSize(targetDescPtr))
+        {
+            const auto targetDesc = makeFromSizeVersioned<slang::TargetDesc>(targetDescPtr);
+            linkage->addTarget(targetDesc);
+        }
+    }
+
     *outSession = asExternal(linkage.detach());
     return SLANG_OK;
 }
@@ -3344,6 +3347,7 @@ RefPtr<Module> Linkage::loadModuleFromIRBlobImpl(
     readOptions.sink = sink;
     readOptions.sourceManager = getSourceManager();
     readOptions.namePool = getNamePool();
+    readOptions.modulePath = filePathInfo.foundPath;
     SerialContainerData containerData;
     if (SLANG_FAILED(SerialContainerUtil::read(&container, readOptions, additionalLoadedModules, containerData)) ||
         containerData.modules.getCount() != 1)
@@ -3689,6 +3693,21 @@ bool Linkage::isBinaryModuleUpToDate(String fromPath, RiffContainer* container)
     auto version = String(getBuildTagString());
     digestBuilder.append(version);
     m_optionSet.buildHash(digestBuilder);
+
+    // Find the canonical path of the directory containing the module source file.
+    String moduleSrcPath = "";
+    if (moduleHeader.dependentFiles.getCount())
+    {
+        moduleSrcPath = moduleHeader.dependentFiles.getFirst();
+        IncludeSystem includeSystem(&getSearchDirectories(), getFileSystemExt(), getSourceManager());
+        PathInfo modulePathInfo;
+        if (SLANG_SUCCEEDED(includeSystem.findFile(moduleSrcPath, fromPath, modulePathInfo)))
+        {
+            moduleSrcPath = modulePathInfo.foundPath;
+            Path::getCanonical(moduleSrcPath, moduleSrcPath);
+        }
+    }
+
     for (auto file : moduleHeader.dependentFiles)
     {
         auto sourceFile = loadSourceFile(fromPath, file);
@@ -3697,7 +3716,7 @@ bool Linkage::isBinaryModuleUpToDate(String fromPath, RiffContainer* container)
             // If we cannot find the source file from `fromPath`,
             // try again from the module's source file path.
             if (moduleHeader.dependentFiles.getCount() != 0)
-                sourceFile = loadSourceFile(moduleHeader.dependentFiles.getFirst(), file);
+                sourceFile = loadSourceFile(moduleSrcPath, file);
         }
         if (!sourceFile)
             return false;
@@ -3920,7 +3939,27 @@ ISlangUnknown* Module::getInterface(const Guid& guid)
 
 void Module::buildHash(DigestBuilder<SHA1>& builder)
 {
-    SLANG_UNUSED(builder);
+    builder.append(computeDigest());
+}
+
+SHA1::Digest Module::computeDigest()
+{
+    if (m_digest == SHA1::Digest())
+    {
+        DigestBuilder<SHA1> digestBuilder;
+        auto version = String(getBuildTagString());
+        digestBuilder.append(version);
+        getOptionSet().buildHash(digestBuilder);
+
+        auto fileDependencies = getFileDependencies();
+
+        for (auto file : fileDependencies)
+        {
+            digestBuilder.append(file->getDigest());
+        }
+        m_digest = digestBuilder.finalize();
+    }
+    return m_digest;
 }
 
 void Module::addModuleDependency(Module* module)
@@ -4242,12 +4281,6 @@ SLANG_NO_THROW void SLANG_MCALL ComponentType::getEntryPointHash(
     // Consequently, any encoding differences as a result of different compiler versions
     // will already be reflected in the resulting hash.
     getLinkage()->buildHash(builder, targetIndex);
-
-    // Enumerate all file dependencies and add them to the hash.
-    for (SourceFile* sourceFile : getFileDependencies())
-    {
-        builder.append(sourceFile->getDigest());
-    }
 
     buildHash(builder);
 
@@ -5228,16 +5261,33 @@ void Linkage::prepareDeserializedModule(SerialContainerData::Module& moduleEntry
     module->setIRModule(moduleEntry.irModule);
     module->setModuleDecl(as<ModuleDecl>(moduleEntry.astRootNode));
     module->clearFileDependency();
+    String moduleSourcePath = filePathInfo.foundPath;
+    bool isFirst = true;
     for (auto file : moduleEntry.dependentFiles)
     {
         auto sourceFile = loadSourceFile(filePathInfo.foundPath, file);
+        if (isFirst)
+        {
+            // The first file is the source for the main module file.
+            // We store the module path as the basis for finding the remaining
+            // dependent files.
+            if (sourceFile)
+                moduleSourcePath = sourceFile->getPathInfo().foundPath;
+            isFirst = false;
+        }
+        // If we cannot find the dependent file directly, try to find
+        // it relative to the module source path.
+        if (!sourceFile)
+        {
+            sourceFile = loadSourceFile(moduleSourcePath, file);
+        }
         if (sourceFile)
         {
             module->addFileDependency(sourceFile);
         }
     }
     module->setPathInfo(filePathInfo);
-
+    module->setDigest(moduleEntry.digest);
     module->_collectShaderParams();
     module->_discoverEntryPoints(sink);
 

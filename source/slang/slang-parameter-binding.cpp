@@ -934,6 +934,12 @@ static void addExplicitParameterBinding(
 
         if (overlappedVarLayout)
         {
+            //legal if atomicUint
+            if(parameterInfo->varLayout->varDecl.getDecl()->getType()->astNodeType == ASTNodeType::GLSLAtomicUintType
+                && overlappedVarLayout->varDecl.getDecl()->getType()->astNodeType == ASTNodeType::GLSLAtomicUintType)
+            {
+                return;
+            }
             auto paramA = parameterInfo->varLayout->varDecl.getDecl();
             auto paramB = overlappedVarLayout->varDecl.getDecl();
 
@@ -2270,6 +2276,13 @@ static RefPtr<TypeLayout> computeEntryPointParameterTypeLayout(
             || paramDeclRef.getDecl()->hasModifier<InOutModifier>())
         {
             state.directionMask |= kEntryPointParameterDirection_Output;
+        }
+
+        // For the purposes of type layout, mesh shader outputs are always
+        // treated as output only, despite missing an 'out' modifier
+        if(as<MeshOutputType>(paramDeclRef.getDecl()->getType()))
+        {
+            state.directionMask = kEntryPointParameterDirection_Output;
         }
 
         return processEntryPointVaryingParameterDecl(

@@ -713,6 +713,10 @@ class CallAttribute : public Attribute
 };
                // `[call]`
 
+class UnscopedEnumAttribute : public Attribute
+{
+    SLANG_AST_CLASS(UnscopedEnumAttribute)
+};
 
 // [[vk_push_constant]] [[push_constant]]
 class PushConstantAttribute : public Attribute 
@@ -735,6 +739,14 @@ class GLSLBindingAttribute : public Attribute
  
     int32_t binding = 0;
     int32_t set = 0;
+};
+
+
+class GLSLOffsetLayoutAttribute : public Attribute 
+{
+    SLANG_AST_CLASS(GLSLOffsetLayoutAttribute)
+
+    int64_t offset;
 };
 
 class GLSLSimpleIntegerLayoutAttribute : public Attribute 
@@ -889,7 +901,12 @@ class VulkanRayPayloadAttribute : public Attribute
 
     int location;
 };
+class VulkanRayPayloadInAttribute : public Attribute 
+{
+    SLANG_AST_CLASS(VulkanRayPayloadInAttribute)
 
+    int location;
+};
 
 // A `[__vulkanCallablePayload(location)]` attribute, which is used in the
 // standard library implementation to indicate that a variable
@@ -901,7 +918,12 @@ class VulkanCallablePayloadAttribute : public Attribute
 
     int location;
 };
+class VulkanCallablePayloadInAttribute : public Attribute 
+{
+    SLANG_AST_CLASS(VulkanCallablePayloadInAttribute)
 
+    int location;
+};
 
 // A `[__vulkanHitAttributes]` attribute, which is used in the
 // standard library implementation to indicate that a variable

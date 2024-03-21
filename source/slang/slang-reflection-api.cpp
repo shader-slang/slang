@@ -1315,6 +1315,10 @@ namespace Slang
                 return SLANG_BINDING_TYPE_MUTABLE_RAW_BUFFER;
             }
         }
+        else if (as<GLSLAtomicUintType>(type))
+        {
+            return SLANG_BINDING_TYPE_MUTABLE_RAW_BUFFER;
+        }
         else if( as<GLSLShaderStorageBufferType>(type) )
         {
             // TODO Immutable buffers

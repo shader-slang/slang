@@ -8,15 +8,18 @@
 #include "slang-ir-any-value-inference.h"
 #include "slang-ir-bind-existentials.h"
 #include "slang-ir-byte-address-legalize.h"
+#include "slang-ir-check-unsupported-inst.h"
 #include "slang-ir-collect-global-uniforms.h"
 #include "slang-ir-cleanup-void.h"
 #include "slang-ir-composite-reg-to-mem.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-diff-call.h"
+#include "slang-ir-check-recursive-type.h"
 #include "slang-ir-autodiff.h"
 #include "slang-ir-defunctionalization.h"
 #include "slang-ir-dll-export.h"
 #include "slang-ir-dll-import.h"
+#include "slang-ir-early-raytracing-intrinsic-simplification.h"
 #include "slang-ir-eliminate-phis.h"
 #include "slang-ir-eliminate-multilevel-break.h"
 #include "slang-ir-entry-point-uniforms.h"
@@ -32,6 +35,7 @@
 #include "slang-ir-legalize-varying-params.h"
 #include "slang-ir-link.h"
 #include "slang-ir-com-interface.h"
+#include "slang-ir-user-type-hint.h"
 #include "slang-ir-lower-append-consume-structured-buffer.h"
 #include "slang-ir-lower-binding-query.h"
 #include "slang-ir-lower-generics.h"
@@ -241,7 +245,7 @@ Result linkAndOptimizeIR(
     // If the user specified the flag that they want us to dump
     // IR, then do it here, for the target-specific, but
     // un-specialized IR.
-    dumpIRIfEnabled(codeGenContext, irModule);
+    dumpIRIfEnabled(codeGenContext, irModule, "POST IR VALIDATION");
 
     if(!isKhronosTarget(targetRequest))
         lowerGLSLShaderStorageBufferObjectsToStructuredBuffers(irModule, sink);
@@ -472,6 +476,7 @@ Result linkAndOptimizeIR(
         break;
     }
 
+    checkForRecursiveTypes(irModule, sink);
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 
@@ -536,6 +541,8 @@ Result linkAndOptimizeIR(
     {
         lowerAppendConsumeStructuredBuffers(targetProgram, irModule, sink);
     }
+
+    addUserTypeHintDecorations(irModule);
 
     // We don't need the legalize pass for C/C++ based types
     if(options.shouldLegalizeExistentialAndResourceTypes )
@@ -1035,6 +1042,9 @@ Result linkAndOptimizeIR(
         }
     }
 
+    replaceLocationIntrinsicsWithRaytracingObject(targetProgram, irModule, sink);
+    validateIRModuleIfEnabled(codeGenContext, irModule);
+
     // Run a final round of simplifications to clean up unused things after phi-elimination.
     simplifyNonSSAIR(targetProgram, irModule, IRSimplificationOptions::getFast());
 
@@ -1054,7 +1064,9 @@ Result linkAndOptimizeIR(
 
     outLinkedIR.metadata = metadata;
 
-    return SLANG_OK;
+    checkUnsupportedInst(codeGenContext->getTargetReq(), irModule, sink);
+
+    return sink->getErrorCount() == 0 ? SLANG_OK : SLANG_FAIL;
 }
 
 SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outArtifact)

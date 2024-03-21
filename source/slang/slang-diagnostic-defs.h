@@ -238,6 +238,7 @@ DIAGNOSTIC(20012, Error, invalidSPIRVVersion, "Expecting SPIR-V version as eithe
 DIAGNOSTIC(20013, Error, invalidCUDASMVersion, "Expecting CUDA SM version as either 'major.minor', or quoted if has patch (eg for '7.0' or \"7.0\"')")
 DIAGNOSTIC(20014, Error, classIsReservedKeyword, "'class' is a reserved keyword in this context; use 'struct' instead.")
 DIAGNOSTIC(20015, Error, unknownSPIRVCapability, "unknown SPIR-V capability '$0'.")
+DIAGNOSTIC(20016, Error, missingLayoutBindingModifier, "Expecting 'binding' modifier in the layout qualifier here")
 
 DIAGNOSTIC(20101, Warning, unintendedEmptyStatement, "potentially unintended empty statement at this location; use {} instead.")
 
@@ -475,6 +476,7 @@ DIAGNOSTIC(39901, Fatal , cannotProcessInclude, "internal compiler error: cannot
 
 // 304xx: generics
 DIAGNOSTIC(30400, Error, genericTypeNeedsArgs, "generic type '$0' used without argument")
+DIAGNOSTIC(30401, Error, invalidTypeForConstraint, "type '$0' cannot be used as a constraint.")
 
 // 305xx: initializer lists
 DIAGNOSTIC(30500, Error, tooManyInitializers, "too many initializers (expected $0, got $1)")
@@ -528,6 +530,8 @@ DIAGNOSTIC(31301, Error, bitFieldNonIntegral, "bit-field type ($0) must be an in
 DIAGNOSTIC(39999, Error, expectedIntegerConstantWrongType, "expected integer constant (found: '$0')")
 DIAGNOSTIC(39999, Error, expectedIntegerConstantNotConstant, "expression does not evaluate to a compile-time constant")
 DIAGNOSTIC(39999, Error, expectedIntegerConstantNotLiteral, "could not extract value from integer constant")
+
+DIAGNOSTIC(39999, Error, expectedRayTracingPayloadObjectAtLocationButMissing, "raytracing payload expected at location $0 but it is missing")
 
 DIAGNOSTIC(39999, Error, noApplicableOverloadForNameWithArgs, "no overload for '$0' applicable to arguments of type $1")
 DIAGNOSTIC(39999, Error, noApplicableWithArgs, "no overload applicable to arguments of type $0")
@@ -662,6 +666,7 @@ DIAGNOSTIC(39024, Warning, cannotInferVulkanBindingWithoutRegisterModifier, "sha
 
 DIAGNOSTIC(39025, Error, conflictingVulkanInferredBindingForParameter, "conflicting vulkan inferred binding for parameter '$0' overlap is $1 and $2")
 
+DIAGNOSTIC(39026, Error, matrixLayoutModifierOnNonMatrixType, "matrix layout modifier cannot be used on non-matrix type '$0'.")
 //
 
 // 4xxxx - IL code generation.
@@ -686,6 +691,7 @@ DIAGNOSTIC(40010, Note, seeInterfaceUsage, "see usage of interface '$0'.")
 
 DIAGNOSTIC(40011, Error, unconstrainedGenericParameterNotAllowedInDynamicFunction, "unconstrained generic paramter '$0' is not allowed in a dynamic function.")
 
+
 DIAGNOSTIC(40020, Error, cannotUnrollLoop, "loop does not terminate within the limited number of iterations, unrolling is aborted.")
 
 DIAGNOSTIC(40030, Fatal, functionNeverReturnsFatal, "function '$0' never returns, compilation ceased.")
@@ -693,6 +699,7 @@ DIAGNOSTIC(40030, Fatal, functionNeverReturnsFatal, "function '$0' never returns
 // 41000 - IR-level validation issues
 
 DIAGNOSTIC(41000, Warning, unreachableCode, "unreachable code detected")
+DIAGNOSTIC(41001, Error, recursiveType, "type '$0' contains cyclic reference to itself.")
 
 DIAGNOSTIC(41010, Warning, missingReturn, "control flow may reach end of non-'void' function")
 DIAGNOSTIC(41015, Error, usingUninitializedValue, "use of uninitialized value '$0'")
@@ -779,7 +786,7 @@ DIAGNOSTIC(52007, Error, typeCannotBeUsedInDynamicDispatch, "failed to generate 
 DIAGNOSTIC(52008, Error, dynamicDispatchOnSpecializeOnlyInterface, "type '$0' is marked for specialization only, but dynamic dispatch is needed for the call.")
 DIAGNOSTIC(53001, Error, invalidTypeMarshallingForImportedDLLSymbol, "invalid type marshalling in imported func $0.")
 
-DIAGNOSTIC(54001, Error, meshOutputMustBeOut, "Mesh shader outputs must be declared with 'out'.")
+DIAGNOSTIC(54001, Warning, meshOutputMustBeOut, "Mesh shader outputs must be declared with 'out'.")
 DIAGNOSTIC(54002, Error, meshOutputMustBeArray, "HLSL style mesh shader outputs must be arrays")
 DIAGNOSTIC(54003, Error, meshOutputArrayMustHaveSize, "HLSL style mesh shader output arrays must have a length specified")
 DIAGNOSTIC(54004, Warning, unnecessaryHLSLMeshOutputModifier, "Unnecessary HLSL style mesh shader output modifier")
@@ -787,6 +794,8 @@ DIAGNOSTIC(54004, Warning, unnecessaryHLSLMeshOutputModifier, "Unnecessary HLSL 
 DIAGNOSTIC(55101, Error, invalidTorchKernelReturnType, "'$0' is not a valid return type for a pytorch kernel function.")
 DIAGNOSTIC(55102, Error, invalidTorchKernelParamType, "'$0' is not a valid parameter type for a pytorch kernel function.")
 
+DIAGNOSTIC(55200, Error, unsupportedBuiltinType, "'$0' is not a supported builtin type for the target.")
+DIAGNOSTIC(55201, Error, unsupportedRecursion, "recursion detected in call to '$0', but the current code generation target does not allow recursion.")
 DIAGNOSTIC(56001, Error, unableToAutoMapCUDATypeToHostType, "Could not automatically map '$0' to a host type. Automatic binding generation failed for '$1'")
 
 DIAGNOSTIC(57001, Warning, spirvOptFailed, "spirv-opt failed. $0")

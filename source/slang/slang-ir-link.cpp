@@ -4,10 +4,12 @@
 #include "slang-capability.h"
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
+#include "slang-legalize-types.h"
 #include "slang-mangle.h"
 #include "slang-ir-string-hash.h"
 #include "slang-ir-autodiff.h"
 #include "slang-ir-specialize-target-switch.h"
+#include "slang-ir-layout.h"
 #include "slang-module-library.h"
 
 #include "../core/slang-performance-profiler.h"
@@ -1520,6 +1522,138 @@ static void diagnoseUnresolvedSymbols(TargetRequest* req, DiagnosticSink* sink, 
     }
 }
 
+void convertAtomicToStorageBuffer(
+    IRSpecContext* context, 
+    Dictionary<int, List<IRInst*>>& bindingToInstMapUnsorted)
+{
+    // Atomic_uint definitions needs to become a storage buffer to follow GL_EXT_vulkan_glsl_relaxed
+    // and to allow translation of atomic_uint into SPIRV
+
+    IRBuilder builder = *context->builder;
+
+    for (auto& bindingToInstList : bindingToInstMapUnsorted)
+    {
+        int64_t maxOffset = 0;
+        for (auto& i : bindingToInstList.second)
+        {
+            int64_t currOffset = int64_t(i->findDecoration<IRGLSLOffsetDecoration>()->getOffset()->getValue());
+            maxOffset = (maxOffset < currOffset) ? currOffset : maxOffset;
+        }
+        auto instToSwitch = *bindingToInstList.second.begin();
+        builder.setInsertBefore(instToSwitch);
+        
+        auto elementType = builder.getArrayType(
+            builder.getUIntType(),
+            builder.getIntValue(builder.getUIntType(), (maxOffset / sizeof(uint32_t))+1)
+        );
+
+        StringBuilder nameStruct;
+        nameStruct << "atomic_uints";
+        nameStruct << bindingToInstList.first;
+        nameStruct << "_t";
+        nameStruct << "_paramGroup";
+        auto structType = builder.createStructType();
+        builder.addNameHintDecoration(structType, nameStruct.produceString().getUnownedSlice());
+
+        auto elementBufferKey = builder.createStructKey();
+        builder.addNameHintDecoration(elementBufferKey, UnownedStringSlice("_data"));
+        auto elementBufferType = elementType;
+        auto _dataField = builder.createStructField(structType, elementBufferKey, elementBufferType);
+        
+        auto std430 = builder._createInst(sizeof(IRTypeLayoutRules), builder.getType(kIROp_Std430BufferLayoutType), kIROp_Std430BufferLayoutType);
+        IRGLSLShaderStorageBufferType* storageBuffer;
+        {
+            IRInst* ops[] = { structType, std430 };
+            storageBuffer = builder.createGLSLShaderStorableBufferType(2, ops);
+        }
+
+        instToSwitch->setFullType(storageBuffer);
+        
+        // All references to a atomic_uint need to be an element ref. to emulate storage buffer usage
+        // All function calls must be inlined since storage buffers cannot pass as parameters to atomic methods
+        for (auto& i : bindingToInstList.second)
+        {
+            int64_t currOffset = int64_t(i->findDecoration<IRGLSLOffsetDecoration>()->getOffset()->getValue());
+
+            // we need a next node to be stored since the following code
+            // changes IRUse* of the use->user node, meaning we will lose
+            // our IRUse list of the atomic_uint being swapped out
+            IRUse* next = nullptr;
+            for (auto use = i->firstUse; use; use = next)
+            {
+                next = use->nextUse;
+                auto user = use->user;
+                
+                switch (user->getOp())
+                {
+                case kIROp_StructFieldLayoutAttr:
+                {
+                    // Definitions do nothing if unused
+                    break;
+                }
+                case kIROp_Call:
+                { 
+                    builder.setInsertBefore(user);
+                    auto fieldAddress = builder.emitFieldAddress(
+                        builder.getPtrType(_dataField->getFieldType()),
+                        instToSwitch,
+                        _dataField->getKey()
+                        );
+                    auto elementAddr = builder.emitElementAddress(
+                        builder.getPtrType(builder.getUIntType()),
+                        fieldAddress,
+                        builder.getIntValue(builder.getIntType(), currOffset/4));
+
+                    user->setOperand(1, elementAddr);
+                    auto funcTypeInst = (user->getOperand(0));
+                    auto funcType = funcTypeInst->getFullType();
+
+                    auto paramReplacment = builder.getInOutType(builder.getUIntType());
+                    funcType->getOperand(1)->replaceUsesWith(paramReplacment);
+                    builder.addForceInlineDecoration(funcTypeInst);
+
+                    break;
+                }
+                }
+            }
+            if (i->typeUse.usedValue->getOp() == kIROp_GLSLAtomicUintType)
+            {
+                i->removeAndDeallocate();
+            }
+        }
+    }
+}
+
+void GLSLReplaceAtomicUint(IRSpecContext* context, TargetProgram* targetProgram, IRModule* irModule)
+{
+    if (!targetProgram->getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL)) return;
+    
+    Dictionary<int, List<IRInst*>> bindingToInstMapUnsorted;
+    for (auto inst : irModule->getGlobalInsts())
+    {
+        if (inst->typeUse.usedValue)
+        {
+            switch (inst->typeUse.usedValue->getOp())
+            {
+            case kIROp_GLSLAtomicUintType:
+            {
+                // atomic_uint are supported by GLSL->VK through converting to a different type (GL_EXT_vulkan_glsl_relaxed).
+                // atomic_uint are not supported by SPIR-V->VK; this means that to get SPIR-V to work we must convert the type ourselves
+                // to an equivlent representation (storage buffer); the added benifit is that then HLSL is possible to emit as a target as well
+                // since atomic_uint is not an HLSL concept, but storageBuffer->RWBuffer is and HLSL concept
+                auto layout = inst->findDecoration<IRLayoutDecoration>()->getLayout();
+                auto layoutVal = as<IRVarOffsetAttr>(layout->getOperand(1));
+                assert(layoutVal != nullptr);
+                bindingToInstMapUnsorted.getOrAddValue(uint32_t(layoutVal->getOffset()), List<IRInst*>()).add(inst);
+                break;
+            }
+            };
+        }
+    }
+        
+    convertAtomicToStorageBuffer(context, bindingToInstMapUnsorted);
+}
+
 LinkedIR linkIR(
     CodeGenContext* codeGenContext)
 {
@@ -1727,6 +1861,11 @@ LinkedIR linkIR(
     // At this point, we should not see any [import] symbols that does not have a
     // definition.
     diagnoseUnresolvedSymbols(targetReq, codeGenContext->getSink(), state->irModule);
+
+    // type-use reformatter of GLSL types (only if compiler is set to AllowGLSL mode)
+    // which are not supported by SPIRV->Vulkan but is supported by GLSL->Vulkan through
+    // compiler magic tricks
+    GLSLReplaceAtomicUint(context, targetProgram, state->irModule);
 
     // TODO: *technically* we should consider the case where
     // we have global variables with initializers, since

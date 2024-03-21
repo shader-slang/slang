@@ -666,6 +666,14 @@ struct ASTDumpContext
         case SPIRVAsmOperand::SlangImmediateValue:
             m_writer->emit("!");
             break;
+        case SPIRVAsmOperand::RayPayloadFromLocation:
+            m_writer->emit("__rayPayloadFromLocation");
+            break;
+        case SPIRVAsmOperand::RayAttributeFromLocation:
+            m_writer->emit("__rayAttributeFromLocation");
+            break;
+        case SPIRVAsmOperand::RayCallableFromLocation:
+            m_writer->emit("__rayCallableFromLocation");
         case SPIRVAsmOperand::BuiltinVar:
             m_writer->emit("builtin");
             break;

@@ -280,11 +280,13 @@ bool isSimpleDecoration(IROp op);
 /// a vulkan ray payload, and should have a location assigned
 /// to it.
 IR_SIMPLE_DECORATION(VulkanRayPayloadDecoration)
+IR_SIMPLE_DECORATION(VulkanRayPayloadInDecoration)
 
 /// A decoration that indicates that a variable represents
 /// a vulkan callable shader payload, and should have a location assigned
 /// to it.
 IR_SIMPLE_DECORATION(VulkanCallablePayloadDecoration)
+IR_SIMPLE_DECORATION(VulkanCallablePayloadInDecoration)
 
 /// A decoration that indicates that a variable represents
 /// vulkan hit attributes, and should have a location assigned
@@ -368,6 +370,12 @@ struct IRGLSLLocationDecoration : IRDecoration
 {
     IR_LEAF_ISA(GLSLLocationDecoration)
     IRIntLit* getLocation() { return cast<IRIntLit>(getOperand(0)); }
+};
+
+struct IRGLSLOffsetDecoration : IRDecoration
+{
+    IR_LEAF_ISA(GLSLOffsetDecoration)
+    IRIntLit* getOffset() { return cast<IRIntLit>(getOperand(0)); }
 };
 
 struct IRNVAPIMagicDecoration : IRDecoration
@@ -1373,10 +1381,18 @@ struct IRGLPositionInputDecoration : public IRDecoration
 
 struct IRMeshOutputRef : public IRInst
 {
-    enum { kOp = kIROp_MeshOutputRef };
     IR_LEAF_ISA(MeshOutputRef)
+    IRInst* getBase() { return getOperand(0); }
     IRInst* getIndex() { return getOperand(1); }
     IRInst* getOutputType() { return cast<IRPtrTypeBase>(getFullType())->getValueType(); }
+};
+
+struct IRMeshOutputSet : public IRInst
+{
+    IR_LEAF_ISA(MeshOutputSet)
+    IRInst* getBase() { return getOperand(0); }
+    IRInst* getIndex() { return getOperand(1); }
+    IRInst* getElementValue() { return getOperand(2); }
 };
 
     /// An attribute that can be attached to another instruction as an operand.
@@ -3816,6 +3832,7 @@ public:
 
     // Create an initially empty `GLSLShaderStorageBufferType` type.
     IRGLSLShaderStorageBufferType* createGLSLShaderStorableBufferType();
+    IRGLSLShaderStorageBufferType* createGLSLShaderStorableBufferType(UInt operandCount, IRInst* const* operands);
 
     // Create an empty `interface` type.
     IRInterfaceType* createInterfaceType(UInt operandCount, IRInst* const* operands);
@@ -4152,6 +4169,10 @@ public:
 
     IRSPIRVAsmOperand* emitSPIRVAsmOperandLiteral(IRInst* literal);
     IRSPIRVAsmOperand* emitSPIRVAsmOperandInst(IRInst* inst);
+    IRSPIRVAsmOperand* createSPIRVAsmOperandInst(IRInst* inst);
+    IRSPIRVAsmOperand* emitSPIRVAsmOperandRayPayloadFromLocation(IRInst* inst);
+    IRSPIRVAsmOperand* emitSPIRVAsmOperandRayAttributeFromLocation(IRInst* inst);
+    IRSPIRVAsmOperand* emitSPIRVAsmOperandRayCallableFromLocation(IRInst* inst);
     IRSPIRVAsmOperand* emitSPIRVAsmOperandId(IRInst* inst);
     IRSPIRVAsmOperand* emitSPIRVAsmOperandResult();
     IRSPIRVAsmOperand* emitSPIRVAsmOperandEnum(IRInst* inst);
@@ -4285,6 +4306,11 @@ public:
     void addNameHintDecoration(IRInst* value, UnownedStringSlice const& text)
     {
         addNameHintDecoration(value, getStringValue(text));
+    }
+
+    void addUserTypeNameDecoration(IRInst* value, IRStringLit* name)
+    {
+        addDecoration(value, kIROp_UserTypeNameDecoration, name);
     }
 
     void addBinaryInterfaceTypeDecoration(IRInst* value)
@@ -4424,6 +4450,11 @@ public:
     void addDebugLocationDecoration(IRInst* value, IRInst* debugSource, IRIntegerValue line, IRIntegerValue col)
     {
         addDecoration(value, kIROp_DebugLocationDecoration, debugSource, getIntValue(getUIntType(), line), getIntValue(getUIntType(), col));
+    }
+
+    void addUnsafeForceInlineDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_UnsafeForceInlineEarlyDecoration);
     }
 
     void addForceInlineDecoration(IRInst* value)
@@ -4717,9 +4748,19 @@ public:
         addDecoration(inst, kIROp_VulkanRayPayloadDecoration, getIntValue(getIntType(), location));
     }
 
+    void addVulkanRayPayloadInDecoration(IRInst* inst, int location)
+    {
+        addDecoration(inst, kIROp_VulkanRayPayloadInDecoration, getIntValue(getIntType(), location));
+    }
+    
     void addVulkanCallablePayloadDecoration(IRInst* inst, int location)
     {
         addDecoration(inst, kIROp_VulkanCallablePayloadDecoration, getIntValue(getIntType(), location));
+    }
+
+    void addVulkanCallablePayloadInDecoration(IRInst* inst, int location)
+    {
+        addDecoration(inst, kIROp_VulkanCallablePayloadInDecoration, getIntValue(getIntType(), location));
     }
 
     void addVulkanHitObjectAttributesDecoration(IRInst* inst, int location)

@@ -2919,6 +2919,24 @@ struct SPIRVEmitContext
         }
     }
 
+    // Make user type name conform to `SPV_GOOGLE_user_type` spec.
+    // https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/GOOGLE/SPV_GOOGLE_user_type.asciidoc
+    String legalizeUserTypeName(UnownedStringSlice typeName)
+    {
+        String result = typeName;
+        auto index = typeName.indexOf('<');
+        if (index == -1)
+            index = typeName.getLength();
+        StringBuilder sb;
+        sb << String(typeName.head(index)).toLower();
+        if (index != typeName.getLength())
+        {
+            sb << ":";
+            sb << typeName.tail(index);
+        }
+        return sb.produceString();
+    }
+
         /// Emit an appropriate SPIR-V decoration for the given IR `decoration`, if necessary and possible.
         ///
         /// The given `dstID` should be the `<id>` of the SPIR-V instruction being decorated,
@@ -2938,6 +2956,7 @@ struct SPIRVEmitContext
         // We will continue to use the Slang terminology here, since
         // this code path is a catch-all for stuff that only needs to
         // be emitted if the owning instruction gets emitted.
+        bool isRayTracingObject = false;
 
         switch( decoration->getOp() )
         {
@@ -3041,6 +3060,12 @@ struct SPIRVEmitContext
                 case Stage::Callable:
                     requireSPIRVCapability(SpvCapabilityRayTracingKHR);
                     ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_ray_tracing"));
+                    break;
+                case Stage::Mesh:
+                case Stage::Amplification:
+                    requireSPIRVCapability(SpvCapabilityMeshShadingEXT);
+                    ensureExtensionDeclaration(UnownedStringSlice("SPV_EXT_mesh_shader"));
+                    break;
                 default:
                     break;
                 }
@@ -3207,13 +3232,25 @@ struct SPIRVEmitContext
             }
             break;
 
+        case kIROp_VulkanHitAttributesDecoration:
         case kIROp_VulkanCallablePayloadDecoration:
+        case kIROp_VulkanCallablePayloadInDecoration:
+            ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_ray_tracing"));
+            requireSPIRVCapability(SpvCapabilityRayTracingKHR);
+            isRayTracingObject = true;
+            break;
         case kIROp_VulkanHitObjectAttributesDecoration:
+            // needed since GLSL will not set optypes accordingly, but will keep the decoration 
+            ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_shader_invocation_reorder"));
+            requireSPIRVCapability(SpvCapabilityShaderInvocationReorderNV);
+            isRayTracingObject = true;
+            break;
         case kIROp_VulkanRayPayloadDecoration:
-            emitOpDecorateLocation(getSection(SpvLogicalSectionID::Annotations),
-                decoration,
-                dstID,
-                SpvLiteralInteger::from32(int32_t(getIntVal(decoration->getOperand(0)))));
+        case kIROp_VulkanRayPayloadInDecoration:
+            // needed since GLSL will not set optypes accordingly, but will keep the decoration 
+            ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_ray_query"));
+            requireSPIRVCapability(SpvCapabilityRayQueryKHR);
+            isRayTracingObject = true;
             break;
         case kIROp_GloballyCoherentDecoration:
             emitOpDecorate(getSection(SpvLogicalSectionID::Annotations),
@@ -3222,6 +3259,17 @@ struct SPIRVEmitContext
                                SpvDecorationCoherent);
             break;
         // ...
+        }
+
+        if(isRayTracingObject)
+        {
+            if (decoration->getOperandCount() > 0) {
+                //if not greater than 0, this is not a layout decoration (no val)
+                emitOpDecorateLocation(getSection(SpvLogicalSectionID::Annotations),
+                    decoration,
+                    dstID,
+                    SpvLiteralInteger::from32(int32_t(getIntVal(decoration->getOperand(0)))));
+            }
         }
 
         if (shouldEmitSPIRVReflectionInfo())
@@ -3246,7 +3294,7 @@ struct SPIRVEmitContext
                         decoration,
                         dstID,
                         SpvDecorationUserTypeGOOGLE,
-                        cast<IRUserTypeNameDecoration>(decoration)->getUserTypeName()->getStringSlice());
+                        legalizeUserTypeName(cast<IRUserTypeNameDecoration>(decoration)->getUserTypeName()->getStringSlice()).getUnownedSlice());
                 }
                 break;
             case kIROp_CounterBufferDecoration:
@@ -5805,7 +5853,7 @@ SlangResult emitSPIRVFromIR(
 
     SPIRVEmitContext context(irModule, codeGenContext->getTargetProgram(), sink);
     legalizeIRForSPIRV(&context, irModule, irEntryPoints, codeGenContext);
-
+    
 #if 0
     {
         DiagnosticSinkWriter writer(codeGenContext->getSink());

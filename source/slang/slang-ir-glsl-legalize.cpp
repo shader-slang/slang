@@ -2106,106 +2106,118 @@ static void legalizeMeshOutputParam(
     // the writes may only be writing to parts of the output struct, or may not
     // be writes at all (i.e. being passed as an out paramter).
     //
-    traverseUsers(g, [&](IRInst* u)
+    std::function<void(ScalarizedVal&, IRInst*)> assignUses =
+        [&](ScalarizedVal& d, IRInst* a)
     {
-        auto l = as<IRLoad>(u);
-        SLANG_ASSERT(l && "Mesh Output sentinel parameter wasn't used in a load");
-
-        std::function<void(ScalarizedVal&, IRInst*)> assignUses =
-            [&](ScalarizedVal& d, IRInst* a)
+        // If we're just writing to an address, we can seamlessly
+        // replace it with the address to the SOA representation.
+        // GLSL's `out` function parameters have copy-out semantics, so
+        // this is all above board.
+        if(d.flavor == ScalarizedVal::Flavor::address)
         {
-            // If we're just writing to an address, we can seamlessly
-            // replace it with the address to the SOA representation.
-            // GLSL's `out` function parameters have copy-out semantics, so
-            // this is all above board.
-            if(d.flavor == ScalarizedVal::Flavor::address)
-            {
-                IRBuilderInsertLocScope locScope{builder};
-                builder->setInsertBefore(a);
-                a->replaceUsesWith(d.irValue);
-                a->removeAndDeallocate();
-                return;
-            }
-            // Otherwise, go through the uses one by one and see what we can do
-            traverseUsers(a, [&](IRInst* s)
-            {
-                IRBuilderInsertLocScope locScope{builder};
-                builder->setInsertBefore(s);
-                if(auto m = as<IRFieldAddress>(s))
-                {
-                    auto key = as<IRStructKey>(m->getField());
-                    SLANG_ASSERT(key && "Result of getField wasn't a struct key");
-
-                    auto d_ = extractField(builder, d, kMaxUInt, key);
-                    assignUses(d_, m);
-                }
-                else if(auto g = as<IRGetElementPtr>(s))
-                {
-                    // Writing to something like `struct Vertex{ Foo foo[10]; }`
-                    // This case is also what's taken in the initial
-                    // traversal, as every mesh output is an array.
-                    auto elemType = composeGetters<IRType>(
-                        g,
-                        &IRInst::getFullType,
-                        &IRPtrTypeBase::getValueType);
-                    auto d_ = getSubscriptVal(builder, elemType, d, g->getIndex());
-                    assignUses(d_, g);
-                }
-                else if(auto store = as<IRStore>(s))
-                {
-                    // Store using the SOA representation
-
-                    assign(
-                        builder,
-                        d,
-                        ScalarizedVal::value(store->getVal()));
-
-                    // Stores aren't used, safe to remove here without checking
-                    store->removeAndDeallocate();
-                }
-                else if(auto c = as<IRCall>(s))
-                {
-                    // Translate
-                    //   foo(vertices[n])
-                    // to
-                    //   tmp
-                    //   foo(tmp)
-                    //   vertices[n] = tmp;
-                    //
-                    // This has copy-out semantics, which is really the
-                    // best we can hope for without going and
-                    // specializing foo.
-                    auto ptr = as<IRPtrTypeBase>(a->getFullType());
-                    SLANG_ASSERT(ptr && "Mesh output parameter was passed by value");
-                    auto t = ptr->getValueType();
-                    auto tmp = builder->emitVar(t);
-                    for(UInt i = 0; i < c->getOperandCount(); i++)
-                    {
-                        if(c->getOperand(i) == a)
-                        {
-                            c->setOperand(i, tmp);
-                        }
-                    }
-                    builder->setInsertAfter(c);
-                    assign(builder, d,
-                            ScalarizedVal::value(builder->emitLoad(tmp)));
-                }
-                else if(const auto swiz = as<IRSwizzledStore>(s))
-                {
-                    SLANG_UNEXPECTED("Swizzled store to a non-address ScalarizedVal");
-                }
-                else
-                {
-                    SLANG_UNEXPECTED("Unhandled use of mesh output parameter during GLSL legalization");
-                }
-            });
-
-            SLANG_ASSERT(!a->hasUses());
+            IRBuilderInsertLocScope locScope{builder};
+            builder->setInsertBefore(a);
+            a->replaceUsesWith(d.irValue);
             a->removeAndDeallocate();
-        };
+            return;
+        }
+        // Otherwise, go through the uses one by one and see what we can do
+        traverseUsers(a, [&](IRInst* s)
+        {
+            IRBuilderInsertLocScope locScope{builder};
+            builder->setInsertBefore(s);
+            if(auto m = as<IRFieldAddress>(s))
+            {
+                auto key = as<IRStructKey>(m->getField());
+                SLANG_ASSERT(key && "Result of getField wasn't a struct key");
 
-        assignUses(globalOutputVal, l);
-    });
+                auto d_ = extractField(builder, d, kMaxUInt, key);
+                assignUses(d_, m);
+            }
+            else if(auto ref = as<IRMeshOutputRef>(s))
+            {
+                auto elemType = composeGetters<IRType>(
+                    ref,
+                    &IRInst::getFullType,
+                    &IRPtrTypeBase::getValueType);
+                auto d_ = getSubscriptVal(builder, elemType, d, ref->getIndex());
+                assignUses(d_, ref);
+            }
+            else if(auto set = as<IRMeshOutputSet>(s))
+            {
+                auto elemType = composeGetters<IRType>(
+                    set,
+                    &IRInst::getFullType,
+                    &IRPtrTypeBase::getValueType);
+                auto d_ = getSubscriptVal(builder, elemType, d, set->getIndex());
+                assign(builder, d_, ScalarizedVal::value(set->getElementValue()));
+                set->removeAndDeallocate();
+            }
+            else if(auto g = as<IRGetElementPtr>(s))
+            {
+                // Writing to something like `struct Vertex{ Foo foo[10]; }`
+                // This case is also what's taken in the initial
+                // traversal, as every mesh output is an array.
+                auto elemType = composeGetters<IRType>(
+                    g,
+                    &IRInst::getFullType,
+                    &IRPtrTypeBase::getValueType);
+                auto d_ = getSubscriptVal(builder, elemType, d, g->getIndex());
+                assignUses(d_, g);
+            }
+            else if(auto store = as<IRStore>(s))
+            {
+                // Store using the SOA representation
+
+                assign(
+                    builder,
+                    d,
+                    ScalarizedVal::value(store->getVal()));
+
+                // Stores aren't used, safe to remove here without checking
+                store->removeAndDeallocate();
+            }
+            else if(auto c = as<IRCall>(s))
+            {
+                // Translate
+                //   foo(vertices[n])
+                // to
+                //   tmp
+                //   foo(tmp)
+                //   vertices[n] = tmp;
+                //
+                // This has copy-out semantics, which is really the
+                // best we can hope for without going and
+                // specializing foo.
+                auto ptr = as<IRPtrTypeBase>(a->getFullType());
+                SLANG_ASSERT(ptr && "Mesh output parameter was passed by value");
+                auto t = ptr->getValueType();
+                auto tmp = builder->emitVar(t);
+                for(UInt i = 0; i < c->getOperandCount(); i++)
+                {
+                    if(c->getOperand(i) == a)
+                    {
+                        c->setOperand(i, tmp);
+                    }
+                }
+                builder->setInsertAfter(c);
+                assign(builder, d,
+                        ScalarizedVal::value(builder->emitLoad(tmp)));
+            }
+            else if(const auto swiz = as<IRSwizzledStore>(s))
+            {
+                SLANG_UNEXPECTED("Swizzled store to a non-address ScalarizedVal");
+            }
+            else
+            {
+                SLANG_UNEXPECTED("Unhandled use of mesh output parameter during GLSL legalization");
+            }
+        });
+
+        SLANG_ASSERT(!a->hasUses());
+        a->removeAndDeallocate();
+    };
+    assignUses(globalOutputVal, g);
 
     //
     // GLSL requires that builtins are written to a block named
@@ -2348,15 +2360,18 @@ static void legalizeMeshOutputParam(
         {
             traverseUsers(builtin.param, [&](IRInst* u)
             {
-                auto p = as<IRGetElementPtr>(u);
-                SLANG_ASSERT(p && "Mesh Output sentinel parameter wasn't used as an array");
-
                 IRBuilderInsertLocScope locScope{builder};
-                builder->setInsertBefore(p);
-                auto e = builder->emitElementAddress(builder->getPtrType(meshOutputBlockType), blockParam, p->getIndex());
+                builder->setInsertBefore(u);
+                IRInst* index;
+                if(const auto p = as<IRGetElementPtr>(u))
+                    index = p->getIndex();
+                else if(const auto m = as<IRMeshOutputRef>(u))
+                    index = m->getIndex();
+                else
+                    SLANG_UNEXPECTED("Illegal use of mesh output parameter");
+                auto e = builder->emitElementAddress(builder->getPtrType(meshOutputBlockType), blockParam, index);
                 auto a = builder->emitFieldAddress(builder->getPtrType(builtin.type), e, builtin.key);
-
-                p->replaceUsesWith(a);
+                u->replaceUsesWith(a);
             });
         }
     }
@@ -2461,7 +2476,7 @@ void legalizeEntryPointParameterForGLSL(
     // - Geometry shader output streams
     // - Mesh shader outputs
     // - Mesh shader payload input
-    if (auto paramPtrType = as<IROutTypeBase>(paramType))
+    if (auto paramPtrType = as<IRPtrTypeBase>(paramType))
     {
         valueType = paramPtrType->getValueType();
     }
@@ -2480,76 +2495,53 @@ void legalizeEntryPointParameterForGLSL(
             stage,
             pp);
 
-        // TODO: a GS output stream might be passed into other
+        // A GS output stream might be passed into other
         // functions, so that we should really be modifying
         // any function that has one of these in its parameter
-        // list (and in the limit we should be leagalizing any
-        // type that nests these...).
+        // list.
         //
-        // For now we will just try to deal with `Append` calls
-        // directly in this function.
-
-        for( auto bb = func->getFirstBlock(); bb; bb = bb->getNextBlock() )
+        HashSet<IRInst*> workListSet;
+        List<IRFunc*> workList;
+        workList.add(func);
+        workListSet.add(func);
+        for (Index i = 0; i < workList.getCount(); i++)
         {
-            for( auto ii = bb->getFirstInst(); ii; ii = ii->getNextInst() )
+            auto f = workList[i];
+            for (auto bb = f->getFirstBlock(); bb; bb = bb->getNextBlock())
             {
-                // Is it a call?
-                if(ii->getOp() != kIROp_Call)
-                    continue;
-
-                // Is it calling the append operation?
-                auto callee = ii->getOperand(0);
-                for(;;)
+                for (auto ii = bb->getFirstInst(); ii; ii = ii->getNextInst())
                 {
-                    // If the instruction is `specialize(X,...)` then
-                    // we want to look at `X`, and if it is `generic { ... return R; }`
-                    // then we want to look at `R`. We handle this
-                    // iteratively here.
-                    //
-                    // TODO: This idiom seems to come up enough that we
-                    // should probably have a dedicated convenience routine
-                    // for this.
-                    //
-                    // Alternatively, we could switch the IR encoding so
-                    // that decorations are added to the generic instead of the
-                    // value it returns.
-                    //
-                    switch(callee->getOp())
-                    {
-                    case kIROp_Specialize:
-                        {
-                            callee = cast<IRSpecialize>(callee)->getOperand(0);
-                            continue;
-                        }
+                    // Is it a call?
+                    if (ii->getOp() != kIROp_Call)
+                        continue;
 
-                    case kIROp_Generic:
+                    // Is it calling the append operation?
+                    auto callee = getResolvedInstForDecorations(ii->getOperand(0));
+                    if (callee->getOp() != kIROp_Func)
+                        continue;
+
+                    if (getBuiltinFuncName(callee) != UnownedStringSlice::fromLiteral("GeometryStreamAppend"))
+                    {
+                        // If we are calling a function that takes a output stream as a parameter,
+                        // we need to add it to the work list to be processed.
+                        for (UInt a = 1; a < ii->getOperandCount(); a++)
                         {
-                            auto genericResult = findGenericReturnVal(cast<IRGeneric>(callee));
-                            if(genericResult)
+                            if (as<IRHLSLStreamOutputType>(ii->getOperand(a)->getDataType()))
                             {
-                                callee = genericResult;
-                                continue;
+                                if (workListSet.add(callee))
+                                    workList.add(as<IRFunc>(callee));
+                                break;
                             }
                         }
-
-                    default:
-                        break;
+                        continue;
                     }
-                    break;
+
+                    // Okay, we have a declaration, and we want to modify it!
+
+                    builder->setInsertBefore(ii);
+
+                    assign(builder, globalOutputVal, ScalarizedVal::value(ii->getOperand(2)));
                 }
-                if(callee->getOp() != kIROp_Func)
-                    continue;
-
-                if (getBuiltinFuncName(callee) != UnownedStringSlice::fromLiteral("GeometryStreamAppend"))
-                {
-                    continue;
-                }
-
-                // Okay, we have a declaration, and we want to modify it!
-
-                builder->setInsertBefore(ii);
-
-                assign(builder, globalOutputVal, ScalarizedVal::value(ii->getOperand(2)));
             }
         }
 
@@ -2715,46 +2707,108 @@ bool shouldUseOriginalEntryPointName(CodeGenContext* codeGenContext)
     return false;
 }
 
+void getAllNullLocationRayObjectsAndUsedLocations(
+    IRModule* module,
+    List<IRInst*>* nullRayObjects,
+    HashSet<IRIntegerValue>* rayPayload,
+    HashSet<IRIntegerValue>* callablePayload,
+    HashSet<IRIntegerValue>* hitObjectAttribute)
+{
+    for (auto inst : module->getGlobalInsts())
+    {
+        auto instOp = inst->getOp();
+        IRIntegerValue intLitVal = NULL;
+        if (instOp != kIROp_GlobalParam && instOp != kIROp_GlobalVar) continue;
+        for (auto decor : inst->getDecorations())
+        {
+            switch (decor->getOp())
+            {
+            case kIROp_VulkanRayPayloadDecoration:
+            case kIROp_VulkanRayPayloadInDecoration:
+                intLitVal = as<IRIntLit>(decor->getOperand(0))->getValue();
+                if (intLitVal == -1) { nullRayObjects->add(inst); goto getAllNullLocationRayObjectsAndUsedLocations_end; }
+                rayPayload->add(intLitVal);
+                goto getAllNullLocationRayObjectsAndUsedLocations_end;
+            case kIROp_VulkanCallablePayloadDecoration:
+            case kIROp_VulkanCallablePayloadInDecoration:
+                intLitVal = as<IRIntLit>(decor->getOperand(0))->getValue();
+                if (intLitVal == -1) { nullRayObjects->add(inst); goto getAllNullLocationRayObjectsAndUsedLocations_end; }
+                callablePayload->add(intLitVal);
+                goto getAllNullLocationRayObjectsAndUsedLocations_end;
+            case kIROp_VulkanHitObjectAttributesDecoration:
+                intLitVal = as<IRIntLit>(decor->getOperand(0))->getValue();
+                if (intLitVal == -1) { nullRayObjects->add(inst); goto getAllNullLocationRayObjectsAndUsedLocations_end; }
+                hitObjectAttribute->add(intLitVal);
+                goto getAllNullLocationRayObjectsAndUsedLocations_end;
+            }
+        }    
+    getAllNullLocationRayObjectsAndUsedLocations_end:;
+    }
+}
 void assignRayPayloadHitObjectAttributeLocations(IRModule* module)
 {
+    List<IRInst*> nullRayObjects;
+    HashSet<IRIntegerValue> rayPayloadLocations;
+    HashSet<IRIntegerValue> callablePayloadLocations;
+    HashSet<IRIntegerValue> hitObjectAttributeLocations;
+    getAllNullLocationRayObjectsAndUsedLocations(module, &nullRayObjects, &rayPayloadLocations, &callablePayloadLocations, &hitObjectAttributeLocations);
+
     IRIntegerValue rayPayloadCounter = 0;
     IRIntegerValue callablePayloadCounter = 0;
     IRIntegerValue hitObjectAttributeCounter = 0;
 
     IRBuilder builder(module);
-    for (auto inst : module->getGlobalInsts())
+    for (auto inst : nullRayObjects)
     {
-        auto globalVar = as<IRGlobalVar>(inst);
-        if (!globalVar)
-            continue;
         IRInst* location = nullptr;
-        for (auto decor : globalVar->getDecorations())
+        IRIntegerValue intLitVal = NULL;
+        for (auto decor : inst->getDecorations())
         {
             switch (decor->getOp())
             {
             case kIROp_VulkanRayPayloadDecoration:
+            case kIROp_VulkanRayPayloadInDecoration:
+                intLitVal = as<IRIntLit>(decor->getOperand(0))->getValue();
+                if (intLitVal >= 0) goto assignRayPayloadHitObjectAttributeLocations_end;
+                while(rayPayloadLocations.contains(rayPayloadCounter))
+                {
+                    rayPayloadCounter++;
+                }
                 builder.setInsertBefore(inst);
                 location = builder.getIntValue(builder.getIntType(), rayPayloadCounter);
                 decor->setOperand(0, location);
                 rayPayloadCounter++;
-                goto end;
+                goto assignRayPayloadHitObjectAttributeLocations_end;
             case kIROp_VulkanCallablePayloadDecoration:
+            case kIROp_VulkanCallablePayloadInDecoration:
+                intLitVal = as<IRIntLit>(decor->getOperand(0))->getValue();
+                if (intLitVal >= 0) goto assignRayPayloadHitObjectAttributeLocations_end;
+                while (callablePayloadLocations.contains(callablePayloadCounter))
+                {
+                    callablePayloadCounter++;
+                }
                 builder.setInsertBefore(inst);
                 location = builder.getIntValue(builder.getIntType(), callablePayloadCounter);
                 decor->setOperand(0, location);
                 callablePayloadCounter++;
-                goto end;
+                goto assignRayPayloadHitObjectAttributeLocations_end;
             case kIROp_VulkanHitObjectAttributesDecoration:
+                intLitVal = as<IRIntLit>(decor->getOperand(0))->getValue();
+                if (intLitVal >= 0) goto assignRayPayloadHitObjectAttributeLocations_end;
+                while (hitObjectAttributeLocations.contains(hitObjectAttributeCounter))
+                {
+                    hitObjectAttributeCounter++;
+                }
                 builder.setInsertBefore(inst);
                 location = builder.getIntValue(builder.getIntType(), hitObjectAttributeCounter);
                 decor->setOperand(0, location);
                 hitObjectAttributeCounter++;
-                goto end;
+                goto assignRayPayloadHitObjectAttributeLocations_end;
             default:
                 break;
             }
         }
-    end:;
+    assignRayPayloadHitObjectAttributeLocations_end:;
     }
 }
 

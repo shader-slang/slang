@@ -1255,12 +1255,15 @@ struct ParameterBlock {}
 __generic<T, let MAX_VERTS : uint>
 __magic_type(VerticesType)
 __intrinsic_type($(kIROp_VerticesType))
-struct Vertices
+[__NonCopyableType]
+struct OutputVertices
 {
     __subscript(uint index) -> T
     {
-        // TODO: Ellie make sure these remains write only
-        __intrinsic_op($(kIROp_GetElementPtr))
+        // TODO: Make sure this remains write only, we can't do this with just
+        // a 'set' operation as it's legal to only write to part of the output
+        // buffer, or part of the output buffer at a time.
+        __intrinsic_op($(kIROp_MeshOutputRef))
         ref;
     }
 };
@@ -1268,24 +1271,28 @@ struct Vertices
 __generic<T, let MAX_PRIMITIVES : uint>
 __magic_type(IndicesType)
 __intrinsic_type($(kIROp_IndicesType))
-struct Indices
+[__NonCopyableType]
+struct OutputIndices
 {
     __subscript(uint index) -> T
     {
-        // TODO: Ellie: It's illegal to not write out the whole primitive at once, should we use set over ref?
-        __intrinsic_op($(kIROp_GetElementPtr))
-        ref;
+        // It's illegal to not write out the entire primitive at once, so limit
+        // this to set
+        [mutating]
+        __intrinsic_op($(kIROp_MeshOutputSet))
+        set;
     }
 };
 
 __generic<T, let MAX_PRIMITIVES : uint>
 __magic_type(PrimitivesType)
 __intrinsic_type($(kIROp_PrimitivesType))
-struct Primitives
+[__NonCopyableType]
+struct OutputPrimitives
 {
     __subscript(uint index) -> T
     {
-        __intrinsic_op($(kIROp_GetElementPtr))
+        __intrinsic_op($(kIROp_MeshOutputRef))
         ref;
     }
 };
@@ -2331,7 +2338,7 @@ __attributeTarget(DeclBase)
 attribute_syntax [push_constant]									: PushConstantAttribute;
 
 __attributeTarget(VarDeclBase)
-attribute_syntax [vk_location(locaiton : int)] : GLSLLocationAttribute;
+attribute_syntax [vk_location(location : int)] : GLSLLocationAttribute;
 
 __attributeTarget(VarDeclBase)
 attribute_syntax [vk_index(index : int)] : GLSLIndexAttribute;
@@ -2344,6 +2351,9 @@ attribute_syntax [spv_target_env_1_3] : SPIRVTargetEnv13Attribute;
 
 __attributeTarget(VarDeclBase)
 attribute_syntax [disable_array_flattening] : DisableArrayFlatteningAttribute;
+
+__attributeTarget(EnumDecl)
+attribute_syntax [UnscopedEnum] : UnscopedEnumAttribute;
 
 // Statement Attributes
 
@@ -2466,7 +2476,7 @@ __attributeTarget(Decl)
 attribute_syntax [allow(diagnostic: String)] : AllowAttribute;
 
 __attributeTarget(Decl)
-attribute_syntax[require(capability)] : RequireCapabilityAttribute;
+attribute_syntax [require(capability)] : RequireCapabilityAttribute;
 
 // Linking
 __attributeTarget(Decl)
@@ -2509,7 +2519,7 @@ __attributeTarget(FuncDecl)
 attribute_syntax [CUDAKernel] : CudaKernelAttribute;
 
 __attributeTarget(FuncDecl)
-attribute_syntax[AutoPyBindCUDA] : AutoPyBindCudaAttribute;
+attribute_syntax [AutoPyBindCUDA] : AutoPyBindCudaAttribute;
 
 __attributeTarget(AggTypeDecl)
 attribute_syntax [PyExport(name: String)] : PyExportAttribute;

@@ -1548,7 +1548,7 @@ DifferentialPair<T> __d_clamp(DifferentialPair<T> dpx, DifferentialPair<T> dpMin
 {
     return DifferentialPair<T>(
         clamp(dpx.p, dpMin.p, dpMax.p),
-        dpx.p < dpMin.p ? (dpx.p > dpMax.p ? dpMax.d : dpx.d) : dpMin.d);
+        dpx.p < dpMin.p ? dpMin.d : (dpx.p > dpMax.p ? dpMax.d : dpx.d));
 }
 __generic<T : __BuiltinFloatingPointType>
 [BackwardDifferentiable]
@@ -1558,7 +1558,7 @@ void __d_clamp(inout DifferentialPair<T> dpx, inout DifferentialPair<T> dpMin, i
 {
     dpx = diffPair(dpx.p, dpx.p > dpMin.p && dpx.p < dpMax.p ? dOut : T.dzero());
     dpMin = diffPair(dpMin.p, dpx.p <= dpMin.p ? dOut : T.dzero());
-    dpMax = diffPair(dpMin.p, dpx.p >= dpMax.p ? dOut : T.dzero());
+    dpMax = diffPair(dpMax.p, dpx.p >= dpMax.p ? dOut : T.dzero());
 }
 VECTOR_MATRIX_TERNARY_DIFF_IMPL(clamp)
 
