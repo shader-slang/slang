@@ -3268,29 +3268,29 @@ public void executeCallableEXT(
 
 // GL_EXT_ray_tracing constants
 
-public const uint gl_HitKindFrontFacingTriangleEXT = 0xFEU;
-public const uint gl_HitKindBackFacingTriangleEXT = 0xFFU;
+public static const uint gl_HitKindFrontFacingTriangleEXT = 0xFEU;
+public static const uint gl_HitKindBackFacingTriangleEXT = 0xFFU;
 
 /// GL_EXT_ray_query
 
 // GL_EXT_ray_query constants
 
-public const uint gl_RayFlagsNoneEXT = 0U;
-public const uint gl_RayFlagsOpaqueEXT = 1U;
-public const uint gl_RayFlagsNoOpaqueEXT = 2U;
-public const uint gl_RayFlagsTerminateOnFirstHitEXT = 4U;
-public const uint gl_RayFlagsSkipClosestHitShaderEXT = 8U;
-public const uint gl_RayFlagsCullBackFacingTrianglesEXT = 16U;
-public const uint gl_RayFlagsCullFrontFacingTrianglesEXT = 32U;
-public const uint gl_RayFlagsCullOpaqueEXT = 64U;
-public const uint gl_RayFlagsCullNoOpaqueEXT = 128U;
+public static const uint gl_RayFlagsNoneEXT = 0U;
+public static const uint gl_RayFlagsOpaqueEXT = 1U;
+public static const uint gl_RayFlagsNoOpaqueEXT = 2U;
+public static const uint gl_RayFlagsTerminateOnFirstHitEXT = 4U;
+public static const uint gl_RayFlagsSkipClosestHitShaderEXT = 8U;
+public static const uint gl_RayFlagsCullBackFacingTrianglesEXT = 16U;
+public static const uint gl_RayFlagsCullFrontFacingTrianglesEXT = 32U;
+public static const uint gl_RayFlagsCullOpaqueEXT = 64U;
+public static const uint gl_RayFlagsCullNoOpaqueEXT = 128U;
 
-public const uint gl_RayQueryCommittedIntersectionNoneEXT = 0U;
-public const uint gl_RayQueryCommittedIntersectionTriangleEXT = 1U;
-public const uint gl_RayQueryCommittedIntersectionGeneratedEXT = 2U;
+public static const uint gl_RayQueryCommittedIntersectionNoneEXT = 0U;
+public static const uint gl_RayQueryCommittedIntersectionTriangleEXT = 1U;
+public static const uint gl_RayQueryCommittedIntersectionGeneratedEXT = 2U;
 
-public const uint gl_RayQueryCandidateIntersectionTriangleEXT = 0U;
-public const uint gl_RayQueryCandidateIntersectionAABBEXT = 1U;
+public static const uint gl_RayQueryCandidateIntersectionTriangleEXT = 0U;
+public static const uint gl_RayQueryCandidateIntersectionAABBEXT = 1U;
 
 // GL_EXT_ray_query functions
 
