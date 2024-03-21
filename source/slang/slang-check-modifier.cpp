@@ -1104,15 +1104,17 @@ namespace Slang
         case ASTNodeType::GLSLReadOnlyModifier:
         case ASTNodeType::GLSLVolatileModifier:
         case ASTNodeType::GLSLRestrictModifier:
-            return (as<VarDeclBase>(decl) && (isGlobalDecl(decl)) || as<ParamDecl>(decl) || as<GLSLInterfaceBlockDecl>(decl))
-                // If allowing GLSL syntax, also allow the following
-                || isGLSLInput && (as<StructDecl>(getParentDecl(decl)) && isGlobalDecl(getParentDecl(decl)));
+            if(isGLSLInput)
+                return (as<VarDeclBase>(decl) && (isGlobalDecl(decl)) || as<ParamDecl>(decl) || as<GLSLInterfaceBlockDecl>(decl)) 
+                    || as<StructDecl>(getParentDecl(decl)) && isGlobalDecl(getParentDecl(decl));
+            return (as<VarDeclBase>(decl) && (isGlobalDecl(decl)) || as<ParamDecl>(decl) || as<GLSLInterfaceBlockDecl>(decl));
+
         case ASTNodeType::GloballyCoherentModifier:
         case ASTNodeType::HLSLVolatileModifier:
-            return as<VarDecl>(decl) && (isGlobalDecl(decl) || as<StructDecl>(getParentDecl(decl)) || as<GLSLInterfaceBlockDecl>(decl))
-                // If allowing GLSL syntax, also allow the following
-                || isGLSLInput && (as<VarDeclBase>(decl) && isGlobalDecl(decl) || as<ParamDecl>(decl) || (as<StructDecl>(getParentDecl(decl)) && isGlobalDecl(getParentDecl(decl))))
-                ;
+            if(isGLSLInput)
+                return as<VarDecl>(decl) && (isGlobalDecl(decl) || as<StructDecl>(getParentDecl(decl)) || as<GLSLInterfaceBlockDecl>(decl))
+                    || as<VarDeclBase>(decl) && isGlobalDecl(decl) || as<ParamDecl>(decl) || (as<StructDecl>(getParentDecl(decl)) && isGlobalDecl(getParentDecl(decl)));
+            return as<VarDecl>(decl) && (isGlobalDecl(decl) || as<StructDecl>(getParentDecl(decl)) || as<GLSLInterfaceBlockDecl>(decl));
 
             // Allowed only on parameters, struct fields and global variables.
         case ASTNodeType::InterpolationModeModifier:

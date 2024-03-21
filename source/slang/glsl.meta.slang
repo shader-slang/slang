@@ -2902,8 +2902,8 @@ ${{{{
         const char *SPVTypePrefix;
         const char *SPVSubTypePrefix;
         const char *SPVAtomicSuffix;
-    }
-    static const kTypeWithPrefix[] =
+    };
+    static const ImageTypeInfo kTypeWithPrefix[] =
         {
             { "", "float", false, "F", "F", "EXT"},
             { "u", "uint", true, "I", "U", ""},

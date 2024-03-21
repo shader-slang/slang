@@ -1142,16 +1142,6 @@ namespace renderer_test
     template<typename T>
     void loadDataIntoInt(T& out, const uint8_t& in)
     {
-        // well define int8_t = uint8_t
-        if constexpr (std::is_same<int8_t, T>())
-        {
-            if (in > 127)
-            {
-                out = T(127);
-                return;
-            }
-        }
-        
         out = T(in);
     }
 
@@ -1245,7 +1235,7 @@ namespace renderer_test
             case Format::R16G16_FLOAT:
             case Format::R16G16B16A16_FLOAT:
             {
-                generateTextureDataWithTargetTStorage<uint16_t>(output, desc, formatInfo, loadDataIntoHalf); // FloatToHalf
+                generateTextureDataWithTargetTStorage<uint16_t>(output, desc, formatInfo, loadDataIntoHalf);
                 break;
             }
             case Format::R64_UINT:

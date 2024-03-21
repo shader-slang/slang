@@ -2270,7 +2270,9 @@ Result DeviceImpl::createBufferView(
                     bufferViewUsage.usage = VK_BUFFER_USAGE_2_UNIFORM_TEXEL_BUFFER_BIT_KHR;
                 }
                 else
+                {
                     assert(!"unhandled");
+                }
 
                 SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateBufferView(m_device, &info, nullptr, &view));
             }
