@@ -3347,6 +3347,7 @@ RefPtr<Module> Linkage::loadModuleFromIRBlobImpl(
     readOptions.sink = sink;
     readOptions.sourceManager = getSourceManager();
     readOptions.namePool = getNamePool();
+    readOptions.modulePath = filePathInfo.foundPath;
     SerialContainerData containerData;
     if (SLANG_FAILED(SerialContainerUtil::read(&container, readOptions, additionalLoadedModules, containerData)) ||
         containerData.modules.getCount() != 1)
@@ -3692,6 +3693,21 @@ bool Linkage::isBinaryModuleUpToDate(String fromPath, RiffContainer* container)
     auto version = String(getBuildTagString());
     digestBuilder.append(version);
     m_optionSet.buildHash(digestBuilder);
+
+    // Find the canonical path of the directory containing the module source file.
+    String moduleSrcPath = "";
+    if (moduleHeader.dependentFiles.getCount())
+    {
+        moduleSrcPath = moduleHeader.dependentFiles.getFirst();
+        IncludeSystem includeSystem(&getSearchDirectories(), getFileSystemExt(), getSourceManager());
+        PathInfo modulePathInfo;
+        if (SLANG_SUCCEEDED(includeSystem.findFile(moduleSrcPath, fromPath, modulePathInfo)))
+        {
+            moduleSrcPath = modulePathInfo.foundPath;
+            Path::getCanonical(moduleSrcPath, moduleSrcPath);
+        }
+    }
+
     for (auto file : moduleHeader.dependentFiles)
     {
         auto sourceFile = loadSourceFile(fromPath, file);
@@ -3700,7 +3716,7 @@ bool Linkage::isBinaryModuleUpToDate(String fromPath, RiffContainer* container)
             // If we cannot find the source file from `fromPath`,
             // try again from the module's source file path.
             if (moduleHeader.dependentFiles.getCount() != 0)
-                sourceFile = loadSourceFile(Path::getParentDirectory(moduleHeader.dependentFiles.getFirst()), file);
+                sourceFile = loadSourceFile(moduleSrcPath, file);
         }
         if (!sourceFile)
             return false;
@@ -5245,9 +5261,26 @@ void Linkage::prepareDeserializedModule(SerialContainerData::Module& moduleEntry
     module->setIRModule(moduleEntry.irModule);
     module->setModuleDecl(as<ModuleDecl>(moduleEntry.astRootNode));
     module->clearFileDependency();
+    String moduleSourcePath = filePathInfo.foundPath;
+    bool isFirst = true;
     for (auto file : moduleEntry.dependentFiles)
     {
         auto sourceFile = loadSourceFile(filePathInfo.foundPath, file);
+        if (isFirst)
+        {
+            // The first file is the source for the main module file.
+            // We store the module path as the basis for finding the remaining
+            // dependent files.
+            if (sourceFile)
+                moduleSourcePath = sourceFile->getPathInfo().foundPath;
+            isFirst = false;
+        }
+        // If we cannot find the dependent file directly, try to find
+        // it relative to the module source path.
+        if (!sourceFile)
+        {
+            sourceFile = loadSourceFile(moduleSourcePath, file);
+        }
         if (sourceFile)
         {
             module->addFileDependency(sourceFile);
