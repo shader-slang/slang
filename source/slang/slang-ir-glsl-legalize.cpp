@@ -2526,7 +2526,10 @@ void legalizeEntryPointParameterForGLSL(
                         // we need to add it to the work list to be processed.
                         for (UInt a = 1; a < ii->getOperandCount(); a++)
                         {
-                            if (as<IRHLSLStreamOutputType>(ii->getOperand(a)->getDataType()))
+                            auto argType = ii->getOperand(a)->getDataType();
+                            if (auto ptrTypeBase = as<IRPtrTypeBase>(argType))
+                                argType = ptrTypeBase->getValueType();
+                            if (as<IRHLSLStreamOutputType>(argType))
                             {
                                 if (workListSet.add(callee))
                                     workList.add(as<IRFunc>(callee));
