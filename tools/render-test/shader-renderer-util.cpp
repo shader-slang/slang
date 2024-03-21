@@ -32,6 +32,7 @@ using Slang::Result;
     // Default to R8G8B8A8_UNORM
     const Format format = (inputDesc.format == Format::Unknown) ? Format::R8G8B8A8_UNORM : inputDesc.format;
 
+    textureResourceDesc.sampleDesc = ITextureResource::SampleDesc{inputDesc.sampleCount, 0};
     textureResourceDesc.format = format;
     textureResourceDesc.numMipLevels = texData.m_mipLevels;
     textureResourceDesc.arraySize = inputDesc.arrayLength;
