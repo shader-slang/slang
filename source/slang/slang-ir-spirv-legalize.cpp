@@ -216,8 +216,12 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             auto user = use->getUser();
             IRBuilder builder(user);
             builder.setInsertBefore(user);
-            if(as<IRGetElement>(user) || as<IRFieldExtract>(user))
+
+            if((as<IRGetElement>(user) || as<IRFieldExtract>(user)) &&
+                use == user->getOperands())
             {
+                // If the use is the address operand of a getElement or FieldExtract,
+                // replace the inst with the updated address and continue to follow the use chain.
                 auto basePtrType = as<IRPtrTypeBase>(addr->getDataType());
                 IRType* ptrType = nullptr;
                 if (basePtrType->hasAddressSpace())

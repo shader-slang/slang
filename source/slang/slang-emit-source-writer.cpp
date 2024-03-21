@@ -250,23 +250,43 @@ void SourceWriter::emit(double value)
 
     std::ostringstream stream;
     stream.imbue(std::locale::classic());
-    stream.setf(std::ios::fixed, std::ios::floatfield);
-    stream.precision(20);
+
+    int expBase2;
+    std::frexp(value, &expBase2);
+    // 2^17 = 131072 which is close to 10^5, so in that case we will
+    // change to use scientific representation.
+    std::ios::fmtflags flags = (std::abs(expBase2) >= 17) ?
+            std::ios::scientific : std::ios::fixed;
+
+    stream.setf(flags, std::ios::floatfield);
+    stream.precision(std::numeric_limits<double>::max_digits10);
     stream << value;
     auto str = stream.str();
-    auto slice = UnownedStringSlice(str.c_str());
+
+    std::size_t found = str.find_last_of("e");
+    found = (found == std::string::npos) ? str.length() : found;
+
+    // separate the mantissa and exponent part, as we want to remove the
+    // trailing 0s from the mantissa part. If we selected the fixed format
+    // above, the 'exponentStr' will be empty.
+    std::string mantissaStr = str.substr(0, found);
+    std::string exponentStr = str.substr(found, str.length());
+
     // Remove redundant trailing 0s.
-    if (slice.end() > slice.begin())
+    if (mantissaStr.end() > mantissaStr.begin())
     {
-        auto lastChar = slice.end() - 1;
-        while (lastChar > slice.begin() && *lastChar == '0')
+        auto lastChar = mantissaStr.end() - 1;
+        while (lastChar > mantissaStr.begin() && *lastChar == '0')
             lastChar--;
         if (*lastChar == '.')
             lastChar++;
-        if (lastChar > slice.end() - 1)
-            lastChar = slice.end() - 1;
-        slice = slice.subString(0, lastChar - slice.begin() + 1);
+        if (lastChar > mantissaStr.end() - 1)
+            lastChar = mantissaStr.end() - 1;
+        mantissaStr = mantissaStr.substr(0, lastChar - mantissaStr.begin() + 1);
     }
+
+    auto finalStr = mantissaStr + exponentStr;
+    auto slice = UnownedStringSlice(finalStr.c_str());
     emit(slice);
 }
 

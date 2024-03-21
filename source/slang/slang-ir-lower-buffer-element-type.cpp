@@ -651,7 +651,7 @@ namespace Slang
                                         for (UInt i = 0; i < user->getOperandCount(); i++)
                                             args.add(user->getOperand(i));
                                         auto newArrayPtrVal = builder.emitFieldAddress(
-                                            builder.getPtrType(loweredElementTypeInfo.loweredInnerArrayType),
+                                            getLoweredPtrLikeType(ptrVal->getDataType(), loweredElementTypeInfo.loweredInnerArrayType),
                                             ptrVal,
                                             loweredElementTypeInfo.loweredInnerStructKey);
                                         builder.replaceOperand(use, newArrayPtrVal);
@@ -745,7 +745,7 @@ namespace Slang
                             {
                                 IRInst* resultInst = nullptr;
                                 auto dataPtr = builder.emitFieldAddress(
-                                    builder.getPtrType(matrixTypeInfo->loweredInnerArrayType),
+                                    getLoweredPtrLikeType(majorAddr->getDataType(), matrixTypeInfo->loweredInnerArrayType),
                                     majorGEP->getBase(),
                                     matrixTypeInfo->loweredInnerStructKey);
                                 if (getIntVal(matrixType->getLayout()) == SLANG_MATRIX_LAYOUT_COLUMN_MAJOR)
@@ -774,7 +774,7 @@ namespace Slang
                                 if (storeInst->getOperand(0) != majorAddr)
                                     break;
                                 auto dataPtr = builder.emitFieldAddress(
-                                    builder.getPtrType(matrixTypeInfo->loweredInnerArrayType),
+                                    getLoweredPtrLikeType(majorAddr->getDataType(), matrixTypeInfo->loweredInnerArrayType),
                                     majorGEP->getBase(),
                                     matrixTypeInfo->loweredInnerStructKey);
                                 if (getIntVal(matrixType->getLayout()) == SLANG_MATRIX_LAYOUT_COLUMN_MAJOR)
@@ -804,7 +804,7 @@ namespace Slang
                                     Swap(rowIndex, colIndex);
                                 }
                                 auto dataPtr = builder.emitFieldAddress(
-                                    builder.getPtrType(matrixTypeInfo->loweredInnerArrayType),
+                                    getLoweredPtrLikeType(majorAddr->getDataType(), matrixTypeInfo->loweredInnerArrayType),
                                     majorGEP->getBase(),
                                     matrixTypeInfo->loweredInnerStructKey);
                                 auto vectorAddr = builder.emitElementAddress(dataPtr, rowIndex);

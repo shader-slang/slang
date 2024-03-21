@@ -7,9 +7,8 @@ Some of the documentation is intended for users of the language and compiler, wh
 Getting Started
 ---------------
 
-The Slang [User's Guide](https://shader-slang.github.io/slang/user-guide/) provides an introduction to the Slang language and its major features.
+The Slang [User's Guide](https://shader-slang.github.io/slang/user-guide/) provides an introduction to the Slang language and its major features, as well as the compilation and reflection API.
 
-The [API user's guide](api-users-guide.md) gives information on how to drive Slang programmatically from an application.
 There is also documentation specific to using the [`slangc`](command-line-slangc.md) command-line tool.
 
 Advanced Users
