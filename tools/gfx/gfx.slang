@@ -150,7 +150,7 @@ public enum class Format
     R16G16_FLOAT,
     R16_FLOAT,
 
-    //R64_UINT,
+    R64_UINT,
 
     R32G32B32A32_UINT,
     R32G32B32_UINT,
@@ -165,7 +165,7 @@ public enum class Format
     R8G8_UINT,
     R8_UINT,
 
-    //R64_SINT,
+    R64_SINT,
 
     R32G32B32A32_SINT,
     R32G32B32_SINT,
