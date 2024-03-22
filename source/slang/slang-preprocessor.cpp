@@ -2570,7 +2570,40 @@ static PreprocessorExpressionValue ParseAndEvaluateUnaryExpression(PreprocessorD
 
                 return LookupMacro(context, name) != NULL;
             }
+            else if (token.getContent() == "__has_feature")
+            {
+                // handle `defined(someName)`
 
+                // Possibly parse a `(`
+                Token leftParen;
+                if (PeekRawTokenType(context) == TokenType::LParent)
+                {
+                    leftParen = AdvanceRawToken(context);
+                }
+
+                // Expect an identifier
+                Token nameToken;
+                if (!ExpectRaw(context, TokenType::Identifier, Diagnostics::expectedTokenInDefinedExpression, &nameToken))
+                {
+                    return 0;
+                }
+                
+                // If we saw an opening `(`, then expect one to close
+                if (leftParen.type != TokenType::Unknown)
+                {
+                    if (!ExpectRaw(context, TokenType::RParent, Diagnostics::expectedTokenInDefinedExpression))
+                    {
+                        GetSink(context)->diagnose(leftParen.loc, Diagnostics::seeOpeningToken, leftParen);
+                        return 0;
+                    }
+                }
+
+                if (nameToken.getContent() == "hlsl_vk_buffer_pointer")
+                {
+                    return 1;
+                }
+                return 0;
+            }
             // An identifier here means it was not defined as a macro (or
             // it is defined, but as a function-like macro. These should
             // just evaluate to zero (possibly with a warning)
