@@ -1158,7 +1158,7 @@ extension matrix<T,N,M,L> : IFloat
     [OverloadRank(-1)]
     [TreatAsDifferentiable]
     [__unsafeForceInlineEarly]
-    __implicit_conversion($(kConversionCost_IntegerToFloatConversion))
+    __implicit_conversion($(kConversionCost_ScalarIntegerToFloatMatrix))
     __init(int v) { this = matrix<T,N,M>(T(v)); }
 
     [OverloadRank(-1)]
