@@ -13919,10 +13919,10 @@ namespace vk
     struct BufferPointer<T, let Alignment : int = 0>
     {
         T *_ptr;
-        __init(T *ptr) { _ptr = ptr; }
-        __init(uint64_t val) { _ptr = (T *)val; }
-        Ref<T> Get() { return *_ptr; }
-        T *getPtr() { return _ptr;}
+        [ForceInline] __init(T *ptr) { _ptr = ptr; }
+        [ForceInline] __init(uint64_t val) { _ptr = (T *)val; }
+        [ForceInline] Ref<T> Get() { return *_ptr; }
+        [ForceInline] T *getPtr() { return _ptr;}
     }
     [ForceInline]
     BufferPointer<U, alignment> static_pointer_cast<U, let alignment : int = 0, T, let a : int>(BufferPointer<T, a> src)
