@@ -7172,6 +7172,7 @@ __target_intrinsic(glsl)
 __target_intrinsic(spirv, "OpTranspose resultType resultId _0")
 [__readNone]
 [PreferRecompute]
+[OverloadRank(-1)]
 matrix<T, M, N> transpose(matrix<T, N, M> x)
 {
     matrix<T, M, N> result;
