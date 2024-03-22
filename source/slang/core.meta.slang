@@ -1073,7 +1073,7 @@ __magic_type(MatrixExpressionType)
 struct matrix : IArray<vector<T,C>>
 {
     __intrinsic_op($(kIROp_MakeMatrixFromScalar))
-    __implicit_conversion($(kConversionCost_ScalarToVector))
+    __implicit_conversion($(kConversionCost_ScalarToMatrix))
     [TreatAsDifferentiable]
     __init(T val);
 
@@ -1158,13 +1158,13 @@ extension matrix<T,N,M,L> : IFloat
     [OverloadRank(-1)]
     [TreatAsDifferentiable]
     [__unsafeForceInlineEarly]
-    __implicit_conversion($(kConversionCost_ScalarToVector))
+    __implicit_conversion($(kConversionCost_IntegerToFloatConversion))
     __init(int v) { this = matrix<T,N,M>(T(v)); }
 
     [OverloadRank(-1)]
     [TreatAsDifferentiable]
     [__unsafeForceInlineEarly]
-    __implicit_conversion($(kConversionCost_ScalarToVector))
+    __implicit_conversion($(kConversionCost_ScalarToMatrix))
     __init(float v) { this = matrix<T,N,M>(T(v)); }
 
     // IDifferentiable.
@@ -1259,7 +1259,7 @@ for (int tt = 0; tt < kBaseTypeCount; ++tt)
 
     sb << "extension " << tname << "\n";
     sb << "{\n";
-    sb << "    __implicit_conversion($(kConversionCost_ScalarToVector))\n";
+    sb << "    __implicit_conversion($(kConversionCost_VectorToScalar))\n";
     sb << "    __init(vector<" << tname << ",1> v) { this = v[0]; }\n";
     sb << "}\n";
 }

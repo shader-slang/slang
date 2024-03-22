@@ -160,6 +160,8 @@ namespace Slang
         // a vector (this will be added to the cost, if any, of converting
         // the element type of the vector)
         kConversionCost_ScalarToVector = 1,
+        kConversionCost_VectorToScalar = 1,
+        kConversionCost_ScalarToMatrix = 1,
 
         // Additional cost when casting an LValue.
         kConversionCost_LValueCast = 800,
