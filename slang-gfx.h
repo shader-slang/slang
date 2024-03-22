@@ -221,8 +221,6 @@ public:
     x(R16G16_FLOAT, 4, 1) \
     x(R16_FLOAT, 2, 1) \
     \
-    x(R64_UINT, 8, 1) \
-    \
     x(R32G32B32A32_UINT, 16, 1) \
     x(R32G32B32_UINT, 12, 1) \
     x(R32G32_UINT, 8, 1) \
@@ -235,8 +233,6 @@ public:
     x(R8G8B8A8_UINT, 4, 1) \
     x(R8G8_UINT, 2, 1) \
     x(R8_UINT, 1, 1) \
-    \
-    x(R64_SINT, 8, 1) \
     \
     x(R32G32B32A32_SINT, 16, 1) \
     x(R32G32B32_SINT, 12, 1) \
@@ -300,8 +296,12 @@ public:
     x(BC6H_UF16, 16, 16) \
     x(BC6H_SF16, 16, 16) \
     x(BC7_UNORM, 16, 16) \
-    x(BC7_UNORM_SRGB, 16, 16)
-
+    x(BC7_UNORM_SRGB, 16, 16) \
+    \
+    x(R64_UINT, 8, 1) \
+    \
+    x(R64_SINT, 8, 1) \
+    \
 // TODO: This should be generated from above
 // TODO: enum class should be explicitly uint32_t or whatever's appropriate
 /// Different formats of things like pixels or elements of vertices
@@ -336,8 +336,6 @@ enum class Format
     R16G16_FLOAT,
     R16_FLOAT,
 
-    R64_UINT,
-
     R32G32B32A32_UINT,
     R32G32B32_UINT,
     R32G32_UINT,
@@ -350,8 +348,6 @@ enum class Format
     R8G8B8A8_UINT,
     R8G8_UINT,
     R8_UINT,
-
-    R64_SINT,
 
     R32G32B32A32_SINT,
     R32G32B32_SINT,
@@ -416,6 +412,10 @@ enum class Format
     BC6H_SF16,
     BC7_UNORM,
     BC7_UNORM_SRGB,
+
+    R64_UINT,
+    
+    R64_SINT,
 
     _Count,
 };
