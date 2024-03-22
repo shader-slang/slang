@@ -1,6 +1,6 @@
 // rw-texture.hlsl
 
-//TEST:COMPARE_HLSL:-no-mangle -profile ps_5_0 -entry main
+//TEST:COMPARE_HLSL: -profile ps_5_0 -entry main
 
 // Ensure that we implement the `Load` operations on
 // `RWTexture*` types with the correct signature.
