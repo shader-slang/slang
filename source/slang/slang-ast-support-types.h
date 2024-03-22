@@ -143,8 +143,8 @@ namespace Slang
         // Default case (usable for user-defined conversions)
         kConversionCost_Default = 500,
 
-	// Cost of converting an integer to int16_t
-        kConversionCost_IntegerToShort = 700,
+        // Cost of converting an integer to int16_t
+        kConversionCost_IntegerTruncate = 700,
 
         // Catch-all for conversions that should be discouraged
         // (i.e., that really shouldn't be made implicitly)
@@ -161,7 +161,7 @@ namespace Slang
         // the element type of the vector)
         kConversionCost_ScalarToVector = 1,
         kConversionCost_VectorToScalar = 1,
-        kConversionCost_ScalarToMatrix = 1,
+        kConversionCost_ScalarToMatrix = 10,
 
         // Additional cost when casting an LValue.
         kConversionCost_LValueCast = 800,

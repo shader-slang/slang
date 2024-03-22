@@ -1197,7 +1197,7 @@ __generic<let R : int, let C : int, let L : int>
 extension matrix<int16_t,R,C,L>
 {
     typealias T = int16_t;
-    __implicit_conversion($(kConversionCost_IntegerToShort))
+    __implicit_conversion($(kConversionCost_IntegerTruncate))
     __init(int value) { this = matrix<T,R,C,L>(T(value)); }
 }
 
