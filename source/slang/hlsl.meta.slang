@@ -13912,6 +13912,41 @@ extension __TextureImpl<float, Shape, 0, 0, 0, $(kStdlibResourceAccessReadWrite)
 
 // Buffer Pointer
 
+namespace vk
+{
+    // Partial implementation of the vk::buffer_ref proposal:
+    // https://github.com/microsoft/hlsl-specs/blob/main/proposals/0010-vk-buffer-ref.md
+    struct BufferPointer<T, let Alignment : int = 0>
+    {
+        T *_ptr;
+        __init(T *ptr) { _ptr = ptr; }
+        __init(uint64_t val) { _ptr = (T *)val; }
+        Ref<T> Get() { return *_ptr; }
+        T *getPtr() { return _ptr;}
+    }
+    [ForceInline]
+    BufferPointer<U, alignment> static_pointer_cast<U, let alignment : int = 0, T, let a : int>(BufferPointer<T, a> src)
+    {
+        return BufferPointer<U, alignment>((U*)(src.getPtr()));
+    }
+    [ForceInline]
+    BufferPointer<U, alignment> reinterpret_pointer_cast<U, let alignment : int = 0, T, let a : int>(BufferPointer<T, a> src)
+    {
+        return BufferPointer<U, alignment>((U *)(src.getPtr()));
+    }
+}
+
+attribute_syntax[vk_aliased_pointer] : VkAliasedPointerAttribute;
+attribute_syntax[vk_restrict_pointer] : VkRestrictPointerAttribute;
+
+extension uint64_t
+{
+    __init<T, let alignment : int>(vk::BufferPointer<T, alignment> ptr)
+    {
+        this = (uint64_t)ptr._ptr;
+    }
+}
+
 __generic<T, let Alignment : int = 16>
 __intrinsic_type($(kIROp_HLSLConstBufferPointerType))
 __glsl_extension(GL_EXT_buffer_reference)
