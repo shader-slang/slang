@@ -159,8 +159,8 @@ namespace Slang
         // Additional conversion cost to add when promoting from a scalar to
         // a vector (this will be added to the cost, if any, of converting
         // the element type of the vector)
-        kConversionCost_ScalarToVector = 1,
-        kConversionCost_VectorToScalar = 1,
+        kConversionCost_OneVectorToScalar = 1,
+        kConversionCost_ScalarToVector = 2,
         kConversionCost_ScalarToMatrix = 10,
         kConversionCost_ScalarIntegerToFloatMatrix = kConversionCost_IntegerToFloatConversion + kConversionCost_ScalarToMatrix,
 

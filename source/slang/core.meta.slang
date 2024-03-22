@@ -1259,7 +1259,7 @@ for (int tt = 0; tt < kBaseTypeCount; ++tt)
 
     sb << "extension " << tname << "\n";
     sb << "{\n";
-    sb << "    __implicit_conversion(" << kConversionCost_VectorToScalar << ")\n";
+    sb << "    __implicit_conversion(" << kConversionCost_OneVectorToScalar << ")\n";
     sb << "    __init(vector<" << tname << ",1> v) { this = v[0]; }\n";
     sb << "}\n";
 }
