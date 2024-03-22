@@ -2823,12 +2823,12 @@ public vec4 shadow2DProjLod(sampler2DShadow sampler, vec4 coord, float lod)
 
 //// gimageDim Implementation
 
-public const int GL_TEXTURE_CUBE_MAP_POSITIVE_X = 0;
-public const int GL_TEXTURE_CUBE_MAP_NEGATIVE_X = 1;
-public const int GL_TEXTURE_CUBE_MAP_POSITIVE_Y = 2;
-public const int GL_TEXTURE_CUBE_MAP_NEGATIVE_Y = 3;
-public const int GL_TEXTURE_CUBE_MAP_POSITIVE_Z = 4;
-public const int GL_TEXTURE_CUBE_MAP_NEGATIVE_Z = 5;
+public static const int GL_TEXTURE_CUBE_MAP_POSITIVE_X = 0;
+public static const int GL_TEXTURE_CUBE_MAP_NEGATIVE_X = 1;
+public static const int GL_TEXTURE_CUBE_MAP_POSITIVE_Y = 2;
+public static const int GL_TEXTURE_CUBE_MAP_NEGATIVE_Y = 3;
+public static const int GL_TEXTURE_CUBE_MAP_POSITIVE_Z = 4;
+public static const int GL_TEXTURE_CUBE_MAP_NEGATIVE_Z = 5;
 
 __generic<T : __BuiltinType>
 [ForceInline] void typeRequireChecks_image_atomic_tier1()
@@ -3018,6 +3018,7 @@ ${{{{
 
         [require(spirv)]
         [require(glsl)]
+        [__readNone]
         [ForceInline] public $(imageSizeIntOrIVec) imageSize(readonly writeonly $(fullTypeName) image)
         {
             __target_switch
@@ -3072,6 +3073,7 @@ ${{{{
 }}}}
             [require(spirv)]
             [require(glsl)]
+            [__readNone]
             [ForceInline] public int imageSamples(readonly writeonly $(fullTypeName) image)
             {
                 __target_switch

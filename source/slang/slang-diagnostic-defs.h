@@ -239,7 +239,6 @@ DIAGNOSTIC(20013, Error, invalidCUDASMVersion, "Expecting CUDA SM version as eit
 DIAGNOSTIC(20014, Error, classIsReservedKeyword, "'class' is a reserved keyword in this context; use 'struct' instead.")
 DIAGNOSTIC(20015, Error, unknownSPIRVCapability, "unknown SPIR-V capability '$0'.")
 DIAGNOSTIC(20016, Error, missingLayoutBindingModifier, "Expecting 'binding' modifier in the layout qualifier here")
-DIAGNOSTIC(20017, Error, glslTokenOnly, "$0 is only allowed in 'allowGLSL' compile mode")
 
 DIAGNOSTIC(20101, Warning, unintendedEmptyStatement, "potentially unintended empty statement at this location; use {} instead.")
 

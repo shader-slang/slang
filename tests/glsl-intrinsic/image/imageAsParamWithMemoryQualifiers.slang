@@ -11,10 +11,10 @@ buffer MyBlockName2
 
 layout(local_size_x = 4) in;
 
-//TEST_INPUT: RWTexture2D(format=R16G16B16A16_FLOAT, size=1, content=one, mipMaps = 1):name someImage
+//TEST_INPUT: set someImage = RWTexture2D(format=R16G16B16A16_FLOAT, size=1, content=one, mipMaps = 1)
 uniform layout(binding=0,rgba16f) writeonly readonly image2D someImage;
 
-//TEST_INPUT: RWTexture2D(format=R16G16B16A16_FLOAT, size=1, content=one, mipMaps = 1):name someImage2
+//TEST_INPUT: set someImage2 = RWTexture2D(format=R16G16B16A16_FLOAT, size=1, content=one, mipMaps = 1)
 uniform layout(binding=1,rgba16f) writeonly image2D someImage2;
 
 bool checkAllImageSizesParamSameQualifiers(writeonly readonly image2D val)
