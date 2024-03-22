@@ -84,6 +84,7 @@ namespace Slang
         bool enableEffectAnnotations = false;
         bool allowGLSLInput = false;
         bool isInLanguageServer = false;
+        CompilerOptionSet optionSet;
     };
 
     // TODO: implement two pass parsing for file reference and struct type recognition
@@ -3207,7 +3208,14 @@ namespace Slang
         else
         {
             // Otherwise, we need to generate a name for the buffer variable.
-            bufferVarDecl->nameAndLoc.name = generateName(parser, "parameterGroup_" + String(reflectionNameToken.getContent()));
+            if (parser->options.optionSet.getBoolOption(CompilerOptionName::NoMangle))
+            {
+                bufferVarDecl->nameAndLoc.name = reflectionNameToken.getName();
+            }
+            else
+            {
+                bufferVarDecl->nameAndLoc.name = generateName(parser, "parameterGroup_" + String(reflectionNameToken.getContent()));
+            }
 
             // We also need to make the declaration "transparent" so that their
             // members are implicitly made visible in the parent scope.
@@ -7546,6 +7554,7 @@ namespace Slang
             translationUnit->compileRequest->optionSet.getBoolOption(CompilerOptionName::AllowGLSL) ||
             sourceLanguage == SourceLanguage::GLSL;
         options.isInLanguageServer = translationUnit->compileRequest->getLinkage()->isInLanguageServer();
+        options.optionSet = translationUnit->compileRequest->optionSet;
 
         Parser parser(astBuilder, tokens, sink, outerScope, options);
         parser.namePool = translationUnit->getNamePool();
