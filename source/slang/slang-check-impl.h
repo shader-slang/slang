@@ -2505,7 +2505,7 @@ namespace Slang
         Expr* visitStaticMemberExpr(StaticMemberExpr* expr);
 
             /// Perform checking operations required for the "base" expression of a member-reference like `base.someField`
-        Expr* checkBaseForMemberExpr(Expr* baseExpr);
+        Expr* checkBaseForMemberExpr(Expr* baseExpr, bool& outNeedDeref);
 
         Expr* lookupMemberResultFailure(
             DeclRefExpr*     expr,

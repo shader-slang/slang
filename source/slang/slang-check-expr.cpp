@@ -1923,7 +1923,8 @@ namespace Slang
 
     Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
     {
-        auto baseExpr = checkBaseForMemberExpr(subscriptExpr->baseExpression);
+        bool needDeref = false;
+        auto baseExpr = checkBaseForMemberExpr(subscriptExpr->baseExpression, needDeref);
 
         // If the base expression is a type, it means that this is an array declaration,
         // then we should disable short-circuit in case there is logical expression in
@@ -3843,13 +3844,18 @@ namespace Slang
         return expr;
     }
 
-    Expr* SemanticsVisitor::checkBaseForMemberExpr(Expr* inBaseExpr)
+    Expr* SemanticsVisitor::checkBaseForMemberExpr(Expr* inBaseExpr, bool& outNeedDeref)
     {
         auto baseExpr = inBaseExpr;
 
         baseExpr = CheckTerm(baseExpr);
 
-        baseExpr = MaybeDereference(baseExpr);
+        auto derefExpr = MaybeDereference(baseExpr);
+
+        if (derefExpr != baseExpr)
+            outNeedDeref = true;
+
+        baseExpr = derefExpr;
 
         // If the base of the member lookup has an interface type
         // *without* a suitable this-type substitution, then we are
@@ -3899,7 +3905,17 @@ namespace Slang
 
     Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr * expr)
     {
-        expr->baseExpression = checkBaseForMemberExpr(expr->baseExpression);
+        bool needDeref = false;
+        expr->baseExpression = checkBaseForMemberExpr(expr->baseExpression, needDeref);
+
+        if (!needDeref && as<DerefMemberExpr>(expr) && !as<PtrType>(expr->baseExpression->type))
+        {
+            // The user is trying to use the `->` operator on something that can't be
+            // dereferenced, so we should diagnose that.
+            if (!as<ErrorType>(expr->baseExpression->type))
+                getSink()->diagnose(expr->memberOperatorLoc, Diagnostics::cannotDereferenceType, expr->baseExpression->type);
+        }
+
         auto baseType = expr->baseExpression->type;
 
         // If we are looking up through a modified type, just pass straight
