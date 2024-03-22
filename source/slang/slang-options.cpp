@@ -517,6 +517,8 @@ void initCommandOptions(CommandOptions& options)
         "Set the filesystem hook to use for a compile request."},
         { OptionKind::Heterogeneous, "-heterogeneous", nullptr, "Output heterogeneity-related code." },
         { OptionKind::NoMangle, "-no-mangle", nullptr, "Do as little mangling of names as possible." },
+        { OptionKind::NoHLSLBinding, "-no-hlsl-binding", nullptr, "Do not include explicit parameter binding semantics in the output HLSL code,"
+                                                                  "except for parameters that has explicit bindings in the input source." },
         { OptionKind::ValidateUniformity, "-validate-uniformity", nullptr, "Perform uniformity validation analysis." },
         { OptionKind::AllowGLSL, "-allow-glsl", nullptr, "Enable GLSL as an input language." },
     };
@@ -1694,6 +1696,7 @@ SlangResult OptionsParser::_parse(
             case OptionKind::PreprocessorOutput:
             case OptionKind::DumpAst:
             case OptionKind::IncompleteLibrary:
+            case OptionKind::NoHLSLBinding:
                 linkage->m_optionSet.set(optionKind, true); break;
                 break;
             case OptionKind::NoCodeGen:
