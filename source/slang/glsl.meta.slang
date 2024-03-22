@@ -3034,6 +3034,7 @@ ${{{{
         }
         [require(spirv)]
         [require(glsl)]
+        [__NoSideEffect]
         [ForceInline] public $(targetType.prefix)vec4 imageLoad(readonly $(IMAGE_PARAMS))
         {
             __target_switch
