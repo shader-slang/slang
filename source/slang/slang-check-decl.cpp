@@ -1773,7 +1773,7 @@ namespace Slang
             }
         }
         if (getOptionSet().getBoolOption(CompilerOptionName::NoMangle) &&
-            (isGlobalDecl(varDecl) || as<StructDecl>(getParentDecl(varDecl))))
+            isGlobalDecl(varDecl))
         {
             // If -no-mangle option is set, we will add `ExternCpp` modifier to all
             // global variables and struct fields to prevent mangling.
@@ -1818,12 +1818,6 @@ namespace Slang
             member->nameAndLoc.loc = structDecl->wrappedType.exp->loc;
             member->loc = member->nameAndLoc.loc;
             structDecl->addMember(member);
-        }
-
-        if (getOptionSet().getBoolOption(CompilerOptionName::NoMangle))
-        {
-            // If -no-mangle option is set, we will add `ExternCpp` modifier to prevent mangling.
-            addModifier(structDecl, m_astBuilder->create<ExternCppModifier>());
         }
         checkVisibility(structDecl);
     }

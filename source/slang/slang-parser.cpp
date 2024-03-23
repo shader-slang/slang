@@ -3210,7 +3210,13 @@ namespace Slang
             // Otherwise, we need to generate a name for the buffer variable.
             if (parser->options.optionSet.getBoolOption(CompilerOptionName::NoMangle))
             {
+                // If no-mangle option is set, use the reflection name as the variable name,
+                // and mark all members of the buffer object as no mangle.
                 bufferVarDecl->nameAndLoc.name = reflectionNameToken.getName();
+                for (auto m : bufferDataTypeDecl->getMembersOfType<VarDecl>())
+                {
+                    addModifier(m, parser->astBuilder->create<ExternCppModifier>());
+                }
             }
             else
             {
