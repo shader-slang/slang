@@ -4797,8 +4797,15 @@ namespace Slang
         // Skip completion request token to prevent producing a type named completion request.
         AdvanceIf(this, TokenType::CompletionRequest);
 
-        // TODO: support `struct` declaration without tag
-        rs->nameAndLoc = expectIdentifier(this);
+        if (LookAheadToken(TokenType::Identifier))
+        {
+            rs->nameAndLoc = expectIdentifier(this);
+        }
+        else
+        {
+            rs->nameAndLoc.name = generateName(this);
+            rs->nameAndLoc.loc = rs->loc;
+        }
         return parseOptGenericDecl(this, [&](GenericDecl*)
         {
             // We allow for an inheritance clause on a `struct`
@@ -5409,6 +5416,27 @@ namespace Slang
         return statement;
     }
 
+    // Look ahead token, skipping all modifiers.
+    bool lookAheadTokenAfterModifiers(Parser* parser, const char* token)
+    {
+        TokenReader tokenPreview = parser->tokenReader;
+        for (Index i = 0;; i++)
+        {
+            if (tokenPreview.peekToken().getContent() == token)
+                return true;
+            else if (auto syntaxDecl = tryLookUpSyntaxDecl(parser, tokenPreview.peekToken().getName()))
+            {
+                if (syntaxDecl->syntaxClass.isSubClassOf<Modifier>())
+                {
+                    tokenPreview.advanceToken();
+                    continue;
+                }
+            }
+            break;
+        }
+        return false;
+    }
+
     Stmt* Parser::parseBlockStatement()
     {
         if(!beginMatch(this, MatchedTokenType::CurlyBraces))
@@ -5432,12 +5460,44 @@ namespace Slang
         }
 
         Token closingBraceToken;
+        auto addStmt = [&](Stmt* stmt)
+        {
+            if (!body)
+            {
+                body = stmt;
+            }
+            else if (auto seqStmt = as<SeqStmt>(body))
+            {
+                seqStmt->stmts.add(stmt);
+            }
+            else
+            {
+                SeqStmt* newBody = astBuilder->create<SeqStmt>();
+                newBody->loc = blockStatement->loc;
+                newBody->stmts.add(body);
+                newBody->stmts.add(stmt);
+
+                body = newBody;
+            }
+        };
         while (!AdvanceIfMatch(this, MatchedTokenType::CurlyBraces, &closingBraceToken))
         {
-            if (LookAheadToken("struct"))
+            if (lookAheadTokenAfterModifiers(this, "struct"))
             {
-                auto structDecl = ParseStruct();
-                AddMember(scopeDecl, structDecl);
+                auto declBase = ParseDecl(this, scopeDecl);
+                if (auto declGroup = as<DeclGroup>(declBase))
+                {
+                    for (auto subDecl : declGroup->decls)
+                    {
+                        if (auto varDecl = as<VarDeclBase>(subDecl))
+                        {
+                            auto declStmt = astBuilder->create<DeclStmt>();
+                            declStmt->loc = varDecl->loc;
+                            declStmt->decl = varDecl;
+                            addStmt(declStmt);
+                        }
+                    }
+                }
                 continue;
             }
             else if (AdvanceIf(this, "typedef"))
@@ -5454,26 +5514,10 @@ namespace Slang
             }
 
             auto stmt = ParseStatement();
-            if(stmt)
-            {
-                if (!body)
-                {
-                    body = stmt;
-                }
-                else if (auto seqStmt = as<SeqStmt>(body))
-                {
-                    seqStmt->stmts.add(stmt);
-                }
-                else
-                {
-                    SeqStmt* newBody = astBuilder->create<SeqStmt>();
-                    newBody->loc = blockStatement->loc;
-                    newBody->stmts.add(body);
-                    newBody->stmts.add(stmt);
 
-                    body = newBody;
-                }
-            }
+            if (stmt)
+                addStmt(stmt);
+
             TryRecover(this);
         }
         PopScope();
