@@ -72,9 +72,9 @@ bool testMemoryBarrierImage()
 bool testGroupMemoryBarrier()
 {
     raceCondition.data[3] = gl_GlobalInvocationID.x;
-    memoryBarrierImage();
+    groupMemoryBarrier();
     raceCondition.data[3] = 1;
-    memoryBarrierImage();
+    groupMemoryBarrier();
     return true
         && raceCondition.data[3] == 1
         ;

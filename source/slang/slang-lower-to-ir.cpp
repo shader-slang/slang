@@ -3533,6 +3533,27 @@ struct ExprLoweringContext
         // TODO: also need to handle this-type substitution here?
     }
 
+    void validateInvokeExprArgsWithFunctionModifiers(
+        InvokeExpr* expr,
+        FunctionDeclBase* decl,
+        List<IRInst*>& irArgs)
+    {
+        if (auto requireShaderInputParameter = decl->findModifier<GLSLRequireShaderInputParameterAttribute>())
+        {
+            if (irArgs.getCount() <= Slang::Index(requireShaderInputParameter->parameterNumber))
+            {
+                this->context->getSink()->diagnose(decl, Diagnostics::attributeArgumentCountMismatch, 
+                    Slang::ASTNodeType::GLSLRequireShaderInputParameterAttribute, requireShaderInputParameter->parameterNumber, irArgs.getCount());
+                return;
+            }
+            if (!irArgs[requireShaderInputParameter->parameterNumber]->findDecoration<IRGlobalInputDecoration>())
+            {
+                this->context->getSink()->diagnose(expr, Diagnostics::requireInputDecoratedVarForParameter, decl, requireShaderInputParameter->parameterNumber);
+            }
+            return;
+        }
+    }
+
     /// Lower an invoke expr, and attempt to fuse a store of the expr's result into destination.
     /// If the store is fused, returns LoweredValInfo::None. Otherwise, returns the IR val representing the RValue.
     LoweredValInfo visitInvokeExprImpl(InvokeExpr* expr, LoweredValInfo destination, const TryClauseEnvironment& tryEnv)
@@ -3649,6 +3670,8 @@ struct ExprLoweringContext
 
             auto funcType = funcTypeInfo.type;
             addDirectCallArgs(expr, funcDeclRef, &irArgs, &argFixups);
+
+            validateInvokeExprArgsWithFunctionModifiers(expr, as<FunctionDeclBase>(funcDeclRef.getDecl()), irArgs);
 
             LoweredValInfo result;
             if (funcTypeInfo.returnViaLastRefParam)
@@ -4024,16 +4047,6 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                     i = getSimpleVal(context, lowerRValueExpr(context, operand.expr));
                 }
                 return builder->emitSPIRVAsmOperandEnum(i);
-            }
-            case SPIRVAsmOperand::ImmediatelyResolve:
-            {
-                IRInst* i;
-                {
-                    IRBuilderInsertLocScope insertScope(builder);
-                    builder->setInsertBefore(spirvAsmInst);
-                    i = getSimpleVal(context, lowerRValueExpr(context, operand.expr));
-                }
-                return builder->emitSPIRVAsmOperandImmediatelyResolve(i);
             }
             case SPIRVAsmOperand::SlangValueAddr:
                 {

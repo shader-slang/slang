@@ -7010,12 +7010,12 @@ public vector<float, N> fwidthCoarse(vector<float, N> p)
     }
 }
 
-//TODO: Somehow require an input variable
 [require(hlsl, sm_5_0)]
 __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
-[__unsafeForceInlineEarly]
-public float interpolateAtCentroid(float interpolant)
+[__readNone]
+[GLSLRequireShaderInputParameter(0)]
+public float interpolateAtCentroid(__ref float interpolant)
 {
     __target_switch
     {
@@ -7029,7 +7029,7 @@ public float interpolateAtCentroid(float interpolant)
         return spirv_asm
         {
             OpCapability InterpolationFunction;
-            OpExtInst $$float result glsl450 InterpolateAtCentroid __immediatelyResolve(interpolant)
+            OpExtInst $$float result glsl450 InterpolateAtCentroid &interpolant
         };
     }
     }
@@ -7038,8 +7038,9 @@ public float interpolateAtCentroid(float interpolant)
 __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
 __generic<let N : int>
-[__unsafeForceInlineEarly]
-public vector<float, N> interpolateAtCentroid(vector<float, N> interpolant)
+[__readNone]
+[GLSLRequireShaderInputParameter(0)]
+public vector<float, N> interpolateAtCentroid(__ref vector<float, N> interpolant)
 {
     __target_switch
     {
@@ -7053,7 +7054,7 @@ public vector<float, N> interpolateAtCentroid(vector<float, N> interpolant)
         return spirv_asm
         {
             OpCapability InterpolationFunction;
-            OpExtInst $$vector<float, N> result glsl450 InterpolateAtCentroid __immediatelyResolve(interpolant)
+            OpExtInst $$vector<float, N> result glsl450 InterpolateAtCentroid &interpolant
         };
     }
     }
@@ -7062,8 +7063,9 @@ public vector<float, N> interpolateAtCentroid(vector<float, N> interpolant)
 [require(hlsl, sm_5_0)]
 __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
-[__unsafeForceInlineEarly]
-public float interpolateAtSample(float interpolant, int sample)
+[__readNone]
+[GLSLRequireShaderInputParameter(0)]
+public float interpolateAtSample(__ref float interpolant, int sample)
 {
     __target_switch
     {
@@ -7077,7 +7079,7 @@ public float interpolateAtSample(float interpolant, int sample)
         return spirv_asm
         {
             OpCapability InterpolationFunction;
-            OpExtInst $$float result glsl450 InterpolateAtSample __immediatelyResolve(interpolant) $sample
+            OpExtInst $$float result glsl450 InterpolateAtSample &interpolant $sample
         };
     }
     }
@@ -7086,8 +7088,9 @@ public float interpolateAtSample(float interpolant, int sample)
 __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
 __generic<let N : int>
-[__unsafeForceInlineEarly]
-public vector<float, N> interpolateAtSample(vector<float, N> interpolant, int sample)
+[__readNone]
+[GLSLRequireShaderInputParameter(0)]
+public vector<float, N> interpolateAtSample(__ref vector<float, N> interpolant, int sample)
 {
     __target_switch
     {
@@ -7101,7 +7104,7 @@ public vector<float, N> interpolateAtSample(vector<float, N> interpolant, int sa
         return spirv_asm
         {
             OpCapability InterpolationFunction;
-            OpExtInst $$vector<float, N> result glsl450 InterpolateAtSample __immediatelyResolve(interpolant) $sample
+            OpExtInst $$vector<float, N> result glsl450 InterpolateAtSample &interpolant $sample
         };
     }
     }
@@ -7109,8 +7112,9 @@ public vector<float, N> interpolateAtSample(vector<float, N> interpolant, int sa
 
 __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
-[__unsafeForceInlineEarly]
-public float interpolateAtOffset(float interpolant, vec2 offset)
+[__readNone]
+[GLSLRequireShaderInputParameter(0)]
+public float interpolateAtOffset(__ref float interpolant, vec2 offset)
 {
     __target_switch
     {
@@ -7120,7 +7124,7 @@ public float interpolateAtOffset(float interpolant, vec2 offset)
         return spirv_asm
         {
             OpCapability InterpolationFunction;
-            OpExtInst $$float result glsl450 78 __immediatelyResolve(interpolant) $offset
+            OpExtInst $$float result glsl450 78 &interpolant $offset
         };
     }
     }
@@ -7128,8 +7132,9 @@ public float interpolateAtOffset(float interpolant, vec2 offset)
 __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
 __generic<let N : int>
-[__unsafeForceInlineEarly]
-public vector<float, N> interpolateAtOffset(vector<float, N> interpolant, vec2 offset)
+[__readNone]
+[GLSLRequireShaderInputParameter(0)]
+public vector<float, N> interpolateAtOffset(__ref vector<float, N> interpolant, vec2 offset)
 {
     __target_switch
     {
@@ -7139,7 +7144,7 @@ public vector<float, N> interpolateAtOffset(vector<float, N> interpolant, vec2 o
         return spirv_asm
         {
             OpCapability InterpolationFunction;
-            OpExtInst $$vector<float, N> result glsl450 78 __immediatelyResolve(interpolant) $offset
+            OpExtInst $$vector<float, N> result glsl450 78 &interpolant $offset
         };
     }
     }
@@ -7273,7 +7278,7 @@ public void memoryBarrierAtomicCounter()
         spirv_asm
         {
             OpCapability Shader;
-            OpMemoryBarrier Invocation AcquireRelease
+            OpMemoryBarrier Invocation AcquireRelease|UniformMemory
         };
     }
     }
@@ -7293,7 +7298,7 @@ public void memoryBarrierBuffer()
         spirv_asm
         {
             OpCapability Shader;
-            OpMemoryBarrier Invocation UniformMemory
+            OpMemoryBarrier Invocation AcquireRelease|UniformMemory
         };
     }
     }
@@ -7314,7 +7319,7 @@ public void memoryBarrierShared()
         spirv_asm
         {
             OpCapability Shader;
-            OpMemoryBarrier Invocation WorkgroupMemory
+            OpMemoryBarrier Workgroup AcquireRelease|WorkgroupMemory
         };
     }
     }
@@ -7333,7 +7338,7 @@ public void memoryBarrierImage()
     {
         spirv_asm
         {
-            OpMemoryBarrier Invocation ImageMemory
+            OpMemoryBarrier Invocation AcquireRelease|ImageMemory
         };
     }
     }

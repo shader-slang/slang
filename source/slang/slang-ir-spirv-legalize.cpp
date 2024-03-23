@@ -633,6 +633,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             builder.setInsertBefore(inst);
             ptrType = builder.getPtrType(kIROp_PtrType, innerType, storageClass);
             inst->setFullType(ptrType);
+
+            //// `in` parameters can be used as is
+            if (storageClass == SpvStorageClassInput)
+                needLoad = false;
+
             if (needLoad)
             {
                 // Insert an explicit load at each use site.

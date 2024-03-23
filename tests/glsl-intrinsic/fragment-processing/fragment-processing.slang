@@ -1,9 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK_GLSL): -target glsl -stage fragment -entry main -allow-glsl
 //TEST:SIMPLE(filecheck=CHECK_SPV): -target spirv -emit-spirv-directly -stage fragment -entry main -allow-glsl
 #version 450
-// CHECK_SPV-DAG: OpEntryPoint
-// CHECK_GLSL-DAG: void main(
-
 buffer MyBlockName
 {
     vec4 fdata[2];
@@ -20,30 +17,24 @@ layout (location = 3) in vec4 inDataV4;
 
 bool testFragmentProcessingDerivativeFunctionsScalar()
 {
-// CHECK_SPV: OpDPdx
+// CHECK_SPV-DAG: OpDPdx
 // CHECK_GLSL-DAG: dFdx
-// CHECK_SPV: OpDPdy
+// CHECK_SPV-DAG: OpDPdy
 // CHECK_GLSL-DAG: dFdy
-// CHECK_SPV: OpDPdxFine
+// CHECK_SPV-DAG: OpDPdxFine
 // CHECK_GLSL-DAG: dFdxFine
-// CHECK_SPV: OpDPdyFine
+// CHECK_SPV-DAG: OpDPdyFine
 // CHECK_GLSL-DAG: dFdyFine
-// CHECK_SPV: OpDPdxCoarse
+// CHECK_SPV-DAG: OpDPdxCoarse
 // CHECK_GLSL-DAG: dFdxCoarse
-// CHECK_SPV: OpDPdyCoarse
+// CHECK_SPV-DAG: OpDPdyCoarse
 // CHECK_GLSL-DAG: dFdyCoarse
-// CHECK_SPV: OpFwidth
+// CHECK_SPV-DAG: OpFwidth
 // CHECK_GLSL-DAG: fwidth
-// CHECK_SPV: OpFwidthFine
+// CHECK_SPV-DAG: OpFwidthFine
 // CHECK_GLSL-DAG: fwidthFine
-// CHECK_SPV: OpFwidthCoarse
+// CHECK_SPV-DAG: OpFwidthCoarse
 // CHECK_GLSL-DAG: fwidthCoarse
-// CHECK_SPV: InterpolateAtCentroid
-// CHECK_GLSL-DAG: interpolateAtCentroid
-// CHECK_SPV: InterpolateAtSample
-// CHECK_GLSL-DAG: interpolateAtSample
-// CHECK_SPV: InterpolateAtOffset
-// CHECK_GLSL-DAG: interpolateAtOffset
     return true
         && dFdx(1.0f) != -1.0f
         && dFdy(1.0f) != -1.0f
@@ -59,30 +50,24 @@ bool testFragmentProcessingDerivativeFunctionsScalar()
 __generic<let N:int>
 bool testFragmentProcessingDerivativeFunctionsVector()
 {
-// CHECK_SPV: OpDPdx
+// CHECK_SPV-DAG: OpDPdx
 // CHECK_GLSL-DAG: dFdx
-// CHECK_SPV: OpDPdy
+// CHECK_SPV-DAG: OpDPdy
 // CHECK_GLSL-DAG: dFdy
-// CHECK_SPV: OpDPdxFine
+// CHECK_SPV-DAG: OpDPdxFine
 // CHECK_GLSL-DAG: dFdxFine
-// CHECK_SPV: OpDPdyFine
+// CHECK_SPV-DAG: OpDPdyFine
 // CHECK_GLSL-DAG: dFdyFine
-// CHECK_SPV: OpDPdxCoarse
+// CHECK_SPV-DAG: OpDPdxCoarse
 // CHECK_GLSL-DAG: dFdxCoarse
-// CHECK_SPV: OpDPdyCoarse
+// CHECK_SPV-DAG: OpDPdyCoarse
 // CHECK_GLSL-DAG: dFdyCoarse
-// CHECK_SPV: OpFwidth
+// CHECK_SPV-DAG: OpFwidth
 // CHECK_GLSL-DAG: fwidth
-// CHECK_SPV: OpFwidthFine
+// CHECK_SPV-DAG: OpFwidthFine
 // CHECK_GLSL-DAG: fwidthFine
-// CHECK_SPV: OpFwidthCoarse
+// CHECK_SPV-DAG: OpFwidthCoarse
 // CHECK_GLSL-DAG: fwidthCoarse
-// CHECK_SPV: InterpolateAtCentroid
-// CHECK_GLSL-DAG: interpolateAtCentroid
-// CHECK_SPV: InterpolateAtSample
-// CHECK_GLSL-DAG: interpolateAtSample
-// CHECK_SPV: InterpolateAtOffset
-// CHECK_GLSL-DAG: interpolateAtOffset
     return true
         && dFdx(vector<float,N>(1.0f)) != vector<float,N>(-1.0f)
         && dFdy(vector<float,N>(1.0f)) != vector<float,N>(-1.0f)
@@ -97,6 +82,33 @@ bool testFragmentProcessingDerivativeFunctionsVector()
 }
 bool testFragmentProcessingInterpolateFunctions()
 {
+// CHECK_SPV: {{.*}} = OpExtInst {{.*}} {{.*}} InterpolateAtCentroid %inDataV1
+// CHECK_GLSL-DAG: interpolateAtCentroid{{.*}}inDataV1
+// CHECK_SPV: {{.*}} = OpExtInst {{.*}} {{.*}} InterpolateAtSample %inDataV1 {{.*}}
+// CHECK_GLSL-DAG: interpolateAtSample{{.*}}inDataV1
+// CHECK_SPV: {{.*}} = OpExtInst {{.*}} {{.*}} InterpolateAtOffset %inDataV1 {{.*}}
+// CHECK_GLSL-DAG: interpolateAtOffset{{.*}}inDataV1
+
+// CHECK_SPV: {{.*}} = OpExtInst {{.*}} {{.*}} InterpolateAtCentroid %inDataV2
+// CHECK_GLSL-DAG: interpolateAtCentroid{{.*}}inDataV2
+// CHECK_SPV: {{.*}} = OpExtInst {{.*}} {{.*}} InterpolateAtSample %inDataV2 {{.*}}
+// CHECK_GLSL-DAG: interpolateAtSample{{.*}}inDataV2
+// CHECK_SPV: {{.*}} = OpExtInst {{.*}} {{.*}} InterpolateAtOffset %inDataV2 {{.*}}
+// CHECK_GLSL-DAG: interpolateAtOffset{{.*}}inDataV2
+
+// CHECK_SPV: {{.*}} = OpExtInst {{.*}} {{.*}} InterpolateAtCentroid %inDataV3
+// CHECK_GLSL-DAG: interpolateAtCentroid{{.*}}inDataV3
+// CHECK_SPV: {{.*}} = OpExtInst {{.*}} {{.*}} InterpolateAtSample %inDataV3 {{.*}}
+// CHECK_GLSL-DAG: interpolateAtSample{{.*}}inDataV3
+// CHECK_SPV: {{.*}} = OpExtInst {{.*}} {{.*}} InterpolateAtOffset %inDataV3 {{.*}}
+// CHECK_GLSL-DAG: interpolateAtOffset{{.*}}inDataV3
+
+// CHECK_SPV: {{.*}} = OpExtInst {{.*}} {{.*}} InterpolateAtCentroid %inDataV4
+// CHECK_GLSL-DAG: interpolateAtCentroid{{.*}}inDataV4
+// CHECK_SPV: {{.*}} = OpExtInst {{.*}} {{.*}} InterpolateAtSample %inDataV4 {{.*}}
+// CHECK_GLSL-DAG: interpolateAtSample{{.*}}inDataV4
+// CHECK_SPV: {{.*}} = OpExtInst {{.*}} {{.*}} InterpolateAtOffset %inDataV4 {{.*}}
+// CHECK_GLSL-DAG: interpolateAtOffset{{.*}}inDataV4
     return true
         && interpolateAtCentroid(inDataV1) != -1.0f
         && interpolateAtSample(inDataV1, 0) != -1.0f

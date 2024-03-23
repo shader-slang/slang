@@ -4183,7 +4183,6 @@ public:
     IRSPIRVAsmOperand* emitSPIRVAsmOperandResult();
     IRSPIRVAsmOperand* emitSPIRVAsmOperandEnum(IRInst* inst);
     IRSPIRVAsmOperand* emitSPIRVAsmOperandEnum(IRInst* inst, IRType* constantType);
-    IRSPIRVAsmOperand* emitSPIRVAsmOperandImmediatelyResolve(IRInst* element);
     IRSPIRVAsmOperand* emitSPIRVAsmOperandBuiltinVar(IRInst* type, IRInst* builtinKind);
     IRSPIRVAsmOperand* emitSPIRVAsmOperandGLSL450Set();
     IRSPIRVAsmOperand* emitSPIRVAsmOperandDebugPrintfSet();

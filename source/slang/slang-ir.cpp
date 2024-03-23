@@ -6119,19 +6119,6 @@ namespace Slang
         return i;
     }
 
-    IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandImmediatelyResolve(IRInst* element)
-    {
-        SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
-        const auto i = createInst<IRSPIRVAsmOperand>(
-            this,
-            kIROp_SPIRVAsmOperandImmediatelyResolve,
-            getTypeType(),
-            element
-        );
-        addInst(i);
-        return i;
-    }
-    
     //
     // Decorations
     //
@@ -6991,11 +6978,6 @@ namespace Slang
             return;
         case kIROp_SPIRVAsmOperandSampledImageType:
             dump(context, "__sampledImageType(");
-            dumpInstExpr(context, inst->getOperand(0));
-            dump(context, ")");
-            return;
-        case kIROp_SPIRVAsmOperandImmediatelyResolve:
-            dump(context, "__immediatelyResolve(");
             dumpInstExpr(context, inst->getOperand(0));
             dump(context, ")");
             return;

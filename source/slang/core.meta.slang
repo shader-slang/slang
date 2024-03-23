@@ -2569,3 +2569,6 @@ attribute_syntax [KnownBuiltin(name : String)] : KnownBuiltinAttribute;
 
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [NonUniformReturn] : NonDynamicUniformAttribute;
+
+__attributeTarget(FunctionDeclBase)
+attribute_syntax [GLSLRequireShaderInputParameter(parameterNumber:int)] : GLSLRequireShaderInputParameterAttribute;

@@ -147,7 +147,7 @@ IRInst* materialize(IRBuilder& builder, LegalizedVaryingVal const& val)
         return val.getValue();
 
     case LegalizedVaryingVal::Flavor::Address:
-        return builder.emitLoad(val.getAddress());
+       return builder.emitLoad(val.getAddress());
 
     default:
         SLANG_UNEXPECTED("unimplemented");

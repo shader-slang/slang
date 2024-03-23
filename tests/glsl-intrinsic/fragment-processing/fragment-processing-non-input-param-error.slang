@@ -1,15 +1,16 @@
 //TEST:SIMPLE(filecheck=CHECK_GLSL): -target glsl -stage fragment -entry main -allow-glsl
 //TEST:SIMPLE(filecheck=CHECK_SPV): -target spirv -emit-spirv-directly -stage fragment -entry main -allow-glsl
 #version 450
-// CHECK_SPV-DAG: OpEntryPoint
-// CHECK_GLSL-DAG: void main(
+// CHECK_SPV-DAG: error 431207
+// CHECK_GLSL-DAG: error 431207
 
 layout(location = 0) out ivec4 outColorActual;
 
 layout (location = 0) in float inDataV1;
 bool testFragmentProcessingInterpolateFunctions()
 {
-    return interpolateAtCentroid(inDataV1) != -1.0f;
+    float v = 1.0f;
+    return interpolateAtCentroid(v) != -1.0f;
 }
 
 void main() {

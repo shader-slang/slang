@@ -269,9 +269,9 @@ Result linkAndOptimizeIR(
     // use sites.
     //
     bindExistentialSlots(irModule, sink);
-#if 0
+//#if 0
     dumpIRIfEnabled(codeGenContext, irModule, "EXISTENTIALS BOUND");
-#endif
+//#endif
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
     // Now that we've linked the IR code, any layout/binding
@@ -293,9 +293,9 @@ Result linkAndOptimizeIR(
     // passed using constant buffers.
     //
     collectGlobalUniformParameters(irModule, outLinkedIR.globalScopeVarLayout);
-#if 0
+//#if 0
     dumpIRIfEnabled(codeGenContext, irModule, "GLOBAL UNIFORMS COLLECTED");
-#endif
+//#endif
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
     // Another transformation that needed to wait until we

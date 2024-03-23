@@ -2727,12 +2727,6 @@ struct SPIRVEmitContext
                 const auto memorySemantics =  emitIntConstant(IRIntegerValue{SpvMemorySemanticsMaskNone}, builder.getUIntType());
                 return emitOpAtomicIDecrement(parent, inst, inst->getFullType(), inst->getOperand(0), memoryScope, memorySemantics);
             }
-        case kIROp_SPIRVAsmOperandImmediatelyResolve:
-            {                
-                assert(inst->getOperand(0)->getOp() == kIROp_Load);
-                return NULL;
-                //return ensureInst(inst->getOperand(0)->getOperand(0));
-            }
         }
     }
 
@@ -5594,12 +5588,6 @@ struct SPIRVEmitContext
                 case kIROp_SPIRVAsmOperandBuiltinVar:
                 {
                     emitOperand(ensureInst(operand));
-                    break;
-                }
-                case kIROp_SPIRVAsmOperandImmediatelyResolve:
-                {
-                    assert(operand->getValue()->getOp() == kIROp_Load);
-                    emitOperand(ensureInst(operand->getValue()->getOperand(0)));
                     break;
                 }
                 case kIROp_SPIRVAsmOperandGLSL450Set:
