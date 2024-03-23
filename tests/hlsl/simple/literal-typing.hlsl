@@ -1,4 +1,4 @@
-//TEST:COMPARE_HLSL:-no-mangle -profile cs_5_0 -entry main
+//TEST:COMPARE_HLSL: -profile cs_5_0 -entry main
 
 // Confirm that we get the typing of literal suffixes correct
 

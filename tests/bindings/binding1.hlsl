@@ -1,4 +1,4 @@
-//TEST:COMPARE_HLSL:-no-mangle -profile ps_4_0 -entry main
+//TEST:COMPARE_HLSL: -profile ps_4_0 -entry main
 
 // We want to make sure that the registers Slang generates
 // are used, even if there are "dead" parameter earlier in the program.
