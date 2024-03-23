@@ -1208,8 +1208,11 @@ namespace Slang
             if (!isModifierAllowedOnDecl(isGLSLInput, m->astNodeType, decl))
             {
                 if (!ignoreUnallowedModifier)
+                {
                     getSink()->diagnose(m, Diagnostics::modifierNotAllowed, m);
-                return nullptr;
+                    return nullptr;
+                }
+                return m;
             }
         }
 
