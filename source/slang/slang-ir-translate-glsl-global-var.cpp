@@ -117,16 +117,16 @@ namespace Slang
                 auto inputParam = builder.emitParam(inputStructType);
                 builder.addLayoutDecoration(inputParam, paramLayout);
 
-                // Initialize all global variables.
-                //for (Index i = 0; i < inputVars.getCount(); i++)
-                //{
-                //    auto input = inputVars[i];
-                //    setInsertBeforeOrdinaryInst(&builder, firstBlock->getFirstOrdinaryInst());
-                //    auto inputType = cast<IRPtrTypeBase>(input->getDataType())->getValueType();
-                //    builder.emitStore(input,
-                //        builder.emitFieldExtract(inputType, inputParam, inputKeys[i]));
-                //}
-                //// Replace all global variables with the actual input variable
+                for (Index i = 0; i < inputVars.getCount(); i++)
+                {
+                    auto input = inputVars[i];
+                    setInsertBeforeOrdinaryInst(&builder, firstBlock->getFirstOrdinaryInst());
+                    auto inputType = cast<IRPtrTypeBase>(input->getDataType())->getValueType();
+                    builder.emitStore(input,
+                        builder.emitFieldExtract(inputType, inputParam, inputKeys[i]));
+                }
+                // Replace all global variable references with
+                // actual global `in` parameter
                 for (Index i = 0; i < inputVars.getCount(); i++)
                 {
                     auto input = inputVars[i];
@@ -135,26 +135,22 @@ namespace Slang
                     for (auto use = input->firstUse; use; use = nextUse)
                     {
                         nextUse = use->nextUse;
-
                         auto user = use->getUser();
-                        //if (user->getOp() == kIROp_Call)
+                        if(user->getOp() != kIROp_Call) continue;
+                        for (Slang::UInt operandIndex = 0; operandIndex < user->getOperandCount(); operandIndex++)
                         {
-                            for (int operandIndex = 0; operandIndex < user->getOperandCount(); operandIndex++) 
-                            {
-                                auto operand = user->getOperand(operandIndex);
-                                auto operandUse = user->getOperands()+operandIndex;
-                                if (operand == input)
-                                {
-                                    builder.setInsertBefore(user);
-                                    auto field = builder.emitFieldExtract(inputType, inputParam, inputKeys[i]);
-                                    builder.replaceOperand(operandUse, field);
-                                    break;
-                                }
-                            }
+                            auto operand = user->getOperand(operandIndex);
+                            auto operandUse = user->getOperands()+operandIndex;
+                            if (operand != input)
+                                continue;
+                            builder.setInsertBefore(user);
+                            auto field = builder.emitFieldExtract(inputType, inputParam, inputKeys[i]);
+                            builder.replaceOperand(operandUse, field);
+                            break;
                         }
                     }
                 }
-                
+
                 // For each entry point, introduce a new parameter to represent each input parameter,
                 // and return all outputs via a struct value.
                 if (hasOutput)

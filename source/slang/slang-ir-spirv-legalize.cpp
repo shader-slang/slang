@@ -203,7 +203,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         return structType;
     }
 
-    static void insertLoadAtLatestLocation(IRInst* addrInst, IRUse* inUse)
+    static void insertLoadAtLatestLocation(IRInst* addrInst, IRUse* inUse, SpvStorageClass storageClass)
     {
         struct WorkItem { IRInst* addr; IRUse* use; };
         List<WorkItem> workList;
@@ -242,6 +242,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             }
             else if(const auto spirvAsmOperand = as<IRSPIRVAsmOperandInst>(user))
             {
+                // skip load emit'ing for `In` ref'ed globals since we ref the pointer
+                if (user->getDataType()->getOp() == kIROp_RefType
+                    && storageClass == SpvStorageClassInput)
+                    return;
                 // If this is being used in an asm block, insert the load to
                 // just prior to the block.
                 const auto asmBlock = spirvAsmOperand->getAsmBlock();
@@ -633,17 +637,12 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             builder.setInsertBefore(inst);
             ptrType = builder.getPtrType(kIROp_PtrType, innerType, storageClass);
             inst->setFullType(ptrType);
-
-            //// `in` parameters can be used as is
-            if (storageClass == SpvStorageClassInput)
-                needLoad = false;
-
             if (needLoad)
             {
                 // Insert an explicit load at each use site.
                 traverseUses(inst, [&](IRUse* use)
                     {
-                        insertLoadAtLatestLocation(inst, use);
+                        insertLoadAtLatestLocation(inst, use, storageClass);
                     });
             }
             else if (arrayType)

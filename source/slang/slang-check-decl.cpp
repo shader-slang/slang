@@ -7182,7 +7182,7 @@ namespace Slang
             errorType = TypeExp(m_astBuilder->getBottomType());
         }
         decl->errorType = errorType;
-        
+
         if (auto interfaceDecl = findParentInterfaceDecl(decl))
         {
             bool isDiffFunc = false;

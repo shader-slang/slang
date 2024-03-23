@@ -3542,7 +3542,7 @@ struct ExprLoweringContext
         {
             if (irArgs.getCount() <= Slang::Index(requireShaderInputParameter->parameterNumber))
             {
-                this->context->getSink()->diagnose(decl, Diagnostics::attributeArgumentCountMismatch, 
+                this->context->getSink()->diagnose(decl, Diagnostics::attributeArgumentCountMismatch,
                     Slang::ASTNodeType::GLSLRequireShaderInputParameterAttribute, requireShaderInputParameter->parameterNumber, irArgs.getCount());
                 return;
             }

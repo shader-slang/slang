@@ -6809,6 +6809,7 @@ __glsl_version(430) [require(glsl)]
 [require(hlsl, sm_4_0)]
 __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
+[__NoSideEffect]
 [ForceInline]
 public float dFdx(float p)
 {
@@ -6818,6 +6819,7 @@ public float dFdx(float p)
 __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
 __generic<let N : int>
+[__NoSideEffect]
 [ForceInline]
 public vector<float, N> dFdx(vector<float, N> p)
 {
@@ -6827,6 +6829,7 @@ public vector<float, N> dFdx(vector<float, N> p)
 [require(hlsl, sm_4_0)]
 __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
+[__NoSideEffect]
 [ForceInline]
 public float dFdy(float p)
 {
@@ -6836,6 +6839,7 @@ public float dFdy(float p)
 __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
 __generic<let N : int>
+[__NoSideEffect]
 [ForceInline]
 public vector<float, N> dFdy(vector<float, N> p)
 {
@@ -6845,6 +6849,7 @@ public vector<float, N> dFdy(vector<float, N> p)
 [require(hlsl, sm_4_0)]
 __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
+[__NoSideEffect]
 [ForceInline]
 public float dFdxFine(float p)
 {
@@ -6854,6 +6859,7 @@ public float dFdxFine(float p)
 __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
 __generic<let N : int>
+[__NoSideEffect]
 [ForceInline]
 public vector<float, N> dFdxFine(vector<float, N> p)
 {
@@ -6863,6 +6869,7 @@ public vector<float, N> dFdxFine(vector<float, N> p)
 [require(hlsl, sm_4_0)]
 __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
+[__NoSideEffect]
 [ForceInline]
 public float dFdyFine(float p)
 {
@@ -6872,6 +6879,7 @@ public float dFdyFine(float p)
 __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
 __generic<let N : int>
+[__NoSideEffect]
 [ForceInline]
 public vector<float, N> dFdyFine(vector<float, N> p)
 {
@@ -6881,6 +6889,7 @@ public vector<float, N> dFdyFine(vector<float, N> p)
 [require(hlsl, sm_4_0)]
 __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
+[__NoSideEffect]
 [ForceInline]
 public float dFdxCoarse(float p)
 {
@@ -6890,6 +6899,7 @@ public float dFdxCoarse(float p)
 __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
 __generic<let N : int>
+[__NoSideEffect]
 [ForceInline]
 public vector<float, N> dFdxCoarse(vector<float, N> p)
 {
@@ -6899,6 +6909,7 @@ public vector<float, N> dFdxCoarse(vector<float, N> p)
 [require(hlsl, sm_4_0)]
 __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
+[__NoSideEffect]
 [ForceInline]
 public float dFdyCoarse(float p)
 {
@@ -6908,6 +6919,7 @@ public float dFdyCoarse(float p)
 __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
 __generic<let N : int>
+[__NoSideEffect]
 [ForceInline]
 public vector<float, N> dFdyCoarse(vector<float, N> p)
 {
@@ -6917,6 +6929,7 @@ public vector<float, N> dFdyCoarse(vector<float, N> p)
 [require(hlsl, sm_4_0)]
 __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
+[__NoSideEffect]
 [ForceInline]
 public float fwidthFine(float p)
 {
@@ -6941,6 +6954,7 @@ public float fwidthFine(float p)
 __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
 __generic<let N : int>
+[__NoSideEffect]
 [ForceInline]
 public vector<float, N> fwidthFine(vector<float, N> p)
 {
@@ -6965,6 +6979,7 @@ public vector<float, N> fwidthFine(vector<float, N> p)
 [require(hlsl, sm_4_0)]
 __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
+[__NoSideEffect]
 [ForceInline]
 public float fwidthCoarse(float p)
 {
@@ -6989,6 +7004,7 @@ public float fwidthCoarse(float p)
 __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
 __generic<let N : int>
+[__NoSideEffect]
 [ForceInline]
 public vector<float, N> fwidthCoarse(vector<float, N> p)
 {
@@ -7013,7 +7029,7 @@ public vector<float, N> fwidthCoarse(vector<float, N> p)
 [require(hlsl, sm_5_0)]
 __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
-[__readNone]
+[__NoSideEffect]
 [GLSLRequireShaderInputParameter(0)]
 public float interpolateAtCentroid(__ref float interpolant)
 {
@@ -7038,7 +7054,7 @@ public float interpolateAtCentroid(__ref float interpolant)
 __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
 __generic<let N : int>
-[__readNone]
+[__NoSideEffect]
 [GLSLRequireShaderInputParameter(0)]
 public vector<float, N> interpolateAtCentroid(__ref vector<float, N> interpolant)
 {
@@ -7063,7 +7079,7 @@ public vector<float, N> interpolateAtCentroid(__ref vector<float, N> interpolant
 [require(hlsl, sm_5_0)]
 __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
-[__readNone]
+[__NoSideEffect]
 [GLSLRequireShaderInputParameter(0)]
 public float interpolateAtSample(__ref float interpolant, int sample)
 {
@@ -7088,7 +7104,7 @@ public float interpolateAtSample(__ref float interpolant, int sample)
 __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
 __generic<let N : int>
-[__readNone]
+[__NoSideEffect]
 [GLSLRequireShaderInputParameter(0)]
 public vector<float, N> interpolateAtSample(__ref vector<float, N> interpolant, int sample)
 {
@@ -7112,7 +7128,7 @@ public vector<float, N> interpolateAtSample(__ref vector<float, N> interpolant, 
 
 __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
-[__readNone]
+[__NoSideEffect]
 [GLSLRequireShaderInputParameter(0)]
 public float interpolateAtOffset(__ref float interpolant, vec2 offset)
 {
@@ -7132,7 +7148,7 @@ public float interpolateAtOffset(__ref float interpolant, vec2 offset)
 __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
 __generic<let N : int>
-[__readNone]
+[__NoSideEffect]
 [GLSLRequireShaderInputParameter(0)]
 public vector<float, N> interpolateAtOffset(__ref vector<float, N> interpolant, vec2 offset)
 {
@@ -7153,6 +7169,7 @@ public vector<float, N> interpolateAtOffset(__ref vector<float, N> interpolant, 
 /// Section 8.15. Noise Functions (deprecated)
 
 [deprecated("Always returns 0")]
+[__NoSideEffect]
 [ForceInline]
 public float noise1(float x)
 {
@@ -7160,6 +7177,7 @@ public float noise1(float x)
 }
 [deprecated("Always returns 0")]
 __generic<let N : int>
+[__NoSideEffect]
 [ForceInline]
 public float noise1(vector<float, N> x)
 {
@@ -7167,6 +7185,7 @@ public float noise1(vector<float, N> x)
 }
 
 [deprecated("Always returns 0")]
+[__NoSideEffect]
 [ForceInline]
 public vec2 noise2(float x)
 {
@@ -7174,6 +7193,7 @@ public vec2 noise2(float x)
 }
 [deprecated("Always returns 0")]
 __generic<let N : int>
+[__NoSideEffect]
 [ForceInline]
 public vec2 noise2(vector<float, N> x)
 {
@@ -7181,6 +7201,7 @@ public vec2 noise2(vector<float, N> x)
 }
 
 [deprecated("Always returns 0")]
+[__NoSideEffect]
 [ForceInline]
 public vec3 noise3(float x)
 {
@@ -7188,6 +7209,7 @@ public vec3 noise3(float x)
 }
 [deprecated("Always returns 0")]
 __generic<let N : int>
+[__NoSideEffect]
 [ForceInline]
 public vec3 noise3(vector<float, N> x)
 {
@@ -7195,6 +7217,7 @@ public vec3 noise3(vector<float, N> x)
 }
 
 [deprecated("Always returns 0")]
+[__NoSideEffect]
 [ForceInline]
 public vec4 noise4(float x)
 {
@@ -7202,6 +7225,7 @@ public vec4 noise4(float x)
 }
 [deprecated("Always returns 0")]
 __generic<let N : int>
+[__NoSideEffect]
 [ForceInline]
 public vec4 noise4(vector<float, N> x)
 {
@@ -7261,7 +7285,7 @@ public void memoryBarrier()
     }
     }
 }
-// Does not exist in vulkan; the equivlent is now `memoryBarrierBuffer`
+// Does not exist in vulkan. The equivlent is now `memoryBarrierBuffer`
 // for vulkan since atomic_counter is a wrapped storage buffer object
 [require(hlsl, sm_5_0)]
 __glsl_version(430) [require(glsl)]
@@ -7303,7 +7327,6 @@ public void memoryBarrierBuffer()
     }
     }
 }
-// TODO only allow in compute shader
 [require(hlsl, sm_5_0)]
 __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
@@ -7343,7 +7366,6 @@ public void memoryBarrierImage()
     }
     }
 }
-// TODO only allow in compute shader
 [require(hlsl, sm_5_0)]
 __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
@@ -7366,14 +7388,13 @@ public void groupMemoryBarrier()
 
 /// Section 8.18. Subpass-Input Functions
 
-// TODO: only allow in fragment shader
 ${{{{
 struct SubpassLoadEntriesType
 {
     const char* typeName;
     const char* prefix;
 };
-const SubpassLoadEntriesType kSubpassLoadEntries[] =
+static const SubpassLoadEntriesType kSubpassLoadEntries[] =
     {
         { "float", "" },
         { "uint", "u" },
@@ -7399,7 +7420,7 @@ for (const auto& subpassLoadEntry : kSubpassLoadEntries)
         __ShapeSubpass,
         0, // isArray
         1, // isMS
-        sampleCount, // sampleCount
+        sampleCount,
         $(kStdlibResourceAccessReadWrite), // access
         0, // isShadow
         0, // isCombined
@@ -7407,6 +7428,7 @@ for (const auto& subpassLoadEntry : kSubpassLoadEntries)
     >;
     __glsl_version(430) [require(glsl)]
     __spirv_version(1.0) [require(spirv)]
+    [__NoSideEffect]
     [ForceInline]
     public $(subpassLoadEntry.prefix)vec4 subpassLoad($(subpassLoadEntry.prefix)subpassInput subpass)
     {
@@ -7426,6 +7448,7 @@ for (const auto& subpassLoadEntry : kSubpassLoadEntries)
     }
     __glsl_version(430) [require(glsl)]
     __spirv_version(1.0) [require(spirv)]
+    [__NoSideEffect]
     [ForceInline]
     public $(subpassLoadEntry.prefix)vec4 subpassLoad($(subpassLoadEntry.prefix)subpassInputMS subpass, int sample)
     {
@@ -7450,7 +7473,7 @@ ${{{{
 /// Section 8.19. Shader Invocation Group Functions
 
 // .*Invocation compiles into SubgroupVoteKHR operations.
-// instead, we directly emit the non depricated alternative
+// instead, we directly emit the non deprecated alternative
 __glsl_version(460) [require(glsl)]
 __spirv_version(1.3) [require(spirv)]
 [ForceInline]

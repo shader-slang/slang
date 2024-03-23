@@ -125,11 +125,11 @@ namespace Slang
         //
         // * If the parents of `inst` and `operand` are both blocks in the
         //   same functin, then the block defining `operand` must dominate
-        //   the block defining `inst`. 
-        // 
+        //   the block defining `inst`.
+        //
         // * Otherwise, we simply require that the parent of `operand` be
-        //   an ancestor (transitive parent) of `inst`, unless if the missing 
-        //   parent is a `Input` decorated variable, since then the variable is 
+        //   an ancestor (transitive parent) of `inst`, unless if the missing
+        //   parent is a `Input` decorated variable, since then the variable is
         //   going to be resolved as a global at some point
 
         auto instParent = inst->getParent();
@@ -225,10 +225,18 @@ namespace Slang
         {
         case kIROp_DifferentiableTypeDictionaryItem:
             return;
+        default:
+            // field extractions of a global param
+            // will always have an ancestor referenced
+            // at some point once resolved by Slang
+            if (inst->getOperand(0)->findDecoration<IRLayoutDecoration>())
+                return;
+            break;
         }
+        //
         // We failed to find `operandParent` while walking the ancestors of `inst`,
         // so something had gone wrong.
-        //validate(context, false, inst, "def must be ancestor of use");
+        validate(context, false, inst, "def must be ancestor of use");
     }
 
     void validateIRInstOperands(

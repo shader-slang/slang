@@ -137,7 +137,6 @@ bool testFragmentProcessingFunctions()
 }
 
 void main() {
-    
     outColorActual = ivec4(true
         && testFragmentProcessingFunctions()
         );

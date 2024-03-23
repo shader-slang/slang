@@ -7059,6 +7059,7 @@ namespace Slang
             parser->ReadMatchingToken(TokenType::RParent);
             return SPIRVAsmOperand{SPIRVAsmOperand::SampledType, Token{}, typeExpr};
         }
+        // The __imageType function
         if (AdvanceIf(parser, "__imageType"))
         {
             parser->ReadToken(TokenType::LParent);
