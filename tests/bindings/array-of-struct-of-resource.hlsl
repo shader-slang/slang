@@ -1,4 +1,4 @@
-//TEST:COMPARE_HLSL:-no-mangle -profile ps_5_1 -entry main
+//TEST:COMPARE_HLSL: -profile ps_5_1 -entry main
 
 // Let's first confirm that Slang can reproduce what the
 // HLSL compiler would already do in the simple case (when

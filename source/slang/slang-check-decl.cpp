@@ -1772,7 +1772,13 @@ namespace Slang
                 parentAggTypeDecl->unionTagsWith(getTypeTags(varDeclRefType));
             }
         }
-
+        if (getOptionSet().getBoolOption(CompilerOptionName::NoMangle) &&
+            isGlobalDecl(varDecl))
+        {
+            // If -no-mangle option is set, we will add `ExternCpp` modifier to all
+            // global variables and struct fields to prevent mangling.
+            addModifier(varDecl, m_astBuilder->create<ExternCppModifier>());
+        }
         checkVisibility(varDecl);
     }
 

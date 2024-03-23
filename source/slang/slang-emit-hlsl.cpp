@@ -37,7 +37,7 @@ void HLSLSourceEmitter::_emitHLSLDecorationSingleInt(const char* name, IRFunc* e
     m_writer->emit(")]\n");
 }
 
-void HLSLSourceEmitter::_emitHLSLRegisterSemantic(LayoutResourceKind kind, EmitVarChain* chain, char const* uniformSemanticSpelling)
+void HLSLSourceEmitter::_emitHLSLRegisterSemantic(LayoutResourceKind kind, EmitVarChain* chain, IRInst* inst, char const* uniformSemanticSpelling)
 {
     if (!chain)
         return;
@@ -100,6 +100,16 @@ void HLSLSourceEmitter::_emitHLSLRegisterSemantic(LayoutResourceKind kind, EmitV
             break;
         default:
         {
+            if (m_codeGenContext->getTargetProgram()->getOptionSet().getBoolOption(CompilerOptionName::NoHLSLBinding))
+            {
+                // If we are told not to emit hlsl binding, and the user has not provided explicit binding,
+                // then skip emitting the `: register` semantics here.
+                //
+                if (!inst || !inst->findDecoration<IRHasExplicitHLSLBindingDecoration>())
+                {
+                    break;
+                }
+            }
             m_writer->emit(" : register(");
             switch (kind)
             {
@@ -130,7 +140,7 @@ void HLSLSourceEmitter::_emitHLSLRegisterSemantic(LayoutResourceKind kind, EmitV
     }
 }
 
-void HLSLSourceEmitter::_emitHLSLRegisterSemantics(EmitVarChain* chain, char const* uniformSemanticSpelling)
+void HLSLSourceEmitter::_emitHLSLRegisterSemantics(EmitVarChain* chain, IRInst* inst, char const* uniformSemanticSpelling)
 {
     if (!chain) return;
 
@@ -147,17 +157,17 @@ void HLSLSourceEmitter::_emitHLSLRegisterSemantics(EmitVarChain* chain, char con
 
     for (auto rr : layout->getOffsetAttrs())
     {
-        _emitHLSLRegisterSemantic(rr->getResourceKind(), chain, uniformSemanticSpelling);
+        _emitHLSLRegisterSemantic(rr->getResourceKind(), chain, inst, uniformSemanticSpelling);
     }
 }
 
-void HLSLSourceEmitter::_emitHLSLRegisterSemantics(IRVarLayout* varLayout, char const* uniformSemanticSpelling)
+void HLSLSourceEmitter::_emitHLSLRegisterSemantics(IRVarLayout* varLayout, IRInst* inst, char const* uniformSemanticSpelling)
 {
     if (!varLayout)
         return;
 
     EmitVarChain chain(varLayout);
-    _emitHLSLRegisterSemantics(&chain, uniformSemanticSpelling);
+    _emitHLSLRegisterSemantics(&chain, inst, uniformSemanticSpelling);
 }
 
 void HLSLSourceEmitter::_emitHLSLParameterGroupFieldLayoutSemantics(EmitVarChain* chain)
@@ -168,7 +178,7 @@ void HLSLSourceEmitter::_emitHLSLParameterGroupFieldLayoutSemantics(EmitVarChain
     auto layout = chain->varLayout;
     for (auto rr : layout->getOffsetAttrs())
     {
-        _emitHLSLRegisterSemantic(rr->getResourceKind(), chain, "packoffset");
+        _emitHLSLRegisterSemantic(rr->getResourceKind(), chain, nullptr, "packoffset");
     }
 }
 
@@ -207,7 +217,7 @@ void HLSLSourceEmitter::_emitHLSLParameterGroup(IRGlobalParam* varDecl, IRUnifor
         typeLayout = parameterGroupTypeLayout->getElementVarLayout()->getTypeLayout();
     }
 
-    _emitHLSLRegisterSemantic(LayoutResourceKind::ConstantBuffer, &containerChain);
+    _emitHLSLRegisterSemantic(LayoutResourceKind::ConstantBuffer, &containerChain, varDecl);
 
     auto elementType = type->getElementType();
     if (hasExplicitConstantBufferOffset(type))
@@ -299,7 +309,7 @@ void HLSLSourceEmitter::emitLayoutSemanticsImpl(IRInst* inst, char const* unifor
     auto layout = getVarLayout(inst); 
     if (layout)
     {
-        _emitHLSLRegisterSemantics(layout, uniformSemanticSpelling);
+        _emitHLSLRegisterSemantics(layout, inst, uniformSemanticSpelling);
     }
 }
 
