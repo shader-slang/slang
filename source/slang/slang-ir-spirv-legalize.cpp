@@ -1675,6 +1675,15 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     void translatePtrResultType(IRInst* inst)
     {
         auto ptrType = as<IRPtrType>(inst->getDataType());
+        if (!ptrType)
+        {
+            if (auto refType = as<IRRefType>(inst->getDataType()))
+            {
+                // Functions that return ref type should be treated as returning a pointer.
+                IRBuilder builder(inst);
+                ptrType = builder.getPtrType(refType->getValueType());
+            }
+        }
         auto newPtrType = translateToStorageBufferPointer(ptrType);
         if (newPtrType == ptrType)
             return;

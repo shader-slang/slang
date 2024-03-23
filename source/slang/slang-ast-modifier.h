@@ -746,6 +746,15 @@ class GLSLBindingAttribute : public Attribute
     int32_t set = 0;
 };
 
+class VkAliasedPointerAttribute : public Attribute
+{
+    SLANG_AST_CLASS(VkAliasedPointerAttribute)
+};
+
+class VkRestrictPointerAttribute : public Attribute
+{
+    SLANG_AST_CLASS(VkRestrictPointerAttribute)
+};
 
 class GLSLOffsetLayoutAttribute : public Attribute 
 {

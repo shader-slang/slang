@@ -327,6 +327,7 @@ DIAGNOSTIC(30068, Warning, mutatingMethodOnFunctionInputParameterWarning, "mutat
 DIAGNOSTIC(30070, Error, unsizedMemberMustAppearLast, "unsized member can only appear as the last member in a composite type.")
 
 DIAGNOSTIC(30100, Error, staticRefToNonStaticMember, "type '$0' cannot be used to refer to non-static member '$1'")
+DIAGNOSTIC(30101, Error, cannotDereferenceType, "cannot dereference type '$0', do you mean to use '.'?")
 
 DIAGNOSTIC(30200, Error, redeclaration, "declaration of '$0' conflicts with existing declaration")
 DIAGNOSTIC(30201, Error, functionRedefinition, "function '$0' already has a body")
@@ -473,6 +474,8 @@ DIAGNOSTIC(30510, Error, loopInDiffFuncRequireUnrollOrMaxIters, "loops inside a 
 
 // TODO: need to assign numbers to all these extra diagnostics...
 DIAGNOSTIC(39999, Fatal, cyclicReference, "cyclic reference '$0'.")
+DIAGNOSTIC(39999, Error, cyclicReferenceInInheritance, "cyclic reference in inheritance graph '$0'.")
+
 DIAGNOSTIC(39999, Error, localVariableUsedBeforeDeclared, "local variable '$0' is being used before its declaration.")
 DIAGNOSTIC(39999, Error, variableUsedInItsOwnDefinition, "the initial-value expression for variable '$0' depends on the value of the variable itself")
 DIAGNOSTIC(39901, Fatal , cannotProcessInclude, "internal compiler error: cannot process '__include' in the current semantic checking context.")

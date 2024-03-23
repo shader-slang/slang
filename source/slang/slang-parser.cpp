@@ -6884,7 +6884,8 @@ namespace Slang
         auto expr = parseAtomicExpr(parser);
         for(;;)
         {
-            switch( peekTokenType(parser) )
+            auto nextTokenType = peekTokenType(parser);
+            switch (nextTokenType)
             {
             default:
                 return expr;
@@ -6976,16 +6977,20 @@ namespace Slang
 
                 break;
             }
-            // Member access `x.m`
+            // Member access `x.m` or `x->m`
             case TokenType::Dot:
+            case TokenType::RightArrow:
                 {
-                    MemberExpr* memberExpr = parser->astBuilder->create<MemberExpr>();
+                    
+                    MemberExpr* memberExpr = nextTokenType == TokenType::Dot
+                        ? parser->astBuilder->create<MemberExpr>()
+                        : parser->astBuilder->create<DerefMemberExpr>();
 
                     // TODO(tfoley): why would a member expression need this?
                     memberExpr->scope = parser->currentScope;
                     memberExpr->memberOperatorLoc = parser->tokenReader.peekLoc();
                     memberExpr->baseExpression = expr;
-                    parser->ReadToken(TokenType::Dot);
+                    parser->ReadToken(nextTokenType);
                     parser->FillPosition(memberExpr);
                     memberExpr->name = expectIdentifier(parser).name;
                     
