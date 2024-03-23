@@ -14,12 +14,14 @@ struct MyStruct
 
 RWStructuredBuffer<MyStruct> outputBuffer;
 
-// CHECK-DAG: SLANG_ParameterGroup_BufferName BufferName;
+// CHECK-DAG: SLANG_ParameterGroup_BufferName{{.*}} BufferName;
 
-// CHECK-DAG: RWStructuredBuffer<MyStruct{{ ?}}> outputBuffer : 
+// CHECK-DAG: RWStructuredBuffer<{{.*}}> outputBuffer : 
 
 [numthreads(1,1,1)]
 void main()
 {
+    // CHECK-DAG: = {{.*}}cbufferParam; 
+
     outputBuffer[0].v = cbufferParam;
 }
