@@ -681,7 +681,7 @@ static bool _isDeclOverloadable(Decl* decl)
 static void _lookUpInScopes(
     ASTBuilder*             astBuilder,
     Name*                   name,
-    LookupRequest           request,
+    LookupRequest const&    request,
     LookupResult&           result)
 {
     auto thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::Default;
