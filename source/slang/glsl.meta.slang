@@ -7409,7 +7409,7 @@ for (const auto& subpassLoadEntry : kSubpassLoadEntries)
         0, // isArray
         0, // isMS
         0, // sampleCount
-        $(kStdlibResourceAccessReadWrite), // access
+        $(kStdlibResourceAccessReadWrite),
         0, // isShadow
         0, // isCombined
         0  // format
@@ -7421,7 +7421,7 @@ for (const auto& subpassLoadEntry : kSubpassLoadEntries)
         0, // isArray
         1, // isMS
         sampleCount,
-        $(kStdlibResourceAccessReadWrite), // access
+        $(kStdlibResourceAccessReadWrite),
         0, // isShadow
         0, // isCombined
         0  // format
@@ -7472,8 +7472,9 @@ ${{{{
 
 /// Section 8.19. Shader Invocation Group Functions
 
-// .*Invocation compiles into SubgroupVoteKHR operations.
-// instead, we directly emit the non deprecated alternative
+// Invocation functions compiles into SubgroupVoteKHR operations. 
+// Instead of using these, we directly emit the non deprecated 
+// alternatives
 __glsl_version(460) [require(glsl)]
 __spirv_version(1.3) [require(spirv)]
 [ForceInline]

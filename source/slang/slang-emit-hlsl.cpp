@@ -266,7 +266,8 @@ void HLSLSourceEmitter::_emitHLSLTextureType(IRTextureTypeBase* texType)
     switch (texType->GetBaseShape())
     {
         case SLANG_TEXTURE_1D:		m_writer->emit("Texture1D");		break;
-        case SLANG_TEXTURE_SUBPASS: // fallthrough
+        case SLANG_TEXTURE_SUBPASS: 
+            /* fallthrough */
         case SLANG_TEXTURE_2D:		m_writer->emit("Texture2D");		break;
         case SLANG_TEXTURE_3D:		m_writer->emit("Texture3D");		break;
         case SLANG_TEXTURE_CUBE:	m_writer->emit("TextureCube");	    break;

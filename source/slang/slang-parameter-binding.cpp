@@ -1088,6 +1088,7 @@ static void addExplicitParameterBindings_GLSL(
     semanticInfo.space = 0;
     semanticInfo.hasInputAttachmentIndex = false;
     semanticInfo.inputAttachmentIndex = 0;
+
     // Try to find `input_attachment_index`
     if (auto attr = varDecl.getDecl()->findModifier<GLSLInputAttachmentIndexAttribute>())
     {

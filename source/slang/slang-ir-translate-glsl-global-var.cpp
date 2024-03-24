@@ -117,6 +117,7 @@ namespace Slang
                 auto inputParam = builder.emitParam(inputStructType);
                 builder.addLayoutDecoration(inputParam, paramLayout);
 
+                // Initialize all global variables.
                 for (Index i = 0; i < inputVars.getCount(); i++)
                 {
                     auto input = inputVars[i];
@@ -126,7 +127,7 @@ namespace Slang
                         builder.emitFieldExtract(inputType, inputParam, inputKeys[i]));
                 }
                 // Replace all global variable references with
-                // actual global `in` parameter
+                // actual global parameter for all Call's
                 for (Index i = 0; i < inputVars.getCount(); i++)
                 {
                     auto input = inputVars[i];

@@ -128,9 +128,7 @@ namespace Slang
         //   the block defining `inst`.
         //
         // * Otherwise, we simply require that the parent of `operand` be
-        //   an ancestor (transitive parent) of `inst`, unless if the missing
-        //   parent is a `Input` decorated variable, since then the variable is
-        //   going to be resolved as a global at some point
+        //   an ancestor (transitive parent) of `inst`.
 
         auto instParent = inst->getParent();
 
@@ -226,9 +224,9 @@ namespace Slang
         case kIROp_DifferentiableTypeDictionaryItem:
             return;
         default:
-            // field extractions of a global param
-            // will always have an ancestor referenced
-            // at some point once resolved by Slang
+            // Variables which eventually resolve into global params will always
+            // have an ancestor referenced at some point, these global params may
+            // not be resolved yet, do not exception on these types.
             if (inst->getOperand(0)->findDecoration<IRLayoutDecoration>())
                 return;
             break;

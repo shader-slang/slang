@@ -816,6 +816,7 @@ SpvInst* emitOpDecorateBinding(
     return emitInst(parent, inst, SpvOpDecorate, target, SpvDecorationBinding, bindingPoint);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpDecorate
 template<typename T>
 SpvInst* emitOpDecorateInputAttachmentIndex(
     SpvInstParent* parent,

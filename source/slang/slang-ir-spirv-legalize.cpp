@@ -242,7 +242,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             }
             else if(const auto spirvAsmOperand = as<IRSPIRVAsmOperandInst>(user))
             {
-                // skip load emit'ing for `In` ref'ed globals since we ref the pointer
+                // Skip load's for referenced `Input` variables since a ref implies
+                // passing as is, which needs to be a pointer (pass as is).
                 if (user->getDataType()->getOp() == kIROp_RefType
                     && storageClass == SpvStorageClassInput)
                     return;
