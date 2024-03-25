@@ -715,6 +715,8 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(RequireGLSLExtensionDecoration,    requireGLSLExtension,   1, 0)
     INST(RequireCUDASMVersionDecoration,    requireCUDASMVersion,   1, 0)
 
+    INST(HasExplicitHLSLBindingDecoration, HasExplicitHLSLBinding, 0, 0)
+
     INST(ReadNoneDecoration,                readNone,               0, 0)
     INST(VulkanCallablePayloadDecoration,   vulkanCallablePayload,  0, 0)
     INST(VulkanCallablePayloadInDecoration, vulkanCallablePayloadIn,  0, 0)

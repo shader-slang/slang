@@ -349,6 +349,7 @@ struct IRRequireGLSLExtensionDecoration : IRDecoration
     }
 };
 
+IR_SIMPLE_DECORATION(HasExplicitHLSLBindingDecoration)
 IR_SIMPLE_DECORATION(ReadNoneDecoration)
 IR_SIMPLE_DECORATION(NoSideEffectDecoration)
 IR_SIMPLE_DECORATION(EarlyDepthStencilDecoration)
@@ -4657,6 +4658,10 @@ public:
     void addHLSLExportDecoration(IRInst* value)
     {
         addDecoration(value, kIROp_HLSLExportDecoration);
+    }
+    void addHasExplicitHLSLBindingDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_HasExplicitHLSLBindingDecoration);
     }
     void addNVAPIMagicDecoration(IRInst* value, UnownedStringSlice const& name)
     {

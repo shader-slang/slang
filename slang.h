@@ -925,6 +925,7 @@ extern "C"
             FileSystem,
             Heterogeneous,
             NoMangle,
+            NoHLSLBinding,
             ValidateUniformity,
             AllowGLSL,
 
