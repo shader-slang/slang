@@ -957,6 +957,12 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     return nullptr;
 }
 
+struct OuterParamInfoLink
+{
+    IRInst* outerParam;
+    OuterParamInfoLink* next;
+};
+
 void createVarLayoutForLegalizedGlobalParam(
     IRInst* globalParam,
     IRBuilder* builder,
@@ -966,7 +972,7 @@ void createVarLayoutForLegalizedGlobalParam(
     UInt bindingIndex,
     UInt bindingSpace,
     GlobalVaryingDeclarator* declarator,
-    IRInst* leafVar,
+    OuterParamInfoLink* outerParamInfo,
     GLSLSystemValueInfo* systemValueInfo)
 {
     // We need to construct a fresh layout for the variable, even
@@ -982,13 +988,16 @@ void createVarLayoutForLegalizedGlobalParam(
     IRVarLayout* varLayout = varLayoutBuilder.build();
     builder->addLayoutDecoration(globalParam, varLayout);
 
-    if (leafVar)
+    for (auto paramInfo = outerParamInfo->outerParam; outerParamInfo; outerParamInfo = outerParamInfo->next)
     {
-        if (auto interpolationModeDecor = leafVar->findDecoration<IRInterpolationModeDecoration>())
+        auto decorParent = paramInfo;
+        if (auto field = as<IRStructField>(decorParent))
+            decorParent = field->getKey();
+        if (auto interpolationModeDecor = decorParent->findDecoration<IRInterpolationModeDecoration>())
         {
             builder->addInterpolationModeDecoration(globalParam, interpolationModeDecor->getMode());
+            break;
         }
-
     }
 
     if (declarator && declarator->flavor == GlobalVaryingDeclarator::Flavor::meshOutputPrimitives)
@@ -1031,7 +1040,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     UInt                        bindingIndex,
     UInt                        bindingSpace,
     GlobalVaryingDeclarator*    declarator,
-    IRInst*                     leafVar,
+    OuterParamInfoLink*         outerParamInfo,
     StringBuilder&              nameHintSB)
 {
     // Check if we have a system value on our hands.
@@ -1101,7 +1110,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
             builder->addImportDecoration(globalParam, systemValueName);
 
             createVarLayoutForLegalizedGlobalParam(
-                globalParam, builder, inVarLayout, inTypeLayout, kind, bindingIndex, bindingSpace, declarator, leafVar, systemValueInfo);
+                globalParam, builder, inVarLayout, inTypeLayout, kind, bindingIndex, bindingSpace, declarator, outerParamInfo, systemValueInfo);
 
             semanticGlobalTmp.globalParam = globalParam;
 
@@ -1239,7 +1248,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     }
 
     createVarLayoutForLegalizedGlobalParam(
-        globalParam, builder, inVarLayout, typeLayout, kind, bindingIndex, bindingSpace, declarator, leafVar, systemValueInfo);
+        globalParam, builder, inVarLayout, typeLayout, kind, bindingIndex, bindingSpace, declarator, outerParamInfo, systemValueInfo);
     return val;
 }
 
@@ -1255,6 +1264,7 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
     UInt                        bindingIndex,
     UInt                        bindingSpace,
     GlobalVaryingDeclarator*    declarator,
+    OuterParamInfoLink*         outerParamInfo,
     IRInst*                     leafVar,
     StringBuilder&              nameHintSB)
 {
@@ -1267,14 +1277,14 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
         return createSimpleGLSLGlobalVarying(
             context,
             codeGenContext,
-            builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator, leafVar, nameHintSB);
+            builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator, outerParamInfo, nameHintSB);
     }
     else if( as<IRVectorType>(type) )
     {
         return createSimpleGLSLGlobalVarying(
             context,
             codeGenContext,
-            builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator, leafVar, nameHintSB);
+            builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator, outerParamInfo, nameHintSB);
     }
     else if( as<IRMatrixType>(type) )
     {
@@ -1282,7 +1292,7 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
         return createSimpleGLSLGlobalVarying(
             context,
             codeGenContext,
-            builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator, leafVar, nameHintSB);
+            builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator, outerParamInfo, nameHintSB);
     }
     else if( auto arrayType = as<IRArrayType>(type) )
     {
@@ -1311,6 +1321,7 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
             bindingIndex,
             bindingSpace,
             &arrayDeclarator,
+            outerParamInfo,
             leafVar,
             nameHintSB);
     }
@@ -1355,6 +1366,7 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
             bindingIndex,
             bindingSpace,
             &arrayDeclarator,
+            outerParamInfo,
             leafVar,
             nameHintSB);
     }
@@ -1377,6 +1389,7 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
             bindingIndex,
             bindingSpace,
             declarator,
+            outerParamInfo,
             leafVar,
             nameHintSB);
     }
@@ -1389,6 +1402,9 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
         SLANG_ASSERT(structTypeLayout);
         RefPtr<ScalarizedTupleValImpl> tupleValImpl = new ScalarizedTupleValImpl();
 
+        OuterParamInfoLink fieldParentInfo;
+        fieldParentInfo.next = outerParamInfo;
+        fieldParentInfo.outerParam = leafVar;
 
         // Construct the actual type for the tuple (including any outer arrays)
         IRType* fullType = type;
@@ -1448,6 +1464,7 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
                 fieldBindingIndex,
                 fieldBindingSpace,
                 declarator,
+                &fieldParentInfo,
                 field,
                 nameHintSB);
             if (fieldVal.flavor != ScalarizedVal::Flavor::none)
@@ -1467,7 +1484,7 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
     return createSimpleGLSLGlobalVarying(
         context,
         codeGenContext,
-        builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator, leafVar, nameHintSB);
+        builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator, outerParamInfo, nameHintSB);
 }
 
 ScalarizedVal createGLSLGlobalVaryings(
@@ -1492,10 +1509,13 @@ ScalarizedVal createGLSLGlobalVaryings(
     {
         namehintSB << nameHint->getName();
     }
+    OuterParamInfoLink outerParamInfo;
+    outerParamInfo.next = nullptr;
+    outerParamInfo.outerParam = leafVar;
     return createGLSLGlobalVaryingsImpl(
         context,
         codeGenContext,
-        builder, type, layout, layout->getTypeLayout(), kind, stage, bindingIndex, bindingSpace, nullptr, leafVar, namehintSB);
+        builder, type, layout, layout->getTypeLayout(), kind, stage, bindingIndex, bindingSpace, nullptr, &outerParamInfo, leafVar, namehintSB);
 }
 
 ScalarizedVal extractField(
