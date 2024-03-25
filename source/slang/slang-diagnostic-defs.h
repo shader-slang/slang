@@ -298,7 +298,7 @@ DIAGNOSTIC(30035, Error, componentOverloadTypeMismatch, "'$0': type of overloade
 DIAGNOSTIC(30041, Error, bitOperationNonIntegral, "bit operation: operand must be integral type.")
 DIAGNOSTIC(30043, Error, getStringHashRequiresStringLiteral, "getStringHash parameter can only accept a string literal")
 DIAGNOSTIC(30047, Error, argumentExpectedLValue, "argument passed to parameter '$0' must be l-value.")
-DIAGNOSTIC(30048, Error, argumentHasMoreMemoryQualifiersThanParam, "argument passed in to parameter has a memory qualifier the parameter type is missing: $0")
+DIAGNOSTIC(30048, Error, argumentHasMoreMemoryQualifiersThanParam, "argument passed in to parameter has a memory qualifier the parameter type is missing: '$0'")
 
 DIAGNOSTIC(30049, Note, thisIsImmutableByDefault, "a 'this' parameter is an immutable parameter by default in Slang; apply the `[mutating]` attribute to the function declaration to opt in to a mutable `this`")
 DIAGNOSTIC(30050, Error, mutatingMethodOnImmutableValue, "mutating method '$0' cannot be called on an immutable value")

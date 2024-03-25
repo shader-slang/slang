@@ -1228,6 +1228,37 @@ namespace Slang
             }
         }
 
+        MemoryQualifierCollectionModifier::Flags::MemoryQualifiersBit memoryQualifierBit = 
+            MemoryQualifierCollectionModifier::Flags::kNone;
+        if(as<GloballyCoherentModifier>(m))
+            memoryQualifierBit = MemoryQualifierCollectionModifier::Flags::kCoherent;
+        else if(as<GLSLReadOnlyModifier>(m))
+            memoryQualifierBit = MemoryQualifierCollectionModifier::Flags::kReadOnly;
+        else if(as<GLSLWriteOnlyModifier>(m))
+            memoryQualifierBit = MemoryQualifierCollectionModifier::Flags::kWriteOnly;
+        else if(as<GLSLVolatileModifier>(m))
+            memoryQualifierBit = MemoryQualifierCollectionModifier::Flags::kVolatile;
+        else if(as<GLSLRestrictModifier>(m))
+            memoryQualifierBit = MemoryQualifierCollectionModifier::Flags::kRestrict;
+        if(memoryQualifierBit != MemoryQualifierCollectionModifier::Flags::kNone)
+        {
+            bool newModifier = false;
+            MemoryQualifierCollectionModifier* memoryQualifiers = syntaxNode->findModifier<MemoryQualifierCollectionModifier>();
+            if(!memoryQualifiers)
+            {
+                newModifier = true;
+                memoryQualifiers = getASTBuilder()->create<MemoryQualifierCollectionModifier>();
+            }
+            memoryQualifiers->addQualifier(m,
+                memoryQualifierBit);
+            if (newModifier)
+            {
+                m->next = memoryQualifiers;
+                return m;
+            }
+            return m;
+        }
+
         if (auto hlslSemantic = as<HLSLSimpleSemantic>(m))
         {
             if (hlslSemantic->name.getName() == getSession()->getCompletionRequestTokenName())

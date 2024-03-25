@@ -7045,6 +7045,16 @@ namespace Slang
                 }
             }
         }
+
+        // Only texture types are allowed to have memory qualifiers on parameters
+        if(!paramDecl->type || paramDecl->type->astNodeType != ASTNodeType::TextureType)
+        {
+            auto memoryQualifierCollection = paramDecl->findModifier<MemoryQualifierCollectionModifier>();
+            if(!memoryQualifierCollection) 
+                return;
+            for(auto mod : memoryQualifierCollection->getModifiers())
+                getSink()->diagnose(paramDecl, Diagnostics::memoryQualifierNotAllowedOnANonImageTypeParameter, mod);
+        }
     }
 
     // This checks that the declaration is marked as "out" and changes the hlsl

@@ -2197,62 +2197,32 @@ namespace Slang
         auto argDeclRef = arg->declRef;
         if (!argDeclRef)
             return;
+        auto argDecl =  argDeclRef.getDecl();
+        auto argMemMods = argDecl->findModifier<MemoryQualifierCollectionModifier>();
+        if(!argMemMods)
+            return;
+        uint32_t argQualifiers = argMemMods->getMemoryQualifierBit();    
 
-        ASTNodeType opThis;
-        ASTNodeType foundOp;
-        for (auto modThis : argDeclRef.getDecl()->modifiers)
-        {
-            UnownedStringSlice target;
-            opThis = modThis->astNodeType;
-            foundOp = ASTNodeType::NodeBase;
-            if (opThis == ASTNodeType::GloballyCoherentModifier)
-            {
-                foundOp = opThis;
-                target = UnownedStringSlice("coherent");
-            }
-            else if (opThis == ASTNodeType::GLSLVolatileModifier)
-            {
-                foundOp = opThis;
-                target = UnownedStringSlice("volatile");
-            }
-            else if (opThis == ASTNodeType::GLSLRestrictModifier)
-            {
-                foundOp = opThis;
-                target = UnownedStringSlice("restrict");
-            }
-            if (opThis == ASTNodeType::GLSLReadOnlyModifier)
-            {
-                foundOp = opThis;
-                target = UnownedStringSlice("readonly");
-            }
-            else if (opThis == ASTNodeType::GLSLWriteOnlyModifier)
-            {
-                foundOp = opThis;
-                target = UnownedStringSlice("writeonly");
-            }
+        uint32_t paramQualifiers = 0;
+        auto paramMemMods = paramIn->findModifier<MemoryQualifierCollectionModifier>();
+        if(paramMemMods)
+            paramQualifiers = paramMemMods->getMemoryQualifierBit();
 
-            if (foundOp == ASTNodeType::NodeBase)
-                continue;
-
-            // Only texture types are allowed to have memory qualifiers on parameters
-            if(paramIn->getType()->astNodeType != ASTNodeType::TextureType)
-                getSink()->diagnose(paramIn, Diagnostics::memoryQualifierNotAllowedOnANonImageTypeParameter, target);
-
-            for (auto modParam : paramIn->modifiers)
-            {
-                if (modParam->astNodeType == foundOp)
-                {
-                    foundOp = ASTNodeType::NodeBase;
-                    break;
-                }
-            }
-
-            if (foundOp == ASTNodeType::NodeBase)
-                continue;
-
-            getSink()->diagnose(
-                arg, Diagnostics::argumentHasMoreMemoryQualifiersThanParam, target);
-        }
+        if(argQualifiers & MemoryQualifierCollectionModifier::Flags::kCoherent
+            && !(paramQualifiers & MemoryQualifierCollectionModifier::Flags::kCoherent))
+                getSink()->diagnose(arg, Diagnostics::argumentHasMoreMemoryQualifiersThanParam, "coherent");
+        if(argQualifiers & MemoryQualifierCollectionModifier::Flags::kReadOnly
+            && !(paramQualifiers & MemoryQualifierCollectionModifier::Flags::kReadOnly))
+                getSink()->diagnose(arg, Diagnostics::argumentHasMoreMemoryQualifiersThanParam, "readonly");
+        if(argQualifiers & MemoryQualifierCollectionModifier::Flags::kWriteOnly
+            && !(paramQualifiers & MemoryQualifierCollectionModifier::Flags::kWriteOnly))
+                getSink()->diagnose(arg, Diagnostics::argumentHasMoreMemoryQualifiersThanParam, "writeonly");
+        if(argQualifiers & MemoryQualifierCollectionModifier::Flags::kVolatile
+            && !(paramQualifiers & MemoryQualifierCollectionModifier::Flags::kVolatile))
+                getSink()->diagnose(arg, Diagnostics::argumentHasMoreMemoryQualifiersThanParam, "volatile");
+        if(argQualifiers & MemoryQualifierCollectionModifier::Flags::kRestrict
+            && !(paramQualifiers & MemoryQualifierCollectionModifier::Flags::kRestrict))
+                getSink()->diagnose(arg, Diagnostics::argumentHasMoreMemoryQualifiersThanParam, "restrict");       
     }
 
     Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr *expr)
