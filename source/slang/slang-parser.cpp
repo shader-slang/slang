@@ -7067,13 +7067,6 @@ namespace Slang
             parser->ReadMatchingToken(TokenType::RParent);
             return SPIRVAsmOperand{ SPIRVAsmOperand::ImageType, Token{}, typeExpr };
         }
-        if (AdvanceIf(parser, "__imagePointer"))
-        {
-            parser->ReadToken(TokenType::LParent);
-            const auto typeExpr = parser->ParseExpression();
-            parser->ReadMatchingToken(TokenType::RParent);
-            return SPIRVAsmOperand{ SPIRVAsmOperand::ImagePointer, Token{}, typeExpr };
-        }
         if (AdvanceIf(parser, "__sampledImageType"))
         {
             parser->ReadToken(TokenType::LParent);
@@ -7791,7 +7784,6 @@ namespace Slang
         parser->sink->diagnose(token, Diagnostics::invalidCUDASMVersion);
         return nullptr;
     }
-
     static NodeBase* parseVolatileModifier(Parser* parser, void* /*userData*/)
     {
         ModifierListBuilder listBuilder;

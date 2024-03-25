@@ -2239,9 +2239,22 @@ void addVarDecorations(
             setMemoryQualifier = true;
             builder->addSimpleDecoration<IRGLSLWriteOnlyDecoration>(inst);
         }
-        if (setMemoryQualifier && inst->getOp() == kIROp_Param && inst->getDataType()->getOp() != kIROp_TextureType)
-            context->getSink()->diagnose(mod->getKeywordNameAndLoc().loc, Diagnostics::memoryQualifierNotAllowedOnANonImageTypeParameter, mod);
 
+        if (setMemoryQualifier && inst->getOp() == kIROp_Param)
+        {
+            IRInst* baseInstType = inst->getDataType();
+            bool isImageType = baseInstType->getOp() == kIROp_TextureType;
+
+            while (isImageType != true 
+                && baseInstType->getOperandCount() > 0)
+            {
+                baseInstType = baseInstType->getOperand(0);
+                isImageType = baseInstType->getOp() == kIROp_TextureType;
+            }
+
+            if(!isImageType)
+                context->getSink()->diagnose(mod->getKeywordNameAndLoc().loc, Diagnostics::memoryQualifierNotAllowedOnANonImageTypeParameter, mod);
+        }
         // TODO: what are other modifiers we need to propagate through?
     }
     if(auto t = composeGetters<IRMeshOutputType>(inst->getFullType(), &IROutTypeBase::getValueType))
@@ -4160,16 +4173,6 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                         i = lowerType(context, operand.type.type);
                     }
                     return builder->emitSPIRVAsmOperandSampledType(i);
-                }
-            case SPIRVAsmOperand::ImagePointer:
-                {
-                    IRInst* i;
-                    {
-                        IRBuilderInsertLocScope insertScope(builder);
-                        builder->setInsertBefore(spirvAsmInst);
-                        i = getSimpleVal(context, lowerRValueExpr(context, operand.expr));
-                    }
-                    return builder->emitSPIRVAsmOperandImagePointer(i);
                 }
             case SPIRVAsmOperand::ImageType:
             {

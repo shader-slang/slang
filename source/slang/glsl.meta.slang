@@ -2962,7 +2962,7 @@ ${{{{
         // the changing list of parameters per gimageDim type
         // https://registry.khronos.org/OpenGL/specs/gl/GLSLangSpec.4.60.pdf
         StringBuilder IMAGE_PARAMSBuilder;
-        IMAGE_PARAMSBuilder << fullTypeName << " image,";
+        IMAGE_PARAMSBuilder << "__constref " << fullTypeName << " image,";
         int paramC = targetShape.imageCoordIVecIndexerDim;
         if (paramC == 1)
             IMAGE_PARAMSBuilder << "int";
@@ -3107,7 +3107,7 @@ ${{{{
                 {
                     OpCapability ImageQuery;
                     %ptrType = OpTypePointer Image $$$(targetType.type);
-                    %ptr:%ptrType = OpImageTexelPointer __imagePointer(image) $P $sample;
+                    %ptr:%ptrType = OpImageTexelPointer &image $P $sample;
                     result:$$$(targetType.type) = OpAtomic$(targetType.SPVTypePrefix)Add$(targetType.SPVAtomicSuffix) %ptr Device None $data
                 };
             }
@@ -3129,7 +3129,7 @@ ${{{{
                 {
                     OpCapability ImageQuery;
                     %ptrType = OpTypePointer Image $$$(targetType.type);
-                    %ptr:%ptrType = OpImageTexelPointer __imagePointer(image) $P $sample;
+                    %ptr:%ptrType = OpImageTexelPointer &image $P $sample;
                     result:$$$(targetType.type) = OpAtomicExchange %ptr Device ImageMemory $data
                 };
             }
@@ -3151,7 +3151,7 @@ ${{{{
                 {
                     OpCapability ImageQuery;
                     %ptrType = OpTypePointer Image $$$(targetType.type);
-                    %ptr:%ptrType = OpImageTexelPointer __imagePointer(image) $P $sample;
+                    %ptr:%ptrType = OpImageTexelPointer &image $P $sample;
                     result:$$$(targetType.type) = OpAtomic$(targetType.SPVSubTypePrefix)Min$(targetType.SPVAtomicSuffix) %ptr Device ImageMemory $data
                 };
             }
@@ -3173,7 +3173,7 @@ ${{{{
                 {
                     OpCapability ImageQuery;
                     %ptrType = OpTypePointer Image $$$(targetType.type);
-                    %ptr:%ptrType = OpImageTexelPointer __imagePointer(image) $P $sample;
+                    %ptr:%ptrType = OpImageTexelPointer &image $P $sample;
                     result:$$$(targetType.type) = OpAtomic$(targetType.SPVSubTypePrefix)Max$(targetType.SPVAtomicSuffix) %ptr Device ImageMemory $data
                 };
             }
@@ -3198,7 +3198,7 @@ ${{{{
                 {
                     OpCapability ImageQuery;
                     %ptrType = OpTypePointer Image $$$(targetType.type);
-                    %ptr:%ptrType = OpImageTexelPointer __imagePointer(image) $P $sample;
+                    %ptr:%ptrType = OpImageTexelPointer &image $P $sample;
                     result:$$$(targetType.type) = OpAtomicAnd %ptr Device ImageMemory $data
                 };
             }
@@ -3219,7 +3219,7 @@ ${{{{
                 {
                     OpCapability ImageQuery;
                     %ptrType = OpTypePointer Image $$$(targetType.type);
-                    %ptr:%ptrType = OpImageTexelPointer __imagePointer(image) $P $sample;
+                    %ptr:%ptrType = OpImageTexelPointer &image $P $sample;
                     result:$$$(targetType.type) = OpAtomicOr %ptr Device ImageMemory $data
                 };
             }
@@ -3240,7 +3240,7 @@ ${{{{
                 {
                     OpCapability ImageQuery;
                     %ptrType = OpTypePointer Image $$$(targetType.type);
-                    %ptr:%ptrType = OpImageTexelPointer __imagePointer(image) $P $sample;
+                    %ptr:%ptrType = OpImageTexelPointer &image $P $sample;
                     result:$$$(targetType.type) = OpAtomicXor %ptr Device ImageMemory $data
                 };
             }
@@ -3261,7 +3261,7 @@ ${{{{
                 {
                     OpCapability ImageQuery;
                     %ptrType = OpTypePointer Image $$$(targetType.type);
-                    %ptr:%ptrType = OpImageTexelPointer __imagePointer(image) $P $sample;
+                    %ptr:%ptrType = OpImageTexelPointer &image $P $sample;
                     result:$$$(targetType.type) = OpAtomicCompareExchange %ptr Device ImageMemory ImageMemory $data $compare
                 };
             }

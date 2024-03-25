@@ -1186,9 +1186,6 @@ INST(SPIRVAsmInst, SPIRVAsmInst, 1, 0)
     // this component type
     INST(SPIRVAsmOperandSampledType, __sampledType, 1, HOISTABLE)
 
-    // A type function which returns the global var OpPointerType of an image
-    INST(SPIRVAsmOperandImagePointer, __imagePointer, 1, HOISTABLE)
-
     // A type function which returns the equivalent OpTypeImage type of sampled image value
     INST(SPIRVAsmOperandImageType, __imageType, 1, HOISTABLE)
 

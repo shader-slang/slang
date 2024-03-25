@@ -254,8 +254,30 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             }
             else
             {
-                if (!as<IRDecoration>(use->getUser()))
+                auto user = use->getUser();
+                if (!as<IRDecoration>(user))
                 {
+                    // do not emit load if we have a `store(Ptr<T>, globalParam<T>)`, instead
+                    // replace the store(Ptr<T>, globalParam<T>) with a globalParam<T> since 
+                    // this is the end product anyways (save on: 1 load, 1 store op). 
+                    // This also stops TextureType from breaking
+                    if(auto opStore = as<IRStore>(user))
+                    {
+                        auto dstType = opStore->getOperand(0)->getDataType();
+                        auto srcType = opStore->getOperand(1)->getDataType();
+                        // Cover the case where we have a Ptr<Ptr<T>>
+                        while (dstType->getOp() == kIROp_PtrType && srcType->getOp() == kIROp_PtrType)
+                        {
+                            dstType = as<IRType>(dstType->getOperand(0));
+                            srcType = as<IRType>(srcType->getOperand(0));
+                        }
+                        if (dstType->getOp() == srcType->getOp())
+                        {
+                            opStore->getOperand(0)->replaceUsesWith(opStore->getOperand(1));
+                            opStore->removeAndDeallocate();
+                            return;
+                        }
+                    }
                     auto val = builder.emitLoad(addr);
                     builder.replaceOperand(use, val);
                 }
