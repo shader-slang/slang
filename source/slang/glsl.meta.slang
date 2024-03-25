@@ -3101,13 +3101,14 @@ ${{{{
             case glsl: __intrinsic_asm "imageAtomicAdd($*0)";
             case spirv:
             {
+                let imageP = __getLegalizedSPIRVGlobalParamAddr(image);
                 typeRequireChecks_image_atomic_int64<$(targetType.type)>();
                 $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
                     %ptrType = OpTypePointer Image $$$(targetType.type);
-                    %ptr:%ptrType = OpImageTexelPointer &image $P $sample;
+                    %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
                     result:$$$(targetType.type) = OpAtomic$(targetType.SPVTypePrefix)Add$(targetType.SPVAtomicSuffix) %ptr Device None $data
                 };
             }
@@ -3123,13 +3124,14 @@ ${{{{
             case glsl: __intrinsic_asm "imageAtomicExchange($*0)";
             case spirv:
             {
+                let imageP = __getLegalizedSPIRVGlobalParamAddr(image);
                 typeRequireChecks_image_atomic_int64<$(targetType.type)>();
                 $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
                     %ptrType = OpTypePointer Image $$$(targetType.type);
-                    %ptr:%ptrType = OpImageTexelPointer &image $P $sample;
+                    %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
                     result:$$$(targetType.type) = OpAtomicExchange %ptr Device ImageMemory $data
                 };
             }
@@ -3145,13 +3147,14 @@ ${{{{
             case glsl: __intrinsic_asm "imageAtomicMin($*0)";
             case spirv:
             {
+                let imageP = __getLegalizedSPIRVGlobalParamAddr(image);
                 typeRequireChecks_image_atomic_int64<$(targetType.type)>();
                 $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
                     %ptrType = OpTypePointer Image $$$(targetType.type);
-                    %ptr:%ptrType = OpImageTexelPointer &image $P $sample;
+                    %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
                     result:$$$(targetType.type) = OpAtomic$(targetType.SPVSubTypePrefix)Min$(targetType.SPVAtomicSuffix) %ptr Device ImageMemory $data
                 };
             }
@@ -3167,13 +3170,14 @@ ${{{{
             case glsl: __intrinsic_asm "imageAtomicMax($*0)";
             case spirv:
             {
+                let imageP = __getLegalizedSPIRVGlobalParamAddr(image);
                 typeRequireChecks_image_atomic_int64<$(targetType.type)>();
                 $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
                     %ptrType = OpTypePointer Image $$$(targetType.type);
-                    %ptr:%ptrType = OpImageTexelPointer &image $P $sample;
+                    %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
                     result:$$$(targetType.type) = OpAtomic$(targetType.SPVSubTypePrefix)Max$(targetType.SPVAtomicSuffix) %ptr Device ImageMemory $data
                 };
             }
@@ -3192,13 +3196,14 @@ ${{{{
             case glsl: __intrinsic_asm "imageAtomicAnd($*0)";
             case spirv:
             {
+                let imageP = __getLegalizedSPIRVGlobalParamAddr(image);
                 typeRequireChecks_image_atomic_int64<$(targetType.type)>();
                 $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
                     %ptrType = OpTypePointer Image $$$(targetType.type);
-                    %ptr:%ptrType = OpImageTexelPointer &image $P $sample;
+                    %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
                     result:$$$(targetType.type) = OpAtomicAnd %ptr Device ImageMemory $data
                 };
             }
@@ -3213,13 +3218,14 @@ ${{{{
             case glsl: __intrinsic_asm "imageAtomicOr($*0)";
             case spirv:
             {
+                let imageP = __getLegalizedSPIRVGlobalParamAddr(image);
                 typeRequireChecks_image_atomic_int64<$(targetType.type)>();
                 $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
                     %ptrType = OpTypePointer Image $$$(targetType.type);
-                    %ptr:%ptrType = OpImageTexelPointer &image $P $sample;
+                    %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
                     result:$$$(targetType.type) = OpAtomicOr %ptr Device ImageMemory $data
                 };
             }
@@ -3234,13 +3240,14 @@ ${{{{
             case glsl: __intrinsic_asm "imageAtomicXor($*0)";
             case spirv:
             {
+                let imageP = __getLegalizedSPIRVGlobalParamAddr(image);
                 typeRequireChecks_image_atomic_int64<$(targetType.type)>();
                 $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
                     %ptrType = OpTypePointer Image $$$(targetType.type);
-                    %ptr:%ptrType = OpImageTexelPointer &image $P $sample;
+                    %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
                     result:$$$(targetType.type) = OpAtomicXor %ptr Device ImageMemory $data
                 };
             }
@@ -3255,13 +3262,14 @@ ${{{{
             case glsl: __intrinsic_asm "imageAtomicCompSwap($*0)";
             case spirv:
             {
+                let imageP = __getLegalizedSPIRVGlobalParamAddr(image);
                 typeRequireChecks_image_atomic_int64<$(targetType.type)>();
                 $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
                     %ptrType = OpTypePointer Image $$$(targetType.type);
-                    %ptr:%ptrType = OpImageTexelPointer &image $P $sample;
+                    %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
                     result:$$$(targetType.type) = OpAtomicCompareExchange %ptr Device ImageMemory ImageMemory $data $compare
                 };
             }

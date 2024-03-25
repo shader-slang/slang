@@ -2207,13 +2207,6 @@ void simplifyIRForSpirvLegalization(TargetProgram* target, DiagnosticSink* sink,
             }
         }
     }
-
-    // simplify all stores(dst,load(src)) patterns created from emitting globalParams
-    for (auto globalInst : module->getModuleInst()->getGlobalInsts())
-    {
-        if(auto func = as<IRFunc>(globalInst))
-            eliminateRedundantLoadStore(func);
-    }
 }
 
 void legalizeIRForSPIRV(
