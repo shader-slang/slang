@@ -957,6 +957,14 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     return nullptr;
 }
 
+// Hold the in-stack linked list that represents the access chain
+// to the current global varying parameter being created.
+// e.g. if the user code has:
+//    struct Params { in float member; }
+//    void main(in Params inParams);
+// Then the `outerParamInfo` when we get to `createSimpleGLSLVarying` for `member`
+// will be:  {IRStructField member} -> {IRParam inParams} -> {IRFunc main}.
+//
 struct OuterParamInfoLink
 {
     IRInst* outerParam;
@@ -988,6 +996,11 @@ void createVarLayoutForLegalizedGlobalParam(
     IRVarLayout* varLayout = varLayoutBuilder.build();
     builder->addLayoutDecoration(globalParam, varLayout);
 
+    // Traverse the entire access chain for the current leaf var and see if
+    // there are interpolation mode decorations along the way.
+    // Make sure we respect the decoration on the inner most node.
+    // So that the decoration on a struct field overrides the outer decoration
+    // on a parameter of the struct type.
     for (; outerParamInfo; outerParamInfo = outerParamInfo->next)
     {
         auto paramInfo = outerParamInfo->outerParam;
@@ -1403,6 +1416,9 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
         SLANG_ASSERT(structTypeLayout);
         RefPtr<ScalarizedTupleValImpl> tupleValImpl = new ScalarizedTupleValImpl();
 
+        // Since we are going to recurse into struct fields,
+        // we need to create a new node in `outerParamInfo` to keep track of
+        // the access chain to get to the new leafVar.
         OuterParamInfoLink fieldParentInfo;
         fieldParentInfo.next = outerParamInfo;
 
