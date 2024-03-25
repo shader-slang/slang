@@ -57,6 +57,15 @@ namespace Slang
 
     void SemanticsStmtVisitor::visitBlockStmt(BlockStmt* stmt)
     {
+        // Make sure to fully check all nested agg type decls first.
+        if (stmt->scopeDecl)
+        {
+            for (auto decl : stmt->scopeDecl->members)
+            {
+                if (as<AggTypeDeclBase>(decl))
+                    ensureAllDeclsRec(decl, DeclCheckState::DefinitionChecked);
+            }
+        }
         checkStmt(stmt->body);
     }
 

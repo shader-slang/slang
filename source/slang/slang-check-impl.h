@@ -1208,6 +1208,10 @@ namespace Slang
             ensureDecl(declRef->getDecl(), state);
         }
 
+        void ensureAllDeclsRec(
+            Decl* decl,
+            DeclCheckState              state);
+
             /// Helper routine allowing `ensureDecl` to be used on a `DeclBase`
             ///
             /// `DeclBase` is the base clas of `Decl` and `DeclGroup`. When
@@ -1516,7 +1520,8 @@ namespace Slang
 
         Modifier* checkModifier(
             Modifier*        m,
-            ModifiableSyntaxNode*   syntaxNode);
+            ModifiableSyntaxNode*   syntaxNode,
+            bool ignoreUnallowedModifier);
 
         void checkModifiers(ModifiableSyntaxNode* syntaxNode);
         void checkVisibility(Decl* decl);
@@ -2735,4 +2740,9 @@ namespace Slang
     DeclVisibility getDeclVisibility(Decl* decl);
 
     void diagnoseCapabilityProvenance(DiagnosticSink* sink, Decl* decl, CapabilityAtom missingAtom);
+
+    void _ensureAllDeclsRec(
+        SemanticsDeclVisitorBase* visitor,
+        Decl* decl,
+        DeclCheckState              state);
 }

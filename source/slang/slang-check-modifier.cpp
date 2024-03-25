@@ -1188,7 +1188,8 @@ namespace Slang
 
     Modifier* SemanticsVisitor::checkModifier(
         Modifier*        m,
-        ModifiableSyntaxNode*   syntaxNode)
+        ModifiableSyntaxNode*   syntaxNode,
+        bool ignoreUnallowedModifier)
     {
         if(auto hlslUncheckedAttribute = as<UncheckedAttribute>(m))
         {
@@ -1218,7 +1219,11 @@ namespace Slang
                 isGLSLInput = true;
             if (!isModifierAllowedOnDecl(isGLSLInput, m->astNodeType, decl))
             {
-                getSink()->diagnose(m, Diagnostics::modifierNotAllowed, m);
+                if (!ignoreUnallowedModifier)
+                {
+                    getSink()->diagnose(m, Diagnostics::modifierNotAllowed, m);
+                    return nullptr;
+                }
                 return m;
             }
         }
@@ -1496,6 +1501,7 @@ namespace Slang
         Dictionary<ASTNodeType, Modifier*> mapExclusiveGroupToModifier;
 
         Modifier* modifier = syntaxNode->modifiers.first;
+        bool ignoreUnallowedModifier = false;
         while (modifier)
         {
             // Check if a modifier belonging to the same conflict group is already
@@ -1520,7 +1526,12 @@ namespace Slang
             // be to return a single unlinked modifier.
             modifier->next = nullptr;
 
-            auto checkedModifier = checkModifier(modifier, syntaxNode);
+            // For any modifiers appears after "SharedModifiers", we will not diagnose
+            // an error if the modifier is not allowed on the declaration.
+            if (as<SharedModifiers>(modifier))
+                ignoreUnallowedModifier = true;
+            
+            auto checkedModifier = checkModifier(modifier, syntaxNode, ignoreUnallowedModifier);
 
             if(checkedModifier)
             {

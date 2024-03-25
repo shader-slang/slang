@@ -1281,13 +1281,12 @@ namespace Slang
         /// because those cannot be meaningfully checked outside of the context
         /// of their surrounding statement(s).
         ///
-    static void _ensureAllDeclsRec(
-        SemanticsDeclVisitorBase*   visitor,
+    void SemanticsVisitor::ensureAllDeclsRec(
         Decl*                       decl,
         DeclCheckState              state)
     {
         // Ensure `decl` itself first.
-        visitor->ensureDecl(decl, state);
+        ensureDecl(decl, state);
 
         // If `decl` is a container, then we want to ensure its children.
         if(auto containerDecl = as<ContainerDecl>(decl))
@@ -1311,7 +1310,7 @@ namespace Slang
                 if(as<ScopeDecl>(childDecl))
                     continue;
 
-                _ensureAllDeclsRec(visitor, childDecl, state);
+                ensureAllDeclsRec(childDecl, state);
             }
         }
 
@@ -1322,7 +1321,7 @@ namespace Slang
         //
         if(auto genericDecl = as<GenericDecl>(decl))
         {
-            _ensureAllDeclsRec(visitor, genericDecl->inner, state);
+            ensureAllDeclsRec(genericDecl->inner, state);
         }
     }
 
@@ -1792,7 +1791,13 @@ namespace Slang
                 parentAggTypeDecl->unionTagsWith(getTypeTags(varDeclRefType));
             }
         }
-
+        if (getOptionSet().getBoolOption(CompilerOptionName::NoMangle) &&
+            isGlobalDecl(varDecl))
+        {
+            // If -no-mangle option is set, we will add `ExternCpp` modifier to all
+            // global variables and struct fields to prevent mangling.
+            addModifier(varDecl, m_astBuilder->create<ExternCppModifier>());
+        }
         checkVisibility(varDecl);
     }
 
@@ -2577,7 +2582,7 @@ namespace Slang
             // to the subset of declarations coming from a given source
             // file.
             //
-            _ensureAllDeclsRec(this, moduleDecl, s);
+            ensureAllDeclsRec(moduleDecl, s);
         }
 
         // Once we have completed the above loop, all declarations not

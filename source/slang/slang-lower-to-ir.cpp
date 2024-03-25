@@ -7744,7 +7744,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
 
         addTargetIntrinsicDecorations(nullptr, irParam, decl);
-
+        if (decl->findModifier<HLSLLayoutSemantic>())
+        {
+            builder->addHasExplicitHLSLBindingDecoration(irParam);
+        }
         // A global variable's SSA value is a *pointer* to
         // the underlying storage.
         context->setGlobalValue(decl, paramVal);
