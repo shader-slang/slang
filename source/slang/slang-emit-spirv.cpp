@@ -2175,10 +2175,18 @@ struct SPIRVEmitContext
             }
         }
 
-        if (var->findDecorationImpl(kIROp_RequireSPIRVDescriptorIndexingExtensionDecoration))
+        for (auto decor : var->getDecorations())
         {
-            ensureExtensionDeclaration(UnownedStringSlice("SPV_EXT_descriptor_indexing"));
-            requireSPIRVCapability(SpvCapabilityRuntimeDescriptorArray);
+            switch (decor->getOp())
+            {
+            case kIROp_GLSLPrimitivesRateDecoration:
+                emitOpDecorate(getSection(SpvLogicalSectionID::Annotations), decor, varInst, SpvDecorationPerPrimitiveEXT);
+                break;
+            case kIROp_RequireSPIRVDescriptorIndexingExtensionDecoration:
+                ensureExtensionDeclaration(UnownedStringSlice("SPV_EXT_descriptor_indexing"));
+                requireSPIRVCapability(SpvCapabilityRuntimeDescriptorArray);
+                break;
+            }
         }
     }
 
