@@ -162,6 +162,20 @@ static IRInst* _getRootVar(IRInst* inst)
     return inst;
 }
 
+IRInst* hasAUse(IRInst* var, IRInst* maybeAUse)
+{
+    for (auto use = var->firstUse; use; use = use->nextUse)
+    {
+        if (use->getUser() == maybeAUse)
+            return maybeAUse;
+    }
+    for (IRInst* child : maybeAUse->getChildren())
+    {
+        if (IRInst* validUse = hasAUse(var, child))
+            return validUse;
+    }
+    return nullptr;
+};
 bool tryRemoveRedundantStore(IRGlobalValueWithCode* func, IRStore* store)
 {
     // We perform a quick and conservative check:
@@ -282,7 +296,9 @@ bool tryRemoveRedundantStore(IRGlobalValueWithCode* func, IRStore* store)
     // no side effects between the load of the var and the store of the var.
     if (auto load = as<IRLoad>(store->getVal()))
     {
-        if (load->getPtr() == store->getPtr())
+        auto loadPtr = load->getPtr();
+        auto storePtr = store->getPtr();
+        if (loadPtr == storePtr)
         {
             if (load->getParent() == store->getParent())
             {
@@ -304,7 +320,45 @@ bool tryRemoveRedundantStore(IRGlobalValueWithCode* func, IRStore* store)
                 }
             }
         }
+        // A store (and associated Load) can be removed if store(dstPtr,load(srcPtr)) when dst and src are the same type
+        // since this is equivlent to using src instead of dst in future operations up until side-effects are encountered
+        // If load/store cannot be removed due to side effects, we still need to replace all dstPtr with srcPtr we can 
+        // since this may be a globalParam being passed into a Op which requires the globalParam's original pointer
+        else if (loadPtr->getDataType()->getOp() == kIROp_PtrType && storePtr->getDataType()->getOp() == kIROp_PtrType
+            && loadPtr->getDataType()->getOperand(0)->getOp() == storePtr->getDataType()->getOperand(0)->getOp())
+        {
+            bool valueMayChange = false;
+            bool modified = false;
+            for (auto inst = store->next; inst; inst = inst->next)
+            {
+                if (IRInst* useInst = hasAUse(storePtr, inst))
+                {
+                    for (auto operandNum = 0; operandNum < useInst->getOperandCount(); operandNum++)
+                    {
+                        auto operand = useInst->getOperand(operandNum);
+                        if (operand == storePtr)
+                        {
+                            modified = true;
+                            useInst->setOperand(operandNum, loadPtr);
+                        }
+                    }
+                }
+                if (inst == store)
+                    break;
+                if (canInstHaveSideEffectAtAddress(func, inst, store->getPtr()))
+                {
+                    valueMayChange = true;
+                    break;
+                }
+            }
+            if (!valueMayChange)
+            {
+                store->removeAndDeallocate();
+            }
+            return modified;
+        }
     }
+
     return false;
 }
 
