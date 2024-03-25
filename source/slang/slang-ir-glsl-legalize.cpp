@@ -988,8 +988,9 @@ void createVarLayoutForLegalizedGlobalParam(
     IRVarLayout* varLayout = varLayoutBuilder.build();
     builder->addLayoutDecoration(globalParam, varLayout);
 
-    for (auto paramInfo = outerParamInfo->outerParam; outerParamInfo; outerParamInfo = outerParamInfo->next)
+    for (; outerParamInfo; outerParamInfo = outerParamInfo->next)
     {
+        auto paramInfo = outerParamInfo->outerParam;
         auto decorParent = paramInfo;
         if (auto field = as<IRStructField>(decorParent))
             decorParent = field->getKey();
@@ -1404,7 +1405,6 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
 
         OuterParamInfoLink fieldParentInfo;
         fieldParentInfo.next = outerParamInfo;
-        fieldParentInfo.outerParam = leafVar;
 
         // Construct the actual type for the tuple (including any outer arrays)
         IRType* fullType = type;
@@ -1452,6 +1452,7 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
                     nameHintSB << ".";
                 nameHintSB << fieldNameHint->getName();
             }
+            fieldParentInfo.outerParam = field;
             auto fieldVal = createGLSLGlobalVaryingsImpl(
                 context,
                 codeGenContext,
