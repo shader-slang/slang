@@ -254,8 +254,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             }
             else
             {
-                auto user = use->getUser();
-                if (!as<IRDecoration>(user))
+                if (!as<IRDecoration>(use->getUser()))
                 {
                     auto val = builder.emitLoad(addr);
                     builder.replaceOperand(use, val);
