@@ -2962,7 +2962,7 @@ ${{{{
         // the changing list of parameters per gimageDim type
         // https://registry.khronos.org/OpenGL/specs/gl/GLSLangSpec.4.60.pdf
         StringBuilder IMAGE_PARAMSBuilder;
-        IMAGE_PARAMSBuilder << "__constref " << fullTypeName << " image,";
+        IMAGE_PARAMSBuilder << fullTypeName << " image,";
         int paramC = targetShape.imageCoordIVecIndexerDim;
         if (paramC == 1)
             IMAGE_PARAMSBuilder << "int";
