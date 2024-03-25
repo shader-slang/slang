@@ -2185,6 +2185,76 @@ namespace Slang
         return _canLValueCoerceScalarType(a, b);
     }
 
+
+    void SemanticsVisitor::compareMemoryQualifierOfParamToArgument(
+        ParamDecl* paramIn,
+        Expr* argIn)
+    {
+        auto arg = as<VarExpr>(argIn);
+        if (!paramIn || !arg)
+            return;
+
+        auto argDeclRef = arg->declRef;
+        if (!argDeclRef)
+            return;
+
+        ASTNodeType opThis;
+        ASTNodeType foundOp;
+        for (auto modThis : argDeclRef.getDecl()->modifiers)
+        {
+            UnownedStringSlice target;
+            opThis = modThis->astNodeType;
+            foundOp = ASTNodeType::NodeBase;
+            if (opThis == ASTNodeType::GloballyCoherentModifier)
+            {
+                foundOp = opThis;
+                target = UnownedStringSlice("coherent");
+            }
+            else if (opThis == ASTNodeType::GLSLVolatileModifier)
+            {
+                foundOp = opThis;
+                target = UnownedStringSlice("volatile");
+            }
+            else if (opThis == ASTNodeType::GLSLRestrictModifier)
+            {
+                foundOp = opThis;
+                target = UnownedStringSlice("restrict");
+            }
+            if (opThis == ASTNodeType::GLSLReadOnlyModifier)
+            {
+                foundOp = opThis;
+                target = UnownedStringSlice("readonly");
+            }
+            else if (opThis == ASTNodeType::GLSLWriteOnlyModifier)
+            {
+                foundOp = opThis;
+                target = UnownedStringSlice("writeonly");
+            }
+
+            if (foundOp == ASTNodeType::NodeBase)
+                continue;
+
+            // Only texture types are allowed to have memory qualifiers on parameters
+            if(paramIn->getType()->astNodeType != ASTNodeType::TextureType)
+                getSink()->diagnose(paramIn, Diagnostics::memoryQualifierNotAllowedOnANonImageTypeParameter, target);
+
+            for (auto modParam : paramIn->modifiers)
+            {
+                if (modParam->astNodeType == foundOp)
+                {
+                    foundOp = ASTNodeType::NodeBase;
+                    break;
+                }
+            }
+
+            if (foundOp == ASTNodeType::NodeBase)
+                continue;
+
+            getSink()->diagnose(
+                arg, Diagnostics::argumentHasMoreMemoryQualifiersThanParam, target);
+        }
+    }
+
     Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr *expr)
     {
         auto rs = ResolveInvoke(expr);
@@ -2202,10 +2272,25 @@ namespace Slang
                     }
                 }
 
+                auto funcDeclRefExpr = as<DeclRefExpr>(invoke->functionExpr);
+                FunctionDeclBase* funcDeclBase = nullptr;
+                if (funcDeclRefExpr)
+                    funcDeclBase = as<FunctionDeclBase>(funcDeclRefExpr->declRef.getDecl());
+
                 Index paramCount = funcType->getParamCount();
                 for (Index pp = 0; pp < paramCount; ++pp)
                 {
                     auto paramType = funcType->getParamType(pp);
+                    Expr* argExpr = nullptr;
+                    ParamDecl* paramDecl = nullptr;
+                    if (pp < expr->arguments.getCount())
+                    {
+                        argExpr = expr->arguments[pp];
+                        if(funcDeclBase)
+                            paramDecl = funcDeclBase->getParameters()[pp];
+                    }
+                    compareMemoryQualifierOfParamToArgument(paramDecl, argExpr);
+
                     if (as<OutTypeBase>(paramType) || as<RefType>(paramType))
                     {
                         // `out`, `inout`, and `ref` parameters currently require
@@ -2215,9 +2300,8 @@ namespace Slang
                         // for an `inout` parameter to be converted in both
                         // directions.
                         //
-                        if( pp < expr->arguments.getCount() )
+                        if( argExpr )
                         {
-                            auto argExpr = expr->arguments[pp];
                             if( !argExpr->type.isLeftValue)
                             {
                                 auto implicitCastExpr = as<ImplicitCastExpr>(argExpr);

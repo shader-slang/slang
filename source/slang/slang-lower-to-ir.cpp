@@ -2115,7 +2115,6 @@ void addVarDecorations(
     auto builder = context->irBuilder;
     for(Modifier* mod : decl->modifiers)
     {
-        bool setMemoryQualifier = false;
         if(as<HLSLNoInterpolationModifier>(mod))
         {
             builder->addInterpolationModeDecoration(inst, IRInterpolationMode::NoInterpolation);
@@ -2178,7 +2177,6 @@ void addVarDecorations(
         }
         else if(as<GloballyCoherentModifier>(mod))
         {
-            setMemoryQualifier = true;
             builder->addSimpleDecoration<IRGloballyCoherentDecoration>(inst);
         }
         else if(as<PreciseModifier>(mod))
@@ -2221,39 +2219,19 @@ void addVarDecorations(
         }
         else if (as<GLSLVolatileModifier>(mod))
         {
-            setMemoryQualifier = true;
             builder->addSimpleDecoration<IRGLSLVolatileDecoration>(inst);
         }
         else if (as<GLSLRestrictModifier>(mod))
         {
-            setMemoryQualifier = true;
             builder->addSimpleDecoration<IRGLSLRestrictDecoration>(inst);
         }
         else if (as<GLSLReadOnlyModifier>(mod))
         {
-            setMemoryQualifier = true;
             builder->addSimpleDecoration<IRGLSLReadOnlyDecoration>(inst);
         }
         else if (as<GLSLWriteOnlyModifier>(mod))
         {
-            setMemoryQualifier = true;
             builder->addSimpleDecoration<IRGLSLWriteOnlyDecoration>(inst);
-        }
-
-        if (setMemoryQualifier && inst->getOp() == kIROp_Param)
-        {
-            IRInst* baseInstType = inst->getDataType();
-            bool isImageType = baseInstType->getOp() == kIROp_TextureType;
-
-            while (isImageType != true 
-                && baseInstType->getOperandCount() > 0)
-            {
-                baseInstType = baseInstType->getOperand(0);
-                isImageType = baseInstType->getOp() == kIROp_TextureType;
-            }
-
-            if(!isImageType)
-                context->getSink()->diagnose(mod->getKeywordNameAndLoc().loc, Diagnostics::memoryQualifierNotAllowedOnANonImageTypeParameter, mod);
         }
         // TODO: what are other modifiers we need to propagate through?
     }
@@ -2611,74 +2589,6 @@ void addArg(
     }
 }
 
-void compareParamToArgumentMemoryQualifier(
-    IRGenContext* context,
-    ParamDecl* param,
-    Expr* argExpr,
-    LoweredValInfo& loweredArg)
-{
-    if (param == nullptr)
-        return;
-
-    auto val = loweredArg.val;
-    if (!((loweredArg.flavor == LoweredValInfo::Flavor::Simple
-        || loweredArg.flavor == LoweredValInfo::Flavor::Ptr)
-        && val->getFullType()->getOp() == kIROp_TextureType))
-        return;
-
-    IROp opThis;
-    ASTNodeType foundOp;
-    for (auto modThis : val->getDecorations())
-    {
-        UnownedStringSlice target;
-        opThis = modThis->getOp();
-        foundOp = ASTNodeType::NodeBase;
-        if (opThis == kIROp_GloballyCoherentDecoration)
-        {
-            foundOp = ASTNodeType::GloballyCoherentModifier;
-            target = UnownedStringSlice("coherent");
-        }
-        else if (opThis == kIROp_GLSLVolatileDecoration)
-        {
-            foundOp = ASTNodeType::GLSLVolatileModifier;
-            target = UnownedStringSlice("volatile");
-        }
-        else if (opThis == kIROp_GLSLRestrictDecoration)
-        {
-            foundOp = ASTNodeType::GLSLRestrictModifier;
-            target = UnownedStringSlice("restrict");
-        }
-        if (opThis == kIROp_GLSLReadOnlyDecoration)
-        {
-            foundOp = ASTNodeType::GLSLReadOnlyModifier;
-            target = UnownedStringSlice("readonly");
-        }
-        else if (opThis == kIROp_GLSLWriteOnlyDecoration)
-        {
-            foundOp = ASTNodeType::GLSLWriteOnlyModifier;
-            target = UnownedStringSlice("writeonly");
-        }
-
-        if (foundOp == ASTNodeType::NodeBase)
-            continue;
-
-        for (auto modParam : param->modifiers)
-        {
-            if (modParam->astNodeType == foundOp)
-            {
-                foundOp = ASTNodeType::NodeBase;
-                break;
-            }
-        }
-
-        if (foundOp == ASTNodeType::NodeBase)
-            continue;
-
-        context->getSink()->diagnose(
-            argExpr, Diagnostics::argumentHasMoreMemoryQualifiersThanParam, target);
-    }
-}
-
     /// Add argument(s) corresponding to one parameter to a call
     ///
     /// The `argExpr` is the AST-level expression being passed as an argument to the call.
@@ -2692,7 +2602,6 @@ void compareParamToArgumentMemoryQualifier(
     ///
 void addCallArgsForParam(
     IRGenContext*           context,
-    ParamDecl*              param,
     IRType*                 paramType,
     ParameterDirection      paramDirection,
     Expr*                   argExpr,
@@ -2707,11 +2616,6 @@ void addCallArgsForParam(
     case kParameterDirection_InOut:
         {
             LoweredValInfo loweredArg = lowerLValueExpr(context, argExpr);
-            compareParamToArgumentMemoryQualifier(
-                context,
-                param,
-                argExpr,
-                loweredArg);
             addArg(context, ioArgs, ioFixups, loweredArg, paramType, paramDirection, argExpr->loc);
         }
         break;
@@ -2719,11 +2623,6 @@ void addCallArgsForParam(
     default:
         {
             LoweredValInfo loweredArg = lowerRValueExpr(context, argExpr);
-            compareParamToArgumentMemoryQualifier(
-                context,
-                param,
-                argExpr,
-                loweredArg);
             addInArg(context, ioArgs, loweredArg);
         }
         break;
@@ -3484,7 +3383,7 @@ struct ExprLoweringContext
         if (argIndex < argCount)
         {
             auto argExpr = expr->arguments[argIndex];
-            addCallArgsForParam(context, paramDeclRef.getDecl(), paramType, paramDirection, argExpr, ioArgs, ioFixups);
+            addCallArgsForParam(context, paramType, paramDirection, argExpr, ioArgs, ioFixups);
         }
         else
         {
@@ -3515,7 +3414,7 @@ struct ExprLoweringContext
 
             _lowerSubstitutionEnv(subContext, argExpr.getSubsts() ? argExpr.getSubsts().declRef : nullptr);
 
-            addCallArgsForParam(subContext, paramDeclRef.getDecl(), paramType, paramDirection, argExpr.getExpr(), ioArgs, ioFixups);
+            addCallArgsForParam(subContext, paramType, paramDirection, argExpr.getExpr(), ioArgs, ioFixups);
 
             // TODO: The approach we are taking here to default arguments
             // is simplistic, and has consequences for the front-end as
@@ -3740,7 +3639,6 @@ struct ExprLoweringContext
                 auto irThisType = lowerType(context, thisType);
                 addCallArgsForParam(
                     context,
-                    nullptr,
                     irThisType,
                     getThisParamDirection(funcDeclRef.getDecl(), kParameterDirection_In),
                     baseExpr,

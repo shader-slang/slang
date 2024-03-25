@@ -2467,6 +2467,7 @@ namespace Slang
         Expr* CheckExpr(Expr* expr);
 
 
+        void compareMemoryQualifierOfParamToArgument(ParamDecl* paramIn, Expr* argIn);
         Expr* CheckInvokeExprWithCheckedOperands(InvokeExpr *expr);
         // Get the type to use when referencing a declaration
         QualType GetTypeForDeclRef(DeclRef<Decl> declRef, SourceLoc loc);

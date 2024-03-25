@@ -2758,13 +2758,6 @@ struct SPIRVEmitContext
                 const auto memorySemantics =  emitIntConstant(IRIntegerValue{SpvMemorySemanticsMaskNone}, builder.getUIntType());
                 return emitOpAtomicIDecrement(parent, inst, inst->getFullType(), inst->getOperand(0), memoryScope, memorySemantics);
             }
-        case kIROp_GetLegalizedSPIRVGlobalParamAddr:
-            {
-                assert(inst->getOperand(0)->getOp() == kIROp_Load);
-                auto inner = ensureInst(inst->getOperand(0)->getOperand(0));
-                registerInst(inst, inner);
-                return inner;
-            }
         }
     }
 
