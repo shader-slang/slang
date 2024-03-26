@@ -329,13 +329,18 @@ struct UsedRanges
     }
 };
 
+struct ParameterAndLayoutConstants
+{
+    static const uint32_t kInputAttachmentIndexUnused = 0xFFFFFFFF;
+};
+
 struct ParameterBindingInfo
 {
     size_t              space = 0;
     size_t              index = 0;
-    bool                hasInputAttachmentIndex = false;
-    size_t              inputAttachmentIndex = 0;
     LayoutSize          count = 0;
+
+    uint32_t            inputAttachmentIndex = ParameterAndLayoutConstants::kInputAttachmentIndexUnused;
 };
 
 struct ParameterBindingAndKindInfo : ParameterBindingInfo
@@ -475,8 +480,7 @@ struct LayoutSemanticInfo
     UInt                space;
     UInt                index;
 
-    bool                hasInputAttachmentIndex = false;
-    size_t              inputAttachmentIndex = 0;
+    uint32_t              inputAttachmentIndex = ParameterAndLayoutConstants::kInputAttachmentIndexUnused;
     // TODO: need to deal with component-granularity binding...
 };
 
@@ -911,7 +915,6 @@ static void addExplicitParameterBinding(
         bindingInfo.count = count;
         bindingInfo.index = semanticInfo.index;
         bindingInfo.space = semanticInfo.space;
-        bindingInfo.hasInputAttachmentIndex = semanticInfo.hasInputAttachmentIndex;
         bindingInfo.inputAttachmentIndex = semanticInfo.inputAttachmentIndex;
 
         VarLayout* overlappedVarLayout = nullptr;
@@ -939,7 +942,7 @@ static void addExplicitParameterBinding(
                 parameterInfo->varLayout,
                 semanticInfo.index,
                 semanticInfo.index + count);
-            if(semanticInfo.hasInputAttachmentIndex)
+            if(semanticInfo.inputAttachmentIndex != ParameterAndLayoutConstants::kInputAttachmentIndexUnused)
                 overlappedVarLayoutInputAttachmentIndex = usedRangeSet->usedResourceRangesInputAttachmentIndex.Add(
                     parameterInfo->varLayout,
                     semanticInfo.inputAttachmentIndex,
@@ -1087,24 +1090,24 @@ static void addExplicitParameterBindings_GLSL(
     LayoutSemanticInfo semanticInfo;
     semanticInfo.index = 0;
     semanticInfo.space = 0;
-    semanticInfo.hasInputAttachmentIndex = false;
     semanticInfo.inputAttachmentIndex = 0;
-
-    // Try to find `input_attachment_index`
-    if (auto attr = varDecl.getDecl()->findModifier<GLSLInputAttachmentIndexModifier>())
-    {
-        semanticInfo.hasInputAttachmentIndex = true;
-        semanticInfo.inputAttachmentIndex = stringToInt(attr->valToken.getContent());
-    }
 
     if( (foundResInfo = typeLayout->FindResourceInfo(LayoutResourceKind::DescriptorTableSlot)) != nullptr )
     {
-        // Try to find `binding` and `set`
-        if (auto attr = varDecl.getDecl()->findModifier<GLSLBindingAttribute>())
+        for (auto dec : varDecl.getDecl()->modifiers)
         {
-            resInfo = foundResInfo;
-            semanticInfo.index = attr->binding;
-            semanticInfo.space = attr->set;
+            // Try to find `binding` and `set`
+            if (auto glslBindingAttr = as<GLSLBindingAttribute>(dec))
+            {
+                resInfo = foundResInfo;
+                semanticInfo.index = glslBindingAttr->binding;
+                semanticInfo.space = glslBindingAttr->set;
+            }
+            // Try to find `input_attachment_index`
+            if (auto glslAttachmentIndexAttr = as<GLSLInputAttachmentIndexModifier>(dec))
+            {
+                semanticInfo.inputAttachmentIndex = stringToInt(glslAttachmentIndexAttr->valToken.getContent());
+            }
         }
     }
     else if( (foundResInfo = typeLayout->FindResourceInfo(LayoutResourceKind::SubElementRegisterSpace)) != nullptr )
