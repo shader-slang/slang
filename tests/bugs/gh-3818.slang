@@ -1,5 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-shaderobj -output-using-type
-//TEST_INPUT: type_conformance TOperationMax : IOperation = 1
+
 interface IOperation
 {
     [mutating]
