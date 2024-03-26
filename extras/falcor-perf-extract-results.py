@@ -36,6 +36,7 @@ recent_index = len(recent_records) + 2
 
 res_dict = {}
 cmd = sys.argv[1]
+proc_env = os.environ.copy()
 program_version_creation_glslang = []
 program_version_creation_slang = []
 program_kernel_creation_glslang = []
@@ -53,12 +54,11 @@ rtn_json = {}
 for i in range(10):
     results_id = time.strftime(r"%Y%m%d%H%M%S", time.localtime()) 
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE, text=True)
+                            stderr=subprocess.PIPE, text=True,
+                           env=proc_env)
     stdout, stderr = proc.communicate()
     retcode = proc.returncode
     res_dict[results_id] = stdout
-    print(stdout)
-    print(stderr)
 
 for key in res_dict.keys():
     data = res_dict[key]
