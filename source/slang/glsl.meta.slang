@@ -7482,6 +7482,7 @@ ${{{{
 // alternatives
 __glsl_version(460) [require(glsl)]
 __spirv_version(1.3) [require(spirv)]
+[NonUniformReturn]
 [ForceInline]
 public bool anyInvocation(bool value)
 {
@@ -7497,6 +7498,7 @@ public bool anyInvocation(bool value)
 }
 __glsl_version(460) [require(glsl)]
 __spirv_version(1.3) [require(spirv)]
+[NonUniformReturn]
 [ForceInline]
 public bool allInvocations(bool value)
 {
@@ -7512,6 +7514,7 @@ public bool allInvocations(bool value)
 }
 __glsl_version(460) [require(glsl)]
 __spirv_version(1.3) [require(spirv)]
+[NonUniformReturn]
 [ForceInline]
 public bool allInvocationsEqual(bool value)
 {
