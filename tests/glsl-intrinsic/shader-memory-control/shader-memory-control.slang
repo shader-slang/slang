@@ -15,6 +15,9 @@ buffer MyBlockName1
 
 shared uint raceConditionShared;
 
+//TEST_INPUT: set raceConditionImage = RWTexture1D(format=R32_SINT, size=4, content=one, mipMaps = 1)
+uniform layout(binding=0,r32i) iimage1D raceConditionImage;
+
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 buffer MyBlockName2
 {
@@ -85,8 +88,17 @@ bool testMemoryBarrierShared()
 }
 bool testMemoryBarrierImage()
 {
-    // image buffers are currently unimplemented
+    for (int i = 0; i < 4; i++)
+    {
+        imageStore(raceConditionImage, 0, 2);
+        memoryBarrierShared();
+        imageStore(raceConditionImage, 0, 1);
+        memoryBarrierShared();
+        if (imageLoad(raceConditionImage, 0).x != 1)
+            return false;
+    }
     return true
+        && imageLoad(raceConditionImage, 0).x == 1
         ;
 }
 bool testGroupMemoryBarrier()
