@@ -1914,8 +1914,16 @@ namespace Slang
             auto& arg = expr->arguments[i];
             if (funcType && i < funcType->getParamCount())
             {
-                if (funcType->getParamDirection(i) == kParameterDirection_Out)
+                switch (funcType->getParamDirection(i))
+                {
+                case kParameterDirection_Out:
+                case kParameterDirection_InOut:
+                case kParameterDirection_Ref:
+                case kParameterDirection_ConstRef:
                     continue;
+                default:
+                    break;
+                }
             }
             arg = maybeOpenExistential(arg);
         }
