@@ -1253,7 +1253,10 @@ namespace Slang
                 memoryQualifierBit);
             if (newModifier)
             {
+                // insert in modifiers list the memoryQualifierCollection
+                Modifier* mod = m->next;
                 m->next = memoryQualifiers;
+                memoryQualifiers->next = mod;
                 return m;
             }
             return m;
@@ -1562,6 +1565,7 @@ namespace Slang
             if (as<SharedModifiers>(modifier))
                 ignoreUnallowedModifier = true;
             
+            // may return a list of modifiers
             auto checkedModifier = checkModifier(modifier, syntaxNode, ignoreUnallowedModifier);
 
             if(checkedModifier)
