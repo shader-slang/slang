@@ -8,10 +8,10 @@ on:
   pull_request:
     branches: [ master ]
   schedule:
-    - cron: '45 23 * * *'
-    - cron: '45 10 * * *'
-    - cron: '55 23 * * *'   
-    - cron: '55 10 * * *'
+    - cron: '25 23 * * *'
+    - cron: '25 00 * * *'
+    - cron: '35 23 * * *'   
+    - cron: '35 00 * * *'
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -85,7 +85,7 @@ jobs:
         $filename = '${{ fromJson(steps.download.outputs.downloaded_files)[0] }}'
         Expand-Archive $filename -DestinationPath .\falcor-perf-test
         $env:PATH += ";.\bin\windows-${{matrix.testPlatform}}\${{matrix.configuration}}";
-        .\falcor-perf-test\bin\Release\falcor_perftest.exe > .\test_results.txt
+        .\falcor-perf-test\bin\Release\falcor_perftest.exe
 
     - name: setup falcor nightly run
       env:
