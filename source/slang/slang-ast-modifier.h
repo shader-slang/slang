@@ -29,7 +29,6 @@ class PrefixModifier : public Modifier { SLANG_AST_CLASS(PrefixModifier)};
 class PostfixModifier : public Modifier { SLANG_AST_CLASS(PostfixModifier)};
 class ExportedModifier : public Modifier { SLANG_AST_CLASS(ExportedModifier)};
 class ConstExprModifier : public Modifier { SLANG_AST_CLASS(ConstExprModifier)};
-class GloballyCoherentModifier : public Modifier { SLANG_AST_CLASS(GloballyCoherentModifier)};
 class ExternCppModifier : public Modifier { SLANG_AST_CLASS(ExternCppModifier)};
 class GLSLPrecisionModifier : public Modifier { SLANG_AST_CLASS(GLSLPrecisionModifier)};
 class GLSLModuleModifier : public Modifier {SLANG_AST_CLASS(GLSLModuleModifier)};
@@ -1493,6 +1492,11 @@ class NoDiffModifier : public TypeModifier
     SLANG_AST_CLASS(NoDiffModifier)
 };
 
+class GloballyCoherentModifier : public SimpleModifier
+{
+    SLANG_AST_CLASS(GloballyCoherentModifier)
+};
+
 // Some GLSL-specific modifiers
 class GLSLBufferModifier : public WrappingTypeModifier
 {
@@ -1507,6 +1511,16 @@ class GLSLWriteOnlyModifier : public SimpleModifier
 class GLSLReadOnlyModifier : public SimpleModifier
 {
     SLANG_AST_CLASS(GLSLReadOnlyModifier)
+};
+
+class GLSLVolatileModifier : public SimpleModifier
+{
+    SLANG_AST_CLASS(GLSLVolatileModifier)
+};
+
+class GLSLRestrictModifier : public SimpleModifier
+{
+    SLANG_AST_CLASS(GLSLRestrictModifier)
 };
 
 class GLSLPatchModifier : public SimpleModifier
@@ -1529,6 +1543,37 @@ class BitFieldModifier : public Modifier
 class DynamicUniformModifier : public Modifier
 {
     SLANG_AST_CLASS(DynamicUniformModifier)
+};
+
+class MemoryQualifierCollectionModifier : public Modifier
+{
+    SLANG_AST_CLASS(MemoryQualifierCollectionModifier);
+
+    List<Modifier*> memoryModifiers;
+
+    uint32_t memoryQualifiers = 0;
+
+public:
+    struct Flags
+    {
+        enum MemoryQualifiersBit
+        {
+            kNone         = 0b0,
+            kCoherent     = 0b1,
+            kReadOnly     = 0b10,
+            kWriteOnly    = 0b100,
+            kVolatile     = 0b1000,
+            kRestrict     = 0b10000,
+        };
+    };
+
+    void addQualifier(Modifier* mod, Flags::MemoryQualifiersBit type)
+    {
+        memoryModifiers.add(mod);
+        memoryQualifiers |= type;
+    }
+    uint32_t getMemoryQualifierBit() { return memoryQualifiers; }
+    List<Modifier*> getModifiers() { return memoryModifiers; }
 };
 
 } // namespace Slang

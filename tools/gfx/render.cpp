@@ -86,6 +86,8 @@ struct FormatInfoMap
         set(Format::R16G16_FLOAT, SLANG_SCALAR_TYPE_FLOAT16, 2);
         set(Format::R16_FLOAT, SLANG_SCALAR_TYPE_FLOAT16, 1);
 
+        set(Format::R64_UINT, SLANG_SCALAR_TYPE_UINT64, 1);
+
         set(Format::R32G32B32A32_UINT, SLANG_SCALAR_TYPE_UINT32, 4);
         set(Format::R32G32B32_UINT, SLANG_SCALAR_TYPE_UINT32, 3);
         set(Format::R32G32_UINT, SLANG_SCALAR_TYPE_UINT32, 2);
@@ -98,6 +100,8 @@ struct FormatInfoMap
         set(Format::R8G8B8A8_UINT, SLANG_SCALAR_TYPE_UINT8, 4);
         set(Format::R8G8_UINT, SLANG_SCALAR_TYPE_UINT8, 2);
         set(Format::R8_UINT, SLANG_SCALAR_TYPE_UINT8, 1);
+
+        set(Format::R64_SINT, SLANG_SCALAR_TYPE_INT64, 1);
 
         set(Format::R32G32B32A32_SINT, SLANG_SCALAR_TYPE_INT32, 4);
         set(Format::R32G32B32_SINT, SLANG_SCALAR_TYPE_INT32, 3);

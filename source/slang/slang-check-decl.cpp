@@ -944,7 +944,27 @@ namespace Slang
                 }
             }
 
+            // Ensures child of struct is set read-only or not
+            bool isWriteOnly = false;
+            {
+                for (auto mod : varDeclRef.getDecl()->modifiers)
+                {
+                    if (as<GLSLReadOnlyModifier>(mod))
+                    {
+                        isLValue = false;
+                        qualType.hasReadOnlyOnTarget = true;
+                        if (isLValue == false && isWriteOnly) break;
+                    }
+                    if (as<GLSLWriteOnlyModifier>(mod))
+                    {
+                        isWriteOnly = true;
+                        if (isLValue == false && isWriteOnly) break;
+                    }
+                }
+            }
+
             qualType.isLeftValue = isLValue;
+            qualType.isWriteOnly = isWriteOnly;
             return qualType;
         }
         else if( auto propertyDeclRef = declRef.as<PropertyDecl>() )
@@ -1846,6 +1866,8 @@ namespace Slang
                 //
             initExpr = subVisitor.CheckTerm(initExpr);
 
+            if (initExpr->type.isWriteOnly)
+                getSink()->diagnose(initExpr, Diagnostics::readingFromWriteOnly);
             initExpr = coerce(CoercionSite::Initializer, varDecl->type.Ptr(), initExpr);
             varDecl->initExpr = initExpr;
 
@@ -7022,6 +7044,16 @@ namespace Slang
                         newModifiers[i]->next = nullptr;
                 }
             }
+        }
+
+        // Only texture types are allowed to have memory qualifiers on parameters
+        if(!paramDecl->type || paramDecl->type->astNodeType != ASTNodeType::TextureType)
+        {
+            auto memoryQualifierCollection = paramDecl->findModifier<MemoryQualifierCollectionModifier>();
+            if(!memoryQualifierCollection) 
+                return;
+            for(auto mod : memoryQualifierCollection->getModifiers())
+                getSink()->diagnose(paramDecl, Diagnostics::memoryQualifierNotAllowedOnANonImageTypeParameter, mod);
         }
     }
 

@@ -217,7 +217,12 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             IRBuilder builder(user);
             builder.setInsertBefore(user);
 
-            if((as<IRGetElement>(user) || as<IRFieldExtract>(user)) &&
+            if(user->getOp() == kIROp_GetLegalizedSPIRVGlobalParamAddr)
+            {
+                user->replaceUsesWith(use->get());
+                user->removeAndDeallocate();
+            }
+            else if((as<IRGetElement>(user) || as<IRFieldExtract>(user)) &&
                 use == user->getOperands())
             {
                 // If the use is the address operand of a getElement or FieldExtract,
