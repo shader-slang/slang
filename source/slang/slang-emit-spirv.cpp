@@ -1415,12 +1415,18 @@ struct SPIRVEmitContext
                     if (m_decoratedSpvInsts.add(getID(resultSpvType)))
                     {
                         IRSizeAndAlignment sizeAndAlignment;
-                        getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), ptrType->getValueType(), &sizeAndAlignment);
+                        uint32_t stride;
+
+                        getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), valueType, &sizeAndAlignment);
+                        stride = sizeAndAlignment.getStride();
+                        // stride is invalid for unsized array, but we have to provide
+                        // a non-zero value to pass the spirv validator.
+                        stride = (stride == 0) ? 0xFFFF : stride;
                         emitOpDecorateArrayStride(
                             getSection(SpvLogicalSectionID::Annotations),
                             nullptr,
                             resultSpvType,
-                            SpvLiteralInteger::from32((uint32_t)sizeAndAlignment.getStride()));
+                            SpvLiteralInteger::from32(stride));
                     }
                 }
                 return resultSpvType;
