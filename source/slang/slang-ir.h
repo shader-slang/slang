@@ -1059,6 +1059,7 @@ void findAllInstsBreadthFirst(IRInst* inst, List<IRInst*>& outInsts);
 // Constant Instructions
 
 typedef int64_t IRIntegerValue;
+typedef uint64_t IRUnsignedIntegerValue;
 typedef double IRFloatingPointValue;
 
 struct IRConstant : IRInst
