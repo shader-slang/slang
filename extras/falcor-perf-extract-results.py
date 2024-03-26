@@ -52,20 +52,17 @@ sheet_row = []
 row_date = time.strftime(r"%Y%m%d%H%M%S", time.localtime()) 
 rtn_json = {}
 
+# Run falcor perf test 10 times so we can take the average to reduce noise
 for i in range(10):
     results_id = time.strftime(r"%Y%m%d%H%M%S", time.localtime()) 
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE, text=True,
                            env=proc_env)
     stdout, stderr = proc.communicate()
-    with open("zysk"+results_id+".txt", "w") as fh:
-        fh.write("proc_env: " + proc_env['PATH'] + "\n")
-        fh.write("cmd: " + cmd + "\n")
-        fh.write("stdout: " + stdout + "\n")
-        fh.write("stderr: " + stderr + "\n")
     retcode = proc.returncode
     res_dict[results_id] = stdout
 
+# Process test output
 for key in res_dict.keys():
     data = res_dict[key]
     results_id = key
@@ -97,6 +94,9 @@ for key in res_dict.keys():
     spirv_compilation_glslang.append(float(rtn_json[results_id]["spirv-compilation"]["glslang"]))
     spirv_compilation_slang.append(float(rtn_json[results_id]["spirv-compilation"]["slang"]))
 
+# In order to have charts in the spreadsheet that automatically update to the most recent
+# 30 test runs, we need to check if we already have 30 runs worth of data. Deleting and
+# re-inserting rows breaks the charts. So, instead we need to update the cells one by one.
 if len(recent_records) > 29:
     cell_list = recent_sheet.range("A2:L31")
     j = 0
@@ -135,6 +135,7 @@ if len(recent_records) > 29:
     j += 1
     recent_sheet.update_cells(cell_list)
 
+# Calculate the averages of the data and insert them in the "Averages" sheet.
 date_format = "%Y%m%d%H%M%S" 
 date_obj = datetime.strptime(row_date, date_format)
 
@@ -151,9 +152,13 @@ sheet_row.append(sum(spirv_generation_slang)/len(spirv_generation_slang))
 sheet_row.append(sum(spirv_compilation_glslang)/len(spirv_compilation_glslang))
 sheet_row.append(sum(spirv_compilation_slang)/len(spirv_compilation_slang))
 averages_sheet.insert_row(sheet_row, averages_index)
+
+# Above if we determined we do not have 30 runs of data in the "Recent" sheet,
+# then we need to insert the latest run here
 if len(recent_records) <= 29:
     recent_sheet.insert_row(sheet_row, recent_index)
 
+# Finally we will insert all the individual test run data in the "Raw Data" sheet
 for date_key in rtn_json.keys():
     sheet_row = []
     sheet_row.append(str(date_key))
