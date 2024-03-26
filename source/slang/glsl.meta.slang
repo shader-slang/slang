@@ -3016,6 +3016,7 @@ ${{{{
             continue;
 }}}}
 
+        // readonly writeonly in GLSL means an object only allows information queries.
         [require(spirv)]
         [require(glsl)]
         [__readNone]
@@ -3072,6 +3073,7 @@ ${{{{
         if (targetShape.isMS)
         {
 }}}}
+            // readonly writeonly in GLSL means an object only allows information queries.
             [require(spirv)]
             [require(glsl)]
             [__readNone]

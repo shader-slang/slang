@@ -1,10 +1,14 @@
 //TEST:SIMPLE(filecheck=CHECK-GLSL): -stage compute -entry computeMain -allow-glsl -target glsl
 //TEST:SIMPLE(filecheck=CHECK-SPV): -stage compute -entry computeMain -allow-glsl -target spirv -emit-spirv-directly
 
+// This code should error since memory qualifiers are only allowed inside:
+// Shader storage blocks, variables declared within shader storage blocks 
+// and variables declared as image types. Named structs inside a Interface
+// block violates these rules
 // CHECK-GLSL: error
 // CHECK-SPV: error
 buffer Block4 {
-    struct structTmp
+    struct StructTmp
     {
         readonly int val;
     };

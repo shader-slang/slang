@@ -2220,9 +2220,7 @@ namespace Slang
         if(argQualifiers & MemoryQualifierCollectionModifier::Flags::kVolatile
             && !(paramQualifiers & MemoryQualifierCollectionModifier::Flags::kVolatile))
                 getSink()->diagnose(arg, Diagnostics::argumentHasMoreMemoryQualifiersThanParam, "volatile");
-        if(argQualifiers & MemoryQualifierCollectionModifier::Flags::kRestrict
-            && !(paramQualifiers & MemoryQualifierCollectionModifier::Flags::kRestrict))
-                getSink()->diagnose(arg, Diagnostics::argumentHasMoreMemoryQualifiersThanParam, "restrict");       
+        // dropping a `restrict` qualifier from arguments is allowed in GLSL with memory qualifiers
     }
 
     Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr *expr)

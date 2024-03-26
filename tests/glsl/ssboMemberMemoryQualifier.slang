@@ -1,6 +1,10 @@
 //TEST:SIMPLE(filecheck=CHECK-GLSL): -stage compute -entry computeMain -allow-glsl -target glsl
 //TEST:SIMPLE(filecheck=CHECK-SPV): -stage compute -entry computeMain -allow-glsl -target spirv -emit-spirv-directly
 
+// due to implementation limitations (slang-check-expr.cpp, `void visitMemberExpr()`) we are unable to 
+// implement and use .length with glsl vectors to test `readonly writeonly` 
+//#define TEST_whenVectorLengthIsImplemented
+
 volatile buffer Block1
 {
     restrict uint data1;
@@ -29,6 +33,7 @@ buffer Block4 {
     readonly structTmp myStruct;
     coherent readonly vec4 member1;
     coherent vec4 member2;
+    readonly writeonly vec3 member3;
 }inputBuffer4;
 
 // CHECK-GLSL: main
@@ -41,8 +46,9 @@ void computeMain()
     inputBuffer1.data4 = 1;
     inputBuffer1.data5 = 1;
     inputBuffer1.data6 = 1;
-
     inputBuffer2.member2 = inputBuffer2.member1;
-
     inputBuffer3.member2 = inputBuffer3.member1;
+#ifdef TEST_whenVectorLengthIsImplemented
+    v = inputBuffer4.member3.length();
+#endif
 }
