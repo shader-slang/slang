@@ -1418,7 +1418,7 @@ struct SPIRVEmitContext
                         uint32_t stride;
 
                         getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), valueType, &sizeAndAlignment);
-                        stride = sizeAndAlignment.getStride();
+                        stride = (uint32_t)sizeAndAlignment.getStride();
                         // stride is invalid for unsized array, but we have to provide
                         // a non-zero value to pass the spirv validator.
                         stride = (stride == 0) ? 0xFFFF : stride;
@@ -1436,13 +1436,28 @@ struct SPIRVEmitContext
         case kIROp_StructType:
             {
                 List<IRType*> types;
+                bool isUnsizedArrayContained = false;
                 for (auto field : static_cast<IRStructType*>(inst)->getFields())
+                {
                     types.add(field->getFieldType());
+                    if ( field->getFieldType()->getOp() == kIROp_UnsizedArrayType)
+                    {
+                        isUnsizedArrayContained = true;
+                    }
+                }
                 auto spvStructType = emitOpTypeStruct(
                     inst,
                     types
                 );
                 emitDecorations(inst, getID(spvStructType));
+                // spirv-val requires that the struct containing the unsized array is block-decorated
+                if (isUnsizedArrayContained)
+                {
+                    IRBuilder builder(inst);
+                    auto decoration = builder.addDecoration(inst, kIROp_SPIRVBlockDecoration);
+                    emitDecoration(getID(spvStructType), decoration);
+                }
+
                 emitLayoutDecorations(as<IRStructType>(inst), getID(spvStructType));
                 return spvStructType;
             }

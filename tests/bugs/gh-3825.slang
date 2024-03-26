@@ -17,9 +17,7 @@ struct Context {
 [shader("fragment")]
 float4 fragment(): SV_Target
 {
-  uint array[];
-
-  return float4(float(context.descriptors.array[0]), 1., 1., 1.);
+  return float4(float(context.descriptors[0].array[0]), 1., 1., 1.);
 }
 
 // CHECK: OpDecorate %_ptr_PhysicalStorageBuffer__runtimearr_uint ArrayStride 65535
