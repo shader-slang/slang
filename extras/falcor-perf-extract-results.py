@@ -59,8 +59,8 @@ for i in range(10):
                            env=proc_env)
     stdout, stderr = proc.communicate()
     with open("zysk"+results_id+".txt", "w") as fh:
-        fh.write("cmd: " + cmd + "\n")
         fh.write("proc_env: " + proc_env + "\n")
+        fh.write("cmd: " + cmd + "\n")
         fh.write("stdout: " + stdout + "\n")
         fh.write("stderr: " + stderr + "\n")
     retcode = proc.returncode
