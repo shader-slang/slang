@@ -8,7 +8,7 @@ buffer MyBlockName
     uvec4 idata[2];
 } keepAliveBuffer;
 
-// CHECK: error 31206
+// CHECK: error 31207
 layout (input_attachment_index = 1, set = 0, binding = 1) uniform vec3 image;
 
 layout (location = 0) out vec4 outColor;
