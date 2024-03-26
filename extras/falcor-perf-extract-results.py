@@ -161,5 +161,5 @@ for date_key in rtn_json.keys():
     for result_key in rtn_json[date_key].keys():
         for flow_key in rtn_json[date_key][result_key].keys():
             sheet_row.append(rtn_json[date_key][result_key][flow_key])
-    raw_data_sheet.insert_row(sheet_row, raw_data_sheet_index)
+    raw_data_sheet.insert_row(sheet_row, raw_data_index)
     raw_data_sheet_index += 1
