@@ -88,7 +88,7 @@ jobs:
         .\falcor-perf-test\bin\Release\falcor_perftest.exe > .\test_results.txt
 
     - name: setup falcor nightly run
-      if: ${{ github.event_name == 'schedule' }}
+      #if: ${{ github.event_name == 'schedule' }}
       env:
         slang_verif_svc: ${{ secrets.slang_verif_svc_cred }}
         github_sha: ${{ github.sha }}
