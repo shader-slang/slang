@@ -37,6 +37,7 @@ recent_index = len(recent_records) + 2
 res_dict = {}
 cmd = sys.argv[1]
 proc_env = os.environ.copy()
+proc_env["PATH"] = proc_env["PATH"] + ";" + sys.argv[2]
 program_version_creation_glslang = []
 program_version_creation_slang = []
 program_kernel_creation_glslang = []
