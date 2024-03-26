@@ -35,6 +35,7 @@ recent_records = recent_sheet.get_all_records()
 recent_index = len(recent_records) + 2
 
 res_dict = {}
+cmd = sys.argv[1]
 program_version_creation_glslang = []
 program_version_creation_slang = []
 program_kernel_creation_glslang = []
@@ -52,8 +53,7 @@ rtn_json = {}
 for i in range(10):
     results_id = time.strftime(r"%Y%m%d%H%M%S", time.localtime()) 
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE, text=True,
-                            env=proc_env)
+                            stderr=subprocess.PIPE, text=True)
     stdout, stderr = proc.communicate()
     retcode = proc.returncode
     res_dict[results_id] = stdout
