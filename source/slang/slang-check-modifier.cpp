@@ -1028,6 +1028,8 @@ namespace Slang
         case ASTNodeType::GLSLBufferModifier:
         case ASTNodeType::GLSLWriteOnlyModifier:
         case ASTNodeType::GLSLReadOnlyModifier:
+        case ASTNodeType::GLSLVolatileModifier:
+        case ASTNodeType::GLSLRestrictModifier:
         case ASTNodeType::GLSLPatchModifier:
         case ASTNodeType::RayPayloadAccessSemantic:
         case ASTNodeType::RayPayloadReadSemantic:
@@ -1111,16 +1113,26 @@ namespace Slang
         case ASTNodeType::RefModifier:
         case ASTNodeType::ConstRefModifier:
         case ASTNodeType::GLSLBufferModifier:
-        case ASTNodeType::GLSLWriteOnlyModifier:
-        case ASTNodeType::GLSLReadOnlyModifier:
         case ASTNodeType::GLSLPatchModifier:
         case ASTNodeType::RayPayloadAccessSemantic:
         case ASTNodeType::RayPayloadReadSemantic:
         case ASTNodeType::RayPayloadWriteSemantic:
             return (as<VarDeclBase>(decl) && isGlobalDecl(decl)) || as<ParamDecl>(decl) || as<GLSLInterfaceBlockDecl>(decl);
 
+        case ASTNodeType::GLSLWriteOnlyModifier:
+        case ASTNodeType::GLSLReadOnlyModifier:
+        case ASTNodeType::GLSLVolatileModifier:
+        case ASTNodeType::GLSLRestrictModifier:
+            if(isGLSLInput)
+                return (as<VarDeclBase>(decl) && (isGlobalDecl(decl)) || as<ParamDecl>(decl) || as<GLSLInterfaceBlockDecl>(decl)) 
+                    || as<StructDecl>(getParentDecl(decl)) && isGlobalDecl(getParentDecl(decl));
+            return (as<VarDeclBase>(decl) && (isGlobalDecl(decl)) || as<ParamDecl>(decl) || as<GLSLInterfaceBlockDecl>(decl));
+
         case ASTNodeType::GloballyCoherentModifier:
         case ASTNodeType::HLSLVolatileModifier:
+            if(isGLSLInput)
+                return as<VarDecl>(decl) && (isGlobalDecl(decl) || as<StructDecl>(getParentDecl(decl)) || as<GLSLInterfaceBlockDecl>(decl))
+                    || as<VarDeclBase>(decl) && isGlobalDecl(decl) || as<ParamDecl>(decl) || (as<StructDecl>(getParentDecl(decl)) && isGlobalDecl(getParentDecl(decl)));
             return as<VarDecl>(decl) && (isGlobalDecl(decl) || as<StructDecl>(getParentDecl(decl)) || as<GLSLInterfaceBlockDecl>(decl));
 
             // Allowed only on parameters, struct fields and global variables.
@@ -1233,6 +1245,40 @@ namespace Slang
                 }
                 return m;
             }
+        }
+
+        MemoryQualifierCollectionModifier::Flags::MemoryQualifiersBit memoryQualifierBit = 
+            MemoryQualifierCollectionModifier::Flags::kNone;
+        if(as<GloballyCoherentModifier>(m))
+            memoryQualifierBit = MemoryQualifierCollectionModifier::Flags::kCoherent;
+        else if(as<GLSLReadOnlyModifier>(m))
+            memoryQualifierBit = MemoryQualifierCollectionModifier::Flags::kReadOnly;
+        else if(as<GLSLWriteOnlyModifier>(m))
+            memoryQualifierBit = MemoryQualifierCollectionModifier::Flags::kWriteOnly;
+        else if(as<GLSLVolatileModifier>(m))
+            memoryQualifierBit = MemoryQualifierCollectionModifier::Flags::kVolatile;
+        else if(as<GLSLRestrictModifier>(m))
+            memoryQualifierBit = MemoryQualifierCollectionModifier::Flags::kRestrict;
+        if(memoryQualifierBit != MemoryQualifierCollectionModifier::Flags::kNone)
+        {
+            bool newModifier = false;
+            MemoryQualifierCollectionModifier* memoryQualifiers = syntaxNode->findModifier<MemoryQualifierCollectionModifier>();
+            if(!memoryQualifiers)
+            {
+                newModifier = true;
+                memoryQualifiers = getASTBuilder()->create<MemoryQualifierCollectionModifier>();
+            }
+            memoryQualifiers->addQualifier(m,
+                memoryQualifierBit);
+            if (newModifier)
+            {
+                // insert in modifiers list the memoryQualifierCollection
+                Modifier* mod = m->next;
+                m->next = memoryQualifiers;
+                memoryQualifiers->next = mod;
+                return m;
+            }
+            return m;
         }
 
         if (auto hlslSemantic = as<HLSLSimpleSemantic>(m))
@@ -1538,6 +1584,7 @@ namespace Slang
             if (as<SharedModifiers>(modifier))
                 ignoreUnallowedModifier = true;
             
+            // may return a list of modifiers
             auto checkedModifier = checkModifier(modifier, syntaxNode, ignoreUnallowedModifier);
 
             if(checkedModifier)

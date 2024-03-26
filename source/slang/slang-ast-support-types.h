@@ -549,6 +549,8 @@ namespace Slang
 
         Type*	type = nullptr;
         bool	        isLeftValue;
+        bool            hasReadOnlyOnTarget = false;
+        bool	        isWriteOnly = false;
 
         QualType()
             : isLeftValue(false)

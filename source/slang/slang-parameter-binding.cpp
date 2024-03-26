@@ -3637,6 +3637,7 @@ static bool _calcNeedsDefaultSpace(SharedParameterBindingContext& sharedContext)
                     break;
 
                 case LayoutResourceKind::RegisterSpace:
+                case LayoutResourceKind::SubElementRegisterSpace:
                 case LayoutResourceKind::VaryingInput:
                 case LayoutResourceKind::VaryingOutput:
                 case LayoutResourceKind::HitAttributes:

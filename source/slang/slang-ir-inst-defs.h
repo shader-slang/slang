@@ -661,6 +661,8 @@ INST(GetOptiXSbtDataPtr, getOptiXSbtDataPointer, 0, 0)
 
 INST(GetVulkanRayTracingPayloadLocation, GetVulkanRayTracingPayloadLocation, 1, 0)
 
+INST(GetLegalizedSPIRVGlobalParamAddr, kIROp_GetLegalizedSPIRVGlobalParamAddr, 1, 0)
+
 INST(MakeArrayList, makeArrayList, 0, 0)
 INST(MakeTensorView, makeTensorView, 0, 0)
 INST(AllocateTorchTensor, allocTorchTensor, 0, 0)
@@ -858,6 +860,10 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(GLSLLocationDecoration, glslLocation, 1, 0)
     INST(GLSLInputAttachmentIndexDecoration, glslInputAttachmentIndex, 1, 0)
     INST(GLSLOffsetDecoration, glslOffset, 1, 0)
+    INST(GLSLVolatileDecoration, glslVolatile, 1, 0)
+    INST(GLSLRestrictDecoration, glslRestrict, 1, 0)
+    INST(GLSLReadOnlyDecoration, glslReadonly, 1, 0)
+    INST(GLSLWriteOnlyDecoration, glslWriteonly, 1, 0)
     INST(PayloadDecoration, payload, 0, 0)
 
     /* Mesh Shader outputs */

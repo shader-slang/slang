@@ -114,6 +114,38 @@ void GLSLSourceEmitter::_requireGLSLVersion(int version)
     }
 }
 
+void GLSLSourceEmitter::_emitMemoryQualifierDecorations(IRInst* varDecl)
+{
+    for (auto decoration : varDecl->getDecorations())
+    {
+        if (as<IRGloballyCoherentDecoration>(decoration))
+        {
+            m_writer->emit("coherent ");
+        }
+        else if (as<IRGLSLVolatileDecoration>(decoration))
+        {
+            m_writer->emit("volatile ");
+        }
+        else if (as<IRGLSLRestrictDecoration>(decoration))
+        {
+            m_writer->emit("restrict ");
+        }
+        else if (as<IRGLSLReadOnlyDecoration>(decoration))
+        {
+            m_writer->emit("readonly ");
+        }
+        else if (as<IRGLSLWriteOnlyDecoration>(decoration))
+        {
+            m_writer->emit("writeonly ");
+        }
+    }
+}
+
+void GLSLSourceEmitter::emitMemoryQualifiers(IRInst* varDecl)
+{
+    _emitMemoryQualifierDecorations(varDecl);
+}
+
 void GLSLSourceEmitter::_emitGLSLStructuredBuffer(IRGlobalParam* varDecl, IRHLSLStructuredBufferTypeBase* structuredBufferType)
 {
     // Shader storage buffer is an OpenGL 430 feature
@@ -182,10 +214,7 @@ void GLSLSourceEmitter::_emitGLSLStructuredBuffer(IRGlobalParam* varDecl, IRHLSL
     HLSLAppendStructuredBufferType                  - Write
     HLSLConsumeStructuredBufferType                 - TODO (JS): Its possible that this can be readonly, but we currently don't support on GLSL
     */
-    if (varDecl->findDecoration<IRGloballyCoherentDecoration>())
-    {
-        m_writer->emit("coherent ");
-    }
+    _emitMemoryQualifierDecorations(varDecl);
     if (as<IRHLSLStructuredBufferType>(structuredBufferType))
     {
         m_writer->emit("readonly ");
@@ -288,10 +317,7 @@ void GLSLSourceEmitter::emitSSBOHeader(IRGlobalParam* varDecl, IRType* bufferTyp
     }
     m_writer->emit(") ");
 
-    if (varDecl->findDecoration<IRGloballyCoherentDecoration>())
-    {
-        m_writer->emit("coherent ");
-    }
+    _emitMemoryQualifierDecorations(varDecl);
 
     /*
     If the output type is a buffer, and we can determine it is only readonly we can prefix before
@@ -461,6 +487,11 @@ void GLSLSourceEmitter::_emitGLSLImageFormatModifier(IRInst* var, IRTextureType*
         }
         else
         {
+            auto formatInfo = getImageFormatInfo(format);
+            if (formatInfo.scalarType == SLANG_SCALAR_TYPE_UINT64 || formatInfo.scalarType == SLANG_SCALAR_TYPE_INT64)
+            {
+                _requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_EXT_shader_image_int64"));
+            }
             // If there is an explicit format specified, then we
             // should emit a `layout` modifier using the GLSL name
             // for the format.

@@ -2821,6 +2821,466 @@ public vec4 shadow2DProjLod(sampler2DShadow sampler, vec4 coord, float lod)
     return textureProjLod(sampler, coord, lod);
 }
 
+//// gimageDim Implementation
+
+public static const int GL_TEXTURE_CUBE_MAP_POSITIVE_X = 0;
+public static const int GL_TEXTURE_CUBE_MAP_NEGATIVE_X = 1;
+public static const int GL_TEXTURE_CUBE_MAP_POSITIVE_Y = 2;
+public static const int GL_TEXTURE_CUBE_MAP_NEGATIVE_Y = 3;
+public static const int GL_TEXTURE_CUBE_MAP_POSITIVE_Z = 4;
+public static const int GL_TEXTURE_CUBE_MAP_NEGATIVE_Z = 5;
+
+__generic<T : __BuiltinType>
+[ForceInline] void typeRequireChecks_image_atomic_tier1()
+{
+    __target_switch
+    {
+    case glsl:
+    {
+        if (__type_equals<T, float>())
+            __requireGLSLExtension("GL_EXT_shader_atomic_float");
+    }
+    case spirv:
+        if (__type_equals<T, float>())
+        {
+            spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_atomic_float_add";
+                OpCapability AtomicFloat32AddEXT
+            };
+        }
+    }
+}
+
+__generic<T : __BuiltinType>
+[ForceInline] void typeRequireChecks_image_atomic_tier2()
+{
+    __target_switch
+    {
+    case glsl:
+    {
+        if (__type_equals<T, float>())
+            __requireGLSLExtension("GL_EXT_shader_atomic_float2");
+    }
+    case spirv:
+        if (__type_equals<T, float>())
+        {
+            spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_atomic_float_min_max";
+                OpCapability AtomicFloat32MinMaxEXT
+            };
+        }
+    }
+}
+
+__generic<T : __BuiltinType>
+[ForceInline] void typeRequireChecks_image_atomic_int64()
+{
+    __target_switch
+    {
+    case spirv:
+        if (__type_equals<T, uint64_t>()
+            || __type_equals<T, int64_t>())
+        {
+            spirv_asm
+            {
+                OpCapability Int64Atomics
+            };
+        }
+        return;
+    }
+}
+
+${{{{
+{
+    struct ImageTypeInfo
+    {
+        const char *prefix;
+        const char *type;
+        bool isInt;
+        const char *SPVTypePrefix;
+        const char *SPVSubTypePrefix;
+        const char *SPVAtomicSuffix;
+    };
+    static const ImageTypeInfo kTypeWithPrefix[] =
+        {
+            { "", "float", false, "F", "F", "EXT"},
+            { "u", "uint", true, "I", "U", ""},
+            { "i", "int", true, "I", "S", ""},
+            { "u64", "uint64_t", true, "I", "U", ""},
+            { "i64", "int64_t", true, "I", "S", ""},
+        };
+    struct ShapeTypeInfo
+    {
+        const char *suffix;
+        int imageSizeIVecDim;
+        int imageCoordIVecIndexerDim;
+        const char *shape;
+        int isArray;
+        int isMS;
+        bool isRect;
+    }
+    static const kShapeType[] =
+        {
+            { "1D", 1, 1,"__Shape1D", 0, 0, 0},
+
+            { "2D", 2, 2, "__Shape2D", 0, 0, 0},
+            { "3D", 3, 3, "__Shape3D", 0, 0, 0},
+            { "Cube", 2, 3, "__ShapeCube", 0, 0, 0},
+            { "2DRect", 2, 2, "__Shape2D", 0, 0, 1},
+            { "1DArray", 2, 2, "__Shape1D", 1, 0, 0},
+
+            { "2DArray", 3, 3, "__Shape2D", 1, 0, 0},
+            { "CubeArray", 3, 3, "__ShapeCube", 1, 0, 0},
+            { "Buffer", 1, 1, "__ShapeBuffer", 0, 0, 0},
+            { "2DMS", 2, 2, "__Shape2D", 0, 1, 0},
+            { "2DMSArray", 3, 3, "__Shape2D", 1, 1, 0},
+        };
+    for (const auto& targetType : kTypeWithPrefix)
+    for (const auto& targetShape : kShapeType)
+    {
+        // gimageDim is the format of image buffers, we
+        // need to resolve a type name from the format:
+        // targetType.prefix is the 'g'
+        // targetShape.suffix is the 'Dim'
+        StringBuilder fullTypeNameBuilder;
+        fullTypeNameBuilder << targetType.prefix << "image" << targetShape.suffix;
+        auto fullTypeName = fullTypeNameBuilder.toString();
+
+        // We need a string to resolve for the imageSize return type
+        // since each shape has a different return which may not be
+        // a vec
+        StringBuilder imageSizeIntOrIVecBuilder;
+        if (targetShape.imageSizeIVecDim == 1)
+            imageSizeIntOrIVecBuilder << "int";
+        else
+            imageSizeIntOrIVecBuilder << "ivec" << targetShape.imageSizeIVecDim;
+        auto imageSizeIntOrIVec = imageSizeIntOrIVecBuilder.toString();
+
+        // Following OpenGL/Vulkan semantics, IMAGE_PARAMS string represents
+        // the changing list of parameters per gimageDim type
+        // https://registry.khronos.org/OpenGL/specs/gl/GLSLangSpec.4.60.pdf
+        StringBuilder IMAGE_PARAMSBuilder;
+        IMAGE_PARAMSBuilder << fullTypeName << " image,";
+        int paramC = targetShape.imageCoordIVecIndexerDim;
+        if (paramC == 1)
+            IMAGE_PARAMSBuilder << "int";
+        else
+            IMAGE_PARAMSBuilder << "ivec" << paramC;
+        IMAGE_PARAMSBuilder << " P";
+        if (targetShape.isMS)
+        {
+            IMAGE_PARAMSBuilder << ", int sample";
+        }
+        auto IMAGE_PARAMS = IMAGE_PARAMSBuilder.toString();
+
+        // SPIR-V requires a 'sample' parameter for all texture
+        // functions. We need to handle a dynamic creation of
+        // 'sample' if 'sample' parameter is not in IMAGE_PARAMS
+        StringBuilder SPV_PREFIX_IMAGE_PARAMSBuilder;
+        StringBuilder SPV_SUFFIX_IMAGE_PARAMSBuilder;
+        StringBuilder SPV_DEFAULT_SAMPLE_VAR_IF_MISSINGBuilder;
+
+        SPV_PREFIX_IMAGE_PARAMSBuilder << "$image $P";
+        SPV_SUFFIX_IMAGE_PARAMSBuilder;
+        if (targetShape.isMS)
+        {
+            SPV_SUFFIX_IMAGE_PARAMSBuilder << " Sample $sample";
+        }
+        else
+        {
+            SPV_DEFAULT_SAMPLE_VAR_IF_MISSINGBuilder << "let sample = 0;";
+        }
+
+        auto SPV_PREFIX_IMAGE_PARAMS = SPV_PREFIX_IMAGE_PARAMSBuilder.toString();
+        auto SPV_SUFFIX_IMAGE_PARAMS = SPV_SUFFIX_IMAGE_PARAMSBuilder.toString();
+        auto SPV_DEFAULT_SAMPLE_VAR_IF_MISSING = SPV_DEFAULT_SAMPLE_VAR_IF_MISSINGBuilder.toString();
+    }}}}
+
+        __generic<let format:int=0>
+        public typealias $(fullTypeName) = __TextureImpl<
+            $(targetType.type),
+            $(targetShape.shape),
+            $(targetShape.isArray), // isArray
+            $(targetShape.isMS), // isMS
+            0, // sampleCount
+            1, // access
+            0, // isShadow
+            0, // isCombined
+            format
+        >;
+
+${{{{
+        if(targetShape.isRect)
+            continue;
+}}}}
+
+        // readonly writeonly in GLSL means an object only allows information queries.
+        [require(spirv)]
+        [require(glsl)]
+        [__readNone]
+        [ForceInline] public $(imageSizeIntOrIVec) imageSize(readonly writeonly $(fullTypeName) image)
+        {
+            __target_switch
+            {
+            case glsl: __intrinsic_asm "imageSize($*0)";
+            case spirv:
+                return spirv_asm
+                {
+                    OpCapability ImageQuery;
+                    result:$$$(imageSizeIntOrIVec) = OpImageQuerySize $image;
+                };
+            }
+        }
+        [require(spirv)]
+        [require(glsl)]
+        [__NoSideEffect]
+        [ForceInline] public $(targetType.prefix)vec4 imageLoad(readonly $(IMAGE_PARAMS))
+        {
+            __target_switch
+            {
+            case glsl: __intrinsic_asm "imageLoad($*0)";
+            case spirv:
+            {
+                $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                return spirv_asm
+                {
+                    result:$$$(targetType.prefix)vec4 = OpImageRead $(SPV_PREFIX_IMAGE_PARAMS) $(SPV_SUFFIX_IMAGE_PARAMS);
+                };
+            }
+            }
+        }
+        [require(spirv)]
+        [require(glsl)]
+        [ForceInline] public void imageStore(writeonly $(IMAGE_PARAMS), $(targetType.prefix)vec4 data)
+        {
+            __target_switch
+            {
+            case glsl: __intrinsic_asm "imageStore($*0)";
+            case spirv:
+            {
+                $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                return spirv_asm
+                {
+                    OpImageWrite $(SPV_PREFIX_IMAGE_PARAMS) $data $(SPV_SUFFIX_IMAGE_PARAMS);
+                };
+            }
+            }
+        }
+
+${{{{
+        if (targetShape.isMS)
+        {
+}}}}
+            // readonly writeonly in GLSL means an object only allows information queries.
+            [require(spirv)]
+            [require(glsl)]
+            [__readNone]
+            [ForceInline] public int imageSamples(readonly writeonly $(fullTypeName) image)
+            {
+                __target_switch
+                {
+                case glsl: __intrinsic_asm "imageSamples($*0)";
+                case spirv:
+                    return spirv_asm
+                    {
+                        OpCapability ImageQuery;
+                        result:$$int = OpImageQuerySamples $image;
+                    };
+                }
+            }
+${{{{
+        }
+}}}}
+        [require(spirv)]
+        [require(glsl)]
+        [ForceInline] public $(targetType.type) imageAtomicAdd($(IMAGE_PARAMS), $(targetType.type) data)
+        {
+            typeRequireChecks_image_atomic_tier1<$(targetType.type)>();
+            __target_switch
+            {
+            case glsl: __intrinsic_asm "imageAtomicAdd($*0)";
+            case spirv:
+            {
+                let imageP = __getLegalizedSPIRVGlobalParamAddr(image);
+                typeRequireChecks_image_atomic_int64<$(targetType.type)>();
+                $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                return spirv_asm
+                {
+                    OpCapability ImageQuery;
+                    %ptrType = OpTypePointer Image $$$(targetType.type);
+                    %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
+                    result:$$$(targetType.type) = OpAtomic$(targetType.SPVTypePrefix)Add$(targetType.SPVAtomicSuffix) %ptr Device None $data
+                };
+            }
+            }
+        }
+        [require(spirv)]
+        [require(glsl)]
+        [ForceInline] public $(targetType.type) imageAtomicExchange($(IMAGE_PARAMS), $(targetType.type) data)
+        {
+            typeRequireChecks_image_atomic_tier1<$(targetType.type)>();
+            __target_switch
+            {
+            case glsl: __intrinsic_asm "imageAtomicExchange($*0)";
+            case spirv:
+            {
+                let imageP = __getLegalizedSPIRVGlobalParamAddr(image);
+                typeRequireChecks_image_atomic_int64<$(targetType.type)>();
+                $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                return spirv_asm
+                {
+                    OpCapability ImageQuery;
+                    %ptrType = OpTypePointer Image $$$(targetType.type);
+                    %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
+                    result:$$$(targetType.type) = OpAtomicExchange %ptr Device ImageMemory $data
+                };
+            }
+            }
+        }
+        [require(spirv)]
+        [require(glsl)]
+        [ForceInline] public $(targetType.type) imageAtomicMin($(IMAGE_PARAMS), $(targetType.type) data)
+        {
+            typeRequireChecks_image_atomic_tier2<$(targetType.type)>();
+            __target_switch
+            {
+            case glsl: __intrinsic_asm "imageAtomicMin($*0)";
+            case spirv:
+            {
+                let imageP = __getLegalizedSPIRVGlobalParamAddr(image);
+                typeRequireChecks_image_atomic_int64<$(targetType.type)>();
+                $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                return spirv_asm
+                {
+                    OpCapability ImageQuery;
+                    %ptrType = OpTypePointer Image $$$(targetType.type);
+                    %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
+                    result:$$$(targetType.type) = OpAtomic$(targetType.SPVSubTypePrefix)Min$(targetType.SPVAtomicSuffix) %ptr Device ImageMemory $data
+                };
+            }
+            }
+        }
+        [require(spirv)]
+        [require(glsl)]
+        [ForceInline] public $(targetType.type) imageAtomicMax($(IMAGE_PARAMS), $(targetType.type) data)
+        {
+            typeRequireChecks_image_atomic_tier2<$(targetType.type)>();
+            __target_switch
+            {
+            case glsl: __intrinsic_asm "imageAtomicMax($*0)";
+            case spirv:
+            {
+                let imageP = __getLegalizedSPIRVGlobalParamAddr(image);
+                typeRequireChecks_image_atomic_int64<$(targetType.type)>();
+                $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                return spirv_asm
+                {
+                    OpCapability ImageQuery;
+                    %ptrType = OpTypePointer Image $$$(targetType.type);
+                    %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
+                    result:$$$(targetType.type) = OpAtomic$(targetType.SPVSubTypePrefix)Max$(targetType.SPVAtomicSuffix) %ptr Device ImageMemory $data
+                };
+            }
+            }
+        }
+${{{{
+        if (!targetType.isInt)
+            continue;
+}}}}
+        [require(spirv)]
+        [require(glsl)]
+        [ForceInline] public $(targetType.type) imageAtomicAnd($(IMAGE_PARAMS), $(targetType.type) data)
+        {
+            __target_switch
+            {
+            case glsl: __intrinsic_asm "imageAtomicAnd($*0)";
+            case spirv:
+            {
+                let imageP = __getLegalizedSPIRVGlobalParamAddr(image);
+                typeRequireChecks_image_atomic_int64<$(targetType.type)>();
+                $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                return spirv_asm
+                {
+                    OpCapability ImageQuery;
+                    %ptrType = OpTypePointer Image $$$(targetType.type);
+                    %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
+                    result:$$$(targetType.type) = OpAtomicAnd %ptr Device ImageMemory $data
+                };
+            }
+            }
+        }
+        [require(spirv)]
+        [require(glsl)]
+        [ForceInline] public $(targetType.type) imageAtomicOr($(IMAGE_PARAMS), $(targetType.type) data)
+        {
+            __target_switch
+            {
+            case glsl: __intrinsic_asm "imageAtomicOr($*0)";
+            case spirv:
+            {
+                let imageP = __getLegalizedSPIRVGlobalParamAddr(image);
+                typeRequireChecks_image_atomic_int64<$(targetType.type)>();
+                $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                return spirv_asm
+                {
+                    OpCapability ImageQuery;
+                    %ptrType = OpTypePointer Image $$$(targetType.type);
+                    %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
+                    result:$$$(targetType.type) = OpAtomicOr %ptr Device ImageMemory $data
+                };
+            }
+            }
+        }
+        [require(spirv)]
+        [require(glsl)]
+        [ForceInline] public $(targetType.type) imageAtomicXor($(IMAGE_PARAMS), $(targetType.type) data)
+        {
+            __target_switch
+            {
+            case glsl: __intrinsic_asm "imageAtomicXor($*0)";
+            case spirv:
+            {
+                let imageP = __getLegalizedSPIRVGlobalParamAddr(image);
+                typeRequireChecks_image_atomic_int64<$(targetType.type)>();
+                $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                return spirv_asm
+                {
+                    OpCapability ImageQuery;
+                    %ptrType = OpTypePointer Image $$$(targetType.type);
+                    %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
+                    result:$$$(targetType.type) = OpAtomicXor %ptr Device ImageMemory $data
+                };
+            }
+            }
+        }
+        [require(spirv)]
+        [require(glsl)]
+        [ForceInline] public $(targetType.type) imageAtomicCompSwap($(IMAGE_PARAMS), $(targetType.type) compare, $(targetType.type) data)
+        {
+            __target_switch
+            {
+            case glsl: __intrinsic_asm "imageAtomicCompSwap($*0)";
+            case spirv:
+            {
+                let imageP = __getLegalizedSPIRVGlobalParamAddr(image);
+                typeRequireChecks_image_atomic_int64<$(targetType.type)>();
+                $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                return spirv_asm
+                {
+                    OpCapability ImageQuery;
+                    %ptrType = OpTypePointer Image $$$(targetType.type);
+                    %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
+                    result:$$$(targetType.type) = OpAtomicCompareExchange %ptr Device ImageMemory ImageMemory $data $compare
+                };
+            }
+            }
+        }
+${{{{
+    }
+}
+}}}}
 
 //// RayTracing
 

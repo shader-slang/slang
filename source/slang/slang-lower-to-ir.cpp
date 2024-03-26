@@ -2227,6 +2227,22 @@ void addVarDecorations(
         {
             builder->addDynamicUniformDecoration(inst);
         }
+        else if (as<GLSLVolatileModifier>(mod))
+        {
+            builder->addSimpleDecoration<IRGLSLVolatileDecoration>(inst);
+        }
+        else if (as<GLSLRestrictModifier>(mod))
+        {
+            builder->addSimpleDecoration<IRGLSLRestrictDecoration>(inst);
+        }
+        else if (as<GLSLReadOnlyModifier>(mod))
+        {
+            builder->addSimpleDecoration<IRGLSLReadOnlyDecoration>(inst);
+        }
+        else if (as<GLSLWriteOnlyModifier>(mod))
+        {
+            builder->addSimpleDecoration<IRGLSLWriteOnlyDecoration>(inst);
+        }
         // TODO: what are other modifiers we need to propagate through?
     }
     if(auto t = composeGetters<IRMeshOutputType>(inst->getFullType(), &IROutTypeBase::getValueType))
