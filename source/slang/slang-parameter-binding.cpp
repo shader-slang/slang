@@ -353,7 +353,8 @@ struct UsedRangeSet : RefObject
     // Information on what ranges of "registers" have already
     // been claimed, for each resource type
     UsedRanges usedResourceRanges[kLayoutResourceKindCount];
-    UsedRanges usedResourceRangesInputAttachmentIndex[kLayoutResourceKindCount];
+    //Subpass is the only current use of InputAttachmentIndex
+    UsedRanges usedResourceRangesInputAttachmentIndex;
 };
 
 // Information on a single parameter
@@ -939,7 +940,7 @@ static void addExplicitParameterBinding(
                 semanticInfo.index,
                 semanticInfo.index + count);
             if(semanticInfo.hasInputAttachmentIndex)
-                overlappedVarLayoutInputAttachmentIndex = usedRangeSet->usedResourceRangesInputAttachmentIndex[(int)semanticInfo.kind].Add(
+                overlappedVarLayoutInputAttachmentIndex = usedRangeSet->usedResourceRangesInputAttachmentIndex.Add(
                     parameterInfo->varLayout,
                     semanticInfo.inputAttachmentIndex,
                     semanticInfo.inputAttachmentIndex + 1);
