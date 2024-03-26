@@ -224,9 +224,11 @@ namespace Slang
         case kIROp_DifferentiableTypeDictionaryItem:
             return;
         default:
-            // Variables which eventually resolve into global params will always
-            // have an ancestor referenced at some point, these global params may
-            // not be resolved yet, do not exception on these types.
+
+            // It is possible that a global parameter will not emit their ancestor until after
+            // `validateIRInstOperand`.
+            // Due to this, do not raise exception if `IRLayoutDecoration` is found since that implies
+            // `inst` is a global parameter and an ancestor likely won't be found.
             if (inst->getOperand(0)->findDecoration<IRLayoutDecoration>())
                 return;
             break;

@@ -243,9 +243,9 @@ class GLSLLocationLayoutModifier : public GLSLParsedLayoutModifier
     SLANG_AST_CLASS(GLSLLocationLayoutModifier)
 };
 
-class GLSLInputAttachmentIndexAttribute : public GLSLParsedLayoutModifier
+class GLSLInputAttachmentIndexModifier : public GLSLParsedLayoutModifier
 {
-    SLANG_AST_CLASS(GLSLInputAttachmentIndexAttribute)
+    SLANG_AST_CLASS(GLSLInputAttachmentIndexModifier)
 };
 
 class GLSLBufferDataLayoutModifier : public GLSLParsedLayoutModifier

@@ -2204,7 +2204,7 @@ void addVarDecorations(
             builder->addDecoration(inst, kIROp_GLSLLocationDecoration,
                 builder->getIntValue(builder->getIntType(), stringToInt(glslLocationMod->valToken.getContent())));
         }
-        else if (auto glslInputAttachmentMod = as<GLSLInputAttachmentIndexAttribute>(mod))
+        else if (auto glslInputAttachmentMod = as<GLSLInputAttachmentIndexModifier>(mod))
         {
             auto textureType = as<IRTextureType>(inst->getDataType());
 

@@ -25,40 +25,60 @@ layout(local_size_x = 32) in;
 
 bool testMemoryBarrier()
 {
-    raceCondition.data[0] = gl_GlobalInvocationID.x;
-    memoryBarrier();
-    raceCondition.data[0] = 1;
-    memoryBarrier();
+    for (int i = 0; i < 4; i++)
+    {
+        raceCondition.data[0] = gl_GlobalInvocationID.x;
+        memoryBarrier();
+        raceCondition.data[0] = 1;
+        memoryBarrier();
+        if (raceCondition.data[0] != 1)
+            return false;
+    }
     return true
         && raceCondition.data[0] == 1
         ;
 }
 bool testMemoryBarrierAtomicCounter()
 {
-    atomicExchange(raceCondition.data[1], 2);
-    memoryBarrierAtomicCounter();
-    atomicExchange(raceCondition.data[1], 1);
-    memoryBarrierAtomicCounter();
+    for (int i = 0; i < 4; i++)
+    {
+        atomicExchange(raceCondition.data[1], 2);
+        memoryBarrierAtomicCounter();
+        atomicExchange(raceCondition.data[1], 1);
+        memoryBarrierAtomicCounter();
+        if (raceCondition.data[1] != 1)
+            return false;
+    }
     return true
         && raceCondition.data[1] == 1
         ;
 }
 bool testMemoryBarrierBuffer()
 {
-    raceCondition.data[2] = gl_GlobalInvocationID.x;
-    memoryBarrierBuffer();
-    raceCondition.data[2] = 1;
-    memoryBarrierBuffer();
+    for (int i = 0; i < 4; i++)
+    {
+        raceCondition.data[2] = gl_GlobalInvocationID.x;
+        memoryBarrierBuffer();
+        raceCondition.data[2] = 1;
+        memoryBarrierBuffer();
+        if (raceCondition.data[2] != 1)
+            return false;
+    }
     return true
         && raceCondition.data[2] == 1
         ;
 }
 bool testMemoryBarrierShared()
 {
-    raceConditionShared = 2;
-    memoryBarrierShared();
-    raceConditionShared = 1;
-    memoryBarrierShared();
+    for (int i = 0; i < 4; i++)
+    {
+        raceConditionShared = 2;
+        memoryBarrierShared();
+        raceConditionShared = 1;
+        memoryBarrierShared();
+        if (raceConditionShared != 1)
+            return false;
+    }
     return true
         && raceConditionShared == 1
         ;
@@ -71,10 +91,15 @@ bool testMemoryBarrierImage()
 }
 bool testGroupMemoryBarrier()
 {
-    raceCondition.data[3] = gl_GlobalInvocationID.x;
-    groupMemoryBarrier();
-    raceCondition.data[3] = 1;
-    groupMemoryBarrier();
+    for (int i = 0; i < 4; i++)
+    {
+        raceCondition.data[3] = gl_GlobalInvocationID.x;
+        groupMemoryBarrier();
+        raceCondition.data[3] = 1;
+        groupMemoryBarrier();
+        if (raceCondition.data[3] != 1)
+            return false;
+    }
     return true
         && raceCondition.data[3] == 1
         ;

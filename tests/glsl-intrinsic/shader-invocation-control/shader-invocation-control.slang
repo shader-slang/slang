@@ -5,11 +5,7 @@
 
 #version 460
 
-//TEST_INPUT:ubuffer(data=[2], stride=4):out,name=raceCondition
-buffer MyBlockName1
-{
-    uint data[];
-} raceCondition;
+shared uint raceConditionShared;
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 buffer MyBlockName2
@@ -18,14 +14,18 @@ buffer MyBlockName2
 } outputBuffer;
 
 layout(local_size_x = 4) in;
-
 bool testBarrier()
 {
-    raceCondition.data[0] = 3;
-    barrier();
-    raceCondition.data[0] = 1;
+    for (int i = 0; i < 4; i++)
+    {
+        raceConditionShared = 3;
+        barrier();
+        raceConditionShared = 1;
+        if (raceConditionShared != 1)
+            return false;
+    }
     return true
-        && raceCondition.data[0] == 1
+        && raceConditionShared == 1
         ;
 }
 

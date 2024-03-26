@@ -7140,7 +7140,7 @@ public float interpolateAtOffset(__ref float interpolant, vec2 offset)
         return spirv_asm
         {
             OpCapability InterpolationFunction;
-            OpExtInst $$float result glsl450 78 &interpolant $offset
+            OpExtInst $$float result glsl450 InterpolateAtOffset &interpolant $offset
         };
     }
     }
@@ -7160,7 +7160,7 @@ public vector<float, N> interpolateAtOffset(__ref vector<float, N> interpolant, 
         return spirv_asm
         {
             OpCapability InterpolationFunction;
-            OpExtInst $$vector<float, N> result glsl450 78 &interpolant $offset
+            OpExtInst $$vector<float, N> result glsl450 InterpolateAtOffset &interpolant $offset
         };
     }
     }
@@ -7250,14 +7250,13 @@ public void barrier()
     case hlsl:
     {
         GroupMemoryBarrier();
-        DeviceMemoryBarrier();
     }
     case glsl: __intrinsic_asm "barrier()";
     case spirv:
     {
         spirv_asm
         {
-            OpControlBarrier Workgroup Device CrossWorkgroupMemory
+            OpControlBarrier Workgroup Workgroup AcquireRelease|WorkgroupMemory
         };
     }
     }
@@ -7285,8 +7284,14 @@ public void memoryBarrier()
     }
     }
 }
+
 // Does not exist in vulkan. The equivlent is now `memoryBarrierBuffer`
-// for vulkan since atomic_counter is a wrapped storage buffer object
+// for vulkan since GL_EXT_vulkan_glsl_relaxed states that a atomic_counter
+// is a storage buffer object in implementation.
+
+// glslang will compile with `AtomicCounterMemory` since it does not use
+// the `AtomicStorage` OpCapability which is required for `AtomicCounterMemory`.
+// this is invalid/undefined spir-v for vulkan targets and should not be followed
 [require(hlsl, sm_5_0)]
 __glsl_version(430) [require(glsl)]
 __spirv_version(1.0) [require(spirv)]
@@ -7472,8 +7477,8 @@ ${{{{
 
 /// Section 8.19. Shader Invocation Group Functions
 
-// Invocation functions compiles into SubgroupVoteKHR operations. 
-// Instead of using these, we directly emit the non deprecated 
+// Invocation functions compiles into SubgroupVoteKHR operations.
+// Instead of using these, we directly emit the non deprecated
 // alternatives
 __glsl_version(460) [require(glsl)]
 __spirv_version(1.3) [require(spirv)]

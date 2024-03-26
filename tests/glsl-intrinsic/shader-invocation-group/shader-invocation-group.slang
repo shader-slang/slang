@@ -24,7 +24,7 @@ bool testAllInvocations()
 {
     return true
         && allInvocations(true)
-        && allInvocations(false) == false
+        && allInvocations(gl_GlobalInvocationID.x == 0) == false
         ;
 }
 bool testAllInvocationsEqual()
@@ -34,19 +34,12 @@ bool testAllInvocationsEqual()
         && allInvocationsEqual(gl_GlobalInvocationID.x == 0) == false
         ;
 }
-bool testInvocations()
-{
-    return true
-        && testAnyInvocation()
-        && testAllInvocations()
-        && testAllInvocationsEqual()
-        ;
-}
-
 void computeMain()
 {
     outputBuffer.data[0] = true
-        && testInvocations()
+        && testAnyInvocation()
+        && testAllInvocations()
+        && testAllInvocationsEqual()
         ;
     // CHECK_GLSL: void main(
     // CHECK_SPV: OpEntryPoint

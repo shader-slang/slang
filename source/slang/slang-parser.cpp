@@ -7844,6 +7844,13 @@ namespace Slang
         return nullptr;
     }
     
+    static NodeBase* parseSharedModifier(Parser* parser, void* /*userData*/)
+    {
+        ModifierListBuilder listBuilder;
+        listBuilder.add(parser->astBuilder->create<HLSLEffectSharedModifier>());
+        listBuilder.add(parser->astBuilder->create<HLSLGroupSharedModifier>());
+        return listBuilder.getFirst();
+    }
     static NodeBase* parseLayoutModifier(Parser* parser, void* /*userData*/)
     {
         ModifierListBuilder listBuilder;
@@ -7937,7 +7944,7 @@ namespace Slang
                 CASE(scalar, GLSLScalarModifier)
                 CASE(offset, GLSLOffsetLayoutAttribute)
                 CASE(location, GLSLLocationLayoutModifier) 
-                CASE(input_attachment_index, GLSLInputAttachmentIndexAttribute)
+                CASE(input_attachment_index, GLSLInputAttachmentIndexModifier)
                 {
                     modifier = parser->astBuilder->create<GLSLUnparsedLayoutModifier>();
                 }
@@ -8205,7 +8212,7 @@ namespace Slang
         _makeParseModifier("sample",        HLSLSampleModifier::kReflectClassInfo),
         _makeParseModifier("centroid",      HLSLCentroidModifier::kReflectClassInfo),
         _makeParseModifier("precise",       PreciseModifier::kReflectClassInfo),
-        _makeParseModifier("shared",        HLSLEffectSharedModifier::kReflectClassInfo),
+        _makeParseModifier("shared",        parseSharedModifier),
         _makeParseModifier("groupshared",   HLSLGroupSharedModifier::kReflectClassInfo),
         _makeParseModifier("static",        HLSLStaticModifier::kReflectClassInfo),
         _makeParseModifier("uniform",       HLSLUniformModifier::kReflectClassInfo),
