@@ -57,6 +57,8 @@ for i in range(10):
     stdout, stderr = proc.communicate()
     retcode = proc.returncode
     res_dict[results_id] = stdout
+    print(stdout)
+    print(stderr)
 
 for key in res_dict.keys():
     data = res_dict[key]
