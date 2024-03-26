@@ -8,10 +8,10 @@ on:
   pull_request:
     branches: [ master ]
   schedule:
-    - cron: '45 14 * * *'
-    - cron: '45 13 * * *'
-    - cron: '55 14 * * *'   
-    - cron: '55 13 * * *'
+    - cron: '45 23 * * *'
+    - cron: '45 10 * * *'
+    - cron: '55 23 * * *'   
+    - cron: '55 10 * * *'
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -88,11 +88,11 @@ jobs:
         .\falcor-perf-test\bin\Release\falcor_perftest.exe > .\test_results.txt
 
     - name: setup falcor nightly run
-      #if: ${{ github.event_name == 'schedule' }}
       env:
         slang_verif_svc: ${{ secrets.slang_verif_svc_cred }}
         github_sha: ${{ github.sha }}
 
+      if: ${{ github.event_name == 'schedule' }}
       run: |
         python -m pip install --upgrade pip
         pip install gspread oauth2client
