@@ -1418,10 +1418,13 @@ struct SPIRVEmitContext
                         uint32_t stride;
 
                         getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), valueType, &sizeAndAlignment);
-                        stride = (uint32_t)sizeAndAlignment.getStride();
-                        // stride is invalid for unsized array, but we have to provide
-                        // a non-zero value to pass the spirv validator.
-                        stride = (stride == 0) ? 0xFFFF : stride;
+                        uint64_t valueSize = sizeAndAlignment.size;
+
+                        // Any unsized data type (e.g. struct or array) will have size of kIndeterminateSize,
+                        // in such case the stride is invalid, so we have to provide a non-zero value to pass the
+                        // spirv validator.
+                        stride = (valueSize >= (uint64_t)sizeAndAlignment.kIndeterminateSize) ?
+                                    0xFFFF : (uint32_t)sizeAndAlignment.getStride();
                         emitOpDecorateArrayStride(
                             getSection(SpvLogicalSectionID::Annotations),
                             nullptr,
@@ -1436,28 +1439,29 @@ struct SPIRVEmitContext
         case kIROp_StructType:
             {
                 List<IRType*> types;
-                bool isUnsizedArrayContained = false;
                 for (auto field : static_cast<IRStructType*>(inst)->getFields())
                 {
                     types.add(field->getFieldType());
-                    if ( field->getFieldType()->getOp() == kIROp_UnsizedArrayType)
-                    {
-                        isUnsizedArrayContained = true;
-                    }
                 }
                 auto spvStructType = emitOpTypeStruct(
                     inst,
                     types
                 );
                 emitDecorations(inst, getID(spvStructType));
-                // spirv-val requires that the struct containing the unsized array is block-decorated
-                if (isUnsizedArrayContained)
+
+                auto structType = as<IRStructType>(inst);
+                uint64_t structSize = 0;
+                if (auto layoutDecor = structType->findDecoration<IRSizeAndAlignmentDecoration>())
+                {
+                    structSize = layoutDecor->getSize();
+                }
+
+                if (structSize >= (uint64_t)IRSizeAndAlignment::kIndeterminateSize)
                 {
                     IRBuilder builder(inst);
                     auto decoration = builder.addDecoration(inst, kIROp_SPIRVBlockDecoration);
                     emitDecoration(getID(spvStructType), decoration);
                 }
-
                 emitLayoutDecorations(as<IRStructType>(inst), getID(spvStructType));
                 return spvStructType;
             }
