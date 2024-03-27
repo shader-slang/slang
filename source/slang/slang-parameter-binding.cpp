@@ -329,9 +329,9 @@ struct UsedRanges
     }
 };
 
-struct ParameterAndLayoutConstants
+namespace ParameterAndLayoutConstants
 {
-    static const uint32_t kInputAttachmentIndexUnused = 0xFFFFFFFF;
+    const constexpr uint32_t kInputAttachmentIndexUnused = 0xFFFFFFFF;
 };
 
 struct ParameterBindingInfo
@@ -339,7 +339,6 @@ struct ParameterBindingInfo
     size_t              space = 0;
     size_t              index = 0;
     LayoutSize          count = 0;
-
     uint32_t            inputAttachmentIndex = ParameterAndLayoutConstants::kInputAttachmentIndexUnused;
 };
 
@@ -479,7 +478,6 @@ struct LayoutSemanticInfo
     LayoutResourceKind  kind; // the register kind
     UInt                space;
     UInt                index;
-
     uint32_t              inputAttachmentIndex = ParameterAndLayoutConstants::kInputAttachmentIndexUnused;
     // TODO: need to deal with component-granularity binding...
 };
@@ -1104,7 +1102,7 @@ static void addExplicitParameterBindings_GLSL(
                 semanticInfo.space = glslBindingAttr->set;
             }
             // Try to find `input_attachment_index`
-            if (auto glslAttachmentIndexAttr = as<GLSLInputAttachmentIndexModifier>(dec))
+            if (auto glslAttachmentIndexAttr = as<GLSLInputAttachmentIndexLayoutModifier>(dec))
             {
                 semanticInfo.inputAttachmentIndex = stringToInt(glslAttachmentIndexAttr->valToken.getContent());
             }

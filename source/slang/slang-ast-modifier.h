@@ -242,9 +242,9 @@ class GLSLLocationLayoutModifier : public GLSLParsedLayoutModifier
     SLANG_AST_CLASS(GLSLLocationLayoutModifier)
 };
 
-class GLSLInputAttachmentIndexModifier : public GLSLParsedLayoutModifier
+class GLSLInputAttachmentIndexLayoutModifier : public GLSLParsedLayoutModifier
 {
-    SLANG_AST_CLASS(GLSLInputAttachmentIndexModifier)
+    SLANG_AST_CLASS(GLSLInputAttachmentIndexLayoutModifier)
 };
 
 class GLSLBufferDataLayoutModifier : public GLSLParsedLayoutModifier
