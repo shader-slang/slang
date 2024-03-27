@@ -957,6 +957,20 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     return nullptr;
 }
 
+// Hold the in-stack linked list that represents the access chain
+// to the current global varying parameter being created.
+// e.g. if the user code has:
+//    struct Params { in float member; }
+//    void main(in Params inParams);
+// Then the `outerParamInfo` when we get to `createSimpleGLSLVarying` for `member`
+// will be:  {IRStructField member} -> {IRParam inParams} -> {IRFunc main}.
+//
+struct OuterParamInfoLink
+{
+    IRInst* outerParam;
+    OuterParamInfoLink* next;
+};
+
 void createVarLayoutForLegalizedGlobalParam(
     IRInst* globalParam,
     IRBuilder* builder,
@@ -966,7 +980,7 @@ void createVarLayoutForLegalizedGlobalParam(
     UInt bindingIndex,
     UInt bindingSpace,
     GlobalVaryingDeclarator* declarator,
-    IRInst* leafVar,
+    OuterParamInfoLink* outerParamInfo,
     GLSLSystemValueInfo* systemValueInfo)
 {
     // We need to construct a fresh layout for the variable, even
@@ -982,13 +996,22 @@ void createVarLayoutForLegalizedGlobalParam(
     IRVarLayout* varLayout = varLayoutBuilder.build();
     builder->addLayoutDecoration(globalParam, varLayout);
 
-    if (leafVar)
+    // Traverse the entire access chain for the current leaf var and see if
+    // there are interpolation mode decorations along the way.
+    // Make sure we respect the decoration on the inner most node.
+    // So that the decoration on a struct field overrides the outer decoration
+    // on a parameter of the struct type.
+    for (; outerParamInfo; outerParamInfo = outerParamInfo->next)
     {
-        if (auto interpolationModeDecor = leafVar->findDecoration<IRInterpolationModeDecoration>())
+        auto paramInfo = outerParamInfo->outerParam;
+        auto decorParent = paramInfo;
+        if (auto field = as<IRStructField>(decorParent))
+            decorParent = field->getKey();
+        if (auto interpolationModeDecor = decorParent->findDecoration<IRInterpolationModeDecoration>())
         {
             builder->addInterpolationModeDecoration(globalParam, interpolationModeDecor->getMode());
+            break;
         }
-
     }
 
     if (declarator && declarator->flavor == GlobalVaryingDeclarator::Flavor::meshOutputPrimitives)
@@ -1031,7 +1054,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     UInt                        bindingIndex,
     UInt                        bindingSpace,
     GlobalVaryingDeclarator*    declarator,
-    IRInst*                     leafVar,
+    OuterParamInfoLink*         outerParamInfo,
     StringBuilder&              nameHintSB)
 {
     // Check if we have a system value on our hands.
@@ -1101,7 +1124,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
             builder->addImportDecoration(globalParam, systemValueName);
 
             createVarLayoutForLegalizedGlobalParam(
-                globalParam, builder, inVarLayout, inTypeLayout, kind, bindingIndex, bindingSpace, declarator, leafVar, systemValueInfo);
+                globalParam, builder, inVarLayout, inTypeLayout, kind, bindingIndex, bindingSpace, declarator, outerParamInfo, systemValueInfo);
 
             semanticGlobalTmp.globalParam = globalParam;
 
@@ -1239,7 +1262,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     }
 
     createVarLayoutForLegalizedGlobalParam(
-        globalParam, builder, inVarLayout, typeLayout, kind, bindingIndex, bindingSpace, declarator, leafVar, systemValueInfo);
+        globalParam, builder, inVarLayout, typeLayout, kind, bindingIndex, bindingSpace, declarator, outerParamInfo, systemValueInfo);
     return val;
 }
 
@@ -1255,6 +1278,7 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
     UInt                        bindingIndex,
     UInt                        bindingSpace,
     GlobalVaryingDeclarator*    declarator,
+    OuterParamInfoLink*         outerParamInfo,
     IRInst*                     leafVar,
     StringBuilder&              nameHintSB)
 {
@@ -1267,14 +1291,14 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
         return createSimpleGLSLGlobalVarying(
             context,
             codeGenContext,
-            builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator, leafVar, nameHintSB);
+            builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator, outerParamInfo, nameHintSB);
     }
     else if( as<IRVectorType>(type) )
     {
         return createSimpleGLSLGlobalVarying(
             context,
             codeGenContext,
-            builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator, leafVar, nameHintSB);
+            builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator, outerParamInfo, nameHintSB);
     }
     else if( as<IRMatrixType>(type) )
     {
@@ -1282,7 +1306,7 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
         return createSimpleGLSLGlobalVarying(
             context,
             codeGenContext,
-            builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator, leafVar, nameHintSB);
+            builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator, outerParamInfo, nameHintSB);
     }
     else if( auto arrayType = as<IRArrayType>(type) )
     {
@@ -1311,6 +1335,7 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
             bindingIndex,
             bindingSpace,
             &arrayDeclarator,
+            outerParamInfo,
             leafVar,
             nameHintSB);
     }
@@ -1355,6 +1380,7 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
             bindingIndex,
             bindingSpace,
             &arrayDeclarator,
+            outerParamInfo,
             leafVar,
             nameHintSB);
     }
@@ -1377,6 +1403,7 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
             bindingIndex,
             bindingSpace,
             declarator,
+            outerParamInfo,
             leafVar,
             nameHintSB);
     }
@@ -1389,6 +1416,11 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
         SLANG_ASSERT(structTypeLayout);
         RefPtr<ScalarizedTupleValImpl> tupleValImpl = new ScalarizedTupleValImpl();
 
+        // Since we are going to recurse into struct fields,
+        // we need to create a new node in `outerParamInfo` to keep track of
+        // the access chain to get to the new leafVar.
+        OuterParamInfoLink fieldParentInfo;
+        fieldParentInfo.next = outerParamInfo;
 
         // Construct the actual type for the tuple (including any outer arrays)
         IRType* fullType = type;
@@ -1436,6 +1468,7 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
                     nameHintSB << ".";
                 nameHintSB << fieldNameHint->getName();
             }
+            fieldParentInfo.outerParam = field;
             auto fieldVal = createGLSLGlobalVaryingsImpl(
                 context,
                 codeGenContext,
@@ -1448,6 +1481,7 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
                 fieldBindingIndex,
                 fieldBindingSpace,
                 declarator,
+                &fieldParentInfo,
                 field,
                 nameHintSB);
             if (fieldVal.flavor != ScalarizedVal::Flavor::none)
@@ -1467,7 +1501,7 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
     return createSimpleGLSLGlobalVarying(
         context,
         codeGenContext,
-        builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator, leafVar, nameHintSB);
+        builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator, outerParamInfo, nameHintSB);
 }
 
 ScalarizedVal createGLSLGlobalVaryings(
@@ -1492,10 +1526,13 @@ ScalarizedVal createGLSLGlobalVaryings(
     {
         namehintSB << nameHint->getName();
     }
+    OuterParamInfoLink outerParamInfo;
+    outerParamInfo.next = nullptr;
+    outerParamInfo.outerParam = leafVar;
     return createGLSLGlobalVaryingsImpl(
         context,
         codeGenContext,
-        builder, type, layout, layout->getTypeLayout(), kind, stage, bindingIndex, bindingSpace, nullptr, leafVar, namehintSB);
+        builder, type, layout, layout->getTypeLayout(), kind, stage, bindingIndex, bindingSpace, nullptr, &outerParamInfo, leafVar, namehintSB);
 }
 
 ScalarizedVal extractField(
@@ -2495,76 +2532,56 @@ void legalizeEntryPointParameterForGLSL(
             stage,
             pp);
 
-        // TODO: a GS output stream might be passed into other
+        // A GS output stream might be passed into other
         // functions, so that we should really be modifying
         // any function that has one of these in its parameter
-        // list (and in the limit we should be leagalizing any
-        // type that nests these...).
+        // list.
         //
-        // For now we will just try to deal with `Append` calls
-        // directly in this function.
-
-        for( auto bb = func->getFirstBlock(); bb; bb = bb->getNextBlock() )
+        HashSet<IRInst*> workListSet;
+        List<IRFunc*> workList;
+        workList.add(func);
+        workListSet.add(func);
+        for (Index i = 0; i < workList.getCount(); i++)
         {
-            for( auto ii = bb->getFirstInst(); ii; ii = ii->getNextInst() )
+            auto f = workList[i];
+            for (auto bb = f->getFirstBlock(); bb; bb = bb->getNextBlock())
             {
-                // Is it a call?
-                if(ii->getOp() != kIROp_Call)
-                    continue;
-
-                // Is it calling the append operation?
-                auto callee = ii->getOperand(0);
-                for(;;)
+                for (auto ii = bb->getFirstInst(); ii; ii = ii->getNextInst())
                 {
-                    // If the instruction is `specialize(X,...)` then
-                    // we want to look at `X`, and if it is `generic { ... return R; }`
-                    // then we want to look at `R`. We handle this
-                    // iteratively here.
-                    //
-                    // TODO: This idiom seems to come up enough that we
-                    // should probably have a dedicated convenience routine
-                    // for this.
-                    //
-                    // Alternatively, we could switch the IR encoding so
-                    // that decorations are added to the generic instead of the
-                    // value it returns.
-                    //
-                    switch(callee->getOp())
-                    {
-                    case kIROp_Specialize:
-                        {
-                            callee = cast<IRSpecialize>(callee)->getOperand(0);
-                            continue;
-                        }
+                    // Is it a call?
+                    if (ii->getOp() != kIROp_Call)
+                        continue;
 
-                    case kIROp_Generic:
+                    // Is it calling the append operation?
+                    auto callee = getResolvedInstForDecorations(ii->getOperand(0));
+                    if (callee->getOp() != kIROp_Func)
+                        continue;
+
+                    if (getBuiltinFuncName(callee) != UnownedStringSlice::fromLiteral("GeometryStreamAppend"))
+                    {
+                        // If we are calling a function that takes a output stream as a parameter,
+                        // we need to add it to the work list to be processed.
+                        for (UInt a = 1; a < ii->getOperandCount(); a++)
                         {
-                            auto genericResult = findGenericReturnVal(cast<IRGeneric>(callee));
-                            if(genericResult)
+                            auto argType = ii->getOperand(a)->getDataType();
+                            if (auto ptrTypeBase = as<IRPtrTypeBase>(argType))
+                                argType = ptrTypeBase->getValueType();
+                            if (as<IRHLSLStreamOutputType>(argType))
                             {
-                                callee = genericResult;
-                                continue;
+                                if (workListSet.add(callee))
+                                    workList.add(as<IRFunc>(callee));
+                                break;
                             }
                         }
-
-                    default:
-                        break;
+                        continue;
                     }
-                    break;
+
+                    // Okay, we have a declaration, and we want to modify it!
+
+                    builder->setInsertBefore(ii);
+
+                    assign(builder, globalOutputVal, ScalarizedVal::value(ii->getOperand(2)));
                 }
-                if(callee->getOp() != kIROp_Func)
-                    continue;
-
-                if (getBuiltinFuncName(callee) != UnownedStringSlice::fromLiteral("GeometryStreamAppend"))
-                {
-                    continue;
-                }
-
-                // Okay, we have a declaration, and we want to modify it!
-
-                builder->setInsertBefore(ii);
-
-                assign(builder, globalOutputVal, ScalarizedVal::value(ii->getOperand(2)));
             }
         }
 

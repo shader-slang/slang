@@ -1,4 +1,4 @@
-//TEST:COMPARE_HLSL:-no-mangle -profile ps_5_0
+//TEST:COMPARE_HLSL: -profile ps_5_0
 
 #ifdef __SLANG__
 
