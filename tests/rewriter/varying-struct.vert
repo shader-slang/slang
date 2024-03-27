@@ -1,5 +1,5 @@
 #version 450 core
-//TEST_DISABLED:COMPARE_GLSL:-no-mangle
+//TEST_DISABLED:COMPARE_GLSL:
 
 #if defined(__SLANG__)
 

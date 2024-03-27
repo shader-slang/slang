@@ -125,6 +125,7 @@ SlangResult LanguageServer::parseNextMessage()
                     caps.documentOnTypeFormattingProvider.moreTriggerCharacter.add("{");
                     caps.documentRangeFormattingProvider = true;
                     caps.completionProvider.triggerCharacters.add(".");
+                    caps.completionProvider.triggerCharacters.add(">");
                     caps.completionProvider.triggerCharacters.add(":");
                     caps.completionProvider.triggerCharacters.add("[");
                     caps.completionProvider.triggerCharacters.add(" ");
@@ -931,17 +932,25 @@ SlangResult LanguageServer::completion(
         return SLANG_OK;
     }
 
-    // Don't show completion at case label.
+    // Don't show completion at case label or after single '>' operator.
     if (args.context.triggerKind ==
-            LanguageServerProtocol::kCompletionTriggerKindTriggerCharacter &&
-        args.context.triggerCharacter == ":")
+            LanguageServerProtocol::kCompletionTriggerKindTriggerCharacter)
     {
-        auto line = doc->getLine((Int)args.position.line + 1);
-        auto prevCharPos = args.position.character - 2;
-        if (prevCharPos >= 0 && prevCharPos < line.getLength() && line[prevCharPos] != ':')
+        char requiredPrevChar = 0;
+        if (args.context.triggerCharacter == ":")
+            requiredPrevChar = ':';
+        else if (args.context.triggerCharacter == ">")
+            requiredPrevChar = '-';
+        if (requiredPrevChar != 0)
         {
-            m_connection->sendResult(NullResponse::get(), responseId);
-            return SLANG_OK;
+            // Check if the previous character is the required character (':' or '-'
+            auto line = doc->getLine((Int)args.position.line + 1);
+            auto prevCharPos = args.position.character - 2;
+            if (prevCharPos >= 0 && prevCharPos < line.getLength() && line[prevCharPos] != requiredPrevChar)
+            {
+                m_connection->sendResult(NullResponse::get(), responseId);
+                return SLANG_OK;
+            }
         }
     }
 

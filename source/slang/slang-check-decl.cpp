@@ -944,7 +944,27 @@ namespace Slang
                 }
             }
 
+            // Ensures child of struct is set read-only or not
+            bool isWriteOnly = false;
+            {
+                for (auto mod : varDeclRef.getDecl()->modifiers)
+                {
+                    if (as<GLSLReadOnlyModifier>(mod))
+                    {
+                        isLValue = false;
+                        qualType.hasReadOnlyOnTarget = true;
+                        if (isLValue == false && isWriteOnly) break;
+                    }
+                    if (as<GLSLWriteOnlyModifier>(mod))
+                    {
+                        isWriteOnly = true;
+                        if (isLValue == false && isWriteOnly) break;
+                    }
+                }
+            }
+
             qualType.isLeftValue = isLValue;
+            qualType.isWriteOnly = isWriteOnly;
             return qualType;
         }
         else if( auto propertyDeclRef = declRef.as<PropertyDecl>() )
@@ -1261,13 +1281,12 @@ namespace Slang
         /// because those cannot be meaningfully checked outside of the context
         /// of their surrounding statement(s).
         ///
-    static void _ensureAllDeclsRec(
-        SemanticsDeclVisitorBase*   visitor,
+    void SemanticsVisitor::ensureAllDeclsRec(
         Decl*                       decl,
         DeclCheckState              state)
     {
         // Ensure `decl` itself first.
-        visitor->ensureDecl(decl, state);
+        ensureDecl(decl, state);
 
         // If `decl` is a container, then we want to ensure its children.
         if(auto containerDecl = as<ContainerDecl>(decl))
@@ -1291,7 +1310,7 @@ namespace Slang
                 if(as<ScopeDecl>(childDecl))
                     continue;
 
-                _ensureAllDeclsRec(visitor, childDecl, state);
+                ensureAllDeclsRec(childDecl, state);
             }
         }
 
@@ -1302,7 +1321,7 @@ namespace Slang
         //
         if(auto genericDecl = as<GenericDecl>(decl))
         {
-            _ensureAllDeclsRec(visitor, genericDecl->inner, state);
+            ensureAllDeclsRec(genericDecl->inner, state);
         }
     }
 
@@ -1772,7 +1791,13 @@ namespace Slang
                 parentAggTypeDecl->unionTagsWith(getTypeTags(varDeclRefType));
             }
         }
-
+        if (getOptionSet().getBoolOption(CompilerOptionName::NoMangle) &&
+            isGlobalDecl(varDecl))
+        {
+            // If -no-mangle option is set, we will add `ExternCpp` modifier to all
+            // global variables and struct fields to prevent mangling.
+            addModifier(varDecl, m_astBuilder->create<ExternCppModifier>());
+        }
         checkVisibility(varDecl);
     }
 
@@ -1841,6 +1866,8 @@ namespace Slang
                 //
             initExpr = subVisitor.CheckTerm(initExpr);
 
+            if (initExpr->type.isWriteOnly)
+                getSink()->diagnose(initExpr, Diagnostics::readingFromWriteOnly);
             initExpr = coerce(CoercionSite::Initializer, varDecl->type.Ptr(), initExpr);
             varDecl->initExpr = initExpr;
 
@@ -2555,7 +2582,7 @@ namespace Slang
             // to the subset of declarations coming from a given source
             // file.
             //
-            _ensureAllDeclsRec(this, moduleDecl, s);
+            ensureAllDeclsRec(moduleDecl, s);
         }
 
         // Once we have completed the above loop, all declarations not
@@ -7017,6 +7044,16 @@ namespace Slang
                         newModifiers[i]->next = nullptr;
                 }
             }
+        }
+
+        // Only texture types are allowed to have memory qualifiers on parameters
+        if(!paramDecl->type || paramDecl->type->astNodeType != ASTNodeType::TextureType)
+        {
+            auto memoryQualifierCollection = paramDecl->findModifier<MemoryQualifierCollectionModifier>();
+            if(!memoryQualifierCollection) 
+                return;
+            for(auto mod : memoryQualifierCollection->getModifiers())
+                getSink()->diagnose(paramDecl, Diagnostics::memoryQualifierNotAllowedOnANonImageTypeParameter, mod);
         }
     }
 

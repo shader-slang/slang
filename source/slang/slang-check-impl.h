@@ -1208,6 +1208,10 @@ namespace Slang
             ensureDecl(declRef->getDecl(), state);
         }
 
+        void ensureAllDeclsRec(
+            Decl* decl,
+            DeclCheckState              state);
+
             /// Helper routine allowing `ensureDecl` to be used on a `DeclBase`
             ///
             /// `DeclBase` is the base clas of `Decl` and `DeclGroup`. When
@@ -1516,7 +1520,8 @@ namespace Slang
 
         Modifier* checkModifier(
             Modifier*        m,
-            ModifiableSyntaxNode*   syntaxNode);
+            ModifiableSyntaxNode*   syntaxNode,
+            bool ignoreUnallowedModifier);
 
         void checkModifiers(ModifiableSyntaxNode* syntaxNode);
         void checkVisibility(Decl* decl);
@@ -2462,6 +2467,7 @@ namespace Slang
         Expr* CheckExpr(Expr* expr);
 
 
+        void compareMemoryQualifierOfParamToArgument(ParamDecl* paramIn, Expr* argIn);
         Expr* CheckInvokeExprWithCheckedOperands(InvokeExpr *expr);
         // Get the type to use when referencing a declaration
         QualType GetTypeForDeclRef(DeclRef<Decl> declRef, SourceLoc loc);
@@ -2505,7 +2511,7 @@ namespace Slang
         Expr* visitStaticMemberExpr(StaticMemberExpr* expr);
 
             /// Perform checking operations required for the "base" expression of a member-reference like `base.someField`
-        Expr* checkBaseForMemberExpr(Expr* baseExpr);
+        Expr* checkBaseForMemberExpr(Expr* baseExpr, bool& outNeedDeref);
 
         Expr* lookupMemberResultFailure(
             DeclRefExpr*     expr,
@@ -2735,4 +2741,9 @@ namespace Slang
     DeclVisibility getDeclVisibility(Decl* decl);
 
     void diagnoseCapabilityProvenance(DiagnosticSink* sink, Decl* decl, CapabilityAtom missingAtom);
+
+    void _ensureAllDeclsRec(
+        SemanticsDeclVisitorBase* visitor,
+        Decl* decl,
+        DeclCheckState              state);
 }

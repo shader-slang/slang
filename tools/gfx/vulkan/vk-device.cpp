@@ -487,6 +487,11 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         extendedFeatures.atomicFloat2Features.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &extendedFeatures.atomicFloat2Features;
 
+        // Image Int64 Atomic
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT.html
+        extendedFeatures.imageInt64AtomicFeatures.pNext = deviceFeatures2.pNext;
+        deviceFeatures2.pNext = &extendedFeatures.imageInt64AtomicFeatures;
+
         // mesh shader features
         extendedFeatures.meshShaderFeatures.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &extendedFeatures.meshShaderFeatures;
@@ -577,6 +582,13 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
             shaderBufferFloat16Atomics,
             VK_EXT_SHADER_ATOMIC_FLOAT_2_EXTENSION_NAME,
             "atomic-float-2"
+        );
+
+        SIMPLE_EXTENSION_FEATURE(
+            extendedFeatures.imageInt64AtomicFeatures,
+            shaderImageInt64Atomics,
+            VK_EXT_SHADER_IMAGE_ATOMIC_INT64_EXTENSION_NAME,
+            "image-atomic-int64"
         );
 
         SIMPLE_EXTENSION_FEATURE(
@@ -1638,6 +1650,97 @@ Result DeviceImpl::createTextureResource(
             VK_IMAGE_LAYOUT_UNDEFINED,
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
+        if(desc.sampleDesc.numSamples != 1)
+        {
+            // Handle senario where texture is sampled. We cannot use
+            // a simple buffer copy for sampled textures. ClearColorImage
+            // is not data accurate but it is fine for testing & works.
+            FormatInfo formatInfo;
+            gfxGetFormatInfo(desc.format, &formatInfo);
+            uint32_t data = 0;
+            VkClearColorValue clearColor;
+            switch(formatInfo.channelType)
+            {
+            case SLANG_SCALAR_TYPE_INT32:
+                for(int i = 0; i < 4; i++)
+                    clearColor.int32[i] = *reinterpret_cast<int32_t*>(const_cast<void*>(initData->data));
+                break;
+            case SLANG_SCALAR_TYPE_UINT32:
+                for(int i = 0; i < 4; i++)
+                    clearColor.uint32[i] = *reinterpret_cast<uint32_t*>(const_cast<void*>(initData->data));                break;
+                break;
+            case SLANG_SCALAR_TYPE_INT64:
+            {
+                for(int i = 0; i < 4; i++)
+                    clearColor.int32[i] = int32_t(*reinterpret_cast<int64_t*>(const_cast<void*>(initData->data)));
+                break;
+            }
+            case SLANG_SCALAR_TYPE_UINT64:
+            {
+                for(int i = 0; i < 4; i++)
+                    clearColor.uint32[i] = uint32_t(*reinterpret_cast<uint64_t*>(const_cast<void*>(initData->data)));
+                break;
+            }
+            case SLANG_SCALAR_TYPE_FLOAT16:
+            {
+                for(int i = 0; i < 4; i++)
+                    clearColor.float32[i] = HalfToFloat(*reinterpret_cast<uint16_t*>(const_cast<void*>(initData->data)));
+                break;
+            }
+            case SLANG_SCALAR_TYPE_FLOAT32:
+            {
+                for(int i = 0; i < 4; i++)
+                    clearColor.float32[i] = (*reinterpret_cast<float*>(const_cast<void*>(initData->data)));
+                break;
+            }
+            case SLANG_SCALAR_TYPE_FLOAT64:
+            {
+                for(int i = 0; i < 4; i++)
+                    clearColor.float32[i] = float(*reinterpret_cast<double*>(const_cast<void*>(initData->data)));
+                break;
+            }
+            case SLANG_SCALAR_TYPE_INT8:
+            {
+                for(int i = 0; i < 4; i++)
+                    clearColor.int32[i] = int32_t(*reinterpret_cast<int8_t*>(const_cast<void*>(initData->data)));
+                break;
+            }
+            case SLANG_SCALAR_TYPE_UINT8:
+            {
+                for(int i = 0; i < 4; i++)
+                    clearColor.uint32[i] = uint32_t(*reinterpret_cast<uint8_t*>(const_cast<void*>(initData->data)));
+                break;
+            }
+            case SLANG_SCALAR_TYPE_INT16:
+            {
+                for(int i = 0; i < 4; i++)
+                    clearColor.int32[i] = int32_t(*reinterpret_cast<int16_t*>(const_cast<void*>(initData->data)));
+                break;
+            }
+            case SLANG_SCALAR_TYPE_UINT16:
+            {
+                for(int i = 0; i < 4; i++)
+                    clearColor.uint32[i] = uint32_t(*reinterpret_cast<uint16_t*>(const_cast<void*>(initData->data)));
+                break;
+            }
+            };
+
+            VkImageSubresourceRange range{};
+            range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            range.baseMipLevel = 0;
+            range.levelCount = VK_REMAINING_MIP_LEVELS;
+            range.baseArrayLayer = 0;
+            range.layerCount = VK_REMAINING_ARRAY_LAYERS;
+
+            m_api.vkCmdClearColorImage(
+                commandBuffer,
+                texture->m_image,
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                &clearColor,
+                1,
+                &range);
+        }
+        else
         {
             Offset srcOffset = 0;
             for (int i = 0; i < arraySize; ++i)
@@ -2154,6 +2257,23 @@ Result DeviceImpl::createBufferView(
                 info.buffer = resourceImpl->m_buffer.m_buffer;
                 info.offset = offset;
                 info.range = size;
+                VkBufferUsageFlags2CreateInfoKHR bufferViewUsage{};
+                bufferViewUsage.sType = VK_STRUCTURE_TYPE_BUFFER_USAGE_FLAGS_2_CREATE_INFO_KHR;
+
+                if (desc.type == IResourceView::Type::UnorderedAccess)
+                {
+                    info.pNext = &bufferViewUsage;
+                    bufferViewUsage.usage = VK_BUFFER_USAGE_2_STORAGE_TEXEL_BUFFER_BIT_KHR;
+                }
+                else if (desc.type == IResourceView::Type::ShaderResource)
+                {
+                    info.pNext = &bufferViewUsage;
+                    bufferViewUsage.usage = VK_BUFFER_USAGE_2_UNIFORM_TEXEL_BUFFER_BIT_KHR;
+                }
+                else
+                {
+                    assert(!"unhandled");
+                }
 
                 SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateBufferView(m_device, &info, nullptr, &view));
             }

@@ -1765,6 +1765,40 @@ struct SPIRVEmitContext
         }
     }
 
+    void setImageFormatCapabilityAndExtension(SpvImageFormat format, SpvCapability_ setCapabilityMask)
+    {
+        switch (format)
+        {
+        case SpvImageFormatUnknown:
+        case SpvImageFormatRgba32f:
+        case SpvImageFormatRgba16f:
+        case SpvImageFormatR32f:
+        case SpvImageFormatRgba8:
+        case SpvImageFormatRgba8Snorm:
+        case SpvImageFormatRgba32i:
+        case SpvImageFormatRgba16i:
+        case SpvImageFormatRgba8i:
+        case SpvImageFormatR32i:
+        case SpvImageFormatRgba32ui:
+        case SpvImageFormatRgba16ui:
+        case SpvImageFormatRgba8ui:
+        case SpvImageFormatR32ui:
+            if(setCapabilityMask == SpvCapabilityShader) return;
+            requireSPIRVCapability(SpvCapabilityShader);
+            return;
+        case SpvImageFormatR64ui:
+        case SpvImageFormatR64i:
+            if(setCapabilityMask == SpvCapabilityInt64ImageEXT) return;
+            ensureExtensionDeclaration(UnownedStringSlice("SPV_EXT_shader_image_int64"));
+            requireSPIRVCapability(SpvCapabilityInt64ImageEXT);
+            return;
+        default:
+            if(setCapabilityMask == SpvCapabilityStorageImageExtendedFormats) return;
+            requireSPIRVCapability(SpvCapabilityStorageImageExtendedFormats);
+            return;
+        }
+    }
+
     SpvInst* ensureTextureType(IRInst* assignee, IRTextureTypeBase* inst)
     {
         // Some untyped constants from OpTypeImage
@@ -1895,6 +1929,8 @@ struct SPIRVEmitContext
         //
         // SPIR-V requires that the sampled/rw info on the image isn't unknown
         SLANG_ASSERT(sampled == sampledImage || sampled == readWriteImage);
+        if(isMultisampled) 
+            requireSPIRVCapability(SpvCapabilityStorageImageMultisample);
         switch(dim)
         {
         case SpvDim1D:
@@ -1933,9 +1969,7 @@ struct SPIRVEmitContext
             requireSPIRVCapability(SpvCapabilityStorageImageWriteWithoutFormat);
         }
         
-        auto formatCapability = getImageFormatCapability(format);
-        if (formatCapability != SpvCapabilityShader)
-            requireSPIRVCapability(formatCapability);
+        setImageFormatCapabilityAndExtension(format, SpvCapabilityShader);
 
         //
         // The op itself
@@ -2141,10 +2175,18 @@ struct SPIRVEmitContext
             }
         }
 
-        if (var->findDecorationImpl(kIROp_RequireSPIRVDescriptorIndexingExtensionDecoration))
+        for (auto decor : var->getDecorations())
         {
-            ensureExtensionDeclaration(UnownedStringSlice("SPV_EXT_descriptor_indexing"));
-            requireSPIRVCapability(SpvCapabilityRuntimeDescriptorArray);
+            switch (decor->getOp())
+            {
+            case kIROp_GLSLPrimitivesRateDecoration:
+                emitOpDecorate(getSection(SpvLogicalSectionID::Annotations), decor, varInst, SpvDecorationPerPrimitiveEXT);
+                break;
+            case kIROp_RequireSPIRVDescriptorIndexingExtensionDecoration:
+                ensureExtensionDeclaration(UnownedStringSlice("SPV_EXT_descriptor_indexing"));
+                requireSPIRVCapability(SpvCapabilityRuntimeDescriptorArray);
+                break;
+            }
         }
     }
 
@@ -3257,6 +3299,30 @@ struct SPIRVEmitContext
                                decoration,
                                dstID,
                                SpvDecorationCoherent);
+            break;
+        case kIROp_GLSLVolatileDecoration:
+            emitOpDecorate(getSection(SpvLogicalSectionID::Annotations),
+                decoration,
+                dstID,
+                SpvDecorationVolatile);
+            break;
+        case kIROp_GLSLRestrictDecoration:
+            emitOpDecorate(getSection(SpvLogicalSectionID::Annotations),
+                decoration,
+                dstID,
+                SpvDecorationRestrict);
+            break;
+        case kIROp_GLSLReadOnlyDecoration:
+            emitOpDecorate(getSection(SpvLogicalSectionID::Annotations),
+                decoration,
+                dstID,
+                SpvDecorationNonWritable);
+            break;
+        case kIROp_GLSLWriteOnlyDecoration:
+            emitOpDecorate(getSection(SpvLogicalSectionID::Annotations),
+                decoration,
+                dstID,
+                SpvDecorationNonReadable);
             break;
         // ...
         }

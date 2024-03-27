@@ -412,6 +412,11 @@ namespace Slang
                 expr->declRef = declRef;
                 expr->memberOperatorLoc = _getMemberOpLoc(originalExpr);
 
+                // If any member declares the following value is a
+                // write only, we must declare the parent as a write
+                // only to avoid modifying the child
+                expr->type.isWriteOnly = baseExpr->type.isWriteOnly || expr->type.isWriteOnly;
+
                 // When referring to a member through an expression,
                 // the result is only an l-value if both the base
                 // expression and the member agree that it should be.
@@ -424,7 +429,7 @@ namespace Slang
                     // One exception to this is if we're reading the contents
                     // of a GLSL buffer interface block which isn't marked as
                     // read_only
-                    expr->type.isLeftValue = isMutableGLSLBufferBlockVarExpr(baseExpr);
+                    expr->type.isLeftValue = isMutableGLSLBufferBlockVarExpr(baseExpr) && (expr->type.hasReadOnlyOnTarget == false);
                 }
                 else
                 {
@@ -1918,7 +1923,8 @@ namespace Slang
 
     Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
     {
-        auto baseExpr = checkBaseForMemberExpr(subscriptExpr->baseExpression);
+        bool needDeref = false;
+        auto baseExpr = checkBaseForMemberExpr(subscriptExpr->baseExpression, needDeref);
 
         // If the base expression is a type, it means that this is an array declaration,
         // then we should disable short-circuit in case there is logical expression in
@@ -2077,6 +2083,9 @@ namespace Slang
 
     Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
     {
+        if (expr->right->type.isWriteOnly)
+            getSink()->diagnose(expr, Diagnostics::readingFromWriteOnly);
+
         expr->left = maybeOpenRef(expr->left);
         auto type = expr->left->type;
         auto right = maybeOpenRef(expr->right);
@@ -2176,6 +2185,44 @@ namespace Slang
         return _canLValueCoerceScalarType(a, b);
     }
 
+
+    void SemanticsVisitor::compareMemoryQualifierOfParamToArgument(
+        ParamDecl* paramIn,
+        Expr* argIn)
+    {
+        auto arg = as<VarExpr>(argIn);
+        if (!paramIn || !arg)
+            return;
+
+        auto argDeclRef = arg->declRef;
+        if (!argDeclRef)
+            return;
+        auto argDecl =  argDeclRef.getDecl();
+        auto argMemMods = argDecl->findModifier<MemoryQualifierCollectionModifier>();
+        if(!argMemMods)
+            return;
+        uint32_t argQualifiers = argMemMods->getMemoryQualifierBit();    
+
+        uint32_t paramQualifiers = 0;
+        auto paramMemMods = paramIn->findModifier<MemoryQualifierCollectionModifier>();
+        if(paramMemMods)
+            paramQualifiers = paramMemMods->getMemoryQualifierBit();
+
+        if(argQualifiers & MemoryQualifierCollectionModifier::Flags::kCoherent
+            && !(paramQualifiers & MemoryQualifierCollectionModifier::Flags::kCoherent))
+                getSink()->diagnose(arg, Diagnostics::argumentHasMoreMemoryQualifiersThanParam, "coherent");
+        if(argQualifiers & MemoryQualifierCollectionModifier::Flags::kReadOnly
+            && !(paramQualifiers & MemoryQualifierCollectionModifier::Flags::kReadOnly))
+                getSink()->diagnose(arg, Diagnostics::argumentHasMoreMemoryQualifiersThanParam, "readonly");
+        if(argQualifiers & MemoryQualifierCollectionModifier::Flags::kWriteOnly
+            && !(paramQualifiers & MemoryQualifierCollectionModifier::Flags::kWriteOnly))
+                getSink()->diagnose(arg, Diagnostics::argumentHasMoreMemoryQualifiersThanParam, "writeonly");
+        if(argQualifiers & MemoryQualifierCollectionModifier::Flags::kVolatile
+            && !(paramQualifiers & MemoryQualifierCollectionModifier::Flags::kVolatile))
+                getSink()->diagnose(arg, Diagnostics::argumentHasMoreMemoryQualifiersThanParam, "volatile");
+        // dropping a `restrict` qualifier from arguments is allowed in GLSL with memory qualifiers
+    }
+
     Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr *expr)
     {
         auto rs = ResolveInvoke(expr);
@@ -2193,10 +2240,25 @@ namespace Slang
                     }
                 }
 
+                auto funcDeclRefExpr = as<DeclRefExpr>(invoke->functionExpr);
+                FunctionDeclBase* funcDeclBase = nullptr;
+                if (funcDeclRefExpr)
+                    funcDeclBase = as<FunctionDeclBase>(funcDeclRefExpr->declRef.getDecl());
+
                 Index paramCount = funcType->getParamCount();
                 for (Index pp = 0; pp < paramCount; ++pp)
                 {
                     auto paramType = funcType->getParamType(pp);
+                    Expr* argExpr = nullptr;
+                    ParamDecl* paramDecl = nullptr;
+                    if (pp < expr->arguments.getCount())
+                    {
+                        argExpr = expr->arguments[pp];
+                        if(funcDeclBase)
+                            paramDecl = funcDeclBase->getParameters()[pp];
+                    }
+                    compareMemoryQualifierOfParamToArgument(paramDecl, argExpr);
+
                     if (as<OutTypeBase>(paramType) || as<RefType>(paramType))
                     {
                         // `out`, `inout`, and `ref` parameters currently require
@@ -2206,9 +2268,8 @@ namespace Slang
                         // for an `inout` parameter to be converted in both
                         // directions.
                         //
-                        if( pp < expr->arguments.getCount() )
+                        if( argExpr )
                         {
-                            auto argExpr = expr->arguments[pp];
                             if( !argExpr->type.isLeftValue)
                             {
                                 auto implicitCastExpr = as<ImplicitCastExpr>(argExpr);
@@ -3279,6 +3340,8 @@ namespace Slang
             {
                 auto elementType = QualType(pointerLikeType->getElementType());
                 elementType.isLeftValue = baseType.isLeftValue;
+                elementType.hasReadOnlyOnTarget = baseType.hasReadOnlyOnTarget;
+                elementType.isWriteOnly = baseType.isWriteOnly;
 
                 auto derefExpr = m_astBuilder->create<DerefExpr>();
                 derefExpr->base = expr;
@@ -3833,13 +3896,18 @@ namespace Slang
         return expr;
     }
 
-    Expr* SemanticsVisitor::checkBaseForMemberExpr(Expr* inBaseExpr)
+    Expr* SemanticsVisitor::checkBaseForMemberExpr(Expr* inBaseExpr, bool& outNeedDeref)
     {
         auto baseExpr = inBaseExpr;
 
         baseExpr = CheckTerm(baseExpr);
 
-        baseExpr = MaybeDereference(baseExpr);
+        auto derefExpr = MaybeDereference(baseExpr);
+
+        if (derefExpr != baseExpr)
+            outNeedDeref = true;
+
+        baseExpr = derefExpr;
 
         // If the base of the member lookup has an interface type
         // *without* a suitable this-type substitution, then we are
@@ -3889,7 +3957,17 @@ namespace Slang
 
     Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr * expr)
     {
-        expr->baseExpression = checkBaseForMemberExpr(expr->baseExpression);
+        bool needDeref = false;
+        expr->baseExpression = checkBaseForMemberExpr(expr->baseExpression, needDeref);
+
+        if (!needDeref && as<DerefMemberExpr>(expr) && !as<PtrType>(expr->baseExpression->type))
+        {
+            // The user is trying to use the `->` operator on something that can't be
+            // dereferenced, so we should diagnose that.
+            if (!as<ErrorType>(expr->baseExpression->type))
+                getSink()->diagnose(expr->memberOperatorLoc, Diagnostics::cannotDereferenceType, expr->baseExpression->type);
+        }
+
         auto baseType = expr->baseExpression->type;
 
         // If we are looking up through a modified type, just pass straight

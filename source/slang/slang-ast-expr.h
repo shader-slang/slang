@@ -238,6 +238,12 @@ class MemberExpr: public DeclRefExpr
     SourceLoc memberOperatorLoc;
 };
 
+// Member expression that is dereferenced, e.g. `a->b`.
+class DerefMemberExpr : public MemberExpr
+{
+    SLANG_AST_CLASS(DerefMemberExpr)
+};
+
 // Member looked up on a type, rather than a value
 class StaticMemberExpr: public DeclRefExpr
 {

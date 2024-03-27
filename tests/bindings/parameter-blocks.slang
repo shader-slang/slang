@@ -1,4 +1,4 @@
-//TEST:COMPARE_HLSL:-no-mangle -profile ps_5_1 -entry main -parameter-blocks-use-register-spaces
+//TEST:COMPARE_HLSL: -profile ps_5_1 -entry main -parameter-blocks-use-register-spaces
 
 // Confirm that Slang `ParameterBlock<T>` generates
 // parameter bindings like we expect.

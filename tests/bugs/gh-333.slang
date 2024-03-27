@@ -1,4 +1,4 @@
-//TEST:COMPARE_HLSL:-no-mangle -profile ps_5_0 -entry main
+//TEST:COMPARE_HLSL: -profile ps_5_0 -entry main
 
 // Ensure declaration order in output is correct
 

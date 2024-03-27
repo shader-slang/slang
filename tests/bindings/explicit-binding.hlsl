@@ -1,4 +1,4 @@
-//TEST:COMPARE_HLSL:-no-mangle -profile ps_4_0 -entry main
+//TEST:COMPARE_HLSL: -profile ps_4_0 -entry main
 
 // We need to allow the user to add explicit bindings to their parameters,
 // and we can't go and auto-assign anything to use the same locations.
