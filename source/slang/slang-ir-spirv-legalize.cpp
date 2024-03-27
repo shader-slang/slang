@@ -377,8 +377,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // If the texture has no format decoration, try to infer it from the type.
         if (format == ImageFormat::unknown)
         {
-            // Do not infer format when shape is a subpass because SPRI-V spec defines
-            // subpass to have an unknown format 
             auto elementType = textureType->getElementType();
             Int vectorWidth = 1;
             if (auto elementVecType = as<IRVectorType>(elementType))
