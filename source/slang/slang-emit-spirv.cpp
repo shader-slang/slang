@@ -1415,12 +1415,21 @@ struct SPIRVEmitContext
                     if (m_decoratedSpvInsts.add(getID(resultSpvType)))
                     {
                         IRSizeAndAlignment sizeAndAlignment;
-                        getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), ptrType->getValueType(), &sizeAndAlignment);
+                        uint32_t stride;
+
+                        getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), valueType, &sizeAndAlignment);
+                        uint64_t valueSize = sizeAndAlignment.size;
+
+                        // Any unsized data type (e.g. struct or array) will have size of kIndeterminateSize,
+                        // in such case the stride is invalid, so we have to provide a non-zero value to pass the
+                        // spirv validator.
+                        stride = (valueSize >= (uint64_t)sizeAndAlignment.kIndeterminateSize) ?
+                                    0xFFFF : (uint32_t)sizeAndAlignment.getStride();
                         emitOpDecorateArrayStride(
                             getSection(SpvLogicalSectionID::Annotations),
                             nullptr,
                             resultSpvType,
-                            SpvLiteralInteger::from32((uint32_t)sizeAndAlignment.getStride()));
+                            SpvLiteralInteger::from32(stride));
                     }
                 }
                 return resultSpvType;
@@ -1431,12 +1440,28 @@ struct SPIRVEmitContext
             {
                 List<IRType*> types;
                 for (auto field : static_cast<IRStructType*>(inst)->getFields())
+                {
                     types.add(field->getFieldType());
+                }
                 auto spvStructType = emitOpTypeStruct(
                     inst,
                     types
                 );
                 emitDecorations(inst, getID(spvStructType));
+
+                auto structType = as<IRStructType>(inst);
+                uint64_t structSize = 0;
+                if (auto layoutDecor = structType->findDecoration<IRSizeAndAlignmentDecoration>())
+                {
+                    structSize = layoutDecor->getSize();
+                }
+
+                if (structSize >= (uint64_t)IRSizeAndAlignment::kIndeterminateSize)
+                {
+                    IRBuilder builder(inst);
+                    auto decoration = builder.addDecoration(inst, kIROp_SPIRVBlockDecoration);
+                    emitDecoration(getID(spvStructType), decoration);
+                }
                 emitLayoutDecorations(as<IRStructType>(inst), getID(spvStructType));
                 return spvStructType;
             }

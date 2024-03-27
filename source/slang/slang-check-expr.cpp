@@ -2601,8 +2601,7 @@ namespace Slang
         }
         expr->type = QualType(m_astBuilder->getErrorType());
         auto lookupResult = lookUp(
-            m_astBuilder,
-            this, expr->name, expr->scope);
+            m_astBuilder, this, expr->name, expr->scope, LookupMask::Default, false, getDeclToExcludeFromLookup());
         
         bool diagnosed = false;
         lookupResult = filterLookupResultByVisibilityAndDiagnose(lookupResult, expr->loc, diagnosed);
@@ -3703,7 +3702,9 @@ namespace Slang
                                 this,
                                 expr->name,
                                 namespaceDecl,
-                                DeclRef(namespaceDecl));
+                                DeclRef(namespaceDecl),
+                                LookupMask::Default,
+                                getDeclToExcludeFromLookup());
                             AddToLookupResult(globalLookupResult, nsLookupResult);
                         }
                     }

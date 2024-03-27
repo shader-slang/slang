@@ -1547,7 +1547,8 @@ namespace Slang
             }
             else
             {
-                initExpr = CheckExpr(initExpr);
+                SemanticsVisitor subVisitor(withDeclToExcludeFromLookup(varDecl));
+                initExpr = subVisitor.CheckExpr(initExpr);
 
                 // TODO: We might need some additional steps here to ensure
                 // that the type of the expression is one we are okay with
@@ -1568,7 +1569,8 @@ namespace Slang
         {
             // A variable with an explicit type is simpler, for the
             // most part.
-            TypeExp typeExp = CheckUsableType(varDecl->type);
+            SemanticsVisitor subVisitor(withDeclToExcludeFromLookup(varDecl));
+            TypeExp typeExp = subVisitor.CheckUsableType(varDecl->type);
             varDecl->type = typeExp;
             if (varDecl->type.equals(m_astBuilder->getVoidType()))
             {
@@ -6222,7 +6224,8 @@ namespace Slang
 
     void SemanticsDeclHeaderVisitor::visitTypeDefDecl(TypeDefDecl* decl)
     {
-        decl->type = CheckProperType(decl->type);
+        SemanticsVisitor visitor(withDeclToExcludeFromLookup(decl));
+        decl->type = visitor.CheckProperType(decl->type);
         checkVisibility(decl);
     }
 
@@ -7016,7 +7019,8 @@ namespace Slang
         auto typeExpr = paramDecl->type;
         if(typeExpr.exp)
         {
-            typeExpr = CheckUsableType(typeExpr);
+            SemanticsVisitor subVisitor(withDeclToExcludeFromLookup(paramDecl));
+            typeExpr = subVisitor.CheckUsableType(typeExpr);
             paramDecl->type = typeExpr;
             checkMeshOutputDecl(paramDecl);
         }
@@ -7658,7 +7662,8 @@ namespace Slang
 
     void SemanticsDeclHeaderVisitor::visitPropertyDecl(PropertyDecl* decl)
     {
-        decl->type = CheckUsableType(decl->type);
+        SemanticsVisitor subVisitor(withDeclToExcludeFromLookup(decl));
+        decl->type = subVisitor.CheckUsableType(decl->type);
         visitAbstractStorageDeclCommon(decl);
         checkVisibility(decl);
     }
