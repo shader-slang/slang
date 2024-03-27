@@ -2175,10 +2175,6 @@ void addVarDecorations(
             // may not be referenced; adding HLSL export modifier force emits
             builder->addHLSLExportDecoration(inst);
         }
-        else if(as<GloballyCoherentModifier>(mod))
-        {
-            builder->addSimpleDecoration<IRGloballyCoherentDecoration>(inst);
-        }
         else if(as<PreciseModifier>(mod))
         {
             builder->addSimpleDecoration<IRPreciseDecoration>(inst);
@@ -2217,21 +2213,9 @@ void addVarDecorations(
         {
             builder->addDynamicUniformDecoration(inst);
         }
-        else if (as<GLSLVolatileModifier>(mod))
+        else if (auto collection = as<MemoryQualifierSetModifier>(mod))
         {
-            builder->addSimpleDecoration<IRGLSLVolatileDecoration>(inst);
-        }
-        else if (as<GLSLRestrictModifier>(mod))
-        {
-            builder->addSimpleDecoration<IRGLSLRestrictDecoration>(inst);
-        }
-        else if (as<GLSLReadOnlyModifier>(mod))
-        {
-            builder->addSimpleDecoration<IRGLSLReadOnlyDecoration>(inst);
-        }
-        else if (as<GLSLWriteOnlyModifier>(mod))
-        {
-            builder->addSimpleDecoration<IRGLSLWriteOnlyDecoration>(inst);
+            builder->addMemoryQualifierSetDecoration(inst, IRIntegerValue(collection->getMemoryQualifierBit()));
         }
         // TODO: what are other modifiers we need to propagate through?
     }

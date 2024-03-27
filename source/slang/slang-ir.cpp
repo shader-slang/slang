@@ -56,7 +56,6 @@ namespace Slang
         switch (op)
         {
             case kIROp_EarlyDepthStencilDecoration: 
-            case kIROp_GloballyCoherentDecoration: 
             case kIROp_KeepAliveDecoration: 
             case kIROp_LineAdjInputPrimitiveTypeDecoration: 
             case kIROp_LineInputPrimitiveTypeDecoration: 

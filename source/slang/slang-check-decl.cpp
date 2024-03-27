@@ -946,21 +946,15 @@ namespace Slang
 
             // Ensures child of struct is set read-only or not
             bool isWriteOnly = false;
+            if(auto collection = varDeclRef.getDecl()->findModifier<MemoryQualifierSetModifier>())
             {
-                for (auto mod : varDeclRef.getDecl()->modifiers)
+                if(collection->getMemoryQualifierBit() & MemoryQualifierSetModifier::Flags::kReadOnly)
                 {
-                    if (as<GLSLReadOnlyModifier>(mod))
-                    {
-                        isLValue = false;
-                        qualType.hasReadOnlyOnTarget = true;
-                        if (isLValue == false && isWriteOnly) break;
-                    }
-                    if (as<GLSLWriteOnlyModifier>(mod))
-                    {
-                        isWriteOnly = true;
-                        if (isLValue == false && isWriteOnly) break;
-                    }
+                    isLValue = false;
+                    qualType.hasReadOnlyOnTarget = true;
                 }
+                if(collection->getMemoryQualifierBit() & MemoryQualifierSetModifier::Flags::kWriteOnly)
+                    isWriteOnly = true;
             }
 
             qualType.isLeftValue = isLValue;
@@ -7053,10 +7047,10 @@ namespace Slang
         // Only texture types are allowed to have memory qualifiers on parameters
         if(!paramDecl->type || paramDecl->type->astNodeType != ASTNodeType::TextureType)
         {
-            auto memoryQualifierCollection = paramDecl->findModifier<MemoryQualifierCollectionModifier>();
-            if(!memoryQualifierCollection) 
+            auto MemoryQualifierSet = paramDecl->findModifier<MemoryQualifierSetModifier>();
+            if(!MemoryQualifierSet) 
                 return;
-            for(auto mod : memoryQualifierCollection->getModifiers())
+            for(auto mod : MemoryQualifierSet->getModifiers())
                 getSink()->diagnose(paramDecl, Diagnostics::memoryQualifierNotAllowedOnANonImageTypeParameter, mod);
         }
     }

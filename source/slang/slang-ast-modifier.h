@@ -1545,9 +1545,9 @@ class DynamicUniformModifier : public Modifier
     SLANG_AST_CLASS(DynamicUniformModifier)
 };
 
-class MemoryQualifierCollectionModifier : public Modifier
+class MemoryQualifierSetModifier : public Modifier
 {
-    SLANG_AST_CLASS(MemoryQualifierCollectionModifier);
+    SLANG_AST_CLASS(MemoryQualifierSetModifier);
 
     List<Modifier*> memoryModifiers;
 

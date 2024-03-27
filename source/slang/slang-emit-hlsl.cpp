@@ -1234,9 +1234,10 @@ void HLSLSourceEmitter::emitMeshShaderModifiersImpl(IRInst* varInst)
 
 void HLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
 {
-    if (varDecl->findDecoration<IRGloballyCoherentDecoration>())
+    if (auto collection = varDecl->findDecoration<IRMemoryQualifierSetDecoration>())
     {
-        m_writer->emit("globallycoherent\n");
+        if(collection->getMemoryQualifierBit() | MemoryQualifierSetModifier::Flags::kCoherent)
+           m_writer->emit("globallycoherent\n");
     }
 }
 
