@@ -7,11 +7,8 @@ on:
     branches: [ master ]
   pull_request:
     branches: [ master ]
-  schedule:
-    - cron: '25 23 * * *'
-    - cron: '25 00 * * *'
-    - cron: '35 23 * * *'   
-    - cron: '35 00 * * *'
+  schedule:   
+    - cron: '30 06 * * *'
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -92,7 +89,9 @@ jobs:
         slang_verif_svc: ${{ secrets.slang_verif_svc_cred }}
         github_sha: ${{ github.sha }}
 
-      if: ${{ github.event_name == 'schedule' }}
+      # commenting this condition out so it will run on pull request
+      # once we're ready to commit I'll remove the comment
+      #if: ${{ github.event_name == 'schedule' }}
       run: |
         python -m pip install --upgrade pip
         pip install gspread oauth2client
