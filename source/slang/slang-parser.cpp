@@ -3572,7 +3572,7 @@ namespace Slang
         if (parser->currentScope && parser->currentScope->containerDecl)
         {
             parseDeclBody(parser, parser->currentScope->containerDecl);
-            return nullptr;
+            return parser->astBuilder->create<EmptyDecl>();
         }
         else
         {

@@ -325,11 +325,16 @@ struct WitnessLookupLoweringContext
         return resultValue;
     }
 
-    void rewriteCallSite(IRCall* call, IRInst* dispatchFunc, IRInst* existentialObject)
+    void rewriteCallSite(IRCall* call, IRInst* dispatchFunc, IRInst* initialExistentialObject)
     {
         SLANG_RELEASE_ASSERT(call->getArgCount() != 0);
         call->setOperand(0, dispatchFunc);
-        call->setOperand(1, existentialObject);
+        IRBuilder builder(call);
+        builder.setInsertBefore(call);
+        auto witnessTable = builder.emitExtractExistentialWitnessTable(initialExistentialObject);
+        auto newExistentialObject = builder.emitMakeExistential(
+            initialExistentialObject->getDataType(), call->getOperand(1), witnessTable);
+        call->setOperand(1, newExistentialObject);
     }
 
     bool processWitnessLookup(IRLookupWitnessMethod* lookupInst)

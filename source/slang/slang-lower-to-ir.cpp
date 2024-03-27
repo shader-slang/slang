@@ -2513,6 +2513,7 @@ void addArg(
     LoweredValInfo          argVal,         //< The lowered value of the argument to add
     IRType*                 paramType,      //< The type of the corresponding parameter
     ParameterDirection      paramDirection, //< The direction of the parameter (`in`, `out`, etc.)
+    Type*                   argType,        //< The AST-level type of the argument
     SourceLoc               loc)            //< A location to use if we need to report an error
 {
     switch(paramDirection)
@@ -2553,6 +2554,12 @@ void addArg(
                 // If the value is not one that could yield a simple l-value
                 // then we need to convert it into a temporary
                 //
+                if (as<IRThisType>(paramType))
+                {
+                    // When paramType is ThisType, we need to get the actual argument type
+                    // from the arg.
+                    paramType = lowerType(context, argType);
+                }
                 if (auto refType = as<IRConstRefType>(paramType))
                 {
                     paramType = refType->getValueType();
@@ -2626,7 +2633,7 @@ void addCallArgsForParam(
     case kParameterDirection_InOut:
         {
             LoweredValInfo loweredArg = lowerLValueExpr(context, argExpr);
-            addArg(context, ioArgs, ioFixups, loweredArg, paramType, paramDirection, argExpr->loc);
+            addArg(context, ioArgs, ioFixups, loweredArg, paramType, paramDirection, argExpr->type, argExpr->loc);
         }
         break;
 
@@ -3233,7 +3240,7 @@ static LoweredValInfo _emitCallToAccessor(
         auto thisParam = info.parameterLists.params[0];
         auto thisParamType = lowerType(context, thisParam.type);
 
-        addArg(context, &allArgs, &fixups, base, thisParamType, thisParam.direction, SourceLoc());
+        addArg(context, &allArgs, &fixups, base, thisParamType, thisParam.direction, thisParam.type, SourceLoc());
     }
 
     allArgs.addRange(args, argCount);

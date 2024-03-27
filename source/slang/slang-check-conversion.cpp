@@ -932,11 +932,15 @@ namespace Slang
                 // to pass a value of a derived `struct` type into methods that
                 // expect a value of its base type.
                 //
-                // TODO: vet this logic for correctness.
-                //
                 if (fromExpr && fromExpr->type.isLeftValue)
                 {
-                    (*outToExpr)->type.isLeftValue = true;
+                    // If the original type is a concrete type and toType is an interface type,
+                    // we need to wrap the original expression into a MakeExistential, and the
+                    // result of MakeExistential is not an l-value.
+                    bool toTypeIsInterface = isInterfaceType(toType);
+                    bool fromTypeIsInterface = isInterfaceType(fromType);
+                    if (!toTypeIsInterface || toTypeIsInterface == fromTypeIsInterface)
+                        (*outToExpr)->type.isLeftValue = true;
                 }
             }
             if (outCost)
