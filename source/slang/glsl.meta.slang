@@ -7946,15 +7946,7 @@ __spirv_version(1.3) [require(spirv)]
 [ForceInline]
 public bool anyInvocation(bool value)
 {
-    __target_switch
-    {
-    case glsl:
-    case hlsl:
-    case spirv:
-    {
-        return WaveActiveAnyTrue(value);
-    }
-    }
+    return WaveActiveAnyTrue(value);
 }
 __glsl_version(460) [require(glsl)]
 __spirv_version(1.3) [require(spirv)]
@@ -7962,15 +7954,7 @@ __spirv_version(1.3) [require(spirv)]
 [ForceInline]
 public bool allInvocations(bool value)
 {
-    __target_switch
-    {
-    case glsl:
-    case hlsl:
-    case spirv:
-    {
-        return WaveActiveAllTrue(value);
-    }
-    }
+    return WaveActiveAllTrue(value);
 }
 __glsl_version(460) [require(glsl)]
 __spirv_version(1.3) [require(spirv)]
@@ -7978,13 +7962,5 @@ __spirv_version(1.3) [require(spirv)]
 [ForceInline]
 public bool allInvocationsEqual(bool value)
 {
-    __target_switch
-    {
-    case glsl:
-    case hlsl:
-    case spirv:
-    {
-        return WaveActiveAllEqual(value);
-    }
-    }
+    return WaveActiveAllEqual(value);
 }

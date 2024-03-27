@@ -450,6 +450,7 @@ DIAGNOSTIC(31205, Error, incompleteTypeCannotBeUsedInUniformParameter, "incomple
 DIAGNOSTIC(31206, Error, memoryQualifierNotAllowedOnANonImageTypeParameter, "modifier $0 is not allowed on a non image type parameter.")
 DIAGNOSTIC(31207, Error, InputAttachmentIndexOnlyAllowedOnSubpass, "input_attachment_index is only allowed on subpass images.")
 DIAGNOSTIC(31208, Error, requireInputDecoratedVarForParameter, "$0 expects for argument $1 a type which is a shader input (`in`) variable.")
+DIAGNOSTIC(31209, Error, invalidImageFormatForType, "image format '$0' is invalid for type '$1'.")
 
 // Enums
 

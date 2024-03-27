@@ -1,12 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK_GLSL): -target glsl -stage fragment -entry main -allow-glsl
 //TEST:SIMPLE(filecheck=CHECK_SPV): -target spirv -emit-spirv-directly -stage fragment -entry main -allow-glsl
 #version 450
-buffer MyBlockName
-{
-    vec4 fdata[2];
-    ivec4 udata[2];
-    uvec4 idata[2];
-} keepAliveBuffer;
 
 layout(location = 0) out ivec4 outColorActual;
 

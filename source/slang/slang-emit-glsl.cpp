@@ -2738,7 +2738,7 @@ void GLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
         {
             m_writer->emit(toSlice("layout(input_attachment_index = "));
             m_writer->emit(glslInputAttachment->getIndex()->getValue());
-            m_writer->emit(toSlice(")"));
+            m_writer->emit(toSlice(")\n"));
         }
     }
 

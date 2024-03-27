@@ -251,7 +251,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 // passing as is, which needs to be a pointer (pass as is).
                 if (user->getDataType()->getOp() == kIROp_RefType
                     && storageClass == SpvStorageClassInput)
-                    return;
+                    continue;
                 // If this is being used in an asm block, insert the load to
                 // just prior to the block.
                 const auto asmBlock = spirvAsmOperand->getAsmBlock();
@@ -368,12 +368,17 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         {
             format = decor->getFormat();
         }
+        if (textureType->GetBaseShape() == SLANG_TEXTURE_SUBPASS)
+        {
+            assert(format == ImageFormat::unknown);
+            return;
+        } 
+
         // If the texture has no format decoration, try to infer it from the type.
         if (format == ImageFormat::unknown)
         {
             // Do not infer format when shape is a subpass because SPRI-V spec defines
             // subpass to have an unknown format 
-            if (textureType->GetBaseShape() == SLANG_TEXTURE_SUBPASS) return;
             auto elementType = textureType->getElementType();
             Int vectorWidth = 1;
             if (auto elementVecType = as<IRVectorType>(elementType))

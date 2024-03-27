@@ -1088,7 +1088,7 @@ static void addExplicitParameterBindings_GLSL(
     LayoutSemanticInfo semanticInfo;
     semanticInfo.index = 0;
     semanticInfo.space = 0;
-    semanticInfo.inputAttachmentIndex = 0;
+    semanticInfo.inputAttachmentIndex = ParameterAndLayoutConstants::kInputAttachmentIndexUnused;
 
     if( (foundResInfo = typeLayout->FindResourceInfo(LayoutResourceKind::DescriptorTableSlot)) != nullptr )
     {

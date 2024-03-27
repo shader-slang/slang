@@ -17,6 +17,7 @@ bool testFragmentProcessingInterpolateFunctions()
         && interpolateAtCentroid(inDataV1) != -1.0f
         && (tmpStore + inDataV1) != -0.1f
         && isOk(inDataV1, tmpStore)
+        && inDataV1 != -1.0f
         ;
 }
 
