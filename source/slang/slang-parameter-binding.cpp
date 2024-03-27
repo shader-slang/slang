@@ -331,7 +331,7 @@ struct UsedRanges
 
 namespace ParameterAndLayoutConstants
 {
-    const constexpr size_t kInputAttachmentIndexUnused = 0xFFFFFFFFFFFFFFFF;
+    const constexpr size_t kInputAttachmentIndexUnused = 0xFFFFFFFF;
 };
 
 struct ParameterBindingInfo
