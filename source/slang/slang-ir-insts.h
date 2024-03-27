@@ -3329,6 +3329,7 @@ public:
     IRBasicType* getVoidType();
     IRBasicType* getBoolType();
     IRBasicType* getIntType();
+    IRBasicType* getInt64Type();
     IRBasicType* getUIntType();
     IRBasicType* getUInt64Type();
     IRBasicType* getCharType();

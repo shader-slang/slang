@@ -921,6 +921,15 @@ namespace Slang
             return result;
         }
 
+        SemanticsContext withDeclToExcludeFromLookup(Decl* decl)
+        {
+            SemanticsContext result(*this);
+            result.m_declToExcludeFromLookup = decl;
+            return result;
+        }
+
+        Decl* getDeclToExcludeFromLookup() { return m_declToExcludeFromLookup; }
+
     private:
         SharedSemanticsContext* m_shared = nullptr;
 
@@ -928,6 +937,7 @@ namespace Slang
 
         ExprLocalScope* m_exprLocalScope = nullptr;
 
+        Decl* m_declToExcludeFromLookup = nullptr;
 
     protected:
         // TODO: consider making more of this state `private`...

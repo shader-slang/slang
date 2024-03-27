@@ -363,11 +363,12 @@ Result getSizeAndAlignment(CompilerOptionSet& optionSet, IRTypeLayoutRules* rule
         IRBuilder builder(module);
 
         auto intType = builder.getIntType();
+        auto int64Type = builder.getInt64Type();
         builder.addDecoration(
             type,
             kIROp_SizeAndAlignmentDecoration,
             builder.getIntValue(intType, (IRIntegerValue)rules->ruleName),
-            builder.getIntValue(intType, sizeAndAlignment.size),
+            builder.getIntValue(int64Type, sizeAndAlignment.size),
             builder.getIntValue(intType, sizeAndAlignment.alignment));
     }
 
