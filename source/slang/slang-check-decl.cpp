@@ -6203,7 +6203,8 @@ namespace Slang
 
     void SemanticsDeclHeaderVisitor::visitTypeDefDecl(TypeDefDecl* decl)
     {
-        decl->type = CheckProperType(decl->type);
+        SemanticsVisitor visitor(withDeclToExcludeFromLookup(decl));
+        decl->type = visitor.CheckProperType(decl->type);
         checkVisibility(decl);
     }
 

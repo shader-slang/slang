@@ -1421,6 +1421,9 @@ namespace Slang
         Scope*              scope       = nullptr;
         Scope*              endScope    = nullptr;
 
+        // A decl to exclude from the lookup, used to exclude the current decl being checked, such as in typedef Foo Foo;
+        // to avoid finding itself.
+        Decl* declToExclude = nullptr;
         LookupMask          mask        = LookupMask::Default;
         LookupOptions       options     = LookupOptions::None;
 
