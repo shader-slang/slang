@@ -13,7 +13,7 @@ buffer MyBlockName1
     uint data[];
 } raceCondition;
 
-shared uint raceConditionShared;
+groupshared uint raceConditionShared;
 
 //TEST_INPUT: set raceConditionImage = RWTexture1D(format=R32_SINT, size=4, content=one, mipMaps = 1)
 uniform layout(binding=0,r32i) iimage1D raceConditionImage;
