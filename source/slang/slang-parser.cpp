@@ -7912,7 +7912,6 @@ namespace Slang
     {
         ModifierListBuilder listBuilder;
         listBuilder.add(parser->astBuilder->create<HLSLEffectSharedModifier>());
-        listBuilder.add(parser->astBuilder->create<HLSLGroupSharedModifier>());
         return listBuilder.getFirst();
     }
     static NodeBase* parseLayoutModifier(Parser* parser, void* /*userData*/)
