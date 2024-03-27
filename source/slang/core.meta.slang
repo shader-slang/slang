@@ -2363,6 +2363,10 @@ int __naturalStrideOf()
 __intrinsic_op($(kIROp_TreatAsDynamicUniform))
 T asDynamicUniform<T>(T v);
 
+__generic<T>
+__intrinsic_op($(kIROp_GetLegalizedSPIRVGlobalParamAddr))
+Ptr<T> __getLegalizedSPIRVGlobalParamAddr(T val);
+
 // Binding Attributes
 
 __attributeTarget(DeclBase)

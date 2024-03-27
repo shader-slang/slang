@@ -80,6 +80,8 @@ namespace gfx_test
         case Format::R16G16_FLOAT:                  return new ValidationTextureFormat<uint16_t>(2);
         case Format::R16_FLOAT:                     return new ValidationTextureFormat<uint16_t>(1);
 
+        case Format::R64_UINT:                      return new ValidationTextureFormat<uint64_t>(1);
+
         case Format::R32G32B32A32_UINT:             return new ValidationTextureFormat<uint32_t>(4);
         case Format::R32G32B32_UINT:                return new ValidationTextureFormat<uint32_t>(3);
         case Format::R32G32_UINT:                   return new ValidationTextureFormat<uint32_t>(2);
@@ -92,6 +94,8 @@ namespace gfx_test
         case Format::R8G8B8A8_UINT:                 return new ValidationTextureFormat<uint8_t>(4);
         case Format::R8G8_UINT:                     return new ValidationTextureFormat<uint8_t>(2);
         case Format::R8_UINT:                       return new ValidationTextureFormat<uint8_t>(1);
+
+        case Format::R64_SINT:                      return new ValidationTextureFormat<int64_t>(1);
 
         case Format::R32G32B32A32_SINT:             return new ValidationTextureFormat<int32_t>(4);
         case Format::R32G32B32_SINT:                return new ValidationTextureFormat<int32_t>(3);

@@ -676,11 +676,23 @@ struct SCCPContext
     }
     LatticeVal evalLsh(IRType* type, LatticeVal v0, LatticeVal v1)
     {
+        IntInfo info = getIntTypeInfo(type);
+        if (info.isSigned == false)
+        {
+            return evalBinaryIntImpl(
+               type, v0, v1, [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1) { return c0 << c1; });
+        }
         return evalBinaryIntImpl(
             type, v0, v1, [](IRIntegerValue c0, IRIntegerValue c1) { return c0 << c1; });
     }
     LatticeVal evalRsh(IRType* type, LatticeVal v0, LatticeVal v1)
     {
+        IntInfo info = getIntTypeInfo(type);
+        if (info.isSigned == false)
+        {
+            return evalBinaryIntImpl(
+               type, v0, v1, [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1) { return c0 >> c1; });
+        }
         return evalBinaryIntImpl(
             type, v0, v1, [](IRIntegerValue c0, IRIntegerValue c1) { return c0 >> c1; });
     }

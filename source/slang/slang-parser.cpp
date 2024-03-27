@@ -7843,12 +7843,78 @@ namespace Slang
         parser->sink->diagnose(token, Diagnostics::invalidCUDASMVersion);
         return nullptr;
     }
+    static NodeBase* parseVolatileModifier(Parser* parser, void* /*userData*/)
+    {
+        ModifierListBuilder listBuilder;
+
+        auto hlslMod = parser->astBuilder->create<HLSLVolatileModifier>();
+        hlslMod->keywordName = getName(parser, "volatile");
+        hlslMod->loc = parser->tokenReader.peekLoc();
+        listBuilder.add(hlslMod);
+
+        auto glslMod = parser->astBuilder->create<GLSLVolatileModifier>();
+        glslMod->keywordName = getName(parser, "volatile");
+        glslMod->loc = parser->tokenReader.peekLoc();
+        listBuilder.add(glslMod);
+
+        return listBuilder.getFirst();
+    }
+
+    static NodeBase* parseCoherentModifier(Parser* parser, void* /*userData*/)
+    {
+        ModifierListBuilder listBuilder;
+
+        auto glslMod = parser->astBuilder->create<GloballyCoherentModifier>();
+        glslMod->keywordName = getName(parser, "coherent");
+        glslMod->loc = parser->tokenReader.peekLoc();
+        listBuilder.add(glslMod);
+
+        return listBuilder.getFirst();
+    }
+
+    static NodeBase* parseRestrictModifier(Parser* parser, void* /*userData*/)
+    {
+        ModifierListBuilder listBuilder;
+
+        auto glslMod = parser->astBuilder->create<GLSLRestrictModifier>();
+        glslMod->keywordName = getName(parser, "restrict");
+        glslMod->loc = parser->tokenReader.peekLoc();
+        listBuilder.add(glslMod);
+
+        return listBuilder.getFirst();
+    }
+
+    static NodeBase* parseReadonlyModifier(Parser* parser, void* /*userData*/)
+    {
+        ModifierListBuilder listBuilder;
+
+        auto glslMod = parser->astBuilder->create<GLSLReadOnlyModifier>();
+        glslMod->keywordName = getName(parser, "readonly");
+        glslMod->loc = parser->tokenReader.peekLoc();
+        listBuilder.add(glslMod);
+
+        return listBuilder.getFirst();
+    }
+
+    static NodeBase* parseWriteonlyModifier(Parser* parser, void* /*userData*/)
+    {
+        ModifierListBuilder listBuilder;
+
+        auto glslMod = parser->astBuilder->create<GLSLWriteOnlyModifier>();
+        glslMod->keywordName = getName(parser, "writeonly");
+        glslMod->loc = parser->tokenReader.peekLoc();
+        listBuilder.add(glslMod);
+
+        return listBuilder.getFirst();
+    }
     
     static NodeBase* parseLayoutModifier(Parser* parser, void* /*userData*/)
     {
         ModifierListBuilder listBuilder;
 
         GLSLLayoutLocalSizeAttribute* numThreadsAttrib = nullptr;
+
+        ImageFormat format;
 
         listBuilder.add(parser->astBuilder->create<GLSLLayoutModifierGroupBegin>());
         
@@ -7922,6 +7988,12 @@ namespace Slang
                         attr->set = int32_t(value);
                     }
                 }
+            }
+            else if(findImageFormatByName(nameText.getUnownedSlice(), &format))
+            {
+                auto attr = parser->astBuilder->create<FormatAttribute>();
+                attr->format = format;
+                listBuilder.add(attr);
             }
             else
             {
@@ -8208,7 +8280,11 @@ namespace Slang
         _makeParseModifier("groupshared",   HLSLGroupSharedModifier::kReflectClassInfo),
         _makeParseModifier("static",        HLSLStaticModifier::kReflectClassInfo),
         _makeParseModifier("uniform",       HLSLUniformModifier::kReflectClassInfo),
-        _makeParseModifier("volatile",      HLSLVolatileModifier::kReflectClassInfo),
+        _makeParseModifier("volatile",      parseVolatileModifier),
+        _makeParseModifier("coherent",      parseCoherentModifier),
+        _makeParseModifier("restrict",      parseRestrictModifier),
+        _makeParseModifier("readonly",      parseReadonlyModifier),
+        _makeParseModifier("writeonly",     parseWriteonlyModifier),
         _makeParseModifier("export",        HLSLExportModifier::kReflectClassInfo),
         _makeParseModifier("dynamic_uniform", DynamicUniformModifier::kReflectClassInfo),
 
