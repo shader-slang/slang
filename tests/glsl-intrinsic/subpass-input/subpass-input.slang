@@ -4,13 +4,6 @@
 // CHECK_SPV-DAG: OpEntryPoint
 // CHECK_GLSL-DAG: void main(
 
-buffer MyBlockName
-{
-    vec4 fdata[2];
-    ivec4 udata[2];
-    uvec4 idata[2];
-} keepAliveBuffer;
-
 // CHECK_SPV-DAG: InputAttachmentIndex 0
 // CHECK_SPV-DAG: InputAttachmentIndex 1
 // CHECK_SPV-DAG: InputAttachmentIndex 2

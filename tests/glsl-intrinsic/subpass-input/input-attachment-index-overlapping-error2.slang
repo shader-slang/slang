@@ -3,11 +3,6 @@
 #version 450
 // CHECK: warning 39001
 // CHECK: main
-buffer MyBlockName
-{
-    uvec4 idata[2];
-} keepAliveBuffer;
-
 layout (input_attachment_index = 0, set = 0, binding = 1) uniform isubpassInput isubpass;
 layout (input_attachment_index = 1, set = 0, binding = 1) uniform isubpassInputMS isubpassMS;
 
