@@ -331,7 +331,7 @@ struct UsedRanges
 
 namespace ParameterAndLayoutConstants
 {
-    const constexpr uint32_t kInputAttachmentIndexUnused = 0xFFFFFFFF;
+    const constexpr size_t kInputAttachmentIndexUnused = 0xFFFFFFFFFFFFFFFF;
 };
 
 struct ParameterBindingInfo
@@ -339,7 +339,7 @@ struct ParameterBindingInfo
     size_t              space = 0;
     size_t              index = 0;
     LayoutSize          count = 0;
-    uint32_t            inputAttachmentIndex = ParameterAndLayoutConstants::kInputAttachmentIndexUnused;
+    size_t              inputAttachmentIndex = ParameterAndLayoutConstants::kInputAttachmentIndexUnused;
 };
 
 struct ParameterBindingAndKindInfo : ParameterBindingInfo
@@ -478,7 +478,7 @@ struct LayoutSemanticInfo
     LayoutResourceKind  kind; // the register kind
     UInt                space;
     UInt                index;
-    uint32_t              inputAttachmentIndex = ParameterAndLayoutConstants::kInputAttachmentIndexUnused;
+    UInt                inputAttachmentIndex = ParameterAndLayoutConstants::kInputAttachmentIndexUnused;
     // TODO: need to deal with component-granularity binding...
 };
 
