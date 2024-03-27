@@ -2649,6 +2649,11 @@ namespace Slang
         return (IRBasicType*)getType(kIROp_IntType);
     }
 
+    IRBasicType* IRBuilder::getInt64Type()
+    {
+        return (IRBasicType*)getType(kIROp_Int64Type);
+    }
+
     IRBasicType* IRBuilder::getUIntType()
     {
         return (IRBasicType*)getType(kIROp_UIntType);
