@@ -1073,6 +1073,7 @@ static void addExplicitParameterBindings_GLSL(
     semanticInfo.space = 0;
 
     LayoutSemanticInfo subpassSemanticInfo;
+    bool foundBinding = false;
     bool foundSubpass = false;
 
     if( (foundResInfo = typeLayout->FindResourceInfo(LayoutResourceKind::DescriptorTableSlot)) != nullptr )
@@ -1085,15 +1086,20 @@ static void addExplicitParameterBindings_GLSL(
                 resInfo = foundResInfo;
                 semanticInfo.index = glslBindingAttr->binding;
                 semanticInfo.space = glslBindingAttr->set;
+                foundBinding = true;
+                if (foundSubpass) 
+                    break;
             }
             // Try to find `input_attachment_index`
-            if (auto glslAttachmentIndexAttr = as<GLSLInputAttachmentIndexLayoutModifier>(dec))
+            else if (auto glslAttachmentIndexAttr = as<GLSLInputAttachmentIndexLayoutModifier>(dec))
             {
                 // Subpass fills semantic info of a descriptor & subpass
                 subpassSemanticInfo.index = stringToInt(glslAttachmentIndexAttr->valToken.getContent());
                 subpassSemanticInfo.space = 0;
                 subpassSemanticInfo.kind = LayoutResourceKind::InputAttachmentIndex;
                 foundSubpass = true;
+                if (foundBinding) 
+                    break;
             }
         }
     }

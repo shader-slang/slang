@@ -387,7 +387,7 @@ namespace Slang
 
             anyValueSizeAttr->size = int32_t(value->getValue());
         }
-        else if (auto GLSLRequireShaderInputParameter = as<GLSLRequireShaderInputParameterAttribute>(attr))
+        else if (auto glslRequireShaderInputParameter = as<GLSLRequireShaderInputParameterAttribute>(attr))
         {
             if (attr->args.getCount() != 1)
             {
@@ -402,7 +402,7 @@ namespace Slang
             {
                 return false;
             }
-            GLSLRequireShaderInputParameter->parameterNumber = int32_t(value->getValue());
+            glslRequireShaderInputParameter->parameterNumber = int32_t(value->getValue());
         }
         else if (auto overloadRankAttr = as<OverloadRankAttribute>(attr))
         {

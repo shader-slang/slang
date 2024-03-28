@@ -3561,11 +3561,11 @@ struct ExprLoweringContext
         FunctionDeclBase* decl,
         List<IRInst*>& irArgs)
     {
-        if (auto requireShaderInputParameter = decl->findModifier<GLSLRequireShaderInputParameterAttribute>())
+        if (auto glslRequireShaderInputParameter = decl->findModifier<GLSLRequireShaderInputParameterAttribute>())
         {
-            if (!irArgs[requireShaderInputParameter->parameterNumber]->findDecoration<IRGlobalInputDecoration>())
+            if (!irArgs[glslRequireShaderInputParameter->parameterNumber]->findDecoration<IRGlobalInputDecoration>())
             {
-                this->context->getSink()->diagnose(expr, Diagnostics::requireInputDecoratedVarForParameter, decl, requireShaderInputParameter->parameterNumber);
+                this->context->getSink()->diagnose(expr, Diagnostics::requireInputDecoratedVarForParameter, decl, glslRequireShaderInputParameter->parameterNumber);
             }
             return;
         }

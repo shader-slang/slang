@@ -7917,12 +7917,6 @@ namespace Slang
         return listBuilder.getFirst();
     }
     
-    static NodeBase* parseSharedModifier(Parser* parser, void* /*userData*/)
-    {
-        ModifierListBuilder listBuilder;
-        listBuilder.add(parser->astBuilder->create<HLSLEffectSharedModifier>());
-        return listBuilder.getFirst();
-    }
     static NodeBase* parseLayoutModifier(Parser* parser, void* /*userData*/)
     {
         ModifierListBuilder listBuilder;
@@ -8292,7 +8286,7 @@ namespace Slang
         _makeParseModifier("sample",        HLSLSampleModifier::kReflectClassInfo),
         _makeParseModifier("centroid",      HLSLCentroidModifier::kReflectClassInfo),
         _makeParseModifier("precise",       PreciseModifier::kReflectClassInfo),
-        _makeParseModifier("shared",        parseSharedModifier),
+        _makeParseModifier("shared",        HLSLEffectSharedModifier::kReflectClassInfo),
         _makeParseModifier("groupshared",   HLSLGroupSharedModifier::kReflectClassInfo),
         _makeParseModifier("static",        HLSLStaticModifier::kReflectClassInfo),
         _makeParseModifier("uniform",       HLSLUniformModifier::kReflectClassInfo),
