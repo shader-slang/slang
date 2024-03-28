@@ -7266,18 +7266,18 @@ __glsl_version(430) [require(glsl)]
 
 /// Section 8.14. Fragment Processing Functions
 
-[require(hlsl, sm_4_0)]
-__glsl_version(430) [require(glsl)]
-__spirv_version(1.0) [require(spirv)]
+__glsl_version(430)
+__spirv_version(1.0)
+[require(any_gfx_target, fragmentprocessing)]
 [__NoSideEffect]
 [ForceInline]
 public float dFdx(float p)
 {
     return ddx(p);
 }
-[require(hlsl, sm_4_0)]
-__glsl_version(430) [require(glsl)]
-__spirv_version(1.0) [require(spirv)]
+__glsl_version(430)
+__spirv_version(1.0)
+[require(any_gfx_target, fragmentprocessing)]
 __generic<let N : int>
 [__NoSideEffect]
 [ForceInline]
@@ -7286,18 +7286,18 @@ public vector<float, N> dFdx(vector<float, N> p)
     return ddx(p);
 }
 
-[require(hlsl, sm_4_0)]
-__glsl_version(430) [require(glsl)]
-__spirv_version(1.0) [require(spirv)]
+__glsl_version(430)
+__spirv_version(1.0)
+[require(any_gfx_target, fragmentprocessing)]
 [__NoSideEffect]
 [ForceInline]
 public float dFdy(float p)
 {
     return ddy(p);
 }
-[require(hlsl, sm_4_0)]
-__glsl_version(430) [require(glsl)]
-__spirv_version(1.0) [require(spirv)]
+__glsl_version(430)
+__spirv_version(1.0)
+[require(any_gfx_target, fragmentprocessing)]
 __generic<let N : int>
 [__NoSideEffect]
 [ForceInline]
@@ -7306,18 +7306,18 @@ public vector<float, N> dFdy(vector<float, N> p)
     return ddy(p);
 }
 
-[require(hlsl, sm_4_0)]
-__glsl_version(430) [require(glsl)]
-__spirv_version(1.0) [require(spirv)]
+__glsl_version(430)
+__spirv_version(1.0)
+[require(any_gfx_target, fragmentprocessing)]
 [__NoSideEffect]
 [ForceInline]
 public float dFdxFine(float p)
 {
     return ddx_fine(p);
 }
-[require(hlsl, sm_4_0)]
-__glsl_version(430) [require(glsl)]
-__spirv_version(1.0) [require(spirv)]
+__glsl_version(430)
+__spirv_version(1.0)
+[require(any_gfx_target, fragmentprocessing)]
 __generic<let N : int>
 [__NoSideEffect]
 [ForceInline]
@@ -7326,18 +7326,18 @@ public vector<float, N> dFdxFine(vector<float, N> p)
     return ddx_fine(p);
 }
 
-[require(hlsl, sm_4_0)]
-__glsl_version(430) [require(glsl)]
-__spirv_version(1.0) [require(spirv)]
+__glsl_version(430)
+__spirv_version(1.0)
+[require(any_gfx_target, fragmentprocessing)]
 [__NoSideEffect]
 [ForceInline]
 public float dFdyFine(float p)
 {
     return ddy_fine(p);
 }
-[require(hlsl, sm_4_0)]
-__glsl_version(430) [require(glsl)]
-__spirv_version(1.0) [require(spirv)]
+__glsl_version(430)
+__spirv_version(1.0)
+[require(any_gfx_target, fragmentprocessing)]
 __generic<let N : int>
 [__NoSideEffect]
 [ForceInline]
@@ -7346,18 +7346,18 @@ public vector<float, N> dFdyFine(vector<float, N> p)
     return ddy_fine(p);
 }
 
-[require(hlsl, sm_4_0)]
-__glsl_version(430) [require(glsl)]
-__spirv_version(1.0) [require(spirv)]
+__glsl_version(430)
+__spirv_version(1.0)
+[require(any_gfx_target, fragmentprocessing)]
 [__NoSideEffect]
 [ForceInline]
 public float dFdxCoarse(float p)
 {
     return ddx_coarse(p);
 }
-[require(hlsl, sm_4_0)]
-__glsl_version(430) [require(glsl)]
-__spirv_version(1.0) [require(spirv)]
+__glsl_version(430)
+__spirv_version(1.0)
+[require(any_gfx_target, fragmentprocessing)]
 __generic<let N : int>
 [__NoSideEffect]
 [ForceInline]
@@ -7366,18 +7366,18 @@ public vector<float, N> dFdxCoarse(vector<float, N> p)
     return ddx_coarse(p);
 }
 
-[require(hlsl, sm_4_0)]
-__glsl_version(430) [require(glsl)]
-__spirv_version(1.0) [require(spirv)]
+__glsl_version(430)
+__spirv_version(1.0)
+[require(any_gfx_target, fragmentprocessing)]
 [__NoSideEffect]
 [ForceInline]
 public float dFdyCoarse(float p)
 {
     return ddy_coarse(p);
 }
-[require(hlsl, sm_4_0)]
-__glsl_version(430) [require(glsl)]
-__spirv_version(1.0) [require(spirv)]
+__glsl_version(430)
+__spirv_version(1.0)
+[require(any_gfx_target, fragmentprocessing)]
 __generic<let N : int>
 [__NoSideEffect]
 [ForceInline]
@@ -7386,9 +7386,9 @@ public vector<float, N> dFdyCoarse(vector<float, N> p)
     return ddy_coarse(p);
 }
 
-[require(hlsl, sm_4_0)]
-__glsl_version(430) [require(glsl)]
-__spirv_version(1.0) [require(spirv)]
+__glsl_version(430)
+__spirv_version(1.0)
+[require(any_gfx_target, fragmentprocessing)]
 [__NoSideEffect]
 [ForceInline]
 public float fwidthFine(float p)
@@ -7410,9 +7410,9 @@ public float fwidthFine(float p)
     }
     }
 }
-[require(hlsl, sm_4_0)]
-__glsl_version(430) [require(glsl)]
-__spirv_version(1.0) [require(spirv)]
+__glsl_version(430)
+__spirv_version(1.0)
+[require(any_gfx_target, fragmentprocessing)]
 __generic<let N : int>
 [__NoSideEffect]
 [ForceInline]
@@ -7436,9 +7436,9 @@ public vector<float, N> fwidthFine(vector<float, N> p)
     }
 }
 
-[require(hlsl, sm_4_0)]
-__glsl_version(430) [require(glsl)]
-__spirv_version(1.0) [require(spirv)]
+__glsl_version(430)
+__spirv_version(1.0)
+[require(any_gfx_target, fragmentprocessing)]
 [__NoSideEffect]
 [ForceInline]
 public float fwidthCoarse(float p)
@@ -7460,9 +7460,9 @@ public float fwidthCoarse(float p)
     }
     }
 }
-[require(hlsl, sm_4_0)]
-__glsl_version(430) [require(glsl)]
-__spirv_version(1.0) [require(spirv)]
+__glsl_version(430)
+__spirv_version(1.0)
+[require(any_gfx_target, fragmentprocessing)]
 __generic<let N : int>
 [__NoSideEffect]
 [ForceInline]
@@ -7486,9 +7486,9 @@ public vector<float, N> fwidthCoarse(vector<float, N> p)
     }
 }
 
-[require(hlsl, sm_5_0)]
-__glsl_version(430) [require(glsl)]
-__spirv_version(1.0) [require(spirv)]
+__glsl_version(430)
+__spirv_version(1.0)
+[require(any_gfx_target, fragmentprocessing)]
 [__NoSideEffect]
 [GLSLRequireShaderInputParameter(0)]
 public float interpolateAtCentroid(__ref float interpolant)
@@ -7510,9 +7510,9 @@ public float interpolateAtCentroid(__ref float interpolant)
     }
     }
 }
-[require(hlsl, sm_5_0)]
-__glsl_version(430) [require(glsl)]
-__spirv_version(1.0) [require(spirv)]
+__glsl_version(430)
+__spirv_version(1.0)
+[require(any_gfx_target, fragmentprocessing)]
 __generic<let N : int>
 [__NoSideEffect]
 [GLSLRequireShaderInputParameter(0)]
@@ -7536,9 +7536,9 @@ public vector<float, N> interpolateAtCentroid(__ref vector<float, N> interpolant
     }
 }
 
-[require(hlsl, sm_5_0)]
-__glsl_version(430) [require(glsl)]
-__spirv_version(1.0) [require(spirv)]
+__glsl_version(430)
+__spirv_version(1.0)
+[require(any_gfx_target, fragmentprocessing)]
 [__NoSideEffect]
 [GLSLRequireShaderInputParameter(0)]
 public float interpolateAtSample(__ref float interpolant, int sample)
@@ -7560,9 +7560,9 @@ public float interpolateAtSample(__ref float interpolant, int sample)
     }
     }
 }
-[require(hlsl, sm_5_0)]
-__glsl_version(430) [require(glsl)]
-__spirv_version(1.0) [require(spirv)]
+__glsl_version(430)
+__spirv_version(1.0)
+[require(any_gfx_target, fragmentprocessing)]
 __generic<let N : int>
 [__NoSideEffect]
 [GLSLRequireShaderInputParameter(0)]
@@ -7586,8 +7586,9 @@ public vector<float, N> interpolateAtSample(__ref vector<float, N> interpolant, 
     }
 }
 
-__glsl_version(430) [require(glsl)]
-__spirv_version(1.0) [require(spirv)]
+__glsl_version(430)
+__spirv_version(1.0)
+[require(glsl_spirv, fragmentprocessing)]
 [__NoSideEffect]
 [GLSLRequireShaderInputParameter(0)]
 public float interpolateAtOffset(__ref float interpolant, vec2 offset)
@@ -7605,8 +7606,9 @@ public float interpolateAtOffset(__ref float interpolant, vec2 offset)
     }
     }
 }
-__glsl_version(430) [require(glsl)]
-__spirv_version(1.0) [require(spirv)]
+__glsl_version(430)
+__spirv_version(1.0)
+[require(glsl_spirv, fragmentprocessing)]
 __generic<let N : int>
 [__NoSideEffect]
 [GLSLRequireShaderInputParameter(0)]
@@ -7699,9 +7701,9 @@ public vec4 noise4(vector<float, N> x)
 // control flow.
 // TODO: if called after a return, error.
 
-[require(hlsl, sm_5_0)]
-__glsl_version(430) [require(glsl)]
-__spirv_version(1.0) [require(spirv)]
+__glsl_version(430)
+__spirv_version(1.0)
+[require(any_gfx_target, compute_tess_gfx)]
 [ForceInline]
 public void barrier()
 {
@@ -7724,9 +7726,9 @@ public void barrier()
 
 /// Section 8.17. Shader Memory Control Functions
 
-[require(hlsl, sm_5_0)]
-__glsl_version(430) [require(glsl)]
-__spirv_version(1.0) [require(spirv)]
+__glsl_version(430)
+__spirv_version(1.0)
+[require(shadermemorycontrol)]
 [ForceInline]
 public void memoryBarrier()
 {
@@ -7752,9 +7754,9 @@ public void memoryBarrier()
 // glslang will compile with `AtomicCounterMemory` since it does not use
 // the `AtomicStorage` OpCapability which is required for `AtomicCounterMemory`.
 // this is invalid/undefined spir-v for vulkan targets and should not be followed
-[require(hlsl, sm_5_0)]
-__glsl_version(430) [require(glsl)]
-__spirv_version(1.0) [require(spirv)]
+__glsl_version(430)
+__spirv_version(1.0)
+[require(any_gfx_target, shadermemorycontrol_compute)]
 [ForceInline]
 public void memoryBarrierAtomicCounter()
 {
@@ -7772,9 +7774,9 @@ public void memoryBarrierAtomicCounter()
     }
     }
 }
-[require(hlsl, sm_5_0)]
-__glsl_version(430) [require(glsl)]
-__spirv_version(1.0) [require(spirv)]
+__glsl_version(430)
+__spirv_version(1.0)
+[require(shadermemorycontrol)]
 [ForceInline]
 public void memoryBarrierBuffer()
 {
@@ -7792,9 +7794,10 @@ public void memoryBarrierBuffer()
     }
     }
 }
-[require(hlsl, sm_5_0)]
-__glsl_version(430) [require(glsl)]
-__spirv_version(1.0) [require(spirv)]
+
+__glsl_version(430)
+__spirv_version(1.0)
+[require(any_gfx_target, shadermemorycontrol_compute)]
 [ForceInline]
 public void memoryBarrierShared()
 {
@@ -7812,9 +7815,9 @@ public void memoryBarrierShared()
     }
     }
 }
-[require(hlsl, sm_5_0)]
-__glsl_version(430) [require(glsl)]
-__spirv_version(1.0) [require(spirv)]
+__glsl_version(430)
+__spirv_version(1.0)
+[require(shadermemorycontrol)]
 [ForceInline]
 public void memoryBarrierImage()
 {
@@ -7831,9 +7834,9 @@ public void memoryBarrierImage()
     }
     }
 }
-[require(hlsl, sm_5_0)]
-__glsl_version(430) [require(glsl)]
-__spirv_version(1.0) [require(spirv)]
+__glsl_version(430)
+__spirv_version(1.0)
+[require(any_gfx_target, shadermemorycontrol_compute)]
 [ForceInline]
 public void groupMemoryBarrier()
 {
@@ -7868,6 +7871,7 @@ static const SubpassLoadEntriesType kSubpassLoadEntries[] =
 for (const auto& subpassLoadEntry : kSubpassLoadEntries)
 {
 }}}}
+    [require(glsl_spirv, subpass)]
     public typealias $(subpassLoadEntry.prefix)subpassInput = __TextureImplUnique<
         $(subpassLoadEntry.typeName),
         __ShapeSubpass,
@@ -7879,6 +7883,8 @@ for (const auto& subpassLoadEntry : kSubpassLoadEntries)
         0, // isCombined
         0  // format
     >;
+
+    [require(glsl_spirv, subpass)]
     __generic<let sampleCount:int=0>
     public typealias $(subpassLoadEntry.prefix)subpassInputMS = __TextureImplUnique<
         $(subpassLoadEntry.typeName),
@@ -7940,24 +7946,27 @@ ${{{{
 // Invocation functions compiles into SubgroupVoteKHR operations.
 // Instead of using these, we directly emit the non deprecated
 // alternatives
-__glsl_version(460) [require(glsl)]
-__spirv_version(1.3) [require(spirv)]
+__glsl_version(460)
+__spirv_version(1.3)
+[require(shaderinvocationgroup)]
 [NonUniformReturn]
 [ForceInline]
 public bool anyInvocation(bool value)
 {
     return WaveActiveAnyTrue(value);
 }
-__glsl_version(460) [require(glsl)]
-__spirv_version(1.3) [require(spirv)]
+__glsl_version(460)
+__spirv_version(1.3)
+[require(shaderinvocationgroup)]
 [NonUniformReturn]
 [ForceInline]
 public bool allInvocations(bool value)
 {
     return WaveActiveAllTrue(value);
 }
-__glsl_version(460) [require(glsl)]
-__spirv_version(1.3) [require(spirv)]
+__glsl_version(460)
+__spirv_version(1.3)
+[require(shaderinvocationgroup)]
 [NonUniformReturn]
 [ForceInline]
 public bool allInvocationsEqual(bool value)

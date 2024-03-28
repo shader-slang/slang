@@ -253,6 +253,12 @@ alias GL_NV_ray_tracing = GL_EXT_ray_tracing;
 
 // Define feature names
 
+alias tess_control_gfx = tess_control + any_gfx_target; 
+alias tess_eval_gfx = tess_control + any_gfx_target; 
+alias fragment_gfx = fragment + any_gfx_target;
+alias compute_gfx = compute + any_gfx_target;
+alias compute_tess_gfx = compute_gfx + tess_control_gfx + tess_eval_gfx;
+
 alias nvapi = hlsl_nvapi;
 alias raytracing = GL_EXT_ray_tracing | _sm_6_5 | cuda;
 alias raytracing_pos = GL_EXT_ray_tracing + GL_EXT_ray_tracing_position_fetch | _sm_6_5 | cuda;
@@ -273,13 +279,11 @@ alias groupnonuniform = GL_KHR_shader_subgroup_ballot + GL_KHR_shader_subgroup_s
                           + GL_KHR_shader_subgroup_arithmetic + GL_KHR_shader_subgroup_quad + GL_KHR_shader_subgroup_vote
                         | _sm_6_0 | cuda;
 alias fragmentshaderbarycentric = GL_EXT_fragment_shader_barycentric | _sm_6_1;
-alias fragment_gfx = fragment + any_gfx_target;
-alias fragmentprocessing = fragment_gfx;
-alias compute_gfx = compute + any_gfx_target;
-alias shadermemorycontrol_compute = compute_gfx;
-alias tess_control_gfx = tess_control + any_gfx_target; 
-alias tess_eval_gfx = tess_control + any_gfx_target; 
-alias compute_tess_gfx = compute_gfx + tess_control_gfx + tess_eval_gfx;
+alias fragmentprocessing = fragment_gfx + glsl_spirv | fragment + _sm_5_0;
+alias shadermemorycontrol = glsl | spirv_1_0 | _sm_5_0;
+alias shadermemorycontrol_compute = compute_gfx + shadermemorycontrol;
+alias subpass = fragment_gfx;
+alias shaderinvocationgroup = GL_KHR_shader_subgroup_vote + glsl | spirv_1_3 | _sm_6_0;
 // Define what each HLSL shader model means on different targets.
 
 
