@@ -781,6 +781,13 @@ void GLSLSourceEmitter::_emitGLSLTextureOrTextureSamplerType(IRTextureTypeBase* 
         _emitGLSLTypePrefix(type->getElementType(), true);
     }
 
+    if(type->GetBaseShape() == SLANG_TEXTURE_SUBPASS)
+    {
+        m_writer->emit("subpassInput");
+        if (type->isMultisample())
+            m_writer->emit("MS");
+        return;
+    }
     m_writer->emit(baseName);
     switch (type->GetBaseShape())
     {
@@ -2722,6 +2729,17 @@ void GLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
 
         // If we emit a location we are done.
         break;
+    }
+
+    // non raytracing decorations
+    for (auto decoration : varDecl->getDecorations())
+    {        
+        if (auto glslInputAttachment = as<IRGLSLInputAttachmentIndexDecoration>(decoration))
+        {
+            m_writer->emit(toSlice("layout(input_attachment_index = "));
+            m_writer->emit(glslInputAttachment->getIndex()->getValue());
+            m_writer->emit(toSlice(")\n"));
+        }
     }
 
     if (varDecl->findDecoration<IRGloballyCoherentDecoration>())

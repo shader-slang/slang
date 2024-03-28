@@ -11406,15 +11406,22 @@ ${{{{
 //
 // Vulkan/SPIR-V specific features
 //
-
-struct VkSubpassInput<T>
+[sealed]
+[builtin]
+interface __ITextureSubpass
 {
-    T SubpassLoad();
+    static const int flavor;
 }
-
-struct VkSubpassInputMS<T>
+__magic_type(TextureShapeSubpassType)
+__intrinsic_type($(kIROp_TextureShapeSubpassType))
+struct __ShapeSubpass : __ITextureSubpass
 {
-    T SubpassLoad(int sampleIndex);
+    static const int flavor = $(SLANG_TEXTURE_SUBPASS);
+}
+__magic_type(TextureType)
+__intrinsic_type($(kIROp_TextureType))
+struct __SubpassImpl<T, Shape: __ITextureSubpass, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
+{
 }
 
 

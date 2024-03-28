@@ -152,6 +152,7 @@ SlangResult CPPSourceEmitter::_calcCPPTextureTypeName(IRTextureTypeBase* texType
         case SLANG_TEXTURE_3D:		outName << "Texture3D";		break;
         case SLANG_TEXTURE_CUBE:	outName << "TextureCube";	break;
         case SLANG_TEXTURE_BUFFER:  outName << "Buffer";        break;
+        case SLANG_TEXTURE_SUBPASS:  outName << "Subpass";      break;
         default:
             SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource shape");
             return SLANG_FAIL;

@@ -1876,6 +1876,9 @@ struct SPIRVEmitContext
             case SLANG_TEXTURE_BUFFER:
                 dim = SpvDimBuffer;
                 break;
+            case SLANG_TEXTURE_SUBPASS:
+                dim = SpvDimSubpassData;
+                break;
         }
         SpvWord arrayed = inst->isArray() ? isArrayed : notArrayed;
 
@@ -3295,6 +3298,17 @@ struct SPIRVEmitContext
                     decoration,
                     dstID,
                     SpvLiteralInteger::from32(int32_t(c->getMaxSize()->getValue()))
+                );
+            }
+            break;
+        case kIROp_GLSLInputAttachmentIndexDecoration:
+            {
+                const auto c = cast<IRGLSLInputAttachmentIndexDecoration>(decoration);
+                emitOpDecorateInputAttachmentIndex(
+                    getSection(SpvLogicalSectionID::Annotations),
+                    decoration,
+                    dstID,
+                    SpvLiteralInteger::from32(int32_t(c->getIndex()->getValue()))
                 );
             }
             break;
