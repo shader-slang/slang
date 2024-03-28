@@ -27,7 +27,8 @@ RefPtr<BufferResource> ShaderTableImpl::createDeviceBuffer(
         m_missShaderCount * handleSize, rtProps.shaderGroupBaseAlignment);
     m_hitTableSize = (uint32_t)VulkanUtil::calcAligned(
         m_hitGroupCount * handleSize, rtProps.shaderGroupBaseAlignment);
-    m_callableTableSize = 0; // TODO: Are callable shaders needed?
+    m_callableTableSize = (uint32_t)VulkanUtil::calcAligned(
+        m_callableShaderCount * handleSize, rtProps.shaderGroupBaseAlignment);
     uint32_t tableSize = m_raygenTableSize + m_missTableSize + m_hitTableSize + m_callableTableSize;
 
     auto pipelineImpl = static_cast<RayTracingPipelineStateImpl*>(pipeline);
@@ -122,7 +123,20 @@ RefPtr<BufferResource> ShaderTableImpl::createDeviceBuffer(
     }
     subTablePtr += m_hitTableSize;
 
-    // TODO: Callable shaders?
+    for (uint32_t i = 0; i < m_callableShaderCount; i++)
+    {
+        auto dstHandlePtr = subTablePtr + i * handleSize;
+        auto shaderGroupName = m_shaderGroupNames[shaderTableEntryCounter++];
+        auto shaderGroupIndexPtr =
+            pipelineImpl->shaderGroupNameToIndex.tryGetValue(shaderGroupName);
+        if (!shaderGroupIndexPtr)
+            continue;
+
+        auto shaderGroupIndex = *shaderGroupIndexPtr;
+        auto srcHandlePtr = handles.getBuffer() + shaderGroupIndex * handleSize;
+        memcpy(dstHandlePtr, srcHandlePtr, handleSize);
+    }
+    subTablePtr += m_callableTableSize;
 
     stagingBuffer->unmap(nullptr);
     encoder->copyBuffer(bufferResource, 0, stagingBuffer, stagingBufferOffset, tableSize);

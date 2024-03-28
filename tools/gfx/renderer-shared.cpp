@@ -1264,8 +1264,9 @@ Result ShaderTableBase::init(const IShaderTable::Desc& desc)
     m_rayGenShaderCount = desc.rayGenShaderCount;
     m_missShaderCount = desc.missShaderCount;
     m_hitGroupCount = desc.hitGroupCount;
-    m_shaderGroupNames.reserve(desc.hitGroupCount + desc.missShaderCount + desc.rayGenShaderCount);
-    m_recordOverwrites.reserve(desc.hitGroupCount + desc.missShaderCount + desc.rayGenShaderCount);
+    m_callableShaderCount = desc.callableShaderCount;
+    m_shaderGroupNames.reserve(desc.hitGroupCount + desc.missShaderCount + desc.rayGenShaderCount + desc.callableShaderCount);
+    m_recordOverwrites.reserve(desc.hitGroupCount + desc.missShaderCount + desc.rayGenShaderCount + desc.callableShaderCount);
     for (GfxIndex i = 0; i < desc.rayGenShaderCount; i++)
     {
         m_shaderGroupNames.add(desc.rayGenShaderEntryPointNames[i]);
@@ -1296,6 +1297,18 @@ Result ShaderTableBase::init(const IShaderTable::Desc& desc)
         if (desc.hitGroupRecordOverwrites)
         {
             m_recordOverwrites.add(desc.hitGroupRecordOverwrites[i]);
+        }
+        else
+        {
+            m_recordOverwrites.add(ShaderRecordOverwrite{});
+        }
+    }
+    for (GfxIndex i = 0; i < desc.callableShaderCount; i++)
+    {
+        m_shaderGroupNames.add(desc.callableShaderEntryPointNames[i]);
+        if (desc.callableShaderRecordOverwrites)
+        {
+            m_recordOverwrites.add(desc.callableShaderRecordOverwrites[i]);
         }
         else
         {
