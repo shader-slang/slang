@@ -3563,12 +3563,6 @@ struct ExprLoweringContext
     {
         if (auto requireShaderInputParameter = decl->findModifier<GLSLRequireShaderInputParameterAttribute>())
         {
-            if (irArgs.getCount() <= Slang::Index(requireShaderInputParameter->parameterNumber))
-            {
-                this->context->getSink()->diagnose(decl, Diagnostics::attributeArgumentCountMismatch,
-                    Slang::ASTNodeType::GLSLRequireShaderInputParameterAttribute, requireShaderInputParameter->parameterNumber, irArgs.getCount());
-                return;
-            }
             if (!irArgs[requireShaderInputParameter->parameterNumber]->findDecoration<IRGlobalInputDecoration>())
             {
                 this->context->getSink()->diagnose(expr, Diagnostics::requireInputDecoratedVarForParameter, decl, requireShaderInputParameter->parameterNumber);

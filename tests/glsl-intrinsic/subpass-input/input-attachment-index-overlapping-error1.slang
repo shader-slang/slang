@@ -1,6 +1,11 @@
 //TEST:SIMPLE(filecheck=CHECK): -target glsl -stage fragment -entry main -allow-glsl
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -stage fragment -entry main -allow-glsl
 #version 450
 // CHECK: warning 39001
+buffer MyBlockName
+{
+    uvec4 idata[2];
+} keepAliveBuffer;
 
 layout(location = 0) in highp vec4 a_position;
 layout(location = 0) in highp vec4 b_position;

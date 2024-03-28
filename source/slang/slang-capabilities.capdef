@@ -65,7 +65,7 @@ alias any_target = hlsl | glsl | c | cpp | cuda | spirv;
 alias any_textual_target = hlsl | glsl | c | cpp | cuda;
 alias any_gfx_target = hlsl | glsl | spirv;
 alias any_cpp_target = cpp | cuda;
-
+alias glsl_spirv = glsl | spirv;
 // Capabilities that stand for target spirv version for GLSL backend.
 // These are not compilation targets.
 def glsl_spirv_1_0 : glsl;
@@ -108,6 +108,10 @@ def _sm_6_6 : _sm_6_5;
 def _sm_6_7 : _sm_6_6;
 
 def hlsl_nvapi : hlsl;
+
+// stage alias
+alias tess_control = hull;
+alias tess_eval = domain;
 
 // SPIRV extensions.
 
@@ -269,8 +273,13 @@ alias groupnonuniform = GL_KHR_shader_subgroup_ballot + GL_KHR_shader_subgroup_s
                           + GL_KHR_shader_subgroup_arithmetic + GL_KHR_shader_subgroup_quad + GL_KHR_shader_subgroup_vote
                         | _sm_6_0 | cuda;
 alias fragmentshaderbarycentric = GL_EXT_fragment_shader_barycentric | _sm_6_1;
-
-
+alias fragment_gfx = fragment + any_gfx_target;
+alias fragmentprocessing = fragment_gfx;
+alias compute_gfx = compute + any_gfx_target;
+alias shadermemorycontrol_compute = compute_gfx;
+alias tess_control_gfx = tess_control + any_gfx_target; 
+alias tess_eval_gfx = tess_control + any_gfx_target; 
+alias compute_tess_gfx = compute_gfx + tess_control_gfx + tess_eval_gfx;
 // Define what each HLSL shader model means on different targets.
 
 
@@ -370,9 +379,6 @@ alias GLSL_430 = glsl + sm_5_1 | spirv_1_5 + sm_5_1;
 alias GLSL_440 = glsl + sm_6_0 | spirv_1_5 + sm_6_0;
 alias GLSL_450 = glsl + sm_6_3 | spirv_1_5 + sm_6_3;
 alias GLSL_460 = glsl_spirv_1_5 + all | spirv_1_5 + all;
-
-alias tess_control = hull;
-alias tess_eval = domain;
 
 alias DX_4_0 = sm_4_0;
 alias DX_4_1 = sm_4_1;
