@@ -222,7 +222,12 @@ namespace Slang
         {
             return kConversionCost_IntegerToFloatConversion;
         }
-
+        else if (toInfo.conversionKind == kBaseTypeConversionKind_Float
+            && toInfo.conversionRank >= kBaseTypeConversionRank_Int16
+            && fromInfo.conversionRank >= kBaseTypeConversionRank_Int8)
+        {
+            return kConversionCost_IntegerToHalfConversion;
+        }
         // All other cases are considered as "general" conversions,
         // where we don't consider any one conversion better than
         // any others.

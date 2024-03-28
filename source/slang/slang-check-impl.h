@@ -2077,6 +2077,9 @@ namespace Slang
             Type* toType,
             QualType fromType);
 
+        bool canConvertImplicitly(
+            ConversionCost cost);
+
         ConversionCost getConversionCost(Type* toType, QualType fromType);
 
         Type* _tryJoinTypeWithInterface(

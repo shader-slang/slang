@@ -105,6 +105,7 @@ namespace Slang
         // through types `X` that are also builtin scalar types.
         //
         Type* bestType = nullptr;
+        ConversionCost bestCost = kConversionCost_Explicit;
         if(auto basicType = dynamicCast<BasicExpressionType>(type))
         {
             for(Int baseTypeFlavorIndex = 0; baseTypeFlavorIndex < Int(BaseType::CountOf); baseTypeFlavorIndex++)
@@ -123,7 +124,8 @@ namespace Slang
                     continue;
 
                 // We only want to consider types where we can implicitly convert from `type`
-                if(!canConvertImplicitly(candidateType, type))
+                auto conversionCost = getConversionCost(candidateType, type);
+                if(!canConvertImplicitly(conversionCost))
                     continue;
 
                 // At this point, we have a candidate type that is usable.
@@ -139,18 +141,16 @@ namespace Slang
                     // Otherwise, we want to pick the "better" type between `candidateType`
                     // and `bestType`.
                     //
-                    // We are going to be a bit loose here, and not worry about the
-                    // case where conversion is allowed in both directions.
+                    // The candidate type that has lower conversion cost from `type` is better.
                     //
-                    // TODO: make this completely robust.
-                    //
-                    if(canConvertImplicitly(bestType, candidateType))
+                    if(conversionCost < bestCost)
                     {
                         // Our candidate can convert to the current "best" type, so
                         // it is logically a more specific type that satisfies our
                         // constraints, therefore we should keep it.
                         //
                         bestType = candidateType;
+                        bestCost = conversionCost;
                     }
                 }
             }

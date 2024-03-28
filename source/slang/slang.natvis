@@ -439,7 +439,6 @@
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ResourceType">(Slang::ResourceType*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::TextureTypeBase">(Slang::TextureTypeBase*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::TextureType">(Slang::TextureType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::TextureSamplerType">(Slang::TextureSamplerType*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::GLSLImageType">(Slang::GLSLImageType*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::SamplerStateType">(Slang::SamplerStateType*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::BuiltinGenericType">(Slang::BuiltinGenericType*)&amp;astNodeType</ExpandedItem>
@@ -502,6 +501,13 @@
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ModifiedType">(Slang::ModifiedType*)&amp;astNodeType</ExpandedItem>
             
             <Item Name="[Raw View]">(Slang::Type*)this,!</Item>
+        </Expand>
+    </Type>
+    <Type Name="Slang::DirectDeclRef">
+        <DisplayString>DirectDeclRef{(Decl*)m_operands.m_buffer[0].values.nodeOperand}</DisplayString>
+        <Expand>
+            <ExpandedItem>(Decl*)m_operands.m_buffer[0].values.nodeOperand</ExpandedItem>
+
         </Expand>
     </Type>
     <Type Name="Slang::SubstitutionSet">
@@ -581,7 +587,6 @@
         <DisplayString Condition="astNodeType == Slang::ASTNodeType::ResourceType">{*(Slang::ResourceType*)this}</DisplayString>
         <DisplayString Condition="astNodeType == Slang::ASTNodeType::TextureTypeBase">{*(Slang::TextureTypeBase*)this}</DisplayString>
         <DisplayString Condition="astNodeType == Slang::ASTNodeType::TextureType">{*(Slang::TextureType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::TextureSamplerType">{*(Slang::TextureSamplerType*)this}</DisplayString>
         <DisplayString Condition="astNodeType == Slang::ASTNodeType::GLSLImageType">{*(Slang::GLSLImageType*)this}</DisplayString>
         <DisplayString Condition="astNodeType == Slang::ASTNodeType::SamplerStateType">{*(Slang::SamplerStateType*)this}</DisplayString>
         <DisplayString Condition="astNodeType == Slang::ASTNodeType::BuiltinGenericType">{*(Slang::BuiltinGenericType*)this}</DisplayString>
@@ -666,7 +671,6 @@
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ResourceType">(Slang::ResourceType*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::TextureTypeBase">(Slang::TextureTypeBase*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::TextureType">(Slang::TextureType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::TextureSamplerType">(Slang::TextureSamplerType*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::GLSLImageType">(Slang::GLSLImageType*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::SamplerStateType">(Slang::SamplerStateType*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::BuiltinGenericType">(Slang::BuiltinGenericType*)&amp;astNodeType</ExpandedItem>
