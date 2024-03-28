@@ -146,6 +146,9 @@ namespace Slang
         // Cost of converting an integer to int16_t
         kConversionCost_IntegerTruncate = 700,
 
+        // Cost of converting an integer to a half type
+        kConversionCost_IntegerToHalfConversion = 800,
+
         // Catch-all for conversions that should be discouraged
         // (i.e., that really shouldn't be made implicitly)
         //

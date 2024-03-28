@@ -1389,13 +1389,22 @@ namespace Slang
     }
 
     bool SemanticsVisitor::canConvertImplicitly(
+        ConversionCost conversionCost)
+    {
+        // Is the conversion cheap enough to be done implicitly?
+        if (conversionCost >= kConversionCost_GeneralConversion)
+            return false;
+        return true;
+    }
+
+    bool SemanticsVisitor::canConvertImplicitly(
         Type* toType,
         QualType fromType)
     {
         auto conversionCost = getConversionCost(toType, fromType);
 
         // Is the conversion cheap enough to be done implicitly?
-        if (conversionCost >= kConversionCost_GeneralConversion)
+        if (canConvertImplicitly(conversionCost))
             return false;
 
         return true;
