@@ -140,14 +140,14 @@ namespace Slang
         // Cost of converting a pointer to bool
         kConversionCost_PtrToBool = 400,
 
-        // Default case (usable for user-defined conversions)
-        kConversionCost_Default = 500,
-
         // Cost of converting an integer to int16_t
-        kConversionCost_IntegerTruncate = 700,
+        kConversionCost_IntegerTruncate = 450,
 
         // Cost of converting an integer to a half type
-        kConversionCost_IntegerToHalfConversion = 800,
+        kConversionCost_IntegerToHalfConversion = 500,
+
+        // Default case (usable for user-defined conversions)
+        kConversionCost_Default = 500,
 
         // Catch-all for conversions that should be discouraged
         // (i.e., that really shouldn't be made implicitly)
