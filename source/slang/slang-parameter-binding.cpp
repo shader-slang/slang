@@ -329,17 +329,11 @@ struct UsedRanges
     }
 };
 
-namespace ParameterAndLayoutConstants
-{
-    const constexpr size_t kInputAttachmentIndexUnused = 0xFFFFFFFF;
-};
-
 struct ParameterBindingInfo
 {
     size_t              space = 0;
     size_t              index = 0;
     LayoutSize          count = 0;
-    size_t              inputAttachmentIndex = ParameterAndLayoutConstants::kInputAttachmentIndexUnused;
 };
 
 struct ParameterBindingAndKindInfo : ParameterBindingInfo
@@ -357,8 +351,6 @@ struct UsedRangeSet : RefObject
     // Information on what ranges of "registers" have already
     // been claimed, for each resource type
     UsedRanges usedResourceRanges[kLayoutResourceKindCount];
-    //Subpass is the only current use of InputAttachmentIndex
-    UsedRanges usedResourceRangesInputAttachmentIndex;
 };
 
 // Information on a single parameter
@@ -478,7 +470,7 @@ struct LayoutSemanticInfo
     LayoutResourceKind  kind; // the register kind
     UInt                space;
     UInt                index;
-    UInt                inputAttachmentIndex = ParameterAndLayoutConstants::kInputAttachmentIndexUnused;
+
     // TODO: need to deal with component-granularity binding...
 };
 
@@ -913,10 +905,8 @@ static void addExplicitParameterBinding(
         bindingInfo.count = count;
         bindingInfo.index = semanticInfo.index;
         bindingInfo.space = semanticInfo.space;
-        bindingInfo.inputAttachmentIndex = semanticInfo.inputAttachmentIndex;
 
         VarLayout* overlappedVarLayout = nullptr;
-        VarLayout* overlappedVarLayoutInputAttachmentIndex = nullptr;
         if( kind == LayoutResourceKind::RegisterSpace || kind == LayoutResourceKind::SubElementRegisterSpace )
         {
             // Parameter is being bound to an entire space, so we
@@ -940,15 +930,8 @@ static void addExplicitParameterBinding(
                 parameterInfo->varLayout,
                 semanticInfo.index,
                 semanticInfo.index + count);
-            if(semanticInfo.inputAttachmentIndex != ParameterAndLayoutConstants::kInputAttachmentIndexUnused)
-                overlappedVarLayoutInputAttachmentIndex = usedRangeSet->usedResourceRangesInputAttachmentIndex.Add(
-                    parameterInfo->varLayout,
-                    semanticInfo.inputAttachmentIndex,
-                    semanticInfo.inputAttachmentIndex + 1);
         }
 
-        if (!overlappedVarLayout)
-            overlappedVarLayout = overlappedVarLayoutInputAttachmentIndex;
         if (overlappedVarLayout)
         {
             //legal if atomicUint
@@ -1088,7 +1071,9 @@ static void addExplicitParameterBindings_GLSL(
     LayoutSemanticInfo semanticInfo;
     semanticInfo.index = 0;
     semanticInfo.space = 0;
-    semanticInfo.inputAttachmentIndex = ParameterAndLayoutConstants::kInputAttachmentIndexUnused;
+
+    LayoutSemanticInfo subpassSemanticInfo;
+    bool foundSubpass = false;
 
     if( (foundResInfo = typeLayout->FindResourceInfo(LayoutResourceKind::DescriptorTableSlot)) != nullptr )
     {
@@ -1104,7 +1089,11 @@ static void addExplicitParameterBindings_GLSL(
             // Try to find `input_attachment_index`
             if (auto glslAttachmentIndexAttr = as<GLSLInputAttachmentIndexLayoutModifier>(dec))
             {
-                semanticInfo.inputAttachmentIndex = stringToInt(glslAttachmentIndexAttr->valToken.getContent());
+                // Subpass fills semantic info of a descriptor & subpass
+                subpassSemanticInfo.index = stringToInt(glslAttachmentIndexAttr->valToken.getContent());
+                subpassSemanticInfo.space = 0;
+                subpassSemanticInfo.kind = LayoutResourceKind::InputAttachmentIndex;
+                foundSubpass = true;
             }
         }
     }
@@ -1139,6 +1128,9 @@ static void addExplicitParameterBindings_GLSL(
         semanticInfo.kind = kind;
 
         addExplicitParameterBinding(context, parameterInfo, varDecl.getDecl(), semanticInfo, count);
+        if (foundSubpass)
+            addExplicitParameterBinding(context, parameterInfo, varDecl.getDecl(), subpassSemanticInfo, count);
+
         return;
     }
 
