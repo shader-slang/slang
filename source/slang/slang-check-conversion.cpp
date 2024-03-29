@@ -1099,7 +1099,8 @@ namespace Slang
 
         // Since the lookup and resolution of all possible implicit conversions
         // can be very costly, we use a cache to store the checking results.
-        ImplicitCastMethod* cachedMethod = getShared()->tryGetImplicitCastMethod(fromType.type, toType);
+        ImplicitCastMethodKey implicitCastKey = ImplicitCastMethodKey(fromType, toType, fromExpr);
+        ImplicitCastMethod* cachedMethod = getShared()->tryGetImplicitCastMethod(implicitCastKey);
 
         if (cachedMethod)
         {
@@ -1114,6 +1115,10 @@ namespace Slang
                 // If we are not requesting to create an expression, we can return early.
                 if (outCost)
                     *outCost = cachedMethod->cost;
+                if (cachedMethod->cost >= kConversionCost_Explicit)
+                {
+                    return false;
+                }
                 return true;
             }
         }
@@ -1139,7 +1144,7 @@ namespace Slang
             {
                 if (!cachedMethod)
                 {
-                    getShared()->cacheImplicitCastMethod(fromType.type, toType, ImplicitCastMethod{});
+                    getShared()->cacheImplicitCastMethod(implicitCastKey, ImplicitCastMethod{});
                 }
                 return _failedCoercion(toType, outToExpr, fromExpr);
             }
@@ -1188,7 +1193,7 @@ namespace Slang
             {
                 if (!cachedMethod)
                 {
-                    getShared()->cacheImplicitCastMethod(fromType.type, toType, ImplicitCastMethod{});
+                    getShared()->cacheImplicitCastMethod(implicitCastKey, ImplicitCastMethod{});
                 }
                 return _failedCoercion(toType, outToExpr, fromExpr);
             }
@@ -1301,12 +1306,12 @@ namespace Slang
                 castExpr->arguments.add(fromExpr);
             }
             if (!cachedMethod)
-                getShared()->cacheImplicitCastMethod(fromType.type, toType, ImplicitCastMethod{ *overloadContext.bestCandidate, cost });
+                getShared()->cacheImplicitCastMethod(implicitCastKey, ImplicitCastMethod{ *overloadContext.bestCandidate, cost });
             return true;
         }
         if (!cachedMethod)
         {
-            getShared()->cacheImplicitCastMethod(fromType.type, toType, ImplicitCastMethod{});
+            getShared()->cacheImplicitCastMethod(implicitCastKey, ImplicitCastMethod{});
         }
         return _failedCoercion(toType, outToExpr, fromExpr);
     }

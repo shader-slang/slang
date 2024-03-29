@@ -556,6 +556,37 @@ namespace Slang
         ConversionCost cost = kConversionCost_Impossible;
     };
 
+    struct ImplicitCastMethodKey
+    {
+        Type* fromType; // nullptr means default construct.
+        bool isLValue;
+        Type* toType;
+        uint64_t constantVal;
+        bool isConstant;
+        HashCode getHashCode() const
+        {
+            return combineHash(Slang::getHashCode(fromType), Slang::getHashCode(toType), Slang::getHashCode(constantVal), (HashCode32)isConstant, (HashCode32)isLValue);
+        }
+        bool operator == (const ImplicitCastMethodKey& other) const
+        {
+            return fromType == other.fromType && toType == other.toType && isConstant == other.isConstant && constantVal == other.constantVal && isLValue == other.isLValue;
+        }
+        ImplicitCastMethodKey() = default;
+        ImplicitCastMethodKey(QualType fromType, Type* toType, Expr* fromExpr)
+            : fromType(fromType)
+            , toType(toType)
+            , constantVal(0)
+            , isConstant(false)
+            , isLValue(fromExpr?fromExpr->type.isLeftValue:false)
+        {
+            if (auto constInt = as<IntegerLiteralExpr>(fromExpr))
+            {
+                constantVal = constInt->value;
+                isConstant = true;
+            }
+        }
+    };
+
         /// Shared state for a semantics-checking session.
     struct SharedSemanticsContext
     {
@@ -664,15 +695,13 @@ namespace Slang
             auto pair = TypePair{ sub, sup };
             m_mapTypePairToSubtypeWitness[pair] = outWitness;
         }
-        ImplicitCastMethod* tryGetImplicitCastMethod(Type* fromType, Type* toType)
+        ImplicitCastMethod* tryGetImplicitCastMethod(ImplicitCastMethodKey key)
         {
-            auto pair = TypePair{ fromType, toType };
-            return m_mapTypePairToImplicitCastMethod.tryGetValue(pair);
+            return m_mapTypePairToImplicitCastMethod.tryGetValue(key);
         }
-        void cacheImplicitCastMethod(Type* fromType, Type* toType, ImplicitCastMethod candidate)
+        void cacheImplicitCastMethod(ImplicitCastMethodKey key, ImplicitCastMethod candidate)
         {
-            auto pair = TypePair{ fromType, toType };
-            m_mapTypePairToImplicitCastMethod[pair] = candidate;
+            m_mapTypePairToImplicitCastMethod[key] = candidate;
         }
 
     private:
@@ -793,7 +822,7 @@ namespace Slang
         Dictionary<Type*, InheritanceInfo> m_mapTypeToInheritanceInfo;
         Dictionary<DeclRef<Decl>, InheritanceInfo> m_mapDeclRefToInheritanceInfo;
         Dictionary<TypePair, SubtypeWitness*> m_mapTypePairToSubtypeWitness;
-        Dictionary<TypePair, ImplicitCastMethod> m_mapTypePairToImplicitCastMethod;
+        Dictionary<ImplicitCastMethodKey, ImplicitCastMethod> m_mapTypePairToImplicitCastMethod;
     };
 
         /// Local/scoped state of the semantic-checking system
