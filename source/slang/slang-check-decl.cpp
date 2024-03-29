@@ -8849,21 +8849,73 @@ namespace Slang
         //
         _getCandidateExtensionList(typeDecl, m_mapTypeDeclToCandidateExtensions).add(extDecl);
 
-        // Removed the cached inheritanceInfo about typeDecl, if `extDecl` inherits new types.
-        bool hasInheritanceMember = extDecl->getMembersOfType<InheritanceDecl>().isNonEmpty();
-        if (hasInheritanceMember)
+        // Remove the cached inheritanceInfo about typeDecl, if `extDecl` inherits new types.
+        bool invalidateSubtypes = false;
+        if (as<InterfaceDecl>(typeDecl))
         {
-            m_mapTypeToInheritanceInfo.clear();
-            m_mapTypePairToSubtypeWitness.clear();
+            // If we are extending an interface, we are effectively extending all types
+            // that inherits the interface. So we need to remove all inheritance info
+            // that is related to the interface.
+            invalidateSubtypes = true;
+        }
+        bool hasInheritanceMember = extDecl->getMembersOfType<InheritanceDecl>().isNonEmpty();
+        if (hasInheritanceMember || invalidateSubtypes)
+        {
+            auto isInheritanceInfoAffected = [typeDecl](InheritanceInfo& info)
+                {
+                    for (auto f : info.facets)
+                        if (f.getImpl()->getDeclRef().getDecl() == typeDecl)
+                        {
+                            return true;
+                        }
+                    return false;
+                };
+
+            decltype(m_mapTypeToInheritanceInfo) newMapTypeToInheritanceInfo;
+            for (auto& kv : m_mapTypeToInheritanceInfo)
+            {
+                if (!isInheritanceInfoAffected(kv.second))
+                {
+                    newMapTypeToInheritanceInfo.add(kv.first, kv.second);
+                }
+            }
+            m_mapTypeToInheritanceInfo = _Move(newMapTypeToInheritanceInfo);
+
             decltype(m_mapDeclRefToInheritanceInfo) newMapDeclRefToInheritanceInfo;
             for (auto& kv : m_mapDeclRefToInheritanceInfo)
             {
-                if (kv.first.getDecl() != typeDecl)
+                // We can confirm the type is not affected by the new extension,
+                // if the declref type does not point to typeDecl.
+                if (kv.first.getDecl() == typeDecl)
+                    continue;
+
+                // If we are extending interface types (and in the future any struct type
+                // if we decide to have full inheritance support),
+                // we also need to account for conformant that implements the interface.
+                if (invalidateSubtypes && !isInheritanceInfoAffected(kv.second))
                 {
                     newMapDeclRefToInheritanceInfo.add(kv.first, kv.second);
                 }
             }
             m_mapDeclRefToInheritanceInfo = _Move(newMapDeclRefToInheritanceInfo);
+
+            decltype(m_mapTypePairToSubtypeWitness) newMapTypePairToSubtypeWitness;
+            auto isTypeUpToDate = [this](Type* type)
+                {
+                    if (auto declRefType = as<DeclRefType>(type))
+                    {
+                        return m_mapDeclRefToInheritanceInfo.containsKey(declRefType->getDeclRef());
+                    }
+                    return m_mapTypeToInheritanceInfo.containsKey(type);
+                };
+            for (auto& kv : m_mapTypePairToSubtypeWitness)
+            {
+                if (isTypeUpToDate(kv.first.type0) && isTypeUpToDate(kv.first.type1))
+                {
+                    newMapTypePairToSubtypeWitness.add(kv.first, kv.second);
+                }
+            }
+            m_mapTypePairToSubtypeWitness = _Move(newMapTypePairToSubtypeWitness);
         }
     }
     
