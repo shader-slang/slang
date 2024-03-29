@@ -282,6 +282,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     {
         if (as<IRTextureTypeBase>(type))
             return true;
+        if (as<IRSubpassInputType>(type))
+            return true;
         if (as<IRSamplerStateTypeBase>(type))
             return true;
         if (const auto arr = as<IRArrayTypeBase>(type))
@@ -368,11 +370,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         {
             format = decor->getFormat();
         }
-        if (textureType->GetBaseShape() == SLANG_TEXTURE_SUBPASS)
-        {
-            assert(format == ImageFormat::unknown);
-            return;
-        } 
 
         // If the texture has no format decoration, try to infer it from the type.
         if (format == ImageFormat::unknown)

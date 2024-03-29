@@ -140,6 +140,8 @@ INST(Nop, nop, 0, 0)
     INST(Std430BufferLayoutType, Std430Layout, 0, HOISTABLE)
     INST(ScalarBufferLayoutType, ScalarLayout, 0, HOISTABLE)
 
+    INST(SubpassInputType, SubpassInputType, 2, HOISTABLE)
+
     INST(TextureFootprintType, TextureFootprintType, 1, HOISTABLE)
 
     INST(TextureShape1DType, TextureShape1DType, 0, HOISTABLE)
@@ -147,7 +149,6 @@ INST(Nop, nop, 0, 0)
     INST(TextureShape3DType, TextureShape1DType, 0, HOISTABLE)
     INST(TextureShapeCubeType, TextureShape1DType, 0, HOISTABLE)
     INST(TextureShapeBufferType, TextureShapeBufferType, 0, HOISTABLE)
-    INST(TextureShapeSubpassType, TextureShapeSubpassType, 0, HOISTABLE)
 
     // TODO: Why do we have all this hierarchy here, when everything
     // that actually matters is currently nested under `TextureTypeBase`?

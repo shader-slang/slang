@@ -783,8 +783,6 @@ SlangResourceShape ResourceType::getBaseShape()
         return SLANG_TEXTURE_CUBE;
     else if (as<TextureShapeBufferType>(shape))
         return SLANG_TEXTURE_BUFFER;
-    else if (as<TextureShapeSubpassType>(shape))
-        return SLANG_TEXTURE_SUBPASS;
 
     return SLANG_RESOURCE_NONE;
 }
@@ -839,6 +837,19 @@ bool ResourceType::isCombined()
 {
     auto combined = _getGenericTypeArg(this, kStdlibTextureIsCombinedParameterIndex);
     if (auto constIntVal = as<ConstantIntVal>(combined))
+        return constIntVal->getValue() != 0;
+    return false;
+}
+
+Type* SubpassInputType::getElementType()
+{
+    return as<Type>(_getGenericTypeArg(this, 0));
+}
+
+bool SubpassInputType::isMultisample()
+{
+    auto isMS = _getGenericTypeArg(this, 1);
+    if (auto constIntVal = as<ConstantIntVal>(isMS))
         return constIntVal->getValue() != 0;
     return false;
 }
@@ -916,8 +927,6 @@ void ResourceType::_toTextOverride(StringBuilder& out)
             {
                 if (shape == SLANG_TEXTURE_BUFFER)
                     resultSB << "Buffer";
-                else if (shape == SLANG_TEXTURE_SUBPASS)
-                    resultSB << "Subpass";
                 else
                     resultSB << "Texture";
             }

@@ -3390,6 +3390,7 @@ public:
         IRInst* isShadow,
         IRInst* isCombined,
         IRInst* format);
+
     IRComPtrType* getComPtrType(IRType* valueType);
 
         /// Get a 'SPIRV literal' 

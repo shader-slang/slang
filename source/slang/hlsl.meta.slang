@@ -11404,26 +11404,64 @@ ${{{{
 }
 
 //
-// Vulkan/SPIR-V specific features
+// SubpassInput
 //
-[sealed]
-[builtin]
-interface __ITextureSubpass
-{
-    static const int flavor;
-}
-__magic_type(TextureShapeSubpassType)
-__intrinsic_type($(kIROp_TextureShapeSubpassType))
-struct __ShapeSubpass : __ITextureSubpass
-{
-    static const int flavor = $(SLANG_TEXTURE_SUBPASS);
-}
-__magic_type(TextureType)
-__intrinsic_type($(kIROp_TextureType))
-struct __SubpassImpl<T, Shape: __ITextureSubpass, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
+
+__magic_type(SubpassInputType)
+__intrinsic_type($(kIROp_SubpassInputType))
+struct __SubpassImpl<T, let isMS:int>
 {
 }
 
+__generic<T, let isMS:int=0>
+typealias SubpassInputMS = __SubpassImpl<T, isMS>;
+
+__generic<T, let isMS:int=0>
+extension __SubpassImpl<T, isMS>
+{
+    [ForceInline]
+    T SubpassLoad()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "$0.SubpassLoad()";
+        case spirv:
+        {
+            let zeroVec = int2(0);
+            return spirv_asm
+            {
+                OpCapability StorageImageReadWithoutFormat;
+                result:$$T = OpImageRead $this $zeroVec
+            };
+        }
+        }
+    }
+}
+
+__generic<T, let isMS:int=1>
+typealias SubpassInput = __SubpassImpl<T, isMS>;
+
+__generic<T, let isMS:int=1>
+extension __SubpassImpl<T, isMS>
+{
+    [ForceInline]
+    T SubpassLoad(int sample)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "$0.SubpassLoad($1)";
+        case spirv:
+        {
+            let zeroVec = int2(0);
+            return spirv_asm
+            {
+                OpCapability StorageImageReadWithoutFormat;
+                result:$$T = OpImageRead $this $zeroVec Sample $sample
+            };
+        }
+        }
+    }
+}
 
 ///
 /// Shader Execution Reordering (SER)

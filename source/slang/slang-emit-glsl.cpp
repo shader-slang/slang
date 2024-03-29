@@ -769,6 +769,16 @@ void GLSLSourceEmitter::_emitGLSLLayoutQualifiers(IRVarLayout* layout, EmitVarCh
     }
 }
 
+void GLSLSourceEmitter::_emitGLSLSubpassInputType(IRSubpassInputType* type)
+{
+    _emitGLSLTypePrefix(type->getElementType(), true);
+    m_writer->emit("subpassInput");
+    if (type->isMultisample())
+    {
+        m_writer->emit("MS");
+    }
+}
+
 void GLSLSourceEmitter::_emitGLSLTextureOrTextureSamplerType(IRTextureTypeBase*  type, char const* baseName)
 {
     if (type->getElementType()->getOp() == kIROp_HalfType)
@@ -781,13 +791,6 @@ void GLSLSourceEmitter::_emitGLSLTextureOrTextureSamplerType(IRTextureTypeBase* 
         _emitGLSLTypePrefix(type->getElementType(), true);
     }
 
-    if(type->GetBaseShape() == SLANG_TEXTURE_SUBPASS)
-    {
-        m_writer->emit("subpassInput");
-        if (type->isMultisample())
-            m_writer->emit("MS");
-        return;
-    }
     m_writer->emit(baseName);
     switch (type->GetBaseShape())
     {
@@ -2492,6 +2495,11 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
     else if (auto imageType = as<IRGLSLImageType>(type))
     {
         _emitGLSLTextureOrTextureSamplerType(imageType, "image");
+        return;
+    }
+    else if (auto subpassType = as<IRSubpassInputType>(type))
+    {
+        _emitGLSLSubpassInputType(subpassType);
         return;
     }
     else if (const auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type))

@@ -2090,6 +2090,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         return arrayTypeLayout;
     }
     // Ignore a bunch of types that don't make sense here...
+    else if (const auto subpassType = as<SubpassInputType>(type)) { return nullptr;  }
     else if (const auto textureType = as<TextureType>(type)) { return nullptr;  }
     else if(const auto samplerStateType = as<SamplerStateType>(type)) { return nullptr;  }
     else if(const auto constantBufferType = as<ConstantBufferType>(type)) { return nullptr;  }

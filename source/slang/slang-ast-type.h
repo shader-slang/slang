@@ -143,10 +143,6 @@ class TextureShapeBufferType : public TextureShapeType
 {
     SLANG_AST_CLASS(TextureShapeBufferType)
 };
-class TextureShapeSubpassType : public TextureShapeType
-{
-    SLANG_AST_CLASS(TextureShapeSubpassType)
-};
 
 // Resources that contain "elements" that can be fetched
 class ResourceType : public BuiltinType 
@@ -181,6 +177,14 @@ class TextureType : public TextureTypeBase
 class GLSLImageType : public TextureTypeBase 
 {
     SLANG_AST_CLASS(GLSLImageType)
+};
+
+class SubpassInputType : public BuiltinType
+{
+    SLANG_AST_CLASS(SubpassInputType)
+
+    bool isMultisample();
+    Type* getElementType();
 };
 
 class SamplerStateType : public BuiltinType 

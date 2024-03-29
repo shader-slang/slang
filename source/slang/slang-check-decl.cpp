@@ -1800,25 +1800,6 @@ namespace Slang
             // global variables and struct fields to prevent mangling.
             addModifier(varDecl, m_astBuilder->create<ExternCppModifier>());
         }
-
-        // Once type is resolved ensure FormatAttribute is used correctly
-        if (auto format = varDecl->findModifier<FormatAttribute>())
-        {
-            auto formatName = getImageFormatInfo(format->format).name;
-            Type* type = nullptr;
-            if (varDecl)
-                type = varDecl->getType();
-            TextureType* texture = nullptr;
-            if (type)
-                texture = as<TextureType>(type);
-            // Format must be unknown for subpass textures
-            if (texture && texture->getBaseShape() == SLANG_TEXTURE_SUBPASS
-                && format->format != ImageFormat::unknown)
-            {
-                getSink()->diagnose(format, Diagnostics::invalidImageFormatForType, formatName, "SubpassInput");
-            }
-        }
-
         checkVisibility(varDecl);
     }
 

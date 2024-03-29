@@ -1234,6 +1234,8 @@ bool isIllegalGLSLParameterType(IRType* type)
             break;
         }
     }
+    if(as<IRSubpassInputType>(type))
+        return true;
     if (as<IRMeshOutputType>(type))
         return true;
     if (as<IRHLSLStreamOutputType>(type))
@@ -1249,6 +1251,8 @@ bool isIllegalSPIRVParameterType(IRType* type, bool isArray)
     // If we are emitting SPIRV direclty, we need to specialize
     // all Texture types.
     if (as<IRTextureType>(type))
+        return true;
+    if(as<IRSubpassInputType>(type))
         return true;
     if (isArray)
     {

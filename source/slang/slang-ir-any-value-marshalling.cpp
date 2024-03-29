@@ -223,7 +223,9 @@ namespace Slang
                 break;
             }
             default:
-                if (as<IRTextureTypeBase>(dataType) || as<IRSamplerStateTypeBase>(dataType))
+                if (as<IRTextureTypeBase>(dataType) 
+                    || as<IRSamplerStateTypeBase>(dataType)
+                    || as<IRSubpassInputType>(dataType))
                 {
                     context->marshalResourceHandle(builder, dataType, concreteTypedVar);
                     return;
@@ -855,7 +857,9 @@ namespace Slang
             return alignUp(offset, 4) + alignUp((SlangInt)anyValueSize, 4);
         }
         default:
-            if (as<IRTextureTypeBase>(type) || as<IRSamplerStateTypeBase>(type))
+            if (as<IRTextureTypeBase>(type) 
+                || as<IRSamplerStateTypeBase>(type)
+                || as<IRSubpassInputType>(type))
             {
                 return alignUp(offset, 4) + 8;
             }

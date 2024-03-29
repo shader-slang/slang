@@ -1514,6 +1514,8 @@ struct SPIRVEmitContext
                     SpvLiteralInteger::from32(stride));
                 return arrayType;
             }
+        case kIROp_SubpassInputType:
+            return ensureSubpassInputType(inst, cast<IRSubpassInputType>(inst));
         case kIROp_TextureType:
             return ensureTextureType(inst, cast<IRTextureType>(inst));
         case kIROp_SamplerStateType:
@@ -1824,39 +1826,62 @@ struct SPIRVEmitContext
         }
     }
 
+    struct ImageOpConstants
+    {
+        enum : SpvWord
+        {
+            // Some untyped constants from OpTypeImage
+            // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypeImage
+
+            // indicates not a depth image
+            notDepthImage = 0,
+            // indicates a depth image
+            isDepthImage = 1,
+            // means no indication as to whether this is a depth or non-depth image
+            unknownDepthImage = 2,
+
+            // indicates non-arrayed content
+            notArrayed = 0,
+            // indicates arrayed content
+            isArrayed = 1,
+
+            // indicates this is only known at run time, not at compile time
+            sampledUnknown = 0,
+            // indicates an image compatible with sampling operations
+            sampledImage = 1,
+            // indicates an image compatible with read/write operations (a storage or subpass data image).
+            readWriteImage = 2,
+
+            // indicates single-sampled content
+            notMultisampled = 0,
+            // indicates multisampled content
+            isMultisampled = 1,
+        };
+    };
+
+    SpvInst* ensureSubpassInputType(IRInst* assignee, IRSubpassInputType* inst)
+    {
+        IRInst* sampledType = inst->getElementType();
+        SpvDim dim = SpvDimSubpassData;
+        SpvWord ms = inst->isMultisample() ? ImageOpConstants::isMultisampled : ImageOpConstants::notMultisampled;
+        SpvWord sampled = 2; 
+        requireSPIRVCapability(SpvCapabilityInputAttachment);
+        requireSPIRVCapability(SpvCapabilityStorageImageReadWithoutFormat);
+        setImageFormatCapabilityAndExtension(SpvImageFormatUnknown, SpvCapabilityShader);
+        return emitOpTypeImage(
+            assignee,
+            dropVector((IRType*)sampledType),
+            dim,
+            SpvLiteralInteger::from32(ImageOpConstants::unknownDepthImage),
+            SpvLiteralInteger::from32(0),
+            SpvLiteralInteger::from32(ms),
+            SpvLiteralInteger::from32(sampled),
+            SpvImageFormatUnknown
+        );
+    }
+
     SpvInst* ensureTextureType(IRInst* assignee, IRTextureTypeBase* inst)
     {
-        // Some untyped constants from OpTypeImage
-        // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypeImage
-
-        // indicates not a depth image
-        [[maybe_unused]]
-        const SpvWord notDepthImage = 0;
-        // indicates a depth image
-        [[maybe_unused]]
-        const SpvWord isDepthImage = 1;
-        // means no indication as to whether this is a depth or non-depth image
-        const SpvWord unknownDepthImage = 2;
-
-        // indicates non-arrayed content
-        const SpvWord notArrayed = 0;
-        // indicates arrayed content
-        const SpvWord isArrayed = 1;
-
-        // indicates single-sampled content
-        const SpvWord notMultisampled = 0;
-        // indicates multisampled content
-        const SpvWord isMultisampled = 1;
-
-        // indicates this is only known at run time, not at compile time
-        const SpvWord sampledUnknown = 0;
-        // indicates an image compatible with sampling operations
-        const SpvWord sampledImage = 1;
-        // indicates an image compatible with read/write operations (a storage or subpass data image).
-        const SpvWord readWriteImage = 2;
-
-        //
-
         IRInst* sampledType = inst->getElementType();
         SpvDim dim = SpvDim1D; // Silence uninitialized warnings from msvc...
         switch(inst->GetBaseShape())
@@ -1876,26 +1901,23 @@ struct SPIRVEmitContext
             case SLANG_TEXTURE_BUFFER:
                 dim = SpvDimBuffer;
                 break;
-            case SLANG_TEXTURE_SUBPASS:
-                dim = SpvDimSubpassData;
-                break;
         }
-        SpvWord arrayed = inst->isArray() ? isArrayed : notArrayed;
+        SpvWord arrayed = inst->isArray() ? ImageOpConstants::isArrayed : ImageOpConstants::notArrayed;
 
         // Vulkan spec 16.1: "The “Depth” operand of OpTypeImage is ignored."
-        SpvWord depth = unknownDepthImage; // No knowledge of if this is a depth image
-        SpvWord ms = inst->isMultisample() ? isMultisampled : notMultisampled;
+        SpvWord depth = ImageOpConstants::unknownDepthImage; // No knowledge of if this is a depth image
+        SpvWord ms = inst->isMultisample() ? ImageOpConstants::isMultisampled : ImageOpConstants::notMultisampled;
 
-        SpvWord sampled = sampledUnknown;
+        SpvWord sampled = ImageOpConstants::sampledUnknown;
         switch(inst->getAccess())
         {
             case SlangResourceAccess::SLANG_RESOURCE_ACCESS_READ_WRITE:
             case SlangResourceAccess::SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
-                sampled = readWriteImage;
+                sampled = ImageOpConstants::readWriteImage;
                 break;
             case SlangResourceAccess::SLANG_RESOURCE_ACCESS_NONE:
             case SlangResourceAccess::SLANG_RESOURCE_ACCESS_READ:
-                sampled = sampledImage;
+                sampled = ImageOpConstants::sampledImage;
                 break;
         }
 
@@ -1956,40 +1978,37 @@ struct SPIRVEmitContext
         // Capabilities, according to section 3.8
         //
         // SPIR-V requires that the sampled/rw info on the image isn't unknown
-        SLANG_ASSERT(sampled == sampledImage || sampled == readWriteImage);
-        if(isMultisampled) 
+        SLANG_ASSERT(sampled == ImageOpConstants::sampledImage || sampled == ImageOpConstants::readWriteImage);
+        if(ms == ImageOpConstants::isMultisampled) 
             requireSPIRVCapability(SpvCapabilityStorageImageMultisample);
         switch(dim)
         {
         case SpvDim1D:
-            requireSPIRVCapability(sampled == sampledImage ? SpvCapabilitySampled1D : SpvCapabilityImage1D);
+            requireSPIRVCapability(sampled == ImageOpConstants::sampledImage ? SpvCapabilitySampled1D : SpvCapabilityImage1D);
             break;
         case SpvDim2D:
             // Also requires Shader or Kernel, but these are a given (?)
-            if(sampled == readWriteImage && ms == isMultisampled && arrayed == isArrayed)
+            if(sampled == ImageOpConstants::readWriteImage && ms == ImageOpConstants::isMultisampled && arrayed == ImageOpConstants::isArrayed)
                 requireSPIRVCapability(SpvCapabilityImageMSArray);
             break;
         case SpvDim3D:
             break;
         case SpvDimCube:
             // Requires shader also
-            if(sampled == readWriteImage && arrayed == isArrayed)
+            if(sampled == ImageOpConstants::readWriteImage && arrayed == ImageOpConstants::isArrayed)
                 requireSPIRVCapability(SpvCapabilityImageCubeArray);
             break;
         case SpvDimRect:
-            requireSPIRVCapability(sampled == sampledImage ? SpvCapabilitySampledRect : SpvCapabilityImageRect);
+            requireSPIRVCapability(sampled == ImageOpConstants::sampledImage ? SpvCapabilitySampledRect : SpvCapabilityImageRect);
             break;
         case SpvDimBuffer:
-            requireSPIRVCapability(sampled == sampledImage ? SpvCapabilitySampledBuffer : SpvCapabilityImageBuffer);
-            break;
-        case SpvDimSubpassData:
-            requireSPIRVCapability(SpvCapabilityInputAttachment);
+            requireSPIRVCapability(sampled == ImageOpConstants::sampledImage ? SpvCapabilitySampledBuffer : SpvCapabilityImageBuffer);
             break;
         case SpvDimTileImageDataEXT:
             SLANG_UNIMPLEMENTED_X("OpTypeImage Capabilities for SpvDimTileImageDataEXT");
             break;
         }
-        if(format == SpvImageFormatUnknown && sampled == readWriteImage)
+        if(format == SpvImageFormatUnknown && sampled == ImageOpConstants::readWriteImage)
         {
             // TODO: It may not be necessary to have both of these
             // depending on if we read or write

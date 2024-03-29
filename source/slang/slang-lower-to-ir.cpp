@@ -2206,9 +2206,9 @@ void addVarDecorations(
         }
         else if (auto glslInputAttachmentMod = as<GLSLInputAttachmentIndexLayoutModifier>(mod))
         {
-            auto textureType = as<IRTextureType>(inst->getDataType());
+            auto subpassType = as<IRSubpassInputType>(inst->getDataType());
 
-            if (!textureType || textureType->GetBaseShape( ) != SLANG_TEXTURE_SUBPASS)
+            if (!subpassType)
                 context->getSink()->diagnose(inst, Diagnostics::InputAttachmentIndexOnlyAllowedOnSubpass);
 
             builder->addDecoration(inst, kIROp_GLSLInputAttachmentIndexDecoration,

@@ -1398,8 +1398,6 @@ struct IRResourceTypeBase : IRType
             return SLANG_TEXTURE_CUBE;
         case kIROp_TextureShapeBufferType:
             return SLANG_TEXTURE_BUFFER;
-        case kIROp_TextureShapeSubpassType:
-            return SLANG_TEXTURE_SUBPASS;
         default:
             return SLANG_RESOURCE_NONE;
         }
@@ -1459,6 +1457,15 @@ struct IRTextureType : IRTextureTypeBase
 struct IRGLSLImageType : IRTextureTypeBase
 {
     IR_LEAF_ISA(GLSLImageType)
+};
+
+struct IRSubpassInputType : IRType
+{
+    IRType* getElementType() { return (IRType*)getOperand(0); }
+    IRInst* getIsMultisampleInst() { return getOperand(1); }
+    bool isMultisample() { return getIntVal(getIsMultisampleInst()) == 1; }
+
+    IR_LEAF_ISA(SubpassInputType)
 };
 
 struct IRSamplerStateTypeBase : IRType

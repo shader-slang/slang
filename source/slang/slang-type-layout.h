@@ -947,6 +947,8 @@ enum class ShaderParameterKind
     AppendConsumeStructuredBuffer,
 
     AtomicUint,
+
+    SubpassInput,
 };
 
 struct SimpleLayoutRulesImpl

@@ -7864,9 +7864,9 @@ struct SubpassLoadEntriesType
 };
 static const SubpassLoadEntriesType kSubpassLoadEntries[] =
     {
-        { "float", "" },
-        { "uint", "u" },
-        { "int", "i" },
+        { "vec4", "" },
+        { "uvec4", "u" },
+        { "ivec4", "i" },
     };
 for (const auto& subpassLoadEntry : kSubpassLoadEntries)
 {
@@ -7874,37 +7874,17 @@ for (const auto& subpassLoadEntry : kSubpassLoadEntries)
     [require(glsl_spirv, subpass)]
     public typealias $(subpassLoadEntry.prefix)subpassInput = __SubpassImpl<
         $(subpassLoadEntry.typeName),
-        __ShapeSubpass,
-        0, // isArray
-        0, // isMS
-        0, // sampleCount
-        $(kStdlibResourceAccessReadWrite),
-        0, // isShadow
-        0, // isCombined
-        0  // format
+        0 // isMS
     >;
 
     [require(glsl_spirv, subpass)]
-    __generic<let sampleCount:int=0>
-    public typealias $(subpassLoadEntry.prefix)subpassInputMS = __SubpassImpl<
-        $(subpassLoadEntry.typeName),
-        __ShapeSubpass,
-        0, // isArray
-        1, // isMS
-        sampleCount,
-        $(kStdlibResourceAccessReadWrite),
-        0, // isShadow
-        0, // isCombined
-        0  // format
-    >;
-    __glsl_version(430) [require(glsl)]
-    __spirv_version(1.0) [require(spirv)]
     [__NoSideEffect]
     [ForceInline]
-    public $(subpassLoadEntry.prefix)vec4 subpassLoad($(subpassLoadEntry.prefix)subpassInput subpass)
+    public $(subpassLoadEntry.typeName) subpassLoad($(subpassLoadEntry.prefix)subpassInput subpass)
     {
         __target_switch
         {
+        case hlsl: return subpass.SubpassLoad();
         case glsl: __intrinsic_asm "subpassLoad($0)";
         case spirv:
         {
@@ -7912,27 +7892,34 @@ for (const auto& subpassLoadEntry : kSubpassLoadEntries)
             return spirv_asm
             {
                 OpCapability StorageImageReadWithoutFormat;
-                result:$$$(subpassLoadEntry.prefix)vec4 = OpImageRead $subpass $zeroVec
+                result:$$$(subpassLoadEntry.typeName) = OpImageRead $subpass $zeroVec
             };
         }
         }
     }
-    __glsl_version(430) [require(glsl)]
-    __spirv_version(1.0) [require(spirv)]
+
+    [require(glsl_spirv, subpass)]
+    public typealias $(subpassLoadEntry.prefix)subpassInputMS = __SubpassImpl<
+        $(subpassLoadEntry.typeName),
+        1 // isMS
+    >;
+
+    [require(glsl_spirv, subpass)]
     [__NoSideEffect]
     [ForceInline]
-    public $(subpassLoadEntry.prefix)vec4 subpassLoad($(subpassLoadEntry.prefix)subpassInputMS subpass, int sample)
+    public $(subpassLoadEntry.typeName) subpassLoad($(subpassLoadEntry.prefix)subpassInputMS subpass, int sample)
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "subpassLoad($0)";
+        case hlsl: return subpass.SubpassLoad(sample);
+        case glsl: __intrinsic_asm "subpassLoad($0, $1)";
         case spirv:
         {
             let zeroVec = ivec2(0);
             return spirv_asm
             {
                 OpCapability StorageImageReadWithoutFormat;
-                result:$$$(subpassLoadEntry.prefix)vec4 = OpImageRead $subpass $zeroVec Sample $sample
+                result:$$$(subpassLoadEntry.typeName) = OpImageRead $subpass $zeroVec Sample $sample
             };
         }
         }
