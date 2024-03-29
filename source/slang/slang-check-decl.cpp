@@ -8847,17 +8847,24 @@ namespace Slang
         // extensions, and force it to rebuild its cache to include the
         // new extension we just added.
         //
-        // TODO: We should probably just go ahead and add `extDecl` directly
-        // into the appropriate entry here, and do a similar step on each
-        // `import`.
-        //
-        m_candidateExtensionListsBuilt = false;
-        m_mapTypeDeclToCandidateExtensions.clear();
+        _getCandidateExtensionList(typeDecl, m_mapTypeDeclToCandidateExtensions).add(extDecl);
 
-        // Invalidate the cached inheritanceInfo.
-        m_mapTypeToInheritanceInfo.clear();
-        m_mapDeclRefToInheritanceInfo.clear();
-        m_mapTypePairToSubtypeWitness.clear();
+        // Removed the cached inheritanceInfo about typeDecl, if `extDecl` inherits new types.
+        bool hasInheritanceMember = extDecl->getMembersOfType<InheritanceDecl>().isNonEmpty();
+        if (hasInheritanceMember)
+        {
+            m_mapTypeToInheritanceInfo.clear();
+            m_mapTypePairToSubtypeWitness.clear();
+            decltype(m_mapDeclRefToInheritanceInfo) newMapDeclRefToInheritanceInfo;
+            for (auto& kv : m_mapDeclRefToInheritanceInfo)
+            {
+                if (kv.first.getDecl() != typeDecl)
+                {
+                    newMapDeclRefToInheritanceInfo.add(kv.first, kv.second);
+                }
+            }
+            m_mapDeclRefToInheritanceInfo = _Move(newMapDeclRefToInheritanceInfo);
+        }
     }
     
     void SharedSemanticsContext::_addCandidateExtensionsFromModule(ModuleDecl* moduleDecl)
