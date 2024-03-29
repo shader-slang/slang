@@ -549,6 +549,12 @@ namespace Slang
         FacetList facets;
     };
 
+        /// Cached information about how to convert between two types.
+    struct ImplicitCastMethod
+    {
+        OverloadCandidate conversionFuncOverloadCandidate;
+    };
+
         /// Shared state for a semantics-checking session.
     struct SharedSemanticsContext
     {
@@ -656,6 +662,18 @@ namespace Slang
         {
             auto pair = TypePair{ sub, sup };
             m_mapTypePairToSubtypeWitness[pair] = outWitness;
+        }
+        ImplicitCastMethod* tryGetImplicitCastMethod(Type* fromType, Type* toType)
+        {
+            auto pair = TypePair{ fromType, toType };
+            return m_mapTypePairToImplicitCastMethod.tryGetValue(pair);
+        }
+        void cacheImplicitCastMethod(Type* fromType, Type* toType, const OverloadCandidate& candidate)
+        {
+            auto pair = TypePair{ fromType, toType };
+            ImplicitCastMethod result;
+            result.conversionFuncOverloadCandidate = candidate;
+            m_mapTypePairToImplicitCastMethod[pair] = result;
         }
 
     private:
@@ -776,6 +794,7 @@ namespace Slang
         Dictionary<Type*, InheritanceInfo> m_mapTypeToInheritanceInfo;
         Dictionary<DeclRef<Decl>, InheritanceInfo> m_mapDeclRefToInheritanceInfo;
         Dictionary<TypePair, SubtypeWitness*> m_mapTypePairToSubtypeWitness;
+        Dictionary<TypePair, ImplicitCastMethod> m_mapTypePairToImplicitCastMethod;
     };
 
         /// Local/scoped state of the semantic-checking system

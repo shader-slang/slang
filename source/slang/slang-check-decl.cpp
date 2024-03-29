@@ -8858,7 +8858,28 @@ namespace Slang
             // that is related to the interface.
             invalidateSubtypes = true;
         }
-        bool hasInheritanceMember = extDecl->getMembersOfType<InheritanceDecl>().isNonEmpty();
+        bool hasInheritanceMember = false;
+        bool hasImplicitCastMember = false;
+        for (auto member : extDecl->members)
+        {
+            if (as<InheritanceDecl>(member))
+            {
+                hasInheritanceMember = true;
+            }
+            else if (auto ctorDecl = as<ConstructorDecl>(member))
+            {
+                if (ctorDecl->hasModifier<ImplicitConversionModifier>())
+                    hasImplicitCastMember = true;
+            }
+        }
+        auto isTypeUpToDate = [this](Type* type)
+            {
+                if (auto declRefType = as<DeclRefType>(type))
+                {
+                    return m_mapDeclRefToInheritanceInfo.containsKey(declRefType->getDeclRef());
+                }
+                return m_mapTypeToInheritanceInfo.containsKey(type);
+            };
         if (hasInheritanceMember || invalidateSubtypes)
         {
             auto isInheritanceInfoAffected = [typeDecl](InheritanceInfo& info)
@@ -8900,14 +8921,6 @@ namespace Slang
             m_mapDeclRefToInheritanceInfo = _Move(newMapDeclRefToInheritanceInfo);
 
             decltype(m_mapTypePairToSubtypeWitness) newMapTypePairToSubtypeWitness;
-            auto isTypeUpToDate = [this](Type* type)
-                {
-                    if (auto declRefType = as<DeclRefType>(type))
-                    {
-                        return m_mapDeclRefToInheritanceInfo.containsKey(declRefType->getDeclRef());
-                    }
-                    return m_mapTypeToInheritanceInfo.containsKey(type);
-                };
             for (auto& kv : m_mapTypePairToSubtypeWitness)
             {
                 if (isTypeUpToDate(kv.first.type0) && isTypeUpToDate(kv.first.type1))
@@ -8916,6 +8929,20 @@ namespace Slang
                 }
             }
             m_mapTypePairToSubtypeWitness = _Move(newMapTypePairToSubtypeWitness);
+        }
+        if (hasImplicitCastMember)
+        {
+            decltype(m_mapTypePairToImplicitCastMethod) newMapTypePairToImplicitCastMethod;
+            for (auto& kv : newMapTypePairToImplicitCastMethod)
+            {
+                // Since implicit casts are defined a constructors on the toType,
+                // we only need to check if the toType is affected by the new extension.
+                if (isTypeUpToDate(kv.first.type1))
+                {
+                    newMapTypePairToImplicitCastMethod.add(kv.first, kv.second);
+                }
+            }
+            m_mapTypePairToImplicitCastMethod = _Move(newMapTypePairToImplicitCastMethod);
         }
     }
     

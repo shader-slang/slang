@@ -1081,6 +1081,9 @@ namespace Slang
         // since we are effectively forming an overloaded
         // call to one of the initializers in the target type.
 
+        // Since the lookup and resolution of all possible implicit conversions
+        // can be very costly, we use a cache to store the checking results.
+
         OverloadResolveContext overloadContext;
         overloadContext.disallowNestedConversions = true;
         overloadContext.argCount = 1;
@@ -1097,7 +1100,21 @@ namespace Slang
         overloadContext.baseExpr = nullptr;
         overloadContext.mode = OverloadResolveContext::Mode::JustTrying;
 
-        AddTypeOverloadCandidates(toType, overloadContext);
+        auto method = getShared()->tryGetImplicitCastMethod(fromType.type, toType);
+        if (method)
+        {
+            if (method->conversionFuncOverloadCandidate.status != OverloadCandidate::Status::Applicable)
+            {
+                return _failedCoercion(toType, outToExpr, fromExpr);
+            }
+            overloadContext.bestCandidateStorage = method->conversionFuncOverloadCandidate;
+            overloadContext.bestCandidate = &overloadContext.bestCandidateStorage;
+        }
+
+        if (!overloadContext.bestCandidate)
+        {
+            AddTypeOverloadCandidates(toType, overloadContext);
+        }
 
         // After all of the overload candidates have been added
         // to the context and processed, we need to see whether
@@ -1265,9 +1282,11 @@ namespace Slang
                 castExpr->arguments.clear();
                 castExpr->arguments.add(fromExpr);
             }
-
+            getShared()->cacheImplicitCastMethod(fromType.type, toType, *overloadContext.bestCandidate);
             return true;
         }
+        OverloadCandidate infeasibleCandidate;
+        getShared()->cacheImplicitCastMethod(fromType.type, toType, infeasibleCandidate);
 
         return _failedCoercion(toType, outToExpr, fromExpr);
     }
