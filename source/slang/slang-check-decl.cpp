@@ -8935,7 +8935,7 @@ namespace Slang
             decltype(m_mapTypePairToImplicitCastMethod) newMapTypePairToImplicitCastMethod;
             for (auto& kv : newMapTypePairToImplicitCastMethod)
             {
-                // Since implicit casts are defined a constructors on the toType,
+                // Since implicit casts are defined as constructors on the toType,
                 // we only need to check if the toType is affected by the new extension.
                 if (isTypeUpToDate(kv.first.type1))
                 {

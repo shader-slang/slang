@@ -1100,14 +1100,15 @@ namespace Slang
         overloadContext.baseExpr = nullptr;
         overloadContext.mode = OverloadResolveContext::Mode::JustTrying;
 
-        auto method = getShared()->tryGetImplicitCastMethod(fromType.type, toType);
-        if (method)
+        auto cachedMethod = getShared()->tryGetImplicitCastMethod(fromType.type, toType);
+
+        if (cachedMethod)
         {
-            if (method->conversionFuncOverloadCandidate.status != OverloadCandidate::Status::Applicable)
+            if (cachedMethod->conversionFuncOverloadCandidate.status != OverloadCandidate::Status::Applicable)
             {
                 return _failedCoercion(toType, outToExpr, fromExpr);
             }
-            overloadContext.bestCandidateStorage = method->conversionFuncOverloadCandidate;
+            overloadContext.bestCandidateStorage = cachedMethod->conversionFuncOverloadCandidate;
             overloadContext.bestCandidate = &overloadContext.bestCandidateStorage;
         }
 
@@ -1128,8 +1129,15 @@ namespace Slang
             // even applicable, because if not, then we shouldn't
             // consider the conversion as possible.
             //
-            if(overloadContext.bestCandidates[0].status != OverloadCandidate::Status::Applicable)
+            if (overloadContext.bestCandidates[0].status != OverloadCandidate::Status::Applicable)
+            {
+                if (!cachedMethod)
+                {
+                    OverloadCandidate infeasibleCandidate;
+                    getShared()->cacheImplicitCastMethod(fromType.type, toType, infeasibleCandidate);
+                }
                 return _failedCoercion(toType, outToExpr, fromExpr);
+            }
 
             // If all of the candidates in `bestCandidates` are applicable,
             // then we have an ambiguity.
@@ -1160,7 +1168,6 @@ namespace Slang
 
             if(outCost)
                 *outCost = bestCost;
-
             return true;
         }
         else if(overloadContext.bestCandidate)
@@ -1172,8 +1179,15 @@ namespace Slang
             // but it wasn't actually usable, so we will check for
             // that case first.
             //
-            if(overloadContext.bestCandidate->status != OverloadCandidate::Status::Applicable)
+            if (overloadContext.bestCandidate->status != OverloadCandidate::Status::Applicable)
+            {
+                if (!cachedMethod)
+                {
+                    OverloadCandidate infeasibleCandidate;
+                    getShared()->cacheImplicitCastMethod(fromType.type, toType, infeasibleCandidate);
+                }
                 return _failedCoercion(toType, outToExpr, fromExpr);
+            }
 
             // Next, we need to look at the implicit conversion
             // cost associated with the initializer we are invoking.
@@ -1282,12 +1296,15 @@ namespace Slang
                 castExpr->arguments.clear();
                 castExpr->arguments.add(fromExpr);
             }
-            getShared()->cacheImplicitCastMethod(fromType.type, toType, *overloadContext.bestCandidate);
+            if (!cachedMethod)
+                getShared()->cacheImplicitCastMethod(fromType.type, toType, *overloadContext.bestCandidate);
             return true;
         }
-        OverloadCandidate infeasibleCandidate;
-        getShared()->cacheImplicitCastMethod(fromType.type, toType, infeasibleCandidate);
-
+        if (!cachedMethod)
+        {
+            OverloadCandidate infeasibleCandidate;
+            getShared()->cacheImplicitCastMethod(fromType.type, toType, infeasibleCandidate);
+        }
         return _failedCoercion(toType, outToExpr, fromExpr);
     }
 
