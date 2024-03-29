@@ -1081,9 +1081,6 @@ namespace Slang
         // since we are effectively forming an overloaded
         // call to one of the initializers in the target type.
 
-        // Since the lookup and resolution of all possible implicit conversions
-        // can be very costly, we use a cache to store the checking results.
-
         OverloadResolveContext overloadContext;
         overloadContext.disallowNestedConversions = true;
         overloadContext.argCount = 1;
@@ -1100,7 +1097,9 @@ namespace Slang
         overloadContext.baseExpr = nullptr;
         overloadContext.mode = OverloadResolveContext::Mode::JustTrying;
 
-        auto cachedMethod = getShared()->tryGetImplicitCastMethod(fromType.type, toType);
+        // Since the lookup and resolution of all possible implicit conversions
+        // can be very costly, we use a cache to store the checking results.
+        ImplicitCastMethod* cachedMethod = getShared()->tryGetImplicitCastMethod(fromType.type, toType);
 
         if (cachedMethod)
         {
@@ -1110,6 +1109,13 @@ namespace Slang
             }
             overloadContext.bestCandidateStorage = cachedMethod->conversionFuncOverloadCandidate;
             overloadContext.bestCandidate = &overloadContext.bestCandidateStorage;
+            if (!outToExpr)
+            {
+                // If we are not requesting to create an expression, we can return early.
+                if (outCost)
+                    *outCost = cachedMethod->cost;
+                return true;
+            }
         }
 
         if (!overloadContext.bestCandidate)
@@ -1133,8 +1139,7 @@ namespace Slang
             {
                 if (!cachedMethod)
                 {
-                    OverloadCandidate infeasibleCandidate;
-                    getShared()->cacheImplicitCastMethod(fromType.type, toType, infeasibleCandidate);
+                    getShared()->cacheImplicitCastMethod(fromType.type, toType, ImplicitCastMethod{});
                 }
                 return _failedCoercion(toType, outToExpr, fromExpr);
             }
@@ -1183,8 +1188,7 @@ namespace Slang
             {
                 if (!cachedMethod)
                 {
-                    OverloadCandidate infeasibleCandidate;
-                    getShared()->cacheImplicitCastMethod(fromType.type, toType, infeasibleCandidate);
+                    getShared()->cacheImplicitCastMethod(fromType.type, toType, ImplicitCastMethod{});
                 }
                 return _failedCoercion(toType, outToExpr, fromExpr);
             }
@@ -1297,13 +1301,12 @@ namespace Slang
                 castExpr->arguments.add(fromExpr);
             }
             if (!cachedMethod)
-                getShared()->cacheImplicitCastMethod(fromType.type, toType, *overloadContext.bestCandidate);
+                getShared()->cacheImplicitCastMethod(fromType.type, toType, ImplicitCastMethod{ *overloadContext.bestCandidate, cost });
             return true;
         }
         if (!cachedMethod)
         {
-            OverloadCandidate infeasibleCandidate;
-            getShared()->cacheImplicitCastMethod(fromType.type, toType, infeasibleCandidate);
+            getShared()->cacheImplicitCastMethod(fromType.type, toType, ImplicitCastMethod{});
         }
         return _failedCoercion(toType, outToExpr, fromExpr);
     }

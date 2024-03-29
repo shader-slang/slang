@@ -553,6 +553,7 @@ namespace Slang
     struct ImplicitCastMethod
     {
         OverloadCandidate conversionFuncOverloadCandidate;
+        ConversionCost cost = kConversionCost_Impossible;
     };
 
         /// Shared state for a semantics-checking session.
@@ -668,12 +669,10 @@ namespace Slang
             auto pair = TypePair{ fromType, toType };
             return m_mapTypePairToImplicitCastMethod.tryGetValue(pair);
         }
-        void cacheImplicitCastMethod(Type* fromType, Type* toType, const OverloadCandidate& candidate)
+        void cacheImplicitCastMethod(Type* fromType, Type* toType, ImplicitCastMethod candidate)
         {
             auto pair = TypePair{ fromType, toType };
-            ImplicitCastMethod result;
-            result.conversionFuncOverloadCandidate = candidate;
-            m_mapTypePairToImplicitCastMethod[pair] = result;
+            m_mapTypePairToImplicitCastMethod[pair] = candidate;
         }
 
     private:
