@@ -556,6 +556,8 @@ DIAGNOSTIC(39999, Note, moreOverloadCandidates, "$0 more overload candidates")
 
 DIAGNOSTIC(39999, Error, caseOutsideSwitch, "'case' not allowed outside of a 'switch' statement")
 DIAGNOSTIC(39999, Error, defaultOutsideSwitch, "'default' not allowed outside of a 'switch' statement")
+DIAGNOSTIC(39999, Error, multipleDefaultsInASwitch, "multiple 'default' cases not allowed within a 'switch' statement")
+DIAGNOSTIC(39999, Error, duplicateCasesInASwitch, "duplicate cases not allowed within a 'switch' statement")
 
 DIAGNOSTIC(39999, Error, expectedAGeneric, "expected a generic when using '<...>' (found: '$0')")
 

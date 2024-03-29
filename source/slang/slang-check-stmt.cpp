@@ -239,6 +239,48 @@ namespace Slang
         subContext.checkStmt(stmt->body);
     }
 
+    void SemanticsStmtVisitor::validateCaseStmts(SwitchStmt* stmt, DiagnosticSink* sink)
+    {
+        auto blockStmt = as<BlockStmt>(stmt->body);
+        if (!blockStmt)
+            return;
+
+        auto seqStmt = as<SeqStmt>(blockStmt->body);
+        if (!seqStmt)
+            return;
+
+        bool hasDefaultStmt = false;
+        HashSet<Val*> caseStmtVals;
+        for (auto& sStmt : seqStmt->stmts)
+        {
+            // check that all case tags are unique
+            if (auto caseStmt = as<CaseStmt>(sStmt))
+            {
+                if (caseStmt->exprVal)
+                {
+                    // exprVal contains the constant folded expr, that is checked for
+                    // uniqueness within the scope of the switch statement.
+                    if (!caseStmtVals.add(caseStmt->exprVal))
+                    {
+                        sink->diagnose(sStmt, Diagnostics::duplicateCasesInASwitch);
+                        return;
+                    }
+                }
+            }
+
+            // check that there is at most one `default` clause
+            else if (auto defaultStmt = as<DefaultStmt>(sStmt))
+            {
+                if (hasDefaultStmt)
+                {
+                    sink->diagnose(sStmt, Diagnostics::multipleDefaultsInASwitch);
+                    return;
+                }
+                hasDefaultStmt = true;
+            }
+        }
+    }
+
     void SemanticsStmtVisitor::visitSwitchStmt(SwitchStmt* stmt)
     {
         WithOuterStmt subContext(this, stmt);
@@ -247,16 +289,16 @@ namespace Slang
         stmt->condition = CheckExpr(stmt->condition);
         subContext.checkStmt(stmt->body);
 
-        // TODO(tfoley): need to check that all case tags are unique
-
-        // TODO(tfoley): check that there is at most one `default` clause
+        // check the case value exits within the switch
+        validateCaseStmts(stmt, getSink());
     }
 
     void SemanticsStmtVisitor::visitCaseStmt(CaseStmt* stmt)
     {
-        // TODO(tfoley): Need to coerce to type being switch on,
-        // and ensure that value is a compile-time constant
         auto expr = CheckExpr(stmt->expr);
+
+        // coerce to type being switch on, and ensure that value is a compile-time constant
+        auto exprVal = tryConstantFoldExpr(expr, ConstantFoldingKind::CompileTime, nullptr);
         auto switchStmt = FindOuterStmt<SwitchStmt>();
 
         if (!switchStmt)
@@ -270,6 +312,7 @@ namespace Slang
         }
 
         stmt->expr = expr;
+        stmt->exprVal = exprVal;
         stmt->parentStmt = switchStmt;
     }
 
