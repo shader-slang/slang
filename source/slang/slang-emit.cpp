@@ -28,6 +28,7 @@
 #include "slang-ir-explicit-global-init.h"
 #include "slang-ir-fuse-satcoop.h"
 #include "slang-ir-glsl-legalize.h"
+#include "slang-ir-hlsl-legalize.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-inline.h"
 #include "slang-ir-legalize-array-return-type.h"
@@ -832,6 +833,19 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::CUDASource:
         {
             legalizeEntryPointVaryingParamsForCUDA(irModule, codeGenContext->getSink());
+        }
+        break;
+
+    default:
+        break;
+    }
+
+    // Legalize non struct parameters that are expected to be structs for HLSL. 
+    switch (target)
+    {
+    case CodeGenTarget::HLSL:
+        {
+            legalizeNonStructParameterToStructForHLSL(irModule);
         }
         break;
 
