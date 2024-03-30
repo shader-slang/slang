@@ -1115,11 +1115,15 @@ namespace Slang
                 // If we are not requesting to create an expression, we can return early.
                 if (outCost)
                     *outCost = cachedMethod->cost;
-                if (cachedMethod->cost >= kConversionCost_Explicit)
-                {
-                    return false;
-                }
                 return true;
+            }
+            else
+            {
+                if (cachedMethod->isAmbiguous)
+                {
+                    overloadContext.bestCandidate = nullptr;
+                    overloadContext.bestCandidates.add(cachedMethod->conversionFuncOverloadCandidate);
+                }
             }
         }
 
@@ -1156,13 +1160,16 @@ namespace Slang
             // all the conversions available.
             //
             ConversionCost bestCost = kConversionCost_Explicit;
+            ImplicitCastMethod method;
             for(auto candidate : overloadContext.bestCandidates)
             {
                 ConversionCost candidateCost = getImplicitConversionCostWithKnownArg(
                     candidate.item.declRef.getDecl(), toType, fromExpr);
-
-                if(candidateCost < bestCost)
+                if (candidateCost < bestCost)
+                {
+                    method.conversionFuncOverloadCandidate = candidate;
                     bestCost = candidateCost;
+                }
             }
 
             // Conceptually, we want to treat the conversion as
@@ -1174,6 +1181,13 @@ namespace Slang
                 getSink()->diagnose(fromExpr, Diagnostics::ambiguousConversion, fromType, toType);
 
                 *outToExpr = CreateErrorExpr(fromExpr);
+            }
+
+            if (!cachedMethod)
+            {
+                method.isAmbiguous = true;
+                method.cost = bestCost;
+                getShared()->cacheImplicitCastMethod(implicitCastKey, method);
             }
 
             if(outCost)

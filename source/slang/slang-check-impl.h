@@ -554,6 +554,7 @@ namespace Slang
     {
         OverloadCandidate conversionFuncOverloadCandidate;
         ConversionCost cost = kConversionCost_Impossible;
+        bool isAmbiguous = false;
     };
 
     struct ImplicitCastMethodKey
@@ -577,7 +578,7 @@ namespace Slang
             , toType(toType)
             , constantVal(0)
             , isConstant(false)
-            , isLValue(fromExpr?fromExpr->type.isLeftValue:false)
+            , isLValue(fromType.isLeftValue)
         {
             if (auto constInt = as<IntegerLiteralExpr>(fromExpr))
             {
