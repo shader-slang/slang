@@ -33,7 +33,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     int idx = int((tid & 3) ^ (tid >> 2)); 
 
     const float delta = anotherBuffer[idx & 3];
-    
+
+    // CHECK: OpAtomicFAddEXT
+
     float previousValue = 0;
     outputBuffer.InterlockedAddF32((idx << 2), 1.0f, previousValue);
     

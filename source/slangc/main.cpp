@@ -49,13 +49,8 @@ static SlangResult _compile(SlangCompileRequest* compileRequest, int argc, const
     try
 #endif
     {
-        auto startTime = std::chrono::high_resolution_clock::now();
-        
         // Run the compiler (this will produce any diagnostics through SLANG_WRITER_TARGET_TYPE_DIAGNOSTIC).
         res = spCompile(compileRequest);
-        auto elapsedTime =
-            (std::chrono::high_resolution_clock::now() - startTime).count() * 0.000000001;
-        printf("Elapsed time: %f\n", elapsedTime);
         // If the compilation failed, then get out of here...
         // Turn into an internal Result -> such that return code can be used to vary result to match previous behavior
         res = SLANG_FAILED(res) ? SLANG_E_INTERNAL_FAIL : res;
