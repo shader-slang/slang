@@ -8918,31 +8918,33 @@ namespace Slang
             }
             m_mapTypeToInheritanceInfo = _Move(newMapTypeToInheritanceInfo);
         }
+
+        ShortList<DeclRef<Decl>, 16> keysToRemove;
+        for (auto& kv : m_mapDeclRefToInheritanceInfo)
+        {
+            // We can confirm the type is affected by the new extension,
+            // if the declref type points to typeDecl.
+            if (kv.first.getDecl() == typeDecl)
+            {
+                keysToRemove.add(kv.first);
+                continue;
+            }
+
+            // If we are extending interface types (and in the future any struct type
+            // if we decide to have full inheritance support),
+            // we also need to account for conformant that implements the interface.
+            if (invalidateSubtypes && isInheritanceInfoAffected(kv.second))
+            {
+                keysToRemove.add(kv.first);
+            }
+        }
+        for (auto& key : keysToRemove)
+        {
+            m_mapDeclRefToInheritanceInfo.remove(key);
+        }
+
         if (hasInheritanceMember || invalidateSubtypes)
         {
-            ShortList<DeclRef<Decl>, 16> keysToRemove;
-            for (auto& kv : m_mapDeclRefToInheritanceInfo)
-            {
-                // We can confirm the type is affected by the new extension,
-                // if the declref type points to typeDecl.
-                if (kv.first.getDecl() == typeDecl)
-                {
-                    keysToRemove.add(kv.first);
-                    continue;
-                }
-
-                // If we are extending interface types (and in the future any struct type
-                // if we decide to have full inheritance support),
-                // we also need to account for conformant that implements the interface.
-                if (invalidateSubtypes && isInheritanceInfoAffected(kv.second))
-                {
-                    keysToRemove.add(kv.first);
-                }
-            }
-            for (auto& key : keysToRemove)
-            {
-                m_mapDeclRefToInheritanceInfo.remove(key);
-            }
             ShortList<TypePair, 16> typePairsToRemove;
             for (auto& kv : m_mapTypePairToSubtypeWitness)
             {
