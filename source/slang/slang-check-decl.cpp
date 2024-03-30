@@ -8955,7 +8955,6 @@ namespace Slang
             {
                 m_mapTypePairToSubtypeWitness.remove(key);
             }
-            printf("remove %d types, %d type pairs\n", (int)keysToRemove.getCount(), (int)typePairsToRemove.getCount());
         }
 
         if (hasImplicitCastMember)

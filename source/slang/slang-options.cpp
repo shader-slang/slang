@@ -2330,13 +2330,17 @@ SlangResult OptionsParser::_parse(
         SLANG_RETURN_ON_FAIL(m_session->compileStdLib(m_compileStdLibFlags));
     }
 
+    // We are going to build a mapping from target formats to the
+    // target that handles that format.
+    Dictionary<CodeGenTarget, int> mapFormatToTargetIndex;
+
     // TODO(JS): This is a restriction because of how setting of state works for load repro
     // If a repro has been loaded, then many of the following options will overwrite
     // what was set up. So for now they are ignored, and only parameters set as part
     // of the loop work if they are after -load-repro
     if (m_hasLoadedRepro)
     {
-        return SLANG_OK;
+        goto endOfOptionInference;
     }
 
     // As a compatability feature, if the user didn't list any explicit entry
@@ -2524,9 +2528,6 @@ SlangResult OptionsParser::_parse(
         rawEntryPoint.entryPointID = entryPointID;
     }
 
-    // We are going to build a mapping from target formats to the
-    // target that handles that format.
-    Dictionary<CodeGenTarget, int> mapFormatToTargetIndex;
 
     // If there was no explicit `-target` specified, then we will look
     // at the `-o` options to see what we can infer.
@@ -2861,7 +2862,7 @@ SlangResult OptionsParser::_parse(
             }
         }
     }
-
+endOfOptionInference:;
 
     // Now that we've diagnosed the output paths, we can add them
     // to the compile request at the appropriate locations.
@@ -2917,6 +2918,7 @@ SlangResult OptionsParser::_parse(
             }
         }
     }
+
 
     // Copy all settings from linkage to targets.
     for (auto target : linkage->targets)
