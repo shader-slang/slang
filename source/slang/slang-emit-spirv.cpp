@@ -3848,7 +3848,7 @@ struct SPIRVEmitContext
                 else if (semanticName == "sv_cullprimitive")
                 {
                     requireSPIRVCapability(SpvCapabilityMeshShadingEXT);
-                    ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_mesh_shader"));
+                    ensureExtensionDeclaration(UnownedStringSlice("SPV_EXT_mesh_shader"));
                     return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInCullPrimitiveEXT);
                 }
                 else if (semanticName == "sv_shadingrate")
