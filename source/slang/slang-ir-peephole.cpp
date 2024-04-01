@@ -960,7 +960,8 @@ struct PeepholeContext : InstPassBase
             {
                 auto getTypeFromOperand = [](IRInst* operand) -> IRType*
                 {
-                    if (as<IRTypeType>(operand->getFullType()) || !operand->getFullType())
+                    if (as<IRTypeType>(operand->getFullType()) || !operand->getFullType() ||
+                        as<IRTypeKind>(operand->getFullType()))
                         return (IRType*)operand;
                     return operand->getFullType();
                 };
