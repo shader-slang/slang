@@ -2253,12 +2253,12 @@ extern "C"
         // The register space offset for the sub-elements that occupies register spaces.
         SLANG_PARAMETER_CATEGORY_SUB_ELEMENT_REGISTER_SPACE,
 
-        // The input_attachment_index subpass occupancy tracker
-        SLANG_PARAMETER_CATEGORY_SUBPASS,
-
-        //
         SLANG_PARAMETER_CATEGORY_COUNT,
 
+        // The input_attachment_index subpass occupancy tracker
+        SLANG_PARAMETER_CATEGORY_SUBPASS = SLANG_PARAMETER_CATEGORY_COUNT,
+
+        SLANG_PARAMETER_CATEGORY_COUNT_REV2,
 
         // DEPRECATED:
         SLANG_PARAMETER_CATEGORY_VERTEX_INPUT = SLANG_PARAMETER_CATEGORY_VARYING_INPUT,

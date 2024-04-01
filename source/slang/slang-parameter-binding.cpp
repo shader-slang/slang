@@ -343,7 +343,7 @@ struct ParameterBindingAndKindInfo : ParameterBindingInfo
 
 enum
 {
-    kLayoutResourceKindCount = SLANG_PARAMETER_CATEGORY_COUNT,
+    kLayoutResourceKindCount = SLANG_PARAMETER_CATEGORY_COUNT_REV2,
 };
 
 struct UsedRangeSet : RefObject
