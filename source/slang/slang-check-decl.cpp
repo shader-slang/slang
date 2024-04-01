@@ -9564,6 +9564,13 @@ namespace Slang
             CapabilitySet set;
             for (auto targetCase : stmt->targetCases)
             {
+                // We may revieve a `default:` case for a `__target_switch`. If this is the case,
+                // we must resolve the target capability as `any_target` to hint to the capability 
+                // system that the following function must be defined on all codegen targets. If
+                // we do not handle `default:`, the codegen will fail when trying to find a specific
+                // codegen target not handled explicitly by a `case` statment.
+                if (targetCase->capability == 0)
+                    targetCase->capability = int32_t(CapabilityName::any_target);
                 auto targetCap = CapabilitySet(CapabilityName(targetCase->capability));
                 auto oldCap = targetCap;
                 auto bodyCap = getStatementCapabilityUsage(this, targetCase->body);
