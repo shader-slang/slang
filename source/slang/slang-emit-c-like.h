@@ -240,6 +240,7 @@ public:
     // Types
     //
 
+    void ensureTypePrelude(IRType* type);
     void emitDeclarator(DeclaratorInfo* declarator);
 
     void emitType(IRType* type, const StringSliceLoc* nameLoc) { emitTypeImpl(type, nameLoc); }
@@ -309,8 +310,8 @@ public:
 
     void emitInstResultDecl(IRInst* inst);
 
-    IRTargetSpecificDecoration* findBestTargetDecoration(IRInst* inst);
-    IRTargetIntrinsicDecoration* _findBestTargetIntrinsicDecoration(IRInst* inst);
+    IRTargetSpecificDecoration* findBestTargetDecoration(IRInst* inst, IROp decorationOp);
+    IRTargetIntrinsicDecoration* _findBestTargetIntrinsicDecoration(IRInst* inst, IROp decorationOp);
 
     // Find the definition of a target intrinsic either from __target_intrinsic decoration, or from
     // a genericAsm inst in the function body.

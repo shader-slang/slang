@@ -129,6 +129,16 @@ void CLikeSourceEmitter::emitPreModuleImpl()
 // Types
 //
 
+void CLikeSourceEmitter::ensureTypePrelude(IRType* type)
+{
+    if (auto requirePreludeDecor = as<IRRequirePreludeDecoration>(findBestTargetDecoration(type, kIROp_RequirePreludeDecoration)))
+    {
+        auto preludeTextInst = as<IRStringLit>(requirePreludeDecor->getOperand(1));
+        if (preludeTextInst)
+            m_requiredPreludes.add(preludeTextInst);
+    }
+}
+
 void CLikeSourceEmitter::emitDeclarator(DeclaratorInfo* declarator)
 {
     if (!declarator) return;
@@ -1733,14 +1743,14 @@ void CLikeSourceEmitter::emitInstResultDecl(IRInst* inst)
     m_writer->emit(" = ");
 }
 
-IRTargetSpecificDecoration* CLikeSourceEmitter::findBestTargetDecoration(IRInst* inInst)
+IRTargetSpecificDecoration* CLikeSourceEmitter::findBestTargetDecoration(IRInst* inInst, IROp decorationOp)
 {
-    return Slang::findBestTargetDecoration(inInst, getTargetCaps());
+    return Slang::findBestTargetDecoration(inInst, getTargetCaps(), decorationOp);
 }
 
-IRTargetIntrinsicDecoration* CLikeSourceEmitter::_findBestTargetIntrinsicDecoration(IRInst* inInst)
+IRTargetIntrinsicDecoration* CLikeSourceEmitter::_findBestTargetIntrinsicDecoration(IRInst* inInst, IROp decorationOp)
 {
-    return as<IRTargetIntrinsicDecoration>(findBestTargetDecoration(inInst));
+    return as<IRTargetIntrinsicDecoration>(findBestTargetDecoration(inInst, decorationOp));
 }
 
 /* static */bool CLikeSourceEmitter::isOrdinaryName(UnownedStringSlice const& name)
@@ -3492,6 +3502,8 @@ void CLikeSourceEmitter::emitFuncDecorationsImpl(IRFunc* func)
 
 void CLikeSourceEmitter::emitStruct(IRStructType* structType)
 {
+    ensureTypePrelude(structType);
+
     // If the selected `struct` type is actually an intrinsic
     // on our target, then we don't want to emit anything at all.
     if(isTargetIntrinsic(structType))
@@ -3549,6 +3561,8 @@ void CLikeSourceEmitter::emitStructDeclarationsBlock(IRStructType* structType, b
 
 void CLikeSourceEmitter::emitClass(IRClassType* classType)
 {
+    ensureTypePrelude(classType);
+
     // If the selected `class` type is actually an intrinsic
     // on our target, then we don't want to emit anything at all.
     if (isTargetIntrinsic(classType))

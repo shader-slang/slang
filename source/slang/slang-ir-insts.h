@@ -126,6 +126,16 @@ struct IRTargetIntrinsicDecoration : IRTargetSpecificDecoration
     }
 };
 
+struct IRRequirePreludeDecoration : IRTargetSpecificDecoration
+{
+    IR_LEAF_ISA(RequirePreludeDecoration)
+
+    UnownedStringSlice getPrelude()
+    {
+        return as<IRStringLit>(getOperand(1))->getStringSlice();
+    }
+};
+
 struct IRIntrinsicOpDecoration : IRDecoration
 {
     enum { kOp = kIROp_IntrinsicOpDecoration };
@@ -4411,6 +4421,11 @@ public:
         addDecoration(value, kIROp_RequireGLSLVersionDecoration, getIntValue(getIntType(), IRIntegerValue(version)));
     }
 
+    void addRequirePreludeDecoration(IRInst* value, const CapabilitySet& caps, UnownedStringSlice prelude)
+    {
+        addDecoration(value, kIROp_RequirePreludeDecoration, getCapabilityValue(caps), getStringValue(prelude));
+    }
+
     void addRequireSPIRVVersionDecoration(IRInst* value, const SemanticVersion& version)
     {
         SemanticVersion::IntegerType intValue = version.toInteger();
@@ -4844,11 +4859,13 @@ IRTargetIntrinsicDecoration* findAnyTargetIntrinsicDecoration(
 
 IRTargetSpecificDecoration* findBestTargetDecoration(
         IRInst*                 val,
-        CapabilitySet const&    targetCaps);
+        CapabilitySet const&    targetCaps,
+        IROp                    decorationOp);
 
 IRTargetSpecificDecoration* findBestTargetDecoration(
         IRInst*         val,
-        CapabilityName  targetCapabilityAtom);
+        CapabilityName  targetCapabilityAtom,
+        IROp            decorationOp);
 
 bool findTargetIntrinsicDefinition(IRInst* callee, CapabilitySet const& targetCaps, UnownedStringSlice& outDefinition);
 
@@ -4856,7 +4873,7 @@ inline IRTargetIntrinsicDecoration* findBestTargetIntrinsicDecoration(
     IRInst* inInst,
     CapabilitySet const& targetCaps)
 {
-    return as<IRTargetIntrinsicDecoration>(findBestTargetDecoration(inInst, targetCaps));
+    return as<IRTargetIntrinsicDecoration>(findBestTargetDecoration(inInst, targetCaps, kIROp_TargetIntrinsicDecoration));
 }
 
 

@@ -8176,7 +8176,8 @@ namespace Slang
 
     IRTargetSpecificDecoration* findBestTargetDecoration(
         IRInst*                 inInst,
-        CapabilitySet const&    targetCaps)
+        CapabilitySet const&    targetCaps,
+        IROp                    deocrationOp)
     {
         IRInst* inst = getResolvedInstForDecorations(inInst);
 
@@ -8193,6 +8194,8 @@ namespace Slang
         {
             auto decoration = as<IRTargetSpecificDecoration>(dd);
             if(!decoration)
+                continue;
+            if (decoration->getOp() != deocrationOp)
                 continue;
 
             auto decorationCaps = decoration->getTargetCaps();
@@ -8226,9 +8229,10 @@ namespace Slang
 
     IRTargetSpecificDecoration* findBestTargetDecoration(
             IRInst*         val,
-            CapabilityName  targetCapabilityAtom)
+            CapabilityName  targetCapabilityAtom,
+            IROp decorationOp)
     {
-        return findBestTargetDecoration(val, CapabilitySet(targetCapabilityAtom));
+        return findBestTargetDecoration(val, CapabilitySet(targetCapabilityAtom), decorationOp);
     }
 
     bool findTargetIntrinsicDefinition(IRInst* callee, CapabilitySet const& targetCaps, UnownedStringSlice& outDefinition)
