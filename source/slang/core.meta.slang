@@ -1073,6 +1073,7 @@ __magic_type(MatrixExpressionType)
 struct matrix : IArray<vector<T,C>>
 {
     __intrinsic_op($(kIROp_MakeMatrixFromScalar))
+    __implicit_conversion($(kConversionCost_ScalarToMatrix))
     [TreatAsDifferentiable]
     __init(T val);
 
@@ -1107,9 +1108,9 @@ extension vector<T,N> : IFloat
     [__unsafeForceInlineEarly] float toFloat() { return __realCast<float>(this[0]); }
 
     [OverloadRank(-1)]
-    [__unsafeForceInlineEarly] __init(int v) { return vector<T,N>(T(v)); }
+    [__unsafeForceInlineEarly] __init(int v) { this = vector<T,N>(T(v)); }
     [OverloadRank(-1)]
-    [__unsafeForceInlineEarly] __init(float v) { return vector<T,N>(T(v)); }
+    [__unsafeForceInlineEarly] __init(float v) { this = vector<T,N>(T(v)); }
 
     // IDifferentiable
 
@@ -1155,9 +1156,16 @@ extension matrix<T,N,M,L> : IFloat
     [TreatAsDifferentiable][__unsafeForceInlineEarly] float toFloat() { return __realCast<float>(this[0][0]); }
 
     [OverloadRank(-1)]
-    [TreatAsDifferentiable][__unsafeForceInlineEarly] __init(int v) { return matrix<T,N,M>(T(v)); }
+    [TreatAsDifferentiable]
+    [__unsafeForceInlineEarly]
+    __implicit_conversion($(kConversionCost_ScalarIntegerToFloatMatrix))
+    __init(int v) { this = matrix<T,N,M>(T(v)); }
+
     [OverloadRank(-1)]
-    [TreatAsDifferentiable][__unsafeForceInlineEarly] __init(float v) { return matrix<T,N,M>(T(v)); }
+    [TreatAsDifferentiable]
+    [__unsafeForceInlineEarly]
+    __implicit_conversion($(kConversionCost_ScalarToMatrix))
+    __init(float v) { this = matrix<T,N,M>(T(v)); }
 
     // IDifferentiable.
     typedef matrix<T, N,M,L> Differential;
@@ -1183,6 +1191,14 @@ extension matrix<T,N,M,L> : IFloat
     {
         return __realCast<T, U>(a) * b;
     }
+}
+
+__generic<let R : int, let C : int, let L : int>
+extension matrix<int16_t,R,C,L>
+{
+    typealias T = int16_t;
+    __implicit_conversion($(kConversionCost_IntegerTruncate))
+    __init(int value) { this = matrix<T,R,C,L>(T(value)); }
 }
 
 ${{{{
@@ -1230,6 +1246,22 @@ for (int tt = 0; tt < kTypeCount; ++tt)
     {
         sb << "typedef matrix<" << kTypes[tt].name << "," << rr << "," << cc << "> " << kTypes[tt].name << rr << "x" << cc << ";\n";
     }
+}
+
+sb << "\n\n";
+sb << "// Cast from vector<T,1> to T, which is a scalar type\n";
+
+for (int tt = 0; tt < kBaseTypeCount; ++tt)
+{
+    if(kBaseTypes[tt].tag == BaseType::Void) continue;
+
+    const char* tname = kBaseTypes[tt].name;
+
+    sb << "extension " << tname << "\n";
+    sb << "{\n";
+    sb << "    __implicit_conversion(" << kConversionCost_OneVectorToScalar << ")\n";
+    sb << "    __init(vector<" << tname << ",1> v) { this = v[0]; }\n";
+    sb << "}\n";
 }
 
 // Declare additional built-in generic types
@@ -1426,6 +1458,19 @@ for( int C = 2; C <= 4; ++C )
         if(rr == R && cc == C) continue;
         sb << "__intrinsic_op(" << int(kIROp_MatrixReshape) << ") __init(matrix<T," << rr << "," << cc << ", L> value);\n";
     }
+
+    // Initialize from matrix and vector
+    if (R > 2)
+    {
+        sb << "__init(matrix<T," << (R - 1) << "," << C << "> m, vector<T," << C << "> row" << (R - 1) << ") ";
+        sb << "{ this = This(";
+        for (int ii = 0; ii < R - 1; ++ii)
+        {
+            sb << "m[" << ii << "], ";
+        }
+        sb << "row" << (R - 1) << "); }\n";
+    }
+
     sb << "}\n";
 }
 
@@ -2317,6 +2362,10 @@ int __naturalStrideOf()
 
 __intrinsic_op($(kIROp_TreatAsDynamicUniform))
 T asDynamicUniform<T>(T v);
+
+__generic<T>
+__intrinsic_op($(kIROp_GetLegalizedSPIRVGlobalParamAddr))
+Ptr<T> __getLegalizedSPIRVGlobalParamAddr(T val);
 
 // Binding Attributes
 

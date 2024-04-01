@@ -569,6 +569,18 @@ namespace Slang
                 // later.
             }
 
+            // If we still cannot find a facet, then there is a true cycle in
+            // the inheritance graph, which is an error in the user code.
+            if (!foundFacet.getImpl())
+            {
+                if (!bases.isEmpty())
+                {
+                    auto baseDecl = (*bases.begin())->facetImpl.origin.declRef.getDecl();
+                    getSink()->diagnose(baseDecl, Diagnostics::cyclicReferenceInInheritance, baseDecl);
+                }
+                return;
+            }
+
             // At this point we definitely have a facet we'd like to
             // add to the output, whether it was found via the true
             // C3 approach, or our relaxed rule above.
@@ -793,6 +805,8 @@ namespace Slang
     {
         for (auto base : *this)
         {
+            if (base->facets.isEmpty())
+                continue;
             if (base->facets.getTail().containsMatchFor(facet))
                 return true;
         }

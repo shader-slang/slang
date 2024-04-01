@@ -167,6 +167,8 @@ D3D12_DEPTH_STENCILOP_DESC D3DUtil::translateStencilOpDesc(DepthStencilOpDesc de
         case Format::R16G16_FLOAT:              return DXGI_FORMAT_R16G16_FLOAT;
         case Format::R16_FLOAT:                 return DXGI_FORMAT_R16_FLOAT;
 
+        case Format::R64_UINT:                  return DXGI_FORMAT_R32G32_UINT;
+
         case Format::R32G32B32A32_UINT:         return DXGI_FORMAT_R32G32B32A32_UINT;
         case Format::R32G32B32_UINT:            return DXGI_FORMAT_R32G32B32_UINT;
         case Format::R32G32_UINT:               return DXGI_FORMAT_R32G32_UINT;
@@ -179,6 +181,8 @@ D3D12_DEPTH_STENCILOP_DESC D3DUtil::translateStencilOpDesc(DepthStencilOpDesc de
         case Format::R8G8B8A8_UINT:             return DXGI_FORMAT_R8G8B8A8_UINT;
         case Format::R8G8_UINT:                 return DXGI_FORMAT_R8G8_UINT;
         case Format::R8_UINT:                   return DXGI_FORMAT_R8_UINT;
+
+        case Format::R64_SINT:                  return DXGI_FORMAT_R32G32_SINT;
 
         case Format::R32G32B32A32_SINT:         return DXGI_FORMAT_R32G32B32A32_SINT;
         case Format::R32G32B32_SINT:            return DXGI_FORMAT_R32G32B32_SINT;

@@ -133,9 +133,49 @@ namespace Slang
             processExtractExistentialElement(inst, 1);
         }
 
-        void processExtractExistentialType(IRExtractExistentialType* inst)
+        void processExtractExistentialType(IRExtractExistentialType* extractInst)
         {
-            processExtractExistentialElement(inst, 0);
+            IRBuilder builderStorage(sharedContext->module);
+            auto builder = &builderStorage;
+            builder->setInsertBefore(extractInst);
+
+            IRInst* element = nullptr;
+            IRInst* anyValueType = nullptr;
+            if (isComInterfaceType(extractInst->getOperand(0)->getDataType()))
+            {
+                // If this is an COM interface, the elements (witness table/rtti) are just the interface value itself.
+                element = extractInst->getOperand(0);
+            }
+            else
+            {
+                element = extractTupleElement(builder, extractInst->getOperand(0), 0);
+                if (auto tupleType = as<IRTupleType>(extractInst->getOperand(0)->getDataType()))
+                {
+                    anyValueType = tupleType->getOperand(2);
+                }
+            }
+
+            // If this instruction is used as a type, we need to replace it with the lowered type,
+            // which should be an AnyValueType.
+            // If it is used as a value, then we can replace it with the extracted element.
+            auto isTypeUse = [](IRUse* use) -> bool
+                {
+                    auto user = use->getUser();
+                    if (as<IRType>(user))
+                        return true;
+                    if (use == &use->getUser()->typeUse)
+                        return true;
+                    return false;
+                };
+            traverseUses(extractInst, [&](IRUse* use)
+                {
+                    if (anyValueType && isTypeUse(use))
+                    {
+                        builder->replaceOperand(use, anyValueType);
+                        return;
+                    }
+                    builder->replaceOperand(use, element);
+                });
         }
 
         void processGetValueFromBoundInterface(IRGetValueFromBoundInterface* inst)

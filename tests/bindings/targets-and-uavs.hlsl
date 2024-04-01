@@ -1,4 +1,4 @@
-//TEST:COMPARE_HLSL:-no-mangle -profile ps_5_0 -entry main
+//TEST:COMPARE_HLSL: -profile ps_5_0 -entry main
 
 // Render target outputs (`SV_Target`) and UAVs are treated
 // as sharing the same binding slots in HLSL, so we need to

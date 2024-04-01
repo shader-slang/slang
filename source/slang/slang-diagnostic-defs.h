@@ -298,6 +298,7 @@ DIAGNOSTIC(30035, Error, componentOverloadTypeMismatch, "'$0': type of overloade
 DIAGNOSTIC(30041, Error, bitOperationNonIntegral, "bit operation: operand must be integral type.")
 DIAGNOSTIC(30043, Error, getStringHashRequiresStringLiteral, "getStringHash parameter can only accept a string literal")
 DIAGNOSTIC(30047, Error, argumentExpectedLValue, "argument passed to parameter '$0' must be l-value.")
+DIAGNOSTIC(30048, Error, argumentHasMoreMemoryQualifiersThanParam, "argument passed in to parameter has a memory qualifier the parameter type is missing: '$0'")
 
 DIAGNOSTIC(30049, Note, thisIsImmutableByDefault, "a 'this' parameter is an immutable parameter by default in Slang; apply the `[mutating]` attribute to the function declaration to opt in to a mutable `this`")
 DIAGNOSTIC(30050, Error, mutatingMethodOnImmutableValue, "mutating method '$0' cannot be called on an immutable value")
@@ -327,6 +328,7 @@ DIAGNOSTIC(30068, Warning, mutatingMethodOnFunctionInputParameterWarning, "mutat
 DIAGNOSTIC(30070, Error, unsizedMemberMustAppearLast, "unsized member can only appear as the last member in a composite type.")
 
 DIAGNOSTIC(30100, Error, staticRefToNonStaticMember, "type '$0' cannot be used to refer to non-static member '$1'")
+DIAGNOSTIC(30101, Error, cannotDereferenceType, "cannot dereference type '$0', do you mean to use '.'?")
 
 DIAGNOSTIC(30200, Error, redeclaration, "declaration of '$0' conflicts with existing declaration")
 DIAGNOSTIC(30201, Error, functionRedefinition, "function '$0' already has a body")
@@ -353,6 +355,8 @@ DIAGNOSTIC(30097, Error, functionNotMarkedAsDifferentiable, "function '$0' is no
 DIAGNOSTIC(30098, Error, nonStaticMemberFunctionNotAllowedAsDiffOperand, "non-static function reference '$0' is not allowed here.")
 
 DIAGNOSTIC(30099, Error, sizeOfArgumentIsInvalid, "argument to sizeof is invalid")
+
+DIAGNOSTIC(30101, Error, readingFromWriteOnly, "cannot read from writeonly, check modifiers.")
 
 // Include
 DIAGNOSTIC(30500, Error, includedFileMissingImplementing, "missing 'implementing' declaration in the included source file '$0'.")
@@ -443,6 +447,7 @@ DIAGNOSTIC(31202, Error, duplicateModifier, "modifier '$0' is redundant or confl
 DIAGNOSTIC(31203, Error, cannotExportIncompleteType, "cannot export incomplete type '$0'")
 DIAGNOSTIC(31204, Error, incompleteTypeCannotBeUsedInBuffer, "incomplete type '$0' cannot be used in a buffer")
 DIAGNOSTIC(31205, Error, incompleteTypeCannotBeUsedInUniformParameter, "incomplete type '$0' cannot be used in a uniform parameter")
+DIAGNOSTIC(31206, Error, memoryQualifierNotAllowedOnANonImageTypeParameter, "modifier $0 is not allowed on a non image type parameter.")
 
 // Enums
 
@@ -470,6 +475,8 @@ DIAGNOSTIC(30510, Error, loopInDiffFuncRequireUnrollOrMaxIters, "loops inside a 
 
 // TODO: need to assign numbers to all these extra diagnostics...
 DIAGNOSTIC(39999, Fatal, cyclicReference, "cyclic reference '$0'.")
+DIAGNOSTIC(39999, Error, cyclicReferenceInInheritance, "cyclic reference in inheritance graph '$0'.")
+
 DIAGNOSTIC(39999, Error, localVariableUsedBeforeDeclared, "local variable '$0' is being used before its declaration.")
 DIAGNOSTIC(39999, Error, variableUsedInItsOwnDefinition, "the initial-value expression for variable '$0' depends on the value of the variable itself")
 DIAGNOSTIC(39901, Fatal , cannotProcessInclude, "internal compiler error: cannot process '__include' in the current semantic checking context.")

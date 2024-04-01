@@ -1,4 +1,4 @@
-//TEST:COMPARE_HLSL:-no-mangle -profile ps_4_0 -entry main
+//TEST:COMPARE_HLSL: -profile ps_4_0 -entry main
 
 // Ensure that matrix-times-scalar works
 

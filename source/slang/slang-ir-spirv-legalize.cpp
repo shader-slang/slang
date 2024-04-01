@@ -217,7 +217,12 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             IRBuilder builder(user);
             builder.setInsertBefore(user);
 
-            if((as<IRGetElement>(user) || as<IRFieldExtract>(user)) &&
+            if(user->getOp() == kIROp_GetLegalizedSPIRVGlobalParamAddr)
+            {
+                user->replaceUsesWith(use->get());
+                user->removeAndDeallocate();
+            }
+            else if((as<IRGetElement>(user) || as<IRFieldExtract>(user)) &&
                 use == user->getOperands())
             {
                 // If the use is the address operand of a getElement or FieldExtract,
@@ -1669,6 +1674,15 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     void translatePtrResultType(IRInst* inst)
     {
         auto ptrType = as<IRPtrType>(inst->getDataType());
+        if (!ptrType)
+        {
+            if (auto refType = as<IRRefType>(inst->getDataType()))
+            {
+                // Functions that return ref type should be treated as returning a pointer.
+                IRBuilder builder(inst);
+                ptrType = builder.getPtrType(refType->getValueType());
+            }
+        }
         auto newPtrType = translateToStorageBufferPointer(ptrType);
         if (newPtrType == ptrType)
             return;

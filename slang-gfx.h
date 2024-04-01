@@ -296,8 +296,12 @@ public:
     x(BC6H_UF16, 16, 16) \
     x(BC6H_SF16, 16, 16) \
     x(BC7_UNORM, 16, 16) \
-    x(BC7_UNORM_SRGB, 16, 16)
-
+    x(BC7_UNORM_SRGB, 16, 16) \
+    \
+    x(R64_UINT, 8, 1) \
+    \
+    x(R64_SINT, 8, 1) \
+    \
 // TODO: This should be generated from above
 // TODO: enum class should be explicitly uint32_t or whatever's appropriate
 /// Different formats of things like pixels or elements of vertices
@@ -408,6 +412,10 @@ enum class Format
     BC6H_SF16,
     BC7_UNORM,
     BC7_UNORM_SRGB,
+
+    R64_UINT,
+    
+    R64_SINT,
 
     _Count,
 };

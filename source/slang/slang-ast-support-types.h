@@ -140,6 +140,12 @@ namespace Slang
         // Cost of converting a pointer to bool
         kConversionCost_PtrToBool = 400,
 
+        // Cost of converting an integer to int16_t
+        kConversionCost_IntegerTruncate = 450,
+
+        // Cost of converting an integer to a half type
+        kConversionCost_IntegerToHalfConversion = 500,
+
         // Default case (usable for user-defined conversions)
         kConversionCost_Default = 500,
 
@@ -156,7 +162,10 @@ namespace Slang
         // Additional conversion cost to add when promoting from a scalar to
         // a vector (this will be added to the cost, if any, of converting
         // the element type of the vector)
-        kConversionCost_ScalarToVector = 1,
+        kConversionCost_OneVectorToScalar = 1,
+        kConversionCost_ScalarToVector = 2,
+        kConversionCost_ScalarToMatrix = 10,
+        kConversionCost_ScalarIntegerToFloatMatrix = kConversionCost_IntegerToFloatConversion + kConversionCost_ScalarToMatrix,
 
         // Additional cost when casting an LValue.
         kConversionCost_LValueCast = 800,
@@ -543,6 +552,8 @@ namespace Slang
 
         Type*	type = nullptr;
         bool	        isLeftValue;
+        bool            hasReadOnlyOnTarget = false;
+        bool	        isWriteOnly = false;
 
         QualType()
             : isLeftValue(false)
@@ -1413,6 +1424,9 @@ namespace Slang
         Scope*              scope       = nullptr;
         Scope*              endScope    = nullptr;
 
+        // A decl to exclude from the lookup, used to exclude the current decl being checked, such as in typedef Foo Foo;
+        // to avoid finding itself.
+        Decl* declToExclude = nullptr;
         LookupMask          mask        = LookupMask::Default;
         LookupOptions       options     = LookupOptions::None;
 

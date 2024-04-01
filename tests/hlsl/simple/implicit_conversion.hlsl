@@ -1,4 +1,4 @@
-//TEST_DISABLED:COMPARE_HLSL:-no-mangle -profile cs_5_0 -entry main
+//TEST_DISABLED:COMPARE_HLSL: -profile cs_5_0 -entry main
 
 // Test various cases of implicit type conversion and preference
 // for overload resolution.

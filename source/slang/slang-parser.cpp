@@ -84,6 +84,7 @@ namespace Slang
         bool enableEffectAnnotations = false;
         bool allowGLSLInput = false;
         bool isInLanguageServer = false;
+        CompilerOptionSet optionSet;
     };
 
     // TODO: implement two pass parsing for file reference and struct type recognition
@@ -2575,11 +2576,20 @@ namespace Slang
             typeSpec.expr = parseFuncTypeExpr(parser);
             return typeSpec;
         }
+        
+        bool inGlobalScope = false;
+        if (AdvanceIf(parser, TokenType::Scope))
+        {
+            inGlobalScope = true;
+        }
 
         Token typeName = parser->ReadToken(TokenType::Identifier);
 
         auto basicType = parser->astBuilder->create<VarExpr>();
-        basicType->scope = parser->currentLookupScope;
+        if (inGlobalScope)
+            basicType->scope = parser->currentModule->ownedScope;
+        else
+            basicType->scope = parser->currentLookupScope;
         basicType->loc = typeName.loc;
         basicType->name = typeName.getNameOrNull();
 
@@ -3207,7 +3217,20 @@ namespace Slang
         else
         {
             // Otherwise, we need to generate a name for the buffer variable.
-            bufferVarDecl->nameAndLoc.name = generateName(parser, "parameterGroup_" + String(reflectionNameToken.getContent()));
+            if (parser->options.optionSet.getBoolOption(CompilerOptionName::NoMangle))
+            {
+                // If no-mangle option is set, use the reflection name as the variable name,
+                // and mark all members of the buffer object as no mangle.
+                bufferVarDecl->nameAndLoc.name = reflectionNameToken.getName();
+                for (auto m : bufferDataTypeDecl->getMembersOfType<VarDecl>())
+                {
+                    addModifier(m, parser->astBuilder->create<ExternCppModifier>());
+                }
+            }
+            else
+            {
+                bufferVarDecl->nameAndLoc.name = generateName(parser, "parameterGroup_" + String(reflectionNameToken.getContent()));
+            }
 
             // We also need to make the declaration "transparent" so that their
             // members are implicitly made visible in the parent scope.
@@ -3558,7 +3581,7 @@ namespace Slang
         if (parser->currentScope && parser->currentScope->containerDecl)
         {
             parseDeclBody(parser, parser->currentScope->containerDecl);
-            return nullptr;
+            return parser->astBuilder->create<EmptyDecl>();
         }
         else
         {
@@ -4797,8 +4820,15 @@ namespace Slang
         // Skip completion request token to prevent producing a type named completion request.
         AdvanceIf(this, TokenType::CompletionRequest);
 
-        // TODO: support `struct` declaration without tag
-        rs->nameAndLoc = expectIdentifier(this);
+        if (LookAheadToken(TokenType::Identifier))
+        {
+            rs->nameAndLoc = expectIdentifier(this);
+        }
+        else
+        {
+            rs->nameAndLoc.name = generateName(this);
+            rs->nameAndLoc.loc = rs->loc;
+        }
         return parseOptGenericDecl(this, [&](GenericDecl*)
         {
             // We allow for an inheritance clause on a `struct`
@@ -5409,6 +5439,27 @@ namespace Slang
         return statement;
     }
 
+    // Look ahead token, skipping all modifiers.
+    bool lookAheadTokenAfterModifiers(Parser* parser, const char* token)
+    {
+        TokenReader tokenPreview = parser->tokenReader;
+        for (Index i = 0;; i++)
+        {
+            if (tokenPreview.peekToken().getContent() == token)
+                return true;
+            else if (auto syntaxDecl = tryLookUpSyntaxDecl(parser, tokenPreview.peekToken().getName()))
+            {
+                if (syntaxDecl->syntaxClass.isSubClassOf<Modifier>())
+                {
+                    tokenPreview.advanceToken();
+                    continue;
+                }
+            }
+            break;
+        }
+        return false;
+    }
+
     Stmt* Parser::parseBlockStatement()
     {
         if(!beginMatch(this, MatchedTokenType::CurlyBraces))
@@ -5432,12 +5483,44 @@ namespace Slang
         }
 
         Token closingBraceToken;
+        auto addStmt = [&](Stmt* stmt)
+        {
+            if (!body)
+            {
+                body = stmt;
+            }
+            else if (auto seqStmt = as<SeqStmt>(body))
+            {
+                seqStmt->stmts.add(stmt);
+            }
+            else
+            {
+                SeqStmt* newBody = astBuilder->create<SeqStmt>();
+                newBody->loc = blockStatement->loc;
+                newBody->stmts.add(body);
+                newBody->stmts.add(stmt);
+
+                body = newBody;
+            }
+        };
         while (!AdvanceIfMatch(this, MatchedTokenType::CurlyBraces, &closingBraceToken))
         {
-            if (LookAheadToken("struct"))
+            if (lookAheadTokenAfterModifiers(this, "struct"))
             {
-                auto structDecl = ParseStruct();
-                AddMember(scopeDecl, structDecl);
+                auto declBase = ParseDecl(this, scopeDecl);
+                if (auto declGroup = as<DeclGroup>(declBase))
+                {
+                    for (auto subDecl : declGroup->decls)
+                    {
+                        if (auto varDecl = as<VarDeclBase>(subDecl))
+                        {
+                            auto declStmt = astBuilder->create<DeclStmt>();
+                            declStmt->loc = varDecl->loc;
+                            declStmt->decl = varDecl;
+                            addStmt(declStmt);
+                        }
+                    }
+                }
                 continue;
             }
             else if (AdvanceIf(this, "typedef"))
@@ -5454,26 +5537,10 @@ namespace Slang
             }
 
             auto stmt = ParseStatement();
-            if(stmt)
-            {
-                if (!body)
-                {
-                    body = stmt;
-                }
-                else if (auto seqStmt = as<SeqStmt>(body))
-                {
-                    seqStmt->stmts.add(stmt);
-                }
-                else
-                {
-                    SeqStmt* newBody = astBuilder->create<SeqStmt>();
-                    newBody->loc = blockStatement->loc;
-                    newBody->stmts.add(body);
-                    newBody->stmts.add(stmt);
 
-                    body = newBody;
-                }
-            }
+            if (stmt)
+                addStmt(stmt);
+
             TryRecover(this);
         }
         PopScope();
@@ -6884,7 +6951,8 @@ namespace Slang
         auto expr = parseAtomicExpr(parser);
         for(;;)
         {
-            switch( peekTokenType(parser) )
+            auto nextTokenType = peekTokenType(parser);
+            switch (nextTokenType)
             {
             default:
                 return expr;
@@ -6976,16 +7044,20 @@ namespace Slang
 
                 break;
             }
-            // Member access `x.m`
+            // Member access `x.m` or `x->m`
             case TokenType::Dot:
+            case TokenType::RightArrow:
                 {
-                    MemberExpr* memberExpr = parser->astBuilder->create<MemberExpr>();
+                    
+                    MemberExpr* memberExpr = nextTokenType == TokenType::Dot
+                        ? parser->astBuilder->create<MemberExpr>()
+                        : parser->astBuilder->create<DerefMemberExpr>();
 
                     // TODO(tfoley): why would a member expression need this?
                     memberExpr->scope = parser->currentScope;
                     memberExpr->memberOperatorLoc = parser->tokenReader.peekLoc();
                     memberExpr->baseExpression = expr;
-                    parser->ReadToken(TokenType::Dot);
+                    parser->ReadToken(nextTokenType);
                     parser->FillPosition(memberExpr);
                     memberExpr->name = expectIdentifier(parser).name;
                     
@@ -7541,6 +7613,7 @@ namespace Slang
             translationUnit->compileRequest->optionSet.getBoolOption(CompilerOptionName::AllowGLSL) ||
             sourceLanguage == SourceLanguage::GLSL;
         options.isInLanguageServer = translationUnit->compileRequest->getLinkage()->isInLanguageServer();
+        options.optionSet = translationUnit->compileRequest->optionSet;
 
         Parser parser(astBuilder, tokens, sink, outerScope, options);
         parser.namePool = translationUnit->getNamePool();
@@ -7779,12 +7852,78 @@ namespace Slang
         parser->sink->diagnose(token, Diagnostics::invalidCUDASMVersion);
         return nullptr;
     }
+    static NodeBase* parseVolatileModifier(Parser* parser, void* /*userData*/)
+    {
+        ModifierListBuilder listBuilder;
+
+        auto hlslMod = parser->astBuilder->create<HLSLVolatileModifier>();
+        hlslMod->keywordName = getName(parser, "volatile");
+        hlslMod->loc = parser->tokenReader.peekLoc();
+        listBuilder.add(hlslMod);
+
+        auto glslMod = parser->astBuilder->create<GLSLVolatileModifier>();
+        glslMod->keywordName = getName(parser, "volatile");
+        glslMod->loc = parser->tokenReader.peekLoc();
+        listBuilder.add(glslMod);
+
+        return listBuilder.getFirst();
+    }
+
+    static NodeBase* parseCoherentModifier(Parser* parser, void* /*userData*/)
+    {
+        ModifierListBuilder listBuilder;
+
+        auto glslMod = parser->astBuilder->create<GloballyCoherentModifier>();
+        glslMod->keywordName = getName(parser, "coherent");
+        glslMod->loc = parser->tokenReader.peekLoc();
+        listBuilder.add(glslMod);
+
+        return listBuilder.getFirst();
+    }
+
+    static NodeBase* parseRestrictModifier(Parser* parser, void* /*userData*/)
+    {
+        ModifierListBuilder listBuilder;
+
+        auto glslMod = parser->astBuilder->create<GLSLRestrictModifier>();
+        glslMod->keywordName = getName(parser, "restrict");
+        glslMod->loc = parser->tokenReader.peekLoc();
+        listBuilder.add(glslMod);
+
+        return listBuilder.getFirst();
+    }
+
+    static NodeBase* parseReadonlyModifier(Parser* parser, void* /*userData*/)
+    {
+        ModifierListBuilder listBuilder;
+
+        auto glslMod = parser->astBuilder->create<GLSLReadOnlyModifier>();
+        glslMod->keywordName = getName(parser, "readonly");
+        glslMod->loc = parser->tokenReader.peekLoc();
+        listBuilder.add(glslMod);
+
+        return listBuilder.getFirst();
+    }
+
+    static NodeBase* parseWriteonlyModifier(Parser* parser, void* /*userData*/)
+    {
+        ModifierListBuilder listBuilder;
+
+        auto glslMod = parser->astBuilder->create<GLSLWriteOnlyModifier>();
+        glslMod->keywordName = getName(parser, "writeonly");
+        glslMod->loc = parser->tokenReader.peekLoc();
+        listBuilder.add(glslMod);
+
+        return listBuilder.getFirst();
+    }
     
     static NodeBase* parseLayoutModifier(Parser* parser, void* /*userData*/)
     {
         ModifierListBuilder listBuilder;
 
         GLSLLayoutLocalSizeAttribute* numThreadsAttrib = nullptr;
+
+        ImageFormat format;
 
         listBuilder.add(parser->astBuilder->create<GLSLLayoutModifierGroupBegin>());
         
@@ -7858,6 +7997,12 @@ namespace Slang
                         attr->set = int32_t(value);
                     }
                 }
+            }
+            else if(findImageFormatByName(nameText.getUnownedSlice(), &format))
+            {
+                auto attr = parser->astBuilder->create<FormatAttribute>();
+                attr->format = format;
+                listBuilder.add(attr);
             }
             else
             {
@@ -8144,7 +8289,11 @@ namespace Slang
         _makeParseModifier("groupshared",   HLSLGroupSharedModifier::kReflectClassInfo),
         _makeParseModifier("static",        HLSLStaticModifier::kReflectClassInfo),
         _makeParseModifier("uniform",       HLSLUniformModifier::kReflectClassInfo),
-        _makeParseModifier("volatile",      HLSLVolatileModifier::kReflectClassInfo),
+        _makeParseModifier("volatile",      parseVolatileModifier),
+        _makeParseModifier("coherent",      parseCoherentModifier),
+        _makeParseModifier("restrict",      parseRestrictModifier),
+        _makeParseModifier("readonly",      parseReadonlyModifier),
+        _makeParseModifier("writeonly",     parseWriteonlyModifier),
         _makeParseModifier("export",        HLSLExportModifier::kReflectClassInfo),
         _makeParseModifier("dynamic_uniform", DynamicUniformModifier::kReflectClassInfo),
 
