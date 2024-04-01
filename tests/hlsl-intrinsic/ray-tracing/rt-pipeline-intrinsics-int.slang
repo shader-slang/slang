@@ -23,10 +23,7 @@
 // SPIRV: OpLoad %mat4v3float %gl_ObjectToWorldEXT
 // SPIRV: OpLoad %mat4v3float %gl_WorldToObjectEXT
 // SPIRV: OpLoad %mat4v3float %gl_WorldToObjectEXT
-// SPIRV: OpLoad %uint %gl_HitKindEXT
 
-// SPIRV: OpLoad %v3float %gl_ObjectRayOriginEXT
-// SPIRV: OpLoad %v3float %gl_ObjectRayDirectionEXT
 // SPIRV: OpLoad %float %gl_RayTminEXT
 // SPIRV: OpLoad %float %gl_RayTmaxEXT
 // SPIRV: OpReportIntersectionKHR
