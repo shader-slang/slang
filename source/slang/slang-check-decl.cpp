@@ -4827,6 +4827,8 @@ namespace Slang
             SLANG_ASSERT("unknown builtin requirement kind.");
         }
         synFunc->parentDecl = context->parentDecl;
+        synFunc->loc = context->parentDecl->closingSourceLoc;
+        synFunc->nameAndLoc.loc = synFunc->loc;
         context->parentDecl->members.add(synFunc);
         context->parentDecl->invalidateMemberDictionary();
         addModifier(synFunc, intrinsicOpModifier);
