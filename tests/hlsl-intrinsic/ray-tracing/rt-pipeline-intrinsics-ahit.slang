@@ -3,7 +3,61 @@
 //TEST:SIMPLE(filecheck=DXIL):-target dxil-assembly -entry main -stage anyhit -profile sm_6_5 -DNOMOTION
 
 // SPIRV: OpEntryPoint
+
+// SPIRV: OpLoad %v3uint %gl_LaunchIDEXT
+// SPIRV: OpLoad %v3uint %gl_LaunchSizeEXT
+
+// SPIRV: OpLoad %v3float %gl_WorldRayOriginEXT
+// SPIRV: OpLoad %v3float %gl_WorldRayDirectionEXT
+// SPIRV: OpLoad %float %gl_RayTminEXT
+// SPIRV: OpLoad %float %gl_RayTmaxEXT
+// SPIRV: OpLoad %uint %gl_IncomingRayFlagsEXT
+
+// SPIRV: OpLoad %int %gl_InstanceID
+// SPIRV: OpLoad %int %gl_InstanceCustomIndexEXT
+// SPIRV: OpLoad %int %gl_GeometryIndexEXT
+// SPIRV: OpLoad %int %gl_PrimitiveID
+// SPIRV: OpLoad %v3float %gl_ObjectRayOriginEXT
+// SPIRV: OpLoad %v3float %gl_ObjectRayDirectionEXT
+// SPIRV: OpLoad %mat4v3float %gl_ObjectToWorldEXT
+// SPIRV: OpLoad %mat4v3float %gl_ObjectToWorldEXT
+// SPIRV: OpLoad %mat4v3float %gl_WorldToObjectEXT
+// SPIRV: OpLoad %mat4v3float %gl_WorldToObjectEXT
+// SPIRV: OpLoad %uint %gl_HitKindEXT
+
+// SPIRV: OpLoad %v3float %gl_ObjectRayOriginEXT
+// SPIRV: OpLoad %v3float %gl_ObjectRayDirectionEXT
+// SPIRV: OpLoad %float %gl_RayTmaxEXT
+// SPIRV: OpTerminateRayKHR
+// SPIRV: OpIgnoreIntersectionKHR
+
 // DXIL: main
+
+// DXIL: call i32 @dx.op.dispatchRaysIndex.i32
+// DXIL: call i32 @dx.op.dispatchRaysDimensions.i32
+
+// DXIL: call float @dx.op.worldRayOrigin.f32
+// DXIL: call float @dx.op.worldRayDirection.f32
+// DXIL: call float @dx.op.rayTMin.f32
+// DXIL: call float @dx.op.rayTCurrent.f32
+// DXIL: call i32 @dx.op.rayFlags.i32
+
+// DXIL: call i32 @dx.op.instanceIndex.i32
+// DXIL: call i32 @dx.op.instanceID.i32
+// DXIL: call i32 @dx.op.geometryIndex.i32
+// DXIL: call i32 @dx.op.primitiveIndex.i32
+// DXIL: call float @dx.op.objectRayOrigin.f32
+// DXIL: call float @dx.op.objectRayDirection.f32
+// DXIL: call float @dx.op.objectToWorld.f32
+// DXIL: call float @dx.op.worldToObject.f32
+// DXIL: call i32 @dx.op.hitKind.i32
+
+// DXIL: call float @dx.op.objectRayOrigin.f32
+// DXIL: call float @dx.op.objectRayDirection.f32
+// DXIL: call float @dx.op.rayTCurrent.f32
+// DXIL: call void @dx.op.acceptHitAndEndSearch
+// DXIL: call void @dx.op.ignoreHit
+
 
 struct RayPayload
 {

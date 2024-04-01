@@ -3,7 +3,34 @@
 //TEST:SIMPLE(filecheck=DXIL):-target dxil-assembly -entry main -stage miss -profile sm_6_5 -DNOMOTION
 
 // SPIRV: OpEntryPoint
+
+// SPIRV: OpLoad %v3uint %gl_LaunchIDEXT
+// SPIRV: OpLoad %v3uint %gl_LaunchSizeEXT
+
+// SPIRV: OpTraceRayKHR
+// SPIRV: OpTraceRayMotionNV
+
+// SPIRV: OpLoad %v3float %gl_WorldRayOriginEXT
+// SPIRV: OpLoad %v3float %gl_WorldRayDirectionEXT
+// SPIRV: OpLoad %float %gl_RayTminEXT
+// SPIRV: OpLoad %float %gl_RayTmaxEXT
+// SPIRV: OpLoad %uint %gl_IncomingRayFlagsEXT
+
+// SPIRV: OpExecuteCallableKHR
+
 // DXIL: main
+
+// DXIL: call i32 @dx.op.dispatchRaysIndex.i32
+// DXIL: call i32 @dx.op.dispatchRaysDimensions.i32
+// DXIL: call void @dx.op.traceRay.struct.RayPayload_0
+
+// DXIL: call float @dx.op.worldRayOrigin.f32
+// DXIL: call float @dx.op.worldRayDirection.f32
+// DXIL: call float @dx.op.rayTMin.f32
+// DXIL: call float @dx.op.rayTCurrent.f32
+// DXIL: call i32 @dx.op.rayFlags.i32
+
+// DXIL: call void @dx.op.callShader.struct.CallableParams_0
 
 [[vk::binding(0)]]
 uniform RaytracingAccelerationStructure accelStruct : register(t0);
@@ -152,7 +179,7 @@ void main( inout RayPayload payload )
     rayDesc.TMin = T_MIN;
     rayDesc.TMax = T_MAX;
 
-    RayPayload payload;
+    //RayPayload payload;
     payload.RayHitT = T_MAX;
 
     float val = 0.0f;

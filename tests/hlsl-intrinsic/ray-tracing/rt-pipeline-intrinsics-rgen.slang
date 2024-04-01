@@ -3,7 +3,22 @@
 //TEST:SIMPLE(filecheck=DXIL):-target dxil-assembly -entry main -stage raygeneration -profile sm_6_5 -DNOMOTION
 
 // SPIRV: OpEntryPoint
+
+// SPIRV: OpLoad %v3uint %gl_LaunchIDEXT
+// SPIRV: OpLoad %v3uint %gl_LaunchSizeEXT
+
+// SPIRV: OpTraceRayKHR
+// SPIRV: OpTraceRayMotionNV
+
+// SPIRV: OpExecuteCallableKHR
+
 // DXIL: main
+
+// DXIL: call i32 @dx.op.dispatchRaysIndex.i32
+// DXIL: call i32 @dx.op.dispatchRaysDimensions.i32
+// DXIL: call void @dx.op.traceRay.struct.RayPayload_0
+// DXIL: call void @dx.op.callShader.struct.CallableParams_0
+
 
 [[vk::binding(0)]]
 uniform RaytracingAccelerationStructure accelStruct : register(t0);
@@ -105,6 +120,7 @@ float CheckSysValueIntrinsics()
 [shader("raygeneration")]
 void main()
 {
+    
     float2 dir = (DispatchRaysIndex().xy / DispatchRaysDimensions().xy) * 2.0f - 1.0f;
     float aspectRatio = DispatchRaysDimensions().x / DispatchRaysDimensions().y;
 
@@ -120,7 +136,7 @@ void main()
     float val = 0.0f;
 
     val += CheckTraceRay(payload, rayDesc);
-    
+   
     if( val < T_MAX )
     {
         val += CheckSysValueIntrinsics();
