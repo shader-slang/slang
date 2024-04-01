@@ -392,7 +392,7 @@ namespace Slang
         auto function = getParentFunc();
         if (!stmt->expression)
         {
-            if (function && !function->returnType.equals(m_astBuilder->getVoidType()))
+            if (function && !function->returnType.equals(m_astBuilder->getVoidType()) && !as<ConstructorDecl>(function))
             {
                 getSink()->diagnose(stmt, Diagnostics::returnNeedsExpression);
             }
