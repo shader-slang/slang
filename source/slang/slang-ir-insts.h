@@ -107,13 +107,18 @@ struct IRTargetSpecificDecoration : IRDecoration
     }
 };
 
-struct IRTargetDecoration : IRTargetSpecificDecoration
+struct IRTargetSpecificDefinitionDecoration : IRTargetSpecificDecoration
+{
+    IR_PARENT_ISA(TargetSpecificDefinitionDecoration)
+};
+
+struct IRTargetDecoration : IRTargetSpecificDefinitionDecoration
 {
     enum { kOp = kIROp_TargetDecoration };
     IR_LEAF_ISA(TargetDecoration)
 };
 
-struct IRTargetIntrinsicDecoration : IRTargetSpecificDecoration
+struct IRTargetIntrinsicDecoration : IRTargetSpecificDefinitionDecoration
 {
     enum { kOp = kIROp_TargetIntrinsicDecoration };
     IR_LEAF_ISA(TargetIntrinsicDecoration)
@@ -4857,15 +4862,15 @@ void markConstExpr(
 IRTargetIntrinsicDecoration* findAnyTargetIntrinsicDecoration(
         IRInst*                 val);
 
+template<typename T>
 IRTargetSpecificDecoration* findBestTargetDecoration(
         IRInst*                 val,
-        CapabilitySet const&    targetCaps,
-        IROp                    decorationOp);
+        CapabilitySet const&    targetCaps);
 
+template<typename T>
 IRTargetSpecificDecoration* findBestTargetDecoration(
         IRInst*         val,
-        CapabilityName  targetCapabilityAtom,
-        IROp            decorationOp);
+        CapabilityName  targetCapabilityAtom);
 
 bool findTargetIntrinsicDefinition(IRInst* callee, CapabilitySet const& targetCaps, UnownedStringSlice& outDefinition);
 
@@ -4873,7 +4878,7 @@ inline IRTargetIntrinsicDecoration* findBestTargetIntrinsicDecoration(
     IRInst* inInst,
     CapabilitySet const& targetCaps)
 {
-    return as<IRTargetIntrinsicDecoration>(findBestTargetDecoration(inInst, targetCaps, kIROp_TargetIntrinsicDecoration));
+    return as<IRTargetIntrinsicDecoration>(findBestTargetDecoration<IRTargetSpecificDefinitionDecoration>(inInst, targetCaps));
 }
 
 

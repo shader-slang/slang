@@ -131,7 +131,7 @@ void CLikeSourceEmitter::emitPreModuleImpl()
 
 void CLikeSourceEmitter::ensureTypePrelude(IRType* type)
 {
-    if (auto requirePreludeDecor = as<IRRequirePreludeDecoration>(findBestTargetDecoration(type, kIROp_RequirePreludeDecoration)))
+    if (auto requirePreludeDecor = as<IRRequirePreludeDecoration>(findBestTargetDecoration<IRRequirePreludeDecoration>(type)))
     {
         auto preludeTextInst = as<IRStringLit>(requirePreludeDecor->getOperand(1));
         if (preludeTextInst)
@@ -1743,14 +1743,15 @@ void CLikeSourceEmitter::emitInstResultDecl(IRInst* inst)
     m_writer->emit(" = ");
 }
 
-IRTargetSpecificDecoration* CLikeSourceEmitter::findBestTargetDecoration(IRInst* inInst, IROp decorationOp)
+template<typename T>
+IRTargetSpecificDecoration* CLikeSourceEmitter::findBestTargetDecoration(IRInst* inInst)
 {
-    return Slang::findBestTargetDecoration(inInst, getTargetCaps(), decorationOp);
+    return Slang::findBestTargetDecoration<T>(inInst, getTargetCaps());
 }
 
-IRTargetIntrinsicDecoration* CLikeSourceEmitter::_findBestTargetIntrinsicDecoration(IRInst* inInst, IROp decorationOp)
+IRTargetIntrinsicDecoration* CLikeSourceEmitter::_findBestTargetIntrinsicDecoration(IRInst* inInst)
 {
-    return as<IRTargetIntrinsicDecoration>(findBestTargetDecoration(inInst, decorationOp));
+    return as<IRTargetIntrinsicDecoration>(findBestTargetDecoration<IRTargetSpecificDefinitionDecoration>(inInst));
 }
 
 /* static */bool CLikeSourceEmitter::isOrdinaryName(UnownedStringSlice const& name)

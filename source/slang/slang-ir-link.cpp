@@ -1031,11 +1031,7 @@ static CapabilitySet _getBestSpecializationCaps(
     if(!val->findDecoration<IRTargetDecoration>())
         return CapabilitySet::makeEmpty();
 
-    if( auto targetIntrinsicDecoration = findBestTargetDecoration(inVal, targetCaps, kIROp_TargetIntrinsicDecoration) )
-    {
-        return targetIntrinsicDecoration->getTargetCaps();
-    }
-    else if (auto targetSpecificDecoration = findBestTargetDecoration(inVal, targetCaps, kIROp_TargetDecoration))
+    if (auto targetSpecificDecoration = findBestTargetDecoration<IRTargetSpecificDefinitionDecoration>(inVal, targetCaps))
     {
         return targetSpecificDecoration->getTargetCaps();
     }

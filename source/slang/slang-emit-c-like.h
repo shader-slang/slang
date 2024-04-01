@@ -310,8 +310,9 @@ public:
 
     void emitInstResultDecl(IRInst* inst);
 
-    IRTargetSpecificDecoration* findBestTargetDecoration(IRInst* inst, IROp decorationOp);
-    IRTargetIntrinsicDecoration* _findBestTargetIntrinsicDecoration(IRInst* inst, IROp decorationOp);
+    template<typename T>
+    IRTargetSpecificDecoration* findBestTargetDecoration(IRInst* inst);
+    IRTargetIntrinsicDecoration* _findBestTargetIntrinsicDecoration(IRInst* inst);
 
     // Find the definition of a target intrinsic either from __target_intrinsic decoration, or from
     // a genericAsm inst in the function body.
