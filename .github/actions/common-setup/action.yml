@@ -54,7 +54,7 @@ runs:
         echo "CXX=$CXX" >> "$GITHUB_ENV"
 
         # Set CMake to use sccache if it's available
-        if command -v sccache; then
+        if type -P sccache &> /dev/null; then
           echo "CMAKE_CXX_COMPILER_LAUNCHER=sccache" >> "$GITHUB_ENV"
           echo "CMAKE_C_COMPILER_LAUNCHER=sccache" >> "$GITHUB_ENV"
         fi
