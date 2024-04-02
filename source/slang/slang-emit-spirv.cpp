@@ -2969,13 +2969,13 @@ struct SPIRVEmitContext
                 break;
             }
         }
-        if (mode != SpvExecutionModeMax)
-        {
-            emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes),
-                nullptr,
-                entryPoint,
-                mode);
-        }
+        if (mode == SpvExecutionModeMax)
+            return;
+
+        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes),
+            nullptr,
+            entryPoint,
+            mode);
     }
 
     // Make user type name conform to `SPV_GOOGLE_user_type` spec.
