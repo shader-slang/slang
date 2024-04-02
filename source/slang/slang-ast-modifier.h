@@ -717,6 +717,12 @@ class UnscopedEnumAttribute : public Attribute
     SLANG_AST_CLASS(UnscopedEnumAttribute)
 };
 
+    // Marks a enum to have `flags` semantics, where each enum case is a bitfield.
+class FlagsAttribute : public Attribute
+{
+    SLANG_AST_CLASS(FlagsAttribute);
+};
+
 // [[vk_push_constant]] [[push_constant]]
 class PushConstantAttribute : public Attribute 
 {
