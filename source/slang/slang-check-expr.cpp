@@ -1771,7 +1771,7 @@ namespace Slang
                     auto intVal = as<IntVal>(tryConstantFoldExpr(tagExpr, kind, &newCircularityInfo));
                     if (!intVal)
                         return nullptr;
-                    return m_astBuilder->getTypeCastIntVal(enumCaseDecl->getType(), intVal);
+                    return as<IntVal>(m_astBuilder->getTypeCastIntVal(enumCaseDecl->getType(), intVal)->resolve());
                 }
             }
         }
