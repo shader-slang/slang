@@ -486,6 +486,14 @@ struct IRNumThreadsDecoration : IRDecoration
     IRIntLit* getExtentAlongAxis(int axis) { return cast<IRIntLit>(getOperand(axis)); }
 };
 
+struct IRWaveSizeDecoration : IRDecoration
+{
+    enum { kOp = kIROp_WaveSizeDecoration };
+    IR_LEAF_ISA(WaveSizeDecoration)
+
+    IRIntLit* getNumLanes() { return cast<IRIntLit>(getOperand(0)); }
+};
+
 struct IREntryPointDecoration : IRDecoration
 {
     enum { kOp = kIROp_EntryPointDecoration };
@@ -3588,6 +3596,7 @@ public:
     IRInst* addFloatingModeOverrideDecoration(IRInst* dest, FloatingPointMode mode);
 
     IRInst* addNumThreadsDecoration(IRInst* inst, IRInst* x, IRInst* y, IRInst* z);
+    IRInst* addWaveSizeDecoration(IRInst* inst, IRInst* numLanes);
 
     IRInst* emitSpecializeInst(
         IRType*         type,

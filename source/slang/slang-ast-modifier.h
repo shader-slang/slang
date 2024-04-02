@@ -875,6 +875,17 @@ class NumThreadsAttribute : public Attribute
     IntVal* z;
 };
 
+class WaveSizeAttribute : public Attribute
+{
+    SLANG_AST_CLASS(WaveSizeAttribute)
+
+    // "numLanes" must be a compile time constant integer
+    // value of an allowed wave size, which is one of the
+    // followings: 4, 8, 16, 32, 64 or 128.
+    //
+    IntVal* numLanes;
+};
+
 class MaxVertexCountAttribute : public Attribute 
 {
     SLANG_AST_CLASS(MaxVertexCountAttribute)

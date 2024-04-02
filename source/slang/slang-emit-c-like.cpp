@@ -268,6 +268,16 @@ void CLikeSourceEmitter::emitSimpleType(IRType* type)
     return decor;
 }
 
+/* static */IRWaveSizeDecoration* CLikeSourceEmitter::getComputeWaveSize(IRFunc* func, Int* outWaveSize)
+{
+    IRWaveSizeDecoration* decor = func->findDecoration<IRWaveSizeDecoration>();
+    if (decor)
+    {
+        *outWaveSize = Int(getIntVal(decor->getOperand(0)));
+    }
+    return decor;
+}
+
 List<IRWitnessTableEntry*> CLikeSourceEmitter::getSortedWitnessTableEntries(IRWitnessTable* witnessTable)
 {
     List<IRWitnessTableEntry*> sortedWitnessTableEntries;
