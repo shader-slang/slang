@@ -449,6 +449,9 @@ public:
         /// Finds the IRNumThreadsDecoration and gets the size from that or sets all dimensions to 1
     static IRNumThreadsDecoration* getComputeThreadGroupSize(IRFunc* func, Int outNumThreads[kThreadGroupAxisCount]);
 
+        /// Finds the IRWaveSizeDecoration and gets the size from that.
+    static IRWaveSizeDecoration* getComputeWaveSize(IRFunc* func, Int *outWaveSize);
+
     protected:
 
 

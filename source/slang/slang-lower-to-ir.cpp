@@ -9621,6 +9621,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     getSimpleVal(context, lowerVal(context, numThreadsAttr->z))
                 );
             }
+            else if (auto waveSizeAttr = as<WaveSizeAttribute>(modifier))
+            {
+                getBuilder()->addWaveSizeDecoration(
+                    irFunc,
+                    getSimpleVal(context, lowerVal(context, waveSizeAttr->numLanes))
+                );
+            }
             else if (as<ReadNoneAttribute>(modifier))
             {
                 getBuilder()->addSimpleDecoration<IRReadNoneDecoration>(irFunc);

@@ -5105,6 +5105,15 @@ namespace Slang
         return addDecoration(inst, kIROp_NumThreadsDecoration, operands, 3);
     }
 
+    IRInst* IRBuilder::addWaveSizeDecoration(IRInst* inst, IRInst* numLanes)
+    {
+        IRInst* operands[1] = {
+            numLanes
+        };
+
+        return addDecoration(inst, kIROp_WaveSizeDecoration, operands, 1);
+    }
+
     IRInst* IRBuilder::emitSwizzle(
         IRType*         type,
         IRInst*         base,
