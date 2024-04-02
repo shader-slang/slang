@@ -2894,7 +2894,7 @@ struct SPIRVEmitContext
     }
 
 
-    SpvExecutionMode isDepthOutput(IRInst* builtinVar)
+    SpvExecutionMode getDepthOutputExecutionMode(IRInst* builtinVar)
     {
         SpvExecutionMode result = SpvExecutionModeMax;
         bool isDepthVar = false;
@@ -2943,6 +2943,7 @@ struct SPIRVEmitContext
             {
             case kIROp_SwizzledStore:
             case kIROp_Store:
+            case kIROp_Call:
                 return result;
             }
         }
@@ -2960,24 +2961,19 @@ struct SPIRVEmitContext
         SpvExecutionMode mode = SpvExecutionModeMax;
         for (auto globalInst : referencedBuiltinIRVars)
         {
-            if (auto thisMode = isDepthOutput(globalInst))
+            auto thisMode = getDepthOutputExecutionMode(globalInst);
+            if (mode == SpvExecutionModeMax)
+                mode = thisMode;
+            else if (mode != thisMode)
             {
                 needDepthReplacingMode = true;
-                if (mode == SpvExecutionModeMax)
-                    mode = thisMode;
-                else if (mode != thisMode)
-                    mode = SpvExecutionModeDepthReplacing;
+                mode = SpvExecutionModeDepthReplacing;
                 break;
             }
         }
         if (!needDepthReplacingMode)
             return;
-        emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes),
-            nullptr,
-            entryPoint,
-            SpvExecutionModeDepthReplacing);
-        if (mode != SpvExecutionModeDepthReplacing &&
-            mode != SpvExecutionModeMax)
+        if (mode != SpvExecutionModeMax)
         {
             emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes),
                 nullptr,
