@@ -364,10 +364,22 @@ void HLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoin
             m_writer->emit(")]\n");
         };
 
+    auto emitWaveSizeAttribute = [&]()
+        {
+            Int waveSize;
+            if (getComputeWaveSize(irFunc, &waveSize))
+            {
+                m_writer->emit("[WaveSize(");
+                m_writer->emit(waveSize);
+                m_writer->emit(")]\n");
+            }
+        };
+
     switch (stage)
     {
         case Stage::Compute:
         {
+            emitWaveSizeAttribute();
             emitNumThreadsAttribute();
         }
         break;

@@ -362,6 +362,47 @@ namespace Slang
             numThreadsAttr->y = values[1];
             numThreadsAttr->z = values[2];
         }
+        else if (auto waveSizeAttr = as<WaveSizeAttribute>(attr))
+        {
+            SLANG_ASSERT(attr->args.getCount() == 1);
+
+            IntVal* value = nullptr;
+
+            auto arg = attr->args[0];
+            if (arg)
+            {
+                auto intValue = checkLinkTimeConstantIntVal(arg);
+                if (!intValue)
+                {
+                    return false;
+                }
+                if (auto constIntVal = as<ConstantIntVal>(intValue))
+                {
+                    bool isValidWaveSize = false;
+                    const IntegerLiteralValue waveSize = constIntVal->getValue();
+                    for (int validWaveSize : { 4, 8, 16, 32, 64, 128 })
+                    {
+                        if (validWaveSize == waveSize)
+                        {
+                            isValidWaveSize = true;
+                            break;
+                        }
+                    }
+                    if (!isValidWaveSize)
+                    {
+                        getSink()->diagnose(attr, Diagnostics::invalidWaveSize, constIntVal->getValue());
+                        return false;
+                    }
+                }
+                value = intValue;
+            }
+            else
+            {
+                value = m_astBuilder->getIntVal(m_astBuilder->getIntType(), 1);
+            }
+
+            waveSizeAttr->numLanes = value;
+        }
         else if (auto anyValueSizeAttr = as<AnyValueSizeAttribute>(attr))
         {
             // This case handles GLSL-oriented layout attributes
