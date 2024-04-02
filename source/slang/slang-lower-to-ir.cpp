@@ -9088,6 +9088,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             builder->addNVAPIMagicDecoration(irInst, decl->getName()->text.getUnownedSlice());
         }
+        if (const auto requirePrelude = decl->findModifier<RequirePreludeAttribute>())
+        {
+            builder->addRequirePreludeDecoration(irInst, requirePrelude->capabilitySet, requirePrelude->prelude.getUnownedSlice());
+        }
     }
 
     void addBitFieldAccessorDecorations(IRInst* irFunc, Decl* decl)
@@ -9619,6 +9623,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     getSimpleVal(context, lowerVal(context, numThreadsAttr->x)),
                     getSimpleVal(context, lowerVal(context, numThreadsAttr->y)),
                     getSimpleVal(context, lowerVal(context, numThreadsAttr->z))
+                );
+            }
+            else if (auto waveSizeAttr = as<WaveSizeAttribute>(modifier))
+            {
+                getBuilder()->addWaveSizeDecoration(
+                    irFunc,
+                    getSimpleVal(context, lowerVal(context, waveSizeAttr->numLanes))
                 );
             }
             else if (as<ReadNoneAttribute>(modifier))

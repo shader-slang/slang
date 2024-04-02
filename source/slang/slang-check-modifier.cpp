@@ -362,6 +362,47 @@ namespace Slang
             numThreadsAttr->y = values[1];
             numThreadsAttr->z = values[2];
         }
+        else if (auto waveSizeAttr = as<WaveSizeAttribute>(attr))
+        {
+            SLANG_ASSERT(attr->args.getCount() == 1);
+
+            IntVal* value = nullptr;
+
+            auto arg = attr->args[0];
+            if (arg)
+            {
+                auto intValue = checkLinkTimeConstantIntVal(arg);
+                if (!intValue)
+                {
+                    return false;
+                }
+                if (auto constIntVal = as<ConstantIntVal>(intValue))
+                {
+                    bool isValidWaveSize = false;
+                    const IntegerLiteralValue waveSize = constIntVal->getValue();
+                    for (int validWaveSize : { 4, 8, 16, 32, 64, 128 })
+                    {
+                        if (validWaveSize == waveSize)
+                        {
+                            isValidWaveSize = true;
+                            break;
+                        }
+                    }
+                    if (!isValidWaveSize)
+                    {
+                        getSink()->diagnose(attr, Diagnostics::invalidWaveSize, constIntVal->getValue());
+                        return false;
+                    }
+                }
+                value = intValue;
+            }
+            else
+            {
+                value = m_astBuilder->getIntVal(m_astBuilder->getIntType(), 1);
+            }
+
+            waveSizeAttr->numLanes = value;
+        }
         else if (auto anyValueSizeAttr = as<AnyValueSizeAttribute>(attr))
         {
             // This case handles GLSL-oriented layout attributes
@@ -847,6 +888,35 @@ namespace Slang
                 }
             }
             requireCapAttr->capabilitySet = CapabilitySet(capabilityNames);
+        }
+        else if (auto requirePreludeAttr = as<RequirePreludeAttribute>(attr))
+        {
+            if (attr->args.getCount() > 2)
+            {
+                getSink()->diagnose(attr, Diagnostics::tooManyArguments, attr->args.getCount(), 0);
+                return false;
+            }
+            else if (attr->args.getCount() < 2)
+            {
+                getSink()->diagnose(attr, Diagnostics::notEnoughArguments, attr->args.getCount(), 2);
+                return false;
+            }
+            CapabilityName capName;
+            if (!checkCapabilityName(attr->args[0], capName))
+            {
+                return false;
+            }
+            requirePreludeAttr->capabilitySet = CapabilitySet(capName);
+            if (auto stringLitExpr = as<StringLiteralExpr>(attr->args[1]))
+            {
+                requirePreludeAttr->prelude = getStringLiteralTokenValue(stringLitExpr->token);
+            }
+            else
+            {
+                getSink()->diagnose(attr->args[1], Diagnostics::expectedAStringLiteral);
+                return false;
+            }
+            return true;
         }
         else
         {

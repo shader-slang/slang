@@ -5105,6 +5105,15 @@ namespace Slang
         return addDecoration(inst, kIROp_NumThreadsDecoration, operands, 3);
     }
 
+    IRInst* IRBuilder::addWaveSizeDecoration(IRInst* inst, IRInst* numLanes)
+    {
+        IRInst* operands[1] = {
+            numLanes
+        };
+
+        return addDecoration(inst, kIROp_WaveSizeDecoration, operands, 1);
+    }
+
     IRInst* IRBuilder::emitSwizzle(
         IRType*         type,
         IRInst*         base,
@@ -8174,6 +8183,7 @@ namespace Slang
         return inst->findDecoration<IRTargetIntrinsicDecoration>();
     }
 
+    template<typename T>
     IRTargetSpecificDecoration* findBestTargetDecoration(
         IRInst*                 inInst,
         CapabilitySet const&    targetCaps)
@@ -8193,6 +8203,8 @@ namespace Slang
         {
             auto decoration = as<IRTargetSpecificDecoration>(dd);
             if(!decoration)
+                continue;
+            if (!T::isaImpl(decoration->getOp()))
                 continue;
 
             auto decorationCaps = decoration->getTargetCaps();
@@ -8224,12 +8236,18 @@ namespace Slang
         return bestDecoration;
     }
 
+    template<typename T>
     IRTargetSpecificDecoration* findBestTargetDecoration(
             IRInst*         val,
             CapabilityName  targetCapabilityAtom)
     {
-        return findBestTargetDecoration(val, CapabilitySet(targetCapabilityAtom));
+        return findBestTargetDecoration<T>(val, CapabilitySet(targetCapabilityAtom));
     }
+
+    template
+    IRTargetSpecificDecoration* findBestTargetDecoration<IRRequirePreludeDecoration>(
+        IRInst* val,
+        CapabilityName  targetCapabilityAtom);
 
     bool findTargetIntrinsicDefinition(IRInst* callee, CapabilitySet const& targetCaps, UnownedStringSlice& outDefinition)
     {

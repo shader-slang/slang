@@ -1612,9 +1612,9 @@ namespace Slang
             CallableDecl* synthesized,
             List<Expr*>& synArgs);
 
-        FuncDecl* synthesizeMethodSignatureForRequirementWitness(
+        FunctionDeclBase* synthesizeMethodSignatureForRequirementWitness(
             ConformanceCheckingContext* context,
-            DeclRef<FuncDecl> requiredMemberDeclRef,
+            DeclRef<FunctionDeclBase> requiredMemberDeclRef,
             List<Expr*>& synArgs,
             ThisExpr*& synThis);
         
@@ -1729,6 +1729,12 @@ namespace Slang
             DeclRef<AssocTypeDecl> requirementDeclRef,
             RefPtr<WitnessTable> witnessTable);
 
+            /// Attempt to synthesize function requirements for enum types to make them conform to `ILogical`.
+        bool trySynthesizeEnumTypeMethodRequirementWitness(ConformanceCheckingContext* context,
+            DeclRef<FunctionDeclBase> requirementDeclRef,
+            RefPtr<WitnessTable> witnessTable,
+            BuiltinRequirementKind requirementKind);
+
         struct DifferentiableMemberInfo
         {
             Decl* memberDecl;
@@ -1809,6 +1815,9 @@ namespace Slang
 
             /// Is `type` a scalar integer type.
         bool isScalarIntegerType(Type* type);
+
+            /// Is `type` something we allow as compile time constants, i.e. scalar integer and enum types.
+        bool isValidCompileTimeConstantType(Type* type);
 
         bool isIntValueInRangeOfType(IntegerLiteralValue value, Type* type);
 
@@ -2750,6 +2759,8 @@ namespace Slang
     };
 
     bool isUnsizedArrayType(Type* type);
+
+    EnumDecl* isEnumType(Type* type);
 
     DeclVisibility getDeclVisibility(Decl* decl);
 

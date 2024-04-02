@@ -129,6 +129,16 @@ void CLikeSourceEmitter::emitPreModuleImpl()
 // Types
 //
 
+void CLikeSourceEmitter::ensureTypePrelude(IRType* type)
+{
+    if (auto requirePreludeDecor = as<IRRequirePreludeDecoration>(findBestTargetDecoration<IRRequirePreludeDecoration>(type)))
+    {
+        auto preludeTextInst = as<IRStringLit>(requirePreludeDecor->getOperand(1));
+        if (preludeTextInst)
+            m_requiredPreludes.add(preludeTextInst);
+    }
+}
+
 void CLikeSourceEmitter::emitDeclarator(DeclaratorInfo* declarator)
 {
     if (!declarator) return;
@@ -254,6 +264,16 @@ void CLikeSourceEmitter::emitSimpleType(IRType* type)
     for (int i = 0; i < 3; ++i)
     {
         outNumThreads[i] = decor ? Int(getIntVal(decor->getOperand(i))) : 1;
+    }
+    return decor;
+}
+
+/* static */IRWaveSizeDecoration* CLikeSourceEmitter::getComputeWaveSize(IRFunc* func, Int* outWaveSize)
+{
+    IRWaveSizeDecoration* decor = func->findDecoration<IRWaveSizeDecoration>();
+    if (decor)
+    {
+        *outWaveSize = Int(getIntVal(decor->getOperand(0)));
     }
     return decor;
 }
@@ -1733,14 +1753,15 @@ void CLikeSourceEmitter::emitInstResultDecl(IRInst* inst)
     m_writer->emit(" = ");
 }
 
+template<typename T>
 IRTargetSpecificDecoration* CLikeSourceEmitter::findBestTargetDecoration(IRInst* inInst)
 {
-    return Slang::findBestTargetDecoration(inInst, getTargetCaps());
+    return Slang::findBestTargetDecoration<T>(inInst, getTargetCaps());
 }
 
 IRTargetIntrinsicDecoration* CLikeSourceEmitter::_findBestTargetIntrinsicDecoration(IRInst* inInst)
 {
-    return as<IRTargetIntrinsicDecoration>(findBestTargetDecoration(inInst));
+    return as<IRTargetIntrinsicDecoration>(findBestTargetDecoration<IRTargetSpecificDefinitionDecoration>(inInst));
 }
 
 /* static */bool CLikeSourceEmitter::isOrdinaryName(UnownedStringSlice const& name)
@@ -3492,6 +3513,8 @@ void CLikeSourceEmitter::emitFuncDecorationsImpl(IRFunc* func)
 
 void CLikeSourceEmitter::emitStruct(IRStructType* structType)
 {
+    ensureTypePrelude(structType);
+
     // If the selected `struct` type is actually an intrinsic
     // on our target, then we don't want to emit anything at all.
     if(isTargetIntrinsic(structType))
@@ -3549,6 +3572,8 @@ void CLikeSourceEmitter::emitStructDeclarationsBlock(IRStructType* structType, b
 
 void CLikeSourceEmitter::emitClass(IRClassType* classType)
 {
+    ensureTypePrelude(classType);
+
     // If the selected `class` type is actually an intrinsic
     // on our target, then we don't want to emit anything at all.
     if (isTargetIntrinsic(classType))

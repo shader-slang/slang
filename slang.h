@@ -2521,6 +2521,10 @@ extern "C"
         SlangUInt                   axisCount,
         SlangUInt*                  outSizeAlongAxis);
 
+    SLANG_API void spReflectionEntryPoint_getComputeWaveSize(
+        SlangReflectionEntryPoint* entryPoint,
+        SlangUInt* outWaveSize);
+
     SLANG_API int spReflectionEntryPoint_usesAnySampleRateInput(
         SlangReflectionEntryPoint* entryPoint);
 
@@ -3333,6 +3337,12 @@ namespace slang
             SlangUInt*  outSizeAlongAxis)
         {
             return spReflectionEntryPoint_getComputeThreadGroupSize((SlangReflectionEntryPoint*) this, axisCount, outSizeAlongAxis);
+        }
+
+        void getComputeWaveSize(
+            SlangUInt* outWaveSize)
+        {
+            return spReflectionEntryPoint_getComputeWaveSize((SlangReflectionEntryPoint*)this, outWaveSize);
         }
 
         bool usesAnySampleRateInput()

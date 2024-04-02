@@ -717,6 +717,12 @@ class UnscopedEnumAttribute : public Attribute
     SLANG_AST_CLASS(UnscopedEnumAttribute)
 };
 
+    // Marks a enum to have `flags` semantics, where each enum case is a bitfield.
+class FlagsAttribute : public Attribute
+{
+    SLANG_AST_CLASS(FlagsAttribute);
+};
+
 // [[vk_push_constant]] [[push_constant]]
 class PushConstantAttribute : public Attribute 
 {
@@ -862,6 +868,17 @@ class NumThreadsAttribute : public Attribute
     IntVal* x;
     IntVal* y;
     IntVal* z;
+};
+
+class WaveSizeAttribute : public Attribute
+{
+    SLANG_AST_CLASS(WaveSizeAttribute)
+
+    // "numLanes" must be a compile time constant integer
+    // value of an allowed wave size, which is one of the
+    // followings: 4, 8, 16, 32, 64 or 128.
+    //
+    IntVal* numLanes;
 };
 
 class MaxVertexCountAttribute : public Attribute 
@@ -1250,6 +1267,15 @@ class RequiresNVAPIAttribute : public Attribute
     SLANG_AST_CLASS(RequiresNVAPIAttribute)
 };
 
+    /// A `[RequirePrelude(target, "string")]` attribute indicates that the declaration being modifed
+    /// requires a textual prelude to be injected in the resulting target code.
+class RequirePreludeAttribute : public Attribute
+{
+    SLANG_AST_CLASS(RequirePreludeAttribute)
+
+    CapabilitySet capabilitySet;
+    String prelude;
+};
 
     /// A `[__AlwaysFoldIntoUseSite]` attribute indicates that the calls into the modified
     /// function should always be folded into use sites during source emit.
