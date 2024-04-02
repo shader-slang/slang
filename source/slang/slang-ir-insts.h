@@ -1620,7 +1620,7 @@ struct IRTypeLayout : IRLayout
             LayoutResourceKind  kind = LayoutResourceKind::None;
             LayoutSize          size = 0;
         };
-        ResInfo m_resInfos[SLANG_PARAMETER_CATEGORY_COUNT_REV2];
+        ResInfo m_resInfos[SLANG_PARAMETER_CATEGORY_COUNT];
     };
 };
 
@@ -2196,7 +2196,7 @@ struct IRVarLayout : IRLayout
         IRUserSemanticAttr* m_userSemantic = nullptr;
         IRStageAttr* m_stageAttr = nullptr;
 
-        ResInfo m_resInfos[SLANG_PARAMETER_CATEGORY_COUNT_REV2];
+        ResInfo m_resInfos[SLANG_PARAMETER_CATEGORY_COUNT];
     };
 };
 
