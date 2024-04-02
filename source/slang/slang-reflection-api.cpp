@@ -2840,6 +2840,28 @@ SLANG_API void spReflectionEntryPoint_getComputeThreadGroupSize(
     }
 }
 
+SLANG_API void spReflectionEntryPoint_getComputeWaveSize(
+    SlangReflectionEntryPoint* inEntryPoint,
+    SlangUInt* outWaveSize)
+{
+    auto entryPointLayout = convert(inEntryPoint);
+
+    if (!entryPointLayout)   return;
+    if (!outWaveSize)   return;
+
+    auto entryPointFunc = entryPointLayout->entryPoint;
+    if (!entryPointFunc) return;
+
+    // First look for the HLSL case, where we have an attribute attached to the entry point function
+    if (auto waveSizeAttribute = entryPointFunc.getDecl()->findModifier<WaveSizeAttribute>())
+    {
+        if (auto cint = entryPointLayout->program->tryFoldIntVal(waveSizeAttribute->numLanes))
+            *outWaveSize = (SlangUInt)cint->getValue();
+        else if (waveSizeAttribute->numLanes)
+            *outWaveSize = 0;
+    }
+}
+
 SLANG_API int spReflectionEntryPoint_usesAnySampleRateInput(
     SlangReflectionEntryPoint* inEntryPoint)
 {

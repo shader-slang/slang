@@ -894,6 +894,25 @@ namespace Slang
             }
             return true;
         }
+
+        // A enum type can be converted into its underlying tag type.
+        if (auto enumDecl = isEnumType(fromType))
+        {
+            Type* tagType = enumDecl->tagType;
+            if (tagType == toType)
+            {
+                if (outCost)
+                {
+                    *outCost = kConversionCost_RankPromotion;
+                }
+                if (outToExpr)
+                {
+                    *outToExpr = fromExpr;
+                }
+                return true;
+            }
+        }
+
         // matrix type with different layouts are convertible
         if (auto fromMatrixType = as<MatrixExpressionType>(fromType))
         {
@@ -1389,13 +1408,22 @@ namespace Slang
     }
 
     bool SemanticsVisitor::canConvertImplicitly(
+        ConversionCost conversionCost)
+    {
+        // Is the conversion cheap enough to be done implicitly?
+        if (conversionCost >= kConversionCost_GeneralConversion)
+            return false;
+        return true;
+    }
+
+    bool SemanticsVisitor::canConvertImplicitly(
         Type* toType,
         QualType fromType)
     {
         auto conversionCost = getConversionCost(toType, fromType);
 
         // Is the conversion cheap enough to be done implicitly?
-        if (conversionCost >= kConversionCost_GeneralConversion)
+        if (canConvertImplicitly(conversionCost))
             return false;
 
         return true;
