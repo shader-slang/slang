@@ -2957,7 +2957,6 @@ struct SPIRVEmitContext
         // Check if the entrypoint uses any depth output builtin variables,
         // if so, we need to emit a DepthReplacing execution mode for the
         // fragment entrypoint.
-        bool needDepthReplacingMode = false;
         SpvExecutionMode mode = SpvExecutionModeMax;
         for (auto globalInst : referencedBuiltinIRVars)
         {
@@ -2966,13 +2965,10 @@ struct SPIRVEmitContext
                 mode = thisMode;
             else if (mode != thisMode)
             {
-                needDepthReplacingMode = true;
                 mode = SpvExecutionModeDepthReplacing;
                 break;
             }
         }
-        if (!needDepthReplacingMode)
-            return;
         if (mode != SpvExecutionModeMax)
         {
             emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes),
