@@ -5946,6 +5946,11 @@ namespace Slang
         return isIntegerBaseType(baseType) || baseType == BaseType::Bool;
     }
 
+    bool SemanticsVisitor::isValidCompileTimeConstantType(Type* type)
+    {
+        return isScalarIntegerType(type) || isEnumType(type);
+    }
+
     bool SemanticsVisitor::isIntValueInRangeOfType(IntegerLiteralValue value, Type* type)
     {
         auto basicType = as<BasicExpressionType>(type);

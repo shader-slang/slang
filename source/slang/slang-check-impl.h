@@ -1816,6 +1816,9 @@ namespace Slang
             /// Is `type` a scalar integer type.
         bool isScalarIntegerType(Type* type);
 
+            /// Is `type` something we allow as compile time constants, i.e. scalar integer and enum types.
+        bool isValidCompileTimeConstantType(Type* type);
+
         bool isIntValueInRangeOfType(IntegerLiteralValue value, Type* type);
 
         // Validate that `type` is a suitable type to use

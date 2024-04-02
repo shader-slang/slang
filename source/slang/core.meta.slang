@@ -2221,6 +2221,27 @@ __prefix T operator !(T v0)
     return v0.not();
 }
 
+// The operator overloads defined above already allows Enum types to be used
+// in logical operators, but we still provide overloads for __EnumTypes and map
+// them directly to intrinsic op to allow constant propagation at AST level to
+// work on enum types.
+
+__generic<T : __EnumType>
+[__unsafeForceInlineEarly]
+__intrinsic_op($(kIROp_BitAnd))
+T operator &(T v0, T v1);
+
+__generic<T : __EnumType>
+[__unsafeForceInlineEarly]
+__intrinsic_op($(kIROp_BitOr))
+T operator |(T v0, T v1);
+
+__generic<T : __EnumType>
+[__unsafeForceInlineEarly]
+__intrinsic_op($(kIROp_BitNot))
+__prefix T operator ~(T v0);
+
+
 // IR level type traits.
 
 __generic<T>
