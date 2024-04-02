@@ -9088,6 +9088,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             builder->addNVAPIMagicDecoration(irInst, decl->getName()->text.getUnownedSlice());
         }
+        if (const auto requirePrelude = decl->findModifier<RequirePreludeAttribute>())
+        {
+            builder->addRequirePreludeDecoration(irInst, requirePrelude->capabilitySet, requirePrelude->prelude.getUnownedSlice());
+        }
     }
 
     void addBitFieldAccessorDecorations(IRInst* irFunc, Decl* decl)

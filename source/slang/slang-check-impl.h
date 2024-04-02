@@ -1612,9 +1612,9 @@ namespace Slang
             CallableDecl* synthesized,
             List<Expr*>& synArgs);
 
-        FuncDecl* synthesizeMethodSignatureForRequirementWitness(
+        FunctionDeclBase* synthesizeMethodSignatureForRequirementWitness(
             ConformanceCheckingContext* context,
-            DeclRef<FuncDecl> requiredMemberDeclRef,
+            DeclRef<FunctionDeclBase> requiredMemberDeclRef,
             List<Expr*>& synArgs,
             ThisExpr*& synThis);
         
@@ -1728,6 +1728,12 @@ namespace Slang
             ConformanceCheckingContext* context,
             DeclRef<AssocTypeDecl> requirementDeclRef,
             RefPtr<WitnessTable> witnessTable);
+
+            /// Attempt to synthesize function requirements for enum types to make them conform to `ILogical`.
+        bool trySynthesizeEnumTypeMethodRequirementWitness(ConformanceCheckingContext* context,
+            DeclRef<FunctionDeclBase> requirementDeclRef,
+            RefPtr<WitnessTable> witnessTable,
+            BuiltinRequirementKind requirementKind);
 
         struct DifferentiableMemberInfo
         {
@@ -2750,6 +2756,8 @@ namespace Slang
     };
 
     bool isUnsizedArrayType(Type* type);
+
+    EnumDecl* isEnumType(Type* type);
 
     DeclVisibility getDeclVisibility(Decl* decl);
 

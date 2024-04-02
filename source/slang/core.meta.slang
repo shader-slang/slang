@@ -76,8 +76,13 @@ syntax __extern_cpp : ExternCppModifier;
 
 interface IComparable
 {
+    __builtin_requirement($( (int)BuiltinRequirementKind::Equals))
     bool equals(This other);
+
+    __builtin_requirement($( (int)BuiltinRequirementKind::LessThan))
     bool lessThan(This other);
+
+    __builtin_requirement($( (int)BuiltinRequirementKind::LessThanOrEquals))
     bool lessThanOrEquals(This other);
 }
 
@@ -107,15 +112,34 @@ interface IArithmetic : IComparable
 
 interface ILogical : IComparable
 {
+    __builtin_requirement($( (int)BuiltinRequirementKind::Shl) )
     This shl(int value);
+
+    __builtin_requirement($( (int)BuiltinRequirementKind::Shr) )
     This shr(int value);
+
+    __builtin_requirement($( (int)BuiltinRequirementKind::BitAnd) )
     This bitAnd(This other);
+
+    __builtin_requirement($( (int)BuiltinRequirementKind::BitOr) )
     This bitOr(This other);
+
+    __builtin_requirement($( (int)BuiltinRequirementKind::BitXor) )
     This bitXor(This other);
+
+    __builtin_requirement($( (int)BuiltinRequirementKind::BitNot) )
     This bitNot();
+
+    __builtin_requirement($( (int)BuiltinRequirementKind::And) )
     This and(This other);
+
+    __builtin_requirement($( (int)BuiltinRequirementKind::Or) )
     This or(This other);
+
+    __builtin_requirement($( (int)BuiltinRequirementKind::Not) )
     This not();
+
+    __builtin_requirement($( (int)BuiltinRequirementKind::InitLogicalFromInt) )
     __init(int val);
 }
 
@@ -336,65 +360,18 @@ interface __BuiltinFloatingPointType : __BuiltinRealType, IFloat
 // A type resulting from an `enum` declaration.
 [builtin]
 __magic_type(EnumTypeType)
-interface __EnumType
+interface __EnumType : ILogical
 {
     // The type of tags for this `enum`
     //
     // Note: using `__Tag` instead of `Tag` to avoid any
     // conflict if a user had an `enum` case called `Tag`
     associatedtype __Tag : __BuiltinIntegerType;
+
+    __builtin_requirement($( (int)BuiltinRequirementKind::InitLogicalFromInt) )
+    __init(__Tag value);
 };
 
-// Use an extension to declare that every `enum` type
-// inherits an initializer based on the tag type.
-//
-// Note: there is an important and subtle point here.
-// If we declared these initializers inside the `interface`
-// declaration above, then they would implicitly be
-// *requirements* of the `__EnumType` interface, and any
-// type that declares conformance to it would need to
-// provide implementations. That would put the onus on
-// the semantic checker to synthesize such initializers
-// when conforming an `enum` type to `__EnumType` (just
-// as it currently synthesizes the `__Tag` requirement.
-// Putting the declaration in an `extension` makes them
-// concrete declerations rather than interface requirements.
-// (Admittedly, they are "concrete" declarations with
-// no bodies, because currently all initializers are
-// assumed to be intrinsics).
-//
-// TODO: It might be more accurate to express this as:
-//
-//      __generic<T:__EnumType> extension T { ... }
-//
-// That alternative would express an extension of every
-// type that conforms to `__EnumType`, rather than an
-// extension of `__EnumType` itself. The distinction
-// is subtle, and unfortunately not one the Slang type
-// checker is equiped to handle right now. For now we
-// will stick with the syntax that actually works, even
-// if it might be the less technically correct one.
-//
-//
-extension __EnumType
-{
-    // TODO: this should be a single initializer using
-    // the `__Tag` associated type from the `__EnumType`
-    // interface, but right now the scoping for looking
-    // up that type isn't working right.
-    //
-    __intrinsic_op($(kIROp_IntCast))
-    __init(int value);
-    __intrinsic_op($(kIROp_IntCast))
-    __init(uint value);
-}
-
-// A type resulting from an `enum` declaration
-// with the `[flags]` attribute.
-[builtin]
-interface __FlagsEnumType : __EnumType
-{
-};
 
 interface IArray<T>
 {
@@ -2404,6 +2381,9 @@ attribute_syntax [disable_array_flattening] : DisableArrayFlatteningAttribute;
 __attributeTarget(EnumDecl)
 attribute_syntax [UnscopedEnum] : UnscopedEnumAttribute;
 
+__attributeTarget(EnumDecl)
+attribute_syntax[Flags] : FlagsAttribute;
+
 // Statement Attributes
 
 __attributeTarget(LoopStmt)
@@ -2597,6 +2577,9 @@ attribute_syntax [builtin] : BuiltinAttribute;
 
 __attributeTarget(DeclBase)
 attribute_syntax [__requiresNVAPI] : RequiresNVAPIAttribute;
+
+__attributeTarget(AggTypeDecl)
+attribute_syntax[RequirePrelude(target, prelude:String)] : RequirePreludeAttribute;
 
 __attributeTarget(DeclBase)
 attribute_syntax [__AlwaysFoldIntoUseSiteAttribute] : AlwaysFoldIntoUseSiteAttribute;

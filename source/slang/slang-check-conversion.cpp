@@ -894,6 +894,25 @@ namespace Slang
             }
             return true;
         }
+
+        // A enum type can be converted into its underlying tag type.
+        if (auto enumDecl = isEnumType(fromType))
+        {
+            Type* tagType = enumDecl->tagType;
+            if (tagType == toType)
+            {
+                if (outCost)
+                {
+                    *outCost = kConversionCost_RankPromotion;
+                }
+                if (outToExpr)
+                {
+                    *outToExpr = fromExpr;
+                }
+                return true;
+            }
+        }
+
         // matrix type with different layouts are convertible
         if (auto fromMatrixType = as<MatrixExpressionType>(fromType))
         {
