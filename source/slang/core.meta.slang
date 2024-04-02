@@ -2458,6 +2458,9 @@ attribute_syntax [earlydepthstencil]    : EarlyDepthStencilAttribute;
 __attributeTarget(FuncDecl)
 attribute_syntax [numthreads(x: int, y: int = 1, z: int = 1)]   : NumThreadsAttribute;
 
+__attributeTarget(FuncDecl)
+attribute_syntax [WaveSize(numLanes: int)]   : WaveSizeAttribute;
+
 //
 __attributeTarget(VarDeclBase)
 attribute_syntax [__vulkanRayPayload(location : int = -1)] : VulkanRayPayloadAttribute;
