@@ -2732,6 +2732,49 @@ void legalizeEntryPointParameterForGLSL(
         IRInst* materialized = materializeValue(builder, globalValue);
 
         pp->replaceUsesWith(materialized);
+
+        // We finally need to replace all global variable references of a global 
+        // parameter with the actual global parameter for all function calls. 
+        // Global parameters are used with a OpStore to copy its data into a global 
+        // variable intermediary. We will follow the uses of a global parameter until 
+        // we find this OpStore, then we will replace uses of the intermediary object. 
+        IRBuilder replaceBuilder(materialized);
+        for (auto globalParamUse = materialized->firstUse; globalParamUse; globalParamUse = globalParamUse->nextUse)
+        {
+            assert(globalParamUse->getUser()->getOp() == kIROp_FieldExtract);
+            auto globalParamUser = globalParamUse->getUser();
+            auto globalParamType = globalParamUser->getDataType();
+            auto fieldExtractKey = globalParamUser->getOperand(1);
+            for (auto maybeStoreUse = globalParamUser->firstUse; maybeStoreUse; maybeStoreUse = maybeStoreUse->nextUse)
+            {
+                if (maybeStoreUse->getUser()->getOp() != kIROp_Store)
+                    continue;
+
+                auto globalVarToReplace = maybeStoreUse->getUser()->getOperand(0);
+                // we will be replacing uses of `globalVarToReplace`, we need globalVarToReplaceNextUse 
+                // to catch the next use before it is removed from the list of uses
+                IRUse* globalVarToReplaceNextUse;
+                for (auto globalVarUse = globalVarToReplace->firstUse; globalVarUse; globalVarUse = globalVarToReplaceNextUse)
+                {
+                    globalVarToReplaceNextUse = globalVarUse->nextUse;
+                    auto user = globalVarUse->getUser();
+                    if (user->getOp() != kIROp_Call) continue;
+                    for (Slang::UInt operandIndex = 0; operandIndex < user->getOperandCount(); 
+                        operandIndex++)
+                    {
+                        auto operand = user->getOperand(operandIndex);
+                        auto operandUse = user->getOperands() + operandIndex;
+                        if (operand != globalVarToReplace)
+                            continue;
+                        replaceBuilder.setInsertBefore(user);
+                        auto structMade = materializeValue(builder, globalValue);
+                        auto field = replaceBuilder.emitFieldExtract(globalParamType, structMade, fieldExtractKey);
+                        replaceBuilder.replaceOperand(operandUse, field);
+                        break;
+                    }
+                }
+            }
+        }
     }
 }
 

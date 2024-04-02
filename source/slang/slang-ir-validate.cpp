@@ -223,15 +223,6 @@ namespace Slang
         {
         case kIROp_DifferentiableTypeDictionaryItem:
             return;
-        default:
-
-            // It is possible that a global parameter will not emit their ancestor until after
-            // `validateIRInstOperand`.
-            // Due to this, do not raise exception if `IRLayoutDecoration` is found since that implies
-            // `inst` is a global parameter and an ancestor likely won't be found.
-            if (inst->getOperand(0)->findDecoration<IRLayoutDecoration>())
-                return;
-            break;
         }
         //
         // We failed to find `operandParent` while walking the ancestors of `inst`,

@@ -1013,7 +1013,7 @@ class ReadNoneAttribute : public Attribute
 };
 
 
-// A `[GLSLRequireShaderInputParameter]` attribute to annotate
+// A `[__GLSLRequireShaderInputParameter]` attribute to annotate
 // functions that require a shader input as parameter
 //
 class GLSLRequireShaderInputParameterAttribute : public Attribute

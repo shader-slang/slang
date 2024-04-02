@@ -7456,7 +7456,7 @@ public vector<float, N> fwidthCoarse(vector<float, N> p)
 
 [require(any_gfx_target, fragmentprocessing)]
 [__NoSideEffect]
-[GLSLRequireShaderInputParameter(0)]
+[__GLSLRequireShaderInputParameter(0)]
 public float interpolateAtCentroid(__ref float interpolant)
 {
     __target_switch
@@ -7479,7 +7479,7 @@ public float interpolateAtCentroid(__ref float interpolant)
 [require(any_gfx_target, fragmentprocessing)]
 __generic<let N : int>
 [__NoSideEffect]
-[GLSLRequireShaderInputParameter(0)]
+[__GLSLRequireShaderInputParameter(0)]
 public vector<float, N> interpolateAtCentroid(__ref vector<float, N> interpolant)
 {
     __target_switch
@@ -7502,7 +7502,7 @@ public vector<float, N> interpolateAtCentroid(__ref vector<float, N> interpolant
 
 [require(any_gfx_target, fragmentprocessing)]
 [__NoSideEffect]
-[GLSLRequireShaderInputParameter(0)]
+[__GLSLRequireShaderInputParameter(0)]
 public float interpolateAtSample(__ref float interpolant, int sample)
 {
     __target_switch
@@ -7525,7 +7525,7 @@ public float interpolateAtSample(__ref float interpolant, int sample)
 [require(any_gfx_target, fragmentprocessing)]
 __generic<let N : int>
 [__NoSideEffect]
-[GLSLRequireShaderInputParameter(0)]
+[__GLSLRequireShaderInputParameter(0)]
 public vector<float, N> interpolateAtSample(__ref vector<float, N> interpolant, int sample)
 {
     __target_switch
@@ -7548,7 +7548,7 @@ public vector<float, N> interpolateAtSample(__ref vector<float, N> interpolant, 
 
 [require(glsl_spirv, fragmentprocessing)]
 [__NoSideEffect]
-[GLSLRequireShaderInputParameter(0)]
+[__GLSLRequireShaderInputParameter(0)]
 public float interpolateAtOffset(__ref float interpolant, vec2 offset)
 {
     __target_switch
@@ -7567,7 +7567,7 @@ public float interpolateAtOffset(__ref float interpolant, vec2 offset)
 [require(glsl_spirv, fragmentprocessing)]
 __generic<let N : int>
 [__NoSideEffect]
-[GLSLRequireShaderInputParameter(0)]
+[__GLSLRequireShaderInputParameter(0)]
 public vector<float, N> interpolateAtOffset(__ref vector<float, N> interpolant, vec2 offset)
 {
     __target_switch

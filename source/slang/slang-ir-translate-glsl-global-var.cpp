@@ -126,31 +126,6 @@ namespace Slang
                     builder.emitStore(input,
                         builder.emitFieldExtract(inputType, inputParam, inputKeys[i]));
                 }
-                // Replace all global variable references with
-                // actual global parameter for all Call's
-                for (Index i = 0; i < inputVars.getCount(); i++)
-                {
-                    auto input = inputVars[i];
-                    auto inputType = cast<IRPtrTypeBase>(input->getDataType())->getValueType();
-                    IRUse* nextUse;
-                    for (auto use = input->firstUse; use; use = nextUse)
-                    {
-                        nextUse = use->nextUse;
-                        auto user = use->getUser();
-                        if(user->getOp() != kIROp_Call) continue;
-                        for (Slang::UInt operandIndex = 0; operandIndex < user->getOperandCount(); operandIndex++)
-                        {
-                            auto operand = user->getOperand(operandIndex);
-                            auto operandUse = user->getOperands()+operandIndex;
-                            if (operand != input)
-                                continue;
-                            builder.setInsertBefore(user);
-                            auto field = builder.emitFieldExtract(inputType, inputParam, inputKeys[i]);
-                            builder.replaceOperand(operandUse, field);
-                            break;
-                        }
-                    }
-                }
 
                 // For each entry point, introduce a new parameter to represent each input parameter,
                 // and return all outputs via a struct value.
