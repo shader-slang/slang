@@ -1252,8 +1252,6 @@ bool isIllegalSPIRVParameterType(IRType* type, bool isArray)
     // all Texture types.
     if (as<IRTextureType>(type))
         return true;
-    if(as<IRSubpassInputType>(type))
-        return true;
     if (isArray)
     {
         if (as<IRSamplerStateTypeBase>(type))

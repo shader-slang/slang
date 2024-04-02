@@ -280,6 +280,7 @@ alias groupnonuniform = GL_KHR_shader_subgroup_ballot + GL_KHR_shader_subgroup_s
                         | _sm_6_0 | cuda;
 alias fragmentshaderbarycentric = GL_EXT_fragment_shader_barycentric | _sm_6_1;
 alias fragmentprocessing = fragment_gfx + glsl_spirv | fragment + _sm_5_0;
+alias fragmentprocessing_derivativecontrol = fragmentprocessing + GL_ARB_derivative_control;
 alias shadermemorycontrol = glsl | spirv_1_0 | _sm_5_0;
 alias shadermemorycontrol_compute = compute_gfx + shadermemorycontrol;
 alias subpass = fragment_gfx;

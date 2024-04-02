@@ -11414,10 +11414,10 @@ struct __SubpassImpl<T, let isMS:int>
 }
 
 __generic<T, let isMS:int=0>
-typealias SubpassInputMS = __SubpassImpl<T, isMS>;
+typealias SubpassInput = __SubpassImpl<T, isMS>;
 
-__generic<T, let isMS:int=0>
-extension __SubpassImpl<T, isMS>
+__generic<T>
+extension __SubpassImpl<T, 0>
 {
     [ForceInline]
     T SubpassLoad()
@@ -11439,10 +11439,10 @@ extension __SubpassImpl<T, isMS>
 }
 
 __generic<T, let isMS:int=1>
-typealias SubpassInput = __SubpassImpl<T, isMS>;
+typealias SubpassInputMS = __SubpassImpl<T, isMS>;
 
-__generic<T, let isMS:int=1>
-extension __SubpassImpl<T, isMS>
+__generic<T>
+extension __SubpassImpl<T, 1>
 {
     [ForceInline]
     T SubpassLoad(int sample)

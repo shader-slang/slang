@@ -249,7 +249,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             {
                 // Skip load's for referenced `Input` variables since a ref implies
                 // passing as is, which needs to be a pointer (pass as is).
-                if (user->getDataType()->getOp() == kIROp_RefType
+                if (user->getDataType() 
+                    && user->getDataType()->getOp() == kIROp_RefType
                     && storageClass == SpvStorageClassInput)
                     continue;
                 // If this is being used in an asm block, insert the load to
