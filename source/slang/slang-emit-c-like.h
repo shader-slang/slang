@@ -240,6 +240,7 @@ public:
     // Types
     //
 
+    void ensureTypePrelude(IRType* type);
     void emitDeclarator(DeclaratorInfo* declarator);
 
     void emitType(IRType* type, const StringSliceLoc* nameLoc) { emitTypeImpl(type, nameLoc); }
@@ -309,6 +310,7 @@ public:
 
     void emitInstResultDecl(IRInst* inst);
 
+    template<typename T>
     IRTargetSpecificDecoration* findBestTargetDecoration(IRInst* inst);
     IRTargetIntrinsicDecoration* _findBestTargetIntrinsicDecoration(IRInst* inst);
 

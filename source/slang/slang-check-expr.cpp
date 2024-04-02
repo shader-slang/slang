@@ -3728,7 +3728,9 @@ namespace Slang
                         this,
                         expr->name,
                         type,
-                        m_outerScope);
+                        m_outerScope,
+                        LookupMask::Default,
+                        LookupOptions::NoDeref);
 
                     // We need to confirm that whatever member we
                     // are trying to refer to is usable via static reference.
