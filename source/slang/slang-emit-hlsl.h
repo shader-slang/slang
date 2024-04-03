@@ -79,6 +79,8 @@ protected:
 
     void _emitHLSLTextureType(IRTextureTypeBase* texType);
 
+    void _emitHLSLSubpassInputType(IRSubpassInputType* subpassType);
+    
     void _emitHLSLDecorationSingleString(const char* name, IRFunc* entryPoint, IRStringLit* val);
     void _emitHLSLDecorationSingleInt(const char* name, IRFunc* entryPoint, IRIntLit* val);
 

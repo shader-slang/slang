@@ -242,6 +242,11 @@ class GLSLLocationLayoutModifier : public GLSLParsedLayoutModifier
     SLANG_AST_CLASS(GLSLLocationLayoutModifier)
 };
 
+class GLSLInputAttachmentIndexLayoutModifier : public GLSLParsedLayoutModifier
+{
+    SLANG_AST_CLASS(GLSLInputAttachmentIndexLayoutModifier)
+};
+
 class GLSLBufferDataLayoutModifier : public GLSLParsedLayoutModifier
 {
     SLANG_AST_CLASS(GLSLBufferDataLayoutModifier)
@@ -1008,6 +1013,15 @@ class ReadNoneAttribute : public Attribute
 };
 
 
+// A `[__GLSLRequireShaderInputParameter]` attribute to annotate
+// functions that require a shader input as parameter
+//
+class GLSLRequireShaderInputParameterAttribute : public Attribute
+{
+    SLANG_AST_CLASS(GLSLRequireShaderInputParameterAttribute)
+
+    uint32_t parameterNumber;
+};
 
 // HLSL modifiers for geometry shader input topology
 class HLSLGeometryShaderInputPrimitiveTypeModifier : public Modifier 
@@ -1571,9 +1585,9 @@ class DynamicUniformModifier : public Modifier
     SLANG_AST_CLASS(DynamicUniformModifier)
 };
 
-class MemoryQualifierCollectionModifier : public Modifier
+class MemoryQualifierSetModifier : public Modifier
 {
-    SLANG_AST_CLASS(MemoryQualifierCollectionModifier);
+    SLANG_AST_CLASS(MemoryQualifierSetModifier);
 
     List<Modifier*> memoryModifiers;
 

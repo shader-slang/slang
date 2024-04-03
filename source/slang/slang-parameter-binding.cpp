@@ -1072,14 +1072,35 @@ static void addExplicitParameterBindings_GLSL(
     semanticInfo.index = 0;
     semanticInfo.space = 0;
 
+    LayoutSemanticInfo subpassSemanticInfo;
+    bool foundBinding = false;
+    bool foundSubpass = false;
+
     if( (foundResInfo = typeLayout->FindResourceInfo(LayoutResourceKind::DescriptorTableSlot)) != nullptr )
     {
-        // Try to find `binding` and `set`
-        if (auto attr = varDecl.getDecl()->findModifier<GLSLBindingAttribute>())
+        for (auto dec : varDecl.getDecl()->modifiers)
         {
-            resInfo = foundResInfo;
-            semanticInfo.index = attr->binding;
-            semanticInfo.space = attr->set;
+            // Try to find `binding` and `set`
+            if (auto glslBindingAttr = as<GLSLBindingAttribute>(dec))
+            {
+                resInfo = foundResInfo;
+                semanticInfo.index = glslBindingAttr->binding;
+                semanticInfo.space = glslBindingAttr->set;
+                foundBinding = true;
+                if (foundSubpass) 
+                    break;
+            }
+            // Try to find `input_attachment_index`
+            else if (auto glslAttachmentIndexAttr = as<GLSLInputAttachmentIndexLayoutModifier>(dec))
+            {
+                // Subpass fills semantic info of a descriptor & subpass
+                subpassSemanticInfo.index = stringToInt(glslAttachmentIndexAttr->valToken.getContent());
+                subpassSemanticInfo.space = 0;
+                subpassSemanticInfo.kind = LayoutResourceKind::InputAttachmentIndex;
+                foundSubpass = true;
+                if (foundBinding) 
+                    break;
+            }
         }
     }
     else if( (foundResInfo = typeLayout->FindResourceInfo(LayoutResourceKind::SubElementRegisterSpace)) != nullptr )
@@ -1113,6 +1134,9 @@ static void addExplicitParameterBindings_GLSL(
         semanticInfo.kind = kind;
 
         addExplicitParameterBinding(context, parameterInfo, varDecl.getDecl(), semanticInfo, count);
+        if (foundSubpass)
+            addExplicitParameterBinding(context, parameterInfo, varDecl.getDecl(), subpassSemanticInfo, count);
+
         return;
     }
 
@@ -2066,6 +2090,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         return arrayTypeLayout;
     }
     // Ignore a bunch of types that don't make sense here...
+    else if (const auto subpassType = as<SubpassInputType>(type)) { return nullptr;  }
     else if (const auto textureType = as<TextureType>(type)) { return nullptr;  }
     else if(const auto samplerStateType = as<SamplerStateType>(type)) { return nullptr;  }
     else if(const auto constantBufferType = as<ConstantBufferType>(type)) { return nullptr;  }

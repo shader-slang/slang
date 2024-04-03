@@ -92,6 +92,7 @@ void HLSLSourceEmitter::_emitHLSLRegisterSemantic(LayoutResourceKind kind, EmitV
         }
         break;
 
+        case LayoutResourceKind::InputAttachmentIndex:
         case LayoutResourceKind::RegisterSpace:
         case LayoutResourceKind::GenericResource:
         case LayoutResourceKind::ExistentialTypeParam:
@@ -302,6 +303,18 @@ void HLSLSourceEmitter::_emitHLSLTextureType(IRTextureTypeBase* texType)
         m_writer->emit(sampleCount->getValue());
     }
     m_writer->emit(" >");
+}
+
+void HLSLSourceEmitter::_emitHLSLSubpassInputType(IRSubpassInputType* subpassType)
+{
+    m_writer->emit("SubpassInput");
+    if (subpassType->isMultisample())
+    {
+        m_writer->emit("MS");
+    }
+    m_writer->emit("<");
+    emitType(subpassType->getElementType());
+    m_writer->emit(">");
 }
 
 void HLSLSourceEmitter::emitLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling)
@@ -981,6 +994,11 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         _emitHLSLTextureType(imageType);
         return;
     }
+    else if (auto subpassType = as<IRSubpassInputType>(type))
+    {
+        _emitHLSLSubpassInputType(subpassType);
+        return;
+    }
     else if (auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type))
     {
         switch (structuredBufferType->getOp())
@@ -1246,9 +1264,22 @@ void HLSLSourceEmitter::emitMeshShaderModifiersImpl(IRInst* varInst)
 
 void HLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
 {
-    if (varDecl->findDecoration<IRGloballyCoherentDecoration>())
+    for(auto decoration : varDecl->getDecorations())
     {
-        m_writer->emit("globallycoherent\n");
+        if(auto glslInputAttachmentIndex = as<IRGLSLInputAttachmentIndexDecoration>(decoration))
+        {
+            m_writer->emit("[[vk::input_attachment_index(");
+            m_writer->emit(glslInputAttachmentIndex->getIndex()->getValue());
+            m_writer->emit(")]]\n");
+            continue;
+        }
+        if (auto collection = as<IRMemoryQualifierSetDecoration>(decoration))
+        {
+            auto flags = collection->getMemoryQualifierBit();
+            if(flags & MemoryQualifierSetModifier::Flags::kCoherent)
+                m_writer->emit("globallycoherent\n");
+            continue;
+        }
     }
 }
 

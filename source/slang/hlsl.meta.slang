@@ -5105,11 +5105,12 @@ void __subgroupBarrier()
     }
 }
 
+__glsl_extension(GL_KHR_memory_scope_semantics)
 void GroupMemoryBarrierWithGroupSync()
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "barrier";
+    case glsl: __intrinsic_asm "controlBarrier(gl_ScopeWorkgroup, gl_ScopeWorkgroup, gl_StorageSemanticsShared, gl_SemanticsAcquireRelease)";
     case hlsl: __intrinsic_asm "GroupMemoryBarrierWithGroupSync";
     case cuda: __intrinsic_asm "__syncthreads()";
     case spirv:
@@ -11404,19 +11405,64 @@ ${{{{
 }
 
 //
-// Vulkan/SPIR-V specific features
+// SubpassInput
 //
 
-struct VkSubpassInput<T>
+__magic_type(SubpassInputType)
+__intrinsic_type($(kIROp_SubpassInputType))
+struct __SubpassImpl<T, let isMS:int>
 {
-    T SubpassLoad();
 }
 
-struct VkSubpassInputMS<T>
+__generic<T, let isMS:int=0>
+typealias SubpassInput = __SubpassImpl<T, isMS>;
+
+__generic<T>
+extension __SubpassImpl<T, 0>
 {
-    T SubpassLoad(int sampleIndex);
+    [ForceInline]
+    T SubpassLoad()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "$0.SubpassLoad()";
+        case spirv:
+        {
+            let zeroVec = int2(0);
+            return spirv_asm
+            {
+                OpCapability StorageImageReadWithoutFormat;
+                result:$$T = OpImageRead $this $zeroVec
+            };
+        }
+        }
+    }
 }
 
+__generic<T, let isMS:int=1>
+typealias SubpassInputMS = __SubpassImpl<T, isMS>;
+
+__generic<T>
+extension __SubpassImpl<T, 1>
+{
+    [ForceInline]
+    T SubpassLoad(int sample)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "$0.SubpassLoad($1)";
+        case spirv:
+        {
+            let zeroVec = int2(0);
+            return spirv_asm
+            {
+                OpCapability StorageImageReadWithoutFormat;
+                result:$$T = OpImageRead $this $zeroVec Sample $sample
+            };
+        }
+        }
+    }
+}
 
 ///
 /// Shader Execution Reordering (SER)
