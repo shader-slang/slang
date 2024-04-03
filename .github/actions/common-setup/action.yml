@@ -29,11 +29,13 @@ runs:
         # Set up system dependencies
 
         # Install Ninja
-        case "${{inputs.os}}" in
-          linux*) sudo apt-get install -y ninja-build;;
-          windows*) choco install ninja;;
-          macos*) brew install ninja;;
-        esac
+        if ! command -v ninja; then
+          case "${{inputs.os}}" in
+            linux*) sudo apt-get install -y ninja-build;;
+            windows*) choco install ninja;;
+            macos*) brew install ninja;;
+          esac
+        fi
 
         # Set compiler
         CC=${{inputs.compiler}}
@@ -54,7 +56,7 @@ runs:
         echo "CXX=$CXX" >> "$GITHUB_ENV"
 
         # Set CMake to use sccache if it's available
-        if type -P sccache &> /dev/null; then
+        if command -v sccache; then
           echo "CMAKE_CXX_COMPILER_LAUNCHER=sccache" >> "$GITHUB_ENV"
           echo "CMAKE_C_COMPILER_LAUNCHER=sccache" >> "$GITHUB_ENV"
         fi
