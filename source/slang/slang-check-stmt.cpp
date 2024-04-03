@@ -253,27 +253,26 @@ namespace Slang
         HashSet<Val*> caseStmtVals;
         for (auto& sStmt : seqStmt->stmts)
         {
-            // check that all case tags are unique
             if (auto caseStmt = as<CaseStmt>(sStmt))
             {
+                // check that all case tags are unique
                 if (caseStmt->exprVal)
                 {
                     // exprVal contains the constant folded expr, that is checked for
                     // uniqueness within the scope of the switch statement.
                     if (!caseStmtVals.add(caseStmt->exprVal))
                     {
-                        sink->diagnose(sStmt, Diagnostics::duplicateCasesInASwitch);
+                        sink->diagnose(sStmt, Diagnostics::switchDuplicateCases);
                         return;
                     }
                 }
             }
-
-            // check that there is at most one `default` clause
             else if (auto defaultStmt = as<DefaultStmt>(sStmt))
             {
+                // check that there is at most one `default` clause
                 if (hasDefaultStmt)
                 {
-                    sink->diagnose(sStmt, Diagnostics::multipleDefaultsInASwitch);
+                    sink->diagnose(sStmt, Diagnostics::switchMultipleDefault);
                     return;
                 }
                 hasDefaultStmt = true;
@@ -298,6 +297,8 @@ namespace Slang
         auto expr = CheckExpr(stmt->expr);
 
         // coerce to type being switch on, and ensure that value is a compile-time constant
+        // The Vals in the AST are pointer-unique, making them easy to check for duplicates
+        // by addeing them to a HashSet.
         auto exprVal = tryConstantFoldExpr(expr, ConstantFoldingKind::CompileTime, nullptr);
         auto switchStmt = FindOuterStmt<SwitchStmt>();
 

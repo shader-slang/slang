@@ -7,7 +7,7 @@ void test()
     switch (0)
     {
         default: break;
-        // CHECK: ([[# @LINE+1]]): error {{.*}}
+        // CHECK: ([[# @LINE+1]]): error 30600: {{.*}}
         default: break;
     }
 	return;

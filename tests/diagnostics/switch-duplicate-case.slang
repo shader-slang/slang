@@ -5,8 +5,7 @@
 enum class Cases
 {
     A,
-    B,
-    C
+    B
 };
 
 void test1(Cases c)
@@ -15,7 +14,7 @@ void test1(Cases c)
     {
         case Cases::A: break;
         case Cases::B: break;
-        // CHECK: ([[# @LINE+1]]): error 39999: {{.*}}
+        // CHECK: ([[# @LINE+1]]): error 30601: {{.*}}
         case Cases::A: break;
     }
     return;
@@ -27,7 +26,7 @@ void test2()
     {
         case 1: break;
         case 2: break;
-        // CHECK: ([[# @LINE+1]]): error 39999: {{.*}}
+        // CHECK: ([[# @LINE+1]]): error 30601: {{.*}}
         case 1: break;
     }
 	return;
