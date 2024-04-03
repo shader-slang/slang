@@ -2764,7 +2764,6 @@ void legalizeEntryPointParameterForGLSL(
                     if (operand != globalVar)
                         continue;
                     replaceBuilder.setInsertBefore(user);
-                    auto structMade = materializeValue(builder, globalValue);
                     auto field = replaceBuilder.emitFieldExtract(globalVarType, materialized, key);
                     replaceBuilder.replaceOperand(operandUse, field);
                     break;
