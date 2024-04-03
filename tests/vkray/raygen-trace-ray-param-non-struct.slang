@@ -14,14 +14,6 @@ void addComplexity2(float dataIn)
     outputBuffer1[2] = dataIn;
 }
 
-// CHECK-DAG: forceVarIntoStructTemporarily{{_[0-9]}}.data{{_[0-9]}} = {{.*}}
-// CHECK-DAG: TraceRay(
-// CHECK-DAG: {{.*}} = forceVarIntoStructTemporarily{{.*}}.data{{.*}};
-
-// CHECK-DAG: forceVarIntoStructTemporarily{{_[0-9]}}.data{{_[0-9]}} = {{.*}}
-// CHECK-DAG: TraceMotionRay(
-// CHECK-DAG: {{.*}} = forceVarIntoStructTemporarily{{.*}}.data{{.*}};
-
 void main()
 {
     RayDesc ray;
@@ -34,6 +26,9 @@ void main()
     float someInData1 = 5.0f;
     addComplexity1(someInData1);
 
+    // CHECK: forceVarIntoStructTemporarily{{_[0-9]}}.data{{_[0-9]}} = {{.*}}
+    // CHECK: TraceRay(
+    // CHECK: {{.*}} = forceVarIntoStructTemporarily{{.*}}.data{{.*}};
     TraceRay(as,
              1,
              0xff,
@@ -44,6 +39,9 @@ void main()
              someInData1);
     outputBuffer1[0] = outputBuffer1[0]+someInData1;
 
+    // CHECK: forceVarIntoStructTemporarily{{_[0-9]}}.data{{_[0-9]}} = {{.*}}
+    // CHECK: TraceMotionRay(
+    // CHECK: {{.*}} = forceVarIntoStructTemporarily{{.*}}.data{{.*}};
     TraceMotionRay(as,
             1,
             0xff,
