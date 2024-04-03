@@ -428,6 +428,23 @@ namespace Slang
 
             anyValueSizeAttr->size = int32_t(value->getValue());
         }
+        else if (auto glslRequireShaderInputParameter = as<GLSLRequireShaderInputParameterAttribute>(attr))
+        {
+            if (attr->args.getCount() != 1)
+            {
+                return false;
+            }
+            auto value = checkConstantIntVal(attr->args[0]);
+            if (value == nullptr)
+            {
+                return false;
+            }
+            if (value->getValue() < 0)
+            {
+                return false;
+            }
+            glslRequireShaderInputParameter->parameterNumber = int32_t(value->getValue());
+        }
         else if (auto overloadRankAttr = as<OverloadRankAttribute>(attr))
         {
             if (attr->args.getCount() != 1)
@@ -1072,6 +1089,7 @@ namespace Slang
         case ASTNodeType::GLSLParsedLayoutModifier:
         case ASTNodeType::GLSLConstantIDLayoutModifier:
         case ASTNodeType::GLSLLocationLayoutModifier:
+        case ASTNodeType::GLSLInputAttachmentIndexLayoutModifier:
         case ASTNodeType::GLSLOffsetLayoutAttribute:
         case ASTNodeType::GLSLUnparsedLayoutModifier:
         case ASTNodeType::GLSLLayoutModifierGroupMarker:
@@ -1150,6 +1168,7 @@ namespace Slang
         case ASTNodeType::GLSLParsedLayoutModifier:
         case ASTNodeType::GLSLConstantIDLayoutModifier:
         case ASTNodeType::GLSLLocationLayoutModifier:
+        case ASTNodeType::GLSLInputAttachmentIndexLayoutModifier:
         case ASTNodeType::GLSLOffsetLayoutAttribute:
         case ASTNodeType::GLSLUnparsedLayoutModifier:
         case ASTNodeType::GLSLLayoutModifierGroupMarker:

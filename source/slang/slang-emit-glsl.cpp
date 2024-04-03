@@ -769,6 +769,16 @@ void GLSLSourceEmitter::_emitGLSLLayoutQualifiers(IRVarLayout* layout, EmitVarCh
     }
 }
 
+void GLSLSourceEmitter::_emitGLSLSubpassInputType(IRSubpassInputType* type)
+{
+    _emitGLSLTypePrefix(type->getElementType(), true);
+    m_writer->emit("subpassInput");
+    if (type->isMultisample())
+    {
+        m_writer->emit("MS");
+    }
+}
+
 void GLSLSourceEmitter::_emitGLSLTextureOrTextureSamplerType(IRTextureTypeBase*  type, char const* baseName)
 {
     if (type->getElementType()->getOp() == kIROp_HalfType)
@@ -2487,6 +2497,11 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         _emitGLSLTextureOrTextureSamplerType(imageType, "image");
         return;
     }
+    else if (auto subpassType = as<IRSubpassInputType>(type))
+    {
+        _emitGLSLSubpassInputType(subpassType);
+        return;
+    }
     else if (const auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type))
     {
         // TODO: We desugar global variables with structured-buffer type into GLSL
@@ -2722,6 +2737,17 @@ void GLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
 
         // If we emit a location we are done.
         break;
+    }
+
+    // non raytracing decorations
+    for (auto decoration : varDecl->getDecorations())
+    {        
+        if (auto glslInputAttachment = as<IRGLSLInputAttachmentIndexDecoration>(decoration))
+        {
+            m_writer->emit(toSlice("layout(input_attachment_index = "));
+            m_writer->emit(glslInputAttachment->getIndex()->getValue());
+            m_writer->emit(toSlice(")\n"));
+        }
     }
 
     if (varDecl->findDecoration<IRGloballyCoherentDecoration>())

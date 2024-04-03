@@ -841,6 +841,19 @@ bool ResourceType::isCombined()
     return false;
 }
 
+Type* SubpassInputType::getElementType()
+{
+    return as<Type>(_getGenericTypeArg(this, 0));
+}
+
+bool SubpassInputType::isMultisample()
+{
+    auto isMS = _getGenericTypeArg(this, 1);
+    if (auto constIntVal = as<ConstantIntVal>(isMS))
+        return constIntVal->getValue() != 0;
+    return false;
+}
+
 SlangResourceAccess ResourceType::getAccess()
 {
     auto access = _getGenericTypeArg(this, kStdlibTextureAccessParameterIndex);

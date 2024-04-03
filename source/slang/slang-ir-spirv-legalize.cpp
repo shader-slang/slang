@@ -203,7 +203,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         return structType;
     }
 
-    static void insertLoadAtLatestLocation(IRInst* addrInst, IRUse* inUse)
+    static void insertLoadAtLatestLocation(IRInst* addrInst, IRUse* inUse, SpvStorageClass storageClass)
     {
         struct WorkItem { IRInst* addr; IRUse* use; };
         List<WorkItem> workList;
@@ -247,6 +247,12 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             }
             else if(const auto spirvAsmOperand = as<IRSPIRVAsmOperandInst>(user))
             {
+                // Skip load's for referenced `Input` variables since a ref implies
+                // passing as is, which needs to be a pointer (pass as is).
+                if (user->getDataType() 
+                    && user->getDataType()->getOp() == kIROp_RefType
+                    && storageClass == SpvStorageClassInput)
+                    continue;
                 // If this is being used in an asm block, insert the load to
                 // just prior to the block.
                 const auto asmBlock = spirvAsmOperand->getAsmBlock();
@@ -276,6 +282,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     bool isSpirvUniformConstantType(IRType* type)
     {
         if (as<IRTextureTypeBase>(type))
+            return true;
+        if (as<IRSubpassInputType>(type))
             return true;
         if (as<IRSamplerStateTypeBase>(type))
             return true;
@@ -363,9 +371,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         {
             format = decor->getFormat();
         }
+
+        // If the texture has no format decoration, try to infer it from the type.
         if (format == ImageFormat::unknown)
         {
-            // If the texture has no format decoration, try to infer it from the type.
             auto elementType = textureType->getElementType();
             Int vectorWidth = 1;
             if (auto elementVecType = as<IRVectorType>(elementType))
@@ -642,7 +651,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 // Insert an explicit load at each use site.
                 traverseUses(inst, [&](IRUse* use)
                     {
-                        insertLoadAtLatestLocation(inst, use);
+                        insertLoadAtLatestLocation(inst, use, storageClass);
                     });
             }
             else if (arrayType)

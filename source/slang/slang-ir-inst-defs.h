@@ -140,6 +140,8 @@ INST(Nop, nop, 0, 0)
     INST(Std430BufferLayoutType, Std430Layout, 0, HOISTABLE)
     INST(ScalarBufferLayoutType, ScalarLayout, 0, HOISTABLE)
 
+    INST(SubpassInputType, SubpassInputType, 2, HOISTABLE)
+
     INST(TextureFootprintType, TextureFootprintType, 1, HOISTABLE)
 
     INST(TextureShape1DType, TextureShape1DType, 0, HOISTABLE)
@@ -715,6 +717,8 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(VulkanHitAttributesDecoration,     vulkanHitAttributes,    0, 0)
     INST(VulkanHitObjectAttributesDecoration, vulkanHitObjectAttributes, 0, 0)
 
+    INST(GlobalVariableShadowingGlobalParameterDecoration, GlobalVariableShadowingGlobalParameterDecoration, 2, 0)
+
     INST(RequireSPIRVVersionDecoration,     requireSPIRVVersion,    1, 0)
     INST(RequireGLSLVersionDecoration,      requireGLSLVersion,     1, 0)
     INST(RequireGLSLExtensionDecoration,    requireGLSLExtension,   1, 0)
@@ -862,6 +866,7 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(GlobalOutputDecoration, output, 0, 0)
     INST(GlobalInputDecoration, output, 0, 0)
     INST(GLSLLocationDecoration, glslLocation, 1, 0)
+    INST(GLSLInputAttachmentIndexDecoration, glslInputAttachmentIndex, 1, 0)
     INST(GLSLOffsetDecoration, glslOffset, 1, 0)
     INST(GLSLVolatileDecoration, glslVolatile, 1, 0)
     INST(GLSLRestrictDecoration, glslRestrict, 1, 0)
