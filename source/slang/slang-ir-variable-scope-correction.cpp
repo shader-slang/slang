@@ -54,65 +54,78 @@ static void debugPrint(uint32_t indent, IRInst* inst, const char* message)
 void VariableScopeCorrectionContext::_processFunction(IRFunc* funcInst)
 {
     IRDominatorTree* dominatorTree = m_module->findOrCreateDominatorTree(funcInst);
-
     Dictionary<IRInst*, List<IRInst*>> workListMap;
+    Dictionary<IRBlock*, IRLoop> loopHeaderMap;
 
-    // traverse each instruction in the function
+    // traverse all blocks in the function
     for (auto block = funcInst->getFirstBlock(); block; block = block->getNextBlock())
     {
-        for (auto inst = block->getFirstChild(); inst; inst = inst->getNextInst())
+        uint32_t indent = 0;
+        debugPrint(indent++, block, "processing block");
+
+        // Traverse all the dominators of a given block to check whether this given block is in a loop region.
+        // Loop region blocks are the blocks that are dominated by the loop header block
+        // but not dominated by the loop break block.
+        auto dominatorBlock = dominatorTree->getImmediateDominator(block);
+        for (; dominatorBlock; dominatorBlock = dominatorTree->getImmediateDominator(dominatorBlock))
         {
-            uint32_t indent = 1;
-            printf("process inst = %d\n", inst->getOp());
-            List<IRInst*> instList;
+            debugPrint(indent++, dominatorBlock, "dominator block");
 
-            // traverse the dominator tree, theoretically, the variables in each of dominator should be accessible in the current block,
-            // except the loop block, so we have to find out if there is a loop block in the dominator chain.
-            auto dominatorBlock = dominatorTree->getImmediateDominator(block);
-            for (; dominatorBlock; dominatorBlock = dominatorTree->getImmediateDominator(dominatorBlock))
+            // Find if the block is loop header block
+            if (auto loopHeader = as<IRLoop>(dominatorBlock->getTerminator()))
             {
-                debugPrint(indent++, dominatorBlock, "dominator block");
-                if (auto loop = as<IRLoop>(dominatorBlock->getTerminator()))
+                debugPrint(indent, loopHeader, "loop header");
+                // Get the break block of the loop and check if such block
+                auto breakBlock = loopHeader->getBreakBlock();
+                debugPrint(indent++, breakBlock, "break block");
+
+                // Check if the current block is dominated by the break block. If so, it means that the block is in the loop region.
+                if (!dominatorTree->dominates(breakBlock, block))
                 {
-                    debugPrint(indent, loop, "loop block");
-                    // Get the break block of the loop and check if such block
-                    auto breakBlock = loop->getBreakBlock();
-                    debugPrint(indent++, breakBlock, "break block");
-
-                    // If a block is not dominated by the break block, but dominated by the loop header, then the
-                    // instructions in this block are considered to be defined in the loop. We need to search
-                    // the instruction's use sites to see if there is any uses are out of the loop.
-                    if (!dominatorTree->dominates(breakBlock, block))
-                    {
-                        debugPrint(indent++, block, "block is not dominated by break block");
-                        // traverse all uses of this instruction
-                        for (auto use = inst->firstUse; use; use=use->nextUse)
-                        {
-                            debugPrint(indent++, getBlock(use->getUser()), "inst's use block is");
-                            if (auto userBlock = getBlock(use->getUser()))
-                            {
-                                // If the use site of this instruction is dominated by the break block, it means that the
-                                // instruction is used after the break block, so we need to make that instruction available globally.
-                                // By doing so, we record all the users of this instructions.
-                                if (dominatorTree->dominates(breakBlock, userBlock))
-                                {
-                                    debugPrint(indent, inst, "inst is defined in loop but used outside of loop");
-                                    debugPrint(indent++, use->getUser(), "The user is");
-                                    instList.add(use->getUser());
-                                }
-                            }
-                        }
-                    }
+                    debugPrint(indent++, block, "block is not dominated by break block");
+                    loopHeaderMap.add(block, *loopHeader);
                 }
-            }
-
-            if (instList.getCount() > 0)
-            {
-                workListMap.add(inst, instList);
             }
         }
     }
 
+    printf("\n");
+    // Traverse all the instructions in function.
+    for (auto block = funcInst->getFirstBlock(); block; block = block->getNextBlock())
+    {
+        if(auto loopHeader = loopHeaderMap.tryGetValue(block))
+        {
+            for (auto inst = block->getFirstChild(); inst; inst = inst->getNextInst())
+            {
+                List<IRInst*> instList;
+                uint32_t indent = 0;
+                auto breakBlock = loopHeader->getBreakBlock();
+                // traverse all uses of this instruction
+                for (auto use = inst->firstUse; use; use=use->nextUse)
+                {
+                    debugPrint(indent++, getBlock(use->getUser()), "inst's use block is");
+                    if (auto userBlock = getBlock(use->getUser()))
+                    {
+                        // If the use site of this instruction is dominated by the break block, it means that the
+                        // instruction is used after the break block, so we need to make that instruction available globally.
+                        // By doing so, we record all the users of this instructions.
+                        if (dominatorTree->dominates(breakBlock, userBlock))
+                        {
+                            debugPrint(indent, inst, "inst is defined in loop but used outside of loop");
+                            debugPrint(indent++, use->getUser(), "The user is");
+                            instList.add(use->getUser());
+                        }
+                    }
+                }
+                if (instList.getCount() > 0)
+                {
+                    workListMap.add(inst, instList);
+                }
+            }
+        }
+    }
+
+    printf("\n");
     // By duplicating the instructions right before their users, we can make the instructions available globally.
     for(auto it = workListMap.begin(); it != workListMap.end(); it++)
     {

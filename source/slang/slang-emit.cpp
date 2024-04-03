@@ -1072,10 +1072,11 @@ Result linkAndOptimizeIR(
         // all the other optimization passes have been performed.
         //
 
+        dumpIRIfEnabled(codeGenContext, irModule, "Before var scope correction");
         applyVariableScopeCorrection(irModule);
         validateIRModuleIfEnabled(codeGenContext, irModule);
         // TODO: Debug purpose, will remove it.
-        dumpIRIfEnabled(codeGenContext, irModule, "AFTER-ALL-OPTMIZATION");
+        dumpIRIfEnabled(codeGenContext, irModule, "After var scope correction");
     }
 
     auto metadata = new ArtifactPostEmitMetadata;
