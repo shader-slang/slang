@@ -78,6 +78,7 @@
 #include "slang-ir-pytorch-cpp-binding.h"
 #include "slang-ir-uniformity.h"
 #include "slang-ir-vk-invert-y.h"
+#include "slang-ir-variable-scope-correction.h"
 #include "slang-legalize-types.h"
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
@@ -1061,6 +1062,21 @@ Result linkAndOptimizeIR(
     dumpIRIfEnabled(codeGenContext, irModule, "OPTIMIZED");
 #endif
     validateIRModuleIfEnabled(codeGenContext, irModule);
+
+    if ( (target != CodeGenTarget::SPIRV) && (target != CodeGenTarget::SPIRVAssembly) )
+    {
+        // We need to perform a final pass to ensure that all the
+        // variables in the IR module have their scopes set correctly.
+        //
+        // This is a separate pass because it needs to run after
+        // all the other optimization passes have been performed.
+        //
+
+        applyVariableScopeCorrection(irModule);
+        validateIRModuleIfEnabled(codeGenContext, irModule);
+        // TODO: Debug purpose, will remove it.
+        dumpIRIfEnabled(codeGenContext, irModule, "AFTER-ALL-OPTMIZATION");
+    }
 
     auto metadata = new ArtifactPostEmitMetadata;
     outLinkedIR.metadata = metadata;
