@@ -1768,7 +1768,10 @@ namespace Slang
                         return nullptr;
 
                     ConstantFoldingCircularityInfo newCircularityInfo(enumCaseDecl, circularityInfo);
-                    return tryConstantFoldExpr(tagExpr, kind, &newCircularityInfo);
+                    auto intVal = as<IntVal>(tryConstantFoldExpr(tagExpr, kind, &newCircularityInfo));
+                    if (!intVal)
+                        return nullptr;
+                    return as<IntVal>(m_astBuilder->getTypeCastIntVal(enumCaseDecl->getType(), intVal)->resolve());
                 }
             }
         }
@@ -1778,7 +1781,7 @@ namespace Slang
             auto substType = getType(m_astBuilder, expr);
             if (!substType)
                 return nullptr;
-            if (!isScalarIntegerType(substType))
+            if (!isValidCompileTimeConstantType(substType))
                 return nullptr;
             auto val = tryConstantFoldExpr(getArg(castExpr, 0), kind, circularityInfo);
             if (val)
@@ -1826,7 +1829,7 @@ namespace Slang
     {
         // Check if type is acceptable for an integer constant expression
         //
-        if(!isScalarIntegerType(getType(m_astBuilder, expr)))
+        if(!isValidCompileTimeConstantType(getType(m_astBuilder, expr)))
             return nullptr;
 
         // Consider operations that we might be able to constant-fold...

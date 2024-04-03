@@ -2916,7 +2916,7 @@ struct SPIRVEmitContext
     }
 
 
-    SpvExecutionMode isDepthOutput(IRInst* builtinVar)
+    SpvExecutionMode getDepthOutputExecutionMode(IRInst* builtinVar)
     {
         SpvExecutionMode result = SpvExecutionModeMax;
         bool isDepthVar = false;
@@ -2965,6 +2965,7 @@ struct SPIRVEmitContext
             {
             case kIROp_SwizzledStore:
             case kIROp_Store:
+            case kIROp_Call:
                 return result;
             }
         }
@@ -2978,34 +2979,25 @@ struct SPIRVEmitContext
         // Check if the entrypoint uses any depth output builtin variables,
         // if so, we need to emit a DepthReplacing execution mode for the
         // fragment entrypoint.
-        bool needDepthReplacingMode = false;
         SpvExecutionMode mode = SpvExecutionModeMax;
         for (auto globalInst : referencedBuiltinIRVars)
         {
-            if (auto thisMode = isDepthOutput(globalInst))
+            auto thisMode = getDepthOutputExecutionMode(globalInst);
+            if (mode == SpvExecutionModeMax)
+                mode = thisMode;
+            else if (mode != thisMode)
             {
-                needDepthReplacingMode = true;
-                if (mode == SpvExecutionModeMax)
-                    mode = thisMode;
-                else if (mode != thisMode)
-                    mode = SpvExecutionModeDepthReplacing;
+                mode = SpvExecutionModeDepthReplacing;
                 break;
             }
         }
-        if (!needDepthReplacingMode)
+        if (mode == SpvExecutionModeMax)
             return;
+
         emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes),
             nullptr,
             entryPoint,
-            SpvExecutionModeDepthReplacing);
-        if (mode != SpvExecutionModeDepthReplacing &&
-            mode != SpvExecutionModeMax)
-        {
-            emitOpExecutionMode(getSection(SpvLogicalSectionID::ExecutionModes),
-                nullptr,
-                entryPoint,
-                mode);
-        }
+            mode);
     }
 
     // Make user type name conform to `SPV_GOOGLE_user_type` spec.
