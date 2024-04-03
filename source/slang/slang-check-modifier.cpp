@@ -1229,8 +1229,7 @@ namespace Slang
             }
         }
 
-        MemoryQualifierSetModifier::Flags::MemoryQualifiersBit memoryQualifierBit = 
-            MemoryQualifierSetModifier::Flags::kNone;
+        MemoryQualifierSetModifier::Flags::MemoryQualifiersBit memoryQualifierBit = MemoryQualifierSetModifier::Flags::kNone;
         if(as<GloballyCoherentModifier>(m))
             memoryQualifierBit = MemoryQualifierSetModifier::Flags::kCoherent;
         else if(as<GLSLReadOnlyModifier>(m))

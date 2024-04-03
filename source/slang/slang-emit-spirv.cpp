@@ -3004,6 +3004,11 @@ struct SPIRVEmitContext
         return sb.produceString();
     }
 
+    void emitMemoryQualifierDecoration(MemoryQualifierSetModifier* memoryQualifier)
+    {
+
+    }
+
         /// Emit an appropriate SPIR-V decoration for the given IR `decoration`, if necessary and possible.
         ///
         /// The given `dstID` should be the `<id>` of the SPIR-V instruction being decorated,
@@ -3323,40 +3328,40 @@ struct SPIRVEmitContext
         {
             auto collection = as<IRMemoryQualifierSetDecoration>(decoration);
             IRIntegerValue flags = collection->getMemoryQualifierBit();
-            if (flags | MemoryQualifierSetModifier::Flags::kCoherent)
+            if (flags & MemoryQualifierSetModifier::Flags::kCoherent)
             {
                 emitOpDecorate(getSection(SpvLogicalSectionID::Annotations),
                     nullptr,
                     dstID,
                     SpvDecorationCoherent);
             }
-            if (flags | MemoryQualifierSetModifier::Flags::kVolatile)
+            if (flags & MemoryQualifierSetModifier::Flags::kVolatile)
             {
                 emitOpDecorate(getSection(SpvLogicalSectionID::Annotations),
                     nullptr,
                     dstID,
                     SpvDecorationVolatile);
             }
-            if (flags | MemoryQualifierSetModifier::Flags::kRestrict)
+            if (flags & MemoryQualifierSetModifier::Flags::kRestrict)
             {
                 emitOpDecorate(getSection(SpvLogicalSectionID::Annotations),
                     nullptr,
                     dstID,
                     SpvDecorationRestrict);
             }
-            if (flags | MemoryQualifierSetModifier::Flags::kReadOnly)
-            {
-                emitOpDecorate(getSection(SpvLogicalSectionID::Annotations),
-                    nullptr,
-                    dstID,
-                    SpvDecorationNonWritable);
-            }
-            if (flags | MemoryQualifierSetModifier::Flags::kWriteOnly)
+            if (flags & MemoryQualifierSetModifier::Flags::kReadOnly)
             {
                 emitOpDecorate(getSection(SpvLogicalSectionID::Annotations),
                     nullptr,
                     dstID,
                     SpvDecorationNonReadable);
+            }
+            if (flags & MemoryQualifierSetModifier::Flags::kWriteOnly)
+            {
+                emitOpDecorate(getSection(SpvLogicalSectionID::Annotations),
+                    nullptr,
+                    dstID,
+                    SpvDecorationNonWritable);
             }
             break;
         }
@@ -3454,14 +3459,57 @@ struct SPIRVEmitContext
                 }
                 else if (auto collection = as<IRMemoryQualifierSetDecoration>(decor))
                 {
-                    if(collection->getMemoryQualifierBit() | MemoryQualifierSetModifier::Flags::kCoherent)
+                    IRIntegerValue flags = collection->getMemoryQualifierBit();
+                    if (flags & MemoryQualifierSetModifier::Flags::kCoherent)
+                    {
                         emitOpMemberDecorate(
                             getSection(SpvLogicalSectionID::Annotations),
-                            decor,
+                            nullptr,
                             spvStructID,
                             SpvLiteralInteger::from32(id),
                             SpvDecorationCoherent
                         );
+                    }
+                    if (flags & MemoryQualifierSetModifier::Flags::kVolatile)
+                    {
+                        emitOpMemberDecorate(
+                            getSection(SpvLogicalSectionID::Annotations),
+                            nullptr,
+                            spvStructID,
+                            SpvLiteralInteger::from32(id),
+                            SpvDecorationVolatile
+                        );
+                    }
+                    if (flags & MemoryQualifierSetModifier::Flags::kRestrict)
+                    {
+                        emitOpMemberDecorate(
+                            getSection(SpvLogicalSectionID::Annotations),
+                            nullptr,
+                            spvStructID,
+                            SpvLiteralInteger::from32(id),
+                            SpvDecorationRestrict
+                        );
+                    }
+                    if (flags & MemoryQualifierSetModifier::Flags::kReadOnly)
+                    {
+                        emitOpMemberDecorate(
+                            getSection(SpvLogicalSectionID::Annotations),
+                            nullptr,
+                            spvStructID,
+                            SpvLiteralInteger::from32(id),
+                            SpvDecorationNonReadable
+                        );
+                    }
+                    if (flags & MemoryQualifierSetModifier::Flags::kWriteOnly)
+                    {
+                        emitOpMemberDecorate(
+                            getSection(SpvLogicalSectionID::Annotations),
+                            nullptr,
+                            spvStructID,
+                            SpvLiteralInteger::from32(id),
+                            SpvDecorationNonWritable
+                        );
+                    }
                 }
                 else if (auto semanticDecor = field->getKey()->findDecoration<IRSemanticDecoration>())
                 {

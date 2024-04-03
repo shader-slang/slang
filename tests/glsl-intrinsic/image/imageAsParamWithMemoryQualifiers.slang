@@ -14,9 +14,17 @@ layout(local_size_x = 4) in;
 // The memory qualifier `restrict` is allowed to be dropped
 // when passing a variable into a function as an argument.
 
+//CHECK_SPV: OpEntryPoint
+
+//CHECK_GLSL: {{(restrict|writeonly|readonly)}} {{(restrict|writeonly|readonly)}} {{(restrict|writeonly|readonly)}}
+//CHECK_SPV: OpDecorate %{{.*}} {{(Restrict|NonWritable|NonReadable)}}
+//CHECK_SPV: OpDecorate %{{.*}} {{(Restrict|NonWritable|NonReadable)}}
+//CHECK_SPV: OpDecorate %{{.*}} {{(Restrict|NonWritable|NonReadable)}}
 //TEST_INPUT: set someImage = RWTexture2D(format=R16G16B16A16_FLOAT, size=1, content=one, mipMaps = 1)
 uniform layout(binding=0,rgba16f) restrict writeonly readonly image2D someImage;
 
+//CHECK_GLSL: writeonly
+//CHECK_SPV: OpDecorate {{.*}} {{(Restrict|NonWritable|NonReadable)}}
 //TEST_INPUT: set someImage2 = RWTexture2D(format=R16G16B16A16_FLOAT, size=1, content=one, mipMaps = 1)
 uniform layout(binding=1,rgba16f) writeonly image2D someImage2;
 
@@ -34,7 +42,6 @@ bool checkAllImageSizesParamMoreQualifiers(readonly writeonly image2D val)
 }
 
 // CHECK_GLSL: void main(
-// CHECK_SPV: OpEntryPoint
 void computeMain()
 {
     outputBuffer.data[0] = true

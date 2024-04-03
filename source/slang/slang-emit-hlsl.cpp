@@ -1236,7 +1236,7 @@ void HLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
 {
     if (auto collection = varDecl->findDecoration<IRMemoryQualifierSetDecoration>())
     {
-        if(collection->getMemoryQualifierBit() | MemoryQualifierSetModifier::Flags::kCoherent)
+        if(collection->getMemoryQualifierBit() & MemoryQualifierSetModifier::Flags::kCoherent)
            m_writer->emit("globallycoherent\n");
     }
 }

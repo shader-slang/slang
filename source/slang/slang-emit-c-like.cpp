@@ -3953,6 +3953,8 @@ void CLikeSourceEmitter::emitGlobalParam(IRGlobalParam* varDecl)
     if (as<IRVoidType>(varType))
         return;
 
+    emitMemoryQualifiers(varDecl);
+
     // When a global shader parameter represents a "parameter group"
     // (either a constant buffer or a parameter block with non-resource
     // data in it), we will prefer to emit it as an ordinary `cbuffer`
