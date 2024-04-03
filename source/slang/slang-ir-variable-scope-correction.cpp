@@ -3,6 +3,7 @@
 
 #include "slang-ir-dominators.h"
 #include "slang-ir-variable-scope-correction.h"
+#include "slang-ir-util.h"
 
 namespace Slang
 {
@@ -63,6 +64,8 @@ void VariableScopeCorrectionContext::_processFunction(IRFunc* funcInst)
         {
             uint32_t indent = 1;
             printf("process inst = %d\n", inst->getOp());
+            List<IRInst*> instList;
+
             // traverse the dominator tree, theoretically, the variables in each of dominator should be accessible in the current block,
             // except the loop block, so we have to find out if there is a loop block in the dominator chain.
             auto dominatorBlock = dominatorTree->getImmediateDominator(block);
@@ -85,8 +88,8 @@ void VariableScopeCorrectionContext::_processFunction(IRFunc* funcInst)
                         // traverse all uses of this instruction
                         for (auto use = inst->firstUse; use; use=use->nextUse)
                         {
-                            debugPrint(indent++, use->getUser()->getParent(), "inst's use block is");
-                            if (auto userBlock = as<IRBlock>(use->getUser()->getParent()))
+                            debugPrint(indent++, getBlock(use->getUser()), "inst's use block is");
+                            if (auto userBlock = getBlock(use->getUser()))
                             {
                                 // If the use site of this instruction is dominated by the break block, it means that the
                                 // instruction is used after the break block, so we need to make that instruction available globally.
@@ -95,19 +98,17 @@ void VariableScopeCorrectionContext::_processFunction(IRFunc* funcInst)
                                 {
                                     debugPrint(indent, inst, "inst is defined in loop but used outside of loop");
                                     debugPrint(indent++, use->getUser(), "The user is");
-
-                                    auto list = workListMap.tryGetValue(inst);
-                                    if (!list)
-                                    {
-                                        workListMap.add(inst, List<IRInst*>());
-                                        list = workListMap.tryGetValue(inst);
-                                    }
-                                    list->add(use->getUser());
+                                    instList.add(use->getUser());
                                 }
                             }
                         }
                     }
                 }
+            }
+
+            if (instList.getCount() > 0)
+            {
+                workListMap.add(inst, instList);
             }
         }
     }
