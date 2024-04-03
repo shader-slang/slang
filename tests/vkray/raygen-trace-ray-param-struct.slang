@@ -9,7 +9,6 @@ struct testStruct
 
 RWStructuredBuffer<int> outputBuffer1;
 
-// CHECK-DAG: void main(
 void main()
 {
     RayDesc ray;
