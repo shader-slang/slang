@@ -5105,11 +5105,12 @@ void __subgroupBarrier()
     }
 }
 
+__glsl_extension(GL_KHR_memory_scope_semantics)
 void GroupMemoryBarrierWithGroupSync()
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "barrier";
+    case glsl: __intrinsic_asm "controlBarrier(gl_ScopeWorkgroup, gl_ScopeWorkgroup, gl_StorageSemanticsShared, gl_SemanticsAcquireRelease)";
     case hlsl: __intrinsic_asm "GroupMemoryBarrierWithGroupSync";
     case cuda: __intrinsic_asm "__syncthreads()";
     case spirv:

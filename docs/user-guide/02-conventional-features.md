@@ -145,6 +145,25 @@ struct MyData
 > #### Note ####
 > Slang allows for a trailing semicolon (`;`) on `struct` declarations, but does not require it.
 
+Structure types can have constructors. Constructors are defined with the `__init` keyword:
+
+```hlsl
+struct MyData
+{
+     int a;
+     __init() { a = 5; }
+     __init(int t) { a = t; }
+}
+void test()
+{
+     MyData d;  // invokes default constructor, d.a = 5
+     MyData h = MyData(4); // invokes overloaded constructor, h.a = 4
+}
+```
+
+> #### Note ####
+> Slang currently does not allow default values on struct members, but we intend to support them in the future.
+
 ### Enumeration Types
 
 Enumeration types can be introduced with the `enum` keyword to provide type-safe constants for a range of values:

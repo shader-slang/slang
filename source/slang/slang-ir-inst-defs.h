@@ -730,7 +730,6 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(VulkanCallablePayloadDecoration,   vulkanCallablePayload,  0, 0)
     INST(VulkanCallablePayloadInDecoration, vulkanCallablePayloadIn,  0, 0)
     INST(EarlyDepthStencilDecoration,       earlyDepthStencil,      0, 0)
-    INST(GloballyCoherentDecoration,        globallyCoherent,       0, 0)
     INST(PreciseDecoration,                 precise,                0, 0)
     INST(PublicDecoration,                  public,                 0, 0)
     INST(HLSLExportDecoration,              hlslExport,             0, 0)
@@ -868,10 +867,6 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(GLSLLocationDecoration, glslLocation, 1, 0)
     INST(GLSLInputAttachmentIndexDecoration, glslInputAttachmentIndex, 1, 0)
     INST(GLSLOffsetDecoration, glslOffset, 1, 0)
-    INST(GLSLVolatileDecoration, glslVolatile, 1, 0)
-    INST(GLSLRestrictDecoration, glslRestrict, 1, 0)
-    INST(GLSLReadOnlyDecoration, glslReadonly, 1, 0)
-    INST(GLSLWriteOnlyDecoration, glslWriteonly, 1, 0)
     INST(PayloadDecoration, payload, 0, 0)
 
     /* Mesh Shader outputs */
@@ -1003,6 +998,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
 
         /// Recognized by SPIRV-emit pass so we can emit a SPIRV `Block` decoration.
     INST(SPIRVBlockDecoration, spvBlock, 0, 0)
+
+        // Stores flag bits of which memory qualifiers an object has
+    INST(MemoryQualifierSetDecoration, MemoryQualifierSetDecoration, 1, 0)
 
         /// Marks a function as one which access a bitfield with the specified
         /// backing value key, width and offset
