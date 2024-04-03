@@ -125,6 +125,9 @@ namespace Slang
                     auto inputType = cast<IRPtrTypeBase>(input->getDataType())->getValueType();
                     builder.emitStore(input,
                         builder.emitFieldExtract(inputType, inputParam, inputKeys[i]));
+                    // Relate "global variable" to a "global parameter" for use later in compilation 
+                    // to resolve a "global variable" shadowing a "global parameter" relationship.
+                    builder.addGlobalVariableShadowingGlobalParameterDecoration(inputParam, input, inputKeys[i]);
                 }
 
                 // For each entry point, introduce a new parameter to represent each input parameter,

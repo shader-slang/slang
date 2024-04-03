@@ -411,6 +411,14 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
         getTypeNameHint(sb, type->getOperand(0));
         sb << ">";
         break;
+    case kIROp_SubpassInputType:
+        {
+            auto textureType = as<IRSubpassInputType>(type);
+            sb <<"SubpassInput";
+            if(textureType->isMultisample())
+                sb << "MS";
+            break;
+        }
     case kIROp_TextureType:
     case kIROp_GLSLImageType:
         {

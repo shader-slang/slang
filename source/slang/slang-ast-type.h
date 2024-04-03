@@ -179,6 +179,14 @@ class GLSLImageType : public TextureTypeBase
     SLANG_AST_CLASS(GLSLImageType)
 };
 
+class SubpassInputType : public BuiltinType
+{
+    SLANG_AST_CLASS(SubpassInputType)
+
+    bool isMultisample();
+    Type* getElementType();
+};
+
 class SamplerStateType : public BuiltinType 
 {
     SLANG_AST_CLASS(SamplerStateType)

@@ -27,6 +27,7 @@ protected:
     virtual void emitImageFormatModifierImpl(IRInst* varDecl, IRType* varType) SLANG_OVERRIDE;
     virtual void emitLayoutQualifiersImpl(IRVarLayout* layout) SLANG_OVERRIDE;
     
+    virtual void emitSubpassInputTypeImpl(IRSubpassInputType* type) SLANG_OVERRIDE { _emitGLSLSubpassInputType(type); }
     virtual void emitTextureOrTextureSamplerTypeImpl(IRTextureTypeBase*  type, char const* baseName) SLANG_OVERRIDE { _emitGLSLTextureOrTextureSamplerType(type, baseName); }
 
     virtual void emitFrontMatterImpl(TargetRequest* targetReq) SLANG_OVERRIDE;
@@ -58,6 +59,7 @@ protected:
     virtual void emitLoopControlDecorationImpl(IRLoopControlDecoration* decl) SLANG_OVERRIDE;
 
     void _emitMemoryQualifierDecorations(IRInst* varDecl);
+    void _emitGLSLSubpassInputType(IRSubpassInputType* type);
     void _emitGLSLTextureOrTextureSamplerType(IRTextureTypeBase* type, char const* baseName);
     void _emitGLSLStructuredBuffer(IRGlobalParam* varDecl, IRHLSLStructuredBufferTypeBase* structuredBufferType);
 

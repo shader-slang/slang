@@ -439,6 +439,8 @@ public:
 
     void emitTextureOrTextureSamplerType(IRTextureTypeBase* type, char const* baseName) { emitTextureOrTextureSamplerTypeImpl(type, baseName); }
 
+    void emitSubpassInputType(IRSubpassInputType* type) { emitSubpassInputTypeImpl(type); }
+
     virtual RefObject* getExtensionTracker() { return nullptr; }
 
         /// Gets a source language for a target for a target. Returns Unknown if not a known target
@@ -503,6 +505,9 @@ public:
 
         // Only needed for glsl output with $ prefix intrinsics - so perhaps removable in the future
     virtual void emitTextureOrTextureSamplerTypeImpl(IRTextureTypeBase*  type, char const* baseName) { SLANG_UNUSED(type); SLANG_UNUSED(baseName); }
+
+    virtual void emitSubpassInputTypeImpl(IRSubpassInputType* type) { SLANG_UNUSED(type); }
+
         // Again necessary for & prefix intrinsics. May be removable in the future
     virtual void emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount) = 0;
 

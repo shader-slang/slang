@@ -394,6 +394,12 @@ struct IRGLSLLocationDecoration : IRDecoration
     IRIntLit* getLocation() { return cast<IRIntLit>(getOperand(0)); }
 };
 
+struct IRGLSLInputAttachmentIndexDecoration : IRDecoration
+{
+    IR_LEAF_ISA(GLSLInputAttachmentIndexDecoration)
+    IRIntLit* getIndex() { return cast<IRIntLit>(getOperand(0)); }
+};
+
 struct IRGLSLOffsetDecoration : IRDecoration
 {
     IR_LEAF_ISA(GLSLOffsetDecoration)
@@ -3409,6 +3415,7 @@ public:
         IRInst* isShadow,
         IRInst* isCombined,
         IRInst* format);
+
     IRComPtrType* getComPtrType(IRType* valueType);
 
         /// Get a 'SPIRV literal' 
@@ -4807,6 +4814,11 @@ public:
     void addVulkanHitObjectAttributesDecoration(IRInst* inst, int location)
     {
         addDecoration(inst, kIROp_VulkanHitObjectAttributesDecoration, getIntValue(getIntType(), location));
+    }
+
+    void addGlobalVariableShadowingGlobalParameterDecoration(IRInst* inst, IRInst* globalVar, IRInst* key)
+    {
+        addDecoration(inst, kIROp_GlobalVariableShadowingGlobalParameterDecoration, globalVar, key);
     }
 
     void addMeshOutputDecoration(IROp d, IRInst* value, IRInst* maxCount)
