@@ -1266,16 +1266,18 @@ void HLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
 {
     for(auto decoration : varDecl->getDecorations())
     {
-        if (as<IRGloballyCoherentDecoration>(decoration))
-        {
-            m_writer->emit("globallycoherent\n");
-            continue;
-        }
-        else if(auto glslInputAttachmentIndex = as<IRGLSLInputAttachmentIndexDecoration>(decoration))
+        if(auto glslInputAttachmentIndex = as<IRGLSLInputAttachmentIndexDecoration>(decoration))
         {
             m_writer->emit("[[vk::input_attachment_index(");
             m_writer->emit(glslInputAttachmentIndex->getIndex()->getValue());
             m_writer->emit(")]]\n");
+            continue;
+        }
+        if (auto collection = as<IRMemoryQualifierSetDecoration>(decoration))
+        {
+            auto flags = collection->getMemoryQualifierBit();
+            if(flags & MemoryQualifierSetModifier::Flags::kCoherent)
+                m_writer->emit("globallycoherent\n");
             continue;
         }
     }

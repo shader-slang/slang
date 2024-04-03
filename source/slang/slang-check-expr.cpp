@@ -314,7 +314,8 @@ namespace Slang
 
         // Check the modifiers on the declaration
         const auto d = varExpr->declRef.getDecl();
-        if(d->hasModifier<GLSLReadOnlyModifier>())
+        auto collection = d->findModifier<MemoryQualifierSetModifier>();
+        if(collection && collection->getMemoryQualifierBit() & MemoryQualifierSetModifier::Flags::kReadOnly)
             return false;
 
         return true;
@@ -2201,27 +2202,27 @@ namespace Slang
         if (!argDeclRef)
             return;
         auto argDecl =  argDeclRef.getDecl();
-        auto argMemMods = argDecl->findModifier<MemoryQualifierCollectionModifier>();
+        auto argMemMods = argDecl->findModifier<MemoryQualifierSetModifier>();
         if(!argMemMods)
             return;
         uint32_t argQualifiers = argMemMods->getMemoryQualifierBit();    
 
         uint32_t paramQualifiers = 0;
-        auto paramMemMods = paramIn->findModifier<MemoryQualifierCollectionModifier>();
+        auto paramMemMods = paramIn->findModifier<MemoryQualifierSetModifier>();
         if(paramMemMods)
             paramQualifiers = paramMemMods->getMemoryQualifierBit();
 
-        if(argQualifiers & MemoryQualifierCollectionModifier::Flags::kCoherent
-            && !(paramQualifiers & MemoryQualifierCollectionModifier::Flags::kCoherent))
+        if(argQualifiers & MemoryQualifierSetModifier::Flags::kCoherent
+            && !(paramQualifiers & MemoryQualifierSetModifier::Flags::kCoherent))
                 getSink()->diagnose(arg, Diagnostics::argumentHasMoreMemoryQualifiersThanParam, "coherent");
-        if(argQualifiers & MemoryQualifierCollectionModifier::Flags::kReadOnly
-            && !(paramQualifiers & MemoryQualifierCollectionModifier::Flags::kReadOnly))
+        if(argQualifiers & MemoryQualifierSetModifier::Flags::kReadOnly
+            && !(paramQualifiers & MemoryQualifierSetModifier::Flags::kReadOnly))
                 getSink()->diagnose(arg, Diagnostics::argumentHasMoreMemoryQualifiersThanParam, "readonly");
-        if(argQualifiers & MemoryQualifierCollectionModifier::Flags::kWriteOnly
-            && !(paramQualifiers & MemoryQualifierCollectionModifier::Flags::kWriteOnly))
+        if(argQualifiers & MemoryQualifierSetModifier::Flags::kWriteOnly
+            && !(paramQualifiers & MemoryQualifierSetModifier::Flags::kWriteOnly))
                 getSink()->diagnose(arg, Diagnostics::argumentHasMoreMemoryQualifiersThanParam, "writeonly");
-        if(argQualifiers & MemoryQualifierCollectionModifier::Flags::kVolatile
-            && !(paramQualifiers & MemoryQualifierCollectionModifier::Flags::kVolatile))
+        if(argQualifiers & MemoryQualifierSetModifier::Flags::kVolatile
+            && !(paramQualifiers & MemoryQualifierSetModifier::Flags::kVolatile))
                 getSink()->diagnose(arg, Diagnostics::argumentHasMoreMemoryQualifiersThanParam, "volatile");
         // dropping a `restrict` qualifier from arguments is allowed in GLSL with memory qualifiers
     }
