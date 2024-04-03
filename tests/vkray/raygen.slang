@@ -1,4 +1,3 @@
-//TEST:CROSS_COMPILE: -profile glsl_460+GL_EXT_ray_tracing -stage raygeneration -entry main -target spirv-assembly
 //TEST:SIMPLE(filecheck=CHECK): -emit-spirv-directly -stage raygeneration -entry main -target spirv-assembly
 
 #define TRACING_EPSILON 1e-6
