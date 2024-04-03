@@ -823,6 +823,9 @@ struct HLSLObjectLayoutRulesImpl : ObjectLayoutRulesImpl
         case ShaderParameterKind::SamplerState:
             return SimpleLayoutInfo(LayoutResourceKind::SamplerState, 1);
 
+        case ShaderParameterKind::SubpassInput:
+            return SimpleLayoutInfo(LayoutResourceKind::InputAttachmentIndex, 1);
+
         case ShaderParameterKind::TextureSampler:
         case ShaderParameterKind::MutableTextureSampler:
         case ShaderParameterKind::InputRenderTarget:
@@ -3853,6 +3856,14 @@ static TypeLayoutResult _createTypeLayout(
             break;
         }
 
+        return createSimpleTypeLayout(
+            rules->GetObjectLayout(kind, context.objectLayoutOptions),
+            type,
+            rules);
+    }
+    else if (auto subpassType = as<SubpassInputType>(type))
+    {
+        ShaderParameterKind kind = ShaderParameterKind::SubpassInput;
         return createSimpleTypeLayout(
             rules->GetObjectLayout(kind, context.objectLayoutOptions),
             type,
