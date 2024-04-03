@@ -2741,6 +2741,9 @@ namespace Slang
         void tryInferLoopMaxIterations(ForStmt* stmt);
 
         void checkLoopInDifferentiableFunc(Stmt* stmt);
+
+    private:
+        void validateCaseStmts(SwitchStmt* stmt, DiagnosticSink* sink);
     };
 
     struct SemanticsDeclVisitorBase
