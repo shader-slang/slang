@@ -271,7 +271,8 @@ typedef slang::ParameterCategory LayoutResourceKind;
     \
     x(SubElementRegisterSpace) \
     x(VertexInput) \
-    x(FragmentOutput)
+    x(FragmentOutput) \
+    x(InputAttachmentIndex)
 
 #define SLANG_PARAMETER_CATEGORY_FLAG(x) x = ParameterCategoryFlags(1) << int(slang::x), 
 
@@ -946,6 +947,8 @@ enum class ShaderParameterKind
     AppendConsumeStructuredBuffer,
 
     AtomicUint,
+
+    SubpassInput,
 };
 
 struct SimpleLayoutRulesImpl

@@ -4,6 +4,7 @@
 #include "slang-ir-generics-lowering-context.h"
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
+#include "slang-legalize-types.h"
 
 namespace Slang
 {
@@ -223,7 +224,7 @@ namespace Slang
                 break;
             }
             default:
-                if (as<IRTextureTypeBase>(dataType) || as<IRSamplerStateTypeBase>(dataType))
+                if (isResourceType(dataType))
                 {
                     context->marshalResourceHandle(builder, dataType, concreteTypedVar);
                     return;
@@ -855,7 +856,7 @@ namespace Slang
             return alignUp(offset, 4) + alignUp((SlangInt)anyValueSize, 4);
         }
         default:
-            if (as<IRTextureTypeBase>(type) || as<IRSamplerStateTypeBase>(type))
+            if (isResourceType(type))
             {
                 return alignUp(offset, 4) + 8;
             }

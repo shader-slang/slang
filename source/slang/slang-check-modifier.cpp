@@ -428,6 +428,23 @@ namespace Slang
 
             anyValueSizeAttr->size = int32_t(value->getValue());
         }
+        else if (auto glslRequireShaderInputParameter = as<GLSLRequireShaderInputParameterAttribute>(attr))
+        {
+            if (attr->args.getCount() != 1)
+            {
+                return false;
+            }
+            auto value = checkConstantIntVal(attr->args[0]);
+            if (value == nullptr)
+            {
+                return false;
+            }
+            if (value->getValue() < 0)
+            {
+                return false;
+            }
+            glslRequireShaderInputParameter->parameterNumber = int32_t(value->getValue());
+        }
         else if (auto overloadRankAttr = as<OverloadRankAttribute>(attr))
         {
             if (attr->args.getCount() != 1)
@@ -1072,12 +1089,14 @@ namespace Slang
         case ASTNodeType::GLSLParsedLayoutModifier:
         case ASTNodeType::GLSLConstantIDLayoutModifier:
         case ASTNodeType::GLSLLocationLayoutModifier:
+        case ASTNodeType::GLSLInputAttachmentIndexLayoutModifier:
         case ASTNodeType::GLSLOffsetLayoutAttribute:
         case ASTNodeType::GLSLUnparsedLayoutModifier:
         case ASTNodeType::GLSLLayoutModifierGroupMarker:
         case ASTNodeType::GLSLLayoutModifierGroupBegin:
         case ASTNodeType::GLSLLayoutModifierGroupEnd:
         case ASTNodeType::GLSLBufferModifier:
+        case ASTNodeType::MemoryQualifierSetModifier:
         case ASTNodeType::GLSLWriteOnlyModifier:
         case ASTNodeType::GLSLReadOnlyModifier:
         case ASTNodeType::GLSLVolatileModifier:
@@ -1150,6 +1169,7 @@ namespace Slang
         case ASTNodeType::GLSLParsedLayoutModifier:
         case ASTNodeType::GLSLConstantIDLayoutModifier:
         case ASTNodeType::GLSLLocationLayoutModifier:
+        case ASTNodeType::GLSLInputAttachmentIndexLayoutModifier:
         case ASTNodeType::GLSLOffsetLayoutAttribute:
         case ASTNodeType::GLSLUnparsedLayoutModifier:
         case ASTNodeType::GLSLLayoutModifierGroupMarker:
@@ -1298,38 +1318,34 @@ namespace Slang
             }
         }
 
-        MemoryQualifierCollectionModifier::Flags::MemoryQualifiersBit memoryQualifierBit = 
-            MemoryQualifierCollectionModifier::Flags::kNone;
+        MemoryQualifierSetModifier::Flags::MemoryQualifiersBit memoryQualifierBit = MemoryQualifierSetModifier::Flags::kNone;
         if(as<GloballyCoherentModifier>(m))
-            memoryQualifierBit = MemoryQualifierCollectionModifier::Flags::kCoherent;
+            memoryQualifierBit = MemoryQualifierSetModifier::Flags::kCoherent;
         else if(as<GLSLReadOnlyModifier>(m))
-            memoryQualifierBit = MemoryQualifierCollectionModifier::Flags::kReadOnly;
+            memoryQualifierBit = MemoryQualifierSetModifier::Flags::kReadOnly;
         else if(as<GLSLWriteOnlyModifier>(m))
-            memoryQualifierBit = MemoryQualifierCollectionModifier::Flags::kWriteOnly;
+            memoryQualifierBit = MemoryQualifierSetModifier::Flags::kWriteOnly;
         else if(as<GLSLVolatileModifier>(m))
-            memoryQualifierBit = MemoryQualifierCollectionModifier::Flags::kVolatile;
+            memoryQualifierBit = MemoryQualifierSetModifier::Flags::kVolatile;
         else if(as<GLSLRestrictModifier>(m))
-            memoryQualifierBit = MemoryQualifierCollectionModifier::Flags::kRestrict;
-        if(memoryQualifierBit != MemoryQualifierCollectionModifier::Flags::kNone)
+            memoryQualifierBit = MemoryQualifierSetModifier::Flags::kRestrict;
+        if(memoryQualifierBit != MemoryQualifierSetModifier::Flags::kNone)
         {
             bool newModifier = false;
-            MemoryQualifierCollectionModifier* memoryQualifiers = syntaxNode->findModifier<MemoryQualifierCollectionModifier>();
+            MemoryQualifierSetModifier* memoryQualifiers = syntaxNode->findModifier<MemoryQualifierSetModifier>();
             if(!memoryQualifiers)
             {
                 newModifier = true;
-                memoryQualifiers = getASTBuilder()->create<MemoryQualifierCollectionModifier>();
+                memoryQualifiers = getASTBuilder()->create<MemoryQualifierSetModifier>();
             }
             memoryQualifiers->addQualifier(m,
                 memoryQualifierBit);
             if (newModifier)
             {
-                // insert in modifiers list the memoryQualifierCollection
-                Modifier* mod = m->next;
                 m->next = memoryQualifiers;
-                memoryQualifiers->next = mod;
-                return m;
+                return memoryQualifiers;
             }
-            return m;
+            return nullptr;
         }
 
         if (auto hlslSemantic = as<HLSLSimpleSemantic>(m))

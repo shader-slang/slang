@@ -818,6 +818,19 @@ SpvInst* emitOpDecorateBinding(
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpDecorate
 template<typename T>
+SpvInst* emitOpDecorateInputAttachmentIndex(
+    SpvInstParent* parent,
+    IRInst* inst,
+    const T& target,
+    const SpvLiteralInteger& bindingPoint
+)
+{
+    static_assert(isSingular<T>);
+    return emitInst(parent, inst, SpvOpDecorate, target, SpvDecorationInputAttachmentIndex, bindingPoint);
+}
+
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpDecorate
+template<typename T>
 SpvInst* emitOpDecorateDescriptorSet(
     SpvInstParent* parent,
     IRInst* inst,

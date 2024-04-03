@@ -116,25 +116,26 @@ void GLSLSourceEmitter::_requireGLSLVersion(int version)
 
 void GLSLSourceEmitter::_emitMemoryQualifierDecorations(IRInst* varDecl)
 {
-    for (auto decoration : varDecl->getDecorations())
+    if(auto collection = varDecl->findDecoration<IRMemoryQualifierSetDecoration>())
     {
-        if (as<IRGloballyCoherentDecoration>(decoration))
+        IRIntegerValue flags = collection->getMemoryQualifierBit();
+        if (flags & MemoryQualifierSetModifier::Flags::kCoherent)
         {
             m_writer->emit("coherent ");
         }
-        else if (as<IRGLSLVolatileDecoration>(decoration))
+        if (flags & MemoryQualifierSetModifier::Flags::kVolatile)
         {
             m_writer->emit("volatile ");
         }
-        else if (as<IRGLSLRestrictDecoration>(decoration))
+        if (flags & MemoryQualifierSetModifier::Flags::kRestrict)
         {
             m_writer->emit("restrict ");
         }
-        else if (as<IRGLSLReadOnlyDecoration>(decoration))
+        if (flags & MemoryQualifierSetModifier::Flags::kReadOnly)
         {
             m_writer->emit("readonly ");
         }
-        else if (as<IRGLSLWriteOnlyDecoration>(decoration))
+        if (flags & MemoryQualifierSetModifier::Flags::kWriteOnly)
         {
             m_writer->emit("writeonly ");
         }
@@ -766,6 +767,16 @@ void GLSLSourceEmitter::_emitGLSLLayoutQualifiers(IRVarLayout* layout, EmitVarCh
         }
 
         _emitGLSLLayoutQualifier(info->getResourceKind(), &chain);
+    }
+}
+
+void GLSLSourceEmitter::_emitGLSLSubpassInputType(IRSubpassInputType* type)
+{
+    _emitGLSLTypePrefix(type->getElementType(), true);
+    m_writer->emit("subpassInput");
+    if (type->isMultisample())
+    {
+        m_writer->emit("MS");
     }
 }
 
@@ -2487,6 +2498,11 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         _emitGLSLTextureOrTextureSamplerType(imageType, "image");
         return;
     }
+    else if (auto subpassType = as<IRSubpassInputType>(type))
+    {
+        _emitGLSLSubpassInputType(subpassType);
+        return;
+    }
     else if (const auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type))
     {
         // TODO: We desugar global variables with structured-buffer type into GLSL
@@ -2724,9 +2740,15 @@ void GLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
         break;
     }
 
-    if (varDecl->findDecoration<IRGloballyCoherentDecoration>())
-    {
-        m_writer->emit("coherent\n");
+    // non raytracing decorations
+    for (auto decoration : varDecl->getDecorations())
+    {        
+        if (auto glslInputAttachment = as<IRGLSLInputAttachmentIndexDecoration>(decoration))
+        {
+            m_writer->emit(toSlice("layout(input_attachment_index = "));
+            m_writer->emit(glslInputAttachment->getIndex()->getValue());
+            m_writer->emit(toSlice(")\n"));
+        }
     }
 }
 

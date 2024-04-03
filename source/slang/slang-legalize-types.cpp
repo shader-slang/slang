@@ -189,6 +189,10 @@ bool isResourceType(IRType* type)
     {
         return true;
     }
+    else if (const auto subpassInputType = as<IRSubpassInputType>(type))
+    {
+        return true;
+    }
     else if(const auto untypedBufferType = as<IRUntypedBufferResourceType>(type))
     {
         return true;
