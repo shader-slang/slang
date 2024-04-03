@@ -623,6 +623,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 innerType = lowerStructuredBufferType(structuredBufferType).structType;
                 storageClass = SpvStorageClassStorageBuffer;
                 needLoad = false;
+
+                // structured buffers in GLSL should be annotated as ReadOnly
+                if (as<IRHLSLStructuredBufferType>(structuredBufferType))
+                    builder.addMemoryQualifierSetDecoration(inst, MemoryQualifierSetModifier::Flags::kReadOnly);
             }
             else if (auto glslShaderStorageBufferType = as<IRGLSLShaderStorageBufferType>(innerType))
             {

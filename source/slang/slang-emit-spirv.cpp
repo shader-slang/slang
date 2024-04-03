@@ -3018,11 +3018,6 @@ struct SPIRVEmitContext
         return sb.produceString();
     }
 
-    void emitMemoryQualifierDecoration(MemoryQualifierSetModifier* memoryQualifier)
-    {
-
-    }
-
         /// Emit an appropriate SPIR-V decoration for the given IR `decoration`, if necessary and possible.
         ///
         /// The given `dstID` should be the `<id>` of the SPIR-V instruction being decorated,
@@ -3379,14 +3374,14 @@ struct SPIRVEmitContext
                 emitOpDecorate(getSection(SpvLogicalSectionID::Annotations),
                     nullptr,
                     dstID,
-                    SpvDecorationNonReadable);
+                    SpvDecorationNonWritable);
             }
             if (flags & MemoryQualifierSetModifier::Flags::kWriteOnly)
             {
                 emitOpDecorate(getSection(SpvLogicalSectionID::Annotations),
                     nullptr,
                     dstID,
-                    SpvDecorationNonWritable);
+                    SpvDecorationNonReadable);
             }
             break;
         }
@@ -3522,7 +3517,7 @@ struct SPIRVEmitContext
                             nullptr,
                             spvStructID,
                             SpvLiteralInteger::from32(id),
-                            SpvDecorationNonReadable
+                            SpvDecorationNonWritable
                         );
                     }
                     if (flags & MemoryQualifierSetModifier::Flags::kWriteOnly)
@@ -3532,7 +3527,7 @@ struct SPIRVEmitContext
                             nullptr,
                             spvStructID,
                             SpvLiteralInteger::from32(id),
-                            SpvDecorationNonWritable
+                            SpvDecorationNonReadable
                         );
                     }
                 }

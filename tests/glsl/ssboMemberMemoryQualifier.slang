@@ -14,10 +14,10 @@
 //CHECK_GLSL: coherent
 //CHECK_GLSL: volatile
 //CHECK_SPV: OpMemberDecorate %{{.*}} 0 Restrict
-//CHECK_SPV: OpMemberDecorate %{{.*}} 1 NonReadable
+//CHECK_SPV: OpMemberDecorate %{{.*}} 1 NonWritable
 //CHECK_SPV: OpMemberDecorate %{{.*}} 2 {{(NonWritable|NonReadable)}}
 //CHECK_SPV: OpMemberDecorate %{{.*}} 2 {{(NonWritable|NonReadable)}}
-//CHECK_SPV: OpMemberDecorate %{{.*}} 3 NonWritable
+//CHECK_SPV: OpMemberDecorate %{{.*}} 3 NonReadable
 //CHECK_SPV: OpMemberDecorate %{{.*}} 4 Coherent
 //CHECK_SPV: OpMemberDecorate %{{.*}} 5 Volatile
 //CHECK_SPV: OpDecorate %{{.*}} {{(Restrict|Volatile)}}
@@ -33,7 +33,7 @@ restrict volatile buffer Block1
 
 //CHECK_GLSL: coherent
 //CHECK_GLSL: readonly
-//CHECK_SPV: OpMemberDecorate %{{.*}} 0 NonReadable
+//CHECK_SPV: OpMemberDecorate %{{.*}} 0 NonWritable
 //CHECK_SPV: OpDecorate %{{.*}} Coherent
 coherent buffer Block2 {
     readonly vec4 member1;
@@ -42,8 +42,8 @@ coherent buffer Block2 {
 
 //CHECK_GLSL: {{(coherent|readonly)}} {{(coherent|readonly)}}
 //CHECK_GLSL: coherent
-//CHECK_SPV: OpMemberDecorate %{{.*}} 0 {{(Coherent|NonReadable)}}
-//CHECK_SPV: OpMemberDecorate %{{.*}} 0 {{(Coherent|NonReadable)}}
+//CHECK_SPV: OpMemberDecorate %{{.*}} 0 {{(Coherent|NonWritable)}}
+//CHECK_SPV: OpMemberDecorate %{{.*}} 0 {{(Coherent|NonWritable)}}
 //CHECK_SPV: OpMemberDecorate %{{.*}} 1 Coherent
 //CHECK_SPV: OpDecorate %{{.*}}
 buffer Block3 {
@@ -55,12 +55,12 @@ buffer Block3 {
 //CHECK_GLSL: coherent
 //CHECK_GLSL: {{(volatile|writeonly)}} {{(volatile|writeonly)}}
 //CHECK_GLSL: readonly
-//CHECK_SPV: OpMemberDecorate %{{.*}} 0 {{(Coherent|NonReadable)}}
-//CHECK_SPV: OpMemberDecorate %{{.*}} 0 {{(Coherent|NonReadable)}}
+//CHECK_SPV: OpMemberDecorate %{{.*}} 0 {{(Coherent|NonWritable)}}
+//CHECK_SPV: OpMemberDecorate %{{.*}} 0 {{(Coherent|NonWritable)}}
 //CHECK_SPV: OpMemberDecorate %{{.*}} 1 Coherent
-//CHECK_SPV: OpMemberDecorate %{{.*}} 2 {{(NonWritable|Volatile)}}
-//CHECK_SPV: OpMemberDecorate %{{.*}} 2 {{(NonWritable|Volatile)}}
-//CHECK_SPV: OpMemberDecorate %{{.*}} 3 NonReadable
+//CHECK_SPV: OpMemberDecorate %{{.*}} 2 {{(NonReadable|Volatile)}}
+//CHECK_SPV: OpMemberDecorate %{{.*}} 2 {{(NonReadable|Volatile)}}
+//CHECK_SPV: OpMemberDecorate %{{.*}} 3 NonWritable
 buffer Block4 {
     struct structTmp
     {

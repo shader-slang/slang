@@ -1264,7 +1264,6 @@ void HLSLSourceEmitter::emitMeshShaderModifiersImpl(IRInst* varInst)
 
 void HLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
 {
-
     for(auto decoration : varDecl->getDecorations())
     {
         if(auto glslInputAttachmentIndex = as<IRGLSLInputAttachmentIndexDecoration>(decoration))
@@ -1272,6 +1271,13 @@ void HLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
             m_writer->emit("[[vk::input_attachment_index(");
             m_writer->emit(glslInputAttachmentIndex->getIndex()->getValue());
             m_writer->emit(")]]\n");
+            continue;
+        }
+        if (auto collection = as<IRMemoryQualifierSetDecoration>(decoration))
+        {
+            auto flags = collection->getMemoryQualifierBit();
+            if(flags & MemoryQualifierSetModifier::Flags::kCoherent)
+                m_writer->emit("globallycoherent\n");
             continue;
         }
     }

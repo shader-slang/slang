@@ -18,22 +18,22 @@ restrict buffer MyBlockName2
 } inputBuffer2;
 
 //CHECK_GLSL: {{(writeonly|volatile)}} {{(writeonly|volatile)}}
-//CHECK_SPV: OpDecorate %{{.*}} {{(NonWritable|Volatile)}}
-//CHECK_SPV: OpDecorate %{{.*}} {{(NonWritable|Volatile)}}
+//CHECK_SPV: OpDecorate %{{.*}} {{(NonReadable|Volatile)}}
+//CHECK_SPV: OpDecorate %{{.*}} {{(NonReadable|Volatile)}}
 writeonly volatile buffer MyBlockName3
 {
     uint data1;
 } inputBuffer3;
 
 //CHECK_GLSL: writeonly
-//CHECK_SPV: OpDecorate %{{.*}} NonWritable
+//CHECK_SPV: OpDecorate %{{.*}} NonReadable
 writeonly buffer MyBlockName4
 {
     uint data1;
 } inputBuffer4;
 
 //CHECK_GLSL: readonly
-//CHECK_SPV: OpDecorate %{{.*}} NonReadable
+//CHECK_SPV: OpDecorate %{{.*}} NonWritable
 readonly buffer MyBlockName5
 {
     uint data1;
