@@ -2920,6 +2920,11 @@ struct SPIRVEmitContext
     {
         SpvExecutionMode result = SpvExecutionModeMax;
         bool isDepthVar = false;
+
+        // If the builtin is an output, we need to emit the DepthReplacing execution mode
+        // required by the SPIRV spec even if we are not writing to it.
+        bool isOutputVar = false;
+
         if (auto layout = getVarLayout(builtinVar))
         {
             if (auto systemValueAttr = layout->findAttr<IRSystemValueSemanticAttr>())
@@ -2931,6 +2936,9 @@ struct SPIRVEmitContext
                     auto importDecor = builtinVar->findDecoration<IRImportDecoration>();
                     if (importDecor->getMangledName() == "gl_FragCoord")
                     {
+                        // SV_POSITION is not necessarily a depth output,
+                        // if it is not written to, we don't need to emit
+                        // the DepthReplacing execution mode.
                         isDepthVar = true;
                         result = SpvExecutionModeDepthReplacing;
                     }
@@ -2938,22 +2946,30 @@ struct SPIRVEmitContext
                 else if (semanticName == "sv_depth")
                 {
                     isDepthVar = true;
+                    isOutputVar = true;
                     result = SpvExecutionModeDepthReplacing;
                 }
                 else if (semanticName == "sv_depthgreaterequal")
                 {
                     isDepthVar = true;
+                    isOutputVar = true;
                     result = SpvExecutionModeDepthGreater;
                 }
                 else if (semanticName == "sv_depthlessequal")
                 {
                     isDepthVar = true;
+                    isOutputVar = true;
                     result = SpvExecutionModeDepthLess;
                 }
             }
         }
         if (!isDepthVar)
+            return SpvExecutionModeMax;
+        if (isOutputVar)
             return result;
+
+        // If the builtin can be both input and output,
+        // we need to check if we actually write to it.
         for (auto use = builtinVar->firstUse; use; use = use->nextUse)
         {
             auto user = use->getUser();
@@ -2969,7 +2985,7 @@ struct SPIRVEmitContext
                 return result;
             }
         }
-        return result;
+        return SpvExecutionModeMax;
     }
 
     void maybeEmitEntryPointDepthReplacingExecutionMode(

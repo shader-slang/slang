@@ -9,9 +9,10 @@ struct PSOut
 }
 // CHECK-NOT: OpExecutionMode {{.*}} DepthReplacing
 
-PSOut main()
+// Using SV_Position does not cause us generate DepthReplacing.
+PSOut main(float4 pos : SV_Position)
 {
     PSOut psout;
-    psout.color = float4(1.0f, 0.0f, 0.0f, 1.0f);
+    psout.color = pos;
     return psout;
 }
