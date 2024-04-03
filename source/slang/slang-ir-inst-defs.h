@@ -691,7 +691,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     /* TargetSpecificDecoration */
         INST(TargetDecoration,              target,                 1, 0)
         INST(TargetIntrinsicDecoration,     targetIntrinsic,        2, 0)
-    INST_RANGE(TargetSpecificDecoration, TargetDecoration, TargetIntrinsicDecoration)
+        INST_RANGE(TargetSpecificDefinitionDecoration, TargetDecoration, TargetIntrinsicDecoration)
+        INST(RequirePreludeDecoration, requirePrelude, 2, 0)
+    INST_RANGE(TargetSpecificDecoration, TargetDecoration, RequirePreludeDecoration)
     INST(GLSLOuterArrayDecoration,          glslOuterArray,         1, 0)
     
     INST(InterpolationModeDecoration,       interpolationMode,      1, 0)
@@ -733,6 +735,7 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(MaxVertexCountDecoration,          maxVertexCount,         1, 0)
     INST(InstanceDecoration,                instance,               1, 0)
     INST(NumThreadsDecoration,              numThreads,             3, 0)
+    INST(WaveSizeDecoration,                waveSize,               1, 0)
 
         // Added to IRParam parameters to an entry point
     /* GeometryInputPrimitiveTypeDecoration */

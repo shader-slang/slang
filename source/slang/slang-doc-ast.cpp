@@ -107,6 +107,10 @@ SlangResult ASTMarkupUtil::extract(ModuleDecl* moduleDecl, SourceManager* source
             SLANG_ASSERT(item.sourceLoc.isValid());
 
             item.searchStyle = getSearchStyle(decl);
+
+            // Don't generate documentation for synthesized members.
+            if (getText(decl->getName()).startsWith("$__syn"))
+                item.searchStyle = DocMarkupExtractor::SearchStyle::None;
         }
 
         DocMarkupExtractor extractor;
