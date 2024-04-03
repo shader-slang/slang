@@ -715,6 +715,8 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(VulkanHitAttributesDecoration,     vulkanHitAttributes,    0, 0)
     INST(VulkanHitObjectAttributesDecoration, vulkanHitObjectAttributes, 0, 0)
 
+    INST(GlobalVariableShadowingGlobalParameterDecoration, GlobalVariableShadowingGlobalParameterDecoration, 2, 0)
+
     INST(RequireSPIRVVersionDecoration,     requireSPIRVVersion,    1, 0)
     INST(RequireGLSLVersionDecoration,      requireGLSLVersion,     1, 0)
     INST(RequireGLSLExtensionDecoration,    requireGLSLExtension,   1, 0)

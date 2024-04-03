@@ -4814,6 +4814,11 @@ public:
         addDecoration(inst, kIROp_VulkanHitObjectAttributesDecoration, getIntValue(getIntType(), location));
     }
 
+    void addGlobalVariableShadowingGlobalParameterDecoration(IRInst* inst, IRInst* globalVar, IRInst* key)
+    {
+        addDecoration(inst, kIROp_GlobalVariableShadowingGlobalParameterDecoration, globalVar, key);
+    }
+
     void addMeshOutputDecoration(IROp d, IRInst* value, IRInst* maxCount)
     {
         SLANG_ASSERT(IRMeshOutputDecoration::isaImpl(d));
