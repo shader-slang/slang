@@ -401,6 +401,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ir-generics-lowering-context.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-glsl-legalize.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-glsl-liveness.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-hlsl-legalize.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-init-local-var.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-inline.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-insert-debug-value-store.h" />
@@ -628,6 +629,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ir-generics-lowering-context.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-glsl-legalize.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-glsl-liveness.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-hlsl-legalize.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-init-local-var.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-inline.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-insert-debug-value-store.cpp" />
