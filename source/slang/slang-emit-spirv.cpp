@@ -3827,6 +3827,7 @@ struct SPIRVEmitContext
                     // non-tessellation shader stages, and if so include a declaration of
                     // Geometry capability.
                     bool needGeometryCapability = true;
+                    bool needPerPrimitiveEXTDecoration = false;
                     if (entryPoints)
                     {
                         for (auto entryPoint : *entryPoints)
@@ -3835,9 +3836,13 @@ struct SPIRVEmitContext
                             {
                                 switch (entryPointDecor->getProfile().getStage())
                                 {
+                                case Stage::Mesh:
+                                    // For outputs decorated with PrimitiveID it must be decorated
+                                    // with PerPrimitiveEXT to comply with Vulkan validation rules
+                                    if (m_capabilities.contains(SpvCapabilityMeshShadingEXT))
+                                        needPerPrimitiveEXTDecoration = true;
                                 case Stage::Geometry:
                                 case Stage::Intersection:
-                                case Stage::Mesh:
                                 case Stage::Amplification:
                                 case Stage::AnyHit:
                                 case Stage::ClosestHit:
@@ -3851,7 +3856,14 @@ struct SPIRVEmitContext
                     }
                     if (needGeometryCapability)
                         requireSPIRVCapability(SpvCapabilityGeometry);
-                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPrimitiveId);
+                    auto varInst = getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPrimitiveId);
+                    if (needPerPrimitiveEXTDecoration)
+                        emitOpDecorate(
+                            getSection(SpvLogicalSectionID::Annotations),
+                            nullptr,
+                            varInst,
+                            SpvDecorationPerPrimitiveEXT);
+                    return varInst;
                 }
                 else if (semanticName == "sv_rendertargetarrayindex")
                 {
