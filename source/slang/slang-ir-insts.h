@@ -2336,6 +2336,11 @@ struct IRStructuredBufferGetDimensions : IRInst
     IRInst* getBuffer() { return getOperand(0); }
 };
 
+struct IRNonUniformResourceIndex : IRInst
+{
+    IR_LEAF_ISA(NonUniformResourceIndex);
+};
+
 struct IRLoadReverseGradient : IRInst
 {
     IR_LEAF_ISA(LoadReverseGradient)
@@ -4229,6 +4234,8 @@ public:
     IRInst* emitGenericAsm(UnownedStringSlice asmText);
 
     IRInst* emitRWStructuredBufferGetElementPtr(IRInst* structuredBuffer, IRInst* index);
+
+    IRInst* emitNonUniformResourceIndex(IRType* type, IRInst* val);
     //
     // Decorations
     //
