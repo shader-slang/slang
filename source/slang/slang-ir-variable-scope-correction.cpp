@@ -246,7 +246,11 @@ void VariableScopeCorrectionContext::_processStorableInst(IRInst* insertLoc, IRI
     m_builder.emitStore(dstPtr, inst);
 
     // last, replace operands in the use site instruction with the new variable
-    _replaceOperand(user, inst,  dstPtr);
+    // Note, because "dstPtr" is a pointer type, we have to insert a load(dstPtr) instruction before use it.
+    // Simply replace any operand with pointer could generate error code.
+    m_builder.setInsertBefore(user);
+    auto loadInst = m_builder.emitLoad(dstPtr->getDataType(), dstPtr);
+    _replaceOperand(user, inst,  loadInst);
 }
 
 void  VariableScopeCorrectionContext::_replaceOperand(IRInst* inst, IRInst* oldOperand, IRInst* newOperand)
@@ -261,19 +265,7 @@ void  VariableScopeCorrectionContext::_replaceOperand(IRInst* inst, IRInst* oldO
 
         if (operand == oldOperand)
         {
-            // We have to special handle the store instruction. Because in C++/CUDA, pointer is a valid type,
-            // "store(dstPtr, srcVal)" could generate "dstPtr = &srcVal" if we declare srcVal at beginning of the function
-            // by using emitVar(type). So we need to insert a load instruction before the store.
-            if (inst->getOp() == kIROp_Store && operand == inst->getOperand(1))
-            {
-                m_builder.setInsertBefore(inst);
-                auto loadVar = m_builder.emitLoad(newOperand->getDataType(), newOperand);
-                inst->setOperand(i, loadVar);
-            }
-            else
-            {
-                inst->setOperand(i, newOperand);
-            }
+            inst->setOperand(i, newOperand);
         }
     }
 }
