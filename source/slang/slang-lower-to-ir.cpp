@@ -586,6 +586,10 @@ struct IRGenContext
     // (For use by functions that returns non-copyable types)
     LoweredValInfo returnDestination;
 
+    // A reference to the Function decl to identify the parent function
+    // that contains the Inst.
+    FunctionDeclBase* funcDecl;
+
     bool includeDebugInfo = false;
 
     explicit IRGenContext(SharedIRGenContext* inShared, ASTBuilder* inAstBuilder)
@@ -6012,18 +6016,31 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
     {
         startBlockIfNeeded(stmt);
 
+        // Check if this return is within a constructor.
+        auto constructorDecl = as<ConstructorDecl>(context->funcDecl);
+
         // A `return` statement turns into a `return` instruction,
         // but we have two kinds of `return`: one for returning
         // a (non-`void`) value, and one for returning "no value"
         // (which effectively returns a value of type `void`).
         //
-        if( auto expr = stmt->expression )
+        if (auto expr = stmt->expression)
         {
             if (context->returnDestination.flavor != LoweredValInfo::Flavor::None)
             {
                 // If this function should return via a __ref parameter, do that and return void.
                 lowerRValueExprWithDestination(context, context->returnDestination, expr);
                 getBuilder()->emitReturn();
+                return;
+            }
+
+            if (constructorDecl)
+            {
+                // If this function is a constructor, but returns a value, rewrite it as
+                // this = val;
+                // return this;
+                lowerRValueExprWithDestination(context, context->thisVal, expr);
+                getBuilder()->emitReturn(getSimpleVal(context, context->thisVal));
                 return;
             }
 
@@ -6061,6 +6078,24 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             // with no value, which can only occur in a function with
             // a `void` result type.
             //
+            if (constructorDecl)
+            {
+                // If this `return` is within a NonCopyableType or an ordinary constructor,
+                // then we must either simply return or `return` the instance respectively.
+                if (context->returnDestination.flavor != LoweredValInfo::Flavor::None)
+                {
+                    // If we have a NonCopyableType constructor of the form
+                    //   void ctor(inout this) { return; }
+                    getBuilder()->emitReturn();
+                }
+                else
+                {
+                    // If we have an ordinary constructor of the form
+                    //   Type ctor() { return; }
+                    getBuilder()->emitReturn(getSimpleVal(context, context->thisVal));
+                }
+                return;
+            }
             getBuilder()->emitReturn();
         }
     }
@@ -9298,7 +9333,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     {
 
         IRGeneric* outerGeneric = nullptr;
-        
+        subContext->funcDecl = decl;
+
         if (auto derivativeRequirement = as<DerivativeRequirementDecl>(decl))
             outerGeneric = emitOuterGenerics(subContext, derivativeRequirement->originalRequirementDecl, derivativeRequirement->originalRequirementDecl);
         else
