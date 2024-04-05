@@ -58,10 +58,11 @@ static void debugPrint(uint32_t indent, IRInst* inst, const char* message, bool 
         printf("    ");
     }
 
+    if (inst) {
 #ifdef SLANG_ENABLE_IR_BREAK_ALLOC
-    if (inst)
         debugid = inst->_debugUID;
 #endif
+    }
 
     if (debugid != 0)
         printf("%s, id: %d\n", message, debugid);
@@ -76,6 +77,7 @@ void VariableScopeCorrectionContext::_processFunction(IRFunc* funcInst)
     Dictionary<IRBlock*, List<IRLoop*>> loopHeaderMap;
 
     bool enableLog = false;
+
     // traverse all blocks in the function
     for (auto block = funcInst->getFirstBlock(); block; block = block->getNextBlock())
     {
@@ -110,6 +112,11 @@ void VariableScopeCorrectionContext::_processFunction(IRFunc* funcInst)
         loopHeaderMap.add(block, loopHeaderList);
     }
 
+    if (loopHeaderMap.getCount() == 0)
+    {
+        return;
+    }
+
     debugPrint(0, nullptr, "", enableLog);
     // Traverse all the instructions in function.
     for (auto block = funcInst->getFirstBlock(); block; block = block->getNextBlock())
@@ -119,6 +126,11 @@ void VariableScopeCorrectionContext::_processFunction(IRFunc* funcInst)
             for (auto inst = block->getFirstChild(); inst; inst = inst->getNextInst())
             {
                 List<IRInst*> instList;
+                // Don't process the variable declaration instruction because the code is not emitted for them unless there is a use.
+                if (inst->getOp() == kIROp_Var)
+                {
+                    continue;
+                }
                 // traverse all uses of this instruction
                 debugPrint(0, getBlock(inst), "inst is defined in block", enableLog);
                 for (auto use = inst->firstUse; use; use=use->nextUse)
@@ -148,6 +160,11 @@ void VariableScopeCorrectionContext::_processFunction(IRFunc* funcInst)
                 }
             }
         }
+    }
+
+    if (workListMap.getCount() == 0)
+    {
+        return;
     }
 
     debugPrint(0, nullptr, "", enableLog);
@@ -200,8 +217,8 @@ void VariableScopeCorrectionContext::_processUnstorableInst(IRInst* insertLoc, I
     clonedInst->insertAt(IRInsertLoc::before(user));
 
     // take care the operands of the duplicated instruction because they could also be invisible at use site
-    uint32_t operandCount = inst->getOperandCount();
-    for (uint32_t i = 0; i < operandCount; i++)
+    SlangUInt operandCount = inst->getOperandCount();
+    for (SlangUInt i = 0; i < operandCount; i++)
     {
         auto operand = inst->getOperand(i);
 
@@ -256,10 +273,10 @@ void VariableScopeCorrectionContext::_processStorableInst(IRInst* insertLoc, IRI
 void  VariableScopeCorrectionContext::_replaceOperand(IRInst* inst, IRInst* oldOperand, IRInst* newOperand)
 {
     // TODO: I'd like to use "user->replaceUsesWith(clonedInst);" here, but it seems not replace the operands at all.
-    uint32_t operandCount = inst->getOperandCount();
+    SlangUInt operandCount = inst->getOperandCount();
 
     // Traverse all the operands to find out which one is the invisible instruction, and replace it with the new one.
-    for (uint32_t i = 0; i < operandCount; i++)
+    for (SlangUInt i = 0; i < operandCount; i++)
     {
         auto operand = inst->getOperand(i);
 
