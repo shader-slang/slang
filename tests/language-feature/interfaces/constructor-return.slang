@@ -2,14 +2,17 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type
 
-// Test to catch errors with return values in constructors within an ordinary struct.
+// Executable test to check the correctness of return values from the constructors within an
+// ordinary struct.
+
 // A constructor from the callsite's point of view is a function that returns the struct type.
 // A constructor from the inside the body is treated as a function that modifies `this` and not return.
 
 // In the following test-cases where the constructor either returns an expr or no value,
-// within a condition for early exit or not, it automatically gets resolved as
-// this = t;
-// return *this; or return;
+// such as `return ...` within a condition for early exit or not,
+// It automatically gets resolved as
+// `this = t;` along with
+// `return this` if it returns the struct type, else `return`
 RWStructuredBuffer<float> outputBuffer;
 
 struct Impl
