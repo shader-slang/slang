@@ -4,6 +4,9 @@
 // CHECK: OpDecorate %gl_PrimitiveID BuiltIn PrimitiveId
 // CHECK: OpDecorate %gl_PrimitiveID PerPrimitiveNV
 
+// CHECK: OpDecorate {{.*}} BuiltIn CullPrimitiveEXT
+// CHECK: OpDecorate {{.*}} PerPrimitiveNV
+
 const static let color: float3[] = {
   float3(1.0, 0.0, 0.0),
   float3(0.0, 1.0, 0.0),
@@ -23,6 +26,7 @@ struct SVertexOutput {
 
 struct SPrimitiveOutput {
   uint PrimitiveId: SV_PrimitiveID;
+  bool cull : SV_CullPrimitive;
 };
 
 [shader("mesh")]
@@ -39,6 +43,6 @@ func main(
   outputVertices[2] = { float4(position[2], 1.0), color[2] };
   outputIndices[0] = uint3(0, 1, 2);
 
-  outputPrimitives[0] = { 0 };
+  outputPrimitives[0] = { 0, false };
 }
 

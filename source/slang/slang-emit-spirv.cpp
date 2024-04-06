@@ -2094,6 +2094,18 @@ struct SPIRVEmitContext
             return false;
         }
     }
+    void emitSystemVarDecoration(IRInst* var, SpvInst* varInst)
+    {
+        for (auto decor : var->getDecorations())
+        {
+            switch (decor->getOp())
+            {
+            case kIROp_GLSLPrimitivesRateDecoration:
+                emitOpDecorate(getSection(SpvLogicalSectionID::Annotations), decor, varInst, SpvDecorationPerPrimitiveEXT);
+                break;
+            }
+        }
+    }
 
     void emitVarLayout(IRInst* var, SpvInst* varInst, IRVarLayout* layout)
     {
@@ -2256,6 +2268,7 @@ struct SPIRVEmitContext
         }
         if (auto systemValInst = maybeEmitSystemVal(param))
         {
+            emitSystemVarDecoration(param, systemValInst);
             registerInst(param, systemValInst);
             return systemValInst;
         }
@@ -3827,7 +3840,6 @@ struct SPIRVEmitContext
                     // non-tessellation shader stages, and if so include a declaration of
                     // Geometry capability.
                     bool needGeometryCapability = true;
-                    bool needPerPrimitiveEXTDecoration = false;
                     if (entryPoints)
                     {
                         for (auto entryPoint : *entryPoints)
@@ -3837,10 +3849,6 @@ struct SPIRVEmitContext
                                 switch (entryPointDecor->getProfile().getStage())
                                 {
                                 case Stage::Mesh:
-                                    // For outputs decorated with PrimitiveID it must be decorated
-                                    // with PerPrimitiveEXT to comply with Vulkan validation rules
-                                    if (m_capabilities.contains(SpvCapabilityMeshShadingEXT))
-                                        needPerPrimitiveEXTDecoration = true;
                                 case Stage::Geometry:
                                 case Stage::Intersection:
                                 case Stage::Amplification:
@@ -3856,14 +3864,7 @@ struct SPIRVEmitContext
                     }
                     if (needGeometryCapability)
                         requireSPIRVCapability(SpvCapabilityGeometry);
-                    auto varInst = getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPrimitiveId);
-                    if (needPerPrimitiveEXTDecoration)
-                        emitOpDecorate(
-                            getSection(SpvLogicalSectionID::Annotations),
-                            nullptr,
-                            varInst,
-                            SpvDecorationPerPrimitiveEXT);
-                    return varInst;
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPrimitiveId);
                 }
                 else if (semanticName == "sv_rendertargetarrayindex")
                 {
