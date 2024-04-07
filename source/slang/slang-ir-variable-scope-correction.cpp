@@ -21,11 +21,14 @@ struct VariableScopeCorrectionContext
 
     /// Process a function in the module
     void _processFunction(IRFunc* funcInst);
-    void _processInstructions(IRFunc* funcInst, const Dictionary<IRInst*, List<IRInst*>>& workListMap);
-    void _processStorableInst(IRInst* insertLoc, IRInst* inst, IRInst* user);
-    void _processUnstorableInst(IRInst* funcInst, IRInst* inst, IRInst* user);
+    IRInst* _processInstruction(IRDominatorTree* dominatorTree, IRInst* instAfterParam,
+            IRInst* originInst, IRInst* useInst, const List<IRLoop*>& loopHeaderList, const HashSet<IRInst*> workList);
+    IRInst* _processUnstorableInst(IRInst* inst, IRInst* user);
+    IRInst* _processStorableInst(IRInst* insertLoc, IRInst* inst, IRInst* user);
+
     void _replaceOperand(IRInst* inst, IRInst* oldOperand, IRInst* newOperand);
     bool _isStorableInst(IRInst* inst);
+    bool _isOutOfScopeUse(IRInst* inst, IRDominatorTree* domTree, const List<IRLoop*>& loopHeaderList);
 
     IRModule* m_module;
     IRBuilder m_builder;
@@ -74,12 +77,15 @@ void VariableScopeCorrectionContext::_processFunction(IRFunc* funcInst)
 {
     IRDominatorTree* dominatorTree = m_module->findOrCreateDominatorTree(funcInst);
     Dictionary<IRInst*, List<IRInst*>> workListMap;
+
+    HashSet<IRInst*> workList;
+
     Dictionary<IRBlock*, List<IRLoop*>> loopHeaderMap;
 
     bool enableLog = false;
 
     // traverse all blocks in the function
-    for (auto block = funcInst->getFirstBlock(); block; block = block->getNextBlock())
+    for (auto block : funcInst->getBlocks())
     {
         uint32_t indent = 0;
         debugPrint(indent++, block, "processing block", enableLog);
@@ -119,9 +125,9 @@ void VariableScopeCorrectionContext::_processFunction(IRFunc* funcInst)
 
     debugPrint(0, nullptr, "", enableLog);
     // Traverse all the instructions in function.
-    for (auto block = funcInst->getFirstBlock(); block; block = block->getNextBlock())
+    for (auto block : funcInst->getBlocks())
     {
-        if(auto loopHeaderList = loopHeaderMap.tryGetValue(block))
+        if(loopHeaderMap.containsKey(block))
         {
             for (auto inst = block->getFirstChild(); inst; inst = inst->getNextInst())
             {
@@ -133,81 +139,115 @@ void VariableScopeCorrectionContext::_processFunction(IRFunc* funcInst)
                 }
                 // traverse all uses of this instruction
                 debugPrint(0, getBlock(inst), "inst is defined in block", enableLog);
-                for (auto use = inst->firstUse; use; use=use->nextUse)
-                {
-                    uint32_t indent = 0;
-                    debugPrint(indent++, getBlock(use->getUser()), "inst's use block is", enableLog);
-                    if (auto userBlock = getBlock(use->getUser()))
-                    {
-                        // If the use site of this instruction is dominated by the break block, it means that the
-                        // instruction is used after the break block, so we need to make that instruction available globally.
-                        // By doing so, we record all the users of this instructions.
-                        for(auto loopHeader : *loopHeaderList)
-                        {
-                            auto breakBlock = loopHeader->getBreakBlock();
-                            if (dominatorTree->dominates(breakBlock, userBlock))
-                            {
-                                debugPrint(indent, block, "inst is defined in loop but used outside of loop", enableLog);
-                                instList.add(use->getUser());
-                                break;
-                            }
-                        }
-                    }
-                }
-                if (instList.getCount() > 0)
-                {
-                    workListMap.add(inst, instList);
-                }
+                workList.add(inst);
             }
         }
     }
 
-    if (workListMap.getCount() == 0)
-    {
-        return;
-    }
-
-    debugPrint(0, nullptr, "", enableLog);
-    _processInstructions(funcInst, workListMap);
-}
-
-void VariableScopeCorrectionContext::_processInstructions(IRFunc* funcInst, const Dictionary<IRInst*, List<IRInst*>>& workListMap)
-{
-    bool enableLog = false;
-
-    // The first instruction in the function is the parameter list, so we need to skip it.
     auto instAfterParam = funcInst->getFirstBlock()->getFirstChild();
     while(instAfterParam->getOp() == kIROp_Param)
     {
         instAfterParam = instAfterParam->getNextInst();
     }
 
-    for(auto it = workListMap.begin(); it != workListMap.end(); it++)
+    // for(auto inst: workList)
+    for(auto it = workList.begin(); it != workList.end(); it++)
     {
-        auto inst = it->first;
-        auto list = it->second;
-        debugPrint(0, inst, "inst", enableLog);
-        bool isStoable = _isStorableInst(inst);
-
-        for(auto user : list)
+        auto inst = *it;
+        if (auto loopHeaderList = loopHeaderMap.tryGetValue(getBlock(inst)))
         {
-            debugPrint(1, user, "The user", enableLog);
-            if(isStoable)
+            for (auto use = inst->firstUse; use; use=use->nextUse)
             {
-                _processStorableInst(instAfterParam, inst, user);
-            }
-            else
-            {
-                _processUnstorableInst(instAfterParam, inst, user);
+                _processInstruction(dominatorTree, instAfterParam, inst, use->getUser(), *loopHeaderList, workList);
             }
         }
     }
+
+
+    debugPrint(0, nullptr, "", enableLog);
 }
 
-// For unstorable instructions, we need to duplicate the instruction right before the use site.
-// For the operands of the instruction, if the operand is in the same block as the instruction,
-// we need to declare a new variable at the beginning of the function
-void VariableScopeCorrectionContext::_processUnstorableInst(IRInst* insertLoc, IRInst* inst, IRInst* user)
+// Check if the instruction is used outside of the loop.
+// The loopHeaderList contains all the loop headers where the original instruction is defined.
+// So we if the block of the user instruction is dominated by the break block of the loop header,
+// it means that it was out of the loop, so it's out of the scope of the loop.
+// Note the reason we use the loopHeaderList is because there could be nested loops, so we need to
+// check all the loop headers from inner to outer.
+bool VariableScopeCorrectionContext::_isOutOfScopeUse(IRInst * userInst, IRDominatorTree* domTree, const List<IRLoop*>& loopHeaderList)
+{
+    if (auto block = getBlock(userInst))
+    {
+        // If the use site of this instruction is dominated by the break block, it means that the
+        // instruction is used after the break block, so we need to make that instruction available globally.
+        // By doing so, we record all the users of this instructions.
+        for(auto loopHeader : loopHeaderList)
+        {
+            auto breakBlock = loopHeader->getBreakBlock();
+            if (domTree->dominates(breakBlock, block))
+            {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+IRInst* VariableScopeCorrectionContext::_processInstruction(IRDominatorTree* dominatorTree, IRInst* instAfterParam,
+        IRInst* originInst, IRInst* useInst, const List<IRLoop*>& loopHeaderList, const HashSet<IRInst*> workList)
+{
+    // For a given instruction, we need to check all the users of this instruction to see
+    // if the user is out of the scope of the loop. If so, we need to make the instruction available globally.
+    // In addition, we have to recursively check all the operands of this instruction to see if they are also
+    // out of the scope of the loop.
+
+    // Check if the user of this instruction is out of the scope of the loop
+    if(_isOutOfScopeUse(useInst, dominatorTree, loopHeaderList))
+    {
+        bool isStoable = _isStorableInst(originInst);
+        IRInst* newInst = nullptr;
+        if(isStoable)
+        {
+            newInst = _processStorableInst(instAfterParam, originInst, useInst);
+        }
+        else
+        {
+            // duplicate the instruction right before the use site.
+            newInst = _processUnstorableInst(originInst, useInst);
+            // When we duplicate the out-of-scope instruction, the side-effect is that the operands of the instruction
+            // could also be out of the scope. So we have to recursively check all the operands of the instruction. Such
+            // issue dooesn't happen for the storable instruction because we store the result of the instruction in a new
+            // variable visible in the whole function.
+            UInt operandCount = newInst->getOperandCount();
+            for (UInt i = 0; i < operandCount; i++)
+            {
+                auto operand = newInst->getOperand(i);
+
+                // workList contains all the instructions in the loop region, so if the operands in the list, then we have to
+                // handle the operand as well
+                if (workList.contains(operand))
+                {
+                    // Recursively check all the operands
+                    // Now the newly inserted inst is the user of the operand, so we pass 'operand' as the origin instruction, and
+                    // 'newInst' as the user instruction.
+                    if (auto newOperand = _processInstruction(dominatorTree, instAfterParam, operand, newInst, loopHeaderList, workList))
+                    {
+                        // Replace the operand with the new instruction
+                        newInst->setOperand(i, newOperand);
+                    }
+                }
+            }
+        }
+        // Replace the operands of user with the new instruction
+        _replaceOperand(useInst, originInst, newInst);
+        return newInst;
+    }
+    return nullptr;
+}
+
+// 1. Duplicate the original instruction
+// 2. Insert the duplicated instruction right before the use site
+// 3. return the load instruction
+IRInst* VariableScopeCorrectionContext::_processUnstorableInst(IRInst* inst, IRInst* user)
 {
     IRCloneEnv cloneEnv;
     m_builder.setInsertBefore(user);
@@ -216,39 +256,14 @@ void VariableScopeCorrectionContext::_processUnstorableInst(IRInst* insertLoc, I
     auto clonedInst = cloneInst(&cloneEnv, &m_builder, inst);
     clonedInst->insertAt(IRInsertLoc::before(user));
 
-    // take care the operands of the duplicated instruction because they could also be invisible at use site
-    SlangUInt operandCount = inst->getOperandCount();
-    for (SlangUInt i = 0; i < operandCount; i++)
-    {
-        auto operand = inst->getOperand(i);
-
-        // if the operand is the same block as the instruction, we need special handling for the operand
-        // because the operand is still not available in the block where the instruction is used.
-        if (getBlock(operand) == getBlock(inst))
-        {
-            // 1. Add a store instruction after this operand, e.g.: store(dstPtr, operand)
-            // 2. Declare the dstPtr at beginning of the function, so it's globally available
-            // 3. Replace the operand with the dstPtr
-            if (auto type = operand->getDataType())
-            {
-                m_builder.setInsertBefore(insertLoc);
-                auto dstPtr = m_builder.emitVar(type);
-
-                m_builder.setInsertAfter(operand);
-                m_builder.emitStore(dstPtr, operand);
-
-                clonedInst->setOperand(i, dstPtr);
-            }
-        }
-    }
-
-    // last, because the user is still referencing the original instruction, we need to
-    // replace operands in the use site instruction with the cloned instruction
-    _replaceOperand(user, inst, clonedInst);
+    return clonedInst;
 }
 
-// For storable instructions, we don't want to duplicate it at use site, so we just need to store the result after the instruction
-void VariableScopeCorrectionContext::_processStorableInst(IRInst* insertLoc, IRInst* inst, IRInst* user)
+// 1. Declare a new variable at the beginning of the function
+// 2. Insert a store instruction after the original instruction
+// 3. Insert a load instruction before the use site
+// 3. return the load instruction
+IRInst* VariableScopeCorrectionContext::_processStorableInst(IRInst* insertLoc, IRInst* inst, IRInst* user)
 {
     auto type = inst->getDataType();
     // store instruction must have a result type
@@ -267,7 +282,8 @@ void VariableScopeCorrectionContext::_processStorableInst(IRInst* insertLoc, IRI
     // Simply replace any operand with pointer could generate error code.
     m_builder.setInsertBefore(user);
     auto loadInst = m_builder.emitLoad(dstPtr->getDataType(), dstPtr);
-    _replaceOperand(user, inst,  loadInst);
+
+    return loadInst;
 }
 
 void  VariableScopeCorrectionContext::_replaceOperand(IRInst* inst, IRInst* oldOperand, IRInst* newOperand)
