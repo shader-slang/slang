@@ -2094,6 +2094,18 @@ struct SPIRVEmitContext
             return false;
         }
     }
+    void emitSystemVarDecoration(IRInst* var, SpvInst* varInst)
+    {
+        for (auto decor : var->getDecorations())
+        {
+            switch (decor->getOp())
+            {
+            case kIROp_GLSLPrimitivesRateDecoration:
+                emitOpDecorate(getSection(SpvLogicalSectionID::Annotations), decor, varInst, SpvDecorationPerPrimitiveEXT);
+                break;
+            }
+        }
+    }
 
     void emitVarLayout(IRInst* var, SpvInst* varInst, IRVarLayout* layout)
     {
@@ -2256,6 +2268,7 @@ struct SPIRVEmitContext
         }
         if (auto systemValInst = maybeEmitSystemVal(param))
         {
+            emitSystemVarDecoration(param, systemValInst);
             registerInst(param, systemValInst);
             return systemValInst;
         }
@@ -3835,9 +3848,9 @@ struct SPIRVEmitContext
                             {
                                 switch (entryPointDecor->getProfile().getStage())
                                 {
+                                case Stage::Mesh:
                                 case Stage::Geometry:
                                 case Stage::Intersection:
-                                case Stage::Mesh:
                                 case Stage::Amplification:
                                 case Stage::AnyHit:
                                 case Stage::ClosestHit:
