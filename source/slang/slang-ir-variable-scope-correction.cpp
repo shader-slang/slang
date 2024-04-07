@@ -27,7 +27,7 @@ struct VariableScopeCorrectionContext
     IRInst* _processStorableInst(IRInst* insertLoc, IRInst* inst, IRInst* user);
 
     void _replaceOperand(IRInst* inst, IRInst* oldOperand, IRInst* newOperand);
-    bool _isStorableInst(IRInst* inst);
+    bool _isStorableType(IRType* inst);
     bool _isOutOfScopeUse(IRInst* inst, IRDominatorTree* domTree, const List<IRLoop*>& loopHeaderList);
 
     IRModule* m_module;
@@ -203,7 +203,7 @@ IRInst* VariableScopeCorrectionContext::_processInstruction(IRDominatorTree* dom
     // Check if the user of this instruction is out of the scope of the loop
     if(_isOutOfScopeUse(useInst, dominatorTree, loopHeaderList))
     {
-        bool isStoable = _isStorableInst(originInst);
+        bool isStoable = _isStorableType(originInst->getDataType());
         IRInst* newInst = nullptr;
         if(isStoable)
         {
@@ -281,7 +281,7 @@ IRInst* VariableScopeCorrectionContext::_processStorableInst(IRInst* insertLoc, 
     // Note, because "dstPtr" is a pointer type, we have to insert a load(dstPtr) instruction before use it.
     // Simply replace any operand with pointer could generate error code.
     m_builder.setInsertBefore(user);
-    auto loadInst = m_builder.emitLoad(dstPtr->getDataType(), dstPtr);
+    auto loadInst = m_builder.emitLoad(type, dstPtr);
 
     return loadInst;
 }
@@ -303,21 +303,29 @@ void  VariableScopeCorrectionContext::_replaceOperand(IRInst* inst, IRInst* oldO
     }
 }
 
-bool VariableScopeCorrectionContext::_isStorableInst(IRInst* inst)
+bool VariableScopeCorrectionContext::_isStorableType(IRType* type)
 {
-    auto type = inst->getDataType();
+    if (!type)
+        return false;
 
-    // If the instruction has a result, and the result is not a void type, we consider it as a storable instruction
-    if (type)
-    {
-        // Take care of pointer type, because we can't store a pointer type, so pointer type is regarded as a non-storable instruction
-        if (type->getOp() == kIROp_PtrType)
-        {
-            return false;
-        }
+    if (as<IRBasicType>(type))
         return true;
+
+    switch(type->getOp())
+    {
+        case kIROp_VectorType:
+        case kIROp_MatrixType:
+        case kIROp_StructType:
+            return true;
+        case kIROp_ArrayType:
+        case kIROp_UnsizedArrayType:
+            if (auto arrayType = as<IRArrayTypeBase>(type))
+                return _isStorableType(arrayType->getElementType());
+            else
+                return false;
+        default:
+            return false;
     }
-    return false;
 }
 
 } // anonymous
