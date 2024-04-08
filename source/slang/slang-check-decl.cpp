@@ -9308,8 +9308,161 @@ namespace Slang
             this, funcDecl, attr, DeclAssociationKind::PrimalSubstituteFunc);
     }
 
+    static int32_t findLevelsOfInheritance(AggTypeDecl* decl, int32_t inheritanceLevel, List<AggTypeDecl*>& linearInheritanceHierarchy)
+    {
+        // We need to assume multiple `InheritanceDecl` are possible per `decl` member list.
+        int32_t inheritanceDepth = inheritanceLevel;
+        for (auto maybeInheritance : decl->members)
+        {
+            auto inheritance = as<InheritanceDecl>(maybeInheritance);
+            if (!inheritance)
+                continue;
+            auto isValidInheritance = as<DeclRefType>(inheritance->base.type);
+            if (!isValidInheritance || !isValidInheritance->getDeclRef())
+                continue;
+            auto isInherited = as<AggTypeDecl>(isValidInheritance->getDeclRef().getDecl());
+            if (!isInherited)
+                continue;
+            linearInheritanceHierarchy.add(isInherited);
+            int32_t depthFound = findLevelsOfInheritance(isInherited, inheritanceLevel-1, linearInheritanceHierarchy);
+            if (depthFound < inheritanceDepth)
+                inheritanceDepth = depthFound;
+        }
+        return inheritanceDepth;
+    }
+
     void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
     {
+        List<AggTypeDecl*> linearInheritanceHierarchy;
+        linearInheritanceHierarchy.add(structDecl);
+        int32_t levelsOfInheritance = findLevelsOfInheritance(structDecl, 0, linearInheritanceHierarchy);
+
+        List<ConstructorDecl*> ctorList;
+        bool fillCtorList = false;
+
+        auto findAllCtor = [&]() {
+            ConstructorDecl* ctorDefault = nullptr;
+            fillCtorList = true;
+            for (auto maybeCtor : structDecl->members)
+            {
+                auto ctor = as<ConstructorDecl>(maybeCtor);
+                if (!ctor)
+                    continue;
+                ctorList.add(ctor);
+
+                // It is possible BlockStmt has a child with the type of
+                // `ExpressionStmt` if an existing constructor has only 1
+                // expression. This would be a senario we need to
+                // put the `ExpressionStmt` inside a `SeqStmt`.
+                // Since we found an init expression, we need to ensure
+                // we are adding to a constructor which can handle multiple
+                // statments since we will be adding `init` expressions to
+                // the constructor.
+                auto block = as<BlockStmt>(ctor->body);
+                if (!as<SeqStmt>(block->body))
+                {
+                    auto tmpExpr = block->body;
+                    auto seqStmt = m_astBuilder->create<SeqStmt>();
+                    seqStmt->stmts.add(tmpExpr);
+                    block->body = seqStmt;
+                }
+                if (ctor->getParameters().getCount() != 0)
+                    continue;
+                ctorDefault = ctor;
+            }
+            if (!ctorDefault)
+            {
+                ctorDefault = m_astBuilder->create<ConstructorDecl>();
+                auto ctorName = getName("$init");
+                ctorDefault->ownedScope = m_astBuilder->create<Scope>();
+                ctorDefault->ownedScope->containerDecl = ctorDefault;
+                ctorDefault->ownedScope->parent = getScope(structDecl);
+                ctorDefault->parentDecl = structDecl;
+                ctorDefault->loc = structDecl->loc;
+                ctorDefault->closingSourceLoc = ctorDefault->loc;
+                ctorDefault->nameAndLoc.name = ctorName;
+                ctorDefault->nameAndLoc.loc = ctorDefault->loc;
+                ctorDefault->returnType.type = calcThisType(makeDeclRef(structDecl));
+                auto body = m_astBuilder->create<BlockStmt>();
+                body->scopeDecl = m_astBuilder->create<ScopeDecl>();
+                body->scopeDecl->ownedScope = m_astBuilder->create<Scope>();
+                body->scopeDecl->ownedScope->parent = getScope(ctorDefault);
+                body->scopeDecl->parentDecl = ctorDefault;
+                body->scopeDecl->loc = ctorDefault->loc;
+                body->scopeDecl->closingSourceLoc = ctorDefault->loc;
+                body->closingSourceLoc = ctorDefault->closingSourceLoc;
+                ctorDefault->body = body;
+                body->body = m_astBuilder->create<SeqStmt>();
+                structDecl->addMember(ctorDefault);
+                ctorList.add(ctorDefault);
+            }
+
+            // It is possible a struct is a child of another struct/related-type.
+            // Since we are creating a new constructor function, it is possible
+            // a parent and a child to both have `__init()` constructors.
+            // As a result, this can cause a compile error when relying on the default
+            // constructor of an object because a child can use a parent object's
+            // constructor.
+            // To solve this issue and produce C++ like behavior we need to add overload
+            // ranks if not present already to prioritize the default constructor of a child.
+            // If an overload rank is manually set, we cannot assume any preference of
+            // constructor by the user and should ignore any special logic.
+            if (ctorDefault->findModifier<OverloadRankAttribute>())
+                return;
+            auto overloadRank = m_astBuilder->create<OverloadRankAttribute>();
+            overloadRank->rank = -levelsOfInheritance;
+            addModifier(ctorDefault, overloadRank);
+        };
+
+        // To follow C++ constructor behavior when adding a init expression to a member
+        // variable we must insert init expressions to the start of all constructors.
+        // Furthermore, to follow C++ behavior we must also ensure we use init expressions
+        // of all accessable parent member variables.
+        Dictionary<Decl*, Expr*> cachedDeclToCheckedVar;
+        for (auto aggTypeDecl : linearInheritanceHierarchy)
+        for (auto m : aggTypeDecl->members)
+        {
+            auto varDeclBase = as<VarDeclBase>(m);
+            if (varDeclBase
+                && varDeclBase->initExpr)
+            {
+                if (!fillCtorList)
+                    findAllCtor();
+
+                for (auto ctor : ctorList)
+                {
+                    auto body = as<BlockStmt>(ctor->body);
+                    auto seqStmt = as<SeqStmt>(body->body);
+
+                    VarExpr* memberVarExpr = m_astBuilder->create<VarExpr>();
+                    memberVarExpr->scope = ctor->ownedScope;
+                    memberVarExpr->name = m->getName();
+                    memberVarExpr->type = nullptr;
+                    auto assign = m_astBuilder->create<AssignExpr>();
+                    assign->left = memberVarExpr;
+                    assign->right = varDeclBase->initExpr;
+                    auto stmt = m_astBuilder->create<ExpressionStmt>();
+                    stmt->expression = assign;
+
+                    Expr* checkedMemberVarExpr;
+                    if (cachedDeclToCheckedVar.containsKey(m))
+                        checkedMemberVarExpr = cachedDeclToCheckedVar[m];
+                    else
+                    {
+                        checkedMemberVarExpr = CheckTerm(memberVarExpr);
+                        cachedDeclToCheckedVar.add({ m, checkedMemberVarExpr });
+                    }
+                    if (!checkedMemberVarExpr->type.isLeftValue)
+                        continue;
+
+                    if (seqStmt->stmts.getCount() == 0)
+                        seqStmt->stmts.add(stmt);
+                    else
+                        seqStmt->stmts.insert(0, stmt);
+                }
+            }
+        }
+
         int backingWidth = 0;
         [[maybe_unused]]
         int totalWidth = 0;
