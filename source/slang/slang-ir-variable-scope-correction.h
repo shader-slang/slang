@@ -28,7 +28,7 @@ struct IRModule;
 ///    inside the loop block (block A), then check if these instructions are used after
 ///    the break block (block B). If so, we duplicate these instructions right before
 ///    their users such that we can make those instructions available globally.
-void applyVariableScopeCorrection(IRModule* module);
+void applyVariableScopeCorrection(IRModule* module, TargetRequest* targetReq);
 
 }
 

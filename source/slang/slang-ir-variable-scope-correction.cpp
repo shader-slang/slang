@@ -9,11 +9,14 @@
 namespace Slang
 {
 
+bool isCPUTarget(TargetRequest* targetReq);
+bool isCUDATarget(TargetRequest* targetReq);
+
 namespace { // anonymous
 struct VariableScopeCorrectionContext
 {
-    VariableScopeCorrectionContext(IRModule* module):
-        m_module(module), m_builder(module)
+    VariableScopeCorrectionContext(IRModule* module, TargetRequest* targetReq):
+        m_module(module), m_builder(module), m_targetReq(targetReq)
     {
     }
 
@@ -32,6 +35,7 @@ struct VariableScopeCorrectionContext
 
     IRModule* m_module;
     IRBuilder m_builder;
+    TargetRequest* m_targetReq;
 };
 
 void VariableScopeCorrectionContext::processModule()
@@ -50,46 +54,15 @@ void VariableScopeCorrectionContext::processModule()
     }
 }
 
-static void debugPrint(uint32_t indent, IRInst* inst, const char* message, bool enable)
-{
-    if (!enable)
-        return;
-
-    uint32_t debugid = 0;
-    for (uint32_t i = 0; i < indent; i++)
-    {
-        printf("    ");
-    }
-
-    if (inst) {
-#ifdef SLANG_ENABLE_IR_BREAK_ALLOC
-        debugid = inst->_debugUID;
-#endif
-    }
-
-    if (debugid != 0)
-        printf("%s, id: %d\n", message, debugid);
-    else
-        printf("\n");
-}
-
 void VariableScopeCorrectionContext::_processFunction(IRFunc* funcInst)
 {
     IRDominatorTree* dominatorTree = m_module->findOrCreateDominatorTree(funcInst);
-    Dictionary<IRInst*, List<IRInst*>> workListMap;
-
     HashSet<IRInst*> workList;
-
     Dictionary<IRBlock*, List<IRLoop*>> loopHeaderMap;
-
-    bool enableLog = false;
 
     // traverse all blocks in the function
     for (auto block : funcInst->getBlocks())
     {
-        uint32_t indent = 0;
-        debugPrint(indent++, block, "processing block", enableLog);
-
         // Traverse all the dominators of a given block to check whether this given block is in a loop region.
         // Loop region blocks are the blocks that are dominated by the loop header block
         // but not dominated by the loop break block.
@@ -97,20 +70,15 @@ void VariableScopeCorrectionContext::_processFunction(IRFunc* funcInst)
         List<IRLoop*> loopHeaderList;
         for (; dominatorBlock; dominatorBlock = dominatorTree->getImmediateDominator(dominatorBlock))
         {
-            debugPrint(indent++, dominatorBlock, "dominator block", enableLog);
-
             // Find if the block is loop header block
             if (auto loopHeader = as<IRLoop>(dominatorBlock->getTerminator()))
             {
-                debugPrint(indent, loopHeader, "loop header", enableLog);
                 // Get the break block of the loop and check if such block
                 auto breakBlock = loopHeader->getBreakBlock();
-                debugPrint(indent++, breakBlock, "break block", enableLog);
 
                 // Check if the current block is dominated by the break block. If so, it means that the block is in the loop region.
                 if (!dominatorTree->dominates(breakBlock, block))
                 {
-                    debugPrint(indent++, block, "block is not dominated by break block", enableLog);
                     loopHeaderList.add(loopHeader);
                 }
             }
@@ -123,7 +91,6 @@ void VariableScopeCorrectionContext::_processFunction(IRFunc* funcInst)
         return;
     }
 
-    debugPrint(0, nullptr, "", enableLog);
     // Traverse all the instructions in function.
     for (auto block : funcInst->getBlocks())
     {
@@ -138,7 +105,6 @@ void VariableScopeCorrectionContext::_processFunction(IRFunc* funcInst)
                     continue;
                 }
                 // traverse all uses of this instruction
-                debugPrint(0, getBlock(inst), "inst is defined in block", enableLog);
                 workList.add(inst);
             }
         }
@@ -150,7 +116,6 @@ void VariableScopeCorrectionContext::_processFunction(IRFunc* funcInst)
         instAfterParam = instAfterParam->getNextInst();
     }
 
-    // for(auto inst: workList)
     for(auto it = workList.begin(); it != workList.end(); it++)
     {
         auto inst = *it;
@@ -162,9 +127,6 @@ void VariableScopeCorrectionContext::_processFunction(IRFunc* funcInst)
             }
         }
     }
-
-
-    debugPrint(0, nullptr, "", enableLog);
 }
 
 // Check if the instruction is used outside of the loop.
@@ -262,7 +224,7 @@ IRInst* VariableScopeCorrectionContext::_processUnstorableInst(IRInst* inst, IRI
 // 1. Declare a new variable at the beginning of the function
 // 2. Insert a store instruction after the original instruction
 // 3. Insert a load instruction before the use site
-// 3. return the load instruction
+// 4. Return the load instruction
 IRInst* VariableScopeCorrectionContext::_processStorableInst(IRInst* insertLoc, IRInst* inst, IRInst* user)
 {
     auto type = inst->getDataType();
@@ -308,6 +270,10 @@ bool VariableScopeCorrectionContext::_isStorableType(IRType* type)
     if (!type)
         return false;
 
+    // C/CPP/CUDA can store any type.
+    if (isCPUTarget(m_targetReq) || isCUDATarget(m_targetReq))
+        return true;
+
     if (as<IRBasicType>(type))
         return true;
 
@@ -330,9 +296,9 @@ bool VariableScopeCorrectionContext::_isStorableType(IRType* type)
 
 } // anonymous
 
-void applyVariableScopeCorrection(IRModule* module)
+void applyVariableScopeCorrection(IRModule* module, TargetRequest* targetReq)
 {
-    VariableScopeCorrectionContext context(module);
+    VariableScopeCorrectionContext context(module, targetReq);
 
     context.processModule();
 }
